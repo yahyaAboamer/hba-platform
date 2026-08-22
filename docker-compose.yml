@@ -1,0 +1,18 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: hba
+      POSTGRES_PASSWORD: hba
+      POSTGRES_DB: hba_platform
+    ports:
+      - "5433:5432"
+    volumes:
+      - hba_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hba -d hba_platform"]
+      interval: 5s
+      retries: 10
+
+volumes:
+  hba_pgdata:
