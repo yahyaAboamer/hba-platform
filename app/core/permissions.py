@@ -55,14 +55,25 @@ ROLES: dict[str, frozenset[str]] = {
             Permission.AUDIT_VIEW,
         }
     ),
-    # Sara: records video and story counts. She needs nothing else, so she gets
-    # nothing else. Note that recording is separated from verifying — verified
-    # targets unlock a base guarantee, so the person entering the numbers must
-    # not also be the person approving them.
-    "target_recorder": frozenset(
+    # Sara: owns content and the affiliate roster day to day. Her job combines
+    # setting monthly requirements, recording what was published, verifying it,
+    # maintaining affiliate records, and setting compensation terms.
+    #
+    # Note deliberately, so it is not mistaken for an oversight: this role both
+    # verifies targets and manages compensation. Verification is what releases a
+    # base guarantee, so there is no second pair of eyes between setting a
+    # target, judging it met, and the money that follows. The business accepted
+    # this knowingly. Approving payroll and recording payments remain elsewhere,
+    # so the obligation and its settlement are still separate acts.
+    "content_manager": frozenset(
         {
             Permission.AFFILIATES_VIEW,
+            Permission.AFFILIATES_MANAGE,
+            Permission.COMPENSATION_MANAGE,
             Permission.TARGETS_RECORD,
+            Permission.TARGETS_MANAGE,
+            Permission.TARGETS_VERIFY,
+            Permission.AUDIT_VIEW,
         }
     ),
     # Affiliates reach their own portal by owning the record, not by holding a

@@ -4,10 +4,10 @@ Spec sections 5.1 and 6.3. Roles are defined in code so that every change to
 who can do what is version-controlled, reviewed, and covered by tests. These
 tests are that coverage.
 
-The target_recorder assertions matter most: an external review flagged that
-granting Sara full affiliate_manager access would let a content-tracking role
-alter compensation, payroll, and payments. The negative assertions below are
-what stop that regressing.
+The negative assertions matter most. Roles here are wide by design - the
+business chose that knowingly - so what these tests pin is the boundary that
+did NOT move: no role except admin can both decide an obligation and settle
+it.
 """
 
 import pytest
@@ -66,47 +66,50 @@ def test_affiliate_manager_cannot_change_platform_settings():
     assert has_permission("affiliate_manager", Permission.SETTINGS_MANAGE) is False
 
 
-# ── target_recorder (Sara) ─────────────────────────────────────────────────────
+# ── content_manager (Sara) ─────────────────────────────────────────────────────
 
 
-def test_target_recorder_can_do_its_job():
-    assert has_permission("target_recorder", Permission.TARGETS_RECORD) is True
-    assert has_permission("target_recorder", Permission.AFFILIATES_VIEW) is True
+def test_content_manager_owns_content_and_the_affiliate_roster():
+    """Sara's job combines several concerns, so the role does too."""
+    for granted in (
+        Permission.AFFILIATES_VIEW,
+        Permission.AFFILIATES_MANAGE,
+        Permission.COMPENSATION_MANAGE,
+        Permission.TARGETS_RECORD,
+        Permission.TARGETS_MANAGE,
+        Permission.TARGETS_VERIFY,
+        Permission.AUDIT_VIEW,
+    ):
+        assert has_permission("content_manager", granted) is True
 
 
-def test_target_recorder_has_no_financial_authority():
-    """The whole reason this role exists.
+def test_content_manager_cannot_approve_payroll_or_move_money():
+    """The boundary that still holds.
 
-    Sara records video and story counts. She needs nothing else, and the audit
-    trail is only meaningful when access is minimal.
+    This role sets compensation and verifies targets, so it decides what is
+    owed. It cannot approve a month, reopen an approved one, or record a
+    payment - so deciding an obligation and settling it stay separate acts,
+    performed by different people.
     """
     for forbidden in (
-        Permission.COMPENSATION_MANAGE,
         Permission.PAYROLL_APPROVE,
         Permission.PAYROLL_REOPEN,
         Permission.PAYMENTS_RECORD,
-        Permission.INVITATIONS_SEND,
-        Permission.AFFILIATES_MANAGE,
-        Permission.TARGETS_MANAGE,
-        Permission.TARGETS_VERIFY,
-        Permission.SETTINGS_MANAGE,
-        Permission.AUDIT_VIEW,
     ):
-        assert has_permission("target_recorder", forbidden) is False
+        assert has_permission("content_manager", forbidden) is False
 
 
-def test_target_recorder_cannot_verify_its_own_recordings():
-    """Separation of duties: recording and verifying are different people.
-
-    Verification is what unlocks a base guarantee, so the person entering the
-    numbers must not also be the person approving them.
-    """
-    assert has_permission("target_recorder", Permission.TARGETS_RECORD) is True
-    assert has_permission("target_recorder", Permission.TARGETS_VERIFY) is False
+def test_content_manager_cannot_grant_access_to_others():
+    assert has_permission("content_manager", Permission.INVITATIONS_SEND) is False
 
 
-def test_target_recorder_is_strictly_smaller_than_affiliate_manager():
-    assert permissions_for("target_recorder") < permissions_for("affiliate_manager")
+def test_content_manager_cannot_change_platform_settings():
+    # Settings change everyone's numbers at once: go-live month, return window.
+    assert has_permission("content_manager", Permission.SETTINGS_MANAGE) is False
+
+
+def test_content_manager_is_strictly_smaller_than_admin():
+    assert permissions_for("content_manager") < permissions_for("admin")
 
 
 # ── affiliate ──────────────────────────────────────────────────────────────────
@@ -151,12 +154,33 @@ def test_permission_values_are_unique():
 
 
 def test_returned_permission_sets_cannot_be_mutated():
-    """A caller must not be able to grant itself a permission at runtime."""
-    granted = permissions_for("target_recorder")
+    """A caller must not be able to grant itself a permission at runtime.
+
+    Uses a real role deliberately. An unknown role returns an empty frozenset,
+    which is also immutable, so this test would still pass while asserting
+    nothing if the role name were stale.
+    """
+    granted = permissions_for("content_manager")
+    assert granted, "must exercise a real, non-empty role"
     with pytest.raises(AttributeError):
         granted.add(Permission.PAYMENTS_RECORD)  # type: ignore[attr-defined]
-    assert has_permission("target_recorder", Permission.PAYMENTS_RECORD) is False
+    assert has_permission("content_manager", Permission.PAYMENTS_RECORD) is False
+
+
+def test_no_test_references_a_role_that_does_not_exist():
+    """Guards against the stale-role-name trap this file just fell into.
+
+    permissions_for() returns an empty set for any unknown role, so a renamed
+    role leaves tests passing while silently checking nothing.
+    """
+    import pathlib
+    import re
+
+    source = pathlib.Path(__file__).read_text(encoding="utf-8")
+    referenced = set(re.findall(r'(?:permissions_for|has_permission)\(\s*"([a-z_]+)"', source))
+    unknown = referenced - VALID_ROLES
+    assert unknown == {"wizard"}, f"tests reference unknown roles: {unknown - {'wizard'}}"
 
 
 def test_the_four_expected_roles_exist_and_no_others():
-    assert VALID_ROLES == {"admin", "affiliate_manager", "target_recorder", "affiliate"}
+    assert VALID_ROLES == {"admin", "affiliate_manager", "content_manager", "affiliate"}
