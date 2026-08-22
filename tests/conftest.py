@@ -1,6 +1,8 @@
 """Shared test fixtures."""
 
 import pytest
+from alembic import command
+from alembic.config import Config
 from sqlalchemy import text
 
 from app.db import SessionLocal, engine
@@ -11,7 +13,8 @@ def db():
     """A session wrapped in a transaction that is always rolled back.
 
     Tests using this fixture never leave rows behind, so they can run in any
-    order and cannot interfere with each other.
+    order and cannot interfere with each other. This is the default: prefer it
+    to anything that commits.
     """
     connection = engine.connect()
     transaction = connection.begin()
@@ -31,13 +34,25 @@ def db():
 
 
 @pytest.fixture()
-def clean_tables():
-    """Truncate identity tables. Only for tests that need real commits."""
+def fresh_database():
+    """Rebuild the schema from scratch.
+
+    Only for tests that genuinely need committed state and an empty database -
+    chiefly the bootstrap endpoint, which by definition only works when no
+    account exists.
+
+    The obvious approach, TRUNCATE, does not work and should not. audit_event
+    is append-only and refuses TRUNCATE, and truncating user_account cascades
+    into it. That is the guard doing its job: an audit trail you can wipe is
+    not an audit trail. So the schema is dropped and migrated again, which is
+    the honest way to get an empty database and also proves the migrations
+    build correctly from nothing on every run.
+    """
     with engine.begin() as connection:
-        connection.execute(
-            text(
-                "TRUNCATE invitation, auth_session, role_assignment, user_account "
-                "RESTART IDENTITY CASCADE"
-            )
-        )
+        connection.execute(text("DROP SCHEMA public CASCADE"))
+        connection.execute(text("CREATE SCHEMA public"))
+
+    config = Config("alembic.ini")
+    command.upgrade(config, "head")
+
     yield
