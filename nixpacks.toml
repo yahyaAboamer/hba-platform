@@ -1,0 +1,19 @@
+# One service builds both halves: Python for the API, Node to compile the
+# frontend into app/web, which FastAPI then serves.
+
+[phases.setup]
+nixPkgs = ["python312", "nodejs_22"]
+
+[phases.install]
+cmds = [
+  "python -m venv --copies /opt/venv && . /opt/venv/bin/activate && pip install -e .",
+  "cd frontend && npm ci",
+]
+
+[phases.build]
+cmds = ["cd frontend && npm run build"]
+
+# Migrations run at start, so a deploy that cannot migrate fails its health
+# check rather than serving a half-migrated database.
+[start]
+cmd = ". /opt/venv/bin/activate && alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT"
