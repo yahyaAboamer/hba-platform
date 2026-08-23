@@ -1,0 +1,12 @@
+.venv/
+.git/
+__pycache__/
+*.py[cod]
+tests/
+docs/
+frontend/node_modules/
+app/web/
+*.log
+.env
+.pytest_cache/
+*.egg-info/
