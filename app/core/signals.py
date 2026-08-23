@@ -1,0 +1,73 @@
+"""Things that did not break, but might.
+
+The platform prevents failures constantly: a duplicate webhook is ignored, an
+enormous error message is truncated, a job is retried. Prevented *silently*,
+each one teaches nobody anything - and when something finally does break, the
+run-up to it is invisible.
+
+Every prevented failure is reported here, in one shape, so that:
+
+- it is greppable in the logs by a single token, ``ANOMALY``
+- the set of things that can be reported is enumerable (see ``Anomaly``)
+- there is one place to attach the operational view to, later, rather than
+  thirty scattered ``logger.warning`` calls with thirty different formats
+
+**Reporting is not an error path.** It must never raise, never change what the
+caller does, and never fail the operation being performed. Something that
+should stop the operation is an exception, not an anomaly.
+
+Each name here should also appear in ``docs/limits.md``, which explains what the
+failure looks like from outside and what to do about it.
+"""
+
+import logging
+from typing import Any
+
+logger = logging.getLogger("hba.anomaly")
+
+
+class Anomaly:
+    """The catalogue of prevented failures.
+
+    A name is added here *with* an entry in docs/limits.md. A log line nobody
+    can look up is only marginally better than no log line.
+    """
+
+    #: A webhook arrived twice under the same id but with different content.
+    #: Deduplication ignored the second, which is right, but the two bodies
+    #: disagreeing means one of our assumptions about the sender is wrong.
+    EVENT_CONTENT_CHANGED = "event_content_changed"
+
+    #: An error message exceeded the column and was cut down. The failure is
+    #: still recorded; part of the detail is not.
+    ERROR_TRUNCATED = "error_truncated"
+
+    #: A job exhausted its retries. The work did not happen and will not be
+    #: attempted again without someone acting.
+    JOB_GAVE_UP = "job_gave_up"
+
+    #: A job was found with an expired lease - the worker holding it died
+    #: mid-flight. Reclaiming is normal; a lot of reclaiming is not.
+    LEASE_RECLAIMED = "lease_reclaimed"
+
+    #: Work was queued for something already queued, and was absorbed.
+    #: Expected in ordinary operation; a flood of it means a sender is looping.
+    WORK_DEDUPLICATED = "work_deduplicated"
+
+
+def report(anomaly: str, **context: Any) -> None:
+    """Record that something was prevented. Never raises.
+
+    Emits one line per occurrence:
+
+        ANOMALY event_content_changed source=shopify external_id=evt-3
+
+    Context values are rendered with ``repr`` so an empty string or a None is
+    distinguishable from a missing key. **Never pass a credential, a token or a
+    customer's details** - this goes to the log, which is not a private place.
+    """
+    try:
+        detail = " ".join(f"{key}={value!r}" for key, value in sorted(context.items()))
+        logger.warning("ANOMALY %s %s", anomaly, detail)
+    except Exception:  # pragma: no cover - reporting must never break a caller
+        logger.warning("ANOMALY %s <context unrenderable>", anomaly)
