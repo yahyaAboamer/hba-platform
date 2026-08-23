@@ -29,6 +29,13 @@ def ready() -> dict:
     # Reported, never enforced: the platform is healthy without Shopify, it
     # simply cannot sync. Surfacing it here means an operator sees a missing
     # credential immediately rather than inferring it from an empty order list.
-    checks["shopify"] = {"ok": True, "configured": settings.shopify_configured}
+    # webhooks_configured is separate from configured: the API credentials can
+    # be perfectly good while the webhook secret is missing, in which case every
+    # delivery is rejected with a 401 and orders quietly stop arriving.
+    checks["shopify"] = {
+        "ok": True,
+        "configured": settings.shopify_configured,
+        "webhooks_configured": bool(settings.shopify_webhook_secret),
+    }
     ready_now = all(check.get("ok") for check in checks.values())
     return {"status": "ready" if ready_now else "not_ready", "checks": checks}

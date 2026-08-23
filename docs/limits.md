@@ -180,13 +180,16 @@ Token exchange fails, every sync job fails visibly, and the operational view
 shows it. The client reports the scopes Shopify grants, so a **missing scope is
 named rather than surfacing as an opaque permission error** (ADR 0015).
 
-### 🟠 The webhook secret changes *(planned)*
+### 🟠 The webhook secret changes or goes missing
 
 Every webhook fails signature verification and is rejected with 401. **Nothing
 is recorded for a rejected webhook**, deliberately — otherwise anyone could fill
-the event table. Orders would then arrive only via the reconciliation sweep:
-correct, but delayed, and with no loud signal. Worth an alert if the rejection
-rate rises.
+the append-only event table. Orders would then arrive only via the
+reconciliation sweep: correct, but delayed.
+
+**Now signalled** rather than silent: each rejection reports `webhook_rejected`,
+and `/api/health/ready` reports `shopify.webhooks_configured` so a missing
+secret is visible without waiting for a delivery to fail.
 
 ### 🟢 Shopify deletes an order *(planned)*
 
@@ -283,6 +286,34 @@ tries again after the poll interval.
 continuous stream means the database is down or the connection pool is
 exhausted, and **no background work is happening at all** — orders will not be
 syncing.
+
+### `webhook_rejected`
+
+A webhook failed signature verification and was refused with a 401. **Nothing is
+recorded for it** — `integration_event` is append-only and cannot be pruned, so
+anyone able to write to it could fill the database permanently. This log line is
+the only trace the request ever existed, and it deliberately contains nothing
+from the body, which is unverified input.
+
+*What to do:* check `secret_configured` in the line. If it is `False`, the
+platform has no webhook secret and **is rejecting every delivery** — orders are
+not arriving. If it is `True`, either Shopify's secret was rotated without
+updating `SHOPIFY_WEBHOOK_SECRET`, or something other than Shopify is posting to
+the endpoint. `/api/health/ready` reports `webhooks_configured` for the first
+case.
+
+Occasional single rejections from internet noise are normal for a public
+endpoint. A steady stream that coincides with orders going missing is not.
+
+### `webhook_unusable`
+
+A webhook verified and was recorded, but nothing could be done with it: an order
+topic whose payload does not name an order.
+
+*What to do:* this means the payload is not the shape the code assumes — either
+Shopify changed it, or a topic was subscribed to that does not carry an order.
+The receipt is in `integration_event` with its topic; compare against
+`ORDER_TOPICS` and `order_id_from` in `app/services/shopify/webhooks.py`.
 
 ### `event_content_changed`
 
