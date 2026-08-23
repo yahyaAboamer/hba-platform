@@ -8,6 +8,13 @@ from sqlalchemy import text
 from app.db import SessionLocal, engine
 
 
+@pytest.fixture(scope="session", autouse=True)
+def _clean_session_start():
+    """Guarantee the first test of the session meets an empty database."""
+    _rebuild_schema()
+    yield
+
+
 @pytest.fixture()
 def db():
     """A session wrapped in a transaction that is always rolled back.
@@ -48,11 +55,19 @@ def fresh_database():
     the honest way to get an empty database and also proves the migrations
     build correctly from nothing on every run.
     """
+    yield
+    # Rebuild on the way out, not the way in. Every test that commits uses this
+    # fixture and cleans up after itself, so the next one always starts clean -
+    # and the session-scoped fixture below guarantees the first one does too.
+    # Rebuilding at both ends would double the cost for no extra safety.
+    #
+    # Committed rows leaking into a later test file is not hypothetical: it
+    # happened, and failed two identity tests on a unique email constraint.
+    _rebuild_schema()
+
+
+def _rebuild_schema() -> None:
     with engine.begin() as connection:
         connection.execute(text("DROP SCHEMA public CASCADE"))
         connection.execute(text("CREATE SCHEMA public"))
-
-    config = Config("alembic.ini")
-    command.upgrade(config, "head")
-
-    yield
+    command.upgrade(Config("alembic.ini"), "head")
