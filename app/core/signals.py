@@ -70,6 +70,21 @@ class Anomaly:
     #: deleted one; the answer to "why is this order not on the dashboard?".
     ORDER_NOT_FOUND = "order_not_found"
 
+    #: Lines in a bulk export that could not be read or understood. The rest
+    #: of the import went ahead; these orders are simply not in it.
+    IMPORT_LINE_SKIPPED = "import_line_skipped"
+
+    #: A bulk import finished having matched no orders at all.
+    IMPORT_EMPTY = "import_empty"
+
+    #: A reconciliation sweep stopped before reading the whole window, so the
+    #: tail of it went unchecked this time round.
+    RECONCILE_TRUNCATED = "reconcile_truncated"
+
+    #: The worker could not queue its recurring work. Ordinary jobs still run;
+    #: the reconciliation sweep and the prune do not until this clears.
+    SCHEDULE_TOP_UP_FAILED = "schedule_top_up_failed"
+
     #: Work was queued for something already queued, and was absorbed.
     #: Expected in ordinary operation; a flood of it means a sender is looping.
     WORK_DEDUPLICATED = "work_deduplicated"

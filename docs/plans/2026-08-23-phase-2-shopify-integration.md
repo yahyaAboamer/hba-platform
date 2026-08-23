@@ -3012,6 +3012,11 @@ git commit -m "feat: bulk historical import and reconciliation sweep"
   - `GET /api/operations/failed-jobs` — visible failures
   - `GET /api/operations/unregistered-codes` — codes in use, owned by nobody
   - `POST /api/operations/verify-code` — the Phase 3 onboarding gate
+  - `POST /api/operations/start-import` — **added after Task 7.** The bulk
+    import mechanism has no trigger: nothing queues a `shopify_bulk_import`
+    job, so the historical load back to 1 January 2026 cannot actually be run.
+    It belongs here, with the rest of the permission-gated operational
+    endpoints, rather than as a row inserted by hand.
 
 - [ ] **Step 1: Write the failing verification test**
 
