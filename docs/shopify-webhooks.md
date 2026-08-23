@@ -120,6 +120,11 @@ The platform does not depend on them for correctness. Webhooks make sync
 *prompt*; the reconciliation sweep makes it *complete*. If deliveries stop
 entirely, orders still arrive — late, in a batch, rather than within seconds.
 
+Concretely: **every 30 minutes the worker re-reads every order Shopify says was
+updated in the last 48 hours.** A missed webhook costs a delay of up to half an
+hour, not a missing order. The sweep is what closes a deploy window, a dropped
+delivery, or a rotated secret nobody noticed.
+
 That is deliberate. A webhook is a delivery mechanism, not a source of truth,
 and building on the assumption that every one arrives is how a missed delivery
 becomes a missing month of commission.

@@ -43,6 +43,9 @@ class JobKind:
     """
 
     SYNC_ORDER = "shopify_sync_order"
+    BULK_IMPORT = "shopify_bulk_import"
+    RECONCILE = "shopify_reconcile"
+    PRUNE_JOBS = "prune_succeeded_jobs"
 
 
 class PermanentFailure(Exception):

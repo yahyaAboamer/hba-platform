@@ -25,6 +25,7 @@ import asyncio
 import logging
 import os
 import socket
+import time
 from typing import Callable
 
 from sqlalchemy.orm import Session
@@ -140,6 +141,24 @@ def run_one(db: Session, worker_id: str) -> bool:
     return True
 
 
+#: How often to top up recurring work. Not the schedule itself - the intervals
+#: live in app.services.schedule - just how often we bother looking.
+SCHEDULE_CHECK_SECONDS = 60
+
+
+def top_up_schedule(db: Session) -> int:
+    """Queue recurring work that is not already outstanding.
+
+    Imported inside the function to keep the import graph acyclic: the schedule
+    names job kinds, whose handlers import this module to register themselves.
+    """
+    from app.services.schedule import ensure_scheduled
+
+    queued = ensure_scheduled(db)
+    db.commit()
+    return queued
+
+
 async def worker_loop() -> None:
     """Poll for work until cancelled.
 
@@ -148,9 +167,25 @@ async def worker_loop() -> None:
     """
     worker_id = worker_identity()
     logger.info("background worker %s started", worker_id)
+    next_schedule_check = 0.0
+
     while True:
         did_work = False
         try:
+            now = time.monotonic()
+            if now >= next_schedule_check:
+                # Set the next check before trying, so a failure waits a minute
+                # rather than retrying on every pass.
+                next_schedule_check = now + SCHEDULE_CHECK_SECONDS
+                try:
+                    with SessionLocal() as db:
+                        top_up_schedule(db)
+                except Exception:  # noqa: BLE001 - never stop running jobs over this
+                    # Running queued work matters more than topping up the
+                    # schedule. Failing here must not cost us both.
+                    logger.exception("could not top up the recurring schedule")
+                    report(Anomaly.SCHEDULE_TOP_UP_FAILED, worker_id=worker_id)
+
             with SessionLocal() as db:
                 did_work = run_one(db, worker_id)
         except asyncio.CancelledError:

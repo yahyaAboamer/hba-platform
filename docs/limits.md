@@ -59,9 +59,11 @@ the point. No stray script can do it.
 
 ### 🟠 Succeeded background jobs accumulate
 
-**The limit.** `background_job` keeps every completed job. `prune_succeeded_jobs`
-exists but **nothing calls it yet** — it needs a scheduled job, which arrives
-with the reconciliation sweep.
+**The limit.** `background_job` keeps every completed job.
+
+**Handled:** `prune_succeeded_jobs` runs daily from the schedule, removing
+succeeded jobs older than 30 days. **Failed jobs are never pruned** — they are
+the record that work did not happen.
 
 **What failure looks like.** Gradual slowdown of the lease query, then the same
 disk pressure as above. Much slower than `integration_event` — rows are small
@@ -233,6 +235,36 @@ synced on the next attempt. `PermanentFailure` is for causes only a person can
 resolve. Everything else — timeouts, throttling, network errors — must stay
 retryable.
 
+### 🟠 The bulk import outlives its lease
+
+**The limit.** Ingesting a year of orders can take longer than the 60-second
+lease. The lease then expires while the job is still running, and another
+worker may take it.
+
+**Why it is survivable now:** there is one worker, running one job at a time,
+so nothing else can claim it. And the ingest is idempotent, so a second run
+would waste time rather than double anything.
+
+**What would change that:** a second replica. Then two workers could ingest the
+same export at once — wasteful, not wrong, but `lease_reclaimed` would fire and
+the import would take twice as long. Raise the lease for this job before adding
+a replica.
+
+### 🟠 Recurring work stops silently
+
+**The limit.** Nothing external triggers the reconciliation sweep or the prune.
+They are queued by the worker itself, on a timer, and **if the worker stops so
+do they** — with no error, because nothing failed. Orders would still arrive by
+webhook, so the dashboard would look normal while the safety net was gone.
+
+**What failure looks like:** no `shopify_reconcile` rows appearing in
+`background_job` over a day. That is the thing to check when orders seem to be
+going missing.
+
+**Why it is built this way:** a scheduler process is a second thing to deploy,
+pay for, and monitor. `docs/limits.md` records the trade rather than the
+schedule pretending to be more reliable than it is.
+
 ### 🟠 A handler that is not idempotent
 
 Every handler must either upsert by Shopify id or be read-only, and must never
@@ -316,6 +348,45 @@ the order simply would not be there, with nothing anywhere explaining why.
 and this still fires, the id being asked for is wrong - check the webhook
 receipt's `entity_id` against the real order, particularly for a refund, where
 the payload's `id` is the refund and the order is in `order_id`.
+
+### `import_line_skipped`
+
+Lines in a bulk export that could not be read or understood. The rest of the
+import went ahead; **those orders are simply not in it**, which is why this is
+reported rather than counted quietly.
+
+*What to do:* compare `written` against Shopify's own `objectCount` in the
+import log line. A handful of skips is usually child objects. A large number
+means the export's shape is not what `normalise_order` expects — likely a
+Shopify API version change.
+
+### `import_empty`
+
+A bulk import completed having matched no orders at all.
+
+*What to do:* check the `since` date, and that the app has `read_all_orders` —
+plain `read_orders` reaches back only 60 days, so a January import against it
+returns nothing and reports exactly this.
+
+### `reconcile_truncated`
+
+A sweep stopped before reading its whole window: either it hit the page limit,
+or Shopify claimed another page and named no cursor. **The tail of the window
+went unchecked**, so an order updated in it may not be indexed.
+
+*What to do:* the next sweep covers an overlapping window, so a single
+occurrence usually self-corrects. Repeated `page limit` means the window holds
+more orders than 200 pages of 50 — shorten `since_hours` or raise `PAGE_SIZE`.
+
+### `schedule_top_up_failed`
+
+The worker could not queue its recurring work. **Ordinary jobs keep running** —
+webhooks still sync orders — but the reconciliation sweep and the prune do not
+until this clears.
+
+*What to do:* one of these around a database restart is expected; it retries a
+minute later. A continuous stream means the safety net is off while everything
+else looks healthy, which is the combination worth an alert.
 
 ### `webhook_rejected`
 
