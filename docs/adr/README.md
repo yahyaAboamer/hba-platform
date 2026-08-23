@@ -60,6 +60,7 @@ what was chosen.
 | [0018](0018-content-manager-scope.md) | content_manager holds wide, overlapping authority | Accepted, risk accepted |
 | [0019](0019-size-to-the-requirement.md) | Size to the requirement, and record the measurement | Accepted |
 | [0020](0020-receipts-store-a-digest.md) | Event receipts store a digest, not the payload | Accepted |
+| [0021](0021-lease-committed-before-work.md) | The worker commits the lease before running the handler | Accepted |
 
 See also [`../limits.md`](../limits.md) — the register of known limits and
 foreseeable failures, which records what will eventually break rather than what

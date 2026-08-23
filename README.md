@@ -31,12 +31,17 @@ python -m venv .venv
 # 3. Frontend
 cd frontend && npm ci && npm run build && cd ..
 
-# 4. Tests
+# 4. Tests  (one at a time - see below)
 ./.venv/Scripts/python.exe -m pytest -q
 
 # 5. Run it
 ./.venv/Scripts/python.exe -m uvicorn app.main:app --reload
 ```
+
+**Run only one pytest process at a time.** Some tests rebuild the schema with
+`DROP SCHEMA public CASCADE`, so a second concurrent run - or an `alembic`
+command against the same database - deadlocks against it. The failure looks
+unrelated to whatever you were changing.
 
 Open `http://127.0.0.1:8000`. On first run, create the administrator:
 

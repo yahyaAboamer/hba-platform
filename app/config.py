@@ -29,6 +29,16 @@ class Settings(BaseSettings):
     shopify_api_version: str = "2026-07"
     shopify_timeout_seconds: float = 20.0
 
+    # The worker runs inside the API process. With one replica that is simpler
+    # and cheaper than a second service, and because jobs are leased rather
+    # than assigned, splitting it out later needs no change to the queue.
+    worker_enabled: bool = True
+    # An idle poll is one indexed lookup against a partial index covering only
+    # pending and running rows - microseconds, roughly 43,000 times a day. That
+    # is cheaper than the moving parts of LISTEN/NOTIFY, and it caps the delay
+    # between a webhook arriving and its order syncing at two seconds.
+    worker_poll_seconds: float = 2.0
+
     @field_validator("database_url")
     @classmethod
     def _use_psycopg3(cls, value: str) -> str:
