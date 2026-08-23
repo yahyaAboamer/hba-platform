@@ -3,8 +3,19 @@
 Internal operations platform for HBA Aesthetics. V1 covers the affiliate
 commission and payroll module.
 
-- **Spec:** `docs/specs/2026-08-22-hba-platform-v1-design.md`
-- **Phase 1 plan:** `docs/plans/2026-08-22-phase-1-platform-foundation.md`
+## Where things are written down
+
+| | |
+|---|---|
+| **Why it is built this way** | [`docs/adr/`](docs/adr/README.md) — architecture decision records |
+| **What will eventually break** | [`docs/limits.md`](docs/limits.md) — known limits and foreseeable failures |
+| **What it does** | [`docs/specs/2026-08-22-hba-platform-v1-design.md`](docs/specs/2026-08-22-hba-platform-v1-design.md) |
+| **How it is being built** | [`docs/plans/`](docs/plans) — phase by phase |
+| **What changed and when** | the git history |
+
+Start with the ADRs. The code says what the system does; the ADRs say why, and
+they are the difference between a deliberate constraint and something that
+looks like a mistake.
 
 ## Local development
 
