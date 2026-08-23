@@ -33,7 +33,7 @@ from app.config import settings
 from app.core.signals import Anomaly, report
 from app.db import SessionLocal
 from app.models.integration import BackgroundJob
-from app.services.jobs import complete_job, fail_job, lease_job
+from app.services.jobs import PermanentFailure, complete_job, fail_job, lease_job
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +59,9 @@ def register_handler(kind: str):
       behind.
     - Raise to fail. The exception's type and message become ``last_error``, so
       make it say something a person can act on.
+    - Raise ``PermanentFailure`` when retrying cannot help - a missing
+      credential, a payload naming nothing. The job fails at once instead of
+      repeating the same failure four more times.
     - Be idempotent. A lease can expire and hand the same job to another
       worker, so running twice must be indistinguishable from running once.
     """
@@ -121,8 +124,15 @@ def run_one(db: Session, worker_id: str) -> bool:
     except Exception as exc:  # noqa: BLE001 - any failure must be recorded, not raised
         db.rollback()
         message = f"{type(exc).__name__}: {exc}"
-        logger.warning("job %s (%s) failed: %s", job_id, kind, message)
-        _record_failure(db, job_id, message, give_up=False)
+        permanent = isinstance(exc, PermanentFailure)
+        logger.warning(
+            "job %s (%s) failed%s: %s",
+            job_id,
+            kind,
+            " permanently" if permanent else "",
+            message,
+        )
+        _record_failure(db, job_id, message, give_up=permanent)
         return True
 
     complete_job(db, db.get(BackgroundJob, job_id))
