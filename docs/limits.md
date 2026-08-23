@@ -91,9 +91,16 @@ storage. Fine at current scale; revisit if affiliate numbers grow tenfold.
 Piastres in `bigint`. Maximum **E£92,233,720,368,547,760 in a single field** —
 not cumulative, not a count of orders. Unreachable.
 
-Recorded because the *previous* type matters: a 32-bit `integer` would cap a
-single order at **E£21,474,836.47**. A test stores a E£20 million order so that
-narrowing the column later fails loudly instead of silently truncating.
+**A 32-bit `integer` would cap a single field at E£21,474,836.47.** That is fine
+for a per-order column and *not* fine for an aggregate: a programme-wide annual
+total passes it in the first year. One money type is used everywhere so the
+distinction never has to be got right — measured at 2 MB over five years
+(ADR 0019).
+
+Overflow is loud, not silent. Postgres raises `integer out of range` and refuses
+the write; it does not wrap or truncate. **The symptom would be an order failing
+to record, not a wrong number.** A test stores a E£20 million order so that
+narrowing the column later fails in the test suite rather than in production.
 
 ### 🟢 Commission rate
 
@@ -207,6 +214,86 @@ idempotent, which order indexing is by construction.
 Every handler must either upsert by Shopify id or be read-only. Recorded because
 it is the assumption a future handler could break silently: re-running would
 double-apply, and lease expiry makes re-running normal rather than exceptional.
+
+---
+
+## Prevented failures, and what they mean
+
+These do not stop anything. Each is a failure the platform absorbed, reported
+so that the run-up to a real breakage is legible instead of invisible.
+
+They appear in the logs as a single greppable line:
+
+```
+ANOMALY job_gave_up attempts=5 job_id=412 kind='sync_order' last_error='...'
+```
+
+The names below are the catalogue in `app/core/signals.py`. **A test fails if a
+name exists there without an entry here**, because a log line nobody can look up
+is barely better than no log line.
+
+### `job_gave_up`
+
+A job exhausted its five attempts. **The work did not happen and will not be
+retried without someone acting.** The most important line in this list.
+
+*What to do:* find the job by id — it is still in `background_job`, marked
+`failed`, with its payload and last error. Fix the cause, then set it back to
+`pending` to re-run it.
+
+### `lease_reclaimed`
+
+A job was found with an expired lease: the worker holding it died mid-flight.
+Reclaiming it is the queue working correctly.
+
+*What to do:* nothing, once. A steady stream means workers are dying — check
+memory limits and deploy restarts, since a restart mid-job produces this every
+time.
+
+### `event_content_changed`
+
+A webhook arrived twice under the same id carrying **different content**.
+Deduplication ignored the second, which is correct, but the sender reusing an id
+means an assumption about it is wrong.
+
+*What to do:* compare the two digests in the log line. If this recurs, the
+idempotency key for that source is not actually unique and needs rethinking.
+
+### `error_truncated`
+
+A failure message exceeded 2,000 characters and was cut down. The failure is
+still recorded; part of the detail is not.
+
+*What to do:* nothing usually. Repeatedly truncating the same job means the
+useful part of the message may be past the cut — check the raw exception.
+
+### `work_deduplicated`
+
+Work was queued for something already queued, and was absorbed. **Expected in
+ordinary operation** — Shopify sends create, update and paid for one order
+within seconds.
+
+*What to do:* nothing, unless the rate is high, which means a sender is looping.
+
+---
+
+### 🟠 Logging can be switched off silently *(fixed, guarded)*
+
+**The limit.** `logging.config.fileConfig` defaults to
+`disable_existing_loggers=True`. Alembic's `env.py` calls it, so running a
+migration inside a process that has already imported the application switches
+off **every logger created before that point** — permanently, without an error.
+
+**What failure looks like.** The logs stop. Nothing else changes. Every
+prevented failure above becomes invisible, which is the exact opposite of what
+this file exists for.
+
+**Fixed** in `migrations/env.py`, which now passes
+`disable_existing_loggers=False`, and guarded by
+`test_running_migrations_does_not_disable_application_logging`.
+
+Found only because it silenced `hba.anomaly` under test. Recorded because the
+same trap applies to any future `fileConfig` or `dictConfig` call.
 
 ---
 

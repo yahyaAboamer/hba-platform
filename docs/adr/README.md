@@ -58,6 +58,8 @@ what was chosen.
 | [0016](0016-frontend-toolchain-pinned.md) | The frontend toolchain is pinned to the builder's Node | Accepted |
 | [0017](0017-payment-proof-visible-to-affiliates.md) | Payment screenshots are shown to affiliates | Accepted, risk accepted |
 | [0018](0018-content-manager-scope.md) | content_manager holds wide, overlapping authority | Accepted, risk accepted |
+| [0019](0019-size-to-the-requirement.md) | Size to the requirement, and record the measurement | Accepted |
+| [0020](0020-receipts-store-a-digest.md) | Event receipts store a digest, not the payload | Accepted |
 
 See also [`../limits.md`](../limits.md) — the register of known limits and
 foreseeable failures, which records what will eventually break rather than what

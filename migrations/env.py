@@ -13,7 +13,12 @@ config = context.config
 config.set_main_option("sqlalchemy.url", settings.database_url)
 
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # disable_existing_loggers=False is not optional. fileConfig defaults to
+    # True, which switches off every logger created before this line - which,
+    # when migrations run inside a process that has already imported the app,
+    # means every application logger goes permanently silent. Nothing errors;
+    # the logs simply stop. Found because it silenced hba.anomaly under test.
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 target_metadata = Base.metadata
 
