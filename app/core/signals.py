@@ -58,6 +58,14 @@ class Anomaly:
     #: the queue being unreachable. The worker survives and retries.
     WORKER_ITERATION_FAILED = "worker_iteration_failed"
 
+    #: A webhook failed signature verification and was refused. Nothing is
+    #: recorded for it, so this log line is the only trace it ever existed.
+    WEBHOOK_REJECTED = "webhook_rejected"
+
+    #: A webhook verified and was recorded, but nothing could be done with it -
+    #: an order topic whose payload does not name an order.
+    WEBHOOK_UNUSABLE = "webhook_unusable"
+
     #: Work was queued for something already queued, and was absorbed.
     #: Expected in ordinary operation; a flood of it means a sender is looping.
     WORK_DEDUPLICATED = "work_deduplicated"
