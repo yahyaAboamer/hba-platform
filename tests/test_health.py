@@ -89,3 +89,33 @@ def test_an_explicit_driver_is_left_alone():
 
     explicit = "postgresql+psycopg://u:p@host:5432/db"
     assert Settings(database_url=explicit).database_url == explicit
+
+
+def test_readiness_reports_whether_shopify_is_configured():
+    """Operators need to see this without reading environment variables."""
+    response = client.get("/api/health/ready")
+    assert "shopify" in response.json()["checks"]
+
+
+def test_shopify_configuration_requires_a_domain_and_credentials():
+    from app.config import Settings
+
+    assert Settings().shopify_configured is False
+    assert (
+        Settings(shopify_shop_domain="s.myshopify.com").shopify_configured is False
+    )
+    assert (
+        Settings(
+            shopify_shop_domain="s.myshopify.com",
+            shopify_client_id="a",
+            shopify_client_secret="b",
+        ).shopify_configured
+        is True
+    )
+    # An older admin-created app supplies a static token instead.
+    assert (
+        Settings(
+            shopify_shop_domain="s.myshopify.com", shopify_access_token="shpat_x"
+        ).shopify_configured
+        is True
+    )

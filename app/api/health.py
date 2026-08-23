@@ -25,5 +25,10 @@ def ready() -> dict:
         checks["database"] = {"ok": False, "error": type(exc).__name__}
 
     checks["configuration"] = {"ok": True, "environment": settings.app_env}
+
+    # Reported, never enforced: the platform is healthy without Shopify, it
+    # simply cannot sync. Surfacing it here means an operator sees a missing
+    # credential immediately rather than inferring it from an empty order list.
+    checks["shopify"] = {"ok": True, "configured": settings.shopify_configured}
     ready_now = all(check.get("ok") for check in checks.values())
     return {"status": "ready" if ready_now else "not_ready", "checks": checks}
