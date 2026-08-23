@@ -33,6 +33,31 @@ LEASE_SECONDS = 60
 ERROR_LIMIT = 2000
 
 
+class JobKind:
+    """Every job kind, named once.
+
+    The producer and the handler live in different modules. Two string literals
+    that must agree is exactly how a rename ships half-done - the receiver
+    queues a kind nothing handles, every job fails with no_handler, and the
+    endpoint keeps returning 200 as though nothing were wrong.
+    """
+
+    SYNC_ORDER = "shopify_sync_order"
+
+
+class PermanentFailure(Exception):
+    """A job failure that retrying cannot fix.
+
+    Raised by a handler when the cause is not going to resolve itself: a
+    missing credential, an ungranted scope, a payload that names nothing. The
+    worker fails the job at once rather than spending the remaining attempts,
+    because four more identical failures over eight minutes buy nothing and
+    bury the one line that explains the problem.
+
+    Anything else a handler raises is treated as temporary and retried.
+    """
+
+
 class JobStatus:
     PENDING = "pending"
     RUNNING = "running"

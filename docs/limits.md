@@ -191,11 +191,11 @@ reconciliation sweep: correct, but delayed.
 and `/api/health/ready` reports `shopify.webhooks_configured` so a missing
 secret is visible without waiting for a delivery to fail.
 
-### 🟢 Shopify deletes an order *(planned)*
+### 🟢 Shopify deletes an order
 
-Order sync must treat a missing order as absence, not failure — returning
-nothing rather than raising. A deleted order is not an error, and treating it as
-one would retry forever.
+`sync_one_order` returns nothing rather than raising, and reports
+`order_not_found`. A deleted order is not an error, and treating it as one would
+retry forever against something that will never come back.
 
 ---
 
@@ -216,6 +216,22 @@ therefore be idempotent, which order indexing is by construction.
 **A deploy does this every time.** The worker is cancelled with the API, so a job
 in flight is abandoned and re-run up to a minute later. Correct, but it means the
 `lease_reclaimed` signal is expected around every restart.
+
+### 🟠 A failure that retrying cannot fix
+
+**The limit.** The queue retries everything five times over about eight minutes.
+For a missing credential, an ungranted scope, or a payload naming nothing, all
+five fail identically — delaying the signal and burying the one line that
+explains it under four copies.
+
+**Handled:** a handler raises `PermanentFailure` and the job fails at once, with
+`attempts` set to the maximum so it is not leased again.
+
+**The risk is the reverse mistake.** Classifying a *temporary* failure as
+permanent means a Shopify blip permanently fails an order that would have
+synced on the next attempt. `PermanentFailure` is for causes only a person can
+resolve. Everything else — timeouts, throttling, network errors — must stay
+retryable.
 
 ### 🟠 A handler that is not idempotent
 
@@ -286,6 +302,20 @@ tries again after the poll interval.
 continuous stream means the database is down or the connection pool is
 exhausted, and **no background work is happening at all** — orders will not be
 syncing.
+
+### `order_not_found`
+
+We asked Shopify for an order and it has no such order. Not an error - an order
+can be deleted between a webhook firing and the job running - so the job
+succeeds rather than retrying forever against something that will never return.
+
+**This is the answer to "why is this order not on the dashboard?"** Without it
+the order simply would not be there, with nothing anywhere explaining why.
+
+*What to do:* nothing if the order really was deleted. If it exists in Shopify
+and this still fires, the id being asked for is wrong - check the webhook
+receipt's `entity_id` against the real order, particularly for a refund, where
+the payload's `id` is the refund and the order is in `order_id`.
 
 ### `webhook_rejected`
 

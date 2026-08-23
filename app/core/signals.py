@@ -66,6 +66,10 @@ class Anomaly:
     #: an order topic whose payload does not name an order.
     WEBHOOK_UNUSABLE = "webhook_unusable"
 
+    #: We asked Shopify for an order and it has no such order. Normal for a
+    #: deleted one; the answer to "why is this order not on the dashboard?".
+    ORDER_NOT_FOUND = "order_not_found"
+
     #: Work was queued for something already queued, and was absorbed.
     #: Expected in ordinary operation; a flood of it means a sender is looping.
     WORK_DEDUPLICATED = "work_deduplicated"

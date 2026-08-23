@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.core.signals import Anomaly, report
 from app.db import get_session
-from app.services.jobs import enqueue, record_event
+from app.services.jobs import JobKind, enqueue, record_event
 from app.services.shopify.webhooks import (
     MAX_BODY_BYTES,
     ORDER_TOPICS,
@@ -28,7 +28,7 @@ from app.services.shopify.webhooks import (
 
 router = APIRouter(prefix="/api/webhooks")
 
-SYNC_ORDER = "shopify_sync_order"
+SYNC_ORDER = JobKind.SYNC_ORDER
 
 
 @router.post("/shopify", include_in_schema=False)

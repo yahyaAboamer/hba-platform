@@ -18,6 +18,11 @@ from app.api import auth, health, webhooks
 from app.config import settings
 from app.worker import worker_loop
 
+# Imported for the side effect of registering its job handlers with the
+# worker. Without this the worker leases shopify_sync_order jobs, finds no
+# handler, and fails every one of them.
+from app.services.shopify import sync as _shopify_sync  # noqa: F401  (registers handlers)
+
 WEB_DIR = Path(__file__).resolve().parent / "web"
 
 logger = logging.getLogger(__name__)

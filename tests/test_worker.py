@@ -12,7 +12,7 @@ from sqlalchemy import text
 
 from app.core.signals import Anomaly
 from app.db import SessionLocal
-from app.services.jobs import MAX_ATTEMPTS, JobStatus, enqueue
+from app.services.jobs import MAX_ATTEMPTS, JobStatus, PermanentFailure, enqueue
 from app.worker import HANDLERS, register_handler, run_one, worker_identity
 
 
@@ -279,3 +279,69 @@ def test_the_worker_stays_off_when_disabled(session, monkeypatch):
         time.sleep(0.5)
 
     assert done == []
+
+
+# ── Failures that will not get better ──────────────────────────────────────────
+
+
+def test_a_permanent_failure_gives_up_on_the_first_attempt(session):
+    """Retrying is for failures that might succeed next time. A missing
+    credential is not one, and four more identical failures over eight minutes
+    only bury the line that explains the problem.
+    """
+
+    @register_handler("hopeless")
+    def handle(db, payload):
+        raise PermanentFailure("SHOPIFY_CLIENT_SECRET is not set")
+
+    job = enqueue(session, "hopeless", {})
+    session.commit()
+    job_id = job.id
+
+    assert run_one(session, worker_id="w") is True
+
+    status, attempts, last_error = _status(session, job_id)
+    assert status == JobStatus.FAILED
+    assert attempts == MAX_ATTEMPTS, "did not skip the remaining attempts"
+    assert "SHOPIFY_CLIENT_SECRET" in last_error
+    assert run_one(session, worker_id="w") is False, "the job was leased again"
+
+
+def test_an_ordinary_failure_still_retries(session):
+    """Guards the test above: PermanentFailure must be the exception, not the
+    rule. A Shopify timeout has to keep retrying.
+    """
+
+    @register_handler("temporary")
+    def handle(db, payload):
+        raise TimeoutError("Shopify took too long")
+
+    job = enqueue(session, "temporary", {})
+    session.commit()
+    job_id = job.id
+
+    run_one(session, worker_id="w")
+
+    status, attempts, _ = _status(session, job_id)
+    assert status == JobStatus.PENDING
+    assert attempts == 1
+
+
+def test_a_permanent_failure_still_discards_the_handler_s_writes(session):
+    """Giving up early must not mean committing half a job."""
+
+    @register_handler("hopeless_writer")
+    def handle(db, payload):
+        db.execute(
+            text("INSERT INTO background_job (kind, payload) VALUES ('half', '{}')")
+        )
+        raise PermanentFailure("no")
+
+    enqueue(session, "hopeless_writer", {})
+    session.commit()
+    run_one(session, worker_id="w")
+
+    leftover = session.execute(
+        text("SELECT count(*) FROM background_job WHERE kind = 'half'")
+    ).scalar()
+    assert leftover == 0
