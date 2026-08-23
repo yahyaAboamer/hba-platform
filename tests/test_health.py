@@ -63,3 +63,29 @@ def test_database_url_avoids_the_ipv6_detour():
     from app.config import Settings
 
     assert "localhost" not in Settings().database_url
+
+
+def test_a_hosted_database_url_is_normalised_to_psycopg3():
+    """Managed providers hand out postgresql:// or postgres://.
+
+    SQLAlchemy maps a bare postgresql:// to psycopg2, which is not installed
+    here, so without this the app would build cleanly and crash on its first
+    connection. Rewriting the scheme also means a rotated database URL keeps
+    working without anyone editing a variable.
+    """
+    from app.config import Settings
+
+    for supplied in (
+        "postgresql://u:p@host:5432/railway",
+        "postgres://u:p@host:5432/railway",
+    ):
+        resolved = Settings(database_url=supplied).database_url
+        assert resolved.startswith("postgresql+psycopg://")
+        assert resolved.endswith("@host:5432/railway")
+
+
+def test_an_explicit_driver_is_left_alone():
+    from app.config import Settings
+
+    explicit = "postgresql+psycopg://u:p@host:5432/db"
+    assert Settings(database_url=explicit).database_url == explicit
