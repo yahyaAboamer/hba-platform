@@ -1,0 +1,169 @@
+# Running the platform
+
+What to look at, in what order, when something seems wrong — and the few things
+that have to be done by hand.
+
+Everything here needs an account. Nothing operational is public.
+
+---
+
+## The one page to check first
+
+```
+GET /api/operations/sync
+```
+
+```json
+{
+  "shopify_configured": true,
+  "webhooks_configured": true,
+  "orders_indexed": 18422,
+  "last_order_synced_at": "2026-08-23T18:42:11+00:00",
+  "last_event_received_at": "2026-08-23T18:42:09+00:00",
+  "jobs": {"pending": 0, "running": 1, "succeeded": 9120, "failed": 0},
+  "recurring": {
+    "shopify_reconcile": {
+      "last_succeeded_at": "2026-08-23T18:15:00+00:00",
+      "next_due_at": "2026-08-23T18:45:00+00:00",
+      "scheduled": true
+    }
+  }
+}
+```
+
+**How to read it:**
+
+| What you see | What it means |
+|---|---|
+| `webhooks_configured: false` | **Every delivery is being rejected.** No orders are arriving live. Set `SHOPIFY_WEBHOOK_SECRET`. |
+| `last_event_received_at` hours old | Webhooks have stopped. The sweep is still covering you; see [`shopify-webhooks.md`](shopify-webhooks.md). |
+| `failed` above zero | Work that did not happen. Look at it — see below. |
+| `recurring.*.scheduled: false` | **The safety net is off.** The worker is not queueing recurring work. |
+| `last_succeeded_at` over an hour old | The sweep is not completing. Check failed jobs for `shopify_reconcile`. |
+
+The last two matter more than they look. Recurring work is queued by the worker
+itself, so if the worker stops, it stops too — **with no error, because nothing
+failed.** Orders keep arriving by webhook and everything looks normal.
+
+---
+
+## When work did not happen
+
+```
+GET /api/operations/failed-jobs
+```
+
+Returns the last 100 failures with the payload, the attempt count, and the last
+error. A failed job is **never deleted** — it is the record that work did not
+happen.
+
+To make one run again, set it back to `pending`:
+
+```sql
+update background_job set status = 'pending', attempts = 0, run_after = now()
+where id = 412;
+```
+
+Fix the cause first. A job that failed five times will fail a sixth.
+
+---
+
+## When an order is missing
+
+In order:
+
+1. **Is it indexed?**
+   `select * from order_index where shopify_order_id = '5123456789';`
+2. **Did a webhook ever arrive for it?**
+   `select * from integration_event where entity_id = '5123456789';`
+3. **Did a job try?**
+   `select * from background_job where payload->>'order_id' = '5123456789';`
+4. **Search the logs for `ANOMALY`** — the reason is usually already written
+   down. Every name is explained in [`limits.md`](limits.md).
+
+If there is no receipt at all, the delivery was rejected — look for
+`ANOMALY webhook_rejected`, which reports whether the secret was configured.
+
+The sweep re-reads the last 48 hours every 30 minutes, so an order missed by a
+webhook appears within the half hour without anyone doing anything.
+
+---
+
+## Codes nobody owns
+
+```
+GET /api/operations/unregistered-codes
+```
+
+Discount codes appearing on real orders, most-used first. A code here that
+belongs to no affiliate is **sales being attributed to nobody** — usually a code
+created in Shopify without being registered on the platform.
+
+---
+
+## Checking a code before approving an affiliate
+
+```
+POST /api/operations/verify-code   {"code": "NOUR10"}
+```
+
+Confirms the code exists in Shopify before anyone is approved against it. A
+code that does not exist attributes nothing, silently, until someone notices
+months of missing sales.
+
+`exists: false` is a normal answer, not an error — it is what a typo looks like.
+
+**This needs the `read_discounts` scope.** Without it the endpoint returns 403
+naming the scope, rather than pretending the code does not exist. That
+distinction matters: "no such code" would have someone re-typing a perfectly
+good code while the real fix is one setting in the Shopify Dev Dashboard.
+
+**It reports the customer discount, never a commission rate.** A creator may
+give customers 10% off while earning 5%. Guessing one from the other would be
+wrong exactly when it mattered.
+
+---
+
+## The historical import
+
+Run **once**, to load orders from before the platform existed.
+
+```
+POST /api/operations/start-import   {"since": "2026-01-01"}
+```
+
+Administrator only. Shopify permits one bulk operation per shop at a time, so a
+second request while one is running is refused with 409.
+
+It queues rather than runs: the export takes minutes. Watch it under `jobs` in
+`/api/operations/sync`. The job re-checks Shopify every 30 seconds and ingests
+the file when it is ready.
+
+**It needs `read_all_orders`.** Plain `read_orders` reaches back only 60 days,
+so a January import against it returns nothing at all — and reports
+`ANOMALY import_empty` when it does, rather than looking like success.
+
+---
+
+## Reading the logs
+
+Every failure the platform absorbs is one greppable line:
+
+```
+ANOMALY job_gave_up attempts=5 job_id=412 kind='sync_order' last_error='...'
+```
+
+Search for `ANOMALY`. Each name has an entry in [`limits.md`](limits.md) saying
+what it means and what to do about it — and a test fails if a name exists in the
+code without one.
+
+---
+
+## What is not automated
+
+- **Starting the historical import.** Deliberate: it is a one-off.
+- **Subscribing to webhook topics.** Done in the Shopify Dev Dashboard, not over
+  the API, because the API route needs a write scope this platform never asks
+  for. See [`shopify-webhooks.md`](shopify-webhooks.md).
+- **Alerting.** Nothing pages anyone. The signals are in the logs and in
+  `/api/operations/sync`; something has to look at them.

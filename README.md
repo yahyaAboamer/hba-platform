@@ -11,6 +11,7 @@ commission and payroll module.
 | **What will eventually break** | [`docs/limits.md`](docs/limits.md) — known limits and foreseeable failures |
 | **What it does** | [`docs/specs/2026-08-22-hba-platform-v1-design.md`](docs/specs/2026-08-22-hba-platform-v1-design.md) |
 | **How it is being built** | [`docs/plans/`](docs/plans) — phase by phase |
+| **What to check when something is wrong** | [`docs/operations.md`](docs/operations.md) — the running-it runbook |
 | **How to switch webhooks on** | [`docs/shopify-webhooks.md`](docs/shopify-webhooks.md) — what they are, and the runbook |
 | **What changed and when** | the git history |
 
