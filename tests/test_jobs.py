@@ -23,6 +23,7 @@ from app.services.jobs import (
     fail_job,
     lease_job,
     payload_digest,
+    prune_succeeded_jobs,
     record_event,
 )
 
@@ -466,3 +467,98 @@ def test_reporting_never_raises_on_an_awkward_value(db, caplog):
         report("something", value=Awkward())
 
     assert "something" in caplog.text
+
+
+# ── Pruning ────────────────────────────────────────────────────────────────────
+
+
+def _age(db, job_id, days):
+    db.execute(
+        text("UPDATE background_job SET finished_at = now() - make_interval(days => :d) "
+             "WHERE id = :i"),
+        {"d": days, "i": job_id},
+    )
+
+
+def test_pruning_removes_old_succeeded_jobs(db):
+    enqueue(db, "sync_order", {})
+    db.flush()
+    job = lease_job(db, worker_id="w")
+    complete_job(db, job)
+    db.flush()
+    _age(db, job.id, 40)
+
+    assert prune_succeeded_jobs(db, older_than_days=30) == 1
+    assert db.execute(text("SELECT count(*) FROM background_job")).scalar() == 0
+
+
+def test_pruning_keeps_recent_succeeded_jobs(db):
+    enqueue(db, "sync_order", {})
+    db.flush()
+    complete_job(db, lease_job(db, worker_id="w"))
+    db.flush()
+
+    assert prune_succeeded_jobs(db, older_than_days=30) == 0
+
+
+def test_pruning_never_removes_a_failed_job(db):
+    """A failed job is the record that work did not happen. It outlives pruning
+    however old it gets - deleting it on a timer would erase exactly the
+    evidence someone needs.
+    """
+    enqueue(db, "sync_order", {})
+    db.flush()
+    for _ in range(MAX_ATTEMPTS):
+        job = lease_job(db, worker_id="w")
+        fail_job(db, job, "boom")
+        db.flush()
+        _make_runnable(db, job)
+    _age(db, job.id, 3650)
+
+    assert prune_succeeded_jobs(db, older_than_days=30) == 0
+    assert db.execute(
+        text("SELECT count(*) FROM background_job WHERE status = 'failed'")
+    ).scalar() == 1
+
+
+def test_pruning_never_removes_outstanding_work(db):
+    """A pending job has no finished_at. It must not be swept up by a NULL."""
+    enqueue(db, "sync_order", {})
+    db.flush()
+
+    assert prune_succeeded_jobs(db, older_than_days=0) == 0
+    assert db.execute(
+        text("SELECT count(*) FROM background_job WHERE status = 'pending'")
+    ).scalar() == 1
+
+
+def test_giving_up_skips_the_remaining_attempts(db):
+    """A failure that cannot succeed on a retry should not spend four more
+    attempts and eight minutes proving it.
+    """
+    enqueue(db, "sync_order", {})
+    db.flush()
+    job = lease_job(db, worker_id="w")
+    fail_job(db, job, "nothing can handle this", give_up=True)
+    db.flush()
+
+    assert job.status == JobStatus.FAILED
+    assert job.attempts == MAX_ATTEMPTS
+    assert job.finished_at is not None
+    assert lease_job(db, worker_id="w") is None
+
+
+def test_giving_up_is_reported_like_any_other_exhaustion(db, caplog):
+    import logging
+
+    from app.core.signals import Anomaly
+
+    enqueue(db, "sync_order", {})
+    db.flush()
+    job = lease_job(db, worker_id="w")
+
+    with caplog.at_level(logging.WARNING, logger="hba.anomaly"):
+        fail_job(db, job, "nope", give_up=True)
+        db.flush()
+
+    assert Anomaly.JOB_GAVE_UP in caplog.text

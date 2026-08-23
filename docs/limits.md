@@ -57,10 +57,11 @@ them through a deliberate, reviewed migration that temporarily disables the
 trigger. That is a conscious act requiring a migration and a review — which is
 the point. No stray script can do it.
 
-### 🟠 Succeeded background jobs accumulate *(planned)*
+### 🟠 Succeeded background jobs accumulate
 
-**The limit.** `background_job` — Phase 2 Task 3 — keeps every completed job.
-Nothing prunes them.
+**The limit.** `background_job` keeps every completed job. `prune_succeeded_jobs`
+exists but **nothing calls it yet** — it needs a scheduled job, which arrives
+with the reconciliation sweep.
 
 **What failure looks like.** Gradual slowdown of the lease query, then the same
 disk pressure as above. Much slower than `integration_event` — rows are small
@@ -121,7 +122,7 @@ division (ADR 0003).
 | `discount_codes[]` element | 120 | A code longer than 120 characters |
 | `user_account.email` | 320 | The RFC maximum; safe |
 | `auth_session.user_agent` | 400 | **Truncated deliberately**, never rejected — a hostile header must not break sign-in |
-| `background_job.last_error` *(planned)* | 2000 | **Truncated deliberately** — a huge traceback must not fail the failure-recording path |
+| `background_job.last_error` | 2000 | **Truncated deliberately** — a huge traceback must not fail the failure-recording path |
 
 The two truncations are the interesting ones: both exist so that an unusual
 input degrades instead of breaking something more important.
@@ -197,23 +198,31 @@ one would retry forever.
 
 ## Concurrency and process
 
-### 🟠 More than one replica *(planned)*
+### 🟠 More than one replica
 
 The worker runs inside the API process (ADR 0009). Leasing uses
 `FOR UPDATE SKIP LOCKED`, so a second replica is *safe* — two workers take
 different jobs. But the platform is currently sized and priced for one, and
 scheduled work would run twice as often.
 
-### 🟢 A worker crashes mid-job *(planned)*
+### 🟢 A worker crashes mid-job
 
-The lease expires and the job is picked up again. Handlers must therefore be
-idempotent, which order indexing is by construction.
+The lease expires after 60 seconds and the job is picked up again. Handlers must
+therefore be idempotent, which order indexing is by construction.
 
-### 🟠 A handler that is not idempotent *(planned)*
+**A deploy does this every time.** The worker is cancelled with the API, so a job
+in flight is abandoned and re-run up to a minute later. Correct, but it means the
+`lease_reclaimed` signal is expected around every restart.
 
-Every handler must either upsert by Shopify id or be read-only. Recorded because
-it is the assumption a future handler could break silently: re-running would
-double-apply, and lease expiry makes re-running normal rather than exceptional.
+### 🟠 A handler that is not idempotent
+
+Every handler must either upsert by Shopify id or be read-only, and must never
+commit the session it is given — the worker owns that. Both rules are stated in
+`register_handler`'s docstring and neither is enforced by anything.
+
+Recorded because this is the assumption a future handler could break silently:
+re-running would double-apply, and lease expiry makes re-running normal rather
+than exceptional.
 
 ---
 
@@ -249,6 +258,31 @@ Reclaiming it is the queue working correctly.
 *What to do:* nothing, once. A steady stream means workers are dying — check
 memory limits and deploy restarts, since a restart mid-job produces this every
 time.
+
+### `no_handler`
+
+A job was queued for a kind nothing knows how to handle. **It fails immediately
+rather than retrying** — five attempts over eight minutes cannot conjure a
+handler, and would only delay the signal.
+
+Almost always a half-finished deploy: something enqueues work the running code
+does not implement, or a handler's module stopped being imported so its
+`@register_handler` never ran.
+
+*What to do:* check that the module defining that kind is imported at startup —
+see `app/main.py`. The job is still in `background_job` with its payload; set it
+back to `pending` once the handler exists.
+
+### `worker_iteration_failed`
+
+The worker loop itself failed — not a job failing, which is ordinary and handled
+inside `run_one`, but the **queue being unreachable**. The worker survives and
+tries again after the poll interval.
+
+*What to do:* one of these around a deploy or a database restart is expected. A
+continuous stream means the database is down or the connection pool is
+exhausted, and **no background work is happening at all** — orders will not be
+syncing.
 
 ### `event_content_changed`
 
@@ -288,12 +322,21 @@ off **every logger created before that point** — permanently, without an error
 prevented failure above becomes invisible, which is the exact opposite of what
 this file exists for.
 
+**How close this came.** Production runs `alembic upgrade head` as a *separate
+process* before uvicorn starts (`nixpacks.toml`), so the application's own
+loggers were never affected. **The trap was latent, not live** — it fired only in
+the test process, which imports the app and then migrates.
+
+That is worth stating plainly: a single change to run migrations in-process at
+startup — a reasonable-looking simplification — would have silenced production
+logging with no other symptom.
+
 **Fixed** in `migrations/env.py`, which now passes
 `disable_existing_loggers=False`, and guarded by
 `test_running_migrations_does_not_disable_application_logging`.
 
-Found only because it silenced `hba.anomaly` under test. Recorded because the
-same trap applies to any future `fileConfig` or `dictConfig` call.
+Recorded because the same trap applies to any future `fileConfig` or
+`dictConfig` call, wherever it runs.
 
 ---
 

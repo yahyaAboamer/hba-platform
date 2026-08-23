@@ -50,6 +50,14 @@ class Anomaly:
     #: mid-flight. Reclaiming is normal; a lot of reclaiming is not.
     LEASE_RECLAIMED = "lease_reclaimed"
 
+    #: A job was queued for a kind nothing knows how to handle. Usually a
+    #: half-finished deploy: something queues work the running code cannot do.
+    NO_HANDLER = "no_handler"
+
+    #: The worker loop itself failed - not a job failing, which is normal, but
+    #: the queue being unreachable. The worker survives and retries.
+    WORKER_ITERATION_FAILED = "worker_iteration_failed"
+
     #: Work was queued for something already queued, and was absorbed.
     #: Expected in ordinary operation; a flood of it means a sender is looping.
     WORK_DEDUPLICATED = "work_deduplicated"

@@ -1,6 +1,13 @@
 """Shared test fixtures."""
 
-import pytest
+import os
+
+# The worker must not race the tests for jobs, or compete with them for the
+# schema while fresh_database is rebuilding it. Set before the app is imported,
+# because Settings reads the environment once at import time.
+os.environ["WORKER_ENABLED"] = "false"
+
+import pytest  # noqa: E402
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import text

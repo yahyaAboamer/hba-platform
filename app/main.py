@@ -4,6 +4,10 @@ One service serves both the API and the built frontend. That keeps hosting to
 a single deployable, which is what holds the running cost inside budget.
 """
 
+import asyncio
+import contextlib
+import logging
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
@@ -12,14 +16,41 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api import auth, health
 from app.config import settings
+from app.worker import worker_loop
 
 WEB_DIR = Path(__file__).resolve().parent / "web"
+
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """Run the background worker alongside the API.
+
+    Cancelled on shutdown. A job in flight when that happens is not lost: its
+    lease expires and the next worker to start picks it up, which is exactly
+    the case leases exist for.
+    """
+    task = None
+    if settings.worker_enabled:
+        task = asyncio.create_task(worker_loop())
+    else:
+        logger.info("background worker disabled by configuration")
+    try:
+        yield
+    finally:
+        if task is not None:
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
+
 
 app = FastAPI(
     title="HBA Platform",
     docs_url=None if settings.is_production else "/api/docs",
     redoc_url=None,
     openapi_url=None if settings.is_production else "/openapi.json",
+    lifespan=lifespan,
 )
 
 

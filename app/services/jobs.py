@@ -223,11 +223,17 @@ def complete_job(db: Session, job: BackgroundJob) -> None:
     job.last_error = None
 
 
-def fail_job(db: Session, job: BackgroundJob, error: str) -> None:
+def fail_job(
+    db: Session, job: BackgroundJob, error: str, *, give_up: bool = False
+) -> None:
     """Record a failed attempt, and either back off or give up.
 
     Backoff doubles each time: 30s, 60s, 120s, 240s. Retrying a struggling
     service at a fixed interval is how a blip becomes an outage.
+
+    ``give_up`` fails the job now, without spending the remaining attempts. For
+    a failure that cannot succeed on a retry - a job kind with no handler, say -
+    retrying only delays the signal.
     """
     message = error or ""
     if len(message) > ERROR_LIMIT:
@@ -239,7 +245,7 @@ def fail_job(db: Session, job: BackgroundJob, error: str) -> None:
             kept=ERROR_LIMIT,
         )
 
-    job.attempts += 1
+    job.attempts = MAX_ATTEMPTS if give_up else job.attempts + 1
     job.last_error = message[:ERROR_LIMIT]
     job.leased_by = None
     job.leased_until = None
