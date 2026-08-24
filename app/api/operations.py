@@ -24,6 +24,7 @@ from app.services.shopify.client import (
     ShopifyMissingScope,
     ShopifyNotConfigured,
 )
+from app.services.shopify.client import REQUIRED_SCOPES
 from app.services.shopify.discounts import REQUIRED_SCOPE, verify_discount_code
 
 router = APIRouter(prefix="/api/operations")
@@ -207,6 +208,47 @@ def verify_code(
         raise HTTPException(503, str(exc)) from exc
     except ShopifyError as exc:
         raise HTTPException(502, f"Could not reach Shopify: {exc}") from exc
+
+
+@router.get("/shopify-scopes")
+def shopify_scopes(
+    _actor: UserAccount = Depends(require_permission(Permission.SETTINGS_MANAGE)),
+) -> dict:
+    """What Shopify actually grants this app.
+
+    Exists because "is the scope granted?" is otherwise unanswerable without
+    guessing. Editing the scope field in the Dev Dashboard only saves a draft:
+    the change takes effect when a new app version is released and approved on
+    the store, and an already-issued token never gains a scope retroactively.
+
+    Forces a token exchange, so it is administrator-only and not something to
+    poll. That is also the point - the answer reflects a *fresh* token rather
+    than whatever was cached before the scope changed.
+    """
+    from app.services.shopify.sync import build_client
+
+    try:
+        client = build_client()
+        # Forces the token exchange that populates the scope list. A missing
+        # scope is the answer here, not an error - so it is swallowed, and the
+        # same client is then asked what it holds.
+        try:
+            client.require_scope(REQUIRED_SCOPE)
+        except ShopifyMissingScope:
+            pass
+    except ShopifyNotConfigured as exc:
+        raise HTTPException(503, str(exc)) from exc
+    except ShopifyError as exc:
+        raise HTTPException(502, f"Could not reach Shopify: {exc}") from exc
+
+    return {
+        "granted": sorted(client.granted_scopes()),
+        "missing": sorted(client.missing_scopes()),
+        "required": sorted(REQUIRED_SCOPES),
+        # A static token carries no scope list, so an empty granted set means
+        # "Shopify did not say", not "nothing is granted".
+        "reported_by_shopify": bool(client.granted_scopes()),
+    }
 
 
 @router.post("/start-import")
