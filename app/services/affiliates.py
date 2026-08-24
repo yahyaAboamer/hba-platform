@@ -8,7 +8,7 @@ their life with the business.
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.businesstime import utcnow
+from app.core.businesstime import business_month, utcnow
 from app.models.affiliates import (
     VALID_KINDS,
     VALID_STATUSES,
@@ -17,6 +17,7 @@ from app.models.affiliates import (
     AffiliateStatus,
 )
 from app.services.audit import record_audit
+from app.services.codes import close_codes_for
 
 
 def create_affiliate(
@@ -110,11 +111,26 @@ def archive_affiliate(
     resolve, and so does every payment already made to them.
 
     The timestamp is set once. When somebody left is a fact, not a function of
-    who pressed the button last - and a later phase closes their code period
-    against this date.
+    who pressed the button last.
+
+    **Also closes any code they still hold**, from this month forward. Archiving
+    says "from now on, not theirs"; it must never say "was never theirs" -
+    close_codes_for only touches open-ended periods and only from the current
+    month on, so nothing already approved and paid is rewritten. Without this,
+    an archived affiliate would keep silently owning their code, and an order
+    placed after they left would still attribute to them.
     """
+    now = utcnow()
     if affiliate.archived_at is None:
-        affiliate.archived_at = utcnow()
+        affiliate.archived_at = now
+
+    close_codes_for(
+        db,
+        affiliate,
+        business_month(now),
+        actor_id=actor_id,
+        actor_email=actor_email,
+    )
 
     set_status(
         db,

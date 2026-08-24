@@ -18,6 +18,7 @@ from app.services.affiliates import (
     list_affiliates,
     set_status,
 )
+from app.services.codes import owner_of, register_code
 
 
 def _account(db, email="nour@example.com") -> UserAccount:
@@ -278,3 +279,49 @@ def test_a_deleted_user_account_takes_its_profile_with_it(db):
     db.flush()
 
     assert db.query(AffiliateProfile).count() == 0
+
+
+# ── Archiving closes code ownership (does not just change status) ──────────────
+
+
+def test_archiving_closes_open_ended_code_ownership(db):
+    """Archiving says "from now on, not theirs" - and must actually make that
+    true, or an archived affiliate keeps silently owning their code and a
+    later order still attributes to them.
+    """
+    from app.core.businesstime import business_month, utcnow
+
+    affiliate = create_affiliate(db, user_account_id=_account(db).id, name="Nour")
+    db.flush()
+    register_code(db, affiliate, "NOUR10", "2026-01")
+    db.flush()
+
+    archive_affiliate(db, affiliate)
+    db.flush()
+
+    current_month = business_month(utcnow())
+    assert owner_of(db, "NOUR10", current_month) is not None
+    # A month safely after "now" in any test run must be unowned.
+    assert owner_of(db, "NOUR10", "2099-12") is None
+
+
+def test_archiving_does_not_touch_already_closed_code_periods(db):
+    """A period that ended earlier must not be extended by archiving."""
+    affiliate = create_affiliate(db, user_account_id=_account(db).id, name="Nour")
+    db.flush()
+    register_code(db, affiliate, "OLD10", "2026-01", "2026-03")
+    db.flush()
+
+    archive_affiliate(db, affiliate)
+    db.flush()
+
+    assert owner_of(db, "OLD10", "2026-02") is not None
+    assert owner_of(db, "OLD10", "2026-04") is None
+
+
+def test_archiving_with_no_codes_does_not_error(db):
+    affiliate = create_affiliate(db, user_account_id=_account(db).id, name="Nour")
+    db.flush()
+    archive_affiliate(db, affiliate)
+    db.flush()
+    assert affiliate.status == AffiliateStatus.ARCHIVED

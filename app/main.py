@@ -14,7 +14,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api import auth, health, operations, webhooks
+from app.api import affiliates, auth, health, operations, webhooks
 from app.config import settings
 from app.worker import worker_loop
 
@@ -83,6 +83,7 @@ app.include_router(health.router)
 app.include_router(auth.router)
 app.include_router(webhooks.router)
 app.include_router(operations.router)
+app.include_router(affiliates.router)
 
 
 if (WEB_DIR / "index.html").exists():
