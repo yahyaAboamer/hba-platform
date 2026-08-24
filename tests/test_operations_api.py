@@ -55,6 +55,46 @@ def _add_order(order_id: str, code: str, *, month: str = "2026-08") -> None:
         )
 
 
+def _register_code(code: str, start_month: str, end_month: str | None = None) -> int:
+    """Give a code an owner, the way the affiliate API does.
+
+    Creates the account and profile inline: this file tests the operational
+    view, not the registry, and going through the HTTP layer here would make
+    these tests fail for reasons that have nothing to do with what they check.
+    """
+    from app.core.passwords import hash_password
+
+    with engine.begin() as connection:
+        account_id = connection.execute(
+            text(
+                "INSERT INTO user_account (email, password_hash, status) "
+                "VALUES (:e, :p, 'active') RETURNING id"
+            ),
+            {"e": f"{code.lower()}@example.com", "p": hash_password("a-long-password")},
+        ).scalar()
+        affiliate_id = connection.execute(
+            text(
+                "INSERT INTO affiliate_profile (user_account_id, name, status) "
+                "VALUES (:u, :n, 'active') RETURNING id"
+            ),
+            {"u": account_id, "n": code},
+        ).scalar()
+        connection.execute(
+            text(
+                "INSERT INTO discount_code_period "
+                "(affiliate_id, code, start_month, end_month) "
+                "VALUES (:a, :c, :s, :e)"
+            ),
+            {"a": affiliate_id, "c": code.upper(), "s": start_month, "e": end_month},
+        )
+    return affiliate_id
+
+
+def _codes_reported(client) -> dict[str, int]:
+    body = client.get("/api/operations/unregistered-codes").json()
+    return {row["code"]: row["order_count"] for row in body["codes"]}
+
+
 def _add_failed_job(kind: str = "shopify_sync_order", error: str = "Shopify timed out"):
     with engine.begin() as connection:
         connection.execute(
@@ -481,3 +521,92 @@ def test_scopes_reports_an_unconfigured_shopify_clearly(client, monkeypatch):
 
     monkeypatch.setattr("app.services.shopify.sync.build_client", unconfigured)
     assert client.get("/api/operations/shopify-scopes").status_code == 503
+
+
+# ── Unregistered means unregistered (Phase 3 Task 8) ───────────────────────────
+
+
+def test_a_registered_code_is_no_longer_reported_as_unregistered(client):
+    """The endpoint's name finally matches what it returns.
+
+    Until an affiliate could own a code, this listed every code seen. Now a
+    code owned for the month an order was placed is registered, and drops out.
+    """
+    _add_order("1", "SARA10", month="2026-08")
+    _add_order("2", "HBA10", month="2026-08")
+    assert _codes_reported(client) == {"SARA10": 1, "HBA10": 1}
+
+    _register_code("SARA10", "2026-01")
+    assert _codes_reported(client) == {"HBA10": 1}
+
+
+def test_a_code_registered_for_a_later_month_is_still_unregistered_earlier(client):
+    """Ownership is dated. Registering NOUR10 from September does not make
+    April's NOUR10 orders owned - those sales still belong to nobody.
+    """
+    _add_order("1", "NOUR10", month="2026-04")
+    _add_order("2", "NOUR10", month="2026-09")
+
+    _register_code("NOUR10", "2026-09")
+
+    assert _codes_reported(client) == {"NOUR10": 1}
+
+
+def test_the_report_names_the_months_that_are_unowned(client):
+    """So somebody registering the code knows which month to start it from."""
+    _add_order("1", "NOUR10", month="2026-04")
+    _add_order("2", "NOUR10", month="2026-05")
+    _add_order("3", "NOUR10", month="2026-09")
+    _register_code("NOUR10", "2026-09")
+
+    row = client.get("/api/operations/unregistered-codes").json()["codes"][0]
+    assert row["code"] == "NOUR10"
+    assert row["unowned_months"] == ["2026-04", "2026-05"]
+
+
+def test_a_code_owned_for_every_month_it_appears_in_is_absent(client):
+    _add_order("1", "NOUR10", month="2026-04")
+    _add_order("2", "NOUR10", month="2026-05")
+    _register_code("NOUR10", "2026-01")
+
+    assert _codes_reported(client) == {}
+
+
+def test_a_closed_code_period_leaves_later_orders_unregistered(client):
+    """An affiliate left in June; her code kept being used in August. Those
+    sales belong to nobody, and that is exactly what this report is for.
+    """
+    _add_order("1", "NOUR10", month="2026-05")
+    _add_order("2", "NOUR10", month="2026-08")
+    _register_code("NOUR10", "2026-01", "2026-06")
+
+    assert _codes_reported(client) == {"NOUR10": 1}
+
+
+def test_case_does_not_defeat_the_subtraction(client):
+    """Codes are stored upper-case; an order carrying a lowercase one must
+    still count as owned, or a registered code would be reported as orphaned.
+    """
+    _add_order("1", "nour10", month="2026-08")
+    _register_code("NOUR10", "2026-01")
+
+    assert _codes_reported(client) == {}
+
+
+def test_the_house_code_is_reported_when_nobody_owns_it(client):
+    """HBA10 is a real code taking real money. Unowned, its sales attribute to
+    nobody, and that is worth seeing even though it is never payable.
+    """
+    _add_order("1", "HBA10", month="2026-08")
+    assert _codes_reported(client) == {"HBA10": 1}
+
+
+def test_ordering_still_puts_the_costliest_first(client):
+    for order_id in range(1, 4):
+        _add_order(str(order_id), "BUSY", month="2026-08")
+    _add_order("9", "QUIET", month="2026-08")
+    _register_code("OWNED", "2026-01")
+    _add_order("10", "OWNED", month="2026-08")
+
+    codes = client.get("/api/operations/unregistered-codes").json()["codes"]
+    assert [row["code"] for row in codes] == ["BUSY", "QUIET"]

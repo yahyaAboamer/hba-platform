@@ -541,12 +541,27 @@ everything else is not.
 The endpoint becomes what its name claims: **live codes nobody owns, whose sales are being
 attributed to no one.**
 
-**2. Backfill on first registration** (§9.2). A previously unattributed order may be attached
-when its code is registered for the first time. That assigns an orphan; **it does not move an
-order.** An order already attributed to someone stays with them, permanently.
+**2. Backfill on first registration — moved to Phase 4.** This plan contradicted itself and
+the contradiction was only visible once the code was in front of me.
 
-`register_code` queues a `backfill_attribution` job — using the durable queue from Phase 2,
-with a dedupe key per code, because registering a code twice in a minute is one piece of work.
+§9.2 says a previously unattributed order may be attached when its code is registered for the
+first time. But attaching an order means writing `attributed_order` — and this same plan's
+*Deliberately not in this phase* section defers `attributed_order` to Phase 4, on the reasoning
+that recording an attribution belongs with the table that stores it and the immutability rule
+that protects it.
+
+Both cannot be true. **Backfill goes to Phase 4**, with the table it writes to:
+
+- Building a `backfill_attribution` job now would queue work no handler can do. The worker
+  would fail it with `no_handler` — the exact anomaly built in Phase 2 Task 4 to catch a
+  half-finished deploy.
+- Building a stub handler that queues correctly and writes nothing is worse: it would look
+  finished, pass a test asserting the job was queued, and silently attach no orders at all.
+
+**What Task 8 delivers instead is the information backfill needs.**
+`/api/operations/unregistered-codes` now reports which months of a code are unowned, so
+registering it starts from the right month rather than leaving a gap that a later backfill
+would have to find. The orders themselves wait for Phase 4.
 
 Tests:
 
@@ -555,14 +570,20 @@ def test_a_registered_code_is_no_longer_reported_as_unregistered(db): ...
 def test_a_code_registered_for_a_later_month_is_still_unregistered_earlier(db):
     """Ownership is dated. Registering NOUR10 from September does not make
     April's NOUR10 orders owned."""
-def test_registering_a_code_queues_a_backfill(db): ...
-def test_backfill_attaches_previously_unattributed_orders(db): ...
-def test_backfill_never_moves_an_already_attributed_order(db):
-    """§9.2: orders never move between models. The one rule here that, broken,
-    silently pays the wrong person."""
-def test_backfill_is_idempotent(db): ...
-def test_registering_the_same_code_twice_queues_one_backfill(db): ...
+def test_the_report_names_the_months_that_are_unowned(db):
+    """So whoever registers the code starts it from the right month rather
+    than guessing and leaving a gap."""
+def test_a_closed_code_period_leaves_later_orders_unregistered(db):
+    """An affiliate left in June, her code kept being used in August. Nobody
+    thinks to look for that, and it is exactly what this report is for."""
+def test_case_does_not_defeat_the_subtraction(db): ...
 ```
+
+**Deferred with the backfill (Phase 4):** `test_backfill_attaches_previously_unattributed_orders`,
+`test_backfill_never_moves_an_already_attributed_order`, `test_backfill_is_idempotent`,
+`test_registering_the_same_code_twice_queues_one_backfill`. The second is the one that matters
+most — orders never move between models — and it needs `attributed_order` to have anything to
+assert against.
 
 ---
 
@@ -579,7 +600,8 @@ def test_registering_the_same_code_twice_queues_one_backfill(db): ...
 - [ ] No raw InstaPay address or account number appears in any audit record
 - [ ] Every affiliate endpoint refuses the `affiliate` role
 - [ ] `/api/operations/unregistered-codes` excludes owned codes
-- [ ] Backfill attaches orphans and **never** moves an attributed order
+- [ ] ~~Backfill attaches orphans and **never** moves an attributed order~~ — moved to
+      Phase 4 with `attributed_order`; see Task 8
 
 ---
 

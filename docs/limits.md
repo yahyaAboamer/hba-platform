@@ -316,6 +316,27 @@ platform at all.** That holds only while the portal does not exist. Phase 8
 must not ship self-service without these, or it removes the one thing currently
 preventing it.
 
+### 🟠 Orders placed before a code was registered stay orphaned
+
+**The limit.** §9.2 says an unattributed order may be attached when its code is
+registered for the first time. **That is not built.** Attaching an order means
+writing `attributed_order`, which arrives in Phase 4, so the backfill goes with
+it.
+
+**What failure looks like.** A model's sales from before her code was set up
+never appear anywhere and never pay. Nothing errors — the orders are indexed
+and simply belong to nobody.
+
+**What exists instead.** `/api/operations/unregistered-codes` reports every code
+whose orders are unowned, **and which months are unowned**, so the gap is
+visible and registering the code starts from the right month rather than
+leaving one.
+
+*What to do until Phase 4:* check that report before approving an affiliate. If
+her code already has orders, register it from the earliest month listed, not
+from today — otherwise the backfill, when it arrives, has a gap to find that
+nobody recorded.
+
 ### 🟠 A handler that is not idempotent
 
 Every handler must either upsert by Shopify id or be read-only, and must never
