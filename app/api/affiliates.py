@@ -24,6 +24,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import require_permission
 from app.core.businesstime import business_month, utcnow
+from app.core.periods import PLATFORM_START_MONTH
 from app.core.permissions import Permission
 from app.db import get_session
 from app.models.affiliates import AffiliateProfile, AffiliateStatus
@@ -59,7 +60,14 @@ class UpdateStatusBody(BaseModel):
 
 class RegisterCodeBody(BaseModel):
     code: str = Field(min_length=1, max_length=120)
-    start_month: str
+    #: Defaults to the platform's data horizon rather than to today.
+    #:
+    #: Most codes were live on Shopify long before this platform existed and
+    #: already have orders against them. Registering one from *today* would
+    #: leave every one of those orders orphaned - the model would open her
+    #: dashboard and see nothing before the day she was approved. Supply a
+    #: later month only when the code genuinely did not exist before then.
+    start_month: str = PLATFORM_START_MONTH
     end_month: str | None = None
     #: Whether Shopify has already confirmed the code exists. Verification
     #: itself - the actual Shopify lookup - is /api/operations/verify-code;

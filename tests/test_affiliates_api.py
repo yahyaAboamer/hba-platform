@@ -63,6 +63,19 @@ def _make_account(email: str) -> int:
         ).scalar()
 
 
+def _add_order(order_id: str, code: str, *, month: str = "2026-08") -> None:
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO order_index (shopify_order_id, order_number, placed_at, "
+                "business_month, discount_codes, subtotal_piastres, total_piastres, "
+                "shipping_piastres, tax_piastres, currency) "
+                "VALUES (:i, :n, now(), :m, ARRAY[:c], 0, 0, 0, 0, 'EGP')"
+            ),
+            {"i": order_id, "n": f"#{order_id}", "m": month, "c": code},
+        )
+
+
 def _register(client, name="Nour", email="nour@example.com", **overrides) -> dict:
     account_id = _make_account(email)
     body = {"user_account_id": account_id, "name": name, **overrides}
@@ -213,8 +226,19 @@ def test_reading_a_fresh_affiliate_shows_nothing_set_yet(client):
 # ── Status ─────────────────────────────────────────────────────────────────────
 
 
+def _verify_code(client, affiliate_id, code="NOUR10"):
+    """Register a code already confirmed against Shopify - the approval gate."""
+    response = client.post(
+        f"/api/affiliates/{affiliate_id}/codes",
+        json={"code": code, "verified": True},
+    )
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
 def test_updating_status(client):
     affiliate = _register(client)
+    _verify_code(client, affiliate["id"])
     response = client.patch(
         f"/api/affiliates/{affiliate['id']}", json={"status": "active"}
     )
@@ -482,3 +506,84 @@ def test_content_manager_can_manage_affiliates_and_compensation(client):
         },
     )
     assert response.status_code == 201
+
+
+# ── History is captured by default (the flow the business described) ───────────
+
+
+def test_a_code_registers_from_the_platform_start_by_default(client):
+    """Most codes were live on Shopify long before this platform existed.
+
+    Registering one from *today* would orphan every order it had already
+    earned - the model would open her dashboard and see nothing before the day
+    she was approved. The safe answer has to be the default, because the
+    unsafe one is a typo away.
+    """
+    from app.core.periods import PLATFORM_START_MONTH
+
+    affiliate = _register(client)
+    response = client.post(
+        f"/api/affiliates/{affiliate['id']}/codes", json={"code": "NOUR10"}
+    )
+    assert response.status_code == 201
+    assert response.json()["start_month"] == PLATFORM_START_MONTH
+
+
+def test_a_later_start_month_is_still_accepted(client):
+    """A genuinely new code, created on Shopify after the platform started,
+    should not claim months it did not exist for.
+    """
+    affiliate = _register(client)
+    response = client.post(
+        f"/api/affiliates/{affiliate['id']}/codes",
+        json={"code": "NEW10", "start_month": "2026-07"},
+    )
+    assert response.json()["start_month"] == "2026-07"
+
+
+def test_a_default_registration_picks_up_the_orders_already_placed(client):
+    """The whole point, end to end: a code already in use stops being reported
+    as belonging to nobody the moment it is registered.
+    """
+    _add_order("1", "NOUR10", month="2026-03")
+    _add_order("2", "NOUR10", month="2026-06")
+
+    before = client.get("/api/operations/unregistered-codes").json()["codes"]
+    assert {row["code"] for row in before} == {"NOUR10"}
+
+    affiliate = _register(client)
+    client.post(f"/api/affiliates/{affiliate['id']}/codes", json={"code": "NOUR10"})
+
+    after = client.get("/api/operations/unregistered-codes").json()["codes"]
+    assert after == []
+
+
+# ── Approval is gated on verification, over HTTP ───────────────────────────────
+
+
+def test_approving_without_a_verified_code_is_refused(client):
+    affiliate = _register(client)
+    response = client.patch(
+        f"/api/affiliates/{affiliate['id']}", json={"status": "active"}
+    )
+    assert response.status_code == 400
+    assert "Shopify" in response.json()["detail"]
+
+
+def test_approving_with_an_unverified_code_is_refused(client):
+    affiliate = _register(client)
+    client.post(f"/api/affiliates/{affiliate['id']}/codes", json={"code": "NOUR10"})
+
+    response = client.patch(
+        f"/api/affiliates/{affiliate['id']}", json={"status": "active"}
+    )
+    assert response.status_code == 400
+
+
+def test_deactivating_never_requires_a_verified_code(client):
+    """The gate is on approval, not on every change of status."""
+    affiliate = _register(client)
+    response = client.patch(
+        f"/api/affiliates/{affiliate['id']}", json={"status": "inactive"}
+    )
+    assert response.status_code == 200

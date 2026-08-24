@@ -133,6 +133,25 @@ def registered_codes(db: Session, month: str) -> dict[str, int]:
     return {code: affiliate_id for code, affiliate_id in rows}
 
 
+def verified_codes_for(
+    db: Session, affiliate: AffiliateProfile
+) -> list[DiscountCodePeriod]:
+    """Codes this affiliate holds that Shopify has confirmed exist.
+
+    Not month-scoped, deliberately. This answers "has anybody actually checked
+    a code for this person", which gates approval (§10.4) - a question about
+    the affiliate, not about a particular month.
+    """
+    return list(
+        db.scalars(
+            select(DiscountCodePeriod)
+            .where(DiscountCodePeriod.affiliate_id == affiliate.id)
+            .where(DiscountCodePeriod.shopify_verified_at.is_not(None))
+            .order_by(DiscountCodePeriod.code)
+        )
+    )
+
+
 def close_codes_for(
     db: Session,
     affiliate: AffiliateProfile,

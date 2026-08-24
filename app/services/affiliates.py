@@ -17,7 +17,7 @@ from app.models.affiliates import (
     AffiliateStatus,
 )
 from app.services.audit import record_audit
-from app.services.codes import close_codes_for
+from app.services.codes import close_codes_for, verified_codes_for
 
 
 def create_affiliate(
@@ -83,6 +83,23 @@ def set_status(
     previous = affiliate.status
     if previous == status:
         return
+
+    if status == AffiliateStatus.ACTIVE and not verified_codes_for(db, affiliate):
+        # Spec 10.4: Shopify code verification is a *required gate* before
+        # approval, and this is the gate.
+        #
+        # Approving a mistyped code is the failure it exists to catch. Nothing
+        # errors: the code simply matches no order, the model earns nothing,
+        # and the first anyone notices is when she asks why her dashboard is
+        # empty - by which point months of her sales have gone to nobody.
+        #
+        # Enforced here rather than in the API so it holds for every caller,
+        # the same reasoning as closing code ownership on archive.
+        raise ValueError(
+            "This affiliate has no code confirmed to exist in Shopify. Verify "
+            "the code first - an unverified code that turns out to be mistyped "
+            "attributes nothing, silently."
+        )
 
     affiliate.status = status
     record_audit(
