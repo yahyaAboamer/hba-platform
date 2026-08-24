@@ -1,0 +1,149 @@
+"""Pay terms, over time.
+
+What an affiliate is owed *per month*. Not how much - that is Phase 4 - but on
+what basis.
+
+Terms are effective-dated, so **a rate change is a new period, not an edit**.
+Editing would rewrite history: a month already approved and paid would silently
+recalculate at the new rate the next time anyone opened it.
+
+One table replaces the three parallel period tables the old system carried, and
+a fourth compensation type needs no schema change.
+"""
+
+from datetime import datetime
+
+from sqlalchemy import (
+    BigInteger,
+    CheckConstraint,
+    Computed,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    text,
+)
+from sqlalchemy.dialects.postgresql import DATERANGE
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.core.periods import EFFECTIVE_RANGE_SQL
+from app.db import Base
+
+
+class CompensationType:
+    """How an affiliate is paid (§9.5)."""
+
+    #: Sales commission alone.
+    COMMISSION = "commission"
+
+    #: Sales commission **plus** a fixed salary. Both are paid.
+    FIXED_PLUS_COMMISSION = "fixed_plus_commission"
+
+    #: **max(sales commission, base amount)** - and only when targets are
+    #: achieved *and* verified.
+    #:
+    #: The base is never added on top of a higher commission, and never caps
+    #: one. It is a floor, not a bonus and not a ceiling. Written here because
+    #: it is the rule most likely to be implemented wrong from the name alone.
+    BASE_GUARANTEE = "base_guarantee"
+
+
+VALID_TYPES = frozenset(
+    value for name, value in vars(CompensationType).items() if not name.startswith("_")
+)
+
+_TYPE_LIST = ", ".join(f"'{kind}'" for kind in sorted(VALID_TYPES))
+
+#: Which money fields each type may carry. A field nothing reads is worse than
+#: a missing one - the next person to look assumes it is being paid.
+_FIELDS_MATCH_TYPE = f"""
+(
+  (compensation_type = '{CompensationType.COMMISSION}'
+     AND fixed_amount_piastres IS NULL
+     AND base_amount_piastres IS NULL)
+  OR (compensation_type = '{CompensationType.FIXED_PLUS_COMMISSION}'
+     AND fixed_amount_piastres IS NOT NULL
+     AND base_amount_piastres IS NULL)
+  OR (compensation_type = '{CompensationType.BASE_GUARANTEE}'
+     AND base_amount_piastres IS NOT NULL
+     AND fixed_amount_piastres IS NULL)
+)
+"""
+
+
+class CompensationPeriod(Base):
+    """One affiliate's pay terms, for a run of months."""
+
+    __tablename__ = "compensation_period"
+    __table_args__ = (
+        CheckConstraint(
+            f"compensation_type IN ({_TYPE_LIST})",
+            name="compensation_period_type_valid",
+        ),
+        CheckConstraint(_FIELDS_MATCH_TYPE, name="compensation_period_fields_match_type"),
+        CheckConstraint(
+            "commission_rate_bp > 0 AND commission_rate_bp <= 10000",
+            name="compensation_period_rate_sane",
+        ),
+        CheckConstraint(
+            "fixed_amount_piastres IS NULL OR fixed_amount_piastres >= 0",
+            name="compensation_period_fixed_not_negative",
+        ),
+        CheckConstraint(
+            "base_amount_piastres IS NULL OR base_amount_piastres >= 0",
+            name="compensation_period_base_not_negative",
+        ),
+        CheckConstraint(
+            "end_month IS NULL OR end_month >= start_month",
+            name="compensation_period_months_ordered",
+        ),
+        Index("compensation_period_affiliate_idx", "affiliate_id"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    affiliate_id: Mapped[int] = mapped_column(
+        ForeignKey("affiliate_profile.id", ondelete="CASCADE"), nullable=False
+    )
+
+    start_month: Mapped[str] = mapped_column(String(7), nullable=False)
+    #: NULL means open-ended: from the start month, until further notice.
+    end_month: Mapped[str | None] = mapped_column(String(7))
+
+    compensation_type: Mapped[str] = mapped_column(String(30), nullable=False)
+
+    #: Basis points. 1000 = 10%. Integers throughout (ADR 0002).
+    commission_rate_bp: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    #: Only for fixed_plus_commission.
+    fixed_amount_piastres: Mapped[int | None] = mapped_column(BigInteger)
+    #: Only for base_guarantee.
+    base_amount_piastres: Mapped[int | None] = mapped_column(BigInteger)
+
+    #: What the customer is expected to get off, in basis points.
+    #:
+    #: Stored **separately** from commission_rate_bp and never derived from it
+    #: (§10.4). A creator may give customers 10% off while earning 5% - they
+    #: are different commercial concepts, and inferring one from the other
+    #: would be wrong exactly when it mattered. It exists to be *compared*
+    #: against what Shopify reports, never to stand in for a rate.
+    expected_customer_discount_bp: Mapped[int | None] = mapped_column(Integer)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+
+    #: Generated by the database; the no-overlap constraint is built on it.
+    #: Declared here so that --autogenerate does not decide to drop it.
+    effective_range: Mapped[object] = mapped_column(
+        DATERANGE, Computed(EFFECTIVE_RANGE_SQL, persisted=True), nullable=True
+    )
+
+    affiliate = relationship("AffiliateProfile", lazy="joined")
+
+    def __repr__(self) -> str:
+        end = self.end_month or "onward"
+        return (
+            f"<CompensationPeriod {self.compensation_type} "
+            f"{self.start_month}..{end}>"
+        )
