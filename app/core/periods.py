@@ -42,8 +42,12 @@ So the date is built from integers instead - `make_date` and integer division,
 which are immutable. The upper bound is "the month after", with December
 rolling into January of the next year:
 
-    year  = month / 12 + year      (12 / 12 = 1, everything else 0)
-    month = month % 12 + 1         (12 -> 1, 6 -> 7)
+    year  = month / 12 + year         (12 / 12 = 1, everything else 0)
+    month = mod(month, 12) + 1        (12 -> 1, 6 -> 7)
+
+``mod()`` rather than the ``%`` operator: a percent sign in DDL passed
+through SQLAlchemy's Computed() is escaped for the driver's parameter
+style and reaches Postgres as ``%%``, which is not an operator.
 
 ## Backwards periods, and the empty-range trap that is not one
 
@@ -87,7 +91,7 @@ EFFECTIVE_RANGE_SQL = """daterange(
         CASE WHEN end_month IS NULL THEN NULL
              ELSE make_date(
                  right(end_month, 2)::int / 12 + left(end_month, 4)::int,
-                 right(end_month, 2)::int % 12 + 1,
+                 mod(right(end_month, 2)::int, 12) + 1,
                  1
              )
         END,
