@@ -293,6 +293,24 @@ delete from background_job
 where status = 'failed' and last_error like '%not configured%';
 ```
 
+### 🟠 Payout destination changes are stored safely but not yet guarded
+
+**The limit.** §6.4 treats repointing a payout destination as a money-impacting
+change and requires five things. Phase 3 builds two of them — append-only
+storage with supersession, and masking so no raw account number reaches an
+audit record.
+
+**Not yet built:** the affiliate re-entering their password, the maintainer
+being notified immediately, and the payment screen warning that a destination
+changed recently. All three need the affiliate portal and the notification
+outbox, which arrive in Phase 8.
+
+**Why this matters now.** Until then, **the protection against a compromised
+account silently redirecting a payout is that affiliates cannot reach the
+platform at all.** That holds only while the portal does not exist. Phase 8
+must not ship self-service without these, or it removes the one thing currently
+preventing it.
+
 ### 🟠 A handler that is not idempotent
 
 Every handler must either upsert by Shopify id or be read-only, and must never
