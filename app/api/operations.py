@@ -1,0 +1,248 @@
+"""Operational visibility.
+
+A failed background job that exists only in a log file is invisible. These
+endpoints put sync state, failures, and unattributed codes where the maintainer
+will actually see them - the point being to learn about a sync failure from the
+platform rather than from a confused affiliate.
+"""
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field, field_validator
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+
+from app.api.deps import require_permission
+from app.config import settings
+from app.core.businesstime import parse_month, utcnow
+from app.core.permissions import Permission
+from app.db import get_session
+from app.models.identity import UserAccount
+from app.services.jobs import JobKind, JobStatus, enqueue
+from app.services.schedule import SCHEDULE
+from app.services.shopify.client import (
+    ShopifyError,
+    ShopifyMissingScope,
+    ShopifyNotConfigured,
+)
+from app.services.shopify.discounts import REQUIRED_SCOPE, verify_discount_code
+
+router = APIRouter(prefix="/api/operations")
+
+#: The earliest the business wants history from. Anything before this is not a
+#: mistake so much as a much larger export than anyone intended.
+EARLIEST_IMPORT = "2026-01-01"
+
+
+class VerifyCodeBody(BaseModel):
+    code: str = Field(min_length=1, max_length=120)
+
+
+class StartImportBody(BaseModel):
+    since: str = Field(default=EARLIEST_IMPORT)
+
+    @field_validator("since")
+    @classmethod
+    def _must_be_a_date(cls, value: str) -> str:
+        text_value = str(value or "").strip()
+        try:
+            year, month, day = (int(part) for part in text_value.split("-"))
+            parse_month(f"{year:04d}-{month:02d}")
+            if not 1 <= day <= 31:
+                raise ValueError
+        except (ValueError, TypeError) as exc:
+            raise ValueError("since must be a date like 2026-01-01") from exc
+        return text_value
+
+
+def _isoformat(value) -> str | None:
+    return value.isoformat() if value else None
+
+
+@router.get("/sync")
+def sync_status(
+    _actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_VIEW)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Is order data flowing, and is the safety net running?
+
+    The second half matters as much as the first. Recurring work is queued by
+    the worker itself, so if the worker stops, the reconciliation sweep stops
+    too - with no error, because nothing failed (docs/limits.md). Reporting
+    when it last ran is what makes that visible instead of silent.
+    """
+    jobs = dict(
+        db.execute(
+            text("SELECT status, count(*) FROM background_job GROUP BY status")
+        ).all()
+    )
+
+    recurring = {}
+    for kind in SCHEDULE:
+        row = db.execute(
+            text(
+                "SELECT max(finished_at) FILTER (WHERE status = 'succeeded') AS last_run, "
+                "       min(run_after) FILTER (WHERE status = 'pending') AS next_due "
+                "FROM background_job WHERE kind = :kind"
+            ),
+            {"kind": kind},
+        ).mappings().one()
+        recurring[kind] = {
+            "last_succeeded_at": _isoformat(row["last_run"]),
+            "next_due_at": _isoformat(row["next_due"]),
+            "scheduled": row["next_due"] is not None,
+        }
+
+    return {
+        "shopify_configured": settings.shopify_configured,
+        "webhooks_configured": bool(settings.shopify_webhook_secret),
+        "orders_indexed": db.execute(text("SELECT count(*) FROM order_index")).scalar()
+        or 0,
+        "last_order_synced_at": _isoformat(
+            db.execute(text("SELECT max(last_synced_at) FROM order_index")).scalar()
+        ),
+        "last_event_received_at": _isoformat(
+            db.execute(text("SELECT max(received_at) FROM integration_event")).scalar()
+        ),
+        "jobs": {
+            "pending": jobs.get(JobStatus.PENDING, 0),
+            "running": jobs.get(JobStatus.RUNNING, 0),
+            "succeeded": jobs.get(JobStatus.SUCCEEDED, 0),
+            "failed": jobs.get(JobStatus.FAILED, 0),
+        },
+        "recurring": recurring,
+    }
+
+
+@router.get("/failed-jobs")
+def failed_jobs(
+    _actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_VIEW)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Work that did not happen, and will not without someone acting."""
+    rows = (
+        db.execute(
+            text(
+                "SELECT id, kind, payload, attempts, last_error, created_at, finished_at "
+                "FROM background_job WHERE status = 'failed' "
+                "ORDER BY finished_at DESC NULLS LAST, id DESC LIMIT 100"
+            )
+        )
+        .mappings()
+        .all()
+    )
+    return {
+        "jobs": [
+            {
+                "id": row["id"],
+                "kind": row["kind"],
+                "payload": row["payload"],
+                "attempts": row["attempts"],
+                "last_error": row["last_error"],
+                "created_at": _isoformat(row["created_at"]),
+                "finished_at": _isoformat(row["finished_at"]),
+            }
+            for row in rows
+        ]
+    }
+
+
+@router.get("/unregistered-codes")
+def unregistered_codes(
+    _actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_VIEW)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Discount codes in use on real orders.
+
+    Phase 3 subtracts the codes that belong to an affiliate, leaving only the
+    genuinely unregistered ones. Until affiliates exist this reports every code
+    seen - already the information needed to spot a live code nobody set up,
+    whose sales are being attributed to no one.
+    """
+    rows = (
+        db.execute(
+            text(
+                "SELECT code, count(*) AS order_count, "
+                "       min(placed_at) AS first_seen, max(placed_at) AS last_seen "
+                "FROM order_index, unnest(discount_codes) AS code "
+                "GROUP BY code ORDER BY order_count DESC, code LIMIT 200"
+            )
+        )
+        .mappings()
+        .all()
+    )
+    return {
+        "codes": [
+            {
+                "code": row["code"],
+                "order_count": row["order_count"],
+                "first_seen": _isoformat(row["first_seen"]),
+                "last_seen": _isoformat(row["last_seen"]),
+            }
+            for row in rows
+        ]
+    }
+
+
+@router.post("/verify-code")
+def verify_code(
+    body: VerifyCodeBody,
+    _actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_MANAGE)),
+) -> dict:
+    """Confirm a discount code exists in Shopify. The Phase 3 onboarding gate."""
+    from app.services.shopify.sync import build_client
+
+    try:
+        return verify_discount_code(build_client(), body.code)
+    except ShopifyMissingScope as exc:
+        # Distinct from a general Shopify failure on purpose. Shopify was
+        # reached and answered; the app simply has not been granted the scope.
+        # Reporting that as "could not reach Shopify" would send someone
+        # debugging the network instead of the app configuration.
+        raise HTTPException(
+            403,
+            f"Shopify has not granted {REQUIRED_SCOPE}. Add it to the app's "
+            f"configuration in the Shopify Dev Dashboard, then try again.",
+        ) from exc
+    except ShopifyNotConfigured as exc:
+        raise HTTPException(503, str(exc)) from exc
+    except ShopifyError as exc:
+        raise HTTPException(502, f"Could not reach Shopify: {exc}") from exc
+
+
+@router.post("/start-import")
+def start_import(
+    body: StartImportBody,
+    _actor: UserAccount = Depends(require_permission(Permission.SETTINGS_MANAGE)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Queue the historical order import.
+
+    Admin only. It runs a server-side export over the whole shop's history and
+    Shopify permits one bulk operation at a time, so this is not something to
+    start casually or twice.
+
+    Queues rather than runs: the export takes minutes, and an HTTP request is
+    not the place to wait for it. Watch it under `jobs` in
+    /api/operations/sync - not under `recurring`, which covers only work that
+    repeats on a schedule.
+    """
+    job = enqueue(
+        db,
+        JobKind.BULK_IMPORT,
+        {"since": body.since},
+        dedupe_key=JobKind.BULK_IMPORT,
+    )
+    if job is None:
+        raise HTTPException(
+            409,
+            "An import is already in progress. Wait for it to finish - Shopify "
+            "runs one bulk operation per shop at a time.",
+        )
+
+    db.commit()
+    return {
+        "status": "queued",
+        "job_id": job.id,
+        "since": body.since,
+        "queued_at": _isoformat(utcnow()),
+    }

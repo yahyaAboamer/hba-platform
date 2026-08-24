@@ -3503,7 +3503,23 @@ git commit -m "feat: discount code verification and operational visibility"
 
 ## Open questions
 
-1. **Which Shopify credentials?** This plan uses a custom-app access token (`SHOPIFY_ACCESS_TOKEN`). The old dashboard also supported a Client ID/Secret exchange for short-lived tokens. Confirm which HBA will use before Task 1 — the client gains a token-refresh path if it is the latter.
-2. **Is `read_discounts` granted?** Task 8 fails without it, and the scope is added in Shopify's app configuration, not here.
-3. **Historical import start date.** The spec says 1 January 2026. Confirm before running the import.
-4. **Webhook registration.** Creating the subscriptions in Shopify is an operational action pointing at the live URL, so it needs explicit approval and is not in any task.
+*Answered during the build. Kept, with the answers, because the questions are
+part of the record.*
+
+1. **Which Shopify credentials?** ~~Custom-app token or client credentials?~~
+   **Client ID and secret** — a Dev Dashboard app with no permanent token. The
+   client exchanges and caches a short-lived one (ADR 0015). A static token
+   remains supported for an older app.
+2. **Is `read_discounts` granted?** **Not yet.** Task 8 is built and tested
+   against a mocked Shopify, so nothing here depends on it — but
+   `POST /api/operations/verify-code` cannot be verified against the real shop
+   until it is granted. Without it the endpoint returns 403 naming the scope,
+   rather than reporting the code as non-existent.
+3. **Historical import start date.** **1 January 2026**, confirmed. It also
+   needs `read_all_orders`: plain `read_orders` reaches back 60 days, so a
+   January import against it returns nothing and reports `import_empty`.
+4. **Webhook registration.** Still an operational action requiring explicit
+   approval, and still in no task. Documented in `docs/shopify-webhooks.md`,
+   including why the topics are subscribed in the Dev Dashboard rather than
+   over the API — the API route needs `write_webhooks`, and this platform never
+   requests a write scope.
