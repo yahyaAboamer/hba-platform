@@ -265,6 +265,34 @@ going missing.
 pay for, and monitor. `docs/limits.md` records the trade rather than the
 schedule pretending to be more reliable than it is.
 
+### 🟠 A recurring job that fails permanently buries the next real failure
+
+**The limit.** A scheduled job whose cause cannot resolve itself fails once per
+interval, for ever, with an identical message. Each failure is correct and each
+is kept — failed jobs are never pruned on a timer — so they accumulate.
+
+**Seen in production on day one.** `shopify_reconcile` ran every 30 minutes for
+19 hours before Shopify credentials were set, leaving **37 identical rows**
+saying `Shopify is not configured`. It healed itself on the next cycle once the
+credentials arrived, which is the behaviour we want — but the residue is
+permanent.
+
+**What failure looks like.** `/api/operations/failed-jobs` returns 100 rows of
+one resolved problem, and `jobs.failed` reads alarmingly high for ever. **The
+next genuinely different failure is invisible inside it.**
+
+**Why it is not fixed by stopping the schedule.** Giving up after N identical
+failures would mean the sweep never resumes once the cause is fixed — trading a
+noisy signal for a silent one, which is the worse of the two.
+
+*What to do:* clear a resolved incident deliberately. It is a human act, not a
+timer:
+
+```sql
+delete from background_job
+where status = 'failed' and last_error like '%not configured%';
+```
+
 ### 🟠 A handler that is not idempotent
 
 Every handler must either upsert by Shopify id or be read-only, and must never

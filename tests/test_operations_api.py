@@ -407,3 +407,77 @@ def test_no_response_mentions_a_commission(client, monkeypatch):
     _stub_shopify(monkeypatch, node=ACTIVE_CODE)
     body = client.post("/api/operations/verify-code", json={"code": "NOUR10"}).json()
     assert "commission" not in " ".join(body).lower()
+
+
+# ── What Shopify actually grants ───────────────────────────────────────────────
+
+
+def _stub_client(monkeypatch, granted: set[str]):
+    """A client reporting exactly the scopes Shopify would have returned."""
+    import httpx
+
+    from app.services.shopify.client import ShopifyClient
+
+    client = ShopifyClient(
+        shop_domain="s.myshopify.com",
+        access_token="t",
+        transport=httpx.MockTransport(lambda r: httpx.Response(200, json={"data": {}})),
+    )
+    client._granted_scopes = set(granted)
+    monkeypatch.setattr("app.services.shopify.sync.build_client", lambda: client)
+    return client
+
+
+def test_scopes_reports_what_is_granted_and_what_is_missing(client, monkeypatch):
+    """The question "is read_discounts actually granted?" has to be answerable
+    with a fact rather than by trying something and reading the error.
+    """
+    _stub_client(monkeypatch, {"read_orders", "read_all_orders"})
+    body = client.get("/api/operations/shopify-scopes").json()
+
+    assert body["granted"] == ["read_all_orders", "read_orders"]
+    assert body["missing"] == ["read_discounts"]
+    assert "read_discounts" in body["required"]
+    assert body["reported_by_shopify"] is True
+
+
+def test_scopes_reports_nothing_missing_once_everything_is_granted(client, monkeypatch):
+    _stub_client(monkeypatch, {"read_orders", "read_all_orders", "read_discounts"})
+    body = client.get("/api/operations/shopify-scopes").json()
+
+    assert body["missing"] == []
+
+
+def test_an_unknown_scope_list_is_not_reported_as_everything_missing(
+    client, monkeypatch
+):
+    """A static token carries no scope list. Saying "all missing" would send
+    someone re-granting scopes that were never the problem.
+    """
+    _stub_client(monkeypatch, set())
+    body = client.get("/api/operations/shopify-scopes").json()
+
+    assert body["granted"] == []
+    assert body["missing"] == []
+    assert body["reported_by_shopify"] is False
+
+
+def test_only_an_administrator_may_read_the_scopes(client, monkeypatch):
+    """It forces a token exchange against Shopify."""
+    _stub_client(monkeypatch, {"read_orders"})
+    _demote_to("affiliate_manager")
+    assert client.get("/api/operations/shopify-scopes").status_code == 403
+
+
+def test_scopes_requires_authentication(anonymous):
+    assert anonymous.get("/api/operations/shopify-scopes").status_code == 401
+
+
+def test_scopes_reports_an_unconfigured_shopify_clearly(client, monkeypatch):
+    from app.services.shopify.client import ShopifyNotConfigured
+
+    def unconfigured():
+        raise ShopifyNotConfigured("Shopify is not configured: set SHOPIFY_SHOP_DOMAIN")
+
+    monkeypatch.setattr("app.services.shopify.sync.build_client", unconfigured)
+    assert client.get("/api/operations/shopify-scopes").status_code == 503
