@@ -598,18 +598,38 @@ def test_registering_the_same_code_twice_queues_one_backfill(db): ...
 
 ---
 
-## Open questions
+## Where the account comes from — settled
 
-1. **Does an affiliate need a `user_account` before they have a login?** The registry is
-   maintainer-filled in this phase, but `affiliate_profile.user_account_id` is not nullable.
-   Either a placeholder account is created at registration, or the column is nullable until
-   Phase 8. **Leaning: create the account at registration in `invited` status**, since it is
-   already the shape invitations use and avoids a nullable foreign key that Phase 8 would have
-   to backfill.
+Phase 1 already answers this, and the onboarding flow the business described (§13) matches it
+exactly:
 
-2. **What happens to a code period when an affiliate is archived?** Ownership presumably ends,
-   but ending it retroactively would change past attribution. **Leaning: archiving closes the
-   period at the current month and never earlier**, so history is untouched.
+| Step | What exists afterwards |
+|---|---|
+| 1. Maintainer invites by email | An `invitation` row. **No account.** |
+| 2. Model opens the link, fills in their details, sets a password | `accept_invitation` creates the `user_account`. **`affiliate_profile` is created here, `pending`.** |
+| 3. Maintainer verifies the code (§10.4), sets compensation and targets | Code period, compensation period |
+| 4. Maintainer approves | Status becomes `active` |
 
-3. **`house` in rankings** — §8 says excluded from payable totals *and rankings*. Rankings are
-   not built until later; noting so it is not forgotten when they are.
+So `affiliate_profile.user_account_id` is **not nullable and needs no placeholder** — the
+account always exists before the profile does. No nullable foreign key, and nothing for Phase 8
+to backfill.
+
+**What Phase 3 builds is step 3.** Steps 1 and 2 exist (Phase 1 invitations); the *self-service
+form* at step 2 is Phase 8. Until then a maintainer creates the profile directly, through the
+same service function Phase 8 will later call from the acceptance flow. One code path, reached
+two ways — not two implementations that must be kept agreeing.
+
+## Decided, not open
+
+**A code period closes at the current month when an affiliate is archived — never earlier.**
+Ending it retroactively would rewrite past attribution and change months that are already
+approved and paid. Archiving says "from now on, not theirs"; it cannot say "was never theirs".
+
+If the business wants a code reissued to someone else, that is a new period starting the month
+after — which the exclusion constraint permits and the overlap rule protects.
+
+## Still open
+
+**`house` in rankings.** §8 excludes house accounts from payable totals *and rankings*.
+Payable totals are handled in Phase 4. Rankings do not exist yet; noted here so it is not
+forgotten when they are built.
