@@ -256,8 +256,47 @@ def test_identity_is_not_rooted_in_an_affiliate_table(db):
         )
     ).scalars().all()
     assert "user_account" in tables
+    # No bare `affiliate` table. An affiliate is a *profile* hanging off an
+    # account; a table by that name would be the shortcut this test exists to
+    # prevent.
     assert "affiliate" not in tables
-    assert "affiliate_profile" not in tables
+
+    # Phase 3 added affiliate_profile, so its absence is no longer the thing to
+    # assert. The invariant was never "no affiliate table exists" - it is which
+    # way the dependency points. Now that there is a profile, that can be
+    # checked directly instead of by proxy.
+    if "affiliate_profile" in tables:
+        profile_columns = db.execute(
+            text(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_schema = 'public' AND table_name = 'affiliate_profile'"
+            )
+        ).scalars().all()
+        assert "user_account_id" in profile_columns, (
+            "affiliate_profile must point at user_account"
+        )
+
+        # The half that actually matters: identity must not depend on the
+        # profile. A foreign key here would mean an account cannot exist
+        # without an affiliate - which is exactly the spine being reshaped
+        # around models.
+        identity_references = db.execute(
+            text(
+                "SELECT c.column_name "
+                "FROM information_schema.table_constraints tc "
+                "JOIN information_schema.key_column_usage c "
+                "  ON c.constraint_name = tc.constraint_name "
+                "JOIN information_schema.constraint_column_usage target "
+                "  ON target.constraint_name = tc.constraint_name "
+                "WHERE tc.table_name = 'user_account' "
+                "  AND tc.constraint_type = 'FOREIGN KEY' "
+                "  AND target.table_name = 'affiliate_profile'"
+            )
+        ).scalars().all()
+        assert identity_references == [], (
+            "user_account must not reference affiliate_profile - identity is "
+            "rooted in the account, not in the business record"
+        )
 
     # Every identity table points at user_account, not the other way round.
     for table in ("role_assignment", "auth_session", "invitation"):
