@@ -300,10 +300,15 @@ change and requires five things. Phase 3 builds two of them — append-only
 storage with supersession, and masking so no raw account number reaches an
 audit record.
 
-**Not yet built:** the affiliate re-entering their password, the maintainer
-being notified immediately, and the payment screen warning that a destination
-changed recently. All three need the affiliate portal and the notification
+**Not yet built:** the affiliate re-entering their password, and the maintainer
+being notified immediately. Both need the affiliate portal and the notification
 outbox, which arrive in Phase 8.
+
+**Half-built:** the payment-screen warning. `changed_recently()` answers *when
+the destination last changed, if it changed lately* — the fact the warning needs
+— and deliberately returns nothing for an affiliate's *first* destination,
+because that is not a redirection. **Nothing displays it yet.** The payment
+screen is Phase 7.
 
 **Why this matters now.** Until then, **the protection against a compromised
 account silently redirecting a payout is that affiliates cannot reach the

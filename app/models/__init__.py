@@ -8,4 +8,5 @@ from app.models import (  # noqa: F401
     identity,
     integration,
     orders,
+    payouts,
 )
