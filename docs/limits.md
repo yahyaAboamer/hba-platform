@@ -391,6 +391,175 @@ every parcel a customer refuses at the door — which for cash-on-delivery throu
 precise loss ADR 0012 was written to stop. That would be a decision about real money and
 belongs to the business, not to whoever is writing code that week.
 
+### 🟠 Orders indexed before Task 2b know nothing about delivery
+
+**The limit.** Delivery, return and refund fields were never requested until
+Phase 4 Task 2b. The migration adds the columns; it cannot invent the data. All
+**529 orders already indexed carry `delivery_state = NULL`**, and an order with
+no delivery state never earns.
+
+**What failure looks like.** A model's January to August sales show as pending
+for ever. Her month calculates to zero earned, correctly, and it looks exactly
+like a month with no sales — the same symptom as a dead delivery signal, from a
+completely different cause.
+
+**What exists instead.** The reconciliation sweep refreshes recent orders on its
+own, so the window it covers heals without anyone doing anything. Everything
+older needs `POST /api/operations/start-import` run again — it is idempotent,
+upserts by Shopify order id, and `first_seen_at` is deliberately excluded from
+the update so re-importing does not rewrite history.
+
+*What to do before the first real payroll:* re-run the import from
+`2026-01-01`, then check `GET /api/operations/order-facts` — `already_indexed`
+will show delivery states once they are populated. **A month of zeroes is not
+evidence of no sales.**
+
+### 🟠 An order half delivered and half failed resolves neither way
+
+**The limit.** A split shipment where one parcel arrives and another fails
+reduces to `in_flight`, not to delivered or failed. It stays there.
+
+**What failure looks like.** The order never earns and never voids. It sits in
+the model's pending column indefinitely, and nothing reports it.
+
+**Why it is deliberate.** Both alternatives are wrong in a way that costs
+somebody money: calling it delivered pays commission on goods that came back,
+and calling it failed refuses commission on goods she genuinely sold. The
+honest answer is that a person has to decide, and the honest state until then is
+*not yet*.
+
+**What is missing.** Nothing lists these orders. Splitting the commission base
+across parcels would be the real fix and is not built — it needs line-item
+detail this platform does not store, for a case that has not been observed once
+in HBA's live data.
+
+*What to do if one appears:* it will show as an order pending long after its
+neighbours settled. Decide it by hand until there are enough to justify
+building for.
+
+### 🟠 An order stuck at "attempted delivery" is invisible
+
+**The limit.** `ATTEMPTED_DELIVERY` is treated as still in flight, because
+Bosta retries and most of those parcels do land. It was **10 of 50** orders in
+the live sample — one in five.
+
+If a parcel is attempted, refused, and Shopify is never moved to
+`NOT_DELIVERED`, the order stays pending for ever. It costs nobody money —
+pending pays nothing — but the model sees it in her pending column indefinitely
+and eventually asks about it.
+
+**What failure looks like.** Not a wrong number. A number that never becomes
+right, and a question nobody can answer from the dashboard.
+
+**What exists instead.** Nothing yet. The natural fix is a report of orders
+pending well past the point their neighbours settled, which is also what catches
+the split-shipment case above. Worth building once there is a month of real data
+to size the threshold from, rather than guessing at one now (ADR 0019).
+
+### 🟠 Nobody has explained any of this to the people using it
+
+**The limit.** The platform is full of ideas a model has never met — carried
+forward, earned versus pending, why a returned order still shows in a month she
+was paid for, why her sales total and her payment are different numbers. **None
+of it is explained anywhere she can reach.** The same applies to the team: an
+invited `target_recorder` lands on a bulk grid with no idea what verification
+unlocks or why approval is blocked.
+
+**What failure looks like.** Not a wrong number — the same question, asked by
+every model, every month, answered by hand each time. Support load that grows
+linearly with the roster, and a quiet loss of trust: a figure she cannot explain
+is a figure she does not believe.
+
+**What exists in the design already.** §16 specifies **commission policy
+versions** — the rules written in plain language, effective-dated, with every
+snapshot recording which version produced it, so a model viewing July sees
+July's rules through an ⓘ control. That is stronger than a glossary, because it
+answers *"what were the rules when I earned this?"* rather than *"what are the
+rules generally?"* — and those diverge the moment a rate changes.
+
+**What is still missing, and is Phase 10 work:**
+
+- The plain-language text itself. Versioned rules with nothing written in them
+  is a table, not an explanation.
+- **Wording that removes the need to look anything up.** If a label needs a
+  glossary, the label is wrong. *"Carried forward"* is jargon; *"paid in your
+  September payment"* is not. A glossary is a patch over vocabulary nobody
+  chose.
+- **Settlement labelling per order** — which payroll actually paid each order.
+  Without it a model reconciling a month by hand cannot arrive at her own
+  payment figure, and this is the single largest source of the questions above.
+  The mechanism is `attributed_order.settled_in_snapshot_id`, built in Phase 6.
+- **Team onboarding.** A first-login walkthrough was considered. Cheaper and
+  more durable: blockers and states that explain themselves where they appear
+  (*"Approval blocked: Nour's target is recorded but not verified"*), which
+  §11.3 already requires. A walkthrough is read once and forgotten; an
+  explanation at the point of confusion is read every time it is needed.
+
+*Recorded now because the decisions that make it possible are being taken now* —
+what a month total means, what an order line carries. Deferring the writing is
+fine. Deferring the data it needs is not.
+
+### 🔴 Shopify's refund figures do not say what HBA actually refunded
+
+**The limit.** The money recorded against a return in Shopify is not what the
+customer received, and sometimes nothing is recorded at all. Confirmed by HBA,
+25 August 2026:
+
+- **Return shipping is deducted from the refund.** A customer returning E£600 of
+  goods receives E£480 — the fee is E£120 today and moves with the currency.
+- **Exchanges are sometimes settled outside E-stebdal**, the request closed by
+  hand, and the order left on Shopify still saying a refund is owed.
+- **A refund is not always recorded on Shopify** at all.
+- **A partial return can void an order-level discount.** Returning one of four
+  items removes the 4-plus-items automatic 20%, and the whole order is
+  recalculated at full price before the refund is worked out.
+
+**What failure looks like.** Any commission rule derived from "how much was
+refunded" is derived from a number that is sometimes wrong and sometimes
+absent. It would not fail loudly — it would pay slightly wrong amounts,
+indefinitely, and reconcile against nothing.
+
+**What is decided instead.** The base is expressed in **goods, not money**:
+
+> Commission base after a return = the value of the products the customer kept.
+
+Shipping never enters it, because shipping was never in the base. The E£120
+return fee is HBA's cost of handling a return, not the model's — she keeps her
+commission on what the customer kept. Stated by HBA in exactly those terms.
+
+**What is still open.** Deciding *which* products the customer kept requires
+telling an exchange from a plain return, and E-stebdal opens an identical
+Shopify return for both. `GET /api/operations/order-facts` now probes Shopify's
+Returns API for `exchangeLineItems` — a replacement going out is the
+discriminator, if Shopify will report it. **Task 3 does not proceed until that
+report is read.**
+
+*If Shopify cannot tell them apart:* a human decides, which is not a new burden —
+HBA already calculates every one of these refunds by hand. The platform would
+capture that decision rather than re-derive it, the way §9.2 already holds a
+multi-code order for a person.
+
+### 🟠 The 4-plus-items discount is harmless only while it cannot combine
+
+**The limit.** HBA's automatic 20% discount for four or more items **cannot
+currently be combined with a model's code**. That single fact is what keeps the
+discount-voiding problem above away from commission entirely: an order carrying
+the automatic discount has no model code, so it is unattributed and no
+commission is calculated on it.
+
+HBA expects this may change.
+
+**What failure looks like if it does.** A model's order gets the automatic
+discount. The customer returns one of four items. HBA voids the discount and
+recalculates the remaining three at full price — so the goods the customer kept
+are worth **more** than the discounted price they were sold at. Subtracting the
+returned item's discounted price from the base would then leave a figure that is
+too low, and the model is underpaid on an order that got *larger*.
+
+*What to do before combining is enabled:* revisit the return rule above. It is
+correct only while an attributed order can carry at most one discount that a
+partial return cannot retroactively remove.
+
 ### 🟠 A code created before the switch cannot be handed over
 
 **The limit.** `retire_and_replace` ends the old code the month **before** the
@@ -616,6 +785,25 @@ still recorded; part of the detail is not.
 
 *What to do:* nothing usually. Repeatedly truncating the same job means the
 useful part of the message may be past the cut — check the raw exception.
+
+### `unknown_fulfilment_status`
+
+A Shopify fulfilment carried a display status nothing has classified. It was
+treated as **still in flight** — the order neither earns nor voids on a value
+nobody has decided about.
+
+Courier integrations add statuses. Without this line the order would simply sit
+pending for ever, and the reason would be invisible: an unrecognised status and
+a parcel genuinely still travelling look identical from outside.
+
+*What to do:* the log line names the status. Decide which of the three sets in
+`app/services/shopify/fulfilment.py` it belongs to — `DELIVERED_STATUSES`,
+`FAILED_STATUSES` or `IN_FLIGHT_STATUSES` — and add it there. **Match the set,
+never a substring:** `OUT_FOR_DELIVERY`, `ATTEMPTED_DELIVERY` and
+`NOT_DELIVERED` all contain the word *deliver*, and reading any of them as a
+delivery pays commission on goods the customer does not have.
+
+---
 
 ### `work_deduplicated`
 

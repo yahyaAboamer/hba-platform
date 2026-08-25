@@ -85,6 +85,12 @@ class Anomaly:
     #: the reconciliation sweep and the prune do not until this clears.
     SCHEDULE_TOP_UP_FAILED = "schedule_top_up_failed"
 
+    #: A Shopify fulfilment carried a display status nothing has classified.
+    #: Treated as still in flight - it never earns and never voids on a guess -
+    #: which means an unrecognised status would otherwise park an order for
+    #: ever in silence.
+    UNKNOWN_FULFILMENT_STATUS = "unknown_fulfilment_status"
+
     #: Work was queued for something already queued, and was absorbed.
     #: Expected in ordinary operation; a flood of it means a sender is looping.
     WORK_DEDUPLICATED = "work_deduplicated"

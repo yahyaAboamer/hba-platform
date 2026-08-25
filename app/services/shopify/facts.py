@@ -23,6 +23,7 @@ from dataclasses import dataclass, field
 from typing import Callable
 
 from app.services.shopify.client import ShopifyClient, ShopifyError
+from app.services.shopify.fulfilment import DELIVERED_STATUSES, FAILED_STATUSES
 from app.services.shopify.normalise import _timestamp, money_to_piastres
 
 #: Enough orders to see a pattern, few enough to stay well inside Shopify's
@@ -30,18 +31,10 @@ from app.services.shopify.normalise import _timestamp, money_to_piastres
 DEFAULT_SAMPLE = 50
 MAX_SAMPLE = 250
 
-#: Fulfilment display statuses meaning the customer actually has the goods.
-#: PICKED_UP counts: collected in person is delivered, whatever the courier
-#: calls it.
-DELIVERED_STATUSES = frozenset({"DELIVERED", "PICKED_UP"})
-
-#: Statuses that contain the word "deliver" and are **not** deliveries. Listed
-#: explicitly because the obvious substring test reads all three as success -
-#: a parcel still on the van, a failed attempt, and an outright refusal would
-#: each have been reported as money earned. Found by a test, not in production.
-NOT_DELIVERIES = frozenset(
-    {"OUT_FOR_DELIVERY", "ATTEMPTED_DELIVERY", "NOT_DELIVERED", "FAILURE"}
-)
+#: The vocabulary lives in one place, so the report and the code that turns
+#: these statuses into money cannot drift apart. NOT_DELIVERIES exists only for
+#: the test that proves the sets do not overlap.
+NOT_DELIVERIES = FAILED_STATUSES | {"OUT_FOR_DELIVERY", "ATTEMPTED_DELIVERY"}
 
 
 @dataclass(frozen=True)
@@ -110,6 +103,19 @@ PROBES: tuple[FactProbe, ...] = (
         candidates=(
             "refunds(first: 10) { id refundLineItems(first: 50) { nodes { subtotalSet { shopMoney { amount currencyCode } } } } }",
             "refunds { id refundLineItems(first: 50) { nodes { subtotalSet { shopMoney { amount currencyCode } } } } }",
+        ),
+    ),
+    FactProbe(
+        name="exchange_vs_return",
+        question=(
+            "Can Shopify tell an exchange from a plain return - did a replacement "
+            "item actually go out? E-stebdal opens the same return for both, and "
+            "the two are paid differently."
+        ),
+        candidates=(
+            "returns(first: 10) { nodes { id status totalQuantity exchangeLineItems(first: 20) { nodes { id } } returnLineItems(first: 20) { nodes { id } } } }",
+            "returns(first: 10) { nodes { id status exchangeLineItems(first: 20) { nodes { id } } } }",
+            "returns(first: 10) { nodes { id status } }",
         ),
     ),
 )
@@ -206,11 +212,53 @@ def _summarise_refund_merchandise(nodes: list[dict]) -> dict:
     }
 
 
+def _summarise_exchange_vs_return(nodes: list[dict]) -> dict:
+    """Does Shopify say a replacement went out?
+
+    This is the one question `order-facts` cannot already answer. E-stebdal
+    opens an identical Shopify return for an exchange and for a plain return,
+    and the two are paid differently: an exchange leaves the model's commission
+    untouched, a return reduces it by the goods that came back.
+    """
+    orders_with_returns = 0
+    with_exchange_items = 0
+    without_exchange_items = 0
+    statuses: Counter = Counter()
+    exchange_field_present = False
+
+    for node in nodes:
+        returns = node.get("returns")
+        rows = returns.get("nodes") if isinstance(returns, dict) else (returns or [])
+        rows = list(rows or [])
+        if rows:
+            orders_with_returns += 1
+        for row in rows:
+            status = row.get("status")
+            statuses[str(status).upper() if status else "(null)"] += 1
+            if "exchangeLineItems" not in row:
+                continue
+            exchange_field_present = True
+            items = (row.get("exchangeLineItems") or {}).get("nodes") or []
+            if items:
+                with_exchange_items += 1
+            else:
+                without_exchange_items += 1
+
+    return {
+        "orders_with_a_return": orders_with_returns,
+        "return_statuses": dict(statuses.most_common()),
+        "shopify_reports_exchange_line_items": exchange_field_present,
+        "returns_that_sent_a_replacement": with_exchange_items,
+        "returns_that_sent_nothing_back": without_exchange_items,
+    }
+
+
 SUMMARISERS: dict[str, Callable[[list[dict]], dict]] = {
     "delivery": _summarise_delivery,
     "return_status": _summarise_return_status,
     "refund_total": _summarise_refund_total,
     "refund_merchandise": _summarise_refund_merchandise,
+    "exchange_vs_return": _summarise_exchange_vs_return,
 }
 
 

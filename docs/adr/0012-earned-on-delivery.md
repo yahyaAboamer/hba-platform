@@ -54,3 +54,24 @@ every affiliate's earnings by ten days to recover a small number of reversals.
 **Claw back from the next payout.** Standard in larger affiliate programmes, and
 corrosive at this scale, where the affiliates are twenty people the business
 knows personally.
+
+## Confirmed against live data, 25 August 2026
+
+`GET /api/operations/order-facts` sampled 50 orders Shopify called **fulfilled**.
+Only **35 had actually been delivered**. The rest: ten mid-attempt, three out for
+delivery, one in transit, and one failed outright.
+
+Across all 529 indexed orders, `displayFulfillmentStatus` — the field the
+platform already stored — has exactly two values, `fulfilled` (455) and
+`unfulfilled` (74). **It says the parcel left. It says nothing about whether it
+arrived.**
+
+Paying on it would have paid commission on fifteen parcels in that sample alone
+that the customer did not have. That is §9.1's defect rebuilt, and it is what
+this ADR exists to prevent. Delivery lives one level down, on the fulfilments.
+
+HBA states the rule as: delivered and failed delivery are what matter, and
+anything between them is still processing. `ATTEMPTED_DELIVERY` therefore counts
+as still in flight rather than failed — Bosta retries, and most of those parcels
+land. It was 10 of the 50, which makes it the second most common status in the
+sample and a case worth being right about.

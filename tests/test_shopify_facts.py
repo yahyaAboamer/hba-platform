@@ -388,3 +388,85 @@ def test_collected_in_person_counts_as_delivered(db):
     )
 
     assert delivery_verdict([run_probe(client, probe, sample_size=5)])["signal"] == "present"
+
+
+# ── Telling an exchange from a return ──────────────────────────────────────────
+#
+# The one question order-facts could not already answer. E-stebdal opens an
+# identical Shopify return for both, and they are paid differently: an exchange
+# leaves the model's commission untouched, a return reduces it by the goods that
+# came back. Everything below asks whether Shopify knows the difference.
+
+
+def _return(status="OPEN", exchange_items=0, return_items=1):
+    return {
+        "id": "gid://shopify/Return/1",
+        "status": status,
+        "totalQuantity": return_items,
+        "exchangeLineItems": {"nodes": [{"id": str(n)} for n in range(exchange_items)]},
+        "returnLineItems": {"nodes": [{"id": str(n)} for n in range(return_items)]},
+    }
+
+
+def _exchange_probe():
+    return next(probe for probe in PROBES if probe.name == "exchange_vs_return")
+
+
+def test_a_replacement_going_out_marks_an_exchange(db):
+    """The discriminator, if Shopify supplies it: an exchange sends something
+    back to the customer, a plain return does not.
+    """
+    summary = SUMMARISERS["exchange_vs_return"](
+        [
+            {"returns": {"nodes": [_return(exchange_items=1)]}},
+            {"returns": {"nodes": [_return(exchange_items=0)]}},
+        ]
+    )
+
+    assert summary["shopify_reports_exchange_line_items"] is True
+    assert summary["returns_that_sent_a_replacement"] == 1
+    assert summary["returns_that_sent_nothing_back"] == 1
+
+
+def test_a_shopify_without_exchange_line_items_says_so(db):
+    """If the field is missing the answer is "Shopify cannot tell us", which is
+    a different answer from "no exchanges happened" and must not be reported as
+    one - a human would have to decide every return instead.
+    """
+    summary = SUMMARISERS["exchange_vs_return"](
+        [{"returns": {"nodes": [{"id": "1", "status": "OPEN"}]}}]
+    )
+
+    assert summary["shopify_reports_exchange_line_items"] is False
+    assert summary["returns_that_sent_a_replacement"] == 0
+    assert summary["orders_with_a_return"] == 1
+
+
+def test_returns_are_read_from_either_shape(db):
+    as_connection = SUMMARISERS["exchange_vs_return"](
+        [{"returns": {"nodes": [_return(exchange_items=2)]}}]
+    )
+    as_list = SUMMARISERS["exchange_vs_return"]([{"returns": [_return(exchange_items=2)]}])
+    assert as_connection == as_list
+
+
+def test_an_order_with_no_returns_counts_as_none(db):
+    summary = SUMMARISERS["exchange_vs_return"]([{"returns": {"nodes": []}}, {}])
+    assert summary["orders_with_a_return"] == 0
+
+
+def test_the_probe_falls_back_when_returns_are_unreadable(db):
+    """`Order.returns` may sit behind read_returns rather than read_orders. The
+    narrowest shape still answers "do returns exist at all", which is worth
+    having even when the exchange field is refused.
+    """
+    probe = _exchange_probe()
+    narrowest = probe.candidates[-1]
+    client, seen = _shop([narrowest], lambda _: [{"returns": {"nodes": [{"id": "1", "status": "OPEN"}]}}])
+
+    result = run_probe(client, probe, sample_size=5)
+
+    assert result.available is True
+    assert result.field_expression == narrowest
+    assert len(seen) == len(probe.candidates)
+    assert result.summary["shopify_reports_exchange_line_items"] is False
