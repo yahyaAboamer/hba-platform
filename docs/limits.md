@@ -456,6 +456,49 @@ pending well past the point their neighbours settled, which is also what catches
 the split-shipment case above. Worth building once there is a month of real data
 to size the threshold from, rather than guessing at one now (ADR 0019).
 
+### 🟠 Nobody has explained any of this to the people using it
+
+**The limit.** The platform is full of ideas a model has never met — carried
+forward, earned versus pending, why a returned order still shows in a month she
+was paid for, why her sales total and her payment are different numbers. **None
+of it is explained anywhere she can reach.** The same applies to the team: an
+invited `target_recorder` lands on a bulk grid with no idea what verification
+unlocks or why approval is blocked.
+
+**What failure looks like.** Not a wrong number — the same question, asked by
+every model, every month, answered by hand each time. Support load that grows
+linearly with the roster, and a quiet loss of trust: a figure she cannot explain
+is a figure she does not believe.
+
+**What exists in the design already.** §16 specifies **commission policy
+versions** — the rules written in plain language, effective-dated, with every
+snapshot recording which version produced it, so a model viewing July sees
+July's rules through an ⓘ control. That is stronger than a glossary, because it
+answers *"what were the rules when I earned this?"* rather than *"what are the
+rules generally?"* — and those diverge the moment a rate changes.
+
+**What is still missing, and is Phase 10 work:**
+
+- The plain-language text itself. Versioned rules with nothing written in them
+  is a table, not an explanation.
+- **Wording that removes the need to look anything up.** If a label needs a
+  glossary, the label is wrong. *"Carried forward"* is jargon; *"paid in your
+  September payment"* is not. A glossary is a patch over vocabulary nobody
+  chose.
+- **Settlement labelling per order** — which payroll actually paid each order.
+  Without it a model reconciling a month by hand cannot arrive at her own
+  payment figure, and this is the single largest source of the questions above.
+  The mechanism is `attributed_order.settled_in_snapshot_id`, built in Phase 6.
+- **Team onboarding.** A first-login walkthrough was considered. Cheaper and
+  more durable: blockers and states that explain themselves where they appear
+  (*"Approval blocked: Nour's target is recorded but not verified"*), which
+  §11.3 already requires. A walkthrough is read once and forgotten; an
+  explanation at the point of confusion is read every time it is needed.
+
+*Recorded now because the decisions that make it possible are being taken now* —
+what a month total means, what an order line carries. Deferring the writing is
+fine. Deferring the data it needs is not.
+
 ### 🟠 A code created before the switch cannot be handed over
 
 **The limit.** `retire_and_replace` ends the old code the month **before** the

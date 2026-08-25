@@ -20,6 +20,9 @@ import pytest
 
 from app.services.shopify.fulfilment import (
     DELIVERED,
+    NO_RETURN,
+    RETURN_ACTIVITY_STATUSES,
+    UNRESOLVED_RETURN_STATUSES,
     DELIVERED_STATUSES,
     FAILED,
     FAILED_STATUSES,
@@ -190,31 +193,96 @@ def test_delivered_with_no_timestamp_is_still_delivered():
 
 
 @pytest.mark.parametrize(
-    "status,open_",
+    "status,unresolved,activity",
     [
-        ("NO_RETURN", False),  # 44 of 50 in the live sample
-        ("IN_PROGRESS", True),  # 6 of 50
-        ("REQUESTED", True),
-        ("INSPECTION_COMPLETE", True),
-        ("RETURNED", True),
-        ("RETURN_FAILED", True),
-        (None, False),
+        # (still being decided, anything ever happened)
+        ("NO_RETURN", False, False),  # 44 of 50 in the live sample
+        ("REQUESTED", True, True),
+        ("IN_PROGRESS", True, True),  # 6 of 50
+        ("INSPECTION_COMPLETE", True, True),
+        # Resolved. The goods are back and the decision is made - but the base
+        # stays frozen, because the subtotal E-stebdal left behind is the
+        # inflated number the freeze exists to keep out.
+        ("RETURNED", False, True),
+        ("RETURN_FAILED", False, True),
+        (None, False, False),
     ],
 )
-def test_return_activity_is_recognised(status, open_):
-    """Any activity freezes the base permanently (ADR 0011). Because the frozen
-    value is never re-read, the exchange inflation that made #29115 read 47%
-    high cannot reach the calculation.
+def test_being_decided_and_having_happened_are_different_questions(
+    status, unresolved, activity
+):
+    """Conflating them is a bug this module already made once.
+
+    One set for both would leave `RETURNED` looking open for ever: the order
+    would never earn and never void, and nothing would report it.
     """
-    name, is_open = derive_return(status)
-    assert is_open is open_
+    name, is_open, had_activity = derive_return(status)
+    assert is_open is unresolved
+    assert had_activity is activity
     assert name == (status.upper() if status else None)
+
+
+def test_a_completed_return_stops_blocking_the_order():
+    """The order has to resolve. Whether it earns or voids is then decided by
+    whether money actually went back - not by the return status.
+    """
+    _, is_open, had_activity = derive_return("RETURNED")
+    assert is_open is False, "a finished return would park the order for ever"
+    assert had_activity is True, "the base must stay frozen"
+
+
+def test_the_base_stays_frozen_after_the_return_finishes():
+    """Unfreezing on completion would let the post-exchange subtotal back in -
+    the E£1,675-instead-of-E£1,062 reading on #29115.
+    """
+    assert derive_return("RETURNED")[2] is True
+    assert derive_return("RETURN_FAILED")[2] is True
+
+
+def test_every_unresolved_status_also_counts_as_activity():
+    """A return cannot be being decided without having happened. If these ever
+    disagreed, an order could block earning while its base stayed live.
+    """
+    assert UNRESOLVED_RETURN_STATUSES <= RETURN_ACTIVITY_STATUSES
+
+
+def test_no_return_is_the_only_quiet_value():
+    assert NO_RETURN not in RETURN_ACTIVITY_STATUSES
+    assert NO_RETURN not in UNRESOLVED_RETURN_STATUSES
 
 
 def test_six_of_fifty_live_orders_had_a_return_open():
     """Not a hypothetical. The freeze applies to about one order in eight."""
     sample = ["NO_RETURN"] * 44 + ["IN_PROGRESS"] * 6
     assert sum(1 for status in sample if derive_return(status)[1]) == 6
+
+
+# ── Telling a return from an exchange, without classifying either ──────────────
+
+
+def test_an_exchange_and_a_return_look_identical_while_open():
+    """E-stebdal opens the same Shopify return for both. The platform does not
+    need to tell them apart: both freeze the base and both block earning, so
+    neither is paid while it is open.
+    """
+    assert derive_return("IN_PROGRESS") == ("IN_PROGRESS", True, True)
+
+
+def test_what_separates_them_is_whether_money_moved():
+    """Once resolved, one fact decides it - and it is a fact, not a judgement.
+
+        an exchange returns goods and no money
+        a return  returns goods and money
+    """
+    exchange_total, exchange_goods = derive_refunds(
+        {"refunds": [_refund("0.00", ["998.00"])]}
+    )
+    return_total, return_goods = derive_refunds(
+        {"refunds": [_refund("600.00", ["600.00"])]}
+    )
+
+    assert exchange_goods > 0 and exchange_total == 0, "goods back, no money"
+    assert return_goods > 0 and return_total > 0, "goods back, money back"
 
 
 # ── Refunds: two numbers, because they disagree ────────────────────────────────
@@ -302,6 +370,7 @@ def test_an_order_carries_its_delivery_facts_the_moment_it_is_indexed():
     assert values["delivery_status"] == "DELIVERED"
     assert values["delivered_at"] is not None
     assert values["return_open"] is False
+    assert values["return_activity"] is False
     assert values["refunded_total_piastres"] == 0
     assert values["refunded_merchandise_piastres"] == 99_800
 
@@ -329,3 +398,4 @@ def test_an_order_shopify_told_us_nothing_about_stays_unknown():
     assert values["delivery_status"] is None
     assert values["return_status"] is None
     assert values["return_open"] is False
+    assert values["return_activity"] is False

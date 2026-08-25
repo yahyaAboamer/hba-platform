@@ -28,6 +28,22 @@ paid in full and kept goods of equal value - underpaying the model on the exact
 case ADR 0011's freeze exists to protect. So both numbers are stored, and Task 3
 decides. **`refunded_merchandise` alone is not a reduction.**
 
+## Return or exchange? The platform never has to decide
+
+E-stebdal opens the same Shopify return for both - the returned product shows
+"return in progress" either way - and only an exchange adds a replacement
+product. So at the moment it opens, the two are genuinely indistinguishable.
+
+**They do not need to be distinguished.** Both freeze the base, and both make
+the order unresolved, so neither is paid while it is open. By the time it
+resolves, one fact separates them and it is a fact rather than a judgement:
+
+    an exchange returns goods and no money
+    a return returns goods and money
+
+`derive_refunds` reports both figures, so the question "did money actually go
+back?" is answered from data. Nothing has to classify anything.
+
 ## An unrecognised status must be loud
 
 New status values appear when a courier integration changes. An unknown one is
@@ -76,16 +92,26 @@ DELIVERED = "delivered"
 FAILED = "failed"
 IN_FLIGHT = "in_flight"
 
-#: Shopify return states that mean a return or exchange is **open**. Any of
-#: these freezes the commission base (ADR 0011). `RETURNED` is deliberately
-#: included: the goods are back, and the money question is settled by the refund
-#: figures, not by re-reading a subtotal E-stebdal has been editing.
-OPEN_RETURN_STATUSES = frozenset(
+#: The one value that means nothing has happened.
+NO_RETURN = "NO_RETURN"
+
+#: **Something happened.** Once it has, the commission base is frozen for good
+#: (ADR 0011) - including after the return finishes, because the subtotal
+#: E-stebdal leaves behind is exactly the inflated number the freeze exists to
+#: keep out.
+RETURN_ACTIVITY_STATUSES = frozenset(
     {"REQUESTED", "IN_PROGRESS", "INSPECTION_COMPLETE", "RETURNED", "RETURN_FAILED"}
 )
 
-#: The one value that means nothing is happening.
-NO_RETURN = "NO_RETURN"
+#: **Still being decided.** Only these block an order from earning (§9.4).
+#:
+#: `RETURNED` and `RETURN_FAILED` are *resolved*, and keeping them here would
+#: have parked every completed return in `pending` for ever - never paid, never
+#: voided, with nothing reporting it. The two sets answer different questions
+#: and an earlier version of this file used one set for both.
+UNRESOLVED_RETURN_STATUSES = frozenset(
+    {"REQUESTED", "IN_PROGRESS", "INSPECTION_COMPLETE"}
+)
 
 
 def _timestamp(value: str | None) -> datetime | None:
@@ -157,17 +183,24 @@ def derive_delivery(
     return IN_FLIGHT, None, raw
 
 
-def derive_return(return_status: str | None) -> tuple[str | None, bool]:
-    """Is a return or exchange open on this order?
+def derive_return(return_status: str | None) -> tuple[str | None, bool, bool]:
+    """``(status, still being decided, anything ever happened)``.
 
-    Any activity freezes the base permanently (ADR 0011). Because the frozen
-    value is never re-read, the exchange inflation that made order #29115 read
-    47% high cannot reach the calculation.
+    **Two questions, not one**, and conflating them is a bug this file already
+    made once:
+
+    *Freeze the base?* Any activity, ever - and permanently. Because the frozen
+    value is never re-read, the exchange inflation that made #29115 read 47%
+    high cannot reach the calculation.
+
+    *Can this order earn yet?* Only while the return is **unresolved**. Once it
+    finishes, the order resolves one way or the other. Treating a completed
+    return as still open leaves the order pending for ever.
     """
     name = str(return_status or "").strip().upper() or None
     if name is None:
-        return None, False
-    return name, name in OPEN_RETURN_STATUSES
+        return None, False, False
+    return name, name in UNRESOLVED_RETURN_STATUSES, name in RETURN_ACTIVITY_STATUSES
 
 
 def _amount(block: dict | None) -> str | None:

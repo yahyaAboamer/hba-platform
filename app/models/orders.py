@@ -69,9 +69,21 @@ class OrderIndex(Base):
     #: parcel lands.
     delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
-    #: Any activity here freezes the commission base permanently (ADR 0011).
     return_status: Mapped[str | None] = mapped_column(String(40))
+
+    #: **Still being decided.** Blocks the order from earning (§9.4) - it is
+    #: neither paid nor voided while somebody is deciding.
     return_open: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
+
+    #: **Anything ever happened.** Freezes the base permanently (ADR 0011),
+    #: including after the return finishes - the subtotal E-stebdal leaves
+    #: behind is the inflated number the freeze exists to keep out.
+    #:
+    #: Two columns because they are two questions. Using one for both parks
+    #: every completed return in pending for ever.
+    return_activity: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=text("false")
     )
 

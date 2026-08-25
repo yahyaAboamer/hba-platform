@@ -86,7 +86,9 @@ def normalise_order(node: dict) -> dict:
     delivery_state, delivered_at, delivery_status = derive_delivery(
         node.get("fulfillments"), order_id=order_id
     )
-    return_status, return_open = derive_return(node.get("returnStatus"))
+    return_status, return_open, return_activity = derive_return(
+        node.get("returnStatus")
+    )
     refunded_total, refunded_merchandise = derive_refunds(node)
 
     codes = []
@@ -117,7 +119,10 @@ def normalise_order(node: dict) -> dict:
         "delivery_status": delivery_status,
         "delivered_at": delivered_at,
         "return_status": return_status,
+        # Still being decided - blocks earning. Distinct from having ever
+        # happened, which freezes the base for good.
         "return_open": return_open,
+        "return_activity": return_activity,
         # Two numbers, not one. An exchange shows merchandise returned with
         # nothing refunded, and treating that as a reduction underpays.
         "refunded_total_piastres": refunded_total,
