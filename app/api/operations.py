@@ -152,20 +152,48 @@ def unregistered_codes(
     _actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_VIEW)),
     db: Session = Depends(get_session),
 ) -> dict:
-    """Discount codes in use on real orders.
+    """Live discount codes whose sales are attributed to nobody.
 
-    Phase 3 subtracts the codes that belong to an affiliate, leaving only the
-    genuinely unregistered ones. Until affiliates exist this reports every code
-    seen - already the information needed to spot a live code nobody set up,
-    whose sales are being attributed to no one.
+    **Ownership is per month, so a code can be partly unregistered.** If
+    NOUR10 was registered from September, April's NOUR10 orders still belong
+    to no one - and those are the sales somebody needs to see. An order counts
+    here when no affiliate owned its code *in the month that order was
+    placed*.
+
+    That also covers the case nobody thinks to look for: an affiliate left in
+    June, her code kept being used in August, and those August sales are
+    quietly going nowhere.
+
+    ``unowned_months`` is included so whoever registers the code knows which
+    month to start it from, rather than guessing and leaving a gap.
     """
     rows = (
         db.execute(
             text(
-                "SELECT code, count(*) AS order_count, "
-                "       min(placed_at) AS first_seen, max(placed_at) AS last_seen "
-                "FROM order_index, unnest(discount_codes) AS code "
-                "GROUP BY code ORDER BY order_count DESC, code LIMIT 200"
+                """
+                SELECT
+                    used.code,
+                    count(*) AS order_count,
+                    min(used.placed_at) AS first_seen,
+                    max(used.placed_at) AS last_seen,
+                    array_agg(DISTINCT used.business_month
+                              ORDER BY used.business_month) AS unowned_months
+                FROM (
+                    SELECT o.placed_at, o.business_month, upper(c.code) AS code
+                    FROM order_index o,
+                         unnest(o.discount_codes) AS c(code)
+                ) AS used
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM discount_code_period p
+                    WHERE p.code = used.code
+                      AND p.start_month <= used.business_month
+                      AND (p.end_month IS NULL
+                           OR p.end_month >= used.business_month)
+                )
+                GROUP BY used.code
+                ORDER BY order_count DESC, used.code
+                LIMIT 200
+                """
             )
         )
         .mappings()
@@ -178,6 +206,7 @@ def unregistered_codes(
                 "order_count": row["order_count"],
                 "first_seen": _isoformat(row["first_seen"]),
                 "last_seen": _isoformat(row["last_seen"]),
+                "unowned_months": list(row["unowned_months"]),
             }
             for row in rows
         ]
