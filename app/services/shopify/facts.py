@@ -23,7 +23,11 @@ from dataclasses import dataclass, field
 from typing import Callable
 
 from app.services.shopify.client import ShopifyClient, ShopifyError
-from app.services.shopify.fulfilment import DELIVERED_STATUSES, FAILED_STATUSES
+from app.services.shopify.fulfilment import (
+    DELIVERED_STATUSES,
+    FAILED_STATUSES,
+    NO_RETURN,
+)
 from app.services.shopify.normalise import _timestamp, money_to_piastres
 
 #: Enough orders to see a pattern, few enough to stay well inside Shopify's
@@ -117,6 +121,14 @@ PROBES: tuple[FactProbe, ...] = (
             "returns(first: 10) { nodes { id status exchangeLineItems(first: 20) { nodes { id } } } }",
             "returns(first: 10) { nodes { id status } }",
         ),
+    ),
+    FactProbe(
+        name="estebdal_tags",
+        question=(
+            "Does E-stebdal tag its orders? A tag is readable with read_orders "
+            "and would separate an exchange from a return without a new scope."
+        ),
+        candidates=("tags returnStatus",),
     ),
 )
 
@@ -253,12 +265,51 @@ def _summarise_exchange_vs_return(nodes: list[dict]) -> dict:
     }
 
 
+def _summarise_estebdal_tags(nodes: list[dict]) -> dict:
+    """What tags exist, and which of them appear on orders with a return.
+
+    Shopify refused `Order.returns` outright - `read_returns` is not granted -
+    so the structured answer costs a scope change and an app release. A tag
+    costs nothing: `tags` is readable with `read_orders`, which the app already
+    holds. This says whether E-stebdal writes one.
+
+    The correlation is the useful half. A tag that appears on every order says
+    nothing; a tag that appears **only** where a return is open is the
+    discriminator.
+    """
+    everywhere: Counter = Counter()
+    on_returns: Counter = Counter()
+    orders_with_returns = 0
+    untagged_returns = 0
+
+    for node in nodes:
+        tags = [str(tag).strip() for tag in (node.get("tags") or []) if str(tag).strip()]
+        everywhere.update(tags)
+
+        status = str(node.get("returnStatus") or "").strip().upper()
+        if status and status != NO_RETURN:
+            orders_with_returns += 1
+            on_returns.update(tags)
+            if not tags:
+                untagged_returns += 1
+
+    return {
+        "tags_seen": dict(everywhere.most_common(40)),
+        "orders_with_a_return": orders_with_returns,
+        "tags_on_orders_with_a_return": dict(on_returns.most_common(40)),
+        # The number that decides it. A return carrying no tag at all cannot be
+        # classified this way, however good the tags on the others look.
+        "orders_with_a_return_and_no_tag": untagged_returns,
+    }
+
+
 SUMMARISERS: dict[str, Callable[[list[dict]], dict]] = {
     "delivery": _summarise_delivery,
     "return_status": _summarise_return_status,
     "refund_total": _summarise_refund_total,
     "refund_merchandise": _summarise_refund_merchandise,
     "exchange_vs_return": _summarise_exchange_vs_return,
+    "estebdal_tags": _summarise_estebdal_tags,
 }
 
 

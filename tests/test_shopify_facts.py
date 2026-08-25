@@ -470,3 +470,68 @@ def test_the_probe_falls_back_when_returns_are_unreadable(db):
     assert result.field_expression == narrowest
     assert len(seen) == len(probe.candidates)
     assert result.summary["shopify_reports_exchange_line_items"] is False
+
+
+# ── E-stebdal tags, the no-scope alternative ───────────────────────────────────
+#
+# Shopify refused `Order.returns` outright: read_returns is not granted. A tag
+# costs nothing - `tags` is readable with read_orders, which the app already
+# holds - so this asks whether E-stebdal writes one.
+
+
+def _tagged(tags, return_status="NO_RETURN"):
+    return {"tags": list(tags), "returnStatus": return_status}
+
+
+def test_a_tag_only_on_returns_is_the_discriminator(db):
+    """A tag that appears everywhere says nothing. One that appears only where a
+    return is open is what separates an exchange from a return.
+    """
+    summary = SUMMARISERS["estebdal_tags"](
+        [
+            _tagged(["estebdal-exchange"], "IN_PROGRESS"),
+            _tagged(["estebdal-return"], "IN_PROGRESS"),
+            _tagged(["cod"]),
+            _tagged(["cod"]),
+        ]
+    )
+
+    assert summary["orders_with_a_return"] == 2
+    assert summary["tags_on_orders_with_a_return"] == {
+        "estebdal-exchange": 1,
+        "estebdal-return": 1,
+    }
+    assert summary["tags_seen"]["cod"] == 2
+    assert "cod" not in summary["tags_on_orders_with_a_return"]
+
+
+def test_an_untagged_return_is_counted_because_it_breaks_the_scheme(db):
+    """The number that decides it. However good the tags on the others look, a
+    return carrying no tag cannot be classified this way - and guessing at it
+    is what pays the wrong amount.
+    """
+    summary = SUMMARISERS["estebdal_tags"](
+        [
+            _tagged(["estebdal-exchange"], "IN_PROGRESS"),
+            _tagged([], "IN_PROGRESS"),
+        ]
+    )
+
+    assert summary["orders_with_a_return_and_no_tag"] == 1
+
+
+def test_a_shop_that_tags_nothing_reports_nothing(db):
+    summary = SUMMARISERS["estebdal_tags"]([_tagged([]), _tagged([], "IN_PROGRESS")])
+
+    assert summary["tags_seen"] == {}
+    assert summary["orders_with_a_return_and_no_tag"] == 1
+
+
+def test_the_tags_probe_needs_no_scope_the_app_lacks(db):
+    """`tags` and `returnStatus` are both read_orders. If this probe is ever
+    refused, the cause is not a missing returns scope.
+    """
+    probe = next(item for item in PROBES if item.name == "estebdal_tags")
+
+    assert probe.candidates == ("tags returnStatus",)
+    assert "returns(" not in probe.candidates[0]

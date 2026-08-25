@@ -529,15 +529,64 @@ commission on what the customer kept. Stated by HBA in exactly those terms.
 
 **What is still open.** Deciding *which* products the customer kept requires
 telling an exchange from a plain return, and E-stebdal opens an identical
-Shopify return for both. `GET /api/operations/order-facts` now probes Shopify's
-Returns API for `exchangeLineItems` — a replacement going out is the
-discriminator, if Shopify will report it. **Task 3 does not proceed until that
-report is read.**
+Shopify return for both. Since ADR 0024 they resolve to **opposite** outcomes —
+an exchange finalises the order at the full base, a plain return reduces it — so
+this is not something to infer.
 
-*If Shopify cannot tell them apart:* a human decides, which is not a new burden —
-HBA already calculates every one of these refunds by hand. The platform would
-capture that decision rather than re-derive it, the way §9.2 already holds a
-multi-code order for a person.
+**Shopify refused to answer it.** `GET /api/operations/order-facts` probed
+`Order.returns` in three shapes on 25 August 2026 and got the same reply to all
+three: **"Access denied for returns field."** That is a scope, not a missing
+feature — `read_returns` is not granted. Two ways forward:
+
+| Option | Cost | Risk |
+|---|---|---|
+| Grant `read_returns` | A scope change and an app release — the same dance `read_discounts` needed | None once granted. `exchangeLineItems` is structured data that cannot drift. |
+| Read E-stebdal's **order tags** | Nothing. `tags` is readable with `read_orders`, already held. | A tag is a convention. Renaming it, or one untagged return, silently breaks the rule. |
+
+The tags path is probed by `estebdal_tags`, which reports which tags appear
+**only** on orders with a return — a tag on every order discriminates nothing —
+and counts **returns carrying no tag at all**, because that number is what
+decides whether the scheme works. Run it with `?sample_size=250`: returns are
+about one order in eight and a sample of 50 recent orders showed only two.
+
+**Recommendation: grant `read_returns` anyway.** Tags are worth reading if they
+already exist, but a convention that silently stops being followed is exactly
+the failure shape this register keeps finding, and this one would pay the wrong
+amount rather than raise an error.
+
+*If neither works:* a human decides, which is not new work — HBA already
+calculates every one of these refunds by hand. The platform records that
+decision rather than re-deriving it, the way §9.2 already holds a multi-code
+order for a person.
+
+### 🟢 The commission base never needs the discount percentage
+
+**The question**, asked by HBA on 25 August: a E£1,000 jacket with a 10% code
+costs the customer E£900, and it is E£900 the model earns on. Does the platform
+need the code's discount percentage recorded to work that out?
+
+**No, and it must not use it.** The base is `total the customer paid − shipping −
+tax`, read from the order. Shopify has already applied every discount by then,
+so the paid figure is the discounted figure. A jacket at E£900 and pants at
+E£540 give a base of E£1,440 with nothing configured anywhere.
+
+`expected_customer_discount_bp` already exists on `compensation_period`,
+separate from `commission_rate_bp`, exactly as HBA describes — a code may give
+the customer 10% while the model earns 15%. **It is for verification only**
+(§10.4): checking the Shopify code still matches what HBA recorded.
+
+**Calculating money from it would be a bug.** It records what HBA *expects*. If
+somebody edits the code in Shopify to 15%, the customer pays 15% less and the
+platform would still calculate at 10% — silently overpaying on every order that
+code touches, with no error anywhere. *Read what was paid. Never infer money
+from a configured rate.*
+
+**What is not yet verified:** that Shopify's refund line items are expressed in
+the same discounted terms, so that subtracting a returned item leaves the right
+figure. It should be — `subtotalSet` carries the line's discount allocation —
+but the live sample contained **zero refunds**, so there was nothing to check it
+against. Task 3 pins it with a test and it wants confirming against one real
+refunded order before a payroll depends on it.
 
 ### 🟠 The 4-plus-items discount is harmless only while it cannot combine
 
