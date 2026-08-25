@@ -43,6 +43,8 @@ from app.services.codes import (
     normalise_code,
     register_code,
     replace_code,
+    open_codes_for,
+    retire_and_replace,
     start_month_for,
     unregistered_code_for,
 )
@@ -141,6 +143,22 @@ class CorrectCompensationBody(BaseModel):
     base_amount_piastres: int | None = None
     expected_customer_discount_bp: int | None = None
     end_month: str | None = None
+
+
+class ReplaceCodeBody(BaseModel):
+    """Move a model onto a new discount code.
+
+    ``replaces`` names which of her codes is being retired, and is only needed
+    when she holds more than one - with a single code there is nothing to
+    disambiguate, and asking would be noise.
+
+    No months are asked for. The new code starts when Shopify created it (or at
+    the platform horizon, whichever is later), and the old one ends the month
+    before. Both are facts, not choices.
+    """
+
+    code: str = Field(min_length=1, max_length=120)
+    replaces: str | None = Field(default=None, max_length=120)
 
 
 class SetPayoutDestinationBody(BaseModel):
@@ -469,6 +487,109 @@ def register_code_route(
         "is_verified": period.is_verified,
         "exists_in_shopify": found["exists"],
         "shopify_status": found["status"],
+    }
+
+
+@router.post("/{affiliate_id}/replace-code", status_code=201)
+def replace_code_route(
+    affiliate_id: int,
+    body: ReplaceCodeBody,
+    actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_MANAGE)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """She changed her code on Shopify. Carry her across to the new one.
+
+    Nothing about her changes: same record, same dashboard, same history. Her
+    earlier months keep showing the old code and the orders it earned; later
+    months show the new one. Her performance runs continuously across both.
+
+    The old code is **ended, never rewritten**. It was live and has attributed
+    orders; changing it would alter what those orders belonged to, and a month
+    already calculated would silently disagree with itself.
+    """
+    from app.services.shopify.sync import build_client
+
+    affiliate = _get_affiliate_or_404(db, affiliate_id)
+
+    held = open_codes_for(db, affiliate)
+    if not held:
+        raise HTTPException(
+            404,
+            "This affiliate holds no current code to replace. Register one "
+            "instead.",
+        )
+    if body.replaces is not None:
+        wanted = normalise_code(body.replaces)
+        old_period = next((p for p in held if p.code == wanted), None)
+        if old_period is None:
+            raise HTTPException(404, f"{wanted!r} is not a current code for this affiliate")
+    elif len(held) > 1:
+        raise HTTPException(
+            409,
+            "This affiliate holds more than one current code. Name which one "
+            "is being replaced.",
+        )
+    else:
+        old_period = held[0]
+
+    try:
+        found = verify_discount_code(build_client(), body.code)
+    except ShopifyMissingScope as exc:
+        raise HTTPException(
+            403,
+            f"Shopify has not granted {REQUIRED_SCOPE}, so this code cannot be "
+            "checked. Add the scope, then try again.",
+        ) from exc
+    except ShopifyNotConfigured as exc:
+        raise HTTPException(503, str(exc)) from exc
+    except ShopifyError as exc:
+        raise HTTPException(502, f"Could not reach Shopify: {exc}") from exc
+
+    if not found["exists"]:
+        # Ending her current code on the strength of one Shopify has never
+        # heard of would leave her earning nothing from that month on, and
+        # nothing would report it.
+        raise HTTPException(
+            400,
+            f"Shopify has no code {found['code']!r}. Create it there first - "
+            "retiring her current code for one that does not exist would stop "
+            "her earning from that month with nothing to show for it.",
+        )
+
+    try:
+        replacement = retire_and_replace(
+            db,
+            affiliate,
+            old_period=old_period,
+            new_code=body.code,
+            new_start_month=start_month_for(found["created_at"]),
+            verified_at=utcnow(),
+            actor_id=actor.id,
+            actor_email=actor.email,
+        )
+        db.flush()
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            409,
+            f"{body.code.strip().upper()!r} is already owned by somebody else "
+            "during part of this period",
+        ) from exc
+
+    db.commit()
+    return {
+        "retired": {
+            "code": old_period.code,
+            "start_month": old_period.start_month,
+            "end_month": old_period.end_month,
+        },
+        "took_over": {
+            "code": replacement.code,
+            "start_month": replacement.start_month,
+            "is_verified": replacement.is_verified,
+        },
     }
 
 

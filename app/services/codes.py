@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from datetime import datetime
 
-from app.core.businesstime import business_month, parse_month
+from app.core.businesstime import business_month, month_add, parse_month
 from app.core.periods import OPEN_ENDED, PLATFORM_START_MONTH, validate_period
 from app.models.affiliates import AffiliateProfile
 from app.models.codes import DiscountCodePeriod
@@ -272,6 +272,86 @@ def replace_code(
         after={"code": period.code, "verified": verified_at is not None},
     )
     return period
+
+
+def open_codes_for(
+    db: Session, affiliate: AffiliateProfile
+) -> list[DiscountCodePeriod]:
+    """Codes this affiliate still holds with no end date."""
+    return list(
+        db.scalars(
+            select(DiscountCodePeriod)
+            .where(DiscountCodePeriod.affiliate_id == affiliate.id)
+            .where(DiscountCodePeriod.end_month.is_(None))
+            .order_by(DiscountCodePeriod.code)
+        )
+    )
+
+
+def retire_and_replace(
+    db: Session,
+    affiliate: AffiliateProfile,
+    *,
+    old_period: DiscountCodePeriod,
+    new_code: str,
+    new_start_month: str,
+    verified_at: datetime | None = None,
+    actor_id: int | None = None,
+    actor_email: str | None = None,
+) -> DiscountCodePeriod:
+    """She changed her code on Shopify. Carry her across to it.
+
+    **Nothing about her changes.** Same affiliate, same record, same dashboard,
+    same history. Only which code earns for her from which month: the old code
+    ends, the new one begins the month after, and both point at her. Her
+    earlier months keep showing the old code and its orders; later months show
+    the new one. Her performance runs continuously across the two.
+
+    This is deliberately not an edit of the old code. That code was live and
+    has attributed orders - rewriting it would change what those orders
+    belonged to, and a month already calculated would silently disagree with
+    itself. Ending it preserves exactly what it earned, for exactly the months
+    it earned them.
+    """
+    parse_month(new_start_month)
+    if new_start_month <= old_period.start_month:
+        raise ValueError(
+            f"{normalise_code(new_code)} would start in {new_start_month}, which is "
+            f"not after {old_period.code} started ({old_period.start_month}). A code "
+            "that overlaps rather than follows is a second code, not a replacement."
+        )
+
+    old_end = month_add(new_start_month, -1)
+    previous_end = old_period.end_month
+    old_period.end_month = old_end
+
+    replacement = DiscountCodePeriod(
+        affiliate_id=affiliate.id,
+        code=normalise_code(new_code),
+        start_month=new_start_month,
+        end_month=OPEN_ENDED,
+        shopify_verified_at=verified_at,
+    )
+    db.add(replacement)
+    db.flush()
+
+    record_audit(
+        db,
+        action="code.replaced",
+        subject=f"affiliate:{affiliate.id}",
+        actor_id=actor_id,
+        actor_email=actor_email,
+        before={"code": old_period.code, "end_month": previous_end},
+        after={
+            "retired": {"code": old_period.code, "end_month": old_end},
+            "took_over": {
+                "code": replacement.code,
+                "start_month": new_start_month,
+                "verified": verified_at is not None,
+            },
+        },
+    )
+    return replacement
 
 
 def close_codes_for(

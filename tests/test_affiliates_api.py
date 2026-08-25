@@ -841,3 +841,168 @@ def test_an_affiliate_cannot_recheck_her_own_code(client):
     assert client.post(
         "/api/affiliates/1/recheck-code", json={}
     ).status_code == 403
+
+
+# ── She changed her code on Shopify ────────────────────────────────────────────
+
+
+def _switch_to(client, affiliate_id, code, created, shopify, **extra):
+    from datetime import timezone
+
+    _shopify_says(shopify, exists=True, created_at=created.replace(tzinfo=timezone.utc))
+    return client.post(
+        f"/api/affiliates/{affiliate_id}/replace-code", json={"code": code, **extra}
+    )
+
+
+def test_replacing_a_code_keeps_the_same_model(client, _shopify):
+    """Nothing about her changes - same record, same dashboard, same history.
+    Only which code earns for her from which month.
+    """
+    from datetime import datetime
+
+    affiliate = _register(client)
+    _verify_code(client, affiliate["id"], "OLD10")
+
+    response = _switch_to(client, affiliate["id"], "NEW10", datetime(2026, 7, 3), _shopify)
+    assert response.status_code == 201
+
+    body = response.json()
+    assert body["retired"]["code"] == "OLD10"
+    assert body["took_over"]["code"] == "NEW10"
+
+    still_hers = client.get(f"/api/affiliates/{affiliate['id']}").json()
+    assert still_hers["status"] == affiliate["status"], "she was not archived"
+    assert still_hers["id"] == affiliate["id"]
+
+
+def test_the_old_code_ends_the_month_before_the_new_one_starts(client, _shopify):
+    """No gap and no overlap - every month belongs to exactly one of her codes."""
+    from datetime import datetime
+
+    affiliate = _register(client)
+    _verify_code(client, affiliate["id"], "OLD10")
+
+    body = _switch_to(
+        client, affiliate["id"], "NEW10", datetime(2026, 7, 3), _shopify
+    ).json()
+
+    assert body["retired"]["end_month"] == "2026-06"
+    assert body["took_over"]["start_month"] == "2026-07"
+
+
+def test_her_history_runs_continuously_across_both_codes(client, _shopify):
+    """The point of the whole operation: orders earned under either code are
+    hers, and neither shows up as belonging to nobody.
+    """
+    from datetime import datetime
+
+    _add_order("1", "OLD10", month="2026-03")
+    _add_order("2", "OLD10", month="2026-05")
+    _add_order("3", "NEW10", month="2026-08")
+
+    affiliate = _register(client)
+    _verify_code(client, affiliate["id"], "OLD10")
+    _switch_to(client, affiliate["id"], "NEW10", datetime(2026, 7, 3), _shopify)
+
+    orphaned = client.get("/api/operations/unregistered-codes").json()["codes"]
+    assert orphaned == [], "an order stopped belonging to her across the switch"
+
+
+def test_the_old_code_still_owns_its_own_months(client, _shopify):
+    """Ending is not rewriting. What the old code earned, it keeps."""
+    from datetime import datetime
+
+    affiliate = _register(client)
+    _verify_code(client, affiliate["id"], "OLD10")
+    _switch_to(client, affiliate["id"], "NEW10", datetime(2026, 7, 3), _shopify)
+
+    from app.db import SessionLocal
+    from app.services.codes import owner_of
+
+    with SessionLocal() as session:
+        assert owner_of(session, "OLD10", "2026-04").id == affiliate["id"]
+        assert owner_of(session, "NEW10", "2026-09").id == affiliate["id"]
+        assert owner_of(session, "OLD10", "2026-09") is None
+
+
+def test_a_code_shopify_does_not_know_cannot_take_over(client, _shopify):
+    """Retiring her working code for one that does not exist would stop her
+    earning from that month, with nothing anywhere reporting it.
+    """
+    affiliate = _register(client)
+    _verify_code(client, affiliate["id"], "OLD10")
+
+    _shopify_says(_shopify, exists=False)
+    response = client.post(
+        f"/api/affiliates/{affiliate['id']}/replace-code", json={"code": "GHOST"}
+    )
+    assert response.status_code == 400
+
+    from app.db import SessionLocal
+    from app.services.codes import owner_of
+
+    with SessionLocal() as session:
+        assert owner_of(session, "OLD10", "2099-12") is not None, "her code was retired anyway"
+
+
+def test_a_replacement_that_does_not_follow_is_refused(client, _shopify):
+    """A new code created before the old one started is not a replacement -
+    it would end the old period before it began.
+    """
+    from datetime import datetime
+
+    affiliate = _register(client)
+    _shopify_says(_shopify, exists=True, created_at=None)
+    client.post(f"/api/affiliates/{affiliate['id']}/codes", json={"code": "OLD10"})
+
+    response = _switch_to(client, affiliate["id"], "NEW10", datetime(2026, 1, 5), _shopify)
+    assert response.status_code == 400
+    assert "not after" in response.json()["detail"]
+
+
+def test_replacing_when_she_holds_no_code_is_refused(client, _shopify):
+    from datetime import datetime
+
+    affiliate = _register(client)
+    response = _switch_to(client, affiliate["id"], "NEW10", datetime(2026, 7, 3), _shopify)
+    assert response.status_code == 404
+
+
+def test_which_code_is_replaced_must_be_named_when_she_holds_several(client, _shopify):
+    from datetime import datetime
+
+    affiliate = _register(client)
+    _verify_code(client, affiliate["id"], "ONE10")
+    _verify_code(client, affiliate["id"], "TWO10")
+
+    ambiguous = _switch_to(client, affiliate["id"], "NEW10", datetime(2026, 7, 3), _shopify)
+    assert ambiguous.status_code == 409
+
+    named = _switch_to(
+        client, affiliate["id"], "NEW10", datetime(2026, 7, 3), _shopify, replaces="ONE10"
+    )
+    assert named.status_code == 201
+    assert named.json()["retired"]["code"] == "ONE10"
+
+
+def test_the_switch_is_recorded(client, _shopify):
+    from datetime import datetime
+
+    affiliate = _register(client)
+    _verify_code(client, affiliate["id"], "OLD10")
+    _switch_to(client, affiliate["id"], "NEW10", datetime(2026, 7, 3), _shopify)
+
+    with engine.connect() as connection:
+        after = connection.execute(
+            text("SELECT after_json FROM audit_event WHERE action = 'code.replaced'")
+        ).scalar()
+    assert after["retired"]["code"] == "OLD10"
+    assert after["took_over"]["code"] == "NEW10"
+
+
+def test_an_affiliate_cannot_replace_her_own_code(client):
+    _demote_to("affiliate")
+    assert client.post(
+        "/api/affiliates/1/replace-code", json={"code": "NEW10"}
+    ).status_code == 403
