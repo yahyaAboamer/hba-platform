@@ -85,6 +85,22 @@ class Anomaly:
     #: the reconciliation sweep and the prune do not until this clears.
     SCHEDULE_TOP_UP_FAILED = "schedule_top_up_failed"
 
+    #: An order carried two or more registered model codes. Nothing was
+    #: written for it - §9.2 makes it wait for a human rather than silently
+    #: paying the wrong person or paying twice.
+    ATTRIBUTION_HELD = "attribution_held"
+
+    #: An order already belonging to one affiliate resolved to a different one.
+    #: Nothing was changed: orders never move between models (§9.2, §17), and
+    #: the database would refuse it anyway. Means a code changed hands with
+    #: overlapping months, or a period was registered wrongly.
+    ATTRIBUTION_CONFLICT = "attribution_conflict"
+
+    #: An order's base cannot be decided - its return resolved, and an exchange
+    #: is indistinguishable from a plain return without `read_returns`. Held,
+    #: and pays nothing, until somebody decides it.
+    BASE_NEEDS_DECISION = "base_needs_decision"
+
     #: A Shopify fulfilment carried a display status nothing has classified.
     #: Treated as still in flight - it never earns and never voids on a guess -
     #: which means an unrecognised status would otherwise park an order for
