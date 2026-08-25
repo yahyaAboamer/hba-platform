@@ -355,6 +355,27 @@ may be one she rarely checks. Nothing errors; she just cannot get in.
 maintainer action - see the affiliate edit endpoint. That keeps the change
 deliberate and audited rather than silent.
 
+### 🔴 Correcting pay terms is not yet blocked by payroll
+
+**The limit.** A mistyped rate, salary or base amount can be corrected, which
+it must be - until now the only fix was editing the database by hand. But
+`assert_correctable` currently blocks nothing, because **payroll does not exist
+until Phase 6** and no month can yet be approved or paid.
+
+**Why it is safe today.** Nothing downstream consumes pay terms. Correcting
+them changes a number nobody has been paid against.
+
+**What failure looks like once payroll exists.** Somebody corrects a rate for a
+month already approved and paid. The platform then reports a different figure
+from the money that actually left the account - and the first sign is a model
+asking why her payslip changed. Nothing errors.
+
+**Phase 6 must wire the check into `assert_correctable`** in
+`app/services/compensation.py`: a period covering any month with an approved
+payroll snapshot is refused, and correcting it becomes a reopen-and-reconcile,
+not an edit. The function exists and is called from both correction and
+closing precisely so there is one place to fill in.
+
 ### 🟠 A handler that is not idempotent
 
 Every handler must either upsert by Shopify id or be read-only, and must never

@@ -13,7 +13,12 @@ from app.core.passwords import hash_password
 from app.models.compensation import CompensationPeriod, CompensationType
 from app.models.identity import UserAccount
 from app.services.affiliates import create_affiliate
-from app.services.compensation import set_terms, terms_for
+from app.services.compensation import (
+    close_terms,
+    correct_terms,
+    set_terms,
+    terms_for,
+)
 
 
 def _affiliate(db, name="Nour"):
@@ -440,3 +445,238 @@ def test_deleting_an_affiliate_takes_their_terms(db):
     db.flush()
 
     assert db.query(CompensationPeriod).count() == 0
+
+
+# ── Correcting a mistyped arrangement ──────────────────────────────────────────
+
+
+def test_a_mistyped_rate_can_be_corrected(db):
+    """100% instead of 10% is one keystroke, and until now it could only be
+    fixed in the database by hand.
+    """
+    nour = _affiliate(db)
+    terms = _commission(db, nour, rate_bp=10_000)
+    db.flush()
+
+    correct_terms(db, terms, commission_rate_bp=1000)
+    db.flush()
+
+    assert terms_for(db, nour, "2026-05").commission_rate_bp == 1000
+
+
+def test_a_mistyped_fixed_salary_can_be_corrected(db):
+    """A zero too many on a salary is the same class of mistake as a rate."""
+    nour = _affiliate(db)
+    terms = set_terms(
+        db,
+        nour,
+        start_month="2026-03",
+        compensation_type=CompensationType.FIXED_PLUS_COMMISSION,
+        commission_rate_bp=1000,
+        fixed_amount_piastres=5_000_000,
+    )
+    db.flush()
+
+    correct_terms(db, terms, fixed_amount_piastres=500_000)
+    db.flush()
+
+    assert terms_for(db, nour, "2026-05").fixed_amount_piastres == 500_000
+
+
+def test_a_mistyped_base_amount_can_be_corrected(db):
+    """The guaranteed floor decides what a base-guarantee model is paid when
+    her commission falls short. It has to be fixable.
+    """
+    nour = _affiliate(db)
+    terms = set_terms(
+        db,
+        nour,
+        start_month="2026-03",
+        compensation_type=CompensationType.BASE_GUARANTEE,
+        commission_rate_bp=1000,
+        base_amount_piastres=8_000_000,
+    )
+    db.flush()
+
+    correct_terms(db, terms, base_amount_piastres=800_000)
+    db.flush()
+
+    assert terms_for(db, nour, "2026-05").base_amount_piastres == 800_000
+
+
+def test_the_customer_discount_can_be_corrected(db):
+    nour = _affiliate(db)
+    terms = _commission(db, nour)
+    db.flush()
+
+    correct_terms(db, terms, expected_customer_discount_bp=1500)
+    db.flush()
+
+    assert terms_for(db, nour, "2026-05").expected_customer_discount_bp == 1500
+
+
+def test_a_correction_records_what_it_changed_from(db):
+    """Pay terms are the records most worth being able to reconstruct."""
+    nour = _affiliate(db)
+    terms = _commission(db, nour, rate_bp=10_000)
+    db.flush()
+
+    correct_terms(db, terms, commission_rate_bp=1000)
+    db.flush()
+
+    before, after = db.execute(
+        text(
+            "SELECT before_json, after_json FROM audit_event "
+            "WHERE action = 'compensation.corrected'"
+        )
+    ).one()
+    assert before["commission_rate_bp"] == 10_000
+    assert after["commission_rate_bp"] == 1000
+
+
+def test_correcting_nothing_records_nothing(db):
+    nour = _affiliate(db)
+    terms = _commission(db, nour, rate_bp=1000)
+    db.flush()
+
+    correct_terms(db, terms, commission_rate_bp=1000)
+    db.flush()
+
+    actions = [row[0] for row in db.execute(text("SELECT action FROM audit_event"))]
+    assert "compensation.corrected" not in actions
+
+
+def test_a_correction_cannot_produce_an_invalid_arrangement(db):
+    """Correction uses the same rules as creation, so it cannot produce
+    something creation would have refused.
+    """
+    nour = _affiliate(db)
+    terms = _commission(db, nour)
+    db.flush()
+
+    with pytest.raises(ValueError, match="must not carry"):
+        correct_terms(db, terms, fixed_amount_piastres=500_000)
+
+
+def test_a_correction_refuses_an_impossible_rate(db):
+    nour = _affiliate(db)
+    terms = _commission(db, nour)
+    db.flush()
+
+    with pytest.raises(ValueError):
+        correct_terms(db, terms, commission_rate_bp=10_001)
+
+
+def test_a_correction_refuses_a_float(db):
+    nour = _affiliate(db)
+    terms = set_terms(
+        db,
+        nour,
+        start_month="2026-03",
+        compensation_type=CompensationType.FIXED_PLUS_COMMISSION,
+        commission_rate_bp=1000,
+        fixed_amount_piastres=500_000,
+    )
+    db.flush()
+
+    with pytest.raises(TypeError):
+        correct_terms(db, terms, fixed_amount_piastres=5000.50)
+
+
+def test_changing_type_clears_the_amount_that_no_longer_applies(db):
+    """A model moved off a salary must not keep a fixed amount nothing reads -
+    the next person to look assumes it is being paid.
+    """
+    nour = _affiliate(db)
+    terms = set_terms(
+        db,
+        nour,
+        start_month="2026-03",
+        compensation_type=CompensationType.FIXED_PLUS_COMMISSION,
+        commission_rate_bp=1000,
+        fixed_amount_piastres=500_000,
+    )
+    db.flush()
+
+    correct_terms(db, terms, compensation_type=CompensationType.COMMISSION)
+    db.flush()
+
+    corrected = terms_for(db, nour, "2026-05")
+    assert corrected.compensation_type == CompensationType.COMMISSION
+    assert corrected.fixed_amount_piastres is None
+
+
+def test_changing_type_to_one_needing_an_amount_requires_it(db):
+    nour = _affiliate(db)
+    terms = _commission(db, nour)
+    db.flush()
+
+    with pytest.raises(ValueError, match="requires"):
+        correct_terms(db, terms, compensation_type=CompensationType.BASE_GUARANTEE)
+
+
+# ── Ending an arrangement so another can start ─────────────────────────────────
+
+
+def test_an_open_ended_arrangement_can_be_closed(db):
+    """Without this it blocks every later one: the database refuses two
+    overlapping periods, and there was no way to end the first.
+    """
+    nour = _affiliate(db)
+    terms = _commission(db, nour, "2026-01", rate_bp=800)
+    db.flush()
+
+    close_terms(db, terms, "2026-06")
+    db.flush()
+
+    assert terms_for(db, nour, "2026-07") is None
+
+
+def test_closing_then_starting_new_terms_works(db):
+    """Moving a model onto a different arrangement, which was impossible."""
+    nour = _affiliate(db)
+    terms = _commission(db, nour, "2026-01", rate_bp=800)
+    db.flush()
+
+    close_terms(db, terms, "2026-06")
+    db.flush()
+    _commission(db, nour, "2026-07", rate_bp=1200)
+    db.flush()
+
+    assert terms_for(db, nour, "2026-04").commission_rate_bp == 800
+    assert terms_for(db, nour, "2026-09").commission_rate_bp == 1200
+
+
+def test_closing_does_not_rewrite_the_months_already_covered(db):
+    """The months she was on the old terms keep saying so - which is what
+    makes a past month still calculable at the rate that applied then.
+    """
+    nour = _affiliate(db)
+    terms = _commission(db, nour, "2026-01", rate_bp=800)
+    db.flush()
+
+    close_terms(db, terms, "2026-06")
+    db.flush()
+
+    assert terms_for(db, nour, "2026-02").commission_rate_bp == 800
+
+
+def test_closing_before_the_start_is_refused(db):
+    nour = _affiliate(db)
+    terms = _commission(db, nour, "2026-06")
+    db.flush()
+
+    with pytest.raises(ValueError):
+        close_terms(db, terms, "2026-03")
+
+
+def test_closing_is_recorded(db):
+    nour = _affiliate(db)
+    terms = _commission(db, nour, "2026-01")
+    db.flush()
+
+    close_terms(db, terms, "2026-06")
+    db.flush()
+
+    actions = [row[0] for row in db.execute(text("SELECT action FROM audit_event"))]
+    assert "compensation.closed" in actions
