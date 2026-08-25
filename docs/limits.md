@@ -769,6 +769,34 @@ money in both directions.
 by hand. It means the two dates genuinely disagree, and someone has to decide
 which months belong to which code. Raise it, and build the feature above.
 
+### 🔴 A base guarantee cannot be paid until targets exist
+
+**The limit.** §9.5 pays a `base_guarantee` affiliate **max(commission, base
+amount)** — but *only when targets were achieved **and** verified*. Targets are
+Phase 5. So the calculation reports the commission figure and **refuses to
+resolve the guarantee**, blocking the month.
+
+**Why it is not defaulted either way.** Both defaults are wrong with somebody's
+money:
+
+- Assume targets were missed → she is paid commission alone, and a model who hit
+  her targets is **underpaid** with nothing saying so.
+- Assume targets were met → the guarantee applies, and a model who missed them
+  is **overpaid** out of HBA's pocket.
+
+The commission is the floor in both readings, so it is still calculated and
+reported. What is unknown is only whether the guarantee lifts it.
+
+**What failure looks like.** A `base_guarantee` month that cannot be approved,
+with `base_guarantee_needs_targets_which_arrive_in_phase_5` in its blockers. That
+is the intended behaviour, not a bug — but it means **no base-guarantee model can
+be paid through the platform until Phase 5 ships.**
+
+*What to do until then:* pay those models the way HBA does today, outside the
+platform, and let the month sit blocked. Do **not** switch them to `commission`
+to unblock it — that silently removes their guarantee and there would be nothing
+in the data to say it had ever applied.
+
 ### 🔴 Correcting pay terms is not yet blocked by payroll
 
 **The limit.** A mistyped rate, salary or base amount can be corrected, which
