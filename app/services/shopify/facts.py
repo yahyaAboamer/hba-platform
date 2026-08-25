@@ -23,6 +23,7 @@ from dataclasses import dataclass, field
 from typing import Callable
 
 from app.services.shopify.client import ShopifyClient, ShopifyError
+from app.services.shopify.fulfilment import DELIVERED_STATUSES, FAILED_STATUSES
 from app.services.shopify.normalise import _timestamp, money_to_piastres
 
 #: Enough orders to see a pattern, few enough to stay well inside Shopify's
@@ -30,18 +31,10 @@ from app.services.shopify.normalise import _timestamp, money_to_piastres
 DEFAULT_SAMPLE = 50
 MAX_SAMPLE = 250
 
-#: Fulfilment display statuses meaning the customer actually has the goods.
-#: PICKED_UP counts: collected in person is delivered, whatever the courier
-#: calls it.
-DELIVERED_STATUSES = frozenset({"DELIVERED", "PICKED_UP"})
-
-#: Statuses that contain the word "deliver" and are **not** deliveries. Listed
-#: explicitly because the obvious substring test reads all three as success -
-#: a parcel still on the van, a failed attempt, and an outright refusal would
-#: each have been reported as money earned. Found by a test, not in production.
-NOT_DELIVERIES = frozenset(
-    {"OUT_FOR_DELIVERY", "ATTEMPTED_DELIVERY", "NOT_DELIVERED", "FAILURE"}
-)
+#: The vocabulary lives in one place, so the report and the code that turns
+#: these statuses into money cannot drift apart. NOT_DELIVERIES exists only for
+#: the test that proves the sets do not overlap.
+NOT_DELIVERIES = FAILED_STATUSES | {"OUT_FOR_DELIVERY", "ATTEMPTED_DELIVERY"}
 
 
 @dataclass(frozen=True)

@@ -172,14 +172,39 @@ The endpoint returns a **verdict**, not just data: `present`, `absent`, or `unre
 a sentence saying what to do about each. `already_indexed` is computed from the platform's own
 database, so there is an answer even when Shopify is unreachable.
 
-### Task 2b — adopt (after the report is read)
+### Task 2b — adopt (shipped)
 
-Widen `ORDER_FIELDS` to the shapes that actually compiled, normalise them into **delivered
-at**, **is a return or exchange open**, and **refunded merchandise value**, and add the
-columns to `order_index` to carry them. One migration.
+The report came back on 25 August 2026. **All four facts available, nothing rejected**, and
+`delivery.signal` was `present`: 35 of 50 shipped orders delivered, each with a timestamp.
 
-Deferred deliberately: columns that nothing writes read as features and are lies (the same
-reasoning that moved `settled_at` to Phase 6).
+`ORDER_FIELDS` now carries the exact expressions the live shop accepted, including the
+`(first: 10)` argument shapes. `app/services/shopify/fulfilment.py` reduces them, and
+`order_index` gains seven columns.
+
+**Two findings changed the design rather than merely confirming it.**
+
+**The order-level status cannot answer "was it delivered?"** Across 529 orders,
+`displayFulfillmentStatus` — which the platform already stored — has two values: `fulfilled`
+(455) and `unfulfilled` (74). In the sample of 50 it called fulfilled, only 35 had arrived.
+Paying on it would have paid for fifteen parcels the customer did not have. Both are stored,
+because they answer different questions, and only one is allowed to pay anybody.
+
+**A refund is not always a refund.** One order carried refund line items worth E£998 against
+a total refunded of **zero** — an exchange, where goods come back and money does not.
+Reducing the base by refunded merchandise, which is the obvious reading of §9.3, would have
+cut E£998 from an order where the customer paid in full and kept goods of equal value. So
+**both numbers are stored**: merchandise says what came back, the total says whether any
+money did. Task 3 reads the pair. Recorded in ADR 0011.
+
+**Where the facts live.** On `order_index`, not only on `attributed_order`. About 40 bytes an
+order — a megabyte a year — to avoid a Shopify call per order every time a code is registered
+and its history backfilled (ADR 0019).
+
+**What the migration cannot do.** The 529 existing rows get `NULL` delivery state, because
+the platform genuinely never asked. An order with no delivery state never earns, so the
+import must be re-run before the first real payroll. Recorded in `docs/limits.md`, along with
+two cases the live data raised: an order half delivered and half failed, and one stuck at
+`ATTEMPTED_DELIVERY` — which was 10 of 50, one in five.
 
 **`GET /api/operations/order-facts`** reports, over the orders already indexed: how many carry
 a delivery signal, the distribution of fulfilment display statuses, how many have a return

@@ -12,6 +12,11 @@ to detect afterwards.
 The business month is derived in Africa/Cairo, never from the UTC prefix of the
 timestamp. An order placed at 21:30 UTC on 31 August belongs to September, and
 getting this wrong moves money between payroll periods.
+
+Delivery, returns and refunds are reduced here too, by ``fulfilment.py``, so an
+order carries what Phase 4 needs the moment it is indexed. Fetching them later
+would mean a Shopify call per order every time a code is registered and its
+history backfilled.
 """
 
 from datetime import datetime
@@ -21,6 +26,11 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.core.businesstime import business_month, utcnow
+from app.services.shopify.fulfilment import (
+    derive_delivery,
+    derive_refunds,
+    derive_return,
+)
 
 PIASTRES_PER_POUND = 100
 
@@ -73,6 +83,12 @@ def normalise_order(node: dict) -> dict:
     shipping, _ = _money(node.get("totalShippingPriceSet"))
     tax, _ = _money(node.get("currentTotalTaxSet"))
 
+    delivery_state, delivered_at, delivery_status = derive_delivery(
+        node.get("fulfillments"), order_id=order_id
+    )
+    return_status, return_open = derive_return(node.get("returnStatus"))
+    refunded_total, refunded_merchandise = derive_refunds(node)
+
     codes = []
     for code in node.get("discountCodes") or []:
         cleaned = str(code or "").strip().upper()
@@ -89,8 +105,23 @@ def normalise_order(node: dict) -> dict:
         "updated_at_shopify": _timestamp(node.get("updatedAt")),
         "cancelled_at": _timestamp(node.get("cancelledAt")),
         "financial_status": str(node.get("displayFinancialStatus") or "").lower() or None,
+        # The order-level status. Across 529 real orders it has exactly two
+        # values, fulfilled and unfulfilled: it says the parcel left, and
+        # nothing about whether it arrived. Kept because it is still the right
+        # answer to "has this shipped?".
         "fulfillment_status": str(node.get("displayFulfillmentStatus") or "").lower()
         or None,
+        # Delivery lives one level down, on the fulfilments. This is what
+        # ADR 0012 pays on.
+        "delivery_state": delivery_state,
+        "delivery_status": delivery_status,
+        "delivered_at": delivered_at,
+        "return_status": return_status,
+        "return_open": return_open,
+        # Two numbers, not one. An exchange shows merchandise returned with
+        # nothing refunded, and treating that as a reduction underpays.
+        "refunded_total_piastres": refunded_total,
+        "refunded_merchandise_piastres": refunded_merchandise,
         "discount_codes": codes,
         "subtotal_piastres": subtotal,
         "total_piastres": total,

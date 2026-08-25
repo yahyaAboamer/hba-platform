@@ -61,3 +61,27 @@ naturally without special handling.
 **Recompute from the final settled state.** More accurate in principle, and it
 depends on an administrator remembering to close each return in E-stebdal -
 which is manual, and therefore sometimes late by weeks.
+
+## Confirmed against live data, 25 August 2026
+
+`GET /api/operations/order-facts` sampled 50 shipped orders from HBA's shop. It
+found one order carrying **refund line items worth E£998 against a total
+refunded of zero**.
+
+That is this ADR's exchange case, in the wild: E-stebdal records the returned
+goods, and no money goes back because the customer swapped for something else.
+
+It also shows why the rule needed both numbers. Reducing the base by *refunded
+merchandise* alone — the obvious reading of "the base reduces by the refunded
+merchandise value" — would have cut **E£998** from an order where the customer
+paid in full and kept goods of equal value. That underpays the model on
+precisely the case the freeze exists to protect.
+
+So `order_index` stores **both** `refunded_total_piastres` and
+`refunded_merchandise_piastres`. They agree on a genuine refund and disagree on
+an exchange, and the disagreement is the signal. The reduction rule that reads
+them is Task 3's, not this ADR's, but it has to be expressible in terms of both:
+merchandise says *what* came back, the total says *whether any money did*.
+
+The same sample confirmed the freeze is not a rare path — **6 of 50 orders had a
+return open**, about one in eight.

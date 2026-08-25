@@ -391,6 +391,71 @@ every parcel a customer refuses at the door — which for cash-on-delivery throu
 precise loss ADR 0012 was written to stop. That would be a decision about real money and
 belongs to the business, not to whoever is writing code that week.
 
+### 🟠 Orders indexed before Task 2b know nothing about delivery
+
+**The limit.** Delivery, return and refund fields were never requested until
+Phase 4 Task 2b. The migration adds the columns; it cannot invent the data. All
+**529 orders already indexed carry `delivery_state = NULL`**, and an order with
+no delivery state never earns.
+
+**What failure looks like.** A model's January to August sales show as pending
+for ever. Her month calculates to zero earned, correctly, and it looks exactly
+like a month with no sales — the same symptom as a dead delivery signal, from a
+completely different cause.
+
+**What exists instead.** The reconciliation sweep refreshes recent orders on its
+own, so the window it covers heals without anyone doing anything. Everything
+older needs `POST /api/operations/start-import` run again — it is idempotent,
+upserts by Shopify order id, and `first_seen_at` is deliberately excluded from
+the update so re-importing does not rewrite history.
+
+*What to do before the first real payroll:* re-run the import from
+`2026-01-01`, then check `GET /api/operations/order-facts` — `already_indexed`
+will show delivery states once they are populated. **A month of zeroes is not
+evidence of no sales.**
+
+### 🟠 An order half delivered and half failed resolves neither way
+
+**The limit.** A split shipment where one parcel arrives and another fails
+reduces to `in_flight`, not to delivered or failed. It stays there.
+
+**What failure looks like.** The order never earns and never voids. It sits in
+the model's pending column indefinitely, and nothing reports it.
+
+**Why it is deliberate.** Both alternatives are wrong in a way that costs
+somebody money: calling it delivered pays commission on goods that came back,
+and calling it failed refuses commission on goods she genuinely sold. The
+honest answer is that a person has to decide, and the honest state until then is
+*not yet*.
+
+**What is missing.** Nothing lists these orders. Splitting the commission base
+across parcels would be the real fix and is not built — it needs line-item
+detail this platform does not store, for a case that has not been observed once
+in HBA's live data.
+
+*What to do if one appears:* it will show as an order pending long after its
+neighbours settled. Decide it by hand until there are enough to justify
+building for.
+
+### 🟠 An order stuck at "attempted delivery" is invisible
+
+**The limit.** `ATTEMPTED_DELIVERY` is treated as still in flight, because
+Bosta retries and most of those parcels do land. It was **10 of 50** orders in
+the live sample — one in five.
+
+If a parcel is attempted, refused, and Shopify is never moved to
+`NOT_DELIVERED`, the order stays pending for ever. It costs nobody money —
+pending pays nothing — but the model sees it in her pending column indefinitely
+and eventually asks about it.
+
+**What failure looks like.** Not a wrong number. A number that never becomes
+right, and a question nobody can answer from the dashboard.
+
+**What exists instead.** Nothing yet. The natural fix is a report of orders
+pending well past the point their neighbours settled, which is also what catches
+the split-shipment case above. Worth building once there is a month of real data
+to size the threshold from, rather than guessing at one now (ADR 0019).
+
 ### 🟠 A code created before the switch cannot be handed over
 
 **The limit.** `retire_and_replace` ends the old code the month **before** the
@@ -616,6 +681,25 @@ still recorded; part of the detail is not.
 
 *What to do:* nothing usually. Repeatedly truncating the same job means the
 useful part of the message may be past the cut — check the raw exception.
+
+### `unknown_fulfilment_status`
+
+A Shopify fulfilment carried a display status nothing has classified. It was
+treated as **still in flight** — the order neither earns nor voids on a value
+nobody has decided about.
+
+Courier integrations add statuses. Without this line the order would simply sit
+pending for ever, and the reason would be invisible: an unrecognised status and
+a parcel genuinely still travelling look identical from outside.
+
+*What to do:* the log line names the status. Decide which of the three sets in
+`app/services/shopify/fulfilment.py` it belongs to — `DELIVERED_STATUSES`,
+`FAILED_STATUSES` or `IN_FLIGHT_STATUSES` — and add it there. **Match the set,
+never a substring:** `OUT_FOR_DELIVERY`, `ATTEMPTED_DELIVERY` and
+`NOT_DELIVERED` all contain the word *deliver*, and reading any of them as a
+delivery pays commission on goods the customer does not have.
+
+---
 
 ### `work_deduplicated`
 
