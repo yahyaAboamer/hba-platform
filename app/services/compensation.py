@@ -33,6 +33,75 @@ def _require_money(value: object, name: str) -> int:
     return value
 
 
+def validate_terms(
+    compensation_type: str,
+    commission_rate_bp: int,
+    fixed_amount_piastres: int | None,
+    base_amount_piastres: int | None,
+    expected_customer_discount_bp: int | None,
+) -> None:
+    """Every rule about what a set of pay terms may say.
+
+    Shared by creating and correcting, so the two can never drift into
+    disagreeing about what a valid arrangement is - which would let a
+    correction produce something creation would have refused.
+    """
+    if compensation_type not in VALID_TYPES:
+        raise ValueError(f"Unknown compensation type: {compensation_type!r}")
+
+    if isinstance(commission_rate_bp, bool) or not isinstance(commission_rate_bp, int):
+        raise TypeError("commission_rate_bp must be an integer")
+    if not 0 < commission_rate_bp <= BASIS_POINTS:
+        raise ValueError(
+            "Commission rate must be above 0 and at most 10000 basis points"
+        )
+
+    # Each type carries exactly the money fields it uses, and no others.
+    required = _REQUIRED_FIELD[compensation_type]
+    supplied = {
+        "fixed_amount_piastres": fixed_amount_piastres,
+        "base_amount_piastres": base_amount_piastres,
+    }
+    for name, value in supplied.items():
+        if name == required:
+            if value is None:
+                raise ValueError(f"{compensation_type} requires {name}")
+            _require_money(value, name)
+        elif value is not None:
+            raise ValueError(
+                f"{compensation_type} must not carry {name} - a field nothing "
+                "reads looks like money that is being paid"
+            )
+
+    if expected_customer_discount_bp is not None:
+        if (
+            isinstance(expected_customer_discount_bp, bool)
+            or not isinstance(expected_customer_discount_bp, int)
+        ):
+            raise TypeError("expected_customer_discount_bp must be an integer")
+        if not 0 <= expected_customer_discount_bp <= BASIS_POINTS:
+            raise ValueError(
+                "Customer discount must be between 0 and 10000 basis points"
+            )
+
+
+def assert_correctable(db: Session, terms: CompensationPeriod) -> None:
+    """Refuse to change terms that have already decided a payment.
+
+    **Not yet enforceable, and deliberately left visible.** Payroll does not
+    exist until Phase 6, so no month has been approved or paid and there is
+    nothing that could be locked. This is not a stub pretending to work -
+    correcting terms genuinely is safe today, because nothing downstream has
+    consumed them yet.
+
+    Phase 6 wires the real check in here: a period covering any month with an
+    approved payroll snapshot must be refused, since correcting it would
+    silently disagree with money that has already left the account. Recorded in
+    docs/limits.md so the gap is not discovered by somebody's payslip changing.
+    """
+    return None
+
+
 def set_terms(
     db: Session,
     affiliate: AffiliateProfile,
@@ -53,47 +122,14 @@ def set_terms(
     database refuses two periods that overlap, so the months an affiliate was
     on 8% cannot later become months they were on 10%.
     """
-    if compensation_type not in VALID_TYPES:
-        raise ValueError(f"Unknown compensation type: {compensation_type!r}")
-
+    validate_terms(
+        compensation_type,
+        commission_rate_bp,
+        fixed_amount_piastres,
+        base_amount_piastres,
+        expected_customer_discount_bp,
+    )
     start_month, end_month = validate_period(start_month, end_month)
-
-    if isinstance(commission_rate_bp, bool) or not isinstance(commission_rate_bp, int):
-        raise TypeError("commission_rate_bp must be an integer")
-    if not 0 < commission_rate_bp <= BASIS_POINTS:
-        raise ValueError(
-            "Commission rate must be above 0 and at most 10000 basis points"
-        )
-
-    # Each type carries exactly the money fields it uses, and no others.
-    required = _REQUIRED_FIELD[compensation_type]
-    supplied = {
-        "fixed_amount_piastres": fixed_amount_piastres,
-        "base_amount_piastres": base_amount_piastres,
-    }
-    for name, value in supplied.items():
-        if name == required:
-            if value is None:
-                raise ValueError(
-                    f"{compensation_type} requires {name}"
-                )
-            _require_money(value, name)
-        elif value is not None:
-            raise ValueError(
-                f"{compensation_type} must not carry {name} - a field nothing "
-                "reads looks like money that is being paid"
-            )
-
-    if expected_customer_discount_bp is not None:
-        if (
-            isinstance(expected_customer_discount_bp, bool)
-            or not isinstance(expected_customer_discount_bp, int)
-        ):
-            raise TypeError("expected_customer_discount_bp must be an integer")
-        if not 0 <= expected_customer_discount_bp <= BASIS_POINTS:
-            raise ValueError(
-                "Customer discount must be between 0 and 10000 basis points"
-            )
 
     terms = CompensationPeriod(
         affiliate_id=affiliate.id,
@@ -125,6 +161,137 @@ def set_terms(
         },
     )
     return terms
+
+
+def correct_terms(
+    db: Session,
+    terms: CompensationPeriod,
+    *,
+    compensation_type: str | None = None,
+    commission_rate_bp: int | None = None,
+    fixed_amount_piastres: int | None = None,
+    base_amount_piastres: int | None = None,
+    expected_customer_discount_bp: int | None = None,
+    actor_id: int | None = None,
+    actor_email: str | None = None,
+) -> CompensationPeriod:
+    """Fix a mistyped arrangement - the rate, the salary, or the base amount.
+
+    All three are money that decides what somebody is paid, and all three are
+    typed by a person. Without this, a rate entered as 100% instead of 10%, or
+    a salary with a zero too many, could only be fixed in the database by hand.
+
+    This corrects **what the arrangement says**, not when it applies. Moving a
+    model onto different terms from a given month is a new period, not a
+    correction - close this one and set new terms, so the months she was on the
+    old arrangement keep saying so.
+
+    An amount belonging to another type is cleared rather than left behind: a
+    model moved from salary to commission-only must not keep a fixed amount
+    that nothing reads, because the next person to look assumes it is paid.
+    """
+    assert_correctable(db, terms)
+
+    new_type = compensation_type or terms.compensation_type
+    changing_type = new_type != terms.compensation_type
+
+    def keep_or_clear(supplied, current):
+        if supplied is not None:
+            return supplied
+        return None if changing_type else current
+
+    proposed = {
+        "compensation_type": new_type,
+        "commission_rate_bp": (
+            commission_rate_bp
+            if commission_rate_bp is not None
+            else terms.commission_rate_bp
+        ),
+        "fixed_amount_piastres": keep_or_clear(
+            fixed_amount_piastres, terms.fixed_amount_piastres
+        ),
+        "base_amount_piastres": keep_or_clear(
+            base_amount_piastres, terms.base_amount_piastres
+        ),
+        "expected_customer_discount_bp": (
+            expected_customer_discount_bp
+            if expected_customer_discount_bp is not None
+            else terms.expected_customer_discount_bp
+        ),
+    }
+
+    validate_terms(
+        proposed["compensation_type"],
+        proposed["commission_rate_bp"],
+        proposed["fixed_amount_piastres"],
+        proposed["base_amount_piastres"],
+        proposed["expected_customer_discount_bp"],
+    )
+
+    changed = {
+        field: getattr(terms, field)
+        for field in proposed
+        if getattr(terms, field) != proposed[field]
+    }
+    if not changed:
+        return terms
+
+    for field, value in proposed.items():
+        setattr(terms, field, value)
+
+    record_audit(
+        db,
+        action="compensation.corrected",
+        subject=f"affiliate:{terms.affiliate_id}",
+        actor_id=actor_id,
+        actor_email=actor_email,
+        before=changed,
+        after={field: proposed[field] for field in changed},
+    )
+    return terms
+
+
+def close_terms(
+    db: Session,
+    terms: CompensationPeriod,
+    end_month: str,
+    *,
+    actor_id: int | None = None,
+    actor_email: str | None = None,
+) -> CompensationPeriod:
+    """End an arrangement, so a different one can start the month after.
+
+    Without this an open-ended arrangement blocks every later one: the database
+    refuses two overlapping periods, correctly, and there was no way to end the
+    first. Moving a model onto new terms was simply impossible.
+
+    Ending is not correcting. The months she was on these terms keep saying so,
+    which is what makes a past month still calculable at the rate that applied
+    then.
+    """
+    assert_correctable(db, terms)
+    validate_period(terms.start_month, end_month)
+
+    previous = terms.end_month
+    if previous == end_month:
+        return terms
+
+    terms.end_month = end_month
+    record_audit(
+        db,
+        action="compensation.closed",
+        subject=f"affiliate:{terms.affiliate_id}",
+        actor_id=actor_id,
+        actor_email=actor_email,
+        before={"end_month": previous},
+        after={"end_month": end_month},
+    )
+    return terms
+
+
+def get_terms(db: Session, period_id: int) -> CompensationPeriod | None:
+    """One arrangement by id, for correcting or closing it."""
+    return db.get(CompensationPeriod, period_id)
 
 
 def terms_for(

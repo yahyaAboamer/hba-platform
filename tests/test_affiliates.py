@@ -146,9 +146,18 @@ def test_an_unknown_account_kind_is_refused_by_the_service(db):
 # ── Status changes ─────────────────────────────────────────────────────────────
 
 
+def _verified_code(db, affiliate, code="NOUR10"):
+    """A code Shopify has confirmed - the gate on approval (§10.4)."""
+    from app.core.businesstime import utcnow
+
+    register_code(db, affiliate, code, "2026-01", verified_at=utcnow())
+    db.flush()
+
+
 def test_a_status_change_is_recorded(db):
     affiliate = create_affiliate(db, user_account_id=_account(db).id, name="Nour")
     db.flush()
+    _verified_code(db, affiliate)
     set_status(db, affiliate, AffiliateStatus.ACTIVE)
     db.flush()
 
@@ -162,6 +171,7 @@ def test_the_audit_record_names_what_it_changed_from(db):
     """
     affiliate = create_affiliate(db, user_account_id=_account(db).id, name="Nour")
     db.flush()
+    _verified_code(db, affiliate)
     set_status(db, affiliate, AffiliateStatus.ACTIVE)
     db.flush()
 
@@ -322,6 +332,63 @@ def test_archiving_does_not_touch_already_closed_code_periods(db):
 def test_archiving_with_no_codes_does_not_error(db):
     affiliate = create_affiliate(db, user_account_id=_account(db).id, name="Nour")
     db.flush()
+    archive_affiliate(db, affiliate)
+    db.flush()
+    assert affiliate.status == AffiliateStatus.ARCHIVED
+
+
+# ── Approval is gated on Shopify verification (spec 10.4) ─────────────────────
+
+
+def test_an_affiliate_cannot_be_approved_without_a_verified_code(db):
+    """The gate the spec calls required, and that nothing enforced until now.
+
+    Approving a mistyped code is silent: it matches no order, the model earns
+    nothing, and the first anyone notices is when she asks why her dashboard
+    is empty - by which point months of her sales have gone to nobody.
+    """
+    affiliate = create_affiliate(db, user_account_id=_account(db).id, name="Nour")
+    db.flush()
+
+    with pytest.raises(ValueError, match="confirmed to exist in Shopify"):
+        set_status(db, affiliate, AffiliateStatus.ACTIVE)
+
+
+def test_an_unverified_code_does_not_satisfy_the_gate(db):
+    """Registering a code is not the same act as checking it exists."""
+    affiliate = create_affiliate(db, user_account_id=_account(db).id, name="Nour")
+    db.flush()
+    register_code(db, affiliate, "NOUR10", "2026-01")
+    db.flush()
+
+    with pytest.raises(ValueError, match="confirmed to exist in Shopify"):
+        set_status(db, affiliate, AffiliateStatus.ACTIVE)
+
+
+def test_a_verified_code_opens_the_gate(db):
+    """Guards the two tests above, which would pass if approval were simply
+    broken for everyone.
+    """
+    affiliate = create_affiliate(db, user_account_id=_account(db).id, name="Nour")
+    db.flush()
+    _verified_code(db, affiliate)
+
+    set_status(db, affiliate, AffiliateStatus.ACTIVE)
+    db.flush()
+    assert affiliate.status == AffiliateStatus.ACTIVE
+
+
+def test_the_gate_does_not_block_other_statuses(db):
+    """Deactivating or archiving somebody must never require a verified code -
+    the gate is on approval, not on every transition.
+    """
+    affiliate = create_affiliate(db, user_account_id=_account(db).id, name="Nour")
+    db.flush()
+
+    set_status(db, affiliate, AffiliateStatus.INACTIVE)
+    db.flush()
+    assert affiliate.status == AffiliateStatus.INACTIVE
+
     archive_affiliate(db, affiliate)
     db.flush()
     assert affiliate.status == AffiliateStatus.ARCHIVED

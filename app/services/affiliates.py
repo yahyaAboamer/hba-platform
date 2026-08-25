@@ -17,7 +17,7 @@ from app.models.affiliates import (
     AffiliateStatus,
 )
 from app.services.audit import record_audit
-from app.services.codes import close_codes_for
+from app.services.codes import close_codes_for, verified_codes_for
 
 
 def create_affiliate(
@@ -84,6 +84,23 @@ def set_status(
     if previous == status:
         return
 
+    if status == AffiliateStatus.ACTIVE and not verified_codes_for(db, affiliate):
+        # Spec 10.4: Shopify code verification is a *required gate* before
+        # approval, and this is the gate.
+        #
+        # Approving a mistyped code is the failure it exists to catch. Nothing
+        # errors: the code simply matches no order, the model earns nothing,
+        # and the first anyone notices is when she asks why her dashboard is
+        # empty - by which point months of her sales have gone to nobody.
+        #
+        # Enforced here rather than in the API so it holds for every caller,
+        # the same reasoning as closing code ownership on archive.
+        raise ValueError(
+            "This affiliate has no code confirmed to exist in Shopify. Verify "
+            "the code first - an unverified code that turns out to be mistyped "
+            "attributes nothing, silently."
+        )
+
     affiliate.status = status
     record_audit(
         db,
@@ -139,6 +156,62 @@ def archive_affiliate(
         actor_id=actor_id,
         actor_email=actor_email,
         reason=reason,
+    )
+
+
+def update_details(
+    db: Session,
+    affiliate: AffiliateProfile,
+    *,
+    name: str | None = None,
+    phone: str | None = None,
+    email: str | None = None,
+    actor_id: int | None = None,
+    actor_email: str | None = None,
+) -> None:
+    """Correct what a model submitted about herself.
+
+    She fills her own details in, and people mistype their own phone numbers.
+    Without this the only fix would be deleting the account and starting over.
+
+    **Email is her login**, so changing it is a real change and not a contact
+    edit - the account she signs in with moves. It is recorded like any other,
+    with what it changed from, because "why can she not sign in any more" is a
+    question that gets asked.
+
+    Only supplied fields change. Passing nothing is not an error, and records
+    nothing.
+    """
+    before: dict = {}
+    after: dict = {}
+
+    if name is not None and (cleaned := name.strip()) and cleaned != affiliate.name:
+        before["name"], after["name"] = affiliate.name, cleaned
+        affiliate.name = cleaned
+
+    if phone is not None:
+        cleaned_phone = phone.strip() or None
+        if cleaned_phone != affiliate.phone:
+            before["phone"], after["phone"] = affiliate.phone, cleaned_phone
+            affiliate.phone = cleaned_phone
+
+    if email is not None and (cleaned_email := email.strip().lower()):
+        account = affiliate.account
+        if cleaned_email != account.email:
+            before["email"], after["email"] = account.email, cleaned_email
+            account.email = cleaned_email
+
+    if not after:
+        return
+
+    record_audit(
+        db,
+        action="affiliate.details_updated",
+        subject=f"affiliate:{affiliate.id}",
+        actor_id=actor_id,
+        actor_email=actor_email,
+        before=before,
+        after=after,
     )
 
 

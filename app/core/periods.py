@@ -79,6 +79,17 @@ from app.core.businesstime import month_add, parse_month
 #: notice. Spelled rather than left as a bare None at every call site.
 OPEN_ENDED = None
 
+#: The earliest month this platform has any data for.
+#:
+#: Orders are imported from 1 January 2026 and no earlier, so nothing before
+#: this month can be known, attributed, or paid. It is the default start for
+#: code ownership: most codes were live on Shopify long before the platform
+#: existed, and registering one from *today* would silently orphan every order
+#: it had already earned. Starting from the horizon captures whatever history
+#: exists and costs nothing for a code that is genuinely new - there are no
+#: orders before a code exists either way.
+PLATFORM_START_MONTH = "2026-01"
+
 #: The canonical generated-column expression.
 #:
 #: Migrations write this out **literally** rather than importing it - a

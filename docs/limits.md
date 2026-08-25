@@ -337,6 +337,82 @@ her code already has orders, register it from the earliest month listed, not
 from today — otherwise the backfill, when it arrives, has a gap to find that
 nobody recorded.
 
+### 🟠 A model's login email is the one she was invited at, not one she types
+
+**The limit.** `accept_invitation` creates the account with the **invitation's**
+email. The application form (Phase 8) collects an email from the model, but that
+is a *contact detail* on her profile - it does not become her login.
+
+**Why it is this way.** The invitation link was sent to that address and
+approved against it. Letting the form silently repoint the login would mean the
+person you invited is not necessarily the person who ends up with the account.
+
+**What failure looks like.** She types the email she actually uses, is approved,
+and then cannot sign in - because the login is the address you invited, which
+may be one she rarely checks. Nothing errors; she just cannot get in.
+
+*What to do:* the form shows the invited address, and correcting it is a
+maintainer action - see the affiliate edit endpoint. That keeps the change
+deliberate and audited rather than silent.
+
+### 🟠 A code created before the switch cannot be handed over
+
+**The limit.** `retire_and_replace` ends the old code the month **before** the
+new one starts, and takes the new one's start month from **when Shopify created
+it**. Those are the same date only because HBA creates a code at the moment of
+switching a model onto it. Nothing enforces that habit.
+
+**What failure looks like.** `NEW10` is created on Shopify in July, but she
+keeps earning on `OLD10` through August. Switching her in September derives a
+July start, which ends `OLD10` in June — so her July and August `OLD10` orders
+fall outside every period she owns. Two months of her sales belong to nobody.
+Nothing errors, nothing recalculates, and the only visible trace is a smaller
+payout than she expects.
+
+The mirror case is as bad: if somebody else used `NEW10` in those months, those
+orders become hers.
+
+**What exists instead.** The handover is **refused** when it would strand
+anything. Before ending the old period, `_orders_on_or_after` counts orders on
+the old code in the new code's start month or later; any at all and the request
+fails with a 400 naming the code, the count, and this file.
+
+The check is on the *harm*, not the calendar. A code created early that nobody
+used strands nothing, so it is allowed — sizing the guard to the failure rather
+than to the shape it usually arrives in (ADR 0019).
+
+**What is missing.** A way to say **which month she actually moved over**,
+separate from when the code was created, with the orders the new code already
+accumulated shown before the decision is confirmed. Deliberately not built:
+HBA does not work this way today, and a handover month that can be typed is a
+handover month that can be typed wrong — which silently re-attributes real
+money in both directions.
+
+*What to do if the refusal appears:* do not work around it by retiring the code
+by hand. It means the two dates genuinely disagree, and someone has to decide
+which months belong to which code. Raise it, and build the feature above.
+
+### 🔴 Correcting pay terms is not yet blocked by payroll
+
+**The limit.** A mistyped rate, salary or base amount can be corrected, which
+it must be - until now the only fix was editing the database by hand. But
+`assert_correctable` currently blocks nothing, because **payroll does not exist
+until Phase 6** and no month can yet be approved or paid.
+
+**Why it is safe today.** Nothing downstream consumes pay terms. Correcting
+them changes a number nobody has been paid against.
+
+**What failure looks like once payroll exists.** Somebody corrects a rate for a
+month already approved and paid. The platform then reports a different figure
+from the money that actually left the account - and the first sign is a model
+asking why her payslip changed. Nothing errors.
+
+**Phase 6 must wire the check into `assert_correctable`** in
+`app/services/compensation.py`: a period covering any month with an approved
+payroll snapshot is refused, and correcting it becomes a reopen-and-reconcile,
+not an edit. The function exists and is called from both correction and
+closing precisely so there is one place to fill in.
+
 ### 🟠 A handler that is not idempotent
 
 Every handler must either upsert by Shopify id or be read-only, and must never

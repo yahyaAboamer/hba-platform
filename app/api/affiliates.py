@@ -24,6 +24,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import require_permission
 from app.core.businesstime import business_month, utcnow
+from app.core.periods import OPEN_ENDED
 from app.core.permissions import Permission
 from app.db import get_session
 from app.models.affiliates import AffiliateProfile, AffiliateStatus
@@ -34,10 +35,33 @@ from app.services.affiliates import (
     get_affiliate,
     list_affiliates,
     set_status,
+    update_details,
 )
-from app.services.codes import codes_for, register_code
-from app.services.compensation import set_terms, terms_for
+from app.services.codes import (
+    codes_for,
+    mark_verified,
+    normalise_code,
+    register_code,
+    replace_code,
+    open_codes_for,
+    retire_and_replace,
+    start_month_for,
+    unregistered_code_for,
+)
+from app.services.compensation import (
+    close_terms,
+    correct_terms,
+    get_terms,
+    set_terms,
+    terms_for,
+)
 from app.services.payouts import current_destination, mask_destination, set_destination
+from app.services.shopify.client import (
+    ShopifyError,
+    ShopifyMissingScope,
+    ShopifyNotConfigured,
+)
+from app.services.shopify.discounts import REQUIRED_SCOPE, verify_discount_code
 
 router = APIRouter(prefix="/api/affiliates")
 
@@ -53,18 +77,41 @@ class CreateAffiliateBody(BaseModel):
 
 
 class UpdateStatusBody(BaseModel):
-    status: str
+    status: str | None = None
     reason: str | None = None
+    #: Corrections to what the model submitted about herself. People mistype
+    #: their own phone numbers, and email is her login - see update_details.
+    name: str | None = Field(default=None, max_length=120)
+    phone: str | None = Field(default=None, max_length=40)
+    email: str | None = Field(default=None, max_length=320)
+
+
+class RecheckCodeBody(BaseModel):
+    """Ask Shopify again about a code that was not found the first time.
+
+    ``code`` corrects a typo at the same time. Left out, the existing code is
+    re-checked unchanged - the ordinary case, where the code was simply not
+    created on Shopify yet.
+    """
+
+    code: str | None = Field(default=None, max_length=120)
 
 
 class RegisterCodeBody(BaseModel):
+    """Just the code.
+
+    **No start month is asked for, deliberately.** There is exactly one right
+    answer - the later of the platform's data horizon and the code's creation
+    on Shopify - so asking a person can only produce a wrong one. Typing
+    today's month would orphan every order the code had already earned, and
+    nobody would notice until the model asked why her dashboard was empty.
+
+    Verification is not asked for either. Registering looks the code up in
+    Shopify, which is the same call that answers "does this exist?" - one
+    action instead of two that could disagree.
+    """
+
     code: str = Field(min_length=1, max_length=120)
-    start_month: str
-    end_month: str | None = None
-    #: Whether Shopify has already confirmed the code exists. Verification
-    #: itself - the actual Shopify lookup - is /api/operations/verify-code;
-    #: this only records that it happened, stamped now.
-    verified: bool = False
 
 
 class SetCompensationBody(BaseModel):
@@ -75,6 +122,43 @@ class SetCompensationBody(BaseModel):
     fixed_amount_piastres: int | None = None
     base_amount_piastres: int | None = None
     expected_customer_discount_bp: int | None = None
+
+
+class CorrectCompensationBody(BaseModel):
+    """Fix a mistyped arrangement, or end it.
+
+    Every money field is here because every one of them is typed by a person:
+    the rate, the salary a fixed-plus-commission model is paid, and the base a
+    base-guarantee model is guaranteed. A zero too many in any of them decides
+    what somebody is paid.
+
+    ``end_month`` ends the arrangement instead of changing it - which is what
+    moving a model onto different terms requires, since two overlapping
+    arrangements are refused.
+    """
+
+    compensation_type: str | None = None
+    commission_rate_bp: int | None = None
+    fixed_amount_piastres: int | None = None
+    base_amount_piastres: int | None = None
+    expected_customer_discount_bp: int | None = None
+    end_month: str | None = None
+
+
+class ReplaceCodeBody(BaseModel):
+    """Move a model onto a new discount code.
+
+    ``replaces`` names which of her codes is being retired, and is only needed
+    when she holds more than one - with a single code there is nothing to
+    disambiguate, and asking would be noise.
+
+    No months are asked for. The new code starts when Shopify created it (or at
+    the platform horizon, whichever is later), and the old one ends the month
+    before. Both are facts, not choices.
+    """
+
+    code: str = Field(min_length=1, max_length=120)
+    replaces: str | None = Field(default=None, max_length=120)
 
 
 class SetPayoutDestinationBody(BaseModel):
@@ -214,7 +298,19 @@ def update_affiliate_status_route(
     """
     affiliate = _get_affiliate_or_404(db, affiliate_id)
     try:
-        if body.status == AffiliateStatus.ARCHIVED:
+        update_details(
+            db,
+            affiliate,
+            name=body.name,
+            phone=body.phone,
+            email=body.email,
+            actor_id=actor.id,
+            actor_email=actor.email,
+        )
+
+        if body.status is None:
+            pass
+        elif body.status == AffiliateStatus.ARCHIVED:
             archive_affiliate(
                 db,
                 affiliate,
@@ -238,6 +334,93 @@ def update_affiliate_status_route(
     return _affiliate_payload(affiliate)
 
 
+@router.post("/{affiliate_id}/recheck-code")
+def recheck_code_route(
+    affiliate_id: int,
+    body: RecheckCodeBody,
+    actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_MANAGE)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Ask Shopify again about a code it did not know.
+
+    Two things happen when it is now found: the code is marked verified, and
+    its start month is corrected. Until Shopify knew the code, its creation
+    date was unknown and the period fell back to the platform horizon - leaving
+    that in place would claim months the code did not exist for.
+
+    A typo is corrected here too, by supplying a different code. That rewrites
+    the row rather than opening a second period: an unverified code never
+    attributed anything, and leaving the wrong one behind would keep it holding
+    ownership that blocks the right person from claiming it.
+    """
+    from app.services.shopify.sync import build_client
+
+    affiliate = _get_affiliate_or_404(db, affiliate_id)
+    period = unregistered_code_for(db, affiliate)
+    if period is None:
+        raise HTTPException(
+            404,
+            "This affiliate has no unverified code. A code Shopify has already "
+            "confirmed is not re-checked - it may have attributed orders.",
+        )
+
+    try:
+        found = verify_discount_code(build_client(), body.code or period.code)
+    except ShopifyMissingScope as exc:
+        raise HTTPException(
+            403,
+            f"Shopify has not granted {REQUIRED_SCOPE}, so this code cannot be "
+            "checked. Add the scope, then try again.",
+        ) from exc
+    except ShopifyNotConfigured as exc:
+        raise HTTPException(503, str(exc)) from exc
+    except ShopifyError as exc:
+        raise HTTPException(502, f"Could not reach Shopify: {exc}") from exc
+
+    verified_at = utcnow() if found["exists"] else None
+    start_month = start_month_for(found["created_at"])
+
+    try:
+        if body.code is not None and normalise_code(body.code) != period.code:
+            replace_code(
+                db,
+                period,
+                body.code,
+                start_month=start_month,
+                verified_at=verified_at,
+                actor_id=actor.id,
+                actor_email=actor.email,
+            )
+        elif found["exists"]:
+            mark_verified(
+                db,
+                period,
+                verified_at=verified_at,
+                start_month=start_month,
+                actor_id=actor.id,
+                actor_email=actor.email,
+            )
+        db.flush()
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            409,
+            f"{(body.code or period.code).strip().upper()!r} is already owned "
+            "by somebody else during part of this period",
+        ) from exc
+
+    db.commit()
+    return {
+        "code": period.code,
+        "start_month": period.start_month,
+        "is_verified": period.is_verified,
+        "exists_in_shopify": found["exists"],
+        "shopify_status": found["status"],
+    }
+
+
 @router.post("/{affiliate_id}/codes", status_code=201)
 def register_code_route(
     affiliate_id: int,
@@ -245,15 +428,44 @@ def register_code_route(
     actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_MANAGE)),
     db: Session = Depends(get_session),
 ) -> dict:
+    """Give an affiliate a discount code.
+
+    Looks the code up in Shopify, and that one call settles both questions:
+    whether it exists, and which month ownership starts from.
+
+    **A code Shopify has never heard of is still registered, unverified.** The
+    business has models whose code has not been created yet, and refusing to
+    record what they applied with would be unhelpful. Approval is what the
+    verification gate protects - see set_status - so an unverified code cannot
+    quietly become a paying one.
+    """
+    from app.services.shopify.sync import build_client
+
     affiliate = _get_affiliate_or_404(db, affiliate_id)
+
+    try:
+        found = verify_discount_code(build_client(), body.code)
+    except ShopifyMissingScope as exc:
+        raise HTTPException(
+            403,
+            f"Shopify has not granted {REQUIRED_SCOPE}, so this code cannot be "
+            "checked. Add the scope, then register the code.",
+        ) from exc
+    except ShopifyNotConfigured as exc:
+        raise HTTPException(503, str(exc)) from exc
+    except ShopifyError as exc:
+        # Registering blind would guess the start month, and a wrong guess
+        # orphans orders silently. Better to fail while somebody is watching.
+        raise HTTPException(502, f"Could not reach Shopify: {exc}") from exc
+
     try:
         period = register_code(
             db,
             affiliate,
             body.code,
-            body.start_month,
-            body.end_month,
-            verified_at=utcnow() if body.verified else None,
+            start_month_for(found["created_at"]),
+            OPEN_ENDED,
+            verified_at=utcnow() if found["exists"] else None,
             actor_id=actor.id,
             actor_email=actor.email,
         )
@@ -273,6 +485,111 @@ def register_code_route(
         "start_month": period.start_month,
         "end_month": period.end_month,
         "is_verified": period.is_verified,
+        "exists_in_shopify": found["exists"],
+        "shopify_status": found["status"],
+    }
+
+
+@router.post("/{affiliate_id}/replace-code", status_code=201)
+def replace_code_route(
+    affiliate_id: int,
+    body: ReplaceCodeBody,
+    actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_MANAGE)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """She changed her code on Shopify. Carry her across to the new one.
+
+    Nothing about her changes: same record, same dashboard, same history. Her
+    earlier months keep showing the old code and the orders it earned; later
+    months show the new one. Her performance runs continuously across both.
+
+    The old code is **ended, never rewritten**. It was live and has attributed
+    orders; changing it would alter what those orders belonged to, and a month
+    already calculated would silently disagree with itself.
+    """
+    from app.services.shopify.sync import build_client
+
+    affiliate = _get_affiliate_or_404(db, affiliate_id)
+
+    held = open_codes_for(db, affiliate)
+    if not held:
+        raise HTTPException(
+            404,
+            "This affiliate holds no current code to replace. Register one "
+            "instead.",
+        )
+    if body.replaces is not None:
+        wanted = normalise_code(body.replaces)
+        old_period = next((p for p in held if p.code == wanted), None)
+        if old_period is None:
+            raise HTTPException(404, f"{wanted!r} is not a current code for this affiliate")
+    elif len(held) > 1:
+        raise HTTPException(
+            409,
+            "This affiliate holds more than one current code. Name which one "
+            "is being replaced.",
+        )
+    else:
+        old_period = held[0]
+
+    try:
+        found = verify_discount_code(build_client(), body.code)
+    except ShopifyMissingScope as exc:
+        raise HTTPException(
+            403,
+            f"Shopify has not granted {REQUIRED_SCOPE}, so this code cannot be "
+            "checked. Add the scope, then try again.",
+        ) from exc
+    except ShopifyNotConfigured as exc:
+        raise HTTPException(503, str(exc)) from exc
+    except ShopifyError as exc:
+        raise HTTPException(502, f"Could not reach Shopify: {exc}") from exc
+
+    if not found["exists"]:
+        # Ending her current code on the strength of one Shopify has never
+        # heard of would leave her earning nothing from that month on, and
+        # nothing would report it.
+        raise HTTPException(
+            400,
+            f"Shopify has no code {found['code']!r}. Create it there first - "
+            "retiring her current code for one that does not exist would stop "
+            "her earning from that month with nothing to show for it.",
+        )
+
+    try:
+        replacement = retire_and_replace(
+            db,
+            affiliate,
+            old_period=old_period,
+            new_code=body.code,
+            new_start_month=start_month_for(found["created_at"]),
+            verified_at=utcnow(),
+            actor_id=actor.id,
+            actor_email=actor.email,
+        )
+        db.flush()
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            409,
+            f"{body.code.strip().upper()!r} is already owned by somebody else "
+            "during part of this period",
+        ) from exc
+
+    db.commit()
+    return {
+        "retired": {
+            "code": old_period.code,
+            "start_month": old_period.start_month,
+            "end_month": old_period.end_month,
+        },
+        "took_over": {
+            "code": replacement.code,
+            "start_month": replacement.start_month,
+            "is_verified": replacement.is_verified,
+        },
     }
 
 
@@ -298,6 +615,59 @@ def set_compensation_route(
             actor_id=actor.id,
             actor_email=actor.email,
         )
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            409, "These months overlap pay terms already on record for this affiliate"
+        ) from exc
+
+    db.commit()
+    return _compensation_payload(terms)
+
+
+@router.patch("/{affiliate_id}/compensation/{period_id}")
+def correct_compensation_route(
+    affiliate_id: int,
+    period_id: int,
+    body: CorrectCompensationBody,
+    actor: UserAccount = Depends(require_permission(Permission.COMPENSATION_MANAGE)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Correct or end an arrangement.
+
+    Correcting changes what the arrangement says; ending changes when it
+    applies. They are different acts and both are needed - a mistyped salary
+    has to be fixable, and a model moving onto new terms needs the old ones
+    closed first, or the database refuses the overlap.
+    """
+    affiliate = _get_affiliate_or_404(db, affiliate_id)
+    terms = get_terms(db, period_id)
+    if terms is None or terms.affiliate_id != affiliate.id:
+        raise HTTPException(404, "No such compensation period for this affiliate")
+
+    try:
+        if body.end_month is not None:
+            close_terms(
+                db,
+                terms,
+                body.end_month,
+                actor_id=actor.id,
+                actor_email=actor.email,
+            )
+        correct_terms(
+            db,
+            terms,
+            compensation_type=body.compensation_type,
+            commission_rate_bp=body.commission_rate_bp,
+            fixed_amount_piastres=body.fixed_amount_piastres,
+            base_amount_piastres=body.base_amount_piastres,
+            expected_customer_discount_bp=body.expected_customer_discount_bp,
+            actor_id=actor.id,
+            actor_email=actor.email,
+        )
+        db.flush()
     except (ValueError, TypeError) as exc:
         raise HTTPException(400, str(exc)) from exc
     except IntegrityError as exc:
