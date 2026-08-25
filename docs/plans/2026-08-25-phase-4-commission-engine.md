@@ -112,22 +112,39 @@ against ~150 bytes in `order_index`, at about 15% attribution.
 **Columns:** `shopify_order_id` (primary key, and a foreign key to `order_index`),
 `affiliate_id`, `business_month`, `commission_base_piastres`,
 `refunded_merchandise_piastres`, `commission_state`, `base_frozen_at`, `financial_status`,
-`fulfillment_status`, `delivered_at`, `return_status`, `settled_at`,
-`settled_in_snapshot_id`, `attributed_at`.
+`fulfillment_status`, `delivered_at`, `return_status`, `attributed_at`, `updated_at`.
 
 **`business_month` is copied, not joined.** It is the month the order was *placed*, derived in
 Cairo (ADR 0005) and never recomputed. Copying it means a month's figures cannot shift
 underneath an approved payroll because something upstream changed.
 
 **Not append-only.** The base legitimately moves while an order is pending. Only
-`affiliate_id` is frozen — a row-level `BEFORE UPDATE` trigger that raises when a non-null
-`affiliate_id` changes. The distinction matters: making the whole row append-only would force
-a new row per fulfilment event, which is storage spent protecting a field that is already
-protected (ADR 0019).
+`affiliate_id` and `business_month` are frozen — a row-level `BEFORE UPDATE` trigger. Making
+the whole row append-only would force a new row per fulfilment event, which is storage spent
+protecting two fields a trigger protects for nothing (ADR 0019).
 
-**Tests:** the trigger refuses a reassignment; it permits setting `affiliate_id` where it was
-null, because that is attaching an orphan (§9.2); base and state update freely; the row dies
-with its order.
+**Tests:** the trigger refuses a reassignment and refuses a month change; rewriting the same
+affiliate back is not a move; base and state update freely; the row dies with its order; an
+affiliate with earnings cannot be deleted out from under them.
+
+### Two corrections to this task, made while building it
+
+**`affiliate_id` is NOT NULL, and attaching an orphan is an INSERT.** This plan said the
+trigger would "permit setting `affiliate_id` where it was null". That implied a nullable
+column and therefore a row per order — which duplicates `order_index` at nine times the size
+and defeats the whole point of two-tier storage (§10.2). A row existing here *means* the order
+is attributed. An unattributed order is an `order_index` row with nothing here, and Task 6
+attaches an orphan by inserting.
+
+**`business_month` is frozen too, not just `affiliate_id`.** §17 requires only the second. But
+the trigger is already firing on every update, so checking one more column costs a single
+line, and a month that could move is money moving between payroll periods — the same failure
+as reassignment. Free, so taken (ADR 0019).
+
+**`settled_at` and `settled_in_snapshot_id` are deferred to Phase 6.** They record which
+approved snapshot paid the order, and snapshots do not exist yet. Adding them now means two
+nullable columns with no writer, no constraint and no test, which read as features and are
+lies. Phase 6 adds them with the foreign key that gives them meaning, in one migration.
 
 ---
 
@@ -194,6 +211,12 @@ zero; an exchange with no net refund changes nothing.
 
 `pending` — in transit, or an exchange is open. `earned` — delivered, with no open return or
 exchange. `void` — cancelled, fully refunded, or failed delivery.
+
+**What HBA reports seeing in Shopify**, to be confirmed against live numbers by Task 2:
+delivered, failed delivery, and in-transit for everything in between. That maps onto the
+three states directly — `DELIVERED` earns, a delivery failure voids, anything else is
+pending. Written down here so Task 2 checks a stated expectation rather than browsing an
+enum, and so a *missing* third value is noticed rather than assumed away.
 
 Only `earned` counts toward a payout. `pending` is displayed separately rather than hidden,
 so a model can see what is coming.
