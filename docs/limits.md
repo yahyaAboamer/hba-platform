@@ -627,6 +627,34 @@ within seconds.
 
 ---
 
+### 🟠 "Out for delivery" is not "delivered" *(fixed, guarded)*
+
+**The limit.** Shopify's fulfilment display statuses include `DELIVERED`,
+`OUT_FOR_DELIVERY`, `ATTEMPTED_DELIVERY` and `NOT_DELIVERED`. The obvious test —
+does the status contain the word *deliver* — reads **all four** as a delivery.
+
+**What failure looks like.** A parcel still on the van, a failed delivery
+attempt, and a customer who refused the goods at the door would each count as
+money earned. For cash-on-delivery through Bosta that is precisely the loss
+ADR 0012 was written to prevent, and it would arrive as commission quietly paid
+on sales that never happened — the old dashboard's defect, rebuilt.
+
+**How close this came.** The first version of `delivery_verdict` used
+`"DELIVER" in name and "NOT" not in name`, which excluded `NOT_DELIVERED` and
+happily accepted `OUT_FOR_DELIVERY`. It was caught by a test written to assert
+the opposite outcome, before the function was ever called against the live shop.
+
+**Fixed** in `app/services/shopify/facts.py`, which now matches an explicit
+`DELIVERED_STATUSES` set. Guarded by
+`test_a_status_that_merely_contains_the_word_is_not_a_delivery`, parametrised
+over every lookalike, and by `test_delivered_and_not_delivered_do_not_overlap`.
+
+Recorded because the same trap waits for Task 4, which turns these statuses into
+`earned`. **String matching on a status name is how the wrong parcel gets paid
+for.** Match the set, never the substring.
+
+---
+
 ### 🟠 Logging can be switched off silently *(fixed, guarded)*
 
 **The limit.** `logging.config.fileConfig` defaults to

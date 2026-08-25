@@ -101,6 +101,50 @@ created in Shopify without being registered on the platform.
 
 ---
 
+## Before believing any earnings figure
+
+```
+GET /api/operations/order-facts
+```
+
+Asks Shopify what it will actually tell us about **delivery**, **returns** and
+**refunds** — the three facts Phase 4 turns into money.
+
+**Read `delivery.signal` first.** It has three answers, and they need different
+actions:
+
+| Signal | Meaning | What to do |
+|---|---|---|
+| `present` | Shipped orders do reach a delivered status | Nothing. This is the expected answer. |
+| `absent` | **Not one shipped order has ever been delivered** | **Stop.** See below. |
+| `unreadable` | Shopify refused the fields, or no shipped orders to judge from | Read `rejected` — the message usually names the field or a missing scope |
+
+### Why `absent` matters more than it looks
+
+A model earns when her order is **delivered** (ADR 0012), and that fact is read
+from Shopify (ADR 0023). If nothing ever reaches delivered, every order stays
+`pending`, every month calculates to **zero earned**, and it looks exactly like
+a month with no sales. Nothing errors. The first person to notice would be a
+model asking why she was not paid.
+
+Whatever writes that status into Shopify lives outside this codebase and can
+stop without a symptom — the same shape as the auto-cancel automation the old
+dashboard depended on. **So this is not a one-time check.** Read it again
+whenever a month comes out lower than expected.
+
+*Do not respond to `absent` by treating `FULFILLED` as delivered.* That pays
+commission on every parcel a customer refuses at the door, which for
+cash-on-delivery through Bosta is exactly the loss ADR 0012 exists to avoid.
+It is a decision about real money and belongs to the business.
+
+`already_indexed` is computed from the platform's own database and works even
+when Shopify is unreachable, so there is always some answer.
+
+Administrator only, and not something to poll — it runs several sampled queries
+against Shopify.
+
+---
+
 ## Checking a code before approving an affiliate
 
 ```

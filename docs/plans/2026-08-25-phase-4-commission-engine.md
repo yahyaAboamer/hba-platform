@@ -150,12 +150,36 @@ lies. Phase 6 adds them with the foreign key that gives them meaning, in one mig
 
 ## Task 2: The facts orders carry
 
-**Files:** modify `app/services/shopify/queries.py`, `app/services/shopify/normalise.py`,
-`app/models/orders.py`; add `GET /api/operations/order-facts`; one migration; tests
+Split into **2a (ask)** and **2b (adopt)** while building it, for a reason worth stating:
+**GraphQL rejects an entire document when one field is wrong.** Adding a mistaken field to
+`ORDER_FIELDS` — the query that indexes every order and runs on every webhook — would stop
+order ingestion outright. Loudly, and stopped. Shopify also moves fields between list and
+connection form across API versions, so `refunds { … }` and `refunds(first: 10) { … }` are
+both plausible and only one compiles.
 
-Adds to the order query the fulfilment `displayStatus` set, `returnStatus`, and refund
-totals. Normalises them into three derived facts: **delivered at**, **is a return or exchange
-open**, and **refunded merchandise value**.
+So the platform asks first, on its own query, and leaves the working one alone.
+
+### Task 2a — ask (shipped)
+
+**Files:** create `app/services/shopify/facts.py`; add `GET /api/operations/order-facts`;
+tests. **`queries.py` is untouched.**
+
+Four facts, each probed on its own query so one missing scope cannot blind the rest, and each
+with several candidate field shapes — the first that compiles wins, and every rejection is
+kept, because four Shopify error messages together say why far better than one.
+
+The endpoint returns a **verdict**, not just data: `present`, `absent`, or `unreadable`, with
+a sentence saying what to do about each. `already_indexed` is computed from the platform's own
+database, so there is an answer even when Shopify is unreachable.
+
+### Task 2b — adopt (after the report is read)
+
+Widen `ORDER_FIELDS` to the shapes that actually compiled, normalise them into **delivered
+at**, **is a return or exchange open**, and **refunded merchandise value**, and add the
+columns to `order_index` to carry them. One migration.
+
+Deferred deliberately: columns that nothing writes read as features and are lies (the same
+reasoning that moved `settled_at` to Phase 6).
 
 **`GET /api/operations/order-facts`** reports, over the orders already indexed: how many carry
 a delivery signal, the distribution of fulfilment display statuses, how many have a return
@@ -171,8 +195,16 @@ The report also becomes the maintainer's standing check that the signal is still
 month calculating to zero earned looks identical to a month with no sales; this is what tells
 the two apart.
 
-**Tests:** each derived fact against fixture nodes — an order with no fulfilment, a partially
-fulfilled one, a delivered one, and one mid-exchange.
+**Tests:** the first shape that compiles wins and stops there; every rejection is kept; the
+delivery sample is narrowed to shipped orders, because asking whether delivery is ever
+reported over orders placed yesterday proves nothing; an empty sample is *not* evidence of
+absence; one unreadable fact does not blind the others; refunds are read from either shape.
+
+**And the one that found a real bug:** `OUT_FOR_DELIVERY`, `ATTEMPTED_DELIVERY` and
+`NOT_DELIVERED` all contain the word *deliver*. The obvious substring test read a parcel still
+on the van as money earned — the old dashboard's defect, rebuilt. Matching an explicit set
+instead. Recorded in `docs/limits.md`, because Task 4 turns these same statuses into `earned`
+and the trap is waiting there too.
 
 ---
 
