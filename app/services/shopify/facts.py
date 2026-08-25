@@ -105,6 +105,19 @@ PROBES: tuple[FactProbe, ...] = (
             "refunds { id refundLineItems(first: 50) { nodes { subtotalSet { shopMoney { amount currencyCode } } } } }",
         ),
     ),
+    FactProbe(
+        name="exchange_vs_return",
+        question=(
+            "Can Shopify tell an exchange from a plain return - did a replacement "
+            "item actually go out? E-stebdal opens the same return for both, and "
+            "the two are paid differently."
+        ),
+        candidates=(
+            "returns(first: 10) { nodes { id status totalQuantity exchangeLineItems(first: 20) { nodes { id } } returnLineItems(first: 20) { nodes { id } } } }",
+            "returns(first: 10) { nodes { id status exchangeLineItems(first: 20) { nodes { id } } } }",
+            "returns(first: 10) { nodes { id status } }",
+        ),
+    ),
 )
 
 
@@ -199,11 +212,53 @@ def _summarise_refund_merchandise(nodes: list[dict]) -> dict:
     }
 
 
+def _summarise_exchange_vs_return(nodes: list[dict]) -> dict:
+    """Does Shopify say a replacement went out?
+
+    This is the one question `order-facts` cannot already answer. E-stebdal
+    opens an identical Shopify return for an exchange and for a plain return,
+    and the two are paid differently: an exchange leaves the model's commission
+    untouched, a return reduces it by the goods that came back.
+    """
+    orders_with_returns = 0
+    with_exchange_items = 0
+    without_exchange_items = 0
+    statuses: Counter = Counter()
+    exchange_field_present = False
+
+    for node in nodes:
+        returns = node.get("returns")
+        rows = returns.get("nodes") if isinstance(returns, dict) else (returns or [])
+        rows = list(rows or [])
+        if rows:
+            orders_with_returns += 1
+        for row in rows:
+            status = row.get("status")
+            statuses[str(status).upper() if status else "(null)"] += 1
+            if "exchangeLineItems" not in row:
+                continue
+            exchange_field_present = True
+            items = (row.get("exchangeLineItems") or {}).get("nodes") or []
+            if items:
+                with_exchange_items += 1
+            else:
+                without_exchange_items += 1
+
+    return {
+        "orders_with_a_return": orders_with_returns,
+        "return_statuses": dict(statuses.most_common()),
+        "shopify_reports_exchange_line_items": exchange_field_present,
+        "returns_that_sent_a_replacement": with_exchange_items,
+        "returns_that_sent_nothing_back": without_exchange_items,
+    }
+
+
 SUMMARISERS: dict[str, Callable[[list[dict]], dict]] = {
     "delivery": _summarise_delivery,
     "return_status": _summarise_return_status,
     "refund_total": _summarise_refund_total,
     "refund_merchandise": _summarise_refund_merchandise,
+    "exchange_vs_return": _summarise_exchange_vs_return,
 }
 
 

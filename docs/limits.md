@@ -499,6 +499,67 @@ rules generally?"* — and those diverge the moment a rate changes.
 what a month total means, what an order line carries. Deferring the writing is
 fine. Deferring the data it needs is not.
 
+### 🔴 Shopify's refund figures do not say what HBA actually refunded
+
+**The limit.** The money recorded against a return in Shopify is not what the
+customer received, and sometimes nothing is recorded at all. Confirmed by HBA,
+25 August 2026:
+
+- **Return shipping is deducted from the refund.** A customer returning E£600 of
+  goods receives E£480 — the fee is E£120 today and moves with the currency.
+- **Exchanges are sometimes settled outside E-stebdal**, the request closed by
+  hand, and the order left on Shopify still saying a refund is owed.
+- **A refund is not always recorded on Shopify** at all.
+- **A partial return can void an order-level discount.** Returning one of four
+  items removes the 4-plus-items automatic 20%, and the whole order is
+  recalculated at full price before the refund is worked out.
+
+**What failure looks like.** Any commission rule derived from "how much was
+refunded" is derived from a number that is sometimes wrong and sometimes
+absent. It would not fail loudly — it would pay slightly wrong amounts,
+indefinitely, and reconcile against nothing.
+
+**What is decided instead.** The base is expressed in **goods, not money**:
+
+> Commission base after a return = the value of the products the customer kept.
+
+Shipping never enters it, because shipping was never in the base. The E£120
+return fee is HBA's cost of handling a return, not the model's — she keeps her
+commission on what the customer kept. Stated by HBA in exactly those terms.
+
+**What is still open.** Deciding *which* products the customer kept requires
+telling an exchange from a plain return, and E-stebdal opens an identical
+Shopify return for both. `GET /api/operations/order-facts` now probes Shopify's
+Returns API for `exchangeLineItems` — a replacement going out is the
+discriminator, if Shopify will report it. **Task 3 does not proceed until that
+report is read.**
+
+*If Shopify cannot tell them apart:* a human decides, which is not a new burden —
+HBA already calculates every one of these refunds by hand. The platform would
+capture that decision rather than re-derive it, the way §9.2 already holds a
+multi-code order for a person.
+
+### 🟠 The 4-plus-items discount is harmless only while it cannot combine
+
+**The limit.** HBA's automatic 20% discount for four or more items **cannot
+currently be combined with a model's code**. That single fact is what keeps the
+discount-voiding problem above away from commission entirely: an order carrying
+the automatic discount has no model code, so it is unattributed and no
+commission is calculated on it.
+
+HBA expects this may change.
+
+**What failure looks like if it does.** A model's order gets the automatic
+discount. The customer returns one of four items. HBA voids the discount and
+recalculates the remaining three at full price — so the goods the customer kept
+are worth **more** than the discounted price they were sold at. Subtracting the
+returned item's discounted price from the base would then leave a figure that is
+too low, and the model is underpaid on an order that got *larger*.
+
+*What to do before combining is enabled:* revisit the return rule above. It is
+correct only while an attributed order can carry at most one discount that a
+partial return cannot retroactively remove.
+
 ### 🟠 A code created before the switch cannot be handed over
 
 **The limit.** `retire_and_replace` ends the old code the month **before** the
