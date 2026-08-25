@@ -96,11 +96,6 @@ class Anomaly:
     #: overlapping months, or a period was registered wrongly.
     ATTRIBUTION_CONFLICT = "attribution_conflict"
 
-    #: An order's base cannot be decided - its return resolved, and an exchange
-    #: is indistinguishable from a plain return without `read_returns`. Held,
-    #: and pays nothing, until somebody decides it.
-    BASE_NEEDS_DECISION = "base_needs_decision"
-
     #: A Shopify fulfilment carried a display status nothing has classified.
     #: Treated as still in flight - it never earns and never voids on a guess -
     #: which means an unrecognised status would otherwise park an order for

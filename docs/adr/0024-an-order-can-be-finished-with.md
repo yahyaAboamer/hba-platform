@@ -87,3 +87,23 @@ in and cannot influence.
 **Wait for the return window before paying anything.** ADR 0012 already rejected
 this — it delays every affiliate's earnings by ten days to recover a small
 number of reversals.
+
+---
+
+## Simplified by ADR 0025, 26 August 2026
+
+The idea survives and got stronger: an order can be finished with, and a finished
+order is never recalculated or re-read.
+
+What changed is *when*. This ADR listed four triggers, one of which was "an exchange
+resolved on it" — which required telling an exchange from a plain return, and that
+turned out to be unanswerable from the available data. ADR 0025 replaces all four
+with one: **delivery**.
+
+That is simpler and strictly earlier. An exchange can only happen to a parcel the
+customer already has, so finalising on delivery covers every case this ADR listed,
+without needing to detect any of them.
+
+**The exchange rule stated here is unchanged and now applies to returns as well:**
+the model keeps her commission on the original sale in full, and any money moving
+afterwards is HBA's, in both directions.

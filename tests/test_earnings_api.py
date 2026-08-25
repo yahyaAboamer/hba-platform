@@ -78,8 +78,7 @@ def _terms(client, affiliate_id, rate_bp=1000, **extra):
     return response.json()
 
 
-def _paid_order(affiliate_id, order_id, base, *, month=MONTH, state="earned",
-                needs_review=None):
+def _paid_order(affiliate_id, order_id, base, *, month=MONTH, state="earned"):
     """An order already attributed, written straight in.
 
     The paths that produce these are covered by their own tests; this file is
@@ -98,17 +97,10 @@ def _paid_order(affiliate_id, order_id, base, *, month=MONTH, state="earned",
         connection.execute(
             text(
                 "INSERT INTO attributed_order (shopify_order_id, affiliate_id, "
-                "business_month, commission_base_piastres, commission_state, "
-                "needs_review) VALUES (:i, :a, :m, :b, :s, :r)"
+                "business_month, commission_base_piastres, commission_state) "
+                "VALUES (:i, :a, :m, :b, :s)"
             ),
-            {
-                "i": order_id,
-                "a": affiliate_id,
-                "m": month,
-                "b": base,
-                "s": state,
-                "r": needs_review,
-            },
+            {"i": order_id, "a": affiliate_id, "m": month, "b": base, "s": state},
         )
 
 
@@ -163,7 +155,6 @@ def test_no_customer_ever_appears(client):
         "delivered_at",
         "return_status",
         "base_frozen_at",
-        "needs_review",
     }
     assert set(body["orders_detail"][0]) == allowed
 
@@ -224,23 +215,6 @@ def test_a_month_with_no_terms_says_so(client):
     assert body["sales"]["earned_piastres"] == 100_000
     assert body["is_payable"] is False
     assert "no_compensation_terms_for_this_month" in body["blockers"]
-
-
-def test_an_order_awaiting_a_decision_blocks_the_month(client):
-    """A month that is incomplete should look incomplete, not merely small."""
-    affiliate = _affiliate(client)
-    _terms(client, affiliate["id"])
-    _paid_order(affiliate["id"], "1", 100_000)
-    _paid_order(
-        affiliate["id"], "2", 50_000,
-        needs_review="return_resolved_but_exchange_is_indistinguishable",
-    )
-
-    body = client.get(f"/api/affiliates/{affiliate['id']}/earnings/{MONTH}").json()
-
-    assert body["orders"]["awaiting_a_decision"] == 1
-    assert body["is_payable"] is False
-    assert "orders_awaiting_a_decision" in body["blockers"]
 
 
 def test_a_base_guarantee_blocks_until_targets_exist(client):

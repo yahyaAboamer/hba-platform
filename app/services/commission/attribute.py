@@ -24,9 +24,9 @@ is raised. The trigger would refuse it anyway (§17); this reports *why* rather
 than letting an IntegrityError surface from somewhere unrelated. It means a code
 changed hands with overlapping months, or a period was registered wrongly.
 
-**It never touches a finalised order.** ADR 0024: once finished with, an order
-is not recalculated and not re-read. A late webhook carrying an edited subtotal
-would otherwise rewrite a figure a payroll has already been approved on.
+**It never touches a finished order.** ADR 0025: delivered or void is the end of
+the story. A late webhook carrying an exchange's edited subtotal would otherwise
+rewrite a figure a payroll has already been approved on.
 
 **It never writes a held order.** Two registered codes on one order is §9.2's
 financial hold: no row, an anomaly, and the order waits for a person. Writing a
@@ -37,11 +37,11 @@ from sqlalchemy.orm import Session
 
 from app.core.businesstime import utcnow
 from app.core.signals import Anomaly, report
-from app.models.attributed_orders import AttributedOrder
+from app.models.attributed_orders import AttributedOrder, CommissionState
 from app.models.orders import OrderIndex
 from app.services.attribution import AttributionOutcome, resolve
 from app.services.commission.base import base_for_order
-from app.services.commission.state import commission_state, is_finalised
+from app.services.commission.state import commission_state, is_final
 
 
 def attribute_order(db: Session, order: OrderIndex) -> AttributedOrder | None:
@@ -81,38 +81,24 @@ def attribute_order(db: Session, order: OrderIndex) -> AttributedOrder | None:
         )
         return existing
 
-    if existing is not None and is_finalised(
-        state=existing.commission_state, delivered_at=existing.delivered_at
-    ):
-        # ADR 0024. Nothing left to change, so nothing is changed.
+    if existing is not None and is_final(existing.commission_state):
+        # ADR 0025. Delivered or void is the end of the story, so nothing is
+        # recalculated and Shopify is not read for it again.
         return existing
+
+    state = commission_state(
+        delivery_state=order.delivery_state,
+        cancelled_at=order.cancelled_at,
+        financial_status=order.financial_status,
+    )
 
     base = base_for_order(
         total_piastres=order.total_piastres,
         shipping_piastres=order.shipping_piastres,
         tax_piastres=order.tax_piastres,
-        return_activity=bool(order.return_activity),
-        return_unresolved=bool(order.return_open),
+        delivered=state == CommissionState.EARNED,
         stored_base_piastres=existing.commission_base_piastres if existing else None,
-        base_frozen_at=existing.base_frozen_at if existing else None,
     )
-
-    state = commission_state(
-        cancelled_at=order.cancelled_at,
-        financial_status=order.financial_status,
-        delivery_state=order.delivery_state,
-        return_unresolved=bool(order.return_open),
-    )
-
-    if base.needs_decision and (existing is None or existing.needs_review is None):
-        # Reported once, when it starts needing a decision - not on every
-        # subsequent sync, which would bury it in its own repetition.
-        report(
-            Anomaly.BASE_NEEDS_DECISION,
-            order=order.shopify_order_id,
-            affiliate=decision.affiliate_id,
-            reason=base.needs_decision,
-        )
 
     if existing is None:
         existing = AttributedOrder(
@@ -125,8 +111,7 @@ def attribute_order(db: Session, order: OrderIndex) -> AttributedOrder | None:
         db.add(existing)
 
     existing.commission_base_piastres = base.piastres
-    existing.base_frozen_at = base.frozen_at
-    existing.needs_review = base.needs_decision
+    existing.base_frozen_at = order.delivered_at if base.is_final else None
     existing.commission_state = state
     existing.refunded_merchandise_piastres = order.refunded_merchandise_piastres or 0
     existing.financial_status = order.financial_status

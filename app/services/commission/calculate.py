@@ -35,10 +35,6 @@ guarantee is unresolved**. It never assumes targets were missed, which underpays
 and never assumes they were met, which overpays. §11.3 makes it a hard blocker
 on approval.
 
-**An order whose figure is held.** A resolved return the platform cannot tell
-from an exchange contributes nothing and is counted separately, so a month with
-one is visibly incomplete rather than quietly short.
-
 ## House accounts
 
 `HBA10` is a real code used by real customers and needs a working dashboard.
@@ -68,7 +64,6 @@ from app.services.compensation import terms_for
 #: Why a month's figure is not final. §11.3 refuses approval on any of these.
 NO_TERMS = "no_compensation_terms_for_this_month"
 TARGETS_UNVERIFIED = "base_guarantee_needs_targets_which_arrive_in_phase_5"
-ORDERS_HELD = "orders_awaiting_a_decision"
 
 
 @dataclass(frozen=True)
@@ -87,10 +82,6 @@ class MonthCalculation:
     pending_base_piastres: int = 0
 
     void_orders: int = 0
-
-    #: Counted apart from everything else. A month with one of these is
-    #: visibly incomplete rather than quietly short.
-    held_orders: int = 0
 
     compensation_type: str | None = None
     commission_rate_bp: int | None = None
@@ -141,12 +132,8 @@ def calculate_month(
     pending_base = 0
     pending_count = 0
     void_count = 0
-    held_count = 0
 
     for row in rows:
-        if row.needs_review is not None:
-            held_count += 1
-            continue
         if row.commission_state == CommissionState.EARNED:
             earned_count += 1
             earned_base += row.commission_base_piastres
@@ -158,8 +145,6 @@ def calculate_month(
 
     is_house = affiliate.account_kind == AccountKind.HOUSE
     blockers: list[str] = []
-    if held_count:
-        blockers.append(ORDERS_HELD)
 
     terms = terms_for(db, affiliate, month)
     if terms is None:
@@ -175,7 +160,6 @@ def calculate_month(
             pending_orders=pending_count,
             pending_base_piastres=pending_base,
             void_orders=void_count,
-            held_orders=held_count,
             is_house=is_house,
             blockers=blockers,
         )
@@ -213,7 +197,6 @@ def calculate_month(
         pending_orders=pending_count,
         pending_base_piastres=pending_base,
         void_orders=void_count,
-        held_orders=held_count,
         compensation_type=terms.compensation_type,
         commission_rate_bp=terms.commission_rate_bp,
         commission_piastres=commission,

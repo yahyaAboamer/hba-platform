@@ -135,9 +135,8 @@ class AttributedOrder(Base):
         String(16), nullable=False, server_default=CommissionState.PENDING
     )
 
-    #: **When** the base stopped tracking Shopify, not merely whether. NULL
-    #: means it is still tracking. A timestamp answers "was this frozen before
-    #: or after the exchange opened?", which a boolean cannot.
+    #: When the base stopped moving - the delivery, since delivery is final
+    #: (ADR 0025). NULL means the order has not arrived yet.
     base_frozen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     financial_status: Mapped[str | None] = mapped_column(String(40))
@@ -149,14 +148,6 @@ class AttributedOrder(Base):
 
     #: Shopify's return state for the order. Any activity here freezes the base.
     return_status: Mapped[str | None] = mapped_column(String(40))
-
-    #: Why this order's figure cannot be relied on, or NULL when it can.
-    #:
-    #: §11.3 makes an unresolved hold a **hard blocker** on approving a month,
-    #: so it has to be queryable rather than only visible in a log line. An
-    #: order carrying this never counts toward a payout, whatever its state
-    #: says.
-    needs_review: Mapped[str | None] = mapped_column(String(64))
 
     attributed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
@@ -174,15 +165,8 @@ class AttributedOrder(Base):
 
     @property
     def counts_toward_payout(self) -> bool:
-        """§9.4. Only earned orders do - and never one awaiting a decision.
-
-        A held order has a figure; what it does not have is confidence that the
-        figure is right. Paying on it would be guessing with somebody's money.
-        """
-        return (
-            self.commission_state == CommissionState.EARNED
-            and self.needs_review is None
-        )
+        """§9.4. Only earned orders do."""
+        return self.commission_state == CommissionState.EARNED
 
     def __repr__(self) -> str:
         return (
