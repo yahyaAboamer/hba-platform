@@ -142,8 +142,19 @@ def upsert_order_index(db: Session, values: dict):
     Orders arrive more than once - a webhook, then a reconciliation sweep, then
     perhaps a re-import - so writing has to be idempotent or the same order
     would appear repeatedly.
+
+    **Attribution happens here, deliberately.** Every path that indexes an
+    order - webhook, sweep, bulk import - goes through this function, so none
+    of them can forget. Hooking the three call sites separately would work
+    until somebody adds a fourth, and a missed attribution is not a visible
+    failure: the order belongs to nobody, quietly, until someone notices the
+    sales are missing.
+
+    The import is local because attribution reads the code registry, which
+    imports this module's siblings. It is a real cycle, not a style choice.
     """
     from app.models.orders import OrderIndex
+    from app.services.commission.attribute import attribute_order
 
     payload = {**values, "last_synced_at": utcnow()}
     statement = insert(OrderIndex).values(**payload)
@@ -158,4 +169,11 @@ def upsert_order_index(db: Session, values: dict):
         },
     )
     db.execute(statement)
-    return db.get(OrderIndex, values["shopify_order_id"])
+    row = db.get(OrderIndex, values["shopify_order_id"])
+    if row is not None:
+        # Refresh, because the UPSERT above went round the session: without it
+        # attribution would read whatever this session last loaded, which for a
+        # reconciliation sweep is the pre-update row.
+        db.refresh(row)
+        attribute_order(db, row)
+    return row

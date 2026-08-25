@@ -948,6 +948,52 @@ still recorded; part of the detail is not.
 *What to do:* nothing usually. Repeatedly truncating the same job means the
 useful part of the message may be past the cut — check the raw exception.
 
+### `attribution_held`
+
+An order carried **two or more registered model codes**. Nothing was written for
+it: §9.2 makes it wait for a person rather than silently paying the wrong one or
+paying twice.
+
+HBA's Shopify configuration makes this unlikely, but Shopify permits combinable
+codes in general and settings change. The log line names every code that
+conflicted — a person cannot resolve it without knowing what collided.
+
+*What to do:* decide which model the sale belongs to and close the other code's
+period so the months no longer overlap. §11.3 makes an unresolved one a **hard
+blocker** on approving that month.
+
+---
+
+### `attribution_conflict`
+
+An order that already belongs to one affiliate resolved to a **different** one.
+Nothing was changed — orders never move between models (§9.2, §17), and the
+database trigger would refuse it anyway.
+
+This reports *why* rather than letting an `IntegrityError` surface from
+somewhere unrelated. It means a code changed hands with overlapping months, or a
+period was registered wrongly.
+
+*What to do:* look at the code's periods. The order keeps its original owner,
+which is correct — the fault is in the registration, not in the order.
+
+---
+
+### `base_needs_decision`
+
+An order's return **resolved**, and the platform cannot tell a plain return from
+an exchange — they pay in opposite directions and `read_returns` is not granted.
+The row is written, the model keeps ownership, and the figure is marked
+unreliable: it **pays nothing** until decided.
+
+Reported once, when the hold starts, and not on every subsequent sync — which
+would bury it in its own repetition.
+
+*What to do:* grant `read_returns`, or decide the order by hand. See the 🔴 entry
+above.
+
+---
+
 ### `unknown_fulfilment_status`
 
 A Shopify fulfilment carried a display status nothing has classified. It was
