@@ -337,6 +337,24 @@ her code already has orders, register it from the earliest month listed, not
 from today — otherwise the backfill, when it arrives, has a gap to find that
 nobody recorded.
 
+### 🟠 A model's login email is the one she was invited at, not one she types
+
+**The limit.** `accept_invitation` creates the account with the **invitation's**
+email. The application form (Phase 8) collects an email from the model, but that
+is a *contact detail* on her profile - it does not become her login.
+
+**Why it is this way.** The invitation link was sent to that address and
+approved against it. Letting the form silently repoint the login would mean the
+person you invited is not necessarily the person who ends up with the account.
+
+**What failure looks like.** She types the email she actually uses, is approved,
+and then cannot sign in - because the login is the address you invited, which
+may be one she rarely checks. Nothing errors; she just cannot get in.
+
+*What to do:* the form shows the invited address, and correcting it is a
+maintainer action - see the affiliate edit endpoint. That keeps the change
+deliberate and audited rather than silent.
+
 ### 🟠 A handler that is not idempotent
 
 Every handler must either upsert by Shopify id or be read-only, and must never

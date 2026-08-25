@@ -159,6 +159,62 @@ def archive_affiliate(
     )
 
 
+def update_details(
+    db: Session,
+    affiliate: AffiliateProfile,
+    *,
+    name: str | None = None,
+    phone: str | None = None,
+    email: str | None = None,
+    actor_id: int | None = None,
+    actor_email: str | None = None,
+) -> None:
+    """Correct what a model submitted about herself.
+
+    She fills her own details in, and people mistype their own phone numbers.
+    Without this the only fix would be deleting the account and starting over.
+
+    **Email is her login**, so changing it is a real change and not a contact
+    edit - the account she signs in with moves. It is recorded like any other,
+    with what it changed from, because "why can she not sign in any more" is a
+    question that gets asked.
+
+    Only supplied fields change. Passing nothing is not an error, and records
+    nothing.
+    """
+    before: dict = {}
+    after: dict = {}
+
+    if name is not None and (cleaned := name.strip()) and cleaned != affiliate.name:
+        before["name"], after["name"] = affiliate.name, cleaned
+        affiliate.name = cleaned
+
+    if phone is not None:
+        cleaned_phone = phone.strip() or None
+        if cleaned_phone != affiliate.phone:
+            before["phone"], after["phone"] = affiliate.phone, cleaned_phone
+            affiliate.phone = cleaned_phone
+
+    if email is not None and (cleaned_email := email.strip().lower()):
+        account = affiliate.account
+        if cleaned_email != account.email:
+            before["email"], after["email"] = account.email, cleaned_email
+            account.email = cleaned_email
+
+    if not after:
+        return
+
+    record_audit(
+        db,
+        action="affiliate.details_updated",
+        subject=f"affiliate:{affiliate.id}",
+        actor_id=actor_id,
+        actor_email=actor_email,
+        before=before,
+        after=after,
+    )
+
+
 def get_affiliate(db: Session, affiliate_id: int) -> AffiliateProfile | None:
     """One affiliate, archived or not. History has to stay reachable."""
     return db.get(AffiliateProfile, affiliate_id)

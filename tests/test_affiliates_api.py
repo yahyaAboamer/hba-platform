@@ -657,3 +657,187 @@ def test_deactivating_never_requires_a_verified_code(client):
         f"/api/affiliates/{affiliate['id']}", json={"status": "inactive"}
     )
     assert response.status_code == 200
+
+
+# ── Correcting what the model submitted ────────────────────────────────────────
+
+
+def test_her_name_and_phone_can_be_corrected(client):
+    """She fills these in herself, and people mistype their own numbers."""
+    affiliate = _register(client)
+    response = client.patch(
+        f"/api/affiliates/{affiliate['id']}",
+        json={"name": "Nour Mahmoud", "phone": "01001234567"},
+    )
+    assert response.status_code == 200
+    assert response.json()["name"] == "Nour Mahmoud"
+    assert response.json()["phone"] == "01001234567"
+
+
+def test_her_login_email_can_be_corrected(client):
+    """Her login is the address she was invited at, not one she typed. If that
+    is wrong she cannot sign in at all, so somebody has to be able to fix it.
+    """
+    affiliate = _register(client, email="typo@example.com")
+    response = client.patch(
+        f"/api/affiliates/{affiliate['id']}", json={"email": "nour@example.com"}
+    )
+    assert response.status_code == 200
+
+    with engine.connect() as connection:
+        stored = connection.execute(
+            text("SELECT email FROM user_account WHERE id = :i"),
+            {"i": affiliate["user_account_id"]},
+        ).scalar()
+    assert stored == "nour@example.com"
+
+
+def test_a_correction_records_what_it_changed_from(client):
+    """"Why can she not sign in any more" is a question that gets asked."""
+    affiliate = _register(client, email="typo@example.com")
+    client.patch(
+        f"/api/affiliates/{affiliate['id']}", json={"email": "nour@example.com"}
+    )
+
+    with engine.connect() as connection:
+        before, after = connection.execute(
+            text(
+                "SELECT before_json, after_json FROM audit_event "
+                "WHERE action = 'affiliate.details_updated'"
+            )
+        ).one()
+    assert before["email"] == "typo@example.com"
+    assert after["email"] == "nour@example.com"
+
+
+def test_details_and_status_can_change_together(client):
+    affiliate = _register(client)
+    _verify_code(client, affiliate["id"])
+    response = client.patch(
+        f"/api/affiliates/{affiliate['id']}",
+        json={"name": "Nour Mahmoud", "status": "active"},
+    )
+    assert response.status_code == 200
+    assert response.json()["name"] == "Nour Mahmoud"
+    assert response.json()["status"] == "active"
+
+
+def test_changing_nothing_is_not_an_error(client):
+    affiliate = _register(client)
+    assert client.patch(f"/api/affiliates/{affiliate['id']}", json={}).status_code == 200
+
+
+def test_an_affiliate_cannot_correct_her_own_details(client):
+    """Section 6.5 again: she may not edit her own record."""
+    _demote_to("affiliate")
+    assert client.patch(
+        "/api/affiliates/1", json={"name": "Someone Else"}
+    ).status_code == 403
+
+
+# ── Re-checking a code Shopify did not know ────────────────────────────────────
+
+
+def test_a_code_can_be_rechecked_once_it_exists_on_shopify(client, _shopify):
+    """The ordinary case: she applied before the code was created."""
+    from datetime import datetime, timezone
+
+    _shopify_says(_shopify, exists=False)
+    affiliate = _register(client)
+    client.post(f"/api/affiliates/{affiliate['id']}/codes", json={"code": "NOTYET"})
+
+    _shopify_says(_shopify, exists=True, created_at=datetime(2026, 5, 2, tzinfo=timezone.utc))
+    response = client.post(f"/api/affiliates/{affiliate['id']}/recheck-code", json={})
+
+    assert response.status_code == 200
+    assert response.json()["is_verified"] is True
+    assert response.json()["start_month"] == "2026-05"
+
+
+def test_rechecking_corrects_the_start_month(client, _shopify):
+    """Until Shopify knew the code its creation date was unknown, so the period
+    fell back to the horizon. Leaving that would claim months it did not exist.
+    """
+    from datetime import datetime, timezone
+
+    _shopify_says(_shopify, exists=False)
+    affiliate = _register(client)
+    created = client.post(
+        f"/api/affiliates/{affiliate['id']}/codes", json={"code": "NOTYET"}
+    )
+    assert created.json()["start_month"] == "2026-01"
+
+    _shopify_says(_shopify, exists=True, created_at=datetime(2026, 7, 9, tzinfo=timezone.utc))
+    response = client.post(f"/api/affiliates/{affiliate['id']}/recheck-code", json={})
+    assert response.json()["start_month"] == "2026-07"
+
+
+def test_a_recheck_that_still_finds_nothing_changes_nothing(client, _shopify):
+    _shopify_says(_shopify, exists=False)
+    affiliate = _register(client)
+    client.post(f"/api/affiliates/{affiliate['id']}/codes", json={"code": "NOTYET"})
+
+    response = client.post(f"/api/affiliates/{affiliate['id']}/recheck-code", json={})
+    assert response.status_code == 200
+    assert response.json()["is_verified"] is False
+
+
+def test_a_mistyped_code_can_be_corrected_on_recheck(client, _shopify):
+    """Rewrites the row rather than opening a second period - the wrong code
+    would otherwise keep holding ownership that blocks the right person.
+    """
+    _shopify_says(_shopify, exists=False)
+    affiliate = _register(client)
+    client.post(f"/api/affiliates/{affiliate['id']}/codes", json={"code": "NUOR10"})
+
+    _shopify_says(_shopify, exists=True)
+    response = client.post(
+        f"/api/affiliates/{affiliate['id']}/recheck-code", json={"code": "NOUR10"}
+    )
+
+    assert response.status_code == 200
+    assert response.json()["code"] == "NOUR10"
+    assert response.json()["is_verified"] is True
+
+    body = client.get(f"/api/affiliates/{affiliate['id']}").json()
+    assert body["codes"] == ["NOUR10"], "the mistyped code was left behind"
+
+
+def test_a_verified_code_is_never_rechecked(client):
+    """It may already have attributed orders; changing it would rewrite what
+    those orders belonged to.
+    """
+    affiliate = _register(client)
+    _verify_code(client, affiliate["id"])
+
+    response = client.post(f"/api/affiliates/{affiliate['id']}/recheck-code", json={})
+    assert response.status_code == 404
+
+
+def test_rechecking_then_approving_works_end_to_end(client, _shopify):
+    """The whole point: a model who applied before her code existed can be
+    approved once it does.
+    """
+    _shopify_says(_shopify, exists=False)
+    affiliate = _register(client)
+    client.post(f"/api/affiliates/{affiliate['id']}/codes", json={"code": "NOTYET"})
+
+    refused = client.patch(
+        f"/api/affiliates/{affiliate['id']}", json={"status": "active"}
+    )
+    assert refused.status_code == 400
+
+    _shopify_says(_shopify, exists=True)
+    client.post(f"/api/affiliates/{affiliate['id']}/recheck-code", json={})
+
+    approved = client.patch(
+        f"/api/affiliates/{affiliate['id']}", json={"status": "active"}
+    )
+    assert approved.status_code == 200
+
+
+def test_an_affiliate_cannot_recheck_her_own_code(client):
+    _demote_to("affiliate")
+    assert client.post(
+        "/api/affiliates/1/recheck-code", json={}
+    ).status_code == 403

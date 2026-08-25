@@ -1,0 +1,91 @@
+# 0022. Shopify owns the codes; the platform only records them
+
+**Status:** Accepted
+**Date:** 2026-08-25
+
+## Context
+
+The business walked through how affiliate codes actually work, and it did not
+match how the platform was asking about them.
+
+Models already have live discount codes on Shopify. Most have been in use for
+months and carry real orders. The platform is not where codes are created — it
+is where they are watched, and where a model eventually sees her own
+performance. "Registering a code" therefore means *recording an existing fact*,
+not creating anything.
+
+The registration API asked for a **start month**. That framing was wrong in a
+way that would have cost every model her history: the natural thing to type is
+the current month, and doing so would have left every order the code had
+already earned attributed to nobody. She would have opened her dashboard and
+seen an empty page, and nothing anywhere would have errored.
+
+## Decision
+
+**Nothing about a code's dates is ever asked for. It is derived.**
+
+Ownership starts at **the later of**:
+
+- `PLATFORM_START_MONTH` (2026-01) — the earliest month any order data exists
+- the month Shopify created the code
+
+The field is removed rather than defaulted, and a supplied `start_month` is
+ignored. There is exactly one right answer, so asking a person can only produce
+a wrong one.
+
+**Registering a code performs the Shopify lookup itself.** One call answers both
+questions that matter — does it exist, and when was it made — so there is no
+separate verification step that could disagree with the registration.
+
+`createdAt` is the anchor because **a code cannot be used before it exists**,
+making it a safe earliest bound on the orders it can have.
+
+### Three consequences that follow
+
+**A code Shopify has never heard of is still recorded, unverified.** Some models
+apply with a code not yet created. Refusing to record what they applied with
+would lose information; approving on it would be unsafe. Approval is gated on
+verification (§10.4), which is where the difference is enforced.
+
+**A maintainer's registration fails loudly when Shopify is unreachable.**
+Registering blind would mean guessing the start month, and a wrong guess orphans
+orders silently. Failing while somebody is watching is far cheaper.
+
+**A model's own submission must never fail for the same reason.** When the
+application form exists (Phase 8), verification runs in the background on the
+durable queue. It would be absurd for her application to be rejected because of
+*our* connection to Shopify.
+
+## Consequences
+
+The ordinary path claims a code's whole history without anybody thinking about
+it. A model approved today sees her sales from January, or from whenever her
+code was created.
+
+**Taking the *later* date, rather than always the horizon, is what makes
+handover work.** If a code previously belonged to a different model, starting
+everyone at January would collide with her period and be refused by the
+exclusion constraint. Each model's ownership now begins exactly when her code
+did.
+
+Registration depends on Shopify being reachable, which it did not before. That
+is a deliberate trade: an unavailable Shopify blocks an action a person is
+watching, rather than silently producing a wrong month.
+
+**The three Shopify failures are kept distinguishable** — unreachable (502),
+unconfigured (503), missing scope (403) — because each needs a different action.
+Collapsing them would send somebody debugging a network when the fix is one
+setting.
+
+## Alternatives considered
+
+**Default the start month to 2026-01 and keep the field.** What was built first.
+It fixes the common case and leaves the trap in place: the field still invites a
+wrong answer, and a code that changed hands still collides.
+
+**Derive from the code's first *order* rather than its creation.** Tempting, and
+wrong for a code with no orders yet — it would have no start at all. Creation is
+always defined and always early enough.
+
+**Ask the model for her start date.** She has no way to know when Shopify
+created her code, and would be guessing about her own money.

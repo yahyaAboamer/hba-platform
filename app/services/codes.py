@@ -177,6 +177,103 @@ def verified_codes_for(
     )
 
 
+def mark_verified(
+    db: Session,
+    period: DiscountCodePeriod,
+    *,
+    verified_at: datetime,
+    start_month: str | None = None,
+    actor_id: int | None = None,
+    actor_email: str | None = None,
+) -> None:
+    """Record that Shopify has now confirmed a code that it had not before.
+
+    ``start_month`` is corrected at the same time, because the two facts arrive
+    together: until Shopify knows the code, its creation date is unknown and
+    the period had to fall back to the platform horizon. Once the code exists,
+    the right start is known - and leaving the horizon in place would claim
+    months the code did not exist for.
+    """
+    before = {
+        "verified": period.is_verified,
+        "start_month": period.start_month,
+    }
+    period.shopify_verified_at = verified_at
+    if start_month is not None and start_month != period.start_month:
+        parse_month(start_month)
+        period.start_month = start_month
+
+    record_audit(
+        db,
+        action="code.verified",
+        subject=f"affiliate:{period.affiliate_id}",
+        actor_id=actor_id,
+        actor_email=actor_email,
+        before=before,
+        after={"verified": True, "start_month": period.start_month},
+    )
+
+
+def unregistered_code_for(
+    db: Session, affiliate: AffiliateProfile
+) -> DiscountCodePeriod | None:
+    """The affiliate's code that Shopify has not confirmed, if any.
+
+    There is at most one in practice: a model applies with a single code, and
+    it stays unverified until somebody checks it.
+    """
+    return db.scalar(
+        select(DiscountCodePeriod)
+        .where(DiscountCodePeriod.affiliate_id == affiliate.id)
+        .where(DiscountCodePeriod.shopify_verified_at.is_(None))
+        .order_by(DiscountCodePeriod.id)
+    )
+
+
+def replace_code(
+    db: Session,
+    period: DiscountCodePeriod,
+    new_code: str,
+    *,
+    start_month: str,
+    verified_at: datetime | None = None,
+    actor_id: int | None = None,
+    actor_email: str | None = None,
+) -> DiscountCodePeriod:
+    """Correct a mistyped code.
+
+    Rewrites the row rather than closing it and opening another. A period that
+    was never verified never attributed anything, so there is no history to
+    preserve - and leaving the wrong code behind would keep it holding
+    ownership that blocks the right person from claiming it.
+
+    **Only ever used on an unverified period.** A verified code has been live
+    and may have attributed orders; changing it would rewrite what those orders
+    belonged to.
+    """
+    if period.is_verified:
+        raise ValueError(
+            "A verified code cannot be rewritten - it may already have "
+            "attributed orders. Close its period and register the new code."
+        )
+
+    previous = period.code
+    period.code = normalise_code(new_code)
+    period.start_month = parse_month(start_month)
+    period.shopify_verified_at = verified_at
+
+    record_audit(
+        db,
+        action="code.corrected",
+        subject=f"affiliate:{period.affiliate_id}",
+        actor_id=actor_id,
+        actor_email=actor_email,
+        before={"code": previous},
+        after={"code": period.code, "verified": verified_at is not None},
+    )
+    return period
+
+
 def close_codes_for(
     db: Session,
     affiliate: AffiliateProfile,

@@ -35,8 +35,17 @@ from app.services.affiliates import (
     get_affiliate,
     list_affiliates,
     set_status,
+    update_details,
 )
-from app.services.codes import codes_for, register_code, start_month_for
+from app.services.codes import (
+    codes_for,
+    mark_verified,
+    normalise_code,
+    register_code,
+    replace_code,
+    start_month_for,
+    unregistered_code_for,
+)
 from app.services.compensation import set_terms, terms_for
 from app.services.payouts import current_destination, mask_destination, set_destination
 from app.services.shopify.client import (
@@ -60,8 +69,24 @@ class CreateAffiliateBody(BaseModel):
 
 
 class UpdateStatusBody(BaseModel):
-    status: str
+    status: str | None = None
     reason: str | None = None
+    #: Corrections to what the model submitted about herself. People mistype
+    #: their own phone numbers, and email is her login - see update_details.
+    name: str | None = Field(default=None, max_length=120)
+    phone: str | None = Field(default=None, max_length=40)
+    email: str | None = Field(default=None, max_length=320)
+
+
+class RecheckCodeBody(BaseModel):
+    """Ask Shopify again about a code that was not found the first time.
+
+    ``code`` corrects a typo at the same time. Left out, the existing code is
+    re-checked unchanged - the ordinary case, where the code was simply not
+    created on Shopify yet.
+    """
+
+    code: str | None = Field(default=None, max_length=120)
 
 
 class RegisterCodeBody(BaseModel):
@@ -228,7 +253,19 @@ def update_affiliate_status_route(
     """
     affiliate = _get_affiliate_or_404(db, affiliate_id)
     try:
-        if body.status == AffiliateStatus.ARCHIVED:
+        update_details(
+            db,
+            affiliate,
+            name=body.name,
+            phone=body.phone,
+            email=body.email,
+            actor_id=actor.id,
+            actor_email=actor.email,
+        )
+
+        if body.status is None:
+            pass
+        elif body.status == AffiliateStatus.ARCHIVED:
             archive_affiliate(
                 db,
                 affiliate,
@@ -250,6 +287,93 @@ def update_affiliate_status_route(
 
     db.commit()
     return _affiliate_payload(affiliate)
+
+
+@router.post("/{affiliate_id}/recheck-code")
+def recheck_code_route(
+    affiliate_id: int,
+    body: RecheckCodeBody,
+    actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_MANAGE)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Ask Shopify again about a code it did not know.
+
+    Two things happen when it is now found: the code is marked verified, and
+    its start month is corrected. Until Shopify knew the code, its creation
+    date was unknown and the period fell back to the platform horizon - leaving
+    that in place would claim months the code did not exist for.
+
+    A typo is corrected here too, by supplying a different code. That rewrites
+    the row rather than opening a second period: an unverified code never
+    attributed anything, and leaving the wrong one behind would keep it holding
+    ownership that blocks the right person from claiming it.
+    """
+    from app.services.shopify.sync import build_client
+
+    affiliate = _get_affiliate_or_404(db, affiliate_id)
+    period = unregistered_code_for(db, affiliate)
+    if period is None:
+        raise HTTPException(
+            404,
+            "This affiliate has no unverified code. A code Shopify has already "
+            "confirmed is not re-checked - it may have attributed orders.",
+        )
+
+    try:
+        found = verify_discount_code(build_client(), body.code or period.code)
+    except ShopifyMissingScope as exc:
+        raise HTTPException(
+            403,
+            f"Shopify has not granted {REQUIRED_SCOPE}, so this code cannot be "
+            "checked. Add the scope, then try again.",
+        ) from exc
+    except ShopifyNotConfigured as exc:
+        raise HTTPException(503, str(exc)) from exc
+    except ShopifyError as exc:
+        raise HTTPException(502, f"Could not reach Shopify: {exc}") from exc
+
+    verified_at = utcnow() if found["exists"] else None
+    start_month = start_month_for(found["created_at"])
+
+    try:
+        if body.code is not None and normalise_code(body.code) != period.code:
+            replace_code(
+                db,
+                period,
+                body.code,
+                start_month=start_month,
+                verified_at=verified_at,
+                actor_id=actor.id,
+                actor_email=actor.email,
+            )
+        elif found["exists"]:
+            mark_verified(
+                db,
+                period,
+                verified_at=verified_at,
+                start_month=start_month,
+                actor_id=actor.id,
+                actor_email=actor.email,
+            )
+        db.flush()
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            409,
+            f"{(body.code or period.code).strip().upper()!r} is already owned "
+            "by somebody else during part of this period",
+        ) from exc
+
+    db.commit()
+    return {
+        "code": period.code,
+        "start_month": period.start_month,
+        "is_verified": period.is_verified,
+        "exists_in_shopify": found["exists"],
+        "shopify_status": found["status"],
+    }
 
 
 @router.post("/{affiliate_id}/codes", status_code=201)

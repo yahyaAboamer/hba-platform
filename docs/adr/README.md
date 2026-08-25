@@ -61,6 +61,7 @@ what was chosen.
 | [0019](0019-size-to-the-requirement.md) | Size to the requirement, and record the measurement | Accepted |
 | [0020](0020-receipts-store-a-digest.md) | Event receipts store a digest, not the payload | Accepted |
 | [0021](0021-lease-committed-before-work.md) | The worker commits the lease before running the handler | Accepted |
+| [0022](0022-codes-are-recorded-not-declared.md) | Shopify owns the codes; the platform only records them | Accepted |
 
 See also [`../limits.md`](../limits.md) — the register of known limits and
 foreseeable failures, which records what will eventually break rather than what
