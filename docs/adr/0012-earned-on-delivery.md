@@ -75,3 +75,20 @@ anything between them is still processing. `ATTEMPTED_DELIVERY` therefore counts
 as still in flight rather than failed — Bosta retries, and most of those parcels
 land. It was 10 of the 50, which makes it the second most common status in the
 sample and a case worth being right about.
+
+---
+
+## Extended by ADR 0025, 26 August 2026
+
+This ADR accepted the exposure of a return arriving **after a month was approved**:
+HBA absorbs it rather than clawing it back, because prompt predictable payment to
+twenty people the business knows personally is worth more than perfect reversal.
+
+ADR 0025 extends the same principle from *after approval* to **after delivery** — a
+difference of a few weeks, on identical reasoning, once it became clear that no rule
+expressible from Shopify's data could reliably tell a return from an exchange.
+
+So the state table above now reads: `pending` while it travels, `earned` on
+delivery and permanently, `void` when the delivery fails or the order was cancelled
+before it shipped. **A return or exchange no longer moves an order back to
+`pending`.**

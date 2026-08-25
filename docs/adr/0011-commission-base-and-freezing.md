@@ -85,3 +85,21 @@ merchandise says *what* came back, the total says *whether any money did*.
 
 The same sample confirmed the freeze is not a rare path — **6 of 50 orders had a
 return open**, about one in eight.
+
+---
+
+## Superseded in part by ADR 0025, 26 August 2026
+
+**The base still excludes shipping and tax, and #29115 is still worth E£1,062.**
+What has gone is everything about *reducing* it.
+
+The freeze moved from "when a return or exchange begins" to **delivery**, which is
+strictly earlier and needs no assumption about the order E-stebdal does things in -
+something nobody at HBA can observe, because it happens inside a back end.
+
+And the reduction rule was abandoned. HBA established that an exchange may swap any
+number of items for any other number, which no rule expressible from Shopify's data
+handles; and that Shopify's refund figures are not what HBA actually refunds. ADR
+0025 records the reasoning and the measured cost of ignoring it: **1.1% of orders**.
+
+The table above describing partial refunds reducing the base **no longer applies**.

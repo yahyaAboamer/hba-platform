@@ -22,7 +22,6 @@ from app.models.orders import OrderIndex
 from app.services.affiliates import create_affiliate
 from app.services.codes import register_code
 from app.services.commission.attribute import attribute_order
-from app.services.commission.base import NEEDS_RETURN_DECISION
 from app.services.shopify.fulfilment import DELIVERED, FAILED, IN_FLIGHT
 from app.services.shopify.normalise import upsert_order_index
 
@@ -139,40 +138,23 @@ def test_two_registered_codes_write_nothing_and_say_so(db, caplog):
     assert "NOUR10,SARA10" in caplog.text
 
 
-def test_a_finished_return_is_written_but_pays_nothing(db, caplog):
-    """The base cannot be decided without telling an exchange from a plain
-    return. The row exists - she is still the owner - but the figure is marked
-    unreliable, and §11.3 makes that a hard blocker on approving the month.
+def test_a_finished_return_changes_nothing(db):
+    """ADR 0025. The parcel arrived, so the sale is hers. What the customer did
+    afterwards is between them and HBA - read, stored, and not acted on.
     """
     _affiliate(db)
     order = _order(db, return_status="RETURNED", return_activity=True, return_open=False)
 
-    with caplog.at_level(logging.WARNING, logger="hba.anomaly"):
-        row = attribute_order(db, order)
+    row = attribute_order(db, order)
 
-    assert row.needs_review == NEEDS_RETURN_DECISION
-    assert row.counts_toward_payout is False, "a held figure must not pay"
-    assert "ANOMALY base_needs_decision" in caplog.text
-
-
-def test_a_held_order_is_reported_once_not_on_every_sync(db, caplog):
-    """Repeating it on every reconciliation sweep would bury the hold in its
-    own repetition.
-    """
-    _affiliate(db)
-    order = _order(db, return_status="RETURNED", return_activity=True, return_open=False)
-    attribute_order(db, order)
-
-    caplog.clear()
-    with caplog.at_level(logging.WARNING, logger="hba.anomaly"):
-        attribute_order(db, order)
-
-    assert "base_needs_decision" not in caplog.text
+    assert row.commission_state == CommissionState.EARNED
+    assert row.counts_toward_payout is True
+    assert row.return_status == "RETURNED", "the fact is still recorded"
 
 
-def test_an_open_return_is_pending_but_not_held(db):
-    """Still being decided means the order pays nothing anyway. A blocker here
-    would report a problem that does not exist.
+def test_an_open_return_on_a_delivered_order_changes_nothing_either(db):
+    """There is no longer a state where a delivered order goes back to pending.
+    Earned is terminal.
     """
     _affiliate(db)
     order = _order(
@@ -181,8 +163,24 @@ def test_an_open_return_is_pending_but_not_held(db):
 
     row = attribute_order(db, order)
 
+    assert row.commission_state == CommissionState.EARNED
+
+
+def test_a_return_before_delivery_still_leaves_it_pending(db):
+    """Nothing has arrived, so nothing is settled."""
+    _affiliate(db)
+    order = _order(
+        db,
+        delivery_state=IN_FLIGHT,
+        delivered_at=None,
+        return_status="IN_PROGRESS",
+        return_activity=True,
+        return_open=True,
+    )
+
+    row = attribute_order(db, order)
+
     assert row.commission_state == CommissionState.PENDING
-    assert row.needs_review is None
 
 
 # ── What it refuses to do ──────────────────────────────────────────────────────
@@ -212,12 +210,13 @@ def test_an_order_is_never_moved_to_another_model(db, caplog):
     assert "ANOMALY attribution_conflict" in caplog.text
 
 
-def test_a_finalised_order_is_not_recalculated(db):
-    """ADR 0024. A late webhook carrying an edited subtotal would otherwise
-    rewrite a figure a payroll has already been approved on.
+def test_a_delivered_order_is_never_recalculated(db):
+    """ADR 0025. A late webhook carrying an exchange's edited subtotal would
+    otherwise rewrite a figure a payroll has already been approved on - and it
+    holds from the moment of delivery, not ten days later.
     """
     _affiliate(db)
-    order = _order(db, delivered_at=NOW - timedelta(days=40))
+    order = _order(db)
     attribute_order(db, order)
 
     order.total_piastres = 999_999
@@ -227,14 +226,10 @@ def test_a_finalised_order_is_not_recalculated(db):
     assert row.commission_base_piastres == EXPECTED_BASE
 
 
-def test_a_recent_delivery_is_still_recalculated(db):
-    """Earned is not the same as finished with. Inside the return window the
-    figure can still move.
-    """
-    from app.core.businesstime import utcnow
-
+def test_an_order_still_travelling_is_recalculated(db):
+    """A genuine edit before it ships should be reflected."""
     _affiliate(db)
-    order = _order(db, delivered_at=utcnow() - timedelta(days=2))
+    order = _order(db, delivery_state=IN_FLIGHT, delivered_at=None)
     attribute_order(db, order)
 
     order.total_piastres = PAID + 10_000

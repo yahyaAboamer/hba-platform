@@ -21,10 +21,8 @@ from app.models.compensation import CompensationType
 from app.models.identity import UserAccount
 from app.models.orders import OrderIndex
 from app.services.affiliates import create_affiliate
-from app.services.commission.base import NEEDS_RETURN_DECISION
 from app.services.commission.calculate import (
     NO_TERMS,
-    ORDERS_HELD,
     TARGETS_UNVERIFIED,
     calculate_month,
 )
@@ -54,7 +52,6 @@ def _earned(
     base,
     month=MONTH,
     state=CommissionState.EARNED,
-    needs_review=None,
 ):
     db.add(
         OrderIndex(
@@ -77,7 +74,6 @@ def _earned(
         business_month=month,
         commission_base_piastres=base,
         commission_state=state,
-        needs_review=needs_review,
     )
     db.add(row)
     db.flush()
@@ -274,29 +270,6 @@ def test_another_models_orders_are_not_counted(db):
     _earned(db, sara, "2", 900_000)
 
     assert calculate_month(db, nour, MONTH).earned_base_piastres == 100_000
-
-
-def test_a_held_order_pays_nothing_and_blocks_the_month(db):
-    """Counted apart from everything else, so a month with one is visibly
-    incomplete rather than quietly short.
-    """
-    affiliate = _affiliate(db)
-    set_terms(
-        db,
-        affiliate,
-        start_month="2026-01",
-        compensation_type=CompensationType.COMMISSION,
-        commission_rate_bp=1000,
-    )
-    _earned(db, affiliate, "1", 100_000)
-    _earned(db, affiliate, "2", 50_000, needs_review=NEEDS_RETURN_DECISION)
-
-    result = calculate_month(db, affiliate, MONTH)
-
-    assert result.earned_base_piastres == 100_000
-    assert result.held_orders == 1
-    assert ORDERS_HELD in result.blockers
-    assert result.is_payable is False
 
 
 # ── The three ways to be paid ──────────────────────────────────────────────────

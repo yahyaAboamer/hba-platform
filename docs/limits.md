@@ -681,40 +681,49 @@ open is the honest answer.
 live samples so far the two have matched exactly — every delivered fulfilment
 carried a date — so this is currently theoretical.
 
-### 🔴 A finished return is held, and pays nothing, until `read_returns` lands
+### 🟠 A return after delivery is not deducted at all *(accepted, ADR 0025)*
 
-**The limit.** HBA's rule is that the base after a return is the value of the
-products the customer kept. Applying it means telling a plain return from an
-exchange, because they resolve to **opposite** outcomes: an exchange finalises
-the order at the full base (ADR 0024), a plain return reduces it.
+**The limit.** Once an order is delivered it is finished with. A customer who
+receives the goods and sends them back — for money, or in exchange — leaves the
+model paid in full, and HBA absorbs it.
 
-E-stebdal opens an identical Shopify return for both, and Shopify refused
-`Order.returns` — `read_returns` is not granted. So `base_for_order` returns
-`needs_decision` on any order whose return has **resolved**, and a held order
-pays nothing.
+**Why, rather than because it was hard.** Three separate attempts failed on the
+data, and ADR 0025 records each: Shopify's refund figures are not what HBA
+actually refunds, Shopify refuses to say whether a return was an exchange
+(`read_returns` is not granted), and an exchange may swap **any** number of items
+for any other number — so no rule expressible from this data would be reliably
+right. Building precision on an input known to be wrong is the expensive way to
+be confidently incorrect.
 
-**What failure looks like.** Not a wrong number — a model whose returned or
-exchanged order sits unpaid, with no explanation on her dashboard, until
-somebody notices. Returns are about **one order in eight**, and some fraction of
-those resolve each month.
+**The measured cost.** Across the 537 orders indexed on 26 August 2026, six show
+money having gone back: one `refunded` and five `partially_refunded`. **1.1% of
+orders**, and only a fraction of any one of them is commission.
 
-**Why held rather than guessed.** Both guesses cost real money in opposite
-directions. Assume exchange, and a genuine return pays full commission on goods
-that came back. Assume return, and every exchange underpays a model who sold the
-item and had no part in the swap. Same shape as the multi-code hold in §9.2: the
-order waits for a person rather than silently paying the wrong amount.
+**The case that will eventually be noticed.** A customer receives E£5,000 of
+goods and returns all of it. The model is paid on a sale that fully reversed.
+That is accepted knowingly, not overlooked.
 
-*What to do:* grant `read_returns` — read-only, and `exchangeLineItems` then
-answers it directly. Until then these orders need deciding by hand, which is not
-new work: HBA already calculates every one of these refunds manually.
+**This was put to HBA and decided, not left implicit.** Voiding a fully refunded
+order is one boolean and would remove the case above — but HBA chose to keep the
+rule whole: nothing related to an edit after delivery belongs in V1, a full refund
+included. One exception invites the next, and each carries back a little of the
+machinery ADR 0025 removed.
+
+It is recorded in §3 of the specification as the **first** thing to add whenever
+reversal is revisited.
+
+**It is reversible.** `order_index` still stores `return_status`,
+`return_activity`, `refunded_total_piastres` and `refunded_merchandise_piastres`
+on every order. The facts keep arriving; the engine does not read them. A later
+phase can measure exactly what a real year cost and decide again with evidence.
 
 ### 🟠 An order first seen mid-exchange freezes at the inflated figure
 
-**The limit.** The freeze holds the base at whatever it was **when the return
-opened**. That only works if the platform saw the order before then. An order
-first indexed while an exchange is already open has no previous value to hold
-on to, so it freezes at what Shopify shows — which for `#29115` mid-exchange was
-E£1,675 of goods against E£1,062 actually paid.
+**The limit.** The base is fixed at whatever it was **when the order was
+delivered**. That only works if the platform saw the order before then. One first
+indexed *after* delivery, with an exchange already open, has no previous value to
+keep, so it takes what Shopify shows — which for `#29115` mid-exchange was E£1,675
+of goods against E£1,062 actually paid.
 
 **What failure looks like.** A single order overstated by up to about 47%, and
 frozen there. It does not correct itself, because the whole point of the freeze
@@ -722,15 +731,16 @@ is that the figure is never re-read.
 
 **Who this hits.** Only the historical import, and only orders that were
 mid-exchange at the moment it ran. Every order arriving by webhook is seen while
-`NO_RETURN` is still true, so its base is correct before anything can inflate it.
+it is still travelling, so its base is right before anything can inflate it.
 
 **What exists instead.** Nothing automatic — the correct figure is not in any
-data the platform ever saw. The order is caught by the hold above whenever its
-return resolves, which is when a person would set it right anyway.
+data the platform ever saw, and since ADR 0025 nothing later will correct it
+either.
 
 *What to do before the first real payroll:* after re-running the import, check
 `/api/operations/order-facts` for orders with a return open. Anything in that
-list that predates the platform is worth eyeballing against Shopify.
+list that predates the platform is worth eyeballing against Shopify — it is a
+handful of orders, once.
 
 ### 🟠 A code created before the switch cannot be handed over
 
@@ -1014,21 +1024,6 @@ period was registered wrongly.
 
 *What to do:* look at the code's periods. The order keeps its original owner,
 which is correct — the fault is in the registration, not in the order.
-
----
-
-### `base_needs_decision`
-
-An order's return **resolved**, and the platform cannot tell a plain return from
-an exchange — they pay in opposite directions and `read_returns` is not granted.
-The row is written, the model keeps ownership, and the figure is marked
-unreliable: it **pays nothing** until decided.
-
-Reported once, when the hold starts, and not on every subsequent sync — which
-would bury it in its own repetition.
-
-*What to do:* grant `read_returns`, or decide the order by hand. See the 🔴 entry
-above.
 
 ---
 

@@ -59,9 +59,6 @@ def _render(result: MonthCalculation, name: str | None = None) -> dict:
             "earned": result.earned_orders,
             "pending": result.pending_orders,
             "void": result.void_orders,
-            # Counted apart so a month with one reads as incomplete rather
-            # than merely small.
-            "awaiting_a_decision": result.held_orders,
         },
         "sales": {
             "earned_piastres": result.earned_base_piastres,
@@ -134,7 +131,6 @@ def affiliate_earnings(
                 "base_frozen_at": row.base_frozen_at.isoformat()
                 if row.base_frozen_at
                 else None,
-                "needs_review": row.needs_review,
             }
             for row in orders
         ],

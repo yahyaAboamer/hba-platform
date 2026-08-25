@@ -1,22 +1,19 @@
-"""What is this order worth? §9.3 and ADR 0011.
+"""What is this order worth? §9.3, ADR 0011, ADR 0025.
 
 Order `#29115` is the acceptance test, not an illustration. The customer paid
 **E£1,157**, of which E£95 was shipping, so the base is **E£1,062**. Mid-exchange
 Shopify reported three items totalling E£1,675 and the old dashboard calculated
 on roughly E£1,557 — about **47% too much on a single order**.
-"""
 
-from datetime import datetime, timedelta, timezone
+The base moves until delivery and then stops. An exchange can only happen to a
+parcel the customer already has, so freezing on delivery is strictly earlier than
+freezing on return activity — and needs no assumption about what E-stebdal does
+first, which is a thing nobody at HBA can observe.
+"""
 
 import pytest
 
-from app.services.commission.base import (
-    NEEDS_RETURN_DECISION,
-    base_for_order,
-    commission_base,
-)
-
-NOW = datetime(2026, 8, 25, 12, 0, tzinfo=timezone.utc)
+from app.services.commission.base import base_for_order, commission_base
 
 #: #29115, in piastres. E£1,157 paid, E£95 of it shipping, no tax.
 PAID = 115_700
@@ -60,179 +57,108 @@ def test_an_order_that_is_all_shipping_is_worth_nothing():
     assert commission_base(9_500, 9_500, 0) == 0
 
 
-# ── The freeze ─────────────────────────────────────────────────────────────────
+# ── Moving, then fixed ─────────────────────────────────────────────────────────
 
 
-def test_the_base_follows_shopify_while_nothing_has_come_back():
-    """A genuine edit before the parcel ships should be reflected."""
+def test_the_base_follows_shopify_until_the_parcel_arrives():
+    """A genuine edit before it ships should be reflected."""
     decision = base_for_order(
         total_piastres=PAID, shipping_piastres=SHIPPING, tax_piastres=TAX
     )
 
     assert decision.piastres == EXPECTED_BASE
-    assert decision.is_frozen is False
-    assert decision.is_decided is True
+    assert decision.is_final is False
 
 
-def test_a_return_opening_freezes_the_base_at_what_it_was():
+def test_delivery_fixes_the_figure():
     decision = base_for_order(
         total_piastres=PAID,
         shipping_piastres=SHIPPING,
         tax_piastres=TAX,
-        return_activity=True,
-        return_unresolved=True,
+        delivered=True,
         stored_base_piastres=EXPECTED_BASE,
-        now=NOW,
     )
 
     assert decision.piastres == EXPECTED_BASE
-    assert decision.frozen_at == NOW
+    assert decision.is_final is True
 
 
-def test_the_exchange_inflation_cannot_reach_a_frozen_base():
+def test_the_exchange_inflation_cannot_reach_a_delivered_order():
     """The defect this module exists to prevent. Shopify now says E£1,675 of
-    goods; the frozen base still says E£1,062. Reading the live figure would
-    calculate 47% too much.
+    goods; the base still says E£1,062. Reading the live figure would calculate
+    47% too much.
     """
     decision = base_for_order(
         total_piastres=INFLATED_PAID,
         shipping_piastres=SHIPPING,
         tax_piastres=TAX,
-        return_activity=True,
-        return_unresolved=True,
+        delivered=True,
         stored_base_piastres=EXPECTED_BASE,
-        base_frozen_at=NOW - timedelta(days=2),
-        now=NOW,
     )
 
     assert decision.piastres == EXPECTED_BASE
     assert decision.piastres != commission_base(INFLATED_PAID, SHIPPING, TAX)
 
 
-def test_freezing_does_not_move_the_moment_it_happened():
-    """When it froze answers "before or after the exchange opened?", which a
-    later timestamp would destroy.
-    """
-    froze = NOW - timedelta(days=3)
-    decision = base_for_order(
-        total_piastres=INFLATED_PAID,
-        shipping_piastres=SHIPPING,
-        tax_piastres=TAX,
-        return_activity=True,
-        return_unresolved=True,
-        stored_base_piastres=EXPECTED_BASE,
-        base_frozen_at=froze,
-        now=NOW,
-    )
-
-    assert decision.frozen_at == froze
-
-
-def test_the_base_stays_frozen_after_the_return_finishes():
-    """Unfreezing on completion would let the post-exchange subtotal back in.
-    The order resolves; the number does not un-freeze.
+def test_a_cheaper_exchange_cannot_reduce_it_either():
+    """ADR 0025 is symmetric. An exchange for something cheaper leaves the model
+    exactly where she was - she sold the original, and the swap is HBA's
+    service, not hers.
     """
     decision = base_for_order(
-        total_piastres=INFLATED_PAID,
+        total_piastres=60_000 + SHIPPING,
         shipping_piastres=SHIPPING,
         tax_piastres=TAX,
-        return_activity=True,
-        return_unresolved=False,
+        delivered=True,
         stored_base_piastres=EXPECTED_BASE,
-        base_frozen_at=NOW - timedelta(days=5),
-        now=NOW,
     )
 
     assert decision.piastres == EXPECTED_BASE
-    assert decision.is_frozen is True
 
 
-def test_an_order_first_seen_mid_exchange_freezes_at_what_it_shows():
-    """No previous value to hold on to. The figure is whatever Shopify says at
-    that moment, which for a historical import of an order already mid-exchange
-    is the inflated one. Recorded in docs/limits.md - it cannot be recovered
-    from data the platform never saw.
+def test_a_refund_after_delivery_is_ignored():
+    """The accepted exposure, stated as a test so nobody mistakes it for an
+    oversight. Six of 537 live orders showed money going back - 1.1%.
+    """
+    decision = base_for_order(
+        total_piastres=0,
+        shipping_piastres=0,
+        tax_piastres=0,
+        delivered=True,
+        stored_base_piastres=EXPECTED_BASE,
+    )
+
+    assert decision.piastres == EXPECTED_BASE
+
+
+def test_an_order_first_seen_after_delivery_takes_what_shopify_shows():
+    """No previous value to keep. For a historical import of an order already
+    mid-exchange that is the inflated figure, and it cannot be recovered from
+    data the platform never saw. Recorded in docs/limits.md.
     """
     decision = base_for_order(
         total_piastres=INFLATED_PAID,
         shipping_piastres=SHIPPING,
         tax_piastres=TAX,
-        return_activity=True,
-        return_unresolved=True,
+        delivered=True,
         stored_base_piastres=None,
-        now=NOW,
     )
 
     assert decision.piastres == commission_base(INFLATED_PAID, SHIPPING, TAX)
-    assert decision.is_frozen is True
+    assert decision.is_final is True
 
 
-# ── Held rather than guessed ───────────────────────────────────────────────────
-
-
-def test_a_resolved_return_is_held_because_it_might_be_an_exchange():
-    """They resolve to opposite outcomes - an exchange finalises at the full
-    base (ADR 0024), a plain return reduces it - and E-stebdal opens an
-    identical Shopify return for both. Shopify refused `Order.returns`, so the
-    platform says it cannot decide rather than picking one.
+@pytest.mark.parametrize("delivered", [True, False])
+def test_the_figure_is_always_the_goods_not_the_total(delivered):
+    """Shipping never enters, in either state. HBA's return fee is HBA's cost of
+    handling a return, and it could not reach this figure even if the base were
+    still moving.
     """
     decision = base_for_order(
         total_piastres=PAID,
         shipping_piastres=SHIPPING,
         tax_piastres=TAX,
-        return_activity=True,
-        return_unresolved=False,
-        stored_base_piastres=EXPECTED_BASE,
-        base_frozen_at=NOW - timedelta(days=4),
-        now=NOW,
+        delivered=delivered,
     )
 
-    assert decision.is_decided is False
-    assert decision.needs_decision == NEEDS_RETURN_DECISION
-
-
-def test_an_unresolved_return_is_not_held_because_it_pays_nothing_yet():
-    """Still being decided means the order is `pending` (§9.4), so no figure
-    pays anybody. Holding it as well would report a problem that does not
-    exist.
-    """
-    decision = base_for_order(
-        total_piastres=PAID,
-        shipping_piastres=SHIPPING,
-        tax_piastres=TAX,
-        return_activity=True,
-        return_unresolved=True,
-        stored_base_piastres=EXPECTED_BASE,
-        now=NOW,
-    )
-
-    assert decision.is_decided is True
-
-
-def test_an_ordinary_order_is_never_held():
-    """Returns are about one order in eight. The other seven must not acquire a
-    blocker they have no reason for.
-    """
-    decision = base_for_order(
-        total_piastres=PAID, shipping_piastres=SHIPPING, tax_piastres=TAX
-    )
-
-    assert decision.is_decided is True
-    assert decision.needs_decision is None
-
-
-@pytest.mark.parametrize(
-    "unresolved,expected_hold", [(True, False), (False, True)]
-)
-def test_only_a_finished_return_needs_a_decision(unresolved, expected_hold):
-    decision = base_for_order(
-        total_piastres=PAID,
-        shipping_piastres=SHIPPING,
-        tax_piastres=TAX,
-        return_activity=True,
-        return_unresolved=unresolved,
-        stored_base_piastres=EXPECTED_BASE,
-        now=NOW,
-    )
-
-    assert (decision.needs_decision is not None) is expected_hold
+    assert decision.piastres == EXPECTED_BASE

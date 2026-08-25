@@ -91,6 +91,27 @@ not be shaped in a way that blocks it.
 **Performance ranking, possibly AI-assisted.** Requires **no new storage** — order history,
 commission history, and target history already provide the inputs.
 
+**Reversing a sale after delivery.** V1 finishes with an order the moment it is delivered
+and ignores every return, exchange and refund that follows (ADR 0025). A future version may
+want some of that back. The order to add it in, easiest and most valuable first:
+
+1. **Void an order that was fully refunded.** `financial_status = 'refunded'` means every
+   piastre went back, which no exchange produces. One boolean — no line items, no scope, no
+   ambiguity about item counts. It removes the only case that is individually noticeable: a
+   customer returns everything and the model keeps full commission.
+2. **Reduce a partly-returned order.** Needs the value of the goods the customer kept, read
+   from the order's line items rather than subtracted from its total — the total carries
+   return shipping and HBA's manual balance corrections.
+3. **Tell an exchange from a return.** The hard one, and the reason 2 is not enough on its
+   own. Needs `read_returns`, and even then an exchange may swap **any** number of items for
+   any other number, so it needs a rule for what the customer ended up holding rather than
+   for what came back.
+
+**Requires no new storage.** `order_index` already carries `return_status`,
+`return_activity`, `refunded_total_piastres` and `refunded_merchandise_piastres` on every
+order, written but never read. Whenever this is picked up, the history is already there —
+which also means the real cost of ignoring it can be measured before deciding.
+
 **Unspecified future features.** The business expects more. This is the reason for the
 governing principle in §1.
 
