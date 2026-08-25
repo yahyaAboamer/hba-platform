@@ -671,6 +671,57 @@ open is the honest answer.
 live samples so far the two have matched exactly — every delivered fulfilment
 carried a date — so this is currently theoretical.
 
+### 🔴 A finished return is held, and pays nothing, until `read_returns` lands
+
+**The limit.** HBA's rule is that the base after a return is the value of the
+products the customer kept. Applying it means telling a plain return from an
+exchange, because they resolve to **opposite** outcomes: an exchange finalises
+the order at the full base (ADR 0024), a plain return reduces it.
+
+E-stebdal opens an identical Shopify return for both, and Shopify refused
+`Order.returns` — `read_returns` is not granted. So `base_for_order` returns
+`needs_decision` on any order whose return has **resolved**, and a held order
+pays nothing.
+
+**What failure looks like.** Not a wrong number — a model whose returned or
+exchanged order sits unpaid, with no explanation on her dashboard, until
+somebody notices. Returns are about **one order in eight**, and some fraction of
+those resolve each month.
+
+**Why held rather than guessed.** Both guesses cost real money in opposite
+directions. Assume exchange, and a genuine return pays full commission on goods
+that came back. Assume return, and every exchange underpays a model who sold the
+item and had no part in the swap. Same shape as the multi-code hold in §9.2: the
+order waits for a person rather than silently paying the wrong amount.
+
+*What to do:* grant `read_returns` — read-only, and `exchangeLineItems` then
+answers it directly. Until then these orders need deciding by hand, which is not
+new work: HBA already calculates every one of these refunds manually.
+
+### 🟠 An order first seen mid-exchange freezes at the inflated figure
+
+**The limit.** The freeze holds the base at whatever it was **when the return
+opened**. That only works if the platform saw the order before then. An order
+first indexed while an exchange is already open has no previous value to hold
+on to, so it freezes at what Shopify shows — which for `#29115` mid-exchange was
+E£1,675 of goods against E£1,062 actually paid.
+
+**What failure looks like.** A single order overstated by up to about 47%, and
+frozen there. It does not correct itself, because the whole point of the freeze
+is that the figure is never re-read.
+
+**Who this hits.** Only the historical import, and only orders that were
+mid-exchange at the moment it ran. Every order arriving by webhook is seen while
+`NO_RETURN` is still true, so its base is correct before anything can inflate it.
+
+**What exists instead.** Nothing automatic — the correct figure is not in any
+data the platform ever saw. The order is caught by the hold above whenever its
+return resolves, which is when a person would set it right anyway.
+
+*What to do before the first real payroll:* after re-running the import, check
+`/api/operations/order-facts` for orders with a return open. Anything in that
+list that predates the platform is worth eyeballing against Shopify.
+
 ### 🟠 A code created before the switch cannot be handed over
 
 **The limit.** `retire_and_replace` ends the old code the month **before** the
