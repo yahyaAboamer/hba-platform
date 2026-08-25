@@ -23,7 +23,11 @@ from dataclasses import dataclass, field
 from typing import Callable
 
 from app.services.shopify.client import ShopifyClient, ShopifyError
-from app.services.shopify.fulfilment import DELIVERED_STATUSES, FAILED_STATUSES
+from app.services.shopify.fulfilment import (
+    DELIVERED_STATUSES,
+    FAILED_STATUSES,
+    NO_RETURN,
+)
 from app.services.shopify.normalise import _timestamp, money_to_piastres
 
 #: Enough orders to see a pattern, few enough to stay well inside Shopify's
@@ -116,6 +120,26 @@ PROBES: tuple[FactProbe, ...] = (
             "returns(first: 10) { nodes { id status totalQuantity exchangeLineItems(first: 20) { nodes { id } } returnLineItems(first: 20) { nodes { id } } } }",
             "returns(first: 10) { nodes { id status exchangeLineItems(first: 20) { nodes { id } } } }",
             "returns(first: 10) { nodes { id status } }",
+        ),
+    ),
+    FactProbe(
+        name="estebdal_tags",
+        question=(
+            "Does E-stebdal tag its orders? A tag is readable with read_orders "
+            "and would separate an exchange from a return without a new scope."
+        ),
+        candidates=("tags returnStatus",),
+    ),
+    FactProbe(
+        name="kept_items",
+        question=(
+            "Can we read the items the customer kept, at the price they paid, "
+            "without ever touching shipping, tax or a manual balance adjustment?"
+        ),
+        candidates=(
+            "lineItems(first: 50) { nodes { id title quantity currentQuantity discountedUnitPriceSet { shopMoney { amount currencyCode } } discountedTotalSet { shopMoney { amount currencyCode } } } } currentSubtotalPriceSet { shopMoney { amount } } currentTotalPriceSet { shopMoney { amount } } totalShippingPriceSet { shopMoney { amount } } currentTotalTaxSet { shopMoney { amount } }",
+            "lineItems(first: 50) { nodes { id title quantity currentQuantity discountedUnitPriceSet { shopMoney { amount currencyCode } } } } currentSubtotalPriceSet { shopMoney { amount } }",
+            "lineItems(first: 50) { nodes { id title quantity discountedTotalSet { shopMoney { amount currencyCode } } } }",
         ),
     ),
 )
@@ -253,12 +277,133 @@ def _summarise_exchange_vs_return(nodes: list[dict]) -> dict:
     }
 
 
+def _summarise_estebdal_tags(nodes: list[dict]) -> dict:
+    """What tags exist, and which of them appear on orders with a return.
+
+    Shopify refused `Order.returns` outright - `read_returns` is not granted -
+    so the structured answer costs a scope change and an app release. A tag
+    costs nothing: `tags` is readable with `read_orders`, which the app already
+    holds. This says whether E-stebdal writes one.
+
+    The correlation is the useful half. A tag that appears on every order says
+    nothing; a tag that appears **only** where a return is open is the
+    discriminator.
+    """
+    everywhere: Counter = Counter()
+    on_returns: Counter = Counter()
+    orders_with_returns = 0
+    untagged_returns = 0
+
+    for node in nodes:
+        tags = [str(tag).strip() for tag in (node.get("tags") or []) if str(tag).strip()]
+        everywhere.update(tags)
+
+        status = str(node.get("returnStatus") or "").strip().upper()
+        if status and status != NO_RETURN:
+            orders_with_returns += 1
+            on_returns.update(tags)
+            if not tags:
+                untagged_returns += 1
+
+    return {
+        "tags_seen": dict(everywhere.most_common(40)),
+        "orders_with_a_return": orders_with_returns,
+        "tags_on_orders_with_a_return": dict(on_returns.most_common(40)),
+        # The number that decides it. A return carrying no tag at all cannot be
+        # classified this way, however good the tags on the others look.
+        "orders_with_a_return_and_no_tag": untagged_returns,
+    }
+
+
+def _summarise_kept_items(nodes: list[dict]) -> dict:
+    """Can the base be built from the product lines alone?
+
+    HBA's correction, and it is the right one: subtracting returned goods from
+    the order total inherits every adjustment made to that total - return
+    shipping, and the manual balance corrections HBA does by hand. Summing the
+    **product lines** touches none of it.
+
+    ``currentQuantity`` is the quantity minus what was refunded, so it is
+    literally "what the customer kept". The cross-check below is the important
+    number: if the line sums already agree with `total - shipping - tax` on
+    ordinary orders, then switching ADR 0011 to line items changes nothing
+    where nothing was returned, and fixes the case where something was.
+    """
+    with_lines = 0
+    with_current_quantity = 0
+    partially_returned = 0
+    agreed = 0
+    disagreed = 0
+    disagreements: list[dict] = []
+
+    for node in nodes:
+        lines = ((node.get("lineItems") or {}).get("nodes")) or []
+        if not lines:
+            continue
+        with_lines += 1
+
+        kept = 0
+        billed = 0
+        saw_current = False
+        for line in lines:
+            quantity = line.get("quantity") or 0
+            current = line.get("currentQuantity")
+            if current is not None:
+                saw_current = True
+            unit = money_to_piastres(
+                ((line.get("discountedUnitPriceSet") or {}).get("shopMoney") or {}).get(
+                    "amount"
+                )
+            )
+            kept += unit * (current if current is not None else quantity)
+            billed += money_to_piastres(
+                ((line.get("discountedTotalSet") or {}).get("shopMoney") or {}).get(
+                    "amount"
+                )
+            ) or (unit * quantity)
+
+        if saw_current:
+            with_current_quantity += 1
+        if kept < billed:
+            partially_returned += 1
+
+        subtotal_block = (node.get("currentSubtotalPriceSet") or {}).get("shopMoney")
+        if not subtotal_block:
+            continue
+        subtotal = money_to_piastres(subtotal_block.get("amount"))
+        # One piastre of slack: Shopify allocates order-level discounts across
+        # lines and rounds each allocation.
+        if abs(billed - subtotal) <= 1:
+            agreed += 1
+        else:
+            disagreed += 1
+            if len(disagreements) < 5:
+                disagreements.append(
+                    {
+                        "order": node.get("legacyResourceId"),
+                        "line_items_sum_piastres": billed,
+                        "order_subtotal_piastres": subtotal,
+                    }
+                )
+
+    return {
+        "orders_with_line_items": with_lines,
+        "orders_reporting_current_quantity": with_current_quantity,
+        "orders_where_something_was_returned": partially_returned,
+        "line_sums_matching_the_order_subtotal": agreed,
+        "line_sums_disagreeing": disagreed,
+        "examples_of_disagreement": disagreements,
+    }
+
+
 SUMMARISERS: dict[str, Callable[[list[dict]], dict]] = {
     "delivery": _summarise_delivery,
     "return_status": _summarise_return_status,
     "refund_total": _summarise_refund_total,
     "refund_merchandise": _summarise_refund_merchandise,
     "exchange_vs_return": _summarise_exchange_vs_return,
+    "estebdal_tags": _summarise_estebdal_tags,
+    "kept_items": _summarise_kept_items,
 }
 
 
