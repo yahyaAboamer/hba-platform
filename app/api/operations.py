@@ -26,6 +26,7 @@ from app.services.shopify.client import (
 )
 from app.services.shopify.client import REQUIRED_SCOPES
 from app.services.shopify.discounts import REQUIRED_SCOPE, verify_discount_code
+from app.services.shopify.facts import DEFAULT_SAMPLE
 
 router = APIRouter(prefix="/api/operations")
 
@@ -278,6 +279,72 @@ def shopify_scopes(
         # "Shopify did not say", not "nothing is granted".
         "reported_by_shopify": bool(client.granted_scopes()),
     }
+
+
+@router.get("/order-facts")
+def order_facts(
+    sample_size: int = DEFAULT_SAMPLE,
+    _actor: UserAccount = Depends(require_permission(Permission.SETTINGS_MANAGE)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """What Shopify will actually tell us about delivery, returns and refunds.
+
+    Phase 4 pays a model when her order is **delivered** (ADR 0012) and reads
+    that from Shopify rather than from Bosta (ADR 0023). This is the instrument
+    that turns "Shopify updates the status" into a number, the same way
+    /shopify-scopes turned "is the scope granted?" into an answer.
+
+    Read `delivery.signal` first. `absent` means no shipped order has ever
+    reached a delivered status - which would mean nobody is ever paid, and
+    every month calculating to zero would look exactly like a month with no
+    sales. That is the failure this endpoint exists to catch **before** the
+    code that depends on it is written.
+
+    It also stays useful afterwards. Whatever writes delivery into Shopify sits
+    outside this codebase and can stop without a symptom, so a month that comes
+    out unexpectedly low is a reason to read this again.
+
+    Administrator only, and not something to poll: it runs several sampled
+    queries against Shopify.
+    """
+    from app.services.shopify.facts import probe_order_facts
+    from app.services.shopify.sync import build_client
+
+    # Free, and independent of Shopify being reachable: what the orders already
+    # indexed actually carry. If the live probe fails, this still says whether
+    # the platform has ever seen a delivery-shaped status.
+    indexed = {
+        "orders_indexed": db.scalar(text("SELECT count(*) FROM order_index")) or 0,
+        "fulfillment_status": {
+            row.value or "(null)": row.count
+            for row in db.execute(
+                text(
+                    "SELECT fulfillment_status AS value, count(*) AS count "
+                    "FROM order_index GROUP BY fulfillment_status "
+                    "ORDER BY count DESC"
+                )
+            )
+        },
+        "financial_status": {
+            row.value or "(null)": row.count
+            for row in db.execute(
+                text(
+                    "SELECT financial_status AS value, count(*) AS count "
+                    "FROM order_index GROUP BY financial_status "
+                    "ORDER BY count DESC"
+                )
+            )
+        },
+    }
+
+    try:
+        report = probe_order_facts(build_client(), sample_size=sample_size)
+    except ShopifyNotConfigured as exc:
+        raise HTTPException(503, str(exc)) from exc
+    except ShopifyError as exc:
+        raise HTTPException(502, f"Could not reach Shopify: {exc}") from exc
+
+    return {**report, "already_indexed": indexed}
 
 
 @router.post("/start-import")
