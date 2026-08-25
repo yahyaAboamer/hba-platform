@@ -11,8 +11,10 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.businesstime import parse_month
-from app.core.periods import OPEN_ENDED, validate_period
+from datetime import datetime
+
+from app.core.businesstime import business_month, parse_month
+from app.core.periods import OPEN_ENDED, PLATFORM_START_MONTH, validate_period
 from app.models.affiliates import AffiliateProfile
 from app.models.codes import DiscountCodePeriod
 from app.services.audit import record_audit
@@ -41,6 +43,29 @@ def _covering(code: str, month: str):
             | (DiscountCodePeriod.end_month >= month)
         )
     )
+
+
+def start_month_for(created_at: datetime | None) -> str:
+    """The month a code's ownership should start from.
+
+    **The later of the platform's data horizon and the code's creation on
+    Shopify** - and it is never a question anybody is asked, because there is
+    exactly one right answer and a person typing it can only get it wrong.
+
+    - A code created before 2026 starts at the horizon. There are no orders
+      before then to claim; the import does not reach back further.
+    - A code created in March starts in March. Claiming January would assert
+      ownership of months the code did not exist for - and if it previously
+      belonged to somebody else, collide with their period.
+
+    An unknown creation date falls back to the horizon. That is the safe
+    direction: it claims at most a few empty months, where starting late would
+    orphan real orders and nobody would notice until the model asked why her
+    dashboard was empty.
+    """
+    if created_at is None:
+        return PLATFORM_START_MONTH
+    return max(PLATFORM_START_MONTH, business_month(created_at))
 
 
 def register_code(

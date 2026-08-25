@@ -24,7 +24,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import require_permission
 from app.core.businesstime import business_month, utcnow
-from app.core.periods import PLATFORM_START_MONTH
+from app.core.periods import OPEN_ENDED
 from app.core.permissions import Permission
 from app.db import get_session
 from app.models.affiliates import AffiliateProfile, AffiliateStatus
@@ -36,9 +36,15 @@ from app.services.affiliates import (
     list_affiliates,
     set_status,
 )
-from app.services.codes import codes_for, register_code
+from app.services.codes import codes_for, register_code, start_month_for
 from app.services.compensation import set_terms, terms_for
 from app.services.payouts import current_destination, mask_destination, set_destination
+from app.services.shopify.client import (
+    ShopifyError,
+    ShopifyMissingScope,
+    ShopifyNotConfigured,
+)
+from app.services.shopify.discounts import REQUIRED_SCOPE, verify_discount_code
 
 router = APIRouter(prefix="/api/affiliates")
 
@@ -59,20 +65,20 @@ class UpdateStatusBody(BaseModel):
 
 
 class RegisterCodeBody(BaseModel):
+    """Just the code.
+
+    **No start month is asked for, deliberately.** There is exactly one right
+    answer - the later of the platform's data horizon and the code's creation
+    on Shopify - so asking a person can only produce a wrong one. Typing
+    today's month would orphan every order the code had already earned, and
+    nobody would notice until the model asked why her dashboard was empty.
+
+    Verification is not asked for either. Registering looks the code up in
+    Shopify, which is the same call that answers "does this exist?" - one
+    action instead of two that could disagree.
+    """
+
     code: str = Field(min_length=1, max_length=120)
-    #: Defaults to the platform's data horizon rather than to today.
-    #:
-    #: Most codes were live on Shopify long before this platform existed and
-    #: already have orders against them. Registering one from *today* would
-    #: leave every one of those orders orphaned - the model would open her
-    #: dashboard and see nothing before the day she was approved. Supply a
-    #: later month only when the code genuinely did not exist before then.
-    start_month: str = PLATFORM_START_MONTH
-    end_month: str | None = None
-    #: Whether Shopify has already confirmed the code exists. Verification
-    #: itself - the actual Shopify lookup - is /api/operations/verify-code;
-    #: this only records that it happened, stamped now.
-    verified: bool = False
 
 
 class SetCompensationBody(BaseModel):
@@ -253,15 +259,44 @@ def register_code_route(
     actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_MANAGE)),
     db: Session = Depends(get_session),
 ) -> dict:
+    """Give an affiliate a discount code.
+
+    Looks the code up in Shopify, and that one call settles both questions:
+    whether it exists, and which month ownership starts from.
+
+    **A code Shopify has never heard of is still registered, unverified.** The
+    business has models whose code has not been created yet, and refusing to
+    record what they applied with would be unhelpful. Approval is what the
+    verification gate protects - see set_status - so an unverified code cannot
+    quietly become a paying one.
+    """
+    from app.services.shopify.sync import build_client
+
     affiliate = _get_affiliate_or_404(db, affiliate_id)
+
+    try:
+        found = verify_discount_code(build_client(), body.code)
+    except ShopifyMissingScope as exc:
+        raise HTTPException(
+            403,
+            f"Shopify has not granted {REQUIRED_SCOPE}, so this code cannot be "
+            "checked. Add the scope, then register the code.",
+        ) from exc
+    except ShopifyNotConfigured as exc:
+        raise HTTPException(503, str(exc)) from exc
+    except ShopifyError as exc:
+        # Registering blind would guess the start month, and a wrong guess
+        # orphans orders silently. Better to fail while somebody is watching.
+        raise HTTPException(502, f"Could not reach Shopify: {exc}") from exc
+
     try:
         period = register_code(
             db,
             affiliate,
             body.code,
-            body.start_month,
-            body.end_month,
-            verified_at=utcnow() if body.verified else None,
+            start_month_for(found["created_at"]),
+            OPEN_ENDED,
+            verified_at=utcnow() if found["exists"] else None,
             actor_id=actor.id,
             actor_email=actor.email,
         )
@@ -281,6 +316,8 @@ def register_code_route(
         "start_month": period.start_month,
         "end_month": period.end_month,
         "is_verified": period.is_verified,
+        "exists_in_shopify": found["exists"],
+        "shopify_status": found["status"],
     }
 
 

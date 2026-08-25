@@ -13,6 +13,8 @@ was agreed. Guessing one from the other would be wrong roughly whenever it
 mattered.
 """
 
+from datetime import datetime
+
 from app.services.shopify.client import ShopifyClient
 
 #: The scope this needs. Named here so a missing grant produces a message that
@@ -28,6 +30,7 @@ query CodeByCode($code: String!) {
       ... on DiscountCodeBasic {
         title
         status
+        createdAt
         usageLimit
         asyncUsageCount
         customerGets {
@@ -44,6 +47,18 @@ query CodeByCode($code: String!) {
 """
 
 
+def _timestamp(value: str | None) -> datetime | None:
+    """Shopify sends ISO-8601 with a Z suffix; Python wants an offset."""
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        # A timestamp we cannot read must not stop verification. The caller
+        # falls back to the platform horizon, which is the safe direction.
+        return None
+
+
 def _not_found(code: str) -> dict:
     return {
         "exists": False,
@@ -52,6 +67,7 @@ def _not_found(code: str) -> dict:
         "discount_bp": None,
         "usage_count": None,
         "title": None,
+        "created_at": None,
     }
 
 
@@ -89,4 +105,8 @@ def verify_discount_code(client: ShopifyClient, code: str) -> dict:
         "discount_bp": discount_bp,
         "usage_count": discount.get("asyncUsageCount"),
         "title": discount.get("title"),
+        #: When Shopify created the code. A code cannot be used before it
+        #: exists, so this is a safe earliest bound on the orders it can have -
+        #: which is what decides the month its ownership starts from.
+        "created_at": _timestamp(discount.get("createdAt")),
     }

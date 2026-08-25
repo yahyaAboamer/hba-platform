@@ -25,7 +25,18 @@ PERCENTAGE_NODE = {
     },
 }
 
-EXPECTED_KEYS = {"exists", "code", "status", "discount_bp", "usage_count", "title"}
+EXPECTED_KEYS = {
+    "exists",
+    "code",
+    "status",
+    "discount_bp",
+    "usage_count",
+    "title",
+    #: When Shopify created the code. A code cannot be used before it exists,
+    #: so this is a safe earliest bound on the orders it can have - which is
+    #: what decides the month its ownership starts from.
+    "created_at",
+}
 
 
 def _client(node, capture: dict | None = None):
@@ -42,12 +53,13 @@ def _client(node, capture: dict | None = None):
     )
 
 
-def _node(value, *, status="ACTIVE", title="X", usage=1):
+def _node(value, *, status="ACTIVE", title="X", usage=1, created=None):
     return {
         "codeDiscount": {
             "__typename": "DiscountCodeBasic",
             "title": title,
             "status": status,
+            "createdAt": created,
             "asyncUsageCount": usage,
             "customerGets": {"value": value},
         }
@@ -187,3 +199,42 @@ def test_a_missing_scope_is_raised_not_reported_as_a_missing_code():
     )
     with pytest.raises(ShopifyMissingScope):
         verify_discount_code(client, "NOUR10")
+
+
+# ── The creation date, which decides where a model's history starts ────────────
+
+
+def test_an_existing_code_reports_when_shopify_created_it():
+    """The month ownership starts from is derived from this, never typed.
+
+    A code cannot be used before it exists, so its creation is a safe earliest
+    bound on the orders it can have.
+    """
+    from datetime import timezone
+
+    node = _node(
+        {"__typename": "DiscountPercentage", "percentage": 0.1}, created="2026-03-04T09:15:00Z"
+    )
+    result = verify_discount_code(_client(node), "NOUR10")
+
+    assert result["created_at"].year == 2026
+    assert result["created_at"].month == 3
+    assert result["created_at"].tzinfo is not None
+    assert result["created_at"].utcoffset() == timezone.utc.utcoffset(None)
+
+
+def test_a_missing_code_reports_no_creation_date():
+    assert verify_discount_code(_client(None), "NOPE")["created_at"] is None
+
+
+def test_an_unreadable_creation_date_does_not_break_verification():
+    """A timestamp we cannot parse must not stop a code being verified. The
+    caller falls back to the platform horizon, which is the safe direction.
+    """
+    node = _node(
+        {"__typename": "DiscountPercentage", "percentage": 0.1}, created="whenever"
+    )
+    result = verify_discount_code(_client(node), "NOUR10")
+
+    assert result["exists"] is True
+    assert result["created_at"] is None

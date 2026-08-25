@@ -63,6 +63,49 @@ def _make_account(email: str) -> int:
         ).scalar()
 
 
+@pytest.fixture(autouse=True)
+def _shopify(monkeypatch):
+    """Registering a code now looks it up in Shopify.
+
+    Autouse and controllable: `_shopify_says` changes what the fake shop
+    returns, so tests can cover a code created in March, one Shopify has never
+    heard of, and Shopify being unreachable.
+    """
+    state = {"created_at": None, "exists": True, "error": None}
+
+    def fake_verify(_client, code):
+        if state["error"] is not None:
+            raise state["error"]
+        normalised = str(code).strip().upper()
+        if not state["exists"]:
+            return {
+                "exists": False,
+                "code": normalised,
+                "status": None,
+                "discount_bp": None,
+                "usage_count": None,
+                "title": None,
+                "created_at": None,
+            }
+        return {
+            "exists": True,
+            "code": normalised,
+            "status": "ACTIVE",
+            "discount_bp": 1000,
+            "usage_count": 3,
+            "title": normalised,
+            "created_at": state["created_at"],
+        }
+
+    monkeypatch.setattr("app.api.affiliates.verify_discount_code", fake_verify)
+    monkeypatch.setattr("app.services.shopify.sync.build_client", lambda: object())
+    return state
+
+
+def _shopify_says(shopify, *, created_at=None, exists=True, error=None):
+    shopify.update(created_at=created_at, exists=exists, error=error)
+
+
 def _add_order(order_id: str, code: str, *, month: str = "2026-08") -> None:
     with engine.begin() as connection:
         connection.execute(
@@ -130,7 +173,7 @@ def test_an_affiliate_cannot_create_or_change_anything(client):
     assert client.patch("/api/affiliates/1", json={"status": "active"}).status_code == 403
     assert client.post(
         "/api/affiliates/1/codes",
-        json={"code": "X10", "start_month": "2026-01"},
+        json={"code": "X10"},
     ).status_code == 403
     assert client.post(
         "/api/affiliates/1/compensation",
@@ -230,7 +273,7 @@ def _verify_code(client, affiliate_id, code="NOUR10"):
     """Register a code already confirmed against Shopify - the approval gate."""
     response = client.post(
         f"/api/affiliates/{affiliate_id}/codes",
-        json={"code": code, "verified": True},
+        json={"code": code},
     )
     assert response.status_code == 201, response.text
     return response.json()
@@ -275,21 +318,13 @@ def test_registering_a_code(client):
     affiliate = _register(client)
     response = client.post(
         f"/api/affiliates/{affiliate['id']}/codes",
-        json={"code": "nour10", "start_month": "2026-01"},
+        json={"code": "nour10"},
     )
     assert response.status_code == 201
     body = response.json()
     assert body["code"] == "NOUR10"
-    assert body["is_verified"] is False
-
-
-def test_registering_a_code_already_verified(client):
-    affiliate = _register(client)
-    response = client.post(
-        f"/api/affiliates/{affiliate['id']}/codes",
-        json={"code": "NOUR10", "start_month": "2026-01", "verified": True},
-    )
-    assert response.json()["is_verified"] is True
+    assert body["is_verified"] is True
+    assert body["exists_in_shopify"] is True
 
 
 def test_a_registered_code_shows_up_on_the_affiliate(client):
@@ -297,7 +332,7 @@ def test_a_registered_code_shows_up_on_the_affiliate(client):
     affiliate = _register(client)
     client.post(
         f"/api/affiliates/{affiliate['id']}/codes",
-        json={"code": "NOUR10", "start_month": "2026-01"},
+        json={"code": "NOUR10"},
     )
     body = client.get(f"/api/affiliates/{affiliate['id']}").json()
     assert body["codes"] == ["NOUR10"]
@@ -309,28 +344,35 @@ def test_two_affiliates_cannot_own_the_same_code_at_once(client):
     sara = _register(client, "Sara", "sara@example.com")
     client.post(
         f"/api/affiliates/{nour['id']}/codes",
-        json={"code": "SHARED", "start_month": "2026-01"},
+        json={"code": "SHARED"},
     )
     response = client.post(
         f"/api/affiliates/{sara['id']}/codes",
-        json={"code": "SHARED", "start_month": "2026-06"},
+        json={"code": "SHARED"},
     )
     assert response.status_code == 409
 
 
-def test_a_backwards_code_period_is_refused(client):
+def test_no_month_can_be_supplied_at_all(client):
+    """The field is gone, not merely defaulted.
+
+    An extra key is ignored rather than honoured - there is one right start
+    month and it is derived, so a caller cannot override it into orphaning
+    their own history.
+    """
     affiliate = _register(client)
     response = client.post(
         f"/api/affiliates/{affiliate['id']}/codes",
-        json={"code": "NOUR10", "start_month": "2026-06", "end_month": "2026-03"},
+        json={"code": "NOUR10", "start_month": "2026-06"},
     )
-    assert response.status_code == 400
+    assert response.status_code == 201
+    assert response.json()["start_month"] == "2026-01"
 
 
 def test_registering_a_code_for_an_unknown_affiliate_is_404(client):
     response = client.post(
         "/api/affiliates/999999/codes",
-        json={"code": "NOUR10", "start_month": "2026-01"},
+        json={"code": "NOUR10"},
     )
     assert response.status_code == 404
 
@@ -511,34 +553,72 @@ def test_content_manager_can_manage_affiliates_and_compensation(client):
 # ── History is captured by default (the flow the business described) ───────────
 
 
-def test_a_code_registers_from_the_platform_start_by_default(client):
-    """Most codes were live on Shopify long before this platform existed.
-
-    Registering one from *today* would orphan every order it had already
-    earned - the model would open her dashboard and see nothing before the day
-    she was approved. The safe answer has to be the default, because the
-    unsafe one is a typo away.
+def test_a_code_older_than_the_platform_starts_at_the_horizon(client, _shopify):
+    """Created on Shopify in 2025. There are no orders before 2026 to claim -
+    the import does not reach back further.
     """
-    from app.core.periods import PLATFORM_START_MONTH
+    from datetime import datetime, timezone
 
+    _shopify_says(_shopify, created_at=datetime(2025, 11, 15, tzinfo=timezone.utc))
     affiliate = _register(client)
+
+    response = client.post(
+        f"/api/affiliates/{affiliate['id']}/codes", json={"code": "OLD10"}
+    )
+    assert response.json()["start_month"] == "2026-01"
+
+
+def test_a_code_created_after_the_platform_starts_when_it_was_created(client, _shopify):
+    """Claiming January would assert ownership of months the code did not
+    exist for - and collide with whoever held it before, if anyone did.
+    """
+    from datetime import datetime, timezone
+
+    _shopify_says(_shopify, created_at=datetime(2026, 3, 4, tzinfo=timezone.utc))
+    affiliate = _register(client)
+
+    response = client.post(
+        f"/api/affiliates/{affiliate['id']}/codes", json={"code": "NEW10"}
+    )
+    assert response.json()["start_month"] == "2026-03"
+
+
+def test_a_code_shopify_has_never_heard_of_is_recorded_unverified(client, _shopify):
+    """Some models apply with a code that has not been created yet.
+
+    Refusing to record it would be unhelpful; approving on it would be unsafe.
+    So it is stored, marked unverified, and the approval gate stops it becoming
+    a paying code until somebody checks.
+    """
+    _shopify_says(_shopify, exists=False)
+    affiliate = _register(client)
+
+    response = client.post(
+        f"/api/affiliates/{affiliate['id']}/codes", json={"code": "NOTYET"}
+    )
+    assert response.status_code == 201
+    assert response.json()["is_verified"] is False
+    assert response.json()["exists_in_shopify"] is False
+
+    refused = client.patch(
+        f"/api/affiliates/{affiliate['id']}", json={"status": "active"}
+    )
+    assert refused.status_code == 400
+
+
+def test_registration_fails_loudly_when_shopify_cannot_be_reached(client, _shopify):
+    """Registering blind would have to guess the start month, and a wrong
+    guess orphans orders silently. Better to fail while somebody is watching.
+    """
+    from app.services.shopify.client import ShopifyError
+
+    _shopify_says(_shopify, error=ShopifyError("Shopify returned 503"))
+    affiliate = _register(client)
+
     response = client.post(
         f"/api/affiliates/{affiliate['id']}/codes", json={"code": "NOUR10"}
     )
-    assert response.status_code == 201
-    assert response.json()["start_month"] == PLATFORM_START_MONTH
-
-
-def test_a_later_start_month_is_still_accepted(client):
-    """A genuinely new code, created on Shopify after the platform started,
-    should not claim months it did not exist for.
-    """
-    affiliate = _register(client)
-    response = client.post(
-        f"/api/affiliates/{affiliate['id']}/codes",
-        json={"code": "NEW10", "start_month": "2026-07"},
-    )
-    assert response.json()["start_month"] == "2026-07"
+    assert response.status_code == 502
 
 
 def test_a_default_registration_picks_up_the_orders_already_placed(client):
@@ -568,16 +648,6 @@ def test_approving_without_a_verified_code_is_refused(client):
     )
     assert response.status_code == 400
     assert "Shopify" in response.json()["detail"]
-
-
-def test_approving_with_an_unverified_code_is_refused(client):
-    affiliate = _register(client)
-    client.post(f"/api/affiliates/{affiliate['id']}/codes", json={"code": "NOUR10"})
-
-    response = client.patch(
-        f"/api/affiliates/{affiliate['id']}", json={"status": "active"}
-    )
-    assert response.status_code == 400
 
 
 def test_deactivating_never_requires_a_verified_code(client):
