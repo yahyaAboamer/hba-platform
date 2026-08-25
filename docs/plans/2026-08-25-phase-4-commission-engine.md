@@ -1,7 +1,7 @@
 # Phase 4 — Commission engine, commission states, rounding
 
 **Spec:** `docs/specs/2026-08-22-hba-platform-v1-design.md` §9 (all), §8, §10.2, §17
-**ADRs this phase implements:** 0002, 0003, 0004, 0011, 0012
+**ADRs this phase implements:** 0002, 0003, 0004, 0011, 0012, 0023
 **Depends on:** Phase 2 (order index, Shopify client) and Phase 3 (who owns which code when)
 **Delivers:** what each affiliate is owed for a month, and why.
 
@@ -63,15 +63,21 @@ Two things this phase depends on cannot be settled by reading the codebase, and 
 turned into facts before anything depends on them** — the same way `/shopify-scopes` turned
 "is the scope granted?" from a guess into an answer.
 
-**Does Shopify tell us an order was *delivered*?** ADR 0012 makes `earned` mean *delivered*,
-not *fulfilled*. Those are different: `displayFulfillmentStatus` reaches `FULFILLED` when the
-parcel leaves, and delivery is a courier event afterwards. Bosta is the courier. Whether
-Bosta's integration writes delivery events back into Shopify — as a fulfilment whose
-`displayStatus` becomes `DELIVERED` — is unknown from here.
+**Exactly what Shopify calls a delivered order, and on how many.** ADR 0012 makes `earned`
+mean *delivered*, not *fulfilled*. Those are different: `displayFulfillmentStatus` reaches
+`FULFILLED` when the parcel leaves HBA, and delivery is a courier event afterwards.
 
-*Why it matters:* if Shopify never reports delivery, every order sits `pending` forever and
-**nobody is ever paid**. That is a silent and total failure, so it is answered in Task 2 by
-counting the live data, before Task 4 depends on the answer.
+HBA has confirmed Shopify's status does update as the shipment moves, and ADR 0023 settles
+that this is the source — Bosta is not integrated. What remains is the specific enum values
+the live shop actually produces, because the state machine in Task 4 is written against them
+and *shipped* must not be mistaken for *delivered*. For cash-on-delivery through Bosta, the
+gap between the two is where refusals live.
+
+**The signal can also stop without saying so.** Whatever writes that status into Shopify sits
+outside this codebase, exactly like the auto-cancel automation in §9.1. If it breaks, every
+month calculates to zero earned — correctly, silently, and indistinguishably from a month
+with no sales. Recorded in `docs/limits.md` as 🟠 before the code exists; the watch that
+catches it is sized to the failure rather than to a second courier integration (ADR 0019).
 
 **Which return and refund fields are actually readable.** `Order.returnStatus` and the refund
 objects may sit behind `read_returns` rather than `read_orders`. Task 2 probes them against
@@ -139,10 +145,14 @@ a delivery signal, the distribution of fulfilment display statuses, how many hav
 open, and **which of the requested fields Shopify refused**. This is the instrument that
 answers both open questions above, and it exists before anything reads them.
 
-*If the answer is that Shopify never reports delivery*, Task 4 does not proceed on
-assumption. The finding is recorded in `docs/limits.md` as a 🔴 and brought back for a
-decision — "earned on delivery" would then be unimplementable as written, and the alternative
-(earning on fulfilment, carrying real refusal exposure) is a business decision, not mine.
+*If the report shows the live shop never gets past `FULFILLED`*, Task 4 does not proceed on
+assumption. The finding is brought back for a decision — "earned on delivery" would then be
+unimplementable as written, and the alternative (earning on fulfilment, carrying real refusal
+exposure) is a business decision about real money, not mine.
+
+The report also becomes the maintainer's standing check that the signal is still alive. A
+month calculating to zero earned looks identical to a month with no sales; this is what tells
+the two apart.
 
 **Tests:** each derived fact against fixture nodes — an order with no fulfilment, a partially
 fulfilled one, a delivered one, and one mid-exchange.
@@ -291,7 +301,10 @@ Never a name, an address, or a phone number.
 
 ## Risks
 
-**The delivery signal.** The largest by far. Addressed by Task 2, before Task 4 needs it.
+**The delivery signal.** Not whether it exists — HBA has confirmed it does, and ADR 0023
+settles Shopify as the source. The risks are that *shipped* gets mistaken for *delivered*,
+and that the signal stops without a symptom. Task 2 answers the first with live numbers and
+gives the maintainer the instrument for the second, before Task 4 needs either.
 
 **Freezing at the wrong moment.** Freezing too early misses a legitimate pre-shipment edit;
 too late lets the exchange inflation in. The trigger is *any* return or exchange activity,
