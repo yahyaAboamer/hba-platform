@@ -355,6 +355,31 @@ may be one she rarely checks. Nothing errors; she just cannot get in.
 maintainer action - see the affiliate edit endpoint. That keeps the change
 deliberate and audited rather than silent.
 
+### 🔴 Nobody knows yet whether Shopify reports delivery
+
+**The limit.** ADR 0012 makes an order `earned` — the only state that pays — when it is
+**delivered**. That is not the same as fulfilled: `displayFulfillmentStatus` reaches
+`FULFILLED` when the parcel leaves HBA, and delivery is a courier event afterwards. Bosta is
+the courier, and **whether Bosta writes delivery events back into Shopify has not been
+checked against the live shop.**
+
+**What failure looks like.** If Shopify never reports delivery, every order stays `pending`
+for ever and **no affiliate is ever paid a piastre**. Nothing errors. The month simply
+calculates to zero, over and over, and it reads like there were no sales.
+
+The opposite mistake costs money the other way: treating `FULFILLED` as delivered pays
+commission on parcels the customer refuses at the door, which for cash-on-delivery through
+Bosta is exactly the loss ADR 0012 was written to stop.
+
+**What exists instead.** Nothing yet — this is recorded *before* the code that depends on it.
+Phase 4 Task 2 builds `GET /api/operations/order-facts`, which counts the delivery signals
+present across the orders already indexed, so the answer becomes a fact before Task 4 relies
+on it. Same instrument as `/shopify-scopes`.
+
+*What to do:* read that report before believing any earnings figure. If it shows no delivery
+signal, **stop** — earning on fulfilment instead is a decision about real refusal exposure
+and belongs to the business, not to whoever is writing the code that week.
+
 ### 🟠 A code created before the switch cannot be handed over
 
 **The limit.** `retire_and_replace` ends the old code the month **before** the
