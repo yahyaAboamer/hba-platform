@@ -523,9 +523,22 @@ indefinitely, and reconcile against nothing.
 
 > Commission base after a return = the value of the products the customer kept.
 
-Shipping never enters it, because shipping was never in the base. The E£120
-return fee is HBA's cost of handling a return, not the model's — she keeps her
-commission on what the customer kept. Stated by HBA in exactly those terms.
+**Read directly, never by subtraction.** An earlier version of this rule
+computed it as *order total minus returned goods* — which inherits every
+adjustment made to that total: return shipping, and the manual balance
+corrections HBA does by hand. HBA rejected it, correctly. Summing the product
+lines touches none of that.
+
+Shopify's `LineItem.currentQuantity` is the quantity minus what was refunded —
+literally what the customer kept — and `discountedUnitPriceSet` is the price she
+paid after her code, so a E£1,000 jacket on a 10% code reads as E£900 with
+nothing configured anywhere. Jacket kept, pants returned, base **E£900**.
+
+The E£120 return fee is HBA's cost of handling a return, not the model's, and it
+cannot reach the figure because nothing in the calculation ever looks at the
+order total. Probed by `kept_items`, which also cross-checks the line sums
+against the order subtotal on ordinary orders — if they already agree, the
+change is invisible where nothing was returned and correct where something was.
 
 **What is still open.** Deciding *which* products the customer kept requires
 telling an exchange from a plain return, and E-stebdal opens an identical

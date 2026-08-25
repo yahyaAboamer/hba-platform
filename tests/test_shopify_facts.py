@@ -535,3 +535,112 @@ def test_the_tags_probe_needs_no_scope_the_app_lacks(db):
 
     assert probe.candidates == ("tags returnStatus",)
     assert "returns(" not in probe.candidates[0]
+
+
+# ── Reading the items the customer kept ────────────────────────────────────────
+#
+# HBA's correction: subtracting returned goods from the order total inherits
+# every adjustment made to that total - return shipping, and the manual balance
+# corrections done by hand. Summing the product lines touches none of it.
+
+
+def _line(quantity=1, current=None, unit="900.00", total=None):
+    return {
+        "id": "gid://shopify/LineItem/1",
+        "title": "Jacket",
+        "quantity": quantity,
+        "currentQuantity": quantity if current is None else current,
+        "discountedUnitPriceSet": {"shopMoney": {"amount": unit}},
+        "discountedTotalSet": {
+            "shopMoney": {"amount": total if total is not None else unit}
+        },
+    }
+
+
+def _order_with_lines(lines, subtotal=None):
+    node = {"legacyResourceId": "29115", "lineItems": {"nodes": lines}}
+    if subtotal is not None:
+        node["currentSubtotalPriceSet"] = {"shopMoney": {"amount": subtotal}}
+    return node
+
+
+def test_the_kept_quantity_is_what_the_customer_still_has(db):
+    """`currentQuantity` is the quantity minus what was refunded - literally
+    what the customer kept. No subtraction from an order total, so return
+    shipping and manual balance corrections cannot reach it.
+    """
+    summary = SUMMARISERS["kept_items"](
+        [
+            _order_with_lines(
+                [
+                    _line(quantity=1, current=1, unit="900.00"),  # jacket kept
+                    _line(quantity=1, current=0, unit="540.00"),  # pants returned
+                ]
+            )
+        ]
+    )
+
+    assert summary["orders_where_something_was_returned"] == 1
+    assert summary["orders_reporting_current_quantity"] == 1
+
+
+def test_the_prices_are_what_she_paid_not_the_shelf_price(db):
+    """A E£1,000 jacket with a 10% code costs E£900, and E£900 is what the
+    model earns on. `discountedUnitPriceSet` already carries the discount, so
+    nothing has to know the code's percentage.
+    """
+    summary = SUMMARISERS["kept_items"](
+        [_order_with_lines([_line(unit="900.00", total="900.00")], subtotal="900.00")]
+    )
+
+    assert summary["line_sums_matching_the_order_subtotal"] == 1
+
+
+def test_the_line_sums_are_cross_checked_against_the_order(db):
+    """The number that says whether switching ADR 0011 to line items is safe.
+    If they already agree on ordinary orders, the change is invisible where
+    nothing was returned and correct where something was.
+    """
+    summary = SUMMARISERS["kept_items"](
+        [
+            _order_with_lines([_line(unit="900.00", total="900.00")], subtotal="900.00"),
+            _order_with_lines([_line(unit="900.00", total="900.00")], subtotal="1157.00"),
+        ]
+    )
+
+    assert summary["line_sums_matching_the_order_subtotal"] == 1
+    assert summary["line_sums_disagreeing"] == 1
+    assert summary["examples_of_disagreement"][0]["order"] == "29115"
+
+
+def test_a_penny_of_rounding_is_not_a_disagreement(db):
+    """Shopify allocates an order-level discount across lines and rounds each
+    allocation. Reporting that as a mismatch would bury a real one in noise.
+    """
+    summary = SUMMARISERS["kept_items"](
+        [_order_with_lines([_line(unit="900.00", total="900.00")], subtotal="900.01")]
+    )
+
+    assert summary["line_sums_matching_the_order_subtotal"] == 1
+
+
+def test_a_shopify_without_current_quantity_says_so(db):
+    """Without it, "what did she keep?" has no answer and the whole approach
+    falls back to subtraction. That must be visible, not assumed away.
+    """
+    summary = SUMMARISERS["kept_items"](
+        [
+            _order_with_lines(
+                [{"id": "1", "title": "Jacket", "quantity": 1,
+                  "discountedUnitPriceSet": {"shopMoney": {"amount": "900.00"}}}]
+            )
+        ]
+    )
+
+    assert summary["orders_reporting_current_quantity"] == 0
+    assert summary["orders_with_line_items"] == 1
+
+
+def test_an_order_with_no_line_items_is_skipped(db):
+    summary = SUMMARISERS["kept_items"]([{"legacyResourceId": "1"}])
+    assert summary["orders_with_line_items"] == 0

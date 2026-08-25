@@ -130,6 +130,18 @@ PROBES: tuple[FactProbe, ...] = (
         ),
         candidates=("tags returnStatus",),
     ),
+    FactProbe(
+        name="kept_items",
+        question=(
+            "Can we read the items the customer kept, at the price they paid, "
+            "without ever touching shipping, tax or a manual balance adjustment?"
+        ),
+        candidates=(
+            "lineItems(first: 50) { nodes { id title quantity currentQuantity discountedUnitPriceSet { shopMoney { amount currencyCode } } discountedTotalSet { shopMoney { amount currencyCode } } } } currentSubtotalPriceSet { shopMoney { amount } } currentTotalPriceSet { shopMoney { amount } } totalShippingPriceSet { shopMoney { amount } } currentTotalTaxSet { shopMoney { amount } }",
+            "lineItems(first: 50) { nodes { id title quantity currentQuantity discountedUnitPriceSet { shopMoney { amount currencyCode } } } } currentSubtotalPriceSet { shopMoney { amount } }",
+            "lineItems(first: 50) { nodes { id title quantity discountedTotalSet { shopMoney { amount currencyCode } } } }",
+        ),
+    ),
 )
 
 
@@ -303,6 +315,87 @@ def _summarise_estebdal_tags(nodes: list[dict]) -> dict:
     }
 
 
+def _summarise_kept_items(nodes: list[dict]) -> dict:
+    """Can the base be built from the product lines alone?
+
+    HBA's correction, and it is the right one: subtracting returned goods from
+    the order total inherits every adjustment made to that total - return
+    shipping, and the manual balance corrections HBA does by hand. Summing the
+    **product lines** touches none of it.
+
+    ``currentQuantity`` is the quantity minus what was refunded, so it is
+    literally "what the customer kept". The cross-check below is the important
+    number: if the line sums already agree with `total - shipping - tax` on
+    ordinary orders, then switching ADR 0011 to line items changes nothing
+    where nothing was returned, and fixes the case where something was.
+    """
+    with_lines = 0
+    with_current_quantity = 0
+    partially_returned = 0
+    agreed = 0
+    disagreed = 0
+    disagreements: list[dict] = []
+
+    for node in nodes:
+        lines = ((node.get("lineItems") or {}).get("nodes")) or []
+        if not lines:
+            continue
+        with_lines += 1
+
+        kept = 0
+        billed = 0
+        saw_current = False
+        for line in lines:
+            quantity = line.get("quantity") or 0
+            current = line.get("currentQuantity")
+            if current is not None:
+                saw_current = True
+            unit = money_to_piastres(
+                ((line.get("discountedUnitPriceSet") or {}).get("shopMoney") or {}).get(
+                    "amount"
+                )
+            )
+            kept += unit * (current if current is not None else quantity)
+            billed += money_to_piastres(
+                ((line.get("discountedTotalSet") or {}).get("shopMoney") or {}).get(
+                    "amount"
+                )
+            ) or (unit * quantity)
+
+        if saw_current:
+            with_current_quantity += 1
+        if kept < billed:
+            partially_returned += 1
+
+        subtotal_block = (node.get("currentSubtotalPriceSet") or {}).get("shopMoney")
+        if not subtotal_block:
+            continue
+        subtotal = money_to_piastres(subtotal_block.get("amount"))
+        # One piastre of slack: Shopify allocates order-level discounts across
+        # lines and rounds each allocation.
+        if abs(billed - subtotal) <= 1:
+            agreed += 1
+        else:
+            disagreed += 1
+            if len(disagreements) < 5:
+                disagreements.append(
+                    {
+                        "order": node.get("legacyResourceId"),
+                        "line_items_sum_piastres": billed,
+                        "order_subtotal_piastres": subtotal,
+                    }
+                )
+
+    return {
+        "orders_with_line_items": with_lines,
+        "orders_reporting_current_quantity": with_current_quantity,
+        "orders_where_something_was_returned": partially_returned,
+        "line_sums_matching_the_order_subtotal": agreed,
+        "line_sums_disagreeing": disagreed,
+        "examples_of_disagreement": disagreements,
+    }
+
+
 SUMMARISERS: dict[str, Callable[[list[dict]], dict]] = {
     "delivery": _summarise_delivery,
     "return_status": _summarise_return_status,
@@ -310,6 +403,7 @@ SUMMARISERS: dict[str, Callable[[list[dict]], dict]] = {
     "refund_merchandise": _summarise_refund_merchandise,
     "exchange_vs_return": _summarise_exchange_vs_return,
     "estebdal_tags": _summarise_estebdal_tags,
+    "kept_items": _summarise_kept_items,
 }
 
 
