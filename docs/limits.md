@@ -703,11 +703,14 @@ orders**, and only a fraction of any one of them is commission.
 goods and returns all of it. The model is paid on a sale that fully reversed.
 That is accepted knowingly, not overlooked.
 
-*The cheap improvement, raised and not built:* `financial_status = 'refunded'`
-means every piastre went back, which no exchange produces. One boolean, no line
-items, no scope — and it removes the case above. Not built because HBA's
-instruction was explicit that everything after delivery is ignored. **Worth
-deciding rather than leaving implicit.**
+**This was put to HBA and decided, not left implicit.** Voiding a fully refunded
+order is one boolean and would remove the case above — but HBA chose to keep the
+rule whole: nothing related to an edit after delivery belongs in V1, a full refund
+included. One exception invites the next, and each carries back a little of the
+machinery ADR 0025 removed.
+
+It is recorded in §3 of the specification as the **first** thing to add whenever
+reversal is revisited.
 
 **It is reversible.** `order_index` still stores `return_status`,
 `return_activity`, `refunded_total_piastres` and `refunded_merchandise_piastres`

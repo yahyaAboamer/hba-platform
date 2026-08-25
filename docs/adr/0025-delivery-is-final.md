@@ -81,7 +81,9 @@ question.
 
 **A wholly returned order still pays.** A customer who receives E£5,000 of goods and
 sends all of it back leaves the model paid on a sale that reversed. This is the case
-that will eventually be noticed, and it is accepted knowingly. See *Alternatives*.
+that will eventually be noticed, and it is accepted knowingly — HBA was asked
+specifically about it and chose to keep the rule whole rather than carve out an
+exception. See *Alternatives*.
 
 **A model's dashboard will show a returned order as earned.** That needs saying in
 the plain-language policy text (§16), not left for her to work out.
@@ -94,9 +96,15 @@ interpret, no state that can be reached two different ways.
 **Void an order that was fully refunded, and ignore everything else.** The one case
 that is unambiguous — `financial_status = 'refunded'` means every piastre went back,
 which no exchange produces. One boolean, no line items, no scope, and it removes the
-worst outcome above. **Recommended as an addition, and deliberately not built here
-because HBA's instruction was explicit: ignore everything after delivery.** Raised
-for decision rather than assumed.
+worst outcome above.
+
+**Put to HBA on 26 August 2026 and declined for V1**, on the grounds that *nothing*
+related to an edit after delivery belongs in this version — a full refund included.
+That is the more consistent rule: one exception invites the next, and each one
+carries back a little of the machinery this ADR removed.
+
+Recorded in §3 of the specification as the **first** thing to add whenever reversal
+is revisited, because it is the cheapest and removes the most noticeable case.
 
 **Grant `read_returns` and detect the replacement.** Identifies that an exchange
 happened; says nothing about what the customer kept when the item counts differ.
