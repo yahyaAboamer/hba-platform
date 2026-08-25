@@ -355,6 +355,42 @@ may be one she rarely checks. Nothing errors; she just cannot get in.
 maintainer action - see the affiliate edit endpoint. That keeps the change
 deliberate and audited rather than silent.
 
+### 🟠 The delivery signal can die without saying so
+
+**The limit.** ADR 0012 makes an order `earned` — the only state that pays — when it is
+**delivered**. That fact is read from Shopify (ADR 0023), where it is written by whatever
+integration reports the shipment's progress. HBA has confirmed the status does update.
+
+Nothing in Shopify announces when that stops.
+
+**What failure looks like.** The integration's token expires, or an app is disabled, or
+somebody changes a setting. Orders keep arriving and keep shipping, and none of them ever
+reaches delivered. Every affiliate's month then calculates to **zero earned**, correctly and
+silently — it looks exactly like a month with no sales. The first person to notice is a model
+asking why she was not paid.
+
+This is the same failure shape as the auto-cancel automation in §9.1: protection that lives
+outside the codebase and disappears without a symptom.
+
+**What exists instead.** Nothing yet — recorded before the code that depends on it.
+
+- Phase 4 Task 2 builds `GET /api/operations/order-facts`, which counts the delivery signals
+  present across the orders already indexed. It says which fulfilment statuses the live shop
+  actually reports and on how many orders — the same instrument as `/shopify-scopes`, and the
+  thing that turns "Shopify updates the status" into a number.
+- The watch itself: **orders still shipping, none reaching delivered** for an extended period
+  is an anomaly the maintainer sees. Sized to the failure rather than to a second courier
+  integration (ADR 0019, ADR 0023).
+
+*What to do:* read that report before believing any earnings figure, and read it again if a
+month comes out unexpectedly low. A zero month is not evidence of no sales.
+
+**A related trap, worth keeping separate.** *Shipped* is not *delivered*. If the report shows
+the live shop only ever reaches `FULFILLED`, earning on that instead would pay commission on
+every parcel a customer refuses at the door — which for cash-on-delivery through Bosta is the
+precise loss ADR 0012 was written to stop. That would be a decision about real money and
+belongs to the business, not to whoever is writing code that week.
+
 ### 🟠 A code created before the switch cannot be handed over
 
 **The limit.** `retire_and_replace` ends the old code the month **before** the
