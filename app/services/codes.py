@@ -8,15 +8,14 @@ change every time a code moved.
 
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
-
-from datetime import datetime
 
 from app.core.businesstime import business_month, month_add, parse_month
 from app.core.periods import OPEN_ENDED, PLATFORM_START_MONTH, validate_period
 from app.models.affiliates import AffiliateProfile
 from app.models.codes import DiscountCodePeriod
+from app.models.orders import OrderIndex
 from app.services.audit import record_audit
 
 
@@ -274,6 +273,24 @@ def replace_code(
     return period
 
 
+def _orders_on_or_after(db: Session, code: str, month: str) -> int:
+    """How many orders used this code in that month or later.
+
+    Read straight from the order index rather than through attribution: the
+    question is whether ending a period here would strand real orders, and
+    that does not depend on who currently owns them.
+    """
+    return (
+        db.execute(
+            select(func.count())
+            .select_from(OrderIndex)
+            .where(OrderIndex.discount_codes.any(code))
+            .where(OrderIndex.business_month >= month)
+        ).scalar()
+        or 0
+    )
+
+
 def open_codes_for(
     db: Session, affiliate: AffiliateProfile
 ) -> list[DiscountCodePeriod]:
@@ -314,6 +331,31 @@ def retire_and_replace(
     it earned them.
     """
     parse_month(new_start_month)
+
+    # The overlap case, refused rather than guessed at.
+    #
+    # Ending the old code the month before the new one starts is only right
+    # when the new code was created at the moment of handover. If it was
+    # created earlier - set up in June, switched to in August - the old code
+    # would be ended in May while she was still earning on it through July,
+    # and those months would fall outside every period she owns. Two months of
+    # her sales would belong to nobody, and nothing would say so.
+    #
+    # The precise harm is what is checked, not the calendar gap: orders on the
+    # old code at or after the new code's start. A new code created early that
+    # nobody used costs nothing, and is allowed.
+    orphaned = _orders_on_or_after(db, old_period.code, new_start_month)
+    if orphaned:
+        raise ValueError(
+            f"{old_period.code} has {orphaned} order(s) in {new_start_month} or "
+            f"later, but {normalise_code(new_code)} was created in "
+            f"{new_start_month}. Retiring the old code there would leave those "
+            "orders belonging to nobody. "
+            "This is the case where a code is created ahead of the switch. "
+            "Handling it needs a way to say which month she actually moved "
+            "over, which is deliberately not built - see docs/limits.md."
+        )
+
     if new_start_month <= old_period.start_month:
         raise ValueError(
             f"{normalise_code(new_code)} would start in {new_start_month}, which is "

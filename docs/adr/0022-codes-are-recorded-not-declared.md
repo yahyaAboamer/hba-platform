@@ -89,3 +89,25 @@ always defined and always early enough.
 
 **Ask the model for her start date.** She has no way to know when Shopify
 created her code, and would be guessing about her own money.
+
+## What this derivation assumes, and where it stops
+
+Deriving the start month from the code's creation date carries a hidden
+assumption: **that a code is created at the moment a model is switched onto
+it.** That is how HBA works, but it is a habit, not a rule.
+
+When it does not hold — a code set up in July, switched to in September — the
+derivation ends the old code in June while she was still earning on it, and two
+months of her orders belong to nobody. The creation date answers "when could
+this code first have earned?", not "when did she move over?", and the two are
+only the same by convention.
+
+So the handover **refuses** rather than guesses, and only when it would actually
+strand orders: a code created early that nobody used costs nothing. Choosing a
+handover month explicitly is deliberately not built, and is recorded in
+`docs/limits.md` under *A code created before the switch cannot be handed over*
+with what to do if the refusal ever appears.
+
+Registration (as opposed to handover) is unaffected: a first code has no
+predecessor to end, so an early creation date only means her history starts
+earlier, which is correct.

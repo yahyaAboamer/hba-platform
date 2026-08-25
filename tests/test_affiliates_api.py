@@ -1006,3 +1006,89 @@ def test_an_affiliate_cannot_replace_her_own_code(client):
     assert client.post(
         "/api/affiliates/1/replace-code", json={"code": "NEW10"}
     ).status_code == 403
+
+
+# ── A code created ahead of the switch ─────────────────────────────────────────
+#
+# The handover month is derived from when Shopify created the new code, which
+# is only the same thing as when she actually moved over because HBA creates a
+# code at the moment of switching. Nothing enforces that habit, so these guard
+# what happens when it is broken.
+
+
+def test_a_code_created_ahead_of_the_switch_is_refused(client, _shopify):
+    """The failure this exists to stop.
+
+    NEW10 was created in July but she kept earning on OLD10 through August.
+    Ending OLD10 in June - the month before NEW10 was created - would put her
+    July and August orders outside every period she owns. They would belong to
+    nobody, and nothing would say so.
+    """
+    from datetime import datetime
+
+    _add_order("1", "OLD10", month="2026-08")
+
+    affiliate = _register(client)
+    _verify_code(client, affiliate["id"], "OLD10")
+
+    response = _switch_to(client, affiliate["id"], "NEW10", datetime(2026, 7, 3), _shopify)
+    assert response.status_code == 400
+    assert "belonging to nobody" in response.json()["detail"]
+
+    from app.db import SessionLocal
+    from app.services.codes import owner_of
+
+    with SessionLocal() as session:
+        assert owner_of(session, "OLD10", "2026-08") is not None, "the order was stranded anyway"
+        assert owner_of(session, "NEW10", "2026-08") is None, "the new code took over regardless"
+
+
+def test_the_refusal_names_what_is_missing(client, _shopify):
+    """A refusal a person cannot act on is a dead end. This one says which
+    code, how many orders, and where the decision is written down.
+    """
+    from datetime import datetime
+
+    _add_order("1", "OLD10", month="2026-09")
+    _add_order("2", "OLD10", month="2026-10")
+
+    affiliate = _register(client)
+    _verify_code(client, affiliate["id"], "OLD10")
+
+    detail = _switch_to(
+        client, affiliate["id"], "NEW10", datetime(2026, 7, 3), _shopify
+    ).json()["detail"]
+
+    assert "OLD10" in detail and "NEW10" in detail
+    assert "2 order" in detail
+    assert "docs/limits.md" in detail
+
+
+def test_a_code_created_at_the_moment_of_the_switch_still_works(client, _shopify):
+    """The normal case, and the reason this is a guard and not a ban. Her last
+    OLD10 order is in June, NEW10 was created in July, so nothing is stranded.
+    """
+    from datetime import datetime
+
+    _add_order("1", "OLD10", month="2026-06")
+
+    affiliate = _register(client)
+    _verify_code(client, affiliate["id"], "OLD10")
+
+    response = _switch_to(client, affiliate["id"], "NEW10", datetime(2026, 7, 3), _shopify)
+    assert response.status_code == 201
+
+
+def test_a_code_created_early_that_nobody_used_is_allowed(client, _shopify):
+    """What is checked is the harm, not the calendar. A code sitting unused on
+    Shopify since January costs nothing to hand over to - there are no orders
+    on the old code in those months to strand.
+    """
+    from datetime import datetime
+
+    affiliate = _register(client)
+    _verify_code(client, affiliate["id"], "OLD10")
+
+    response = _switch_to(client, affiliate["id"], "NEW10", datetime(2026, 4, 9), _shopify)
+    assert response.status_code == 201
+    assert response.json()["retired"]["end_month"] == "2026-03"
