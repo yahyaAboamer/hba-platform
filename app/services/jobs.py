@@ -47,6 +47,11 @@ class JobKind:
     RECONCILE = "shopify_reconcile"
     PRUNE_JOBS = "prune_succeeded_jobs"
 
+    #: Attach the orders a code already had when it was registered (§9.2).
+    #: Models arrive with codes already live and already selling, so without
+    #: this everything earned before registration belongs to nobody.
+    BACKFILL_CODE = "backfill_code"
+
 
 class PermanentFailure(Exception):
     """A job failure that retrying cannot fix.

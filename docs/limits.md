@@ -316,26 +316,36 @@ platform at all.** That holds only while the portal does not exist. Phase 8
 must not ship self-service without these, or it removes the one thing currently
 preventing it.
 
-### 🟠 Orders placed before a code was registered stay orphaned
+### 🟢 Orders placed before a code was registered *(fixed, Phase 4 Task 6)*
 
-**The limit.** §9.2 says an unattributed order may be attached when its code is
-registered for the first time. **That is not built.** Attaching an order means
-writing `attributed_order`, which arrives in Phase 4, so the backfill goes with
-it.
+**The limit, as it stood.** §9.2 says an unattributed order may be attached when
+its code is registered for the first time. That was not built, because attaching
+means writing `attributed_order` and the table did not exist until Phase 4.
 
-**What failure looks like.** A model's sales from before her code was set up
-never appear anywhere and never pay. Nothing errors — the orders are indexed
-and simply belong to nobody.
+**Why it mattered.** Models arrive at HBA with codes **already live and already
+selling** (ADR 0022). Everything a code earned before somebody typed it into the
+platform belonged to nobody, permanently, and nothing said so.
 
-**What exists instead.** `/api/operations/unregistered-codes` reports every code
-whose orders are unowned, **and which months are unowned**, so the gap is
-visible and registering the code starts from the right month rather than
-leaving one.
+**Fixed.** Registering a code queues a background job that finds every indexed
+order using it, in the months she owns, and attaches the unattributed ones. Each
+goes through the same `attribute_order` as a live order, so a backfilled month is
+worth the same as one that arrived by webhook.
 
-*What to do until Phase 4:* check that report before approving an affiliate. If
-her code already has orders, register it from the earliest month listed, not
-from today — otherwise the backfill, when it arrives, has a gap to find that
-nobody recorded.
+All three paths that create ownership queue it — `register_code`,
+`replace_code` (a corrected typo is a different code with its own history), and
+`retire_and_replace`. A path that creates ownership and forgets to backfill
+leaves those orders belonging to nobody, which is the whole failure this entry
+described.
+
+**What it will not do.** Attach an order that already has an owner. §9.2 is
+explicit — this assigns an orphan, it does not move an order — so a mistyped
+registration cannot quietly take a sale from the model who was paid for it. The
+job reports and carries on rather than failing on a row it was never entitled to
+touch.
+
+*Still true:* `/api/operations/unregistered-codes` remains the report for codes
+that belong to nobody at all. Nothing backfills those, because there is no one
+to backfill them to.
 
 ### 🟠 A model's login email is the one she was invited at, not one she types
 
