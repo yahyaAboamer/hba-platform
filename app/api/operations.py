@@ -335,6 +335,20 @@ def order_facts(
                 )
             )
         },
+        # The one that says whether a re-import actually landed. An order with
+        # delivery_state NULL was indexed before the platform ever asked
+        # Shopify about delivery, and it can never earn - so a shop full of
+        # NULLs calculates every month to zero while looking like no sales.
+        "delivery_state": {
+            row.value or "(never asked)": row.count
+            for row in db.execute(
+                text(
+                    "SELECT delivery_state AS value, count(*) AS count "
+                    "FROM order_index GROUP BY delivery_state "
+                    "ORDER BY count DESC"
+                )
+            )
+        },
     }
 
     try:

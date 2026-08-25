@@ -610,3 +610,38 @@ def test_ordering_still_puts_the_costliest_first(client):
 
     codes = client.get("/api/operations/unregistered-codes").json()["codes"]
     assert [row["code"] for row in codes] == ["BUSY", "QUIET"]
+
+
+def test_order_facts_reports_whether_delivery_ever_landed(client, monkeypatch):
+    """The number that says a re-import worked. An order indexed before the
+    platform asked Shopify about delivery has `delivery_state` NULL and can
+    never earn - so a shop full of them calculates every month to zero while
+    looking exactly like a shop with no sales.
+    """
+    from sqlalchemy import text as sql_text
+
+    from app.db import engine
+
+    with engine.begin() as connection:
+        for order_id, state in (("9001", "delivered"), ("9002", None)):
+            connection.execute(
+                sql_text(
+                    "INSERT INTO order_index (shopify_order_id, order_number, "
+                    "placed_at, business_month, discount_codes, subtotal_piastres, "
+                    "total_piastres, shipping_piastres, tax_piastres, currency, "
+                    "delivery_state) VALUES (:i, :n, now(), '2026-04', ARRAY['X'], "
+                    "0, 0, 0, 0, 'EGP', :d)"
+                ),
+                {"i": order_id, "n": f"#{order_id}", "d": state},
+            )
+
+    monkeypatch.setattr(
+        "app.services.shopify.facts.probe_order_facts",
+        lambda client, sample_size=50: {"sample_size": sample_size, "facts": []},
+    )
+    monkeypatch.setattr("app.services.shopify.sync.build_client", lambda: object())
+
+    body = client.get("/api/operations/order-facts").json()
+
+    assert body["already_indexed"]["delivery_state"]["delivered"] == 1
+    assert body["already_indexed"]["delivery_state"]["(never asked)"] == 1

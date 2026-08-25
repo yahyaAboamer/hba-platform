@@ -742,6 +742,61 @@ either.
 list that predates the platform is worth eyeballing against Shopify — it is a
 handful of orders, once.
 
+### 🔴 Line-item prices do not include the discount code
+
+**The finding.** `GET /api/operations/order-facts?sample_size=250` on 26 August
+2026 compared each order's line-item totals against its own subtotal. **Only 71
+of 250 agreed.** The 179 that disagreed did so by a constant ratio:
+
+| Line items sum | Order subtotal | Ratio |
+|---|---|---|
+| 199,700 | 179,730 | 0.9 |
+| 109,800 | 98,820 | 0.9 |
+| 99,800 | 89,820 | 0.9 |
+
+That is a **10% discount code**. `LineItem.discountedTotalSet` and
+`discountedUnitPriceSet` carry only *line-level* discounts. The order-level code —
+the model's code — is applied at the order, and appears only in
+`currentSubtotalPriceSet` and `currentTotalPriceSet`.
+
+**What failure this prevented.** HBA asked for the commission base to be built by
+summing the items the customer kept. Built from those line-item fields it would
+have used **pre-discount prices**, paying every model commission on the shelf
+price rather than what the customer actually paid — roughly **10% too much on
+every attributed order carrying a code**, silently, for ever.
+
+**What the platform does instead**, and why it was already right: the base is
+`total the customer pays − shipping − tax`, read from the **order**, where the
+discount has already been applied. A E£1,000 jacket on a 10% code arrives inside a
+total of E£900, and no percentage is configured anywhere.
+
+*The rule this leaves behind:* **money comes from the order, never from the sum of
+its lines.** If the kept-items approach is ever revisited (§3 of the
+specification), it must read `discountAllocations` per line, or apply the order's
+own discount ratio — not `discountedTotalSet`.
+
+### 🟢 The delivery signal, confirmed at scale
+
+250 shipped orders sampled on 26 August 2026: **163 delivered, every one carrying
+a timestamp.** No unrecognised statuses, and no order needing the
+`unknown_fulfilment_status` fallback.
+
+**13 were `NOT_DELIVERED`** — 5.2%, one order in twenty refused at the door. That
+is the loss ADR 0012 exists to prevent, and it is not theoretical: the old
+dashboard pays commission on every one of them unless an external Shopify
+automation happens to cancel it first.
+
+**E-stebdal's tags will not distinguish an exchange from a return.** Every
+return-bearing order carried tags, but they are workflow markers — `bosta_synced`,
+`Confirmed ✅`, `Call Confirmed📞` — with one exception (`Est-R1-Damaged_products`)
+appearing once in 250. Moot since ADR 0025, and recorded so the idea is not
+revisited on the assumption it would have worked.
+
+**Refunds are mostly not refunds.** 40 orders carried refund line items worth
+E£34,444 of merchandise against **E£2,689 actually refunded** — a factor of nearly
+thirteen. Goods come back; money largely does not. That is the exchange pattern
+ADR 0011 identified, now measured across a real sample rather than one order.
+
 ### 🟠 A code created before the switch cannot be handed over
 
 **The limit.** `retire_and_replace` ends the old code the month **before** the
