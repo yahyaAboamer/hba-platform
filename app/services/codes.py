@@ -19,6 +19,13 @@ from app.models.orders import OrderIndex
 from app.services.audit import record_audit
 
 
+def queue_backfill(db, affiliate, code, start_month, end_month=None) -> None:
+    """Local import, because backfill imports attribution which imports this."""
+    from app.services.commission.backfill import queue_backfill as _queue
+
+    _queue(db, affiliate, code, start_month, end_month)
+
+
 def normalise_code(code: str) -> str:
     """The canonical form: trimmed and upper-case.
 
@@ -113,6 +120,13 @@ def register_code(
             "verified": verified_at is not None,
         },
     )
+
+    # §9.2 and §10.3. Models arrive with codes already live and already
+    # selling, so everything this one earned before today would otherwise
+    # belong to nobody, permanently. Queued rather than done here: registration
+    # never waits on it, and a code with hundreds of orders must not hold an
+    # HTTP request open.
+    queue_backfill(db, affiliate, canonical, start_month, end_month)
     return period
 
 
@@ -270,6 +284,10 @@ def replace_code(
         before={"code": previous},
         after={"code": period.code, "verified": verified_at is not None},
     )
+
+    # The corrected code is a different code, with its own history. A typo
+    # fixed on Monday must not leave the real code's orders orphaned.
+    queue_backfill(db, period.affiliate, period.code, period.start_month, period.end_month)
     return period
 
 
@@ -393,6 +411,8 @@ def retire_and_replace(
             },
         },
     )
+
+    queue_backfill(db, affiliate, replacement.code, new_start_month, OPEN_ENDED)
     return replacement
 
 
