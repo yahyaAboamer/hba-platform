@@ -622,6 +622,55 @@ too low, and the model is underpaid on an order that got *larger*.
 correct only while an attributed order can carry at most one discount that a
 partial return cannot retroactively remove.
 
+### 🟠 `partially_paid` earns like any other delivered order
+
+**The limit.** §9.1 names `partially_paid` as a status the old dashboard
+"handled nowhere", so a mid-exchange order passed through as normal at up to 47%
+inflated value. **This platform does not special-case it either** — a delivered
+order with no unresolved return earns, whatever its financial status says apart
+from `refunded` and `voided`.
+
+It is **25 of 537** live orders, about one in twenty.
+
+**Why, and why it is not the old defect.** The 47% was an *inflated base*, and
+the freeze (ADR 0011) is what stops that — not the state machine. Requiring full
+payment before earning would be worse than it sounds: for cash on delivery,
+delivery *is* payment and Shopify's financial status lags the courier. **118 of
+537 orders sit at `pending`**, so a payment condition would park most of the
+shop. And treating "some money" as worse than "no money" is backwards.
+
+**What failure looks like.** An order genuinely stuck part-paid — a customer who
+paid a deposit and never the balance — earns full commission. The mid-exchange
+case §9.1 worries about is caught by the return being unresolved, so this is
+narrower than it sounds, but it is not nothing.
+
+**What exists instead.** Nothing. `partially_paid` is a number worth watching
+once a month of real payroll exists: if it climbs, or if any of those orders
+never reach `paid`, the rule needs revisiting with evidence rather than the
+guess that would be made now (ADR 0019).
+
+### 🟠 An order delivered with no timestamp never finishes
+
+**The limit.** `is_finalised` measures the 10-day return window from
+`delivered_at`. Some couriers report `DELIVERED` without a date. Such an order
+**earns and pays normally** — that part is unaffected — but it never reaches
+finalised, so it stays recalculable for ever and shows on a dashboard as *may
+still change* long after it cannot.
+
+**What failure looks like.** No wrong payment. A permanent asterisk on an order
+that is in fact settled, and a row that keeps being re-read from Shopify when it
+has nothing left to say.
+
+**Why not fall back to another date.** The alternatives are worse: using the
+order's own date would finalise it before it was even delivered, and using
+"first seen" would finalise a historical import instantly. Leaving it visibly
+open is the honest answer.
+
+*What to do:* `GET /api/operations/order-facts` reports
+`fulfilments_carrying_a_delivered_timestamp` against the delivered count. In the
+live samples so far the two have matched exactly — every delivered fulfilment
+carried a date — so this is currently theoretical.
+
 ### 🟠 A code created before the switch cannot be handed over
 
 **The limit.** `retire_and_replace` ends the old code the month **before** the
