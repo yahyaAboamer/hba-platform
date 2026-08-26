@@ -98,8 +98,45 @@ async function request<T>(
   return payload as T;
 }
 
+/**
+ * A file, sent as multipart rather than JSON.
+ *
+ * Separate from `request` because the body must not be stringified and the
+ * content-type must be left alone — the browser sets it, including the
+ * boundary, and overriding it produces a request the server cannot parse.
+ */
+async function upload<T>(path: string, file: File): Promise<T> {
+  const headers: Record<string, string> = {};
+  const token = readToken();
+  if (token) headers[CSRF_HEADER] = token;
+
+  const form = new FormData();
+  form.append("file", file);
+
+  const response = await fetch(path, {
+    method: "POST",
+    headers,
+    body: form,
+    credentials: "same-origin",
+  });
+
+  const text = await response.text();
+  const payload = text ? JSON.parse(text) : null;
+
+  if (!response.ok) {
+    const detail =
+      payload && typeof payload.detail === "string"
+        ? payload.detail
+        : `The platform returned ${response.status}.`;
+    throw new ApiError(response.status, detail);
+  }
+
+  return payload as T;
+}
+
 export const api = {
   get: <T>(path: string) => request<T>("GET", path),
+  upload,
   post: <T>(path: string, body?: unknown) => request<T>("POST", path, body),
   put: <T>(path: string, body?: unknown) => request<T>("PUT", path, body),
   patch: <T>(path: string, body?: unknown) => request<T>("PATCH", path, body),

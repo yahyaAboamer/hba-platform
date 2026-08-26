@@ -41,7 +41,7 @@ from app.models.payroll import PayrollMonth, PayrollSnapshot
 from app.services.audit import record_audit
 from app.services.payments_state import SettlementState
 from app.services.payouts import current_destination, mask_destination
-from app.services.payroll import get_month
+from app.services.payroll import get_month, open_month
 
 
 def allocated_to(db: Session, snapshot: PayrollSnapshot) -> int:
@@ -147,6 +147,11 @@ def balance_for(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
     return {
         "month": month,
         "state": SettlementState.of(obligation + credited, paid + adjusted),
+        # Payments allocate to a **snapshot**, not to a month (§11.5): money
+        # paid against a superseded version has to stay attached to the version
+        # it settled. Anything recording a payment therefore needs this id, so
+        # the balance that says what is owed also says what to pay it against.
+        "payroll_snapshot_id": snapshot.id,
         "version": snapshot.version,
         "obligation_piastres": obligation,
         "paid_piastres": paid,
@@ -346,12 +351,22 @@ def adjust(
                 "A credit needs a month to land on. To absorb it instead, "
                 "record a write-off."
             )
-        destination = get_month(db, affiliate, destination_month)
-        if destination is None:
-            raise ValueError(
-                f"{affiliate.name} has no {destination_month} for the credit "
-                "to land on. Open that month first."
-            )
+        # Opened on demand, which is exactly what ADR 0013 says a month row is
+        # for: created because somebody asked, not on a schedule.
+        #
+        # Refusing here instead was a dead end at the one moment this is used.
+        # An overpayment is found in early October, when October has not been
+        # approved and so has no row - and the refusal said "open that month
+        # first", naming a step nothing in the platform could perform. The only
+        # way out was to write off money that should have carried forward, or
+        # to remember to come back, which §11.5 is entirely about not relying
+        # on.
+        #
+        # The credit sits on the draft month and changes nothing until that
+        # month is approved, at which point `credited_into` folds it into the
+        # balance. A month opened this way has no snapshots, so it is not one
+        # of the reopened-and-forgotten months either.
+        destination = open_month(db, affiliate, destination_month)
         if destination.id == source.id:
             raise ValueError(
                 "A credit cannot land on the month it came from - that is a "

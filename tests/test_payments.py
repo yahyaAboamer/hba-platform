@@ -524,3 +524,95 @@ def test_an_adjustment_cannot_be_edited(db):
     with pytest.raises(DBAPIError):
         db.execute(text("UPDATE payroll_adjustment SET amount_piastres = 99"))
     db.rollback()
+
+
+def test_a_credit_opens_the_month_it_lands_on(db):
+    """The month a credit carries into does not exist yet, and that is normal.
+
+    An overpayment is found in early October, when October has not been
+    approved and so has no row. Refusing until somebody "opened that month
+    first" named a step nothing in the platform could perform, leaving a
+    write-off as the only way out - money absorbed that should have carried
+    forward.
+    """
+    from app.services.payments import adjust
+
+    affiliate = _affiliate(db)
+    _owed(db, affiliate, AUGUST)
+
+    assert get_month(db, affiliate, SEPTEMBER) is None, "September is untouched"
+
+    adjust(
+        db,
+        affiliate,
+        kind=AdjustmentType.CREDIT,
+        source_month=AUGUST,
+        amount_piastres=20_000,
+        reason="August was reopened to a lower figure.",
+        destination_month=SEPTEMBER,
+    )
+    db.flush()
+
+    landed = get_month(db, affiliate, SEPTEMBER)
+    assert landed is not None
+    assert landed.active_snapshot is None, "opening it agrees nothing"
+
+
+def test_a_credit_waits_on_a_draft_month_and_applies_when_it_is_approved(db):
+    """The credit changes nothing until the month it lands on is agreed.
+
+    Until then there is no figure to reduce, and reporting one would be
+    inventing an obligation nobody has approved.
+    """
+    from app.services.payments import adjust
+
+    affiliate = _affiliate(db)
+    _owed(db, affiliate, AUGUST)
+    adjust(
+        db,
+        affiliate,
+        kind=AdjustmentType.CREDIT,
+        source_month=AUGUST,
+        amount_piastres=20_000,
+        reason="August was reopened to a lower figure.",
+        destination_month=SEPTEMBER,
+    )
+    db.flush()
+
+    waiting = balance_for(db, affiliate, SEPTEMBER)
+    assert waiting["state"] == SettlementState.NOT_APPROVED
+    assert waiting["balance_piastres"] == 0
+
+    _owed(db, affiliate, SEPTEMBER, base=1_000_000)
+    db.flush()
+
+    # E£1,000 agreed, plus E£200 carried in, and nothing paid yet.
+    settled = balance_for(db, affiliate, SEPTEMBER)
+    assert settled["credited_piastres"] == 20_000
+    assert settled["balance_piastres"] == 120_000
+
+
+def test_a_month_opened_only_to_receive_a_credit_is_not_reported_as_forgotten(db):
+    """§11.5's alarm is for months approved and then reopened.
+
+    A month never approved has no superseded snapshot and no payment stranded
+    against one, so raising it would be noise on the one warning that has to be
+    believed.
+    """
+    from app.services.payments import adjust
+    from app.services.payroll import months_left_reopened
+
+    affiliate = _affiliate(db)
+    _owed(db, affiliate, AUGUST)
+    adjust(
+        db,
+        affiliate,
+        kind=AdjustmentType.CREDIT,
+        source_month=AUGUST,
+        amount_piastres=20_000,
+        reason="August was reopened to a lower figure.",
+        destination_month=SEPTEMBER,
+    )
+    db.flush()
+
+    assert months_left_reopened(db, SEPTEMBER) == []

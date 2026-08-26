@@ -134,3 +134,58 @@ export function currentMonth(): string {
   }).format(new Date());
   return cairo.slice(0, 7);
 }
+
+/**
+ * `"5,512.35"` → `551235` piastres. `null` if it is not a figure.
+ *
+ * **Parsed as text, digit by digit, never through a float** (ADR 0002).
+ * `parseFloat("5512.35") * 100` is `551234.9999999999`, and rounding that back
+ * is a habit that works until the one figure where it does not. Money never
+ * becomes a float on this side of the wire either.
+ *
+ * Accepts what a person actually types: thousands separators, a currency
+ * symbol, spaces, one or two decimal places, or none. Refuses anything else
+ * rather than guessing — a silent reinterpretation of a payment amount is the
+ * worst possible failure here.
+ */
+export function parseEgp(text: string): number | null {
+  // The currency is stripped only where a currency goes — at the front.
+  // Removing every "e" in the string turned "1e5" into "15", quietly reading a
+  // figure nobody meant to type as E£15.00 rather than refusing it.
+  const cleaned = text
+    .trim()
+    .replace(/^\+/, "")
+    .replace(/^(EGP|E£|£)\s*/i, "")
+    .replace(/[\s, ]/g, "");
+  if (cleaned === "" || cleaned === "-") return null;
+  if (!/^-?\d*(\.\d{0,2})?$/.test(cleaned)) return null;
+
+  const negative = cleaned.startsWith("-");
+  const body = negative ? cleaned.slice(1) : cleaned;
+  const [whole = "", fraction = ""] = body.split(".");
+  if (whole === "" && fraction === "") return null;
+
+  const piastres =
+    Number(whole || "0") * PIASTRES_PER_POUND + Number(fraction.padEnd(2, "0"));
+  if (!Number.isSafeInteger(piastres)) return null;
+  return negative ? -piastres : piastres;
+}
+
+/**
+ * `551235` → `"5512.35"`. What goes *into* an editable amount field.
+ *
+ * Integer arithmetic, like everything else that touches money (ADR 0002).
+ * `piastres / 100` is a float division, and while it happens to be exact for
+ * the figures HBA pays today, "exact for the values we have now" is the
+ * property that quietly stops holding.
+ *
+ * Unlike `formatEgp` this carries no symbol and no separators, because a
+ * person is about to edit it.
+ */
+export function egpPlain(piastres: number): string {
+  const negative = piastres < 0;
+  const absolute = Math.abs(piastres);
+  const whole = Math.trunc(absolute / PIASTRES_PER_POUND);
+  const fraction = absolute % PIASTRES_PER_POUND;
+  return `${negative ? "-" : ""}${whole}.${String(fraction).padStart(2, "0")}`;
+}
