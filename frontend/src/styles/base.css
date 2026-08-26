@@ -201,6 +201,8 @@ select {
  */
 .button {
   display: inline-flex;
+  text-decoration: none;
+  color: inherit;
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-4);
@@ -235,6 +237,26 @@ select {
   background: var(--rule);
   border-color: var(--rule);
   color: var(--quiet);
+}
+
+/*
+ * For an action that reaches back into something already settled. Outlined
+ * rather than filled: it should look like a decision being taken, not like the
+ * obvious next step. The one filled button on a page is the ordinary path, and
+ * reopening an agreed month is never that.
+ */
+.button--danger {
+  border-color: var(--refused);
+  color: var(--refused);
+}
+
+.button--danger:hover:not(:disabled) {
+  background: var(--refused-quiet);
+}
+
+.button--danger:disabled {
+  border-color: var(--rule);
+  color: var(--rule-strong);
 }
 
 /* ── Fields ───────────────────────────────────────────────────────────────*/
@@ -282,6 +304,14 @@ select {
   border-left-color: var(--refused);
   background: var(--refused-quiet);
   color: var(--refused);
+}
+
+/* Something finished, correctly. Used sparingly — a tool that congratulates
+   itself after every action stops being read. */
+.notice--settled {
+  border-left-color: var(--settled);
+  background: var(--settled-quiet);
+  color: var(--settled);
 }
 
 /* An empty screen is an invitation to act, not a shrug. */
