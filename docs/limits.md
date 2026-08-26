@@ -840,6 +840,47 @@ path, and tested as being called.
 
 *Phase 6 must wire it*, and this entry is what says so.
 
+### 🔴 The go-live month is not chosen, and nothing can be approved until it is
+
+**The limit.** §11.2 divides time at a configured **go-live month**: everything
+before it is `historical` — imported, visible, and **never payable**, because it
+was settled outside the platform. §21 lists choosing it as an open question, and
+it is still open.
+
+`GO_LIVE_MONTH` is blank, and blank **blocks every approval** with
+`go_live_month_is_not_configured`.
+
+**Why blank rather than a default.** A default would silently make eight months
+of imported orders look approvable — money HBA has already paid, presented as a
+debt and ready to be paid a second time. Refusing until somebody chooses is the
+entire point of the feature, so refusing loudly is the only honest default.
+
+*What to do:* set `GO_LIVE_MONTH` on Railway to the first month the platform is
+responsible for paying, as `YYYY-MM`. Everything before it will show sales only,
+labelled *"Settled before the platform — commission not calculated"* (ADR 0014).
+
+**Choose it before the first real payroll, not during.** Moving it afterwards
+would turn already-approved months into historical ones, or historical months
+into payable ones, and neither has a defined behaviour.
+
+### 🟠 A reopened month that is never re-approved
+
+**The limit.** Reopening returns a month to `draft` and preserves the snapshot
+payments were made against. Nothing forces it to be approved again.
+
+**What failure looks like.** Not a wrong number — a month sitting in draft with
+real money already paid against a superseded version. `balance_due` is computed
+from the **active** snapshot, and a reopened month has none, so the amount
+outstanding for that model is unanswerable until somebody re-approves.
+
+**Why it is allowed at all.** Reopening exists precisely because something was
+wrong; forcing an immediate re-approval would mean approving a figure nobody had
+finished checking.
+
+**What exists instead.** `GET /api/payroll/{month}/reopened` lists them, and
+§11.5 requires a home-screen alert once there is a home screen. **The dangerous
+state is not reopening; it is forgetting.**
+
 ### 🟠 A code created before the switch cannot be handed over
 
 **The limit.** `retire_and_replace` ends the old code the month **before** the
@@ -904,26 +945,25 @@ know*, never as a penalty for a quiet month.
 to `commission` to unblock a month silently removed her guarantee. There is now a
 correct way to unblock one — record her actuals and have somebody confirm them.
 
-### 🔴 Correcting pay terms is not yet blocked by payroll
+### 🟢 Correcting pay terms is blocked by payroll *(fixed, Phase 6)*
 
-**The limit.** A mistyped rate, salary or base amount can be corrected, which
-it must be - until now the only fix was editing the database by hand. But
-`assert_correctable` currently blocks nothing, because **payroll does not exist
-until Phase 6** and no month can yet be approved or paid.
+**The limit, as it stood.** `assert_correctable` was a seam that blocked
+nothing, because approved months did not exist. A rate corrected after payroll
+would change what a month was worth **after the money moved**, and the frozen
+figure would silently disagree with the data it came from.
 
-**Why it is safe today.** Nothing downstream consumes pay terms. Correcting
-them changes a number nobody has been paid against.
+**Fixed.** Correcting terms that cover an approved month is refused, naming the
+month and pointing at reopen — which requires a written reason.
 
-**What failure looks like once payroll exists.** Somebody corrects a rate for a
-month already approved and paid. The platform then reports a different figure
-from the money that actually left the account - and the first sign is a model
-asking why her payslip changed. Nothing errors.
+**Narrower for *ending* terms, deliberately.** Closing a period in August does
+not change what April was worth: April was on those terms and still says so.
+Only a close that would leave an approved month with **no terms at all** is
+refused, because that month would be incalculable if it were ever reopened. This
+distinction was found by a test that was right to fail.
 
-**Phase 6 must wire the check into `assert_correctable`** in
-`app/services/compensation.py`: a period covering any month with an approved
-payroll snapshot is refused, and correcting it becomes a reopen-and-reconcile,
-not an edit. The function exists and is called from both correction and
-closing precisely so there is one place to fill in.
+The same wiring closed `assert_recordable` for targets: a target decides whether
+a base guarantee applied, so editing one after payroll changes what the month was
+worth.
 
 ### 🟠 A handler that is not idempotent
 

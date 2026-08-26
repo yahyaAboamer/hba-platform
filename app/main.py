@@ -20,6 +20,7 @@ from app.api import (
     earnings,
     health,
     operations,
+    payroll,
     targets,
     webhooks,
 )
@@ -95,6 +96,7 @@ app.include_router(operations.router)
 app.include_router(affiliates.router)
 app.include_router(earnings.router)
 app.include_router(targets.router)
+app.include_router(payroll.router)
 
 
 if (WEB_DIR / "index.html").exists():
