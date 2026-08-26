@@ -38,8 +38,10 @@ from app.core.permissions import Permission
 from app.db import get_session
 from app.models.affiliates import AffiliateProfile
 from app.models.identity import UserAccount
+from app.models.compensation import CompensationType
 from app.models.targets import MonthlyTarget
 from app.services.affiliates import list_affiliates
+from app.services.compensation import terms_for
 from app.services.targets import (
     get_target,
     record_actuals,
@@ -82,10 +84,27 @@ def _month_or_400(month: str) -> str:
         raise HTTPException(400, "A month looks like 2026-04") from exc
 
 
-def _render(affiliate: AffiliateProfile, target: MonthlyTarget | None) -> dict:
+def _render(
+    affiliate: AffiliateProfile,
+    target: MonthlyTarget | None,
+    *,
+    determines_pay: bool = False,
+) -> dict:
     return {
         "affiliate_id": affiliate.id,
         "name": affiliate.name,
+        # A house code publishes nothing and is never paid, so it has no
+        # target. Listed rather than dropped server-side, because "who is
+        # on this grid" is a screen's question and a payload that quietly
+        # omits rows is one nobody can reconcile against the registry.
+        "account_kind": affiliate.account_kind,
+        # §15. Targets are **informational** for commission and
+        # fixed_plus_commission, and decide what is paid only for
+        # base_guarantee - which is also the only kind §11.3 blocks payroll on.
+        #
+        # A screen that cannot tell them apart marks every empty row as urgent,
+        # and a warning that is always on is one nobody reads.
+        "determines_pay": determines_pay,
         "required_videos": target.required_videos if target else None,
         "required_stories": target.required_stories if target else None,
         "actual_videos": target.actual_videos if target else None,
@@ -121,8 +140,28 @@ def target_grid(
 
     return {
         "month": month,
-        "rows": [_render(a, found.get(a.id)) for a in affiliates],
+        "rows": [
+            _render(
+                affiliate,
+                found.get(affiliate.id),
+                determines_pay=_determines_pay(db, affiliate, month),
+            )
+            for affiliate in affiliates
+        ],
     }
+
+
+def _determines_pay(db: Session, affiliate: AffiliateProfile, month: str) -> bool:
+    """Whether this month's target decides what she is paid.
+
+    Only a base guarantee turns a target into money. For everyone else the
+    numbers are worth recording and worth looking at, and nothing at all
+    depends on them.
+    """
+    terms = terms_for(db, affiliate, month)
+    return bool(
+        terms and terms.compensation_type == CompensationType.BASE_GUARANTEE
+    )
 
 
 @router.put("/{month}")

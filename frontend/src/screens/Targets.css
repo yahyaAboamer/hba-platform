@@ -1,0 +1,125 @@
+.targets__note {
+  margin-bottom: var(--space-4);
+}
+
+.targets__lead {
+  max-width: 72ch;
+  margin: 0 0 var(--space-5);
+  font-size: var(--text-sm);
+  color: var(--quiet);
+}
+
+.targets__lead strong {
+  font-family: var(--mono);
+  color: var(--ink);
+}
+
+.targets__grid {
+  table-layout: auto;
+}
+
+.targets__pick {
+  width: 2rem;
+}
+
+/*
+ * The second header row carries Videos/Stories under each of the two spanning
+ * labels. It sits quietly: the reader needs it once, to learn the shape, and
+ * never again.
+ */
+.targets__subhead th {
+  padding-top: 0;
+  border-bottom: 1px solid var(--rule-strong);
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.targets__number,
+.table th.targets__number {
+  text-align: center;
+  width: 5.5rem;
+}
+
+/*
+ * Boxes that are tabbed through, not filled in one at a time.
+ *
+ * The border is the lightest rule in the palette. Borderless was the first
+ * version and it was wrong: twenty models times four numbers is eighty
+ * outlined boxes and that reads as a form, but with no border at all an empty
+ * cell gave no sign it could be typed into. Faint, not absent.
+ */
+.targets__input {
+  width: 100%;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-family: var(--mono);
+  font-size: var(--text-sm);
+  text-align: center;
+  color: var(--ink);
+}
+
+.targets__input:hover {
+  border-color: var(--rule-strong);
+}
+
+.targets__input:focus {
+  border-color: var(--focus);
+  background: var(--surface);
+  outline: 2px solid var(--focus);
+  outline-offset: -1px;
+}
+
+.targets__name {
+  color: var(--ink);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.targets__name:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* Whose money actually depends on the four numbers beside it. */
+.targets__decides {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}
+
+.targets__outcome {
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+
+/*
+ * Met and missed are both ordinary outcomes and neither is coloured. §11.3 is
+ * explicit that the block is on missing information and never on a quiet
+ * month, so colouring a miss would say the opposite of the rule.
+ */
+.targets__met,
+.targets__missed,
+.targets__unknown {
+  color: var(--ink);
+}
+
+.targets__unknown {
+  color: var(--quiet);
+}
+
+.targets__confirmed,
+.targets__unconfirmed {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}
+
+@media (max-width: 640px) {
+  .targets__grid {
+    display: block;
+    overflow-x: auto;
+  }
+}
