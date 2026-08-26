@@ -1378,6 +1378,44 @@ place.
 
 ---
 
+## A credit could only carry into a month that had already been approved
+
+**Symptom.** Recording an overpayment as a credit into the following month was
+refused:
+
+> Nour has no 2026-10 for the credit to land on. Open that month first.
+
+**Cause.** `adjust` looked the destination up with `get_month`, which returns
+nothing until a row exists — and `open_month` was called from exactly one
+place, `approve_month`. So a credit could only land on a month that had already
+been agreed.
+
+That is backwards from when the situation actually arises. §11.5's overpayment
+is discovered by reopening a settled month and re-approving it lower. In early
+October, with September just corrected, **October has not been approved and
+therefore does not exist.** The credit had nowhere to go.
+
+**Why it was worth fixing rather than documenting.** The refusal named a step —
+*"open that month first"* — that nothing in the platform could perform. There
+is no "open a month" action anywhere, because ADR 0013 says month rows are
+created on demand rather than on a schedule. So the two ways out were to write
+off money that should have carried forward, or to remember to come back after
+October's payroll — and §11.5 exists precisely because *remembering to come
+back* is the thing that fails.
+
+An error message describing a workflow that does not exist is the tell. It was
+an oversight, not a constraint.
+
+**Fixed** by opening the destination on demand, which is what `open_month` is
+for. The credit sits on the draft month and changes nothing until that month is
+approved, at which point `credited_into` folds it into the balance. Three
+tests: the month is opened, the credit waits and then applies, and a month
+opened only to receive a credit is **not** reported among the
+reopened-and-forgotten — it has no superseded snapshot and no payment stranded
+against one, and noise on that warning is the one thing it cannot afford.
+
+---
+
 ## Business rules with deliberate exposure
 
 These are not bugs. They are accepted costs, recorded so nobody "fixes" them.

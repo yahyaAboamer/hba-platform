@@ -7,6 +7,9 @@ import type { Session } from "./lib/api";
 import { AffiliateDetail } from "./screens/AffiliateDetail";
 import { Affiliates } from "./screens/Affiliates";
 import { Overview } from "./screens/Overview";
+import { PaymentReconcile } from "./screens/PaymentReconcile";
+import { PaymentRecord } from "./screens/PaymentRecord";
+import { Payments } from "./screens/Payments";
 import { Payroll } from "./screens/Payroll";
 import { PayrollApprove } from "./screens/PayrollApprove";
 import { PayrollReopen } from "./screens/PayrollReopen";
@@ -60,18 +63,23 @@ export default function App() {
             <Route path="/affiliates/:id" element={<AffiliateDetail />} />
             <Route
               path="/orders"
-              element={<NotBuiltYet name="Orders" phase="Coming after payments." />}
+              element={<NotBuiltYet name="Orders" phase="Coming after targets." />}
             />
             <Route path="/payroll" element={<Payroll session={session} />} />
             <Route path="/payroll/:month/approve" element={<PayrollApprove />} />
             <Route path="/payroll/:month/reopen" element={<PayrollReopen />} />
+            <Route path="/payments" element={<Payments session={session} />} />
             <Route
-              path="/payments"
-              element={<NotBuiltYet name="Payments" phase="Coming next, after payroll." />}
+              path="/payments/:month/:affiliateId"
+              element={<PaymentRecord />}
+            />
+            <Route
+              path="/payments/:month/:affiliateId/reconcile"
+              element={<PaymentReconcile />}
             />
             <Route
               path="/targets"
-              element={<NotBuiltYet name="Targets" phase="Coming after payments." />}
+              element={<NotBuiltYet name="Targets" phase="Coming next, after payments." />}
             />
             <Route
               path="/settings"
