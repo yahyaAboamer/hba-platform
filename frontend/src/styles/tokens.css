@@ -1,0 +1,67 @@
+/*
+ * Design tokens. ADR 0027.
+ *
+ * Colour is reserved for money state. Navigation, headings, panels and active
+ * states carry none of it — an interface where everything is coloured has no
+ * way left to say "this one matters".
+ *
+ * The single exception is --focus, which appears nowhere else, because focus is
+ * the one thing that must never blend into its surroundings.
+ */
+
+:root {
+  /* Surfaces and text. Cool near-neutrals: the warmth belongs to the affiliate
+     portal, not to a tool for reconciling twenty payments at month end. */
+  --paper: #fbfbfc;
+  --surface: #ffffff;
+  --ink: #14181f;
+  --quiet: #5c6673;
+  --rule: #e4e7ec;
+  --rule-strong: #cdd3db;
+  --hover: #f4f5f7;
+
+  /* Money state, and nothing else. */
+  --owed: #b54708; /* outstanding — attention, not alarm */
+  --settled: #067647; /* resolved */
+  --refused: #b42318; /* blocked, or void */
+  --owed-quiet: #fdf6ef;
+  --settled-quiet: #f0faf5;
+  --refused-quiet: #fdf3f2;
+
+  /* Never used for anything else. */
+  --focus: #3538cd;
+
+  /*
+   * Two faces from one superfamily, drawn together, so mixing them inside a
+   * single row reads as intentional rather than as a fallback.
+   *
+   * Sans carries prose and provisional figures. Mono carries agreed money,
+   * months, discount codes and order numbers — the things that must line up in
+   * a column and must not be mistaken for a working number.
+   */
+  --sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* Dense, laptop-first (§12.5). Built for scanning twenty affiliates. */
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.9375rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.75rem;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-8: 3rem;
+
+  --sidebar-width: 216px;
+  --row-height: 2.5rem;
+
+  /* No shadows and no elevation anywhere. §12.1 asks for trustworthy rather
+     than decorative, and a drop shadow is decoration that has learned to look
+     like structure. Radius is small enough to read as a rule, not a card. */
+  --radius: 3px;
+}
