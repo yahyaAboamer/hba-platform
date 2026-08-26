@@ -41,6 +41,7 @@ from typing import Any
 from sqlalchemy import (
     BigInteger,
     CheckConstraint,
+    LargeBinary,
     DateTime,
     ForeignKey,
     Index,
@@ -72,6 +73,43 @@ VALID_ADJUSTMENT_TYPES = frozenset(
     for name, value in vars(AdjustmentType).items()
     if not name.startswith("_") and isinstance(value, str)
 )
+
+
+class ProofFile(Base):
+    """One payment screenshot.
+
+    **Its own table, deliberately** (ADR 0026). A blob column on
+    `payment_transaction` would be loaded by every query that touched a
+    payment - the payments list, the settlement calculation, the audit render -
+    because selecting a row selects its columns.
+    """
+
+    __tablename__ = "proof_file"
+
+    #: The content hash, which makes re-uploading the same screenshot
+    #: idempotent rather than duplicating the bytes.
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+
+    #: Who it belongs to. Checked on every read - a URL is not a permission.
+    affiliate_id: Mapped[int] = mapped_column(
+        ForeignKey("affiliate_profile.id", ondelete="RESTRICT"), nullable=False
+    )
+
+    content: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    content_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+
+    uploaded_by: Mapped[int | None] = mapped_column(
+        ForeignKey("user_account.id", ondelete="SET NULL")
+    )
+    uploaded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+
+    affiliate = relationship("AffiliateProfile", lazy="joined")
+
+    def __repr__(self) -> str:
+        return f"<ProofFile {self.id[:12]} {self.size_bytes}b>"
 
 
 class PaymentTransaction(Base):

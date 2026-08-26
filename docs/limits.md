@@ -1193,6 +1193,30 @@ within seconds.
 
 ---
 
+### 🟠 A summed money column comes back as a string *(fixed, guarded)*
+
+**The limit.** Postgres `SUM()` over a `bigint` returns **`numeric`**, not
+`bigint`. psycopg hands that back as a `Decimal`, and a `Decimal` reaching the
+API is serialised as a **string**.
+
+**What failure looks like.** Every balance arriving as `"180000"` instead of
+`180000`. Nothing errors — JSON is happy to carry a string — and it breaks in the
+client, where `balance - paid` becomes a type error or, worse, a string
+concatenation. Money silently stops being a number at the boundary.
+
+**How close this came.** Caught by a test comparing a balance to an integer,
+which failed with `assert '180000' == 180000`. Without that comparison it would
+have shipped and surfaced as an inexplicable frontend bug months later.
+
+**Fixed** in `app/services/payments.py`: every `func.sum` over piastres is
+wrapped in `int()`. ADR 0002 says money is integer piastres everywhere, and
+"everywhere" includes on the way out of an aggregate.
+
+**Recorded because it applies to every future sum.** `func.count()` is safe;
+`func.sum()` over `bigint` is not. Any new total over a money column needs the
+same wrapper, and the symptom will look like a frontend problem rather than a
+database one.
+
 ### 🟠 "Out for delivery" is not "delivered" *(fixed, guarded)*
 
 **The limit.** Shopify's fulfilment display statuses include `DELIVERED`,

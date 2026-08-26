@@ -102,6 +102,12 @@ def sync_status(
         # Reported here so "did the variable land?" is a fact rather than a
         # guess about a deploy.
         "go_live_month": settings.go_live_month or None,
+        # ADR 0026 puts the trigger for revisiting proof storage at 200 MB,
+        # which is only a trigger if somebody can see the number.
+        "proof_stored_bytes": db.execute(
+            text("SELECT coalesce(sum(size_bytes), 0) FROM proof_file")
+        ).scalar()
+        or 0,
         "payroll_can_be_approved": bool(settings.go_live_month),
         "orders_indexed": db.execute(text("SELECT count(*) FROM order_index")).scalar()
         or 0,
