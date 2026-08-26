@@ -1,8 +1,15 @@
 """Password hashing."""
 
+import pathlib
+
 import pytest
 
-from app.core.passwords import MINIMUM_PASSWORD_LENGTH, hash_password, verify_password
+from app.core import passwords
+from app.core.passwords import (
+    MINIMUM_PASSWORD_LENGTH,
+    hash_password,
+    verify_password,
+)
 
 
 def test_correct_password_verifies():
@@ -78,9 +85,67 @@ def test_unknown_algorithm_is_refused():
 
 
 def test_encoded_format_is_self_describing():
-    # algorithm$iterations$salt$digest — the cost is stored with the hash, so
-    # iterations can be raised later without invalidating existing passwords.
-    algorithm, iterations, salt, digest = hash_password("a-long-enough-password").split("$")
+    """algorithm$iterations$salt$digest.
+
+    The cost is stored **with** each hash, which is what lets it be raised
+    later without invalidating existing passwords - and what lets this suite
+    hash cheaply while production hashes properly.
+
+    This asserts the *shape*. What the shipped cost actually is belongs to
+    `test_the_shipped_password_cost_is_not_this_one`, which reads the source:
+    checking the running value here would only confirm whatever the test
+    session had set.
+    """
+    algorithm, iterations, salt, digest = hash_password(
+        "a-long-enough-password"
+    ).split("$")
+
     assert algorithm == "pbkdf2_sha256"
-    assert int(iterations) >= 600_000
+    assert int(iterations) == passwords.ITERATIONS, (
+        "the count written is the count used"
+    )
     assert salt and digest
+
+
+def test_a_hash_verifies_at_whatever_cost_it_was_made_with():
+    """The property the self-describing format exists for. A password hashed
+    at the old cost keeps working after the cost is raised - so raising it is
+    a one-line change rather than a migration that logs everybody out.
+    """
+    from app.core import passwords
+
+    original = passwords.ITERATIONS
+    try:
+        passwords.ITERATIONS = 1_000
+        cheap = hash_password("a-long-enough-password")
+        passwords.ITERATIONS = 50_000
+        dearer = hash_password("a-long-enough-password")
+    finally:
+        passwords.ITERATIONS = original
+
+    assert verify_password("a-long-enough-password", cheap)
+    assert verify_password("a-long-enough-password", dearer)
+    assert cheap.split("$")[1] != dearer.split("$")[1]
+
+
+def test_the_shipped_password_cost_is_not_this_one():
+    """The suite lowers the iteration count so it does not spend a minute a
+    file hashing passwords nobody attacks. **That must never lower it in
+    production.**
+
+    Asserted from the source rather than the running value, because the running
+    value is exactly what the test session has patched - checking it would
+    confirm the patch rather than the shipped default, and pass no matter what
+    was released.
+
+    600,000 PBKDF2-SHA256 iterations is current OWASP guidance. Raising it
+    later is safe: the count is stored in each digest, so existing passwords
+    keep verifying at the cost they were made with.
+    """
+    source = pathlib.Path("app/core/passwords.py").read_text(encoding="utf-8")
+
+    assert "ITERATIONS = 600_000" in source, (
+        "The shipped password cost has changed. If that is deliberate, update "
+        "this test and say why in the commit - it is a security parameter, not "
+        "a tuning knob."
+    )
