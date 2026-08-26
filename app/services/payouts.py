@@ -194,3 +194,53 @@ def changed_recently(
         .limit(1)
     )
     return current.created_at if has_history else None
+
+
+#: What the person sending the money needs, per method. InstaPay is absent on
+#: purpose: its address is handed to the deep link, never to a reader, so
+#: revealing it would put a credential on screen for no one's benefit.
+PAYABLE_FIELDS = {
+    PayoutMethod.INSTAPAY: ("instapay_address_url",),
+    PayoutMethod.BANK: ("bank_name", "bank_account_holder", "bank_account_number"),
+    PayoutMethod.WALLET: ("wallet_phone",),
+}
+
+
+def reveal_destination(
+    db: Session,
+    affiliate: AffiliateProfile,
+    *,
+    actor_id: int,
+    actor_email: str,
+) -> dict:
+    """The real values, for the one person about to send money. ADR 0028.
+
+    Masking protects **records** - audit rows, logs, notifications, the
+    confirmation shown when a destination changes. It was never meant to stop
+    the payer paying: a bank account number rendered `…291` cannot be typed
+    into a banking app, and reading the rule as absolute made the task
+    impossible rather than safe.
+
+    So the values are available, and getting them is a deliberate, recorded
+    act rather than a side effect of opening a screen. The audit row says who
+    looked at whose destination and when. **It never carries the value** -
+    that would recreate exactly the leak the masking exists to prevent.
+    """
+    destination = current_destination(db, affiliate)
+    if destination is None:
+        raise ValueError("No payout destination on file")
+
+    record_audit(
+        db,
+        action="payout_destination.revealed",
+        subject=f"affiliate:{affiliate.id}",
+        actor_id=actor_id,
+        actor_email=actor_email,
+        after={"method": destination.method},
+    )
+
+    fields = PAYABLE_FIELDS.get(destination.method, ())
+    return {
+        "method": destination.method,
+        **{field: getattr(destination, field) for field in fields},
+    }

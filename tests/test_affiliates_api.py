@@ -152,6 +152,7 @@ def test_writing_requires_authentication(anonymous):
         ("POST", "/api/affiliates/1/codes"),
         ("POST", "/api/affiliates/1/compensation"),
         ("PUT", "/api/affiliates/1/payout-destination"),
+        ("POST", "/api/affiliates/1/payout-destination/reveal"),
     ]:
         response = anonymous.request(method, path, json={})
         assert response.status_code == 401, path
@@ -1141,3 +1142,75 @@ def test_the_list_reports_terms_once_they_exist(client):
     # Registering a code is a separate act, and Shopify confirming it is a
     # third. Neither has happened.
     assert row["has_verified_code"] is False
+
+
+# ── Revealing a destination, for the person about to pay (ADR 0028) ────────────
+
+
+def _bank_destination(client, affiliate_id: int) -> None:
+    response = client.put(
+        f"/api/affiliates/{affiliate_id}/payout-destination",
+        json={
+            "method": "bank",
+            "bank_name": "CIB",
+            "bank_account_holder": "Nour Abdelrahman",
+            "bank_account_number": "100029384756",
+        },
+    )
+    assert response.status_code == 200, response.text
+
+
+def test_the_profile_shows_a_bank_account_masked(client):
+    """Recognition, never use. The number a payer needs comes from the reveal
+    endpoint, which is audited; a profile screen left open on a desk must not
+    be a list of account numbers.
+    """
+    affiliate = _register(client)
+    _bank_destination(client, affiliate["id"])
+
+    body = client.get(f"/api/affiliates/{affiliate['id']}").json()
+
+    assert body["payout_destination"]["bank_account_number"] == "…756"
+    assert body["payout_destination"]["bank_account_holder"] == "Nour Abdelrahman"
+
+
+def test_revealing_gives_the_payer_the_real_number(client):
+    affiliate = _register(client)
+    _bank_destination(client, affiliate["id"])
+
+    response = client.post(
+        f"/api/affiliates/{affiliate['id']}/payout-destination/reveal"
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json() == {
+        "method": "bank",
+        "bank_name": "CIB",
+        "bank_account_holder": "Nour Abdelrahman",
+        "bank_account_number": "100029384756",
+    }
+
+
+def test_revealing_needs_the_permission_for_moving_money(client):
+    """`payments.record`, not `affiliates.view`. Reading a profile and sending
+    money are different acts, and only the second needs the number.
+    """
+    affiliate = _register(client)
+    _bank_destination(client, affiliate["id"])
+    _demote_to("affiliate")
+
+    response = client.post(
+        f"/api/affiliates/{affiliate['id']}/payout-destination/reveal"
+    )
+
+    assert response.status_code == 403
+
+
+def test_revealing_with_nothing_on_file_is_a_404(client):
+    affiliate = _register(client)
+
+    response = client.post(
+        f"/api/affiliates/{affiliate['id']}/payout-destination/reveal"
+    )
+
+    assert response.status_code == 404

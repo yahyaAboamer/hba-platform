@@ -407,3 +407,110 @@ def test_the_instapay_phone_is_optional(db):
     )
     db.flush()
     assert destination.instapay_phone is None
+
+
+# ── Revealing, for the person about to send money (ADR 0028) ───────────────────
+
+
+def test_a_bank_payout_reveals_the_number_the_payer_has_to_type(db):
+    """Masking protects records, not the act of paying.
+
+    A bank account rendered `…291` cannot be typed into a banking app. Reading
+    the masking rule as absolute made the payment screen impossible rather
+    than safe.
+    """
+    from app.services.payouts import reveal_destination
+
+    nour = _affiliate(db)
+    set_destination(
+        db,
+        nour,
+        method=PayoutMethod.BANK,
+        bank_name="CIB",
+        bank_account_holder="Nour Abdelrahman",
+        bank_account_number="100029384756",
+    )
+    db.flush()
+
+    revealed = reveal_destination(db, nour, actor_id=1, actor_email="o@example.com")
+
+    assert revealed == {
+        "method": PayoutMethod.BANK,
+        "bank_name": "CIB",
+        "bank_account_holder": "Nour Abdelrahman",
+        "bank_account_number": "100029384756",
+    }
+
+
+def test_revealing_returns_only_what_that_method_needs(db):
+    """A wallet payout does not hand back a bank number that happens to sit on
+    the same row.
+    """
+    from app.services.payouts import reveal_destination
+
+    nour = _affiliate(db)
+    set_destination(
+        db,
+        nour,
+        method=PayoutMethod.WALLET,
+        wallet_phone="01012345678",
+        bank_account_number="100029384756",
+    )
+    db.flush()
+
+    revealed = reveal_destination(db, nour, actor_id=1, actor_email="o@example.com")
+
+    assert revealed == {"method": PayoutMethod.WALLET, "wallet_phone": "01012345678"}
+    assert "bank_account_number" not in revealed
+
+
+def test_revealing_is_recorded_without_the_value(db):
+    """The audit row says who looked at whose destination. Putting the value in
+    it would recreate exactly the leak the masking exists to prevent.
+    """
+    import json
+
+    from sqlalchemy import text
+
+    from app.services.payouts import reveal_destination
+
+    nour = _affiliate(db)
+    set_destination(
+        db,
+        nour,
+        method=PayoutMethod.BANK,
+        bank_name="CIB",
+        bank_account_holder="Nour Abdelrahman",
+        bank_account_number="100029384756",
+    )
+    db.flush()
+    reveal_destination(
+        db,
+        nour,
+        actor_id=nour.user_account_id,
+        actor_email="owner@example.com",
+    )
+    db.flush()
+
+    rows = db.execute(
+        text(
+            "SELECT action, actor_email, before_json, after_json FROM audit_event "
+            "WHERE action = 'payout_destination.revealed'"
+        )
+    ).all()
+
+    assert len(rows) == 1
+    action, actor_email, before, after = rows[0]
+    assert actor_email == "owner@example.com"
+    written = json.dumps([before, after], default=str)
+    assert "100029384756" not in written, "the account number reached the audit log"
+
+
+def test_revealing_a_destination_that_does_not_exist_is_refused(db):
+    from app.services.payouts import reveal_destination
+
+    nour = _affiliate(db)
+    db.flush()
+
+    with pytest.raises(ValueError):
+        reveal_destination(db, nour, actor_id=1, actor_email="o@example.com")
