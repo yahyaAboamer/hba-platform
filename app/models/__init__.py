@@ -10,6 +10,7 @@ from app.models import (  # noqa: F401
     integration,
     orders,
     payouts,
+    payments,
     payroll,
     targets,
 )
