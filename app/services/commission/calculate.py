@@ -29,11 +29,14 @@ it. §9.5.
 
 ## Two things it refuses to decide
 
-**A base guarantee, because targets are Phase 5.** "Achieved and verified" has
-no answer yet, so the calculation returns the commission figure **and says the
-guarantee is unresolved**. It never assumes targets were missed, which underpays,
-and never assumes they were met, which overpays. §11.3 makes it a hard blocker
-on approval.
+**A base guarantee whose targets nobody recorded.** "Achieved and verified" has
+no answer, so the month blocks rather than guessing. It never assumes she missed,
+which underpays, and never assumes she hit them, which overpays.
+
+**Missing information blocks; poor performance does not.** A model who missed her
+targets is paid her commission, promptly, and the month approves. §11.3, and the
+distinction is the whole design - the block exists where the platform *does not
+know*, never as a penalty.
 
 ## House accounts
 
@@ -60,10 +63,19 @@ from app.models.affiliates import AccountKind, AffiliateProfile
 from app.models.attributed_orders import AttributedOrder, CommissionState
 from app.models.compensation import CompensationType
 from app.services.compensation import terms_for
+from app.services.targets import get_target
 
 #: Why a month's figure is not final. §11.3 refuses approval on any of these.
 NO_TERMS = "no_compensation_terms_for_this_month"
-TARGETS_UNVERIFIED = "base_guarantee_needs_targets_which_arrive_in_phase_5"
+
+#: Nobody has said what she was asked to produce, so nobody can say whether the
+#: guarantee applies. §11.3 blocks on **missing information**, never on poor
+#: performance.
+NO_TARGET = "no_target_recorded_for_this_month"
+
+#: She hit her targets and nobody has confirmed the numbers. Verification is
+#: what unlocks the guarantee (§11.3), so this is not a formality.
+TARGETS_UNVERIFIED = "targets_achieved_but_not_verified"
 
 
 @dataclass(frozen=True)
@@ -97,6 +109,16 @@ class MonthCalculation:
 
     #: The same figure rounded half-up to whole pounds. ADR 0004.
     payout_piastres: int = 0
+
+    #: §15. ``None`` means nobody has recorded what she produced - which is a
+    #: different answer from missing the target, and blocks where missing does
+    #: not.
+    target_achieved: bool | None = None
+    target_verified: bool = False
+
+    #: Whether ``max(commission, base)`` actually took effect. False on a
+    #: `commission` model, on a missed target, and on an unverified one.
+    guarantee_applied: bool = False
 
     #: Real, and never owed. §8, §17.
     is_house: bool = False
@@ -146,6 +168,11 @@ def calculate_month(
     is_house = affiliate.account_kind == AccountKind.HOUSE
     blockers: list[str] = []
 
+    target = get_target(db, affiliate, month)
+    achieved = target.is_achieved if target else None
+    verified = bool(target and target.is_verified)
+    guarantee_applied = False
+
     terms = terms_for(db, affiliate, month)
     if terms is None:
         # Sales are still real and still worth reporting; what she is owed is
@@ -160,6 +187,8 @@ def calculate_month(
             pending_orders=pending_count,
             pending_base_piastres=pending_base,
             void_orders=void_count,
+            target_achieved=achieved,
+            target_verified=verified,
             is_house=is_house,
             blockers=blockers,
         )
@@ -182,10 +211,25 @@ def calculate_month(
         exact = commission + fixed
     elif terms.compensation_type == CompensationType.BASE_GUARANTEE:
         guarantee = int(terms.base_amount_piastres or 0)
-        # Targets arrive in Phase 5. Until then the guarantee cannot be
-        # applied: max(commission, guarantee) is only correct when the targets
-        # were achieved *and* verified, and neither assumption is safe.
-        blockers.append(TARGETS_UNVERIFIED)
+
+        if achieved is None:
+            # Nobody has recorded what she produced. Not a judgement about her
+            # month - the platform simply does not know, and §11.3 blocks on
+            # missing information.
+            blockers.append(NO_TARGET)
+        elif not achieved:
+            # A confirmed miss. She is paid her commission, promptly, and the
+            # month approves - the block is never a punishment for a quiet
+            # month.
+            pass
+        elif not verified:
+            blockers.append(TARGETS_UNVERIFIED)
+        else:
+            # §9.5. The base is never added on top of a higher commission and
+            # never caps it, which is the intuitive mistake the spec calls out.
+            if guarantee > commission:
+                exact = Decimal(guarantee)
+                guarantee_applied = True
 
     payout = 0 if is_house else round_half_up_to_pounds(exact)
 
@@ -204,6 +248,9 @@ def calculate_month(
         base_amount_piastres=guarantee,
         exact_unrounded_piastres=exact,
         payout_piastres=payout,
+        target_achieved=achieved,
+        target_verified=verified,
+        guarantee_applied=guarantee_applied,
         is_house=is_house,
         blockers=blockers,
     )
