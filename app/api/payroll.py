@@ -85,6 +85,7 @@ def _row(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
 
     blockers, calculation = blockers_for(db, affiliate, month)
     payroll_month = get_month(db, affiliate, month)
+    snapshot = payroll_month.active_snapshot if payroll_month else None
 
     return {
         "affiliate_id": affiliate.id,
@@ -98,17 +99,27 @@ def _row(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
             "pending": calculation.pending_orders,
             "void": calculation.void_orders,
         },
+        # What it would come to if calculated right now. For an approved month
+        # this is **not** what was agreed: an order settling after approval
+        # changes the calculation and never the obligation (§11.4).
         "obligation_piastres": calculation.payout_piastres,
         "obligation": format_egp(calculation.payout_piastres),
+        # What was actually agreed, or null if nothing has been. A screen
+        # showing the recalculated figure under the word "approved" would be
+        # presenting a working number as a debt.
+        "approved_obligation_piastres": (
+            snapshot.approved_obligation_piastres if snapshot else None
+        ),
+        "approved_obligation": (
+            format_egp(snapshot.approved_obligation_piastres) if snapshot else None
+        ),
         "exact_unrounded_piastres": str(calculation.exact_unrounded_piastres),
         # §11.4. Orders from earlier approved months that this one will pay -
         # the common path, not an edge case.
         "carried_forward": carry_forward_summary(db, affiliate, month),
         "blockers": blockers,
         "is_payable": not blockers,
-        "version": payroll_month.active_snapshot.version
-        if payroll_month and payroll_month.active_snapshot
-        else None,
+        "version": snapshot.version if snapshot else None,
     }
 
 

@@ -7,6 +7,9 @@ import type { Session } from "./lib/api";
 import { AffiliateDetail } from "./screens/AffiliateDetail";
 import { Affiliates } from "./screens/Affiliates";
 import { Overview } from "./screens/Overview";
+import { Payroll } from "./screens/Payroll";
+import { PayrollApprove } from "./screens/PayrollApprove";
+import { PayrollReopen } from "./screens/PayrollReopen";
 import { SignIn } from "./screens/SignIn";
 
 /** A section that exists in the navigation and not yet in the platform. */
@@ -57,15 +60,14 @@ export default function App() {
             <Route path="/affiliates/:id" element={<AffiliateDetail />} />
             <Route
               path="/orders"
-              element={<NotBuiltYet name="Orders" phase="Coming after the payroll screens." />}
+              element={<NotBuiltYet name="Orders" phase="Coming after payments." />}
             />
-            <Route
-              path="/payroll"
-              element={<NotBuiltYet name="Payroll" phase="Coming next, after affiliates." />}
-            />
+            <Route path="/payroll" element={<Payroll session={session} />} />
+            <Route path="/payroll/:month/approve" element={<PayrollApprove />} />
+            <Route path="/payroll/:month/reopen" element={<PayrollReopen />} />
             <Route
               path="/payments"
-              element={<NotBuiltYet name="Payments" phase="Coming after payroll." />}
+              element={<NotBuiltYet name="Payments" phase="Coming next, after payroll." />}
             />
             <Route
               path="/targets"

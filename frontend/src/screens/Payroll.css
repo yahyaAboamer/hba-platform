@@ -1,0 +1,183 @@
+.payroll__note {
+  margin-bottom: var(--space-4);
+}
+
+/*
+ * The three figures month end is decided on: what it costs, who is ready, who
+ * is holding it up. §12.3 principle 5 — a page carries summary figures only
+ * where they support the decision made on that page.
+ */
+.payroll__figures {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-8);
+  margin-bottom: var(--space-5);
+}
+
+.payroll__figure {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.payroll__figure-label {
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}
+
+/* The one number on the page allowed to be large. Everything else is scanned;
+   this one is decided on. */
+.payroll__total {
+  font-size: var(--text-xl);
+}
+
+.payroll__count {
+  font-family: var(--mono);
+  font-size: var(--text-lg);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.payroll__count--refused {
+  color: var(--refused);
+}
+
+.payroll__table {
+  table-layout: auto;
+}
+
+.payroll__pick {
+  width: 2rem;
+}
+
+/* `.table th` sets text-align: left and is the more specific selector, so the
+   header would sit left of the column it labels. */
+.payroll__amount,
+.table th.payroll__amount {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.payroll__name {
+  color: var(--ink);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.payroll__name:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.payroll__state {
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+
+/*
+ * Only one of the four states is coloured. "Ready" is the ordinary case and
+ * needs no announcement; "approved" is finished and quiet; "not paid" is a
+ * house account behaving exactly as designed. Colouring all four would leave
+ * nothing to say *this one*.
+ */
+.payroll__state--needs-you {
+  color: var(--refused);
+}
+
+.payroll__version {
+  margin-left: var(--space-2);
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}
+
+.payroll__orders {
+  font-size: var(--text-sm);
+  color: var(--quiet);
+  white-space: nowrap;
+}
+
+.payroll__pending {
+  display: block;
+  font-size: var(--text-xs);
+}
+
+/* A row that is not a problem and never will be — a house account, a month
+   already settled. Present, legible, and not competing for attention. */
+.payroll__row--quiet td {
+  color: var(--quiet);
+}
+
+.payroll__carried,
+.payroll__carried-line {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}
+
+.payroll__carried-sales {
+  display: block;
+}
+
+.payroll__blocker,
+.payroll__quiet-reason {
+  display: block;
+}
+
+.payroll__quiet-reason {
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}
+
+.payroll__actions {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+}
+
+/* ── The approval and reopen pages ────────────────────────────────────────*/
+
+.approve__summary {
+  padding: var(--space-5);
+  margin-bottom: var(--space-5);
+}
+
+.approve__lead {
+  max-width: 60ch;
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-sm);
+  color: var(--quiet);
+}
+
+.approve__total {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-top: var(--space-5);
+}
+
+.reopen__reason {
+  max-width: 60ch;
+  margin-top: var(--space-5);
+}
+
+.reopen__textarea {
+  resize: vertical;
+  font-family: inherit;
+}
+
+/* §12.5: a table becomes cards on a phone rather than scrolling sideways to
+   read money. Payroll is laptop-first work, so rather than a second layout
+   nobody would use, the table scrolls inside its own box and the page does
+   not. Money still never wraps. */
+@media (max-width: 640px) {
+  .payroll__figures {
+    gap: var(--space-5);
+    flex-wrap: wrap;
+  }
+
+  .payroll__table {
+    display: block;
+    overflow-x: auto;
+  }
+}

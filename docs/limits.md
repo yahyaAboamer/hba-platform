@@ -1342,6 +1342,42 @@ strict reading of the rule; it is a misreading of what the rule was protecting.
 
 ---
 
+## The payroll screen showed a working number in the face reserved for debts
+
+**Symptom.** Caught on screen during the first run of the payroll table, before
+it shipped. Two models read *Approved · E£5,512.00* in the mono face — which
+under ADR 0027 means **this is an obligation and it cannot change.**
+
+It could change. The figure came from `calculation.payout_piastres`, which
+`blockers_for` recomputes on every request.
+
+**Cause.** `_row` returned one amount for both questions. For a draft month
+"what would this come to" and "what is owed" are the same number, so nothing
+looked wrong. For an **approved** month they are different by design: §11.4
+says an order settling after approval lands in the *next* month and never
+alters the one already agreed. Egyptian COD delivery straddles month end
+routinely, so the two figures would have diverged within days of going live.
+
+**What it would have looked like.** A month approved at E£5,512. Two orders
+land on 2 October. The payroll screen still says *Approved*, still sets the
+number in mono, and now reads E£5,900 — a figure nobody agreed, in the typeface
+that promises somebody did. The payments screen, reading the snapshot, would
+have said E£5,512. Two screens, two numbers, both labelled as the debt.
+
+**Fixed.** `_row` now returns `approved_obligation_piastres` from the active
+snapshot alongside the recalculation, and every place that prints the word
+*approved* or *agreed* uses the snapshot. Guarded by
+`test_an_approved_row_reports_what_was_agreed_and_what_it_would_be_now`, which
+approves a month, lands a late order, and asserts the agreed figure has not
+moved while the calculation has.
+
+**Worth recording.** The typographic rule did its job: the number was wrong
+long before the face was, but it was the *face* that made it obvious, because
+mono is a promise. A design rule that makes a data bug visible has earned its
+place.
+
+---
+
 ## Business rules with deliberate exposure
 
 These are not bugs. They are accepted costs, recorded so nobody "fixes" them.

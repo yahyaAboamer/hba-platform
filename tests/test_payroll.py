@@ -562,3 +562,32 @@ def test_working_month_falls_back_to_this_month_with_no_go_live(monkeypatch):
     monkeypatch.setattr(settings, "go_live_month", "", raising=False)
 
     assert working_month() == business_month(utcnow())
+
+
+def test_an_approved_row_reports_what_was_agreed_and_what_it_would_be_now(db):
+    """Two figures, and they are allowed to differ.
+
+    An order settling after approval changes the calculation and never the
+    obligation (§11.4). A screen showing the recalculated figure under the word
+    "approved" would present a working number as a debt.
+    """
+    from app.api.payroll import _row
+
+    nour = _affiliate(db)
+    _terms(db, nour)
+    _order(db, nour, "a-1", 1_000_000)
+    db.flush()
+
+    approve_month(db, nour, MONTH, actor_id=None, actor_email=None)
+    db.flush()
+
+    agreed = _row(db, nour, MONTH)["approved_obligation_piastres"]
+
+    # An order settles after the fact, exactly as Egyptian COD delivery does.
+    _order(db, nour, "late-1", 500_000)
+    db.flush()
+
+    row = _row(db, nour, MONTH)
+
+    assert row["approved_obligation_piastres"] == agreed, "the agreed figure moved"
+    assert row["obligation_piastres"] > agreed, "the calculation should have moved"

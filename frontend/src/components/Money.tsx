@@ -7,6 +7,14 @@ type Props = {
   kind?: MoneyKind;
   tone?: MoneyTone;
   title?: string;
+  /**
+   * Layout only — size and placement.
+   *
+   * The face and the colour are decided by `kind` and `tone` and are not
+   * open to a caller, because the whole value of ADR 0027 is that the same
+   * distinction looks the same on every screen.
+   */
+  className?: string;
 };
 
 /**
@@ -24,9 +32,15 @@ export function Money({
   kind = "provisional",
   tone = "neutral",
   title,
+  className,
 }: Props) {
   return (
-    <span className={moneyClass(kind, tone, piastres)} title={title}>
+    <span
+      className={[moneyClass(kind, tone, piastres), className]
+        .filter(Boolean)
+        .join(" ")}
+      title={title}
+    >
       {formatEgp(piastres)}
     </span>
   );
