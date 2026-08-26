@@ -1,3 +1,4 @@
+import pytest
 from sqlalchemy import text
 
 from app.db import engine
@@ -44,3 +45,48 @@ def test_no_schema_drift_between_the_models_and_the_migrations(db):
             "model - but do not let --autogenerate decide, because its answer "
             "to an undeclared column is to drop it."
         ) from drift
+
+
+def test_emptying_the_database_leaves_the_guards_on():
+    """The fast reset disables user triggers for one transaction so TRUNCATE
+    can pass the append-only guards. If that setting leaked - a session-level
+    SET riding along on a pooled connection - the guards would be off for
+    whatever ran next, and a later test would pass for the wrong reason.
+
+    So: empty the database, then prove an audit event still cannot be edited.
+    """
+    from sqlalchemy import text as sql_text
+
+    from app.db import engine
+    from tests.conftest import empty_the_database
+
+    empty_the_database()
+
+    with engine.begin() as connection:
+        connection.execute(
+            sql_text("INSERT INTO audit_event (action, subject) VALUES ('t', 's')")
+        )
+
+    with pytest.raises(Exception):
+        with engine.begin() as connection:
+            connection.execute(sql_text("UPDATE audit_event SET action = 'x'"))
+
+    empty_the_database()
+
+
+def test_emptying_the_database_keeps_the_schema_migrated():
+    """`alembic_version` is excluded on purpose. Emptying it would make the
+    schema look unmigrated and send the next run through every migration again
+    - which is the cost this whole change exists to remove.
+    """
+    from sqlalchemy import text as sql_text
+
+    from app.db import engine
+    from tests.conftest import empty_the_database
+
+    empty_the_database()
+
+    with engine.begin() as connection:
+        assert connection.execute(
+            sql_text("SELECT count(*) FROM alembic_version")
+        ).scalar() == 1

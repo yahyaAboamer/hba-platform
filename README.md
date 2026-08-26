@@ -80,3 +80,28 @@ this database cannot be reset, only rebuilt.
 
 Permissions are defined in code and enforced server-side. Hiding a control in
 the interface is presentation, not protection.
+
+## Running the tests
+
+```
+pytest
+```
+
+**Do not run two pytest processes at once.** The suite empties the database
+between tests, so a second run pulls the first one's rows out from under it and
+produces failures that look like real bugs. This has cost time more than once.
+
+The suite runs in about **90 seconds**. It used to take fifteen minutes, and the
+two reasons are worth knowing because both traps are easy to reintroduce:
+
+**Every test that commits used to rebuild the schema** - drop it, then re-run
+every migration - because the append-only guards refuse `TRUNCATE`. That is
+2.2 seconds a test across 317 tests. It now empties the tables inside a
+transaction with `session_replication_role = replica`, which is 0.2 seconds, and
+a test proves the guards are back on afterwards.
+
+**Password hashing is deliberately slow.** 600,000 PBKDF2 iterations is about a
+second, and every API test bootstraps an account. The session lowers the count
+to 1,000; `test_the_shipped_password_cost_is_not_this_one` reads the source and
+asserts what actually ships, so the fast setting cannot leak into production.
+
