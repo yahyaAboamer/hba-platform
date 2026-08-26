@@ -645,3 +645,20 @@ def test_order_facts_reports_whether_delivery_ever_landed(client, monkeypatch):
 
     assert body["already_indexed"]["delivery_state"]["delivered"] == 1
     assert body["already_indexed"]["delivery_state"]["(never asked)"] == 1
+
+
+def test_sync_reports_whether_payroll_can_be_approved(client, monkeypatch):
+    """§11.2. Blank blocks every approval, so "did the variable land?" needs to
+    be answerable without guessing at a deploy.
+    """
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "go_live_month", "", raising=False)
+    body = client.get("/api/operations/sync").json()
+    assert body["go_live_month"] is None
+    assert body["payroll_can_be_approved"] is False
+
+    monkeypatch.setattr(settings, "go_live_month", "2026-09", raising=False)
+    body = client.get("/api/operations/sync").json()
+    assert body["go_live_month"] == "2026-09"
+    assert body["payroll_can_be_approved"] is True

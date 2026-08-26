@@ -97,6 +97,12 @@ def sync_status(
     return {
         "shopify_configured": settings.shopify_configured,
         "webhooks_configured": bool(settings.shopify_webhook_secret),
+        # §11.2. Blank blocks every approval, deliberately - a default would
+        # silently make eight months of already-settled orders approvable.
+        # Reported here so "did the variable land?" is a fact rather than a
+        # guess about a deploy.
+        "go_live_month": settings.go_live_month or None,
+        "payroll_can_be_approved": bool(settings.go_live_month),
         "orders_indexed": db.execute(text("SELECT count(*) FROM order_index")).scalar()
         or 0,
         "last_order_synced_at": _isoformat(
