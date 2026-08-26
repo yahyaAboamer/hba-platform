@@ -217,7 +217,10 @@ def test_a_month_with_no_terms_says_so(client):
     assert "no_compensation_terms_for_this_month" in body["blockers"]
 
 
-def test_a_base_guarantee_blocks_until_targets_exist(client):
+def test_a_base_guarantee_with_no_target_recorded_blocks(client):
+    """Nobody has said what she was asked for, so nobody can say whether the
+    guarantee applies. §11.3 blocks on missing information.
+    """
     affiliate = _affiliate(client)
     _terms(
         client,
@@ -230,7 +233,78 @@ def test_a_base_guarantee_blocks_until_targets_exist(client):
     body = client.get(f"/api/affiliates/{affiliate['id']}/earnings/{MONTH}").json()
 
     assert body["is_payable"] is False
-    assert "base_guarantee_needs_targets_which_arrive_in_phase_5" in body["blockers"]
+    assert "no_target_recorded_for_this_month" in body["blockers"]
+    assert body["targets"]["achieved"] is None
+
+
+def test_a_verified_target_unlocks_the_guarantee_over_http(client):
+    """The end of the chain, through the endpoints somebody actually calls:
+    record the month on the grid, confirm it, and the guarantee applies.
+    """
+    affiliate = _affiliate(client)
+    _terms(
+        client,
+        affiliate["id"],
+        compensation_type="base_guarantee",
+        base_amount_piastres=800_000,
+    )
+    _paid_order(affiliate["id"], "1", 200_000)
+
+    client.put(
+        f"/api/targets/{MONTH}",
+        json={
+            "rows": [
+                {
+                    "affiliate_id": affiliate["id"],
+                    "required_videos": 8,
+                    "required_stories": 5,
+                    "actual_videos": 8,
+                    "actual_stories": 5,
+                }
+            ]
+        },
+    )
+    client.post(
+        f"/api/targets/{MONTH}/verify", json={"affiliate_ids": [affiliate["id"]]}
+    )
+
+    body = client.get(f"/api/affiliates/{affiliate['id']}/earnings/{MONTH}").json()
+
+    assert body["is_payable"] is True
+    assert body["targets"]["guarantee_applied"] is True
+    assert body["payout"]["piastres"] == 800_000
+
+
+def test_an_unverified_target_still_blocks_over_http(client):
+    affiliate = _affiliate(client)
+    _terms(
+        client,
+        affiliate["id"],
+        compensation_type="base_guarantee",
+        base_amount_piastres=800_000,
+    )
+
+    client.put(
+        f"/api/targets/{MONTH}",
+        json={
+            "rows": [
+                {
+                    "affiliate_id": affiliate["id"],
+                    "required_videos": 8,
+                    "required_stories": 5,
+                    "actual_videos": 8,
+                    "actual_stories": 5,
+                }
+            ]
+        },
+    )
+
+    body = client.get(f"/api/affiliates/{affiliate['id']}/earnings/{MONTH}").json()
+
+    assert body["is_payable"] is False
+    assert "targets_achieved_but_not_verified" in body["blockers"]
+    assert body["targets"]["achieved"] is True
+    assert body["targets"]["verified"] is False
 
 
 # ── The whole programme ────────────────────────────────────────────────────────

@@ -797,6 +797,49 @@ E£34,444 of merchandise against **E£2,689 actually refunded** — a factor of 
 thirteen. Goods come back; money largely does not. That is the exchange pattern
 ADR 0011 identified, now measured across a real sample rather than one order.
 
+### 🟠 Recording a target and verifying it are the same person
+
+**The limit.** `targets.record` and `targets.verify` are separate permissions,
+because one person recording a number that unlocks a payment is one person
+deciding what somebody is owed. **HBA's `content_manager` role holds both**
+(ADR 0018), so today the separation is structural rather than organisational:
+the platform enforces a split the staffing does not.
+
+Phase 3 recorded this for compensation. Phase 5 is where it starts **deciding
+payments** — a verified, achieved target is what applies a base guarantee (§9.5),
+and Sara can record the actuals and confirm them herself.
+
+**What failure looks like.** Not fraud, most likely. A miscount confirmed by the
+person who made it, and a guarantee paid on a month that did not qualify. Nothing
+errors, and the audit trail shows a correctly-followed process.
+
+**What exists instead.** The full trail: who recorded, when, who verified, when,
+and a written reason required to take a verification back. Re-recording actuals
+**clears any verification**, so a correction cannot inherit somebody else's
+confirmation.
+
+*What to do:* when there are two people, give `targets.verify` to somebody who
+does not hold `targets.record`. The endpoint check is already there and will start
+meaning something the day the roles differ.
+
+### 🟠 Nothing stops a target being changed after payroll
+
+**The limit.** §15 says recording is blocked once a month is `approved`.
+`assert_recordable` is where that rule lives and **it blocks nothing**, because
+approved months do not exist until Phase 6.
+
+**What failure looks like.** A target edited after a month was paid, changing
+whether a guarantee applied and therefore what the month was worth — after the
+money moved. The payroll snapshot would disagree with the target it was
+calculated from, and nothing would reconcile them.
+
+**Why it is a seam rather than a check.** The same shape as
+`assert_correctable` for compensation in Phase 3: one place for the rule to live
+so it is not remembered at three call sites later, called from every mutating
+path, and tested as being called.
+
+*Phase 6 must wire it*, and this entry is what says so.
+
 ### 🟠 A code created before the switch cannot be handed over
 
 **The limit.** `retire_and_replace` ends the old code the month **before** the
@@ -834,33 +877,32 @@ money in both directions.
 by hand. It means the two dates genuinely disagree, and someone has to decide
 which months belong to which code. Raise it, and build the feature above.
 
-### 🔴 A base guarantee cannot be paid until targets exist
+### 🟢 A base guarantee is paid *(fixed, Phase 5)*
 
-**The limit.** §9.5 pays a `base_guarantee` affiliate **max(commission, base
-amount)** — but *only when targets were achieved **and** verified*. Targets are
-Phase 5. So the calculation reports the commission figure and **refuses to
-resolve the guarantee**, blocking the month.
+**The limit, as it stood.** §9.5 pays a `base_guarantee` affiliate
+**max(commission, base amount)**, but only when targets were achieved *and*
+verified. Targets did not exist, so the calculation reported her commission and
+refused to resolve the guarantee — which meant **no base-guarantee model could be
+paid through the platform at all.**
 
-**Why it is not defaulted either way.** Both defaults are wrong with somebody's
-money:
+**Fixed.** `monthly_target` records what she was asked for and what she produced;
+verification confirms it; `calculate_month` applies §9.5.
 
-- Assume targets were missed → she is paid commission alone, and a model who hit
-  her targets is **underpaid** with nothing saying so.
-- Assume targets were met → the guarantee applies, and a model who missed them
-  is **overpaid** out of HBA's pocket.
+| Situation | Result |
+|---|---|
+| Achieved and verified | `max(commission, base)` |
+| Achieved, unverified | **Blocked** — verification is what unlocks it |
+| Recorded, missed | Commission, and the month approves |
+| Nothing recorded | **Blocked** — nobody knows |
 
-The commission is the floor in both readings, so it is still calculated and
-reported. What is unknown is only whether the guarantee lifts it.
+**The distinction that survives.** Missing information blocks; poor performance
+does not. A model who missed her targets is paid what she earned, promptly, and
+her month closes. The block exists only where the platform genuinely *does not
+know*, never as a penalty for a quiet month.
 
-**What failure looks like.** A `base_guarantee` month that cannot be approved,
-with `base_guarantee_needs_targets_which_arrive_in_phase_5` in its blockers. That
-is the intended behaviour, not a bug — but it means **no base-guarantee model can
-be paid through the platform until Phase 5 ships.**
-
-*What to do until then:* pay those models the way HBA does today, outside the
-platform, and let the month sit blocked. Do **not** switch them to `commission`
-to unblock it — that silently removes their guarantee and there would be nothing
-in the data to say it had ever applied.
+*The warning that is no longer needed:* switching a model from `base_guarantee`
+to `commission` to unblock a month silently removed her guarantee. There is now a
+correct way to unblock one — record her actuals and have somebody confirm them.
 
 ### 🔴 Correcting pay terms is not yet blocked by payroll
 

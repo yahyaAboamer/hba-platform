@@ -112,6 +112,20 @@ want some of that back. The order to add it in, easiest and most valuable first:
 order, written but never read. Whenever this is picked up, the history is already there —
 which also means the real cost of ignoring it can be measured before deciding.
 
+**Target types HBA defines itself.** V1 has two fixed numbers per model per month, videos
+and stories, because that is what Sara tracks today (confirmed 26 August 2026). The shape
+HBA wants eventually is **named numeric fields the business creates** — add a field, name
+it, give each model a number for it — rather than two columns everyone shares whose only
+difference is the target value.
+
+*Not V1, and deliberately:* it turns a target from two columns into a definition plus values,
+which is a schema, a form, and a set of questions about what happens to history when a field
+is renamed or removed. **The input type is always a number**, which keeps it far smaller than
+a general custom-field system — worth remembering when it is picked up.
+
+Nothing in `monthly_target` blocks it: the achieved rule is *every requirement met*, which
+generalises to any number of fields without changing.
+
 **Unspecified future features.** The business expects more. This is the reason for the
 governing principle in §1.
 
