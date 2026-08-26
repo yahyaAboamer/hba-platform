@@ -36,7 +36,7 @@ from dataclasses import asdict
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.businesstime import parse_month, utcnow
+from app.core.businesstime import business_month, parse_month, utcnow
 from app.models.affiliates import AccountKind, AffiliateProfile
 from app.models.attributed_orders import AttributedOrder
 from app.models.payroll import CalculationState, PayrollMonth, PayrollSnapshot
@@ -299,6 +299,28 @@ def go_live_month() -> str:
     from app.config import settings
 
     return str(settings.go_live_month or "").strip()
+
+
+def working_month() -> str:
+    """The month a screen should open on.
+
+    Normally this month. Before go-live it is the go-live month instead.
+
+    On 26 August, with the platform starting in September, "this month" holds
+    nothing at all: every figure is zero and every list is empty, because the
+    platform was not responsible for August. Somebody opening the tool in that
+    week is there to get September ready, and showing them an empty August
+    reads as "the numbers are broken" rather than "this month is not ours".
+
+    This decides only what a screen **defaults to**. It never decides which
+    month an order belongs to - that is the order's own date, taken in Cairo
+    (ADR 0005), and nothing here may move it.
+    """
+    now = business_month(utcnow())
+    configured = go_live_month()
+    if configured and now < parse_month(configured):
+        return parse_month(configured)
+    return now
 
 
 def is_historical(month: str) -> bool:

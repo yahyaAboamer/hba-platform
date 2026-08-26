@@ -383,3 +383,44 @@ def test_deleting_an_affiliate_takes_their_code_periods(db):
     db.flush()
 
     assert db.query(DiscountCodePeriod).count() == 0
+
+
+def test_codes_with_status_says_whether_shopify_confirmed_each_one(db):
+    """Registered and confirmed are different facts, and a screen needs both.
+
+    An unconfirmed code still attributes orders. What is unknown is whether it
+    exists on Shopify at all - so if it was mistyped, no order will ever carry
+    it, and nothing looks wrong (docs/limits.md).
+    """
+    from app.services.codes import codes_with_status
+
+    nour = _affiliate(db)
+    register_code(db, nour, "SEEN", "2026-01", verified_at=utcnow())
+    register_code(db, nour, "UNSEEN", "2026-01")
+    db.flush()
+
+    found = codes_with_status(db, nour, "2026-03")
+
+    assert [(row["code"], row["verified"]) for row in found] == [
+        ("SEEN", True),
+        ("UNSEEN", False),
+    ]
+
+
+def test_codes_for_and_codes_with_status_agree(db):
+    """One definition of "owned in this month", used two ways.
+
+    Two copies of that filter would eventually disagree, and the way anybody
+    would find out is a model paid for somebody else's orders.
+    """
+    from app.services.codes import codes_with_status
+
+    nour = _affiliate(db)
+    register_code(db, nour, "KEPT", "2026-01")
+    register_code(db, nour, "ENDED", "2026-01", end_month="2026-02")
+    db.flush()
+
+    for month in ("2026-01", "2026-02", "2026-03"):
+        assert codes_for(db, nour, month) == [
+            row["code"] for row in codes_with_status(db, nour, month)
+        ]

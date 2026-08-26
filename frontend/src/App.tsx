@@ -4,6 +4,8 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { currentUser } from "./lib/api";
 import type { Session } from "./lib/api";
+import { AffiliateDetail } from "./screens/AffiliateDetail";
+import { Affiliates } from "./screens/Affiliates";
 import { Overview } from "./screens/Overview";
 import { SignIn } from "./screens/SignIn";
 
@@ -50,30 +52,28 @@ export default function App() {
         />
         {session ? (
           <Route element={<Layout session={session} />}>
-            <Route path="/" element={<Overview />} />
-            <Route
-              path="/affiliates"
-              element={<NotBuiltYet name="Affiliates" phase="Next." />}
-            />
+            <Route path="/" element={<Overview session={session} />} />
+            <Route path="/affiliates" element={<Affiliates />} />
+            <Route path="/affiliates/:id" element={<AffiliateDetail />} />
             <Route
               path="/orders"
-              element={<NotBuiltYet name="Orders" phase="After affiliates." />}
+              element={<NotBuiltYet name="Orders" phase="Coming after the payroll screens." />}
             />
             <Route
               path="/payroll"
-              element={<NotBuiltYet name="Payroll" phase="After orders." />}
+              element={<NotBuiltYet name="Payroll" phase="Coming next, after affiliates." />}
             />
             <Route
               path="/payments"
-              element={<NotBuiltYet name="Payments" phase="After payroll." />}
+              element={<NotBuiltYet name="Payments" phase="Coming after payroll." />}
             />
             <Route
               path="/targets"
-              element={<NotBuiltYet name="Targets" phase="After payments." />}
+              element={<NotBuiltYet name="Targets" phase="Coming after payments." />}
             />
             <Route
               path="/settings"
-              element={<NotBuiltYet name="Settings" phase="Last." />}
+              element={<NotBuiltYet name="Settings" phase="Coming last." />}
             />
           </Route>
         ) : (

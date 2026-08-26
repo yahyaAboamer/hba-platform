@@ -1274,6 +1274,38 @@ Recorded because the same trap applies to any future `fileConfig` or
 
 ---
 
+## UI copy asserted a failure the backend does not have
+
+**Symptom.** Malak's profile showed a red banner reading "Shopify has not
+confirmed this code yet, so no orders are being attributed to it" — directly
+above a panel reading **Sales that count: E£2,100.00**. The page contradicted
+itself in two adjacent boxes.
+
+**Cause.** Mine, in the copy. I assumed verification gated attribution. It does
+not: `registered_codes` matches on *registered* periods and never looks at
+`shopify_verified_at`, so a code nobody has confirmed still attributes orders
+perfectly well. The list screen inherited the same wrong idea and counted such
+affiliates under "cannot earn yet".
+
+**What verification actually buys.** Confirmation that the code exists on
+Shopify. If it was mistyped, or was never created there, **no order will ever
+carry it** — and the failure is silent, because an affiliate with no sales looks
+exactly like an affiliate who made none. The risk is real; it is just a
+different risk, and one degree less severe than "her money is going nowhere".
+
+**Fixed** in `Affiliates.tsx` and `AffiliateDetail.tsx`: the column is
+*Needs attention*, missing pay terms is listed first as the one that genuinely
+stops payroll, and the unconfirmed-code text says what the actual exposure is.
+
+**Worth recording even though nothing shipped.** An interface that overstates a
+problem is not a safe error to make. Somebody who is told twice that a working
+code is broken learns to ignore the warning, and the warning is there for the
+day the code really is wrong. The reason this was caught at all is that the
+seed data put a contradiction on one screen — reasoning about the copy alone
+would not have found it.
+
+---
+
 ## Business rules with deliberate exposure
 
 These are not bugs. They are accepted costs, recorded so nobody "fixes" them.

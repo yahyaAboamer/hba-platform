@@ -138,10 +138,29 @@ def owner_of(db: Session, code: str, month: str) -> AffiliateProfile | None:
 
 
 def codes_for(db: Session, affiliate: AffiliateProfile, month: str) -> list[str]:
-    """Every code this affiliate owned in this month."""
+    """Every code this affiliate owned in this month, names only.
+
+    Built on `codes_with_status` so there is one definition of "owned in this
+    month". Two copies of that filter would eventually disagree, and the way
+    anybody would find out is a model being paid for somebody else's orders.
+    """
+    return [row["code"] for row in codes_with_status(db, affiliate, month)]
+
+
+def codes_with_status(
+    db: Session, affiliate: AffiliateProfile, month: str
+) -> list[dict]:
+    """Every code this affiliate owned in this month, and whether Shopify
+    has confirmed each one.
+
+    Separate from `codes_for`, which answers "which codes" for callers that do
+    not care why. A screen does care: a registered code Shopify has never
+    heard of earns nothing, and looks exactly like a working one until
+    somebody asks where the money went.
+    """
     parse_month(month)
     rows = db.scalars(
-        select(DiscountCodePeriod.code)
+        select(DiscountCodePeriod)
         .where(DiscountCodePeriod.affiliate_id == affiliate.id)
         .where(DiscountCodePeriod.start_month <= month)
         .where(
@@ -150,7 +169,15 @@ def codes_for(db: Session, affiliate: AffiliateProfile, month: str) -> list[str]
         )
         .order_by(DiscountCodePeriod.code)
     )
-    return list(rows)
+    return [
+        {
+            "code": row.code,
+            "verified": row.shopify_verified_at is not None,
+            "start_month": row.start_month,
+            "end_month": row.end_month,
+        }
+        for row in rows
+    ]
 
 
 def registered_codes(db: Session, month: str) -> dict[str, int]:

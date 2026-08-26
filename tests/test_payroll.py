@@ -525,3 +525,40 @@ def test_a_target_for_an_unapproved_month_is_still_editable(db):
     record_actuals(db, other, videos=8, stories=5)
 
     assert other.actual_videos == 8
+
+
+# ── Which month a screen opens on ──────────────────────────────────────────────
+
+
+def test_working_month_is_this_month_once_the_platform_is_live(monkeypatch):
+    from app.config import settings
+    from app.core.businesstime import business_month, utcnow
+    from app.services.payroll import working_month
+
+    monkeypatch.setattr(settings, "go_live_month", "2026-01", raising=False)
+
+    assert working_month() == business_month(utcnow())
+
+
+def test_working_month_is_the_go_live_month_before_the_platform_starts(monkeypatch):
+    """The week before go-live, "this month" holds nothing at all.
+
+    Opening on it shows every figure at zero, which reads as a broken tool
+    rather than as a month the platform was never responsible for.
+    """
+    from app.config import settings
+    from app.services.payroll import working_month
+
+    monkeypatch.setattr(settings, "go_live_month", "2099-06", raising=False)
+
+    assert working_month() == "2099-06"
+
+
+def test_working_month_falls_back_to_this_month_with_no_go_live(monkeypatch):
+    from app.config import settings
+    from app.core.businesstime import business_month, utcnow
+    from app.services.payroll import working_month
+
+    monkeypatch.setattr(settings, "go_live_month", "", raising=False)
+
+    assert working_month() == business_month(utcnow())

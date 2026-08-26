@@ -20,6 +20,7 @@ from app.models.identity import RoleAssignment, UserAccount
 from app.services.audit import record_audit
 from app.services.auth import authenticate, issue_session, revoke_session
 from app.services.invitations import accept_invitation, create_invitation
+from app.services.payroll import go_live_month, working_month
 
 router = APIRouter(prefix="/api/auth")
 
@@ -167,8 +168,21 @@ def logout(
 def me(
     user: UserAccount = Depends(current_user), db: Session = Depends(get_session)
 ) -> dict:
-    """The caller's identity and everything they may do."""
-    return {"actor": actor_payload(db, user), "permissions": permission_list(db, user)}
+    """The caller's identity, everything they may do, and where the platform is.
+
+    `platform` rides along because every screen needs it before it can render a
+    single figure, and this request is already made once at start-up. A second
+    round trip to ask "which month are we in" would be one more thing that can
+    fail between signing in and seeing anything.
+    """
+    return {
+        "actor": actor_payload(db, user),
+        "permissions": permission_list(db, user),
+        "platform": {
+            "working_month": working_month(),
+            "go_live_month": go_live_month() or None,
+        },
+    }
 
 
 @router.post("/invitations", status_code=201)
