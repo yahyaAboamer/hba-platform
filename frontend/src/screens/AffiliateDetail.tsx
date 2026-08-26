@@ -298,6 +298,16 @@ export function AffiliateDetail() {
                   </span>
                 </Row>
               )}
+              {detail.payout_destination.instapay_phone && (
+                <Row label="InstaPay number">
+                  <span className="code">
+                    {detail.payout_destination.instapay_phone}
+                  </span>
+                  <span className="detail__note">
+                    Used when the app does not open
+                  </span>
+                </Row>
+              )}
               {detail.payout_destination.wallet_phone && (
                 <Row label="Wallet number">
                   <span className="code">
@@ -314,7 +324,7 @@ export function AffiliateDetail() {
                */}
               <p className="detail__masked">
                 {detail.payout_destination.method === "instapay"
-                  ? "Shortened on purpose. Paying opens InstaPay with her address filled in — nobody has to read it."
+                  ? "Shortened on purpose. Paying opens InstaPay with her address filled in, and shows her number beside it for when the app does not open."
                   : "Shortened on purpose. The full number is shown on the payment screen, when you are about to send the money."}
               </p>
             </dl>
