@@ -1,0 +1,39 @@
+.sign-in {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: var(--space-4);
+}
+
+.sign-in__form {
+  width: 100%;
+  max-width: 22rem;
+}
+
+.sign-in__brand {
+  margin-bottom: var(--space-6);
+}
+
+.sign-in__mark {
+  display: block;
+  font-family: var(--mono);
+  font-size: var(--text-xl);
+  font-weight: 600;
+  letter-spacing: -0.04em;
+}
+
+.sign-in__title {
+  font-size: var(--text-sm);
+  font-weight: 400;
+  color: var(--quiet);
+  margin-top: var(--space-1);
+}
+
+.sign-in__error {
+  margin-bottom: var(--space-4);
+}
+
+.sign-in__submit {
+  width: 100%;
+  justify-content: center;
+}

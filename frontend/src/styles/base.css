@@ -1,0 +1,293 @@
+/* Reset, typography, and the shared primitives. ADR 0027. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: var(--sans);
+  font-size: var(--text-base);
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--paper);
+  /* Tabular figures everywhere, not only in the money column. A count of
+     orders that shifts width as it changes is a count that is hard to scan. */
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+
+h1 {
+  font-size: var(--text-xl);
+}
+h2 {
+  font-size: var(--text-lg);
+}
+h3 {
+  font-size: var(--text-base);
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+/* Visible, and the same everywhere. The one place colour appears outside money
+   state, because focus is the one thing that must never blend in. */
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── Money ────────────────────────────────────────────────────────────────
+ *
+ * ADR 0027. The typeface says whether a figure is real.
+ *
+ *   .money            provisional — a working number, in the prose face
+ *   .money--agreed    frozen in an approved snapshot, in the mono face
+ *   .money--blocked   cannot be approved; the reason sits beside it
+ *
+ * §12.5: money never wraps or truncates at any width. If a figure does not
+ * fit, the layout changes — never the number.
+ */
+.money {
+  font-family: var(--sans);
+  font-variant-numeric: tabular-nums;
+  color: var(--quiet);
+  white-space: nowrap;
+}
+
+.money--agreed {
+  font-family: var(--mono);
+  font-weight: 500;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+}
+
+.money--owed {
+  color: var(--owed);
+}
+
+.money--settled {
+  color: var(--settled);
+}
+
+.money--blocked {
+  color: var(--quiet);
+}
+
+.money--zero {
+  color: var(--rule-strong);
+}
+
+/* Codes, months, order numbers. Things that line up in a column. */
+.code {
+  font-family: var(--mono);
+  font-size: var(--text-sm);
+  letter-spacing: -0.01em;
+}
+
+/* ── State ────────────────────────────────────────────────────────────────
+ *
+ * A word, not a pill. Twenty coloured badges in a column is twenty things to
+ * read; the point is to answer the question before reading.
+ */
+.state {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+  color: var(--quiet);
+  white-space: nowrap;
+}
+
+.state--earned,
+.state--settled,
+.state--approved {
+  color: var(--settled);
+}
+
+.state--void,
+.state--refused {
+  color: var(--refused);
+}
+
+.state--unpaid,
+.state--partially_paid {
+  color: var(--owed);
+}
+
+/* ── The refusal ──────────────────────────────────────────────────────────
+ *
+ * §11.3: blockers refuse, they do not warn. So a blocked row says what is
+ * missing in words, on the row, rather than hiding it behind an icon.
+ */
+.blocker {
+  font-size: var(--text-xs);
+  color: var(--refused);
+  white-space: nowrap;
+}
+
+/* ── Tables ───────────────────────────────────────────────────────────────
+ *
+ * Hairlines and space. Calm density (§12.1): built for scanning twenty
+ * affiliates at month end, not for looking impressive in a screenshot.
+ */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.table th {
+  text-align: left;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--quiet);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--rule-strong);
+  white-space: nowrap;
+}
+
+.table td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--rule);
+  height: var(--row-height);
+}
+
+.table tbody tr:hover {
+  background: var(--hover);
+}
+
+.table .numeric {
+  text-align: right;
+}
+
+/* ── Buttons ──────────────────────────────────────────────────────────────
+ *
+ * One shape. The weight of an action is carried by what it says, not by how
+ * loud it looks — "Approve August" is already the strongest thing on a page.
+ */
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.button:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.button:disabled {
+  color: var(--rule-strong);
+  cursor: not-allowed;
+}
+
+.button--primary {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--surface);
+}
+
+.button--primary:hover:not(:disabled) {
+  background: #000;
+}
+
+.button--primary:disabled {
+  background: var(--rule);
+  border-color: var(--rule);
+  color: var(--quiet);
+}
+
+/* ── Fields ───────────────────────────────────────────────────────────────*/
+
+.field {
+  display: block;
+  margin-bottom: var(--space-4);
+}
+
+.field__label {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  margin-bottom: var(--space-1);
+}
+
+.field__hint {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--quiet);
+  margin-top: var(--space-1);
+}
+
+.input {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+/* ── Messages ─────────────────────────────────────────────────────────────
+ *
+ * An error explains what went wrong and how to fix it, in the interface's
+ * voice. It does not apologise and it is never vague about what happened.
+ */
+.notice {
+  padding: var(--space-3) var(--space-4);
+  border-left: 2px solid var(--rule-strong);
+  background: var(--surface);
+  font-size: var(--text-sm);
+}
+
+.notice--refused {
+  border-left-color: var(--refused);
+  background: var(--refused-quiet);
+  color: var(--refused);
+}
+
+/* An empty screen is an invitation to act, not a shrug. */
+.empty {
+  padding: var(--space-8) var(--space-4);
+  text-align: center;
+  color: var(--quiet);
+  font-size: var(--text-sm);
+}

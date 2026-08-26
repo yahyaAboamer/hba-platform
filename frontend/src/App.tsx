@@ -1,37 +1,85 @@
 import { useEffect, useState } from "react";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
-type Health = { status: string };
+import { Layout } from "./components/Layout";
+import { currentUser } from "./lib/api";
+import type { Session } from "./lib/api";
+import { Overview } from "./screens/Overview";
+import { SignIn } from "./screens/SignIn";
 
-/**
- * Placeholder shell.
- *
- * Its only job is to prove the deployment shape end to end: React builds to
- * static assets, FastAPI serves them, and the browser can reach the API from
- * the same origin. Real screens arrive with the modules that need them.
- */
+/** A section that exists in the navigation and not yet in the platform. */
+function NotBuiltYet({ name, phase }: { name: string; phase: string }) {
+  return (
+    <>
+      <div className="page__head">
+        <div className="page__title">
+          <h1>{name}</h1>
+        </div>
+      </div>
+      <p className="empty">
+        {name} is built in the platform and does not have a screen yet. {phase}
+      </p>
+    </>
+  );
+}
+
 export default function App() {
-  const [health, setHealth] = useState<Health | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    fetch("/api/health/ready")
-      .then((response) => response.json())
-      .then(setHealth)
-      .catch(() => setError("Could not reach the API"));
+    currentUser()
+      .then(setSession)
+      .catch(() => setSession(null))
+      .finally(() => setChecking(false));
   }, []);
 
+  // Nothing is rendered until it is known whether somebody is signed in.
+  // Flashing the sign-in screen at a signed-in person reads as being logged
+  // out, which on a payroll tool is alarming rather than merely untidy.
+  if (checking) return null;
+
   return (
-    <main
-      style={{
-        fontFamily: "system-ui, -apple-system, sans-serif",
-        padding: "3rem",
-        color: "#1a1a1a",
-      }}
-    >
-      <h1 style={{ fontWeight: 600, margin: 0 }}>HBA Platform</h1>
-      <p style={{ color: "#666", marginTop: "0.5rem" }}>
-        {error ?? (health ? `API status: ${health.status}` : "Checking API…")}
-      </p>
-    </main>
+    <BrowserRouter>
+      <Routes>
+        <Route
+          path="/sign-in"
+          element={
+            session ? <Navigate to="/" replace /> : <SignIn onSignedIn={setSession} />
+          }
+        />
+        {session ? (
+          <Route element={<Layout session={session} />}>
+            <Route path="/" element={<Overview />} />
+            <Route
+              path="/affiliates"
+              element={<NotBuiltYet name="Affiliates" phase="Next." />}
+            />
+            <Route
+              path="/orders"
+              element={<NotBuiltYet name="Orders" phase="After affiliates." />}
+            />
+            <Route
+              path="/payroll"
+              element={<NotBuiltYet name="Payroll" phase="After orders." />}
+            />
+            <Route
+              path="/payments"
+              element={<NotBuiltYet name="Payments" phase="After payroll." />}
+            />
+            <Route
+              path="/targets"
+              element={<NotBuiltYet name="Targets" phase="After payments." />}
+            />
+            <Route
+              path="/settings"
+              element={<NotBuiltYet name="Settings" phase="Last." />}
+            />
+          </Route>
+        ) : (
+          <Route path="*" element={<Navigate to="/sign-in" replace />} />
+        )}
+      </Routes>
+    </BrowserRouter>
   );
 }

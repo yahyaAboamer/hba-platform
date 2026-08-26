@@ -1,0 +1,191 @@
+/*
+ * The month grid. §12.4.
+ *
+ * A locked month is shown as locked *before* it is clicked, which is the whole
+ * reason the native control was replaced. The three locks are distinguished
+ * because they mean different things: one can be undone, two cannot.
+ */
+
+.month-picker {
+  position: relative;
+  display: inline-block;
+}
+
+.month-picker__trigger {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.month-picker__trigger:hover {
+  background: var(--hover);
+}
+
+.month-picker__value {
+  font-weight: 500;
+}
+
+.month-picker__caret {
+  font-size: 0.625rem;
+  color: var(--quiet);
+}
+
+.month-picker__panel {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + var(--space-1));
+  left: 0;
+  width: 17rem;
+  padding: var(--space-3);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.month-picker__years {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
+}
+
+.month-picker__year {
+  font-family: var(--mono);
+  font-weight: 500;
+}
+
+.month-picker__year-step {
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--quiet);
+  cursor: pointer;
+}
+
+.month-picker__year-step:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+
+.month-picker__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-1);
+}
+
+.month-picker__month {
+  padding: var(--space-2) 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: none;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.month-picker__month:hover {
+  background: var(--hover);
+}
+
+.month-picker__month--selected {
+  background: var(--ink);
+  color: var(--surface);
+}
+
+.month-picker__month--selected:hover {
+  background: var(--ink);
+}
+
+/*
+ * Locked, and legible as locked without colour doing the work — a hatch reads
+ * the same to everybody, and colour here is spent on money state (ADR 0027).
+ * Still clickable: §12.4 says clicking a locked month explains the lock.
+ */
+.month-picker__month--historical,
+.month-picker__month--approved,
+.month-picker__month--future {
+  color: var(--quiet);
+  cursor: help;
+}
+
+.month-picker__month--historical {
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 3px,
+    var(--rule) 3px,
+    var(--rule) 4px
+  );
+}
+
+.month-picker__month--approved {
+  background: var(--settled-quiet);
+  color: var(--settled);
+}
+
+.month-picker__month--future {
+  color: var(--rule-strong);
+}
+
+.month-picker__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  margin: var(--space-3) 0 0;
+  padding: var(--space-3) 0 0;
+  border-top: 1px solid var(--rule);
+  list-style: none;
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}
+
+.month-picker__legend li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.month-picker__swatch {
+  display: inline-block;
+  width: 0.625rem;
+  height: 0.625rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: 2px;
+}
+
+.month-picker__swatch--historical {
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 2px,
+    var(--rule-strong) 2px,
+    var(--rule-strong) 3px
+  );
+}
+
+.month-picker__swatch--approved {
+  background: var(--settled-quiet);
+  border-color: var(--settled);
+}
+
+.month-picker__swatch--future {
+  background: var(--paper);
+}
+
+/* Said out loud for a screen reader, drawn for everybody else by the hatch and
+   the tint. A `title` alone is announced inconsistently and never on touch. */
+.month-picker__mark-text {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
