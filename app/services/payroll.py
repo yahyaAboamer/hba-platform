@@ -139,6 +139,14 @@ def blockers_for(
     if held_order_count(db, affiliate, month):
         blockers.append(ORDERS_ON_HOLD)
 
+    # Section 11.2. An unset go-live would silently make eight months of
+    # imported orders approvable - money already settled outside the platform,
+    # ready to be paid a second time.
+    if not go_live_month():
+        blockers.append(NO_GO_LIVE_MONTH)
+    elif is_historical(month):
+        blockers.append(ALREADY_SETTLED_OUTSIDE)
+
     return blockers, calculation
 
 
@@ -277,3 +285,251 @@ def snapshots_for(
             .order_by(PayrollSnapshot.version)
         )
     )
+
+
+# -- Historical months (Section 11.2, ADR 0014) --------------------------------
+
+#: Section 11.2. Nobody has said which month the platform starts paying for, so
+#: it refuses to pay for any of them.
+NO_GO_LIVE_MONTH = "go_live_month_is_not_configured"
+
+
+def go_live_month() -> str:
+    """The first month the platform is responsible for. Empty until chosen."""
+    from app.config import settings
+
+    return str(settings.go_live_month or "").strip()
+
+
+def is_historical(month: str) -> bool:
+    """Section 11.2. Before go-live, and settled outside the platform.
+
+    Re-importing from January gives every model months of orders with no
+    payroll records. Without this they all read as unfinalised and **owed** -
+    money HBA already paid, presented as a debt.
+    """
+    parse_month(month)
+    configured = go_live_month()
+    if not configured:
+        return False
+    return month < parse_month(configured)
+
+
+def historical_sales(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
+    """What a historical month shows: sales, and no commission figure.
+
+    **Decided, and worth restating** (ADR 0014). Computing March's commission
+    needs March's rates, which exist only in the old system and in somebody's
+    memory. Applying today's rates to last March would be actively misleading,
+    and reconstructing them by hand invites errors nobody could later verify.
+    """
+    rows = list(
+        db.scalars(
+            select(AttributedOrder)
+            .where(AttributedOrder.affiliate_id == affiliate.id)
+            .where(AttributedOrder.business_month == month)
+        )
+    )
+    return {
+        "affiliate_id": affiliate.id,
+        "month": month,
+        "calculation_state": CalculationState.HISTORICAL,
+        "orders": len(rows),
+        "net_sales_piastres": sum(row.commission_base_piastres for row in rows),
+        "commission": None,
+        "label": "Settled before the platform - commission not calculated",
+        "is_payable": False,
+    }
+
+
+# -- Carry-forward (Section 11.4) ---------------------------------------------
+
+
+def carried_into(
+    db: Session, affiliate: AffiliateProfile, month: str
+) -> list[AttributedOrder]:
+    """Orders from earlier months that this draft month will pay.
+
+    Section 11.4, and **the common path rather than an edge case**: Egyptian
+    cash-on-delivery routinely straddles month end, so an order placed on
+    29 August may still be travelling when payroll runs on 5 September.
+
+    An order qualifies when it was placed **before** this month, is earned, has
+    not been settled by any payroll, and its own month is already approved -
+    that last condition is what makes it *carried* rather than simply late. An
+    unapproved earlier month will pay its own orders when it is approved.
+
+    **Its business_month never changes.** August sales means orders placed in
+    August, frozen by trigger since Phase 4. Carry-forward is about which
+    payroll pays an order, never about which month it belongs to - and
+    conflating the two is what would make a model's own arithmetic disagree
+    with her payment.
+    """
+    parse_month(month)
+    approved_months = {
+        row.month
+        for row in db.scalars(
+            select(PayrollMonth)
+            .where(PayrollMonth.affiliate_id == affiliate.id)
+            .where(PayrollMonth.calculation_state == CalculationState.APPROVED)
+        )
+    }
+    if not approved_months:
+        return []
+
+    rows = db.scalars(
+        select(AttributedOrder)
+        .where(AttributedOrder.affiliate_id == affiliate.id)
+        .where(AttributedOrder.business_month < month)
+        .where(AttributedOrder.settled_in_snapshot_id.is_(None))
+        .order_by(AttributedOrder.business_month, AttributedOrder.shopify_order_id)
+    )
+    return [
+        row
+        for row in rows
+        if row.counts_toward_payout and row.business_month in approved_months
+    ]
+
+
+def carry_forward_summary(
+    db: Session, affiliate: AffiliateProfile, month: str
+) -> list[dict]:
+    """The labelled lines Section 11.4 describes, one per month carried from.
+
+    "Carried forward from August - 2 orders, 840 pounds."
+    """
+    carried = carried_into(db, affiliate, month)
+    by_month: dict[str, dict] = {}
+    for order in carried:
+        line = by_month.setdefault(
+            order.business_month,
+            {"from_month": order.business_month, "orders": 0, "piastres": 0},
+        )
+        line["orders"] += 1
+        line["piastres"] += order.commission_base_piastres
+    return [by_month[key] for key in sorted(by_month)]
+
+
+# -- Reopen (Section 11.5) ----------------------------------------------------
+
+
+def reopen_month(
+    db: Session,
+    affiliate: AffiliateProfile,
+    month: str,
+    *,
+    reason: str,
+    actor_id: int | None = None,
+    actor_email: str | None = None,
+) -> PayrollMonth:
+    """Return an approved month to draft.
+
+    **The most dangerous operation in the platform** - it touches a month
+    somebody has been paid for. Hence: a written reason, the prior snapshot
+    preserved as a version, and payment allocations against it left untouched.
+    Money that moved does not un-move because a calculation was revisited.
+
+    Orders settled by the reopened snapshot are **released**, so the
+    recalculation can pay them again. Orders paid by a *different* snapshot are
+    left alone - that month is settled, and Section 11.4 says they stay there.
+    """
+    parse_month(month)
+    if not str(reason or "").strip():
+        raise ValueError("Reopening an approved month requires a written reason")
+
+    payroll_month = get_month(db, affiliate, month)
+    if payroll_month is None or not payroll_month.is_approved:
+        raise ValueError(f"{affiliate.name}'s {month} is not approved")
+
+    snapshot_id = payroll_month.active_snapshot_id
+    released = 0
+    if snapshot_id is not None:
+        for order in db.scalars(
+            select(AttributedOrder).where(
+                AttributedOrder.settled_in_snapshot_id == snapshot_id
+            )
+        ):
+            order.settled_in_snapshot_id = None
+            order.settled_at = None
+            released += 1
+
+    payroll_month.calculation_state = CalculationState.DRAFT
+    payroll_month.active_snapshot_id = None
+    payroll_month.updated_at = utcnow()
+    db.flush()
+
+    record_audit(
+        db,
+        action="payroll.reopened",
+        subject=f"affiliate:{affiliate.id}",
+        actor_id=actor_id,
+        actor_email=actor_email,
+        before={"month": month, "snapshot_id": snapshot_id},
+        after={"month": month, "orders_released": released},
+        reason=reason.strip(),
+    )
+    return payroll_month
+
+
+def reconciliation_for(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
+    """Section 11.5. What re-approving changed, and what to do about it.
+
+    Three outcomes, and **the platform reports rather than decides**: an
+    overpayment is a credit or a write-off, and which one is a business
+    judgement about a person HBA knows.
+    """
+    payroll_month = get_month(db, affiliate, month)
+    if payroll_month is None:
+        return {"outcome": "no_month"}
+
+    versions = snapshots_for(db, payroll_month)
+    if len(versions) < 2:
+        return {"outcome": "not_reconcilable", "versions": len(versions)}
+
+    previous, latest = versions[-2], versions[-1]
+    difference = (
+        latest.approved_obligation_piastres - previous.approved_obligation_piastres
+    )
+    outcome = "unchanged"
+    if difference > 0:
+        outcome = "underpaid"
+    elif difference < 0:
+        outcome = "overpaid"
+
+    return {
+        "outcome": outcome,
+        "difference_piastres": difference,
+        "from_version": previous.version,
+        "to_version": latest.version,
+        # Section 11.5: the maintainer chooses a credit or a write-off.
+        # Deciding here would be the platform spending HBA's money on its own
+        # judgement.
+        "resolution": None,
+    }
+
+
+def months_left_reopened(db: Session, month: str | None = None) -> list[PayrollMonth]:
+    """Section 11.5. Months returned to draft and never re-approved.
+
+    **The dangerous state is not reopening; it is forgetting.** A month sitting
+    in draft with payments already made against a superseded snapshot is a
+    balance nobody is watching.
+    """
+    query = (
+        select(PayrollMonth)
+        .where(PayrollMonth.calculation_state == CalculationState.DRAFT)
+        .where(PayrollMonth.active_snapshot_id.is_(None))
+    )
+    if month is not None:
+        query = query.where(PayrollMonth.month == parse_month(month))
+
+    return [
+        row
+        for row in db.scalars(query)
+        if db.scalar(
+            select(PayrollSnapshot.id)
+            .where(PayrollSnapshot.payroll_month_id == row.id)
+            .limit(1)
+        )
+        is not None
+    ]

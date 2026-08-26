@@ -101,6 +101,35 @@ created in Shopify without being registered on the platform.
 
 ---
 
+## The go-live month — set this before the first real payroll
+
+```
+GO_LIVE_MONTH=2026-09
+```
+
+A Railway service variable. **Chosen by HBA on 26 August 2026: September 2026 is
+the first month the platform is responsible for paying.**
+
+Everything before it is `historical`: imported, visible, and **never payable**.
+January to August 2026 were settled outside the platform, and without this line
+they would all appear as unfinalised debt.
+
+Those months show **sales only, never a commission figure** (ADR 0014). March's
+rates exist in the old system and in somebody's memory; applying today's rates to
+last March would be actively misleading, and reconstructing them by hand invites
+errors nobody could later verify. They are labelled *"Settled before the platform
+— commission not calculated."*
+
+**Blank blocks every approval**, with `go_live_month_is_not_configured`. That is
+deliberate: a default would silently make eight months of already-paid orders
+look approvable, ready to be paid a second time.
+
+**Do not move it once a month has been approved.** Shifting it would turn
+approved months into historical ones, or historical months into payable ones, and
+neither has a defined behaviour.
+
+---
+
 ## Before believing any earnings figure
 
 ```

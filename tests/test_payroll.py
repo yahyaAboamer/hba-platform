@@ -41,6 +41,20 @@ from app.services.targets import record_actuals, set_requirements, verify
 MONTH = "2026-04"
 
 
+@pytest.fixture(autouse=True)
+def _go_live(monkeypatch):
+    """A configured go-live month, so the §11.2 guard does not block every test.
+
+    It blocks by default, and that is deliberate: an unset go-live would
+    silently make eight months of imported orders approvable. Every test here
+    is about something else, so each one says out loud that the month is
+    configured rather than relying on a default that must not exist.
+    """
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "go_live_month", "2026-01", raising=False)
+
+
 def _affiliate(db, name="Nour", kind=AccountKind.MODEL):
     account = UserAccount(
         email=f"{name.lower()}@example.com",

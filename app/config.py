@@ -14,6 +14,16 @@ class Settings(BaseSettings):
     session_hours: int = 12
     db_connect_timeout_seconds: int = 5
 
+    # §11.2. The first month the platform is responsible for paying. Everything
+    # before it is `historical`: imported and visible, never payable.
+    #
+    # **Blank on purpose, and blank blocks every approval.** An unset go-live
+    # that defaulted to something would silently make eight months of imported
+    # orders look approvable - money already settled outside the platform, ready
+    # to be paid a second time. Refusing until somebody chooses is the whole
+    # point (§21, open question 1).
+    go_live_month: str = ""
+
     # Shopify. Blank by default so the platform runs without it: health checks
     # and authentication must keep working on a machine with no credentials.
     shopify_shop_domain: str = ""
