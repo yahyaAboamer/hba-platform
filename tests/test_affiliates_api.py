@@ -335,7 +335,10 @@ def test_a_registered_code_shows_up_on_the_affiliate(client):
         json={"code": "NOUR10"},
     )
     body = client.get(f"/api/affiliates/{affiliate['id']}").json()
-    assert body["codes"] == ["NOUR10"]
+    # Each code carries whether Shopify has confirmed it. A screen showing a
+    # registered code with no hint that nobody has confirmed it exists is how
+    # a mistyped code goes unnoticed (docs/limits.md).
+    assert [row["code"] for row in body["codes"]] == ["NOUR10"]
 
 
 def test_two_affiliates_cannot_own_the_same_code_at_once(client):
@@ -800,7 +803,10 @@ def test_a_mistyped_code_can_be_corrected_on_recheck(client, _shopify):
     assert response.json()["is_verified"] is True
 
     body = client.get(f"/api/affiliates/{affiliate['id']}").json()
-    assert body["codes"] == ["NOUR10"], "the mistyped code was left behind"
+    # Each code carries whether Shopify has confirmed it. A screen showing a
+    # registered code with no hint that nobody has confirmed it exists is how
+    # a mistyped code goes unnoticed (docs/limits.md).
+    assert [row["code"] for row in body["codes"]] == ["NOUR10"], "the mistyped code was left behind"
 
 
 def test_a_verified_code_is_never_rechecked(client):
@@ -1092,3 +1098,46 @@ def test_a_code_created_early_that_nobody_used_is_allowed(client, _shopify):
     response = _switch_to(client, affiliate["id"], "NEW10", datetime(2026, 4, 9), _shopify)
     assert response.status_code == 201
     assert response.json()["retired"]["end_month"] == "2026-03"
+
+
+# ── The list carries enough to answer "who needs me" ───────────────────────────
+
+
+def test_the_list_says_who_is_not_set_up_yet(client):
+    """Without this, finding a model with no confirmed code means opening
+    twenty profiles one at a time - which is how it stays unnoticed.
+    """
+    account = _make_account("nour@example.com")
+    created = client.post(
+        "/api/affiliates", json={"user_account_id": account, "name": "Nour"}
+    )
+    assert created.status_code == 201, created.text
+
+    row = client.get("/api/affiliates").json()["affiliates"][0]
+
+    assert row["has_verified_code"] is False
+    assert row["has_terms"] is False
+
+
+def test_the_list_reports_terms_once_they_exist(client):
+    account = _make_account("nour@example.com")
+    affiliate_id = client.post(
+        "/api/affiliates", json={"user_account_id": account, "name": "Nour"}
+    ).json()["id"]
+
+    set_terms = client.post(
+        f"/api/affiliates/{affiliate_id}/compensation",
+        json={
+            "start_month": "2020-01",
+            "compensation_type": "commission",
+            "commission_rate_bp": 1000,
+        },
+    )
+    assert set_terms.status_code in (200, 201), set_terms.text
+
+    row = client.get("/api/affiliates").json()["affiliates"][0]
+
+    assert row["has_terms"] is True
+    # Registering a code is a separate act, and Shopify confirming it is a
+    # third. Neither has happened.
+    assert row["has_verified_code"] is False

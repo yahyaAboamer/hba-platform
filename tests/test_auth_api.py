@@ -175,6 +175,42 @@ def test_me_returns_the_actor_and_permissions(client):
     assert "payments.record" in body["permissions"]
 
 
+def test_me_says_which_month_the_platform_is_working_in(client, monkeypatch):
+    """Every screen needs this before it can render a figure, and this request
+    is already made once at start-up.
+
+    Before go-live the working month is the go-live month: opening on a month
+    the platform holds nothing for reads as a broken tool.
+    """
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "go_live_month", "2099-06", raising=False)
+    _bootstrap(client)
+
+    body = client.get("/api/auth/me").json()
+
+    assert body["platform"] == {
+        "working_month": "2099-06",
+        "go_live_month": "2099-06",
+    }
+
+
+def test_me_reports_no_go_live_month_when_none_is_set(client, monkeypatch):
+    """Null rather than an empty string, so the client has one falsy shape to
+    check rather than two.
+    """
+    from app.config import settings
+    from app.core.businesstime import business_month, utcnow
+
+    monkeypatch.setattr(settings, "go_live_month", "", raising=False)
+    _bootstrap(client)
+
+    body = client.get("/api/auth/me").json()
+
+    assert body["platform"]["go_live_month"] is None
+    assert body["platform"]["working_month"] == business_month(utcnow())
+
+
 def test_an_unsafe_request_without_csrf_is_rejected(client):
     """A cross-site form post must not be able to act on a live cookie."""
     _bootstrap(client)

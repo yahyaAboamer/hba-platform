@@ -4,6 +4,7 @@ import { Money } from "../components/Money";
 import { MonthPicker } from "../components/MonthPicker";
 import type { MonthLock } from "../components/MonthPicker";
 import { api } from "../lib/api";
+import type { Session } from "../lib/api";
 import { currentMonth, describeBlocker, formatMonth } from "../lib/money";
 
 type PayrollRow = {
@@ -47,8 +48,10 @@ type SyncStatus = {
  *
  * Nothing here is a chart. Twenty rows is not a dataset.
  */
-export function Overview() {
-  const [month, setMonth] = useState(currentMonth);
+export function Overview({ session }: { session: Session }) {
+  // Opens on the working month, which before go-live is the month the
+  // platform starts in rather than an August it holds nothing for.
+  const [month, setMonth] = useState(session.platform.working_month);
   const [payroll, setPayroll] = useState<PayrollMonth | null>(null);
   const [sync, setSync] = useState<SyncStatus | null>(null);
   const [error, setError] = useState<string | null>(null);

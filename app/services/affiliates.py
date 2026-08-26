@@ -16,6 +16,8 @@ from app.models.affiliates import (
     AffiliateProfile,
     AffiliateStatus,
 )
+from app.models.codes import DiscountCodePeriod
+from app.models.compensation import CompensationPeriod
 from app.services.audit import record_audit
 from app.services.codes import close_codes_for, verified_codes_for
 
@@ -232,3 +234,61 @@ def list_affiliates(
     if not include_archived:
         query = query.where(AffiliateProfile.status != AffiliateStatus.ARCHIVED)
     return list(db.scalars(query))
+
+
+def _covers(month: str, start_month, end_month):
+    """Rows whose effective period contains `month`.
+
+    An open-ended period - `end_month` null - runs until something closes it,
+    so it covers every month from its start onwards.
+    """
+    return (start_month <= month) & (
+        (end_month.is_(None)) | (end_month >= month)
+    )
+
+
+def readiness(db: Session, month: str) -> dict[int, dict[str, bool]]:
+    """Per affiliate, whether the two things she needs in order to earn exist.
+
+    A model earns nothing without **a code Shopify has confirmed** and **terms
+    saying what she is paid**. Either one missing is silent: orders arrive,
+    attribution finds no owner or the calculator finds no rate, and the first
+    anybody hears of it is the model asking why her dashboard is empty. The
+    list screen exists to catch that before she has to ask.
+
+    Two set-based queries rather than two per affiliate. Twenty models would
+    otherwise be forty round trips for something the database answers in two -
+    and the cost of getting this wrong grows exactly as the programme grows.
+    """
+    with_code = set(
+        db.scalars(
+            select(DiscountCodePeriod.affiliate_id)
+            .where(DiscountCodePeriod.shopify_verified_at.is_not(None))
+            .where(
+                _covers(
+                    month,
+                    DiscountCodePeriod.start_month,
+                    DiscountCodePeriod.end_month,
+                )
+            )
+        )
+    )
+    with_terms = set(
+        db.scalars(
+            select(CompensationPeriod.affiliate_id).where(
+                _covers(
+                    month,
+                    CompensationPeriod.start_month,
+                    CompensationPeriod.end_month,
+                )
+            )
+        )
+    )
+
+    return {
+        affiliate_id: {
+            "has_verified_code": affiliate_id in with_code,
+            "has_terms": affiliate_id in with_terms,
+        }
+        for affiliate_id in db.scalars(select(AffiliateProfile.id))
+    }

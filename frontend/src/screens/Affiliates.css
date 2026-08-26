@@ -1,0 +1,113 @@
+.affiliates__controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.affiliates__toggle-archived {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--quiet);
+  cursor: pointer;
+}
+
+.affiliates__view {
+  display: inline-flex;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.affiliates__view-button {
+  padding: var(--space-1) var(--space-3);
+  border: none;
+  background: var(--surface);
+  font-size: var(--text-sm);
+  color: var(--quiet);
+  cursor: pointer;
+}
+
+.affiliates__view-button + .affiliates__view-button {
+  border-left: 1px solid var(--rule-strong);
+}
+
+.affiliates__view-button--on {
+  background: var(--ink);
+  color: var(--surface);
+}
+
+/*
+ * Two figures, both of which answer "who needs me". A count of everything is
+ * the sort of filler metric §12.3 warns about — it is on the page already, at
+ * the top, next to the title.
+ */
+.affiliates__figures {
+  display: flex;
+  gap: var(--space-5);
+  margin-bottom: var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--quiet);
+}
+
+.affiliates__figures strong {
+  font-family: var(--mono);
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.affiliates__name {
+  color: var(--ink);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.affiliates__name:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* A house account is distinguished by saying so, not by colour. ADR 0027
+   reserves colour for money state, and "this row is a house code" is not one —
+   spending --owed on it would make an ordinary row look like a problem. */
+.affiliates__kind {
+  font-size: var(--text-sm);
+  color: var(--quiet);
+}
+
+/* The only figure on the page allowed to raise its voice, and only when it is
+   not zero. Nobody needs a nought announced in orange. */
+.affiliates__stuck strong {
+  color: var(--refused);
+}
+
+.affiliates__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: var(--space-3);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.affiliates__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  align-items: flex-start;
+  padding: var(--space-4);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.affiliates__card-note {
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}
+
+/* §12.5's "a table becomes cards on a phone, never a horizontal scroll" is
+   enforced in the component, not here. Which layout is *rendered* is component
+   state, so hiding the table in CSS left a phone with nothing on the page at
+   all — see useIsNarrow in Affiliates.tsx. */

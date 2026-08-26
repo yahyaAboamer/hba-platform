@@ -392,3 +392,78 @@ def test_the_gate_does_not_block_other_statuses(db):
     archive_affiliate(db, affiliate)
     db.flush()
     assert affiliate.status == AffiliateStatus.ARCHIVED
+
+
+# ── Readiness: what a list screen has to be able to see ────────────────────────
+
+
+def test_readiness_reports_a_confirmed_code_and_terms_separately(db):
+    """The two things an affiliate needs are tracked independently.
+
+    They fail independently and they mean different things, so a single
+    "ready" boolean would throw away the only information worth having.
+    """
+    from datetime import datetime, timezone
+
+    from app.models.compensation import CompensationType
+    from app.services.affiliates import readiness
+    from app.services.compensation import set_terms
+
+    ready = create_affiliate(db, user_account_id=_account(db).id, name="Ready")
+    register_code(
+        db, ready, "READY10", "2026-01", verified_at=datetime.now(timezone.utc)
+    )
+    set_terms(
+        db,
+        ready,
+        start_month="2026-01",
+        compensation_type=CompensationType.COMMISSION,
+        commission_rate_bp=1000,
+    )
+
+    unconfirmed = create_affiliate(
+        db, user_account_id=_account(db, "malak@example.com").id, name="Unconfirmed"
+    )
+    register_code(db, unconfirmed, "MALAK10", "2026-01")
+    set_terms(
+        db,
+        unconfirmed,
+        start_month="2026-01",
+        compensation_type=CompensationType.COMMISSION,
+        commission_rate_bp=1000,
+    )
+
+    bare = create_affiliate(
+        db, user_account_id=_account(db, "habiba@example.com").id, name="Bare"
+    )
+    db.flush()
+
+    found = readiness(db, "2026-03")
+
+    assert found[ready.id] == {"has_verified_code": True, "has_terms": True}
+    # Registered, never confirmed by Shopify. Attribution still works - what is
+    # unknown is whether the code exists there at all (docs/limits.md).
+    assert found[unconfirmed.id] == {"has_verified_code": False, "has_terms": True}
+    assert found[bare.id] == {"has_verified_code": False, "has_terms": False}
+
+
+def test_readiness_is_asked_of_one_month_at_a_time(db):
+    """A code that ended in February does not make March ready."""
+    from datetime import datetime, timezone
+
+    from app.services.affiliates import readiness
+    from app.services.codes import register_code
+
+    nour = create_affiliate(db, user_account_id=_account(db).id, name="Nour")
+    register_code(
+        db,
+        nour,
+        "NOUR10",
+        "2026-01",
+        end_month="2026-02",
+        verified_at=datetime.now(timezone.utc),
+    )
+    db.flush()
+
+    assert readiness(db, "2026-02")[nour.id]["has_verified_code"] is True
+    assert readiness(db, "2026-03")[nour.id]["has_verified_code"] is False

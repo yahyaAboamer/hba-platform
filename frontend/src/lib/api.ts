@@ -120,10 +120,23 @@ export type Actor = {
   role: string;
 };
 
+/** Where the platform is in time, decided by the server and not the browser. */
+export type Platform = {
+  /**
+   * The month a screen opens on. Usually this month; before go-live, the
+   * go-live month — an empty August is not a useful first impression when the
+   * platform starts in September.
+   */
+  working_month: string;
+  /** The first month the platform is responsible for. Null until chosen. */
+  go_live_month: string | null;
+};
+
 export type Session = {
   actor: Actor;
   /** §6.5 and §5.1. What this account may do, from the server. */
   permissions: string[];
+  platform: Platform;
 };
 
 /**

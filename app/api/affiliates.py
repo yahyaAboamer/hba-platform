@@ -34,11 +34,13 @@ from app.services.affiliates import (
     create_affiliate,
     get_affiliate,
     list_affiliates,
+    readiness,
     set_status,
     update_details,
 )
 from app.services.codes import (
     codes_for,
+    codes_with_status,
     mark_verified,
     normalise_code,
     register_code,
@@ -56,6 +58,7 @@ from app.services.compensation import (
     terms_for,
 )
 from app.services.payouts import current_destination, mask_destination, set_destination
+from app.services.payroll import working_month
 from app.services.shopify.client import (
     ShopifyError,
     ShopifyMissingScope,
@@ -212,12 +215,16 @@ def _affiliate_detail(db: Session, affiliate: AffiliateProfile) -> dict:
     The payout destination is masked. This is a maintainer's screen, not the
     affiliate's own - the raw value is never returned here, only enough to
     recognise it (app/services/payouts.py).
+
+    "Current" is the **working** month, not necessarily this one: before
+    go-live the useful question is what will apply when the platform starts,
+    not what applied in a month it was never responsible for.
     """
-    month = business_month(utcnow())
+    month = working_month()
     return {
         **_affiliate_payload(affiliate),
         "current_month": month,
-        "codes": codes_for(db, affiliate, month),
+        "codes": codes_with_status(db, affiliate, month),
         "compensation": _compensation_payload(terms_for(db, affiliate, month)),
         "payout_destination": mask_destination(current_destination(db, affiliate)),
     }
@@ -236,8 +243,20 @@ def list_affiliates_route(
     _actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_VIEW)),
     db: Session = Depends(get_session),
 ) -> dict:
+    """Everyone, plus whether each of them is actually set up to earn.
+
+    The readiness flags are here rather than only on the detail screen because
+    the question this list answers is "who needs me". A model with no verified
+    code earns nothing and says nothing about it, and finding that by opening
+    twenty profiles one at a time is how it stays unnoticed for a month.
+    """
     affiliates = list_affiliates(db, include_archived=include_archived)
-    return {"affiliates": [_affiliate_payload(a) for a in affiliates]}
+    setup = readiness(db, working_month())
+    return {
+        "affiliates": [
+            {**_affiliate_payload(a), **setup.get(a.id, {})} for a in affiliates
+        ]
+    }
 
 
 @router.post("", status_code=201)
