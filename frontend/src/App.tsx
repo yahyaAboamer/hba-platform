@@ -14,6 +14,7 @@ import { Payroll } from "./screens/Payroll";
 import { PayrollApprove } from "./screens/PayrollApprove";
 import { PayrollReopen } from "./screens/PayrollReopen";
 import { SignIn } from "./screens/SignIn";
+import { Targets } from "./screens/Targets";
 
 /** A section that exists in the navigation and not yet in the platform. */
 function NotBuiltYet({ name, phase }: { name: string; phase: string }) {
@@ -63,7 +64,7 @@ export default function App() {
             <Route path="/affiliates/:id" element={<AffiliateDetail />} />
             <Route
               path="/orders"
-              element={<NotBuiltYet name="Orders" phase="Coming after targets." />}
+              element={<NotBuiltYet name="Orders" phase="Coming next, after targets." />}
             />
             <Route path="/payroll" element={<Payroll session={session} />} />
             <Route path="/payroll/:month/approve" element={<PayrollApprove />} />
@@ -77,10 +78,7 @@ export default function App() {
               path="/payments/:month/:affiliateId/reconcile"
               element={<PaymentReconcile />}
             />
-            <Route
-              path="/targets"
-              element={<NotBuiltYet name="Targets" phase="Coming next, after payments." />}
-            />
+            <Route path="/targets" element={<Targets session={session} />} />
             <Route
               path="/settings"
               element={<NotBuiltYet name="Settings" phase="Coming last." />}

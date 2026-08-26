@@ -23,6 +23,7 @@ from app.models.audit import AuditEvent
 from app.models.identity import UserAccount
 from app.models.targets import MonthlyTarget
 from app.services.affiliates import create_affiliate
+from app.services.compensation import set_terms
 from app.services.targets import (
     get_target,
     record_actuals,
@@ -413,3 +414,46 @@ def test_a_month_that_is_not_a_month_is_refused(db):
 
     with pytest.raises(ValueError):
         set_requirements(db, affiliate, "2026-13", videos=1, stories=1)
+
+
+def test_the_grid_says_whose_pay_a_target_decides(db):
+    """§15. A target decides money only for a base guarantee.
+
+    A screen that cannot tell the difference marks every empty row as urgent,
+    and §11.3 blocks payroll on exactly one of these kinds. Warning about the
+    other three is a false alarm on every model, every month.
+    """
+    from app.api.targets import _determines_pay
+    from app.models.compensation import CompensationType
+
+    guaranteed = _affiliate(db, "Sara")
+    set_terms(
+        db,
+        guaranteed,
+        start_month="2026-01",
+        compensation_type=CompensationType.BASE_GUARANTEE,
+        commission_rate_bp=1000,
+        base_amount_piastres=800_000,
+    )
+    on_commission = _affiliate(db, "Nour")
+    set_terms(
+        db,
+        on_commission,
+        start_month="2026-01",
+        compensation_type=CompensationType.COMMISSION,
+        commission_rate_bp=1000,
+    )
+    db.flush()
+
+    assert _determines_pay(db, guaranteed, MONTH) is True
+    assert _determines_pay(db, on_commission, MONTH) is False
+
+
+def test_a_model_with_no_terms_has_no_target_deciding_anything(db):
+    """No arrangement means nothing is calculable from her target either."""
+    from app.api.targets import _determines_pay
+
+    nobody = _affiliate(db, "Habiba")
+    db.flush()
+
+    assert _determines_pay(db, nobody, MONTH) is False

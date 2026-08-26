@@ -1416,6 +1416,61 @@ against one, and noise on that warning is the one thing it cannot afford.
 
 ---
 
+## Carry-forward is identified, displayed, and never paid
+
+**Status: open. Not yet fixed — it needs a decision (see below).**
+
+**Symptom.** An order placed 29 August, still travelling when August payroll
+runs, delivering on 8 September. September's payroll row shows the line §11.4
+asks for — *"1 order from August, E£1,000 of sales"* — and September's payout
+does not include a piastre of it.
+
+Proven directly:
+
+    August approved at 20,000p  (10% of 200,000p)
+    September says carried forward: [{'from_month': '2026-08', 'orders': 1,
+                                      'piastres': 100000}]
+    September payout: 30000p  from earned base 300000p
+
+    September's own sales   300,000p -> commission 30,000p
+    August's late order     100,000p -> commission 10,000p
+    September actually pays  30,000p          <- the late order is never paid
+
+**Cause.** `calculate_month` selects `AttributedOrder.business_month == month`
+and nothing else. `carried_into` finds the late orders and
+`carry_forward_summary` renders them, but no code path adds them to a payout.
+Every test around carry-forward asserts *identification* — that the right
+orders are found, that they keep their own month, that a settled one does not
+carry twice. **None asserts one is ever paid.**
+
+**Why it matters more than it looks.** §11.4 calls this "the common path, not
+an edge case": Egyptian cash-on-delivery routinely straddles month end, and
+118 of 537 live orders sit undelivered at any moment. This is not a rare
+correction — it is a slice of every month, silently unpaid, for every model.
+
+**And it forces the one thing §11.4 forbids.** Today the only way that order
+reaches her is to reopen August, which the spec's own words rule out:
+*"Orders settling after approval never alter the approved month."* The platform
+currently requires the operation it tells you not to perform.
+
+**Why it is not fixed here.** Paying carried orders is not a one-line change,
+and the open questions are business decisions rather than engineering ones:
+
+1. **Which month's rate?** The order belongs to August. §9.5 is firm that a
+   rate change in June must not rewrite what April was worth, which argues for
+   August's rate — but `calculate_month` resolves one rate for the whole month,
+   so this means per-order rate resolution.
+2. **Does a carried order count toward a base guarantee?** If her September
+   commission is compared against her guarantee, a carried August order could
+   push her over the line and cost HBA the guarantee, or under it and cost her.
+3. **Which snapshot settles it**, and what does her dashboard say it was paid
+   in — August's month or September's payment?
+
+Recorded now rather than fixed quietly, because a wrong answer to (1) or (2)
+underpays or overpays every model with a late delivery, every month.
+
+---
+
 ## Business rules with deliberate exposure
 
 These are not bugs. They are accepted costs, recorded so nobody "fixes" them.
