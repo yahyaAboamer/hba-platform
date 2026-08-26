@@ -1,6 +1,6 @@
 # 0028 — Paying by bank or wallet needs a number, not a link
 
-**Status:** accepted
+**Status:** accepted, amended 2026-08-27
 **Date:** 2026-08-26
 **Amends:** spec §13.1 (InstaPay details), §14 (Payments and proof)
 **Related:** [0017](0017-proof-is-shown-to-the-affiliate.md), §6.4 (payout destination changes)
@@ -101,3 +101,62 @@ screen shows every account number".
   rule it enforces is now stated precisely enough not to be misread again.
 - The InstaPay deep-link discovery item in §13.1 still stands, and now affects
   one method out of three rather than the whole payment flow.
+
+---
+
+## Amendment, 2026-08-27 — the phone number is part of paying, not a spare
+
+The table above gave InstaPay one thing to reveal: the address, fed to the deep
+link. The reasoning was that nobody has to *read* an InstaPay address, so
+putting it on screen would be a credential displayed for no one's benefit.
+
+That reasoning was sound and the conclusion was still wrong, because it assumed
+the deep link works.
+
+> "Maybe when I press open InstaPay and come back to our application, it asks me
+> whether it worked or not."
+
+The concern is right. §13.1 already flags the deep link as **unverified** —
+behaviour on Android, on iPhone, with and without the app installed, is
+reported from experience and not documented anywhere. And there is a case where
+it certainly does not work: **a desktop browser has no InstaPay app to open.**
+Month-end payroll is desktop work. So the machine where the fallback matters
+most is the machine the original design served worst.
+
+**Decided: an InstaPay reveal returns the address and the phone number
+together.** §13.1 already collects the number for exactly this purpose.
+
+There is no exposure argument against it. The address *is* the means of
+payment — anyone permitted to see it may see the number beside it.
+
+### Why not ask "did it work?"
+
+The proposal was a prompt on return from InstaPay: yes, go on to record the
+payment; no, show the number. Rejected, and it is worth saying why, because the
+instinct behind it is correct.
+
+- **It asks a question the platform cannot verify and does not need.** Whether
+  the app opened is something the person can see. Whether the *money moved* is a
+  different question entirely, and the only acceptable answer to that one is the
+  screenshot — §14 is emphatic that the platform must never record a payment
+  that may not have happened.
+- **It taxes the common case to serve the rare one.** Twenty models, twenty
+  prompts, to catch the few where the link fails.
+- **On a desktop it is not the rare case, it is every case** — twenty prompts,
+  all answered "no", to reach a number that could have been on the screen from
+  the start.
+
+Showing both costs nothing and serves both outcomes without asking anyone
+anything. If the app opens, the number is ignored. If it does not, the number
+is already there.
+
+### A related correction
+
+The proposal continued *"it will just move me to the next page, which is
+sending the screenshot and finalizing the month"*. Those are two separate acts
+and they run in the other order.
+
+A payment allocates to a `payroll_snapshot`, which only exists once the month
+has been **approved**. So the month is finalised *before* anybody can be paid
+against it. Approve → pay → record the payment with its proof. Paying a model
+finalises nothing; there is nothing left to finalise by then.

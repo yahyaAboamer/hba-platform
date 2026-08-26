@@ -196,11 +196,18 @@ def changed_recently(
     return current.created_at if has_history else None
 
 
-#: What the person sending the money needs, per method. InstaPay is absent on
-#: purpose: its address is handed to the deep link, never to a reader, so
-#: revealing it would put a credential on screen for no one's benefit.
+#: What the person sending the money needs, per method.
+#:
+#: InstaPay carries **both** its address and the phone number behind it. The
+#: address feeds the deep link; the number is what a person types when the deep
+#: link does not open - on a desktop it never will, and month-end payroll is
+#: desktop work. Withholding the number would leave the payer stuck on the one
+#: machine they are most likely using (ADR 0028, amended).
+#:
+#: It costs nothing to include. The address *is* the means of payment, so
+#: anyone who may see it may see the number beside it.
 PAYABLE_FIELDS = {
-    PayoutMethod.INSTAPAY: ("instapay_address_url",),
+    PayoutMethod.INSTAPAY: ("instapay_address_url", "instapay_phone"),
     PayoutMethod.BANK: ("bank_name", "bank_account_holder", "bank_account_number"),
     PayoutMethod.WALLET: ("wallet_phone",),
 }

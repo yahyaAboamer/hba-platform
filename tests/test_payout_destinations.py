@@ -514,3 +514,44 @@ def test_revealing_a_destination_that_does_not_exist_is_refused(db):
 
     with pytest.raises(ValueError):
         reveal_destination(db, nour, actor_id=1, actor_email="o@example.com")
+
+
+def test_an_instapay_reveal_carries_the_number_as_well_as_the_link(db):
+    """ADR 0028, amended. The address feeds the deep link; the number is what a
+    person types when the link does not open.
+
+    A desktop browser has no InstaPay app to open, and month-end payroll is
+    desktop work - so the machine where the fallback matters most is the one
+    the link serves worst.
+    """
+    from app.services.payouts import reveal_destination
+
+    nour = _affiliate(db)
+    _instapay(db, nour, url=INSTAPAY_URL, phone="01001234567")
+    db.flush()
+
+    revealed = reveal_destination(db, nour, actor_id=1, actor_email="o@example.com")
+
+    assert revealed == {
+        "method": PayoutMethod.INSTAPAY,
+        "instapay_address_url": INSTAPAY_URL,
+        "instapay_phone": "01001234567",
+    }
+
+
+def test_an_instapay_reveal_without_a_number_still_gives_the_link(db):
+    """The number is a fallback, not a precondition. Somebody who registered
+    before it was collected can still be paid.
+    """
+    from app.services.payouts import reveal_destination
+
+    nour = _affiliate(db)
+    set_destination(
+        db, nour, method=PayoutMethod.INSTAPAY, instapay_address_url=INSTAPAY_URL
+    )
+    db.flush()
+
+    revealed = reveal_destination(db, nour, actor_id=1, actor_email="o@example.com")
+
+    assert revealed["instapay_address_url"] == INSTAPAY_URL
+    assert revealed["instapay_phone"] is None
