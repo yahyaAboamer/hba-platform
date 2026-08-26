@@ -36,6 +36,7 @@ from app.models.payments import (
     PaymentTransaction,
     PayrollAdjustment,
 )
+from app.models.payments import VALID_ADJUSTMENT_TYPES
 from app.models.payroll import PayrollMonth, PayrollSnapshot
 from app.services.audit import record_audit
 from app.services.payments_state import SettlementState
@@ -48,8 +49,14 @@ def allocated_to(db: Session, snapshot: PayrollSnapshot) -> int:
 
     Against the snapshot rather than the month, because §11.5 requires payments
     made against a superseded version to remain visible after a reopen.
+
+    ``int()``, and not for tidiness. **Postgres `SUM()` over a bigint returns
+    `numeric`**, which psycopg hands back as a `Decimal` - and a `Decimal`
+    reaching the API is serialised as a *string*, so every balance would arrive
+    as `"180000"` and any client doing arithmetic on it would break. Money is
+    integer piastres everywhere (ADR 0002), including on the way out of a sum.
     """
-    return (
+    return int(
         db.scalar(
             select(func.coalesce(func.sum(PaymentAllocation.allocated_piastres), 0))
             .where(PaymentAllocation.payroll_snapshot_id == snapshot.id)
@@ -65,7 +72,7 @@ def adjusted_against(db: Session, payroll_month: PayrollMonth) -> int:
     is expected to increase the destination. A **write-off** reduces the source
     and goes nowhere - HBA absorbs it.
     """
-    return (
+    return int(
         db.scalar(
             select(func.coalesce(func.sum(PayrollAdjustment.amount_piastres), 0))
             .where(PayrollAdjustment.source_payroll_month_id == payroll_month.id)
@@ -76,7 +83,7 @@ def adjusted_against(db: Session, payroll_month: PayrollMonth) -> int:
 
 def credited_into(db: Session, payroll_month: PayrollMonth) -> int:
     """Credits landing on this month from an earlier overpayment."""
-    return (
+    return int(
         db.scalar(
             select(func.coalesce(func.sum(PayrollAdjustment.amount_piastres), 0))
             .where(PayrollAdjustment.destination_payroll_month_id == payroll_month.id)
@@ -284,5 +291,117 @@ def payments_for(
             select(PaymentTransaction)
             .where(PaymentTransaction.affiliate_id == affiliate.id)
             .order_by(PaymentTransaction.occurred_at.desc())
+        )
+    )
+
+
+# -- Adjustments (Section 11.5) -----------------------------------------------
+
+
+def adjust(
+    db: Session,
+    affiliate: AffiliateProfile,
+    *,
+    kind: str,
+    source_month: str,
+    amount_piastres: int,
+    reason: str,
+    destination_month: str | None = None,
+    actor_id: int | None = None,
+    actor_email: str | None = None,
+) -> PayrollAdjustment:
+    """Move money without a transfer: a credit, a write-off, a correction.
+
+    This is where the sentence Phase 6 left unfinished ends. Re-approving a
+    reopened month may find a model **overpaid**, and Section 11.5 says the
+    maintainer chooses between applying the excess against a later month and
+    absorbing it. `reconciliation_for` reports the difference and returns
+    `resolution: None`; this fills it in.
+
+    **A reason is required.** An adjustment is money moving with no bank record
+    behind it, and the only thing that makes one auditable is why.
+
+    **A credit needs somewhere to land.** A write-off does not - it goes
+    nowhere, which is what absorbing means.
+    """
+    if kind not in VALID_ADJUSTMENT_TYPES:
+        raise ValueError(f"Unknown adjustment type: {kind!r}")
+    if amount_piastres <= 0:
+        raise ValueError("An adjustment must be for more than nothing")
+    if not str(reason or "").strip():
+        raise ValueError(
+            "An adjustment needs a reason. It is money moving with no bank "
+            "record behind it, and the reason is the only thing that makes it "
+            "auditable."
+        )
+
+    source = get_month(db, affiliate, source_month)
+    if source is None:
+        raise ValueError(f"{affiliate.name} has no {source_month} to adjust")
+
+    destination = None
+    if kind == AdjustmentType.CREDIT:
+        if destination_month is None:
+            raise ValueError(
+                "A credit needs a month to land on. To absorb it instead, "
+                "record a write-off."
+            )
+        destination = get_month(db, affiliate, destination_month)
+        if destination is None:
+            raise ValueError(
+                f"{affiliate.name} has no {destination_month} for the credit "
+                "to land on. Open that month first."
+            )
+        if destination.id == source.id:
+            raise ValueError(
+                "A credit cannot land on the month it came from - that is a "
+                "write-off."
+            )
+    elif destination_month is not None:
+        raise ValueError(
+            f"A {kind} goes nowhere. Only a credit lands on another month."
+        )
+
+    adjustment = PayrollAdjustment(
+        type=kind,
+        source_payroll_month_id=source.id,
+        destination_payroll_month_id=destination.id if destination else None,
+        amount_piastres=int(amount_piastres),
+        reason=reason.strip(),
+        created_by=actor_id,
+    )
+    db.add(adjustment)
+    db.flush()
+
+    record_audit(
+        db,
+        action=f"adjustment.{kind}",
+        subject=f"affiliate:{affiliate.id}",
+        actor_id=actor_id,
+        actor_email=actor_email,
+        after={
+            "source_month": source_month,
+            "destination_month": destination_month,
+            "amount_piastres": int(amount_piastres),
+        },
+        reason=reason.strip(),
+    )
+    return adjustment
+
+
+def adjustments_for(
+    db: Session, affiliate: AffiliateProfile
+) -> list[PayrollAdjustment]:
+    """Every credit and write-off touching this affiliate, newest first.
+
+    Section 11.5 requires these to be visible to her: a credit she cannot see
+    is a credit she cannot check.
+    """
+    months = select(PayrollMonth.id).where(PayrollMonth.affiliate_id == affiliate.id)
+    return list(
+        db.scalars(
+            select(PayrollAdjustment)
+            .where(PayrollAdjustment.source_payroll_month_id.in_(months))
+            .order_by(PayrollAdjustment.created_at.desc())
         )
     )
