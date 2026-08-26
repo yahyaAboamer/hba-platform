@@ -57,7 +57,12 @@ from app.services.compensation import (
     set_terms,
     terms_for,
 )
-from app.services.payouts import current_destination, mask_destination, set_destination
+from app.services.payouts import (
+    current_destination,
+    mask_destination,
+    reveal_destination,
+    set_destination,
+)
 from app.services.payroll import working_month
 from app.services.shopify.client import (
     ShopifyError,
@@ -697,6 +702,37 @@ def correct_compensation_route(
 
     db.commit()
     return _compensation_payload(terms)
+
+
+@router.post("/{affiliate_id}/payout-destination/reveal")
+def reveal_payout_destination_route(
+    affiliate_id: int,
+    actor: UserAccount = Depends(require_permission(Permission.PAYMENTS_RECORD)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """The real destination, for the person about to send money. ADR 0028.
+
+    Gated on `payments.record` rather than `affiliates.view`: reading a
+    profile and sending money are different acts, and only the second one
+    needs the number.
+
+    **POST, not GET.** It writes an audit row, and a request that changes
+    state is not a GET however much it reads like one. It also keeps the
+    affiliate id out of anywhere a URL gets logged with a 200 beside it.
+
+    Returns only the fields that method actually needs. A bank payout does not
+    hand back a wallet number that happens to be on the same row.
+    """
+    affiliate = _get_affiliate_or_404(db, affiliate_id)
+    try:
+        revealed = reveal_destination(
+            db, affiliate, actor_id=actor.id, actor_email=actor.email
+        )
+    except ValueError as exc:
+        raise HTTPException(404, str(exc)) from exc
+
+    db.commit()
+    return revealed
 
 
 @router.put("/{affiliate_id}/payout-destination")

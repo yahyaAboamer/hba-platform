@@ -1306,6 +1306,42 @@ would not have found it.
 
 ---
 
+## The payment screen could not have paid anyone by bank transfer
+
+**Symptom.** None yet — found by the business reading the design, before the
+payment screen was built.
+
+> "People that will not go with InstaPay and choose maybe e-wallets or bank
+> accounts, they won't have this link."
+
+**Cause.** Spec §13.1 and §14 were written entirely around InstaPay, whose
+**Payment Address URL** sits behind a *Pay* button that deep-links into the
+app. That flow has a property nobody noticed was load-bearing: **the payer
+never has to read the address.** The link carries it.
+
+`mask_destination` is the only representation the API returns, so an account
+number reaches every screen as `…756`. For InstaPay that is fine. For a bank
+transfer it is fatal — the entire act is *read the number, type it into your
+banking app* — and there was **no endpoint anywhere** that could hand over the
+real value. The payment screen, as specified, could not have completed a bank
+or wallet payout at all.
+
+**Two faults, and the second is the one that mattered.** A *Pay* button with
+nothing to open is visible the moment somebody presses it. A missing path to
+the number is invisible until the first non-InstaPay model is due money — most
+likely at month end, with a person waiting to be paid.
+
+**Fixed** by ADR 0028: a reveal endpoint gated on `payments.record`, audited
+without the value, returning only the fields that method needs.
+
+**Why it was missed.** The masking rule in §6.4.4 is about *records* — audit
+rows, logs, notifications, the confirmation shown when a destination changes.
+I read it as an absolute and implemented it as one, which made a necessary task
+impossible rather than safe. A security rule that stops the work is not a
+strict reading of the rule; it is a misreading of what the rule was protecting.
+
+---
+
 ## Business rules with deliberate exposure
 
 These are not bugs. They are accepted costs, recorded so nobody "fixes" them.

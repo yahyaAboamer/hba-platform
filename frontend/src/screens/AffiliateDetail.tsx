@@ -276,6 +276,14 @@ export function AffiliateDetail() {
                 {METHOD[detail.payout_destination.method] ??
                   detail.payout_destination.method}
               </Row>
+              {detail.payout_destination.bank_name && (
+                <Row label="Bank">{detail.payout_destination.bank_name}</Row>
+              )}
+              {detail.payout_destination.bank_account_holder && (
+                <Row label="Account holder">
+                  {detail.payout_destination.bank_account_holder}
+                </Row>
+              )}
               {detail.payout_destination.instapay_address_url && (
                 <Row label="Address">
                   <span className="code">
@@ -283,33 +291,31 @@ export function AffiliateDetail() {
                   </span>
                 </Row>
               )}
-              {detail.payout_destination.bank_account_holder && (
-                <Row label="Account holder">
-                  {detail.payout_destination.bank_account_holder}
-                </Row>
-              )}
               {detail.payout_destination.bank_account_number && (
-                <Row label="Account">
+                <Row label="Account number">
                   <span className="code">
                     {detail.payout_destination.bank_account_number}
                   </span>
                 </Row>
               )}
               {detail.payout_destination.wallet_phone && (
-                <Row label="Wallet">
+                <Row label="Wallet number">
                   <span className="code">
                     {detail.payout_destination.wallet_phone}
                   </span>
                 </Row>
               )}
               {/*
-               * §6.4.4. Shown masked, always — the full address appears only on
-               * her own screen. Saying so stops somebody reading the dots as a
-               * loading state and going looking for the real one.
+               * §6.4.4 and ADR 0028. Shortened here on purpose — this is the
+               * screen somebody leaves open while doing something else, and a
+               * page of full account numbers is a different object from a page
+               * of masked ones. The number needed to actually send money is
+               * revealed on the payment screen, one at a time and recorded.
                */}
               <p className="detail__masked">
-                Shortened on purpose. The full details are only ever shown to
-                her.
+                {detail.payout_destination.method === "instapay"
+                  ? "Shortened on purpose. Paying opens InstaPay with her address filled in — nobody has to read it."
+                  : "Shortened on purpose. The full number is shown on the payment screen, when you are about to send the money."}
               </p>
             </dl>
           )}
