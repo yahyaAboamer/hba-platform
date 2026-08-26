@@ -85,21 +85,64 @@ def validate_terms(
             )
 
 
-def assert_correctable(db: Session, terms: CompensationPeriod) -> None:
-    """Refuse to change terms that have already decided a payment.
+def assert_correctable(db: Session, terms, *, new_end_month: str | None = "") -> None:
+    """Refuse a change that an approved month was calculated from.
 
-    **Not yet enforceable, and deliberately left visible.** Payroll does not
-    exist until Phase 6, so no month has been approved or paid and there is
-    nothing that could be locked. This is not a stub pretending to work -
-    correcting terms genuinely is safe today, because nothing downstream has
-    consumed them yet.
+    §11.1 and §11.5. Changing a rate after payroll would change what a month
+    was worth **after the money moved**, and the frozen snapshot would silently
+    disagree with the data it came from. Reopen the month first, which requires
+    a written reason.
 
-    Phase 6 wires the real check in here: a period covering any month with an
-    approved payroll snapshot must be refused, since correcting it would
-    silently disagree with money that has already left the account. Recorded in
-    docs/limits.md so the gap is not discovered by somebody's payslip changing.
+    **A seam since Phase 3, and blocking from Phase 6.** The `docs/limits.md`
+    entry recording it as unenforced said exactly this would happen.
+
+    **Ending terms is not correcting them**, and the check is narrower for it.
+    Closing a period in August does not change what April was worth - April was
+    still on those terms and still says so. What is refused is a close that
+    would leave an approved month **without terms at all**, which would make it
+    incalculable if it were ever reopened. Pass ``new_end_month`` to get that
+    reading; the default checks every month the terms cover.
+
+    Only months the terms actually cover are ever checked. A rate that starts in
+    September is not constrained by an approved August.
     """
-    return None
+    from app.models.payroll import CalculationState, PayrollMonth
+
+    approved = db.scalars(
+        select(PayrollMonth)
+        .where(PayrollMonth.affiliate_id == terms.affiliate_id)
+        .where(PayrollMonth.calculation_state == CalculationState.APPROVED)
+        .where(PayrollMonth.month >= terms.start_month)
+    )
+    covered = [
+        row.month
+        for row in approved
+        if terms.end_month is None or row.month <= terms.end_month
+    ]
+
+    if new_end_month != "":
+        # Ending them. Only an approved month that would fall outside the new
+        # coverage loses anything.
+        covered = [
+            month
+            for month in covered
+            if new_end_month is not None and month > new_end_month
+        ]
+        if covered:
+            raise ValueError(
+                f"Ending these terms in {new_end_month} would leave "
+                f"{', '.join(sorted(covered))} - already approved - with no "
+                "terms at all. Reopen the month first if that is intended."
+            )
+        return
+
+    if covered:
+        raise ValueError(
+            "These terms were used to calculate an approved month "
+            f"({', '.join(sorted(covered))}). Correcting them now would change "
+            "what that month was worth after it was agreed. Reopen the month "
+            "first - it requires a written reason."
+        )
 
 
 def set_terms(
@@ -269,7 +312,7 @@ def close_terms(
     which is what makes a past month still calculable at the rate that applied
     then.
     """
-    assert_correctable(db, terms)
+    assert_correctable(db, terms, new_end_month=end_month)
     validate_period(terms.start_month, end_month)
 
     previous = terms.end_month

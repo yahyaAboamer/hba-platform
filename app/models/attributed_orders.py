@@ -149,6 +149,19 @@ class AttributedOrder(Base):
     #: Shopify's return state for the order. Any activity here freezes the base.
     return_status: Mapped[str | None] = mapped_column(String(40))
 
+    #: **Which payroll actually paid this order.** §11.4, and the answer to a
+    #: question a model will otherwise ask every month: an order placed in
+    #: August but still travelling when August was approved is paid in
+    #: September, while remaining an August sale. Without this her own
+    #: arithmetic cannot arrive at her own payment.
+    #:
+    #: Deferred out of Phase 4 deliberately - snapshots did not exist, and a
+    #: nullable column nothing writes reads as a feature and is a lie.
+    settled_in_snapshot_id: Mapped[int | None] = mapped_column(
+        ForeignKey("payroll_snapshot.id", ondelete="RESTRICT")
+    )
+    settled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
     attributed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )

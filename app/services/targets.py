@@ -53,12 +53,27 @@ def _snapshot(target: MonthlyTarget) -> dict:
 def assert_recordable(db: Session, target: MonthlyTarget) -> None:
     """Refuse to change a target belonging to an approved month.
 
-    **Blocks nothing today**, because approved months do not exist until
-    Phase 6. It is here so the rule has one place to live rather than being
-    remembered at three call sites later, and so the tests that will enforce it
-    already have something to call.
+    §15. A target decides whether a base guarantee applied, so editing one after
+    payroll changes what the month was worth **after the money moved** - and the
+    snapshot would disagree with the target it was calculated from.
+
+    **A seam since Phase 5, and blocking from Phase 6**, exactly as the
+    `docs/limits.md` entry said it would be.
     """
-    return None
+    from app.models.payroll import CalculationState, PayrollMonth
+
+    approved = db.scalar(
+        select(PayrollMonth)
+        .where(PayrollMonth.affiliate_id == target.affiliate_id)
+        .where(PayrollMonth.month == target.month)
+        .where(PayrollMonth.calculation_state == CalculationState.APPROVED)
+    )
+    if approved is not None:
+        raise ValueError(
+            f"{target.month} is approved. Changing this target now would change "
+            "whether a base guarantee applied, after the month was agreed. "
+            "Reopen the month first - it requires a written reason."
+        )
 
 
 def get_target(
