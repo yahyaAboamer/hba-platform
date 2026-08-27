@@ -6,6 +6,7 @@ import { currentUser } from "./lib/api";
 import type { Session } from "./lib/api";
 import { AffiliateDetail } from "./screens/AffiliateDetail";
 import { Affiliates } from "./screens/Affiliates";
+import { Orders } from "./screens/Orders";
 import { Overview } from "./screens/Overview";
 import { PaymentReconcile } from "./screens/PaymentReconcile";
 import { PaymentRecord } from "./screens/PaymentRecord";
@@ -62,10 +63,7 @@ export default function App() {
             <Route path="/" element={<Overview session={session} />} />
             <Route path="/affiliates" element={<Affiliates />} />
             <Route path="/affiliates/:id" element={<AffiliateDetail />} />
-            <Route
-              path="/orders"
-              element={<NotBuiltYet name="Orders" phase="Coming next, after targets." />}
-            />
+            <Route path="/orders" element={<Orders session={session} />} />
             <Route path="/payroll" element={<Payroll session={session} />} />
             <Route path="/payroll/:month/approve" element={<PayrollApprove />} />
             <Route path="/payroll/:month/reopen" element={<PayrollReopen />} />

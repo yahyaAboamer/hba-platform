@@ -20,6 +20,7 @@ from app.api import (
     earnings,
     health,
     operations,
+    orders,
     payments,
     payroll,
     targets,
@@ -97,6 +98,7 @@ app.include_router(operations.router)
 app.include_router(affiliates.router)
 app.include_router(earnings.router)
 app.include_router(targets.router)
+app.include_router(orders.router)
 app.include_router(payroll.router)
 app.include_router(payments.router)
 
