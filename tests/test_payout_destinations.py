@@ -555,3 +555,84 @@ def test_an_instapay_reveal_without_a_number_still_gives_the_link(db):
 
     assert revealed["instapay_address_url"] == INSTAPAY_URL
     assert revealed["instapay_phone"] is None
+
+
+# ── The InstaPay address is a link, not a phone number ───────────────────────
+
+
+def test_a_phone_number_in_the_link_field_is_refused(db):
+    """The mistake actually worth catching.
+
+    §13.1 collects both an address and a number and they sit next to each
+    other on the form. Mixed up, nothing errors at the time - it surfaces at
+    month end when somebody tries to pay her and the button opens nothing.
+    """
+    from app.services.payouts import normalise_instapay_address
+
+    with pytest.raises(ValueError, match="looks like a phone number"):
+        normalise_instapay_address("01001234567")
+
+
+def test_a_link_to_somewhere_else_is_refused(db):
+    """A URL anywhere but ipn.eg cannot open InstaPay, whatever else it is."""
+    from app.services.payouts import normalise_instapay_address
+
+    with pytest.raises(ValueError, match="points at"):
+        normalise_instapay_address("https://facebook.com/nour")
+
+
+def test_a_lookalike_domain_is_refused(db):
+    """`notipn.eg` ends with the right letters and is not the right host."""
+    from app.services.payouts import normalise_instapay_address
+
+    with pytest.raises(ValueError, match="points at"):
+        normalise_instapay_address("https://notipn.eg/nour")
+
+
+def test_a_subdomain_of_instapay_is_accepted(db):
+    from app.services.payouts import normalise_instapay_address
+
+    assert (
+        normalise_instapay_address("https://app.ipn.eg/S/nour")
+        == "https://app.ipn.eg/S/nour"
+    )
+
+
+def test_a_missing_scheme_is_added_rather_than_refused(db):
+    """Somebody typing it by hand omits https:// far more often than they mean
+    a different site."""
+    from app.services.payouts import normalise_instapay_address
+
+    assert normalise_instapay_address("ipn.eg/S/nour") == "https://ipn.eg/S/nour"
+
+
+def test_the_path_is_not_second_guessed(db):
+    """No real address has ever been seen by this codebase. Refusing a genuine
+    one because its path looks unfamiliar would stop a model joining at all,
+    which is far worse than accepting an odd-looking ipn.eg link.
+    """
+    from app.services.payouts import normalise_instapay_address
+
+    for address in (
+        "https://ipn.eg/S/nour.mahmoud/instapay/8Xk2Qp",
+        "https://ipn.eg/nour@instapay",
+        "https://ipn.eg/x",
+        "https://ipn.eg/",
+    ):
+        assert normalise_instapay_address(address) == address
+
+
+def test_the_check_applies_wherever_a_destination_is_written(db):
+    """Inside `set_destination`, so the application, a model changing her own,
+    and a maintainer correcting one are all checked by the same rule.
+    """
+    nour = _affiliate(db)
+
+    with pytest.raises(ValueError, match="looks like a phone number"):
+        set_destination(
+            db,
+            nour,
+            method=PayoutMethod.INSTAPAY,
+            instapay_address_url="01001234567",
+            instapay_phone="01001234567",
+        )

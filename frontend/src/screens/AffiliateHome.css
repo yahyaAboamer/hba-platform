@@ -57,3 +57,43 @@
   padding-top: var(--space-3);
   border-top: 1px solid var(--rule);
 }
+
+.affiliate__details {
+  margin-top: var(--space-4);
+}
+
+.affiliate__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: var(--space-3) 0 var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.affiliate__list dt {
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}
+
+.affiliate__list dd {
+  margin: var(--space-1) 0 0;
+}
+
+.affiliate__code {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+/* Her code is registered and Shopify has not confirmed it yet. Stated
+   plainly rather than alarmingly - nothing is wrong, somebody is checking. */
+.affiliate__pending-code {
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}
+
+.affiliate__note {
+  margin: 0 0 var(--space-4);
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}

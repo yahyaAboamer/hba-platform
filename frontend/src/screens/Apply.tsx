@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import instapayGuide from "../assets/instapay-link.png";
 import { api } from "../lib/api";
 import "./Apply.css";
 
@@ -10,6 +11,39 @@ type Mine = {
 };
 
 type Method = "instapay" | "bank" | "wallet";
+
+/**
+ * The same rule as `normalise_instapay_address` on the server, for immediate
+ * feedback. **The server is the control; this is the courtesy.** It is
+ * duplicated rather than fetched because a model typing into a field should
+ * not wait on a round trip to be told she pasted her phone number.
+ *
+ * The host is checked and the path is not, for the reason the server gives:
+ * no real address has ever been seen here, and refusing a genuine one because
+ * its path looks unfamiliar would stop her joining at all.
+ */
+export function instapayProblem(value: string): string | null {
+  const cleaned = value.trim();
+  if (!cleaned) return null;
+
+  if (/^[+\d][\d\s\-()]*$/.test(cleaned)) {
+    return "That looks like your phone number — it goes in the field below. The payment address is a link starting https://ipn.eg/";
+  }
+
+  let host: string;
+  try {
+    host = new URL(cleaned.includes("://") ? cleaned : `https://${cleaned}`)
+      .hostname.toLowerCase();
+  } catch {
+    return "That is not a link. Tap Link in InstaPay and copy what it gives you.";
+  }
+
+  if (host !== "ipn.eg" && !host.endsWith(".ipn.eg")) {
+    return `An InstaPay payment address is a link on ipn.eg — that one points at ${host}.`;
+  }
+
+  return null;
+}
 
 const METHOD_LABEL: Record<Method, string> = {
   instapay: "InstaPay",
@@ -36,6 +70,9 @@ export function Apply({ onApplied }: { onApplied: () => void }) {
   const [fields, setFields] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
+
+  const addressProblem =
+    method === "instapay" ? instapayProblem(fields.instapay_address_url ?? "") : null;
 
   useEffect(() => {
     api
@@ -165,6 +202,36 @@ export function Apply({ onApplied }: { onApplied: () => void }) {
 
         {method === "instapay" && (
           <>
+            {/*
+             * §13.1's illustrated guide. The steps are written from what the
+             * business observed doing it: tapping Link opens a share sheet
+             * offering apps as well as Copy, and somebody following "tap Link"
+             * alone can easily send it to WhatsApp instead of copying it. So
+             * the instruction names Copy explicitly.
+             */}
+            <figure className="apply__guide">
+              <img
+                className="apply__guide-image"
+                src={instapayGuide}
+                alt="The InstaPay home screen, with the Link button under your account circled"
+              />
+              <figcaption className="apply__guide-steps">
+                <strong>Where to find it</strong>
+                <ol>
+                  <li>Open InstaPay.</li>
+                  <li>
+                    Under your account, tap <strong>Link</strong> — circled
+                    above.
+                  </li>
+                  <li>
+                    Choose <strong>Copy</strong>. It will also offer to send it
+                    through other apps; you want Copy.
+                  </li>
+                  <li>Paste it below.</li>
+                </ol>
+              </figcaption>
+            </figure>
+
             <label className="field">
               <span className="field__label">Your InstaPay payment address</span>
               <input
@@ -172,21 +239,18 @@ export function Apply({ onApplied }: { onApplied: () => void }) {
                 required
                 value={fields.instapay_address_url ?? ""}
                 onChange={(event) => set("instapay_address_url", event.target.value)}
-                placeholder="https://ipn.eg/S/your-name/instapay/…"
+                placeholder="https://ipn.eg/…"
+                aria-invalid={addressProblem !== null}
               />
-              {/*
-               * §13.1 wants an illustrated guide here showing where this lives
-               * in the InstaPay app. The screenshots are an asset the business
-               * has to provide; until they exist this is written guidance in
-               * the same place the images will go, rather than a field with no
-               * explanation at all.
-               */}
-              <span className="apply__hint">
-                Open InstaPay, go to your profile, and copy your{" "}
-                <strong>payment address</strong>. It is a link starting{" "}
-                <code className="code">https://ipn.eg/</code> — not your phone
-                number.
-              </span>
+              {addressProblem ? (
+                <span className="blocker apply__problem">{addressProblem}</span>
+              ) : (
+                <span className="apply__hint">
+                  A link starting{" "}
+                  <code className="code">https://ipn.eg/</code> — not your phone
+                  number.
+                </span>
+              )}
             </label>
 
             <label className="field">
@@ -254,7 +318,7 @@ export function Apply({ onApplied }: { onApplied: () => void }) {
         <button
           type="submit"
           className="button button--primary apply__submit"
-          disabled={working}
+          disabled={working || addressProblem !== null}
         >
           {working ? "Sending…" : "Send my application"}
         </button>

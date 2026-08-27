@@ -15,6 +15,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api import (
+    affiliate_self,
     affiliates,
     applications,
     audit,
@@ -100,6 +101,7 @@ app.include_router(webhooks.router)
 app.include_router(operations.router)
 app.include_router(affiliates.router)
 app.include_router(applications.router)
+app.include_router(affiliate_self.router)
 app.include_router(earnings.router)
 app.include_router(targets.router)
 app.include_router(orders.router)

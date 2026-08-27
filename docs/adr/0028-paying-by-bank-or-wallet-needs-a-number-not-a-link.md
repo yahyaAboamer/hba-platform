@@ -1,6 +1,6 @@
 # 0028 — Paying by bank or wallet needs a number, not a link
 
-**Status:** accepted, amended 2026-08-27
+**Status:** accepted, amended 2026-08-27, deep link verified 2026-08-27
 **Date:** 2026-08-26
 **Amends:** spec §13.1 (InstaPay details), §14 (Payments and proof)
 **Related:** [0017](0017-proof-is-shown-to-the-affiliate.md), §6.4 (payout destination changes)
@@ -160,3 +160,55 @@ A payment allocates to a `payroll_snapshot`, which only exists once the month
 has been **approved**. So the month is finalised *before* anybody can be paid
 against it. Approve → pay → record the payment with its proof. Paying a model
 finalises nothing; there is nothing left to finalise by then.
+
+---
+
+## The deep link works — verified 2026-08-27
+
+§13.1 called this an implementation discovery item: *"deep-link behaviour must
+be verified on Android and iPhone, with and without the app installed, before
+the Pay flow is built around it."* The Pay flow shipped in Phase 7 with this
+still untested, which was recorded as overdue rather than upcoming.
+
+**Now tested.** The business tapped an `ipn.eg` link on a phone with InstaPay
+installed. **The operating system handed it to the InstaPay app**, which is
+the behaviour §13.1 assumed and the entire reason that section collects a link
+rather than a number.
+
+The app then showed *"QR verification failed"* — expected, and not a finding
+about the mechanism. The link tapped was invented seed data, so no account
+exists behind it. What was being tested is whether `ipn.eg` routes to the app,
+and it does.
+
+**What remains untested:** iPhone specifically, and the behaviour with the app
+*not* installed. Both matter less than they did before this ADR's amendment,
+because the number now sits beside the link either way — a link that fails to
+open costs one manual step, not the payment.
+
+## What this settles, and what it changes
+
+Nothing in the built flow. The Pay button stays, the number stays beside it.
+
+What it removes is the possibility that the whole approach was wrong — that
+`ipn.eg` links were inert and §13.1 had been built on a misremembered detail.
+That was the real exposure, and it is now closed.
+
+## The field is validated as a consequence
+
+`normalise_instapay_address` checks a payment address is a URL on `ipn.eg`.
+The host is checked and **the path is not**, deliberately: the domain is a
+principled line, since a URL anywhere else cannot open InstaPay whatever else
+it is, while the path shape is a guess — no real address has ever been seen by
+this codebase, and refusing a genuine one because its path looks unfamiliar
+would stop a model joining at all.
+
+The mistake worth catching is a **phone number in the link field**. §13.1
+collects both and they sit next to each other on the form; mixed up, nothing
+errors at the time and it surfaces at month end when somebody tries to pay her.
+That case gets its own message rather than falling through the host check,
+which produced *"that one points at 01001234567"* — true, and nonsense to the
+person who has to fix it.
+
+The check lives inside `set_destination`, so the application, a model changing
+her own destination, and a maintainer correcting one are all covered by the
+same rule. A validator on one path is a validator with a way around it.

@@ -20,6 +20,16 @@ type Revealed = {
 
 type Outstanding = { affiliates: Balance[] };
 
+/** "2 days ago", in the words §6.4.5 uses. */
+function describeWhen(iso: string): string {
+  const days = Math.floor(
+    (Date.now() - new Date(iso).getTime()) / (1000 * 60 * 60 * 24),
+  );
+  if (days <= 0) return "today";
+  if (days === 1) return "yesterday";
+  return `${days} days ago`;
+}
+
 const METHOD_LABEL: Record<string, string> = {
   instapay: "InstaPay",
   bank: "Bank transfer",
@@ -178,6 +188,24 @@ export function PaymentRecord() {
       {error && (
         <p className="notice notice--refused" role="alert">
           {error}
+        </p>
+      )}
+
+      {/*
+       * §6.4.5, and the reason it is here rather than buried in the panel
+       * below: this is the moment a redirected payout would actually cost
+       * money, and the person about to send it is the only one who can tell a
+       * model who switched banks from an account somebody else is now holding.
+       *
+       * It does not block. A destination changing shortly before payday is
+       * overwhelmingly the former, and refusing to pay her would be the wrong
+       * default by a wide margin.
+       */}
+      {balance.destination_changed_at && (
+        <p className="notice notice--refused pay__changed" role="alert">
+          Where {balance.name} is paid changed{" "}
+          <strong>{describeWhen(balance.destination_changed_at)}</strong>. If
+          you were not expecting that, check with her before sending anything.
         </p>
       )}
 
