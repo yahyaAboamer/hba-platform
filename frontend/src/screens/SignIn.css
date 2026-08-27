@@ -37,3 +37,13 @@
   width: 100%;
   justify-content: center;
 }
+
+/* The first-run screen only. Says why this form exists at all, because a
+   platform with nobody in it is a state most people meet once and never
+   again. */
+.sign-in__lead {
+  max-width: 40ch;
+  margin: 0 0 var(--space-5);
+  font-size: var(--text-sm);
+  color: var(--quiet);
+}
