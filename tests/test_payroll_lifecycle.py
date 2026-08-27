@@ -653,3 +653,237 @@ def test_a_model_may_not_approve_anything(client):
 @pytest.mark.parametrize("month", ["2026-13", "not-a-month", "2026"])
 def test_a_month_that_is_not_a_month_is_refused(client, month):
     assert client.get(f"/api/payroll/{month}").status_code == 400
+
+
+# ── Carry-forward is actually paid (§11.4) ─────────────────────────────────────
+
+
+def test_a_carried_order_is_paid_by_the_month_that_carries_it(db):
+    """§11.4's whole point. Until this, carry-forward found the orders,
+    labelled them on the next month's row, and paid none of them.
+    """
+    from app.services.commission.calculate import calculate_month
+
+    affiliate = _affiliate(db)
+    _order(db, affiliate, "paid", 200_000)
+    late = _order(db, affiliate, "late", 100_000, state=CommissionState.PENDING)
+    approve_month(db, affiliate, AUGUST)
+    late.commission_state = CommissionState.EARNED
+    _order(db, affiliate, "own", 300_000, month=SEPTEMBER)
+    db.flush()
+
+    september = calculate_month(db, affiliate, SEPTEMBER)
+
+    # E£3,000 of its own at 10%, plus E£1,000 carried at 10%.
+    assert september.carried_orders == 1
+    assert september.carried_piastres == 10_000
+    assert september.payout_piastres == 40_000
+
+
+def test_a_carried_order_is_paid_at_its_own_months_rate(db):
+    """§9.5. A rate change in September must not rewrite what August was worth,
+    and that holds just as firmly when September is the month doing the paying.
+    """
+    from app.services.commission.calculate import calculate_month
+    from app.services.compensation import close_terms, terms_for
+
+    affiliate = _affiliate(db)
+    close_terms(db, terms_for(db, affiliate, AUGUST), end_month=AUGUST)
+    set_terms(
+        db,
+        affiliate,
+        start_month=SEPTEMBER,
+        compensation_type=CompensationType.COMMISSION,
+        commission_rate_bp=2000,
+    )
+    _order(db, affiliate, "paid", 200_000)
+    late = _order(db, affiliate, "late", 100_000, state=CommissionState.PENDING)
+    approve_month(db, affiliate, AUGUST)
+    late.commission_state = CommissionState.EARNED
+    _order(db, affiliate, "own", 100_000, month=SEPTEMBER)
+    db.flush()
+
+    september = calculate_month(db, affiliate, SEPTEMBER)
+
+    # September's own E£1,000 at 20% = E£200. August's late E£1,000 at **10%**
+    # = E£100. Paying it at September's rate would have made it E£400.
+    assert september.carried_piastres == 10_000
+    assert september.payout_piastres == 30_000
+
+
+def test_a_carried_order_is_not_paid_twice(db):
+    """Approving the month that carries it settles it. Nothing else records
+    that an order has been paid, so without this it would be offered to every
+    later month for ever.
+    """
+    from app.services.commission.calculate import calculate_month
+
+    affiliate = _affiliate(db)
+    _order(db, affiliate, "paid", 200_000)
+    late = _order(db, affiliate, "late", 100_000, state=CommissionState.PENDING)
+    approve_month(db, affiliate, AUGUST)
+    late.commission_state = CommissionState.EARNED
+    db.flush()
+
+    approve_month(db, affiliate, SEPTEMBER)
+    db.flush()
+
+    october = calculate_month(db, affiliate, "2026-10")
+
+    assert october.carried_orders == 0
+    assert october.payout_piastres == 0
+    assert carried_into(db, affiliate, "2026-10") == []
+
+
+def test_carried_money_sits_on_top_of_a_guarantee_not_inside_it(db):
+    """A guarantee is a floor under **this month's** work, and an order from a
+    different month is not this month's work.
+
+    Comparing it against the floor would let a late August order be swallowed
+    by a September guarantee she was going to receive anyway.
+    """
+    from app.services.commission.calculate import calculate_month
+    from app.services.compensation import close_terms, terms_for
+    from app.services.targets import record_actuals, set_requirements, verify
+
+    affiliate = _affiliate(db)
+    close_terms(db, terms_for(db, affiliate, AUGUST), end_month="2026-07")
+    set_terms(
+        db,
+        affiliate,
+        start_month=AUGUST,
+        compensation_type=CompensationType.BASE_GUARANTEE,
+        commission_rate_bp=1000,
+        base_amount_piastres=800_000,
+    )
+
+    for month in (AUGUST, SEPTEMBER):
+        target = set_requirements(db, affiliate, month, videos=1, stories=1)
+        record_actuals(db, target, videos=2, stories=2)
+        verify(db, target, actor_id=None)
+
+    _order(db, affiliate, "paid", 200_000)
+    late = _order(db, affiliate, "late", 100_000, state=CommissionState.PENDING)
+    approve_month(db, affiliate, AUGUST)
+    late.commission_state = CommissionState.EARNED
+    _order(db, affiliate, "own", 100_000, month=SEPTEMBER)
+    db.flush()
+
+    september = calculate_month(db, affiliate, SEPTEMBER)
+
+    # Own commission E£100, floor E£8,000, carried E£100.
+    assert september.guarantee_applied is True
+    assert september.payout_piastres == 810_000
+
+
+def test_a_carried_month_with_no_terms_blocks_rather_than_guesses(db):
+    """A backstop, and deliberately kept.
+
+    `assert_correctable` already refuses to leave an approved month without
+    terms, so this state should not arise - the row is removed here with raw
+    SQL to reach it at all. It is guarded anyway because the alternative is not
+    a crash but a **silent underpayment**: `carried_forward` would skip the
+    month, she would be paid less than she is owed, and nothing on any screen
+    would say so.
+
+    Three lines to turn a quiet wrong number into a refusal is the trade ADR
+    0019 asks for, not defence in depth over a closed hole.
+    """
+    from app.services.commission.calculate import (
+        NO_TERMS_FOR_CARRIED,
+        calculate_month,
+    )
+
+    affiliate = _affiliate(db)
+    _order(db, affiliate, "paid", 200_000)
+    late = _order(db, affiliate, "late", 100_000, state=CommissionState.PENDING)
+    approve_month(db, affiliate, AUGUST)
+    late.commission_state = CommissionState.EARNED
+    db.flush()
+
+    db.execute(
+        text("DELETE FROM compensation_period WHERE affiliate_id = :a"),
+        {"a": affiliate.id},
+    )
+    db.flush()
+    db.expire_all()
+
+    september = calculate_month(db, affiliate, SEPTEMBER)
+
+    assert NO_TERMS_FOR_CARRIED in september.blockers
+    assert september.carried_without_terms == [AUGUST]
+    assert september.carried_piastres == 0, "nothing is guessed at"
+
+
+def test_reopening_a_month_reclaims_an_order_the_next_month_has_not_paid(db):
+    """§11.4. The destination is still draft, so the order belongs back here.
+
+    Reopening August un-approves it, and an order only counts as *carried*
+    while its own month is closed. It returns to August on its own.
+    """
+    from app.services.commission.calculate import calculate_month
+
+    affiliate = _affiliate(db)
+    _order(db, affiliate, "paid", 200_000)
+    late = _order(db, affiliate, "late", 100_000, state=CommissionState.PENDING)
+    approve_month(db, affiliate, AUGUST)
+    late.commission_state = CommissionState.EARNED
+    db.flush()
+    assert len(carried_into(db, affiliate, SEPTEMBER)) == 1
+
+    reopen_month(db, affiliate, AUGUST, reason="An order arrived late.")
+    db.flush()
+
+    assert carried_into(db, affiliate, SEPTEMBER) == []
+    # E£2,000 + E£1,000 at 10%.
+    assert calculate_month(db, affiliate, AUGUST).payout_piastres == 30_000
+
+
+def test_reopening_a_month_leaves_an_order_the_next_month_has_paid(db):
+    """§11.4. The destination is approved, so that month is settled and the
+    order stays there permanently.
+
+    And - the trap this closes - August must **not** recalculate to include it.
+    Without that, re-approving August would agree commission September had
+    already paid, and the model would be paid for the same order twice.
+    """
+    from app.services.commission.calculate import calculate_month
+
+    affiliate = _affiliate(db)
+    _order(db, affiliate, "paid", 200_000)
+    late = _order(db, affiliate, "late", 100_000, state=CommissionState.PENDING)
+    august = approve_month(db, affiliate, AUGUST)
+    late.commission_state = CommissionState.EARNED
+    _order(db, affiliate, "own", 300_000, month=SEPTEMBER)
+    db.flush()
+
+    september = approve_month(db, affiliate, SEPTEMBER)
+    db.flush()
+    assert september.approved_obligation_piastres == 40_000
+    assert late.settled_in_snapshot_id == september.id
+
+    reopen_month(db, affiliate, AUGUST, reason="Checking the interaction.")
+    db.flush()
+
+    assert late.settled_in_snapshot_id == september.id, "it moved out of September"
+    assert (
+        calculate_month(db, affiliate, AUGUST).payout_piastres
+        == august.approved_obligation_piastres
+    ), "August counted an order September had already paid"
+
+
+def test_an_approved_month_still_reports_its_own_settled_orders(db):
+    """The guard excludes orders settled by *another* month, not every settled
+    order. Excluding all of them would make a month's figure collapse to zero
+    the moment it was approved.
+    """
+    from app.services.commission.calculate import calculate_month
+
+    affiliate = _affiliate(db)
+    _order(db, affiliate, "paid", 200_000)
+    snapshot = approve_month(db, affiliate, AUGUST)
+    db.flush()
+
+    assert calculate_month(db, affiliate, AUGUST).payout_piastres == (
+        snapshot.approved_obligation_piastres
+    )

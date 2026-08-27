@@ -1418,7 +1418,8 @@ against one, and noise on that warning is the one thing it cannot afford.
 
 ## Carry-forward is identified, displayed, and never paid
 
-**Status: open. Not yet fixed — it needs a decision (see below).**
+**Fixed** — ADR 0029. Left below in full, because the symptom is what somebody
+will recognise if it ever returns.
 
 **Symptom.** An order placed 29 August, still travelling when August payroll
 runs, delivering on 8 September. September's payroll row shows the line §11.4
@@ -1453,21 +1454,17 @@ reaches her is to reopen August, which the spec's own words rule out:
 *"Orders settling after approval never alter the approved month."* The platform
 currently requires the operation it tells you not to perform.
 
-**Why it is not fixed here.** Paying carried orders is not a one-line change,
-and the open questions are business decisions rather than engineering ones:
+**How it was fixed.** The three open questions were business decisions and
+were answered by HBA: the source month's rate, on top of any guarantee, settled
+by the paying month. ADR 0029 records all three and the alternatives rejected.
 
-1. **Which month's rate?** The order belongs to August. §9.5 is firm that a
-   rate change in June must not rewrite what April was worth, which argues for
-   August's rate — but `calculate_month` resolves one rate for the whole month,
-   so this means per-order rate resolution.
-2. **Does a carried order count toward a base guarantee?** If her September
-   commission is compared against her guarantee, a carried August order could
-   push her over the line and cost HBA the guarantee, or under it and cost her.
-3. **Which snapshot settles it**, and what does her dashboard say it was paid
-   in — August's month or September's payment?
-
-Recorded now rather than fixed quietly, because a wrong answer to (1) or (2)
-underpays or overpays every model with a late delivery, every month.
+**The second bug, found while fixing the first.** Settling a carried order in
+September meant reopening August would recalculate August to include it — and
+re-approving would agree commission September had already paid. Reproduced,
+then closed by a single rule: *an order counts toward a month unless a
+different month's payroll paid it.* Both halves matter; excluding **every**
+settled order instead would make each month recalculate to zero the moment it
+was approved.
 
 ---
 
@@ -1482,6 +1479,7 @@ These are not bugs. They are accepted costs, recorded so nobody "fixes" them.
 | One role sets, records and verifies targets | Releases base guarantees unchecked | 0018 |
 | Payment screenshots visible to affiliates | May expose HBA banking details | 0017 |
 | Manual out-of-window exchanges are invisible | Created in Bosta only, never reach Shopify | Spec §9.4 |
+| A late order is paid its commission even where its own month paid a guarantee | Small, in the model's favour; bought an explainable rule | 0029 |
 
 ---
 

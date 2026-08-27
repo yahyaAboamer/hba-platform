@@ -19,7 +19,15 @@ export type PayrollRow = {
   obligation_piastres: number;
   /** What was agreed, or null if nothing has been. Cannot move. */
   approved_obligation_piastres: number | null;
-  carried_forward: { from_month: string; orders: number; piastres: number }[];
+  carried_forward: {
+    from_month: string;
+    orders: number;
+    base_piastres: number;
+    commission_rate_bp: number;
+    commission_piastres: number;
+  }[];
+  /** What those carried orders add to this month's figure. */
+  carried_piastres: number;
   blockers: string[];
   is_payable: boolean;
   version: number | null;
@@ -463,18 +471,24 @@ function PayrollTableRow({
           tone={state === "ready" && row.obligation_piastres > 0 ? "owed" : "neutral"}
         />
       </td>
+      {/*
+       * §11.4. The money, and the sales it came from — in that order, because
+       * the money is what the figure beside it went up by. Showing sales alone
+       * overstates the line by roughly ten times; showing money alone leaves
+       * nobody able to check it.
+       *
+       * Each line carries its own month's rate, because that is the rate it
+       * was paid at (§9.5).
+       */}
       <td className="payroll__carried">
         {row.carried_forward.map((line) => (
           <span key={line.from_month} className="payroll__carried-line">
-            {line.orders} order{line.orders === 1 ? "" : "s"} from{" "}
+            <Money piastres={line.commission_piastres} /> from{" "}
             {formatMonth(line.from_month)}
-            {/*
-             * Sales, not commission. `carry_forward_summary` sums
-             * commission_base_piastres, and labelling that as a payout would
-             * overstate what the line is worth by roughly ten times.
-             */}
             <span className="payroll__carried-sales">
-              <Money piastres={line.piastres} /> of sales
+              {line.orders} order{line.orders === 1 ? "" : "s"},{" "}
+              <Money piastres={line.base_piastres} /> of sales at{" "}
+              {line.commission_rate_bp / 100}%
             </span>
           </span>
         ))}

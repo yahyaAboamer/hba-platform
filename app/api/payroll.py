@@ -23,6 +23,8 @@ make month-end hostage to a single row. What each model got is reported
 individually.
 """
 
+from decimal import ROUND_HALF_UP, Decimal
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -76,6 +78,20 @@ def _affiliate_or_404(db: Session, affiliate_id: int) -> AffiliateProfile:
     return affiliate
 
 
+def _display_piastres(exact: Decimal | str) -> int:
+    """A fractional-piastre figure as whole piastres, **for reading only**.
+
+    `Decimal`, never `float`. `round(float(x))` is the habit this codebase
+    exists to avoid: it works until the one figure sitting on a boundary, and
+    that figure is somebody's pay (ADR 0002).
+
+    The payout itself is rounded once, on the total (ADR 0004). This rounds a
+    line so it can be shown beside the others; the two are not the same
+    operation and the total is never assembled from these.
+    """
+    return int(Decimal(exact).quantize(Decimal(1), rounding=ROUND_HALF_UP))
+
+
 def _row(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
     """One model's month: the figure, what blocks it, and what it carries."""
     if is_historical(month):
@@ -114,9 +130,22 @@ def _row(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
             format_egp(snapshot.approved_obligation_piastres) if snapshot else None
         ),
         "exact_unrounded_piastres": str(calculation.exact_unrounded_piastres),
-        # §11.4. Orders from earlier approved months that this one will pay -
-        # the common path, not an edge case.
-        "carried_forward": carry_forward_summary(db, affiliate, month),
+        # §11.4. Orders from earlier approved months that this one is paying,
+        # each at **its own** month's rate - the common path, not an edge case.
+        # Both figures are given: the sales carried, and what they are worth.
+        # A line that showed only sales would read as roughly ten times the
+        # money it actually adds.
+        "carried_forward": [
+            {
+                "from_month": line["from_month"],
+                "orders": line["orders"],
+                "base_piastres": line["base_piastres"],
+                "commission_rate_bp": line["commission_rate_bp"],
+                "commission_piastres": _display_piastres(line["commission_piastres"]),
+            }
+            for line in calculation.carried_lines
+        ],
+        "carried_piastres": _display_piastres(calculation.carried_piastres),
         "blockers": blockers,
         "is_payable": not blockers,
         "version": snapshot.version if snapshot else None,
