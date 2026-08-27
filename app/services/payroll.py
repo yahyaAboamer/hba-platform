@@ -42,7 +42,11 @@ from app.models.attributed_orders import AttributedOrder
 from app.models.payroll import CalculationState, PayrollMonth, PayrollSnapshot
 from app.services.attribution import AttributionOutcome, resolve_order
 from app.services.audit import record_audit
-from app.services.commission.calculate import MonthCalculation, calculate_month
+from app.services.commission.calculate import (
+    MonthCalculation,
+    calculate_month,
+    not_settled_by_another_month,
+)
 
 #: §9.2 and §11.3. An order carrying two registered codes belongs to nobody
 #: until a person decides, and approving a month containing one would pay a
@@ -150,25 +154,42 @@ def blockers_for(
     return blockers, calculation
 
 
-def _payload(calculation: MonthCalculation, orders: list[AttributedOrder]) -> dict:
+def _order_line(order: AttributedOrder) -> dict:
+    return {
+        "shopify_order_id": order.shopify_order_id,
+        "state": order.commission_state,
+        "base_piastres": order.commission_base_piastres,
+        "delivered_at": order.delivered_at.isoformat()
+        if order.delivered_at
+        else None,
+    }
+
+
+def _payload(
+    calculation: MonthCalculation,
+    orders: list[AttributedOrder],
+    carried: list[AttributedOrder] | None = None,
+) -> dict:
     """The whole calculation, in a form that survives the data changing.
 
     Every order is written out with what it was worth **at approval**, not a
     reference to a row that may be recalculated later.
+
+    Carried orders are listed separately and keep their own month, because
+    "which payroll paid it" and "which month it belongs to" are different
+    questions and §11.4 turns on not confusing them.
     """
     body = asdict(calculation)
+    # Decimals are written as strings, not floats. A float would round the one
+    # value the whole module exists to keep exact, and JSON has no other way
+    # to carry it.
     body["exact_unrounded_piastres"] = str(calculation.exact_unrounded_piastres)
     body["commission_piastres"] = str(calculation.commission_piastres)
-    body["orders"] = [
-        {
-            "shopify_order_id": order.shopify_order_id,
-            "state": order.commission_state,
-            "base_piastres": order.commission_base_piastres,
-            "delivered_at": order.delivered_at.isoformat()
-            if order.delivered_at
-            else None,
-        }
-        for order in orders
+    body["carried_piastres"] = str(calculation.carried_piastres)
+    body["orders"] = [_order_line(order) for order in orders]
+    body["carried_from_earlier_months"] = [
+        {**_order_line(order), "business_month": order.business_month}
+        for order in (carried or [])
     ]
     return body
 
@@ -213,8 +234,13 @@ def approve_month(
             .order_by(AttributedOrder.shopify_order_id)
         )
     )
+    # §11.4. Orders from earlier closed months that this payroll is paying.
+    # They are settled by this snapshot below, which is what stops them being
+    # offered to next month as well - the calculation would happily pay them
+    # again, because nothing about the order says it has been paid except this.
+    carried = carried_into(db, affiliate, month)
 
-    payload = _payload(calculation, orders)
+    payload = _payload(calculation, orders, carried)
     previous = latest_version(db, payroll_month)
 
     snapshot = PayrollSnapshot(
@@ -238,7 +264,7 @@ def approve_month(
     # until snapshots existed, and what lets a model's dashboard say "paid in
     # your September payment" rather than leaving her to work out the
     # difference.
-    for order in orders:
+    for order in [*orders, *carried]:
         if order.counts_toward_payout and order.settled_in_snapshot_id is None:
             order.settled_in_snapshot_id = snapshot.id
             order.settled_at = snapshot.approved_at
@@ -376,10 +402,15 @@ def carried_into(
     cash-on-delivery routinely straddles month end, so an order placed on
     29 August may still be travelling when payroll runs on 5 September.
 
-    An order qualifies when it was placed **before** this month, is earned, has
-    not been settled by any payroll, and its own month is already approved -
-    that last condition is what makes it *carried* rather than simply late. An
-    unapproved earlier month will pay its own orders when it is approved.
+    An order qualifies when it was placed **before** this month, is earned, is
+    not settled by a *different* month's payroll, and its own month is already
+    approved - that last condition is what makes it *carried* rather than
+    simply late. An unapproved earlier month will pay its own orders when it is
+    approved.
+
+    "A different month" rather than "any payroll", so that an approved month
+    still reports what it carried. Excluding everything settled would make a
+    month's own figure fall the moment it was agreed.
 
     **Its business_month never changes.** August sales means orders placed in
     August, frozen by trigger since Phase 4. Carry-forward is about which
@@ -403,7 +434,7 @@ def carried_into(
         select(AttributedOrder)
         .where(AttributedOrder.affiliate_id == affiliate.id)
         .where(AttributedOrder.business_month < month)
-        .where(AttributedOrder.settled_in_snapshot_id.is_(None))
+        .where(not_settled_by_another_month(affiliate.id, month))
         .order_by(AttributedOrder.business_month, AttributedOrder.shopify_order_id)
     )
     return [
