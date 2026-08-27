@@ -15,6 +15,13 @@ from app.models.identity import RoleAssignment, UserAccount
 from app.services.auth import resolve_session
 
 SESSION_COOKIE = "hba_session"
+
+#: The same token as the header, in a cookie the page can read. Double submit:
+#: the page echoes it back, and only a page on this origin can read it to do
+#: so. It exists because `sessionStorage` does not survive a closed tab and the
+#: session cookie does - see `_set_cookie` in `app/api/auth.py`.
+CSRF_COOKIE = "hba_csrf"
+
 CSRF_HEADER = "x-csrf-token"
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 

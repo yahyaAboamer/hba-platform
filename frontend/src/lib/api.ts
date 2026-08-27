@@ -31,7 +31,36 @@ export class ApiError extends Error {
   }
 }
 
+/** The CSRF cookie the server sets beside the session. Readable on purpose. */
+const CSRF_COOKIE = "hba_csrf";
+
+function readCookie(name: string): string | null {
+  const prefix = `${name}=`;
+  for (const part of document.cookie.split(";")) {
+    const entry = part.trim();
+    if (entry.startsWith(prefix)) {
+      return decodeURIComponent(entry.slice(prefix.length)) || null;
+    }
+  }
+  return null;
+}
+
+/**
+ * The token that proves a write came from this page.
+ *
+ * **The cookie first, and it is the one that matters.** `sessionStorage` is
+ * emptied when the tab closes while the session cookie lives twelve hours, so
+ * a returning tab had a live session and no token: every read worked, the
+ * interface showed a signed-in administrator, and every write failed saying
+ * authentication was required.
+ *
+ * The storage copy stays as a fallback for the one case the cookie cannot
+ * cover — a browser configured to refuse cookies set on a response it is
+ * already showing — and costs nothing when it is not needed.
+ */
 function readToken(): string | null {
+  const fromCookie = readCookie(CSRF_COOKIE);
+  if (fromCookie) return fromCookie;
   try {
     return sessionStorage.getItem(CSRF_STORAGE_KEY);
   } catch {
@@ -244,13 +273,29 @@ export async function acceptInvitation(
   return session;
 }
 
+/**
+ * Sign out, and end up signed out either way.
+ *
+ * **Never throws.** It used to: the logout call needs a CSRF token like any
+ * other write, and when the token was missing it failed with a 401 — so the
+ * navigation that was waiting on it never ran and the button appeared to do
+ * nothing at all. Being unable to *tell* the server is not a reason to leave
+ * somebody sitting in a session they asked to leave.
+ *
+ * The local half always happens. The cookies are cleared by the server's
+ * response when it answers, and by the browser when they expire when it does
+ * not.
+ */
 export async function signOut(): Promise<void> {
   try {
     await api.post("/api/auth/logout");
+  } catch {
+    // Recorded nowhere on purpose: there is nothing the person can do about
+    // it, and the outcome they asked for still happens.
   } finally {
-    // Forget locally even if the request failed. A stale token the server no
-    // longer honours is worse than none: it makes every later write fail in a
-    // way that looks like a bug rather than a sign-out.
+    // Forget locally regardless. A stale token the server no longer honours is
+    // worse than none: it makes every later write fail in a way that looks
+    // like a bug rather than a sign-out.
     forgetToken();
   }
 }

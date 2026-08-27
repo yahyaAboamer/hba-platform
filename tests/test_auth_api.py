@@ -473,3 +473,84 @@ def test_it_reveals_nothing_the_bootstrap_endpoint_did_not(client):
 
     assert refused.status_code == 409
     assert anonymous.get("/api/auth/needs-setup").json()["needs_setup"] is False
+
+
+# -- The session outlives the token that lets you use it ---------------------
+
+
+def test_a_returning_tab_can_still_write(fresh_database):
+    """The bug that made *Invite a model* and *Sign out* both say
+    "Authentication required" on a platform somebody was plainly signed in to.
+
+    The session cookie is persistent - twelve hours, `max_age` set. The CSRF
+    token was kept in `sessionStorage`, which the browser throws away when the
+    tab closes. So reopening the tab left a live session and no token: every
+    read worked, the interface showed a signed-in administrator, and **every
+    write failed with a message about authentication.**
+
+    Reproduced by keeping the cookie and discarding everything else, which is
+    exactly what closing a tab does.
+    """
+    with TestClient(app) as first_visit:
+        created = first_visit.post("/api/auth/bootstrap", json=BOOTSTRAP)
+        assert created.status_code == 201
+        cookie = first_visit.cookies.get("hba_session")
+        csrf_cookie = first_visit.cookies.get("hba_csrf")
+
+    # A new tab. The browser still has the cookies; nothing else survives.
+    with TestClient(app) as returning:
+        returning.cookies.set("hba_session", cookie)
+        if csrf_cookie:
+            returning.cookies.set("hba_csrf", csrf_cookie)
+
+        # Reads work, which is why the interface looks fine.
+        assert returning.get("/api/auth/me").status_code == 200
+
+        # And so must writes. The token has to come from somewhere the browser
+        # keeps for as long as it keeps the session.
+        assert csrf_cookie, "the CSRF token must survive a closed tab"
+        wrote = returning.post(
+            "/api/auth/invitations",
+            json={"email": "model@example.com", "role": "affiliate"},
+            headers={"X-CSRF-Token": csrf_cookie},
+        )
+        assert wrote.status_code == 201, wrote.text
+
+
+def test_the_csrf_cookie_is_readable_by_the_page(fresh_database):
+    """Double submit: the page reads the token and echoes it in a header.
+
+    Readable on purpose. An attacker on another origin cannot read our
+    cookies, and `SameSite=lax` means the session cookie is not sent on a
+    cross-site POST at all - so the header remains something only our own page
+    can produce. Nothing is lost by the page being able to read it: script
+    running on this origin could already read `sessionStorage` and make
+    credentialed same-origin requests.
+    """
+    with TestClient(app) as client:
+        response = client.post("/api/auth/bootstrap", json=BOOTSTRAP)
+
+    header = response.headers.get_list("set-cookie")
+    session_cookie = next(c for c in header if c.startswith("hba_session="))
+    csrf_cookie = next(c for c in header if c.startswith("hba_csrf="))
+
+    assert "httponly" in session_cookie.lower(), "the session token is never readable"
+    assert "httponly" not in csrf_cookie.lower(), "the page has to be able to read this"
+    assert "samesite=lax" in csrf_cookie.lower()
+
+
+def test_signing_out_clears_both(fresh_database):
+    """Sign-out appeared to do nothing: the request needed a CSRF token, the
+    token was gone, so it failed - and the screen never moved because the
+    navigation was waiting on a call that threw.
+    """
+    with TestClient(app) as client:
+        created = client.post("/api/auth/bootstrap", json=BOOTSTRAP)
+        client.headers["X-CSRF-Token"] = created.json()["csrf"]
+
+        out = client.post("/api/auth/logout")
+        assert out.status_code in (200, 204), out.text
+
+    cleared = out.headers.get_list("set-cookie")
+    assert any(c.startswith("hba_session=") for c in cleared)
+    assert any(c.startswith("hba_csrf=") for c in cleared)
