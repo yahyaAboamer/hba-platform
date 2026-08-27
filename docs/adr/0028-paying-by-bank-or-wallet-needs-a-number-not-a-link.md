@@ -170,9 +170,9 @@ be verified on Android and iPhone, with and without the app installed, before
 the Pay flow is built around it."* The Pay flow shipped in Phase 7 with this
 still untested, which was recorded as overdue rather than upcoming.
 
-**Now tested.** The business tapped an `ipn.eg` link on a phone with InstaPay
-installed. **The operating system handed it to the InstaPay app**, which is
-the behaviour §13.1 assumed and the entire reason that section collects a link
+**Now tested, on iPhone.** The business tapped an `ipn.eg` link on an iPhone
+with InstaPay installed. **iOS handed it to the InstaPay app**, which is the
+behaviour §13.1 assumed and the entire reason that section collects a link
 rather than a number.
 
 The app then showed *"QR verification failed"* — expected, and not a finding
@@ -180,10 +180,18 @@ about the mechanism. The link tapped was invented seed data, so no account
 exists behind it. What was being tested is whether `ipn.eg` routes to the app,
 and it does.
 
-**What remains untested:** iPhone specifically, and the behaviour with the app
-*not* installed. Both matter less than they did before this ADR's amendment,
-because the number now sits beside the link either way — a link that fails to
-open costs one manual step, not the payment.
+**What remains untested:** Android, and the behaviour with the app *not*
+installed.
+
+Android is expected to work: the business's reading is that it will behave as
+iPhone does, and the mechanism is the same one either platform uses to claim a
+domain - iOS Universal Links, Android App Links. That is a reasonable
+expectation and it is **not** a test, so it is written here as an expectation.
+
+Both matter less than they did before this ADR's amendment, because the number
+now sits beside the link either way — a link that fails to open costs one
+manual step, not the payment. Neither is worth chasing before a real Android
+model is on the programme and can try her own address.
 
 ## What this settles, and what it changes
 
