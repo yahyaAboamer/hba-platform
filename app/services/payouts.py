@@ -239,6 +239,14 @@ def set_destination(
         before=mask_destination(previous),
         after=mask_destination(destination),
     )
+
+    # Section 6.4.5. Only on a *change* - the first destination is part of
+    # applying and warning about it would make the warning meaningless.
+    if previous is not None:
+        from app.services.notifications import destination_changed
+
+        destination_changed(db, affiliate, mask_destination(destination))
+
     return destination
 
 

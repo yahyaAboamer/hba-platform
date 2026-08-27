@@ -104,6 +104,15 @@ def set_status(
         )
 
     affiliate.status = status
+
+    # Section 16, and the email the whole go-live depends on arriving. Only on
+    # the transition into `active` from a pending application - reactivating a
+    # paused model is not the same event and she has already been welcomed.
+    if status == AffiliateStatus.ACTIVE and previous == AffiliateStatus.PENDING:
+        from app.services.notifications import application_approved
+
+        application_approved(db, affiliate)
+
     record_audit(
         db,
         action="affiliate.status_changed",

@@ -145,6 +145,14 @@ def submit_application(
         # payout details are masked by `record_audit` on the way in regardless.
         after={"name": name, "code": code, "payout_method": payout_method},
     )
+
+    # Section 16. Queued in this transaction, so an application that commits
+    # always carries the notice about it - and one that rolls back takes the
+    # emails with it. Imported here rather than at module scope: notifications
+    # reaches the worker, which reaches back into services.
+    from app.services.notifications import application_submitted
+
+    application_submitted(db, affiliate)
     return affiliate
 
 

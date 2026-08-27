@@ -284,6 +284,14 @@ def approve_month(
             "orders": len(orders),
         },
     )
+
+    # Section 16, and ADR 0030: a reopen sends nothing of its own, so this one
+    # email covers the first approval and every re-approval after it. Queued in
+    # the same transaction as the snapshot, so an agreed month and the notice
+    # about it commit together.
+    from app.services.notifications import month_approved
+
+    month_approved(db, affiliate, snapshot, month)
     return snapshot
 
 

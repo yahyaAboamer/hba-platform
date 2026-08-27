@@ -143,6 +143,7 @@ function InvitePanel() {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("content_manager");
   const [link, setLink] = useState<string | null>(null);
+  const [emailed, setEmailed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
 
@@ -152,10 +153,11 @@ function InvitePanel() {
     setError(null);
     setLink(null);
     try {
-      const result = await api.post<{ token: string }>("/api/auth/invitations", {
-        email: email.trim(),
-        role,
-      });
+      const result = await api.post<{ token: string; emailed: boolean }>(
+        "/api/auth/invitations",
+        { email: email.trim(), role },
+      );
+      setEmailed(result.emailed);
       setLink(`${window.location.origin}/accept-invitation?token=${result.token}`);
       setEmail("");
     } catch (caught) {
@@ -178,14 +180,22 @@ function InvitePanel() {
       )}
 
       {/*
-       * §16: email delivery is a later phase. Until it exists, the link is
-       * shown once, here, for whoever invited them to send it themselves -
-       * WhatsApp, email, however they'd reach that person anyway. It is
-       * shown once because it is a working credential until it is used.
+       * §16. The platform emails the link, and the link is still shown here.
+       *
+       * Both, deliberately. An emailed link is exactly what somebody wants on
+       * screen the moment the recipient says it never arrived - and on a
+       * machine with no mail credentials, which is every development machine,
+       * the copyable link is the only way in at all.
+       *
+       * Shown once because it is a working credential until it is used.
        */}
       {link && (
         <div className="notice notice--settled settings__link">
-          <p>Send this to them yourself — it only appears here once.</p>
+          <p>
+            {emailed
+              ? "Emailed to them. Here is the same link, in case it does not arrive — it only appears here once."
+              : "Send this to them yourself — it only appears here once."}
+          </p>
           <code className="code settings__link-value">{link}</code>
         </div>
       )}

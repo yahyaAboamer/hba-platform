@@ -1771,6 +1771,73 @@ from reading as a payment problem.
 
 ---
 
+## A scripted edit made the retry path unreachable
+
+**Symptom.** None, and that is the point. The notification sender's tests
+passed, the full suite passed, and the branch that re-queues a failed email had
+become dead code:
+
+    if row.attempts >= MAX_ATTEMPTS:
+        row.state = FAILED
+        _forget_secrets(row)
+    return                      # <- dedented one level
+    enqueue(...)                # <- unreachable
+
+A mail server that was briefly unavailable would have marked the attempt and
+never tried again. Every email queued during the outage would have sat at
+`pending` forever, and nothing on any screen would have said so.
+
+**Cause.** A Python script applying the edit computed the indentation of the
+inserted `return` from the whitespace of the block it was replacing, and got it
+wrong by four spaces. Python accepted it - a `return` at function level after a
+conditional is perfectly legal - and no test covered the give-up path and the
+retry path in the same run.
+
+**Found by reading the file afterwards**, not by running anything.
+
+**Worth recording** as a rule about how the edit was made rather than about
+what it did: **a scripted edit that computes indentation is a scripted edit
+that can silently change control flow.** String replacement with the full
+surrounding block written out by hand cannot do this; anything that derives
+whitespace can. Re-read the region after any patch that inserts a statement
+into an existing branch.
+
+The tests were extended so the two paths are exercised in one file, and the
+retry now asserts a second job was actually queued.
+
+---
+
+## Backslash escapes do not survive a shell heredoc here
+
+**Symptom.** Three separate `SyntaxError`s while writing Python through
+`bash <<'EOF'`, all of the same shape:
+
+    clean = "".join(c for c in name if c not in "
+    ").strip()
+
+`"\r\n"` in the script became a literal carriage return and newline in the
+written file. The same thing happened to `"\n\n"` inside an email template and
+turned a working module into an unterminated string literal.
+
+**Cause.** Not diagnosed precisely, and it does not need to be: the quoted
+heredoc should pass its body through untouched, and in this environment it does
+not. Long command bodies were separately truncated at the terminator, producing
+`unexpected EOF while looking for matching`.
+
+**Worked around** by writing any content containing escape sequences - or
+anything over a few dozen lines - with the file-writing tool and having a short
+script splice it in. Naming the characters instead of embedding them also
+works, and reads better in this case:
+
+    LINE_BREAKS = (chr(13), chr(10))
+
+**Worth recording** because the failure mode is *silent corruption of source*,
+not a refused command. The `SyntaxError` was the lucky version. The same
+collapse inside a string that still parses - a template, a regex, a SQL
+fragment - would have shipped.
+
+---
+
 ## Business rules with deliberate exposure
 
 These are not bugs. They are accepted costs, recorded so nobody "fixes" them.

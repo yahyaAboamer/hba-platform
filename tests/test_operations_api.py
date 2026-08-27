@@ -662,3 +662,80 @@ def test_sync_reports_whether_payroll_can_be_approved(client, monkeypatch):
     body = client.get("/api/operations/sync").json()
     assert body["go_live_month"] == "2026-09"
     assert body["payroll_can_be_approved"] is True
+
+
+# -- The operational view (Phase 10) -----------------------------------------
+
+
+def test_the_notification_view_says_whether_mail_is_configured_at_all(client):
+    """The most likely way this goes wrong, and the least likely to be noticed.
+
+    A screen reporting "0 failed" would be truthfully describing a platform
+    that has quietly sent nothing since the day it was deployed.
+    """
+    body = client.get("/api/operations/notifications").json()
+
+    assert body["configured"] is False
+    assert body["from_address"] is None
+    assert body["counts"]["pending"] == 0
+
+
+def test_a_failed_email_is_visible_nowhere_else(client, monkeypatch):
+    """A model who was never told is invisible from every other screen: the
+    month is approved, the payment is recorded, every figure is right.
+    """
+    from app.db import SessionLocal
+    from app.models.notifications import NotificationOutbox, NotificationState
+
+    with SessionLocal() as session:
+        session.add(
+            NotificationOutbox(
+                event="month.approved",
+                recipient_email="nour@example.com",
+                subject_ref="affiliate:1",
+                payload={"email": "nour@example.com"},
+                state=NotificationState.FAILED,
+                attempts=5,
+                last_error="550 no such user",
+            )
+        )
+        session.commit()
+
+    body = client.get("/api/operations/notifications").json()
+
+    assert body["counts"]["failed"] == 1
+    assert body["failed"][0]["recipient_email"] == "nour@example.com"
+    assert "550" in body["failed"][0]["last_error"]
+
+
+def test_the_view_never_returns_a_notification_payload(client):
+    """An invitation token lives in the payload until the email goes out, and a
+    send that failed before that leaves one there. The operational view says
+    who never heard, not what would have been in the message.
+    """
+    from app.db import SessionLocal
+    from app.models.notifications import NotificationOutbox, NotificationState
+
+    with SessionLocal() as session:
+        session.add(
+            NotificationOutbox(
+                event="invitation.sent",
+                recipient_email="someone@example.com",
+                payload={"_secret": {"token": "a-real-looking-token"}},
+                state=NotificationState.FAILED,
+                attempts=5,
+                last_error="timed out",
+            )
+        )
+        session.commit()
+
+    body = client.get("/api/operations/notifications").json()
+
+    assert "a-real-looking-token" not in str(body)
+
+
+def test_a_model_may_not_read_the_notification_view(client):
+    """It names every address on the programme."""
+    _demote_to("affiliate")
+
+    assert client.get("/api/operations/notifications").status_code == 403
