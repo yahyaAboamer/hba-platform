@@ -57,6 +57,21 @@ export function MyMonth() {
             <p className="figure__state">Before the platform</p>
             <p className="figure__note">{body.note}</p>
           </>
+        ) : body.not_started ? (
+          /*
+           * The first thing twenty people will see. A model invited on the
+           * 31st of August opens on September, and September has nothing in
+           * it - "Still adding up, E£0.00" is true and lands as though the
+           * platform is broken or she has earned nothing.
+           */
+          <>
+            <p className="figure__state">Not started yet</p>
+            <p className="figure__note figure__note--lead">
+              {formatMonth(body.month)} has not begun. Once it does, everything
+              your code sells will appear here as it happens — you do not need
+              to do anything.
+            </p>
+          </>
         ) : (
           <>
             <p className="figure__state">
@@ -104,7 +119,7 @@ export function MyMonth() {
         </p>
       )}
 
-      {body.makeup.length > 0 && (
+      {body.makeup.length > 0 && !body.not_started && (
         <section className="panel makeup">
           <div className="panel__head">
             <h2 className="panel__title">How this adds up</h2>
@@ -165,6 +180,7 @@ export function MyMonth() {
         </section>
       )}
 
+      {!body.not_started && (
       <section className="panel sales">
         <div className="panel__head">
           <h2 className="panel__title">Your sales</h2>
@@ -216,6 +232,7 @@ export function MyMonth() {
           See every order →
         </Link>
       </section>
+      )}
 
       {/*
        * §11.4, her side of it. She counted this month's orders herself and the

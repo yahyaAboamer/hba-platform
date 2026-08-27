@@ -42,6 +42,12 @@ export type MyEarnings = {
    */
   state: "historical" | "open" | "agreed";
   is_working_month: boolean;
+  /**
+   * The calendar has not reached this month yet. Distinct from "open with no
+   * sales", which is the same figures and a completely different sentence -
+   * and it is what a model invited before go-live sees first.
+   */
+  not_started: boolean;
   sales: {
     earned_piastres: number;
     earned: string;

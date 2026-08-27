@@ -1109,3 +1109,52 @@ def test_the_payment_routes_refuse_a_maintainer(admin):
     """Two gates, never mixed. There is already an admin route for both."""
     assert admin.get("/api/me/payments").status_code == 403
     assert admin.get("/api/me/payments/1/proof").status_code == 403
+
+
+# -- A month the calendar has not reached (Phase 10) -------------------------
+
+
+def test_a_month_that_has_not_started_says_so(admin, monkeypatch):
+    """The first thing twenty people will see.
+
+    A model invited before go-live opens on the go-live month, and that month
+    has nothing in it. *Still adding up, nothing* is true and lands as though
+    the platform is broken or she has earned nothing.
+    """
+    from app.core import businesstime
+
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"])
+
+    # The clock says August; the screen is opening on September.
+    body = _sign_in().get(f"/api/me/earnings/{SEPTEMBER}").json()
+
+    assert body["not_started"] is True
+    assert body["state"] == "open"
+    assert businesstime  # imported to make the dependency explicit
+
+
+def test_a_month_that_has_begun_does_not(admin):
+    """August is the current month in this suite, so it has started - and an
+    open month with no sales yet is a completely different sentence.
+    """
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"])
+
+    body = _sign_in().get(f"/api/me/earnings/{AUGUST}").json()
+
+    assert body["not_started"] is False
+
+
+def test_a_historical_month_never_reads_as_not_started(admin, monkeypatch):
+    """It is the opposite: settled long ago, not yet to come."""
+    from app.config import settings
+
+    affiliate = _affiliate(admin)
+    _order(affiliate["id"], "1", 100_000, month="2025-11")
+    monkeypatch.setattr(settings, "go_live_month", "2026-01", raising=False)
+
+    body = _sign_in().get("/api/me/earnings/2025-11").json()
+
+    assert body["state"] == "historical"
+    assert body["not_started"] is False

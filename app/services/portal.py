@@ -50,7 +50,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.businesstime import parse_month
+from app.core.businesstime import business_month, parse_month, utcnow
 from app.core.money import format_egp
 from app.models.affiliates import AffiliateProfile
 from app.models.attributed_orders import AttributedOrder, CommissionState
@@ -220,6 +220,23 @@ def months_for(db: Session, affiliate: AffiliateProfile) -> list[str]:
         cursor = f"{year:04d}-{index:02d}"
 
     return list(reversed(months))
+
+
+def _not_started(month: str) -> bool:
+    """Whether this month has not begun yet.
+
+    Before go-live, `working_month()` opens every screen on the go-live month -
+    which is right, because an empty August is a useless first impression when
+    the platform starts in September. For the maintainer that month is
+    something to get ready. For a model invited on the 31st of August it is a
+    month with nothing in it, and *Still adding up - E0.00* is a poor first
+    thing to see from a platform she has just been told to trust.
+
+    Compared against the real business month in Cairo (ADR 0005), never the
+    browser's clock: a model in another timezone must not be told her month has
+    not started when it has.
+    """
+    return month > business_month(utcnow())
 
 
 def _carried_out(db: Session, affiliate: AffiliateProfile, month: str) -> list[dict]:
@@ -413,6 +430,7 @@ def my_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
             "month": month,
             "state": "historical",
             "is_working_month": month == working,
+            "not_started": False,
             "sales": {
                 "earned_piastres": sales["net_sales_piastres"],
                 "earned": format_egp(sales["net_sales_piastres"]),
@@ -459,6 +477,10 @@ def my_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
         "month": month,
         "state": "agreed" if agreed else "open",
         "is_working_month": month == working,
+        # A month the calendar has not reached. Distinct from "open with no
+        # sales yet", which is the same figures and a completely different
+        # sentence.
+        "not_started": _not_started(month),
         "sales": {
             "earned_piastres": figures["earned_base_piastres"],
             "earned": format_egp(figures["earned_base_piastres"]),

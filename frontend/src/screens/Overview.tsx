@@ -31,6 +31,18 @@ type PayrollMonth = {
   };
 };
 
+/** §16's in-platform notifications. Empty on a healthy platform. */
+type Attention = {
+  items: {
+    key: string;
+    severity: "blocking" | "attention";
+    text: string;
+    detail: string;
+    where: string;
+  }[];
+  blocking: number;
+};
+
 type SyncStatus = {
   orders_indexed: number;
   go_live_month: string | null;
@@ -54,6 +66,7 @@ export function Overview({ session }: { session: Session }) {
   const [month, setMonth] = useState(session.platform.working_month);
   const [payroll, setPayroll] = useState<PayrollMonth | null>(null);
   const [sync, setSync] = useState<SyncStatus | null>(null);
+  const [attention, setAttention] = useState<Attention | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [lockNote, setLockNote] = useState<string | null>(null);
 
@@ -62,10 +75,12 @@ export function Overview({ session }: { session: Session }) {
     Promise.all([
       api.get<PayrollMonth>(`/api/payroll/${month}`),
       api.get<SyncStatus>("/api/operations/sync"),
+      api.get<Attention>("/api/operations/attention"),
     ])
-      .then(([months, status]) => {
+      .then(([months, status, needing]) => {
         setPayroll(months);
         setSync(status);
+        setAttention(needing);
       })
       .catch((caught) => setError(caught.message));
     setLockNote(null);
@@ -113,16 +128,33 @@ export function Overview({ session }: { session: Session }) {
       )}
 
       {/*
-       * The one thing that stops everything. GO_LIVE_MONTH blank blocks every
-       * approval by design, and a person who does not know that will read a
-       * screen full of blocked months as a bug.
+       * §16's in-platform notifications, where somebody lands rather than
+       * behind a tab they have to think to open. Every item is conditional on
+       * something genuinely true and genuinely actionable, and the whole panel
+       * disappears on a healthy platform - which is what makes it worth
+       * reading when it does not.
+       *
+       * The go-live warning used to be a bespoke banner here. It is one of
+       * these now: the judgement about what deserves attention belongs on the
+       * server, in one place, rather than being spread across screens that ask
+       * the same question differently.
        */}
-      {sync && !sync.payroll_can_be_approved && (
-        <p className="notice notice--refused" style={{ marginBottom: "var(--space-5)" }}>
-          No go-live month is set, so no month can be approved. Set{" "}
-          <code className="code">GO_LIVE_MONTH</code> to the first month the
-          platform is responsible for paying.
-        </p>
+      {attention && attention.items.length > 0 && (
+        <section className="attention">
+          {attention.items.map((item) => (
+            <div
+              key={item.key}
+              className={
+                item.severity === "blocking"
+                  ? "attention__item attention__item--blocking"
+                  : "attention__item"
+              }
+            >
+              <p className="attention__text">{item.text}</p>
+              <p className="attention__detail">{item.detail}</p>
+            </div>
+          ))}
+        </section>
       )}
 
       {/*

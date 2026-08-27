@@ -739,3 +739,113 @@ def test_a_model_may_not_read_the_notification_view(client):
     _demote_to("affiliate")
 
     assert client.get("/api/operations/notifications").status_code == 403
+
+
+# -- What needs attention (§16) ----------------------------------------------
+
+
+def test_a_healthy_platform_says_nothing(client, monkeypatch):
+    """The whole point. A warning that is always on is one nobody reads, so an
+    empty list is what makes a non-empty one worth looking at.
+    """
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "go_live_month", "2026-09", raising=False)
+    monkeypatch.setattr(settings, "smtp_host", "smtp.example.com", raising=False)
+    monkeypatch.setattr(settings, "mail_from_address", "no@example.com", raising=False)
+
+    body = client.get("/api/operations/attention").json()
+
+    assert body["items"] == []
+    assert body["blocking"] == 0
+
+
+def test_an_unset_go_live_month_blocks_everything_and_says_so(client, monkeypatch):
+    """§11.2. Blank blocks every approval by design, and somebody who does not
+    know that reads a screen full of blocked months as a bug.
+    """
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "go_live_month", "", raising=False)
+
+    body = client.get("/api/operations/attention").json()
+    keys = {item["key"]: item for item in body["items"]}
+
+    assert keys["go_live_month_unset"]["severity"] == "blocking"
+    assert body["blocking"] >= 1
+
+
+def test_mail_being_off_is_reported(client, monkeypatch):
+    """The most likely thing to be silently wrong on a fresh deployment, and
+    the least likely to be noticed: nothing errors, models never hear.
+    """
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "go_live_month", "2026-09", raising=False)
+    monkeypatch.setattr(settings, "smtp_host", "", raising=False)
+
+    keys = {item["key"] for item in client.get("/api/operations/attention").json()["items"]}
+
+    assert "mail_not_configured" in keys
+
+
+def test_an_undelivered_email_is_reported(client, monkeypatch):
+    """A model who was never told is invisible from every other screen."""
+    from app.config import settings
+    from app.db import SessionLocal
+    from app.models.notifications import NotificationOutbox, NotificationState
+
+    monkeypatch.setattr(settings, "go_live_month", "2026-09", raising=False)
+    monkeypatch.setattr(settings, "smtp_host", "smtp.example.com", raising=False)
+    monkeypatch.setattr(settings, "mail_from_address", "no@example.com", raising=False)
+
+    with SessionLocal() as session:
+        session.add(
+            NotificationOutbox(
+                event="month.approved",
+                recipient_email="nour@example.com",
+                payload={},
+                state=NotificationState.FAILED,
+                attempts=5,
+                last_error="550",
+            )
+        )
+        session.commit()
+
+    keys = {item["key"] for item in client.get("/api/operations/attention").json()["items"]}
+
+    assert "notifications_failed" in keys
+
+
+def test_a_code_belonging_to_nobody_is_reported(client, monkeypatch):
+    """§10.2. Real sales attributed to no model, and the model whose code it is
+    will notice long before anybody here does.
+    """
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "go_live_month", "2026-09", raising=False)
+    monkeypatch.setattr(settings, "smtp_host", "smtp.example.com", raising=False)
+    monkeypatch.setattr(settings, "mail_from_address", "no@example.com", raising=False)
+
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO order_index (shopify_order_id, order_number, placed_at, "
+                "business_month, discount_codes, subtotal_piastres, total_piastres, "
+                "shipping_piastres, tax_piastres, currency) "
+                "VALUES ('900', '#900', now(), '2026-09', ARRAY['NOBODY10'], "
+                "10000, 10000, 0, 0, 'EGP')"
+            )
+        )
+
+    items = {i["key"]: i for i in client.get("/api/operations/attention").json()["items"]}
+
+    assert "unregistered_codes" in items
+    assert "belongs to nobody" in items["unregistered_codes"]["text"]
+
+
+def test_a_model_may_not_read_what_needs_attention(client):
+    """It names blocked months and unowned codes across the whole programme."""
+    _demote_to("affiliate")
+
+    assert client.get("/api/operations/attention").status_code == 403
