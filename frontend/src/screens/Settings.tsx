@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { api, can } from "../lib/api";
 import type { Session } from "../lib/api";
 import { formatMonth } from "../lib/money";
+import { DataPanel } from "./DataPanel";
 import "./Settings.css";
 
 type SyncStatus = {
@@ -79,6 +80,7 @@ export function Settings({ session }: { session: Session }) {
         <PlatformPanel session={session} />
         {can(session, "invitations.send") && <InvitePanel />}
         {can(session, "settings.manage") && <RosterPanel />}
+        {can(session, "settings.manage") && <DataPanel />}
         {can(session, "audit.view") && <ActivityPanel />}
       </div>
     </>

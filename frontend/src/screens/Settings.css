@@ -149,3 +149,75 @@
   font-size: var(--text-sm);
   color: var(--quiet);
 }
+
+/* ── Shopify & data ───────────────────────────────────────────────────────
+ *
+ * The operations the platform could do and had no button for. A reachability
+ * audit found nineteen; the worst was that order history could not be
+ * imported at all, which is step 3 of the cutover.
+ */
+.data__body {
+  padding: var(--space-4);
+}
+
+.data__facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: var(--space-4);
+  margin: 0 0 var(--space-5);
+}
+
+.data__fact dt {
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}
+
+.data__fact dd {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-sm);
+}
+
+.data__heading {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.data__note {
+  max-width: 66ch;
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}
+
+.data__import,
+.data__list {
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--rule);
+  margin-top: var(--space-4);
+}
+
+.data__import-row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+
+.data__field {
+  max-width: 11rem;
+}
+
+.data__months {
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}
+
+/* A provider's refusal, as written. Long, and the whole of it is the useful
+   part - so it wraps rather than being cut off. */
+.data__error {
+  max-width: 40ch;
+  font-size: var(--text-xs);
+  color: var(--refused);
+  word-break: break-word;
+}
