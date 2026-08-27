@@ -470,3 +470,254 @@ def notification_health(
             for row in failed_notifications(db)
         ],
     }
+
+
+#: §16's bottom two rows, and the rule that decides whether each one appears.
+#:
+#: **A warning that is always on is one nobody reads.** Every item here is
+#: conditional on something being genuinely true and genuinely actionable, and
+#: the whole list is empty on a healthy platform - which is what makes a
+#: non-empty one worth looking at.
+#:
+#: Two severities, and they mean different things. `blocking` stops money
+#: moving and somebody has to act before month end. `attention` is a thing
+#: going wrong quietly that nobody would otherwise meet until it mattered.
+BLOCKING = "blocking"
+ATTENTION = "attention"
+
+#: §16. The payroll reminder, on the 5th unless somebody changes it.
+PAYROLL_REMINDER_DAY = 5
+
+#: How long a sync can be silent before it is worth saying so. Webhooks arrive
+#: within seconds of an order, and the reconciliation sweep runs every half
+#: hour, so a day of silence is either a very quiet shop or a broken pipe -
+#: and the two look identical from here, which is exactly why it is reported
+#: rather than judged.
+STALE_SYNC_HOURS = 24
+
+
+@router.get("/attention")
+def attention(
+    _actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_VIEW)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Everything a maintainer should not have to go looking for.
+
+    §16 lists these as in-platform notifications, and until now the data
+    existed while the screens did not: `/sync`, `/failed-jobs`,
+    `/unregistered-codes` and `/notifications` were all built and all sat
+    behind a Settings tab somebody had to think to open.
+
+    **The point is not the data, it is not having to look.** These belong where
+    somebody lands, and quiet when there is nothing to say.
+
+    One endpoint rather than five calls from the browser, so the judgement
+    about *what deserves attention* lives in one place on the server and cannot
+    drift between screens that ask the same questions differently.
+    """
+    from app.models.notifications import NotificationOutbox, NotificationState
+    from app.services.payroll import months_left_reopened, working_month
+
+    items: list[dict] = []
+
+    # -- The one that stops everything ---------------------------------------
+    if not settings.go_live_month:
+        items.append(
+            {
+                "key": "go_live_month_unset",
+                "severity": BLOCKING,
+                "text": "No go-live month is set, so no month can be approved.",
+                "detail": (
+                    "Set GO_LIVE_MONTH to the first month the platform is "
+                    "responsible for paying. It is blank on purpose - a "
+                    "default would quietly make months already settled "
+                    "elsewhere look approvable."
+                ),
+                "where": "/settings",
+            }
+        )
+
+    # -- Mail ----------------------------------------------------------------
+    #
+    # The most likely thing to be silently wrong on a fresh deployment, and the
+    # least likely to be noticed: nothing errors, models simply never hear.
+    if not settings.mail_configured:
+        items.append(
+            {
+                "key": "mail_not_configured",
+                "severity": ATTENTION,
+                "text": "No email is being sent.",
+                "detail": (
+                    "Applications, approved months and payments are all being "
+                    "recorded and none of them is reaching anybody. Set the "
+                    "mail credentials to turn it on."
+                ),
+                "where": "/settings",
+            }
+        )
+
+    failed_mail = db.scalar(
+        select(func.count())
+        .select_from(NotificationOutbox)
+        .where(NotificationOutbox.state == NotificationState.FAILED)
+    )
+    if failed_mail:
+        items.append(
+            {
+                "key": "notifications_failed",
+                "severity": ATTENTION,
+                "text": f"{failed_mail} email{'' if failed_mail == 1 else 's'} could not be delivered.",
+                "detail": (
+                    "Somebody was told nothing. A failed notification is "
+                    "invisible from every other screen - the month is "
+                    "approved, the payment is recorded, and one model simply "
+                    "never heard."
+                ),
+                "where": "/settings",
+            }
+        )
+
+    # -- Work that did not happen --------------------------------------------
+    failed_jobs = db.execute(
+        text("SELECT count(*) FROM background_job WHERE status = 'failed'")
+    ).scalar()
+    if failed_jobs:
+        items.append(
+            {
+                "key": "failed_jobs",
+                "severity": ATTENTION,
+                "text": f"{failed_jobs} background job{'' if failed_jobs == 1 else 's'} failed.",
+                "detail": "They will not retry on their own.",
+                "where": "/settings",
+            }
+        )
+
+    # -- Orders nobody owns --------------------------------------------------
+    #
+    # §9.2 and §10.2. A live code registered to nobody means real sales going
+    # nowhere, and the model whose code it is will notice long before anyone
+    # here does.
+    unowned = db.execute(
+        text(
+            """
+            SELECT count(DISTINCT upper(c.code))
+            FROM order_index o, unnest(o.discount_codes) AS c(code)
+            WHERE NOT EXISTS (
+                SELECT 1 FROM discount_code_period p
+                WHERE upper(p.code) = upper(c.code)
+                  AND p.start_month <= o.business_month
+                  AND (p.end_month IS NULL OR p.end_month >= o.business_month)
+            )
+            """
+        )
+    ).scalar()
+    if unowned:
+        items.append(
+            {
+                "key": "unregistered_codes",
+                "severity": ATTENTION,
+                "text": f"{unowned} discount code{'' if unowned == 1 else 's'} used on orders belongs to nobody.",
+                "detail": (
+                    "Those sales are attributed to no model. Register the code "
+                    "from the month its orders start, or the gap stays."
+                ),
+                "where": "/settings",
+            }
+        )
+
+    # -- Orders two models both claim ----------------------------------------
+    #
+    # §9.2 and §11.3. Nobody owns it until a person decides, and it blocks
+    # every affected month from being approved.
+    held = db.execute(
+        text(
+            """
+            SELECT count(*) FROM order_index o
+            WHERE (
+                SELECT count(DISTINCT p.affiliate_id)
+                FROM unnest(o.discount_codes) AS c(code)
+                JOIN discount_code_period p
+                  ON upper(p.code) = upper(c.code)
+                 AND p.start_month <= o.business_month
+                 AND (p.end_month IS NULL OR p.end_month >= o.business_month)
+            ) > 1
+            """
+        )
+    ).scalar()
+    if held:
+        items.append(
+            {
+                "key": "orders_held",
+                "severity": BLOCKING,
+                "text": f"{held} order{'' if held == 1 else 's'} carr{'ies' if held == 1 else 'y'} more than one model's code.",
+                "detail": (
+                    "Nobody owns them until somebody decides, and every month "
+                    "they fall in is blocked until then."
+                ),
+                "where": "/orders",
+            }
+        )
+
+    # -- Reopened and forgotten ----------------------------------------------
+    #
+    # §11.5, and the dangerous state is not reopening - it is forgetting. A
+    # month sitting in draft with payments already made against a superseded
+    # snapshot is a balance nobody is watching.
+    stuck = months_left_reopened(db)
+    if stuck:
+        months = sorted({row.month for row in stuck})
+        items.append(
+            {
+                "key": "months_left_reopened",
+                "severity": BLOCKING,
+                "text": (
+                    f"{len(stuck)} month{'' if len(stuck) == 1 else 's'} "
+                    "reopened and never agreed again."
+                ),
+                "detail": (
+                    "Payments were made against the old figure and there is no "
+                    "current one to settle against: "
+                    + ", ".join(months)
+                ),
+                "where": "/payroll",
+            }
+        )
+
+    # -- The reminder --------------------------------------------------------
+    #
+    # §16, on the 5th. Not an alarm - a month that is ready and unapproved on
+    # the 6th is the ordinary way somebody forgets.
+    today = utcnow()
+    if today.day >= PAYROLL_REMINDER_DAY:
+        previous = _previous_month(working_month())
+        unapproved = db.execute(
+            text(
+                "SELECT count(*) FROM affiliate_profile a "
+                "WHERE a.status = 'active' AND a.account_kind <> 'house' "
+                "AND NOT EXISTS ("
+                "  SELECT 1 FROM payroll_month m WHERE m.affiliate_id = a.id "
+                "  AND m.month = :month AND m.calculation_state = 'approved')"
+            ),
+            {"month": previous},
+        ).scalar()
+        if unapproved:
+            items.append(
+                {
+                    "key": "payroll_due",
+                    "severity": ATTENTION,
+                    "text": f"{unapproved} model{'' if unapproved == 1 else 's'} still unapproved for {previous}.",
+                    "detail": "Payroll usually runs on the 5th.",
+                    "where": "/payroll",
+                }
+            )
+
+    return {
+        "items": items,
+        "blocking": sum(1 for item in items if item["severity"] == BLOCKING),
+    }
+
+
+def _previous_month(month: str) -> str:
+    year, _, index = month.partition("-")
+    year, index = int(year), int(index)
+    return f"{year - 1}-12" if index == 1 else f"{year}-{index - 1:02d}"

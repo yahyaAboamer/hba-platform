@@ -212,3 +212,45 @@
   font-size: var(--text-sm);
   font-weight: 500;
 }
+
+/* ── What needs attention (§16) ───────────────────────────────────────────
+ *
+ * Where somebody lands, and gone entirely when there is nothing to say. A
+ * warning that is always on is one nobody reads.
+ */
+.attention {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
+}
+
+.attention__item {
+  padding: var(--space-3) var(--space-4);
+  border-left: 2px solid var(--rule-strong);
+  background: var(--surface);
+}
+
+/* Colour, because this is the one category that stops money moving - and it is
+   the same red the platform already uses for a refusal, not a new one. */
+.attention__item--blocking {
+  border-left-color: var(--refused);
+  background: var(--refused-quiet);
+}
+
+.attention__text {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.attention__detail {
+  max-width: 70ch;
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}
+
+.attention__item--blocking .attention__detail {
+  color: var(--refused);
+}
