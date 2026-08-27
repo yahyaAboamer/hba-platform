@@ -6,6 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import (
+    CSRF_COOKIE,
     SESSION_COOKIE,
     actor_payload,
     current_user,
@@ -52,16 +53,37 @@ def _client_ip(request: Request) -> str | None:
     return request.client.host if request.client else None
 
 
-def _set_cookie(response: Response, token: str) -> None:
-    response.set_cookie(
-        SESSION_COOKIE,
-        token,
-        max_age=settings.session_hours * 3600,
-        httponly=True,
-        secure=settings.is_production,
-        samesite="lax",
-        path="/",
-    )
+def _set_cookie(response: Response, token: str, csrf: str) -> None:
+    """Both halves of a session, with the same lifetime.
+
+    **They must expire together.** An earlier version set only the session
+    cookie and handed the CSRF token to the page to keep in `sessionStorage` -
+    which the browser throws away when the tab closes, while a twelve-hour
+    cookie survives it. Reopening the tab left a live session and no token:
+    every read worked, the interface showed a signed-in administrator, and
+    every write failed saying authentication was required.
+
+    So the token is a cookie too, deliberately **readable by the page** - the
+    double-submit pattern. The page reads it and echoes it in a header, and
+    `resolve_session` compares that header against the hash on the session row
+    exactly as before.
+
+    Readable costs nothing here. An attacker on another origin cannot read our
+    cookies, and `SameSite=lax` means the session cookie is not sent on a
+    cross-site POST at all, so producing the header remains something only our
+    own page can do. Script already running on this origin could read
+    `sessionStorage` and make credentialed same-origin requests regardless.
+    """
+    common = {
+        "max_age": settings.session_hours * 3600,
+        "secure": settings.is_production,
+        "samesite": "lax",
+        "path": "/",
+    }
+    # The session token is never readable by script. That has not changed and
+    # is the half that actually authenticates.
+    response.set_cookie(SESSION_COOKIE, token, httponly=True, **common)
+    response.set_cookie(CSRF_COOKIE, csrf, httponly=False, **common)
 
 
 @router.get("/needs-setup")
@@ -124,7 +146,7 @@ def bootstrap(
         ip_address=_client_ip(request),
     )
     db.commit()
-    _set_cookie(response, token)
+    _set_cookie(response, token, csrf)
     return {"actor": actor_payload(db, user), "csrf": csrf}
 
 
@@ -161,7 +183,7 @@ def login(
         ip_address=_client_ip(request),
     )
     db.commit()
-    _set_cookie(response, token)
+    _set_cookie(response, token, csrf)
     return {"actor": actor_payload(db, user), "csrf": csrf}
 
 
@@ -183,6 +205,7 @@ def logout(
     )
     db.commit()
     response.delete_cookie(SESSION_COOKIE, path="/")
+    response.delete_cookie(CSRF_COOKIE, path="/")
     return {"success": True}
 
 
@@ -291,5 +314,5 @@ def accept(
         ip_address=_client_ip(request),
     )
     db.commit()
-    _set_cookie(response, token)
+    _set_cookie(response, token, csrf)
     return {"actor": actor_payload(db, user), "csrf": csrf}
