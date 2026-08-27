@@ -85,8 +85,87 @@ export type MyEarnings = {
     targets_verified: boolean;
   } | null;
   commission_rate_bp: number | null;
+  /**
+   * What was asked of her and what was recorded. `null` when nothing was ever
+   * set for the month - a target that does not exist is not one she failed.
+   */
+  targets: {
+    required_videos: number;
+    required_stories: number;
+    actual_videos: number | null;
+    actual_stories: number | null;
+    /** §15. `null` means nobody has recorded what she produced. */
+    achieved: boolean | null;
+    verified: boolean;
+    /**
+     * §15, and the clause that matters: targets decide money only on a
+     * guaranteed minimum. On commission they are informational, and a model
+     * who reads a missed target as money gone has been told something untrue.
+     */
+    determines_pay: boolean;
+    recorded_at: string | null;
+  } | null;
   /** Translated, and carrying whose move it is. Today always HBA's. */
   waiting_on: { who: string; text: string }[];
   note: string | null;
   orders_detail: MyOrder[];
+};
+
+/** One month's settlement, derived from the ledger and never stored. */
+export type PaymentMonth = {
+  month: string;
+  /**
+   * §11.1. `not_approved` never reaches this screen — a month with no agreed
+   * figure is not an unpaid bill, and saying "nothing outstanding" about one
+   * that may have been paid against a superseded version is the most
+   * misleading answer available.
+   */
+  state: "unpaid" | "partially_paid" | "settled" | "overpaid";
+  obligation_piastres: number;
+  obligation: string;
+  paid_piastres: number;
+  paid: string;
+  /** Settled without a transfer - a write-off or a correction (§11.5). */
+  adjusted_piastres: number;
+  adjusted: string;
+  /** An overpayment from an earlier month, applied to this one. */
+  credited_piastres: number;
+  credited: string;
+  balance_piastres: number;
+  balance: string;
+};
+
+export type Payment = {
+  id: number;
+  amount_piastres: number;
+  amount: string;
+  occurred_at: string;
+  reference: string | null;
+  /** Masked, and frozen at the moment it was paid (§6.4.4). */
+  destination: Record<string, string | null> | null;
+  /** §14 and ADR 0017. The screenshot, served only to her. */
+  has_proof: boolean;
+  /** Which months it covered. Empty is ordinary: money can arrive first. */
+  settles: { month: string; piastres: number; amount: string }[];
+};
+
+/** §11.5. A credit she cannot see is a credit she cannot check. */
+export type Adjustment = {
+  kind: "credit" | "writeoff" | "correction";
+  kind_text: string;
+  amount_piastres: number;
+  amount: string;
+  /** As somebody wrote it at the time. §11.5 makes it mandatory. */
+  reason: string;
+  created_at: string;
+  from_month: string | null;
+  to_month: string | null;
+};
+
+export type MyPayments = {
+  months: PaymentMonth[];
+  payments: Payment[];
+  adjustments: Adjustment[];
+  outstanding_piastres: number;
+  outstanding: string;
 };

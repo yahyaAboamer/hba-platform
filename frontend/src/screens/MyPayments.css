@@ -1,0 +1,112 @@
+/* What has arrived. The one screen in the portal that spends colour, and it
+   spends it only on money state (ADR 0027) — outstanding is owed, transferred
+   is settled. Her earnings screen paints nothing, because a figure still being
+   worked out is not a debt. */
+
+.settle {
+  margin-bottom: var(--space-4);
+}
+
+.settle__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.settle__row {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--rule);
+}
+
+.settle__list > .settle__row:last-child {
+  border-bottom: none;
+}
+
+.settle__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.settle__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+  margin-top: var(--space-1);
+}
+
+.settle__month {
+  font-size: var(--text-sm);
+}
+
+.settle__kind {
+  font-size: var(--text-sm);
+}
+
+.settle__for,
+.settle__when,
+.settle__balance {
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}
+
+.settle__reference {
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}
+
+/* The reason somebody wrote at the time, shown as written. §11.5 makes it
+   mandatory precisely so this line exists. */
+.settle__reason {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+}
+
+.settle__when {
+  margin: var(--space-1) 0 0;
+}
+
+/* ── The screenshot ─────────────────────────────────────────────────────── */
+
+.settle__proof-toggle {
+  margin-top: var(--space-3);
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: var(--text-xs);
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.settle__proof-toggle:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Capped rather than full-bleed: a phone screenshot is taller than it is wide,
+   and an unbounded one pushes everything below it off the screen. */
+.settle__proof {
+  display: block;
+  width: 100%;
+  max-height: 60vh;
+  margin-top: var(--space-3);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  object-fit: contain;
+  object-position: top;
+  background: var(--hover);
+}
+
+/* Where a transfer alone does not account for the month. Plain prose, no
+   colour: nothing has gone wrong, the money simply moved in two ways. */
+.settle__reconcile {
+  max-width: 42ch;
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}

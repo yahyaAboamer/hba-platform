@@ -56,8 +56,16 @@ from app.models.affiliates import AffiliateProfile
 from app.models.attributed_orders import AttributedOrder, CommissionState
 from app.models.compensation import CompensationType
 from app.models.orders import OrderIndex
+from app.models.payments import (
+    AdjustmentType,
+    PaymentAllocation,
+    PaymentTransaction,
+    PayrollAdjustment,
+)
 from app.models.payroll import CalculationState, PayrollMonth, PayrollSnapshot
 from app.services.commission.calculate import MonthCalculation
+from app.services.payments import adjustments_for, balance_for, payments_for
+from app.services.payments_state import SettlementState
 from app.services.payroll import (
     blockers_for,
     get_month,
@@ -65,6 +73,7 @@ from app.services.payroll import (
     is_historical,
     working_month,
 )
+from app.services.targets import get_target
 
 #: What each blocker means to the person waiting on it, and whose move it is.
 #:
@@ -418,6 +427,7 @@ def my_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
             "carried_out": [],
             "guarantee_applied": False,
             "guarantee": None,
+            "targets": None,
             "commission_rate_bp": None,
             "waiting_on": [],
             "note": (
@@ -481,6 +491,7 @@ def my_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
         "carried_out": _carried_out(db, affiliate, month),
         "guarantee_applied": bool(figures.get("guarantee_applied")),
         "guarantee": _guarantee(figures),
+        "targets": _targets(db, affiliate, month, figures),
         "commission_rate_bp": figures.get("commission_rate_bp"),
         # Nothing blocks a month that is already agreed. The live blocker list
         # keeps answering "could this be approved *now*", and after approval
@@ -550,3 +561,215 @@ def my_orders(db: Session, affiliate: AffiliateProfile, month: str) -> list[dict
         }
         for order, index in rows
     ]
+
+
+def _targets(
+    db: Session, affiliate: AffiliateProfile, month: str, figures: dict
+) -> dict | None:
+    """What was asked of her, what was recorded, and whether it changes her pay.
+
+    §15, and the last clause is the one that matters. Targets are
+    **informational** on a commission or salary-plus-commission arrangement and
+    decide money only on a guaranteed minimum. A model on commission who sees a
+    target she missed should not think she has lost anything, because she has
+    not - and a screen that cannot tell the two apart teaches her to read every
+    shortfall as money gone.
+
+    `None` when nothing was ever recorded for the month. There is no sentence
+    worth writing about a target that does not exist on an arrangement it would
+    not affect; where it *would* affect her, `_guarantee` is already saying so
+    in the one place she is looking.
+
+    **Nothing here is editable and no route offers to change it** (§6.5). She
+    sees what was recorded; recording is somebody else's job.
+    """
+    target = get_target(db, affiliate, month)
+    if target is None:
+        return None
+
+    return {
+        "required_videos": target.required_videos,
+        "required_stories": target.required_stories,
+        "actual_videos": target.actual_videos,
+        "actual_stories": target.actual_stories,
+        # Three answers, not two. `null` is *nobody has recorded what you
+        # produced*, which is a different thing from missing the target and is
+        # the only one of the three that stops a month closing (§11.3).
+        "achieved": target.is_achieved,
+        "verified": bool(target.is_verified),
+        "determines_pay": (
+            figures.get("compensation_type") == CompensationType.BASE_GUARANTEE
+        ),
+        "recorded_at": (
+            target.recorded_at.isoformat() if target.recorded_at else None
+        ),
+    }
+
+
+#: What a credit or a write-off means to the person it was made about. §11.5
+#: requires these to be visible to her: *a credit she cannot see is a credit she
+#: cannot check.*
+#:
+#: Each says which direction the money went, because "adjustment" on its own is
+#: the kind of word that makes somebody assume the worse reading.
+ADJUSTMENT_TEXT = {
+    AdjustmentType.CREDIT: "Carried into a later month",
+    AdjustmentType.WRITEOFF: "Written off by HBA",
+    AdjustmentType.CORRECTION: "A correction",
+}
+
+
+def _settled_by(db: Session, affiliate: AffiliateProfile) -> dict[int, list[dict]]:
+    """Which months each of her payments settled, keyed by payment id.
+
+    A transfer can cover more than one month, and can arrive before anybody has
+    decided which - `record_payment` allows an empty allocation on purpose, so
+    a payment with no months against it is an ordinary state and not a gap.
+    """
+    rows = db.execute(
+        select(
+            PaymentAllocation.payment_transaction_id,
+            PayrollMonth.month,
+            PaymentAllocation.allocated_piastres,
+        )
+        .join(
+            PayrollSnapshot,
+            PayrollSnapshot.id == PaymentAllocation.payroll_snapshot_id,
+        )
+        .join(PayrollMonth, PayrollMonth.id == PayrollSnapshot.payroll_month_id)
+        .join(
+            PaymentTransaction,
+            PaymentTransaction.id == PaymentAllocation.payment_transaction_id,
+        )
+        .where(PaymentTransaction.affiliate_id == affiliate.id)
+        .order_by(PayrollMonth.month)
+    ).all()
+
+    by_payment: dict[int, list[dict]] = {}
+    for payment_id, month, piastres in rows:
+        by_payment.setdefault(payment_id, []).append(
+            {"month": month, "piastres": piastres, "amount": format_egp(piastres)}
+        )
+    return by_payment
+
+
+def _month_of(db: Session, payroll_month_id: int | None) -> str | None:
+    if payroll_month_id is None:
+        return None
+    return db.scalar(
+        select(PayrollMonth.month).where(PayrollMonth.id == payroll_month_id)
+    )
+
+
+def my_payments(db: Session, affiliate: AffiliateProfile) -> dict:
+    """What has arrived, when, and what is still outstanding.
+
+    §14. Deliberately a different screen from her earnings, and they stay
+    different: *what I have earned* and *what has arrived* have different
+    answers for most of any month, and merging them is how a model ends up
+    believing she has been paid twice, or not at all.
+
+    Three lists, and each answers a question she actually asks.
+
+    **Per month** - what was agreed, what has been paid against it, what is
+    left. The settlement state is derived from the ledger every time it is
+    asked, so it cannot disagree with the payments it came from.
+
+    **Every payment** - the amount, the date, the reference, which months it
+    covered, and whether there is a screenshot. A transfer with no months
+    against it is normal: money can arrive before anybody has decided what it
+    covers.
+
+    **Every adjustment** - §11.5 requires these to be visible to her, with the
+    reason that was written at the time.
+
+    Her payout destination appears **masked**, exactly as it does everywhere
+    else. She supplied it, so it tells her nothing she does not know, and a
+    screen printing an account number in full is one worth photographing over
+    her shoulder.
+    """
+    months = []
+    for month in months_for(db, affiliate):
+        if is_historical(month):
+            # ADR 0014. Settled outside the platform, so there is no agreed
+            # figure and no balance - and a row reading "unpaid, nothing" would
+            # be a debt that never existed.
+            continue
+        balance = balance_for(db, affiliate, month)
+        if balance["state"] == SettlementState.NOT_APPROVED:
+            # Nothing agreed yet. That belongs on her earnings screen, which
+            # says the month is still moving; here it would read as an unpaid
+            # bill.
+            continue
+        months.append(
+            {
+                "month": month,
+                "state": balance["state"],
+                "obligation_piastres": balance["obligation_piastres"],
+                "obligation": format_egp(balance["obligation_piastres"]),
+                "paid_piastres": balance["paid_piastres"],
+                "paid": format_egp(balance["paid_piastres"]),
+                # Without these her arithmetic does not close. A month agreed
+                # at 2,400 and settled by a transfer of 2,340 reads as sixty
+                # pounds short unless the row itself says the rest was written
+                # off - and the adjustment panel further down is not something
+                # she will connect to this line on her own.
+                "adjusted_piastres": balance["adjusted_piastres"],
+                "adjusted": format_egp(balance["adjusted_piastres"]),
+                # §11.5. An overpayment from an earlier month, applied here.
+                # It raises what this month settles against, so a row showing
+                # only the agreed figure would understate what it took to
+                # clear.
+                "credited_piastres": balance["credited_piastres"],
+                "credited": format_egp(balance["credited_piastres"]),
+                "balance_piastres": balance["balance_piastres"],
+                "balance": format_egp(balance["balance_piastres"]),
+            }
+        )
+
+    settled_by = _settled_by(db, affiliate)
+
+    payments = [
+        {
+            "id": payment.id,
+            "amount_piastres": payment.amount_piastres,
+            "amount": format_egp(payment.amount_piastres),
+            "occurred_at": payment.occurred_at.isoformat(),
+            "reference": payment.reference,
+            "destination": payment.destination_snapshot_json,
+            # §14 and ADR 0017. Visible proof removes an entire category of
+            # "did you send it?" messages, which is the whole reason it is kept
+            # at all.
+            "has_proof": payment.proof_file_id is not None,
+            "settles": settled_by.get(payment.id, []),
+        }
+        for payment in payments_for(db, affiliate)
+    ]
+
+    adjustments = [
+        {
+            "kind": adjustment.type,
+            "kind_text": ADJUSTMENT_TEXT.get(adjustment.type, adjustment.type),
+            "amount_piastres": adjustment.amount_piastres,
+            "amount": format_egp(adjustment.amount_piastres),
+            # The reason somebody wrote at the time, shown as written. §11.5
+            # makes it mandatory precisely so this line exists.
+            "reason": adjustment.reason,
+            "created_at": adjustment.created_at.isoformat(),
+            "from_month": _month_of(db, adjustment.source_payroll_month_id),
+            "to_month": _month_of(db, adjustment.destination_payroll_month_id),
+        }
+        for adjustment in adjustments_for(db, affiliate)
+    ]
+
+    outstanding = sum(
+        row["balance_piastres"] for row in months if row["balance_piastres"] > 0
+    )
+
+    return {
+        "months": months,
+        "payments": payments,
+        "adjustments": adjustments,
+        "outstanding_piastres": outstanding,
+        "outstanding": format_egp(outstanding),
+    }

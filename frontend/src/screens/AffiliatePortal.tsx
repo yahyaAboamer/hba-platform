@@ -10,6 +10,7 @@ import { MyDetails } from "./MyDetails";
 import type { Me } from "./MyDetails";
 import { MyMonth } from "./MyMonth";
 import { MyOrders } from "./MyOrders";
+import { MyPayments } from "./MyPayments";
 import "./Apply.css";
 import "./AffiliateHome.css";
 
@@ -150,6 +151,7 @@ export function AffiliatePortal({ session }: { session: Session }) {
         <Route element={<AffiliateLayout context={context} />}>
           <Route index element={<MyMonth />} />
           <Route path="orders" element={<MyOrders />} />
+          <Route path="payments" element={<MyPayments />} />
           <Route path="you" element={<MyDetails me={me} onChanged={load} />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>

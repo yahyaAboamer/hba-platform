@@ -19,6 +19,7 @@ import "./AffiliateLayout.css";
 const TABS = [
   { to: "/", label: "Earnings", end: true },
   { to: "/orders", label: "Orders" },
+  { to: "/payments", label: "Payments" },
   { to: "/you", label: "You" },
 ];
 

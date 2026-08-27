@@ -15,13 +15,20 @@ for values that were deliberately put into the database, so the test fails if
 somebody ever adds a field that carries them.
 """
 
+import io
+
 import pytest
 from fastapi.testclient import TestClient
+from PIL import Image
 from sqlalchemy import text
 
 from app.core.passwords import hash_password
 from app.db import engine
 from app.main import app
+from app.models.payouts import PayoutMethod
+
+#: Where her money goes, so a payment can freeze a masked copy of it.
+ADDRESS = 'https://ipn.eg/S/nour.mahmoud/instapay/8Xk2Qp' 
 
 BOOTSTRAP = {
     "email": "owner@example.com",
@@ -236,6 +243,80 @@ def _missed_targets(admin, affiliate_id, month):
         f"/api/targets/{month}/verify", json={"affiliate_ids": [affiliate_id]}
     )
     assert confirmed.status_code == 200, confirmed.text
+
+
+def _egp(piastres: int) -> str:
+    """The formatted figure, from the platform's own formatter.
+
+    Rather than re-typing the currency symbol in twenty assertions - one
+    mistyped glyph is a failure that says nothing about the code.
+    """
+    from app.core.money import format_egp
+
+    return format_egp(piastres)
+
+
+def _destination(admin, affiliate_id):
+    """Somewhere to pay her, so a payment can freeze a masked copy of it."""
+    response = admin.put(
+        f"/api/affiliates/{affiliate_id}/payout-destination",
+        json={
+            "method": PayoutMethod.INSTAPAY,
+            "instapay_address_url": ADDRESS,
+            "instapay_phone": "01001234567",
+        },
+    )
+    assert response.status_code in (200, 201), response.text
+
+
+def _proof(admin, affiliate_id) -> str:
+    """A screenshot, uploaded the way §14's flow does it - before the payment.
+
+    `payment_transaction` is append-only, so proof is attached at the moment
+    the payment is recorded rather than added to the row afterwards.
+    """
+    image = Image.new("RGB", (600, 900), (240, 240, 250))
+    out = io.BytesIO()
+    image.save(out, format="PNG")
+
+    response = admin.post(
+        f"/api/affiliates/{affiliate_id}/proof",
+        files={"file": ("transfer.png", out.getvalue(), "image/png")},
+    )
+    assert response.status_code == 201, response.text
+    return response.json()["proof_file_id"]
+
+
+def _pay(admin, affiliate_id, month, piastres, *, proof=None, note=None) -> int:
+    """Money that has already moved, allocated against that month's snapshot.
+
+    Payments allocate to a **snapshot**, not to a month (§11.5): money paid
+    against a superseded version stays attached to the version it settled.
+    """
+    balance = admin.get(f"/api/payments/{month}").json()["affiliates"]
+    mine = next(row for row in balance if row["affiliate_id"] == affiliate_id)
+
+    response = admin.post(
+        "/api/payments",
+        json={
+            "affiliate_id": affiliate_id,
+            "amount_piastres": piastres,
+            "allocations": [
+                {
+                    "payroll_snapshot_id": mine["payroll_snapshot_id"],
+                    "piastres": piastres,
+                }
+            ],
+            "reference": "IPN-77",
+            # §14 refuses a partial payment with no explanation: *a partial
+            # payment and a typo look identical without one.*
+            "note": note,
+            "proof_file_id": proof,
+        },
+    )
+    assert response.status_code == 201, response.text
+    return response.json()["id"]
+
 
 
 def _approve(admin, affiliate_id, month):
@@ -739,3 +820,292 @@ def test_a_month_is_validated_before_anything_is_read(admin):
     _affiliate(admin)
 
     assert _sign_in().get("/api/me/earnings/august").status_code == 400
+
+
+# -- §15: what was asked, and whether it changes what she is paid ------------
+
+
+def test_a_target_says_whether_it_decides_her_pay(admin):
+    """§15, and the clause that matters. On a guaranteed minimum a target
+    decides money; on commission it is informational, and a model who reads a
+    missed target as money gone has been told something untrue.
+    """
+    guaranteed = _affiliate(admin)
+    commission = _affiliate(admin, "Sara", "sara@example.com", "SARA10")
+    _terms(
+        admin,
+        guaranteed["id"],
+        compensation_type="base_guarantee",
+        base_amount_piastres=800_000,
+    )
+    _terms(admin, commission["id"])
+    _hit_targets(admin, guaranteed["id"], AUGUST, verified=True)
+    _hit_targets(admin, commission["id"], AUGUST, verified=True)
+
+    hers = _sign_in().get(f"/api/me/earnings/{AUGUST}").json()["targets"]
+    theirs = _sign_in("sara@example.com").get(
+        f"/api/me/earnings/{AUGUST}"
+    ).json()["targets"]
+
+    assert hers["determines_pay"] is True
+    assert theirs["determines_pay"] is False
+    assert hers["required_videos"] == 4
+    assert hers["actual_stories"] == 8
+    assert hers["achieved"] is True
+    assert hers["verified"] is True
+
+
+def test_a_month_with_no_target_recorded_has_nothing_to_show(admin):
+    """Rather than a row of dashes. A target that was never set is not a target
+    she failed, and where it *would* have decided her pay the guarantee note is
+    already saying so in the one place she is looking.
+    """
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"])
+    _order(affiliate["id"], "1", 100_000)
+
+    assert _sign_in().get(f"/api/me/earnings/{AUGUST}").json()["targets"] is None
+
+
+def test_nothing_about_a_target_can_be_changed_from_her_side(admin):
+    """§6.5. She sees what was recorded; recording is HBA's, and the portal
+    offers no route that would let her touch it.
+    """
+    from app.api.affiliate_self import router
+
+    writable = [
+        route.path
+        for route in router.routes
+        if set(route.methods) - {"GET", "HEAD", "OPTIONS"}
+    ]
+
+    assert writable == ["/api/me/payout-destination"]
+
+
+# -- §14: what has arrived ---------------------------------------------------
+
+
+def test_an_unpaid_month_shows_what_is_outstanding(admin):
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"])
+    _order(affiliate["id"], "1", 1_000_000)
+    _approve(admin, affiliate["id"], AUGUST)
+
+    body = _sign_in().get("/api/me/payments").json()
+
+    assert body["months"] == [
+        {
+            "month": AUGUST,
+            "state": "unpaid",
+            "obligation_piastres": 100_000,
+            "obligation": _egp(100_000),
+            "paid_piastres": 0,
+            "paid": _egp(0),
+            "adjusted_piastres": 0,
+            "adjusted": _egp(0),
+            "credited_piastres": 0,
+            "credited": _egp(0),
+            "balance_piastres": 100_000,
+            "balance": _egp(100_000),
+        }
+    ]
+    assert body["outstanding_piastres"] == 100_000
+    assert body["payments"] == []
+
+
+def test_a_payment_says_when_it_arrived_and_what_it_settled(admin):
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"])
+    _order(affiliate["id"], "1", 1_000_000)
+    _approve(admin, affiliate["id"], AUGUST)
+    _pay(admin, affiliate["id"], AUGUST, 100_000)
+
+    body = _sign_in().get("/api/me/payments").json()
+
+    assert body["months"][0]["state"] == "settled"
+    assert body["outstanding_piastres"] == 0
+
+    payment = body["payments"][0]
+    assert payment["amount_piastres"] == 100_000
+    assert payment["settles"] == [
+        {"month": AUGUST, "piastres": 100_000, "amount": _egp(100_000)}
+    ]
+    assert payment["reference"] == "IPN-77"
+
+
+def test_a_month_still_being_worked_out_is_not_an_unpaid_bill(admin):
+    """An open month has no agreed figure to settle against. Listing it here
+    would put a debt on the screen for a number that is still moving.
+    """
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"])
+    _order(affiliate["id"], "1", 1_000_000)
+
+    body = _sign_in().get("/api/me/payments").json()
+
+    assert body["months"] == []
+    assert body["outstanding_piastres"] == 0
+
+
+def test_her_own_destination_stays_masked_on_the_payment(admin):
+    """She supplied it, so it tells her nothing she does not know - and a
+    screen printing an account number in full is one worth photographing over
+    her shoulder.
+    """
+    affiliate = _affiliate(admin)
+    _destination(admin, affiliate["id"])
+    _terms(admin, affiliate["id"])
+    _order(affiliate["id"], "1", 1_000_000)
+    _approve(admin, affiliate["id"], AUGUST)
+    _pay(admin, affiliate["id"], AUGUST, 100_000)
+
+    body = _sign_in().get("/api/me/payments").json()
+
+    served = str(body)
+    assert ADDRESS not in served
+    assert "01001234567" not in served
+
+
+def test_a_month_settled_partly_without_a_transfer_says_so_on_its_own_row(admin):
+    """The gap the browser found.
+
+    A month agreed at 1,000 pounds, transferred as 940 with the remaining 60
+    written off, is `settled` and correct. Her row read *E1,000.00 - paid* and
+    the transfer below it read *E940.00*, which is sixty pounds short until she
+    reads a panel further down and connects it herself.
+
+    The row now carries both parts, so the arithmetic closes where she is
+    looking.
+    """
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"])
+    _order(affiliate["id"], "1", 1_000_000)
+    _approve(admin, affiliate["id"], AUGUST)
+    _pay(
+        admin,
+        affiliate["id"],
+        AUGUST,
+        94_000,
+        note="Rounded down; the rest is being written off",
+    )
+
+    written_off = admin.post(
+        "/api/adjustments",
+        json={
+            "affiliate_id": affiliate["id"],
+            "type": "writeoff",
+            "source_month": AUGUST,
+            "amount_piastres": 6_000,
+            "reason": "Transfer fee absorbed by HBA",
+        },
+    )
+    assert written_off.status_code == 201, written_off.text
+
+    row = _sign_in().get("/api/me/payments").json()["months"][0]
+
+    assert row["state"] == "settled"
+    assert row["obligation_piastres"] == 100_000
+    assert row["paid_piastres"] == 94_000
+    assert row["adjusted_piastres"] == 6_000
+    # The three account for each other exactly. That is the property the row
+    # exists to let her check.
+    assert row["paid_piastres"] + row["adjusted_piastres"] == row[
+        "obligation_piastres"
+    ]
+    assert row["balance_piastres"] == 0
+
+
+# -- §11.5: a credit she cannot see is a credit she cannot check -------------
+
+
+def test_an_adjustment_is_visible_to_her_with_its_reason(admin):
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"])
+    _order(affiliate["id"], "1", 1_000_000)
+    _approve(admin, affiliate["id"], AUGUST)
+
+    made = admin.post(
+        "/api/adjustments",
+        json={
+            "affiliate_id": affiliate["id"],
+            "type": "writeoff",
+            "source_month": AUGUST,
+            "amount_piastres": 25_000,
+            "reason": "Transfer fee absorbed by HBA",
+        },
+    )
+    assert made.status_code == 201, made.text
+
+    body = _sign_in().get("/api/me/payments").json()
+
+    assert len(body["adjustments"]) == 1
+    adjustment = body["adjustments"][0]
+    assert adjustment["kind"] == "writeoff"
+    assert adjustment["kind_text"] == "Written off by HBA"
+    assert adjustment["amount_piastres"] == 25_000
+    assert adjustment["reason"] == "Transfer fee absorbed by HBA"
+    assert adjustment["from_month"] == AUGUST
+
+
+# -- §14 and ADR 0017: the screenshot ----------------------------------------
+
+
+def test_she_can_see_the_screenshot_of_her_own_payment(admin):
+    """Visible proof removes an entire category of *did you send it?* messages,
+    which is the whole reason it is kept.
+    """
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"])
+    _order(affiliate["id"], "1", 1_000_000)
+    _approve(admin, affiliate["id"], AUGUST)
+    payment_id = _pay(
+        admin, affiliate["id"], AUGUST, 100_000, proof=_proof(admin, affiliate["id"])
+    )
+
+    model = _sign_in()
+    assert model.get("/api/me/payments").json()["payments"][0]["has_proof"] is True
+
+    served = model.get(f"/api/me/payments/{payment_id}/proof")
+
+    assert served.status_code == 200
+    # Re-encoded on the way in, so what comes back is a JPEG whatever was sent.
+    assert served.headers["content-type"] == "image/jpeg"
+    assert served.content[:2] == b"\xff\xd8"
+
+
+def test_one_models_screenshot_is_not_served_to_another(admin):
+    """§14. Served **only to the affiliate it belongs to** - and the risk ADR
+    0017 accepted was exposure to her, not to everybody on the programme.
+    """
+    nour = _affiliate(admin)
+    _affiliate(admin, "Sara", "sara@example.com", "SARA10")
+    _terms(admin, nour["id"])
+    _order(nour["id"], "1", 1_000_000)
+    _approve(admin, nour["id"], AUGUST)
+    payment_id = _pay(
+        admin, nour["id"], AUGUST, 100_000, proof=_proof(admin, nour["id"])
+    )
+
+    sara = _sign_in("sara@example.com")
+
+    assert sara.get(f"/api/me/payments/{payment_id}/proof").status_code == 404
+    assert sara.get("/api/me/payments").json()["payments"] == []
+
+
+def test_a_payment_with_no_screenshot_says_so_rather_than_erroring(admin):
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"])
+    _order(affiliate["id"], "1", 1_000_000)
+    _approve(admin, affiliate["id"], AUGUST)
+    payment_id = _pay(admin, affiliate["id"], AUGUST, 100_000)
+
+    model = _sign_in()
+
+    assert model.get("/api/me/payments").json()["payments"][0]["has_proof"] is False
+    assert model.get(f"/api/me/payments/{payment_id}/proof").status_code == 404
+
+
+def test_the_payment_routes_refuse_a_maintainer(admin):
+    """Two gates, never mixed. There is already an admin route for both."""
+    assert admin.get("/api/me/payments").status_code == 403
+    assert admin.get("/api/me/payments/1/proof").status_code == 403

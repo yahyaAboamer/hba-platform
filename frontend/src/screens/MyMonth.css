@@ -163,3 +163,38 @@
   margin-top: var(--space-4);
   color: var(--quiet);
 }
+
+/* ── What she was asked for ─────────────────────────────────────────────── */
+
+.targets__list {
+  margin: 0;
+  padding: var(--space-4) var(--space-4) var(--space-2);
+}
+
+.targets__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding-bottom: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.targets__row dd {
+  margin: 0;
+}
+
+/* Mono, like every other pair of figures meant to be compared down a column. */
+.targets__figures {
+  color: var(--quiet);
+}
+
+/* No colour, deliberately. §15 makes a target informational on every
+   arrangement but a guaranteed minimum, and a red shortfall on a commission
+   model says she has lost money she never had. The sentence carries it. */
+.targets__note {
+  margin: 0;
+  padding: 0 var(--space-4) var(--space-4);
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}

@@ -9,7 +9,7 @@ not refused, it is unexpressible.
 money goes. She may not touch a rate, a target, an order, or a month state.
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -17,6 +17,7 @@ from app.api.deps import current_affiliate, current_user
 from app.db import get_session
 from app.models.affiliates import AffiliateProfile
 from app.models.identity import UserAccount
+from app.models.payments import PaymentTransaction
 from app.services.applications import REQUIRED_PAYOUT_FIELDS, application_state
 from app.services.auth import authenticate
 from app.services.codes import codes_with_status
@@ -26,7 +27,8 @@ from app.services.payouts import (
     mask_destination,
     set_destination,
 )
-from app.services.portal import months_for, my_month, my_orders
+from app.services.portal import months_for, my_month, my_orders, my_payments
+from app.services.proof import readable_by
 
 router = APIRouter(prefix="/api/me")
 
@@ -203,3 +205,61 @@ def my_earnings(
         **my_month(db, affiliate, month),
         "orders_detail": my_orders(db, affiliate, month),
     }
+
+
+@router.get("/payments")
+def my_payment_history(
+    affiliate: AffiliateProfile = Depends(current_affiliate),
+    db: Session = Depends(get_session),
+) -> dict:
+    """What has arrived, and what is still outstanding.
+
+    §14. A different route from her earnings on purpose, and it stays
+    different: *what I have earned* and *what has arrived* have different
+    answers for most of any month.
+
+    Ownership again, and no affiliate id anywhere - the settlement figures come
+    from the same `balance_for` the maintainer's payment screen uses, so the
+    number she chases and the number they see cannot disagree.
+    """
+    return my_payments(db, affiliate)
+
+
+@router.get("/payments/{payment_id}/proof")
+def my_payment_proof(
+    payment_id: int,
+    affiliate: AffiliateProfile = Depends(current_affiliate),
+    db: Session = Depends(get_session),
+) -> Response:
+    """The transfer screenshot for one of her payments.
+
+    §14 and ADR 0017: proof is shown to the affiliate because visible proof
+    removes an entire category of *"did you send it?"* messages. The business
+    accepted the recorded risk that a screenshot may expose HBA's own banking
+    details to about twenty people; the mitigations that made that acceptable -
+    EXIF stripped, re-encoded, size-capped, and **served only to the owner** -
+    are conditions, not extras.
+
+    The last of those lives in `readable_by`, whose docstring has named this
+    route since Phase 7: *"the affiliate's own route arrives in Phase 9 and
+    calls the same `readable_by`, so the two cannot drift apart on the rule."*
+    This is that route, and it calls it rather than re-checking the rule here.
+
+    The ownership check on the transaction comes first all the same. Without
+    it, asking for a payment id that is not hers would be answered by whether
+    the *file* was hers - a slower path to the same 404, and one that reveals
+    which payment ids exist by how long it takes.
+    """
+    transaction = db.get(PaymentTransaction, payment_id)
+    if (
+        transaction is None
+        or transaction.affiliate_id != affiliate.id
+        or transaction.proof_file_id is None
+    ):
+        raise HTTPException(404, "No proof for that payment")
+
+    stored = readable_by(db, transaction.proof_file_id, affiliate_id=affiliate.id)
+    if stored is None:
+        raise HTTPException(404, "No proof for that payment")
+
+    return Response(content=stored.content, media_type=stored.content_type)
