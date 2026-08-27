@@ -139,6 +139,32 @@ export function MyMonth() {
         </section>
       )}
 
+      {/*
+       * §15, and it lives here rather than on a tab of its own because the
+       * guarantee note above already refers to it. Splitting the question from
+       * its answer across two screens is how somebody ends up asking HBA.
+       */}
+      {body.targets && (
+        <section className="panel targets">
+          <div className="panel__head">
+            <h2 className="panel__title">What you were asked for</h2>
+          </div>
+          <dl className="targets__list">
+            <TargetRow
+              label="Videos"
+              required={body.targets.required_videos}
+              actual={body.targets.actual_videos}
+            />
+            <TargetRow
+              label="Stories"
+              required={body.targets.required_stories}
+              actual={body.targets.actual_stories}
+            />
+          </dl>
+          <p className="targets__note">{describeTargets(body.targets)}</p>
+        </section>
+      )}
+
       <section className="panel sales">
         <div className="panel__head">
           <h2 className="panel__title">Your sales</h2>
@@ -234,4 +260,58 @@ function describeGuarantee(guarantee: {
     return "You met your targets, so it applies as soon as HBA confirms the numbers.";
   }
   return "Your commission came to more than it this month, so you are paid the larger of the two.";
+}
+
+function TargetRow({
+  label,
+  required,
+  actual,
+}: {
+  label: string;
+  required: number;
+  actual: number | null;
+}) {
+  return (
+    <div className="targets__row">
+      <dt>{label}</dt>
+      <dd>
+        <span className="code targets__figures">
+          {actual === null ? "—" : actual} of {required}
+        </span>
+      </dd>
+    </div>
+  );
+}
+
+/**
+ * What her targets mean for her pay this month.
+ *
+ * §15 splits on one thing: a target decides money **only** on a guaranteed
+ * minimum. On commission or salary-plus-commission it is a record, and a model
+ * who reads a missed target as money gone has been told something untrue by a
+ * screen that could not tell the two apart.
+ *
+ * Where it does decide money, the missed case is the one to be careful with.
+ * It costs her the guarantee and nothing else - she is paid her commission,
+ * promptly, and the month closes (§11.3). Any wording that makes that sound
+ * like a penalty is wrong about the rule as well as unkind.
+ */
+function describeTargets(targets: {
+  achieved: boolean | null;
+  verified: boolean;
+  determines_pay: boolean;
+}): string {
+  if (!targets.determines_pay) {
+    return "These are for HBA's records. What you are paid is your commission either way.";
+  }
+  if (targets.achieved === null) {
+    return "Nobody has recorded what you posted yet, so it is not settled whether your guaranteed minimum applies.";
+  }
+  if (!targets.achieved) {
+    return "Short this month, so your guaranteed minimum does not apply and you are paid your commission.";
+  }
+  if (!targets.verified) {
+    return "Met. Your guaranteed minimum applies as soon as HBA confirms the numbers.";
+  }
+  return "Met and confirmed, so your guaranteed minimum applies.";
 }

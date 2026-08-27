@@ -1683,6 +1683,94 @@ reproducing a click path.
 
 ---
 
+## A settled month did not account for itself
+
+**Symptom.** Nour's September was agreed at E£2,400.00, transferred as
+E£2,340.00 with the remaining E£60.00 written off as a bank fee. Her payments
+screen read:
+
+    September 2026        E£2,400.00   paid
+    27 August 2026        E£2,340.00   For September 2026   IPN-4471
+
+Both correct. Read top to bottom by the person whose money it is, sixty pounds
+went missing. The write-off *was* on the screen — in a separate panel, several
+sections further down, headed *Changes without a transfer*.
+
+**Cause.** `balance_for` returns `adjusted_piastres` and `credited_piastres`
+alongside the payment total, and the portal payload dropped both. The
+settlement state was right, the balance was right, and the row had no way to
+say **how** it got to zero.
+
+The maintainer's payment screen has never needed this: it shows the parts in a
+column beside the total, and whoever is looking made the adjustment themselves
+ten minutes earlier. She did neither.
+
+**Fixed** by carrying both figures on the month row and stating them where she
+is looking:
+
+    E£2,340.00 transferred, and E£60.00 settled without a transfer.
+    See below for why.
+
+A test now asserts the three account for each other exactly —
+`paid + adjusted == obligation` — because that is the property the row exists
+to let her check.
+
+**Worth recording** as the same shape as the guaranteed-minimum bug found an
+hour earlier, and the shape to watch for through the rest of this phase:
+**every figure on the screen was correct, and the screen was still wrong.**
+A maintainer's screen can rely on the reader having context. Hers cannot. The
+test that would have caught either one is a person reading the page top to
+bottom and trying to make the numbers meet.
+
+---
+
+## Browser verification degraded mid-session, twice over
+
+**Symptom.** Two distinct failures in one session, both silent about their real
+cause.
+
+*Synthetic input stopped reaching the page.* Clicks landed, keystrokes did not,
+and `Page.captureScreenshot` began timing out with *the renderer may be frozen*.
+Worked around by setting React inputs through the native prototype setter — see
+the entry below.
+
+*Later, the window collapsed to a zero viewport.* Screenshots failed with
+`Failed to deserialize params.clip.scale`, and `window.innerHeight` reported
+`0`. Anything measured through `getBoundingClientRect` came back as 3px, which
+looks exactly like a CSS bug: a proof screenshot with `max-height: 60vh`
+computed to `max-height: 0px` and rendered 3 pixels tall.
+
+**Not a CSS bug.** `60vh` of a zero-height viewport is zero. The image itself
+was fine: 200, `image/jpeg`, natural size 900×1400, correct `alt`.
+
+**Worth recording** for the diagnostic, which cost real time: **before
+believing a layout measurement, check `window.innerHeight`.** A collapsed
+viewport makes every element three pixels and every `vh` unit zero, and the
+resulting numbers are indistinguishable from a genuine layout fault.
+
+`resize_window` reported success without restoring it. When that happens,
+`get_page_text` still works and still verifies the thing that matters most —
+that the right words are on the page in the right order — so the remaining
+check is a reading, not a screenshot.
+
+---
+
+## A screenshot that will not load
+
+**Not a failure that has happened**, recorded because the guide-image incident
+in Phase 8 was exactly this shape and cost an afternoon.
+
+An `<img>` pointed at `/api/me/payments/{id}/proof` renders as broken alt text
+if the request 404s — a deleted proof row, an expired session, a payment id
+that stopped being hers. The payment above it is real either way, so a broken
+icon is the least useful thing that could appear.
+
+`onError` now swaps the image for a sentence: *the screenshot would not load;
+the transfer above is still recorded.* One line, and it keeps a storage problem
+from reading as a payment problem.
+
+---
+
 ## Business rules with deliberate exposure
 
 These are not bugs. They are accepted costs, recorded so nobody "fixes" them.
