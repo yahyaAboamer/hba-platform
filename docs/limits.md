@@ -1530,6 +1530,44 @@ Resized to 720px tall — 224 KB, 84% smaller, still sharp on a 3x screen.
 
 ---
 
+## A failed action wiped the record it failed against
+
+**Symptom.** Pressing *Check it* on an affiliate's review panel, against a
+machine with no Shopify credentials, replaced the entire page with one line:
+*"Shopify is not configured: set SHOPIFY_SHOP_DOMAIN"*. Correct message,
+nothing else left on screen — her name, her arrangement, her payout details,
+the two steps still outstanding, all gone. The only way back was to navigate
+to the list and find her again.
+
+**Cause.** `AffiliateDetail` had one `error` state and one early return:
+
+    if (error) return <p className="notice notice--refused">{error}</p>
+
+That branch was written when the only thing that could fail was **loading the
+affiliate**, where replacing the page is right — there is nothing to show. Batch C
+added actions to the same component, and every one of them called the same
+`setError`. An action failing is a completely different situation: everything
+the person was looking at is still valid, and they need it to decide what to do
+about the failure.
+
+**Fixed** by making the branch conditional on there being nothing to show:
+
+    if (error && !detail) return <full-page error>
+
+With a record loaded the error renders in place, above the panel it came from.
+
+**Worth recording** because the fault was in reusing a state variable, not in
+the error handling — both call sites looked correct in isolation. The general
+shape: **a component that both loads and acts needs to distinguish "I have
+nothing" from "that did not work",** and a single `error` state cannot.
+
+**Found by running the failing path on purpose.** Shopify is deliberately
+unconfigured locally, so pressing the button was the fastest way to see what a
+maintainer with a misconfigured deploy would see. Testing only the success path
+would have shipped it.
+
+---
+
 ## Business rules with deliberate exposure
 
 These are not bugs. They are accepted costs, recorded so nobody "fixes" them.

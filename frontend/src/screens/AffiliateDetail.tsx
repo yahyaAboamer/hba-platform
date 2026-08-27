@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { Money } from "../components/Money";
-import { api } from "../lib/api";
+import { api, can } from "../lib/api";
+import type { Session } from "../lib/api";
 import { describeBlocker, formatMonth } from "../lib/money";
 import { STATUS_LABEL } from "./Affiliates";
 import type { Affiliate } from "./Affiliates";
@@ -73,27 +74,86 @@ const PAY_TYPE: Record<string, string> = {
  * this changes" preview, and those are the next screens after this one (§12.2
  * calls them Pattern C: money decisions never happen in a small dialog).
  */
-export function AffiliateDetail() {
+export function AffiliateDetail({ session }: { session: Session }) {
   const { id } = useParams();
   const [detail, setDetail] = useState<Detail | null>(null);
   const [earnings, setEarnings] = useState<Earnings | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [working, setWorking] = useState<string | null>(null);
+  const [correction, setCorrection] = useState("");
 
-  useEffect(() => {
+  function load() {
     setError(null);
     api
       .get<Detail>(`/api/affiliates/${id}`)
       .then((body) => {
         setDetail(body);
+        setCorrection("");
         return api.get<Earnings>(
           `/api/affiliates/${id}/earnings/${body.current_month}`,
         );
       })
       .then(setEarnings)
       .catch((caught) => setError(caught.message));
-  }, [id]);
+  }
 
-  if (error) {
+  useEffect(load, [id]);
+
+  /**
+   * §10.4's gate, from the maintainer's side. Asks Shopify whether the code
+   * this model applied with actually exists.
+   *
+   * A typo is corrected here rather than anywhere else: `recheck-code`
+   * rewrites the unverified period instead of opening a second one, because
+   * a code Shopify never confirmed attributed nothing, and leaving the wrong
+   * one behind would keep it holding ownership that blocks the right person
+   * from claiming it.
+   */
+  async function verifyCode() {
+    setWorking("code");
+    setError(null);
+    setNotice(null);
+    try {
+      const result = await api.post<{ verified: boolean; code: string }>(
+        `/api/affiliates/${id}/recheck-code`,
+        correction.trim() ? { code: correction.trim() } : {},
+      );
+      setNotice(
+        result.verified
+          ? `Shopify knows ${result.code}. She can be approved.`
+          : `Shopify has never heard of ${result.code}. Check it against the shop — a code that does not exist there earns nothing, silently.`,
+      );
+      load();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not check it.");
+    } finally {
+      setWorking(null);
+    }
+  }
+
+  async function approve() {
+    setWorking("approve");
+    setError(null);
+    setNotice(null);
+    try {
+      await api.patch(`/api/affiliates/${id}`, { status: "active" });
+      setNotice("She is on the programme. Her sales are being counted.");
+      load();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not approve her.");
+    } finally {
+      setWorking(null);
+    }
+  }
+
+  // **Only a failure to load replaces the page.** An action that fails - a
+  // Shopify check against a shop that is not configured, an approval the
+  // server refuses - used to hit this same branch and wipe the record the
+  // person was looking at, leaving them to navigate back and find her again.
+  // A failed action is reported in place, with everything it failed against
+  // still on screen.
+  if (error && !detail) {
     return (
       <p className="notice notice--refused" role="alert">
         {error}
@@ -102,6 +162,8 @@ export function AffiliateDetail() {
   }
 
   if (!detail) return <p className="empty">Loading…</p>;
+
+  const verified = detail.codes.some((entry) => entry.verified);
 
   return (
     <>
@@ -130,6 +192,114 @@ export function AffiliateDetail() {
               : "Shopify has not confirmed this code exists. Orders that carry it are still attributed — the risk is that it was mistyped or never created there, in which case no order ever will, and nothing looks wrong until somebody asks why the sales are missing."}
           </p>
         )}
+
+      {error && (
+        <p className="notice notice--refused detail__warning" role="alert">
+          {error}
+        </p>
+      )}
+
+      {notice && (
+        <p className="notice notice--settled detail__warning">{notice}</p>
+      )}
+
+      {/*
+       * §13 step 4. The maintainer's side of an application: what is still
+       * missing before she can earn, and the action for each.
+       *
+       * Deliberately **not** a separate Applications list. The Affiliates
+       * screen already answers "who is waiting" and flags exactly these two
+       * gaps on her row; a second list would be the same question asked twice
+       * and one more place to keep in step. This is the page somebody already
+       * lands on from there.
+       */}
+      {detail.status === "pending" && can(session, "affiliates.manage") && (
+        <section className="panel detail__review">
+          <div className="panel__head">
+            <h2 className="panel__title">Before she can earn</h2>
+          </div>
+
+          <ol className="detail__steps">
+            <li className={verified ? "detail__step--done" : undefined}>
+              <div>
+                <strong>Check her code against Shopify</strong>
+                <span className="detail__note">
+                  {verified
+                    ? `Shopify knows ${detail.codes[0]?.code}.`
+                    : "Required before she can be approved (§10.4). A code the shop has never heard of earns nothing, and nothing errors — she simply never gets paid."}
+                </span>
+              </div>
+              {!verified && (
+                <div className="detail__step-action">
+                  <input
+                    className="input detail__correction"
+                    value={correction}
+                    onChange={(event) => setCorrection(event.target.value)}
+                    placeholder={detail.codes[0]?.code ?? "Her code"}
+                    aria-label="Correct her code before checking"
+                  />
+                  <button
+                    type="button"
+                    className="button"
+                    onClick={verifyCode}
+                    disabled={working !== null}
+                  >
+                    {working === "code" ? "Asking Shopify…" : "Check it"}
+                  </button>
+                </div>
+              )}
+            </li>
+
+            <li className={detail.compensation ? "detail__step--done" : undefined}>
+              <div>
+                <strong>Set what she is paid</strong>
+                <span className="detail__note">
+                  {detail.compensation
+                    ? "Her arrangement is recorded."
+                    : "Without this her month cannot be calculated at all — her sales are counted and her payroll stays blocked."}
+                </span>
+              </div>
+              <Link className="button" to={`/affiliates/${detail.id}/compensation`}>
+                {detail.compensation ? "Change it" : "Set it"}
+              </Link>
+            </li>
+
+            <li>
+              <div>
+                <strong>Set her targets</strong>
+                <span className="detail__note">
+                  {detail.compensation?.compensation_type === "base_guarantee"
+                    ? "Her guarantee only applies in a month where these are met and confirmed, so this one decides money."
+                    : "Worth recording, and decides nothing — targets only change pay on a guaranteed minimum."}
+                </span>
+              </div>
+              <Link className="button" to="/targets">
+                Open targets
+              </Link>
+            </li>
+          </ol>
+
+          {/*
+           * The gate is `set_status`, server-side, and it raises on an
+           * unverified code. Showing it here means the maintainer sees why
+           * before pressing rather than meeting a refusal after.
+           */}
+          <div className="payroll__actions">
+            <button
+              type="button"
+              className="button button--primary"
+              onClick={approve}
+              disabled={working !== null || !verified}
+            >
+              {working === "approve"
+                ? "Approving…"
+                : verified
+                  ? `Put ${detail.name} on the programme`
+                  : "Check her code first"}
+            </button>
+          </div>
+        </section>
+      )}
 
       <div className="detail__grid">
         <section className="panel">
