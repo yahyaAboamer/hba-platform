@@ -1838,6 +1838,81 @@ fragment - would have shipped.
 
 ---
 
+## Every email failed in production while every test passed
+
+**Symptom.** An invitation was sent from the deployed staging platform. The API
+returned 201, the screen said it had been emailed, and nothing arrived — not in
+the inbox, not in spam. The logs said:
+
+    job 4 (notification.send) failed:
+      TypeError: _forget_secrets() takes 1 positional argument but 2 were given
+    ANOMALY job_gave_up attempts=5 job_id=4 kind='notification.send'
+
+Five times, then it gave up. **Every email the platform would ever send was
+failing the same way.**
+
+**Cause.** A scripted edit inserted a helper function between
+`@register_handler(JOB_KIND)` and the function it was decorating. The decorator
+therefore registered `_forget_secrets` as the handler for `notification.send`,
+and `send_notification` was registered for nothing at all. The worker called
+the helper with `(db, payload)`; it takes one argument.
+
+Python was perfectly happy. So were twenty-one tests.
+
+**Why nothing caught it.** Every test called `send_notification(db, payload)`
+**directly**. They covered the send, the skip, the refusal, the retry, the
+give-up, and the token erasure — every branch inside the function, and not once
+the question of whether anything would ever call it.
+
+> **Calling a function is not the same as it being wired up.**
+
+**Fixed** by moving the decorator, and by adding the two tests that would have
+caught it: one asserting `HANDLERS["notification.send"] is send_notification`,
+and one that queues an email and runs `run_one` — the worker path production
+uses. Both were confirmed to fail against the broken code before the fix went
+in.
+
+**Worth recording** twice over. The bug is the second one this phase caused by
+a scripted edit computing where to put something (see *a scripted edit made the
+retry path unreachable*), and the pattern is now unmistakable: **an edit script
+that positions code relative to existing lines can silently move a decorator,
+a `return`, or an `except` onto the wrong thing.** Read the region afterwards.
+
+The test gap is the more general lesson. A handler, a route, a signal receiver
+and an event listener are all functions whose *registration* is a separate fact
+from their behaviour, and a suite that only ever calls them directly tests half
+of what ships.
+
+---
+
+## There was no way to invite a model
+
+**Symptom.** The business went to send a model her sign-in link, found *Invite
+someone* in Settings, and the role list offered Admin, Content manager and
+Affiliate manager. No model.
+
+**Cause.** The invite form hard-coded the three staff roles in its dropdown.
+`affiliate` is a real role — §6.1 gives it an empty permission set on purpose —
+and it was never offered, so the only way to start the onboarding flow was to
+call the API by hand.
+
+Phase 8 built the whole model journey: invitation, acceptance, her own
+application, approval. **Nothing could start it.** Every test drove it from the
+API, so the suite proved the journey worked while the front door did not exist.
+
+**Fixed** by putting it where models live rather than by adding a fourth option
+to the dropdown, which is what the business asked for and is the better answer.
+Inviting staff grants somebody permissions over other people's money; inviting a
+model puts her on the programme and grants her nothing. Offering both from one
+list said they were variations of one decision.
+
+**Worth recording** as a gap a full test suite cannot see: **an end-to-end test
+that starts at the API starts one step after the button.** The whole flow was
+covered and the entry point was missing, and only somebody using the screen
+could find that.
+
+---
+
 ## Business rules with deliberate exposure
 
 These are not bugs. They are accepted costs, recorded so nobody "fixes" them.

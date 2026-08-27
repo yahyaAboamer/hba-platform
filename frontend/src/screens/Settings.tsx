@@ -170,7 +170,7 @@ function InvitePanel() {
   return (
     <section className="panel settings__panel">
       <div className="panel__head">
-        <h2 className="panel__title">Invite someone</h2>
+        <h2 className="panel__title">Invite a member of staff</h2>
       </div>
 
       {error && (
@@ -199,6 +199,17 @@ function InvitePanel() {
           <code className="code settings__link-value">{link}</code>
         </div>
       )}
+
+      {/*
+       * Staff only, and it says so. Inviting a model is a different act - she
+       * holds no permission at all (§6.1) - and it lives on Affiliates, where
+       * models live. Offering both from one list said they were variations of
+       * one decision.
+       */}
+      <p className="settings__note">
+        For models, use <strong>Invite a model</strong> on the Affiliates
+        screen.
+      </p>
 
       <form onSubmit={submit} className="settings__form">
         <label className="field settings__field">
