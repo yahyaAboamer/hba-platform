@@ -6,6 +6,7 @@ import { currentUser } from "./lib/api";
 import type { Session } from "./lib/api";
 import { AcceptInvitation } from "./screens/AcceptInvitation";
 import { AffiliateDetail } from "./screens/AffiliateDetail";
+import { AffiliateHome } from "./screens/AffiliateHome";
 import { Affiliates } from "./screens/Affiliates";
 import { Orders } from "./screens/Orders";
 import { Overview } from "./screens/Overview";
@@ -54,7 +55,16 @@ export default function App() {
           path="/accept-invitation"
           element={<AcceptInvitation onSignedIn={setSession} />}
         />
-        {session ? (
+        {/*
+         * §6.1. The split is on **what the session is**, not on what it may
+         * do. A model holds no staff permission at all, so every admin route
+         * would refuse her - but a sidebar full of things that refuse you is a
+         * sidebar that teaches you the tool is broken. Before this, a model
+         * signing in landed on the maintainer's Overview and a 403.
+         */}
+        {session && session.actor.role === "affiliate" ? (
+          <Route path="*" element={<AffiliateHome session={session} />} />
+        ) : session ? (
           <Route element={<Layout session={session} />}>
             <Route path="/" element={<Overview session={session} />} />
             <Route path="/affiliates" element={<Affiliates />} />

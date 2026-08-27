@@ -171,11 +171,27 @@ def test_a_refused_acceptance_does_not_consume_the_invitation(db):
     assert invitation.accepted_at is not None
 
 
-def test_accepting_for_an_email_that_already_exists_is_refused(db):
-    """Otherwise an invitation could be used to collide with a live account."""
+def test_inviting_an_email_that_already_has_an_account_is_refused(db):
+    """Caught when the invitation is created, so the person inviting finds out
+    while they can still act on it rather than after sending a dead link."""
     _admin(db, "taken@example.com")
+    with pytest.raises(ValueError, match="already exists"):
+        create_invitation(db, "taken@example.com", "admin", None)
+
+
+def test_accepting_for_an_email_that_already_exists_is_refused(db):
+    """The same collision, arriving the other way round.
+
+    The account is created **after** the invitation was sent, so the check at
+    creation time could not have seen it. Both guards are needed: this one
+    covers the window between sending a link and somebody using it, which is
+    up to 72 hours wide.
+    """
     token, _ = create_invitation(db, "taken@example.com", "admin", None)
     db.flush()
+    _admin(db, "taken@example.com")
+    db.flush()
+
     with pytest.raises(ValueError):
         accept_invitation(db, token, PASSWORD, "Taken")
 

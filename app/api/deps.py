@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.core.permissions import has_permission, permissions_for
 from app.db import get_session
+from app.models.affiliates import AffiliateProfile, AffiliateStatus
 from app.models.identity import RoleAssignment, UserAccount
 from app.services.auth import resolve_session
 
@@ -89,3 +90,46 @@ def actor_payload(db: Session, user: UserAccount) -> dict:
 def permission_list(db: Session, user: UserAccount) -> list[str]:
     """Everything the caller may do, so the interface can render accordingly."""
     return sorted(permissions_for(active_role(db, user)))
+
+
+def current_affiliate(
+    user: UserAccount = Depends(current_user), db: Session = Depends(get_session)
+) -> AffiliateProfile:
+    """The affiliate record this account **owns**, or refuse the request.
+
+    §6.1 and ADR 0006. A model reaches her data by owning the record, never by
+    holding a permission - `app/core/permissions.py` gives the `affiliate` role
+    an empty permission set on purpose, so `require_permission` can never let
+    her through and is not meant to.
+
+    Two gates, and they are never mixed:
+
+        require_permission   may this person do this?      staff routes
+        current_affiliate    is this person the subject?    model routes
+
+    A route accepting either would let a maintainer act *as* a model, and §6.5's
+    audit trail could not then distinguish that from the model acting herself.
+    Where a maintainer needs a model's data there is already an admin route.
+
+    **Every refusal is 403, never 404.** Whether an affiliate record exists for
+    some account is not something an unauthorised caller should be able to
+    establish by watching status codes.
+    """
+    profile = db.scalar(
+        select(AffiliateProfile).where(AffiliateProfile.user_account_id == user.id)
+    )
+    if profile is None:
+        # A staff account, or an invited affiliate who has not applied yet.
+        # Both are "not the subject of this record", which is the only question
+        # being asked here.
+        raise HTTPException(403, "This account is not an affiliate")
+
+    if profile.status == AffiliateStatus.ARCHIVED:
+        # History still resolves - the person does not sign in.
+        raise HTTPException(403, "This account is no longer active")
+
+    # `inactive` passes deliberately. §8: *not earning, may return*. A paused
+    # model must still see what she was owed from before she was paused;
+    # locking her out would make "paused" and "archived" the same thing to the
+    # only person they affect.
+    return profile

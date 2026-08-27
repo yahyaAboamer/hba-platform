@@ -200,7 +200,12 @@ def invite(
     if body.role not in VALID_ROLES:
         raise HTTPException(422, f"Unknown role: {body.role}")
 
-    token, invitation = create_invitation(db, str(body.email), body.role, actor.id)
+    try:
+        token, invitation = create_invitation(db, str(body.email), body.role, actor.id)
+    except ValueError as exc:
+        # Already on the programme, or already has an account. Both are
+        # ordinary mistakes with readable answers, not server errors.
+        raise HTTPException(409, str(exc)) from exc
     record_audit(
         db,
         action="invitation.create",
