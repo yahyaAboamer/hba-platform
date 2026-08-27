@@ -814,6 +814,7 @@ monthly totals. **Evidence collection remains external for V1.**
 | New application received | Maintainer | Email + in-platform |
 | Application approved | Model | Email with sign-in link |
 | Month approved | Model | Email |
+| **Month re-approved after a reopen** | Model | **Email, on re-approval only — see below** |
 | Payment recorded | Model | Email **with receipt** |
 | **Payout destination changed** | Maintainer | **Email + in-platform, immediately** |
 | Sync failure, failed job, unattributed code, multi-code hold, stuck reopen | Maintainer | In-platform + email |
@@ -821,6 +822,22 @@ monthly totals. **Evidence collection remains external for V1.**
 
 All emails are written through `notification_outbox` in the same transaction as the change
 that caused them.
+
+**A reopen sends no email of its own** (ADR 0030). Reopening and re-approving happen back to
+back in practice, so a heads-up at reopen only trains the model to skip it and, eventually,
+the real one. The existing "Month approved" event covers re-approval — it is an approval,
+just not the first one — with two additions for `version > 1`:
+
+- The difference from the previous version, and the written reason (§11.5), rewritten in
+  plain language rather than copied from the audit log.
+- If the new figure is **lower** than what was already paid, the email is sent **immediately
+  on re-approval, before any correction is applied** — there is no transfer to attach the news
+  to, and the model will notice nothing in her bank account otherwise. It states which §11.5
+  resolution was chosen: *"E£300 will come off next month's payment"* (credit) or *"nothing
+  further is needed from you"* (write-off).
+
+**Every model gets email only.** There is no in-platform inbox for her — that channel belongs
+to the maintainer. This applies here as everywhere else in this table.
 
 **Business audit trail.** Every mutation: who, what, when, before/after, and reason where
 required. Append-only, enforced by trigger. **Sensitive fields are masked** — account numbers
