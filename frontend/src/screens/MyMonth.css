@@ -1,0 +1,165 @@
+/* Her month. §11.1 is the whole screen: is this figure settled or not. */
+
+.figure {
+  padding: var(--space-5) 0 var(--space-6);
+}
+
+/* Said in words as well as in the typeface. She does not know which months are
+   closed; the maintainer does. */
+.figure__state {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--quiet);
+}
+
+/* The one place a figure is set this large. Everything else on the screen is
+   an explanation of it. */
+.figure__amount {
+  display: block;
+  font-size: 2.5rem;
+  line-height: 1.1;
+}
+
+.figure__note {
+  max-width: 38ch;
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-sm);
+  color: var(--quiet);
+}
+
+/* ── Whose move it is ───────────────────────────────────────────────────── */
+
+/* No colour. §11.3 blocks on missing information, never on poor performance,
+   and painting that red would tell her something is wrong with her month when
+   what is true is that somebody here has not finished. */
+.waiting {
+  display: block;
+  margin-bottom: var(--space-4);
+  color: var(--quiet);
+}
+
+.waiting__who {
+  display: block;
+  margin-top: var(--space-2);
+  color: var(--ink);
+}
+
+/* ── The guaranteed minimum ─────────────────────────────────────────────── */
+
+/* No colour, like the waiting notice. Nothing has gone wrong: a guarantee that
+   did not apply is an ordinary month, and painting it would say otherwise. */
+.guarantee {
+  display: block;
+  margin-bottom: var(--space-4);
+  color: var(--quiet);
+}
+
+.guarantee__amount {
+  color: var(--ink);
+}
+
+/* ── How it adds up ─────────────────────────────────────────────────────── */
+
+.makeup {
+  margin-bottom: var(--space-4);
+}
+
+.makeup__lines {
+  margin: 0;
+}
+
+.makeup__line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--rule);
+  font-size: var(--text-sm);
+}
+
+.makeup__line dt {
+  min-width: 0;
+}
+
+.makeup__line dd {
+  margin: 0;
+  /* §12.5: money never wraps. If a figure does not fit, the layout gives way. */
+  flex: none;
+}
+
+.makeup__detail {
+  display: block;
+  margin-top: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}
+
+.makeup__line--total {
+  border-bottom: none;
+  font-weight: 500;
+}
+
+/* ── Sales ──────────────────────────────────────────────────────────────── */
+
+.sales__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: 0;
+  padding: var(--space-4);
+}
+
+.sales__list dt {
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}
+
+.sales__list dd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin: var(--space-1) 0 0;
+}
+
+.sales__count {
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}
+
+/* What becomes of an order still travelling. On its own line because it is a
+   sentence, not a label - and because the row above it is where somebody stops
+   reading and starts worrying. */
+.sales__fate {
+  flex-basis: 100%;
+  max-width: 40ch;
+  margin-top: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}
+
+.sales__link {
+  display: block;
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--rule);
+  font-size: var(--text-sm);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.sales__link:hover {
+  background: var(--hover);
+}
+
+/* ── Carried forward ────────────────────────────────────────────────────── */
+
+/* Stated plainly, not as a warning. Nothing has gone wrong: the order arrived
+   late and was paid in the next month at this month's rate (ADR 0029). */
+.carried {
+  display: block;
+  margin-top: var(--space-4);
+  color: var(--quiet);
+}

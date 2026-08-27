@@ -51,11 +51,11 @@
   color: var(--quiet);
 }
 
-/* Says what is coming rather than showing an empty panel that reads as "you
-   have earned nothing". */
-.affiliate__soon {
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--rule);
+/* True across every tab, so it sits above them rather than on one of them. */
+.affiliate__paused {
+  display: block;
+  margin-bottom: var(--space-4);
+  color: var(--quiet);
 }
 
 .affiliate__details {

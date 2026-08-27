@@ -6,7 +6,7 @@ import { currentUser } from "./lib/api";
 import type { Session } from "./lib/api";
 import { AcceptInvitation } from "./screens/AcceptInvitation";
 import { AffiliateDetail } from "./screens/AffiliateDetail";
-import { AffiliateHome } from "./screens/AffiliateHome";
+import { AffiliatePortal } from "./screens/AffiliatePortal";
 import { Affiliates } from "./screens/Affiliates";
 import { Compensation } from "./screens/Compensation";
 import { Orders } from "./screens/Orders";
@@ -64,7 +64,7 @@ export default function App() {
          * signing in landed on the maintainer's Overview and a 403.
          */}
         {session && session.actor.role === "affiliate" ? (
-          <Route path="*" element={<AffiliateHome session={session} />} />
+          <Route path="*" element={<AffiliatePortal session={session} />} />
         ) : session ? (
           <Route element={<Layout session={session} />}>
             <Route path="/" element={<Overview session={session} />} />
