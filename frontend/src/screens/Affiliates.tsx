@@ -1,7 +1,8 @@
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { Link } from "react-router-dom";
 
 import { api } from "../lib/api";
+import { InviteModel } from "./InviteModel";
 import "./Affiliates.css";
 
 export type Affiliate = {
@@ -91,7 +92,7 @@ export function Affiliates() {
   // phone however firmly somebody asked for one.
   const shown: View = isNarrow ? "cards" : view;
 
-  useEffect(() => {
+  const reload = useCallback(() => {
     setError(null);
     api
       .get<{ affiliates: Affiliate[] }>(
@@ -100,6 +101,8 @@ export function Affiliates() {
       .then((body) => setRows(body.affiliates))
       .catch((caught) => setError(caught.message));
   }, [includeArchived]);
+
+  useEffect(reload, [reload]);
 
   const waiting = rows?.filter((row) => row.status === "pending") ?? [];
   const stuck = rows?.filter((row) => missingSetup(row).length > 0) ?? [];
@@ -115,6 +118,14 @@ export function Affiliates() {
         </div>
 
         <div className="affiliates__controls">
+          {/*
+           * The primary action on this screen, and it used to have no home at
+           * all: inviting a model was neither here nor in Settings, whose role
+           * list offers only staff. Phase 8 built the whole onboarding flow
+           * and nothing could start it.
+           */}
+          <InviteModel onInvited={reload} />
+
           <label className="affiliates__toggle-archived">
             <input
               type="checkbox"

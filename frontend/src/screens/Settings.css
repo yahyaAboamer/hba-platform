@@ -142,3 +142,10 @@
     overflow-x: auto;
   }
 }
+
+/* Points at the other screen. Staff and models are different acts. */
+.settings__note {
+  margin: 0 0 var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--quiet);
+}

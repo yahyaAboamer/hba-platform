@@ -545,7 +545,6 @@ def render(event: str, payload: dict) -> Message | None:
 # -- Sending ------------------------------------------------------------------
 
 
-@register_handler(JOB_KIND)
 def _forget_secrets(row: NotificationOutbox) -> None:
     """Drop anything in the payload that was only needed to send it once.
 
@@ -565,6 +564,7 @@ def _forget_secrets(row: NotificationOutbox) -> None:
     row.payload = {k: v for k, v in row.payload.items() if k != "_secret"}
 
 
+@register_handler(JOB_KIND)
 def send_notification(db: Session, payload: dict) -> None:
     """Send one queued email.
 

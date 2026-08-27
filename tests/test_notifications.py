@@ -511,3 +511,90 @@ def test_the_invitation_email_carries_a_link_that_works(monkeypatch):
 
     assert "https://pay.example.com/accept-invitation?token=abc123" in message.body
     assert "expires in three days" in message.body
+
+
+# -- Through the worker, the way production runs it --------------------------
+
+
+def test_the_registered_handler_is_the_one_that_sends(fresh_database):
+    """The bug this file did not catch, and the reason it did not.
+
+    A decorator ended up above the wrong function, so `notification.send` was
+    registered to `_forget_secrets` - which the worker then called with two
+    arguments. Every email failed with a `TypeError`, five times each, and
+    nothing here noticed, because **every test called the handler directly.**
+
+    Calling a function is not the same as it being wired up. This asserts the
+    wiring.
+    """
+    import app.main  # noqa: F401  - importing is what registers the handlers
+    from app.services.notifications import JOB_KIND, send_notification
+    from app.worker import HANDLERS
+
+    assert HANDLERS[JOB_KIND] is send_notification
+
+
+def test_a_queued_email_is_sent_by_the_worker(fresh_database, monkeypatch):
+    """End to end through the queue: `queue` writes the row and the job, the
+    worker leases it, and the row comes out sent.
+
+    The direct-call tests above cover the branches; this covers that the two
+    halves are joined at all - which is exactly what broke in production while
+    every one of them passed.
+    """
+    import app.main  # noqa: F401
+    from app.db import SessionLocal
+    from app.models.notifications import NotificationOutbox, NotificationState
+    from app.services.notifications import Event, queue
+    from app.worker import run_one
+
+    sent = []
+    monkeypatch.setattr(
+        "app.services.notifications.send", lambda message: sent.append(message) or True
+    )
+
+    with SessionLocal() as session:
+        queue(
+            session,
+            event=Event.APPLICATION_APPROVED,
+            recipient_email="nour@example.com",
+            payload={"email": "nour@example.com", "name": "Nour"},
+        )
+        session.commit()
+
+    with SessionLocal() as session:
+        assert run_one(session, "test-worker") is True
+
+    with SessionLocal() as session:
+        row = session.scalars(select(NotificationOutbox)).one()
+        assert row.state == NotificationState.SENT, row.last_error
+        assert len(sent) == 1
+        assert "on the programme" in sent[0].body
+
+
+def test_the_worker_does_not_leave_a_token_behind(fresh_database, monkeypatch):
+    """The same path as above, for the one payload that carries a credential."""
+    import app.main  # noqa: F401
+    from app.config import settings
+    from app.db import SessionLocal
+    from app.models.notifications import NotificationOutbox
+    from app.services.notifications import invitation_sent
+    from app.worker import run_one
+
+    monkeypatch.setattr(settings, "public_base_url", "https://pay.example.com")
+    sent = []
+    monkeypatch.setattr(
+        "app.services.notifications.send", lambda message: sent.append(message) or True
+    )
+
+    with SessionLocal() as session:
+        invitation_sent(session, "someone@example.com", "TOKEN-abc", "affiliate")
+        session.commit()
+
+    with SessionLocal() as session:
+        run_one(session, "test-worker")
+
+    with SessionLocal() as session:
+        row = session.scalars(select(NotificationOutbox)).one()
+        assert "_secret" not in row.payload
+    assert "TOKEN-abc" in sent[0].body

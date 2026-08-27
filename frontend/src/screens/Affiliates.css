@@ -111,3 +111,48 @@
    enforced in the component, not here. Which layout is *rendered* is component
    state, so hiding the table in CSS left a phone with nothing on the page at
    all — see useIsNarrow in Affiliates.tsx. */
+
+/* ── Inviting a model ─────────────────────────────────────────────────────
+ *
+ * The primary action on this screen. It lives here rather than in Settings
+ * because a model is not a staff role: she holds no permission at all, and
+ * offering both from one list said they were variations of one decision.
+ */
+.invite {
+  margin-bottom: var(--space-5);
+}
+
+.invite__body {
+  padding: var(--space-4);
+}
+
+.invite__lead {
+  max-width: 60ch;
+  margin: 0 0 var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--quiet);
+}
+
+.invite__field {
+  max-width: 26rem;
+}
+
+.invite__actions {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.invite__link {
+  display: block;
+  margin-bottom: var(--space-4);
+}
+
+/* A working credential until it is used, so it wraps rather than being
+   truncated - a link somebody cannot select in full is a link they cannot
+   send. */
+.invite__link-value {
+  display: block;
+  margin-top: var(--space-2);
+  word-break: break-all;
+}
