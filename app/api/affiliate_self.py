@@ -26,6 +26,7 @@ from app.services.payouts import (
     mask_destination,
     set_destination,
 )
+from app.services.portal import months_for, my_month, my_orders
 
 router = APIRouter(prefix="/api/me")
 
@@ -149,3 +150,56 @@ def destination_changed_recently(
     """
     changed = changed_recently(db, affiliate)
     return {"changed_at": changed.isoformat() if changed else None}
+
+
+# -- What she has earned (Phase 9, §11.1 and §11.4) ---------------------------
+
+
+def _month_or_400(month: str) -> str:
+    from app.core.businesstime import parse_month
+
+    try:
+        return parse_month(month)
+    except ValueError as exc:
+        raise HTTPException(400, "A month looks like 2026-04") from exc
+
+
+@router.get("/months")
+def my_months(
+    affiliate: AffiliateProfile = Depends(current_affiliate),
+    db: Session = Depends(get_session),
+) -> dict:
+    """The months she can look at, newest first.
+
+    Hers, not the calendar's. The maintainer's picker offers every month
+    because she is choosing which payroll to run; a model offered a month from
+    before she joined would find an empty screen and no way to tell whether
+    that meant nothing happened or something broke.
+    """
+    months = months_for(db, affiliate)
+    return {"months": months, "working_month": months[0] if months else None}
+
+
+@router.get("/earnings/{month}")
+def my_earnings(
+    month: str,
+    affiliate: AffiliateProfile = Depends(current_affiliate),
+    db: Session = Depends(get_session),
+) -> dict:
+    """One of her months, and every order behind the figure.
+
+    The orders travel with the month deliberately. The first thing anybody does
+    with a payment figure is try to reconcile it against what they think they
+    sold, and a screen that makes her ask for the detail separately is a screen
+    that makes her ask HBA instead.
+
+    Nothing here is recalculated for her: an agreed month is read out of its
+    snapshot, an open one out of the same `calculate_month` the payroll screen
+    uses. Two implementations of what she is owed would be two answers waiting
+    to disagree, and she would be paid the other one.
+    """
+    month = _month_or_400(month)
+    return {
+        **my_month(db, affiliate, month),
+        "orders_detail": my_orders(db, affiliate, month),
+    }

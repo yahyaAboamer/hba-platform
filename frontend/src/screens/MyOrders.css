@@ -1,0 +1,47 @@
+/* Her orders. A list, not a table — a phone has no room for five columns, and
+   the maintainer's Orders screen is the one built for scanning. */
+
+.orders {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--rule);
+}
+
+.orders__row {
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.orders__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.orders__number {
+  color: var(--quiet);
+}
+
+.orders__foot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-1);
+}
+
+.orders__date {
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}
+
+/* Stated plainly. Nothing has gone wrong: the parcel was still travelling when
+   the month closed, and the next payroll paid it at this month's rate. */
+.orders__carried {
+  max-width: 40ch;
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}

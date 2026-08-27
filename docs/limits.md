@@ -1568,6 +1568,121 @@ would have shipped it.
 
 ---
 
+## A guaranteed minimum that did not apply was never mentioned
+
+**Symptom.** Sara is on a guaranteed minimum of E£8,000. Her targets for
+September had not been recorded, so §9.5's comparison had no answer and the
+month paid her commission: E£1,100. Her portal showed *STILL ADDING UP*,
+E£1,100, a breakdown reading *Commission on this month's sales*, and a note
+saying nobody had recorded her posts yet.
+
+Every figure on that screen was correct. The word "guarantee" did not appear on
+it anywhere.
+
+**Cause.** The month endpoint returned `guarantee_applied: false` and nothing
+else about the guarantee. That was enough for the maintainer's screens, which
+show the arrangement in a column beside the figure - and useless on hers, where
+the arrangement is not on the page at all because she is assumed to know it.
+
+She does know it. That is exactly why its absence reads as *they have forgotten
+my minimum* rather than as *the comparison could not be made*.
+
+**Fixed** by returning the guarantee whether or not it applied, with the three
+target states §15 distinguishes, and saying which sentence applies:
+
+| Target state | What she reads |
+|---|---|
+| Not recorded | *Whether it applies depends on your targets, and nobody has recorded them yet.* |
+| Met, not confirmed | *You met your targets, so it applies as soon as HBA confirms the numbers.* |
+| Missed | *It applies in a month where your targets are met. They were not this month, so you are paid your commission instead.* |
+
+The third one matters most and is the one to keep an eye on in future edits: a
+missed target costs her the guarantee and **nothing else** (§11.3), and any
+wording that makes it sound like a penalty is wrong about the rule as well as
+unkind.
+
+**Worth recording** because no test could have found it. Every endpoint
+assertion passed; the figure was right; the blocker was right. What was missing
+was a number that was never asked for, on a screen whose reader brings context
+no test has. **Found by signing in as a model and looking at her own month** -
+the discipline that has now caught this, the invitation redirect, the guide
+image, and the page-wiping error, none of which any status code disagreed
+with.
+
+---
+
+## A test asserted a blocker that was never raised
+
+**Symptom.** A new test claimed an agreed month stays settled even when a
+later multi-code order re-blocks it. It passed. It also passed with the guard
+it was testing replaced by `if False`.
+
+**Cause.** The test's `_affiliate` helper posted `{"user_account_id", "name",
+"code"}` to `POST /api/affiliates`. `CreateAffiliateBody` has no `code` field,
+so Pydantic dropped it in silence. No discount code period was ever registered,
+`resolve_order` matched nothing, the order resolved as *unattributed* rather
+than *held*, and the blocker the test was named after never existed.
+
+**Fixed** by writing the `discount_code_period` row directly, the way
+`test_orders_api.py` already does - registering one through the API calls
+Shopify to settle the start month, which is not what that file is about. An
+assertion against the maintainer's own payroll view now proves the blocker is
+raised before the portal is asked to suppress it.
+
+**Worth recording** for the method rather than the bug: **a guard is not tested
+until the test has been seen to fail without it.** Breaking it on purpose took
+one edit and thirty seconds, and it was the only thing that distinguished a
+real test from a decorative one. Pydantic ignoring an unknown field is the
+general hazard - a request body is not a schema check unless the model has the
+field.
+
+---
+
+## The dev server and the test suite share one database
+
+**Symptom.** A full `pytest` run finished `1315 passed, 4 errors`, the errors
+being a Postgres deadlock and `{"detail":"An account already exists"}` from
+bootstrap. Re-running with nothing else touching the machine: `1317 passed`.
+
+**Cause.** `uvicorn` was left running against the same local Postgres the suite
+uses. `fresh_database` truncates every table between tests; the server held
+connections and pooled sessions across those truncations, so the two fought for
+locks and occasionally left a committed row behind.
+
+**Not a bug to fix** - one local database is the right setup for developing
+screens against seeded data. Recorded because the symptom is alarming and the
+cause is not in the code: **stop the dev server before trusting a full test
+run**, and treat any bootstrap or deadlock error in the suite as this until
+proven otherwise.
+
+---
+
+## Browser verification: synthetic input does not reach a React input
+
+**Symptom.** Driving the sign-in form through the browser tools, clicks landed
+and keystrokes did not. `form_input` set the field's `value` and the page
+showed the text, but submitting sent nothing - and repeated `Page.captureScreenshot`
+calls timed out with *the renderer may be frozen*.
+
+**Cause.** React tracks a controlled input's value on the DOM node itself.
+Writing `element.value` sets the DOM property and leaves React's copy behind,
+so its `onChange` never fires and component state stays empty.
+
+**Worked around** by setting the value through the native prototype setter and
+dispatching a bubbling `input` event, which is what React listens for:
+
+    const proto = Object.getPrototypeOf(el);
+    Object.getOwnPropertyDescriptor(proto, "value").set.call(el, v);
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+
+**Worth recording** because browser verification has caught four real bugs in
+this project and is worth keeping usable. When keystrokes stop landing, this is
+the first thing to try; when they still do not, navigating straight to a route
+by URL and reading the result is a smaller, more reliable check than
+reproducing a click path.
+
+---
+
 ## Business rules with deliberate exposure
 
 These are not bugs. They are accepted costs, recorded so nobody "fixes" them.

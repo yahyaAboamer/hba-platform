@@ -1,0 +1,98 @@
+/* The affiliate portal's shell. §12.5: phone-first.
+ *
+ * The maintainer's sidebar is the opposite instruction — seven sections down
+ * the left, for a laptop at month end. Here there are three, at the bottom,
+ * where a thumb reaches. */
+
+/* Room for the tab bar, so the last line of a screen is never under it. */
+.portal__body {
+  padding-bottom: calc(var(--space-8) + 2.5rem);
+}
+
+/* ── Which month ────────────────────────────────────────────────────────── */
+
+.months {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--rule);
+}
+
+.months__current {
+  font-family: var(--mono);
+  font-size: var(--text-base);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+/* Wide enough to press without looking. 44px is the smallest target that is
+   reliably hit on a phone held one-handed. */
+.months__step {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  padding: 0;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--text-base);
+  cursor: pointer;
+}
+
+.months__step:disabled {
+  border-color: var(--rule);
+  color: var(--rule-strong);
+  cursor: default;
+}
+
+/* ── The tab bar ────────────────────────────────────────────────────────── */
+
+.tabs {
+  position: fixed;
+  inset: auto 0 0 0;
+  z-index: 10;
+  display: flex;
+  border-top: 1px solid var(--rule);
+  background: var(--surface);
+  /* Without this the last tab sits under an iPhone's home indicator and takes
+     two attempts to press. */
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+/* The bar spans the window - a tab bar inset from the edges of a phone looks
+   broken - but the tabs themselves keep the same measure as the content above
+   them. On a desktop window the alternative is three labels stranded across a
+   metre of screen, and an active-tab rule running a third of the way across
+   under a column that is 30rem wide. */
+.tabs__inner {
+  display: flex;
+  width: 100%;
+  max-width: 30rem;
+  margin: 0 auto;
+}
+
+.tabs__tab {
+  flex: 1;
+  padding: var(--space-3) var(--space-2);
+  border-top: 2px solid transparent;
+  color: var(--quiet);
+  font-size: var(--text-sm);
+  text-align: center;
+  text-decoration: none;
+}
+
+/* A rule and a weight, no colour. ADR 0027 keeps colour for money state, and
+   a coloured tab bar would spend it on navigation. */
+.tabs__tab--on {
+  border-top-color: var(--ink);
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.tabs__tab:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
