@@ -4,6 +4,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { currentUser } from "./lib/api";
 import type { Session } from "./lib/api";
+import { AcceptInvitation } from "./screens/AcceptInvitation";
 import { AffiliateDetail } from "./screens/AffiliateDetail";
 import { Affiliates } from "./screens/Affiliates";
 import { Orders } from "./screens/Orders";
@@ -14,24 +15,9 @@ import { Payments } from "./screens/Payments";
 import { Payroll } from "./screens/Payroll";
 import { PayrollApprove } from "./screens/PayrollApprove";
 import { PayrollReopen } from "./screens/PayrollReopen";
+import { Settings } from "./screens/Settings";
 import { SignIn } from "./screens/SignIn";
 import { Targets } from "./screens/Targets";
-
-/** A section that exists in the navigation and not yet in the platform. */
-function NotBuiltYet({ name, phase }: { name: string; phase: string }) {
-  return (
-    <>
-      <div className="page__head">
-        <div className="page__title">
-          <h1>{name}</h1>
-        </div>
-      </div>
-      <p className="empty">
-        {name} is built in the platform and does not have a screen yet. {phase}
-      </p>
-    </>
-  );
-}
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
@@ -58,6 +44,16 @@ export default function App() {
             session ? <Navigate to="/" replace /> : <SignIn onSignedIn={setSession} />
           }
         />
+        {/*
+         * Reachable whether or not somebody is already signed in - an
+         * existing admin opening their own invite link to check it is a real
+         * scenario, not a misuse, and accepting replaces whichever session
+         * was live either way.
+         */}
+        <Route
+          path="/accept-invitation"
+          element={<AcceptInvitation onSignedIn={setSession} />}
+        />
         {session ? (
           <Route element={<Layout session={session} />}>
             <Route path="/" element={<Overview session={session} />} />
@@ -77,10 +73,7 @@ export default function App() {
               element={<PaymentReconcile />}
             />
             <Route path="/targets" element={<Targets session={session} />} />
-            <Route
-              path="/settings"
-              element={<NotBuiltYet name="Settings" phase="Coming last." />}
-            />
+            <Route path="/settings" element={<Settings session={session} />} />
           </Route>
         ) : (
           <Route path="*" element={<Navigate to="/sign-in" replace />} />
