@@ -8,7 +8,7 @@ platform rather than from a confused affiliate.
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import text
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_permission
@@ -409,4 +409,64 @@ def start_import(
         "job_id": job.id,
         "since": body.since,
         "queued_at": _isoformat(utcnow()),
+    }
+
+
+@router.get("/notifications")
+def notification_health(
+    _actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_VIEW)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Emails owed, and emails that will never arrive.
+
+    §16. Worth its own view because a failed notification is invisible from
+    every other screen in the platform: the month is approved, the payment is
+    recorded, the figures are all correct, and one model simply never heard.
+    Nothing else here would ever show that.
+
+    `configured` says whether mail could be sent at all. Without it a screen
+    reporting "0 failed" would be truthfully describing a platform that has
+    quietly sent nothing since it was deployed - which is the most likely way
+    this goes wrong, and the least likely to be noticed.
+    """
+    from app.models.notifications import NotificationOutbox, NotificationState
+    from app.services.notifications import failed as failed_notifications
+
+    counts = dict(
+        db.execute(
+            select(NotificationOutbox.state, func.count())
+            .group_by(NotificationOutbox.state)
+        ).all()
+    )
+
+    return {
+        "configured": settings.mail_configured,
+        "from_address": settings.mail_from_address or None,
+        "counts": {
+            state: int(counts.get(state, 0))
+            for state in sorted(
+                {
+                    NotificationState.PENDING,
+                    NotificationState.SENT,
+                    NotificationState.FAILED,
+                    NotificationState.SKIPPED,
+                }
+            )
+        },
+        "failed": [
+            {
+                "id": row.id,
+                "event": row.event,
+                # The address is shown: knowing *which* model never heard is
+                # the entire point, and it is an address the maintainer already
+                # has. The payload is not - an invitation token would be in it
+                # if the send failed before it was erased.
+                "recipient_email": row.recipient_email,
+                "subject_ref": row.subject_ref,
+                "attempts": row.attempts,
+                "last_error": row.last_error,
+                "created_at": _isoformat(row.created_at),
+            }
+            for row in failed_notifications(db)
+        ],
     }

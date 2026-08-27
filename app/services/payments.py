@@ -243,6 +243,14 @@ def record_payment(
         },
         reason=transaction.note,
     )
+
+    # Section 14. The receipt itself stays on her payments screen rather than
+    # travelling as an attachment - mail is the one channel that leaves the
+    # building, and ADR 0017 accepted exposure to *her*, not to whatever
+    # forwards an inbox.
+    from app.services.notifications import payment_recorded
+
+    payment_recorded(db, affiliate, transaction)
     return transaction
 
 

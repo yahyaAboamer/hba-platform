@@ -36,6 +36,7 @@ from app.worker import worker_loop
 # Imported for the side effect of registering its job handlers with the
 # worker. Without this the worker leases shopify_sync_order jobs, finds no
 # handler, and fails every one of them.
+from app.services import notifications as _notifications  # noqa: F401  (registers handlers)
 from app.services import reconcile as _reconcile  # noqa: F401  (registers handlers)
 from app.services.commission import backfill as _backfill  # noqa: F401  (registers handlers)
 from app.services.shopify import bulk as _shopify_bulk  # noqa: F401  (registers handlers)

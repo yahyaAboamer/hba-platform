@@ -20,6 +20,7 @@ from app.models.identity import RoleAssignment, UserAccount
 from app.services.audit import record_audit
 from app.services.auth import authenticate, issue_session, revoke_session
 from app.services.invitations import accept_invitation, create_invitation
+from app.services.notifications import invitation_sent
 from app.services.payroll import go_live_month, working_month
 
 router = APIRouter(prefix="/api/auth")
@@ -192,10 +193,17 @@ def invite(
     actor: UserAccount = Depends(require_permission(Permission.INVITATIONS_SEND)),
     db: Session = Depends(get_session),
 ) -> dict:
-    """Invite a member of staff and choose their role.
+    """Invite somebody and choose their role.
 
-    Returns the token so the caller can deliver the link. Email delivery
-    arrives in a later phase.
+    **Emails the link, and still returns the token.** The email is the flow
+    that matters - twenty invitations on the night before go-live should be
+    twenty presses, not twenty copy-pastes into a mail client. The token comes
+    back anyway because the platform runs perfectly well with no mail
+    credentials, and on a machine in that state the copyable link is the only
+    way in.
+
+    Queued in this transaction, like every other notification (§16), so an
+    invitation that commits always carries the email that delivers it.
     """
     if body.role not in VALID_ROLES:
         raise HTTPException(422, f"Unknown role: {body.role}")
@@ -206,6 +214,11 @@ def invite(
         # Already on the programme, or already has an account. Both are
         # ordinary mistakes with readable answers, not server errors.
         raise HTTPException(409, str(exc)) from exc
+    # §13, and the reason `create_invitation` keeps only the hash: the raw
+    # token is a credential. It is erased from the outbox the moment the email
+    # goes out - see `_forget_secrets`.
+    emailed = invitation_sent(db, invitation.email, token, body.role) is not None
+
     record_audit(
         db,
         action="invitation.create",
@@ -223,6 +236,11 @@ def invite(
             "expires_at": invitation.expires_at.isoformat(),
         },
         "token": token,
+        # Whether the platform will actually send it. The screen shows the
+        # copyable link either way - a link that was emailed is still worth
+        # having on screen when somebody says it never arrived - but it should
+        # not claim to have sent an email it only queued into a void.
+        "emailed": emailed and settings.mail_configured,
     }
 
 

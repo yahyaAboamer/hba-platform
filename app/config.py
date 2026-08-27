@@ -39,6 +39,33 @@ class Settings(BaseSettings):
     shopify_api_version: str = "2026-07"
     shopify_timeout_seconds: float = 20.0
 
+    # Where links in emails point. Blank means the platform will not put a
+    # link in an email at all rather than send one to localhost - a sign-in
+    # link that goes nowhere is worse than no email, because it teaches twenty
+    # people that mail from HBA is broken.
+    public_base_url: str = ""
+
+    # Mail. Blank by default so the platform runs, queues and records what it
+    # *would* have sent on a machine with no credentials - the same rule
+    # Shopify follows, and what keeps the test suite from needing a mail
+    # server.
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = ""
+    # STARTTLS on 587. Only turned off for a local capture server; there is no
+    # reason to send credentials to a real host in the clear.
+    smtp_use_tls: bool = True
+    smtp_timeout_seconds: float = 20.0
+    # What a recipient sees in the From line. The address must be one the SMTP
+    # account is allowed to send as - Gmail refuses anything else, which is a
+    # useful refusal.
+    mail_from_address: str = ""
+    mail_from_name: str = "HBA Aesthetics"
+    # Where operational warnings go (Section 16). Blank means nowhere, and the
+    # in-platform view is the only channel.
+    maintainer_email: str = ""
+
     # The worker runs inside the API process. With one replica that is simpler
     # and cheaper than a second service, and because jobs are leased rather
     # than assigned, splitting it out later needs no change to the queue.
@@ -73,6 +100,16 @@ class Settings(BaseSettings):
         return bool(
             self.shopify_shop_domain and (has_credentials or self.shopify_access_token)
         )
+
+    @property
+    def mail_configured(self) -> bool:
+        """Whether an email could actually be sent.
+
+        A host and a From address are the minimum. Credentials are not
+        required: a relay on a private network may accept unauthenticated mail,
+        and demanding a username would make that setup impossible to express.
+        """
+        return bool(self.smtp_host.strip() and self.mail_from_address.strip())
 
     @property
     def is_production(self) -> bool:

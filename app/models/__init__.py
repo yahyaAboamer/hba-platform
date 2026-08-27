@@ -8,6 +8,7 @@ from app.models import (  # noqa: F401
     compensation,
     identity,
     integration,
+    notifications,
     orders,
     payouts,
     payments,
