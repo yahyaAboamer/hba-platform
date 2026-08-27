@@ -8,6 +8,7 @@ import { AcceptInvitation } from "./screens/AcceptInvitation";
 import { AffiliateDetail } from "./screens/AffiliateDetail";
 import { AffiliateHome } from "./screens/AffiliateHome";
 import { Affiliates } from "./screens/Affiliates";
+import { Compensation } from "./screens/Compensation";
 import { Orders } from "./screens/Orders";
 import { Overview } from "./screens/Overview";
 import { PaymentReconcile } from "./screens/PaymentReconcile";
@@ -68,7 +69,14 @@ export default function App() {
           <Route element={<Layout session={session} />}>
             <Route path="/" element={<Overview session={session} />} />
             <Route path="/affiliates" element={<Affiliates />} />
-            <Route path="/affiliates/:id" element={<AffiliateDetail />} />
+            <Route
+              path="/affiliates/:id"
+              element={<AffiliateDetail session={session} />}
+            />
+            <Route
+              path="/affiliates/:id/compensation"
+              element={<Compensation />}
+            />
             <Route path="/orders" element={<Orders session={session} />} />
             <Route path="/payroll" element={<Payroll session={session} />} />
             <Route path="/payroll/:month/approve" element={<PayrollApprove />} />

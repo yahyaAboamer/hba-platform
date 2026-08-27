@@ -1,0 +1,45 @@
+.comp__form {
+  max-width: 44rem;
+}
+
+.comp__choice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-5);
+  padding: 0;
+  border: none;
+}
+
+.comp__field {
+  max-width: 22rem;
+}
+
+/* A percentage sign belongs to the number, not to the label - somebody
+   checking "did I type 10 or 100" should not have to read the hint to know
+   which unit they are in. */
+.comp__suffixed {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.comp__suffix {
+  font-family: var(--mono);
+  font-size: var(--text-sm);
+  color: var(--quiet);
+}
+
+.comp__summary {
+  margin-top: var(--space-4);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+}
+
+/* The arrangement being replaced. Stated plainly rather than in the refused
+   colour: ending one period and starting another is the ordinary way a rate
+   changes, not a fault. */
+.comp__note {
+  max-width: 60ch;
+  margin-top: var(--space-4);
+}
