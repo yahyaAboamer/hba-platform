@@ -1,0 +1,59 @@
+/* Phone-first, §12.5. Same measure as the application form so signing in and
+   applying feel like one place rather than two. */
+.affiliate {
+  max-width: 30rem;
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-4) var(--space-8);
+}
+
+.affiliate__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+
+.affiliate__mark {
+  display: block;
+  font-family: var(--mono);
+  font-size: var(--text-xl);
+  font-weight: 600;
+  letter-spacing: -0.04em;
+}
+
+.affiliate__title {
+  font-size: var(--text-sm);
+  font-weight: 400;
+  color: var(--quiet);
+  margin-top: var(--space-1);
+}
+
+.affiliate__sign-out {
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: var(--text-sm);
+  color: var(--quiet);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.affiliate__panel {
+  padding: var(--space-5);
+}
+
+.affiliate__lead {
+  max-width: 40ch;
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-sm);
+  color: var(--quiet);
+}
+
+/* Says what is coming rather than showing an empty panel that reads as "you
+   have earned nothing". */
+.affiliate__soon {
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--rule);
+}

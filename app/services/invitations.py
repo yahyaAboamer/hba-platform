@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 from app.core.businesstime import utcnow
 from app.core.passwords import hash_password
 from app.core.permissions import VALID_ROLES
+from app.models.affiliates import AffiliateProfile
 from app.models.identity import Invitation, RoleAssignment, UserAccount
 
 TOKEN_BYTES = 32
@@ -42,9 +43,29 @@ def create_invitation(
     """
     if role not in VALID_ROLES:
         raise ValueError(f"Unknown role: {role}")
+
+    email = str(email or "").strip().lower()
+
+    # The database's unique index on lower(email) already refuses a duplicate
+    # account at insert time. This refuses the sharper and far more likely
+    # mistake - inviting somebody who is already on the programme - while the
+    # person doing it can still act on the answer.
+    existing = db.scalar(
+        select(UserAccount).where(func.lower(UserAccount.email) == email)
+    )
+    if existing is not None:
+        owns_profile = db.scalar(
+            select(AffiliateProfile).where(
+                AffiliateProfile.user_account_id == existing.id
+            )
+        )
+        if owns_profile is not None:
+            raise ValueError(f"{email} is already on the programme")
+        raise ValueError(f"An account already exists for {email}")
+
     token = secrets.token_urlsafe(TOKEN_BYTES)
     invitation = Invitation(
-        email=str(email or "").strip().lower(),
+        email=email,
         role=role,
         token_hash=_hash(token),
         expires_at=utcnow() + timedelta(hours=valid_hours),
