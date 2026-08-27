@@ -83,3 +83,88 @@
   justify-content: center;
   margin-top: var(--space-4);
 }
+
+/*
+ * §13.1's illustrated guide. Sits directly above the field it explains rather
+ * than in a help link, because the person who needs it is filling the field in
+ * right now and will not go looking.
+ */
+.apply__guide {
+  display: flex;
+  gap: var(--space-4);
+  margin: 0 0 var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+/* Capped by height, not width: a phone screenshot is tall, and left to fill
+   the column it would push the field it explains off the screen. */
+.apply__guide-image {
+  height: 11rem;
+  width: auto;
+  border-radius: var(--radius);
+}
+
+.apply__guide-steps {
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}
+
+.apply__guide-steps ol {
+  margin: var(--space-2) 0 0;
+  padding-left: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.apply__problem {
+  display: block;
+  margin-top: var(--space-1);
+}
+
+@media (max-width: 26rem) {
+  .apply__guide {
+    flex-direction: column;
+  }
+
+  .apply__guide-image {
+    height: auto;
+    max-width: 12rem;
+  }
+}
+
+/* Shared by the application form and the payout-change panel: the same
+   decision in the same shape, whether she is joining or moving her money. */
+.apply__panel {
+  padding: var(--space-5);
+}
+
+.apply__actions {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+/* §6.4.2. Old and new, side by side, both masked. */
+.apply__compare {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  font-size: var(--text-sm);
+}
+
+.apply__compare dt {
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}
+
+.apply__compare dd {
+  margin: var(--space-1) 0 0;
+}

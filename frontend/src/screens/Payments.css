@@ -194,3 +194,10 @@
     overflow-x: auto;
   }
 }
+
+/* §6.4.5. Above the fold, before the amount and before the destination is
+   revealed - a warning that arrives after somebody has already sent money is
+   not a warning. */
+.pay__changed {
+  margin-bottom: var(--space-4);
+}

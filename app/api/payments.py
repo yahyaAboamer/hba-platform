@@ -43,6 +43,7 @@ from app.services.payments import (
     payments_for,
     record_payment,
 )
+from app.services.payouts import changed_recently
 from app.services.proof import ProofRejected, readable_by, store_proof
 
 router = APIRouter(prefix="/api")
@@ -87,11 +88,22 @@ def _affiliate_or_404(db: Session, affiliate_id: int) -> AffiliateProfile:
     return affiliate
 
 
-def _render_balance(affiliate: AffiliateProfile, balance: dict) -> dict:
+def _render_balance(
+    affiliate: AffiliateProfile,
+    balance: dict,
+    destination_changed_at=None,
+) -> dict:
     return {
         **balance,
         "affiliate_id": affiliate.id,
         "name": affiliate.name,
+        # §6.4.5. Surfaced at the moment a redirected payout would actually
+        # cost money. `changed_recently` has existed since Phase 3 and reached
+        # no screen until now - it had nothing to warn about while only the
+        # maintainer could change a destination, and from Phase 8 it does.
+        "destination_changed_at": (
+            destination_changed_at.isoformat() if destination_changed_at else None
+        ),
         "obligation": format_egp(balance["obligation_piastres"]),
         "paid": format_egp(balance["paid_piastres"]),
         "balance": format_egp(balance["balance_piastres"]),
@@ -112,7 +124,11 @@ def outstanding(
     """
     month = _month_or_400(month)
     rows = [
-        _render_balance(affiliate, balance_for(db, affiliate, month))
+        _render_balance(
+            affiliate,
+            balance_for(db, affiliate, month),
+            changed_recently(db, affiliate),
+        )
         for affiliate in list_affiliates(db, include_archived=include_archived)
     ]
     outstanding_rows = [row for row in rows if row["balance_piastres"] > 0]

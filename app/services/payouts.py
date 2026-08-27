@@ -48,6 +48,73 @@ _SENSITIVE = (
 _VISIBLE = ("method", "bank_name", "bank_account_holder")
 
 
+#: InstaPay issues payment addresses on this domain. Confirmed by the
+#: business tapping one on a phone: the OS handed it to the InstaPay app,
+#: which is the entire reason §13.1 collects a link rather than a number.
+INSTAPAY_HOST = "ipn.eg"
+
+
+def normalise_instapay_address(value: str) -> str:
+    """Check an InstaPay payment address is one, and return it cleaned.
+
+    **The host is checked; the path is not.** The purpose of this field is the
+    deep link, and a URL anywhere other than ipn.eg cannot open InstaPay - so
+    the domain is a principled line rather than a guess. The path shape is a
+    guess: no real address has ever been seen by this codebase, and refusing a
+    genuine one because its path looks unfamiliar would block a model from
+    joining at all. That is a far worse failure than accepting an odd-looking
+    ipn.eg link.
+
+    The mistake actually worth catching is a **phone number in the link
+    field** - §13.1 collects both, they sit next to each other, and a model
+    who mixes them up leaves the Pay button with nothing to open. Nothing
+    errors at the time; it surfaces at month end when somebody tries to pay
+    her.
+
+    A missing scheme is added rather than refused. Somebody typing the address
+    by hand omits `https://` far more often than they mean a different site.
+    """
+    import re
+    from urllib.parse import urlparse
+
+    cleaned = str(value or "").strip()
+    if not cleaned:
+        raise ValueError("An InstaPay payment address is needed")
+
+    # Named before anything else, because it is the mistake this function
+    # exists for and it deserves its own words. Left to the host check below
+    # it produced "that one points at 01001234567", which is true and reads
+    # as nonsense to the person who has to fix it.
+    if re.fullmatch(r"[+\d][\d\s\-()]*", cleaned):
+        raise ValueError(
+            "That looks like a phone number. The payment address is a link "
+            "starting https://ipn.eg/ - tap Link in InstaPay and copy it. "
+            "Your number goes in the field below."
+        )
+
+    if "://" not in cleaned:
+        cleaned = f"https://{cleaned}"
+
+    parsed = urlparse(cleaned)
+    host = (parsed.hostname or "").lower()
+
+    if not host:
+        raise ValueError(
+            "That is not a payment address. It should be a link starting "
+            "https://ipn.eg/ - copied from the Link button in InstaPay, not "
+            "your phone number."
+        )
+
+    # Subdomains count: ipn.eg and anything.ipn.eg, never notipn.eg.
+    if host != INSTAPAY_HOST and not host.endswith(f".{INSTAPAY_HOST}"):
+        raise ValueError(
+            f"An InstaPay payment address is a link on {INSTAPAY_HOST}. "
+            f"That one points at {host}."
+        )
+
+    return cleaned
+
+
 def mask_value(value: str | None) -> str | None:
     """Keep enough to recognise, never enough to use."""
     if value is None:
@@ -125,6 +192,13 @@ def set_destination(
     """
     if method not in VALID_METHODS:
         raise ValueError(f"Unknown payout method: {method!r}")
+
+    # Here rather than at each caller, so the application, a model changing
+    # her own destination, and a maintainer correcting one are all checked by
+    # the same rule. A validator on one path is a validator with a way around
+    # it.
+    if method == PayoutMethod.INSTAPAY and instapay_address_url:
+        instapay_address_url = normalise_instapay_address(instapay_address_url)
 
     fields = {
         "instapay_address_url": instapay_address_url,

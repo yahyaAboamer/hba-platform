@@ -1498,6 +1498,38 @@ that unit tests on an endpoint cannot catch.
 
 ---
 
+## The onboarding guide image was served as the SPA fallback
+
+**Symptom.** The InstaPay guide on the application form rendered as its alt
+text: *"The InstaPay home screen, with the Link button under your account
+circled"*. The file was on disk, the path was right, and the request returned
+**200**.
+
+**Cause.** `app/main.py` mounts exactly one static directory, `/assets`.
+Anything else falls through to the catch-all that serves `index.html`, so
+`/guides/instapay-link.png` returned 465 bytes of HTML with a 200 and an
+`image/*` request quietly failed to decode.
+
+A 404 would have been obvious. **A 200 that returns the wrong content type is
+the version that wastes an afternoon**, and it is what any unmounted path does
+in a single-page app with a catch-all route.
+
+**Fixed** by importing the image in the component instead of referencing a
+URL. Vite fingerprints it into `/assets`, which is the directory that is
+actually mounted — one pipeline rather than a second mount to keep in step
+with it.
+
+**Found the same way as the last one:** by looking at the rendered page rather
+than trusting the status code. `curl -o /dev/null -w "%{http_code}"` said 200
+and would have ended the investigation; `%{size_download}` said 465 bytes and
+gave it away.
+
+**Also fixed on the way past:** the screenshot was 1.4 MB. It renders at 11rem
+tall on a form a model fills in once, on a phone, on Egyptian mobile data.
+Resized to 720px tall — 224 KB, 84% smaller, still sharp on a 3x screen.
+
+---
+
 ## Business rules with deliberate exposure
 
 These are not bugs. They are accepted costs, recorded so nobody "fixes" them.
