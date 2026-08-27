@@ -16,6 +16,7 @@ neither does.
 
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.audit import AuditEvent
@@ -122,3 +123,21 @@ def record_audit(
     )
     db.add(event)
     return event
+
+
+def recent_events(
+    db: Session, *, limit: int = 50, subject_contains: str | None = None
+) -> list[AuditEvent]:
+    """The most recent business events, newest first. Read-only counterpart to
+    `record_audit` - nothing here writes, and this is the only function in the
+    module that reads.
+
+    Filtered by a substring on `subject` (`affiliate:12`,
+    `invitation:nour@example.com`) rather than a structured query, because
+    that is the shape a person actually has in hand when they come looking -
+    a name or an id copied from another screen, not a table and a column.
+    """
+    query = select(AuditEvent).order_by(AuditEvent.created_at.desc()).limit(limit)
+    if subject_contains:
+        query = query.where(AuditEvent.subject.ilike(f"%{subject_contains}%"))
+    return list(db.scalars(query))

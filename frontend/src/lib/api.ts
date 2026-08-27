@@ -218,6 +218,32 @@ export async function signIn(
   return session;
 }
 
+/**
+ * Turn an invitation into an account, and sign the new person straight in.
+ *
+ * Mirrors `signIn` deliberately: the server's accept endpoint already
+ * returns a live session (§13's "invited, accepted, and inside the tool in
+ * one step"), so the same "ask `/me` once more for the permission list"
+ * pattern applies here too.
+ */
+export async function acceptInvitation(
+  token: string,
+  displayName: string,
+  password: string,
+): Promise<Session> {
+  const result = await api.post<{ csrf: string; actor: Actor }>(
+    "/api/auth/invitations/accept",
+    { token, display_name: displayName, password },
+  );
+  rememberToken(result.csrf);
+
+  const session = await currentUser();
+  if (session === null) {
+    throw new ApiError(401, "Accepted, but the session did not stick.");
+  }
+  return session;
+}
+
 export async function signOut(): Promise<void> {
   try {
     await api.post("/api/auth/logout");

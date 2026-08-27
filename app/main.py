@@ -16,6 +16,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api import (
     affiliates,
+    audit,
     auth,
     earnings,
     health,
@@ -23,6 +24,7 @@ from app.api import (
     orders,
     payments,
     payroll,
+    staff,
     targets,
     webhooks,
 )
@@ -99,6 +101,8 @@ app.include_router(affiliates.router)
 app.include_router(earnings.router)
 app.include_router(targets.router)
 app.include_router(orders.router)
+app.include_router(staff.router)
+app.include_router(audit.router)
 app.include_router(payroll.router)
 app.include_router(payments.router)
 

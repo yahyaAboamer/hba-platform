@@ -1,0 +1,144 @@
+.settings__sections {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  max-width: 48rem;
+}
+
+.settings__panel {
+  padding: var(--space-5);
+}
+
+.settings__form {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.settings__field {
+  margin-bottom: 0;
+  min-width: 14rem;
+}
+
+.settings__link {
+  margin-bottom: var(--space-4);
+}
+
+.settings__link-value {
+  display: block;
+  margin-top: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface);
+  word-break: break-all;
+}
+
+.settings__table {
+  table-layout: auto;
+  margin-bottom: var(--space-4);
+}
+
+.settings__email {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}
+
+.settings__role-select {
+  width: auto;
+  font-size: var(--text-sm);
+  padding: var(--space-1) var(--space-2);
+}
+
+.settings__status {
+  font-size: var(--text-sm);
+  text-transform: capitalize;
+}
+
+/* Only the state that means "cannot sign in" is coloured — the ordinary
+   states either side of it need no announcement (ADR 0027). */
+.settings__status--suspended {
+  color: var(--refused);
+}
+
+.settings__action {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.settings__suspend-form {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  justify-content: flex-end;
+}
+
+.settings__reason {
+  width: 12rem;
+}
+
+.settings__subhead {
+  margin: var(--space-5) 0 var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.settings__quiet {
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}
+
+.settings__search {
+  display: flex;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.settings__search input {
+  flex: 1;
+}
+
+.settings__activity {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.settings__activity-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-3);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--rule);
+}
+
+.settings__activity-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.settings__activity-action {
+  font-size: var(--text-xs);
+}
+
+.settings__activity-subject {
+  font-size: var(--text-sm);
+}
+
+.settings__activity-reason {
+  flex-basis: 100%;
+  font-size: var(--text-sm);
+  color: var(--quiet);
+  font-style: italic;
+}
+
+@media (max-width: 640px) {
+  .settings__table {
+    display: block;
+    overflow-x: auto;
+  }
+}

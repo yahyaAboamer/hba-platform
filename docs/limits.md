@@ -1468,6 +1468,36 @@ was approved.
 
 ---
 
+## Accepting an invitation worked and looked like it had not
+
+**Symptom.** Filling in the accept-invitation form and pressing "Get started"
+did exactly what it should on the server - created the account, issued a
+session, set the cookie - and left the person looking at the same empty form
+with no sign anything had happened. `/api/auth/me` from that same browser
+confirmed a live session; the screen simply never moved.
+
+**Cause.** `/accept-invitation` is a public route, reachable whether or not
+somebody is already signed in - deliberately, since an existing admin opening
+their own invite link to check it is a real case (§13). `onSignedIn(session)`
+updates state one level up in `App`, but nothing on the route itself reacts to
+that by navigating anywhere. `/sign-in` redirects once a session exists
+because its own route element checks for one; this route had no such check
+and no navigation call at all.
+
+**Fixed** by calling `navigate("/", { replace: true })` immediately after
+`onSignedIn` succeeds, rather than relying on a route-level redirect - the
+form is filled with a live password on screen at that moment, and leaving it
+rendered a beat longer than necessary was the wrong side to err on.
+
+**How it was found.** Not by reading the code - by finishing the whole loop in
+a browser: invite, copy the link, accept it, expect to land in the tool. A
+"it returned 201, so it must be fine" check on the endpoint alone would have
+shipped this. Recorded because the same shape - a successful mutation with
+nothing downstream to carry the person forward - is exactly the class of bug
+that unit tests on an endpoint cannot catch.
+
+---
+
 ## Business rules with deliberate exposure
 
 These are not bugs. They are accepted costs, recorded so nobody "fixes" them.
