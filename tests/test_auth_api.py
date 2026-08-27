@@ -417,3 +417,59 @@ def test_no_response_ever_contains_a_password_hash(client):
     me = client.get("/api/auth/me").text
     assert "password" not in me.lower()
     assert "pbkdf2" not in me.lower()
+
+
+# -- Standing up a fresh deployment (Phase 10) -------------------------------
+
+
+def test_a_fresh_platform_says_it_needs_setting_up(fresh_database):
+    """Until this existed, the first step of every deployment had no interface.
+
+    The API docs are switched off in production, so standing one up meant
+    calling the bootstrap endpoint by hand - which is a poor first impression
+    and has to be done again every time staging is reset.
+    """
+    with TestClient(app) as anonymous:
+        assert anonymous.get("/api/auth/needs-setup").json() == {"needs_setup": True}
+
+
+def test_once_there_is_an_account_it_says_so(client):
+    """Anonymous callers see the same answer - it is a fact about the
+    deployment, not about the caller.
+    """
+    _bootstrap(client)
+
+    with TestClient(app) as anonymous:
+        assert anonymous.get("/api/auth/needs-setup").json() == {"needs_setup": False}
+
+
+def test_the_check_needs_no_session(fresh_database):
+    """The only person who can ask is somebody looking at a platform with
+    nobody in it, so requiring a session would make it unanswerable.
+    """
+    with TestClient(app) as anonymous:
+        assert anonymous.get("/api/auth/needs-setup").status_code == 200
+
+
+def test_it_reveals_nothing_the_bootstrap_endpoint_did_not(client):
+    """Worth being explicit about the disclosure.
+
+    `POST /bootstrap` already answers 201 or 409 to the same question, so this
+    tells an anonymous caller nothing new - it shortens the unclaimed window
+    rather than lengthening it, because the owner can find the form instead of
+    hunting for a curl command.
+    """
+    _bootstrap(client)
+
+    with TestClient(app) as anonymous:
+        refused = anonymous.post(
+            "/api/auth/bootstrap",
+            json={
+                "email": "someone@example.com",
+                "display_name": "Someone",
+                "password": "a-long-enough-password",
+            },
+        )
+
+    assert refused.status_code == 409
+    assert anonymous.get("/api/auth/needs-setup").json()["needs_setup"] is False

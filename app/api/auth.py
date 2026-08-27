@@ -64,6 +64,27 @@ def _set_cookie(response: Response, token: str) -> None:
     )
 
 
+@router.get("/needs-setup")
+def needs_setup(db: Session = Depends(get_session)) -> dict:
+    """Whether this deployment has an administrator yet.
+
+    Unauthenticated, because the only person who can ask is somebody looking at
+    a platform with nobody in it.
+
+    **This does disclose something**, and it is worth being clear about what:
+    an anonymous caller learns whether a fresh deployment is unclaimed. That is
+    already true of `POST /bootstrap`, which answers 201 or 409 to the same
+    question, so this reveals nothing the endpoint it fronts did not - and it
+    *shortens* the window rather than lengthening it, because the owner can now
+    find the form instead of hunting for a curl command.
+
+    The window is the exposure. A deployment is unclaimed from the moment it is
+    reachable until somebody bootstraps it, and the mitigation is to do that
+    immediately - which is the whole reason this endpoint exists.
+    """
+    return {"needs_setup": not db.scalar(select(func.count()).select_from(UserAccount))}
+
+
 @router.post("/bootstrap", status_code=201)
 def bootstrap(
     body: BootstrapBody,

@@ -2,13 +2,14 @@ import { useEffect, useState } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
 import { Layout } from "./components/Layout";
-import { currentUser } from "./lib/api";
+import { api, currentUser } from "./lib/api";
 import type { Session } from "./lib/api";
 import { AcceptInvitation } from "./screens/AcceptInvitation";
 import { AffiliateDetail } from "./screens/AffiliateDetail";
 import { AffiliatePortal } from "./screens/AffiliatePortal";
 import { Affiliates } from "./screens/Affiliates";
 import { Compensation } from "./screens/Compensation";
+import { FirstRun } from "./screens/FirstRun";
 import { Orders } from "./screens/Orders";
 import { Overview } from "./screens/Overview";
 import { PaymentReconcile } from "./screens/PaymentReconcile";
@@ -24,10 +25,23 @@ import { Targets } from "./screens/Targets";
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [checking, setChecking] = useState(true);
+  const [needsSetup, setNeedsSetup] = useState(false);
 
   useEffect(() => {
     currentUser()
-      .then(setSession)
+      .then(async (found) => {
+        setSession(found);
+        // Only asked when nobody is signed in. A fresh deployment has no
+        // account at all, and until this screen existed the first step of
+        // standing one up had no interface - the API docs are switched off in
+        // production, so it meant calling the endpoint by hand.
+        if (found === null) {
+          const state = await api
+            .get<{ needs_setup: boolean }>("/api/auth/needs-setup")
+            .catch(() => ({ needs_setup: false }));
+          setNeedsSetup(state.needs_setup);
+        }
+      })
       .catch(() => setSession(null))
       .finally(() => setChecking(false));
   }, []);
@@ -36,6 +50,20 @@ export default function App() {
   // Flashing the sign-in screen at a signed-in person reads as being logged
   // out, which on a payroll tool is alarming rather than merely untidy.
   if (checking) return null;
+
+  // Before the router: there is exactly one thing to do on a platform with
+  // nobody in it, and offering a sign-in form for accounts that do not exist
+  // teaches somebody their password is wrong.
+  if (!session && needsSetup) {
+    return (
+      <FirstRun
+        onSignedIn={(created) => {
+          setSession(created);
+          setNeedsSetup(false);
+        }}
+      />
+    );
+  }
 
   return (
     <BrowserRouter>
