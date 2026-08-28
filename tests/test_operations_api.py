@@ -7,7 +7,7 @@ from a confused affiliate.
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import text
+from sqlalchemy import select, text
 
 from app.db import engine
 from app.main import app
@@ -852,3 +852,57 @@ def test_a_model_may_not_read_what_needs_attention(client):
     _demote_to("affiliate")
 
     assert client.get("/api/operations/attention").status_code == 403
+
+
+def test_failed_emails_can_be_sent_again(client, monkeypatch):
+    """The case this exists for is a provider that was not working yet.
+
+    Brevo holds a new account for manual activation and answers every send with
+    *your account is not yet activated* - a 403, correctly permanent. Every
+    notification queued before activation is then dead, with no way to revive
+    it but a button.
+    """
+    from app.config import settings
+    from app.db import SessionLocal
+    from app.models.notifications import NotificationOutbox, NotificationState
+
+    monkeypatch.setattr(settings, "go_live_month", "2026-09", raising=False)
+
+    with SessionLocal() as session:
+        for event in ("invitation.sent", "month.approved"):
+            session.add(
+                NotificationOutbox(
+                    event=event,
+                    recipient_email="nour@example.com",
+                    payload={"email": "nour@example.com"},
+                    state=NotificationState.FAILED,
+                    attempts=5,
+                    last_error="403 not activated",
+                )
+            )
+        session.commit()
+
+    result = client.post("/api/operations/notifications/retry").json()
+
+    assert result["queued"] == 2
+    with SessionLocal() as session:
+        rows = list(session.scalars(select(NotificationOutbox)))
+    assert {row.state for row in rows} == {NotificationState.PENDING}
+    # A fresh attempt at something that has been fixed, not a continuation of
+    # the run that gave up.
+    assert {row.attempts for row in rows} == {0}
+    assert {row.last_error for row in rows} == {None}
+
+
+def test_retrying_with_nothing_failed_is_harmless(client, monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "go_live_month", "2026-09", raising=False)
+
+    assert client.post("/api/operations/notifications/retry").json() == {"queued": 0}
+
+
+def test_a_model_may_not_resend_everybodys_email(client):
+    _demote_to("affiliate")
+
+    assert client.post("/api/operations/notifications/retry").status_code == 403
