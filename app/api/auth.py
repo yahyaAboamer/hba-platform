@@ -19,7 +19,13 @@ from app.core.permissions import VALID_ROLES, Permission
 from app.db import get_session
 from app.models.identity import RoleAssignment, UserAccount
 from app.services.audit import record_audit
-from app.services.auth import authenticate, issue_session, revoke_session
+from app.services.auth import (
+    authenticate,
+    ensure_csrf,
+    issue_session,
+    resolve_session,
+    revoke_session,
+)
 from app.services.invitations import accept_invitation, create_invitation
 from app.services.notifications import invitation_sent
 from app.services.payroll import go_live_month, working_month
@@ -83,7 +89,25 @@ def _set_cookie(response: Response, token: str, csrf: str) -> None:
     # The session token is never readable by script. That has not changed and
     # is the half that actually authenticates.
     response.set_cookie(SESSION_COOKIE, token, httponly=True, **common)
-    response.set_cookie(CSRF_COOKIE, csrf, httponly=False, **common)
+    _set_csrf_cookie(response, csrf)
+
+
+def _set_csrf_cookie(response: Response, csrf: str) -> None:
+    """The readable half, on its own.
+
+    Separate because `/me` repairs a session that has lost it, and doing that
+    must not touch the session cookie - re-issuing that would extend a session
+    every time a page loaded.
+    """
+    response.set_cookie(
+        CSRF_COOKIE,
+        csrf,
+        max_age=settings.session_hours * 3600,
+        secure=settings.is_production,
+        samesite="lax",
+        path="/",
+        httponly=False,
+    )
 
 
 @router.get("/needs-setup")
@@ -191,19 +215,46 @@ def login(
 def logout(
     request: Request,
     response: Response,
-    user: UserAccount = Depends(current_user),
     db: Session = Depends(get_session),
 ) -> dict:
-    revoke_session(db, request.cookies.get(SESSION_COOKIE, ""))
-    record_audit(
-        db,
-        action="auth.logout",
-        subject=f"user:{user.id}",
-        actor_id=user.id,
-        actor_email=user.email,
-        ip_address=_client_ip(request),
-    )
+    """End the session. **Deliberately not behind the CSRF check.**
+
+    Every other write on the platform requires the token. This one does not,
+    and the reasoning is worth stating because it looks like a hole and is not.
+
+    What CSRF protection buys on a logout is preventing somebody being signed
+    out of their own session by a page they did not mean to visit. That is a
+    nuisance: it reads nothing, changes nothing, and moves no money.
+
+    What enforcing it costs is somebody who **cannot sign out** - which the
+    platform did twice in production, once leaving a live administrator session
+    on a machine after the person had asked to leave it. On a shared computer
+    that is a real exposure, and it is strictly worse than the attack it was
+    guarding against.
+
+    So this resolves the session itself rather than depending on
+    `current_user`, and revokes it whatever the browser managed to send.
+
+    **Idempotent.** Signing out of a session that is already gone is not an
+    error; it is the outcome the person asked for. The cookies are cleared
+    either way, so a browser holding something stale does not keep it.
+    """
+    token = request.cookies.get(SESSION_COOKIE, "")
+    # No CSRF argument: this is the one route that does not check it.
+    user = resolve_session(db, token) if token else None
+
+    revoke_session(db, token)
+    if user is not None:
+        record_audit(
+            db,
+            action="auth.logout",
+            subject=f"user:{user.id}",
+            actor_id=user.id,
+            actor_email=user.email,
+            ip_address=_client_ip(request),
+        )
     db.commit()
+
     response.delete_cookie(SESSION_COOKIE, path="/")
     response.delete_cookie(CSRF_COOKIE, path="/")
     return {"success": True}
@@ -211,15 +262,26 @@ def logout(
 
 @router.get("/me")
 def me(
-    user: UserAccount = Depends(current_user), db: Session = Depends(get_session)
+    request: Request,
+    response: Response,
+    user: UserAccount = Depends(current_user),
+    db: Session = Depends(get_session),
 ) -> dict:
-    """The caller's identity, everything they may do, and where the platform is.
+    """Who is signed in, and what they may do.
 
-    `platform` rides along because every screen needs it before it can render a
-    single figure, and this request is already made once at start-up. A second
-    round trip to ask "which month are we in" would be one more thing that can
-    fail between signing in and seeing anything.
+    **It also repairs a session that cannot write.** The page loads this first,
+    so it is the one place guaranteed to run before anything is attempted - and
+    a session holding no usable CSRF token is exactly the state that made every
+    write fail while the interface looked perfectly healthy.
+
+    `ensure_csrf` rotates only when the token is missing or wrong, so a second
+    tab does not invalidate the first.
     """
+    issued = ensure_csrf(db, request.cookies.get(SESSION_COOKIE, ""), request.cookies.get(CSRF_COOKIE))
+    if issued is not None:
+        db.commit()
+        _set_csrf_cookie(response, issued)
+
     return {
         "actor": actor_payload(db, user),
         "permissions": permission_list(db, user),
