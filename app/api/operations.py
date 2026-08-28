@@ -683,3 +683,51 @@ def _previous_month(month: str) -> str:
     year, _, index = month.partition("-")
     year, index = int(year), int(index)
     return f"{year - 1}-12" if index == 1 else f"{year}-{index - 1:02d}"
+
+
+@router.post("/notifications/retry")
+def retry_notifications(
+    _actor: UserAccount = Depends(require_permission(Permission.SETTINGS_MANAGE)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Send everything that failed, again.
+
+    **The case this exists for is a provider that was not working yet.** Brevo
+    holds a new account for manual activation and answers every send with
+    *"your account is not yet activated"* - a 403, which is correctly treated
+    as permanent, because retrying a refusal four more times helps nobody.
+
+    The consequence is that every notification queued before activation is
+    dead. Approvals, invitations, payment notices: all owed, all marked failed,
+    none of them ever going out - and no way to change that but a button.
+
+    Which is also why this is deliberately **not** automatic. The reason a
+    batch failed is usually a setting somebody has to fix first, and a queue
+    that retried on its own would hide that by eventually succeeding. Somebody
+    fixes the cause, then presses this.
+
+    Idempotent, and safe on a healthy platform: with nothing failed it queues
+    nothing.
+    """
+    from app.models.notifications import NotificationOutbox, NotificationState
+    from app.services.jobs import enqueue
+    from app.services.notifications import JOB_KIND
+
+    failed = list(
+        db.scalars(
+            select(NotificationOutbox).where(
+                NotificationOutbox.state == NotificationState.FAILED
+            )
+        )
+    )
+
+    for row in failed:
+        row.state = NotificationState.PENDING
+        # The count starts again: this is a fresh attempt at something that has
+        # been fixed, not a continuation of the run that gave up.
+        row.attempts = 0
+        row.last_error = None
+        enqueue(db, JOB_KIND, {"outbox_id": row.id})
+
+    db.commit()
+    return {"queued": len(failed)}

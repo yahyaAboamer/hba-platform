@@ -92,6 +92,22 @@ async def security_headers(request: Request, call_next):
     # Authenticated responses must never sit in a shared or browser cache.
     if request.url.path.startswith("/api/"):
         response.headers["Cache-Control"] = "no-store"
+    elif request.url.path.startswith("/assets/"):
+        # **Content-hashed, so immutable.** Vite puts a hash of the contents in
+        # every asset filename, which means a given URL can never mean
+        # something different - a change produces a new name.
+        #
+        # Without this the browser had an ETag and no freshness, so it
+        # revalidated every file on every page load: five or six extra round
+        # trips before anything could render, and each round trip to this host
+        # from Cairo costs about 210ms. The files were in the cache the whole
+        # time; the browser just kept asking whether they were still good.
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    elif request.url.path == "/" or not request.url.path.startswith("/api/"):
+        # The shell, on the other hand, must be checked every time - it is what
+        # names the current asset hashes, so caching it is how somebody keeps
+        # running last week's deploy.
+        response.headers["Cache-Control"] = "no-cache"
     return response
 
 

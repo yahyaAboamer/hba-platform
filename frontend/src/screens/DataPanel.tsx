@@ -221,6 +221,29 @@ export function DataPanel() {
         {mail && mail.failed.length > 0 && (
           <div className="data__list">
             <h3 className="data__heading">Emails that never arrived</h3>
+            {/*
+             * The provider being switched off is the usual reason a batch
+             * fails, and it is fixed outside the platform - so the retry is a
+             * button rather than something automatic. Retrying on its own
+             * would hide the cause by eventually succeeding.
+             */}
+            <button
+              type="button"
+              className="button"
+              onClick={() =>
+                api
+                  .post<{ queued: number }>("/api/operations/notifications/retry")
+                  .then((result) => {
+                    setNotice(
+                      `${result.queued} queued again. They will go out within a minute if the problem is fixed.`,
+                    );
+                    load();
+                  })
+                  .catch((caught) => setError(caught.message))
+              }
+            >
+              Send them again
+            </button>
             <p className="data__note">
               Somebody was told nothing. This is invisible from every other
               screen — the month is approved, the payment recorded, and one
