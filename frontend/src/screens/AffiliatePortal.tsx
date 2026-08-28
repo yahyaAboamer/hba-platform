@@ -37,7 +37,11 @@ export function AffiliatePortal({ session }: { session: Session }) {
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(() => {
-    api
+    // Returned, so a caller can wait for it. Changing where you are paid used
+    // to close its form the instant the write returned, leaving the old
+    // destination on screen until this landed - and somebody watching that saw
+    // nothing happen at all.
+    return api
       .get<Mine>("/api/applications/mine")
       .then((body) => {
         setMine(body);
@@ -59,7 +63,11 @@ export function AffiliatePortal({ session }: { session: Session }) {
       .catch((caught) => setError(caught.message));
   }, []);
 
-  useEffect(load, [load]);
+  // Wrapped rather than passed: `load` returns a promise now, and an effect
+  // callback returning one is read by React as a cleanup function.
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   const head = (
     <div className="affiliate__head">

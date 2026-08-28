@@ -108,7 +108,18 @@
   color: var(--quiet);
 }
 
-.payroll__carried,
+/* **Never `display: block` on a `td`.** It was, and a cell told to be a block
+   leaves the table layout altogether: it stops sharing the row's height, and
+   its bottom border is drawn wherever the block happens to end. The result was
+   a row rule that ran level across the first four columns and then stepped
+   down under the last two - which is what the business screenshotted.
+
+   The cell stays a cell. Only the lines inside it stack. */
+.payroll__carried {
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}
+
 .payroll__carried-line {
   display: block;
   font-size: var(--text-xs);

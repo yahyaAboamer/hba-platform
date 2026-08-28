@@ -25,17 +25,27 @@ const METHOD_LABEL: Record<string, string> = {
  * The only things on the whole portal she can change, and deliberately so: she
  * may correct how to reach her, and nothing that decides what she is owed.
  */
-export function MyDetails({ me, onChanged }: { me: Me; onChanged: () => void }) {
+export function MyDetails({
+  me,
+  onChanged,
+}: {
+  me: Me;
+  onChanged: () => void | Promise<void>;
+}) {
   const [changing, setChanging] = useState(false);
+  const [changed, setChanged] = useState(false);
 
   if (changing) {
     return (
       <MyPayout
         current={me.payout_destination}
         required={me.required_fields}
-        onChanged={() => {
+        onChanged={async () => {
+          // Wait for the record to come back before closing the form, so the
+          // panel behind it is already showing the new destination.
+          await onChanged();
           setChanging(false);
-          onChanged();
+          setChanged(true);
         }}
         onCancel={() => setChanging(false)}
       />
@@ -45,6 +55,18 @@ export function MyDetails({ me, onChanged }: { me: Me; onChanged: () => void }) 
   return (
     <section className="panel affiliate__panel affiliate__details">
       <h2 className="panel__title">Your details</h2>
+
+      {/*
+       * Said out loud. Changing where your money goes with no confirmation is
+       * the one place silence is unacceptable - the business changed it, saw
+       * the form close and the old method still listed, and concluded nothing
+       * had happened.
+       */}
+      {changed && (
+        <p className="notice notice--settled">
+          Changed. This is where your money will be sent from now on.
+        </p>
+      )}
       <dl className="affiliate__list">
         <div>
           <dt>Your code</dt>

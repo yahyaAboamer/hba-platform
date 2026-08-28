@@ -86,27 +86,13 @@ export function PayrollReopen() {
           <section className="panel approve__summary">
             <h2 className="panel__title">What this changes</h2>
             <p className="approve__lead">
-              The agreed figure goes back to being a working one, and is
-              recalculated from what is true now. It may come out higher or
-              lower than what was agreed.
+              The agreed figure becomes a working one again and is recalculated
+              from what is true now. It may come out higher or lower.
             </p>
             <p className="approve__lead">
-              <strong>Nothing is erased.</strong> The version you agreed is
-              kept, and any payment made against it stays attached to it and
-              stays visible to her. Approving again creates the next version
-              beside it, not on top of it.
-            </p>
-            <p className="approve__lead">
-              Orders that carried forward into a month still being worked out
-              are pulled back here, where they belong. Orders that carried into
-              a month already agreed stay there — that month is settled.
-            </p>
-            <p className="approve__lead">
-              Afterwards the month is <em>unapproved</em>, and it stays that way
-              until you approve it again. That is the state worth watching: a
-              month left open with a payment already made against the old
-              version is a balance nobody is tracking, so the payroll screen
-              says so until it is closed.
+              <strong>Nothing is erased.</strong> The version you agreed is kept,
+              and any payment made against it stays attached to it. The month
+              stays unapproved until you agree it again.
             </p>
           </section>
 

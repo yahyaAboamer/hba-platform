@@ -156,3 +156,38 @@
   margin-top: var(--space-2);
   word-break: break-all;
 }
+
+/* ── Invited, not opened yet ──────────────────────────────────────────────
+ *
+ * Here rather than on the staff panel: a model is not staff. And they have to
+ * be somewhere, or an invitation sent to the wrong address could never be
+ * withdrawn.
+ */
+.affiliates__invited {
+  margin-bottom: var(--space-5);
+}
+
+.affiliates__invited-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.affiliates__invited-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--rule);
+  font-size: var(--text-sm);
+}
+
+.affiliates__invited-list li:last-child {
+  border-bottom: none;
+}
+
+.affiliates__invited-state {
+  flex: 1;
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}

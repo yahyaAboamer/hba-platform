@@ -49,6 +49,17 @@ class Settings(BaseSettings):
     # *would* have sent on a machine with no credentials - the same rule
     # Shopify follows, and what keeps the test suite from needing a mail
     # server.
+    # Most hosts block outbound SMTP - Railway does - so mail normally goes
+    # over HTTPS through a provider's API instead. Whichever key is set decides
+    # which. SMTP stays for local development and hosts that allow it.
+    #
+    # Resend needs a domain you control and delivers best because the mail is
+    # genuinely signed by it. Brevo will verify a single address, a Gmail one
+    # included, which is the only option with no domain - and delivers less
+    # reliably, because a third party sending as @gmail.com cannot align DMARC.
+    resend_api_key: str = ""
+    brevo_api_key: str = ""
+
     smtp_host: str = ""
     smtp_port: int = 587
     smtp_username: str = ""
@@ -105,11 +116,18 @@ class Settings(BaseSettings):
     def mail_configured(self) -> bool:
         """Whether an email could actually be sent.
 
-        A host and a From address are the minimum. Credentials are not
-        required: a relay on a private network may accept unauthenticated mail,
-        and demanding a username would make that setup impossible to express.
+        A From address, and something to send it with: an HTTP provider key, or
+        an SMTP host. Credentials are not required for SMTP - a relay on a
+        private network may accept unauthenticated mail, and demanding a
+        username would make that setup impossible to express.
         """
-        return bool(self.smtp_host.strip() and self.mail_from_address.strip())
+        if not self.mail_from_address.strip():
+            return False
+        return bool(
+            self.resend_api_key.strip()
+            or self.brevo_api_key.strip()
+            or self.smtp_host.strip()
+        )
 
     @property
     def is_production(self) -> bool:

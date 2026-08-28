@@ -18,6 +18,14 @@ export type Affiliate = {
   has_terms?: boolean;
 };
 
+/** An invitation nobody has opened yet. Not a model, and still ours. */
+type Invited = {
+  id: number;
+  email: string;
+  expires_at: string;
+  expired: boolean;
+};
+
 type View = "table" | "cards";
 
 /** §12.5's breakpoint, in one place so the CSS and the component agree. */
@@ -45,9 +53,9 @@ function useIsNarrow(): boolean {
 
 export const STATUS_LABEL: Record<string, string> = {
   pending: "Waiting to be approved",
-  active: "On the programme",
+  active: "Approved",
   inactive: "Paused",
-  archived: "No longer on the programme",
+  archived: "No longer active",
 };
 
 /**
@@ -84,6 +92,7 @@ export function missingSetup(row: Affiliate): string[] {
  */
 export function Affiliates() {
   const [rows, setRows] = useState<Affiliate[] | null>(null);
+  const [invited, setInvited] = useState<Invited[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<View>("table");
   const [includeArchived, setIncludeArchived] = useState(false);
@@ -95,10 +104,13 @@ export function Affiliates() {
   const reload = useCallback(() => {
     setError(null);
     api
-      .get<{ affiliates: Affiliate[] }>(
+      .get<{ affiliates: Affiliate[]; invited: Invited[] }>(
         `/api/affiliates?include_archived=${includeArchived}`,
       )
-      .then((body) => setRows(body.affiliates))
+      .then((body) => {
+        setRows(body.affiliates);
+        setInvited(body.invited ?? []);
+      })
       .catch((caught) => setError(caught.message));
   }, [includeArchived]);
 
@@ -181,15 +193,62 @@ export function Affiliates() {
         </p>
       )}
 
+      {/*
+       * Two counts that overlap, and the business read them as the same thing:
+       * *I don't understand what is needs attention and what is the difference
+       * between it and waiting to be approved.*
+       *
+       * They are different and only one of them is about a decision. Waiting
+       * to be approved is somebody who has applied. Needs attention is
+       * somebody - approved or not - who is missing a verified code or pay
+       * terms, and therefore earns nothing while looking fine. Saying what
+       * each means costs a clause and removes the question.
+       */}
       {rows && rows.length > 0 && (
         <div className="affiliates__figures">
           <span>
-            <strong>{waiting.length}</strong> waiting to be approved
+            <strong>{waiting.length}</strong> waiting for you to approve
           </span>
           <span className={stuck.length > 0 ? "affiliates__stuck" : undefined}>
-            <strong>{stuck.length}</strong> need attention
+            <strong>{stuck.length}</strong> cannot earn yet — no code confirmed,
+            or no pay terms
           </span>
         </div>
+      )}
+
+      {/*
+       * Invitations nobody has opened. They belong here rather than on the
+       * staff panel - a model is not staff - and they have to be somewhere, or
+       * an invitation sent to the wrong address could never be withdrawn.
+       */}
+      {invited.length > 0 && (
+        <section className="panel affiliates__invited">
+          <div className="panel__head">
+            <h2 className="panel__title">Invited, not opened yet</h2>
+          </div>
+          <ul className="affiliates__invited-list">
+            {invited.map((row) => (
+              <li key={row.id}>
+                <span>{row.email}</span>
+                <span className="affiliates__invited-state">
+                  {row.expired ? "Link expired" : "Waiting for her to open it"}
+                </span>
+                <button
+                  type="button"
+                  className="button"
+                  onClick={() =>
+                    api
+                      .post(`/api/staff/invitations/${row.id}/revoke`)
+                      .then(reload)
+                      .catch((caught) => setError(caught.message))
+                  }
+                >
+                  Withdraw
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       {rows === null && <p className="empty">Loading…</p>}

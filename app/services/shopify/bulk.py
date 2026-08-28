@@ -30,7 +30,7 @@ from app.services.shopify.client import (
     ShopifyNotConfigured,
 )
 from app.services.shopify.normalise import normalise_order, upsert_order_index
-from app.services.shopify.queries import ORDER_FIELDS
+from app.services.shopify.queries import BULK_ORDER_FIELDS
 from app.worker import register_handler
 
 logger = logging.getLogger(__name__)
@@ -68,12 +68,20 @@ query {
 
 
 def _orders_query(since: str) -> str:
+    """The export document.
+
+    `BULK_ORDER_FIELDS`, not `ORDER_FIELDS`: a bulk operation refuses a
+    connection nested inside a list field, which is what `refundLineItems`
+    inside `refunds` is. Shopify rejects the **whole document** for it, so the
+    import failed outright every time it was started - queued, retried five
+    times, and gave up, with the screen reporting only that it had begun.
+    """
     return f"""
     {{
       orders(query: "created_at:>={since}") {{
         edges {{
           node {{
-            {ORDER_FIELDS}
+            {BULK_ORDER_FIELDS}
           }}
         }}
       }}

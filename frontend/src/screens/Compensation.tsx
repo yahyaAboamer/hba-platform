@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { Money } from "../components/Money";
+import { MonthPicker } from "../components/MonthPicker";
 import { api } from "../lib/api";
 import { egpPlain, formatMonth, parseEgp } from "../lib/money";
 import type { Affiliate } from "./Affiliates";
@@ -254,15 +255,29 @@ export function Compensation() {
           </span>
         </label>
 
-        <label className="field comp__field">
-          <span className="field__label">In force from</span>
-          <input
-            className="input code"
-            value={startMonth}
-            onChange={(event) => setStartMonth(event.target.value)}
-            placeholder="2026-09"
-          />
-        </label>
+        {/*
+         * A month, chosen from a calendar. It was a text box accepting any
+         * string, which is how "2026-9" or a typed sentence gets as far as the
+         * server - and the business asked for the picker every other screen
+         * already uses.
+         *
+         * It also needed saying what it means. *In force from* is when this
+         * arrangement starts applying, not when her orders start counting:
+         * orders are counted from the month her code was registered, which may
+         * be long before. Setting it to September does not hide her August
+         * sales; it means August is paid on whatever she was on in August.
+         */}
+        <div className="field comp__field">
+          <span className="field__label">
+            {detail.compensation ? "New rate applies from" : "Applies from"}
+          </span>
+          <MonthPicker value={startMonth} onChange={setStartMonth} />
+          <span className="detail__note">
+            {detail.compensation
+              ? "The months before this keep the arrangement she is on now."
+              : "Her sales are counted from the month her code was registered, whichever month you choose here."}
+          </span>
+        </div>
 
         {/*
          * §12.2 requires this, and it is the reason the page exists rather

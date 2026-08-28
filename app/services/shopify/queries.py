@@ -58,3 +58,25 @@ query OrdersPage($first: Int!, $after: String, $query: String) {{
 
 #: Cheapest possible query. Used to prove the credentials work.
 SHOP_NAME = "query { shop { name myshopifyDomain } }"
+
+
+#: The same fields, minus what a bulk operation refuses.
+#:
+#: Shopify's bulk export rejects the whole document for two reasons at once
+#: here: a **connection inside a list field** is unsupported, and `nodes` may
+#: not be used to select one - it insists on `edges { node }`. `refunds` is a
+#: list and `refundLineItems` is a connection inside it, so no spelling of it
+#: is accepted.
+#:
+#: The import therefore brings back the refund *total* and not its line items,
+#: and `refunded_merchandise_piastres` stays 0 on an imported row until the
+#: ordinary per-order sync fills it in - which it does through `SINGLE_ORDER`,
+#: where the field is allowed.
+#:
+#: **That gap matters and is bounded.** Refunded merchandise reduces a
+#: commission base (§9.3), so an imported month could over-report sales until
+#: the reconcile sweep catches up. It is corrected rather than permanent, and
+#: the alternative was an import that fails outright - which is what it did.
+BULK_ORDER_FIELDS = "\n".join(
+    line for line in ORDER_FIELDS.splitlines() if "refundLineItems" not in line
+)

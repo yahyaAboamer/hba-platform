@@ -598,3 +598,144 @@ def test_the_worker_does_not_leave_a_token_behind(fresh_database, monkeypatch):
         row = session.scalars(select(NotificationOutbox)).one()
         assert "_secret" not in row.payload
     assert "TOKEN-abc" in sent[0].body
+
+
+# -- Sending over HTTPS, because the host blocks SMTP ------------------------
+
+
+def test_smtp_is_only_used_when_nothing_better_is_configured(monkeypatch):
+    """Railway blocks outbound SMTP, and so do most hosts.
+
+    Every notification the platform queued failed with
+    `OSError: [Errno 101] Network is unreachable` connecting to port 587. Not
+    a credential problem and not fixable by changing a password - so an HTTP
+    key has to win, because on such a host SMTP is not a fallback, it is a
+    guaranteed and silent failure.
+    """
+    from app.config import settings
+    from app.services.mail import MailProvider, transport
+
+    monkeypatch.setattr(settings, "resend_api_key", "", raising=False)
+    monkeypatch.setattr(settings, "brevo_api_key", "", raising=False)
+    monkeypatch.setattr(settings, "smtp_host", "smtp.gmail.com", raising=False)
+    assert transport() == MailProvider.SMTP
+
+    monkeypatch.setattr(settings, "brevo_api_key", "a-key", raising=False)
+    assert transport() == MailProvider.BREVO
+
+    monkeypatch.setattr(settings, "resend_api_key", "another", raising=False)
+    assert transport() == MailProvider.RESEND
+
+
+def test_mail_counts_as_configured_with_only_an_http_key(monkeypatch):
+    """`mail_configured` decides whether the screen says an invitation was
+    emailed. It asked for an SMTP host, so a platform sending perfectly well
+    over HTTPS would have reported that email was switched off.
+    """
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "smtp_host", "", raising=False)
+    monkeypatch.setattr(settings, "brevo_api_key", "a-key", raising=False)
+    monkeypatch.setattr(settings, "mail_from_address", "hba@example.com", raising=False)
+
+    assert settings.mail_configured is True
+
+
+def test_a_provider_that_refuses_is_not_retried(monkeypatch):
+    """A 4xx will not become acceptable by being repeated: a rejected sender, a
+    malformed address, a revoked key.
+    """
+    import httpx
+
+    from app.config import settings
+    from app.services import mail
+
+    monkeypatch.setattr(settings, "brevo_api_key", "a-key", raising=False)
+    monkeypatch.setattr(settings, "resend_api_key", "", raising=False)
+    monkeypatch.setattr(settings, "mail_from_address", "hba@example.com", raising=False)
+    monkeypatch.setattr(
+        httpx,
+        "post",
+        lambda *a, **k: httpx.Response(403, text="sender not verified"),
+    )
+
+    with pytest.raises(mail.MailRefused) as refused:
+        mail.send(
+            mail.Message(
+                to_address="nour@example.com", to_name=None, subject="x", body="y"
+            )
+        )
+
+    assert "sender not verified" in str(refused.value)
+
+
+def test_a_provider_that_is_unreachable_is_retried(monkeypatch):
+    """Unlike a refusal. This is the failure that was happening on every send,
+    and it has to stay retryable rather than becoming permanent.
+    """
+    import httpx
+
+    from app.config import settings
+    from app.services import mail
+
+    monkeypatch.setattr(settings, "brevo_api_key", "a-key", raising=False)
+    monkeypatch.setattr(settings, "resend_api_key", "", raising=False)
+    monkeypatch.setattr(settings, "mail_from_address", "hba@example.com", raising=False)
+
+    def unreachable(*a, **k):
+        raise httpx.ConnectError("Network is unreachable")
+
+    monkeypatch.setattr(httpx, "post", unreachable)
+
+    with pytest.raises(RuntimeError) as failed:
+        mail.send(
+            mail.Message(
+                to_address="nour@example.com", to_name=None, subject="x", body="y"
+            )
+        )
+
+    assert not isinstance(failed.value, mail.MailRefused)
+
+
+def test_the_message_reaches_the_provider_intact(monkeypatch):
+    """Including the link, which is the only part of an invitation that
+    matters.
+    """
+    import httpx
+
+    from app.config import settings
+    from app.services import mail
+
+    monkeypatch.setattr(settings, "brevo_api_key", "a-key", raising=False)
+    monkeypatch.setattr(settings, "resend_api_key", "", raising=False)
+    monkeypatch.setattr(settings, "mail_from_address", "hba@example.com", raising=False)
+    monkeypatch.setattr(settings, "mail_from_name", "HBA Aesthetics", raising=False)
+
+    captured = {}
+
+    def capture(url, json=None, headers=None, timeout=None):
+        captured["url"] = url
+        captured["json"] = json
+        captured["headers"] = headers
+        return httpx.Response(201, json={"messageId": "1"})
+
+    monkeypatch.setattr(httpx, "post", capture)
+
+    sent = mail.send(
+        mail.Message(
+            to_address="nour@example.com",
+            to_name="Nour",
+            subject="Your HBA affiliate account",
+            body="Open this link:\nhttps://pay.example.com/accept-invitation?token=abc",
+        )
+    )
+
+    assert sent is True
+    assert "brevo" in captured["url"]
+    assert captured["json"]["sender"] == {
+        "name": "HBA Aesthetics",
+        "email": "hba@example.com",
+    }
+    assert captured["json"]["to"] == [{"email": "nour@example.com"}]
+    assert "accept-invitation?token=abc" in captured["json"]["textContent"]
+    assert captured["headers"]["api-key"] == "a-key"

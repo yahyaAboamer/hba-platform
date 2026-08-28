@@ -841,7 +841,10 @@ def test_a_code_belonging_to_nobody_is_reported(client, monkeypatch):
     items = {i["key"]: i for i in client.get("/api/operations/attention").json()["items"]}
 
     assert "unregistered_codes" in items
-    assert "belongs to nobody" in items["unregistered_codes"]["text"]
+    assert "belongs to no model" in items["unregistered_codes"]["text"]
+    # One line, and short enough to scan. The business read the first version
+    # and said so: *this is too much and as an admin I do not need all of this.*
+    assert len(items["unregistered_codes"]["text"]) < 80
 
 
 def test_a_model_may_not_read_what_needs_attention(client):

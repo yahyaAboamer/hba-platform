@@ -79,7 +79,13 @@ export function AffiliateDetail({ session }: { session: Session }) {
   const [detail, setDetail] = useState<Detail | null>(null);
   const [earnings, setEarnings] = useState<Earnings | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  // A message and whether it is good news. The two used to be separate, and
+  // the news was always rendered green - so "Shopify has never heard of this
+  // code", which is the worst answer the check can give, arrived in the colour
+  // reserved for something having gone right.
+  const [notice, setNotice] = useState<{ text: string; good: boolean } | null>(
+    null,
+  );
   const [working, setWorking] = useState<string | null>(null);
   const [correction, setCorrection] = useState("");
 
@@ -119,11 +125,12 @@ export function AffiliateDetail({ session }: { session: Session }) {
         `/api/affiliates/${id}/recheck-code`,
         correction.trim() ? { code: correction.trim() } : {},
       );
-      setNotice(
-        result.verified
+      setNotice({
+        good: result.verified,
+        text: result.verified
           ? `Shopify knows ${result.code}. She can be approved.`
-          : `Shopify has never heard of ${result.code}. Check it against the shop — a code that does not exist there earns nothing, silently.`,
-      );
+          : `Shopify has never heard of ${result.code}. Check it against the shop.`,
+      });
       load();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not check it.");
@@ -138,7 +145,7 @@ export function AffiliateDetail({ session }: { session: Session }) {
     setNotice(null);
     try {
       await api.patch(`/api/affiliates/${id}`, { status: "active" });
-      setNotice("She is on the programme. Her sales are being counted.");
+      setNotice({ good: true, text: "Approved. Her sales are being counted." });
       load();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not approve her.");
@@ -184,12 +191,19 @@ export function AffiliateDetail({ session }: { session: Session }) {
        * active model with no confirmed code earns nothing, silently, until
        * somebody notices the sales are missing (§10.4).
        */}
+      {/*
+       * Only where the panel below is not already saying it. On a pending
+       * affiliate the *Before she can earn* list carries the same fact with
+       * the button to fix it attached, and saying it twice - once at length -
+       * was the first thing the business objected to on this page.
+       */}
       {detail.status !== "archived" &&
+        detail.status !== "pending" &&
         !detail.codes.some((entry) => entry.verified) && (
           <p className="notice notice--refused detail__warning">
             {detail.codes.length === 0
-              ? `No discount code is registered for ${formatMonth(detail.current_month)}. Orders placed with one will belong to nobody until there is.`
-              : "Shopify has not confirmed this code exists. Orders that carry it are still attributed — the risk is that it was mistyped or never created there, in which case no order ever will, and nothing looks wrong until somebody asks why the sales are missing."}
+              ? `No discount code registered. Orders using one will belong to nobody.`
+              : "Shopify has not confirmed this code exists."}
           </p>
         )}
 
@@ -200,7 +214,15 @@ export function AffiliateDetail({ session }: { session: Session }) {
       )}
 
       {notice && (
-        <p className="notice notice--settled detail__warning">{notice}</p>
+        <p
+          className={
+            notice.good
+              ? "notice notice--settled detail__warning"
+              : "notice notice--refused detail__warning"
+          }
+        >
+          {notice.text}
+        </p>
       )}
 
       {/*
@@ -226,7 +248,7 @@ export function AffiliateDetail({ session }: { session: Session }) {
                 <span className="detail__note">
                   {verified
                     ? `Shopify knows ${detail.codes[0]?.code}.`
-                    : "Required before she can be approved (§10.4). A code the shop has never heard of earns nothing, and nothing errors — she simply never gets paid."}
+                    : "A code the shop has never heard of earns nothing, silently."}
                 </span>
               </div>
               {!verified && (
@@ -256,7 +278,7 @@ export function AffiliateDetail({ session }: { session: Session }) {
                 <span className="detail__note">
                   {detail.compensation
                     ? "Her arrangement is recorded."
-                    : "Without this her month cannot be calculated at all — her sales are counted and her payroll stays blocked."}
+                    : "Her payroll stays blocked until this is set."}
                 </span>
               </div>
               <Link className="button" to={`/affiliates/${detail.id}/compensation`}>
@@ -269,8 +291,8 @@ export function AffiliateDetail({ session }: { session: Session }) {
                 <strong>Set her targets</strong>
                 <span className="detail__note">
                   {detail.compensation?.compensation_type === "base_guarantee"
-                    ? "Her guarantee only applies in a month where these are met and confirmed, so this one decides money."
-                    : "Worth recording, and decides nothing — targets only change pay on a guaranteed minimum."}
+                    ? "Her guarantee applies only in a month where these are met and confirmed."
+                    : "Recorded only. Targets change pay on a guaranteed minimum."}
                 </span>
               </div>
               <Link className="button" to="/targets">
@@ -294,7 +316,7 @@ export function AffiliateDetail({ session }: { session: Session }) {
               {working === "approve"
                 ? "Approving…"
                 : verified
-                  ? `Put ${detail.name} on the programme`
+                  ? `Approve ${detail.name}`
                   : "Check her code first"}
             </button>
           </div>
@@ -302,6 +324,16 @@ export function AffiliateDetail({ session }: { session: Session }) {
       )}
 
       <div className="detail__grid">
+        {/*
+         * Not before she is approved. A pending affiliate has no terms, so
+         * this panel could only ever show zero owed and "no pay terms for this
+         * month" - an answer to a question nobody is asking yet, on a page
+         * whose whole job at that point is the list of things still to do.
+         *
+         * The business put it plainly: *what creates the model is setting her
+         * up, not her registering.*
+         */}
+        {detail.status !== "pending" && (
         <section className="panel">
           <div className="panel__head">
             <h2 className="panel__title">How the month is going</h2>
@@ -364,6 +396,8 @@ export function AffiliateDetail({ session }: { session: Session }) {
             )}
           </dl>
         </section>
+
+        )}
 
         <section className="panel">
           <div className="panel__head">
@@ -494,8 +528,8 @@ export function AffiliateDetail({ session }: { session: Session }) {
                */}
               <p className="detail__masked">
                 {detail.payout_destination.method === "instapay"
-                  ? "Shortened on purpose. Paying opens InstaPay with her address filled in, and shows her number beside it for when the app does not open."
-                  : "Shortened on purpose. The full number is shown on the payment screen, when you are about to send the money."}
+                  ? "Shortened on purpose. Pay her from Payments, which opens InstaPay with her address filled in."
+                  : "Shortened on purpose. Pay her from Payments, where the full number is shown."}
               </p>
             </dl>
           )}

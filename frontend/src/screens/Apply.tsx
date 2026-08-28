@@ -125,7 +125,7 @@ export function Apply({ onApplied }: { onApplied: () => void }) {
     <main className="apply">
       <div className="apply__brand">
         <span className="apply__mark">HBA</span>
-        <h1 className="apply__title">Join the programme</h1>
+        <h1 className="apply__title">Your details</h1>
       </div>
 
       <p className="apply__lead">

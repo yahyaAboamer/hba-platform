@@ -503,58 +503,46 @@ def attention(
 ) -> dict:
     """Everything a maintainer should not have to go looking for.
 
-    §16 lists these as in-platform notifications, and until now the data
-    existed while the screens did not: `/sync`, `/failed-jobs`,
-    `/unregistered-codes` and `/notifications` were all built and all sat
-    behind a Settings tab somebody had to think to open.
+    §16's in-platform notifications, on the screen somebody lands on.
 
-    **The point is not the data, it is not having to look.** These belong where
-    somebody lands, and quiet when there is nothing to say.
+    **One line each.** The first version explained itself at length - three
+    sentences per item, on a panel meant to be scanned in two seconds - and the
+    business's verdict on reading it was *"this is too much and as an admin I
+    don't need all of this. Just one liners."*
 
-    One endpoint rather than five calls from the browser, so the judgement
-    about *what deserves attention* lives in one place on the server and cannot
-    drift between screens that ask the same questions differently.
+    That is the right instinct and it costs nothing, because the explanation
+    was never the useful part. What a maintainer needs from this panel is
+    **what is wrong, how many, and where to go.** `where` carries the last one,
+    so the panel points rather than lectures.
+
+    Months are written out. `2026-07` on a screen is a string somebody has to
+    decode; *July 2026* is a month.
     """
     from app.models.notifications import NotificationOutbox, NotificationState
     from app.services.payroll import months_left_reopened, working_month
 
     items: list[dict] = []
 
+    def add(key: str, severity: str, text: str, where: str) -> None:
+        items.append(
+            {"key": key, "severity": severity, "text": text, "where": where}
+        )
+
     # -- The one that stops everything ---------------------------------------
     if not settings.go_live_month:
-        items.append(
-            {
-                "key": "go_live_month_unset",
-                "severity": BLOCKING,
-                "text": "No go-live month is set, so no month can be approved.",
-                "detail": (
-                    "Set GO_LIVE_MONTH to the first month the platform is "
-                    "responsible for paying. It is blank on purpose - a "
-                    "default would quietly make months already settled "
-                    "elsewhere look approvable."
-                ),
-                "where": "/settings",
-            }
+        add(
+            "go_live_month_unset",
+            BLOCKING,
+            "No go-live month is set, so nothing can be approved.",
+            "/settings",
         )
 
     # -- Mail ----------------------------------------------------------------
     #
-    # The most likely thing to be silently wrong on a fresh deployment, and the
-    # least likely to be noticed: nothing errors, models simply never hear.
+    # The most likely thing to be silently wrong, and the least likely to be
+    # noticed: nothing errors, people simply never hear.
     if not settings.mail_configured:
-        items.append(
-            {
-                "key": "mail_not_configured",
-                "severity": ATTENTION,
-                "text": "No email is being sent.",
-                "detail": (
-                    "Applications, approved months and payments are all being "
-                    "recorded and none of them is reaching anybody. Set the "
-                    "mail credentials to turn it on."
-                ),
-                "where": "/settings",
-            }
-        )
+        add("mail_not_configured", ATTENTION, "No email is being sent.", "/settings")
 
     failed_mail = db.scalar(
         select(func.count())
@@ -562,19 +550,11 @@ def attention(
         .where(NotificationOutbox.state == NotificationState.FAILED)
     )
     if failed_mail:
-        items.append(
-            {
-                "key": "notifications_failed",
-                "severity": ATTENTION,
-                "text": f"{failed_mail} email{'' if failed_mail == 1 else 's'} could not be delivered.",
-                "detail": (
-                    "Somebody was told nothing. A failed notification is "
-                    "invisible from every other screen - the month is "
-                    "approved, the payment is recorded, and one model simply "
-                    "never heard."
-                ),
-                "where": "/settings",
-            }
+        add(
+            "notifications_failed",
+            ATTENTION,
+            f"{failed_mail} email{_s(failed_mail)} did not arrive.",
+            "/settings",
         )
 
     # -- Work that did not happen --------------------------------------------
@@ -582,21 +562,16 @@ def attention(
         text("SELECT count(*) FROM background_job WHERE status = 'failed'")
     ).scalar()
     if failed_jobs:
-        items.append(
-            {
-                "key": "failed_jobs",
-                "severity": ATTENTION,
-                "text": f"{failed_jobs} background job{'' if failed_jobs == 1 else 's'} failed.",
-                "detail": "They will not retry on their own.",
-                "where": "/settings",
-            }
+        # "Background job" meant nothing to the person reading it. Named by
+        # what it is *for* instead: the work that keeps order data current.
+        add(
+            "failed_jobs",
+            ATTENTION,
+            f"{failed_jobs} piece{_s(failed_jobs)} of order syncing failed.",
+            "/settings",
         )
 
     # -- Orders nobody owns --------------------------------------------------
-    #
-    # §9.2 and §10.2. A live code registered to nobody means real sales going
-    # nowhere, and the model whose code it is will notice long before anyone
-    # here does.
     unowned = db.execute(
         text(
             """
@@ -612,23 +587,14 @@ def attention(
         )
     ).scalar()
     if unowned:
-        items.append(
-            {
-                "key": "unregistered_codes",
-                "severity": ATTENTION,
-                "text": f"{unowned} discount code{'' if unowned == 1 else 's'} used on orders belongs to nobody.",
-                "detail": (
-                    "Those sales are attributed to no model. Register the code "
-                    "from the month its orders start, or the gap stays."
-                ),
-                "where": "/settings",
-            }
+        add(
+            "unregistered_codes",
+            ATTENTION,
+            f"{unowned} discount code{_s(unowned)} on orders belong{'s' if unowned == 1 else ''} to no model.",
+            "/settings",
         )
 
     # -- Orders two models both claim ----------------------------------------
-    #
-    # §9.2 and §11.3. Nobody owns it until a person decides, and it blocks
-    # every affected month from being approved.
     held = db.execute(
         text(
             """
@@ -645,48 +611,29 @@ def attention(
         )
     ).scalar()
     if held:
-        items.append(
-            {
-                "key": "orders_held",
-                "severity": BLOCKING,
-                "text": f"{held} order{'' if held == 1 else 's'} carr{'ies' if held == 1 else 'y'} more than one model's code.",
-                "detail": (
-                    "Nobody owns them until somebody decides, and every month "
-                    "they fall in is blocked until then."
-                ),
-                "where": "/orders",
-            }
+        add(
+            "orders_held",
+            BLOCKING,
+            f"{held} order{_s(held)} carry two models' codes and need a decision.",
+            "/orders",
         )
 
     # -- Reopened and forgotten ----------------------------------------------
     #
-    # §11.5, and the dangerous state is not reopening - it is forgetting. A
-    # month sitting in draft with payments already made against a superseded
-    # snapshot is a balance nobody is watching.
+    # §11.5, and the dangerous state is not reopening - it is forgetting.
     stuck = months_left_reopened(db)
     if stuck:
         months = sorted({row.month for row in stuck})
-        items.append(
-            {
-                "key": "months_left_reopened",
-                "severity": BLOCKING,
-                "text": (
-                    f"{len(stuck)} month{'' if len(stuck) == 1 else 's'} "
-                    "reopened and never agreed again."
-                ),
-                "detail": (
-                    "Payments were made against the old figure and there is no "
-                    "current one to settle against: "
-                    + ", ".join(months)
-                ),
-                "where": "/payroll",
-            }
+        add(
+            "months_left_reopened",
+            BLOCKING,
+            f"{_month_words(months[0])} was reopened and never agreed again."
+            if len(months) == 1
+            else f"{len(months)} months were reopened and never agreed again.",
+            "/payroll",
         )
 
     # -- The reminder --------------------------------------------------------
-    #
-    # §16, on the 5th. Not an alarm - a month that is ready and unapproved on
-    # the 6th is the ordinary way somebody forgets.
     today = utcnow()
     if today.day >= PAYROLL_REMINDER_DAY:
         previous = _previous_month(working_month())
@@ -701,20 +648,35 @@ def attention(
             {"month": previous},
         ).scalar()
         if unapproved:
-            items.append(
-                {
-                    "key": "payroll_due",
-                    "severity": ATTENTION,
-                    "text": f"{unapproved} model{'' if unapproved == 1 else 's'} still unapproved for {previous}.",
-                    "detail": "Payroll usually runs on the 5th.",
-                    "where": "/payroll",
-                }
+            add(
+                "payroll_due",
+                ATTENTION,
+                f"{unapproved} model{_s(unapproved)} still unapproved for "
+                f"{_month_words(previous)}.",
+                "/payroll",
             )
 
     return {
         "items": items,
         "blocking": sum(1 for item in items if item["severity"] == BLOCKING),
     }
+
+
+def _s(count: int) -> str:
+    return "" if count == 1 else "s"
+
+
+def _month_words(month: str) -> str:
+    """`2026-07` -> `July 2026`. A month, not a string to decode."""
+    names = (
+        "January February March April May June July August September October "
+        "November December"
+    ).split()
+    year, _, index = month.partition("-")
+    try:
+        return f"{names[int(index) - 1]} {year}"
+    except (ValueError, IndexError):
+        return month
 
 
 def _previous_month(month: str) -> str:

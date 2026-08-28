@@ -33,10 +33,23 @@ def list_staff(db: Session) -> list[dict]:
 
     "Has ever held one" rather than "holds one now": a suspended account still
     needs to be visible, or reactivating it would have nowhere to happen from.
+
+    **Models are not staff and are not listed.** Accepting an invitation gives
+    an affiliate a role assignment like anybody else, so they used to appear
+    here - with an account status of *active* beside an approval status that
+    was still *waiting to be approved*, which reads as the platform
+    contradicting itself. They belong on Affiliates, which is where their
+    status means what it says.
     """
     from app.api.deps import active_role  # avoids a module-level import cycle
 
-    account_ids = list(db.scalars(select(RoleAssignment.user_account_id).distinct()))
+    account_ids = list(
+        db.scalars(
+            select(RoleAssignment.user_account_id)
+            .where(RoleAssignment.role != "affiliate")
+            .distinct()
+        )
+    )
     if not account_ids:
         return []
 
@@ -59,20 +72,23 @@ def list_staff(db: Session) -> list[dict]:
     ]
 
 
-def list_pending_invitations(db: Session) -> list[Invitation]:
+def list_pending_invitations(
+    db: Session, *, exclude_roles: tuple[str, ...] = ()
+) -> list[Invitation]:
     """Invitations sent and not yet used, oldest first.
 
     An expired one is included rather than hidden - nobody accepted it before
     it lapsed, which is exactly the kind of thing worth noticing and
     re-sending, not a fact to bury.
+
+    `exclude_roles` keeps model invitations off the staff panel. They are not
+    hidden: they appear on Affiliates, beside the models they will become, so
+    every invitation is still withdrawable from the screen it belongs to.
     """
-    return list(
-        db.scalars(
-            select(Invitation)
-            .where(Invitation.accepted_at.is_(None))
-            .order_by(Invitation.created_at)
-        )
-    )
+    query = select(Invitation).where(Invitation.accepted_at.is_(None))
+    if exclude_roles:
+        query = query.where(Invitation.role.notin_(exclude_roles))
+    return list(db.scalars(query.order_by(Invitation.created_at)))
 
 
 def _admin_count(db: Session, *, excluding: int | None = None) -> int:
