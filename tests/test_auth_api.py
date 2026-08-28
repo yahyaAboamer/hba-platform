@@ -212,17 +212,72 @@ def test_me_reports_no_go_live_month_when_none_is_set(client, monkeypatch):
 
 
 def test_an_unsafe_request_without_csrf_is_rejected(client):
-    """A cross-site form post must not be able to act on a live cookie."""
+    """A cross-site form post must not be able to act on a live cookie.
+
+    Tested against inviting somebody, which is a write that matters. It used to
+    be tested against logout, which is now deliberately exempt - and a control
+    demonstrated only on the one route that does not enforce it is a control
+    nobody has actually checked.
+    """
     _bootstrap(client)
-    assert client.post("/api/auth/logout").status_code == 401
+    client.headers.pop("X-CSRF-Token", None)
+
+    refused = client.post(
+        "/api/auth/invitations", json={"email": "nour@example.com", "role": "affiliate"}
+    )
+
+    assert refused.status_code == 401
 
 
 def test_an_unsafe_request_with_a_wrong_csrf_is_rejected(client):
     _bootstrap(client)
-    response = client.post(
-        "/api/auth/logout", headers={"X-CSRF-Token": "not-the-right-token"}
+
+    refused = client.post(
+        "/api/auth/invitations",
+        json={"email": "nour@example.com", "role": "affiliate"},
+        headers={"X-CSRF-Token": "not-the-right-token"},
     )
-    assert response.status_code == 401
+
+    assert refused.status_code == 401
+
+
+def test_logout_is_exempt_from_csrf_on_purpose(client):
+    """Pinned, so the exemption stays a decision rather than becoming a drift.
+
+    What the check buys on a logout is preventing somebody being signed out of
+    their own session: it reads nothing, changes nothing, moves no money. What
+    enforcing it cost was somebody who **could not sign out**, twice, once
+    leaving a live administrator session on a machine after the person had
+    asked to leave it.
+
+    If this test ever fails because the exemption was removed, the thing to
+    re-read is that trade, not this assertion.
+    """
+    created = _bootstrap(client)
+    assert created["csrf"]
+    client.headers.pop("X-CSRF-Token", None)
+
+    out = client.post("/api/auth/logout")
+
+    assert out.status_code == 200
+    assert client.get("/api/auth/me").status_code == 401
+
+
+def test_logout_still_needs_a_real_session(client):
+    """Exempt from the token, not from having a session at all.
+
+    Idempotent by design - signing out of something already gone is the
+    outcome asked for, not an error - so this checks it cannot be used to
+    learn anything, rather than that it refuses.
+    """
+    _bootstrap(client)
+    client.cookies.set("hba_session", "a-completely-made-up-token")
+    client.headers.pop("X-CSRF-Token", None)
+
+    out = client.post("/api/auth/logout")
+
+    assert out.status_code == 200
+    assert out.json() == {"success": True}
 
 
 def test_a_forged_session_cookie_is_rejected(client):

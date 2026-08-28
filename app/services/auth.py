@@ -82,6 +82,41 @@ def resolve_session(
     return user
 
 
+def ensure_csrf(db: Session, token: str, presented: str | None) -> str | None:
+    """Give a live session a usable CSRF token if it has not got one.
+
+    Returns a fresh value the caller must put in the cookie, or ``None`` when
+    the token the browser already holds is correct and nothing needs to change.
+
+    **This is what makes "if you can read, you can write" true.** Issuing the
+    token only at sign-in leaves two states where it is false, and the platform
+    met both in production:
+
+    - a session created before the token was ever issued as a cookie, which no
+      amount of reloading can fix
+    - a browser that lost the cookie while keeping the session
+
+    In both, reads succeed, the interface shows somebody signed in, and every
+    write is refused as unauthenticated - which is true and reads as nonsense.
+
+    **Rotation only when it is needed**, never on every request. Two tabs share
+    one cookie jar, so once a token is right the second tab changes nothing;
+    rotating unconditionally would have each page load invalidate the other
+    tab's token and reintroduce the same failure by a different route.
+    """
+    if not token:
+        return None
+    row = db.scalar(select(AuthSession).where(AuthSession.token_hash == _hash(token)))
+    if row is None or row.revoked_at is not None or row.expires_at <= utcnow():
+        return None
+    if presented and hmac.compare_digest(row.csrf_hash, _hash(presented)):
+        return None
+
+    issued = secrets.token_urlsafe(TOKEN_BYTES)
+    row.csrf_hash = _hash(issued)
+    return issued
+
+
 def revoke_session(db: Session, token: str) -> bool:
     """Revoke one session. Returns whether this call changed anything."""
     if not token:

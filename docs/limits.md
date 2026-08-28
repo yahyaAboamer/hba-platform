@@ -1913,6 +1913,58 @@ could find that.
 
 ---
 
+## A fix that only worked for people who had not signed in yet
+
+**Symptom.** Reported twice, and the second time after it had supposedly been
+fixed: inviting a model said *Authentication required*, and signing out
+redirected to the home page instead of signing out.
+
+**Cause of the original bug.** The session cookie is persistent — twelve hours.
+The CSRF token lived in `sessionStorage`, which the browser empties when the
+tab closes. A returning tab therefore held a live session and no token: every
+read worked, the interface showed a signed-in administrator, and every write
+was refused as unauthenticated.
+
+**Cause of the fix failing.** The fix issued the token as a cookie — at
+sign-in. Only at sign-in. A session that already existed when the fix deployed
+never received one, and no amount of reloading could produce it, because
+nothing but `POST /login` ever set it.
+
+Which is to say: **the fix restored the invariant only for sessions created
+after it, and the person reporting the bug had one created before it.** They
+were told to reload. Reloading could not possibly have worked, and nobody had
+checked that it would.
+
+**Fixed properly** by making the invariant hold for every session rather than
+for new ones: `GET /api/auth/me` now repairs a session that has no usable
+token. The page loads it before anything else, so it is the one place
+guaranteed to run before a write is attempted. It rotates only when the token
+is missing or wrong, so a second tab does not invalidate the first.
+
+**And logout was made exempt from the check.** What CSRF protection buys on a
+logout is preventing somebody being signed out of their own session — it reads
+nothing, changes nothing, moves no money. What enforcing it cost was somebody
+who *could not sign out*, twice, once leaving a live administrator session on a
+machine after the person had asked to leave it. That is the worse of the two,
+and the exemption is pinned by a test so it stays a decision.
+
+**Worth recording for the method, which is the real failure here.** Two fixes
+went out for one bug and neither was verified against the thing that was
+broken. What was missing was not care — it was a test that knows only what a
+browser knows.
+
+`tests/test_browser_journey.py` is that test now. Its client holds a cookie jar
+and nothing else, and derives the CSRF header from the jar exactly as
+`api.ts` derives it from `document.cookie`. **The rule for that file is: never
+read a token out of a response body.** Every other API test in this project
+does, and that single shortcut is what let a platform where no write worked at
+all pass fourteen hundred tests.
+
+It also covers the state nobody thinks to write a test for: **a session created
+before today's deploy.**
+
+---
+
 ## Business rules with deliberate exposure
 
 These are not bugs. They are accepted costs, recorded so nobody "fixes" them.
