@@ -5,6 +5,9 @@ import { ApiError, acceptInvitation } from "../lib/api";
 import type { Session } from "../lib/api";
 import "./SignIn.css";
 
+/** §5.1. Enforced by the server; said here so nobody meets it as a rejection. */
+const MINIMUM_PASSWORD = 12;
+
 /**
  * Turning an invitation into an account.
  *
@@ -24,6 +27,8 @@ export function AcceptInvitation({
 
   const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
+  // §5.1, and stated here so the rule arrives before the refusal does.
+  const tooShort = password.length > 0 && password.length < MINIMUM_PASSWORD;
   const [error, setError] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
 
@@ -42,10 +47,15 @@ export function AcceptInvitation({
       // just finished signing up.
       navigate("/", { replace: true });
     } catch (caught) {
+      // A 422 is the server's shape check, and its body is a validation
+      // structure rather than a sentence. Shown raw it read "422" to somebody
+      // whose only mistake was a short password.
       setError(
-        caught instanceof ApiError
-          ? caught.message
-          : "Could not reach the platform. Check the connection and try again.",
+        caught instanceof ApiError && caught.status === 422
+          ? `Check the form — a password needs at least ${MINIMUM_PASSWORD} characters.`
+          : caught instanceof ApiError
+            ? caught.message
+            : "Could not reach the platform. Check the connection and try again.",
       );
     } finally {
       setWorking(false);
@@ -77,6 +87,16 @@ export function AcceptInvitation({
           <h1 className="sign-in__title">Set up your account</h1>
         </div>
 
+        {/*
+         * It reads as the whole sign-up and is the first of two steps. Somebody
+         * arriving here from an email has no idea more is coming, and said so:
+         * *as a model I would think this is just a page where I create my user.*
+         */}
+        <p className="sign-in__lead">
+          First a password, so only you can get in. Next you will fill in your
+          details, your discount code, and where you want to be paid.
+        </p>
+
         <label className="field">
           <span className="field__label">Your name</span>
           <input
@@ -96,8 +116,19 @@ export function AcceptInvitation({
             required
             value={password}
             onChange={(event) => setPassword(event.target.value)}
+            aria-invalid={tooShort}
           />
+          <span className="field__hint">
+            At least {MINIMUM_PASSWORD} characters.
+          </span>
         </label>
+
+        {tooShort && (
+          <p className="blocker sign-in__error">
+            That is {MINIMUM_PASSWORD - password.length} character
+            {MINIMUM_PASSWORD - password.length === 1 ? "" : "s"} short.
+          </p>
+        )}
 
         {error && (
           <p className="notice notice--refused sign-in__error" role="alert">
@@ -108,9 +139,9 @@ export function AcceptInvitation({
         <button
           type="submit"
           className="button button--primary sign-in__submit"
-          disabled={working}
+          disabled={working || tooShort || password.length === 0}
         >
-          {working ? "Setting up…" : "Get started"}
+          {working ? "Setting up…" : "Continue"}
         </button>
       </form>
     </main>

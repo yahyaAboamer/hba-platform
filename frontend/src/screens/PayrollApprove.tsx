@@ -179,13 +179,9 @@ export function PayrollApprove() {
               {willApprove.length === 1
                 ? `One model’s ${formatMonth(month)} is agreed at the figure below.`
                 : `${willApprove.length} models’ ${formatMonth(month)} is agreed at the figures below.`}{" "}
-              From that moment the amount is fixed: later orders and later
-              corrections do not change it, they land in the next month instead.
-            </p>
-            <p className="approve__lead">
-              This can be undone by reopening the month, which keeps a record of
-              both versions. It is not a quiet edit, which is why it is here on
-              its own page and not a button on a row.
+              From that moment the amount is fixed — later orders land in the
+              next month instead. Reopening the month undoes it and keeps both
+              versions.
             </p>
             <div className="approve__total">
               <Money piastres={total} tone="owed" className="payroll__total" />

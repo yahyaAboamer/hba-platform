@@ -2028,6 +2028,77 @@ screen that wants to sign somebody out has nothing to get wrong.
 
 ---
 
+## Every email failed because the host blocks SMTP
+
+**Symptom.** Not one notification ever arrived - invitations, applications,
+approvals, payments, destination changes. Nothing in the inbox, nothing in
+spam, over days and two rounds of "fixes" aimed at credentials.
+
+**Cause**, from the deployed logs and unambiguous once looked at:
+
+    notification 4 (invitation.sent) gave up after 5 attempts:
+      OSError: [Errno 101] Network is unreachable
+
+**Railway blocks outbound SMTP.** So do most hosts, on ports 25, 465 and 587,
+to stop their address space being used for spam. No password, app password or
+Gmail setting could ever have fixed it, and the recommendation to use Gmail
+SMTP was wrong for this host from the first minute.
+
+**Fixed** by sending over HTTPS through a provider API - port 443, which is not
+blocked. `send()` still takes a `Message` and still raises `MailRefused` for a
+failure that will not fix itself, so nothing above it changed.
+
+**Worth recording** for what it says about diagnosis. Three rounds were spent
+on the *symptom the screen showed* rather than on the logs, which had named the
+cause exactly, in one line, from the first attempt. **The platform was telling
+us and nobody read it.** Checking `railway logs` is now the first step for
+anything that fails on the deployed platform, not the last.
+
+---
+
+## The import failed silently every time it was started
+
+**Symptom.** Pressing *Import from Shopify* said "queued, it takes minutes, the
+order count below will climb". The count never climbed.
+
+**Cause.** Shopify rejected the whole document:
+
+    Queries that contain a connection field within a list field are not
+    currently supported. Invalid connection fields: 'refundLineItems'.
+
+`refunds` is a list and `refundLineItems` is a connection inside it, which a
+bulk operation refuses outright. The job retried five times and gave up, and
+the only screen that could have shown that was the one nobody had built yet.
+
+**Fixed** with a bulk-specific field set that omits it. The refund *total* still
+comes back; the line-item breakdown does not, so `refunded_merchandise_piastres`
+stays 0 on an imported row until the ordinary per-order sync fills it in.
+
+**That gap is real and bounded**: refunded merchandise reduces a commission base
+(§9.3), so an imported month can over-report sales until the reconcile sweep
+catches up. The alternative was an import that does not run.
+
+---
+
+## `display: block` on a `<td>`
+
+**Symptom.** Payroll's row rules ran level across the first four columns and
+then stepped down under *Carried forward* and *Waiting on*. Screenshotted by
+the business as "the lines break".
+
+**Cause.** `.payroll__carried` is the class on a `<td>`, and it was given
+`display: block`. A cell told to be a block leaves the table layout: it stops
+sharing the row's height, and its bottom border is drawn wherever the block
+happens to end.
+
+**Fixed** by leaving the cell a cell and stacking only the lines inside it.
+
+**Worth recording** as a rule rather than an incident: **a layout property on a
+`td` is almost always a mistake.** The thing that wants to stack is the content,
+and it needs a wrapper.
+
+---
+
 ## Business rules with deliberate exposure
 
 These are not bugs. They are accepted costs, recorded so nobody "fixes" them.

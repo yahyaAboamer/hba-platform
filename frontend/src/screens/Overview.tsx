@@ -242,7 +242,7 @@ export function Overview({ session }: { session: Session }) {
             </div>
             {blocked.length === 0 ? (
               <p className="empty">
-                Nothing. Every model on the programme is ready to approve.
+                Nothing. Every model is ready to approve.
               </p>
             ) : (
               <table className="table">

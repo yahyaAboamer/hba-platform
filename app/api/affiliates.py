@@ -255,12 +255,27 @@ def list_affiliates_route(
     code earns nothing and says nothing about it, and finding that by opening
     twenty profiles one at a time is how it stays unnoticed for a month.
     """
+    from app.services.staff import list_pending_invitations
+
     affiliates = list_affiliates(db, include_archived=include_archived)
     setup = readiness(db, working_month())
     return {
         "affiliates": [
             {**_affiliate_payload(a), **setup.get(a.id, {})} for a in affiliates
-        ]
+        ],
+        # Invitations that have not been opened yet. They belong here rather
+        # than on the staff panel: a model is not staff, and an invitation
+        # nobody has accepted is still somebody this screen is responsible for.
+        "invited": [
+            {
+                "id": invitation.id,
+                "email": invitation.email,
+                "expires_at": invitation.expires_at.isoformat(),
+                "expired": invitation.expires_at <= utcnow(),
+            }
+            for invitation in list_pending_invitations(db)
+            if invitation.role == "affiliate"
+        ],
     }
 
 

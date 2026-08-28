@@ -42,6 +42,8 @@ from dataclasses import dataclass
 from email.headerregistry import Address
 from email.message import EmailMessage
 
+import httpx
+
 from app.config import settings
 
 
@@ -100,6 +102,106 @@ def build(message: Message) -> EmailMessage:
     return mail
 
 
+# -- Sending over HTTPS ------------------------------------------------------
+#
+# **Railway blocks outbound SMTP.** Every notification the platform queued
+# failed with `OSError: [Errno 101] Network is unreachable` on the connect to
+# `smtp.gmail.com:587` - not a credential problem, not a Gmail problem, and
+# nothing that could be fixed by changing the password. Most hosts block ports
+# 25, 465 and 587 to stop their address space being used for spam, and Railway
+# is one of them.
+#
+# So mail goes out over port 443 instead, through a provider's HTTP API. The
+# rest of the platform is unchanged: `send` still takes a `Message` and still
+# raises `MailRefused` for a failure that will not fix itself.
+#
+# Two providers, because the right one depends on something outside this code:
+#
+# - **Resend** needs a domain you control. Best deliverability by a distance,
+#   because the mail is genuinely signed by that domain.
+# - **Brevo** will verify a single address, a Gmail one included. Worse
+#   deliverability - a third party sending as `@gmail.com` cannot align DMARC,
+#   because only Google can publish records for `gmail.com` - and the only
+#   option when there is no domain to use.
+#
+# Whichever has an API key set is the one that is used. SMTP stays for local
+# development and for any host that permits it.
+
+
+class MailProvider:
+    SMTP = "smtp"
+    RESEND = "resend"
+    BREVO = "brevo"
+
+
+def transport() -> str:
+    """Which way mail will go, decided by what is configured.
+
+    An HTTP key wins over SMTP. On a host that blocks the ports, SMTP is not a
+    fallback - it is a guaranteed failure, and a silent one.
+    """
+    if settings.resend_api_key.strip():
+        return MailProvider.RESEND
+    if settings.brevo_api_key.strip():
+        return MailProvider.BREVO
+    return MailProvider.SMTP
+
+
+def _from_pair() -> tuple[str, str]:
+    return settings.mail_from_name.strip() or "HBA", settings.mail_from_address.strip()
+
+
+def _send_over_http(message: Message) -> bool:
+    """Hand the message to a provider's API.
+
+    A 4xx means the request will not become acceptable by being repeated - a
+    rejected sender, a malformed address, a revoked key - so it is permanent. A
+    5xx or a network error is not, and is left to the caller's retry.
+    """
+    provider = transport()
+    name, address = _from_pair()
+
+    if provider == MailProvider.RESEND:
+        url = "https://api.resend.com/emails"
+        headers = {"Authorization": f"Bearer {settings.resend_api_key.strip()}"}
+        payload = {
+            "from": f"{name} <{address}>",
+            "to": [message.to_address],
+            "subject": message.subject,
+            "text": message.body,
+        }
+    else:
+        url = "https://api.brevo.com/v3/smtp/email"
+        headers = {"api-key": settings.brevo_api_key.strip()}
+        payload = {
+            "sender": {"name": name, "email": address},
+            "to": [{"email": message.to_address}],
+            "subject": message.subject,
+            "textContent": message.body,
+        }
+
+    try:
+        response = httpx.post(
+            url,
+            json=payload,
+            headers=headers,
+            timeout=settings.smtp_timeout_seconds,
+        )
+    except httpx.HTTPError as exc:
+        # Unreachable, timed out, DNS. Worth trying again.
+        raise RuntimeError(f"Could not reach {provider}: {exc}") from exc
+
+    if 400 <= response.status_code < 500:
+        raise MailRefused(
+            f"{provider} refused the message ({response.status_code}): "
+            f"{response.text[:300]}"
+        )
+    if response.status_code >= 500:
+        raise RuntimeError(f"{provider} returned {response.status_code}")
+
+    return True
+
+
 def send(message: Message) -> bool:
     """Send it. Returns whether anything was actually sent.
 
@@ -116,6 +218,9 @@ def send(message: Message) -> bool:
         # An affiliate with no email on file. Permanent by definition: no
         # number of retries will invent an address.
         raise MailRefused("There is no email address to send to")
+
+    if transport() != MailProvider.SMTP:
+        return _send_over_http(message)
 
     try:
         with smtplib.SMTP(

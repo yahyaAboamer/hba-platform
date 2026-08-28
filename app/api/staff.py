@@ -85,7 +85,7 @@ def roster(
                 "expires_at": _isoformat(invitation.expires_at),
                 "expired": invitation.expires_at <= now,
             }
-            for invitation in list_pending_invitations(db)
+            for invitation in list_pending_invitations(db, exclude_roles=("affiliate",))
         ],
         "assignable_roles": sorted(ASSIGNABLE_ROLES),
     }

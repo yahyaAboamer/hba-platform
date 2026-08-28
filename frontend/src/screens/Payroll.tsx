@@ -306,7 +306,7 @@ export function Payroll({ session }: { session: Session }) {
       )}
 
       {data && rows.length === 0 && (
-        <p className="empty">Nobody on the programme this month.</p>
+        <p className="empty">No models this month.</p>
       )}
 
       {data && rows.length > 0 && (
