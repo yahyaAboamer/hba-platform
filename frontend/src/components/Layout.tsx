@@ -1,6 +1,6 @@
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Outlet } from "react-router-dom";
 
-import { signOut } from "../lib/api";
+import { signOutAndLeave } from "../lib/api";
 import type { Session } from "../lib/api";
 import "./Layout.css";
 
@@ -23,12 +23,6 @@ const SECTIONS = [
 ];
 
 export function Layout({ session }: { session: Session }) {
-  const navigate = useNavigate();
-
-  async function leave() {
-    await signOut();
-    navigate("/sign-in", { replace: true });
-  }
 
   return (
     <div className="layout">
@@ -58,7 +52,7 @@ export function Layout({ session }: { session: Session }) {
           <span className="layout__email" title={session.actor.email}>
             {session.actor.display_name || session.actor.email}
           </span>
-          <button type="button" className="layout__sign-out" onClick={leave}>
+          <button type="button" className="layout__sign-out" onClick={signOutAndLeave}>
             Sign out
           </button>
         </div>

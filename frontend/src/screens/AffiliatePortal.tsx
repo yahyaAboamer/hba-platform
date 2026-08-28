@@ -3,7 +3,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 
 import { AffiliateLayout } from "../components/AffiliateLayout";
 import type { PortalContext } from "../components/AffiliateLayout";
-import { api, signOut } from "../lib/api";
+import { api, signOutAndLeave } from "../lib/api";
 import type { Session } from "../lib/api";
 import { Apply } from "./Apply";
 import { MyDetails } from "./MyDetails";
@@ -72,7 +72,7 @@ export function AffiliatePortal({ session }: { session: Session }) {
       <button
         type="button"
         className="affiliate__sign-out"
-        onClick={() => signOut().then(() => window.location.assign("/sign-in"))}
+        onClick={signOutAndLeave}
       >
         Sign out
       </button>

@@ -129,7 +129,9 @@ def _email_for(db: Session, affiliate) -> tuple[str | None, str]:
     return (account.email if account else None), affiliate.name
 
 
-def invitation_sent(db: Session, email: str, token: str, role: str) -> None:
+def invitation_sent(
+    db: Session, email: str, token: str, role: str
+) -> NotificationOutbox | None:
     """Email somebody their invitation link. §13.
 
     The flow the business asked for: type an address, press send, and the link
@@ -142,7 +144,11 @@ def invitation_sent(db: Session, email: str, token: str, role: str) -> None:
     the email leaves** - see `_forget_secrets`. The row keeps its record of what
     was sent; it stops being a way in.
     """
-    queue(
+    # **Returned, not discarded.** The caller reports to the screen whether the
+    # link was emailed, and an earlier version returned nothing at all - so
+    # every invitation said "email is not switched on" and told the maintainer
+    # to send the link by hand, while the platform quietly emailed it anyway.
+    return queue(
         db,
         event=Event.INVITATION_SENT,
         recipient_email=email,

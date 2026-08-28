@@ -286,6 +286,35 @@ export async function acceptInvitation(
  * response when it answers, and by the browser when they expire when it does
  * not.
  */
+/**
+ * Sign out, and land on the sign-in screen with nothing left over.
+ *
+ * **A full document load, deliberately.** Signing out with a client-side
+ * navigation left the session in React state: the route guard saw somebody
+ * signed in, sent them to the Overview, and the Overview asked the server a
+ * question it now answered with 401. The screen read "Authentication
+ * required" under a full sidebar, with the person's name still in the corner,
+ * and only a refresh got them to the sign-in page.
+ *
+ * The server had done its part correctly. The application simply never told
+ * itself.
+ *
+ * Reloading makes that impossible rather than unlikely: every piece of state
+ * is re-derived from the server, so there is nothing left to be stale. It
+ * costs a page load on the one action where nobody minds waiting, and it
+ * removes a whole class of "the screen and the session disagree" bugs instead
+ * of fixing one instance of it.
+ *
+ * It also has to be the *only* way out, which is why the navigation lives here
+ * rather than at each call site. Two screens each doing their own version is
+ * how one of them forgets.
+ */
+export async function signOutAndLeave(): Promise<void> {
+  await signOut();
+  // `replace`, so Back does not return to a page that no longer has a session.
+  window.location.replace("/sign-in");
+}
+
 export async function signOut(): Promise<void> {
   try {
     await api.post("/api/auth/logout");

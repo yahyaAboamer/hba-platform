@@ -25,6 +25,7 @@ import io
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 from PIL import Image
 
 from app.main import app
@@ -194,6 +195,74 @@ def test_a_write_with_a_wrong_token_is_still_refused(browser):
     )
 
     assert refused.status_code == 401
+
+
+def test_the_screen_is_told_the_link_was_emailed(browser, monkeypatch):
+    """It said "email is not switched on" on a platform where it was.
+
+    `invitation_sent` returned nothing at all, so the caller's
+    `is not None` check was false every time. The maintainer was told to send
+    the link by hand while the platform quietly emailed it anyway - which is
+    the worst of both: an instruction to do redundant work, and no reason to
+    trust anything the screen says about delivery.
+    """
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "smtp_host", "smtp.gmail.com", raising=False)
+    monkeypatch.setattr(
+        settings, "mail_from_address", "hba@example.com", raising=False
+    )
+    _sign_up(browser)
+
+    invited = browser.post(
+        "/api/auth/invitations",
+        json={"email": "nour@example.com", "role": "affiliate"},
+    )
+
+    assert invited.status_code == 201, invited.text
+    assert invited.json()["emailed"] is True
+
+
+def test_the_screen_is_told_when_it_was_not(browser, monkeypatch):
+    """The other half, and the reason the flag exists.
+
+    With no credentials the platform records what it would have sent and sends
+    nothing. Saying so is what tells the maintainer the copyable link is the
+    only way in - which on a development machine it always is.
+    """
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "smtp_host", "", raising=False)
+    _sign_up(browser)
+
+    invited = browser.post(
+        "/api/auth/invitations",
+        json={"email": "nour@example.com", "role": "affiliate"},
+    )
+
+    assert invited.json()["emailed"] is False
+    # The link still comes back. It is the only way in when nothing is sent.
+    assert invited.json()["token"]
+
+
+def test_an_invitation_always_queues_a_notification(browser):
+    """Whether or not it can be delivered. The outbox is the record of what was
+    owed, and a platform with no credentials still owes it.
+    """
+    from app.db import SessionLocal
+    from app.models.notifications import NotificationOutbox
+
+    _sign_up(browser)
+    browser.post(
+        "/api/auth/invitations",
+        json={"email": "nour@example.com", "role": "affiliate"},
+    )
+
+    with SessionLocal() as session:
+        rows = list(session.scalars(select(NotificationOutbox)))
+
+    assert [row.event for row in rows] == ["invitation.sent"]
+    assert rows[0].recipient_email == "nour@example.com"
 
 
 # -- The whole journey, as two people --------------------------------------
