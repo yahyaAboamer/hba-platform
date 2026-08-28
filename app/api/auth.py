@@ -323,7 +323,7 @@ def invite(
     # §13, and the reason `create_invitation` keeps only the hash: the raw
     # token is a credential. It is erased from the outbox the moment the email
     # goes out - see `_forget_secrets`.
-    emailed = invitation_sent(db, invitation.email, token, body.role) is not None
+    queued = invitation_sent(db, invitation.email, token, body.role)
 
     record_audit(
         db,
@@ -342,11 +342,13 @@ def invite(
             "expires_at": invitation.expires_at.isoformat(),
         },
         "token": token,
-        # Whether the platform will actually send it. The screen shows the
-        # copyable link either way - a link that was emailed is still worth
-        # having on screen when somebody says it never arrived - but it should
-        # not claim to have sent an email it only queued into a void.
-        "emailed": emailed and settings.mail_configured,
+        # Whether the platform will actually send it: a notification was
+        # queued, and there are credentials to send it with. The screen shows
+        # the copyable link either way - a link that was emailed is still worth
+        # having when somebody says it never arrived - but it must not claim to
+        # have sent an email it only queued into a void, nor deny sending one
+        # it did send.
+        "emailed": queued is not None and settings.mail_configured,
     }
 
 

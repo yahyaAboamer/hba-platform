@@ -1965,6 +1965,69 @@ before today's deploy.**
 
 ---
 
+## The screen said email was off on a platform where it was on
+
+**Symptom.** Inviting a model returned *"Email is not switched on, so send her
+this link yourself"* on staging, where `SMTP_HOST`, `SMTP_USERNAME`,
+`MAIL_FROM_ADDRESS` and a valid app password were all set and mail was working.
+
+**Cause.** One missing `return`:
+
+    def invitation_sent(db, email, token, role) -> None:
+        queue(db, event=Event.INVITATION_SENT, ...)
+
+The caller decided what to tell the screen with
+`invitation_sent(...) is not None`, and the function returned `None` every
+time. So every invitation reported that nothing had been sent, **while the
+platform sent it anyway.**
+
+The worst kind of wrong: an instruction to do redundant work, and no reason
+left to trust anything the screen says about delivery.
+
+**Fixed** by returning the queued row, and by computing the flag from what is
+actually true - a notification was queued, and there are credentials to send it
+with.
+
+**Worth recording** because the type annotation was `-> None` and honest about
+it. The mistake was at the call site, which asked a question the function had
+never claimed to answer. **A boolean derived from a function's return value is
+a contract; `is not None` on something typed `-> None` is a bug the type
+checker will not catch and the reader will not see.**
+
+---
+
+## Signing out worked, and the screen did not notice
+
+**Symptom.** Pressing *Sign out* returned to the Overview showing
+"Authentication required" in red, under a full sidebar, with the person's name
+still in the corner. A refresh then showed the sign-in page.
+
+**Cause.** The server did its part correctly: the session was revoked and both
+cookies cleared. The application never told itself. `signOut()` was followed by
+a client-side `navigate("/sign-in")`, React still held the session in state,
+the route guard therefore redirected a "signed-in" person away from the
+sign-in page to the Overview, and the Overview asked the server a question it
+now answered with 401.
+
+**Fixed** by making sign-out a **full document load**. Everything is
+re-derived from the server, so there is nothing left to be stale.
+
+That is a deliberate trade: a page load on the one action where nobody minds
+waiting, in exchange for removing a whole class of *the screen and the session
+disagree* bug rather than fixing one instance of it.
+
+It is also now the **only** way out - `signOutAndLeave` lives in `api.ts` and
+both screens call it. Two screens each doing their own version is how one of
+them forgets, and one of them had.
+
+**Not covered by a test**, and that is stated rather than hidden: this project
+has no component-testing setup, and adding jsdom and a testing library in the
+middle of a go-live was the wrong trade. The structural fix is what makes the
+absence acceptable - there is one path, it cannot skip a step, and a future
+screen that wants to sign somebody out has nothing to get wrong.
+
+---
+
 ## Business rules with deliberate exposure
 
 These are not bugs. They are accepted costs, recorded so nobody "fixes" them.
