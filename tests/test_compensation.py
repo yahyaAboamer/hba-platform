@@ -33,6 +33,17 @@ def _affiliate(db, name="Nour"):
     return create_affiliate(db, user_account_id=account.id, name=name)
 
 
+def _approved_month(db, affiliate, month):
+    """A month already agreed and paid, which nothing may retroactively change."""
+    from app.models.payroll import CalculationState, PayrollMonth
+
+    row = PayrollMonth(affiliate_id=affiliate.id, month=month)
+    row.calculation_state = CalculationState.APPROVED
+    db.add(row)
+    db.flush()
+    return row
+
+
 def _commission(db, affiliate, start_month="2026-03", end_month=None, rate_bp=1000):
     return set_terms(
         db,
@@ -128,14 +139,30 @@ def test_adjacent_terms_are_allowed(db):
     assert count == 2
 
 
-def test_two_open_ended_periods_are_refused(db):
+def test_the_database_still_refuses_two_open_ended_periods(db):
+    """The backstop, tested where it still applies.
+
+    `set_terms` no longer reaches this constraint - it ends the arrangement in
+    force first, which is what a rate change means. The constraint is what
+    stops anything *else* from writing overlapping terms, so it is exercised
+    here by inserting straight into the table.
+    """
     nour = _affiliate(db)
     _commission(db, nour, "2026-03")
     db.flush()
 
+    db.add(
+        CompensationPeriod(
+            affiliate_id=nour.id,
+            start_month="2026-09",
+            end_month=None,
+            compensation_type=CompensationType.COMMISSION,
+            commission_rate_bp=1000,
+        )
+    )
     with pytest.raises(IntegrityError):
-        _commission(db, nour, "2026-09")
         db.flush()
+    db.rollback()
 
 
 def test_different_affiliates_may_hold_the_same_months(db):
@@ -680,3 +707,136 @@ def test_closing_is_recorded(db):
 
     actions = [row[0] for row in db.execute(text("SELECT action FROM audit_event"))]
     assert "compensation.closed" in actions
+
+
+# --- Changing a rate ---------------------------------------------------
+#
+# The screen has always said "Saving this ends that arrangement and starts a
+# new one". Until now it did not: the second arrangement was refused for
+# overlapping the first, and every rate change after the very first one failed
+# with a 409 nobody could act on.
+
+
+def test_a_later_arrangement_ends_the_one_in_force(db):
+    affiliate = _affiliate(db)
+    first = set_terms(
+        db,
+        affiliate,
+        start_month="2026-01",
+        compensation_type="commission",
+        commission_rate_bp=800,
+    )
+    assert first.end_month is None, "the first arrangement is open-ended"
+
+    second = set_terms(
+        db,
+        affiliate,
+        start_month="2026-09",
+        compensation_type="commission",
+        commission_rate_bp=1200,
+    )
+
+    assert first.end_month == "2026-08", "the old arrangement must end the month before"
+    assert second.start_month == "2026-09"
+    assert second.end_month is None, "the new arrangement is now the one in force"
+
+
+def test_the_months_already_paid_keep_their_old_rate(db):
+    """The point of ending rather than editing."""
+    affiliate = _affiliate(db)
+    set_terms(
+        db,
+        affiliate,
+        start_month="2026-01",
+        compensation_type="commission",
+        commission_rate_bp=800,
+    )
+    set_terms(
+        db,
+        affiliate,
+        start_month="2026-09",
+        compensation_type="commission",
+        commission_rate_bp=1200,
+    )
+
+    assert terms_for(db, affiliate, "2026-05").commission_rate_bp == 800
+    assert terms_for(db, affiliate, "2026-08").commission_rate_bp == 800
+    assert terms_for(db, affiliate, "2026-09").commission_rate_bp == 1200
+
+
+def test_backfilling_earlier_history_does_not_end_the_current_arrangement(db):
+    """Terms that stop before the open one starts do not overlap it."""
+    affiliate = _affiliate(db)
+    current = set_terms(
+        db,
+        affiliate,
+        start_month="2026-01",
+        compensation_type="commission",
+        commission_rate_bp=800,
+    )
+    set_terms(
+        db,
+        affiliate,
+        start_month="2025-03",
+        end_month="2025-12",
+        compensation_type="commission",
+        commission_rate_bp=600,
+    )
+
+    assert current.end_month is None, "backfilling history must not end today's terms"
+    assert terms_for(db, affiliate, "2025-06").commission_rate_bp == 600
+    assert terms_for(db, affiliate, "2026-06").commission_rate_bp == 800
+
+
+def test_starting_new_terms_in_the_same_month_is_refused_readably(db):
+    """Two arrangements cannot both start in September.
+
+    The maintainer meant one of two things and the platform must not guess:
+    correct what is there, or start the replacement later.
+    """
+    affiliate = _affiliate(db)
+    set_terms(
+        db,
+        affiliate,
+        start_month="2026-09",
+        compensation_type="commission",
+        commission_rate_bp=800,
+    )
+
+    with pytest.raises(ValueError) as refused:
+        set_terms(
+            db,
+            affiliate,
+            start_month="2026-09",
+            compensation_type="commission",
+            commission_rate_bp=1200,
+        )
+
+    assert "already starts in 2026-09" in str(refused.value)
+
+
+def test_a_rate_change_cannot_disturb_an_approved_month(db):
+    """`assert_correctable` still guards the close, because it runs inside it."""
+    affiliate = _affiliate(db)
+    terms = set_terms(
+        db,
+        affiliate,
+        start_month="2026-01",
+        compensation_type="commission",
+        commission_rate_bp=800,
+    )
+    _approved_month(db, affiliate, "2026-09")
+
+    # Starting in September would end the old terms in August and leave the
+    # approved month resolving to a rate it was never calculated at.
+    with pytest.raises(ValueError) as refused:
+        set_terms(
+            db,
+            affiliate,
+            start_month="2026-09",
+            compensation_type="commission",
+            commission_rate_bp=1200,
+        )
+
+    assert "2026-09" in str(refused.value)
+    assert terms.end_month is None, "nothing may be left half-changed"

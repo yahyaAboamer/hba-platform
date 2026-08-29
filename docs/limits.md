@@ -2258,6 +2258,63 @@ same discipline that caught a guard replaced by `if False` in Phase 8.
 
 ---
 
+## The screen promised to end an arrangement and could not
+
+**Symptom.** Changing what anybody is paid failed. The Compensation screen said,
+in as many words:
+
+> {name} is currently on commission only at 10%, from March. **Saving this ends
+> that arrangement and starts a new one** — the months already on the old rate
+> keep it.
+
+Pressing the button returned `409 These months overlap pay terms already on
+record for this affiliate`. Every rate change after the very first one, for
+every model, since Phase 3.
+
+**Cause.** Two separate holes that hid each other.
+
+1. `POST /compensation` never ended anything. It created a period and left the
+   database to refuse the overlap - which it did, correctly. The screen's
+   sentence was aspirational.
+2. `PATCH .../compensation/{period_id}` *could* end one, and was written for
+   exactly this. But `_compensation_payload` never returned the period's `id`,
+   so no screen could ever address it. The capability existed and was
+   unreachable in a way no route audit would catch, because the route was
+   present and permissioned - only its identifier was missing.
+
+The reachability list recorded this as *"nothing can end one"*, which was wrong
+in an instructive way: the thing that could end one had been built, and the
+note had gone stale without anybody noticing.
+
+**Fixed** by making a rate change one call. `set_terms` now ends the
+arrangement in force, inside the same transaction, and `_compensation_payload`
+returns `id`.
+
+**One call rather than two, deliberately.** The browser could have done this as
+`PATCH` then `POST`, needing no server change. It was rejected because the
+failure is asymmetric: if the close succeeds and the open fails, the model is
+left with **no terms at all** from that month, their payroll blocks, and
+nothing anywhere says why. The destructive half is the one that survives. In
+one transaction it is both or neither, and the worst case is that the old rate
+stands.
+
+**Only an open-ended arrangement is superseded.** One already carrying an end
+month was a deliberate choice about when it stops; shortening that silently is
+a different act. Terms that end before the open one begins do not overlap it,
+so backfilling earlier history still leaves today's arrangement alone.
+
+**Worth recording** as two rules:
+
+- **A promise in interface copy is a specification.** This one was written
+  before the behaviour existed, was never true, and read as documentation for
+  five phases. If a sentence on screen describes what the platform does, a test
+  should fail when it stops being true.
+- **An endpoint is not reachable until its identifier is.** Route audits ask
+  whether a path is called. They cannot ask whether the caller could ever know
+  which row to name.
+
+---
+
 ## Business rules with deliberate exposure
 
 These are not bugs. They are accepted costs, recorded so nobody "fixes" them.

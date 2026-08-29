@@ -65,11 +65,6 @@ UNREACHED_ON_PURPOSE = {
 #: fails both when something new becomes unreachable *and* when something here
 #: is finally built and should be struck off.
 NOT_BUILT_YET = {
-    # Cannot change what a model is paid. Setting terms the first time works;
-    # changing a rate needs the open period ended first, and nothing can end
-    # one - the database refuses the overlap, correctly, and there is no way
-    # out of it from a screen.
-    ("PATCH", "/api/affiliates/{affiliate_id}/compensation/{period_id}"),
     # Cannot give a code to an affiliate who has none, or add a second. The
     # application flow registers theirs; `recheck-code` only re-checks an
     # unverified one that already exists.
