@@ -2315,6 +2315,35 @@ so backfilling earlier history still leaves today's arrangement alone.
 
 ---
 
+## `railway variables --kv` prints secrets, not just their names
+
+**Symptom.** None visible on screen - which is exactly the problem. Checking
+whether `BREVO_API_KEY` and `SMTP_PASSWORD` were set on production, intending
+to confirm only that the *names* existed, actually printed both values in full
+into the session transcript.
+
+**Cause.** `railway variables --kv` (and the bare `railway variables --json`
+form used elsewhere without incident) render every variable's real value, not
+a redacted placeholder. There is no flag that lists names only. Any command
+built to answer "is X configured?" has to stop short of the value on its own -
+the tool will not stop for you.
+
+**Fixed** by treating this as a standing rule rather than a one-off mistake:
+never run a variables-listing command without first deciding how the output
+will be filtered to names only, and never widen a query "just to check" once
+credentials are in scope.
+
+**Recorded rather than reversed**, because a transcript cannot be unprinted.
+The right response is to rotate both credentials on the assumption that
+anything that reached a transcript is compromised - the same standard this
+project already holds InstaPay addresses and passwords to - not to hope the
+exposure was contained. Whether that rotation has actually happened is the
+maintainer's to know, not this file's to assume. If you are reading this
+because it happened again: rotate first, log second, and say so plainly - the
+failure is worth less than pretending it did not happen.
+
+---
+
 ## Business rules with deliberate exposure
 
 These are not bugs. They are accepted costs, recorded so nobody "fixes" them.
