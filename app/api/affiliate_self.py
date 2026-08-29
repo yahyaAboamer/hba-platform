@@ -27,7 +27,13 @@ from app.services.payouts import (
     mask_destination,
     set_destination,
 )
-from app.services.portal import months_for, my_month, my_orders, my_payments
+from app.services.portal import (
+    months_for,
+    my_month,
+    my_orders,
+    my_payments,
+    my_year,
+)
 from app.services.proof import readable_by
 
 router = APIRouter(prefix="/api/me")
@@ -263,3 +269,17 @@ def my_payment_proof(
         raise HTTPException(404, "No proof for that payment")
 
     return Response(content=stored.content, media_type=stored.content_type)
+
+
+@router.get("/year")
+def my_year_view(
+    affiliate: AffiliateProfile = Depends(current_affiliate),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Every month she has, for the charts.
+
+    Nothing here is new arithmetic - each month is the same figure the Earnings
+    screen shows, gathered. A second way of working out what she earned would
+    be a second answer waiting to disagree with the first.
+    """
+    return my_year(db, affiliate)

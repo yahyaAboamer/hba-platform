@@ -54,8 +54,11 @@ export function MyMonth() {
       <section className="figure">
         {body.state === "historical" ? (
           <>
-            <p className="figure__state">Before the platform</p>
-            <p className="figure__note">{body.note}</p>
+            <p className="figure__state">
+              <span className="figure__pip figure__pip--agreed" />
+              Paid the old way
+            </p>
+            <p className="figure__note figure__note--lead">{body.note}</p>
           </>
         ) : body.not_started ? (
           /*
@@ -65,7 +68,10 @@ export function MyMonth() {
            * platform is broken or she has earned nothing.
            */
           <>
-            <p className="figure__state">Not started yet</p>
+            <p className="figure__state">
+              <span className="figure__pip" />
+              Not started yet
+            </p>
             <p className="figure__note figure__note--lead">
               {formatMonth(body.month)} has not begun. Once it does, everything
               your code sells will appear here as it happens — you do not need
@@ -75,6 +81,11 @@ export function MyMonth() {
         ) : (
           <>
             <p className="figure__state">
+              <span
+                className={
+                  settled ? "figure__pip figure__pip--agreed" : "figure__pip"
+                }
+              />
               {settled ? "Agreed — this is yours" : "Still adding up"}
             </p>
             <Money
@@ -162,7 +173,12 @@ export function MyMonth() {
       {body.targets && (
         <section className="panel targets">
           <div className="panel__head">
-            <h2 className="panel__title">What you were asked for</h2>
+            <h2 className="panel__title">Targets</h2>
+            {targetChip(body.targets) && (
+              <span className={targetChip(body.targets)!.className}>
+                {targetChip(body.targets)!.text}
+              </span>
+            )}
           </div>
           <dl className="targets__list">
             <TargetRow
@@ -176,10 +192,23 @@ export function MyMonth() {
               actual={body.targets.actual_stories}
             />
           </dl>
-          <p className="targets__note">{describeTargets(body.targets)}</p>
+          {/*
+           * Only where it decides money. A commission or salary model already
+           * knows targets do not change her pay, and being told so every month
+           * is noise - the business said exactly that. On a guaranteed minimum
+           * it is the sentence the whole card exists for.
+           */}
+          {body.targets.determines_pay && (
+            <p className="targets__note">{describeTargets(body.targets)}</p>
+          )}
         </section>
       )}
 
+      {/*
+       * Shown on a historical month too. The orders are real and the counting
+       * is real - only the payment happened elsewhere - so it behaves like any
+       * other month rather than like a month that did not happen.
+       */}
       {!body.not_started && (
       <section className="panel sales">
         <div className="panel__head">
@@ -214,16 +243,24 @@ export function MyMonth() {
                     : `${body.orders.pending} orders not delivered yet`}
                 </span>
                 {/*
-                 * §11.4, before the carry has happened. Without this she is
-                 * looking at a settled figure and a second, larger figure with
-                 * no stated relationship to it - which reads either as money
-                 * she has lost or as money she is about to be paid twice.
+                 * §11.4, before the carry has happened - and behind an ⓘ
+                 * rather than on the page. The business's own reasoning, and
+                 * a better rule than mine: *an information button makes it
+                 * like, okay, there is something I need to know about.* She
+                 * will not ask every month, and when she does the answer is
+                 * one press away.
                  */}
-                <span className="sales__fate">
-                  {settled
-                    ? "This month is closed, so these will be paid with a later month — still at this month's rate."
-                    : "If they arrive before HBA closes the month they count here. If not, they are paid with the next one — still at this month's rate."}
-                </span>
+                <details className="expl sales__fate">
+                  <summary aria-label="What happens to these orders">
+                    <span className="info" aria-hidden="true">i</span>
+                  </summary>
+                  <div className="expl__body">
+                    An order counts once it reaches the customer.{" "}
+                    {settled
+                      ? "This month is closed, so these will be paid with a later month — still at this month's rate. Nothing is lost."
+                      : "If they arrive before HBA closes the month they count here. If not, they are paid with the next one — still at this month's rate."}
+                  </div>
+                </details>
               </dd>
             </div>
           )}
@@ -251,6 +288,30 @@ export function MyMonth() {
       ))}
     </>
   );
+}
+
+/**
+ * The card's own state, at a glance.
+ *
+ * One chip at most, and only where the numbers above it do not already say it.
+ * A model who met her targets sees so from the figures; what she cannot see is
+ * whether anybody has confirmed them.
+ */
+function targetChip(targets: {
+  achieved: boolean | null;
+  verified: boolean;
+  determines_pay: boolean;
+}): { text: string; className: string } | null {
+  if (targets.achieved === null) {
+    return { text: "Not recorded yet", className: "chip chip--quiet" };
+  }
+  if (!targets.achieved) {
+    return { text: "Short this month", className: "chip chip--quiet" };
+  }
+  if (targets.determines_pay && !targets.verified) {
+    return { text: "Waiting to be confirmed", className: "chip" };
+  }
+  return { text: "Met", className: "chip chip--ok" };
 }
 
 /**

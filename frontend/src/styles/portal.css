@@ -1,0 +1,249 @@
+/*
+ * The affiliate portal's own surface.
+ *
+ * `tokens.css` says it in writing: *"Cool near-neutrals: the warmth belongs to
+ * the affiliate portal, not to a tool for reconciling twenty payments at month
+ * end."* The maintainer's half was built. The portal's warm half never was — it
+ * inherited the payroll tool's palette, and the business's verdict on opening
+ * it was exactly that: *"pure white background with black text, so I don't know
+ * which is which."*
+ *
+ * **Scoped to `.affiliate`, deliberately.** Everything here lives under the
+ * portal's root element, so no maintainer screen can be reached by it. Those
+ * screens are a dense month-end tool and the cool neutrals were always right
+ * for them.
+ *
+ * ## What does not change
+ *
+ * ADR 0027 is intact. The typeface still says whether a figure is an
+ * obligation — mono for agreed, prose for a working number — and colour is
+ * still spent on money state and nothing else. The palette is warmer; the
+ * rules it expresses are identical.
+ */
+
+.affiliate {
+  /* Surfaces. Paper rather than screen-white: this is a statement of account,
+     read in daylight, on a phone. */
+  --paper: #fbf8f4;
+  --surface: #ffffff;
+  --ink: #1a1714;
+  --quiet: #6b635b;
+  --rule: #eae3da;
+  --rule-strong: #d8cec1;
+  --hover: #f5f1eb;
+
+  /* Money state, unchanged in meaning and warmed to sit on this paper. Each
+     is checked against the surface behind it rather than carried over. */
+  --owed: #a65b14;
+  --settled: #0f6b45;
+  --refused: #a83224;
+  --owed-quiet: #fbf1e6;
+  --settled-quiet: #edf6f1;
+  --refused-quiet: #fbefec;
+
+  --radius: 14px;
+
+  background: var(--paper);
+  color: var(--ink);
+  min-height: 100vh;
+}
+
+/* The serif carries headings and the one big figure. It is the only thing on
+   the page that is allowed to be expressive, which is why it is confined to
+   those two jobs. */
+.affiliate {
+  --display: "Fraunces", Georgia, "Times New Roman", serif;
+}
+
+/* ── The figure ───────────────────────────────────────────────────────────
+ *
+ * The page is one number and a set of explanations of it. Nothing else comes
+ * near this size.
+ */
+.affiliate .figure {
+  padding: var(--space-4) 0 var(--space-6);
+}
+
+.affiliate .figure__state {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--quiet);
+}
+
+/* A dot rather than a word. It carries the same distinction the typeface
+   does — settled or still moving — without repeating it in prose. */
+.affiliate .figure__pip {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--rule-strong);
+}
+
+.affiliate .figure__pip--agreed {
+  background: var(--settled);
+}
+
+.affiliate .figure__amount {
+  display: block;
+  font-size: 2.75rem;
+  line-height: 1;
+  letter-spacing: -0.045em;
+}
+
+.affiliate .figure__note {
+  max-width: 34ch;
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  color: var(--quiet);
+}
+
+/* The month that has not started. No figure at all — a zero is a statement
+   about what she earned, and this is a statement about the calendar. */
+.affiliate .figure__note--lead {
+  max-width: 32ch;
+  font-size: var(--text-base);
+  color: var(--ink);
+}
+
+/* ── Cards ───────────────────────────────────────────────────────────────── */
+
+.affiliate .panel {
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--surface);
+  margin-bottom: var(--space-4);
+  overflow: hidden;
+}
+
+.affiliate .panel__head {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--rule);
+}
+
+.affiliate .panel__title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+/* ── The information button ──────────────────────────────────────────────
+ *
+ * The business's idea, and a better one than a paragraph: *"an information
+ * button makes it like, okay, there's something I need to know about."*
+ *
+ * Curiosity is cheaper than obligation. Everything that was a permanent
+ * explanation is now something she can open once and never again.
+ */
+.affiliate .expl {
+  display: inline;
+}
+
+.affiliate .expl > summary {
+  display: inline-flex;
+  align-items: center;
+  list-style: none;
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+.affiliate .expl > summary::-webkit-details-marker {
+  display: none;
+}
+
+.affiliate .info {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  margin-left: var(--space-1);
+  border: 1px solid var(--rule-strong);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--quiet);
+  font-family: var(--display);
+  font-size: 0.66rem;
+  line-height: 1;
+}
+
+.affiliate .expl[open] .info,
+.affiliate .expl > summary:hover .info {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.affiliate .expl > summary:focus-visible .info {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.affiliate .expl__body {
+  margin-top: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  background: var(--paper);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  color: var(--quiet);
+}
+
+/* ── A chip ──────────────────────────────────────────────────────────────
+ *
+ * One per card at most, and only where the card's state is not obvious from
+ * the figures in it.
+ */
+.affiliate .chip {
+  display: inline-block;
+  padding: 3px var(--space-2);
+  border-radius: 999px;
+  background: var(--owed-quiet);
+  color: var(--owed);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
+.affiliate .chip--ok {
+  background: var(--settled-quiet);
+  color: var(--settled);
+}
+
+.affiliate .chip--quiet {
+  background: var(--hover);
+  color: var(--quiet);
+}
+
+/* ── The head and the month bar ─────────────────────────────────────────── */
+
+.affiliate .affiliate__mark {
+  font-family: var(--display);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.affiliate .months__current {
+  font-family: var(--mono);
+  font-size: var(--text-base);
+  font-weight: 500;
+}
+
+.affiliate .months__step {
+  border-radius: 10px;
+}
+
+/* ── Struck-through money ────────────────────────────────────────────────
+ *
+ * An order that did not arrive. The business asked whether to show the amount
+ * at all: yes, because hiding it invites the worse guess. Struck through and
+ * faded, it can never be mistaken for money coming.
+ */
+.affiliate .money--void {
+  text-decoration: line-through;
+  opacity: 0.55;
+}

@@ -57,15 +57,26 @@ export function MyOrders() {
         <li key={order.order_number} className="orders__row">
           <div className="orders__head">
             <span className="code orders__number">{order.order_number}</span>
+            {/*
+             * An order that did not arrive keeps its figure, struck through.
+             *
+             * The business asked whether to show it at all. Showing it is the
+             * safer answer: hiding a cancelled order's amount invites the
+             * worse guess - that the platform lost it - where a struck-through
+             * E£1,200 lets her check it against her own record and move on. It
+             * can never be mistaken for money coming.
+             */}
             <Money
               piastres={order.base_piastres}
               kind={order.state === "earned" ? "agreed" : "provisional"}
+              className={order.state === "void" ? "money--void" : undefined}
             />
           </div>
           <div className="orders__foot">
             <span className="orders__date">{onlyTheDate(order.placed_at)}</span>
             <span className={`state state--${order.state}`}>
               {order.state_text}
+              {order.state === "void" && " · not counted"}
             </span>
           </div>
           {/*
@@ -73,10 +84,25 @@ export function MyOrders() {
            * would bury the one or two that matter, and these are the rows that
            * decide whether her own arithmetic closes.
            */}
+          {/*
+           * §11.4, and the one row that will be asked about - so it keeps its
+           * explanation rather than moving behind an ⓘ. Labelling every row
+           * would bury the one or two that matter.
+           */}
           {order.paid_in_month && (
             <p className="orders__carried">
-              Arrived after this month closed, so it was paid with{" "}
-              {formatMonth(order.paid_in_month)} — at this month&rsquo;s rate.
+              Paid with {formatMonth(order.paid_in_month)}, at this
+              month&rsquo;s rate
+              <details className="expl">
+                <summary aria-label="Why this was paid later">
+                  <span className="info" aria-hidden="true">i</span>
+                </summary>
+                <div className="expl__body">
+                  It had not reached the customer when this month closed, so it
+                  was paid with the next one — still at the rate you were on
+                  when you sold it, not the later month&rsquo;s.
+                </div>
+              </details>
             </p>
           )}
         </li>

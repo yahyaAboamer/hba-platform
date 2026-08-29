@@ -206,3 +206,13 @@
   font-size: var(--text-base);
   color: var(--ink);
 }
+
+/* Five tabs on a 375px phone. The label shrinks a step rather than wrapping —
+   a tab bar that wraps to two lines is a tab bar that has stopped being one. */
+@media (max-width: 400px) {
+  .tabs__tab {
+    padding-left: 0;
+    padding-right: 0;
+    font-size: var(--text-xs);
+  }
+}

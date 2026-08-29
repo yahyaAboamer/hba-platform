@@ -673,9 +673,7 @@ def test_every_order_state_is_shown_in_her_words(admin):
 # -- ADR 0014: a month from before the platform --------------------------------
 
 
-def test_a_month_before_go_live_shows_sales_and_says_why_there_is_no_figure(
-    admin, monkeypatch
-):
+def test_a_month_before_go_live_behaves_like_any_other_month(admin, monkeypatch):
     """An empty commission on a month full of sales reads as *HBA did not pay
     me for March*, which is the opposite of true.
     """
@@ -690,7 +688,10 @@ def test_a_month_before_go_live_shows_sales_and_says_why_there_is_no_figure(
     assert body["state"] == "historical"
     assert body["amount_piastres"] is None
     assert body["sales"]["earned_piastres"] == 100_000
-    assert "settled before" in body["note"]
+    assert "HBA paid you" in body["note"]
+    # Her words, not the platform's. She does not know what a platform is, and
+    # a blank where the figure goes reads as *they did not pay me for March*.
+    assert "platform" not in body["note"].lower()
     assert body["waiting_on"] == []
 
 
@@ -1158,3 +1159,106 @@ def test_a_historical_month_never_reads_as_not_started(admin, monkeypatch):
 
     assert body["state"] == "historical"
     assert body["not_started"] is False
+
+
+def test_a_historical_month_counts_its_orders_the_same_way(admin, monkeypatch):
+    """The business's addition, and it is right: the orders are real and the
+    counting is real. Only the *payment* happened elsewhere.
+
+    Reporting one lump of sales and nothing else made a month she worked look
+    like a month that did not happen.
+    """
+    from app.config import settings
+
+    affiliate = _affiliate(admin)
+    _order(affiliate["id"], "h1", 100_000, month="2025-11", state="earned")
+    _order(affiliate["id"], "h2", 40_000, month="2025-11", state="pending")
+    _order(affiliate["id"], "h3", 25_000, month="2025-11", state="void")
+    monkeypatch.setattr(settings, "go_live_month", "2026-01", raising=False)
+
+    body = _sign_in().get("/api/me/earnings/2025-11").json()
+
+    assert body["state"] == "historical"
+    assert body["orders"] == {"earned": 1, "pending": 1, "void": 1}
+    assert body["sales"]["earned_piastres"] == 100_000
+    assert body["sales"]["pending_piastres"] == 40_000
+    # And every order is listed, exactly as in any other month.
+    assert len(body["orders_detail"]) == 3
+    # The one thing still withheld: March's rates live in the old system, and
+    # guessing at them is how somebody is told the wrong number (ADR 0014).
+    assert body["amount_piastres"] is None
+
+
+# -- Her year (the fifth screen) ---------------------------------------------
+
+
+def test_the_year_reports_earnings_and_orders_as_different_things(admin):
+    """The constraint the business set, and it is the whole design.
+
+    The first attempt charted earnings *and* sales. On a commission
+    arrangement those move together, so drawing both is drawing one thing with
+    two y-axes - which is exactly what they said on seeing it.
+
+    So one series is money and the other is a count. Sales travel with the
+    order count, where they make a bar mean something rather than repeating
+    the line.
+    """
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"])
+    _order(affiliate["id"], "1", 1_000_000, month="2026-07")
+    _order(affiliate["id"], "2", 400_000, month=AUGUST)
+    _order(affiliate["id"], "3", 600_000, month=AUGUST)
+
+    body = _sign_in().get("/api/me/year").json()
+
+    august = next(m for m in body["months"] if m["month"] == AUGUST)
+    assert august["orders"] == 2
+    assert august["sales_piastres"] == 1_000_000
+    assert august["earned_piastres"] == 100_000
+    # A number for the axis, not a name to translate.
+    assert august["number"] == 8
+
+
+def test_the_year_reads_left_to_right(admin):
+    """Oldest first. A chart is read in one direction and the data should
+    arrive in it.
+    """
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"])
+    _order(affiliate["id"], "1", 100_000, month="2026-07")
+    _order(affiliate["id"], "2", 100_000, month=AUGUST)
+
+    months = [m["month"] for m in _sign_in().get("/api/me/year").json()["months"]]
+
+    assert months == sorted(months)
+
+
+def test_a_month_before_go_live_has_no_figure_rather_than_a_zero(admin, monkeypatch):
+    """A zero on a chart is a claim that she earned nothing. She did not - the
+    commission was agreed elsewhere (ADR 0014), and the sales are still real.
+    """
+    from app.config import settings
+
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"])
+    _order(affiliate["id"], "old", 500_000, month="2025-11")
+    _order(affiliate["id"], "new", 100_000, month=AUGUST)
+    monkeypatch.setattr(settings, "go_live_month", "2026-01", raising=False)
+
+    body = _sign_in().get("/api/me/year").json()
+    old = next(m for m in body["months"] if m["month"] == "2025-11")
+
+    assert old["earned_piastres"] is None
+    assert old["sales_piastres"] == 500_000
+    assert old["orders"] == 1
+    # And it is excluded from the totals, which are about what she was paid
+    # through this platform.
+    assert body["total_earned_piastres"] == 10_000
+
+
+def test_the_year_is_hers_alone(admin):
+    _affiliate(admin)
+    _affiliate(admin, "Sara", "sara@example.com", "SARA10")
+
+    assert admin.get("/api/me/year").status_code == 403
+    assert _sign_in().get("/api/me/year").status_code == 200
