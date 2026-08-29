@@ -67,10 +67,10 @@ const PAY_TYPE: Record<string, string> = {
 };
 
 /**
- * One model, and everything true about her this month.
+ * One model, and everything true about them this month.
  *
- * Read-only for now. The pages that *change* what she is paid — her rate, her
- * discount code, where her money goes — each get their own page with a "what
+ * Read-only for now. The pages that *change* what they are paid — their rate, their
+ * discount code, where their money goes — each get their own page with a "what
  * this changes" preview, and those are the next screens after this one (§12.2
  * calls them Pattern C: money decisions never happen in a small dialog).
  */
@@ -160,7 +160,7 @@ export function AffiliateDetail({ session }: { session: Session }) {
   // **Only a failure to load replaces the page.** An action that fails - a
   // Shopify check against a shop that is not configured, an approval the
   // server refuses - used to hit this same branch and wipe the record the
-  // person was looking at, leaving them to navigate back and find her again.
+  // person was looking at, leaving them to navigate back and find them again.
   // A failed action is reported in place, with everything it failed against
   // still on screen.
   if (error && !detail) {
@@ -196,7 +196,7 @@ export function AffiliateDetail({ session }: { session: Session }) {
        */}
       {/*
        * Only where the panel below is not already saying it. On a pending
-       * affiliate the *Before she can earn* list carries the same fact with
+       * affiliate the *Before they can earn* list carries the same fact with
        * the button to fix it attached, and saying it twice - once at length -
        * was the first thing the business objected to on this page.
        */}
@@ -230,11 +230,11 @@ export function AffiliateDetail({ session }: { session: Session }) {
 
       {/*
        * §13 step 4. The maintainer's side of an application: what is still
-       * missing before she can earn, and the action for each.
+       * missing before they can earn, and the action for each.
        *
        * Deliberately **not** a separate Applications list. The Affiliates
        * screen already answers "who is waiting" and flags exactly these two
-       * gaps on her row; a second list would be the same question asked twice
+       * gaps on their row; a second list would be the same question asked twice
        * and one more place to keep in step. This is the page somebody already
        * lands on from there.
        */}
@@ -328,13 +328,13 @@ export function AffiliateDetail({ session }: { session: Session }) {
 
       <div className="detail__grid">
         {/*
-         * Not before she is approved. A pending affiliate has no terms, so
+         * Not before they are approved. A pending affiliate has no terms, so
          * this panel could only ever show zero owed and "no pay terms for this
          * month" - an answer to a question nobody is asking yet, on a page
          * whose whole job at that point is the list of things still to do.
          *
          * The business put it plainly: *what creates the model is setting her
-         * up, not her registering.*
+         * up, not her registering.* Quoted as said; it is true of any model.
          */}
         {detail.status !== "pending" && (
         <section className="panel">

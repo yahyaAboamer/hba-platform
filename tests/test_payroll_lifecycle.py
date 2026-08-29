@@ -4,7 +4,7 @@ Phase 6 Tasks 4-7. §11.2, §11.4, §11.5.
 
 Two things here answer questions HBA asked directly. **Carry-forward** is why an
 August order can be paid in September while remaining an August sale — and
-`settled_in_snapshot_id` is what lets her dashboard say so instead of leaving her
+`settled_in_snapshot_id` is what lets their dashboard say so instead of leaving them
 to work out the difference. **Historical months** are why eight months of
 imported orders do not appear as a debt.
 """
@@ -146,7 +146,7 @@ def test_a_carried_order_keeps_its_own_month(db):
     """August sales means orders placed in August, and that never shifts.
     Carry-forward is about which payroll pays it, never which month it belongs
     to - conflating the two is what makes a model's arithmetic disagree with
-    her payment.
+    their payment.
     """
     affiliate = _affiliate(db)
     _order(db, affiliate, "paid", 200_000)
@@ -348,7 +348,7 @@ def test_a_lower_re_approval_leaves_the_choice_to_a_person(db):
     _order(db, affiliate, "1", 200_000)
     _order(db, affiliate, "2", 100_000)
     approve_month(db, affiliate, AUGUST)
-    reopen_month(db, affiliate, AUGUST, reason="an order was not hers")
+    reopen_month(db, affiliate, AUGUST, reason="an order was not theirs")
     db.execute(text("DELETE FROM attributed_order WHERE shopify_order_id = '2'"))
     db.flush()
     approve_month(db, affiliate, AUGUST)
@@ -740,7 +740,7 @@ def test_carried_money_sits_on_top_of_a_guarantee_not_inside_it(db):
     different month is not this month's work.
 
     Comparing it against the floor would let a late August order be swallowed
-    by a September guarantee she was going to receive anyway.
+    by a September guarantee they were going to receive anyway.
     """
     from app.services.commission.calculate import calculate_month
     from app.services.compensation import close_terms, terms_for
@@ -783,7 +783,7 @@ def test_a_carried_month_with_no_terms_blocks_rather_than_guesses(db):
     terms, so this state should not arise - the row is removed here with raw
     SQL to reach it at all. It is guarded anyway because the alternative is not
     a crash but a **silent underpayment**: `carried_forward` would skip the
-    month, she would be paid less than she is owed, and nothing on any screen
+    month, they would be paid less than they are owed, and nothing on any screen
     would say so.
 
     Three lines to turn a quiet wrong number into a refusal is the trade ADR

@@ -6,10 +6,10 @@
 ## Context
 
 Sara works under Boda and tracks what each affiliate publishes. The first draft
-gave her a narrow `target_recorder` role: view affiliates, record target
+gave them a narrow `target_recorder` role: view affiliates, record target
 actuals, nothing else.
 
-The business corrected this. Her job in practice combines setting the monthly
+The business corrected this. Their job in practice combines setting the monthly
 requirements, recording what was published, verifying it, maintaining affiliate
 records, and setting compensation terms.
 

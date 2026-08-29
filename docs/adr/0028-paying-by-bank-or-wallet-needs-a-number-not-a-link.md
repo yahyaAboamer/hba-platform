@@ -191,7 +191,7 @@ expectation and it is **not** a test, so it is written here as an expectation.
 Both matter less than they did before this ADR's amendment, because the number
 now sits beside the link either way — a link that fails to open costs one
 manual step, not the payment. Neither is worth chasing before a real Android
-model is on the programme and can try her own address.
+model is on the programme and can try their own address.
 
 ## What this settles, and what it changes
 
@@ -212,11 +212,11 @@ would stop a model joining at all.
 
 The mistake worth catching is a **phone number in the link field**. §13.1
 collects both and they sit next to each other on the form; mixed up, nothing
-errors at the time and it surfaces at month end when somebody tries to pay her.
+errors at the time and it surfaces at month end when somebody tries to pay them.
 That case gets its own message rather than falling through the host check,
 which produced *"that one points at 01001234567"* — true, and nonsense to the
 person who has to fix it.
 
 The check lives inside `set_destination`, so the application, a model changing
-her own destination, and a maintainer correcting one are all covered by the
+their own destination, and a maintainer correcting one are all covered by the
 same rule. A validator on one path is a validator with a way around it.

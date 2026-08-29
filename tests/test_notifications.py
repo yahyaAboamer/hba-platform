@@ -5,7 +5,7 @@ guarantees underneath it:
 
 **An email is queued in the same transaction as the change it announces.** A
 month agreed with no email queued is a model who was paid and never told; an
-email queued for a month that rolled back is a model told about money she is
+email queued for a month that rolled back is a model told about money they are
 not owed. Both are proven by rolling the transaction back and looking.
 
 **Nothing sensitive leaves the building.** Mail is the one channel that keeps a
@@ -105,7 +105,7 @@ def test_the_sending_job_is_queued_in_the_same_transaction(db, affiliate):
 
 
 def test_an_affiliate_with_no_address_is_not_an_error(db, affiliate):
-    """She was entered by hand from a WhatsApp conversation. That must not stop
+    """They were entered by hand from a WhatsApp conversation. That must not stop
     a month being approved.
     """
     assert queue(db, event=Event.MONTH_APPROVED, recipient_email=None) is None
@@ -152,7 +152,7 @@ def test_no_payout_detail_reaches_an_email(db, affiliate, monkeypatch):
 
 def test_a_month_email_states_a_figure_and_links_to_the_screen(monkeypatch):
     """Phase 9 built the screens. Restating a breakdown in an email is a second
-    place for the figures to disagree, and she will be reading both.
+    place for the figures to disagree, and they will be reading both.
     """
     from app.config import settings
 
@@ -172,7 +172,7 @@ def test_a_month_email_states_a_figure_and_links_to_the_screen(monkeypatch):
     assert "E£2,400.00" in message.body
     assert "https://pay.example.com/" in message.body
     # One figure, not a breakdown. Restating the lines in an email is a second
-    # place for them to disagree with the screen, and she reads both.
+    # place for them to disagree with the screen, and they read both.
     assert message.body.count("E£") == 1
 
 
@@ -212,7 +212,7 @@ def test_a_name_cannot_inject_a_header(monkeypatch):
 
     # The injected text survives as part of the quoted display name, which is
     # harmless. What must not survive is a header break or a second recipient,
-    # and neither does: there is exactly one address, and it is hers.
+    # and neither does: there is exactly one address, and it is theirs.
     header = str(built["To"])
     assert chr(10) not in header and chr(13) not in header
     assert [address.addr_spec for address in built["To"].addresses] == [
@@ -245,7 +245,7 @@ def test_with_no_credentials_it_is_skipped_not_failed(db, affiliate):
 
 def test_a_sent_notification_is_never_sent_twice(db, affiliate, monkeypatch):
     """A lease can expire and hand the same job to a second worker. A duplicate
-    payroll email is a model asking whether she is being paid twice.
+    payroll email is a model asking whether they are being paid twice.
     """
     sends = []
     monkeypatch.setattr(

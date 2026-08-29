@@ -1,11 +1,11 @@
-"""What a model fills in for herself.
+"""What a model fills in for themselves.
 
-§13 step 2. She has already accepted an invitation, so an account exists and a
-password is set; this is the record that hangs off it - her name, her phone,
-the code she wants to use, and where her money should go.
+§13 step 2. They have already accepted an invitation, so an account exists and a
+password is set; this is the record that hangs off it - their name, their phone,
+the code they want to use, and where their money should go.
 
-**Nothing here decides what she is paid.** §6.5 is absolute: a model may never
-edit anything determining what she is owed. Compensation type, rate, fixed
+**Nothing here decides what they are paid.** §6.5 is absolute: a model may never
+edit anything determining what they are owed. Compensation type, rate, fixed
 amount, base amount and targets are all the maintainer's, set at review. That
 is enforced by this module simply having no parameter for any of them - a
 form that merely omits a field is not a control, but a service that cannot
@@ -58,7 +58,7 @@ def submit_application(
 ) -> AffiliateProfile:
     """Create the affiliate record a model has applied with.
 
-    One transaction, three rows: the profile, her proposed code, and her payout
+    One transaction, three rows: the profile, their proposed code, and their payout
     destination. Partially applying would leave a `pending` row that looks like
     an application somebody made and did not finish, which is indistinguishable
     from one they never started.
@@ -116,7 +116,7 @@ def submit_application(
     # The start month is derived, never asked for: there is exactly one right
     # answer and asking a person can only produce a wrong one (see
     # `start_month_for`). A model choosing "this month" would orphan every
-    # order her code had already earned.
+    # order their code had already earned.
     register_code(
         db,
         affiliate,
@@ -157,7 +157,7 @@ def submit_application(
 
 
 def application_state(db: Session, affiliate: AffiliateProfile) -> str:
-    """What to tell her about where her application stands.
+    """What to tell them about where their application stands.
 
     Three answers, not two. "Applied and waiting" and "on the programme" are
     completely different messages to the one person they are about, and an

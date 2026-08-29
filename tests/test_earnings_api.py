@@ -6,7 +6,7 @@ Nothing here freezes a figure. Approving a month is Phase 6's job, and doing it
 on a GET would mean a month could be settled by whoever happened to load a page.
 Every payout comes back marked provisional.
 
-§6.5: a model may never touch anything deciding what she is owed. The
+§6.5: a model may never touch anything deciding what they are owed. The
 `affiliate` role holds no permissions at all, so it is refused here as
 everywhere - proven per endpoint, not assumed.
 """
@@ -160,7 +160,7 @@ def test_no_customer_ever_appears(client):
 
 
 def test_pending_sales_are_shown_not_hidden(client):
-    """A model should be able to see what is coming rather than wonder why her
+    """A model should be able to see what is coming rather than wonder why their
     month looks small.
     """
     affiliate = _affiliate(client)
@@ -204,7 +204,7 @@ def test_both_figures_are_reported(client):
 
 
 def test_a_month_with_no_terms_says_so(client):
-    """The sales are real and worth reporting; what she is owed is not
+    """The sales are real and worth reporting; what they are owed is not
     calculable, and §11.3 refuses approval rather than warning.
     """
     affiliate = _affiliate(client)
@@ -218,7 +218,7 @@ def test_a_month_with_no_terms_says_so(client):
 
 
 def test_a_base_guarantee_with_no_target_recorded_blocks(client):
-    """Nobody has said what she was asked for, so nobody can say whether the
+    """Nobody has said what they were asked for, so nobody can say whether the
     guarantee applies. §11.3 blocks on missing information.
     """
     affiliate = _affiliate(client)

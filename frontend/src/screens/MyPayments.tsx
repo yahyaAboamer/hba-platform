@@ -6,7 +6,7 @@ import { formatMonth } from "../lib/money";
 import type { MyPayments as Body, Payment } from "../lib/portal";
 import "./MyPayments.css";
 
-/** The settlement states, in her words rather than the ledger's. */
+/** The settlement states, in their words rather than the ledger's. */
 const STATE_TEXT: Record<string, string> = {
   unpaid: "Not paid yet",
   partially_paid: "Part paid",
@@ -17,17 +17,17 @@ const STATE_TEXT: Record<string, string> = {
 /**
  * What has arrived, and what is still outstanding.
  *
- * §14, and **a separate screen from her earnings on purpose.** *What I have
+ * §14, and **a separate screen from their earnings on purpose.** *What I have
  * earned* and *what has arrived* have different answers for most of any month,
- * and merging them is how a model ends up believing she has been paid twice,
+ * and merging them is how a model ends up believing they have been paid twice,
  * or not at all.
  *
  * This is the one screen in the portal where colour is spent (ADR 0027). Money
  * state is the only thing it is ever spent on, and here the platform actually
- * knows: outstanding is `owed`, settled is `settled`. Her earnings screen
+ * knows: outstanding is `owed`, settled is `settled`. Their earnings screen
  * paints nothing, because a figure still being worked out is not a debt.
  *
- * Not month-scoped. Her earnings are a question about one month; *where is my
+ * Not month-scoped. Their earnings are a question about one month; *where is my
  * money* is a question about all of them at once.
  */
 export function MyPayments() {
@@ -109,10 +109,10 @@ export function MyPayments() {
                 )}
               </div>
               {/*
-               * The line that makes her own arithmetic close. A month agreed
+               * The line that makes their own arithmetic close. A month agreed
                * at 2,400 pounds and settled by a transfer of 2,340 reads as
                * sixty pounds short - the write-off is in a panel further down,
-               * and she will not connect the two to each other on her own.
+               * and they will not connect the two to each other on their own.
                */}
               {row.adjusted_piastres > 0 && (
                 <p className="settle__reconcile">
@@ -146,8 +146,8 @@ export function MyPayments() {
       )}
 
       {/*
-       * §11.5 requires these to be visible to her, with the reason written at
-       * the time: a credit she cannot see is a credit she cannot check. They
+       * §11.5 requires these to be visible to them, with the reason written at
+       * the time: a credit they cannot see is a credit they cannot check. They
        * are also the only place a figure moves without a transfer, which is
        * exactly the kind of thing that looks like an error when unexplained.
        */}
@@ -205,7 +205,7 @@ function PaymentRow({ payment }: { payment: Payment }) {
        *
        * Behind a press rather than always open: twelve months of transfers is
        * twelve full-width images to scroll past on a phone before reaching the
-       * one she came for.
+       * one they came for.
        */}
       {payment.has_proof && (
         <>
@@ -220,9 +220,9 @@ function PaymentRow({ payment }: { payment: Payment }) {
           {showing &&
             (broken ? (
               /*
-               * A screenshot that will not load is not a reason to show her a
+               * A screenshot that will not load is not a reason to show them a
                * broken-image icon and nothing else. The payment is real either
-               * way, and the sentence she needs is what to do about it.
+               * way, and the sentence they need is what to do about it.
                */
               <p className="settle__reconcile">
                 The screenshot would not load. The transfer above is still

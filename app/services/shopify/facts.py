@@ -1,6 +1,6 @@
 """Asking Shopify what it will actually tell us about delivery and returns.
 
-Phase 4 pays a model when her order is **delivered** (ADR 0012), reads delivery
+Phase 4 pays a model when their order is **delivered** (ADR 0012), reads delivery
 from Shopify rather than from Bosta (ADR 0023), and freezes the commission base
 the moment a return or exchange begins (ADR 0011). All three depend on fields
 this platform has never requested.

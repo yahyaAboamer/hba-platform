@@ -55,7 +55,7 @@ ROLES: dict[str, frozenset[str]] = {
             Permission.AUDIT_VIEW,
         }
     ),
-    # Sara: owns content and the affiliate roster day to day. Her job combines
+    # Sara: owns content and the affiliate roster day to day. Their job combines
     # setting monthly requirements, recording what was published, verifying it,
     # maintaining affiliate records, and setting compensation terms.
     #

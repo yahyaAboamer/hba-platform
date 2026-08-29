@@ -13,16 +13,16 @@ import { api } from "../lib/api";
  *
  * The two acts are different and belong apart. Inviting staff is granting
  * somebody permissions over other people's money; inviting a model is putting
- * her on the programme, and she holds no permission at all — §6.1 gives the
+ * them on the programme, and they hold no permission at all — §6.1 gives the
  * `affiliate` role an empty permission set on purpose. Offering them from one
  * list says they are variations of one decision, and they are not.
  *
  * So this lives on Affiliates, where models live.
  *
- * What happens next is hers: she sets a password, fills in her own details and
- * her own payout destination, and applies. §6.5 keeps the application form
- * free of anything deciding what she is paid, so approving her — and setting
- * her rate — stays a separate, deliberate act.
+ * What happens next is theirs: they set a password, fills in their own details and
+ * their own payout destination, and applies. §6.5 keeps the application form
+ * free of anything deciding what they are paid, so approving them — and setting
+ * their rate — stays a separate, deliberate act.
  */
 export function InviteModel({ onInvited }: { onInvited: () => void }) {
   const [open, setOpen] = useState(false);
@@ -85,7 +85,7 @@ export function InviteModel({ onInvited }: { onInvited: () => void }) {
         {/*
          * Both the confirmation and the link, for the reason the staff invite
          * gives: an emailed link is exactly what somebody wants on screen the
-         * moment she says it never arrived, and it is shown once because it is
+         * moment they say it never arrived, and it is shown once because it is
          * a working credential until it is used.
          */}
         {link && (

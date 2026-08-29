@@ -1,25 +1,25 @@
-"""What a model was asked to produce, what she produced, and who confirmed it.
+"""What a model was asked to produce, what they produced, and who confirmed it.
 
 §15. For most models this is a management record. For a `base_guarantee` model it
-**decides what she is paid** (§9.5), and the same table serves both — the
+**decides what they are paid** (§9.5), and the same table serves both — the
 difference lives entirely in the compensation type, not here.
 
 ## Three states, and only one of them is a boolean
 
-    requirements set, nothing recorded   nobody knows what she did
+    requirements set, nothing recorded   nobody knows what they did
     recorded                             achieved, or not
     recorded and verified                a second person confirmed the numbers
 
 "Not achieved" and "not yet recorded" are different answers with different
-consequences (§11.3): the first pays her commission and approves the month, the
+consequences (§11.3): the first pays their commission and approves the month, the
 second **blocks it**. That is why `actual_videos` and `actual_stories` are
 nullable and the requirements are not - a requirement of zero is a real answer
-meaning *nothing was asked of her*, and it must stay distinguishable from nobody
+meaning *nothing was asked of them*, and it must stay distinguishable from nobody
 having asked.
 
 ## One row per model per month
 
-Enforced by the database. Two rows would be two answers to "did she achieve
+Enforced by the database. Two rows would be two answers to "did they achieve
 August?", and whichever the query happened to read first would decide a payment.
 
 ## Two fields today, and that is a decision
@@ -60,7 +60,7 @@ class MonthlyTarget(Base):
 
     __tablename__ = "monthly_target"
     __table_args__ = (
-        # §17. Two answers to "did she achieve August?" is one too many.
+        # §17. Two answers to "did they achieve August?" is one too many.
         UniqueConstraint("affiliate_id", "month", name="monthly_target_one_per_month"),
         CheckConstraint(
             "required_videos >= 0 AND required_stories >= 0",
@@ -72,8 +72,8 @@ class MonthlyTarget(Base):
             name="monthly_target_actuals_not_negative",
         ),
         # Recording is both numbers or neither. A half-recorded month is not a
-        # third state anybody has a rule for, and "she did 8 videos and an
-        # unknown number of stories" cannot answer whether she achieved.
+        # third state anybody has a rule for, and "they did 8 videos and an
+        # unknown number of stories" cannot answer whether they achieved.
         CheckConstraint(
             "(actual_videos IS NULL) = (actual_stories IS NULL)",
             name="monthly_target_actuals_recorded_together",
@@ -95,11 +95,11 @@ class MonthlyTarget(Base):
     #: month, not to a day in it.
     month: Mapped[str] = mapped_column(String(7), nullable=False)
 
-    #: What she was asked for. Zero is a real answer; absent is not possible.
+    #: What they were asked for. Zero is a real answer; absent is not possible.
     required_videos: Mapped[int] = mapped_column(Integer, nullable=False)
     required_stories: Mapped[int] = mapped_column(Integer, nullable=False)
 
-    #: What she produced. NULL means nobody has recorded it yet - which blocks
+    #: What they produced. NULL means nobody has recorded it yet - which blocks
     #: approval, where merely missing the target does not (§11.3).
     actual_videos: Mapped[int | None] = mapped_column(Integer)
     actual_stories: Mapped[int | None] = mapped_column(Integer)
@@ -128,7 +128,7 @@ class MonthlyTarget(Base):
 
     @property
     def is_recorded(self) -> bool:
-        """Has anybody said what she actually produced?"""
+        """Has anybody said what they actually produced?"""
         return self.actual_videos is not None and self.actual_stories is not None
 
     @property
@@ -139,7 +139,7 @@ class MonthlyTarget(Base):
     def is_achieved(self) -> bool | None:
         """Every requirement met - or ``None`` when nobody has recorded it.
 
-        The ``None`` is the point. "Not achieved" pays her commission and
+        The ``None`` is the point. "Not achieved" pays their commission and
         approves the month; "not yet recorded" blocks it. A boolean cannot
         express both, and collapsing them would silently approve a month nobody
         had looked at.

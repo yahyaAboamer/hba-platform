@@ -69,7 +69,7 @@ def normalise_instapay_address(value: str) -> str:
     field** - §13.1 collects both, they sit next to each other, and a model
     who mixes them up leaves the Pay button with nothing to open. Nothing
     errors at the time; it surfaces at month end when somebody tries to pay
-    her.
+    them.
 
     A missing scheme is added rather than refused. Somebody typing the address
     by hand omits `https://` far more often than they mean a different site.
@@ -194,7 +194,7 @@ def set_destination(
         raise ValueError(f"Unknown payout method: {method!r}")
 
     # Here rather than at each caller, so the application, a model changing
-    # her own destination, and a maintainer correcting one are all checked by
+    # their own destination, and a maintainer correcting one are all checked by
     # the same rule. A validator on one path is a validator with a way around
     # it.
     if method == PayoutMethod.INSTAPAY and instapay_address_url:

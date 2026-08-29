@@ -16,8 +16,8 @@ good half twice while they are still wondering.
 ## Every model appears, including the ones with no target
 
 A model missing from the grid is a model nobody records a target for, and that is
-exactly the case that blocks her month later (§11.3). Returning her with nulls
-puts the gap where somebody will see it, rather than leaving her absent and
+exactly the case that blocks their month later (§11.3). Returning them with nulls
+puts the gap where somebody will see it, rather than leaving their absent and
 therefore invisible.
 
 ## Recording and verifying are different permissions
@@ -58,7 +58,7 @@ class GridRow(BaseModel):
     affiliate_id: int
     required_videos: int = Field(ge=0)
     required_stories: int = Field(ge=0)
-    #: Both or neither. A half-recorded month cannot answer whether she
+    #: Both or neither. A half-recorded month cannot answer whether they
     #: achieved, and the database refuses it too.
     actual_videos: int | None = Field(default=None, ge=0)
     actual_stories: int | None = Field(default=None, ge=0)
@@ -109,8 +109,8 @@ def _render(
         "required_stories": target.required_stories if target else None,
         "actual_videos": target.actual_videos if target else None,
         "actual_stories": target.actual_stories if target else None,
-        # Three answers, not two. `null` means nobody has recorded what she
-        # did - which blocks her month, where missing the target does not.
+        # Three answers, not two. `null` means nobody has recorded what they
+        # did - which blocks their month, where missing the target does not.
         "achieved": target.is_achieved if target else None,
         "verified": bool(target and target.is_verified),
         "verified_at": target.verified_at.isoformat()
@@ -132,7 +132,7 @@ def target_grid(
     """Every model down the side, one month across.
 
     Models with no target appear with nulls rather than being omitted. An
-    absent row is an invisible gap, and the gap is what blocks her month.
+    absent row is an invisible gap, and the gap is what blocks their month.
     """
     month = _month_or_400(month)
     affiliates = list_affiliates(db, include_archived=include_archived)
@@ -152,7 +152,7 @@ def target_grid(
 
 
 def _determines_pay(db: Session, affiliate: AffiliateProfile, month: str) -> bool:
-    """Whether this month's target decides what she is paid.
+    """Whether this month's target decides what they are paid.
 
     Only a base guarantee turns a target into money. For everyone else the
     numbers are worth recording and worth looking at, and nothing at all
@@ -239,7 +239,7 @@ def verify_targets(
     """Confirm the recorded numbers, one model or many.
 
     This is what unlocks a base guarantee (§9.5). It confirms the **numbers**,
-    not the outcome - verifying a target she missed is a normal thing to do.
+    not the outcome - verifying a target they missed is a normal thing to do.
     """
     month = _month_or_400(month)
     by_id = {a.id: a for a in list_affiliates(db, include_archived=True)}

@@ -130,7 +130,7 @@ def test_anonymous_access_is_refused(anonymous):
 
 
 def test_an_affiliate_cannot_read_the_order_index(client):
-    """§6.5's boundary, checked here too: this is not her screen."""
+    """§6.5's boundary, checked here too: this is not their screen."""
     _demote_to("affiliate")
     assert client.get(f"/api/orders/{MONTH}").status_code == 403
 

@@ -10,14 +10,14 @@ match how the platform was asking about them.
 
 Models already have live discount codes on Shopify. Most have been in use for
 months and carry real orders. The platform is not where codes are created — it
-is where they are watched, and where a model eventually sees her own
+is where they are watched, and where a model eventually sees their own
 performance. "Registering a code" therefore means *recording an existing fact*,
 not creating anything.
 
 The registration API asked for a **start month**. That framing was wrong in a
-way that would have cost every model her history: the natural thing to type is
+way that would have cost every model their history: the natural thing to type is
 the current month, and doing so would have left every order the code had
-already earned attributed to nobody. She would have opened her dashboard and
+already earned attributed to nobody. They would have opened their dashboard and
 seen an empty page, and nothing anywhere would have errored.
 
 ## Decision
@@ -53,19 +53,19 @@ orders silently. Failing while somebody is watching is far cheaper.
 
 **A model's own submission must never fail for the same reason.** When the
 application form exists (Phase 8), verification runs in the background on the
-durable queue. It would be absurd for her application to be rejected because of
+durable queue. It would be absurd for their application to be rejected because of
 *our* connection to Shopify.
 
 ## Consequences
 
 The ordinary path claims a code's whole history without anybody thinking about
-it. A model approved today sees her sales from January, or from whenever her
+it. A model approved today sees their sales from January, or from whenever their
 code was created.
 
 **Taking the *later* date, rather than always the horizon, is what makes
 handover work.** If a code previously belonged to a different model, starting
-everyone at January would collide with her period and be refused by the
-exclusion constraint. Each model's ownership now begins exactly when her code
+everyone at January would collide with their period and be refused by the
+exclusion constraint. Each model's ownership now begins exactly when their code
 did.
 
 Registration depends on Shopify being reachable, which it did not before. That
@@ -87,8 +87,8 @@ wrong answer, and a code that changed hands still collides.
 wrong for a code with no orders yet — it would have no start at all. Creation is
 always defined and always early enough.
 
-**Ask the model for her start date.** She has no way to know when Shopify
-created her code, and would be guessing about her own money.
+**Ask the model for their start date.** They have no way to know when Shopify
+created their code, and would be guessing about their own money.
 
 ## What this derivation assumes, and where it stops
 
@@ -97,9 +97,9 @@ assumption: **that a code is created at the moment a model is switched onto
 it.** That is how HBA works, but it is a habit, not a rule.
 
 When it does not hold — a code set up in July, switched to in September — the
-derivation ends the old code in June while she was still earning on it, and two
-months of her orders belong to nobody. The creation date answers "when could
-this code first have earned?", not "when did she move over?", and the two are
+derivation ends the old code in June while they were still earning on it, and two
+months of their orders belong to nobody. The creation date answers "when could
+this code first have earned?", not "when did they move over?", and the two are
 only the same by convention.
 
 So the handover **refuses** rather than guesses, and only when it would actually
@@ -109,5 +109,5 @@ handover month explicitly is deliberately not built, and is recorded in
 with what to do if the refusal ever appears.
 
 Registration (as opposed to handover) is unaffected: a first code has no
-predecessor to end, so an early creation date only means her history starts
+predecessor to end, so an early creation date only means their history starts
 earlier, which is correct.

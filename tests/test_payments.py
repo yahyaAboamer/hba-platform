@@ -199,7 +199,7 @@ def test_overpaying_is_reported_not_refused(db):
 
 def test_a_month_owing_nothing_is_settled_not_unpaid(db):
     """A model with no sales is not carrying a debt of zero, and showing one on
-    her row would have somebody chasing it.
+    their row would have somebody chasing it.
     """
     affiliate = _affiliate(db)
     approve_month(db, affiliate, AUGUST)
@@ -240,7 +240,7 @@ def test_a_reopened_month_is_unanswerable_not_settled(db):
     snapshot = _owed(db, affiliate)
     record_payment(db, affiliate, amount_piastres=200_000,
                    allocations={snapshot.id: 200_000})
-    reopen_month(db, affiliate, AUGUST, reason="an order was not hers")
+    reopen_month(db, affiliate, AUGUST, reason="an order was not theirs")
 
     balance = balance_for(db, affiliate, AUGUST)
 
@@ -494,7 +494,7 @@ def test_a_payment_with_no_destination_on_file_is_still_recorded(db):
 
 
 def test_a_write_off_clears_the_rest(db):
-    """§11.5. She was overpaid, or the remainder is not worth chasing, and HBA
+    """§11.5. They were overpaid, or the remainder is not worth chasing, and HBA
     absorbs it.
     """
     affiliate = _affiliate(db)

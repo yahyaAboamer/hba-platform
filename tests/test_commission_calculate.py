@@ -313,7 +313,7 @@ def test_a_fixed_salary_is_added_on_top(db):
 
 
 def test_a_fixed_salary_is_paid_in_a_month_with_no_sales(db):
-    """It is a salary. Nothing about it depends on whether she sold anything."""
+    """It is a salary. Nothing about it depends on whether they sold anything."""
     affiliate = _affiliate(db)
     set_terms(
         db,
@@ -453,7 +453,7 @@ def _guaranteed(db, affiliate, *, base=800_000, rate_bp=1000):
 
 
 def test_achieved_and_verified_applies_the_guarantee(db):
-    """Her commission is 200 pounds; the guarantee is 8,000. She is paid the
+    """Their commission is 200 pounds; the guarantee is 8,000. They are paid the
     guarantee.
     """
     affiliate = _affiliate(db)
@@ -470,7 +470,7 @@ def test_achieved_and_verified_applies_the_guarantee(db):
 
 def test_the_guarantee_never_caps_a_higher_commission(db):
     """Section 9.5 says this explicitly because it is the intuitive mistake.
-    She sold a great deal; she keeps all of it.
+    They sold a great deal; they keep all of it.
     """
     affiliate = _affiliate(db)
     _guaranteed(db, affiliate, base=800_000)
@@ -497,7 +497,7 @@ def test_the_guarantee_is_never_added_on_top(db):
 
 
 def test_a_missed_target_pays_commission_and_approves(db):
-    """The block is never a punishment for a quiet month. She is paid what she
+    """The block is never a punishment for a quiet month. They are paid what they
     earned, promptly, and the month closes.
     """
     affiliate = _affiliate(db)
@@ -514,7 +514,7 @@ def test_a_missed_target_pays_commission_and_approves(db):
 
 
 def test_no_target_recorded_blocks_the_month(db):
-    """Nobody has said what she was asked for, so nobody can say whether the
+    """Nobody has said what they were asked for, so nobody can say whether the
     guarantee applies. Section 11.3 blocks on missing information.
     """
     affiliate = _affiliate(db)
@@ -529,7 +529,7 @@ def test_no_target_recorded_blocks_the_month(db):
 
 
 def test_requirements_set_but_nothing_recorded_also_blocks(db):
-    """A requirement with no actual is still nobody knowing what she did."""
+    """A requirement with no actual is still nobody knowing what they did."""
     affiliate = _affiliate(db)
     _guaranteed(db, affiliate)
     _target(db, affiliate)
@@ -573,9 +573,9 @@ def test_a_missed_target_needs_no_verification_to_approve(db):
 
 
 def test_a_commission_model_is_unaffected_by_a_missing_target(db):
-    """Section 15: targets are informational for her. Blocking her month over a
+    """Section 15: targets are informational for them. Blocking their month over a
     management figure would stop a payment for a reason that has nothing to do
-    with what she is owed.
+    with what they are owed.
     """
     affiliate = _affiliate(db)
     set_terms(

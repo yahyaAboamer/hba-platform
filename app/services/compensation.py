@@ -226,7 +226,7 @@ def correct_terms(
 
     This corrects **what the arrangement says**, not when it applies. Moving a
     model onto different terms from a given month is a new period, not a
-    correction - close this one and set new terms, so the months she was on the
+    correction - close this one and set new terms, so the months they were on the
     old arrangement keep saying so.
 
     An amount belonging to another type is cleared rather than left behind: a
@@ -308,7 +308,7 @@ def close_terms(
     refuses two overlapping periods, correctly, and there was no way to end the
     first. Moving a model onto new terms was simply impossible.
 
-    Ending is not correcting. The months she was on these terms keep saying so,
+    Ending is not correcting. The months they were on these terms keep saying so,
     which is what makes a past month still calculable at the rate that applied
     then.
     """

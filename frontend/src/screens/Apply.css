@@ -137,7 +137,7 @@
 }
 
 /* Shared by the application form and the payout-change panel: the same
-   decision in the same shape, whether she is joining or moving her money. */
+   decision in the same shape, whether they are joining or moving their money. */
 .apply__panel {
   padding: var(--space-5);
 }

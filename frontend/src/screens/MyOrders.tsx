@@ -8,12 +8,12 @@ import type { MyEarnings } from "../lib/portal";
 import "./MyOrders.css";
 
 /**
- * The orders behind the figure, so she can count them against her own list.
+ * The orders behind the figure, so they can count them against their own list.
  *
  * **No customer appears here**, and not because anything filters them: §10.2's
  * order index never stored a name, an address or a phone number, so there is
- * nothing to leak. What she sees is her side of the sale — the order number,
- * when it was placed, what it was worth to her, and whether it counts yet.
+ * nothing to leak. What they see is their side of the sale — the order number,
+ * when it was placed, what it was worth to them, and whether it counts yet.
  *
  * A row is never removed. §9.4 pays on delivery, so an order can go from
  * counting to not counting, and one that quietly disappeared would look like a
@@ -63,7 +63,7 @@ export function MyOrders() {
              * The business asked whether to show it at all. Showing it is the
              * safer answer: hiding a cancelled order's amount invites the
              * worse guess - that the platform lost it - where a struck-through
-             * E£1,200 lets her check it against her own record and move on. It
+             * E£1,200 lets them check it against their own record and move on. It
              * can never be mistaken for money coming.
              */}
             <Money
@@ -82,7 +82,7 @@ export function MyOrders() {
           {/*
            * §11.4. Only where a *different* month paid it. Labelling every row
            * would bury the one or two that matter, and these are the rows that
-           * decide whether her own arithmetic closes.
+           * decide whether their own arithmetic closes.
            */}
           {/*
            * §11.4, and the one row that will be asked about - so it keeps its

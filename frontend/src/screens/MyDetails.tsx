@@ -20,10 +20,10 @@ const METHOD_LABEL: Record<string, string> = {
 };
 
 /**
- * Her code and where her money goes. §6.4 and §6.5.
+ * Their code and where their money goes. §6.4 and §6.5.
  *
- * The only things on the whole portal she can change, and deliberately so: she
- * may correct how to reach her, and nothing that decides what she is owed.
+ * The only things on the whole portal they can change, and deliberately so: they
+ * may correct how to reach them, and nothing that decides what they are owed.
  */
 export function MyDetails({
   me,
@@ -91,9 +91,9 @@ export function MyDetails({
         </div>
       </dl>
       {/*
-       * Shortened even to her. She supplied it, so it tells her nothing she
-       * does not know - and a screen printing a full account number is one
-       * worth photographing over her shoulder on a bus.
+       * Shortened even to them. They supplied it, so it tells them nothing they
+       * do not know - and a screen printing a full account number is one
+       * worth photographing over their shoulder on a bus.
        */}
       <p className="affiliate__note">
         Shortened on purpose. You gave us these, so this is only here for you to

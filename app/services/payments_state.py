@@ -41,7 +41,7 @@ class SettlementState:
         **Equality is checked before emptiness**, so a month that owes nothing
         and has been paid nothing is `settled` rather than `unpaid`. A model
         with no sales in a month is not carrying a debt of zero, and showing
-        one on her row would have somebody chasing it.
+        one on their row would have somebody chasing it.
         """
         if covered_piastres > owed_piastres:
             return SettlementState.OVERPAID

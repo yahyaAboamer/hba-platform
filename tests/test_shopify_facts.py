@@ -378,7 +378,7 @@ def test_delivered_and_not_delivered_do_not_overlap(db):
 
 
 def test_collected_in_person_counts_as_delivered(db):
-    """PICKED_UP means the customer has the goods. Withholding her commission
+    """PICKED_UP means the customer has the goods. Withholding their commission
     because the courier called it something else would be wrong.
     """
     probe = _delivery_probe()
@@ -584,7 +584,7 @@ def test_the_kept_quantity_is_what_the_customer_still_has(db):
     assert summary["orders_reporting_current_quantity"] == 1
 
 
-def test_the_prices_are_what_she_paid_not_the_shelf_price(db):
+def test_the_prices_are_what_they_paid_not_the_shelf_price(db):
     """A E£1,000 jacket with a 10% code costs E£900, and E£900 is what the
     model earns on. `discountedUnitPriceSet` already carries the discount, so
     nothing has to know the code's percentage.
@@ -625,7 +625,7 @@ def test_a_penny_of_rounding_is_not_a_disagreement(db):
 
 
 def test_a_shopify_without_current_quantity_says_so(db):
-    """Without it, "what did she keep?" has no answer and the whole approach
+    """Without it, "what did they keep?" has no answer and the whole approach
     falls back to subtraction. That must be visible, not assumed away.
     """
     summary = SUMMARISERS["kept_items"](

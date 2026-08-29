@@ -16,7 +16,7 @@ not after.
 
 Order number, date, what it was worth, whether it counts. Never a name, an
 address, a phone number, or anything the customer typed. §6.5 keeps a model
-away from anything deciding what she is owed; this keeps everybody away from
+away from anything deciding what they are owed; this keeps everybody away from
 the customers.
 """
 
@@ -64,7 +64,7 @@ def _render(result: MonthCalculation, name: str | None = None) -> dict:
             "earned_piastres": result.earned_base_piastres,
             "earned": format_egp(result.earned_base_piastres),
             # Shown, never hidden. A model should be able to see what is
-            # coming rather than wonder why her month looks small.
+            # coming rather than wonder why their month looks small.
             "pending_piastres": result.pending_base_piastres,
             "pending": format_egp(result.pending_base_piastres),
         },
@@ -83,8 +83,8 @@ def _render(result: MonthCalculation, name: str | None = None) -> dict:
             "is_provisional": True,
         },
         "targets": {
-            # Three answers, not two. `null` means nobody recorded what she
-            # produced - which blocks her month, where missing the target does
+            # Three answers, not two. `null` means nobody recorded what they
+            # produced - which blocks their month, where missing the target does
             # not (§11.3).
             "achieved": result.target_achieved,
             "verified": result.target_verified,
@@ -163,7 +163,7 @@ def programme_earnings(
 
     # Archived affiliates are excluded by default, exactly as list_affiliates
     # does it - the common question is "who is on the programme", not "who ever
-    # was". An archived one still has real months behind her, so the flag is
+    # was". An archived one still has real months behind them, so the flag is
     # there for the month somebody needs to go back and look at.
     rows = [
         _render(calculate_month(db, affiliate, month), affiliate.name)

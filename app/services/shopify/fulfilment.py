@@ -220,7 +220,7 @@ def derive_refunds(order: dict) -> tuple[int, int]:
 
     **Both, deliberately.** They disagree in the case that matters: an exchange
     shows merchandise returned with nothing refunded, and treating that as a
-    reduction underpays the model on goods she sold and the customer kept the
+    reduction underpays the model on goods they sold and the customer kept the
     value of. Task 3 decides what to do with the pair; this only reports them.
     """
     from app.services.shopify.normalise import money_to_piastres

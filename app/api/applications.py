@@ -1,4 +1,4 @@
-"""A model applying for herself, over HTTP.
+"""A model applying for themselves, over HTTP.
 
 §13 step 2. The only write endpoint in the platform reached by ownership
 rather than by a permission, and the only one whose caller is not staff.

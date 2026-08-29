@@ -326,11 +326,11 @@ def affiliate_payments(
     _actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_VIEW)),
     db: Session = Depends(get_session),
 ) -> dict:
-    """Everything one model has been paid, and every adjustment touching her.
+    """Everything one model has been paid, and every adjustment touching them.
 
-    §11.5 requires adjustments to be visible to her - a credit she cannot see
-    is a credit she cannot check. This is the maintainer's view of the same
-    facts; hers arrives in Phase 9.
+    §11.5 requires adjustments to be visible to them - a credit they cannot see
+    is a credit they cannot check. This is the maintainer's view of the same
+    facts; theirs arrives in Phase 9.
     """
     affiliate = _affiliate_or_404(db, affiliate_id)
 

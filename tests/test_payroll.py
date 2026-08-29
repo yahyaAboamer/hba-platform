@@ -139,7 +139,7 @@ def test_asking_twice_returns_the_same_month(db):
 
 
 def test_a_second_month_row_is_refused(db):
-    """§17. Two rows would be two answers to "what is she owed for August?"."""
+    """§17. Two rows would be two answers to "what is they owed for August?"."""
     affiliate = _affiliate(db)
     open_month(db, affiliate, MONTH)
 
@@ -392,7 +392,7 @@ def test_a_version_cannot_be_reused(db):
 
 def test_approving_records_which_payroll_paid_each_order(db):
     """§11.4, and the answer to a question a model will otherwise ask every
-    month. Without it her own arithmetic cannot arrive at her own payment.
+    month. Without it their own arithmetic cannot arrive at their own payment.
     """
     affiliate = _ready(db)
 

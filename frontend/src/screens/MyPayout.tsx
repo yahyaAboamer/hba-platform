@@ -24,12 +24,12 @@ const FIELD_LABEL: Record<string, string> = {
 };
 
 /**
- * §6.4. Where her money goes — the highest-risk thing she can do.
+ * §6.4. Where their money goes — the highest-risk thing they can do.
  *
  * Two steps, deliberately. The password is asked for at the point of
- * committing rather than up front, so she confirms the change and authorises
- * it in one deliberate act instead of typing a password before she knows what
- * she is authorising.
+ * committing rather than up front, so they confirm the change and authorises
+ * it in one deliberate act instead of typing a password before they know what
+ * they are authorising.
  */
 export function MyPayout({
   current,
@@ -158,8 +158,8 @@ export function MyPayout({
       ) : (
         <form onSubmit={commit}>
           {/*
-           * §6.4.2. Both sides shown masked. She supplied both, so masking
-           * costs her nothing and means the screen she is looking at is not
+           * §6.4.2. Both sides shown masked. They supplied both, so masking
+           * costs them nothing and means the screen they are looking at is not
            * one worth photographing.
            */}
           <dl className="apply__compare">
@@ -180,8 +180,8 @@ export function MyPayout({
 
           {/*
            * §6.4.1. The password, not the session - a session is what an
-           * attacker already has. Asked here rather than up front so she
-           * confirms and authorises in one act, knowing what she is
+           * attacker already has. Asked here rather than up front so they
+           * confirm and authorises in one act, knowing what they are
            * authorising.
            */}
           <label className="field">

@@ -56,7 +56,7 @@ def commission_base(
     E£1,000 jacket on a 10% code arrives here inside a total of E£900.
 
     Never negative. A refund larger than the order would otherwise produce one,
-    and a negative base would quietly subtract from everything else she earned
+    and a negative base would quietly subtract from everything else they earned
     that month.
     """
     goods = int(total_piastres) - int(shipping_piastres) - int(tax_piastres)

@@ -139,7 +139,7 @@ def test_two_registered_codes_write_nothing_and_say_so(db, caplog):
 
 
 def test_a_finished_return_changes_nothing(db):
-    """ADR 0025. The parcel arrived, so the sale is hers. What the customer did
+    """ADR 0025. The parcel arrived, so the sale is theirs. What the customer did
     afterwards is between them and HBA - read, stored, and not acted on.
     """
     _affiliate(db)

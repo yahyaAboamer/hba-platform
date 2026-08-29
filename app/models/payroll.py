@@ -99,7 +99,7 @@ class PayrollMonth(Base):
 
     __tablename__ = "payroll_month"
     __table_args__ = (
-        # §17. Two rows would be two answers to "what is she owed for August?",
+        # §17. Two rows would be two answers to "what is they owed for August?",
         # and whichever the query read first would decide a payment.
         UniqueConstraint("affiliate_id", "month", name="payroll_month_one_per_month"),
         CheckConstraint(
@@ -113,7 +113,7 @@ class PayrollMonth(Base):
     affiliate_id: Mapped[int] = mapped_column(
         # RESTRICT, not CASCADE. This row is the record that money was agreed.
         # Deleting an affiliate who has been paid should fail loudly rather
-        # than quietly erase what she was paid for.
+        # than quietly erase what they were paid for.
         ForeignKey("affiliate_profile.id", ondelete="RESTRICT"), nullable=False
     )
     month: Mapped[str] = mapped_column(String(7), nullable=False)

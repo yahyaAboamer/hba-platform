@@ -49,18 +49,18 @@ after the comparison:
 
 **The alternative was considered and rejected.** Including carried money in the
 comparison would let a late August order be swallowed by a September guarantee
-she was going to receive anyway: her figure would not move, and the order would
-be paid nothing while appearing on her row as paid.
+they were going to receive anyway: their figure would not move, and the order would
+be paid nothing while appearing on their row as paid.
 
 **The accepted cost, stated plainly.** If August itself paid at the guarantee,
 its commission was already below the floor, and a late August order strictly
 should only matter if it lifted August's commission *over* that floor. It does
-not: she receives its commission regardless. This is a small overpayment in the
+not: they receive its commission regardless. This is a small overpayment in the
 model's favour, and it was chosen over the correct-but-unexplainable
 alternative — recomputing a closed month and paying the difference — because
-§16 requires a policy a model can read and check against her own arithmetic.
+§16 requires a policy a model can read and check against their own arithmetic.
 *"Any order that arrives after your month closes is paid at that month's rate
-in your next payment"* is a sentence she can verify. *"Your August was
+in your next payment"* is a sentence they can verify. *"Your August was
 recomputed and the difference against your floor..."* is not.
 
 Listed in the deliberate-exposure table.

@@ -92,8 +92,8 @@ def set_status(
         #
         # Approving a mistyped code is the failure it exists to catch. Nothing
         # errors: the code simply matches no order, the model earns nothing,
-        # and the first anyone notices is when she asks why her dashboard is
-        # empty - by which point months of her sales have gone to nobody.
+        # and the first anyone notices is when they ask why their dashboard is
+        # empty - by which point months of their sales have gone to nobody.
         #
         # Enforced here rather than in the API so it holds for every caller,
         # the same reasoning as closing code ownership on archive.
@@ -107,7 +107,7 @@ def set_status(
 
     # Section 16, and the email the whole go-live depends on arriving. Only on
     # the transition into `active` from a pending application - reactivating a
-    # paused model is not the same event and she has already been welcomed.
+    # paused model is not the same event and they have already been welcomed.
     if status == AffiliateStatus.ACTIVE and previous == AffiliateStatus.PENDING:
         from app.services.notifications import application_approved
 
@@ -180,14 +180,14 @@ def update_details(
     actor_id: int | None = None,
     actor_email: str | None = None,
 ) -> None:
-    """Correct what a model submitted about herself.
+    """Correct what a model submitted about themselves.
 
-    She fills her own details in, and people mistype their own phone numbers.
+    They fill their own details in, and people mistype their own phone numbers.
     Without this the only fix would be deleting the account and starting over.
 
-    **Email is her login**, so changing it is a real change and not a contact
-    edit - the account she signs in with moves. It is recorded like any other,
-    with what it changed from, because "why can she not sign in any more" is a
+    **Email is their login**, so changing it is a real change and not a contact
+    edit - the account they sign in with moves. It is recorded like any other,
+    with what it changed from, because "why can they not sign in any more" is a
     question that gets asked.
 
     Only supplied fields change. Passing nothing is not an error, and records
@@ -257,13 +257,13 @@ def _covers(month: str, start_month, end_month):
 
 
 def readiness(db: Session, month: str) -> dict[int, dict[str, bool]]:
-    """Per affiliate, whether the two things she needs in order to earn exist.
+    """Per affiliate, whether the two things they need in order to earn exist.
 
     A model earns nothing without **a code Shopify has confirmed** and **terms
-    saying what she is paid**. Either one missing is silent: orders arrive,
+    saying what they are paid**. Either one missing is silent: orders arrive,
     attribution finds no owner or the calculator finds no rate, and the first
-    anybody hears of it is the model asking why her dashboard is empty. The
-    list screen exists to catch that before she has to ask.
+    anybody hears of it is the model asking why their dashboard is empty. The
+    list screen exists to catch that before they have to ask.
 
     Two set-based queries rather than two per affiliate. Twenty models would
     otherwise be forty round trips for something the database answers in two -

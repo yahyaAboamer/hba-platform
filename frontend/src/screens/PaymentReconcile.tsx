@@ -14,7 +14,7 @@ type Kind = "credit" | "writeoff";
 /**
  * Settling an overpayment. §11.5, and Pattern C (§12.2).
  *
- * Reaching this page means she has been paid more than the month agreed —
+ * Reaching this page means they have been paid more than the month agreed —
  * usually because it was reopened to a lower figure after the money had gone,
  * sometimes a rounding split or a fee.
  *

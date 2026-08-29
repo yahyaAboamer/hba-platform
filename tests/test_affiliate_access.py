@@ -1,6 +1,6 @@
 """The ownership gate.
 
-§6.1 and ADR 0006: a model reaches her data by owning the record, never by
+§6.1 and ADR 0006: a model reaches their data by owning the record, never by
 holding a permission. This file proves the gate refuses everything it should,
 because it is the only thing standing between one model and another model's
 money.
@@ -45,27 +45,27 @@ def _model(db, email="nour@example.com", status=AffiliateStatus.ACTIVE):
 # ── What it allows ───────────────────────────────────────────────────────────
 
 
-def test_a_model_reaches_her_own_record(db):
+def test_a_model_reaches_their_own_record(db):
     account, affiliate = _model(db)
 
     assert current_affiliate(user=account, db=db).id == affiliate.id
 
 
-def test_a_paused_model_still_reaches_her_record(db):
+def test_a_paused_model_still_reaches_their_record(db):
     """§8: `inactive` is *not earning, may return*.
 
-    Locking her out would make "paused" and "archived" the same thing to the
-    only person they affect - and she still needs to see what she was owed
-    from before she was paused.
+    Locking them out would make "paused" and "archived" the same thing to the
+    only person they affect - and they still needs to see what they were owed
+    from before they were paused.
     """
     account, affiliate = _model(db, status=AffiliateStatus.INACTIVE)
 
     assert current_affiliate(user=account, db=db).id == affiliate.id
 
 
-def test_a_pending_model_reaches_her_record(db):
-    """She has applied and is waiting. She must be able to sign in and be told
-    that, rather than be refused as though she were nobody.
+def test_a_pending_model_reaches_their_record(db):
+    """They have applied and is waiting. They must be able to sign in and be told
+    that, rather than be refused as though they were nobody.
     """
     account, affiliate = _model(db, status=AffiliateStatus.PENDING)
 

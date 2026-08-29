@@ -104,10 +104,10 @@ def current_affiliate(
 ) -> AffiliateProfile:
     """The affiliate record this account **owns**, or refuse the request.
 
-    §6.1 and ADR 0006. A model reaches her data by owning the record, never by
+    §6.1 and ADR 0006. A model reaches their data by owning the record, never by
     holding a permission - `app/core/permissions.py` gives the `affiliate` role
     an empty permission set on purpose, so `require_permission` can never let
-    her through and is not meant to.
+    them through and is not meant to.
 
     Two gates, and they are never mixed:
 
@@ -115,7 +115,7 @@ def current_affiliate(
         current_affiliate    is this person the subject?    model routes
 
     A route accepting either would let a maintainer act *as* a model, and §6.5's
-    audit trail could not then distinguish that from the model acting herself.
+    audit trail could not then distinguish that from the model acting themselves.
     Where a maintainer needs a model's data there is already an admin route.
 
     **Every refusal is 403, never 404.** Whether an affiliate record exists for
@@ -136,7 +136,7 @@ def current_affiliate(
         raise HTTPException(403, "This account is no longer active")
 
     # `inactive` passes deliberately. §8: *not earning, may return*. A paused
-    # model must still see what she was owed from before she was paused;
-    # locking her out would make "paused" and "archived" the same thing to the
+    # model must still see what they were owed from before they were paused;
+    # locking them out would make "paused" and "archived" the same thing to the
     # only person they affect.
     return profile

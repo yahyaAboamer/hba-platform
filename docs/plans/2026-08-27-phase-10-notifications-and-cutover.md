@@ -4,7 +4,7 @@
 **ADRs:** 0009 (Postgres as the job queue), 0017 (proof visible to the affiliate),
 0021 (lease committed before work), 0030 (a reopened month emails once, on
 re-approval)
-**Depends on:** Phase 9 — every event this phase announces is a screen she can
+**Depends on:** Phase 9 — every event this phase announces is a screen they can
 now open
 **Delivers:** the last build phase, and the cutover it exists to make possible
 
@@ -67,7 +67,7 @@ with the retry behaviour that already exists (ADR 0021).
 
 ### The other rule
 
-**Every model gets email only.** There is no in-platform inbox for her; that
+**Every model gets email only.** There is no in-platform inbox for them; that
 channel is the maintainer's. §16 says so explicitly and it is worth restating
 here, because "notifications" is the kind of word that grows a bell icon in the
 corner of every screen if nobody stops it.
@@ -80,7 +80,7 @@ corner of every screen if nobody stops it.
 |---|---|---|
 | 1 | The outbox | A row written with the change, never instead of it |
 | 2 | Sending | The job that drains it, and what happens when it cannot |
-| 3 | The six emails that matter | §16's table, in her language |
+| 3 | The six emails that matter | §16's table, in their language |
 | 4 | Deploy | A real URL, a real database, real secrets |
 | 5 | The maintainer's warnings | In-platform, where the maintainer already looks |
 | 6 | Policy versions and the dictionary | Why a figure was what it was, and what the words mean |
@@ -114,7 +114,7 @@ open a connection of its own. That is the whole point — the email and the thin
 it announces succeed together or fail together.
 
 **The payload is frozen, not a set of references.** The same reasoning as
-`payroll_snapshot` (§11.1): an email that resolves *"her September figure"* at
+`payroll_snapshot` (§11.1): an email that resolves *"their September figure"* at
 send time will say something different from the screen if anything moved in
 between, and the model will be reading both.
 
@@ -154,8 +154,8 @@ that leaves the building. An email says a figure and links to the screen.
 | Event | To | Why it is here |
 |---|---|---|
 | **Application approved** | Model | **The one that carries the sign-in link.** This is what goes out on 31 August. |
-| Application submitted | Model + maintainer | She knows it arrived; somebody knows to look. |
-| Month approved | Model | What she is owed, now fixed. §11.1's whole distinction, delivered. |
+| Application submitted | Model + maintainer | They know it arrived; somebody knows to look. |
+| Month approved | Model | What they are owed, now fixed. §11.1's whole distinction, delivered. |
 | Payment recorded | Model | With the receipt (§14, ADR 0017). |
 | **Payout destination changed** | Maintainer, immediately | §6.4.5. The one email that is a security control rather than a courtesy. |
 | Month **re-approved** | Model | ADR 0030, and the case with the sharpest edge — below. |
@@ -167,8 +167,8 @@ reason, in plain language rather than copied from the audit log.
 
 And the sharp one: **if the new figure is lower than what was already paid, the
 email goes immediately, before any correction is applied.** There is no
-transfer to attach the news to and nothing will change in her bank account, so
-without it the first she hears of an overpayment is a smaller payment next
+transfer to attach the news to and nothing will change in their bank account, so
+without it the first they hear of an overpayment is a smaller payment next
 month. It names the resolution that was chosen: *"E£300 will come off next
 month's payment"*, or *"nothing further is needed from you"*.
 
@@ -232,10 +232,10 @@ once, in one place, instead of in six tooltips that drift.
 
 A model who signs in on 31 August or 1 September opens on September, and
 September has nothing in it. Today that reads *"Still adding up — E£0.00"*,
-which is true and lands badly as a first impression of a platform she was just
+which is true and lands badly as a first impression of a platform they were just
 invited to.
 
-It should say the month has not started rather than showing her a zero. Small,
+It should say the month has not started rather than showing them a zero. Small,
 and it is the first thing twenty people will see.
 
 ---
@@ -261,7 +261,7 @@ will not work for SMTP). Free and quick.
 
 **My recommendation: the provider, if HBA owns a domain.** These emails carry
 sign-in links, which is precisely the shape spam filters are trained on. A link
-from a personal Gmail address asking a model to sign in and check her payout
+from a personal Gmail address asking a model to sign in and check their payout
 details is one that a careful person *should* distrust — and one an incautious
 person clicking teaches to trust the next one, which may not be from you.
 
@@ -334,8 +334,8 @@ isolation is a different database, not a flag somebody has to remember.
 Then you walk through the whole thing as both people:
 
 **As the maintainer.** Bootstrap your account. Invite a model — use a second
-email address of your own. Approve her application, set what she is paid,
-register her code. Run the Shopify import. Open Payroll, look at the blockers,
+email address of your own. Approve their application, set what they are paid,
+register their code. Run the Shopify import. Open Payroll, look at the blockers,
 approve a month. Record a payment with a screenshot. Reopen a month and watch
 what the model is told.
 
@@ -381,14 +381,14 @@ and nobody has asked for one yet.
 
 ## What "done" looks like
 
-A model gets an email on 31 August from an address that looks like HBA's. She
-opens it on her phone, sets a password, fills in where she wants to be paid,
+A model gets an email on 31 August from an address that looks like HBA's. They
+open it on their phone, sets a password, fills in where they want to be paid,
 and sees that September has not started yet.
 
-In early October she gets a second email: September is agreed, and here is what
-she is owed. She opens it, and every figure adds up against what she sold.
+In early October they get a second email: September is agreed, and here is what
+they are owed. They open it, and every figure adds up against what they sold.
 
-The gap between those two emails is five weeks in which she can watch her own
+The gap between those two emails is five weeks in which they can watch their own
 month forming and never has to ask anybody how it is going.
 
-Nobody at HBA had to tell her any of that, and nobody had to remember to.
+Nobody at HBA had to tell their any of that, and nobody had to remember to.

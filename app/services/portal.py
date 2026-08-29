@@ -1,12 +1,12 @@
-"""What a model sees about her own money.
+"""What a model sees about their own money.
 
 §11.1, §11.4 and ADR 0014, from the other side of the screen.
 
 **Nothing here calculates anything.** Every figure already exists: the engine
 decided it in Phase 4, approval froze it in Phase 6, and this reads those
-decisions. A second implementation of what she is owed would be a second answer
+decisions. A second implementation of what they are owed would be a second answer
 waiting to disagree with the first, and the one it disagreed with would be the
-one she was paid.
+one they were paid.
 
 ## An agreed month is read from the snapshot, never recalculated
 
@@ -22,20 +22,20 @@ did.
 
 The second reason is subtler, and is why the whole breakdown comes from the
 payload rather than only the total: lines drawn from a live recalculation
-underneath a frozen total would not add up. She is the one person guaranteed
+underneath a frozen total would not add up. They are the one person guaranteed
 to check.
 
-## Blockers are translated, and none of them is her fault
+## Blockers are translated, and none of them is their fault
 
-Every blocker the platform can raise is HBA's own work - nobody has set her
-rate, nobody has recorded her targets, nobody has confirmed them, an order
-needs a decision. Not one is something she did, and
+Every blocker the platform can raise is HBA's own work - nobody has set their
+rate, nobody has recorded their targets, nobody has confirmed them, an order
+needs a decision. Not one is something they did, and
 `targets_achieved_but_not_verified` in particular reads as an accusation when
-it means the opposite: she hit them, and somebody here is slow.
+it means the opposite: they hit them, and somebody here is slow.
 
 So each one says whose move it is, and today every one of them says HBA. The
-field is not decoration - it is what lets the screen tell her there is nothing
-for her to do, which is the actual answer.
+field is not decoration - it is what lets the screen tell them there is nothing
+for them to do, which is the actual answer.
 
 ## No customer ever appears here
 
@@ -79,7 +79,7 @@ from app.services.targets import get_target
 #: `who` is `"hba"` for every one of them today. That is not an oversight -
 #: §11.3 blocks on missing information, and all of the information missing is
 #: information HBA records. The field exists so that a blocker which genuinely
-#: is hers can say so without the others quietly changing meaning.
+#: is theirs can say so without the others quietly changing meaning.
 WAITING_ON: dict[str, dict[str, str]] = {
     "no_compensation_terms_for_this_month": {
         "who": "hba",
@@ -120,7 +120,7 @@ WAITING_ON: dict[str, dict[str, str]] = {
     },
 }
 
-#: Not blockers to her - states. "Already approved" is the good outcome, and
+#: Not blockers to them - states. "Already approved" is the good outcome, and
 #: "settled before the platform" is what a historical month *is*. Showing
 #: either under "waiting on" would turn a finished month into a stuck one.
 NOT_HER_PROBLEM = frozenset(
@@ -133,7 +133,7 @@ NOT_HER_PROBLEM = frozenset(
     }
 )
 
-#: What each order state means to her. `void` matters most: §9.4 pays on
+#: What each order state means to them. `void` matters most: §9.4 pays on
 #: delivery, and an order that vanishes without a word looks like a mistake.
 ORDER_STATE_TEXT = {
     CommissionState.EARNED: "Counted",
@@ -149,7 +149,7 @@ def _display_piastres(exact: Decimal | str | int) -> int:
     on the total alone (ADR 0004); this rounds a single line so it can be shown
     beside the others, and the total is never assembled from these. Where they
     do not add up, `_makeup` says so in a line of its own rather than leaving
-    her to hunt for the gap.
+    them to hunt for the gap.
     """
     return int(Decimal(exact).quantize(Decimal(1), rounding=ROUND_HALF_UP))
 
@@ -169,18 +169,18 @@ def _as_payload(calculation: MonthCalculation) -> dict:
 
 
 def months_for(db: Session, affiliate: AffiliateProfile) -> list[str]:
-    """Every month she can look at, newest first.
+    """Every month they can look at, newest first.
 
-    From her first month to the working one. **Months before she joined are not
+    From their first month to the working one. **Months before they joined are not
     offered at all** - the maintainer's picker shows the whole calendar because
-    she is deciding which payroll to run, but a model opening a month that
-    predates her would find an empty screen with no way to tell whether that
+    they are deciding which payroll to run, but a model opening a month that
+    predates them would find an empty screen with no way to tell whether that
     meant nothing happened or something is broken.
 
-    Her first month is the earliest month she has an order in or a payroll
-    record for, whichever is earlier. Not her join date: an order can be
-    attributed to a month before her profile row was created, and it is the
-    orders she will be looking for.
+    Their first month is the earliest month they have an order in or a payroll
+    record for, whichever is earlier. Not their join date: an order can be
+    attributed to a month before their profile row was created, and it is the
+    orders they will be looking for.
     """
     earliest_order = db.scalar(
         select(AttributedOrder.business_month)
@@ -198,7 +198,7 @@ def months_for(db: Session, affiliate: AffiliateProfile) -> list[str]:
     working = working_month()
     known = [month for month in (earliest_order, earliest_payroll) if month]
     if not known:
-        # New, or joined before any order landed. One month: the one she is in.
+        # New, or joined before any order landed. One month: the one they are in.
         return [working]
 
     first = min(known)
@@ -229,26 +229,26 @@ def _not_started(month: str) -> bool:
     the platform starts in September. For the maintainer that month is
     something to get ready. For a model invited on the 31st of August it is a
     month with nothing in it, and *Still adding up - E0.00* is a poor first
-    thing to see from a platform she has just been told to trust.
+    thing to see from a platform they have just been told to trust.
 
     Compared against the real business month in Cairo (ADR 0005), never the
-    browser's clock: a model in another timezone must not be told her month has
+    browser's clock: a model in another timezone must not be told their month has
     not started when it has.
     """
     return month > business_month(utcnow())
 
 
 def _carried_out(db: Session, affiliate: AffiliateProfile, month: str) -> list[dict]:
-    """Orders she sold in this month that a **later** payroll paid.
+    """Orders they sold in this month that a **later** payroll paid.
 
-    The other half of §11.4, and the half only she needs. The maintainer sees
-    carry-forward as money arriving in September; she sees it as money missing
-    from August, because she counted August's orders herself and the total does
+    The other half of §11.4, and the half only they need. The maintainer sees
+    carry-forward as money arriving in September; they see it as money missing
+    from August, because they counted August's orders themselves and the total does
     not match.
 
     `calculate_month` deliberately excludes these from the month they were sold
     in - otherwise reopening August would offer money September already paid -
-    so without this line her arithmetic cannot close.
+    so without this line their arithmetic cannot close.
     """
     rows = db.execute(
         select(AttributedOrder, PayrollMonth.month)
@@ -314,8 +314,8 @@ def _makeup(figures: dict, total_piastres: int) -> list[dict]:
 
     if figures.get("guarantee_applied"):
         # §9.5. Never both, and never one on top of the other. Naming what it
-        # replaced is the difference between a floor she understands and a
-        # figure she cannot place.
+        # replaced is the difference between a floor they understand and a
+        # figure they cannot place.
         lines.append(
             {
                 "label": "Your guaranteed minimum",
@@ -374,17 +374,17 @@ def _makeup(figures: dict, total_piastres: int) -> list[dict]:
 
 
 def _guarantee(figures: dict) -> dict | None:
-    """Her guaranteed minimum, and why it is or is not in the figure above.
+    """Their guaranteed minimum, and why it is or is not in the figure above.
 
     Only on a `base_guarantee` arrangement, and **present whether or not it
-    applied** - which is the whole point. A month where her targets have not
-    been recorded pays her commission, because §9.5's comparison has no answer
+    applied** - which is the whole point. A month where their targets have not
+    been recorded pays their commission, because §9.5's comparison has no answer
     without them. Sara's September looked like this: a guaranteed minimum of
     E£8,000, a commission of E£1,100, and a screen showing E£1,100 with no
     mention of the guarantee at all.
 
     Nothing was wrong with the figure. What was wrong was that the one number
-    she signed for did not appear on the screen, so the honest reading of it
+    they signed for did not appear on the screen, so the honest reading of it
     was *they have forgotten my minimum*.
     """
     if figures.get("compensation_type") != CompensationType.BASE_GUARANTEE:
@@ -396,20 +396,20 @@ def _guarantee(figures: dict) -> dict | None:
         "amount": format_egp(amount),
         "applied": bool(figures.get("guarantee_applied")),
         # §15. Three answers, not two. `null` means nobody has recorded what
-        # she produced - a different thing from missing the target, and the
-        # difference decides which sentence she should be reading.
+        # they produced - a different thing from missing the target, and the
+        # difference decides which sentence they should be reading.
         "targets_achieved": figures.get("target_achieved"),
         "targets_verified": bool(figures.get("target_verified")),
     }
 
 
 def my_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
-    """One of her months: what it is worth, and whether that is settled.
+    """One of their months: what it is worth, and whether that is settled.
 
-    Three shapes, and which one she gets is the most important thing on the
+    Three shapes, and which one they get is the most important thing on the
     screen (§11.1).
 
-    *Historical* - before go-live. Her sales are real and there is no
+    *Historical* - before go-live. Their sales are real and there is no
     commission figure, because March's rates live in the old system and in
     somebody's memory (ADR 0014). Shown with the reason attached: an empty
     commission on a month full of sales reads as *HBA did not pay me for
@@ -418,7 +418,7 @@ def my_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
     *Open* - still moving. Orders are still arriving and the figure will
     change.
 
-    *Agreed* - frozen. This is what she is owed, and it does not move again.
+    *Agreed* - frozen. This is what they are owed, and it does not move again.
     """
     parse_month(month)
     working = working_month()
@@ -427,7 +427,7 @@ def my_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
         # **A normal month with one thing missing.** The business asked for
         # this and was right: the orders are real, the counting is real, only
         # the *payment* happened elsewhere. Reporting one lump of sales and
-        # nothing else made a month she worked look like a month that did not
+        # nothing else made a month they worked look like a month that did not
         # happen.
         #
         # So the states are counted the same way they are in any other month,
@@ -473,7 +473,7 @@ def my_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
             "targets": None,
             "commission_rate_bp": None,
             "waiting_on": [],
-            # Her words, not the platform's. She does not know or care what a
+            # Their words, not the platform's. They do not know or care what a
             # platform is, and the earlier version's blank read as *they did
             # not pay me for June*.
             "note": (
@@ -510,9 +510,9 @@ def my_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
         "sales": {
             "earned_piastres": figures["earned_base_piastres"],
             "earned": format_egp(figures["earned_base_piastres"]),
-            # Shown, never hidden. Hiding an order still in transit makes her
+            # Shown, never hidden. Hiding an order still in transit makes their
             # month look smaller than it is, and produces exactly the question
-            # this platform exists to stop her having to ask.
+            # this platform exists to stop their having to ask.
             "pending_piastres": figures["pending_base_piastres"],
             "pending": format_egp(figures["pending_base_piastres"]),
         },
@@ -545,7 +545,7 @@ def my_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
         # keeps answering "could this be approved *now*", and after approval
         # that question has a stale answer: unverifying a target in October
         # would otherwise put "someone still has to confirm your numbers" on
-        # top of a month she was paid for in September.
+        # top of a month they were paid for in September.
         "waiting_on": (
             []
             if agreed
@@ -560,9 +560,9 @@ def my_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
 
 
 def my_orders(db: Session, affiliate: AffiliateProfile, month: str) -> list[dict]:
-    """The orders behind the figure, so she can count them against her own list.
+    """The orders behind the figure, so they can count them against their own list.
 
-    Order number, date, what it was worth to her, whether it counts, and which
+    Order number, date, what it was worth to them, whether it counts, and which
     payroll paid it. **No customer appears** - not because anything is filtered
     here, but because §10.2's index never stored a name, an address or a phone
     number in the first place.
@@ -614,22 +614,22 @@ def my_orders(db: Session, affiliate: AffiliateProfile, month: str) -> list[dict
 def _targets(
     db: Session, affiliate: AffiliateProfile, month: str, figures: dict
 ) -> dict | None:
-    """What was asked of her, what was recorded, and whether it changes her pay.
+    """What was asked of them, what was recorded, and whether it changes their pay.
 
     §15, and the last clause is the one that matters. Targets are
     **informational** on a commission or salary-plus-commission arrangement and
     decide money only on a guaranteed minimum. A model on commission who sees a
-    target she missed should not think she has lost anything, because she has
-    not - and a screen that cannot tell the two apart teaches her to read every
+    target they missed should not think they have lost anything, because they have
+    not - and a screen that cannot tell the two apart teaches them to read every
     shortfall as money gone.
 
     `None` when nothing was ever recorded for the month. There is no sentence
     worth writing about a target that does not exist on an arrangement it would
-    not affect; where it *would* affect her, `_guarantee` is already saying so
-    in the one place she is looking.
+    not affect; where it *would* affect them, `_guarantee` is already saying so
+    in the one place they are looking.
 
-    **Nothing here is editable and no route offers to change it** (§6.5). She
-    sees what was recorded; recording is somebody else's job.
+    **Nothing here is editable and no route offers to change it** (§6.5). They
+    see what was recorded; recording is somebody else's job.
     """
     target = get_target(db, affiliate, month)
     if target is None:
@@ -655,7 +655,7 @@ def _targets(
 
 
 #: What a credit or a write-off means to the person it was made about. §11.5
-#: requires these to be visible to her: *a credit she cannot see is a credit she
+#: requires these to be visible to them: *a credit they cannot see is a credit they
 #: cannot check.*
 #:
 #: Each says which direction the money went, because "adjustment" on its own is
@@ -668,7 +668,7 @@ ADJUSTMENT_TEXT = {
 
 
 def _settled_by(db: Session, affiliate: AffiliateProfile) -> dict[int, list[dict]]:
-    """Which months each of her payments settled, keyed by payment id.
+    """Which months each of their payments settled, keyed by payment id.
 
     A transfer can cover more than one month, and can arrive before anybody has
     decided which - `record_payment` allows an empty allocation on purpose, so
@@ -712,12 +712,12 @@ def _month_of(db: Session, payroll_month_id: int | None) -> str | None:
 def my_payments(db: Session, affiliate: AffiliateProfile) -> dict:
     """What has arrived, when, and what is still outstanding.
 
-    §14. Deliberately a different screen from her earnings, and they stay
+    §14. Deliberately a different screen from their earnings, and they stay
     different: *what I have earned* and *what has arrived* have different
     answers for most of any month, and merging them is how a model ends up
-    believing she has been paid twice, or not at all.
+    believing they have been paid twice, or not at all.
 
-    Three lists, and each answers a question she actually asks.
+    Three lists, and each answers a question they actually asks.
 
     **Per month** - what was agreed, what has been paid against it, what is
     left. The settlement state is derived from the ledger every time it is
@@ -728,13 +728,13 @@ def my_payments(db: Session, affiliate: AffiliateProfile) -> dict:
     against it is normal: money can arrive before anybody has decided what it
     covers.
 
-    **Every adjustment** - §11.5 requires these to be visible to her, with the
+    **Every adjustment** - §11.5 requires these to be visible to them, with the
     reason that was written at the time.
 
-    Her payout destination appears **masked**, exactly as it does everywhere
-    else. She supplied it, so it tells her nothing she does not know, and a
+    Their payout destination appears **masked**, exactly as it does everywhere
+    else. They supplied it, so it tells them nothing they do not know, and a
     screen printing an account number in full is one worth photographing over
-    her shoulder.
+    their shoulder.
     """
     months = []
     for month in months_for(db, affiliate):
@@ -745,7 +745,7 @@ def my_payments(db: Session, affiliate: AffiliateProfile) -> dict:
             continue
         balance = balance_for(db, affiliate, month)
         if balance["state"] == SettlementState.NOT_APPROVED:
-            # Nothing agreed yet. That belongs on her earnings screen, which
+            # Nothing agreed yet. That belongs on their earnings screen, which
             # says the month is still moving; here it would read as an unpaid
             # bill.
             continue
@@ -757,11 +757,11 @@ def my_payments(db: Session, affiliate: AffiliateProfile) -> dict:
                 "obligation": format_egp(balance["obligation_piastres"]),
                 "paid_piastres": balance["paid_piastres"],
                 "paid": format_egp(balance["paid_piastres"]),
-                # Without these her arithmetic does not close. A month agreed
+                # Without these their arithmetic does not close. A month agreed
                 # at 2,400 and settled by a transfer of 2,340 reads as sixty
                 # pounds short unless the row itself says the rest was written
                 # off - and the adjustment panel further down is not something
-                # she will connect to this line on her own.
+                # they will connect to this line on their own.
                 "adjusted_piastres": balance["adjusted_piastres"],
                 "adjusted": format_egp(balance["adjusted_piastres"]),
                 # §11.5. An overpayment from an earlier month, applied here.
@@ -824,20 +824,20 @@ def my_payments(db: Session, affiliate: AffiliateProfile) -> dict:
 
 
 def my_year(db: Session, affiliate: AffiliateProfile) -> dict:
-    """Every month she has, as two series and a summary.
+    """Every month they have, as two series and a summary.
 
     The fifth screen. Nothing here is new arithmetic - each month is the same
     `my_month` the Earnings screen shows, gathered.
 
     **Two series that measure different things**, which is the whole design
     constraint. The business caught the first attempt reporting the same facts
-    twice with a different y-axis, and was right: what she earned and what she
+    twice with a different y-axis, and was right: what they earned and what they
     sold move together on a commission arrangement, so drawing both is drawing
     one thing.
 
     So one is money and the other is a count:
 
-    - `earned` — what reached her. A trend, drawn as a line, because the
+    - `earned` — what reached them. A trend, drawn as a line, because the
       question is *am I going up?* and the eye answers that from a slope.
     - `orders` — how many arrived. A tally, drawn as bars, because you can
       compare bar heights exactly in a way you cannot compare points.
@@ -847,7 +847,7 @@ def my_year(db: Session, affiliate: AffiliateProfile) -> dict:
 
     **A month before go-live has no `earned` figure** and says so with `null`
     rather than a zero. Its sales and orders are real (ADR 0014); the
-    commission was agreed elsewhere, and a zero on a chart is a claim that she
+    commission was agreed elsewhere, and a zero on a chart is a claim that they
     earned nothing.
     """
     months = months_for(db, affiliate)

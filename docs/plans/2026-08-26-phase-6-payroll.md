@@ -165,12 +165,12 @@ approved appears in **September's** draft as a labelled line: *"Carried forward 
 **Its `business_month` never changes.** August sales means orders placed in August, and that
 is frozen by trigger (Phase 4 Task 1). Carry-forward is about *which payroll pays it*, never
 about which month it belongs to — and conflating the two is what would make a model's own
-arithmetic disagree with her payment.
+arithmetic disagree with their payment.
 
 **This is the answer to HBA's question about closed months.** A model looking at August will
 see that order, because it is an August sale. `attributed_order.settled_in_snapshot_id` —
 deferred from Phase 4 precisely until snapshots existed — records **which payroll actually
-paid it**, so her dashboard can say *"paid in your September payment"* rather than leaving her
+paid it**, so their dashboard can say *"paid in your September payment"* rather than leaving them
 to work out why the numbers differ.
 
 **Nothing carries backwards.** §9.3 and ADR 0025: a return, a refund or a correction arriving
@@ -251,7 +251,7 @@ boundary month behaves as live; an unconfigured go-live blocks approval rather t
 GET  /api/payroll/{month}                    every model, figures, blockers
 POST /api/payroll/{month}/approve            one or many, with a preview first
 POST /api/payroll/{month}/reopen             reason required
-GET  /api/affiliates/{id}/payroll/{month}    one model, with her snapshot history
+GET  /api/affiliates/{id}/payroll/{month}    one model, with their snapshot history
 ```
 
 **Approval is a POST that can be previewed.** §11.3 requires seeing every model, amount and
@@ -270,7 +270,7 @@ named; reopening without a reason is refused; a model may not see any of it.
 
 - **Payments.** Phase 7. This phase produces an obligation; nothing here records money moving,
   and `balance_due` is therefore always the full obligation until then.
-- **Notifications.** §16 emails a model when her month is approved. `notification_outbox`
+- **Notifications.** §16 emails a model when their month is approved. `notification_outbox`
   exists from Phase 2; wiring it is Phase 10, and the outbox is written transactionally with
   the approval so nothing is lost in between.
 - **The interface.** Screens come after Phase 7, against a settled model.

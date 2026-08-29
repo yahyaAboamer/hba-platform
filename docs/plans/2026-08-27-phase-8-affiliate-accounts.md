@@ -18,17 +18,17 @@ gated on a permission, every screen is an admin screen, and the only way an affi
 record comes into existence is an administrator typing it in against an account somebody
 else already made.
 
-This phase opens the second door. A model gets an account, applies for herself, and
-manages the one thing about her record that is genuinely hers — where her money goes.
+This phase opens the second door. A model gets an account, applies for themselves, and
+manages the one thing about their record that is genuinely theirs — where their money goes.
 
-It stops short of showing her what she has earned. That is Phase 9, and the split is
+It stops short of showing them what they have earned. That is Phase 9, and the split is
 deliberate: **accounts and money-in are different risks from money-out.** Getting a model
-signed in wrongly is an access bug; showing her the wrong figure is a trust bug, and it
+signed in wrongly is an access bug; showing them the wrong figure is a trust bug, and it
 deserves its own phase with its own attention.
 
 ### The rule the whole phase rests on
 
-§6.1 and ADR 0006. **A model reaches her data by owning the record, never by holding a
+§6.1 and ADR 0006. **A model reaches their data by owning the record, never by holding a
 permission.**
 
 `app/core/permissions.py` already says this out loud — the `affiliate` role's permission
@@ -48,9 +48,9 @@ Two gates, never mixed:
 | Is this person the subject of this record? | `current_affiliate` | Every model route |
 
 Mixing them is the failure to avoid. A staff route that also accepts ownership would let a
-model reach an admin screen for her own row; a model route that also accepts a permission
+model reach an admin screen for their own row; a model route that also accepts a permission
 would let an administrator quietly act *as* a model, which §6.5's audit trail could not
-then distinguish from the model acting herself.
+then distinguish from the model acting themselves.
 
 ---
 
@@ -61,7 +61,7 @@ Both were introduced earlier and are recorded here rather than discovered later.
 **A model signing in today gets a broken admin screen.** `App.tsx` renders the admin
 `Layout` for any session at all, and `/` is the maintainer's Overview, which calls
 `/api/payroll/{month}` — a route requiring `affiliates.view`. A model has no such
-permission, so she would land on the admin sidebar and a 403. Nothing about this is
+permission, so they would land on the admin sidebar and a 403. Nothing about this is
 harmful, and all of it is embarrassing on first contact.
 
 **§6.4.5's warning reaches no screen.** `changed_recently` was written in Phase 3 and its
@@ -81,11 +81,11 @@ them through a `notification_outbox` that does not exist yet. Phase 10. Until th
 invitation link is handed to the maintainer to send, exactly as staff invitations already
 work in Settings.
 
-**No earnings, orders, or payment history for the model.** Phase 9. This phase gives her
-an account and one screen: her own details.
+**No earnings, orders, or payment history for the model.** Phase 9. This phase gives them
+an account and one screen: their own details.
 
 **No illustrated InstaPay guide.** §13.1 wants screenshots showing a model where to find
-her Payment Address. *Blocked on the business* — the assets do not exist. The field is
+their Payment Address. *Blocked on the business* — the assets do not exist. The field is
 built with written guidance and a place for the images to land.
 
 **The InstaPay deep-link is still unverified.** §13.1 calls this an implementation
@@ -102,7 +102,7 @@ than a dead end. **Raising it again here rather than letting it disappear.**
 |---|---|---|
 | 1 | `current_affiliate` | The ownership gate, and the tests that prove it does not leak |
 | 2 | Affiliate invitations | An invite that creates a model, not a staff account |
-| 3 | The application | What a model fills in for herself, and what it may not set |
+| 3 | The application | What a model fills in for themselves, and what it may not set |
 | 4 | The affiliate shell | Where a signed-in model lands, instead of a broken admin screen |
 | 5 | Payout destination, self-service | §6.4's high-risk change, done by its owner |
 | 6 | The recent-change warning | §6.4.5, wired to the payment screen at last |
@@ -111,7 +111,7 @@ than a dead end. **Raising it again here rather than letting it disappear.**
 **Batches**, as agreed:
 
 - **Batch A — tasks 1, 2, 3.** The spine: a model can be invited, apply, and exist.
-- **Batch B — tasks 4, 5, 6.** Self-service: she can sign in, see herself, and move her money.
+- **Batch B — tasks 4, 5, 6.** Self-service: they can sign in, see themselves, and move their money.
 - **Batch C — task 7.** The maintainer closes the loop.
 
 Each batch is one PR, tested and merged before the next starts.
@@ -143,8 +143,8 @@ Four refusals, each with its own test:
 | Account owning no profile at all | Fails closed |
 
 **`inactive` is allowed through, deliberately.** §8's own words: *not earning, may return*.
-A paused model must still be able to sign in and see what she is owed from before she was
-paused — locking her out would make "paused" indistinguishable from "archived" to the only
+A paused model must still be able to sign in and see what they are owed from before they were
+paused — locking them out would make "paused" indistinguishable from "archived" to the only
 person it affects.
 
 **A second dependency, `affiliate_or_owner`, is not built.** It is the obvious convenience
@@ -159,17 +159,17 @@ there is already an admin route for it.
 
 `Invitation` already carries `email`, `role`, a hashed single-use token, and an expiry.
 Accepting creates a `user_account` plus a `role_assignment`. For a model that is not
-enough: she also needs an `affiliate_profile`, and it must not exist until she has
+enough: they also needs an `affiliate_profile`, and it must not exist until they have
 actually applied.
 
 **The invitation says who and what, never how much.** It carries `email` and
 `role='affiliate'` and nothing else. No name, no proposed code, no compensation. Anything
 the invitation carried would be a figure the maintainer typed before the model was asked,
-and §13's step 2 is explicit that the model supplies her own details.
+and §13's step 2 is explicit that the model supplies their own details.
 
 **Accepting an affiliate invitation creates the account and stops.** It does not create the
-profile. The profile is created by the application (task 3), because until she has told us
-her name and code there is nothing to create a profile *from*, and a half-empty `pending`
+profile. The profile is created by the application (task 3), because until they have told us
+their name and code there is nothing to create a profile *from*, and a half-empty `pending`
 row is a row that looks like an application nobody made.
 
 **Reuses the existing token machinery unchanged.** Same hash, same single use, same expiry,
@@ -204,7 +204,7 @@ approving an affiliate with no verified code raises. Registering the code here m
 maintainer's review has something concrete to verify rather than a free-text field to
 retype, and the existing gate does the refusing.
 
-**Nothing on this form decides what she is paid.** §6.5. No compensation type, no rate, no
+**Nothing on this form decides what they are paid.** §6.5. No compensation type, no rate, no
 targets. The application collects identity and destination; the money terms are the
 maintainer's, at review. This is checked server-side rather than merely omitted from the
 form — a form that only *looks* restricted is not a control.
@@ -230,11 +230,11 @@ Where a model lands. Today: the admin sidebar and a 403.
 **Routing splits on what the session is, not on what it may do.** `/api/auth/me` already
 returns the actor's role; the shell chooses on `role === 'affiliate'`. A model never sees
 the maintainer's navigation, and a maintainer never sees the model's — not because the
-other one would refuse her, but because a menu full of things that refuse you is a menu
+other one would refuse them, but because a menu full of things that refuse you is a menu
 that teaches you the tool is broken.
 
-**One screen this phase: her own details.** Name, phone, her discount code and whether it
-is confirmed, and where her money goes. Earnings, orders and payments arrive in Phase 9,
+**One screen this phase: their own details.** Name, phone, their discount code and whether it
+is confirmed, and where their money goes. Earnings, orders and payments arrive in Phase 9,
 and the screen says so plainly rather than showing empty panels.
 
 **§12.5: the affiliate portal is phone-first.** The admin screens are laptop-first because
@@ -242,7 +242,7 @@ they are used to reconcile twenty rows at month end. This one is used standing u
 phone, and is built that way from the start rather than retrofitted.
 
 **A pending application shows its own state.** A model who has applied and not yet been
-approved signs in to *"We have your application"*, not to an empty dashboard. She is the
+approved signs in to *"We have your application"*, not to an empty dashboard. They are the
 one person for whom "nothing here yet" and "we are still looking at it" are completely
 different messages.
 
@@ -276,7 +276,7 @@ confirmation step, and a model being allowed to call any of it.
 
 **The password check is its own service function, not inline.** `authenticate` already
 exists and already returns `None` rather than raising, and reusing it means a model
-re-entering her password is checked by exactly the code that checks it at sign-in.
+re-entering their password is checked by exactly the code that checks it at sign-in.
 
 ---
 
@@ -293,7 +293,7 @@ changed within seven days — the moment a redirected payout would actually cost
 it is one number in one place.
 
 **The warning does not block.** A destination changing shortly before payday is
-overwhelmingly a model who switched banks, and refusing to pay her would be the wrong
+overwhelmingly a model who switched banks, and refusing to pay them would be the wrong
 default by a wide margin. It is a warning because the person paying is the one who can tell
 the difference, and they cannot tell it if nobody mentions it.
 
@@ -310,7 +310,7 @@ and those are the ones that get folded into something bigger and lost.
 
 A pending application is currently visible on the Affiliates list as a row marked *waiting
 to be approved*, which is enough to know it exists and not enough to act on. This is the
-screen that acts on it: what she submitted, the code verified against Shopify, compensation
+screen that acts on it: what they submitted, the code verified against Shopify, compensation
 set, targets set, approved.
 
 **Approval already refuses an unverified code.** `set_status` raises, per §10.4. This screen
@@ -331,12 +331,12 @@ person.
 
 ## What "done" looks like
 
-A model is invited from Settings, opens the link, sets a password, fills in her own name,
-phone, code and payout details, and signs in to a phone-shaped screen that tells her she
-has applied. The maintainer sees the application, verifies the code against Shopify, sets
-her terms and her targets, and approves her. She signs in again and the screen says she is
-on the programme. She changes her InstaPay address, re-entering her password to do it, and
-the next time anybody opens her payment screen it says the destination changed two days
+A model is invited from Settings, opens the link, sets a password, fills in their own name,
+phone, code and payout details, and signs in to a phone-shaped screen that tells them they
+have applied. The maintainer sees the application, verifies the code against Shopify, sets
+their terms and their targets, and approves them. They sign in again and the screen says they are
+on the programme. They change their InstaPay address, re-entering their password to do it, and
+the next time anybody opens their payment screen it says the destination changed two days
 ago.
 
 No email is sent at any point in that sequence, and every step of it is in the audit trail.

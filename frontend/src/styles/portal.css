@@ -104,7 +104,7 @@
 }
 
 /* The month that has not started. No figure at all — a zero is a statement
-   about what she earned, and this is a statement about the calendar. */
+   about what they earned, and this is a statement about the calendar. */
 .affiliate .figure__note--lead {
   max-width: 32ch;
   font-size: var(--text-base);
@@ -137,7 +137,7 @@
  * button makes it like, okay, there's something I need to know about."*
  *
  * Curiosity is cheaper than obligation. Everything that was a permanent
- * explanation is now something she can open once and never again.
+ * explanation is now something they can open once and never again.
  */
 .affiliate .expl {
   display: inline;

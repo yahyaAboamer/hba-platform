@@ -28,8 +28,8 @@
 }
 
 /*
- * Two columns, never three. The panels pair: what she has earned sits above
- * her codes on the left, how she is paid above where the money goes on the
+ * Two columns, never three. The panels pair: what they have earned sits above
+ * their codes on the left, how they are paid above where the money goes on the
  * right. Letting the browser fit as many columns as would go put a fourth
  * panel hanging under the first, which reads as a layout that broke rather
  * than one that was chosen.

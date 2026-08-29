@@ -1,4 +1,4 @@
-/* Her year. Two charts that measure different things — money as a trend,
+/* Their year. Two charts that measure different things — money as a trend,
    orders as a tally — and never restate each other. */
 
 .year {
@@ -45,7 +45,7 @@
 }
 
 /* A month the platform did not pay for. Present on the baseline and never
-   plotted: its sales are real, and a zero would be a claim that she earned
+   plotted: its sales are real, and a zero would be a claim that they earned
    nothing. */
 .chart__hollow {
   fill: var(--surface);

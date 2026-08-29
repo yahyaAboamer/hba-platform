@@ -18,16 +18,16 @@ import "./AffiliateHome.css";
 type Mine = { applied: boolean; status: string | null };
 
 /**
- * Where a model lands after signing in, and everything she can reach.
+ * Where a model lands after signing in, and everything they can reach.
  *
  * The routing splits on **what the session is**, not on what it may do: a
  * model never sees the maintainer's navigation, and not because those screens
- * would refuse her. A menu full of things that refuse you is a menu that
+ * would refuse them. A menu full of things that refuse you is a menu that
  * teaches you the tool is broken.
  *
- * **A pending application gets no tabs.** She is not on the programme yet, so
- * an Earnings tab would open on a month with no pay terms and tell her HBA has
- * not set her rate — true, and a worse answer than "we are checking your
+ * **A pending application gets no tabs.** They are not on the programme yet, so
+ * an Earnings tab would open on a month with no pay terms and tell their HBA has
+ * not set their rate — true, and a worse answer than "we are checking your
  * application". Tabs appear when there is something behind them.
  */
 export function AffiliatePortal({ session }: { session: Session }) {
@@ -47,7 +47,7 @@ export function AffiliatePortal({ session }: { session: Session }) {
       .then((body) => {
         setMine(body);
         // Only once a profile exists - `/api/me` is gated on owning one, so
-        // asking before she has applied would be a guaranteed 403.
+        // asking before they have applied would be a guaranteed 403.
         if (!body.applied) return undefined;
         return Promise.all([
           api.get<Me>("/api/me"),
@@ -55,7 +55,7 @@ export function AffiliatePortal({ session }: { session: Session }) {
         ]).then(([detail, calendar]) => {
           setMe(detail);
           setMonths(calendar.months);
-          // Opens on the working month and stays wherever she moves it. The
+          // Opens on the working month and stays wherever they move it. The
           // server decides which month that is - the browser's clock is not
           // in Cairo and is not authoritative about anything (ADR 0005).
           setMonth((was) => was ?? calendar.months[0] ?? null);
@@ -76,11 +76,11 @@ export function AffiliatePortal({ session }: { session: Session }) {
     <div className="affiliate__head">
       <div>
         {/*
-         * **Her name is the heading; HBA is the address.** It was the other
-         * way round - the brand set large in a serif with her name small
+         * **Their name is the heading; HBA is the address.** It was the other
+         * way round - the brand set large in a serif with their name small
          * underneath - which is right for a shop window and wrong for
-         * somebody's own account page. She knows who HBA is; what she needs
-         * to see is that this is *hers*.
+         * somebody's own account page. They know who HBA is; what they need
+         * to see is that this is *theirs*.
          *
          * The mark stays, small and quiet, because it is the only thing on
          * screen saying whose site this is - and most people arrive here from
@@ -91,7 +91,7 @@ export function AffiliatePortal({ session }: { session: Session }) {
           {session.actor.display_name || session.actor.email}
         </h1>
         {/*
-         * Her code, beside her name. It is the thing she gives out, the thing
+         * Their code, beside their name. It is the thing they give out, the thing
          * customers type, and the reason any of these figures exist - and it
          * lived three taps away on the You screen.
          */}
@@ -137,7 +137,7 @@ export function AffiliatePortal({ session }: { session: Session }) {
   }
 
   // Invited, accepted, and not yet applied. The form is the whole screen -
-  // there is nothing else for her to do until it is sent.
+  // there is nothing else for them to do until it is sent.
   if (!mine.applied) return <Apply onApplied={load} />;
 
   if (me === null || month === null) {
@@ -176,8 +176,8 @@ export function AffiliatePortal({ session }: { session: Session }) {
 
       {/*
        * True across every tab, so it sits above them rather than on one. §8:
-       * *not earning, may return* - and anything she was already owed still
-       * stands, which is the part she will be worried about.
+       * *not earning, may return* - and anything they were already owed still
+       * stands, which is the part they will be worried about.
        */}
       {mine.status === "inactive" && (
         <p className="notice affiliate__paused">

@@ -478,7 +478,7 @@ def test_a_credit_cannot_land_on_the_month_it_came_from(client):
     assert response.status_code == 400
 
 
-# ── What is outstanding, and her history ───────────────────────────────────────
+# ── What is outstanding, and their history ───────────────────────────────────────
 
 
 def test_the_month_shows_who_is_still_owed(client):
@@ -501,9 +501,9 @@ def test_the_month_shows_who_is_still_owed(client):
     assert body["totals"]["still_owed_piastres"] == 200_000
 
 
-def test_her_history_shows_payments_and_adjustments(client):
-    """§11.5 requires adjustments to be visible to her - a credit she cannot
-    see is a credit she cannot check.
+def test_their_history_shows_payments_and_adjustments(client):
+    """§11.5 requires adjustments to be visible to them - a credit they cannot
+    see is a credit they cannot check.
     """
     affiliate = _affiliate(client)
     snapshot = _owed(client, affiliate)
@@ -534,8 +534,8 @@ def test_her_history_shows_payments_and_adjustments(client):
     assert body["adjustments"][0]["reason"] == "transfer fee absorbed"
 
 
-def test_a_recorded_destination_is_masked_in_her_history(client):
-    """§6.4.4. Never the raw address, anywhere but her own screen."""
+def test_a_recorded_destination_is_masked_in_their_history(client):
+    """§6.4.4. Never the raw address, anywhere but their own screen."""
     affiliate = _affiliate(client)
     client.put(
         f"/api/affiliates/{affiliate['id']}/payout-destination",
@@ -562,7 +562,7 @@ def test_a_recorded_destination_is_masked_in_her_history(client):
 
 
 def test_a_model_may_record_nothing(client):
-    """§6.5. She may never touch anything determining what she is owed."""
+    """§6.5. They may never touch anything determining what they are owed."""
     affiliate = _affiliate(client)
     with engine.begin() as connection:
         connection.execute(text("UPDATE role_assignment SET role = 'affiliate'"))

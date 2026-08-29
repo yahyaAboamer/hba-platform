@@ -203,8 +203,8 @@ function InvitePanel() {
       )}
 
       {/*
-       * Staff only, and it says so. Inviting a model is a different act - she
-       * holds no permission at all (§6.1) - and it lives on Affiliates, where
+       * Staff only, and it says so. Inviting a model is a different act - they
+       * hold no permission at all (§6.1) - and it lives on Affiliates, where
        * models live. Offering both from one list said they were variations of
        * one decision.
        */}

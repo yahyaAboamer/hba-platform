@@ -97,7 +97,7 @@ const COMMISSION_LABEL: Record<string, string> = {
 /**
  * Why one order reads the way it does.
  *
- * Affiliates, Payroll and Payments each answer "what does she earn" for a
+ * Affiliates, Payroll and Payments each answer "what does they earn" for a
  * model or a month. This answers the question that actually arrives one order
  * at a time — whose code it carried, whether Shopify has said it arrived,
  * which payroll paid it — so the order is the unit here, not the person.

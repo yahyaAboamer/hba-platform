@@ -16,11 +16,11 @@ type Method = "instapay" | "bank" | "wallet";
  * The same rule as `normalise_instapay_address` on the server, for immediate
  * feedback. **The server is the control; this is the courtesy.** It is
  * duplicated rather than fetched because a model typing into a field should
- * not wait on a round trip to be told she pasted her phone number.
+ * not wait on a round trip to be told they pasted their phone number.
  *
  * The host is checked and the path is not, for the reason the server gives:
  * no real address has ever been seen here, and refusing a genuine one because
- * its path looks unfamiliar would stop her joining at all.
+ * its path looks unfamiliar would stop them joining at all.
  */
 export function instapayProblem(value: string): string | null {
   const cleaned = value.trim();
@@ -52,12 +52,12 @@ const METHOD_LABEL: Record<Method, string> = {
 };
 
 /**
- * §13 step 2. What a model fills in for herself.
+ * §13 step 2. What a model fills in for themselves.
  *
  * Phone-first (§12.5): the admin screens are used to reconcile twenty rows at
  * month end on a laptop; this one is filled in once, standing up, on a phone.
  *
- * **Nothing here decides what she is paid.** No rate, no salary, no targets —
+ * **Nothing here decides what they are paid.** No rate, no salary, no targets —
  * §6.5. Their absence is enforced server-side; the form simply has nowhere to
  * put them.
  */

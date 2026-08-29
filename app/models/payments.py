@@ -58,10 +58,10 @@ from app.db import Base
 class AdjustmentType:
     """§11.5. Money moving without a transfer."""
 
-    #: She was overpaid, and the excess is applied against a later month.
+    #: They were overpaid, and the excess is applied against a later month.
     CREDIT = "credit"
 
-    #: She was overpaid, and HBA absorbs it. Nothing is recovered.
+    #: They were overpaid, and HBA absorbs it. Nothing is recovered.
     WRITEOFF = "writeoff"
 
     #: A bookkeeping correction that is neither of the above.
@@ -129,7 +129,7 @@ class PaymentTransaction(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     affiliate_id: Mapped[int] = mapped_column(
         # RESTRICT. Deleting somebody who has been paid should fail loudly
-        # rather than quietly erase the record that she was.
+        # rather than quietly erase the record that they were.
         ForeignKey("affiliate_profile.id", ondelete="RESTRICT"), nullable=False
     )
 

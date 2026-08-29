@@ -7,8 +7,8 @@ does not move.
 ## Blockers refuse, they do not warn
 
 §11.3, and the distinction underneath it is the whole design: **the block is on
-missing information, never on poor performance.** A model who missed her targets
-is paid her commission, promptly, and her month closes. A month nobody has
+missing information, never on poor performance.** A model who missed their targets
+is paid their commission, promptly, and their month closes. A month nobody has
 recorded anything for does not, because the platform genuinely does not know.
 
 A warning that can be clicked past is not a control. Every blocker here refuses.
@@ -18,7 +18,7 @@ A warning that can be clicked past is not a control. Every blocker here refuses.
 `assert_correctable` (compensation, Phase 3) and `assert_recordable` (targets,
 Phase 5) have blocked nothing since they were written, and both `docs/limits.md`
 entries say Phase 6 must wire them. This is that. Correcting somebody's rate or
-her target after payroll would change what a month was worth **after the money
+their target after payroll would change what a month was worth **after the money
 moved**, and the snapshot would silently disagree with the data it came from.
 
 ## The snapshot holds everything, not references to it
@@ -262,7 +262,7 @@ def approve_month(
 
     # §11.4. Which payroll actually paid each order - deferred out of Phase 4
     # until snapshots existed, and what lets a model's dashboard say "paid in
-    # your September payment" rather than leaving her to work out the
+    # your September payment" rather than leaving them to work out the
     # difference.
     for order in [*orders, *carried]:
         if order.counts_toward_payout and order.settled_in_snapshot_id is None:
@@ -424,7 +424,7 @@ def carried_into(
     August, frozen by trigger since Phase 4. Carry-forward is about which
     payroll pays an order, never about which month it belongs to - and
     conflating the two is what would make a model's own arithmetic disagree
-    with her payment.
+    with their payment.
     """
     parse_month(month)
     approved_months = {

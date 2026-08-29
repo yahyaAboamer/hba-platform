@@ -573,7 +573,7 @@ def test_a_code_owned_for_every_month_it_appears_in_is_absent(client):
 
 
 def test_a_closed_code_period_leaves_later_orders_unregistered(client):
-    """An affiliate left in June; her code kept being used in August. Those
+    """An affiliate left in June; their code kept being used in August. Those
     sales belong to nobody, and that is exactly what this report is for.
     """
     _add_order("1", "NOUR10", month="2026-05")

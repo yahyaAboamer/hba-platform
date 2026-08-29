@@ -1,6 +1,6 @@
 """Who has access to the platform, over HTTP.
 
-Distinct from `app/api/affiliates.py`: a model reaches her own portal by
+Distinct from `app/api/affiliates.py`: a model reaches their own portal by
 owning an `affiliate_profile`, never by holding a role here (§6.1). This is
 the one screen `settings.manage` and `invitations.send` were defined for and
 had no UI outlet until now (app/core/permissions.py).

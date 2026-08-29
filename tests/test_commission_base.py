@@ -48,7 +48,7 @@ def test_the_discount_is_already_in_the_figure():
 
 def test_a_base_can_never_go_negative():
     """A refund larger than the order would otherwise produce one, and a
-    negative base subtracts from everything else she earned that month.
+    negative base subtracts from everything else they earned that month.
     """
     assert commission_base(5_000, 9_500, 0) == 0
 
@@ -102,8 +102,8 @@ def test_the_exchange_inflation_cannot_reach_a_delivered_order():
 
 def test_a_cheaper_exchange_cannot_reduce_it_either():
     """ADR 0025 is symmetric. An exchange for something cheaper leaves the model
-    exactly where she was - she sold the original, and the swap is HBA's
-    service, not hers.
+    exactly where they were - they sold the original, and the swap is HBA's
+    service, not theirs.
     """
     decision = base_for_order(
         total_piastres=60_000 + SHIPPING,

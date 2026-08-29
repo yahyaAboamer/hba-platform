@@ -11,15 +11,15 @@ a `base_guarantee` model and being paid through the platform.
 ## What this phase is for
 
 Phase 4 ends with a hole it deliberately left open. §9.5 pays a `base_guarantee` affiliate
-**max(commission, base amount)** — but only when her targets were *achieved **and**
-verified*. Targets do not exist, so `calculate_month` reports her commission and refuses to
+**max(commission, base amount)** — but only when their targets were *achieved **and**
+verified*. Targets do not exist, so `calculate_month` reports their commission and refuses to
 resolve the guarantee, blocking the month.
 
 That refusal was correct and it is expensive: **no base-guarantee model can be paid through
 the platform until this phase ships.** Everything here exists to close that.
 
 It is a smaller phase than Phase 4 and a different kind of work. Nothing here touches money
-directly. It records what a model was asked to produce, what she actually produced, and
+directly. It records what a model was asked to produce, what they actually produced, and
 whether a second person confirmed it — and Phase 4's arithmetic reads the answer.
 
 ### Targets mean different things to different models
@@ -49,11 +49,11 @@ the whole design:
 
 | Situation | Approval |
 |---|---|
-| No target recorded at all | 🚫 **Blocked** — nobody knows what she was asked for |
+| No target recorded at all | 🚫 **Blocked** — nobody knows what they were asked for |
 | Recorded, not achieved | ✅ **Allowed** — the base simply does not apply |
 | Achieved, not yet verified | 🚫 **Blocked** — verification is what unlocks the base |
 
-A model who missed her targets is paid her commission, promptly, with no ceremony. The block
+A model who missed their targets is paid their commission, promptly, with no ceremony. The block
 exists for the cases where the platform *does not know*, never as a punishment.
 
 **3. An approved month is closed to recording.** §15. Changing a target after payroll would
@@ -83,7 +83,7 @@ written reason.
 `verified_by`, `verified_at`, `created_at`, `updated_at`.
 
 **One row per affiliate per month**, enforced by a unique constraint (§17). Two rows would
-mean two answers to "did she achieve August?", and whichever the query happened to read
+mean two answers to "did they achieve August?", and whichever the query happened to read
 first would decide a payment.
 
 **`month` is a plain `YYYY-MM` string**, matching every other dated thing in the platform
@@ -91,9 +91,9 @@ first would decide a payment.
 rather than to a day in it.
 
 **Actuals are nullable; requirements are not.** A target with no requirement recorded is the
-"nobody knows what she was asked for" case that blocks approval, and it must be
+"nobody knows what they were asked for" case that blocks approval, and it must be
 distinguishable from a requirement of zero — which is a real answer meaning *nothing was
-asked of her this month*.
+asked of them this month*.
 
 **Not append-only**, but verification is one-way: see Task 3.
 
@@ -152,7 +152,7 @@ confirming nothing, and it would unlock a guarantee on an empty month.
 exists because a mistaken verification otherwise silently pays a guarantee.
 
 **Verification does not mean achieved.** A verified target that was missed is a *confirmed
-miss* — she is paid commission, and the month is approvable. Conflating the two would block
+miss* — they are paid commission, and the month is approvable. Conflating the two would block
 every model who had a quiet month.
 
 **Tests:** verifying without actuals is refused; verifying a missed target is allowed and
@@ -176,15 +176,15 @@ not recorded           →  blocked
 ```
 
 **The base is never added on top of a higher commission, and never caps it.** A model whose
-commission beats her guarantee is paid the commission. §9.5 says this explicitly because the
+commission beats their guarantee is paid the commission. §9.5 says this explicitly because the
 opposite is the intuitive mistake.
 
 **`TARGETS_UNVERIFIED` stops being a permanent blocker** and becomes a real answer. The
 `docs/limits.md` entry recording that base-guarantee models cannot be paid is closed here.
 
 **Only `base_guarantee` is affected.** A `commission` model with no target recorded is
-payable — the target is informational for her, and blocking her month over a management
-figure would stop a payment for a reason that has nothing to do with what she is owed.
+payable — the target is informational for them, and blocking their month over a management
+figure would stop a payment for a reason that has nothing to do with what they are owed.
 
 **Tests:** each of the four rows above; commission beating the guarantee; the guarantee
 beating commission; a `commission`-type model unaffected by a missing target; a month
@@ -212,7 +212,7 @@ grid is worse than a rejection, because the person cannot see which half landed.
 
 **The grid returns rows for models with no target yet**, with nulls rather than omitting
 them. A model missing from the grid is a model nobody records a target for, which is exactly
-the case that blocks her month later.
+the case that blocks their month later.
 
 **Permission-gated per action.** `targets.record` writes actuals; `targets.verify` verifies.
 The split is meaningless in today's roles (ADR 0018) and enforced anyway, because roles
@@ -228,7 +228,7 @@ verifying without `targets.verify` is refused; an `affiliate` role is refused ev
 
 - **Evidence collection.** §15 is explicit: *"Evidence collection remains external for V1."*
   Sara counts posts on the models' own social accounts and records the totals. The platform
-  stores what she recorded and who confirmed it, and does not attempt to see Instagram.
+  stores what they recorded and who confirmed it, and does not attempt to see Instagram.
 - **Payroll months and approval.** Phase 6. This phase provides the answer that unblocks
   approval; it does not approve anything.
 - **The grid's interface.** The frontend is still a placeholder. This builds what it saves

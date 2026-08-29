@@ -30,11 +30,11 @@ it. §9.5.
 ## Two things it refuses to decide
 
 **A base guarantee whose targets nobody recorded.** "Achieved and verified" has
-no answer, so the month blocks rather than guessing. It never assumes she missed,
-which underpays, and never assumes she hit them, which overpays.
+no answer, so the month blocks rather than guessing. It never assumes they missed,
+which underpays, and never assumes they hit them, which overpays.
 
-**Missing information blocks; poor performance does not.** A model who missed her
-targets is paid her commission, promptly, and the month approves. §11.3, and the
+**Missing information blocks; poor performance does not.** A model who missed their
+targets is paid their commission, promptly, and the month approves. §11.3, and the
 distinction is the whole design - the block exists where the platform *does not
 know*, never as a penalty.
 
@@ -69,18 +69,18 @@ from app.services.targets import get_target
 #: Why a month's figure is not final. §11.3 refuses approval on any of these.
 NO_TERMS = "no_compensation_terms_for_this_month"
 
-#: Nobody has said what she was asked to produce, so nobody can say whether the
+#: Nobody has said what they were asked to produce, so nobody can say whether the
 #: guarantee applies. §11.3 blocks on **missing information**, never on poor
 #: performance.
 NO_TARGET = "no_target_recorded_for_this_month"
 
-#: She hit her targets and nobody has confirmed the numbers. Verification is
+#: They hit their targets and nobody has confirmed the numbers. Verification is
 #: what unlocks the guarantee (§11.3), so this is not a formality.
 TARGETS_UNVERIFIED = "targets_achieved_but_not_verified"
 
 #: §11.4. An order carried from a month that has no compensation terms. Its
 #: sales are real; what it is worth is not calculable, and guessing at a rate
-#: she was on eight months ago is how somebody gets paid the wrong amount.
+#: they were on eight months ago is how somebody gets paid the wrong amount.
 NO_TERMS_FOR_CARRIED = "no_compensation_terms_for_a_carried_month"
 
 
@@ -116,7 +116,7 @@ class MonthCalculation:
     #: The same figure rounded half-up to whole pounds. ADR 0004.
     payout_piastres: int = 0
 
-    #: §15. ``None`` means nobody has recorded what she produced - which is a
+    #: §15. ``None`` means nobody has recorded what they produced - which is a
     #: different answer from missing the target, and blocks where missing does
     #: not.
     target_achieved: bool | None = None
@@ -141,7 +141,7 @@ class MonthCalculation:
 
     #: A carried month with no terms. Its sales are real and its commission is
     #: not calculable, so the month cannot be approved until somebody says what
-    #: she was on back then.
+    #: they were on back then.
     carried_without_terms: list[str] = field(default_factory=list)
 
     #: Empty means the figure can be approved as it stands.
@@ -300,7 +300,7 @@ def calculate_month(
 
     terms = terms_for(db, affiliate, month)
     if terms is None:
-        # Sales are still real and still worth reporting; what she is owed is
+        # Sales are still real and still worth reporting; what they are owed is
         # not calculable without terms, and guessing at a rate is how somebody
         # gets paid the wrong amount for eight months.
         blockers.append(NO_TERMS)
@@ -343,12 +343,12 @@ def calculate_month(
         guarantee = int(terms.base_amount_piastres or 0)
 
         if achieved is None:
-            # Nobody has recorded what she produced. Not a judgement about her
+            # Nobody has recorded what they produced. Not a judgement about their
             # month - the platform simply does not know, and §11.3 blocks on
             # missing information.
             blockers.append(NO_TARGET)
         elif not achieved:
-            # A confirmed miss. She is paid her commission, promptly, and the
+            # A confirmed miss. They are paid their commission, promptly, and the
             # month approves - the block is never a punishment for a quiet
             # month.
             pass

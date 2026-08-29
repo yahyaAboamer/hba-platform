@@ -150,11 +150,11 @@ actions:
 
 ### Why `absent` matters more than it looks
 
-A model earns when her order is **delivered** (ADR 0012), and that fact is read
+A model earns when their order is **delivered** (ADR 0012), and that fact is read
 from Shopify (ADR 0023). If nothing ever reaches delivered, every order stays
 `pending`, every month calculates to **zero earned**, and it looks exactly like
 a month with no sales. Nothing errors. The first person to notice would be a
-model asking why she was not paid.
+model asking why they were not paid.
 
 Whatever writes that status into Shopify lives outside this codebase and can
 stop without a symptom — the same shape as the auto-cancel automation the old

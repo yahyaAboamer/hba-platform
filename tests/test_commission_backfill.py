@@ -156,10 +156,10 @@ def test_the_job_does_not_fail_on_a_row_it_cannot_touch(db):
     assert db.get(AttributedOrder, "3006").affiliate_id == sara.id
 
 
-# ── Only the months she owns ───────────────────────────────────────────────────
+# ── Only the months they own ───────────────────────────────────────────────────
 
 
-def test_only_months_she_owns_are_attached(db):
+def test_only_months_they_own_are_attached(db):
     """A code that changed hands has periods either side. Each registration
     backfills its own, or a model is paid for another model's sales.
     """
@@ -170,9 +170,9 @@ def test_only_months_she_owns_are_attached(db):
 
     backfill_code(db, "NOUR10", "2026-04", "2026-06")
 
-    assert db.get(AttributedOrder, "3007") is None, "reached before her period"
+    assert db.get(AttributedOrder, "3007") is None, "reached before the period"
     assert db.get(AttributedOrder, "3008") is not None
-    assert db.get(AttributedOrder, "3009") is None, "reached past her period"
+    assert db.get(AttributedOrder, "3009") is None, "reached past the period"
 
 
 def test_an_open_ended_period_has_no_upper_bound(db):
