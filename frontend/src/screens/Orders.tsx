@@ -37,6 +37,51 @@ type Grid = {
   totals: { orders: number; held: number; unattributed: number; carried: number };
 };
 
+/**
+ * What to look at. The screen answers two questions and they are not the same
+ * one: *what happened this month*, and *what needs me*.
+ *
+ * The second is the reason to open it at all on a busy day, and until now it
+ * meant reading two hundred rows to find three. Each filter here is a real
+ * state with a real consequence, not a category:
+ *
+ * - `held` blocks every month it touches until somebody decides (§9.2)
+ * - `unowned` is sales going to nobody — the model whose code it is will
+ *   notice long before anybody here does
+ * - `void` did not arrive, so it pays nothing, and it is the row a model asks
+ *   about
+ * - `carried` was sold here and paid by another month (§11.4)
+ */
+type Lens = "all" | "attention" | "held" | "unowned" | "void" | "carried";
+
+const LENS_LABEL: Record<Lens, string> = {
+  all: "Everything",
+  attention: "Needs a decision",
+  held: "Two codes claim it",
+  unowned: "Belongs to nobody",
+  void: "Did not arrive",
+  carried: "Carried in",
+};
+
+function matches(row: OrderRow, lens: Lens): boolean {
+  switch (lens) {
+    case "held":
+      return row.outcome === "held";
+    case "unowned":
+      return row.outcome === "unattributed";
+    case "void":
+      return row.commission_state === "void" || row.cancelled;
+    case "carried":
+      return row.is_carried;
+    case "attention":
+      // The two that actually stop something. A void order is settled and a
+      // carried one is correct; neither needs anybody.
+      return row.outcome === "held" || row.outcome === "unattributed";
+    default:
+      return true;
+  }
+}
+
 const DELIVERY_LABEL: Record<string, string> = {
   delivered: "Delivered",
   failed: "Failed delivery",
@@ -68,6 +113,7 @@ export function Orders({ session }: { session: Session }) {
   const [search, setSearch] = useState("");
   const [found, setFound] = useState<OrderRow | null | undefined>(undefined);
   const [searching, setSearching] = useState(false);
+  const [lens, setLens] = useState<Lens>("all");
 
   useEffect(() => {
     setError(null);
@@ -103,7 +149,9 @@ export function Orders({ session }: { session: Session }) {
     }
   }
 
-  const rows = grid?.orders ?? [];
+  const all = grid?.orders ?? [];
+  const rows = all.filter((row) => matches(row, lens));
+  const count = (of: Lens) => all.filter((row) => matches(row, of)).length;
 
   return (
     <>
@@ -208,8 +256,42 @@ export function Orders({ session }: { session: Session }) {
         </div>
       )}
 
-      {grid && rows.length === 0 && !found && (
+      {/*
+       * Only the lenses that have something behind them. A row of filters
+       * that all read zero is a row of things somebody has to rule out.
+       */}
+      {grid && all.length > 0 && (
+        <div className="orders__lenses" role="group" aria-label="What to look at">
+          {(Object.keys(LENS_LABEL) as Lens[])
+            .filter((option) => option === "all" || count(option) > 0)
+            .map((option) => (
+              <button
+                key={option}
+                type="button"
+                className={
+                  lens === option
+                    ? "orders__lens orders__lens--on"
+                    : "orders__lens"
+                }
+                onClick={() => setLens(option)}
+                aria-pressed={lens === option}
+              >
+                {LENS_LABEL[option]}
+                <span className="orders__lens-count">{count(option)}</span>
+              </button>
+            ))}
+        </div>
+      )}
+
+      {grid && all.length === 0 && !found && (
         <p className="empty">No orders placed in {formatMonth(month)} yet.</p>
+      )}
+
+      {grid && all.length > 0 && rows.length === 0 && (
+        <p className="empty">
+          Nothing in {formatMonth(month)} matches that — which is the good
+          answer.
+        </p>
       )}
 
       {grid && rows.length > 0 && (
