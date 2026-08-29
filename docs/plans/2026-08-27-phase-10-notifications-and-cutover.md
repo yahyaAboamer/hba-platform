@@ -215,16 +215,115 @@ destination-changed notice already follows.
 
 ## Task 6: Policy versions and the dictionary
 
-**Files:** a policy table and migration, an ⓘ control, a glossary page; tests
+**Planned:** 2026-08-30. Deliberately last, per the batch note above — the
+calendar took the bite it was allowed to, and this is it. Written now because
+the platform is live and both halves have real content to describe rather than
+a guess at what the rules will turn out to be.
 
-§16: the commission rules are **versioned and effective-dated with
-plain-language text**, every snapshot records the version that produced it, and
-a model viewing July sees July's rules.
+Two features that got bundled under one task number because the business
+asked for them together, not because they share a data model. They are built
+and shipped as two independent pieces.
 
-Plus the FAQ and glossary the business asked for, for models *and* for the
-team. Phase 9 put *carried forward*, *pending*, *void*, *guaranteed minimum*
-and *provisional* in front of people; this is where those words get defined
-once, in one place, instead of in six tooltips that drift.
+### 6a. Policy versions
+
+**Files:** a migration on `payroll_snapshot`, a `policy_version` table, the
+calculation path that stamps it, a maintainer screen to add one, the figure a
+model sees; tests
+
+**The column already has a comment written for it.** `app/models/payroll.py`
+says so directly: *"no `policy_version` column yet... a column nothing writes
+reads as a feature and is a lie."* This task is the thing that fills it.
+
+**What "versioned and effective-dated with plain-language text" means here,
+concretely** - two things this project has never needed to distinguish before:
+
+- **The engineering record** is the ADRs. 0002 through 0031 already say
+  exactly what the rules are and why, precisely and for nobody but whoever
+  reads code.
+- **The policy version** is the same rules, translated once into what a model
+  reads: *"Commission is worked out on the sale price after any discount and
+  after shipping and tax are taken off. If a parcel is refused within 10 days
+  the commission it earned is reversed. A guaranteed minimum only pays in a
+  month your targets were both met and confirmed."* Nothing new is decided
+  here - it is translation, not policy-making.
+
+**The model.** `policy_version`: `id`, `effective_month` (the first business
+month it governs), `summary_markdown` (the plain-language text), `created_at`,
+`created_by`. Nothing is ever edited or deleted - a rule change is a new row
+with a later `effective_month`, exactly the append-only discipline every
+other money-adjacent table in this platform already holds to.
+
+`payroll_snapshot.policy_version_id` records which version was in force when
+that snapshot was calculated - looked up once, at calculation time, by
+`effective_month <= month order by effective_month desc limit 1`, and frozen
+into the snapshot the same way every other figure on it is frozen. A policy
+version created *after* a month was calculated never touches that month's
+snapshot, for the same reason a compensation change never touches an approved
+one (ADR affecting `assert_correctable`): a snapshot is what a model was told,
+and what they were told does not change because the wording changed later.
+
+**Backfilling.** Every rule this platform has ever calculated under is, in
+effect, one policy that was never written down as such. There is no v0 to
+distinguish it from. So: **policy v1 is written now**, dated to
+`GO_LIVE_MONTH`, describing the ruleset as it stands today - and a migration
+sets `policy_version_id = 1` on every snapshot that predates the column,
+rather than leaving them `null` and making "which rules applied here" a
+question the data cannot answer for the platform's own first months.
+
+**Where it appears.** One line on a settled month, model-facing: *"Calculated
+under the rules in force since September 2026."*, linking to that version's
+text. Nothing changes for a month whose policy never changed - this is only
+visible as a fact worth stating once a second version exists to distinguish
+from.
+
+**A new one is added by the maintainer**, not edited into existence by a
+migration each time - a small screen (name, effective month, the text) in
+Settings, gated the same way compensation and targets are: recording facts is
+one permission, deciding what they mean is another. Given how rarely the
+actual rules change (a handful of ADRs across ten phases), this does not need
+to be more than a form with a text area.
+
+**What needs a decision, and it is not code.** *Who writes the plain-language
+text?* Recommended: drafted here, from the ADRs, the same way every other
+plan and spec document in this project has been - and reviewed by the
+business before it ships, the same way every plan has been. Not a live
+self-service editor for v1; the rules do not change often enough to earn one,
+and a form that is only ever touched a handful of times per year is exactly
+the kind of screen that is safer built plain than built flexible.
+
+### 6b. The dictionary
+
+**Files:** a static glossary screen, links from wherever a term already
+appears; no migration - this is content, not data
+
+**Six places already explain these words, separately**, checked directly
+rather than estimated: `Money.tsx`, `AffiliateDetail.tsx`, `Compensation.tsx`,
+`MyMonth.tsx`, `MyOrders.tsx`, `Orders.tsx`, `Payroll.tsx`, `Targets.tsx` all
+define at least one of *carried forward*, *pending*, *void*, *guaranteed
+minimum*, *provisional* inline, in their own words, at the moment a screen
+needs them - eight files, at last count, not the six the original note
+guessed. Each explanation is honest on its own and none of them are
+guaranteed to say the same thing five phases from now.
+
+**One page, both sides.** The definitions do not differ between what a
+maintainer needs and what a model needs - *void* means the same thing on the
+Payroll screen as it does on MyOrders. So this is **one glossary**, not two,
+reached from both the maintainer's layout and the affiliate portal's, which is
+also what keeps it from drifting into two dictionaries that quietly disagree.
+
+**Terms, gathered from the eight files above rather than reinvented:** *carried
+forward, pending, void, guaranteed minimum, provisional, historical, settled,
+verified* - each a sentence explaining what it means and, where useful, why
+the platform draws the line where it does (*void* is not "we chose not to pay
+this," it is "the parcel came back, so there is nothing to pay on").
+
+**Not a replacement for the inline explanations that already work.** A
+tooltip that already says the right thing at the moment somebody needs it
+stays exactly where it is - this is the page a person reaches when the
+tooltip is not enough, linked from an ⓘ beside each term rather than
+replacing the sentence already there. Removing working inline copy to force a
+navigation would be a worse experience wearing a tidier information
+architecture.
 
 ## Task 7: First-run polish
 
