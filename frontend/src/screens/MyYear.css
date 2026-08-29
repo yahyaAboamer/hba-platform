@@ -79,17 +79,20 @@
   outline-offset: -2px;
 }
 
+/* Positioned by `tipStyle`, which clamps it inside the card and flips it
+   below the point when there is no room above. The transform is set there
+   too, because it changes with the flip. */
 .chart__tip {
   position: absolute;
   z-index: 3;
-  transform: translate(-50%, -118%);
+  max-width: 88%;
+  white-space: normal;
   padding: var(--space-2) var(--space-3);
   border-radius: 10px;
   background: var(--ink);
   color: var(--paper);
   font-size: var(--text-xs);
   line-height: 1.5;
-  white-space: nowrap;
   pointer-events: none;
 }
 
@@ -132,4 +135,21 @@
   margin-top: 2px;
   font-size: var(--text-xs);
   color: var(--quiet);
+}
+
+/* Why the chart is mostly empty, said on the chart. A model who joined before
+   go-live saw seven hollow months and one point and read it as broken. */
+.year__caveat {
+  max-width: 60ch;
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--rule);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  color: var(--quiet);
+}
+
+.year__caveat strong {
+  color: var(--ink);
+  font-weight: 500;
 }

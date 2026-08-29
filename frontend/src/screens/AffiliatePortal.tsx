@@ -70,13 +70,43 @@ export function AffiliatePortal({ session }: { session: Session }) {
     void load();
   }, [load]);
 
+  // Rendered before `me` arrives as well as after, so every field it reads
+  // has to tolerate not being there yet.
   const head = (
     <div className="affiliate__head">
       <div>
+        {/*
+         * **Her name is the heading; HBA is the address.** It was the other
+         * way round - the brand set large in a serif with her name small
+         * underneath - which is right for a shop window and wrong for
+         * somebody's own account page. She knows who HBA is; what she needs
+         * to see is that this is *hers*.
+         *
+         * The mark stays, small and quiet, because it is the only thing on
+         * screen saying whose site this is - and most people arrive here from
+         * an email, where that matters.
+         */}
         <span className="affiliate__mark">HBA</span>
         <h1 className="affiliate__title">
           {session.actor.display_name || session.actor.email}
         </h1>
+        {/*
+         * Her code, beside her name. It is the thing she gives out, the thing
+         * customers type, and the reason any of these figures exist - and it
+         * lived three taps away on the You screen.
+         */}
+        {me?.codes?.length ? (
+          <span className="affiliate__codes">
+            {me.codes.map((entry) => (
+              <span key={entry.code} className="code affiliate__code-chip">
+                {entry.code}
+                {!entry.verified && (
+                  <span className="affiliate__code-pending">being checked</span>
+                )}
+              </span>
+            ))}
+          </span>
+        ) : null}
       </div>
       <button
         type="button"

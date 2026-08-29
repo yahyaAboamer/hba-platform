@@ -67,6 +67,13 @@ export function MyYear() {
   }
   if (year === null) return <p className="empty">Loading…</p>;
 
+  // Months the platform actually paid for. The rest are real months with real
+  // sales whose commission was agreed elsewhere.
+  const paidMonths = year.months.filter(
+    (m) => m.earned_piastres !== null,
+  ).length;
+  const before = year.months.length - paidMonths;
+
   if (year.months.length < 2) {
     return (
       <p className="empty">
@@ -82,6 +89,26 @@ export function MyYear() {
           <h2 className="panel__title">What you have earned</h2>
         </div>
         <EarningsLine months={year.months} />
+
+        {/*
+         * **Why the chart is mostly empty**, said on the chart.
+         *
+         * A model who joined before go-live sees seven hollow months and one
+         * point, and reads it as broken - which is exactly what happened. The
+         * figures are missing on purpose: HBA paid those months before this
+         * page existed and their rates live in the old system (ADR 0014).
+         *
+         * The sales are not missing, and the bars below prove it, so the
+         * sentence points at them rather than apologising.
+         */}
+        {before > 0 && (
+          <p className="year__caveat">
+            {before === 1 ? "One month is" : `${before} months are`} not shown
+            here — HBA paid {before === 1 ? "it" : "them"} before this page
+            existed. Everything you sold in {before === 1 ? "it" : "them"} is in{" "}
+            <strong>Orders that counted</strong> below.
+          </p>
+        )}
         <div className="year__facts">
           {year.best_month_label && (
             <div>
@@ -96,8 +123,14 @@ export function MyYear() {
             <dt>Since you joined</dt>
             <dd>
               <Money piastres={year.total_earned_piastres} kind="agreed" />
+              {/*
+               * The months that have a figure, not every month she has. It
+               * said "E£3,829 across 8 months" when seven of them contributed
+               * nothing to that total - which reads as a very bad year rather
+               * than as a total that does not cover them.
+               */}
               <span className="year__facts-sub">
-                across {year.months.length} months
+                across {paidMonths} {paidMonths === 1 ? "month" : "months"}
               </span>
             </dd>
           </div>
@@ -117,6 +150,32 @@ export function MyYear() {
 
 /** Where the pointer is, if anywhere. `null` means no tooltip. */
 type Hover = { index: number; x: number; y: number } | null;
+
+/**
+ * Keep the tooltip inside the card.
+ *
+ * Centred on the point and lifted above it, which is right in the middle of a
+ * chart and wrong at both ends: on the last month it ran off the right edge
+ * and lost half the figure, and on a tall point it was cut off by the top of
+ * the card. Both were photographed on a phone before anybody noticed here.
+ *
+ * So it is clamped horizontally, and flips below the point when there is not
+ * room above. The transform has to change with the flip, because the whole
+ * position is relative to a corner that moves.
+ */
+function tipStyle(hover: NonNullable<Hover>): React.CSSProperties {
+  const below = hover.y < 0.34;
+  // 18% keeps a two-line tooltip clear of either edge at phone widths without
+  // pulling it so far from its point that it stops pointing at anything.
+  const left = Math.min(Math.max(hover.x, 0.18), 0.82);
+  return {
+    left: `${left * 100}%`,
+    top: `${hover.y * 100}%`,
+    transform: below
+      ? `translate(-${left * 100}%, 22%)`
+      : `translate(-${left * 100}%, -118%)`,
+  };
+}
 
 function EarningsLine({ months }: { months: YearMonth[] }) {
   const [hover, setHover] = useState<Hover>(null);
@@ -215,10 +274,7 @@ function EarningsLine({ months }: { months: YearMonth[] }) {
       </svg>
 
       {active && (
-        <div
-          className="chart__tip"
-          style={{ left: `${hover!.x * 100}%`, top: `${hover!.y * 100}%` }}
-        >
+        <div className="chart__tip" style={tipStyle(hover!)}>
           {active.label}
           <b>
             {active.earned_piastres === null
@@ -295,10 +351,7 @@ function OrdersBars({ months }: { months: YearMonth[] }) {
       </svg>
 
       {active && (
-        <div
-          className="chart__tip"
-          style={{ left: `${hover!.x * 100}%`, top: `${hover!.y * 100}%` }}
-        >
+        <div className="chart__tip" style={tipStyle(hover!)}>
           {active.label}
           <b>
             {active.orders} {active.orders === 1 ? "order" : "orders"}
