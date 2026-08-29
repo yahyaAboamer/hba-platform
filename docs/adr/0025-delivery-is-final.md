@@ -86,9 +86,9 @@ specifically about it and chose to keep the rule whole rather than carve out an
 exception. See *Alternatives*.
 
 **A model's dashboard will show a returned order as earned.** That needs saying in
-the plain-language policy text (§16), not left for her to work out.
+the plain-language policy text (§16), not left for them to work out.
 
-**The base is simply what she sold.** No freezing to explain, no timestamp to
+**The base is simply what they sold.** No freezing to explain, no timestamp to
 interpret, no state that can be reached two different ways.
 
 ## Alternatives considered

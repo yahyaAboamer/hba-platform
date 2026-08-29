@@ -74,7 +74,7 @@ def allocated_to_month(db: Session, payroll_month: PayrollMonth) -> int:
     After a reopen the two diverge, and the platform reported the wrong one.
     August was agreed at E£760 and paid in full; more orders arrived; it was
     reopened and agreed again at E£1,060. The payment screen then said **still
-    owed E£1,060** - because nothing had been allocated to version 2 - when she
+    owed E£1,060** - because nothing had been allocated to version 2 - when they
     had already received E£760 and was genuinely owed E£300.
 
     Paying what that screen said would have sent E£1,820 for a month worth
@@ -315,9 +315,9 @@ def record_payment(
         reason=transaction.note,
     )
 
-    # Section 14. The receipt itself stays on her payments screen rather than
+    # Section 14. The receipt itself stays on their payments screen rather than
     # travelling as an attachment - mail is the one channel that leaves the
-    # building, and ADR 0017 accepted exposure to *her*, not to whatever
+    # building, and ADR 0017 accepted exposure to *them*, not to whatever
     # forwards an inbox.
     from app.services.notifications import payment_recorded
 
@@ -369,7 +369,7 @@ def allocate(
 def payments_for(
     db: Session, affiliate: AffiliateProfile
 ) -> list[PaymentTransaction]:
-    """Everything she has been paid, newest first."""
+    """Everything they have been paid, newest first."""
     return list(
         db.scalars(
             select(PaymentTransaction)
@@ -488,8 +488,8 @@ def adjustments_for(
 ) -> list[PayrollAdjustment]:
     """Every credit and write-off touching this affiliate, newest first.
 
-    Section 11.5 requires these to be visible to her: a credit she cannot see
-    is a credit she cannot check.
+    Section 11.5 requires these to be visible to them: a credit they cannot see
+    is a credit they cannot check.
     """
     months = select(PayrollMonth.id).where(PayrollMonth.affiliate_id == affiliate.id)
     return list(

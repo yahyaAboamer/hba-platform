@@ -1127,7 +1127,7 @@ ROLES: dict[str, frozenset[str]] = {
             Permission.AUDIT_VIEW,
         }
     ),
-    # Sara records video and story counts. She needs nothing else, so she gets
+    # Sara records video and story counts. They need nothing else, so they get
     # nothing else — the audit trail is only meaningful when access is minimal.
     "target_recorder": frozenset(
         {

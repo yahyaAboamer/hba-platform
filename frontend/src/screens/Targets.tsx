@@ -17,7 +17,7 @@ type Row = {
   required_stories: number | null;
   actual_videos: number | null;
   actual_stories: number | null;
-  /** `null` means nobody has recorded what she did — which is not a miss. */
+  /** `null` means nobody has recorded what they did — which is not a miss. */
   achieved: boolean | null;
   verified: boolean;
   verified_at: string | null;
@@ -58,7 +58,7 @@ function count(text: string): number | null | undefined {
 /**
  * What each row is waiting for, in the words §11.3 uses.
  *
- * Three answers, not two. Nothing recorded **blocks** her month; a recorded
+ * Three answers, not two. Nothing recorded **blocks** their month; a recorded
  * miss does not — the block is on missing information, never on a quiet month.
  */
 function waitingOn(row: Row): string | null {
@@ -75,9 +75,9 @@ function waitingOn(row: Row): string | null {
  * than a form: every model down the side, one month across, tab straight
  * through, single save.
  *
- * Sara records these from her own tracking; the platform collects no evidence.
+ * Sara records these from their own tracking; the platform collects no evidence.
  * What it does is make the consequence visible — for a model on a guaranteed
- * minimum these numbers decide what she is paid, and for everybody else they
+ * minimum these numbers decide what they are paid, and for everybody else they
  * are worth knowing and decide nothing.
  */
 export function Targets({ session }: { session: Session }) {
@@ -352,7 +352,7 @@ export function Targets({ session }: { session: Session }) {
           {/*
            * §15 and §11.3. Confirming is what unlocks a guarantee, so it is
            * worth saying plainly that it is about the numbers and not about
-           * her month — somebody who thinks they are approving a *result* will
+           * their month — somebody who thinks they are approving a *result* will
            * hesitate to confirm a miss, and a miss left unconfirmed is
            * indistinguishable from a month nobody looked at.
            */}

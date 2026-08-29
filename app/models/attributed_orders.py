@@ -86,7 +86,7 @@ class AttributedOrder(Base):
             "refunded_merchandise_piastres >= 0",
             name="attributed_order_refund_not_negative",
         ),
-        # "What did she earn in August?" - the question this table exists to
+        # "What did they earn in August?" - the question this table exists to
         # answer, asked once per affiliate per month for every payroll run.
         Index(
             "attributed_order_affiliate_month_idx", "affiliate_id", "business_month"
@@ -106,7 +106,7 @@ class AttributedOrder(Base):
     #: RESTRICT, deliberately, where discount_code_period cascades. A code
     #: period is a fact about arrangement and can go with the affiliate; this
     #: row is a fact about money. Deleting an affiliate who has been paid should
-    #: fail loudly rather than quietly erase what she was paid for. Affiliates
+    #: fail loudly rather than quietly erase what they were paid for. Affiliates
     #: are archived (Phase 3), not deleted, so this should never fire - which is
     #: exactly when a guard is worth having.
     affiliate_id: Mapped[int] = mapped_column(
@@ -152,8 +152,8 @@ class AttributedOrder(Base):
     #: **Which payroll actually paid this order.** §11.4, and the answer to a
     #: question a model will otherwise ask every month: an order placed in
     #: August but still travelling when August was approved is paid in
-    #: September, while remaining an August sale. Without this her own
-    #: arithmetic cannot arrive at her own payment.
+    #: September, while remaining an August sale. Without this their own
+    #: arithmetic cannot arrive at their own payment.
     #:
     #: Deferred out of Phase 4 deliberately - snapshots did not exist, and a
     #: nullable column nothing writes reads as a feature and is a lie.

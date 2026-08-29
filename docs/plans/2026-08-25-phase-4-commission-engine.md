@@ -318,7 +318,7 @@ visible rather than buried.
 
 **Tests:** the two Phase 3 deferred by name —
 `test_backfill_attaches_previously_unattributed_orders` and its sibling — plus: an already
-attributed order is untouched; only months she owns are attached; the job is idempotent.
+attributed order is untouched; only months they own are attached; the job is idempotent.
 
 ---
 

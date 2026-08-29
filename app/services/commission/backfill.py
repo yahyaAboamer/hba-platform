@@ -15,7 +15,7 @@ and nothing says so.
 Every order is put through the same `attribute_order` as a live one, which
 refuses to reassign anything that already has an owner and reports it instead.
 So an order another model has already been paid for cannot be quietly taken from
-her by a mistyped registration — the job reports and carries on rather than
+them by a mistyped registration — the job reports and carries on rather than
 failing on a row it was never entitled to touch.
 
 ## It never blocks registration
@@ -57,7 +57,7 @@ MAX_ORDERS_PER_RUN = 500
 def orders_awaiting_attachment(
     db: Session, code: str, start_month: str, end_month: str | None, *, limit: int
 ) -> list[OrderIndex]:
-    """Indexed orders using this code, in months she owns, with no owner yet.
+    """Indexed orders using this code, in months they own, with no owner yet.
 
     The `end_month` bound is what stops a backfill reaching into months the code
     belonged to somebody else. A code that changed hands has periods either

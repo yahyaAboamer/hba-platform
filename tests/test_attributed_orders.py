@@ -279,7 +279,7 @@ def test_a_state_nobody_defined_is_refused(db):
 
 def test_a_negative_base_is_refused(db):
     """A refund larger than the order would otherwise produce one, and a
-    negative base would quietly subtract from everything else she earned.
+    negative base would quietly subtract from everything else they earned.
     """
     affiliate = _affiliate(db)
     order = _order(db)

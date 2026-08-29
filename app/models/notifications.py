@@ -109,9 +109,9 @@ class NotificationOutbox(Base):
     subject_ref: Mapped[str | None] = mapped_column(String(80), index=True)
 
     #: **Frozen, not a set of references.** The same reasoning as
-    #: `payroll_snapshot` (§11.1): an email resolving "her September figure" at
+    #: `payroll_snapshot` (§11.1): an email resolving "their September figure" at
     #: send time would say something different from the screen if anything
-    #: moved in between - and she will be reading both.
+    #: moved in between - and they will be reading both.
     payload: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
 
     state: Mapped[str] = mapped_column(

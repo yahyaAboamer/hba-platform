@@ -25,7 +25,7 @@ type Year = {
 };
 
 /**
- * Her year.
+ * Their year.
  *
  * **Two charts that measure different things.** The first attempt drew
  * earnings and sales, and the business caught it immediately: on a commission
@@ -45,7 +45,7 @@ type Year = {
  *
  * A month before go-live is drawn hollow rather than at zero. Its sales are
  * real; the commission was agreed elsewhere, and a zero would be a claim that
- * she earned nothing (ADR 0014).
+ * they earned nothing (ADR 0014).
  */
 export function MyYear() {
   const [year, setYear] = useState<Year | null>(null);
@@ -124,7 +124,7 @@ export function MyYear() {
             <dd>
               <Money piastres={year.total_earned_piastres} kind="agreed" />
               {/*
-               * The months that have a figure, not every month she has. It
+               * The months that have a figure, not every month they have. It
                * said "E£3,829 across 8 months" when seven of them contributed
                * nothing to that total - which reads as a very bad year rather
                * than as a total that does not cover them.

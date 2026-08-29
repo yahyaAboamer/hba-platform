@@ -344,8 +344,8 @@ def test_an_affiliate_cannot_be_approved_without_a_verified_code(db):
     """The gate the spec calls required, and that nothing enforced until now.
 
     Approving a mistyped code is silent: it matches no order, the model earns
-    nothing, and the first anyone notices is when she asks why her dashboard
-    is empty - by which point months of her sales have gone to nobody.
+    nothing, and the first anyone notices is when they ask why their dashboard
+    is empty - by which point months of their sales have gone to nobody.
     """
     affiliate = create_affiliate(db, user_account_id=_account(db).id, name="Nour")
     db.flush()

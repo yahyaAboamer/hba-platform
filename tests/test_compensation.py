@@ -485,7 +485,7 @@ def test_a_mistyped_fixed_salary_can_be_corrected(db):
 
 def test_a_mistyped_base_amount_can_be_corrected(db):
     """The guaranteed floor decides what a base-guarantee model is paid when
-    her commission falls short. It has to be fixable.
+    their commission falls short. It has to be fixable.
     """
     nour = _affiliate(db)
     terms = set_terms(
@@ -648,7 +648,7 @@ def test_closing_then_starting_new_terms_works(db):
 
 
 def test_closing_does_not_rewrite_the_months_already_covered(db):
-    """The months she was on the old terms keep saying so - which is what
+    """The months they were on the old terms keep saying so - which is what
     makes a past month still calculable at the rate that applied then.
     """
     nour = _affiliate(db)

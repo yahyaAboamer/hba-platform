@@ -1,4 +1,4 @@
-"""What a model may do to her own record, over HTTP.
+"""What a model may do to their own record, over HTTP.
 
 §6.4 is the highest-risk thing in the affiliate portal: a compromised account
 that can silently repoint an InstaPay address can redirect an entire payout.
@@ -43,7 +43,7 @@ def admin(fresh_database):
 
 
 def _model(admin, email: str, name: str, code: str) -> TestClient:
-    """An invited, accepted, applied model, in her own client."""
+    """An invited, accepted, applied model, in their own client."""
     invite = admin.post(
         "/api/auth/invitations", json={"email": email, "role": "affiliate"}
     )
@@ -68,10 +68,10 @@ def _model(admin, email: str, name: str, code: str) -> TestClient:
     return client
 
 
-# ── Her own record ───────────────────────────────────────────────────────────
+# ── Their own record ───────────────────────────────────────────────────────────
 
 
-def test_a_model_sees_her_own_record(admin):
+def test_a_model_sees_their_own_record(admin):
     model = _model(admin, "nour@example.com", "Nour", "NOUR10")
 
     body = model.get("/api/me").json()
@@ -81,8 +81,8 @@ def test_a_model_sees_her_own_record(admin):
     assert body["state"] == "waiting"
 
 
-def test_her_payout_destination_is_masked_even_to_her(admin):
-    """She supplied it, so it tells her nothing she does not know - and a
+def test_a_payout_destination_is_masked_even_to_its_owner(admin):
+    """They supplied it, so it tells them nothing they do not know - and a
     screen printing a full account number is one worth photographing over
     somebody's shoulder.
     """
@@ -106,7 +106,7 @@ def test_anonymous_access_is_refused(fresh_database):
         assert anonymous.get("/api/me").status_code == 401
 
 
-# ── §6.4: changing where her money goes ─────────────────────────────────────
+# ── §6.4: changing where their money goes ─────────────────────────────────────
 
 
 def test_changing_a_destination_needs_the_password(admin):
@@ -118,7 +118,7 @@ def test_changing_a_destination_needs_the_password(admin):
     refused = model.put(
         "/api/me/payout-destination",
         json={
-            "password": "not-her-password",
+            "password": "not-the-password",
             "method": PayoutMethod.INSTAPAY,
             "instapay_address_url": NEW_ADDRESS,
             "instapay_phone": "01009999999",
@@ -133,7 +133,7 @@ def test_a_wrong_password_changes_nothing(admin):
     model.put(
         "/api/me/payout-destination",
         json={
-            "password": "not-her-password",
+            "password": "not-the-password",
             "method": PayoutMethod.INSTAPAY,
             "instapay_address_url": NEW_ADDRESS,
             "instapay_phone": "01009999999",
@@ -176,7 +176,7 @@ def test_the_right_password_moves_it(admin):
 
 
 def test_both_sides_come_back_masked(admin):
-    """§6.4.2. She can confirm what she changed without the screen printing
+    """§6.4.2. They can confirm what they changed without the screen printing
     either value in full - and the response body is a second place a raw value
     could be logged.
     """
@@ -330,10 +330,10 @@ def test_one_models_change_never_touches_another(admin):
     ]
 
 
-# ── §6.4.5, from her side and the maintainer's ──────────────────────────────
+# ── §6.4.5, from their side and the maintainer's ──────────────────────────────
 
 
-def test_she_can_see_that_her_destination_moved_lately(admin):
+def test_they_can_see_that_their_destination_moved_lately(admin):
     """A model who did not make that change is the first person who would
     notice, and the only one who can say so.
     """

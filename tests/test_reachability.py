@@ -50,7 +50,7 @@ UNREACHED_ON_PURPOSE = {
     ("GET", "/api/operations/order-facts"),
     ("GET", "/api/operations/shopify-scopes"),
     ("POST", "/api/operations/verify-code"),
-    # The affiliate's own equivalent is on her payments screen; the
+    # The affiliate's own equivalent is on their payments screen; the
     # maintainer's is the destination_changed_at flag already on the payments
     # row, which is where the warning belongs (§6.4.5).
     ("GET", "/api/me/payout-destination/changed-recently"),
@@ -71,7 +71,7 @@ NOT_BUILT_YET = {
     # out of it from a screen.
     ("PATCH", "/api/affiliates/{affiliate_id}/compensation/{period_id}"),
     # Cannot give a code to an affiliate who has none, or add a second. The
-    # application flow registers hers; `recheck-code` only re-checks an
+    # application flow registers theirs; `recheck-code` only re-checks an
     # unverified one that already exists.
     ("POST", "/api/affiliates/{affiliate_id}/codes"),
     # Cannot move a verified code to somebody else.
@@ -81,8 +81,8 @@ NOT_BUILT_YET = {
     ("POST", "/api/affiliates"),
     # Cannot undo a verification made in error before the month was approved.
     ("POST", "/api/targets/{month}/unverify"),
-    # Cannot correct where a model is paid on her behalf. She can change it
-    # herself (§6.4), so this is a fallback rather than the main path.
+    # Cannot correct where a model is paid on their behalf. They can change it
+    # themselves (§6.4), so this is a fallback rather than the main path.
     ("PUT", "/api/affiliates/{affiliate_id}/payout-destination"),
     # Cannot see one model's payment history in one place, or open the
     # screenshot of a payment already recorded.

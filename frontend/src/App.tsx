@@ -87,7 +87,7 @@ export default function App() {
         {/*
          * §6.1. The split is on **what the session is**, not on what it may
          * do. A model holds no staff permission at all, so every admin route
-         * would refuse her - but a sidebar full of things that refuse you is a
+         * would refuse them - but a sidebar full of things that refuse you is a
          * sidebar that teaches you the tool is broken. Before this, a model
          * signing in landed on the maintainer's Overview and a 403.
          */}

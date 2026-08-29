@@ -30,8 +30,8 @@ It is reversible: the data keeps arriving.
 ## Pending is shown, never hidden
 
 A model should be able to see what is coming. Hiding an undelivered order makes
-her month look smaller than it is and produces exactly the question this platform
-exists to stop her having to ask.
+their month look smaller than it is and produces exactly the question this platform
+exists to stop their having to ask.
 
 ## What this deliberately does not do
 

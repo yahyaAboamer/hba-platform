@@ -1,7 +1,7 @@
-"""A model applying for herself.
+"""A model applying for themselves.
 
 §13 step 2, and §6.5's boundary: the application collects identity and
-destination, and cannot express a single figure that decides what she is paid.
+destination, and cannot express a single figure that decides what they are paid.
 """
 
 import pytest
@@ -49,7 +49,7 @@ def _apply(db, account, **overrides):
 
 def test_applying_creates_a_pending_profile(db):
     """Pending, never active. Approval is a deliberate later act by somebody
-    who has verified her code (§10.4).
+    who has verified their code (§10.4).
     """
     account = _account(db)
 
@@ -64,7 +64,7 @@ def test_applying_creates_a_pending_profile(db):
 def test_the_proposed_code_is_registered_but_not_verified(db):
     """§10.4's gate is `set_status`, and registering here does not open it.
 
-    Verifying on application would let a model approve her own code by typing
+    Verifying on application would let a model approve their own code by typing
     it, which is the exact failure the gate exists for.
     """
     account = _account(db)
@@ -148,7 +148,7 @@ def test_applying_twice_is_refused(db):
 
 def test_a_missing_instapay_number_is_refused(db):
     """ADR 0028: the address feeds the deep link, the number is what somebody
-    types when the link does not open. Both, or she cannot reliably be paid.
+    types when the link does not open. Both, or they cannot reliably be paid.
     """
     account = _account(db)
 
@@ -204,7 +204,7 @@ def test_an_unknown_payout_method_is_refused(db):
 # ── §6.5, as a boundary rather than an intention ─────────────────────────────
 
 
-def test_the_application_cannot_express_what_she_is_paid(db):
+def test_the_application_cannot_express_what_they_are_paid(db):
     """A form that merely omits a field is not a control. This asserts the
     service has no parameter for one, so no client can send one.
     """

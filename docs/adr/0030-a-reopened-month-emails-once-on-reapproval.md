@@ -7,20 +7,20 @@
 
 ## The question
 
-> "We need to send [her] a mail like paying a normal month saying that his
+> "We need to send [them] a mail like paying a normal month saying that his
 > payment for this month is updated to what I will write."
 
 Right, in substance. Reopening a month and re-approving it at a different
-figure moves money she was not expecting, and §11.1's whole premise is that a
+figure moves money they were not expecting, and §11.1's whole premise is that a
 model should never have to ask what a number means. An unexplained transfer is
 exactly the question this platform exists to prevent.
 
 ## Decision: no separate email for reopening itself
 
-The proposal was raised as two moments — tell her when it's reopened, tell her
+The proposal was raised as two moments — tell them when it's reopened, tell them
 again when it's re-approved. Considered and rejected for one reason, given by
 the business directly: **reopen and re-approve happen back to back.** A
-heads-up email that lands minutes before the real one teaches her to skip the
+heads-up email that lands minutes before the real one teaches them to skip the
 first and, eventually, skim the second.
 
 **One email, on re-approval.** §16's existing "Month approved" row already
@@ -28,24 +28,24 @@ covers this — a re-approval is an approval, just not the first one. No new
 event type is needed. What is missing is that the email has to *know* it is a
 second version and say so.
 
-## Decision: the channel is email, because that is the only one she has
+## Decision: the channel is email, because that is the only one they have
 
 §16's table gives models exactly one channel: email. There is no in-platform
-inbox for her — that belongs to the maintainer alone, and even her own
+inbox for them — that belongs to the maintainer alone, and even their own
 dashboard does not exist before Phase 9. So until notifications are built
-(Phase 10) and her portal exists (Phase 9), a re-approval is invisible to her
+(Phase 10) and their portal exists (Phase 9), a re-approval is invisible to their
 exactly like every other event in that table. This ADR does not move that
 timeline; it settles what the email says once it is built.
 
 ## Decision: the email states the reason, not just the new figure
 
 *"Your August is now E£2,650"* answers what changed. It does not answer the
-question she will actually have: *did you make a mistake, or did I?* Silence
+question they will actually have: *did you make a mistake, or did I?* Silence
 on that point is what turns a correction into a support message.
 
 The reopen action already collects a written reason (§11.5, enforced
 server-side). The re-approval email for a **second or later version** must
-include it, rewritten for her rather than copied from the audit log verbatim -
+include it, rewritten for them rather than copied from the audit log verbatim -
 *"an order arrived after the month closed"*, not
 `orders_released: 1`.
 
@@ -54,8 +54,8 @@ include it, rewritten for her rather than copied from the audit log verbatim -
 The proposal assumed the figure only goes up. It does not — ADR 0029 and a
 corrected rate or target can both make a re-approved month **lower** than what
 was already paid. When that happens there is no transfer to attach the news
-to, and by construction she will notice nothing in her bank account. Telling
-her only reaches her the day her next payment is short, which is the exact
+to, and by construction they will notice nothing in their bank account. Telling
+them only reaches them the day their next payment is short, which is the exact
 failure this ADR exists to prevent.
 
 So a downward re-approval emails **immediately**, at approval, and says which

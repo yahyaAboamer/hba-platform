@@ -172,7 +172,7 @@ def test_an_order_that_wholly_failed_is_failed():
 def test_one_parcel_arrived_and_one_failed_resolves_neither_way():
     """Genuinely ambiguous: part of the order is with the customer and part
     never will be. Earning would pay for goods that came back; voiding would
-    refuse commission on goods she sold. It waits - see docs/limits.md.
+    refuse commission on goods they sold. It waits - see docs/limits.md.
     """
     state, _, _ = derive_delivery(
         [_fulfilment("DELIVERED", "2026-04-18T10:00:00Z"), _fulfilment("FAILURE")]

@@ -198,7 +198,7 @@ export function PaymentRecord() {
        * model who switched banks from an account somebody else is now holding.
        *
        * It does not block. A destination changing shortly before payday is
-       * overwhelmingly the former, and refusing to pay her would be the wrong
+       * overwhelmingly the former, and refusing to pay them would be the wrong
        * default by a wide margin.
        */}
       {balance.destination_changed_at && (
@@ -386,7 +386,7 @@ export function PaymentRecord() {
               </dl>
 
               {/*
-               * ADR 0028. The link opens the app with her address filled in;
+               * ADR 0028. The link opens the app with their address filled in;
                * the number below it is what you type when it does not open —
                * which on a laptop is always, because there is no app to open.
                */}

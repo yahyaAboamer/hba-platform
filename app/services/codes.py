@@ -66,7 +66,7 @@ def start_month_for(created_at: datetime | None) -> str:
 
     An unknown creation date falls back to the horizon. That is the safe
     direction: it claims at most a few empty months, where starting late would
-    orphan real orders and nobody would notice until the model asked why her
+    orphan real orders and nobody would notice until the model asked why their
     dashboard was empty.
     """
     if created_at is None:
@@ -361,13 +361,13 @@ def retire_and_replace(
     actor_id: int | None = None,
     actor_email: str | None = None,
 ) -> DiscountCodePeriod:
-    """She changed her code on Shopify. Carry her across to it.
+    """They changed their code on Shopify. Carry them across to it.
 
-    **Nothing about her changes.** Same affiliate, same record, same dashboard,
-    same history. Only which code earns for her from which month: the old code
-    ends, the new one begins the month after, and both point at her. Her
+    **Nothing about them changes.** Same affiliate, same record, same dashboard,
+    same history. Only which code earns for them from which month: the old code
+    ends, the new one begins the month after, and both point at them. Their
     earlier months keep showing the old code and its orders; later months show
-    the new one. Her performance runs continuously across the two.
+    the new one. Their performance runs continuously across the two.
 
     This is deliberately not an edit of the old code. That code was live and
     has attributed orders - rewriting it would change what those orders
@@ -382,9 +382,9 @@ def retire_and_replace(
     # Ending the old code the month before the new one starts is only right
     # when the new code was created at the moment of handover. If it was
     # created earlier - set up in June, switched to in August - the old code
-    # would be ended in May while she was still earning on it through July,
-    # and those months would fall outside every period she owns. Two months of
-    # her sales would belong to nobody, and nothing would say so.
+    # would be ended in May while they were still earning on it through July,
+    # and those months would fall outside every period they own. Two months of
+    # their sales would belong to nobody, and nothing would say so.
     #
     # The precise harm is what is checked, not the calendar gap: orders on the
     # old code at or after the new code's start. A new code created early that

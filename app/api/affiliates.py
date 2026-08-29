@@ -87,8 +87,8 @@ class CreateAffiliateBody(BaseModel):
 class UpdateStatusBody(BaseModel):
     status: str | None = None
     reason: str | None = None
-    #: Corrections to what the model submitted about herself. People mistype
-    #: their own phone numbers, and email is her login - see update_details.
+    #: Corrections to what the model submitted about themselves. People mistype
+    #: their own phone numbers, and email is their login - see update_details.
     name: str | None = Field(default=None, max_length=120)
     phone: str | None = Field(default=None, max_length=40)
     email: str | None = Field(default=None, max_length=320)
@@ -112,7 +112,7 @@ class RegisterCodeBody(BaseModel):
     answer - the later of the platform's data horizon and the code's creation
     on Shopify - so asking a person can only produce a wrong one. Typing
     today's month would orphan every order the code had already earned, and
-    nobody would notice until the model asked why her dashboard was empty.
+    nobody would notice until the model asked why their dashboard was empty.
 
     Verification is not asked for either. Registering looks the code up in
     Shopify, which is the same call that answers "does this exist?" - one
@@ -156,8 +156,8 @@ class CorrectCompensationBody(BaseModel):
 class ReplaceCodeBody(BaseModel):
     """Move a model onto a new discount code.
 
-    ``replaces`` names which of her codes is being retired, and is only needed
-    when she holds more than one - with a single code there is nothing to
+    ``replaces`` names which of their codes is being retired, and is only needed
+    when they hold more than one - with a single code there is nothing to
     disambiguate, and asking would be noise.
 
     No months are asked for. The new code starts when Shopify created it (or at
@@ -536,11 +536,11 @@ def replace_code_route(
     actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_MANAGE)),
     db: Session = Depends(get_session),
 ) -> dict:
-    """She changed her code on Shopify. Carry her across to the new one.
+    """They changed their code on Shopify. Carry them across to the new one.
 
-    Nothing about her changes: same record, same dashboard, same history. Her
+    Nothing about them changes: same record, same dashboard, same history. Their
     earlier months keep showing the old code and the orders it earned; later
-    months show the new one. Her performance runs continuously across both.
+    months show the new one. Their performance runs continuously across both.
 
     The old code is **ended, never rewritten**. It was live and has attributed
     orders; changing it would alter what those orders belonged to, and a month
@@ -585,8 +585,8 @@ def replace_code_route(
         raise HTTPException(502, f"Could not reach Shopify: {exc}") from exc
 
     if not found["exists"]:
-        # Ending her current code on the strength of one Shopify has never
-        # heard of would leave her earning nothing from that month on, and
+        # Ending their current code on the strength of one Shopify has never
+        # heard of would leave them earning nothing from that month on, and
         # nothing would report it.
         raise HTTPException(
             400,

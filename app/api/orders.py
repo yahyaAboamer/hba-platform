@@ -6,7 +6,7 @@ decisions rather than making any. That is the whole reason this screen needs
 no permission beyond `affiliates.view` - it cannot change what anybody is owed.
 
 **Why a screen for this at all**, when every figure already appears somewhere
-on Affiliates, Payroll or Payments: those three answer "what does she earn"
+on Affiliates, Payroll or Payments: those three answer "what does they earn"
 and this answers "why does this *order* read the way it does" - whose code it
 carried, whether Shopify has said it arrived, which payroll actually paid it.
 That is the question support ends up asking about one order at a time, and it

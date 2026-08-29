@@ -44,18 +44,18 @@ is settled.
 
 ### An exchange finalises the order at the original sale
 
-The model earns on what she sold. The exchange is HBA's service, not hers:
+The model earns on what they sold. The exchange is HBA's service, not theirs:
 
-- She keeps her commission on the original order, in full.
+- They keep their commission on the original order, in full.
 - Any price difference — the customer paying more for a pricier replacement, or
-  being refunded for a cheaper one — is **HBA's**, in both directions. She sold
-  the first item; she did not sell the replacement.
+  being refunded for a cheaper one — is **HBA's**, in both directions. They sold
+  the first item; they did not sell the replacement.
 - Refunds settled outside E-stebdal, exchange shipping fees, and the "refund
   needed" flag Shopify is left showing all fall after finalisation and cannot
   reach the calculation.
 
-**Nothing is taken from her and nothing is added.** That was HBA's phrasing and
-it is the whole rule.
+**Nothing is taken from her and nothing is added.** That was HBA's phrasing,
+verbatim, and it is the whole rule. It applies to every model.
 
 ## Consequences
 
@@ -79,9 +79,9 @@ See `docs/limits.md`.
 order. It is what allowed a completed return to look permanently open.
 
 **Pay no commission at all on an order that was exchanged.** A stricter reading
-of "the model did not do the exchange". Rejected: she did make the original
-sale, the customer kept goods of comparable value, and withholding her
-commission because a size did not fit punishes her for something she has no part
+of "the model did not do the exchange". Rejected: they did make the original
+sale, the customer kept goods of comparable value, and withholding their
+commission because a size did not fit punishes them for something they have no part
 in and cannot influence.
 
 **Wait for the return window before paying anything.** ADR 0012 already rejected
@@ -105,5 +105,5 @@ customer already has, so finalising on delivery covers every case this ADR liste
 without needing to detect any of them.
 
 **The exchange rule stated here is unchanged and now applies to returns as well:**
-the model keeps her commission on the original sale in full, and any money moving
+the model keeps their commission on the original sale in full, and any money moving
 afterwards is HBA's, in both directions.

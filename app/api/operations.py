@@ -174,7 +174,7 @@ def unregistered_codes(
     placed*.
 
     That also covers the case nobody thinks to look for: an affiliate left in
-    June, her code kept being used in August, and those August sales are
+    June, their code kept being used in August, and those August sales are
     quietly going nowhere.
 
     ``unowned_months`` is included so whoever registers the code knows which
@@ -301,7 +301,7 @@ def order_facts(
 ) -> dict:
     """What Shopify will actually tell us about delivery, returns and refunds.
 
-    Phase 4 pays a model when her order is **delivered** (ADR 0012) and reads
+    Phase 4 pays a model when their order is **delivered** (ADR 0012) and reads
     that from Shopify rather than from Bosta (ADR 0023). This is the instrument
     that turns "Shopify updates the status" into a number, the same way
     /shopify-scopes turned "is the scope granted?" into an answer.

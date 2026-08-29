@@ -50,8 +50,8 @@ const KIND_MEANING: Record<Kind, string> = {
  * *no pay terms* forever, with no way to resolve it.
  *
  * **A rate change is a new period, never an edit.** The database refuses two
- * periods that overlap, so the months she was on 8% cannot later become months
- * she was on 10%. That is enforced server-side; this page exists to make it
+ * periods that overlap, so the months they were on 8% cannot later become months
+ * they were on 10%. That is enforced server-side; this page exists to make it
  * legible before it is committed.
  */
 export function Compensation() {
@@ -262,10 +262,10 @@ export function Compensation() {
          * already uses.
          *
          * It also needed saying what it means. *In force from* is when this
-         * arrangement starts applying, not when her orders start counting:
-         * orders are counted from the month her code was registered, which may
-         * be long before. Setting it to September does not hide her August
-         * sales; it means August is paid on whatever she was on in August.
+         * arrangement starts applying, not when their orders start counting:
+         * orders are counted from the month their code was registered, which may
+         * be long before. Setting it to September does not hide their August
+         * sales; it means August is paid on whatever they were on in August.
          */}
         <div className="field comp__field">
           <span className="field__label">

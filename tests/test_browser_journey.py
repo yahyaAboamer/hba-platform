@@ -286,17 +286,17 @@ def test_the_maintainer_and_the_model_can_get_all_the_way_through(browser):
     assert invited.status_code == 201, invited.text
     token = invited.json()["token"]
 
-    # 2. She opens the link in her own browser and chooses a password.
-    with TestClient(app) as hers:
-        model = Browser(hers)
+    # 2. They open the link in their own browser and chooses a password.
+    with TestClient(app) as jar:
+        model = Browser(jar)
         accepted = model.post(
             "/api/auth/invitations/accept",
             json={"token": token, "display_name": "Nour", "password": PASSWORD},
         )
         assert accepted.status_code == 201, accepted.text
-        assert model.csrf, "accepting an invitation has to leave her able to write"
+        assert model.csrf, "accepting an invitation has to leave the model able to write"
 
-        # 3. She applies, with her own details and her own payout destination.
+        # 3. They apply, with their own details and their own payout destination.
         applied = model.post(
             "/api/applications",
             json={
@@ -310,16 +310,16 @@ def test_the_maintainer_and_the_model_can_get_all_the_way_through(browser):
         )
         assert applied.status_code == 201, applied.text
 
-        # 4. And she can see her own record straight away.
+        # 4. And they can see their own record straight away.
         assert model.get("/api/me").status_code == 200
         assert model.get("/api/me/months").status_code == 200
 
-    # 5. The maintainer finds her waiting.
+    # 5. The maintainer finds them waiting.
     roster = browser.get("/api/affiliates").json()["affiliates"]
     nour = next(row for row in roster if row["name"] == "Nour Mahmoud")
     assert nour["status"] == "pending"
 
-    # 6. Sets what she is paid - which §6.5 keeps off her application form.
+    # 6. Sets what they are paid - which §6.5 keeps off their application form.
     terms = browser.post(
         f"/api/affiliates/{nour['id']}/compensation",
         json={
@@ -381,9 +381,9 @@ def test_the_maintainer_and_the_model_can_get_all_the_way_through(browser):
     )
     assert paid.status_code == 201, paid.text
 
-    # 10. And she can see all of it, on her own screens, in her own browser.
-    with TestClient(app) as hers:
-        model = Browser(hers)
+    # 10. And they can see all of it, on their own screens, in their own browser.
+    with TestClient(app) as jar:
+        model = Browser(jar)
         model.post("/api/auth/login", json={"email": "nour@example.com", "password": PASSWORD})
 
         month = model.get(f"/api/me/earnings/{AUGUST}").json()
@@ -407,8 +407,8 @@ def test_a_model_cannot_reach_the_maintainers_screens(browser):
         json={"email": "nour@example.com", "role": "affiliate"},
     )
 
-    with TestClient(app) as hers:
-        model = Browser(hers)
+    with TestClient(app) as jar:
+        model = Browser(jar)
         model.post(
             "/api/auth/invitations/accept",
             json={
@@ -438,7 +438,7 @@ def _screenshot() -> bytes:
 
 
 def _confirm_code(affiliate_id: int, code: str) -> None:
-    """Mark her code confirmed, the way a Shopify check would.
+    """Mark their code confirmed, the way a Shopify check would.
 
     Done directly because §10.4's verification calls Shopify, and this file is
     about the journey rather than about that call.

@@ -666,8 +666,8 @@ def test_deactivating_never_requires_a_verified_code(client):
 # ── Correcting what the model submitted ────────────────────────────────────────
 
 
-def test_her_name_and_phone_can_be_corrected(client):
-    """She fills these in herself, and people mistype their own numbers."""
+def test_their_name_and_phone_can_be_corrected(client):
+    """They fill these in themselves, and people mistype their own numbers."""
     affiliate = _register(client)
     response = client.patch(
         f"/api/affiliates/{affiliate['id']}",
@@ -678,9 +678,9 @@ def test_her_name_and_phone_can_be_corrected(client):
     assert response.json()["phone"] == "01001234567"
 
 
-def test_her_login_email_can_be_corrected(client):
-    """Her login is the address she was invited at, not one she typed. If that
-    is wrong she cannot sign in at all, so somebody has to be able to fix it.
+def test_their_login_email_can_be_corrected(client):
+    """Their login is the address they were invited at, not one they typed. If that
+    is wrong they cannot sign in at all, so somebody has to be able to fix it.
     """
     affiliate = _register(client, email="typo@example.com")
     response = client.patch(
@@ -697,7 +697,7 @@ def test_her_login_email_can_be_corrected(client):
 
 
 def test_a_correction_records_what_it_changed_from(client):
-    """"Why can she not sign in any more" is a question that gets asked."""
+    """"Why can they not sign in any more" is a question that gets asked."""
     affiliate = _register(client, email="typo@example.com")
     client.patch(
         f"/api/affiliates/{affiliate['id']}", json={"email": "nour@example.com"}
@@ -731,8 +731,8 @@ def test_changing_nothing_is_not_an_error(client):
     assert client.patch(f"/api/affiliates/{affiliate['id']}", json={}).status_code == 200
 
 
-def test_an_affiliate_cannot_correct_her_own_details(client):
-    """Section 6.5 again: she may not edit her own record."""
+def test_an_affiliate_cannot_correct_their_own_details(client):
+    """Section 6.5 again: they may not edit their own record."""
     _demote_to("affiliate")
     assert client.patch(
         "/api/affiliates/1", json={"name": "Someone Else"}
@@ -743,7 +743,7 @@ def test_an_affiliate_cannot_correct_her_own_details(client):
 
 
 def test_a_code_can_be_rechecked_once_it_exists_on_shopify(client, _shopify):
-    """The ordinary case: she applied before the code was created."""
+    """The ordinary case: they applied before the code was created."""
     from datetime import datetime, timezone
 
     _shopify_says(_shopify, exists=False)
@@ -822,7 +822,7 @@ def test_a_verified_code_is_never_rechecked(client):
 
 
 def test_rechecking_then_approving_works_end_to_end(client, _shopify):
-    """The whole point: a model who applied before her code existed can be
+    """The whole point: a model who applied before their code existed can be
     approved once it does.
     """
     _shopify_says(_shopify, exists=False)
@@ -843,14 +843,14 @@ def test_rechecking_then_approving_works_end_to_end(client, _shopify):
     assert approved.status_code == 200
 
 
-def test_an_affiliate_cannot_recheck_her_own_code(client):
+def test_an_affiliate_cannot_recheck_their_own_code(client):
     _demote_to("affiliate")
     assert client.post(
         "/api/affiliates/1/recheck-code", json={}
     ).status_code == 403
 
 
-# ── She changed her code on Shopify ────────────────────────────────────────────
+# ── They changed their code on Shopify ────────────────────────────────────────────
 
 
 def _switch_to(client, affiliate_id, code, created, shopify, **extra):
@@ -863,8 +863,8 @@ def _switch_to(client, affiliate_id, code, created, shopify, **extra):
 
 
 def test_replacing_a_code_keeps_the_same_model(client, _shopify):
-    """Nothing about her changes - same record, same dashboard, same history.
-    Only which code earns for her from which month.
+    """Nothing about them changes - same record, same dashboard, same history.
+    Only which code earns for them from which month.
     """
     from datetime import datetime
 
@@ -878,13 +878,13 @@ def test_replacing_a_code_keeps_the_same_model(client, _shopify):
     assert body["retired"]["code"] == "OLD10"
     assert body["took_over"]["code"] == "NEW10"
 
-    still_hers = client.get(f"/api/affiliates/{affiliate['id']}").json()
-    assert still_hers["status"] == affiliate["status"], "she was not archived"
-    assert still_hers["id"] == affiliate["id"]
+    still_there = client.get(f"/api/affiliates/{affiliate['id']}").json()
+    assert still_there["status"] == affiliate["status"], "the model was not archived"
+    assert still_there["id"] == affiliate["id"]
 
 
 def test_the_old_code_ends_the_month_before_the_new_one_starts(client, _shopify):
-    """No gap and no overlap - every month belongs to exactly one of her codes."""
+    """No gap and no overlap - every month belongs to exactly one of their codes."""
     from datetime import datetime
 
     affiliate = _register(client)
@@ -898,9 +898,9 @@ def test_the_old_code_ends_the_month_before_the_new_one_starts(client, _shopify)
     assert body["took_over"]["start_month"] == "2026-07"
 
 
-def test_her_history_runs_continuously_across_both_codes(client, _shopify):
+def test_their_history_runs_continuously_across_both_codes(client, _shopify):
     """The point of the whole operation: orders earned under either code are
-    hers, and neither shows up as belonging to nobody.
+    theirs, and neither shows up as belonging to nobody.
     """
     from datetime import datetime
 
@@ -913,7 +913,7 @@ def test_her_history_runs_continuously_across_both_codes(client, _shopify):
     _switch_to(client, affiliate["id"], "NEW10", datetime(2026, 7, 3), _shopify)
 
     orphaned = client.get("/api/operations/unregistered-codes").json()["codes"]
-    assert orphaned == [], "an order stopped belonging to her across the switch"
+    assert orphaned == [], "an order stopped belonging to anybody across the switch"
 
 
 def test_the_old_code_still_owns_its_own_months(client, _shopify):
@@ -934,7 +934,7 @@ def test_the_old_code_still_owns_its_own_months(client, _shopify):
 
 
 def test_a_code_shopify_does_not_know_cannot_take_over(client, _shopify):
-    """Retiring her working code for one that does not exist would stop her
+    """Retiring their working code for one that does not exist would stop them
     earning from that month, with nothing anywhere reporting it.
     """
     affiliate = _register(client)
@@ -950,7 +950,7 @@ def test_a_code_shopify_does_not_know_cannot_take_over(client, _shopify):
     from app.services.codes import owner_of
 
     with SessionLocal() as session:
-        assert owner_of(session, "OLD10", "2099-12") is not None, "her code was retired anyway"
+        assert owner_of(session, "OLD10", "2099-12") is not None, "the code was retired anyway"
 
 
 def test_a_replacement_that_does_not_follow_is_refused(client, _shopify):
@@ -968,7 +968,7 @@ def test_a_replacement_that_does_not_follow_is_refused(client, _shopify):
     assert "not after" in response.json()["detail"]
 
 
-def test_replacing_when_she_holds_no_code_is_refused(client, _shopify):
+def test_replacing_when_they_hold_no_code_is_refused(client, _shopify):
     from datetime import datetime
 
     affiliate = _register(client)
@@ -976,7 +976,7 @@ def test_replacing_when_she_holds_no_code_is_refused(client, _shopify):
     assert response.status_code == 404
 
 
-def test_which_code_is_replaced_must_be_named_when_she_holds_several(client, _shopify):
+def test_which_code_is_replaced_must_be_named_when_they_hold_several(client, _shopify):
     from datetime import datetime
 
     affiliate = _register(client)
@@ -1008,7 +1008,7 @@ def test_the_switch_is_recorded(client, _shopify):
     assert after["took_over"]["code"] == "NEW10"
 
 
-def test_an_affiliate_cannot_replace_her_own_code(client):
+def test_an_affiliate_cannot_replace_their_own_code(client):
     _demote_to("affiliate")
     assert client.post(
         "/api/affiliates/1/replace-code", json={"code": "NEW10"}
@@ -1018,7 +1018,7 @@ def test_an_affiliate_cannot_replace_her_own_code(client):
 # ── A code created ahead of the switch ─────────────────────────────────────────
 #
 # The handover month is derived from when Shopify created the new code, which
-# is only the same thing as when she actually moved over because HBA creates a
+# is only the same thing as when they actually moved over because HBA creates a
 # code at the moment of switching. Nothing enforces that habit, so these guard
 # what happens when it is broken.
 
@@ -1026,9 +1026,9 @@ def test_an_affiliate_cannot_replace_her_own_code(client):
 def test_a_code_created_ahead_of_the_switch_is_refused(client, _shopify):
     """The failure this exists to stop.
 
-    NEW10 was created in July but she kept earning on OLD10 through August.
-    Ending OLD10 in June - the month before NEW10 was created - would put her
-    July and August orders outside every period she owns. They would belong to
+    NEW10 was created in July but they kept earning on OLD10 through August.
+    Ending OLD10 in June - the month before NEW10 was created - would put their
+    July and August orders outside every period they own. They would belong to
     nobody, and nothing would say so.
     """
     from datetime import datetime
@@ -1072,7 +1072,7 @@ def test_the_refusal_names_what_is_missing(client, _shopify):
 
 
 def test_a_code_created_at_the_moment_of_the_switch_still_works(client, _shopify):
-    """The normal case, and the reason this is a guard and not a ban. Her last
+    """The normal case, and the reason this is a guard and not a ban. Their last
     OLD10 order is in June, NEW10 was created in July, so nothing is stranded.
     """
     from datetime import datetime

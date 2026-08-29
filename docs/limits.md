@@ -327,7 +327,7 @@ selling** (ADR 0022). Everything a code earned before somebody typed it into the
 platform belonged to nobody, permanently, and nothing said so.
 
 **Fixed.** Registering a code queues a background job that finds every indexed
-order using it, in the months she owns, and attaches the unattributed ones. Each
+order using it, in the months they own, and attaches the unattributed ones. Each
 goes through the same `attribute_order` as a live order, so a backfilled month is
 worth the same as one that arrived by webhook.
 
@@ -347,19 +347,19 @@ touch.
 that belong to nobody at all. Nothing backfills those, because there is no one
 to backfill them to.
 
-### 🟠 A model's login email is the one she was invited at, not one she types
+### 🟠 A model's login email is the one they were invited at, not one they type
 
 **The limit.** `accept_invitation` creates the account with the **invitation's**
 email. The application form (Phase 8) collects an email from the model, but that
-is a *contact detail* on her profile - it does not become her login.
+is a *contact detail* on their profile - it does not become their login.
 
 **Why it is this way.** The invitation link was sent to that address and
 approved against it. Letting the form silently repoint the login would mean the
 person you invited is not necessarily the person who ends up with the account.
 
-**What failure looks like.** She types the email she actually uses, is approved,
+**What failure looks like.** They type the email they actually uses, is approved,
 and then cannot sign in - because the login is the address you invited, which
-may be one she rarely checks. Nothing errors; she just cannot get in.
+may be one they rarely checks. Nothing errors; they just cannot get in.
 
 *What to do:* the form shows the invited address, and correcting it is a
 maintainer action - see the affiliate edit endpoint. That keeps the change
@@ -377,7 +377,7 @@ Nothing in Shopify announces when that stops.
 somebody changes a setting. Orders keep arriving and keep shipping, and none of them ever
 reaches delivered. Every affiliate's month then calculates to **zero earned**, correctly and
 silently — it looks exactly like a month with no sales. The first person to notice is a model
-asking why she was not paid.
+asking why they were not paid.
 
 This is the same failure shape as the auto-cancel automation in §9.1: protection that lives
 outside the codebase and disappears without a symptom.
@@ -409,7 +409,7 @@ Phase 4 Task 2b. The migration adds the columns; it cannot invent the data. All
 no delivery state never earns.
 
 **What failure looks like.** A model's January to August sales show as pending
-for ever. Her month calculates to zero earned, correctly, and it looks exactly
+for ever. Their month calculates to zero earned, correctly, and it looks exactly
 like a month with no sales — the same symptom as a dead delivery signal, from a
 completely different cause.
 
@@ -434,7 +434,7 @@ the model's pending column indefinitely, and nothing reports it.
 
 **Why it is deliberate.** Both alternatives are wrong in a way that costs
 somebody money: calling it delivered pays commission on goods that came back,
-and calling it failed refuses commission on goods she genuinely sold. The
+and calling it failed refuses commission on goods they genuinely sold. The
 honest answer is that a person has to decide, and the honest state until then is
 *not yet*.
 
@@ -455,7 +455,7 @@ the live sample — one in five.
 
 If a parcel is attempted, refused, and Shopify is never moved to
 `NOT_DELIVERED`, the order stays pending for ever. It costs nobody money —
-pending pays nothing — but the model sees it in her pending column indefinitely
+pending pays nothing — but the model sees it in their pending column indefinitely
 and eventually asks about it.
 
 **What failure looks like.** Not a wrong number. A number that never becomes
@@ -469,16 +469,16 @@ to size the threshold from, rather than guessing at one now (ADR 0019).
 ### 🟠 Nobody has explained any of this to the people using it
 
 **The limit.** The platform is full of ideas a model has never met — carried
-forward, earned versus pending, why a returned order still shows in a month she
-was paid for, why her sales total and her payment are different numbers. **None
-of it is explained anywhere she can reach.** The same applies to the team: an
+forward, earned versus pending, why a returned order still shows in a month they
+were paid for, why their sales total and their payment are different numbers. **None
+of it is explained anywhere they can reach.** The same applies to the team: an
 invited `target_recorder` lands on a bulk grid with no idea what verification
 unlocks or why approval is blocked.
 
 **What failure looks like.** Not a wrong number — the same question, asked by
 every model, every month, answered by hand each time. Support load that grows
-linearly with the roster, and a quiet loss of trust: a figure she cannot explain
-is a figure she does not believe.
+linearly with the roster, and a quiet loss of trust: a figure they cannot explain
+is a figure they do not believe.
 
 **What exists in the design already.** §16 specifies **commission policy
 versions** — the rules written in plain language, effective-dated, with every
@@ -496,7 +496,7 @@ rules generally?"* — and those diverge the moment a rate changes.
   September payment"* is not. A glossary is a patch over vocabulary nobody
   chose.
 - **Settlement labelling per order** — which payroll actually paid each order.
-  Without it a model reconciling a month by hand cannot arrive at her own
+  Without it a model reconciling a month by hand cannot arrive at their own
   payment figure, and this is the single largest source of the questions above.
   The mechanism is `attributed_order.settled_in_snapshot_id`, built in Phase 6.
 - **Team onboarding.** A first-login walkthrough was considered. Cheaper and
@@ -540,8 +540,8 @@ corrections HBA does by hand. HBA rejected it, correctly. Summing the product
 lines touches none of that.
 
 Shopify's `LineItem.currentQuantity` is the quantity minus what was refunded —
-literally what the customer kept — and `discountedUnitPriceSet` is the price she
-paid after her code, so a E£1,000 jacket on a 10% code reads as E£900 with
+literally what the customer kept — and `discountedUnitPriceSet` is the price they
+paid after their code, so a E£1,000 jacket on a 10% code reads as E£900 with
 nothing configured anywhere. Jacket kept, pants returned, base **E£900**.
 
 The E£120 return fee is HBA's cost of handling a return, not the model's, and it
@@ -807,7 +807,7 @@ the platform enforces a split the staffing does not.
 
 Phase 3 recorded this for compensation. Phase 5 is where it starts **deciding
 payments** — a verified, achieved target is what applies a base guarantee (§9.5),
-and Sara can record the actuals and confirm them herself.
+and Sara can record the actuals and confirm them themselves.
 
 **What failure looks like.** Not fraud, most likely. A miscount confirmed by the
 person who made it, and a guarantee paid on a month that did not qualify. Nothing
@@ -888,15 +888,15 @@ new one starts, and takes the new one's start month from **when Shopify created
 it**. Those are the same date only because HBA creates a code at the moment of
 switching a model onto it. Nothing enforces that habit.
 
-**What failure looks like.** `NEW10` is created on Shopify in July, but she
-keeps earning on `OLD10` through August. Switching her in September derives a
-July start, which ends `OLD10` in June — so her July and August `OLD10` orders
-fall outside every period she owns. Two months of her sales belong to nobody.
+**What failure looks like.** `NEW10` is created on Shopify in July, but they
+keep earning on `OLD10` through August. Switching them in September derives a
+July start, which ends `OLD10` in June — so their July and August `OLD10` orders
+fall outside every period they own. Two months of their sales belong to nobody.
 Nothing errors, nothing recalculates, and the only visible trace is a smaller
-payout than she expects.
+payout than they expect.
 
 The mirror case is as bad: if somebody else used `NEW10` in those months, those
-orders become hers.
+orders become theirs.
 
 **What exists instead.** The handover is **refused** when it would strand
 anything. Before ending the old period, `_orders_on_or_after` counts orders on
@@ -907,7 +907,7 @@ The check is on the *harm*, not the calendar. A code created early that nobody
 used strands nothing, so it is allowed — sizing the guard to the failure rather
 than to the shape it usually arrives in (ADR 0019).
 
-**What is missing.** A way to say **which month she actually moved over**,
+**What is missing.** A way to say **which month they actually moved over**,
 separate from when the code was created, with the orders the new code already
 accumulated shown before the decision is confirmed. Deliberately not built:
 HBA does not work this way today, and a handover month that can be typed is a
@@ -922,11 +922,11 @@ which months belong to which code. Raise it, and build the feature above.
 
 **The limit, as it stood.** §9.5 pays a `base_guarantee` affiliate
 **max(commission, base amount)**, but only when targets were achieved *and*
-verified. Targets did not exist, so the calculation reported her commission and
+verified. Targets did not exist, so the calculation reported their commission and
 refused to resolve the guarantee — which meant **no base-guarantee model could be
 paid through the platform at all.**
 
-**Fixed.** `monthly_target` records what she was asked for and what she produced;
+**Fixed.** `monthly_target` records what they were asked for and what they produced;
 verification confirms it; `calculate_month` applies §9.5.
 
 | Situation | Result |
@@ -937,13 +937,13 @@ verification confirms it; `calculate_month` applies §9.5.
 | Nothing recorded | **Blocked** — nobody knows |
 
 **The distinction that survives.** Missing information blocks; poor performance
-does not. A model who missed her targets is paid what she earned, promptly, and
-her month closes. The block exists only where the platform genuinely *does not
+does not. A model who missed their targets is paid what they earned, promptly, and
+their month closes. The block exists only where the platform genuinely *does not
 know*, never as a penalty for a quiet month.
 
 *The warning that is no longer needed:* switching a model from `base_guarantee`
-to `commission` to unblock a month silently removed her guarantee. There is now a
-correct way to unblock one — record her actuals and have somebody confirm them.
+to `commission` to unblock a month silently removed their guarantee. There is now a
+correct way to unblock one — record their actuals and have somebody confirm them.
 
 ### 🟢 Correcting pay terms is blocked by payroll *(fixed, Phase 6)*
 
@@ -1291,7 +1291,7 @@ affiliates under "cannot earn yet".
 Shopify. If it was mistyped, or was never created there, **no order will ever
 carry it** — and the failure is silent, because an affiliate with no sales looks
 exactly like an affiliate who made none. The risk is real; it is just a
-different risk, and one degree less severe than "her money is going nowhere".
+different risk, and one degree less severe than "their money is going nowhere".
 
 **Fixed** in `Affiliates.tsx` and `AffiliateDetail.tsx`: the column is
 *Needs attention*, missing pay terms is listed first as the one that genuinely
@@ -1450,7 +1450,7 @@ an edge case": Egyptian cash-on-delivery routinely straddles month end, and
 correction — it is a slice of every month, silently unpaid, for every model.
 
 **And it forces the one thing §11.4 forbids.** Today the only way that order
-reaches her is to reopen August, which the spec's own words rule out:
+reaches them is to reopen August, which the spec's own words rule out:
 *"Orders settling after approval never alter the approved month."* The platform
 currently requires the operation it tells you not to perform.
 
@@ -1535,9 +1535,9 @@ Resized to 720px tall — 224 KB, 84% smaller, still sharp on a 3x screen.
 **Symptom.** Pressing *Check it* on an affiliate's review panel, against a
 machine with no Shopify credentials, replaced the entire page with one line:
 *"Shopify is not configured: set SHOPIFY_SHOP_DOMAIN"*. Correct message,
-nothing else left on screen — her name, her arrangement, her payout details,
+nothing else left on screen — their name, their arrangement, their payout details,
 the two steps still outstanding, all gone. The only way back was to navigate
-to the list and find her again.
+to the list and find them again.
 
 **Cause.** `AffiliateDetail` had one `error` state and one early return:
 
@@ -1570,41 +1570,41 @@ would have shipped it.
 
 ## A guaranteed minimum that did not apply was never mentioned
 
-**Symptom.** Sara is on a guaranteed minimum of E£8,000. Her targets for
+**Symptom.** Sara is on a guaranteed minimum of E£8,000. Their targets for
 September had not been recorded, so §9.5's comparison had no answer and the
-month paid her commission: E£1,100. Her portal showed *STILL ADDING UP*,
+month paid their commission: E£1,100. Their portal showed *STILL ADDING UP*,
 E£1,100, a breakdown reading *Commission on this month's sales*, and a note
-saying nobody had recorded her posts yet.
+saying nobody had recorded their posts yet.
 
 Every figure on that screen was correct. The word "guarantee" did not appear on
 it anywhere.
 
 **Cause.** The month endpoint returned `guarantee_applied: false` and nothing
 else about the guarantee. That was enough for the maintainer's screens, which
-show the arrangement in a column beside the figure - and useless on hers, where
-the arrangement is not on the page at all because she is assumed to know it.
+show the arrangement in a column beside the figure - and useless on theirs, where
+the arrangement is not on the page at all because they are assumed to know it.
 
-She does know it. That is exactly why its absence reads as *they have forgotten
+They do know it. That is exactly why its absence reads as *they have forgotten
 my minimum* rather than as *the comparison could not be made*.
 
 **Fixed** by returning the guarantee whether or not it applied, with the three
 target states §15 distinguishes, and saying which sentence applies:
 
-| Target state | What she reads |
+| Target state | What they read |
 |---|---|
 | Not recorded | *Whether it applies depends on your targets, and nobody has recorded them yet.* |
 | Met, not confirmed | *You met your targets, so it applies as soon as HBA confirms the numbers.* |
 | Missed | *It applies in a month where your targets are met. They were not this month, so you are paid your commission instead.* |
 
 The third one matters most and is the one to keep an eye on in future edits: a
-missed target costs her the guarantee and **nothing else** (§11.3), and any
+missed target costs them the guarantee and **nothing else** (§11.3), and any
 wording that makes it sound like a penalty is wrong about the rule as well as
 unkind.
 
 **Worth recording** because no test could have found it. Every endpoint
 assertion passed; the figure was right; the blocker was right. What was missing
 was a number that was never asked for, on a screen whose reader brings context
-no test has. **Found by signing in as a model and looking at her own month** -
+no test has. **Found by signing in as a model and looking at their own month** -
 the discipline that has now caught this, the invitation redirect, the guide
 image, and the page-wiping error, none of which any status code disagreed
 with.
@@ -1686,7 +1686,7 @@ reproducing a click path.
 ## A settled month did not account for itself
 
 **Symptom.** Nour's September was agreed at E£2,400.00, transferred as
-E£2,340.00 with the remaining E£60.00 written off as a bank fee. Her payments
+E£2,340.00 with the remaining E£60.00 written off as a bank fee. Their payments
 screen read:
 
     September 2026        E£2,400.00   paid
@@ -1703,22 +1703,22 @@ say **how** it got to zero.
 
 The maintainer's payment screen has never needed this: it shows the parts in a
 column beside the total, and whoever is looking made the adjustment themselves
-ten minutes earlier. She did neither.
+ten minutes earlier. They did neither.
 
-**Fixed** by carrying both figures on the month row and stating them where she
-is looking:
+**Fixed** by carrying both figures on the month row and stating them where they
+are looking:
 
     E£2,340.00 transferred, and E£60.00 settled without a transfer.
     See below for why.
 
 A test now asserts the three account for each other exactly —
 `paid + adjusted == obligation` — because that is the property the row exists
-to let her check.
+to let them check.
 
 **Worth recording** as the same shape as the guaranteed-minimum bug found an
 hour earlier, and the shape to watch for through the rest of this phase:
 **every figure on the screen was correct, and the screen was still wrong.**
-A maintainer's screen can rely on the reader having context. Hers cannot. The
+A maintainer's screen can rely on the reader having context. Theirs cannot. The
 test that would have caught either one is a person reading the page top to
 bottom and trying to make the numbers meet.
 
@@ -1762,7 +1762,7 @@ in Phase 8 was exactly this shape and cost an afternoon.
 
 An `<img>` pointed at `/api/me/payments/{id}/proof` renders as broken alt text
 if the request 404s — a deleted proof row, an expired session, a payment id
-that stopped being hers. The payment above it is real either way, so a broken
+that stopped being theirs. The payment above it is real either way, so a broken
 icon is the least useful thing that could appear.
 
 `onError` now swaps the image for a sentence: *the screenshot would not load;
@@ -1887,7 +1887,7 @@ of what ships.
 
 ## There was no way to invite a model
 
-**Symptom.** The business went to send a model her sign-in link, found *Invite
+**Symptom.** The business went to send a model their sign-in link, found *Invite
 someone* in Settings, and the role list offered Admin, Content manager and
 Affiliate manager. No model.
 
@@ -1896,14 +1896,14 @@ Affiliate manager. No model.
 and it was never offered, so the only way to start the onboarding flow was to
 call the API by hand.
 
-Phase 8 built the whole model journey: invitation, acceptance, her own
+Phase 8 built the whole model journey: invitation, acceptance, their own
 application, approval. **Nothing could start it.** Every test drove it from the
 API, so the suite proved the journey worked while the front door did not exist.
 
 **Fixed** by putting it where models live rather than by adding a fourth option
 to the dropdown, which is what the business asked for and is the better answer.
 Inviting staff grants somebody permissions over other people's money; inviting a
-model puts her on the programme and grants her nothing. Offering both from one
+model puts them on the programme and grants them nothing. Offering both from one
 list said they were variations of one decision.
 
 **Worth recording** as a gap a full test suite cannot see: **an end-to-end test
@@ -1968,7 +1968,7 @@ before today's deploy.**
 ## The screen said email was off on a platform where it was on
 
 **Symptom.** Inviting a model returned *"Email is not switched on, so send her
-this link yourself"* on staging, where `SMTP_HOST`, `SMTP_USERNAME`,
+this link yourself"* on staging (the wording the screen carried at the time), where `SMTP_HOST`, `SMTP_USERNAME`,
 `MAIL_FROM_ADDRESS` and a valid app password were all set and mail was working.
 
 **Cause.** One missing `return`:
@@ -2096,6 +2096,57 @@ happens to end.
 **Worth recording** as a rule rather than an incident: **a layout property on a
 `td` is almost always a mistake.** The thing that wants to stack is the content,
 and it needs a wrapper.
+
+---
+
+## A thousand pronouns, and four ways to get them wrong
+
+**Symptom.** None yet — this is a record of what a bulk rewrite broke while
+it was being checked, because each was invisible in a passing test suite.
+
+The platform was written as though every model were a woman. HBA's are men
+and women, so 57 strings a person reads and 998 sites in comments, docstrings,
+ADRs and plans had to change. That is far too many to hand-write and exactly
+the shape of job a find-and-replace ruins quietly.
+
+**Cause, four times over.**
+
+1. **`her` is two different words.** `her month` is possessive and `lets her
+   check it` is not. A rule that decided from the *following* word got 979
+   right and 19 wrong, all of the same shape: `her` as a verb's object with a
+   bare infinitive after it — *lets her check*, *tells her it*, *stop her
+   joining*, *gives her no way*. They read as `their check`, `their it`.
+
+2. **A wrapped comment hides the verb.** `she` at the end of a comment line
+   puts its verb behind a `#` or `*` on the next line. The rule looked at the
+   next word, saw a marker, and left the verb alone: `they is meant to do`.
+   Sixteen sites, four of them broken this way. Found before applying, by
+   grepping for the pattern rather than by reading the output.
+
+3. **A quotation is not prose.** Three passages quote somebody verbatim —
+   HBA's own *"nothing is taken from her and nothing is added"*, the business
+   on what creates a model, and a bug report quoting what the screen said at
+   the time. Rewriting a quote is not a copy change, it is a false record.
+   Restored, and now marked as quoted.
+
+4. **The transform could not see the test names.** It only ever edits inside a
+   comment or a docstring, so 31 functions still called
+   `test_unverified_targets_never_read_as_her_failure` sat above docstrings
+   that now said *they*. Worse than either alone. Renamed by hand, along with
+   the assertion messages and two local variables called `hers`.
+
+**Fixed** by treating the transform as a draft and auditing its output: a
+script that flags every `their` followed by a word that cannot start a noun
+phrase, and every `them` followed by a word that can only be one. That is what
+found the 19; reading 801 changed lines would not have.
+
+**Worth recording** as the rule this cost: **a bulk rewrite is a draft, and the
+audit is a separate program, not a read-through.** The check has to be
+mechanical and independent of the transform, because the transform's own logic
+is exactly the thing under suspicion. Also: `git checkout` the moment a
+formatter is involved. Running Prettier over the seven changed screens reflowed
+lines the copy change never touched and turned 89 insertions into 266 — the
+same unreviewable-diff problem the two-pass split existed to avoid.
 
 ---
 

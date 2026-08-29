@@ -174,8 +174,8 @@ Binding. Every rule below derives from them.
 | `affiliate` | Own portal only. |
 
 `target_recorder` exists because Sara's job is recording video and story counts. Granting
-her compensation and payment authority she never uses would violate least privilege and
-make the audit trail less meaningful. The role can be widened later if her responsibilities
+their compensation and payment authority they never uses would violate least privilege and
+make the audit trail less meaningful. The role can be widened later if their responsibilities
 actually expand; widening access is easy, explaining a mistake made with unnecessary access
 is not.
 
@@ -832,11 +832,11 @@ just not the first one — with two additions for `version > 1`:
   plain language rather than copied from the audit log.
 - If the new figure is **lower** than what was already paid, the email is sent **immediately
   on re-approval, before any correction is applied** — there is no transfer to attach the news
-  to, and the model will notice nothing in her bank account otherwise. It states which §11.5
+  to, and the model will notice nothing in their bank account otherwise. It states which §11.5
   resolution was chosen: *"E£300 will come off next month's payment"* (credit) or *"nothing
   further is needed from you"* (write-off).
 
-**Every model gets email only.** There is no in-platform inbox for her — that channel belongs
+**Every model gets email only.** There is no in-platform inbox for them — that channel belongs
 to the maintainer. This applies here as everywhere else in this table.
 
 **Business audit trail.** Every mutation: who, what, when, before/after, and reason where

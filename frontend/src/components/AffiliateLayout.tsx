@@ -6,15 +6,15 @@ import "./AffiliateLayout.css";
 /**
  * §12.5: **the affiliate portal is phone-first.**
  *
- * A bottom tab bar rather than the maintainer's sidebar, because she is
- * holding the phone in one hand and her thumb does not reach the top of it.
+ * A bottom tab bar rather than the maintainer's sidebar, because they are
+ * holding the phone in one hand and their thumb does not reach the top of it.
  * The maintainer's `Layout` is the opposite instruction: seven sections down
  * the left, built for scanning twenty models at month end on a laptop.
  *
  * Earnings and Payments are separate tabs and stay separate. *What I have
  * earned* and *what has arrived* are different questions with different
  * answers for most of any month, and merging them is how a model ends up
- * believing she has been paid twice or not at all.
+ * believing they have been paid twice or not at all.
  */
 const TABS = [
   { to: "/", label: "Earnings", end: true },
@@ -31,7 +31,7 @@ export type PortalContext = {
   month: string;
   months: string[];
   setMonth: (month: string) => void;
-  /** Re-read her record after something changes. */
+  /** Re-read their record after something changes. */
   reload: () => void;
 };
 

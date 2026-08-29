@@ -10,7 +10,7 @@
 ## What this phase is for
 
 Phase 6 produced an **obligation**: a frozen figure somebody agreed. This phase records
-**settlement** — that the money left HBA and reached her.
+**settlement** — that the money left HBA and reached them.
 
 They are separate on purpose (§11.1), and keeping them separate is what the old dashboard
 got wrong. One column conflating them produced the awkward *"Approved · Partially paid"*, and
@@ -180,7 +180,7 @@ it in.
 **A reason is required on every one.** An adjustment is money moving without a transfer, and
 the only thing that makes it auditable is why.
 
-**Both audited and visible to the affiliate** (§11.5). A credit she cannot see is a credit she
+**Both audited and visible to the affiliate** (§11.5). A credit they cannot see is a credit they
 cannot check.
 
 **Tests:** a credit reduces a later month's balance; a write-off clears the source month
@@ -198,7 +198,7 @@ POST /api/payments                              record a transfer, with allocati
 POST /api/payments/{id}/proof                   attach the screenshot
 GET  /api/payments/{id}/proof                   owner or maintainer only
 POST /api/adjustments                           a credit or a write-off
-GET  /api/affiliates/{id}/payments              her history
+GET  /api/affiliates/{id}/payments              their history
 ```
 
 **The amount is pre-filled with `balance_due` and editable** (§14). Partial payments,
@@ -209,7 +209,7 @@ mistakes where the record must show the truth.
 the difference between a deliberate partial payment and a typo, and only the person recording
 it knows which.
 
-**`payments.record` gates writing.** Reading her own history is Phase 9's affiliate portal;
+**`payments.record` gates writing.** Reading their own history is Phase 9's affiliate portal;
 this phase builds the maintainer's side.
 
 **Tests:** a differing amount without a note is refused; over-allocation is refused with the

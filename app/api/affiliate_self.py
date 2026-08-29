@@ -1,12 +1,12 @@
-"""What a model may do to her own record.
+"""What a model may do to their own record.
 
 Gated on `current_affiliate` - ownership, never a permission (§6.1). Every
 route here acts on the caller's own profile and takes no affiliate id at all,
 so there is no parameter to tamper with: reaching another model's record is
 not refused, it is unexpressible.
 
-§6.5 bounds what appears here. She may correct how to reach her and where her
-money goes. She may not touch a rate, a target, an order, or a month state.
+§6.5 bounds what appears here. They may correct how to reach them and where their
+money goes. They may not touch a rate, a target, an order, or a month state.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Response
@@ -57,12 +57,12 @@ def me(
     affiliate: AffiliateProfile = Depends(current_affiliate),
     db: Session = Depends(get_session),
 ) -> dict:
-    """Her own record, as she is allowed to see it.
+    """Their own record, as they are allowed to see it.
 
-    The payout destination is **masked even to her**. She supplied it, so it
-    tells her nothing she does not know - and a screen that prints a full
+    The payout destination is **masked even to them**. They supplied it, so it
+    tells them nothing they do not know - and a screen that prints a full
     account number is a screen worth photographing over somebody's shoulder.
-    Recognising which account is hers is all this has to do.
+    Recognising which account is theirs is all this has to do.
     """
     destination = current_destination(db, affiliate)
     return {
@@ -87,7 +87,7 @@ def change_payout_destination(
     user: UserAccount = Depends(current_user),
     db: Session = Depends(get_session),
 ) -> dict:
-    """§6.4. Move where her money goes.
+    """§6.4. Move where their money goes.
 
     The highest-risk thing a model can do: a compromised account that can
     silently repoint an InstaPay address can redirect an entire payout.
@@ -138,7 +138,7 @@ def change_payout_destination(
 
     db.commit()
     return {
-        # §6.4.2. Both sides, masked, so she can confirm what she changed
+        # §6.4.2. Both sides, masked, so they can confirm what they changed
         # without the screen printing either in full.
         "before": before,
         "after": mask_destination(destination),
@@ -150,9 +150,9 @@ def destination_changed_recently(
     affiliate: AffiliateProfile = Depends(current_affiliate),
     db: Session = Depends(get_session),
 ) -> dict:
-    """When her destination last moved, if it was lately.
+    """When their destination last moved, if it was lately.
 
-    Hers to see as well as the maintainer's. A model who did not make that
+    Theirs to see as well as the maintainer's. A model who did not make that
     change is the first person who would notice, and the only one who can say
     so.
     """
@@ -160,7 +160,7 @@ def destination_changed_recently(
     return {"changed_at": changed.isoformat() if changed else None}
 
 
-# -- What she has earned (Phase 9, §11.1 and §11.4) ---------------------------
+# -- What they have earned (Phase 9, §11.1 and §11.4) ---------------------------
 
 
 def _month_or_400(month: str) -> str:
@@ -177,11 +177,11 @@ def my_months(
     affiliate: AffiliateProfile = Depends(current_affiliate),
     db: Session = Depends(get_session),
 ) -> dict:
-    """The months she can look at, newest first.
+    """The months they can look at, newest first.
 
-    Hers, not the calendar's. The maintainer's picker offers every month
-    because she is choosing which payroll to run; a model offered a month from
-    before she joined would find an empty screen and no way to tell whether
+    Theirs, not the calendar's. The maintainer's picker offers every month
+    because they are choosing which payroll to run; a model offered a month from
+    before they joined would find an empty screen and no way to tell whether
     that meant nothing happened or something broke.
     """
     months = months_for(db, affiliate)
@@ -194,17 +194,17 @@ def my_earnings(
     affiliate: AffiliateProfile = Depends(current_affiliate),
     db: Session = Depends(get_session),
 ) -> dict:
-    """One of her months, and every order behind the figure.
+    """One of their months, and every order behind the figure.
 
     The orders travel with the month deliberately. The first thing anybody does
     with a payment figure is try to reconcile it against what they think they
-    sold, and a screen that makes her ask for the detail separately is a screen
-    that makes her ask HBA instead.
+    sold, and a screen that makes them ask for the detail separately is a screen
+    that makes them ask HBA instead.
 
-    Nothing here is recalculated for her: an agreed month is read out of its
+    Nothing here is recalculated for them: an agreed month is read out of its
     snapshot, an open one out of the same `calculate_month` the payroll screen
-    uses. Two implementations of what she is owed would be two answers waiting
-    to disagree, and she would be paid the other one.
+    uses. Two implementations of what they are owed would be two answers waiting
+    to disagree, and they would be paid the other one.
     """
     month = _month_or_400(month)
     return {
@@ -220,13 +220,13 @@ def my_payment_history(
 ) -> dict:
     """What has arrived, and what is still outstanding.
 
-    §14. A different route from her earnings on purpose, and it stays
+    §14. A different route from their earnings on purpose, and it stays
     different: *what I have earned* and *what has arrived* have different
     answers for most of any month.
 
     Ownership again, and no affiliate id anywhere - the settlement figures come
     from the same `balance_for` the maintainer's payment screen uses, so the
-    number she chases and the number they see cannot disagree.
+    number they chase and the number they see cannot disagree.
     """
     return my_payments(db, affiliate)
 
@@ -237,7 +237,7 @@ def my_payment_proof(
     affiliate: AffiliateProfile = Depends(current_affiliate),
     db: Session = Depends(get_session),
 ) -> Response:
-    """The transfer screenshot for one of her payments.
+    """The transfer screenshot for one of their payments.
 
     §14 and ADR 0017: proof is shown to the affiliate because visible proof
     removes an entire category of *"did you send it?"* messages. The business
@@ -252,8 +252,8 @@ def my_payment_proof(
     This is that route, and it calls it rather than re-checking the rule here.
 
     The ownership check on the transaction comes first all the same. Without
-    it, asking for a payment id that is not hers would be answered by whether
-    the *file* was hers - a slower path to the same 404, and one that reveals
+    it, asking for a payment id that is not theirs would be answered by whether
+    the *file* was theirs - a slower path to the same 404, and one that reveals
     which payment ids exist by how long it takes.
     """
     transaction = db.get(PaymentTransaction, payment_id)
@@ -276,10 +276,10 @@ def my_year_view(
     affiliate: AffiliateProfile = Depends(current_affiliate),
     db: Session = Depends(get_session),
 ) -> dict:
-    """Every month she has, for the charts.
+    """Every month they have, for the charts.
 
     Nothing here is new arithmetic - each month is the same figure the Earnings
-    screen shows, gathered. A second way of working out what she earned would
+    screen shows, gathered. A second way of working out what they earned would
     be a second answer waiting to disagree with the first.
     """
     return my_year(db, affiliate)

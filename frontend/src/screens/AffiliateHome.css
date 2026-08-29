@@ -14,7 +14,7 @@
   margin-bottom: var(--space-5);
 }
 
-/* Small, quiet, and above her name rather than over it. The only thing on
+/* Small, quiet, and above their name rather than over it. The only thing on
    screen saying whose site this is, which matters most to somebody who
    arrived from an email - and nothing more than that. */
 .affiliate__mark {
@@ -26,7 +26,7 @@
   color: var(--quiet);
 }
 
-/* Hers. This is her account page, so her name is the heading. */
+/* Theirs. This is their account page, so their name is the heading. */
 .affiliate__title {
   margin-top: var(--space-1);
   font-family: var(--display, inherit);
@@ -36,7 +36,7 @@
   line-height: 1.1;
 }
 
-/* The code she gives out, beside her name rather than three taps away. */
+/* The code they give out, beside their name rather than three taps away. */
 .affiliate__codes {
   display: flex;
   flex-wrap: wrap;
@@ -117,7 +117,7 @@
   gap: var(--space-2);
 }
 
-/* Her code is registered and Shopify has not confirmed it yet. Stated
+/* Their code is registered and Shopify has not confirmed it yet. Stated
    plainly rather than alarmingly - nothing is wrong, somebody is checking. */
 .affiliate__pending-code {
   font-size: var(--text-xs);

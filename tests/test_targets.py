@@ -1,12 +1,12 @@
-"""What a model was asked to produce, what she produced, and who confirmed it.
+"""What a model was asked to produce, what they produced, and who confirmed it.
 
 Phase 5 Tasks 1-3. §15, and for a `base_guarantee` model this is the input that
-decides her pay.
+decides their pay.
 
 The distinction the whole design turns on (§11.3):
 
-    no target recorded      blocks the month - nobody knows what she did
-    recorded, missed        pays her commission, month approves
+    no target recorded      blocks the month - nobody knows what they did
+    recorded, missed        pays their commission, month approves
     recorded, achieved      unlocks the guarantee - **once verified**
 
 "Not achieved" and "not yet recorded" are different answers with different
@@ -74,7 +74,7 @@ def _audits(db, action):
 
 
 def test_a_target_with_nothing_recorded_is_neither_achieved_nor_missed(db):
-    """The `None` is the point. "Not achieved" pays her commission and approves
+    """The `None` is the point. "Not achieved" pays their commission and approves
     the month; "not yet recorded" blocks it. A boolean cannot express both, and
     collapsing them would silently approve a month nobody had looked at.
     """
@@ -100,7 +100,7 @@ def test_exceeding_the_requirement_is_achieved(db):
 
 def test_eight_videos_and_four_of_five_stories_is_not_achieved(db):
     """Confirmed with HBA on 26 August 2026. Every requirement, not most of
-    them - §9.5 has no fractional guarantee. She is paid her commission,
+    them - §9.5 has no fractional guarantee. They are paid their commission,
     promptly, and the guarantee does not apply.
     """
     target = _target(db, _affiliate(db), videos=8, stories=5)
@@ -110,7 +110,7 @@ def test_eight_videos_and_four_of_five_stories_is_not_achieved(db):
 
 
 def test_nothing_asked_for_is_achieved_by_nothing_produced(db):
-    """A requirement of zero is a real answer meaning nothing was asked of her
+    """A requirement of zero is a real answer meaning nothing was asked of them
     this month - distinct from nobody having asked, which is what a missing row
     means.
     """
@@ -124,7 +124,7 @@ def test_nothing_asked_for_is_achieved_by_nothing_produced(db):
 
 
 def test_a_second_target_for_the_same_month_is_refused(db):
-    """§17. Two rows would be two answers to "did she achieve August?", and
+    """§17. Two rows would be two answers to "did they achieve August?", and
     whichever the query read first would decide a payment.
     """
     affiliate = _affiliate(db)
@@ -151,7 +151,7 @@ def test_setting_requirements_twice_updates_the_same_row(db):
     assert (target.required_videos, target.required_stories) == (10, 6)
 
 
-def test_changing_what_was_asked_does_not_un_know_what_she_did(db):
+def test_changing_what_was_asked_does_not_un_know_what_they_did(db):
     affiliate = _affiliate(db)
     target = _target(db, affiliate, videos=8, stories=5)
     record_actuals(db, target, videos=9, stories=6)
@@ -160,7 +160,7 @@ def test_changing_what_was_asked_does_not_un_know_what_she_did(db):
 
     target = get_target(db, affiliate, MONTH)
     assert (target.actual_videos, target.actual_stories) == (9, 6)
-    assert target.is_achieved is False, "the bar moved, and she is now under it"
+    assert target.is_achieved is False, "the bar moved, and the model is now under it"
 
 
 def test_each_month_stands_alone(db):
@@ -177,7 +177,7 @@ def test_each_month_stands_alone(db):
 
 def test_both_numbers_are_recorded_together(db):
     """A half-recorded month is not a state anybody has a rule for: "eight
-    videos and an unknown number of stories" cannot answer whether she
+    videos and an unknown number of stories" cannot answer whether they
     achieved.
     """
     affiliate = _affiliate(db)
@@ -266,7 +266,7 @@ def test_the_database_refuses_it_too(db):
 
 def test_a_missed_target_can_be_verified(db):
     """Verification confirms the **numbers**, not the outcome. A verified miss
-    is a confirmed miss: she is paid her commission, the month approves, and
+    is a confirmed miss: they are paid their commission, the month approves, and
     the guarantee simply does not apply. Conflating the two would block every
     model who had a quiet month.
     """
@@ -389,7 +389,7 @@ def test_another_months_targets_are_not_returned(db):
 
 def test_an_affiliate_with_no_target_is_simply_absent(db):
     """The grid fills the gap in Task 5. Here, absent means absent - which is
-    the case that blocks her month later.
+    the case that blocks their month later.
     """
     _affiliate(db)
 
@@ -450,7 +450,7 @@ def test_the_grid_says_whose_pay_a_target_decides(db):
 
 
 def test_a_model_with_no_terms_has_no_target_deciding_anything(db):
-    """No arrangement means nothing is calculable from her target either."""
+    """No arrangement means nothing is calculable from their target either."""
     from app.api.targets import _determines_pay
 
     nobody = _affiliate(db, "Habiba")

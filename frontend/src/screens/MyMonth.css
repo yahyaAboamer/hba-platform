@@ -1,10 +1,10 @@
-/* Her month. §11.1 is the whole screen: is this figure settled or not. */
+/* Their month. §11.1 is the whole screen: is this figure settled or not. */
 
 .figure {
   padding: var(--space-5) 0 var(--space-6);
 }
 
-/* Said in words as well as in the typeface. She does not know which months are
+/* Said in words as well as in the typeface. They do not know which months are
    closed; the maintainer does. */
 .figure__state {
   margin: 0 0 var(--space-2);
@@ -32,7 +32,7 @@
 /* ── Whose move it is ───────────────────────────────────────────────────── */
 
 /* No colour. §11.3 blocks on missing information, never on poor performance,
-   and painting that red would tell her something is wrong with her month when
+   and painting that red would tell them something is wrong with their month when
    what is true is that somebody here has not finished. */
 .waiting {
   display: block;
@@ -164,7 +164,7 @@
   color: var(--quiet);
 }
 
-/* ── What she was asked for ─────────────────────────────────────────────── */
+/* ── What they were asked for ─────────────────────────────────────────────── */
 
 .targets__list {
   margin: 0;
@@ -191,7 +191,7 @@
 
 /* No colour, deliberately. §15 makes a target informational on every
    arrangement but a guaranteed minimum, and a red shortfall on a commission
-   model says she has lost money she never had. The sentence carries it. */
+   model says they have lost money they never had. The sentence carries it. */
 .targets__note {
   margin: 0;
   padding: 0 var(--space-4) var(--space-4);
@@ -200,7 +200,7 @@
 }
 
 /* The month that has not started. No figure at all - a zero is a statement
-   about what she has earned, and this is a statement about the calendar. */
+   about what they have earned, and this is a statement about the calendar. */
 .figure__note--lead {
   max-width: 34ch;
   font-size: var(--text-base);

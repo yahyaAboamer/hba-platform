@@ -45,7 +45,7 @@ by hand.
 
 The delivery signal is only as good as whatever writes it into Shopify — and
 that is now watched rather than assumed. A dead signal shows up as a reported
-anomaly, before it shows up as a model asking why she was not paid.
+anomaly, before it shows up as a model asking why they were not paid.
 
 **What would change this decision.** Bosta becomes worth its cost when Shopify
 genuinely cannot answer a question that money depends on:

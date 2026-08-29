@@ -1,10 +1,10 @@
 """Setting requirements, recording what happened, and confirming it.
 
-§15, and for a `base_guarantee` model this is the input that decides her pay.
+§15, and for a `base_guarantee` model this is the input that decides their pay.
 
 ## Recording and confirming are separate permissions, deliberately
 
-`targets.record` writes what she produced; `targets.verify` confirms it. They are
+`targets.record` writes what they produced; `targets.verify` confirms it. They are
 split because one person recording a number that unlocks a payment is one person
 deciding what somebody is owed.
 
@@ -15,7 +15,7 @@ keeping anyway: roles change, and the check is what will still be here.
 
 ## Verifying is not the same as approving of the result
 
-A verified target that was **missed** is a confirmed miss. She is paid her
+A verified target that was **missed** is a confirmed miss. They are paid their
 commission, the month approves, and the guarantee simply does not apply (§11.3).
 Verification confirms the *numbers*, never the outcome - conflating them would
 block every model who had a quiet month.
@@ -117,7 +117,7 @@ def set_requirements(
 
     Creates the row or updates the requirement on an existing one. Recorded
     actuals are left alone: changing what was asked for does not un-know what
-    she did.
+    they did.
     """
     parse_month(month)
     if videos < 0 or stories < 0:
@@ -162,11 +162,11 @@ def record_actuals(
     actor_id: int | None = None,
     actor_email: str | None = None,
 ) -> MonthlyTarget:
-    """What she actually produced.
+    """What they actually produced.
 
     **Both numbers together.** A half-recorded month is not a state anybody has
     a rule for - "eight videos and an unknown number of stories" cannot answer
-    whether she achieved, and the database refuses it too.
+    whether they achieved, and the database refuses it too.
 
     **Re-recording clears any verification.** The confirmation was of the old
     numbers; leaving it in place would let a correction inherit somebody else's
@@ -212,7 +212,7 @@ def verify(
     """A second person confirms the recorded numbers.
 
     This is what unlocks a base guarantee (§9.5, §11.3). It confirms the
-    numbers, **not** the outcome - verifying a target she missed is a normal
+    numbers, **not** the outcome - verifying a target they missed is a normal
     thing to do, and it means "these figures are right", not "well done".
     """
     assert_recordable(db, target)

@@ -363,7 +363,7 @@ def test_the_invited_role_gets_exactly_its_permissions(client):
     permissions = client.get("/api/auth/me").json()["permissions"]
     assert "targets.record" in permissions
     assert "compensation.manage" in permissions
-    # The boundary that holds: she cannot approve payroll or move money.
+    # The boundary that holds: they cannot approve payroll or move money.
     assert "payroll.approve" not in permissions
     assert "payments.record" not in permissions
     assert "invitations.send" not in permissions

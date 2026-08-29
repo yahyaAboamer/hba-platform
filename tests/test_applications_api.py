@@ -105,7 +105,7 @@ def test_the_form_learns_its_required_fields_from_the_server(admin):
 
 
 def test_a_newly_applied_model_appears_on_the_maintainers_list(admin):
-    """The two sides meet: she applies, and it is waiting for somebody."""
+    """The two sides meet: they apply, and it is waiting for somebody."""
     token = _invite(admin, "nour@example.com")
     model = _accept(token, "Nour")
     model.post("/api/applications", json=APPLICATION)
@@ -168,7 +168,7 @@ def test_a_second_application_leaves_the_first_untouched(admin):
 
 
 def test_money_terms_sent_with_an_application_are_ignored(admin):
-    """A model may never edit what she is owed (§6.5).
+    """A model may never edit what they are owed (§6.5).
 
     The body model has no field for a rate, so sending one is dropped rather
     than applied - proven here rather than trusted, because "the form does not
@@ -192,10 +192,10 @@ def test_money_terms_sent_with_an_application_are_ignored(admin):
     assert created.status_code == 201, created.text
 
     body = admin.get("/api/affiliates").json()["affiliates"][0]
-    assert body["status"] == "pending", "she did not approve herself"
+    assert body["status"] == "pending", "the applicant approved themselves"
 
     detail = admin.get(f"/api/affiliates/{body['id']}").json()
-    assert detail["compensation"] is None, "she did not set her own rate"
+    assert detail["compensation"] is None, "the applicant set their own rate"
 
 
 # ── Inviting somebody already on the programme ───────────────────────────────

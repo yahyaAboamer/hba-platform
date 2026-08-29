@@ -5,7 +5,7 @@ through, single save.
 
 The two things worth proving: **one bad row saves nothing**, and a model with no
 target **appears anyway**. A partial save leaves somebody unable to see which half
-landed; an absent row is a gap nobody notices until it blocks her month.
+landed; an absent row is a gap nobody notices until it blocks their month.
 """
 
 import pytest
@@ -85,7 +85,7 @@ def _grid(client, month=MONTH) -> dict:
 
 def test_a_model_with_no_target_appears_anyway(client):
     """An absent row is an invisible gap, and the gap is exactly what blocks
-    her month later.
+    their month later.
     """
     affiliate = _affiliate(client)
 
@@ -134,7 +134,7 @@ def test_requirements_and_actuals_save_together(client):
 
 
 def test_the_three_answers_are_distinguishable(client):
-    """`null` means nobody recorded it - which blocks her month, where missing
+    """`null` means nobody recorded it - which blocks their month, where missing
     the target does not.
     """
     nothing = _affiliate(client, "Nothing", "a@example.com")

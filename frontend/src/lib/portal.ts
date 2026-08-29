@@ -1,7 +1,7 @@
 /**
  * What `/api/me/earnings/{month}` sends back.
  *
- * One shape, read by two screens - her month and her orders both come from the
+ * One shape, read by two screens - their month and their orders both come from the
  * same request, because the first thing anybody does with a payment figure is
  * try to reconcile it against what they think they sold, and splitting the two
  * across separate calls would let them disagree by a refresh.
@@ -25,7 +25,7 @@ export type MyOrder = {
   base: string;
   /** §9.4. Only `earned` counts toward a payout. */
   state: "earned" | "pending" | "void";
-  /** The same thing in her words: counted, on its way, did not arrive. */
+  /** The same thing in their words: counted, on its way, did not arrive. */
   state_text: string;
   delivered_at: string | null;
   /** §11.4. Set only where a **different** month's payroll paid it. */
@@ -36,7 +36,7 @@ export type MyEarnings = {
   month: string;
   /**
    * §11.1, and the most important thing on the screen. `open` is a working
-   * number that will move; `agreed` is what she is owed and cannot move;
+   * number that will move; `agreed` is what they are owed and cannot move;
    * `historical` predates the platform and has no commission figure at all
    * (ADR 0014).
    */
@@ -68,7 +68,7 @@ export type MyEarnings = {
     piastres: number;
     amount: string;
   }[];
-  /** Orders she sold this month that a later payroll paid. Her side of §11.4. */
+  /** Orders they sold this month that a later payroll paid. Their side of §11.4. */
   carried_out: {
     to_month: string;
     orders: number;
@@ -77,30 +77,30 @@ export type MyEarnings = {
   }[];
   guarantee_applied: boolean;
   /**
-   * Her guaranteed minimum, on a `base_guarantee` arrangement only - and
+   * Their guaranteed minimum, on a `base_guarantee` arrangement only - and
    * present whether or not it applied. §9.5 pays whichever is larger, so a
    * month where the comparison could not be made still has to name the figure
-   * she signed for, or the screen reads as having forgotten it.
+   * they signed for, or the screen reads as having forgotten it.
    */
   guarantee: {
     piastres: number;
     amount: string;
     applied: boolean;
-    /** §15. `null` means nobody has recorded what she produced. */
+    /** §15. `null` means nobody has recorded what they produced. */
     targets_achieved: boolean | null;
     targets_verified: boolean;
   } | null;
   commission_rate_bp: number | null;
   /**
-   * What was asked of her and what was recorded. `null` when nothing was ever
-   * set for the month - a target that does not exist is not one she failed.
+   * What was asked of them and what was recorded. `null` when nothing was ever
+   * set for the month - a target that does not exist is not one they failed.
    */
   targets: {
     required_videos: number;
     required_stories: number;
     actual_videos: number | null;
     actual_stories: number | null;
-    /** §15. `null` means nobody has recorded what she produced. */
+    /** §15. `null` means nobody has recorded what they produced. */
     achieved: boolean | null;
     verified: boolean;
     /**
@@ -149,13 +149,13 @@ export type Payment = {
   reference: string | null;
   /** Masked, and frozen at the moment it was paid (§6.4.4). */
   destination: Record<string, string | null> | null;
-  /** §14 and ADR 0017. The screenshot, served only to her. */
+  /** §14 and ADR 0017. The screenshot, served only to them. */
   has_proof: boolean;
   /** Which months it covered. Empty is ordinary: money can arrive first. */
   settles: { month: string; piastres: number; amount: string }[];
 };
 
-/** §11.5. A credit she cannot see is a credit she cannot check. */
+/** §11.5. A credit they cannot see is a credit they cannot check. */
 export type Adjustment = {
   kind: "credit" | "writeoff" | "correction";
   kind_text: string;

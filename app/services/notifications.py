@@ -83,7 +83,7 @@ def queue(
     """Owe somebody an email. **Does not commit.**
 
     Returns `None` when there is nobody to send to. An affiliate with no email
-    on file is an ordinary state - she was entered by hand from a WhatsApp
+    on file is an ordinary state - they were entered by hand from a WhatsApp
     conversation - and not something that should stop a month being approved.
     """
     address = str(recipient_email or "").strip()
@@ -118,7 +118,7 @@ def _email_for(db: Session, affiliate) -> tuple[str | None, str]:
     """An affiliate's address and name.
 
     On `user_account`, not on the profile: §6.1 roots identity in the account,
-    and email is her login. A profile with no account is possible in principle
+    and email is their login. A profile with no account is possible in principle
     and means there is nobody to write to.
     """
     from app.models.identity import UserAccount
@@ -158,7 +158,7 @@ def invitation_sent(
 
 
 def application_submitted(db: Session, affiliate) -> None:
-    """Two emails: she knows it arrived, and somebody knows to look."""
+    """Two emails: they know it arrived, and somebody knows to look."""
     email, name = _email_for(db, affiliate)
     queue(
         db,
@@ -203,9 +203,9 @@ def month_approved(db: Session, affiliate, snapshot, month: str) -> None:
     email, with two additions when `version > 1`.
 
     **The overpayment case is stated outright.** If the new figure is below
-    what she was already paid there is no transfer to attach the news to and
-    nothing will change in her bank account, so she would otherwise find out
-    when next month's payment is smaller than she expected.
+    what they were already paid there is no transfer to attach the news to and
+    nothing will change in their bank account, so they would otherwise find out
+    when next month's payment is smaller than they expected.
 
     What it does *not* do is name the §11.5 resolution. The spec expects one,
     and at this moment nobody has chosen: credit or write-off is a judgement
@@ -257,7 +257,7 @@ def month_approved(db: Session, affiliate, snapshot, month: str) -> None:
 
 
 def payment_recorded(db: Session, affiliate, transaction) -> None:
-    """§14. Money moved, with the receipt on her payments screen."""
+    """§14. Money moved, with the receipt on their payments screen."""
     email, name = _email_for(db, affiliate)
     queue(
         db,
@@ -393,8 +393,8 @@ def render(event: str, payload: dict) -> Message | None:
 
     if event == Event.INVITATION_SENT:
         # §13: invited, accepted, and inside the tool in one step. The link is
-        # the whole email - anything else in it competes with the one thing she
-        # is meant to do.
+        # the whole email - anything else in it competes with the one thing they
+        # are meant to do.
         token = (payload.get("_secret") or {}).get("token", "")
         link = _link(f"/accept-invitation?token={token}") if token else ""
         body = (
@@ -489,7 +489,7 @@ def render(event: str, payload: dict) -> Message | None:
                 detail += f"\n\nWhy it changed: {payload['reason']}"
             if payload.get("resolution"):
                 # The figure fell below what was already paid. There is no
-                # transfer to attach this to and nothing will change in her
+                # transfer to attach this to and nothing will change in their
                 # bank account, so it has to be said outright.
                 detail += f"\n\n{payload['resolution']}"
 
@@ -577,7 +577,7 @@ def send_notification(db: Session, payload: dict) -> None:
     **Idempotent**, as every handler must be: a lease can expire and hand the
     same job to a second worker, and a row that is no longer pending is left
     exactly as it is rather than sent twice. A duplicate payroll email is a
-    model asking whether she is being paid twice.
+    model asking whether they are being paid twice.
 
     ## Delivery failures are recorded, not raised
 
@@ -695,7 +695,7 @@ def pending_count(db: Session) -> int:
 def failed(db: Session, limit: int = 50) -> list[NotificationOutbox]:
     """Emails that will not be delivered, newest first.
 
-    For the operational view. A model who was never told what she is owed is
+    For the operational view. A model who was never told what they are owed is
     invisible from every other screen in the platform.
     """
     return list(

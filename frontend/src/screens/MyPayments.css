@@ -1,6 +1,6 @@
 /* What has arrived. The one screen in the portal that spends colour, and it
    spends it only on money state (ADR 0027) — outstanding is owed, transferred
-   is settled. Her earnings screen paints nothing, because a figure still being
+   is settled. Their earnings screen paints nothing, because a figure still being
    worked out is not a debt. */
 
 .settle {

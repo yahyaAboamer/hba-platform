@@ -1,6 +1,6 @@
 """The people who run the platform, not the people it pays.
 
-Distinct from `app/services/affiliates.py`: a model reaches her own portal by
+Distinct from `app/services/affiliates.py`: a model reaches their own portal by
 owning an `affiliate_profile`, never by holding a role here (§6.1, ADR 0006).
 This module is the roster of staff - who has access, what they may do, and
 the three things a person actually needs to do about that day to day: change

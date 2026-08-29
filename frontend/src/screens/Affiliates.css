@@ -115,7 +115,7 @@
 /* ── Inviting a model ─────────────────────────────────────────────────────
  *
  * The primary action on this screen. It lives here rather than in Settings
- * because a model is not a staff role: she holds no permission at all, and
+ * because a model is not a staff role: they hold no permission at all, and
  * offering both from one list said they were variations of one decision.
  */
 .invite {

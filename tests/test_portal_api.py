@@ -1,13 +1,13 @@
-"""What a model sees about her own money, over HTTP.
+"""What a model sees about their own money, over HTTP.
 
 Phase 9. Every figure here already existed and had been exercised on the
 maintainer's screens for months, so this file is not about arithmetic - it is
 about the three things that go wrong when the same figure is shown to the
 person whose money it is:
 
-* an agreed month quietly showing a **recalculation** instead of what she was
+* an agreed month quietly showing a **recalculation** instead of what they were
   paid (§11.1),
-* carry-forward leaving her own arithmetic unable to close (§11.4),
+* carry-forward leaving their own arithmetic unable to close (§11.4),
 * a customer's details reaching a model dashboard (§19).
 
 The last one is asserted rather than asserted-about: the response is searched
@@ -27,7 +27,7 @@ from app.db import engine
 from app.main import app
 from app.models.payouts import PayoutMethod
 
-#: Where her money goes, so a payment can freeze a masked copy of it.
+#: Where their money goes, so a payment can freeze a masked copy of it.
 ADDRESS = 'https://ipn.eg/S/nour.mahmoud/instapay/8Xk2Qp' 
 
 BOOTSTRAP = {
@@ -108,7 +108,7 @@ def _affiliate(admin, name="Nour", email="nour@example.com", code="NOUR10") -> d
 
 
 def _sign_in(email: str = "nour@example.com") -> TestClient:
-    """Her own client - a session that owns the profile, holding no permission."""
+    """Their own client - a session that owns the profile, holding no permission."""
     client = TestClient(app)
     response = client.post(
         "/api/auth/login", json={"email": email, "password": PASSWORD}
@@ -194,7 +194,7 @@ def _deliver(order_id: str) -> None:
 
 
 def _hit_targets(admin, affiliate_id, month, *, verified: bool):
-    """Record a month she met, and optionally confirm the numbers.
+    """Record a month they met, and optionally confirm the numbers.
 
     §15: verification is what unlocks a guarantee, and it confirms the numbers
     rather than the outcome - the two steps are separate here because the gap
@@ -257,7 +257,7 @@ def _egp(piastres: int) -> str:
 
 
 def _destination(admin, affiliate_id):
-    """Somewhere to pay her, so a payment can freeze a masked copy of it."""
+    """Somewhere to pay them, so a payment can freeze a masked copy of it."""
     response = admin.put(
         f"/api/affiliates/{affiliate_id}/payout-destination",
         json={
@@ -335,7 +335,7 @@ def _approve(admin, affiliate_id, month):
 
 def test_a_maintainer_is_refused_from_the_model_routes(admin):
     """Two gates, never mixed (§6.1). An administrator is not the subject of
-    any affiliate record, and there is already an admin route for her month.
+    any affiliate record, and there is already an admin route for their month.
     """
     assert admin.get(f"/api/me/earnings/{AUGUST}").status_code == 403
     assert admin.get("/api/me/months").status_code == 403
@@ -358,14 +358,14 @@ def test_the_route_takes_no_affiliate_id_at_all(admin):
     _order(nour["id"], "1", 100_000)
     _order(sara["id"], "2", 500_000, code="SARA10")
 
-    hers = _sign_in().get(f"/api/me/earnings/{AUGUST}").json()
+    mine = _sign_in().get(f"/api/me/earnings/{AUGUST}").json()
 
-    assert hers["sales"]["earned_piastres"] == 100_000
-    assert len(hers["orders_detail"]) == 1
+    assert mine["sales"]["earned_piastres"] == 100_000
+    assert len(mine["orders_detail"]) == 1
 
 
-def test_a_paused_model_still_sees_what_she_was_owed(admin):
-    """§8. *Not earning, may return.* Locking her out would make paused and
+def test_a_paused_model_still_sees_what_they_were_owed(admin):
+    """§8. *Not earning, may return.* Locking them out would make paused and
     archived the same thing to the only person they affect.
     """
     affiliate = _affiliate(admin)
@@ -381,7 +381,7 @@ def test_a_paused_model_still_sees_what_she_was_owed(admin):
 # -- No customer, ever --------------------------------------------------------
 
 
-def test_nothing_a_customer_typed_can_reach_her_screen(admin):
+def test_nothing_a_customer_typed_can_reach_their_screen(admin):
     """§19, and the reason it is structural rather than a filter.
 
     There is no column on `order_index` or `attributed_order` for a customer's
@@ -435,7 +435,7 @@ def test_an_agreed_month_shows_what_was_paid_not_what_it_recalculates_to(admin):
 
     `calculate_month` keeps moving after approval. A late order arriving in
     September changes what August *would* come to and never what August *is* -
-    and she is the person who would notice a settled figure moving.
+    and they are the person who would notice a settled figure moving.
     """
     affiliate = _affiliate(admin)
     _terms(admin, affiliate["id"])
@@ -453,11 +453,11 @@ def test_an_agreed_month_shows_what_was_paid_not_what_it_recalculates_to(admin):
 
 
 def test_the_breakdown_adds_up_to_the_total(admin):
-    """She is the one person guaranteed to add it up.
+    """They are the one person guaranteed to add it up.
 
     ADR 0004 rounds once, on the total, so display-rounded lines can miss it by
     up to half a pound. Where they do, the difference gets a line of its own
-    rather than being left for her to find.
+    rather than being left for them to find.
     """
     affiliate = _affiliate(admin)
     _terms(admin, affiliate["id"], rate_bp=1000)
@@ -488,8 +488,8 @@ def test_a_salary_is_its_own_line(admin):
 
 
 def test_a_guarantee_says_what_it_replaced(admin):
-    """§9.5. Never both, never one on top of the other - and a floor she cannot
-    place against her own commission is a floor she will assume is a mistake.
+    """§9.5. Never both, never one on top of the other - and a floor they cannot
+    place against their own commission is a floor they will assume is a mistake.
     """
     affiliate = _affiliate(admin)
     _terms(
@@ -511,8 +511,8 @@ def test_a_guarantee_says_what_it_replaced(admin):
 def test_a_guarantee_that_did_not_apply_is_still_named(admin):
     """The bug the browser found, and the screen it came from.
 
-    Sara is on a guaranteed minimum of E£8,000. Her targets have not been
-    recorded, so §9.5's comparison has no answer and she is paid her commission
+    Sara is on a guaranteed minimum of E£8,000. Their targets have not been
+    recorded, so §9.5's comparison has no answer and they are paid their commission
     of E£1,100. Nothing about that figure is wrong - but the first version of
     this screen showed E£1,100 and never mentioned the guarantee at all, and
     the honest reading of that is *they have forgotten my minimum*.
@@ -534,16 +534,16 @@ def test_a_guarantee_that_did_not_apply_is_still_named(admin):
         "amount": "E£8,000.00",
         "applied": False,
         # §15. `null` is a third answer, and the one that decides which
-        # sentence she reads: nobody has recorded her month, rather than she
-        # missed her targets.
+        # sentence they read: nobody has recorded their month, rather than they
+        # missed their targets.
         "targets_achieved": None,
         "targets_verified": False,
     }
 
 
 def test_a_missed_target_says_so_without_calling_it_a_penalty(admin):
-    """§11.3. A confirmed miss costs her the guarantee and nothing else - she
-    is paid her commission, promptly, and the month approves.
+    """§11.3. A confirmed miss costs them the guarantee and nothing else - they
+    are paid their commission, promptly, and the month approves.
     """
     affiliate = _affiliate(admin)
     _terms(
@@ -571,11 +571,11 @@ def test_a_commission_only_month_has_no_guarantee_to_explain(admin):
     assert _sign_in().get(f"/api/me/earnings/{AUGUST}").json()["guarantee"] is None
 
 
-# -- §11.4: the order she sold in August and was paid for in September --------
+# -- §11.4: the order they sold in August and was paid for in September --------
 
 
 def test_a_carried_order_names_the_month_that_paid_it(admin):
-    """August's side. She counted August's orders herself; the total is short
+    """August's side. They counted August's orders themselves; the total is short
     by one, and this is the line that closes the gap.
     """
     affiliate = _affiliate(admin)
@@ -653,7 +653,7 @@ def test_the_month_that_paid_it_says_where_it_came_from(admin):
 # -- §9.4: an order that did not arrive ---------------------------------------
 
 
-def test_every_order_state_is_shown_in_her_words(admin):
+def test_every_order_state_is_shown_in_their_words(admin):
     """A void order stays visible. §9.4 pays on delivery, and an order that
     vanishes without a word looks like a mistake somebody made.
     """
@@ -689,13 +689,13 @@ def test_a_month_before_go_live_behaves_like_any_other_month(admin, monkeypatch)
     assert body["amount_piastres"] is None
     assert body["sales"]["earned_piastres"] == 100_000
     assert "HBA paid you" in body["note"]
-    # Her words, not the platform's. She does not know what a platform is, and
+    # Their words, not the platform's. They do not know what a platform is, and
     # a blank where the figure goes reads as *they did not pay me for March*.
     assert "platform" not in body["note"].lower()
     assert body["waiting_on"] == []
 
 
-# -- Blockers, in language that does not accuse her ---------------------------
+# -- Blockers, in language that does not accuse them ---------------------------
 
 
 def test_a_month_with_no_terms_says_hba_has_not_set_them(admin):
@@ -708,8 +708,8 @@ def test_a_month_with_no_terms_says_hba_has_not_set_them(admin):
     assert "HBA has not set" in body["waiting_on"][0]["text"]
 
 
-def test_unverified_targets_never_read_as_her_failure(admin):
-    """`targets_achieved_but_not_verified` means she hit them and somebody here
+def test_unverified_targets_never_read_as_their_failure(admin):
+    """`targets_achieved_but_not_verified` means they hit them and somebody here
     is slow. Shown raw it reads as an accusation.
     """
     affiliate = _affiliate(admin)
@@ -735,8 +735,8 @@ def test_an_agreed_month_stays_settled_when_a_later_order_blocks_the_month(admin
 
     A multi-code order landing in August after August was agreed blocks the
     month afresh - correctly, for the maintainer, who may still have to reopen
-    it. To her it would read as "your September payment is stuck" on money that
-    is already in her account.
+    it. To them it would read as "your September payment is stuck" on money that
+    is already in their account.
     """
     affiliate = _affiliate(admin)
     _affiliate(admin, "Sara", "sara@example.com", "SARA10")
@@ -782,10 +782,10 @@ def test_an_agreed_month_is_not_waiting_on_anything(admin):
     assert body["waiting_on"] == []
 
 
-# -- Which months she is offered ----------------------------------------------
+# -- Which months they are offered ----------------------------------------------
 
 
-def test_she_is_offered_her_own_months_newest_first(admin):
+def test_they_are_offered_their_own_months_newest_first(admin):
     affiliate = _affiliate(admin)
     _terms(admin, affiliate["id"])
     _order(affiliate["id"], "1", 100_000, month="2026-07")
@@ -796,8 +796,8 @@ def test_she_is_offered_her_own_months_newest_first(admin):
     assert body["working_month"] == SEPTEMBER
 
 
-def test_months_before_she_joined_are_not_offered(admin):
-    """An empty month from before she existed gives her no way to tell whether
+def test_months_before_they_joined_are_not_offered(admin):
+    """An empty month from before they existed gives them no way to tell whether
     nothing happened or something is broken.
     """
     affiliate = _affiliate(admin)
@@ -823,10 +823,10 @@ def test_a_month_is_validated_before_anything_is_read(admin):
     assert _sign_in().get("/api/me/earnings/august").status_code == 400
 
 
-# -- §15: what was asked, and whether it changes what she is paid ------------
+# -- §15: what was asked, and whether it changes what they are paid ------------
 
 
-def test_a_target_says_whether_it_decides_her_pay(admin):
+def test_a_target_says_whether_it_decides_their_pay(admin):
     """§15, and the clause that matters. On a guaranteed minimum a target
     decides money; on commission it is informational, and a model who reads a
     missed target as money gone has been told something untrue.
@@ -843,23 +843,23 @@ def test_a_target_says_whether_it_decides_her_pay(admin):
     _hit_targets(admin, guaranteed["id"], AUGUST, verified=True)
     _hit_targets(admin, commission["id"], AUGUST, verified=True)
 
-    hers = _sign_in().get(f"/api/me/earnings/{AUGUST}").json()["targets"]
+    mine = _sign_in().get(f"/api/me/earnings/{AUGUST}").json()["targets"]
     theirs = _sign_in("sara@example.com").get(
         f"/api/me/earnings/{AUGUST}"
     ).json()["targets"]
 
-    assert hers["determines_pay"] is True
+    assert mine["determines_pay"] is True
     assert theirs["determines_pay"] is False
-    assert hers["required_videos"] == 4
-    assert hers["actual_stories"] == 8
-    assert hers["achieved"] is True
-    assert hers["verified"] is True
+    assert mine["required_videos"] == 4
+    assert mine["actual_stories"] == 8
+    assert mine["achieved"] is True
+    assert mine["verified"] is True
 
 
 def test_a_month_with_no_target_recorded_has_nothing_to_show(admin):
     """Rather than a row of dashes. A target that was never set is not a target
-    she failed, and where it *would* have decided her pay the guarantee note is
-    already saying so in the one place she is looking.
+    they failed, and where it *would* have decided their pay the guarantee note is
+    already saying so in the one place they are looking.
     """
     affiliate = _affiliate(admin)
     _terms(admin, affiliate["id"])
@@ -868,9 +868,9 @@ def test_a_month_with_no_target_recorded_has_nothing_to_show(admin):
     assert _sign_in().get(f"/api/me/earnings/{AUGUST}").json()["targets"] is None
 
 
-def test_nothing_about_a_target_can_be_changed_from_her_side(admin):
-    """§6.5. She sees what was recorded; recording is HBA's, and the portal
-    offers no route that would let her touch it.
+def test_nothing_about_a_target_can_be_changed_from_their_side(admin):
+    """§6.5. They see what was recorded; recording is HBA's, and the portal
+    offers no route that would let them touch it.
     """
     from app.api.affiliate_self import router
 
@@ -948,10 +948,10 @@ def test_a_month_still_being_worked_out_is_not_an_unpaid_bill(admin):
     assert body["outstanding_piastres"] == 0
 
 
-def test_her_own_destination_stays_masked_on_the_payment(admin):
-    """She supplied it, so it tells her nothing she does not know - and a
+def test_their_own_destination_stays_masked_on_the_payment(admin):
+    """They supplied it, so it tells them nothing they do not know - and a
     screen printing an account number in full is one worth photographing over
-    her shoulder.
+    their shoulder.
     """
     affiliate = _affiliate(admin)
     _destination(admin, affiliate["id"])
@@ -971,11 +971,11 @@ def test_a_month_settled_partly_without_a_transfer_says_so_on_its_own_row(admin)
     """The gap the browser found.
 
     A month agreed at 1,000 pounds, transferred as 940 with the remaining 60
-    written off, is `settled` and correct. Her row read *E1,000.00 - paid* and
-    the transfer below it read *E940.00*, which is sixty pounds short until she
-    reads a panel further down and connects it herself.
+    written off, is `settled` and correct. Their row read *E1,000.00 - paid* and
+    the transfer below it read *E940.00*, which is sixty pounds short until they
+    read a panel further down and connects it themselves.
 
-    The row now carries both parts, so the arithmetic closes where she is
+    The row now carries both parts, so the arithmetic closes where they are
     looking.
     """
     affiliate = _affiliate(admin)
@@ -1009,17 +1009,17 @@ def test_a_month_settled_partly_without_a_transfer_says_so_on_its_own_row(admin)
     assert row["paid_piastres"] == 94_000
     assert row["adjusted_piastres"] == 6_000
     # The three account for each other exactly. That is the property the row
-    # exists to let her check.
+    # exists to let them check.
     assert row["paid_piastres"] + row["adjusted_piastres"] == row[
         "obligation_piastres"
     ]
     assert row["balance_piastres"] == 0
 
 
-# -- §11.5: a credit she cannot see is a credit she cannot check -------------
+# -- §11.5: a credit they cannot see is a credit they cannot check -------------
 
 
-def test_an_adjustment_is_visible_to_her_with_its_reason(admin):
+def test_an_adjustment_is_visible_to_them_with_its_reason(admin):
     affiliate = _affiliate(admin)
     _terms(admin, affiliate["id"])
     _order(affiliate["id"], "1", 1_000_000)
@@ -1051,7 +1051,7 @@ def test_an_adjustment_is_visible_to_her_with_its_reason(admin):
 # -- §14 and ADR 0017: the screenshot ----------------------------------------
 
 
-def test_she_can_see_the_screenshot_of_her_own_payment(admin):
+def test_they_can_see_the_screenshot_of_their_own_payment(admin):
     """Visible proof removes an entire category of *did you send it?* messages,
     which is the whole reason it is kept.
     """
@@ -1076,7 +1076,7 @@ def test_she_can_see_the_screenshot_of_her_own_payment(admin):
 
 def test_one_models_screenshot_is_not_served_to_another(admin):
     """§14. Served **only to the affiliate it belongs to** - and the risk ADR
-    0017 accepted was exposure to her, not to everybody on the programme.
+    0017 accepted was exposure to them, not to everybody on the programme.
     """
     nour = _affiliate(admin)
     _affiliate(admin, "Sara", "sara@example.com", "SARA10")
@@ -1120,7 +1120,7 @@ def test_a_month_that_has_not_started_says_so(admin, monkeypatch):
 
     A model invited before go-live opens on the go-live month, and that month
     has nothing in it. *Still adding up, nothing* is true and lands as though
-    the platform is broken or she has earned nothing.
+    the platform is broken or they have earned nothing.
     """
     from app.core import businesstime
 
@@ -1165,7 +1165,7 @@ def test_a_historical_month_counts_its_orders_the_same_way(admin, monkeypatch):
     """The business's addition, and it is right: the orders are real and the
     counting is real. Only the *payment* happened elsewhere.
 
-    Reporting one lump of sales and nothing else made a month she worked look
+    Reporting one lump of sales and nothing else made a month they worked look
     like a month that did not happen.
     """
     from app.config import settings
@@ -1189,7 +1189,7 @@ def test_a_historical_month_counts_its_orders_the_same_way(admin, monkeypatch):
     assert body["amount_piastres"] is None
 
 
-# -- Her year (the fifth screen) ---------------------------------------------
+# -- Their year (the fifth screen) ---------------------------------------------
 
 
 def test_the_year_reports_earnings_and_orders_as_different_things(admin):
@@ -1234,7 +1234,7 @@ def test_the_year_reads_left_to_right(admin):
 
 
 def test_a_month_before_go_live_has_no_figure_rather_than_a_zero(admin, monkeypatch):
-    """A zero on a chart is a claim that she earned nothing. She did not - the
+    """A zero on a chart is a claim that they earned nothing. They did not - the
     commission was agreed elsewhere (ADR 0014), and the sales are still real.
     """
     from app.config import settings
@@ -1251,7 +1251,7 @@ def test_a_month_before_go_live_has_no_figure_rather_than_a_zero(admin, monkeypa
     assert old["earned_piastres"] is None
     assert old["sales_piastres"] == 500_000
     assert old["orders"] == 1
-    # And it is excluded from the totals, which are about what she was paid
+    # And it is excluded from the totals, which are about what they were paid
     # through this platform.
     assert body["total_earned_piastres"] == 10_000
 

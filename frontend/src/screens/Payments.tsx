@@ -46,7 +46,7 @@ export type Balance = {
   balance_piastres: number;
   /** Only on a month with no active snapshot: was there ever one? */
   reopened?: boolean;
-  /** §6.4.5. When her payout destination last moved, if it was lately. */
+  /** §6.4.5. When their payout destination last moved, if it was lately. */
   destination_changed_at?: string | null;
 };
 

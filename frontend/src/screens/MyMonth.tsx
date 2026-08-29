@@ -9,18 +9,18 @@ import type { MyEarnings } from "../lib/portal";
 import "./MyMonth.css";
 
 /**
- * What she has earned this month, and whether that figure is settled.
+ * What they have earned this month, and whether that figure is settled.
  *
  * §11.1 is the whole screen. A month still open is a working number that will
- * move because orders are still arriving; a month agreed is what she is owed
- * and cannot move. She is the one who screenshots a figure in the third week
+ * move because orders are still arriving; a month agreed is what they are owed
+ * and cannot move. They are the one who screenshots a figure in the third week
  * and asks why it changed, so the distinction is said in words as well as
  * carried by the typeface (ADR 0027).
  *
  * Nothing here is calculated in the browser. The server sends the figure, the
  * breakdown and the total; adding them up on this side would be a second
- * implementation of what she is owed, and the two would eventually disagree in
- * front of her.
+ * implementation of what they are owed, and the two would eventually disagree in
+ * front of them.
  */
 export function MyMonth() {
   const { month } = usePortal();
@@ -65,7 +65,7 @@ export function MyMonth() {
            * The first thing twenty people will see. A model invited on the
            * 31st of August opens on September, and September has nothing in
            * it - "Still adding up, E£0.00" is true and lands as though the
-           * platform is broken or she has earned nothing.
+           * platform is broken or they have earned nothing.
            */
           <>
             <p className="figure__state">
@@ -105,7 +105,7 @@ export function MyMonth() {
       {/*
        * Whose move it is, in words. Every blocker the platform has is HBA's
        * own work, and `targets_achieved_but_not_verified` in particular reads
-       * as an accusation when it means she hit them and somebody here is slow.
+       * as an accusation when it means they hit them and somebody here is slow.
        */}
       {body.waiting_on.map((item) => (
         <p key={item.text} className="notice waiting">
@@ -117,8 +117,8 @@ export function MyMonth() {
       ))}
 
       {/*
-       * §9.5. The one figure she signed for, on the months where the platform
-       * could not apply it. Without this the screen shows her commission and
+       * §9.5. The one figure they signed for, on the months where the platform
+       * could not apply it. Without this the screen shows their commission and
        * never names the minimum, and the honest reading of that is that HBA
        * has forgotten it.
        */}
@@ -194,7 +194,7 @@ export function MyMonth() {
           </dl>
           {/*
            * Only where it decides money. A commission or salary model already
-           * knows targets do not change her pay, and being told so every month
+           * knows targets do not change their pay, and being told so every month
            * is noise - the business said exactly that. On a guaranteed minimum
            * it is the sentence the whole card exists for.
            */}
@@ -228,9 +228,9 @@ export function MyMonth() {
             </dd>
           </div>
           {/*
-           * Shown, never hidden. An order still in transit makes her month
+           * Shown, never hidden. An order still in transit makes their month
            * look smaller than it is, and hiding it produces exactly the
-           * question this platform exists to stop her having to ask.
+           * question this platform exists to stop their having to ask.
            */}
           {body.orders.pending > 0 && (
             <div>
@@ -246,8 +246,8 @@ export function MyMonth() {
                  * §11.4, before the carry has happened - and behind an ⓘ
                  * rather than on the page. The business's own reasoning, and
                  * a better rule than mine: *an information button makes it
-                 * like, okay, there is something I need to know about.* She
-                 * will not ask every month, and when she does the answer is
+                 * like, okay, there is something I need to know about.* They
+                 * will not ask every month, and when they do the answer is
                  * one press away.
                  */}
                 <details className="expl sales__fate">
@@ -272,9 +272,9 @@ export function MyMonth() {
       )}
 
       {/*
-       * §11.4, her side of it. She counted this month's orders herself and the
+       * §11.4, their side of it. They counted this month's orders themselves and the
        * total is short by one - this is the line that closes the gap, and
-       * without it her arithmetic cannot arrive at her own payment.
+       * without it their arithmetic cannot arrive at their own payment.
        */}
       {body.carried_out.map((line) => (
         <p key={line.to_month} className="notice carried">
@@ -294,7 +294,7 @@ export function MyMonth() {
  * The card's own state, at a glance.
  *
  * One chip at most, and only where the numbers above it do not already say it.
- * A model who met her targets sees so from the figures; what she cannot see is
+ * A model who met their targets sees so from the figures; what they cannot see is
  * whether anybody has confirmed them.
  */
 function targetChip(targets: {
@@ -318,10 +318,10 @@ function targetChip(targets: {
  * Why the guaranteed minimum is not in this month's figure.
  *
  * Three answers, because §15 has three states and they mean different things
- * to her: nobody has recorded her month, she missed her targets, or she met
- * them and is waiting on HBA. Only the middle one is about her, and it is the
- * one that must not sound like a penalty - a missed target costs her the
- * guarantee and nothing else, and she is paid her commission promptly either
+ * to them: nobody has recorded their month, they missed their targets, or they met
+ * them and is waiting on HBA. Only the middle one is about them, and it is the
+ * one that must not sound like a penalty - a missed target costs them the
+ * guarantee and nothing else, and they are paid their commission promptly either
  * way (§11.3).
  */
 function describeGuarantee(guarantee: {
@@ -362,7 +362,7 @@ function TargetRow({
 }
 
 /**
- * What her targets mean for her pay this month.
+ * What their targets mean for their pay this month.
  *
  * §15 splits on one thing: a target decides money **only** on a guaranteed
  * minimum. On commission or salary-plus-commission it is a record, and a model
@@ -370,7 +370,7 @@ function TargetRow({
  * screen that could not tell the two apart.
  *
  * Where it does decide money, the missed case is the one to be careful with.
- * It costs her the guarantee and nothing else - she is paid her commission,
+ * It costs them the guarantee and nothing else - they are paid their commission,
  * promptly, and the month closes (§11.3). Any wording that makes that sound
  * like a penalty is wrong about the rule as well as unkind.
  */

@@ -565,7 +565,7 @@ def test_a_phone_number_in_the_link_field_is_refused(db):
 
     §13.1 collects both an address and a number and they sit next to each
     other on the form. Mixed up, nothing errors at the time - it surfaces at
-    month end when somebody tries to pay her and the button opens nothing.
+    month end when somebody tries to pay them and the button opens nothing.
     """
     from app.services.payouts import normalise_instapay_address
 
@@ -623,7 +623,7 @@ def test_the_path_is_not_second_guessed(db):
 
 
 def test_the_check_applies_wherever_a_destination_is_written(db):
-    """Inside `set_destination`, so the application, a model changing her own,
+    """Inside `set_destination`, so the application, a model changing their own,
     and a maintainer correcting one are all checked by the same rule.
     """
     nour = _affiliate(db)

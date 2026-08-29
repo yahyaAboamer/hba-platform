@@ -574,7 +574,7 @@ def test_the_report_names_the_months_that_are_unowned(db):
     """So whoever registers the code starts it from the right month rather
     than guessing and leaving a gap."""
 def test_a_closed_code_period_leaves_later_orders_unregistered(db):
-    """An affiliate left in June, her code kept being used in August. Nobody
+    """An affiliate left in June, their code kept being used in August. Nobody
     thinks to look for that, and it is exactly what this report is for."""
 def test_case_does_not_defeat_the_subtraction(db): ...
 ```
