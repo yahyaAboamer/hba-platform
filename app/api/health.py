@@ -1,6 +1,6 @@
 """Liveness and readiness probes."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Response
 from sqlalchemy import text
 
 from app.config import settings
@@ -15,7 +15,7 @@ def live() -> dict:
 
 
 @router.get("/api/health/ready")
-def ready() -> dict:
+def ready(response: Response) -> dict:
     checks: dict = {}
     try:
         with engine.connect() as connection:
@@ -38,4 +38,17 @@ def ready() -> dict:
         "webhooks_configured": bool(settings.shopify_webhook_secret),
     }
     ready_now = all(check.get("ok") for check in checks.values())
+
+    # **The status code is the whole point of this endpoint.**
+    #
+    # Railway queries this path until it gets a 200 and only then routes
+    # traffic to a new deployment - and it never asks again afterwards. So this
+    # number is the single gate a broken deployment ever meets.
+    #
+    # It used to return 200 unconditionally, saying `"database": {"ok": false}`
+    # in a body nothing reads. A deployment that could not reach its database
+    # was therefore declared healthy and put in front of the models. It also
+    # meant an outside probe could not tell a working platform from a broken
+    # one, which is how a region migration went by unmeasured.
+    response.status_code = 200 if ready_now else 503
     return {"status": "ready" if ready_now else "not_ready", "checks": checks}

@@ -2201,6 +2201,63 @@ one:
 
 ---
 
+## The readiness probe could not say no
+
+**Symptom.** None visible, which is the problem. `/api/health/ready` reported
+the database honestly in its body and returned HTTP **200 either way**:
+
+```python
+checks["database"] = {"ok": False, "error": type(exc).__name__}
+...
+return {"status": "not_ready", "checks": checks}   # ...with a 200
+```
+
+Found by accident. A probe was left running against staging across the
+Amsterdam region migration (ADR 0031) to measure how long the database was
+away. It logged an unbroken run of 200s through a migration that certainly
+took the database offline — because the endpoint answers 200 whether or not
+the database is reachable, and the probe was only reading status codes.
+
+**Cause.** The status code is the only part of this endpoint anything reads.
+Railway polls the healthcheck path until it gets a 200, routes traffic to the
+new deployment, and — per its own documentation — **never asks again**. So a
+200 is not a report, it is a decision, and this endpoint was making it
+unconditionally.
+
+**Two consequences, and the invisible one is worse.**
+
+1. A probe could not distinguish a healthy platform from a broken one, so the
+   region migration went by unmeasured. Every downtime number in ADR 0031
+   comes from the *volume's* `Migrating → Ready` status, not from outside.
+2. A deployment that could not reach its database would pass its healthcheck,
+   be declared live, and be put in front of the models. `healthcheckPath` has
+   pointed at this endpoint since Phase 1, so no deploy has ever actually been
+   gated on the database.
+
+**Fixed** by answering 503 when any check fails. This is safe in exactly the
+way it needs to be: Railway does not monitor the endpoint after a deployment
+goes live, so the worst a 503 can do is fail a deploy that deserved to fail. A
+brief database blip can never restart a running container, and the 300-second
+healthcheck timeout leaves ample room for a database that is still starting.
+
+**One trap left in place, deliberately.** `/health` and `/healthz` also answer
+200 — not because anything checks them, but because the SPA catch-all serves
+`index.html` for every path that is not `/api/...`. They are a web page. Any
+uptime monitor pointed at either would report a healthy platform forever,
+including one whose database is gone. **The only endpoint that means anything
+is `/api/health/ready`**, and it is the one to point a monitor at.
+
+**Worth recording** as the rule: **a health endpoint that cannot fail is not a
+health check, it is a log line.** If the body says `not_ready` and the status
+line says 200, the status line wins — every machine that reads it believes the
+status line, and no machine reads the body.
+
+The test that covers it was proved load-bearing before being trusted: with the
+status code pinned back to 200 it fails with `assert 200 == 503`, which is the
+same discipline that caught a guard replaced by `if False` in Phase 8.
+
+---
+
 ## Business rules with deliberate exposure
 
 These are not bugs. They are accepted costs, recorded so nobody "fixes" them.

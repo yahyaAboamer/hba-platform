@@ -232,6 +232,16 @@ code without one.
 
 ---
 
+## If you ever point an uptime monitor at this
+
+**Use `/api/health/ready`, and read the status code.** It answers 200 when the
+platform can reach its database and 503 when it cannot.
+
+`/health` and `/healthz` look like health endpoints and are not: every path
+that is not `/api/...` is served the app's `index.html`, so both answer 200
+forever, including on a platform whose database has gone. A monitor pointed at
+either would never tell you anything (docs/limits.md).
+
 ## Where the platform runs
 
 Both services, in both environments, run in Railway's **EU West** region

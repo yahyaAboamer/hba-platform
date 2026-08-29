@@ -119,3 +119,38 @@ def test_shopify_configuration_requires_a_domain_and_credentials():
         ).shopify_configured
         is True
     )
+
+
+def test_readiness_answers_503_when_the_database_is_unreachable(monkeypatch):
+    """The status code is the only part of this endpoint anything reads.
+
+    Railway polls this path until it gets a 200, then routes traffic to the new
+    deployment and never asks again. Returning 200 with `"database": {"ok":
+    false}` in the body meant a deployment that could not reach its database
+    was declared healthy and put in front of the models.
+
+    It also made the endpoint useless for watching from outside: a probe run
+    across the Amsterdam migration saw an unbroken run of 200s and could not
+    have reported an outage if there had been one (ADR 0031).
+    """
+    import app.api.health as health
+
+    class Refuses:
+        def connect(self):
+            raise OSError("no route to host")
+
+    monkeypatch.setattr(health, "engine", Refuses())
+
+    response = client.get("/api/health/ready")
+
+    assert response.status_code == 503, "a platform that cannot read its own data is not ready"
+    body = response.json()
+    assert body["status"] == "not_ready"
+    assert body["checks"]["database"]["ok"] is False
+
+
+def test_readiness_answers_200_when_everything_answers():
+    """The other half of the gate: a healthy platform must not be refused."""
+    response = client.get("/api/health/ready")
+    assert response.status_code == 200
+    assert response.json()["status"] == "ready"
