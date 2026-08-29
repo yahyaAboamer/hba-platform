@@ -58,6 +58,13 @@ database's region migrates the disk and the database is offline meanwhile. Both
 volumes are small — staging 191 MB, production 225 MB — and both finished in
 about 60–95 seconds.
 
+Those figures come from the volume's own `Migrating → Ready` status, **not from
+outside the platform.** A probe was running against staging throughout and
+recorded nothing, because `/api/health/ready` answered 200 whether or not the
+database was reachable — a defect this migration exposed, now fixed and
+recorded in docs/limits.md. The next region change can be measured properly;
+this one could not be.
+
 **Nothing else changed.** Domains, private networking, environment variables
 and the Shopify webhook addresses are all unaffected, which is Railway's
 documented behaviour and held in practice.
