@@ -14,19 +14,51 @@
   margin-bottom: var(--space-5);
 }
 
+/* Small, quiet, and above her name rather than over it. The only thing on
+   screen saying whose site this is, which matters most to somebody who
+   arrived from an email - and nothing more than that. */
 .affiliate__mark {
   display: block;
-  font-family: var(--mono);
-  font-size: var(--text-xl);
-  font-weight: 600;
-  letter-spacing: -0.04em;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--quiet);
 }
 
+/* Hers. This is her account page, so her name is the heading. */
 .affiliate__title {
-  font-size: var(--text-sm);
-  font-weight: 400;
-  color: var(--quiet);
   margin-top: var(--space-1);
+  font-family: var(--display, inherit);
+  font-size: var(--text-xl);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+/* The code she gives out, beside her name rather than three taps away. */
+.affiliate__codes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.affiliate__code-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: 2px var(--space-2);
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: var(--text-xs);
+  letter-spacing: 0.02em;
+}
+
+.affiliate__code-pending {
+  font-family: var(--sans);
+  color: var(--quiet);
 }
 
 .affiliate__sign-out {
