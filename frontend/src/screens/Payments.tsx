@@ -24,7 +24,23 @@ export type Balance = {
   payroll_snapshot_id?: number;
   version?: number;
   obligation_piastres: number;
+  /** What left the bank for this month, across every version of it. */
   paid_piastres: number;
+  /** Of that, what settled the version currently in force. */
+  paid_this_version_piastres?: number;
+  /** And what settled a version that has since been superseded. */
+  paid_earlier_versions_piastres?: number;
+  /**
+   * Every agreed figure this month has had. One entry on an ordinary month;
+   * more once it has been reopened and agreed again.
+   */
+  versions?: {
+    version: number;
+    obligation_piastres: number;
+    paid_piastres: number;
+    approved_at: string | null;
+    is_current: boolean;
+  }[];
   adjusted_piastres: number;
   credited_piastres: number;
   balance_piastres: number;
