@@ -121,3 +121,57 @@
   margin-bottom: var(--space-5);
   border-bottom: 1px solid var(--rule-strong);
 }
+
+/* ── What to look at ──────────────────────────────────────────────────────
+ *
+ * The screen answers two questions and they are not the same one: what
+ * happened this month, and what needs me. The second is the reason to open it
+ * on a busy day, and it used to mean reading two hundred rows to find three.
+ */
+.orders__lenses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.orders__lens {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--quiet);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.orders__lens:hover {
+  background: var(--hover);
+}
+
+/* A rule and a weight, no colour. ADR 0027 keeps colour for money state, and
+   a filter is not money. */
+.orders__lens--on {
+  border-color: var(--ink);
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.orders__lens:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.orders__lens-count {
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}
+
+.orders__lens--on .orders__lens-count {
+  color: var(--ink);
+}
