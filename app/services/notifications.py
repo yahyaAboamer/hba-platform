@@ -70,6 +70,13 @@ class Event:
     PAYMENT_RECORDED = "payment.recorded"
     DESTINATION_CHANGED = "destination.changed"
 
+    #: Not in §16's table. Added with the maintainer's own
+    #: payout-destination screen, because that screen is the first way one
+    #: person can move another person's money - and until it existed, the
+    #: only mail a change produced went to the maintainer, who might be the
+    #: one who made it.
+    DESTINATION_CHANGED_FOR_THEM = "destination.changed_for_them"
+
 
 def queue(
     db: Session,
@@ -304,6 +311,40 @@ def destination_changed(db: Session, affiliate, masked: dict | None) -> None:
             "name": name,
             "masked": shown or None,
         },
+    )
+
+
+def destination_changed_for_them(db: Session, affiliate, masked: dict | None):
+    """Tell the model that somebody else moved where their money goes.
+
+    **The one email the owner of the money has to get.** A maintainer
+    correcting a destination is a real and necessary act - a model who cannot
+    reach their own screen still has to be paid - and it is indistinguishable,
+    from the outside, from somebody quietly redirecting a payout. What
+    separates them is whether the person whose money it is finds out.
+
+    Masked, like everywhere else (§6.4.4). The point is that they notice a
+    change happened, not that an account number ends up in an inbox.
+    """
+    email, name = _email_for(db, affiliate)
+    if not email:
+        return None
+
+    shown = ""
+    if masked:
+        shown = str(
+            masked.get("instapay_address_url")
+            or masked.get("bank_account_number")
+            or masked.get("wallet_phone")
+            or ""
+        )
+    return queue(
+        db,
+        event=Event.DESTINATION_CHANGED_FOR_THEM,
+        recipient_email=email,
+        recipient_name=name,
+        subject_ref=f"affiliate:{affiliate.id}",
+        payload={"email": email, "name": name, "masked": shown or None},
     )
 
 
@@ -542,6 +583,25 @@ def render(event: str, payload: dict) -> Message | None:
                 "payment run.",
                 "/payments",
                 "The payments screen flags it too:",
+            ),
+        )
+
+    if event == Event.DESTINATION_CHANGED_FOR_THEM:
+        # Addressed to the model. Says who to argue with, because the whole
+        # value of this mail is that they can.
+        return Message(
+            to_address=payload["email"],
+            to_name=payload.get("name"),
+            subject="Where your HBA payments go has changed",
+            body=_with_link(
+                f"Hi {first},\n\n"
+                "Somebody at HBA has changed where your payments are sent.\n\n"
+                f"They now go to the account ending {payload.get('masked') or 'unknown'}.\n\n"
+                "If you asked for this, nothing more is needed. **If you did "
+                "not, reply to this email before the next payment run** - it "
+                "has not been paid yet.",
+                "/me/details",
+                "You can see and change it yourself here:",
             ),
         )
 

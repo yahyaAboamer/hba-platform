@@ -10,7 +10,7 @@ warning) needs the affiliate portal and arrives in Phase 8. See docs/limits.md.
 """
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import select, text
 from sqlalchemy.exc import DatabaseError
 
 from app.core.passwords import hash_password
@@ -636,3 +636,77 @@ def test_the_check_applies_wherever_a_destination_is_written(db):
             instapay_address_url="01001234567",
             instapay_phone="01001234567",
         )
+
+
+# ── Who gets told ──────────────────────────────────────────────────────────────
+#
+# A maintainer correcting a destination is necessary - a model who cannot reach
+# their own screen still has to be paid - and from the outside it is
+# indistinguishable from somebody quietly redirecting a payout. What separates
+# them is whether the person whose money it is finds out.
+
+
+def _queued(db):
+    from app.models.notifications import NotificationOutbox
+
+    return list(db.scalars(select(NotificationOutbox)))
+
+
+def test_a_maintainer_moving_the_money_tells_the_model(db):
+    from app.services.notifications import Event
+
+    nour = _affiliate(db)
+    _instapay(db, nour)
+    db.flush()
+
+    # Somebody else's account id: a maintainer, not Nour.
+    _instapay(db, nour, url="https://ipn.eg/@nour.new", phone="01009999999")
+    db.flush()
+
+    events = [row.event for row in _queued(db)]
+    assert Event.DESTINATION_CHANGED_FOR_THEM in events, (
+        "the owner of the money was never told it moved"
+    )
+
+    to_model = [
+        row for row in _queued(db) if row.event == Event.DESTINATION_CHANGED_FOR_THEM
+    ]
+    assert to_model[0].recipient_email == "nour@example.com"
+    assert "@nour.new" not in str(to_model[0].payload), (
+        "the raw address must never reach an outbox row"
+    )
+
+
+def test_a_model_changing_it_themselves_is_not_emailed_about_it(db):
+    """They just did it. Telling them would train them to ignore the warning."""
+    from app.services.notifications import Event
+
+    nour = _affiliate(db)
+    _instapay(db, nour)
+    db.flush()
+
+    set_destination(
+        db,
+        nour,
+        method=PayoutMethod.INSTAPAY,
+        instapay_address_url="https://ipn.eg/@nour.new",
+        instapay_phone="01009999999",
+        actor_id=nour.user_account_id,
+    )
+    db.flush()
+
+    events = [row.event for row in _queued(db)]
+    assert Event.DESTINATION_CHANGED_FOR_THEM not in events
+
+
+def test_the_first_destination_is_not_a_change(db):
+    """Setting one while applying is not somebody moving your money."""
+    from app.services.notifications import Event
+
+    nour = _affiliate(db)
+    _instapay(db, nour)
+    db.flush()
+
+    events = [row.event for row in _queued(db)]
+    assert Event.DESTINATION_CHANGED_FOR_THEM not in events
+    assert Event.DESTINATION_CHANGED not in events

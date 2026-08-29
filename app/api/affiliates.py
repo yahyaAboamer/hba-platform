@@ -50,6 +50,7 @@ from app.services.codes import (
     start_month_for,
     unregistered_code_for,
 )
+from app.services.applications import REQUIRED_PAYOUT_FIELDS
 from app.services.compensation import (
     close_terms,
     correct_terms,
@@ -237,6 +238,13 @@ def _affiliate_detail(db: Session, affiliate: AffiliateProfile) -> dict:
         "codes": codes_with_status(db, affiliate, month),
         "compensation": _compensation_payload(terms_for(db, affiliate, month)),
         "payout_destination": mask_destination(current_destination(db, affiliate)),
+        # Which fields each method needs, from the one place that decides it.
+        # The model's own screen already reads this; the maintainer's screen
+        # correcting a destination on their behalf must agree with it, and two
+        # hand-written copies would eventually not.
+        "required_payout_fields": {
+            method: list(fields) for method, fields in REQUIRED_PAYOUT_FIELDS.items()
+        },
     }
 
 

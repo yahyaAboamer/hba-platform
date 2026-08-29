@@ -7,6 +7,8 @@ import type { Session } from "./lib/api";
 import { AcceptInvitation } from "./screens/AcceptInvitation";
 import { AffiliateDetail } from "./screens/AffiliateDetail";
 import { AffiliatePortal } from "./screens/AffiliatePortal";
+import { AffiliatePayments } from "./screens/AffiliatePayments";
+import { AffiliatePayout } from "./screens/AffiliatePayout";
 import { Affiliates } from "./screens/Affiliates";
 import { Compensation } from "./screens/Compensation";
 import { FirstRun } from "./screens/FirstRun";
@@ -104,6 +106,14 @@ export default function App() {
             <Route
               path="/affiliates/:id/compensation"
               element={<Compensation />}
+            />
+            <Route
+              path="/affiliates/:id/payments"
+              element={<AffiliatePayments />}
+            />
+            <Route
+              path="/affiliates/:id/payout-destination"
+              element={<AffiliatePayout />}
             />
             <Route path="/orders" element={<Orders session={session} />} />
             <Route path="/payroll" element={<Payroll session={session} />} />

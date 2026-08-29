@@ -243,9 +243,25 @@ def set_destination(
     # Section 6.4.5. Only on a *change* - the first destination is part of
     # applying and warning about it would make the warning meaningless.
     if previous is not None:
-        from app.services.notifications import destination_changed
+        from app.services.notifications import (
+            destination_changed,
+            destination_changed_for_them,
+        )
 
         destination_changed(db, affiliate, mask_destination(destination))
+
+        # **And the model too, when it was not the model who did it.** The
+        # maintainer's warning is the right one while they are watching
+        # somebody else's change; it is the wrong one when the maintainer made
+        # the change, because then the only person told is the person who did
+        # it. Whoever owns the money hears about it either way.
+        by_themselves = (
+            actor_id is not None and actor_id == affiliate.user_account_id
+        )
+        if not by_themselves:
+            destination_changed_for_them(
+                db, affiliate, mask_destination(destination)
+            )
 
     return destination
 

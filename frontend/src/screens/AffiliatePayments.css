@@ -1,0 +1,57 @@
+/* One model's payments, read by the maintainer. A list of things that
+   happened, not a table to scan — there are rarely many, and each one carries
+   a reason, a destination and sometimes a screenshot. */
+
+.paid {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.paid__row {
+  padding: var(--space-4);
+  border-top: 1px solid var(--rule);
+}
+
+.paid__row:first-child {
+  border-top: none;
+}
+
+.paid__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.paid__when {
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}
+
+.paid__facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin: var(--space-3) 0 0;
+}
+
+.paid__facts dt {
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}
+
+.paid__facts dd {
+  margin: 2px 0 0;
+  font-size: var(--text-sm);
+}
+
+/* The reason an adjustment exists, and the note on a payment. Both are
+   somebody's own words, so they get room to be a sentence. */
+.paid__note {
+  max-width: 68ch;
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  color: var(--quiet);
+}
