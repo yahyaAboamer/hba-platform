@@ -65,6 +65,64 @@ def allocated_to(db: Session, snapshot: PayrollSnapshot) -> int:
     )
 
 
+def allocated_to_month(db: Session, payroll_month: PayrollMonth) -> int:
+    """Money applied to **any version** of this month.
+
+    `allocated_to` answers *what has been paid against this snapshot*, which is
+    the right question for a version and the wrong one for a bank account.
+
+    After a reopen the two diverge, and the platform reported the wrong one.
+    August was agreed at E£760 and paid in full; more orders arrived; it was
+    reopened and agreed again at E£1,060. The payment screen then said **still
+    owed E£1,060** - because nothing had been allocated to version 2 - when she
+    had already received E£760 and was genuinely owed E£300.
+
+    Paying what that screen said would have sent E£1,820 for a month worth
+    E£1,060.
+
+    Both facts still exist and are still separate: a payment stays attached to
+    the version it settled (§11.5), and this sums what actually left the bank
+    for the month. What is owed is a question about the month.
+    """
+    snapshots = select(PayrollSnapshot.id).where(
+        PayrollSnapshot.payroll_month_id == payroll_month.id
+    )
+    return int(
+        db.scalar(
+            select(
+                func.coalesce(func.sum(PaymentAllocation.allocated_piastres), 0)
+            ).where(PaymentAllocation.payroll_snapshot_id.in_(snapshots))
+        )
+        or 0
+    )
+
+
+def version_history(db: Session, payroll_month: PayrollMonth) -> list[dict]:
+    """Every agreed figure this month has had, and what was paid against each.
+
+    §11.5 keeps superseded versions rather than overwriting them, and until now
+    nothing showed them. A single figure with a small "v2" beside it cannot
+    answer the only question somebody has when they see one: *is this the whole
+    amount, or what is left?*
+    """
+    from app.services.payroll import snapshots_for
+
+    versions = snapshots_for(db, payroll_month)
+    active = payroll_month.active_snapshot_id
+    return [
+        {
+            "version": snapshot.version,
+            "obligation_piastres": snapshot.approved_obligation_piastres,
+            "paid_piastres": allocated_to(db, snapshot),
+            "approved_at": snapshot.approved_at.isoformat()
+            if snapshot.approved_at
+            else None,
+            "is_current": snapshot.id == active,
+        }
+        for snapshot in versions
+    ]
+
+
 def adjusted_against(db: Session, payroll_month: PayrollMonth) -> int:
     """Credits and write-offs reducing what this month still owes.
 
@@ -138,7 +196,11 @@ def balance_for(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
         }
 
     obligation = snapshot.approved_obligation_piastres
-    paid = allocated_to(db, snapshot)
+    # **The month, not the version.** See `allocated_to_month`: after a reopen
+    # these differ, and reporting the version's figure as the balance told
+    # somebody to send money that had already been sent.
+    paid = allocated_to_month(db, payroll_month)
+    paid_this_version = allocated_to(db, snapshot)
     adjusted = adjusted_against(db, payroll_month)
     credited = credited_into(db, payroll_month)
 
@@ -155,9 +217,18 @@ def balance_for(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
         "version": snapshot.version,
         "obligation_piastres": obligation,
         "paid_piastres": paid,
+        # Kept separate rather than folded in. A payment belongs to the version
+        # it settled (§11.5) and that stays true; it is simply not the answer
+        # to "how much is still to send".
+        "paid_this_version_piastres": paid_this_version,
+        "paid_earlier_versions_piastres": paid - paid_this_version,
         "adjusted_piastres": adjusted,
         "credited_piastres": credited,
         "balance_piastres": balance,
+        # Every figure this month has had. Nothing showed them, and a lone
+        # figure with a small "v2" beside it cannot answer the only question
+        # somebody has on seeing one.
+        "versions": version_history(db, payroll_month),
     }
 
 

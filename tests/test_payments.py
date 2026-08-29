@@ -265,9 +265,18 @@ def test_the_allocation_survives_a_reopen(db):
     assert still_there == [200_000]
 
 
-def test_re_approving_leaves_the_new_version_unpaid(db):
-    """The payment settled version 1. Version 2 is a different agreed figure,
-    and carrying the allocation across would claim it was paid when it was not.
+def test_money_already_sent_still_counts_after_a_reopen(db):
+    """The bug that could have paid somebody twice.
+
+    A payment settles the **version** it was allocated to, and that stays true
+    - §11.5 keeps it attached there. What is *owed*, though, is a question
+    about the month, and the two diverge the moment a month is agreed again.
+
+    This test previously asserted `paid_piastres == 0` after re-approval, on
+    the reasoning that carrying the allocation across would claim version 2 had
+    been paid when it had not. Right about the version, wrong about the
+    balance: the screen then told somebody to send the whole new figure to a
+    model who had already received most of it.
     """
     affiliate = _affiliate(db)
     _owed(db, affiliate)
@@ -281,8 +290,52 @@ def test_re_approving_leaves_the_new_version_unpaid(db):
     balance = balance_for(db, affiliate, AUGUST)
 
     assert balance["version"] == 2
-    assert balance["paid_piastres"] == 0
-    assert balance["state"] == SettlementState.UNPAID
+    # Nothing has been allocated to version 2 - the fact the old test was
+    # protecting, kept and named for what it is.
+    assert balance["paid_this_version_piastres"] == 0
+    # And E£2,000 has left the bank for this month, so it is not still owed.
+    assert balance["paid_piastres"] == 200_000
+    assert balance["paid_earlier_versions_piastres"] == 200_000
+    assert balance["balance_piastres"] == (
+        balance["obligation_piastres"] - 200_000
+    )
+    assert balance["state"] == SettlementState.PARTIALLY_PAID
+
+
+def test_every_version_of_a_month_is_reported(db):
+    """A single figure with a small "v2" beside it cannot answer the only
+    question somebody has on seeing one: is this the whole amount, or what is
+    left?
+    """
+    affiliate = _affiliate(db)
+    _owed(db, affiliate)
+    snapshot = get_month(db, affiliate, AUGUST).active_snapshot
+    first = snapshot.approved_obligation_piastres
+    record_payment(db, affiliate, amount_piastres=200_000,
+                   allocations={snapshot.id: 200_000})
+    reopen_month(db, affiliate, AUGUST, reason="an order was missing")
+    _order(db, affiliate, "extra", 1_000_000)
+    approve_month(db, affiliate, AUGUST)
+
+    versions = balance_for(db, affiliate, AUGUST)["versions"]
+
+    assert [v["version"] for v in versions] == [1, 2]
+    assert versions[0]["obligation_piastres"] == first
+    assert versions[0]["paid_piastres"] == 200_000
+    assert versions[0]["is_current"] is False
+    assert versions[1]["paid_piastres"] == 0
+    assert versions[1]["is_current"] is True
+
+
+def test_a_month_agreed_once_has_one_version(db):
+    """The ordinary case stays ordinary - no history panel to explain away."""
+    affiliate = _affiliate(db)
+    _owed(db, affiliate)
+
+    versions = balance_for(db, affiliate, AUGUST)["versions"]
+
+    assert len(versions) == 1
+    assert versions[0]["is_current"] is True
 
 
 # ── What the database refuses ──────────────────────────────────────────────────
