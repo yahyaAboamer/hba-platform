@@ -231,7 +231,7 @@ export function Affiliates() {
               <li key={row.id}>
                 <span>{row.email}</span>
                 <span className="affiliates__invited-state">
-                  {row.expired ? "Link expired" : "Waiting for her to open it"}
+                  {row.expired ? "Link expired" : "Still waiting"}
                 </span>
                 <button
                   type="button"
@@ -255,8 +255,8 @@ export function Affiliates() {
 
       {rows?.length === 0 && (
         <p className="empty">
-          Nobody yet. An affiliate appears here once she has applied and you
-          have created her record.
+          Nobody yet. An affiliate appears here once they have applied and you
+          have created their record.
         </p>
       )}
 

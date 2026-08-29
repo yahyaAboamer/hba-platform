@@ -397,8 +397,8 @@ def retire_and_replace(
             f"{new_start_month}. Retiring the old code there would leave those "
             "orders belonging to nobody. "
             "This is the case where a code is created ahead of the switch. "
-            "Handling it needs a way to say which month she actually moved "
-            "over, which is deliberately not built - see docs/limits.md."
+            "Handling it needs a way to say which month the switch actually "
+            "happened, which is deliberately not built - see docs/limits.md."
         )
 
     if new_start_month <= old_period.start_month:

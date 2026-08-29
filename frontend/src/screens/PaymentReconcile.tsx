@@ -114,8 +114,8 @@ export function PaymentReconcile() {
               question is where it counts.
             </p>
             <p className="approve__lead">
-              Either answer is recorded and both are visible to her. Nothing
-              here takes money back.
+              Either answer is recorded and both are visible to {balance.name}.
+              Nothing here takes money back.
             </p>
           </section>
 
@@ -136,8 +136,8 @@ export function PaymentReconcile() {
               <span className="pay__option-body">
                 <strong>Count it against a later month</strong>
                 <span className="detail__note">
-                  She keeps it, and next month owes her that much less. Use this
-                  when she is still on the programme.
+                  {balance.name} keeps it, and next month owes that much less. Use
+                  this while they are still on the programme.
                 </span>
               </span>
             </label>
@@ -159,7 +159,7 @@ export function PaymentReconcile() {
                 <strong>Absorb it</strong>
                 <span className="detail__note">
                   HBA takes the loss and nothing carries forward. Use this for
-                  small differences, or when she is leaving.
+                  small differences, or when they are leaving.
                 </span>
               </span>
             </label>
@@ -193,7 +193,7 @@ export function PaymentReconcile() {
               {piastres === null
                 ? "Type a figure, for example 120.00"
                 : piastres > over
-                  ? `More than the ${formatEgp(over)} she was overpaid.`
+                  ? `More than the ${formatEgp(over)} overpaid.`
                   : `${formatEgp(piastres)} of the ${formatEgp(over)} overpaid.`}
             </span>
           </label>
@@ -210,8 +210,8 @@ export function PaymentReconcile() {
               placeholder="September was reopened lower after a parcel came back refused."
             />
             <span className="detail__note">
-              Kept in the record, and shown to her — a credit she cannot see is
-              a credit she cannot check.
+              Kept in the record, and shown to {balance.name} — a credit they
+              cannot see is a credit they cannot check.
             </span>
           </label>
 
