@@ -67,9 +67,14 @@ UNREACHED_ON_PURPOSE = {
 NOT_BUILT_YET = {
     # Cannot create an affiliate without an invitation - which is how a house
     # account has to be made (§8), and how a model with no email would be.
+    #
+    # **The only one of the seven that is not a missing screen.** A profile
+    # hangs off a `user_account` and the column is not nullable, deliberately
+    # (ADR 0006): identity lives in one place. Exactly two things in the
+    # platform create an account - bootstrapping the first admin, and somebody
+    # accepting an invitation - and a house code is not a person to invite. So
+    # this needs a decision about what HBA10 *is* before it needs an interface.
     ("POST", "/api/affiliates"),
-    # Cannot undo a verification made in error before the month was approved.
-    ("POST", "/api/targets/{month}/unverify"),
 }
 
 
