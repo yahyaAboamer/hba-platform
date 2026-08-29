@@ -232,6 +232,39 @@ code without one.
 
 ---
 
+## Where the platform runs
+
+Both services, in both environments, run in Railway's **EU West** region
+(`europe-west4-drams3a`, Amsterdam). This is not cosmetic: the models are in
+Egypt, and the platform spent its first months in California paying roughly
+150 ms of pure travel on every request (ADR 0031).
+
+Check it with:
+
+```
+railway service scale --service hba-platform
+railway service scale --service Postgres
+```
+
+**Two rules if you ever change it.**
+
+1. **The app and the database move together, database first.** `DATABASE_URL`
+   goes over the private network, so a split leaves the Atlantic between the
+   app and every query it makes - far worse than the problem being fixed.
+2. **Name both regions in one command**, or you get a second replica rather
+   than a move:
+
+   ```
+   railway service scale --service Postgres eu-west=1 sfo=0
+   ```
+
+Changing the database's region migrates its volume and takes the database
+offline for the duration - about a minute at the current size. The app has no
+volume and moves with no downtime at all.
+
+Nothing else needs touching: domains, private networking, environment
+variables and the Shopify webhook addresses are all unaffected.
+
 ## What is not automated
 
 - **Starting the historical import.** Deliberate: it is a one-off.

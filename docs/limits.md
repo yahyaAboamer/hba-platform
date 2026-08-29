@@ -2150,6 +2150,57 @@ same unreviewable-diff problem the two-pass split existed to avoid.
 
 ---
 
+## `railway service scale` adds a region, it does not move one
+
+**Symptom.** Moving the database to Amsterdam with the obvious command:
+
+```
+railway service scale --service Postgres --environment staging eu-west=1
+```
+
+Railway answered:
+
+```
+regions:    EU West (1) · sfo (1)
+replicas:   2 replicas configured
+```
+
+Two replicas of a **database**, in two continents, sharing one volume that can
+only ever attach to one of them. Not what was asked for and not a sane state
+for Postgres.
+
+**Cause.** The argument is `REGION=REPLICAS`, and it sets the count for the
+region named and leaves every other region alone. It reads like *move to EU
+West* and means *also run one in EU West*. For a stateless web service that is
+a legitimate scaling operation; for a service with a volume it is not.
+
+**Fixed** by naming both regions in one command, so the old one is emptied in
+the same operation as the new one is filled:
+
+```
+railway service scale --service Postgres eu-west=1 sfo=0
+```
+
+**Worth recording** for the reason it cost nothing: **staging went first.** The
+bad state existed for eighteen seconds on a database nobody depends on, and
+the production command was written correctly the first time because staging
+had already been wrong. A rehearsal environment is only worth having if it is
+actually used before the real thing, on the same day, with the same commands.
+
+Two smaller notes from the same operation, both worth knowing before the next
+one:
+
+- **`railway ssh` puts its banner on stderr**, so `railway ssh <svc> "pg_dump
+  ..." > file.sql` produces a clean dump. Verified with a schema-only probe
+  before trusting it with 225 MB of payroll data.
+- **Multi-statement `psql -c` over `railway ssh` silently returns only the
+  first result**, and quoting a query with inner single quotes loses it
+  entirely. Comparing two `pg_dump` outputs is both easier and a stronger
+  check: production came through the migration with 22 tables and 6,464 → 6,466
+  rows, the two new rows being a Shopify webhook that arrived mid-window.
+
+---
+
 ## Business rules with deliberate exposure
 
 These are not bugs. They are accepted costs, recorded so nobody "fixes" them.
