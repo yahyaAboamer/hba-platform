@@ -275,6 +275,40 @@ volume and moves with no downtime at all.
 Nothing else needs touching: domains, private networking, environment
 variables and the Shopify webhook addresses are all unaffected.
 
+## Backups
+
+A `db-backup-<environment>` service in each environment dumps its own
+database once a day at 00:00 UTC (02:00 Cairo) and uploads it to that
+environment's `backups` bucket, keeping the newest 30 days in production and
+14 in staging (ADR 0032). Nobody has to run this; it is the whole point of it.
+
+**What to check occasionally.** Open the `db-backup-production` service in
+Railway and look at its deployment history - each run is one deployment, and
+a run that failed shows as one there. There is no other alert for this today.
+
+**To see what is actually stored:**
+
+```
+railway bucket list --environment production
+railway bucket credentials --bucket backups --environment production
+```
+
+The credentials command hands back an S3-compatible access key, secret, and
+endpoint. Any S3 browser (Cyberduck, S3 Browser, the AWS CLI configured with
+a custom endpoint) can connect with those and list what is there without
+needing a Railway login.
+
+**To restore one**, download the object, then:
+
+```
+pg_restore --clean --if-exists --no-owner --no-acl \
+  --dbname="<DATABASE_URL>" backup-file.dump
+```
+
+This overwrites whatever is currently in the target database. There is no
+button for this and there should not be - confirm the target URL before
+running it, the same way you would confirm before deleting anything.
+
 ## What is not automated
 
 - **Starting the historical import.** Deliberate: it is a one-off.
