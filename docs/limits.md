@@ -2315,32 +2315,53 @@ so backfilling earlier history still leaves today's arrangement alone.
 
 ---
 
-## `railway variables --kv` prints secrets, not just their names
+## Railway's own config commands print secrets, not just settings
 
-**Symptom.** None visible on screen - which is exactly the problem. Checking
-whether `BREVO_API_KEY` and `SMTP_PASSWORD` were set on production, intending
-to confirm only that the *names* existed, actually printed both values in full
-into the session transcript.
+**Symptom.** None visible on screen - which is exactly the problem, twice in
+one session. `railway variables --kv`, checking whether `BREVO_API_KEY` and
+`SMTP_PASSWORD` were set on production, printed both values in full into the
+transcript. Minutes later, `railway environment config --json`, checked while
+debugging an unrelated branch-configuration question, printed the same two
+again **plus `SHOPIFY_CLIENT_SECRET` and `SHOPIFY_WEBHOOK_SECRET`** - the
+second command was reached for specifically to route around the first
+mistake, and carried the same defect anyway.
 
-**Cause.** `railway variables --kv` (and the bare `railway variables --json`
-form used elsewhere without incident) render every variable's real value, not
-a redacted placeholder. There is no flag that lists names only. Any command
-built to answer "is X configured?" has to stop short of the value on its own -
-the tool will not stop for you.
+**Cause.** Neither command has a names-only mode. `--kv` and `--json` on
+`railway variables`, and the equivalent on `railway environment config`, all
+render every variable's real value - there is no redacted-placeholder option
+on any of them. A question shaped like "is X configured?" or "which branch is
+this on?" has to be answered without ever calling a command whose *output
+shape* includes values, because reaching for `--json` on the assumption that
+structured output is inherently safer is exactly how the second incident
+happened.
 
-**Fixed** by treating this as a standing rule rather than a one-off mistake:
-never run a variables-listing command without first deciding how the output
-will be filtered to names only, and never widen a query "just to check" once
-credentials are in scope.
+**Fixed** by routing every such question through the application's own
+`/api/health/ready`, which already reports `configured: true/false` for
+Shopify without ever touching the value (used correctly, without incident,
+earlier in this same session) - or, when a Railway-side answer is genuinely
+needed and no safe endpoint exists, piping the command's JSON through a
+filter that discards everything except the one field being asked about,
+written before the command runs rather than read off afterward. Checked
+after the fact is too late; the value has already reached the transcript by
+the time anyone reads the output.
 
 **Recorded rather than reversed**, because a transcript cannot be unprinted.
-The right response is to rotate both credentials on the assumption that
-anything that reached a transcript is compromised - the same standard this
+The right response is to rotate every credential that reached one, on the
+assumption that anything printed is compromised - the same standard this
 project already holds InstaPay addresses and passwords to - not to hope the
-exposure was contained. Whether that rotation has actually happened is the
-maintainer's to know, not this file's to assume. If you are reading this
-because it happened again: rotate first, log second, and say so plainly - the
-failure is worth less than pretending it did not happen.
+exposure was contained. Four credentials from this session: `BREVO_API_KEY`,
+`SMTP_PASSWORD`, `SHOPIFY_CLIENT_SECRET`, `SHOPIFY_WEBHOOK_SECRET`. Whether
+that rotation has actually happened is the maintainer's to know, not this
+file's to assume.
+
+**Worth naming plainly:** the second incident happened *while correcting for
+the first one*, in the same session, minutes later. Recognising a mistake is
+not the same discipline as not making the next one - the fix has to be a rule
+applied before the command runs ("what could this print, and have I
+filtered it"), not a resolution held in mind after the last time it went
+wrong. If you are reading this because it happened a third time: rotate
+first, log second, and say so plainly - the failure is worth less than
+pretending it did not happen.
 
 ---
 
