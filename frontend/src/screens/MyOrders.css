@@ -45,3 +45,9 @@
   font-size: var(--text-xs);
   color: var(--quiet);
 }
+
+/* The carried explanation sits inline with its line rather than under it, so
+   the row stays one thing. */
+.orders__carried .expl {
+  margin-left: var(--space-1);
+}

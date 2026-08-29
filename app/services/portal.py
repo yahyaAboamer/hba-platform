@@ -69,7 +69,6 @@ from app.services.payments_state import SettlementState
 from app.services.payroll import (
     blockers_for,
     get_month,
-    historical_sales,
     is_historical,
     working_month,
 )
@@ -425,19 +424,45 @@ def my_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
     working = working_month()
 
     if is_historical(month):
-        sales = historical_sales(db, affiliate, month)
+        # **A normal month with one thing missing.** The business asked for
+        # this and was right: the orders are real, the counting is real, only
+        # the *payment* happened elsewhere. Reporting one lump of sales and
+        # nothing else made a month she worked look like a month that did not
+        # happen.
+        #
+        # So the states are counted the same way they are in any other month,
+        # from the same rows, and only the commission figure is withheld -
+        # because March's rates live in the old system and guessing at them is
+        # how somebody is told the wrong number (ADR 0014).
+        rows = list(
+            db.scalars(
+                select(AttributedOrder)
+                .where(AttributedOrder.affiliate_id == affiliate.id)
+                .where(AttributedOrder.business_month == month)
+            )
+        )
+        counted = [r for r in rows if r.commission_state == CommissionState.EARNED]
+        travelling = [r for r in rows if r.commission_state == CommissionState.PENDING]
+        gone = [r for r in rows if r.commission_state == CommissionState.VOID]
+        earned_base = sum(r.commission_base_piastres for r in counted)
+        pending_base = sum(r.commission_base_piastres for r in travelling)
+
         return {
             "month": month,
             "state": "historical",
             "is_working_month": month == working,
             "not_started": False,
             "sales": {
-                "earned_piastres": sales["net_sales_piastres"],
-                "earned": format_egp(sales["net_sales_piastres"]),
-                "pending_piastres": 0,
-                "pending": format_egp(0),
+                "earned_piastres": earned_base,
+                "earned": format_egp(earned_base),
+                "pending_piastres": pending_base,
+                "pending": format_egp(pending_base),
             },
-            "orders": {"earned": sales["orders"], "pending": 0, "void": 0},
+            "orders": {
+                "earned": len(counted),
+                "pending": len(travelling),
+                "void": len(gone),
+            },
             "amount_piastres": None,
             "amount": None,
             "makeup": [],
@@ -448,11 +473,12 @@ def my_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
             "targets": None,
             "commission_rate_bp": None,
             "waiting_on": [],
+            # Her words, not the platform's. She does not know or care what a
+            # platform is, and the earlier version's blank read as *they did
+            # not pay me for June*.
             "note": (
-                "This month was settled before HBA started using this system. "
-                "Your sales are here; what you were paid for them was agreed "
-                "the old way, and this page will not invent a figure it was "
-                "never told."
+                "HBA paid you for this month before this page existed, so the "
+                "amount is not shown here — but everything you sold is."
             ),
         }
 
@@ -795,3 +821,79 @@ def my_payments(db: Session, affiliate: AffiliateProfile) -> dict:
         "outstanding_piastres": outstanding,
         "outstanding": format_egp(outstanding),
     }
+
+
+def my_year(db: Session, affiliate: AffiliateProfile) -> dict:
+    """Every month she has, as two series and a summary.
+
+    The fifth screen. Nothing here is new arithmetic - each month is the same
+    `my_month` the Earnings screen shows, gathered.
+
+    **Two series that measure different things**, which is the whole design
+    constraint. The business caught the first attempt reporting the same facts
+    twice with a different y-axis, and was right: what she earned and what she
+    sold move together on a commission arrangement, so drawing both is drawing
+    one thing.
+
+    So one is money and the other is a count:
+
+    - `earned` — what reached her. A trend, drawn as a line, because the
+      question is *am I going up?* and the eye answers that from a slope.
+    - `orders` — how many arrived. A tally, drawn as bars, because you can
+      compare bar heights exactly in a way you cannot compare points.
+
+    Sales stay off the charts and travel with the order count instead, where
+    they make a bar mean something rather than repeating the line.
+
+    **A month before go-live has no `earned` figure** and says so with `null`
+    rather than a zero. Its sales and orders are real (ADR 0014); the
+    commission was agreed elsewhere, and a zero on a chart is a claim that she
+    earned nothing.
+    """
+    months = months_for(db, affiliate)
+    series = []
+
+    for month in reversed(months):  # oldest first: a chart reads left to right
+        figures = my_month(db, affiliate, month)
+        series.append(
+            {
+                "month": month,
+                # 1-12, because an axis wants a number and a number needs no
+                # translating.
+                "number": int(month.split("-")[1]),
+                "label": _month_words(month),
+                "state": figures["state"],
+                # `None` on a month the platform did not pay for.
+                "earned_piastres": figures["amount_piastres"],
+                "earned": figures["amount"],
+                "sales_piastres": figures["sales"]["earned_piastres"],
+                "sales": figures["sales"]["earned"],
+                "orders": figures["orders"]["earned"],
+            }
+        )
+
+    paid_months = [row for row in series if row["earned_piastres"] is not None]
+    best = max(paid_months, key=lambda r: r["earned_piastres"], default=None)
+    total = sum(row["earned_piastres"] for row in paid_months)
+
+    return {
+        "months": series,
+        "total_earned_piastres": total,
+        "total_earned": format_egp(total),
+        "best_month": best["month"] if best else None,
+        "best_month_label": best["label"] if best else None,
+        "best_month_piastres": best["earned_piastres"] if best else None,
+        "total_orders": sum(row["orders"] for row in series),
+    }
+
+
+def _month_words(month: str) -> str:
+    names = (
+        "January February March April May June July August September October "
+        "November December"
+    ).split()
+    year, _, index = month.partition("-")
+    try:
+        return f"{names[int(index) - 1]} {year}"
+    except (ValueError, IndexError):
+        return month

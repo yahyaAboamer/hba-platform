@@ -20,6 +20,7 @@ const TABS = [
   { to: "/", label: "Earnings", end: true },
   { to: "/orders", label: "Orders" },
   { to: "/payments", label: "Payments" },
+  { to: "/year", label: "Your year" },
   { to: "/you", label: "You" },
 ];
 

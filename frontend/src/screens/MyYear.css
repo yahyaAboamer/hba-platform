@@ -1,0 +1,135 @@
+/* Her year. Two charts that measure different things — money as a trend,
+   orders as a tally — and never restate each other. */
+
+.year {
+  margin-bottom: var(--space-4);
+}
+
+.chart {
+  position: relative;
+  padding: var(--space-3) var(--space-4) var(--space-2);
+  color: var(--ink);
+}
+
+.chart svg {
+  display: block;
+  width: 100%;
+  overflow: visible;
+}
+
+.chart__base {
+  stroke: var(--rule);
+  stroke-width: 1;
+}
+
+.chart__line {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.25;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.chart__area {
+  fill: url(#earn);
+}
+
+.chart__point {
+  fill: var(--surface);
+  stroke: currentColor;
+  stroke-width: 2;
+}
+
+.chart__point--on {
+  fill: currentColor;
+}
+
+/* A month the platform did not pay for. Present on the baseline and never
+   plotted: its sales are real, and a zero would be a claim that she earned
+   nothing. */
+.chart__hollow {
+  fill: var(--surface);
+  stroke: var(--rule-strong);
+  stroke-width: 1.5;
+}
+
+.chart__bar {
+  fill: var(--rule-strong);
+}
+
+.chart__bar--on {
+  fill: currentColor;
+}
+
+.chart__tick {
+  font-family: var(--mono);
+  font-size: 9px;
+  fill: var(--quiet);
+}
+
+/* One wide target per month, because a finger is not a pointer. Invisible and
+   focusable, so the charts are reachable from a keyboard too. */
+.chart__hit {
+  fill: transparent;
+  cursor: pointer;
+}
+
+.chart__hit:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+.chart__tip {
+  position: absolute;
+  z-index: 3;
+  transform: translate(-50%, -118%);
+  padding: var(--space-2) var(--space-3);
+  border-radius: 10px;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.chart__tip b {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--mono);
+  font-weight: 500;
+  font-size: var(--text-sm);
+}
+
+.chart__tip i {
+  display: block;
+  margin-top: 3px;
+  font-style: normal;
+  font-size: var(--text-xs);
+  opacity: 0.72;
+}
+
+.year__facts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+  margin: 0;
+  padding: var(--space-4);
+  border-top: 1px solid var(--rule);
+}
+
+.year__facts dt {
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}
+
+.year__facts dd {
+  margin: var(--space-1) 0 0;
+}
+
+.year__facts-sub {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}
