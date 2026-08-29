@@ -123,3 +123,16 @@
     overflow-x: auto;
   }
 }
+
+/* Folded away on purpose. Undoing a confirmation stops a guaranteed minimum
+   applying, so it should not read as the sibling of the button beside it. */
+.targets__undo {
+  margin-top: var(--space-4);
+  padding: var(--space-4);
+}
+
+.targets__undo-list {
+  margin: var(--space-3) 0;
+  padding: 0;
+  list-style: none;
+}

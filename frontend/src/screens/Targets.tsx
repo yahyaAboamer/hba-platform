@@ -88,6 +88,13 @@ export function Targets({ session }: { session: Session }) {
   const [saved, setSaved] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
   const [chosen, setChosen] = useState<Set<number>>(new Set());
+  //: Undoing is its own selection and its own reason. Sharing `chosen`
+  //: with confirming would let one button act on rows picked for the
+  //: other, which on a screen that releases guarantees is not a mistake
+  //: worth risking to save a state variable.
+  const [undoing, setUndoing] = useState(false);
+  const [takingBack, setTakingBack] = useState<Set<number>>(new Set());
+  const [why, setWhy] = useState("");
 
   function load() {
     setError(null);
@@ -175,6 +182,25 @@ export function Targets({ session }: { session: Session }) {
     }
   }
 
+  async function takeBack() {
+    setWorking(true);
+    setError(null);
+    try {
+      await api.post(`/api/targets/${month}/unverify`, {
+        affiliate_ids: [...takingBack],
+        reason: why.trim(),
+      });
+      setTakingBack(new Set());
+      setWhy("");
+      setUndoing(false);
+      load();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Nothing changed.");
+    } finally {
+      setWorking(false);
+    }
+  }
+
   function lockFor(candidate: string): MonthLock {
     if (
       session.platform.go_live_month &&
@@ -193,6 +219,7 @@ export function Targets({ session }: { session: Session }) {
   const confirmable = rows.filter(
     (row) => row.actual_videos !== null && !row.verified,
   );
+  const confirmed = rows.filter((row) => row.verified);
 
   return (
     <>
@@ -362,6 +389,116 @@ export function Targets({ session }: { session: Session }) {
             paid either way. It is <em>nothing recorded</em> that holds a
             month up.
           </p>
+
+          {/*
+           * **The way back, and it looks like one.**
+           *
+           * A confirmation released a guaranteed minimum. Taking it back is
+           * rare, deliberate, and worth a written reason — so it is folded
+           * away rather than sitting beside *Confirm* as though the two were
+           * a pair. Somebody reaching for it has decided to.
+           *
+           * The reason is not paperwork. A verification undone leaves no other
+           * trace anybody would ever meet: the row simply reads unconfirmed
+           * again, exactly as though nobody had looked yet.
+           */}
+          {can(session, "targets.verify") && confirmed.length > 0 && (
+            <section className="panel targets__undo">
+              {!undoing ? (
+                <button
+                  type="button"
+                  className="button"
+                  onClick={() => setUndoing(true)}
+                >
+                  Take a confirmation back
+                </button>
+              ) : (
+                <>
+                  <div className="panel__head">
+                    <h2 className="panel__title">Take a confirmation back</h2>
+                  </div>
+                  <p className="targets__lead">
+                    The month reads as unconfirmed again, and a guaranteed
+                    minimum it had released stops applying until somebody
+                    confirms it once more.
+                  </p>
+
+                  <ul className="targets__undo-list">
+                    {confirmed.map((row) => (
+                      <li key={row.affiliate_id}>
+                        <label className="pay__option">
+                          <input
+                            type="checkbox"
+                            checked={takingBack.has(row.affiliate_id)}
+                            onChange={(event) => {
+                              const next = new Set(takingBack);
+                              if (event.target.checked) next.add(row.affiliate_id);
+                              else next.delete(row.affiliate_id);
+                              setTakingBack(next);
+                            }}
+                          />
+                          <span className="pay__option-body">
+                            <strong>{row.name}</strong>
+                            {row.determines_pay && (
+                              <span className="detail__note">
+                                a guaranteed minimum depends on this
+                              </span>
+                            )}
+                          </span>
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <label className="field comp__field">
+                    <span className="field__label">Why?</span>
+                    <textarea
+                      className="input reopen__textarea"
+                      rows={2}
+                      maxLength={500}
+                      required
+                      value={why}
+                      onChange={(event) => setWhy(event.target.value)}
+                      placeholder="Confirmed against the wrong month's posts."
+                    />
+                    <span className="detail__note">
+                      Kept in the record. Without it there is nothing anywhere
+                      to say a confirmation was ever made.
+                    </span>
+                  </label>
+
+                  <div className="payroll__actions">
+                    <button
+                      type="button"
+                      className="button"
+                      onClick={() => {
+                        setUndoing(false);
+                        setTakingBack(new Set());
+                        setWhy("");
+                      }}
+                      disabled={working}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="button button--primary"
+                      onClick={takeBack}
+                      disabled={
+                        working || takingBack.size === 0 || why.trim() === ""
+                      }
+                    >
+                      {working
+                        ? "Saving…"
+                        : `Take back ${takingBack.size} ${
+                            takingBack.size === 1 ? "confirmation" : "confirmations"
+                          }`}
+                    </button>
+                  </div>
+                </>
+              )}
+            </section>
+          )}
         </>
       )}
 
