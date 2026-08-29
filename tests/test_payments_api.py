@@ -599,3 +599,60 @@ def test_a_model_may_record_nothing(client):
 @pytest.mark.parametrize("month", ["2026-13", "not-a-month"])
 def test_a_month_that_is_not_a_month_is_refused(client, month):
     assert client.get(f"/api/payments/{month}").status_code == 400
+
+
+def test_the_pay_screen_carries_every_version_of_a_reopened_month(client):
+    """What the business could not see, and needed to.
+
+    Paying what the screen said before this would have sent the whole new
+    figure to somebody already paid most of it.
+    """
+    def balance():
+        rows = client.get(f"/api/payments/{AUGUST}").json()["affiliates"]
+        return next(r for r in rows if r["affiliate_id"] == affiliate["id"])
+
+    affiliate = _affiliate(client)
+    snapshot_id = _owed(client, affiliate)
+
+    first = balance()
+    assert len(first["versions"]) == 1
+
+    client.post(
+        "/api/payments",
+        json={
+            "affiliate_id": affiliate["id"],
+            "amount_piastres": first["balance_piastres"],
+            "allocations": [
+                {
+                    "payroll_snapshot_id": snapshot_id,
+                    "piastres": first["balance_piastres"],
+                }
+            ],
+        },
+    )
+    assert balance()["balance_piastres"] == 0
+
+    reopened = client.post(
+        f"/api/payroll/{AUGUST}/reopen",
+        json={"affiliate_ids": [affiliate["id"]], "reason": "orders arrived late"},
+    )
+    assert reopened.status_code == 200, reopened.text
+    _order(affiliate["id"], "late-one", 1_000_000)
+    client.post(
+        f"/api/payroll/{AUGUST}/approve",
+        json={"affiliate_ids": [affiliate["id"]], "preview": False},
+    )
+
+    after = balance()
+    already = first["balance_piastres"]
+
+    assert [v["version"] for v in after["versions"]] == [1, 2]
+    assert after["versions"][0]["paid_piastres"] == already
+    assert after["versions"][0]["is_current"] is False
+    assert after["versions"][1]["paid_piastres"] == 0
+    assert after["versions"][1]["is_current"] is True
+
+    # And the figure somebody would act on is the difference, not the whole.
+    assert after["paid_piastres"] == already
+    assert after["paid_earlier_versions_piastres"] == already
+    assert after["balance_piastres"] == after["obligation_piastres"] - already

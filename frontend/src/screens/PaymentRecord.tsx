@@ -233,7 +233,11 @@ export function PaymentRecord() {
             )}
             {balance.paid_piastres > 0 && (
               <Line
-                label="Already sent"
+                label={
+                  (balance.paid_earlier_versions_piastres ?? 0) > 0
+                    ? "Already sent to her"
+                    : "Already sent"
+                }
                 piastres={-balance.paid_piastres}
               />
             )}
@@ -255,6 +259,67 @@ export function PaymentRecord() {
             </div>
           </dl>
         </section>
+
+        {/*
+         * Only once a month has been agreed more than once. On an ordinary
+         * month there is nothing to reconcile and this would be a panel
+         * explaining that nothing happened.
+         *
+         * It exists because the figure alone could not answer the question
+         * somebody actually has on seeing "v2": is this the whole amount, or
+         * what is left? Until the balance was corrected it was neither - the
+         * screen offered the full new figure to a model who had already been
+         * paid most of it.
+         */}
+        {(balance.versions?.length ?? 0) > 1 && (
+          <section className="panel pay__versions">
+            <div className="panel__head">
+              <h2 className="panel__title">How this month changed</h2>
+            </div>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Version</th>
+                  <th className="numeric">Agreed</th>
+                  <th className="numeric">Paid against it</th>
+                </tr>
+              </thead>
+              <tbody>
+                {balance.versions!.map((entry) => (
+                  <tr
+                    key={entry.version}
+                    className={entry.is_current ? undefined : "pay__version--old"}
+                  >
+                    <td>
+                      {entry.version}
+                      {!entry.is_current && (
+                        <span className="detail__note"> superseded</span>
+                      )}
+                    </td>
+                    <td className="numeric">
+                      <Money
+                        piastres={entry.obligation_piastres}
+                        kind={entry.is_current ? "agreed" : "blocked"}
+                      />
+                    </td>
+                    <td className="numeric">
+                      <Money
+                        piastres={entry.paid_piastres}
+                        kind={entry.is_current ? "agreed" : "blocked"}
+                        tone={entry.paid_piastres > 0 ? "settled" : "neutral"}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="pay__versions-note">
+              Money stays attached to the version it settled. What is still
+              owed is the difference between the current figure and everything
+              already sent for this month.
+            </p>
+          </section>
+        )}
 
         <section className="panel">
           <div className="panel__head">
