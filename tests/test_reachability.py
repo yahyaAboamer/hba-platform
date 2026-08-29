@@ -70,13 +70,6 @@ NOT_BUILT_YET = {
     ("POST", "/api/affiliates"),
     # Cannot undo a verification made in error before the month was approved.
     ("POST", "/api/targets/{month}/unverify"),
-    # Cannot correct where a model is paid on their behalf. They can change it
-    # themselves (§6.4), so this is a fallback rather than the main path.
-    ("PUT", "/api/affiliates/{affiliate_id}/payout-destination"),
-    # Cannot see one model's payment history in one place, or open the
-    # screenshot of a payment already recorded.
-    ("GET", "/api/affiliates/{affiliate_id}/payments"),
-    ("GET", "/api/payments/{payment_id}/proof"),
 }
 
 

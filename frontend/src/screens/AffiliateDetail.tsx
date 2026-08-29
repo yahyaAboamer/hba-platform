@@ -450,6 +450,25 @@ export function AffiliateDetail({ session }: { session: Session }) {
 
         <section className="panel">
           <div className="panel__head">
+            <h2 className="panel__title">What has been paid</h2>
+            <Link className="button" to={`/affiliates/${detail.id}/payments`}>
+              Open the history
+            </Link>
+          </div>
+          {/*
+           * Deliberately a link and not a summary. "What has this person ever
+           * been sent" is asked rarely and answered at length - every payment,
+           * its reference, where it went and the screenshot - and putting the
+           * first two rows here would answer it wrongly more often than it
+           * answered it at all.
+           */}
+          <p className="empty">
+            Every payment and adjustment, with the screenshots.
+          </p>
+        </section>
+
+        <section className="panel">
+          <div className="panel__head">
             <h2 className="panel__title">Discount codes</h2>
             <span className="page__subtitle">
               {formatMonth(detail.current_month)}
@@ -482,6 +501,14 @@ export function AffiliateDetail({ session }: { session: Session }) {
         <section className="panel">
           <div className="panel__head">
             <h2 className="panel__title">Where the money goes</h2>
+            {can(session, "affiliates.manage") && (
+              <Link
+                className="button"
+                to={`/affiliates/${detail.id}/payout-destination`}
+              >
+                {detail.payout_destination ? "Correct it" : "Set it"}
+              </Link>
+            )}
           </div>
           {detail.payout_destination === null ? (
             <p className="empty">
