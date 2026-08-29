@@ -28,9 +28,12 @@ class AccountKind:
 
     MODEL = "model"
 
-    #: HBA's own code - HBA10. A real code used by real customers, so it needs a
-    #: working dashboard and Shopify verification like any other. But it is not
-    #: a person, so it is **excluded from payable totals and from rankings**.
+    #: HBA's own code - HBA10. A real code used by real customers, and its
+    #: orders are attributed and Shopify-verified exactly like a model's. What
+    #: makes it a house account rather than a model is that nobody signs in as
+    #: it: `create_house_account` gives it a `user_account` it can never sign
+    #: into, purely to satisfy the same foreign key every affiliate has. It is
+    #: **excluded from payable totals and from rankings** either way.
     #:
     #: Replaces the old system's `code_type='test'`, which described the code
     #: rather than the account and confused everyone who met it. A house code is

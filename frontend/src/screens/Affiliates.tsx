@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { Link } from "react-router-dom";
 
 import { api } from "../lib/api";
+import { AddHouseCode } from "./AddHouseCode";
 import { InviteModel } from "./InviteModel";
 import "./Affiliates.css";
 
@@ -137,6 +138,15 @@ export function Affiliates() {
            * and nothing could start it.
            */}
           <InviteModel onInvited={reload} />
+
+          {/*
+           * Deliberately its own button, not a second option folded into
+           * inviting a model. The two create opposite things - a person who
+           * signs in and gets paid, versus a code that never does either -
+           * and one control offering both invites exactly the mistake this
+           * exists to prevent.
+           */}
+          <AddHouseCode onCreated={reload} />
 
           <label className="affiliates__toggle-archived">
             <input

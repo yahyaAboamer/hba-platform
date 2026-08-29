@@ -32,6 +32,7 @@ from app.models.identity import UserAccount
 from app.services.affiliates import (
     archive_affiliate,
     create_affiliate,
+    create_house_account,
     get_affiliate,
     list_affiliates,
     readiness,
@@ -320,6 +321,100 @@ def create_affiliate_route(
 
     db.commit()
     return _affiliate_payload(affiliate)
+
+
+class CreateHouseAccountBody(BaseModel):
+    """A code that is HBA's own, not a person's.
+
+    Just the name and the code - the same two facts an invitation collects
+    for a model, minus the invitation, because there is nobody to send one to.
+    """
+
+    name: str = Field(min_length=1, max_length=120)
+    code: str = Field(min_length=1, max_length=120)
+
+
+@router.post("/house", status_code=201)
+def create_house_account_route(
+    body: CreateHouseAccountBody,
+    actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_MANAGE)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Bring a house account into existence, code and all, in one act.
+
+    Three things a model's onboarding does as separate steps, each requiring
+    someone to come back and press the next button - accept an invitation,
+    register a code, get approved - collapse into one here, because a house
+    account has nobody to do the middle steps and no reason to wait between
+    the others: it has no compensation to set and no targets to record, so a
+    verified code is the only thing standing between it and *active*.
+
+    Registering the code looks it up in Shopify first, exactly like
+    `register_code_route` - the same call answers "does this exist?" and
+    "which month does ownership start from?". A code Shopify has never heard
+    of is still recorded, unverified, and the account stays `pending` rather
+    than silently claiming orders for a code that might be mistyped.
+    """
+    from app.services.shopify.sync import build_client
+
+    try:
+        affiliate = create_house_account(
+            db, name=body.name, actor_id=actor.id, actor_email=actor.email
+        )
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            409, "A house account already exists with that name"
+        ) from exc
+
+    try:
+        found = verify_discount_code(build_client(), body.code)
+    except ShopifyMissingScope as exc:
+        raise HTTPException(
+            403,
+            f"Shopify has not granted {REQUIRED_SCOPE}, so this code cannot be "
+            "checked. Add the scope, then try again.",
+        ) from exc
+    except ShopifyNotConfigured as exc:
+        raise HTTPException(503, str(exc)) from exc
+    except ShopifyError as exc:
+        raise HTTPException(502, f"Could not reach Shopify: {exc}") from exc
+
+    try:
+        register_code(
+            db,
+            affiliate,
+            body.code,
+            start_month_for(found["created_at"]),
+            OPEN_ENDED,
+            verified_at=utcnow() if found["exists"] else None,
+            actor_id=actor.id,
+            actor_email=actor.email,
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            409,
+            f"{body.code.strip().upper()!r} is already owned by somebody else "
+            "during part of this period",
+        ) from exc
+
+    # The only gate on approval is a verified code (set_status enforces this
+    # itself, so this call would refuse otherwise) - a house account has no
+    # compensation to wait on.
+    if found["exists"]:
+        set_status(
+            db,
+            affiliate,
+            AffiliateStatus.ACTIVE,
+            actor_id=actor.id,
+            actor_email=actor.email,
+        )
+
+    db.commit()
+    return _affiliate_detail(db, affiliate)
 
 
 @router.get("/{affiliate_id}")
