@@ -201,6 +201,11 @@ def _compensation_payload(terms) -> dict | None:
     if terms is None:
         return None
     return {
+        # Without this the browser cannot address `PATCH .../compensation/
+        # {period_id}` at all - it holds the terms and not their identity, so
+        # correcting a mistyped rate was unreachable however the screen was
+        # written.
+        "id": terms.id,
         "start_month": terms.start_month,
         "end_month": terms.end_month,
         "compensation_type": terms.compensation_type,

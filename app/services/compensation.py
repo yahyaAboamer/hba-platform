@@ -7,7 +7,7 @@ for which months; Phase 4 turns that into an amount.
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.businesstime import parse_month
+from app.core.businesstime import month_add, parse_month
 from app.core.money import BASIS_POINTS
 from app.core.periods import OPEN_ENDED, validate_period
 from app.models.affiliates import AffiliateProfile
@@ -145,6 +145,65 @@ def assert_correctable(db: Session, terms, *, new_end_month: str | None = "") ->
         )
 
 
+def _supersede_open_terms(
+    db: Session,
+    affiliate: AffiliateProfile,
+    start_month: str,
+    end_month: str | None,
+    *,
+    actor_id: int | None = None,
+    actor_email: str | None = None,
+) -> list[CompensationPeriod]:
+    """End the arrangement in force, so a new one can start.
+
+    **A rate change is one decision** - *from September they are on 12%* - and
+    the maintainer should not have to perform it as two. Doing it here means it
+    happens inside the caller's transaction: the old arrangement ends and the
+    new one begins together, or neither does.
+
+    Done from the browser as two calls it can half-succeed, and the half that
+    survives is the destructive one - a model left with no terms at all from
+    September, whose payroll then blocks with nothing saying why. The screen
+    already promised this was one act; it returned a 409 instead.
+
+    **Only an open-ended arrangement is superseded.** One that already carries
+    an end month was a deliberate choice about when it stops, and shortening
+    that silently is a different act from ending the current one. New terms
+    overlapping a closed period are still refused by the database.
+
+    Backfilling earlier history is left alone: terms that end before the open
+    arrangement begins do not overlap it, so nothing is closed.
+    """
+    open_now = list(
+        db.scalars(
+            select(CompensationPeriod)
+            .where(CompensationPeriod.affiliate_id == affiliate.id)
+            .where(CompensationPeriod.end_month.is_(None))
+        )
+    )
+
+    superseded = []
+    for terms in open_now:
+        if end_month is not None and end_month < terms.start_month:
+            continue
+        if terms.start_month >= start_month:
+            raise ValueError(
+                f"An arrangement already starts in {terms.start_month}. To "
+                "change what it says, correct it; to replace it, start the new "
+                "one in a later month."
+            )
+        close_terms(
+            db,
+            terms,
+            month_add(start_month, -1),
+            actor_id=actor_id,
+            actor_email=actor_email,
+        )
+        superseded.append(terms)
+
+    return superseded
+
+
 def set_terms(
     db: Session,
     affiliate: AffiliateProfile,
@@ -164,6 +223,11 @@ def set_terms(
     A rate change is a **new period**, never an edit to an existing one. The
     database refuses two periods that overlap, so the months an affiliate was
     on 8% cannot later become months they were on 10%.
+
+    Which is why this also **ends the arrangement currently in force**, in
+    the same transaction: without it every rate change after the first was
+    refused, and doing it from the browser as two calls could leave a model
+    with no terms at all. See `_supersede_open_terms`.
     """
     validate_terms(
         compensation_type,
@@ -173,6 +237,17 @@ def set_terms(
         expected_customer_discount_bp,
     )
     start_month, end_month = validate_period(start_month, end_month)
+
+    # Ends whatever is currently in force, in this same transaction, so the
+    # change cannot half-happen. See `_supersede_open_terms`.
+    _supersede_open_terms(
+        db,
+        affiliate,
+        start_month,
+        end_month,
+        actor_id=actor_id,
+        actor_email=actor_email,
+    )
 
     terms = CompensationPeriod(
         affiliate_id=affiliate.id,

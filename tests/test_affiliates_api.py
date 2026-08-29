@@ -1214,3 +1214,66 @@ def test_revealing_with_nothing_on_file_is_a_404(client):
     )
 
     assert response.status_code == 404
+
+
+def test_changing_a_rate_through_the_api_is_one_call(client):
+    """What the Compensation screen has always claimed to do.
+
+    The screen says "Saving this ends that arrangement and starts a new one".
+    It returned 409 - the second arrangement overlapped the first, and every
+    rate change after the very first one failed with a message nobody could
+    act on. One call now, and it either happens completely or not at all.
+    """
+    affiliate = _register(client)
+
+    first = client.post(
+        f"/api/affiliates/{affiliate['id']}/compensation",
+        json={
+            "start_month": "2026-01",
+            "compensation_type": "commission",
+            "commission_rate_bp": 800,
+        },
+    )
+    assert first.status_code == 201, first.text
+    assert first.json()["end_month"] is None
+
+    changed = client.post(
+        f"/api/affiliates/{affiliate['id']}/compensation",
+        json={
+            "start_month": "2026-09",
+            "compensation_type": "commission",
+            "commission_rate_bp": 1200,
+        },
+    )
+    assert changed.status_code == 201, changed.text
+    assert changed.json()["commission_rate_bp"] == 1200
+    assert changed.json()["start_month"] == "2026-09"
+
+
+def test_the_terms_carry_their_own_id(client):
+    """Without it the browser cannot address `PATCH .../compensation/{id}`.
+
+    Correcting a mistyped rate was unreachable not because the route was
+    missing but because nothing ever told the screen which period to correct.
+    """
+    affiliate = _register(client)
+    created = client.post(
+        f"/api/affiliates/{affiliate['id']}/compensation",
+        json={
+            "start_month": "2026-01",
+            "compensation_type": "commission",
+            "commission_rate_bp": 800,
+        },
+    )
+    period_id = created.json()["id"]
+    assert isinstance(period_id, int)
+
+    corrected = client.patch(
+        f"/api/affiliates/{affiliate['id']}/compensation/{period_id}",
+        json={"commission_rate_bp": 850},
+    )
+    assert corrected.status_code == 200, corrected.text
+    assert corrected.json()["commission_rate_bp"] == 850
+
+    detail = client.get(f"/api/affiliates/{affiliate['id']}").json()
+    assert detail["compensation"]["id"] == period_id
