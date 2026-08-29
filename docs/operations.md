@@ -275,6 +275,36 @@ volume and moves with no downtime at all.
 Nothing else needs touching: domains, private networking, environment
 variables and the Shopify webhook addresses are all unaffected.
 
+## Deploying — staging and production are split, temporarily
+
+Since 2026-08-30 (ADR 0034), **`main` deploys to staging only**, on a
+dedicated service, `hba-platform-staging`, at
+`hba-platform-staging-staging.up.railway.app`. **Production deploys from its
+own `production` branch**, on the original `hba-platform` service, at the
+domain everyone already knows: `hba-platform-production.up.railway.app`.
+
+**To ship something to production**, once it has been checked on staging:
+
+```
+git checkout production
+git merge --ff-only main
+git push origin production
+```
+
+Railway redeploys `hba-platform` automatically from there. Nothing else
+needs touching - variables, region, Postgres are all exactly as they were.
+
+**`hba-platform-staging.up.railway.app` (no `-staging-staging`) is retired.**
+It still answers, because the shared service that used to serve it now
+serves `production` branch content there instead - do not link it or trust
+what it says about "staging."
+
+**This is temporary.** The plan is to collapse back to one shared service on
+`main` for both environments within days, once the pace of changes settles -
+at which point: delete `hba-platform-staging`, repoint `hba-platform`'s
+branch back to `main`, delete the `production` git branch. Ask before
+assuming this is still the setup if it has been longer than a few days.
+
 ## Backups
 
 A `db-backup-<environment>` service in each environment dumps its own
