@@ -438,8 +438,8 @@ def render(event: str, payload: dict) -> Message | None:
             body=_with_link(
                 f"{name} has applied to the programme"
                 + (f" with the code {payload['code']}." if payload.get("code") else ".")
-                + "\n\nHer code needs checking against Shopify before she can "
-                "be approved.",
+                + "\n\nThe code needs checking against Shopify before "
+                "the application can be approved.",
                 "/affiliates",
                 "Review it here:",
             ),
@@ -534,11 +534,11 @@ def render(event: str, payload: dict) -> Message | None:
         return Message(
             to_address=payload["email"],
             to_name=None,
-            subject=f"{name} changed where she is paid",
+            subject=f"{name} changed where the money goes",
             body=_with_link(
-                f"{name} has changed her payout destination.\n\n"
+                f"{name} has changed where payments go.\n\n"
                 f"It now ends {payload.get('masked') or 'unknown'}.\n\n"
-                "If that was not expected, check with her before the next "
+                "If that was not expected, check with them before the next "
                 "payment run.",
                 "/payments",
                 "The payments screen flags it too:",

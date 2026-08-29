@@ -591,8 +591,8 @@ def replace_code_route(
         raise HTTPException(
             400,
             f"Shopify has no code {found['code']!r}. Create it there first - "
-            "retiring her current code for one that does not exist would stop "
-            "her earning from that month with nothing to show for it.",
+            "retiring the current code for one that does not exist would stop "
+            "the earnings from that month with nothing to show for it.",
         )
 
     try:

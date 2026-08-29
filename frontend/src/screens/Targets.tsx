@@ -63,9 +63,9 @@ function count(text: string): number | null | undefined {
  */
 function waitingOn(row: Row): string | null {
   if (!row.determines_pay) return null;
-  if (row.actual_videos === null) return "Blocks her month — nothing recorded";
+  if (row.actual_videos === null) return "Blocks this month — nothing recorded";
   if (row.achieved && !row.verified) {
-    return "Blocks her month — met, and not yet confirmed";
+    return "Blocks this month — met, and not yet confirmed";
   }
   return null;
 }
@@ -216,9 +216,9 @@ export function Targets({ session }: { session: Session }) {
 
       {grid && (
         <p className="targets__lead">
-          Videos and stories she published, from your own tracking. For a model
-          on a guaranteed minimum these decide what she is paid; for everyone
-          else they are worth knowing and change nothing.{" "}
+          Videos and stories published, from your own tracking. On a guaranteed
+          minimum these decide the pay; for everyone else they are worth
+          knowing and change nothing.{" "}
           <strong>{blocking.length}</strong>{" "}
           {blocking.length === 1 ? "model is" : "models are"} held up by them
           this month.
@@ -289,7 +289,7 @@ export function Targets({ session }: { session: Session }) {
                         {row.name}
                       </Link>
                       {row.determines_pay && (
-                        <span className="targets__decides">decides her pay</span>
+                        <span className="targets__decides">decides pay</span>
                       )}
                     </td>
                     <Cell
@@ -358,8 +358,8 @@ export function Targets({ session }: { session: Session }) {
            */}
           <p className="targets__lead">
             Confirming says the numbers are right, not that the month went well.
-            Confirming a miss is normal and costs her nothing — she is paid her
-            commission either way. It is <em>nothing recorded</em> that holds a
+            Confirming a miss is normal and costs nothing — the commission is
+            paid either way. It is <em>nothing recorded</em> that holds a
             month up.
           </p>
         </>

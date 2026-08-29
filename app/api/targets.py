@@ -195,8 +195,8 @@ def save_grid(
             raise HTTPException(
                 400,
                 f"Row {index + 1} ({affiliate.name}): record both videos and "
-                "stories or neither - half a month cannot say whether she "
-                "achieved. Nothing saved.",
+                "stories or neither - half a month cannot say whether the "
+                "target was achieved. Nothing saved.",
             )
 
         try:

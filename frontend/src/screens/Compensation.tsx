@@ -33,11 +33,11 @@ const KIND_LABEL: Record<Kind, string> = {
 };
 
 const KIND_MEANING: Record<Kind, string> = {
-  commission: "She is paid a share of what her code sells, and nothing else.",
+  commission: "A share of what the code sells, and nothing else.",
   fixed_plus_commission:
-    "She is paid a fixed amount every month, and her commission on top of it.",
+    "A fixed amount every month, and commission on top of it.",
   base_guarantee:
-    "She is paid whichever is larger — her commission, or the guaranteed amount. Never both. The guarantee only applies in a month where her targets were met and confirmed.",
+    "Whichever is larger — commission, or the guaranteed amount. Never both. The guarantee only applies in a month where targets were met and confirmed.",
 };
 
 /**
@@ -140,7 +140,7 @@ export function Compensation() {
         <Link to={`/affiliates/${id}`} className="detail__back">
           {detail?.name ?? "Affiliate"}
         </Link>
-        <h1>How {detail?.name ?? "she"} is paid</h1>
+        <h1>How {detail?.name ?? "this model"} is paid</h1>
       </div>
     </div>
   );
@@ -172,7 +172,7 @@ export function Compensation() {
 
       <form onSubmit={submit} className="comp__form">
         <fieldset className="comp__choice">
-          <legend className="field__label">What is she paid?</legend>
+          <legend className="field__label">What is the arrangement?</legend>
           {(Object.keys(KIND_LABEL) as Kind[]).map((option) => (
             <label
               key={option}
@@ -205,7 +205,7 @@ export function Compensation() {
             />
             <span className="comp__suffix">%</span>
           </span>
-          <span className="detail__note">Of what her code sells, after shipping and tax.</span>
+          <span className="detail__note">Of what the code sells, after shipping and tax.</span>
         </label>
 
         {kind === "fixed_plus_commission" && (
@@ -232,7 +232,7 @@ export function Compensation() {
               placeholder="8000.00"
             />
             <span className="detail__note">
-              Only applies in a month where her targets are met and confirmed.
+              Only applies in a month where targets are met and confirmed.
             </span>
           </label>
         )}
@@ -250,8 +250,8 @@ export function Compensation() {
             <span className="comp__suffix">%</span>
           </span>
           <span className="detail__note">
-            What her code takes off for the customer. Recorded for reference; it
-            does not change what she is paid.
+            What the code takes off for the customer. Recorded for reference; it
+            does not change what is paid.
           </span>
         </label>
 
@@ -274,8 +274,8 @@ export function Compensation() {
           <MonthPicker value={startMonth} onChange={setStartMonth} />
           <span className="detail__note">
             {detail.compensation
-              ? "The months before this keep the arrangement she is on now."
-              : "Her sales are counted from the month her code was registered, whichever month you choose here."}
+              ? "The months before this keep the current arrangement."
+              : "Sales are counted from the month the code was registered, whichever month you choose here."}
           </span>
         </div>
 
@@ -322,7 +322,7 @@ export function Compensation() {
                   <Money piastres={exampleOn(1_000_000, kind, rateBp, fixedPiastres, basePiastres)} />
                   <span className="detail__note">
                     {kind === "base_guarantee"
-                      ? "the larger of her commission and the guarantee, if her targets were met"
+                      ? "the larger of commission and the guarantee, if targets were met"
                       : "in a month with no other adjustments"}
                   </span>
                 </Row>
@@ -333,11 +333,11 @@ export function Compensation() {
 
         {detail.compensation && (
           <p className="notice comp__note">
-            She is currently on{" "}
+            {detail.name} is currently on{" "}
             <strong>{KIND_LABEL[detail.compensation.compensation_type].toLowerCase()}</strong>{" "}
             at {detail.compensation.commission_rate_bp / 100}%, from{" "}
             {formatMonth(detail.compensation.start_month)}. Saving this ends
-            that arrangement and starts a new one — the months she was on the
+            that arrangement and starts a new one — the months already on the
             old rate keep it.
           </p>
         )}
@@ -356,7 +356,9 @@ export function Compensation() {
             className="button button--primary"
             disabled={working || problem !== null}
           >
-            {working ? "Saving…" : `Pay her this from ${formatMonth(startMonth)}`}
+            {working
+              ? "Saving…"
+              : `Pay ${detail.name} this from ${formatMonth(startMonth)}`}
           </button>
         </div>
       </form>

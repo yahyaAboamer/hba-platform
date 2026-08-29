@@ -128,7 +128,7 @@ export function AffiliateDetail({ session }: { session: Session }) {
       setNotice({
         good: result.verified,
         text: result.verified
-          ? `Shopify knows ${result.code}. She can be approved.`
+          ? `Shopify knows ${result.code}. You can approve now.`
           : `Shopify has never heard of ${result.code}. Check it against the shop.`,
       });
       load();
@@ -145,10 +145,13 @@ export function AffiliateDetail({ session }: { session: Session }) {
     setNotice(null);
     try {
       await api.patch(`/api/affiliates/${id}`, { status: "active" });
-      setNotice({ good: true, text: "Approved. Her sales are being counted." });
+      setNotice({
+        good: true,
+        text: "Approved. Sales on this code are being counted.",
+      });
       load();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not approve her.");
+      setError(caught instanceof Error ? caught.message : "Could not approve.");
     } finally {
       setWorking(null);
     }
@@ -238,13 +241,13 @@ export function AffiliateDetail({ session }: { session: Session }) {
       {detail.status === "pending" && can(session, "affiliates.manage") && (
         <section className="panel detail__review">
           <div className="panel__head">
-            <h2 className="panel__title">Before she can earn</h2>
+            <h2 className="panel__title">Before {detail.name} can earn</h2>
           </div>
 
           <ol className="detail__steps">
             <li className={verified ? "detail__step--done" : undefined}>
               <div>
-                <strong>Check her code against Shopify</strong>
+                <strong>Check the code against Shopify</strong>
                 <span className="detail__note">
                   {verified
                     ? `Shopify knows ${detail.codes[0]?.code}.`
@@ -257,8 +260,8 @@ export function AffiliateDetail({ session }: { session: Session }) {
                     className="input detail__correction"
                     value={correction}
                     onChange={(event) => setCorrection(event.target.value)}
-                    placeholder={detail.codes[0]?.code ?? "Her code"}
-                    aria-label="Correct her code before checking"
+                    placeholder={detail.codes[0]?.code ?? "Discount code"}
+                    aria-label="Correct the code before checking"
                   />
                   <button
                     type="button"
@@ -274,11 +277,11 @@ export function AffiliateDetail({ session }: { session: Session }) {
 
             <li className={detail.compensation ? "detail__step--done" : undefined}>
               <div>
-                <strong>Set what she is paid</strong>
+                <strong>Set what {detail.name} is paid</strong>
                 <span className="detail__note">
                   {detail.compensation
-                    ? "Her arrangement is recorded."
-                    : "Her payroll stays blocked until this is set."}
+                    ? "The arrangement is recorded."
+                    : "Payroll stays blocked until this is set."}
                 </span>
               </div>
               <Link className="button" to={`/affiliates/${detail.id}/compensation`}>
@@ -288,10 +291,10 @@ export function AffiliateDetail({ session }: { session: Session }) {
 
             <li>
               <div>
-                <strong>Set her targets</strong>
+                <strong>Set the targets</strong>
                 <span className="detail__note">
                   {detail.compensation?.compensation_type === "base_guarantee"
-                    ? "Her guarantee applies only in a month where these are met and confirmed."
+                    ? "The guaranteed minimum applies only in a month where these are met and confirmed."
                     : "Recorded only. Targets change pay on a guaranteed minimum."}
                 </span>
               </div>
@@ -317,7 +320,7 @@ export function AffiliateDetail({ session }: { session: Session }) {
                 ? "Approving…"
                 : verified
                   ? `Approve ${detail.name}`
-                  : "Check her code first"}
+                  : "Check the code first"}
             </button>
           </div>
         </section>
@@ -401,12 +404,12 @@ export function AffiliateDetail({ session }: { session: Session }) {
 
         <section className="panel">
           <div className="panel__head">
-            <h2 className="panel__title">How she is paid</h2>
+            <h2 className="panel__title">How {detail.name} is paid</h2>
           </div>
           {detail.compensation === null ? (
             <p className="empty">
-              No pay terms for this month, so nothing can be calculated. Her
-              sales are still recorded.
+              No pay terms for this month, so nothing can be calculated. Sales
+              are still recorded.
             </p>
           ) : (
             <dl className="detail__list">
@@ -427,7 +430,7 @@ export function AffiliateDetail({ session }: { session: Session }) {
                 <Row label="Guaranteed minimum">
                   <Money piastres={detail.compensation.base_amount_piastres} />
                   <span className="detail__note">
-                    Applies only when her targets are met and confirmed
+                    Applies only when targets are met and confirmed
                   </span>
                 </Row>
               )}
@@ -470,10 +473,12 @@ export function AffiliateDetail({ session }: { session: Session }) {
 
         <section className="panel">
           <div className="panel__head">
-            <h2 className="panel__title">Where her money goes</h2>
+            <h2 className="panel__title">Where the money goes</h2>
           </div>
           {detail.payout_destination === null ? (
-            <p className="empty">Nothing on file. She cannot be paid yet.</p>
+            <p className="empty">
+              Nothing on file. {detail.name} cannot be paid yet.
+            </p>
           ) : (
             <dl className="detail__list">
               <Row label="Method">
@@ -528,8 +533,8 @@ export function AffiliateDetail({ session }: { session: Session }) {
                */}
               <p className="detail__masked">
                 {detail.payout_destination.method === "instapay"
-                  ? "Shortened on purpose. Pay her from Payments, which opens InstaPay with her address filled in."
-                  : "Shortened on purpose. Pay her from Payments, where the full number is shown."}
+                  ? "Shortened on purpose. Pay from Payments, which opens InstaPay with the address filled in."
+                  : "Shortened on purpose. Pay from Payments, where the full number is shown."}
               </p>
             </dl>
           )}

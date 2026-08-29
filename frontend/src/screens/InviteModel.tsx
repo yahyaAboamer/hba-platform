@@ -29,6 +29,7 @@ export function InviteModel({ onInvited }: { onInvited: () => void }) {
   const [email, setEmail] = useState("");
   const [link, setLink] = useState<string | null>(null);
   const [emailed, setEmailed] = useState(false);
+  const [sentTo, setSentTo] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
 
@@ -43,11 +44,14 @@ export function InviteModel({ onInvited }: { onInvited: () => void }) {
         { email: email.trim(), role: "affiliate" },
       );
       setEmailed(result.emailed);
+      setSentTo(email.trim());
       setLink(`${window.location.origin}/accept-invitation?token=${result.token}`);
       setEmail("");
       onInvited();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not invite her.");
+      setError(
+        caught instanceof Error ? caught.message : "Could not send the invitation.",
+      );
     } finally {
       setWorking(false);
     }
@@ -88,22 +92,22 @@ export function InviteModel({ onInvited }: { onInvited: () => void }) {
           <div className="notice notice--settled invite__link">
             <p>
               {emailed
-                ? "Emailed to her. Here is the same link, in case it does not arrive — it only appears here once."
-                : "Email is not switched on, so send her this link yourself — it only appears here once."}
+                ? `Emailed to ${sentTo}. Here is the same link, in case it does not arrive — it only appears here once.`
+                : "Email is not switched on, so send this link yourself — it only appears here once."}
             </p>
             <code className="code invite__link-value">{link}</code>
           </div>
         )}
 
         <p className="invite__lead">
-          She sets her own password, fills in her details and where she wants to
-          be paid, and applies. You approve her and set what she is paid after
-          that — nothing about her pay is decided here.
+          The link opens a form: a password, their own details, and where they
+          want to be paid. You approve the application and set the pay after
+          that — nothing about pay is decided here.
         </p>
 
         <form onSubmit={submit} className="invite__form">
           <label className="field invite__field">
-            <span className="field__label">Her email</span>
+            <span className="field__label">Email address</span>
             <input
               className="input"
               type="email"
@@ -112,7 +116,7 @@ export function InviteModel({ onInvited }: { onInvited: () => void }) {
               onChange={(event) => setEmail(event.target.value)}
             />
             <span className="field__hint">
-              This is what she will sign in with, so use the one she reads.
+              This is what they will sign in with, so use the one they read.
             </span>
           </label>
 
@@ -133,7 +137,7 @@ export function InviteModel({ onInvited }: { onInvited: () => void }) {
               className="button button--primary"
               disabled={working || !email.trim()}
             >
-              {working ? "Inviting…" : "Send her the link"}
+              {working ? "Inviting…" : "Send the link"}
             </button>
           </div>
         </form>

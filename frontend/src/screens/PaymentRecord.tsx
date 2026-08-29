@@ -205,7 +205,7 @@ export function PaymentRecord() {
         <p className="notice notice--refused pay__changed" role="alert">
           Where {balance.name} is paid changed{" "}
           <strong>{describeWhen(balance.destination_changed_at)}</strong>. If
-          you were not expecting that, check with her before sending anything.
+          you were not expecting that, check with them before sending anything.
         </p>
       )}
 
@@ -235,7 +235,7 @@ export function PaymentRecord() {
               <Line
                 label={
                   (balance.paid_earlier_versions_piastres ?? 0) > 0
-                    ? "Already sent to her"
+                    ? "Already sent, across versions"
                     : "Already sent"
                 }
                 piastres={-balance.paid_piastres}
@@ -329,7 +329,7 @@ export function PaymentRecord() {
           {revealed === null ? (
             <>
               <p className="pay__lead">
-                Her details are shortened everywhere else on purpose. Showing
+                These details are shortened everywhere else on purpose. Showing
                 them is recorded — who looked, and when.
               </p>
               <button
@@ -477,7 +477,7 @@ export function PaymentRecord() {
               onChange={(event) => setProof(event.target.files?.[0] ?? null)}
             />
             <span className="detail__note">
-              She sees this, which is what stops the “did you send it?”
+              {balance.name} sees this, which is what stops the “did you send it?”
               messages. Location data is stripped and the image is compressed
               before it is stored.
             </span>
