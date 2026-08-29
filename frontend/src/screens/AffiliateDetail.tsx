@@ -469,6 +469,14 @@ export function AffiliateDetail({ session }: { session: Session }) {
               ))}
             </ul>
           )}
+
+          {can(session, "affiliates.manage") && (
+            <CodeForm
+              affiliateId={detail.id}
+              held={detail.codes}
+              onDone={load}
+            />
+          )}
         </section>
 
         <section className="panel">
@@ -543,6 +551,189 @@ export function AffiliateDetail({ session }: { session: Session }) {
     </>
   );
 }
+
+/**
+ * Giving a model a code, and moving them onto a different one.
+ *
+ * **Two acts that produce the same typing and mean opposite things.** Adding
+ * leaves the old code earning; moving ends it the month before the new one
+ * began. Get it wrong in the *adding* direction and a retired code keeps
+ * collecting orders it should not; wrong in the *moving* direction and months
+ * of real sales stop belonging to anybody. Neither is recoverable by guessing
+ * later, so the screen asks - and asks only when there is something to move
+ * away from.
+ *
+ * **No month is asked for anywhere here, deliberately.** There is exactly one
+ * right answer - the later of the platform's data horizon and the code's
+ * creation on Shopify - so offering a person the choice can only produce a
+ * wrong one. Typing today's month would orphan every order the code had
+ * already earned, and nobody would notice until the model asked why their
+ * dashboard was empty.
+ */
+function CodeForm({
+  affiliateId,
+  held,
+  onDone,
+}: {
+  affiliateId: number;
+  held: Code[];
+  onDone: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [code, setCode] = useState("");
+  const [moving, setMoving] = useState(true);
+  const [replaces, setReplaces] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [working, setWorking] = useState(false);
+
+  const first = held.length === 0;
+  // `replaces` only disambiguates. With one code there is nothing to choose
+  // between, and asking would be noise.
+  const mustChoose = moving && held.length > 1;
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    setWorking(true);
+    setError(null);
+    try {
+      if (!first && moving) {
+        await api.post(`/api/affiliates/${affiliateId}/replace-code`, {
+          code: code.trim(),
+          replaces: mustChoose ? replaces : null,
+        });
+      } else {
+        await api.post(`/api/affiliates/${affiliateId}/codes`, {
+          code: code.trim(),
+        });
+      }
+      setCode("");
+      setOpen(false);
+      onDone();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not save that.");
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  if (!open) {
+    return (
+      <div className="detail__step-action">
+        <button type="button" className="button" onClick={() => setOpen(true)}>
+          {first ? "Register a code" : "Register or change a code"}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={submit} className="detail__code-form">
+      {error && (
+        <p className="notice notice--refused" role="alert">
+          {error}
+        </p>
+      )}
+
+      {!first && (
+        <fieldset className="comp__choice">
+          <legend className="field__label">Which is this?</legend>
+          <label className={moving ? "pay__option pay__option--on" : "pay__option"}>
+            <input
+              type="radio"
+              name="code-act"
+              checked={moving}
+              onChange={() => setMoving(true)}
+            />
+            <span className="pay__option-body">
+              <strong>They changed their code on Shopify</strong>
+              <span className="detail__note">
+                The old one ends the month before this one started. Their
+                earlier months keep showing it, and the orders it earned stay
+                theirs.
+              </span>
+            </span>
+          </label>
+          <label className={!moving ? "pay__option pay__option--on" : "pay__option"}>
+            <input
+              type="radio"
+              name="code-act"
+              checked={!moving}
+              onChange={() => setMoving(false)}
+            />
+            <span className="pay__option-body">
+              <strong>They sell under this one as well</strong>
+              <span className="detail__note">
+                Both codes stay live and both earn.
+              </span>
+            </span>
+          </label>
+        </fieldset>
+      )}
+
+      {mustChoose && (
+        <label className="field comp__field">
+          <span className="field__label">Which code are they leaving?</span>
+          <select
+            className="input"
+            value={replaces}
+            onChange={(event) => setReplaces(event.target.value)}
+            required
+          >
+            <option value="">Choose one</option>
+            {held.map((entry) => (
+              <option key={entry.code} value={entry.code}>
+                {entry.code}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+
+      <label className="field comp__field">
+        <span className="field__label">The code</span>
+        <input
+          className="input"
+          value={code}
+          onChange={(event) => setCode(event.target.value)}
+          placeholder="NOUR10"
+          required
+        />
+        <span className="detail__note">
+          Shopify is asked about it now. That one answer settles both whether it
+          exists and which month it starts earning from, so no month is asked
+          for here. A code Shopify has never heard of is still recorded - it
+          just cannot be approved until Shopify has it.
+        </span>
+      </label>
+
+      <div className="payroll__actions">
+        <button
+          type="button"
+          className="button"
+          onClick={() => {
+            setOpen(false);
+            setError(null);
+          }}
+          disabled={working}
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          className="button button--primary"
+          disabled={working || code.trim() === "" || (mustChoose && replaces === "")}
+        >
+          {working
+            ? "Asking Shopify…"
+            : first || !moving
+              ? "Register it"
+              : "Move them onto it"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (

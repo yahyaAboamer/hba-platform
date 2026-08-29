@@ -65,12 +65,6 @@ UNREACHED_ON_PURPOSE = {
 #: fails both when something new becomes unreachable *and* when something here
 #: is finally built and should be struck off.
 NOT_BUILT_YET = {
-    # Cannot give a code to an affiliate who has none, or add a second. The
-    # application flow registers theirs; `recheck-code` only re-checks an
-    # unverified one that already exists.
-    ("POST", "/api/affiliates/{affiliate_id}/codes"),
-    # Cannot move a verified code to somebody else.
-    ("POST", "/api/affiliates/{affiliate_id}/replace-code"),
     # Cannot create an affiliate without an invitation - which is how a house
     # account has to be made (§8), and how a model with no email would be.
     ("POST", "/api/affiliates"),
