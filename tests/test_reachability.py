@@ -65,15 +65,15 @@ UNREACHED_ON_PURPOSE = {
 #: fails both when something new becomes unreachable *and* when something here
 #: is finally built and should be struck off.
 NOT_BUILT_YET = {
-    # Cannot create an affiliate without an invitation - which is how a house
-    # account has to be made (§8), and how a model with no email would be.
+    # Cannot create a *model* without an invitation - the case of a real
+    # person with no email at all, who has nobody to send a link to.
     #
-    # **The only one of the seven that is not a missing screen.** A profile
-    # hangs off a `user_account` and the column is not nullable, deliberately
-    # (ADR 0006): identity lives in one place. Exactly two things in the
-    # platform create an account - bootstrapping the first admin, and somebody
-    # accepting an invitation - and a house code is not a person to invite. So
-    # this needs a decision about what HBA10 *is* before it needs an interface.
+    # The other half of this gap - a house account, which is not a person and
+    # never had an invitation to begin with - is solved: `create_house_account`
+    # gives it a `user_account` it can never sign into, exposed at
+    # `POST /api/affiliates/house`. What is left is narrower than it looked:
+    # not "affiliates without invitations" in general, just a model who
+    # genuinely cannot receive one.
     ("POST", "/api/affiliates"),
 }
 

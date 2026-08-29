@@ -14,6 +14,7 @@ from app.models.identity import UserAccount
 from app.services.affiliates import (
     archive_affiliate,
     create_affiliate,
+    create_house_account,
     get_affiliate,
     list_affiliates,
     set_status,
@@ -90,9 +91,10 @@ def test_the_phone_number_is_optional(db):
 
 
 def test_a_house_account_is_marked_as_such(db):
-    """HBA10 is a real code used by real customers. It needs a working
-    dashboard for verification and must never appear in payable totals or
-    rankings - so it is a kind of account, not a kind of code.
+    """HBA10 is a real code used by real customers, and its orders are
+    attributed and Shopify-verified exactly like a model's - but it must
+    never appear in payable totals or rankings, so it is a kind of account,
+    not a kind of code.
     """
     house = create_affiliate(
         db,
@@ -110,6 +112,85 @@ def test_a_model_account_is_payable(db):
     affiliate = create_affiliate(db, user_account_id=_account(db).id, name="Nour")
     db.flush()
     assert affiliate.is_payable is True
+
+
+# ── Bringing a house account into existence ─────────────────────────────────────
+#
+# Every affiliate hangs off a user_account and that column is not nullable
+# (ADR 0006) - identity lives in one place, not in a special-cased second
+# shape for the one row that is not a person. So a house account gets a real
+# account too. What makes it a house account rather than a model is that the
+# account can never be signed into.
+
+
+def test_a_house_account_gets_its_own_user_account(db):
+    house = create_house_account(db, name="HBA10")
+    db.flush()
+
+    assert house.account_kind == AccountKind.HOUSE
+    assert house.is_payable is False
+    assert house.status == AffiliateStatus.PENDING, (
+        "exactly like create_affiliate - registering and verifying the code, "
+        "and approving once verified, are the caller's next acts"
+    )
+
+    account = db.get(UserAccount, house.user_account_id)
+    assert account is not None
+    assert account.display_name == "HBA10"
+
+
+def test_a_house_account_can_never_sign_in(db):
+    """The one guarantee this whole feature rests on."""
+    house = create_house_account(db, name="HBA10")
+    db.flush()
+
+    account = db.get(UserAccount, house.user_account_id)
+    assert account.status == "suspended", (
+        "the same status a real person's account is put into to lock them "
+        "out - here it starts there and never leaves"
+    )
+
+    # Belt and braces: even a leaked hash proves nothing, because nobody -
+    # not the maintainer, not whoever wrote this test - knows the password it
+    # is a hash of.
+    from app.core.passwords import verify_password
+
+    assert verify_password("", account.password_hash) is False
+    assert verify_password("password", account.password_hash) is False
+    assert verify_password("HBA10", account.password_hash) is False
+
+
+def test_two_house_accounts_do_not_collide_on_email(db):
+    first = create_house_account(db, name="HBA10")
+    db.flush()
+    second = create_house_account(db, name="HBA Referral")
+    db.flush()
+
+    first_account = db.get(UserAccount, first.user_account_id)
+    second_account = db.get(UserAccount, second.user_account_id)
+    assert first_account.email != second_account.email
+
+
+def test_the_same_house_account_name_is_refused(db):
+    create_house_account(db, name="HBA10")
+    db.flush()
+
+    with pytest.raises(IntegrityError):
+        create_house_account(db, name="HBA10")
+        db.flush()
+
+
+def test_creating_a_house_account_is_recorded(db):
+    house = create_house_account(db, name="HBA10", actor_email="admin@hba.example")
+    db.flush()
+
+    row = db.execute(
+        text("select action, actor_email from audit_event where subject = :s"),
+        {"s": f"affiliate:{house.id}"},
+    ).fetchone()
+    assert row is not None
+    assert row.action == "affiliate.created"
+    assert row.actor_email == "admin@hba.example"
 
 
 # ── The vocabulary is fixed ────────────────────────────────────────────────────

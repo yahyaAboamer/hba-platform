@@ -133,6 +133,7 @@ def _register(client, name="Nour", email="nour@example.com", **overrides) -> dic
 ENDPOINTS = [
     ("GET", "/api/affiliates", None),
     ("POST", "/api/affiliates", {"user_account_id": 1, "name": "X"}),
+    ("POST", "/api/affiliates/house", {"name": "HBA10", "code": "HBA10"}),
 ]
 
 
@@ -171,6 +172,9 @@ def test_an_affiliate_cannot_create_or_change_anything(client):
     assert client.post(
         "/api/affiliates", json={"user_account_id": 1, "name": "X"}
     ).status_code == 403
+    assert client.post(
+        "/api/affiliates/house", json={"name": "HBA10", "code": "HBA10"}
+    ).status_code == 403
     assert client.patch("/api/affiliates/1", json={"status": "active"}).status_code == 403
     assert client.post(
         "/api/affiliates/1/codes",
@@ -205,6 +209,83 @@ def test_a_house_account_is_created_as_such(client):
     body = _register(client, name="House", email="house@example.com", account_kind="house")
     assert body["account_kind"] == "house"
     assert body["is_payable"] is False
+
+
+# ── House accounts, made without an invitation ──────────────────────────────────
+#
+# The one kind of affiliate `POST /api/affiliates` cannot make on its own -
+# there is nobody to invite, so nothing ever produces the `user_account_id` it
+# requires. `POST /api/affiliates/house` brings the account into existence
+# itself, then does what a model's onboarding does as three separate acts -
+# register the code, verify it, approve if verified - in one.
+
+
+def test_creating_a_house_account_registers_and_verifies_the_code(client, _shopify):
+    from datetime import datetime, timezone
+
+    _shopify_says(_shopify, created_at=datetime(2025, 1, 1, tzinfo=timezone.utc))
+
+    response = client.post(
+        "/api/affiliates/house", json={"name": "HBA10", "code": "hba10"}
+    )
+
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["account_kind"] == "house"
+    assert body["is_payable"] is False
+    assert body["status"] == "active", "a verified code is the only gate - no compensation to wait on"
+    assert body["codes"][0]["code"] == "HBA10"
+    assert body["codes"][0]["verified"] is True
+
+
+def test_a_house_account_with_an_unconfirmed_code_stays_pending(client, _shopify):
+    """Exactly the model path: an unverified code is still recorded, and
+    §10.4's gate refuses to approve on the strength of it.
+    """
+    _shopify_says(_shopify, exists=False)
+
+    response = client.post(
+        "/api/affiliates/house", json={"name": "HBA10", "code": "HBA10"}
+    )
+
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["status"] == "pending"
+    assert body["codes"][0]["verified"] is False
+
+
+def test_a_house_account_needs_no_compensation_to_be_approved(client, _shopify):
+    """The claim the whole feature rests on: a house account is never paid,
+    so nothing here should ever ask for a rate.
+    """
+    response = client.post(
+        "/api/affiliates/house", json={"name": "HBA10", "code": "HBA10"}
+    )
+    assert response.json()["status"] == "active"
+    assert response.json()["compensation"] is None
+
+
+def test_two_house_accounts_cannot_share_a_name(client):
+    first = client.post(
+        "/api/affiliates/house", json={"name": "HBA10", "code": "HBA10"}
+    )
+    assert first.status_code == 201
+
+    second = client.post(
+        "/api/affiliates/house", json={"name": "HBA10", "code": "OTHERCODE"}
+    )
+    assert second.status_code == 409
+
+
+def test_a_house_account_cannot_claim_a_code_already_owned(client):
+    """The same overlap rule a model's code registration is refused by."""
+    _register(client)  # Nour, holding nothing yet
+    client.post("/api/affiliates/house", json={"name": "HBA10", "code": "SHARED10"})
+
+    second = client.post(
+        "/api/affiliates/house", json={"name": "HBA Extra", "code": "SHARED10"}
+    )
+    assert second.status_code == 409
 
 
 def test_an_unknown_account_kind_is_refused(client):
