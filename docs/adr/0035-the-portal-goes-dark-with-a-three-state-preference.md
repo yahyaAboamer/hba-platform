@@ -9,7 +9,7 @@ The portal's light palette was settled in ADR 0027 and re-voiced in warm tones
 when the portal got its own surface (portal.css): paper rather than screen-white,
 cool neutrals deliberately kept for the maintainer's month-end tool. Models who
 use the portal after dark asked for the same care in a dark theme: the business
-relayted that a bright white screen at night is the one part of the job nobody
+related that a bright white screen at night is the one part of the job nobody
 misses by doing it tomorrow.
 
 The admin side has no such request on the table. Its dense tables were designed
