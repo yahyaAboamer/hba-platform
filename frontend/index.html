@@ -5,6 +5,31 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="robots" content="noindex, nofollow" />
     <title>HBA Platform</title>
+    <script>
+      /*
+       * Theme before first paint, so the dark portal never flashes light.
+       * This must stay identical to resolveTheme in src/lib/theme.ts (the
+       * source of truth): the stored preference decides, Auto defers to the
+       * device. It only sets the attribute — native controls follow per
+       * surface, by CSS, so the maintainer's screens keep light controls.
+       */
+      (function () {
+        try {
+          var stored = localStorage.getItem("hba-theme");
+          var preference =
+            stored === "light" || stored === "dark" || stored === "auto"
+              ? stored
+              : "auto";
+          var dark =
+            preference === "dark" ||
+            (preference === "auto" &&
+              window.matchMedia("(prefers-color-scheme: dark)").matches);
+          document.documentElement.dataset.theme = dark ? "dark" : "light";
+        } catch (error) {
+          document.documentElement.dataset.theme = "light";
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
