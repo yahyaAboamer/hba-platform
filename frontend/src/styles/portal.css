@@ -247,3 +247,92 @@
   text-decoration: line-through;
   opacity: 0.55;
 }
+
+/* ── Dark: warm lamplight ────────────────────────────────────────────────
+ *
+ * The same portal after sunset. Everything above this line is the light
+ * theme and none of it changed; every rule here lives under
+ * `[data-theme="dark"]`, which the script in index.html sets on <html>
+ * before the bundle loads. ADR 0035.
+ *
+ * Scoping. The portal's surface is `.affiliate` — head, month bar, tab bar
+ * and body all sit inside that <main>. Two model-facing pages sit outside
+ * it: the application form (`.apply`) and the invitation (`.accept-invite`).
+ * Those three roots are the whole list. The maintainer's screens match none
+ * of them, and no light value is redefined anywhere — the shared primitives
+ * in base.css read these variables and follow along on their own.
+ *
+ * What the palette keeps: no shadows (borders carry structure), the 14px
+ * radius, mono for agreed money, and colour spent on money state and nothing
+ * else. Each money colour was re-checked against the dark card it lands on,
+ * not carried over from the light theme.
+ */
+
+[data-theme="dark"] .affiliate,
+[data-theme="dark"] .apply,
+[data-theme="dark"] .accept-invite {
+  /* Surfaces: lamplight on dark wood, not grey-on-black. */
+  --paper: #16120e;
+  --surface: #201a14;
+  --ink: #f0e9df;
+  --quiet: #b0a494;
+  --rule: #2e271f;
+  --rule-strong: #413930;
+  --hover: #262017;
+
+  /* Money state. Same three meanings, tuned to the dark surface:
+     owed is lamplight amber, settled a cool leaf green, refused a warm red. */
+  --owed: #e8a23d;
+  --settled: #46c07e;
+  --refused: #ef6f63;
+  --owed-quiet: rgba(232, 162, 61, 0.14);
+  --settled-quiet: rgba(70, 192, 126, 0.14);
+  --refused-quiet: rgba(239, 111, 99, 0.14);
+
+  /* Focus keeps its one job and its hue: a lighter step of the same indigo,
+     because the light theme's ring vanishes against the dark page. */
+  --focus: #9fa2ff;
+
+  /* Native controls (inputs, selects, scrollbars) inside the model's surfaces
+     follow the theme. Deliberately scoped here, not set on <html>: the
+     maintainer's screens keep light controls even while a model's pages are
+     dark. */
+  color-scheme: dark;
+
+  /* The application form and the invitation paint their own ground. In the
+     light theme the body's paper shows through and did the job; in the dark
+     it would stay light. Setting it here changes nothing in the light theme. */
+  background: var(--paper);
+  color: var(--ink);
+}
+
+/* The primary button inverts in the dark (light fill, dark text), so base.css's
+   black hover would put dark text on black. One step brighter instead — scoped
+   to the same three roots as the palette above. */
+[data-theme="dark"] .affiliate .button--primary:hover:not(:disabled),
+[data-theme="dark"] .apply .button--primary:hover:not(:disabled),
+[data-theme="dark"] .accept-invite .button--primary:hover:not(:disabled) {
+  background: #fdfaf5;
+  border-color: #fdfaf5;
+  color: #16120e;
+}
+
+/* Light images keep a light ground. The InstaPay guide is a screenshot of the
+   InstaPay app — white by nature — and a payment proof is a phone screenshot.
+   Recolouring either would lie about what they show; a light frame on the dark
+   card is how a photograph is mounted, not how the interface is painted. */
+[data-theme="dark"] .affiliate .settle__proof {
+  background: #f5f1eb;
+}
+[data-theme="dark"] .apply .apply__guide,
+[data-theme="dark"] .affiliate .apply__guide {
+  /* Re-declare the light tokens for the figure and everything inside it, so
+     its steps text reads as it does in daylight. */
+  --paper: #fbf8f4;
+  --surface: #ffffff;
+  --ink: #1a1714;
+  --quiet: #6b635b;
+  --rule: #eae3da;
+  --rule-strong: #d8cec1;
+  --hover: #f5f1eb;
+}
