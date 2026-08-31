@@ -336,3 +336,62 @@
   --rule-strong: #d8cec1;
   --hover: #f5f1eb;
 }
+
+/* ── The theme pick ───────────────────────────────────────────────────────
+ *
+ * On MyDetails, because appearance is the model's own business and that is
+ * where their own things live. Token-driven only, so both palettes above
+ * dress it correctly with no rules of its own for dark.
+ */
+.theme-pick {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--rule);
+}
+
+.theme-pick__title {
+  margin-bottom: var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.theme-pick__row {
+  display: inline-flex;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.theme-pick__option {
+  padding: var(--space-2) var(--space-4);
+  border: none;
+  border-right: 1px solid var(--rule-strong);
+  background: var(--surface);
+  color: var(--quiet);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.theme-pick__option:last-child {
+  border-right: none;
+}
+
+.theme-pick__option:hover:not([aria-pressed="true"]) {
+  background: var(--hover);
+  color: var(--ink);
+}
+
+/* The chosen state inverts, exactly as the primary button does: in the dark
+   the segment fills light with dark text, in daylight dark with light text. */
+.theme-pick__option[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--paper);
+  cursor: default;
+}
+
+.theme-pick__hint {
+  margin-top: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}
