@@ -61,16 +61,6 @@
 /* A column header that is also a link to what the word means. Reads as a
    plain header until hovered, not as a stray blue link sitting in a table
    full of figures. */
-.payroll__glossary-link {
-  color: inherit;
-  text-decoration: none;
-}
-
-.payroll__glossary-link:hover {
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-
 .payroll__name {
   color: var(--ink);
   text-decoration: none;

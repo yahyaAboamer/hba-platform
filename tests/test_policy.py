@@ -65,6 +65,40 @@ def test_the_database_backs_the_refusal_too(db):
         db.flush()
 
 
+def test_a_version_cannot_be_rewritten(db):
+    """The text is what a model was told the rules were. Changing it in place
+    would change what an already-approved month claims it was calculated
+    under, and leave nothing behind saying so.
+
+    `payroll_snapshot.policy_version_id` is `ondelete RESTRICT`, which stops a
+    version some month depends on being deleted - but RESTRICT says nothing
+    about the words. The guard does (b7c4e1a92f30).
+    """
+    version = _version(db, text_="the original wording")
+    db.flush()
+
+    with pytest.raises(IntegrityError) as refused:
+        db.execute(
+            text("update policy_version set summary_markdown = :t where id = :i"),
+            {"t": "quietly different", "i": version.id},
+        )
+    assert "append-only" in str(refused.value)
+
+
+def test_a_version_cannot_be_deleted(db):
+    """A rule change is a new row with a later effective_month. Nothing is ever
+    withdrawn, including a version no month happens to point at yet.
+    """
+    version = _version(db)
+    db.flush()
+
+    with pytest.raises(IntegrityError) as refused:
+        db.execute(
+            text("delete from policy_version where id = :i"), {"i": version.id}
+        )
+    assert "append-only" in str(refused.value)
+
+
 def test_creating_a_version_is_recorded(db):
     version = _version(db, text_="x", month="2026-09")
     db.flush()

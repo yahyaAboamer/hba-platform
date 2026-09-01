@@ -2391,6 +2391,48 @@ proven, would make that discipline hollow. `grep -rn "not_started.*True"
 tests/` found no sibling instances; nothing else in the suite shares this
 shape today, but nothing stops a new one being written the same way.
 
+## `railway service delete --environment` does not scope to that environment
+
+**Symptom.** None yet, and that is the point - this was caught before running
+it, not after. The command reads as safe and is not.
+
+**What the CLI says.** `railway service delete --help`: *"Delete a service
+from an environment"*, with `--environment` documented as *"Environment to
+delete the service from."* Its own example passes `--environment production`.
+Read plainly, that is a scoped, per-environment delete.
+
+**What the API says.** Introspecting the underlying `serviceDelete` mutation
+(`railway api describe serviceDelete`) gives the real rule on `environmentId`:
+
+> *"If the environment is a forked environment, the service will only be
+> deleted in the specified environment, otherwise it will deleted in all
+> environments that are not forks of other environments"*
+
+So the selector only scopes anything when the target is a **fork**. Ours are
+not - `environments { sourceEnvironment }` returns `null` for both `staging`
+and `production`. Deleting `hba-platform` "from staging" would therefore have
+deleted it from production too: the service, its variables, and
+`hba-platform-production.up.railway.app`, which Railway cannot reattach to a
+different service, only regenerate under a new name.
+
+**There is also no way to do the thing the flag implies.** No
+`serviceInstanceRemove` mutation exists. A service is present in every
+non-fork environment or in none. Removing one from a single environment is
+not a supported operation, so the answer is to neutralise it - auto-deploy
+off for that environment (`serviceInstanceAutoDeployUpdate` takes a
+*required* `environmentId` and is genuinely per-instance), domain deleted,
+deployment brought down.
+
+**Worth recording** because of the pattern, which is now three-for-three in
+this project: `railway environment edit --service-config source.branch`
+silently did nothing, `connect-service-source` claimed to be per-environment
+and was global, and this one describes a scoped delete it does not perform.
+Railway's CLI surface and Railway's actual behaviour are different things
+here. Introspect the mutation (`railway api describe <name>`) before trusting
+a destructive command's help text, and prefer testing on something cheap
+first - which is possible for most operations, and is exactly not possible
+for a delete.
+
 ## Business rules with deliberate exposure
 
 These are not bugs. They are accepted costs, recorded so nobody "fixes" them.

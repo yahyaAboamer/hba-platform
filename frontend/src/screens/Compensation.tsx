@@ -397,7 +397,16 @@ export function Compensation() {
                   </Row>
                 )}
                 {kind === "base_guarantee" && basePiastres !== null && (
-                  <Row label="Guaranteed minimum">
+                  <Row
+                    label={
+                      <Link
+                        to="/glossary#guaranteed-minimum"
+                        className="glossary-link"
+                      >
+                        Guaranteed minimum
+                      </Link>
+                    }
+                  >
                     <Money piastres={basePiastres} kind="agreed" />
                   </Row>
                 )}
@@ -485,7 +494,15 @@ function exampleOn(
   return commission;
 }
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
+/** `label` takes a node, not a string, so a term that has a glossary entry can
+ *  link to it from the label itself rather than growing a second column. */
+function Row({
+  label,
+  children,
+}: {
+  label: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
     <div className="detail__row">
       <dt className="detail__label">{label}</dt>
