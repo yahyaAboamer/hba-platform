@@ -2423,6 +2423,16 @@ off for that environment (`serviceInstanceAutoDeployUpdate` takes a
 *required* `environmentId` and is genuinely per-instance), domain deleted,
 deployment brought down.
 
+**One surprise in the fix, worth knowing before it reads as damage.** Turning
+auto-deploy off also **clears that instance's `branch`**. `get-service-config`
+for the switched-off instance now returns `source: {repo}` with no branch at
+all, where it previously said `branch: "production"`. That is the desired end
+state - the instance tracks nothing and cannot be triggered - but a service
+showing no branch looks broken if you do not know why. Production's own
+config was re-checked immediately after and still reads
+`branch: "production"` with its domain `ACTIVE`, so unlike
+`connect-service-source`, this mutation really is per-environment.
+
 **Worth recording** because of the pattern, which is now three-for-three in
 this project: `railway environment edit --service-config source.branch`
 silently did nothing, `connect-service-source` claimed to be per-environment

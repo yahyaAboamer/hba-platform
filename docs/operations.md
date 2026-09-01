@@ -313,6 +313,53 @@ it, do not link the old hostname.
 > in **every** non-fork environment - production included, along with its
 > public domain, which cannot be reattached. See `docs/limits.md`.
 
+## Where the credentials live, and how to change one
+
+Railway variables are per **service** *and* per **environment**, so "the
+Brevo key" is two different values in two different places. There is one
+place to edit each, and it is not always the service you would guess.
+
+| To change it for | Edit on service | In environment |
+|---|---|---|
+| Production | `hba-platform` | `production` |
+| Staging | `hba-platform` | `staging` |
+
+**Staging is edited on the old service, not the new one.** Every variable on
+`hba-platform-staging` is a Railway *reference* — `${{hba-platform.BREVO_API_KEY}}`
+— never a typed value (ADR 0034). A reference resolves within its own
+environment, so `hba-platform-staging` reads whatever `hba-platform` holds in
+the `staging` environment. That instance is switched off, but its variables
+are configuration and still resolve; **do not delete them**, or staging loses
+its settings. Confirm before editing: a referenced variable displays as
+`${{…}}` in the dashboard rather than a value.
+
+The upside is that a rotated credential only has to be typed once per
+environment — the new service picks it up with nothing to keep in sync.
+
+**Rotating anything is two steps, in this order:** change it at the provider
+first, then paste the new value into Railway. Doing it the other way round
+means a window where the platform holds a key the provider has already
+stopped accepting. Railway redeploys the service on a variable change, so
+expect a brief restart.
+
+### Which of these the platform actually uses
+
+- **`BREVO_API_KEY`** — how mail is genuinely sent. `transport()` in
+  `app/services/mail.py` picks an HTTP provider whenever one is configured.
+- **`SMTP_PASSWORD`, `SMTP_USERNAME`, `SMTP_HOST`** — **not used while a
+  Brevo key is set.** SMTP is the last resort in `transport()`, and Railway
+  blocks the ports anyway, so it is a guaranteed silent failure rather than a
+  fallback. These are leftovers; the credential still exists at the provider
+  until it is revoked there.
+- **`SHOPIFY_CLIENT_SECRET`** — the Dev Dashboard app's secret, used to
+  authenticate outbound calls (`app/services/shopify/sync.py`).
+- **`SHOPIFY_WEBHOOK_SECRET`** — verifies inbound deliveries. A wrong value
+  does not disable anything visibly: `webhooks_configured` in
+  `/api/health/ready` only reports that the string is non-empty. A mismatch
+  shows up as **401** on `POST /api/webhooks/shopify` and an
+  `integration.webhook_rejected` anomaly, while a working one returns **200**.
+  After rotating it, check the logs for 401s before assuming it took.
+
 ## Backups
 
 A `db-backup-<environment>` service in each environment dumps its own
