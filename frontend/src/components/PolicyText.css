@@ -1,0 +1,27 @@
+/* Plain-language policy text, read on both the maintainer and model sides.
+   Deliberately quiet - this is reference material somebody consults, not the
+   main content of the screen it appears on. */
+
+.policy-text {
+  max-width: 60ch;
+}
+
+.policy-text p {
+  margin: 0 0 var(--space-3);
+  line-height: 1.6;
+  color: var(--ink);
+}
+
+.policy-text p:last-child {
+  margin-bottom: 0;
+}
+
+.policy-text h3 {
+  margin: var(--space-4) 0 var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.policy-text h3:first-child {
+  margin-top: 0;
+}

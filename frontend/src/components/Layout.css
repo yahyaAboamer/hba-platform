@@ -93,6 +93,7 @@
   white-space: nowrap;
 }
 
+.layout__glossary,
 .layout__sign-out {
   padding: 0;
   border: none;
@@ -104,6 +105,7 @@
   cursor: pointer;
 }
 
+.layout__glossary:hover,
 .layout__sign-out:hover {
   color: var(--ink);
 }

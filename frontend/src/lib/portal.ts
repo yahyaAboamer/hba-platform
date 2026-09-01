@@ -114,6 +114,12 @@ export type MyEarnings = {
   /** Translated, and carrying whose move it is. Today always HBA's. */
   waiting_on: { who: string; text: string }[];
   note: string | null;
+  /**
+   * §16, Phase 10 Batch C. Which rules this month was actually calculated
+   * under - frozen at approval, never the current ones. `null` on a month
+   * that is not agreed yet, or one approved before any policy existed.
+   */
+  policy_version: { id: number; effective_month: string } | null;
   orders_detail: MyOrder[];
 };
 

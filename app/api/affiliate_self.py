@@ -27,6 +27,7 @@ from app.services.payouts import (
     mask_destination,
     set_destination,
 )
+from app.services.policy import get_policy_version
 from app.services.portal import (
     months_for,
     my_month,
@@ -283,3 +284,26 @@ def my_year_view(
     be a second answer waiting to disagree with the first.
     """
     return my_year(db, affiliate)
+
+
+@router.get("/policy/{policy_version_id}")
+def my_policy_version(
+    policy_version_id: int,
+    _affiliate: AffiliateProfile = Depends(current_affiliate),
+    db: Session = Depends(get_session),
+) -> dict:
+    """The rules a settled month names, in full.
+
+    Not ownership-scoped like everything else here - a policy version is a
+    platform-wide fact, the same text whoever reads it, not a record that
+    belongs to one affiliate. `current_affiliate` still gates it: signed in
+    as a model is what this route requires, not signed in as this model.
+    """
+    version = get_policy_version(db, policy_version_id)
+    if version is None:
+        raise HTTPException(404, "No such policy version")
+    return {
+        "id": version.id,
+        "effective_month": version.effective_month,
+        "summary_markdown": version.summary_markdown,
+    }

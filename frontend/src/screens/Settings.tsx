@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 
+import { MonthPicker } from "../components/MonthPicker";
+import { PolicyText } from "../components/PolicyText";
 import { api, can } from "../lib/api";
 import type { Session } from "../lib/api";
-import { formatMonth } from "../lib/money";
+import { currentMonth, formatMonth } from "../lib/money";
 import { DataPanel } from "./DataPanel";
 import "./Settings.css";
 
@@ -80,6 +82,7 @@ export function Settings({ session }: { session: Session }) {
         <PlatformPanel session={session} />
         {can(session, "invitations.send") && <InvitePanel />}
         {can(session, "settings.manage") && <RosterPanel />}
+        {can(session, "settings.manage") && <PolicyPanel />}
         {can(session, "settings.manage") && <DataPanel />}
         {can(session, "audit.view") && <ActivityPanel />}
       </div>
@@ -458,6 +461,165 @@ function RosterPanel() {
             </tbody>
           </table>
         </>
+      )}
+    </section>
+  );
+}
+
+type PolicyVersionRow = {
+  id: number;
+  effective_month: string;
+  summary_markdown: string;
+  created_at: string;
+};
+
+/**
+ * §16, Phase 10 Batch C. The commission rules, in the words a model reads -
+ * not the ADRs, which stay the engineering record for nobody but whoever
+ * reads code.
+ *
+ * **A new version, never an edit.** A rate reworded next year is a fact about
+ * the future, not a rewrite of what a model already agreed to in September -
+ * every payroll snapshot freezes which version it was calculated under, and
+ * that has to stay true regardless of what this form does later.
+ */
+function PolicyPanel() {
+  const [versions, setVersions] = useState<PolicyVersionRow[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [effectiveMonth, setEffectiveMonth] = useState(currentMonth());
+  const [text, setText] = useState("");
+  const [working, setWorking] = useState(false);
+
+  function load() {
+    api
+      .get<{ versions: PolicyVersionRow[] }>("/api/policy/versions")
+      .then((body) => setVersions(body.versions))
+      .catch((caught) => setError(caught.message));
+  }
+
+  useEffect(load, []);
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    setWorking(true);
+    setError(null);
+    try {
+      await api.post("/api/policy/versions", {
+        effective_month: effectiveMonth,
+        summary_markdown: text,
+      });
+      setText("");
+      setAdding(false);
+      load();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not save that.");
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  const newest = versions && versions.length > 0 ? versions[versions.length - 1] : null;
+
+  return (
+    <section className="panel settings__panel">
+      <div className="panel__head">
+        <h2 className="panel__title">Policy versions</h2>
+      </div>
+
+      {error && (
+        <p className="notice notice--refused" role="alert">
+          {error}
+        </p>
+      )}
+
+      <p className="settings__note">
+        What a model reads, not the engineering record. A new version applies
+        from its effective month onward - it never changes what an already
+        agreed month was told.
+      </p>
+
+      {versions === null ? (
+        <p className="empty">Loading…</p>
+      ) : versions.length === 0 ? (
+        <p className="empty">
+          None recorded yet. Every settled month simply shows no rules were in
+          force - add the first version below.
+        </p>
+      ) : (
+        <ul className="settings__policy-list">
+          {versions.map((version) => (
+            <li key={version.id} className="settings__policy-item">
+              <div className="settings__policy-head">
+                <strong>Effective {formatMonth(version.effective_month)}</strong>
+                {version.id === newest?.id && (
+                  <span className="detail__note">current</span>
+                )}
+              </div>
+              <PolicyText markdown={version.summary_markdown} />
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {!adding ? (
+        <button
+          type="button"
+          className="button"
+          onClick={() => {
+            setAdding(true);
+            setEffectiveMonth(currentMonth());
+          }}
+        >
+          Add a version
+        </button>
+      ) : (
+        <form onSubmit={submit} className="comp__form">
+          <label className="field comp__field">
+            <span className="field__label">Effective from</span>
+            <MonthPicker value={effectiveMonth} onChange={setEffectiveMonth} />
+            <span className="field__hint">
+              {newest
+                ? `Must be later than ${formatMonth(newest.effective_month)}, the current version.`
+                : "Every month from here onward reads this version."}
+            </span>
+          </label>
+          <label className="field">
+            <span className="field__label">The text</span>
+            <textarea
+              className="input reopen__textarea"
+              rows={10}
+              required
+              value={text}
+              onChange={(event) => setText(event.target.value)}
+              placeholder="## How commission works&#10;&#10;Commission is worked out on..."
+            />
+            <span className="field__hint">
+              Plain language, not the ADRs. `## ` starts a heading, `**text**`
+              is bold - nothing else is read specially.
+            </span>
+          </label>
+          <div className="payroll__actions">
+            <button
+              type="button"
+              className="button"
+              onClick={() => {
+                setAdding(false);
+                setError(null);
+              }}
+              disabled={working}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="button button--primary"
+              disabled={working || !text.trim()}
+            >
+              {working ? "Saving…" : "Save this version"}
+            </button>
+          </div>
+        </form>
       )}
     </section>
   );

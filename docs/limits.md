@@ -2365,6 +2365,32 @@ pretending it did not happen.
 
 ---
 
+## A test that passed by outliving its own assumption
+
+**Symptom.** `test_a_month_that_has_not_started_says_so` failed on 2026-09-01,
+mid-session, having passed on every run before it - nothing in the code it
+tests had changed.
+
+**Cause.** The test asserted `"2026-09" has not started` and took a
+`monkeypatch` fixture it never called. `_not_started` compares a month against
+`business_month(utcnow())` - the real clock, correctly, because a model's
+month must never depend on their browser's timezone (ADR 0005). The test
+relied on that same real clock landing on a date before September, which was
+true for every day this project had existed until the day it was not. A test
+that reads as pinned - it takes a fixture named for exactly this - and is not,
+is worse than one that visibly depends on the date: it looks safe.
+
+**Fixed** by actually using the fixture: `monkeypatch.setattr(portal,
+"utcnow", lambda: datetime(2026, 8, 15, ...))`, so the test's premise is true
+by construction and stays true regardless of which day it runs.
+
+**Worth recording** as a check on this file's own trustworthiness. This project
+places real weight on "log the symptom, not just the fix" - and a test suite
+that goes green because a bug's window closed, not because anything was
+proven, would make that discipline hollow. `grep -rn "not_started.*True"
+tests/` found no sibling instances; nothing else in the suite shares this
+shape today, but nothing stops a new one being written the same way.
+
 ## Business rules with deliberate exposure
 
 These are not bugs. They are accepted costs, recorded so nobody "fixes" them.

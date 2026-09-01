@@ -555,6 +555,18 @@ def my_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
                 if key not in NOT_HER_PROBLEM and key in WAITING_ON
             ]
         ),
+        # §16, Phase 10 Batch C. Frozen on the snapshot at approval, so this
+        # names the rules this month was actually calculated under - never
+        # the current ones, which may have changed since. `None` for an open
+        # month: nothing has been frozen yet to name.
+        "policy_version": (
+            {
+                "id": snapshot.policy_version_id,
+                "effective_month": snapshot.policy_version.effective_month,
+            }
+            if agreed and snapshot.policy_version_id is not None
+            else None
+        ),
         "note": None,
     }
 

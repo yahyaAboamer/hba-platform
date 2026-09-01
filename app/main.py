@@ -26,6 +26,7 @@ from app.api import (
     orders,
     payments,
     payroll,
+    policy,
     staff,
     targets,
     webhooks,
@@ -126,6 +127,7 @@ app.include_router(staff.router)
 app.include_router(audit.router)
 app.include_router(payroll.router)
 app.include_router(payments.router)
+app.include_router(policy.router)
 
 
 if (WEB_DIR / "index.html").exists():

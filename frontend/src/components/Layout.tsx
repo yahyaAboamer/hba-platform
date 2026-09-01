@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { Link, NavLink, Outlet } from "react-router-dom";
 
 import { signOutAndLeave } from "../lib/api";
 import type { Session } from "../lib/api";
@@ -52,6 +52,15 @@ export function Layout({ session }: { session: Session }) {
           <span className="layout__email" title={session.actor.email}>
             {session.actor.display_name || session.actor.email}
           </span>
+          {/*
+           * Reference material, not a workflow step - deliberately not one of
+           * the seven sections above it. What "void" or "carried forward"
+           * mean is reached from here or from a term wherever it already
+           * appears, never a destination somebody scans past every month.
+           */}
+          <Link to="/glossary" className="layout__glossary">
+            What these words mean
+          </Link>
           <button type="button" className="layout__sign-out" onClick={signOutAndLeave}>
             Sign out
           </button>
