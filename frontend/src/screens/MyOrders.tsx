@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 
 import { usePortal } from "../components/AffiliateLayout";
 import { Money } from "../components/Money";
@@ -100,7 +101,8 @@ export function MyOrders() {
                 <div className="expl__body">
                   It had not reached the customer when this month closed, so it
                   was paid with the next one — still at the rate you were on
-                  when you sold it, not the later month&rsquo;s.
+                  when you sold it, not the later month&rsquo;s. This is called{" "}
+                  <Link to="/glossary#carried-forward">carried forward</Link>.
                 </div>
               </details>
             </p>

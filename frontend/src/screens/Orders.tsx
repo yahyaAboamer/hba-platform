@@ -321,7 +321,11 @@ function OrderHead() {
       <th>Commission</th>
       <th className="orders__amount">Sales</th>
       <th className="orders__amount">Base</th>
-      <th>Paid by</th>
+      <th>
+        <Link to="/glossary#carried-forward" className="glossary-link">
+          Paid by
+        </Link>
+      </th>
     </tr>
   );
 }

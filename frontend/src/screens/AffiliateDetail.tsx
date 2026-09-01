@@ -293,9 +293,29 @@ export function AffiliateDetail({ session }: { session: Session }) {
               <div>
                 <strong>Set the targets</strong>
                 <span className="detail__note">
-                  {detail.compensation?.compensation_type === "base_guarantee"
-                    ? "The guaranteed minimum applies only in a month where these are met and confirmed."
-                    : "Recorded only. Targets change pay on a guaranteed minimum."}
+                  {detail.compensation?.compensation_type === "base_guarantee" ? (
+                    <>
+                      The{" "}
+                      <Link
+                        to="/glossary#guaranteed-minimum"
+                        className="glossary-link"
+                      >
+                        guaranteed minimum
+                      </Link>{" "}
+                      applies only in a month where these are met and confirmed.
+                    </>
+                  ) : (
+                    <>
+                      Recorded only. Targets change pay on a{" "}
+                      <Link
+                        to="/glossary#guaranteed-minimum"
+                        className="glossary-link"
+                      >
+                        guaranteed minimum
+                      </Link>
+                      .
+                    </>
+                  )}
                 </span>
               </div>
               <Link className="button" to="/targets">

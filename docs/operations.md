@@ -275,7 +275,7 @@ volume and moves with no downtime at all.
 Nothing else needs touching: domains, private networking, environment
 variables and the Shopify webhook addresses are all unaffected.
 
-## Deploying — staging and production are split, temporarily
+## Deploying — staging and production are separate services
 
 Since 2026-08-30 (ADR 0034), **`main` deploys to staging only**, on a
 dedicated service, `hba-platform-staging`, at
@@ -294,16 +294,24 @@ git push origin production
 Railway redeploys `hba-platform` automatically from there. Nothing else
 needs touching - variables, region, Postgres are all exactly as they were.
 
-**`hba-platform-staging.up.railway.app` (no `-staging-staging`) is retired.**
-It still answers, because the shared service that used to serve it now
-serves `production` branch content there instead - do not link it or trust
-what it says about "staging."
+Note which way round this is, because it is the point: `main` is the default
+branch, so a pull request opened without thinking targets **staging**.
+Production takes a separate, deliberate act. Do not invert this.
 
-**This is temporary.** The plan is to collapse back to one shared service on
-`main` for both environments within days, once the pace of changes settles -
-at which point: delete `hba-platform-staging`, repoint `hba-platform`'s
-branch back to `main`, delete the `production` git branch. Ask before
-assuming this is still the setup if it has been longer than a few days.
+**`hba-platform-staging.up.railway.app` (no `-staging-staging`) is dead.**
+The original `hba-platform` service used to serve it and still has a service
+instance sitting in the `staging` environment, because Railway cannot remove
+a service from one environment - it exists in every non-fork environment or
+none. That instance is switched off rather than deleted: auto-deploy
+disabled for staging, domain removed, deployment taken down. Do not revive
+it, do not link the old hostname.
+
+> **Never run `railway service delete` against `hba-platform`.** Its help
+> text says "Delete a service from an environment." That is not what it does
+> here: an `environmentId` only scopes the delete if that environment is a
+> *fork*, and neither of ours is. Scoped to staging, it deletes the service
+> in **every** non-fork environment - production included, along with its
+> public domain, which cannot be reattached. See `docs/limits.md`.
 
 ## Backups
 

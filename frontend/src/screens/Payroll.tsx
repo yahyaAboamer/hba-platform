@@ -336,7 +336,7 @@ export function Payroll({ session }: { session: Session }) {
                 {data.is_historical ? "Net sales" : "Would be paid"}
               </th>
               <th>
-                <Link to="/glossary#carried-forward" className="payroll__glossary-link">
+                <Link to="/glossary#carried-forward" className="glossary-link">
                   Carried forward
                 </Link>
               </th>

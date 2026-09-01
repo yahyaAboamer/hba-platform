@@ -265,7 +265,11 @@ export function Targets({ session }: { session: Session }) {
                 <th className="targets__number" colSpan={2}>
                   Produced
                 </th>
-                <th>Outcome</th>
+                <th>
+                  <Link to="/glossary#verified" className="glossary-link">
+                    Outcome
+                  </Link>
+                </th>
                 <th>Waiting on</th>
               </tr>
               <tr className="targets__subhead">
