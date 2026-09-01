@@ -42,6 +42,7 @@ from app.models.attributed_orders import AttributedOrder
 from app.models.payroll import CalculationState, PayrollMonth, PayrollSnapshot
 from app.services.attribution import AttributionOutcome, resolve_order
 from app.services.audit import record_audit
+from app.services.policy import active_policy_for
 from app.services.commission.calculate import (
     MonthCalculation,
     calculate_month,
@@ -243,6 +244,11 @@ def approve_month(
     payload = _payload(calculation, orders, carried)
     previous = latest_version(db, payroll_month)
 
+    # §16, Phase 10 Batch C. Which plain-language rules this was calculated
+    # under - frozen here and never re-resolved, so a policy reworded next
+    # year cannot change what this snapshot already told somebody.
+    policy = active_policy_for(db, month)
+
     snapshot = PayrollSnapshot(
         payroll_month_id=payroll_month.id,
         version=previous + 1,
@@ -252,6 +258,7 @@ def approve_month(
         exact_unrounded_piastres=str(calculation.exact_unrounded_piastres),
         approved_by=actor_id,
         approved_at=utcnow(),
+        policy_version_id=policy.id if policy else None,
     )
     db.add(snapshot)
     db.flush()

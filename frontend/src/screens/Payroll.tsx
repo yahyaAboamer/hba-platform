@@ -335,7 +335,11 @@ export function Payroll({ session }: { session: Session }) {
               <th className="payroll__amount">
                 {data.is_historical ? "Net sales" : "Would be paid"}
               </th>
-              <th>Carried forward</th>
+              <th>
+                <Link to="/glossary#carried-forward" className="payroll__glossary-link">
+                  Carried forward
+                </Link>
+              </th>
               <th>Waiting on</th>
             </tr>
           </thead>

@@ -98,6 +98,19 @@ export function MyMonth() {
                 ? "This month is closed. The figure will not change again."
                 : "Orders are still arriving, so this will move. It becomes final when HBA closes the month."}
             </p>
+            {/*
+             * §16, Phase 10 Batch C. Named, not restated - the rules a month
+             * was calculated under can matter later even when they never
+             * change, and the day they do change this is the sentence that
+             * says a September figure still means what it meant in September.
+             */}
+            {body.policy_version && (
+              <p className="figure__note">
+                Calculated under the rules in force since{" "}
+                {formatMonth(body.policy_version.effective_month)}.{" "}
+                <Link to={`/policy/${body.policy_version.id}`}>Read them</Link>
+              </p>
+            )}
           </>
         )}
       </section>
@@ -124,7 +137,8 @@ export function MyMonth() {
        */}
       {body.guarantee && !body.guarantee.applied && (
         <p className="notice guarantee">
-          Your guaranteed minimum is{" "}
+          Your{" "}
+          <Link to="/glossary#guaranteed-minimum">guaranteed minimum</Link> is{" "}
           <Money piastres={body.guarantee.piastres} className="guarantee__amount" />.{" "}
           {describeGuarantee(body.guarantee)}
         </p>

@@ -1,16 +1,18 @@
 import { useCallback, useEffect, useState } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Link, Navigate, Route, Routes } from "react-router-dom";
 
 import { AffiliateLayout } from "../components/AffiliateLayout";
 import type { PortalContext } from "../components/AffiliateLayout";
 import { api, signOutAndLeave } from "../lib/api";
 import type { Session } from "../lib/api";
 import { Apply } from "./Apply";
+import { Glossary } from "./Glossary";
 import { MyDetails } from "./MyDetails";
 import type { Me } from "./MyDetails";
 import { MyMonth } from "./MyMonth";
 import { MyOrders } from "./MyOrders";
 import { MyPayments } from "./MyPayments";
+import { MyPolicy } from "./MyPolicy";
 import { MyYear } from "./MyYear";
 import "./Apply.css";
 import "./AffiliateHome.css";
@@ -108,6 +110,9 @@ export function AffiliatePortal({ session }: { session: Session }) {
           </span>
         ) : null}
       </div>
+      <Link to="/glossary" className="affiliate__sign-out">
+        What these words mean
+      </Link>
       <button
         type="button"
         className="affiliate__sign-out"
@@ -193,6 +198,8 @@ export function AffiliatePortal({ session }: { session: Session }) {
           <Route path="payments" element={<MyPayments />} />
           <Route path="year" element={<MyYear />} />
           <Route path="you" element={<MyDetails me={me} onChanged={load} />} />
+          <Route path="policy/:id" element={<MyPolicy />} />
+          <Route path="glossary" element={<Glossary />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

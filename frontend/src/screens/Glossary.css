@@ -1,0 +1,25 @@
+.glossary__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  margin: 0;
+  max-width: 60ch;
+}
+
+.glossary__entry dt {
+  font-weight: 600;
+  margin-bottom: var(--space-1);
+}
+
+.glossary__entry dd {
+  margin: 0;
+  line-height: 1.6;
+  color: var(--ink);
+}
+
+/* Scrolled to from a `#term` link elsewhere in the platform - the one word
+   that sent somebody here should not require reading past seven others to
+   find. */
+.glossary__entry--target dt {
+  color: var(--focus);
+}

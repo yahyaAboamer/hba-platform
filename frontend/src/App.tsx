@@ -12,6 +12,7 @@ import { AffiliatePayout } from "./screens/AffiliatePayout";
 import { Affiliates } from "./screens/Affiliates";
 import { Compensation } from "./screens/Compensation";
 import { FirstRun } from "./screens/FirstRun";
+import { Glossary } from "./screens/Glossary";
 import { Orders } from "./screens/Orders";
 import { Overview } from "./screens/Overview";
 import { PaymentReconcile } from "./screens/PaymentReconcile";
@@ -130,6 +131,7 @@ export default function App() {
             />
             <Route path="/targets" element={<Targets session={session} />} />
             <Route path="/settings" element={<Settings session={session} />} />
+            <Route path="/glossary" element={<Glossary />} />
           </Route>
         ) : (
           <Route path="*" element={<Navigate to="/sign-in" replace />} />

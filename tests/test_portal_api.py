@@ -430,6 +430,63 @@ def test_an_agreed_month_is_marked_agreed(admin):
     assert body["amount_piastres"] == 10_600
 
 
+# ── Phase 10 Batch C: which policy governed this ────────────────────────────
+
+
+def test_an_agreed_month_names_the_policy_in_force(admin):
+    created = admin.post(
+        "/api/policy/versions",
+        json={"effective_month": "2026-01", "summary_markdown": "x"},
+    ).json()
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"])
+    _order(affiliate["id"], "1", 106_200)
+    _approve(admin, affiliate["id"], AUGUST)
+
+    body = _sign_in().get(f"/api/me/earnings/{AUGUST}").json()
+
+    assert body["policy_version"] == {"id": created["id"], "effective_month": "2026-01"}
+
+
+def test_the_full_text_is_readable_from_the_portal(admin):
+    _affiliate(admin)
+    created = admin.post(
+        "/api/policy/versions",
+        json={"effective_month": "2026-01", "summary_markdown": "The full text."},
+    ).json()
+
+    response = _sign_in().get(f"/api/me/policy/{created['id']}")
+
+    assert response.status_code == 200
+    assert response.json()["summary_markdown"] == "The full text."
+
+
+def test_an_open_month_names_no_policy(admin):
+    """Nothing has been frozen yet - naming one would claim a decision that
+    has not been made."""
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"])
+    _order(affiliate["id"], "1", 106_200)
+
+    body = _sign_in().get(f"/api/me/earnings/{AUGUST}").json()
+
+    assert body["state"] == "open"
+    assert body["policy_version"] is None
+
+
+def test_an_agreed_month_with_no_policy_yet_names_none(admin):
+    """A deployment before anyone has written policy v1 must still be able to
+    approve payroll - the column is nullable for exactly this."""
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"])
+    _order(affiliate["id"], "1", 106_200)
+    _approve(admin, affiliate["id"], AUGUST)
+
+    body = _sign_in().get(f"/api/me/earnings/{AUGUST}").json()
+
+    assert body["policy_version"] is None
+
+
 def test_an_agreed_month_shows_what_was_paid_not_what_it_recalculates_to(admin):
     """The trap the maintainer's payroll screen already fell into.
 
@@ -1122,17 +1179,23 @@ def test_a_month_that_has_not_started_says_so(admin, monkeypatch):
     has nothing in it. *Still adding up, nothing* is true and lands as though
     the platform is broken or they have earned nothing.
     """
-    from app.core import businesstime
+    from datetime import datetime, timezone
+
+    import app.services.portal as portal
 
     affiliate = _affiliate(admin)
     _terms(admin, affiliate["id"])
 
-    # The clock says August; the screen is opening on September.
+    # The clock says August, pinned rather than assumed - a suite that only
+    # passed because it happened to run before September silently broke the
+    # day it did not (found on 2026-09-01, mid-session).
+    monkeypatch.setattr(
+        portal, "utcnow", lambda: datetime(2026, 8, 15, tzinfo=timezone.utc)
+    )
     body = _sign_in().get(f"/api/me/earnings/{SEPTEMBER}").json()
 
     assert body["not_started"] is True
     assert body["state"] == "open"
-    assert businesstime  # imported to make the dependency explicit
 
 
 def test_a_month_that_has_begun_does_not(admin):

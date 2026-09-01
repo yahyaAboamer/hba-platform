@@ -171,6 +171,49 @@ def test_the_month_points_at_the_version_in_force(db):
     assert get_month(db, affiliate, MONTH).active_snapshot_id == snapshot.id
 
 
+# ── Phase 10 Batch C: which policy governed this ────────────────────────────
+
+
+def test_approving_stamps_the_policy_in_force(db):
+    from app.services.policy import create_policy_version
+
+    policy = create_policy_version(db, effective_month="2026-01", summary_markdown="x")
+    db.flush()
+    affiliate = _ready(db)
+
+    snapshot = approve_month(db, affiliate, MONTH)
+
+    assert snapshot.policy_version_id == policy.id
+
+
+def test_a_later_policy_never_touches_an_earlier_snapshot(db):
+    """Frozen at approval, not re-resolved - the whole point of freezing it."""
+    from app.services.policy import create_policy_version
+
+    v1 = create_policy_version(db, effective_month="2026-01", summary_markdown="x")
+    db.flush()
+    affiliate = _ready(db)
+    snapshot = approve_month(db, affiliate, MONTH)
+    assert snapshot.policy_version_id == v1.id
+
+    create_policy_version(db, effective_month="2026-05", summary_markdown="y")
+    db.flush()
+
+    assert snapshot.policy_version_id == v1.id, "a later policy must not retarget this"
+
+
+def test_no_policy_yet_leaves_the_snapshot_pointing_at_nothing(db):
+    """Not every deployment has written policy v1 the moment it goes live -
+    the migration itself skips creating one when GO_LIVE_MONTH is unset. A
+    snapshot approved before any policy exists must still be approvable.
+    """
+    affiliate = _ready(db)
+
+    snapshot = approve_month(db, affiliate, MONTH)
+
+    assert snapshot.policy_version_id is None
+
+
 def test_a_payout_is_always_whole_pounds(db):
     """§9.6, ADR 0004, and the database enforces it - a snapshot carrying
     fractional pounds is a figure nobody can pay.

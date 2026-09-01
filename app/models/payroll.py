@@ -47,10 +47,11 @@ recorded in the audit log."* `audit_event` is append-only, already carries a
 by `payroll_month.active_snapshot_id`, so a superseded snapshot is recognisable
 without a column saying so. §8 is explicitly indicative.
 
-**And no `policy_version` column yet.** §16's versioned rules arrive in Phase 10;
-a column nothing writes reads as a feature and is a lie (the same reasoning that
-deferred `settled_in_snapshot_id` out of Phase 4). Phase 10 adds it with the
-thing that fills it.
+**`policy_version_id` is Phase 10 Batch C.** It names which `policy_version`
+row - the plain-language rules, not the ADRs that engineer them - was in force
+when a snapshot was calculated. Stamped once, at approval, and never touched
+again: a rule reworded next year must not change what a snapshot already told
+somebody last September.
 """
 
 from datetime import datetime
@@ -64,6 +65,7 @@ from sqlalchemy import (
     Index,
     Integer,
     String,
+    Text,
     UniqueConstraint,
     text,
 )
@@ -170,6 +172,46 @@ class PayrollMonth(Base):
         )
 
 
+class PolicyVersion(Base):
+    """The commission rules, in plain language, dated.
+
+    Not the engineering record - the ADRs already are that, precisely and for
+    nobody but whoever reads code. This is the same rules translated once into
+    what a model reads, so a payroll snapshot can point at *what they were
+    told*, and not silently mean something different once the wording changes.
+
+    **Append-only, like every other record money depends on.** A rule change
+    is a new row with a later `effective_month`; nothing here is ever edited
+    or deleted. `effective_month <= month, newest first` is the whole lookup -
+    no end date, because the next row's start is the previous row's end.
+    """
+
+    __tablename__ = "policy_version"
+    __table_args__ = (
+        UniqueConstraint("effective_month", name="policy_version_effective_month_unique"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    #: The first business month this version governs. `YYYY-MM`, the same
+    #: shape every other month string in this platform uses.
+    effective_month: Mapped[str] = mapped_column(String(7), nullable=False)
+
+    #: The plain-language text itself. Markdown, rendered the same way
+    #: everywhere it appears rather than re-formatted per screen.
+    summary_markdown: Mapped[str] = mapped_column(Text, nullable=False)
+
+    created_by: Mapped[int | None] = mapped_column(
+        ForeignKey("user_account.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+
+    def __repr__(self) -> str:
+        return f"<PolicyVersion {self.effective_month}>"
+
+
 class PayrollSnapshot(Base):
     """A frozen calculation. Append-only, versioned, and never recomputed."""
 
@@ -231,7 +273,23 @@ class PayrollSnapshot(Base):
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )
 
+    #: Which plain-language rules were in force when this was calculated.
+    #: `RESTRICT`, matching every other fact a snapshot depends on: a policy
+    #: version cannot be deleted out from under a snapshot that names it.
+    #: Nullable only because months predating this column exist and are
+    #: backfilled to policy 1 rather than left to guess, not because a new
+    #: snapshot is ever allowed to skip it - `approve_month` always supplies
+    #: one.
+    policy_version_id: Mapped[int | None] = mapped_column(
+        ForeignKey("policy_version.id", ondelete="RESTRICT")
+    )
+
     month = relationship("PayrollMonth", foreign_keys=[payroll_month_id], lazy="joined")
+    # eager: my_year() calls my_month() once per month, and a lazy load here
+    # would be one extra query per agreed month on that screen alone.
+    policy_version = relationship(
+        "PolicyVersion", foreign_keys=[policy_version_id], lazy="joined"
+    )
 
     def __repr__(self) -> str:
         return (
