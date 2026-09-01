@@ -125,13 +125,38 @@ def upgrade() -> None:
             .returning(policy_version.c.id)
         )
         policy_id = result.scalar_one()
+        # payroll_snapshot is append-only (payroll_snapshot_no_update_or_delete,
+        # 31998d2af5d6) precisely so a figure already paid cannot be quietly
+        # changed later. Stamping which rules governed it is not that - no
+        # money value moves - but the trigger does not know the difference;
+        # it blocks every UPDATE. Disabled for this one administrative
+        # backfill, on this one column, inside this migration's own
+        # transaction, and re-enabled immediately after. The app itself never
+        # gets this permission back. Found by running this migration against
+        # a database that actually had snapshots to backfill - an empty
+        # table takes the FOR EACH ROW trigger with it, since it never fires
+        # on zero matched rows, which is exactly how this passed locally.
         connection.execute(
             sa.text(
-                "UPDATE payroll_snapshot SET policy_version_id = :policy_id "
-                "WHERE policy_version_id IS NULL"
-            ),
-            {"policy_id": policy_id},
+                "ALTER TABLE payroll_snapshot "
+                "DISABLE TRIGGER payroll_snapshot_no_update_or_delete"
+            )
         )
+        try:
+            connection.execute(
+                sa.text(
+                    "UPDATE payroll_snapshot SET policy_version_id = :policy_id "
+                    "WHERE policy_version_id IS NULL"
+                ),
+                {"policy_id": policy_id},
+            )
+        finally:
+            connection.execute(
+                sa.text(
+                    "ALTER TABLE payroll_snapshot "
+                    "ENABLE TRIGGER payroll_snapshot_no_update_or_delete"
+                )
+            )
         print(f"policy_version: created v1 effective {go_live_month}")
     else:
         print("policy_version: GO_LIVE_MONTH not set - no v1 created, table left empty")
