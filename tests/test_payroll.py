@@ -24,7 +24,7 @@ from app.models.payroll import CalculationState, PayrollMonth, PayrollSnapshot
 from app.services.affiliates import create_affiliate
 from app.services.codes import register_code
 from app.services.commission.calculate import NO_TERMS
-from app.services.compensation import correct_terms, set_terms
+from app.services.compensation import set_terms
 from app.services.payroll import (
     ALREADY_APPROVED,
     HOUSE_ACCOUNT,
@@ -475,7 +475,15 @@ def test_pay_terms_cannot_be_corrected_after_approval(db):
     approve_month(db, affiliate, MONTH)
 
     with pytest.raises(ValueError, match="approved month"):
-        correct_terms(db, terms, commission_rate_bp=5000)
+        # Naming the month the arrangement already starts in is how a rate is
+        # rewritten now. The guard is unchanged: an approved month refuses.
+        set_terms(
+            db,
+            affiliate,
+            start_month=terms.start_month,
+            compensation_type=terms.compensation_type,
+            commission_rate_bp=5000,
+        )
 
 
 def test_terms_for_a_later_month_are_still_correctable(db):
@@ -499,9 +507,16 @@ def test_terms_for_a_later_month_are_still_correctable(db):
         compensation_type=CompensationType.COMMISSION,
         commission_rate_bp=1200,
     )
-    correct_terms(db, later, commission_rate_bp=1300)
+    rewritten = set_terms(
+        db,
+        affiliate,
+        start_month="2026-09",
+        compensation_type=CompensationType.COMMISSION,
+        commission_rate_bp=1300,
+    )
 
-    assert later.commission_rate_bp == 1300
+    assert rewritten.id == later.id
+    assert rewritten.commission_rate_bp == 1300
 
 
 def test_ending_terms_after_an_approved_month_is_allowed(db):

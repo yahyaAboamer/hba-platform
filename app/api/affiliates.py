@@ -54,8 +54,6 @@ from app.services.codes import (
 )
 from app.services.applications import REQUIRED_PAYOUT_FIELDS
 from app.services.compensation import (
-    close_terms,
-    correct_terms,
     get_terms,
     set_terms,
     terms_for,
@@ -135,27 +133,6 @@ class SetCompensationBody(BaseModel):
     expected_customer_discount_bp: int | None = None
 
 
-class CorrectCompensationBody(BaseModel):
-    """Fix a mistyped arrangement, or end it.
-
-    Every money field is here because every one of them is typed by a person:
-    the rate, the salary a fixed-plus-commission model is paid, and the base a
-    base-guarantee model is guaranteed. A zero too many in any of them decides
-    what somebody is paid.
-
-    ``end_month`` ends the arrangement instead of changing it - which is what
-    moving a model onto different terms requires, since two overlapping
-    arrangements are refused.
-    """
-
-    compensation_type: str | None = None
-    commission_rate_bp: int | None = None
-    fixed_amount_piastres: int | None = None
-    base_amount_piastres: int | None = None
-    expected_customer_discount_bp: int | None = None
-    end_month: str | None = None
-
-
 class ReplaceCodeBody(BaseModel):
     """Move a model onto a new discount code.
 
@@ -204,11 +181,6 @@ def _compensation_payload(terms) -> dict | None:
     if terms is None:
         return None
     return {
-        # Without this the browser cannot address `PATCH .../compensation/
-        # {period_id}` at all - it holds the terms and not their identity, so
-        # correcting a mistyped rate was unreachable however the screen was
-        # written.
-        "id": terms.id,
         "start_month": terms.start_month,
         "end_month": terms.end_month,
         "compensation_type": terms.compensation_type,
@@ -783,59 +755,6 @@ def set_compensation_route(
             actor_id=actor.id,
             actor_email=actor.email,
         )
-    except (ValueError, TypeError) as exc:
-        raise HTTPException(400, str(exc)) from exc
-    except IntegrityError as exc:
-        db.rollback()
-        raise HTTPException(
-            409, "These months overlap pay terms already on record for this affiliate"
-        ) from exc
-
-    db.commit()
-    return _compensation_payload(terms)
-
-
-@router.patch("/{affiliate_id}/compensation/{period_id}")
-def correct_compensation_route(
-    affiliate_id: int,
-    period_id: int,
-    body: CorrectCompensationBody,
-    actor: UserAccount = Depends(require_permission(Permission.COMPENSATION_MANAGE)),
-    db: Session = Depends(get_session),
-) -> dict:
-    """Correct or end an arrangement.
-
-    Correcting changes what the arrangement says; ending changes when it
-    applies. They are different acts and both are needed - a mistyped salary
-    has to be fixable, and a model moving onto new terms needs the old ones
-    closed first, or the database refuses the overlap.
-    """
-    affiliate = _get_affiliate_or_404(db, affiliate_id)
-    terms = get_terms(db, period_id)
-    if terms is None or terms.affiliate_id != affiliate.id:
-        raise HTTPException(404, "No such compensation period for this affiliate")
-
-    try:
-        if body.end_month is not None:
-            close_terms(
-                db,
-                terms,
-                body.end_month,
-                actor_id=actor.id,
-                actor_email=actor.email,
-            )
-        correct_terms(
-            db,
-            terms,
-            compensation_type=body.compensation_type,
-            commission_rate_bp=body.commission_rate_bp,
-            fixed_amount_piastres=body.fixed_amount_piastres,
-            base_amount_piastres=body.base_amount_piastres,
-            expected_customer_discount_bp=body.expected_customer_discount_bp,
-            actor_id=actor.id,
-            actor_email=actor.email,
-        )
-        db.flush()
     except (ValueError, TypeError) as exc:
         raise HTTPException(400, str(exc)) from exc
     except IntegrityError as exc:

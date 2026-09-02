@@ -69,7 +69,6 @@ export function Compensation() {
   //: Changing what somebody is paid from a month, or fixing what was typed
   //: into the arrangement they are already on. Only offered once there is
   //: something to correct.
-  const [act, setAct] = useState<"change" | "correct">("change");
   const [error, setError] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
 
@@ -104,8 +103,6 @@ export function Compensation() {
   const fixedPiastres = fixed.trim() === "" ? null : parseEgp(fixed);
   const basePiastres = base.trim() === "" ? null : parseEgp(base);
 
-  // Only meaningful once terms exist; there is nothing to correct otherwise.
-  const correcting = act === "correct" && detail?.compensation != null;
 
   const problem =
     rateBp === null
@@ -133,21 +130,15 @@ export function Compensation() {
       expected_customer_discount_bp: discountBp,
     };
     try {
-      if (correcting && detail?.compensation) {
-        // Rewrites the arrangement in place, for every month it covers. The
-        // server refuses it outright if one of those months is approved.
-        await api.patch(
-          `/api/affiliates/${id}/compensation/${detail.compensation.id}`,
-          terms,
-        );
-      } else {
-        // One call. The server ends whatever is in force and opens this in the
-        // same transaction, so a rate change cannot half-happen.
-        await api.post(`/api/affiliates/${id}/compensation`, {
-          start_month: startMonth,
-          ...terms,
-        });
-      }
+      // One call, one meaning. The month decides which: a later month ends
+      // whatever is in force and opens a new arrangement, the month one
+      // already starts in rewrites it. Both happen in a single transaction,
+      // so a rate change cannot half-happen - and the server refuses either
+      // outright if a month it covers is already approved.
+      await api.post(`/api/affiliates/${id}/compensation`, {
+        start_month: startMonth,
+        ...terms,
+      });
       navigate(`/affiliates/${id}`);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not save that.");
@@ -289,61 +280,8 @@ export function Compensation() {
          * be long before. Setting it to September does not hide their August
          * sales; it means August is paid on whatever they were on in August.
          */}
-        {/*
-         * **Two different acts, named as such.**
-         *
-         * Changing what somebody is paid leaves every month already worked
-         * alone. Correcting rewrites the arrangement itself, for every month
-         * it covers - which is the right thing when a rate was typed wrong and
-         * the wrong thing when a rate actually changed.
-         *
-         * The platform cannot tell them apart from the figures, because they
-         * produce identical form input. Only the person knows which happened,
-         * so the screen asks rather than guessing. Offered only when there is
-         * an arrangement to correct.
-         */}
-        {detail.compensation && (
-          <fieldset className="comp__choice">
-            <legend className="field__label">What are you doing?</legend>
-            <label
-              className={act === "change" ? "pay__option pay__option--on" : "pay__option"}
-            >
-              <input
-                type="radio"
-                name="act"
-                checked={act === "change"}
-                onChange={() => setAct("change")}
-              />
-              <span className="pay__option-body">
-                <strong>Changing what {detail.name} is paid</strong>
-                <span className="detail__note">
-                  From a month you choose. Everything before it keeps the old
-                  arrangement.
-                </span>
-              </span>
-            </label>
-            <label
-              className={act === "correct" ? "pay__option pay__option--on" : "pay__option"}
-            >
-              <input
-                type="radio"
-                name="act"
-                checked={act === "correct"}
-                onChange={() => setAct("correct")}
-              />
-              <span className="pay__option-body">
-                <strong>Fixing what was typed</strong>
-                <span className="detail__note">
-                  Rewrites the current arrangement for every month it covers.
-                  Refused if one of them is already approved.
-                </span>
-              </span>
-            </label>
-          </fieldset>
-        )}
 
-        {!correcting && (
-          <div className="field comp__field">
+        <div className="field comp__field">
             <span className="field__label">
               {detail.compensation ? "New rate applies from" : "Applies from"}
             </span>
@@ -354,7 +292,6 @@ export function Compensation() {
                 : "Sales are counted from the month the code was registered, whichever month you choose here."}
             </span>
           </div>
-        )}
 
         {/*
          * §12.2 requires this, and it is the reason the page exists rather
@@ -370,14 +307,7 @@ export function Compensation() {
           ) : (
             <>
               <p className="approve__lead">
-                {correcting && detail.compensation ? (
-                  <>
-                    Every month from{" "}
-                    <strong>{formatMonth(detail.compensation.start_month)}</strong>{" "}
-                    onwards is recalculated as if {detail.name} had always been
-                    on <strong>{KIND_LABEL[kind].toLowerCase()}</strong>.
-                  </>
-                ) : (
+                {(
                   <>
                     From <strong>{formatMonth(startMonth)}</strong> onwards,{" "}
                     {detail.name} is paid{" "}
@@ -436,8 +366,6 @@ export function Compensation() {
             {formatMonth(detail.compensation.start_month)}. Saving this ends
             that arrangement and starts a new one — the months already on the
             old rate keep it.
-            {correcting &&
-              " You are correcting instead, which replaces those figures rather than keeping them."}
           </p>
         )}
 
@@ -457,9 +385,7 @@ export function Compensation() {
           >
             {working
               ? "Saving…"
-              : correcting
-                ? "Save the correction"
-                : `Pay ${detail.name} this from ${formatMonth(startMonth)}`}
+              : `Pay ${detail.name} this from ${formatMonth(startMonth)}`}
           </button>
         </div>
       </form>
