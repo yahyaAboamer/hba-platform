@@ -186,11 +186,15 @@ def _supersede_open_terms(
     for terms in open_now:
         if end_month is not None and end_month < terms.start_month:
             continue
-        if terms.start_month >= start_month:
+        if terms.start_month > start_month:
+            # Strictly later, now. An arrangement starting in the *same* month
+            # is handled before this is ever reached - naming that month means
+            # rewriting it, which is the one control the walkthrough asked for.
+            # What is still refused is starting an arrangement *before* one
+            # already in force, which would swallow months nobody looked at.
             raise ValueError(
-                f"An arrangement already starts in {terms.start_month}. To "
-                "change what it says, correct it; to replace it, start the new "
-                "one in a later month."
+                f"An arrangement already starts in {terms.start_month}. Start "
+                "the new one in that month to rewrite it, or in a later one."
             )
         close_terms(
             db,
@@ -238,6 +242,65 @@ def set_terms(
     )
     start_month, end_month = validate_period(start_month, end_month)
 
+    # **Naming the month an arrangement already starts in means "I meant this
+    # instead", not "a second arrangement begins here".**
+    #
+    # This used to be a separate control the maintainer had to choose between -
+    # *changing what somebody is paid* versus *fixing what was typed* - and the
+    # difference between them is real but almost impossible to hold in mind at
+    # the moment of use. The walkthrough asked for one control. This is how one
+    # control keeps both meanings: a later month opens a new arrangement, the
+    # same month rewrites the one already there.
+    #
+    # Without it, deleting the second control would have left a rate typed
+    # wrongly this month unfixable for ever - the only remaining move being to
+    # start correct terms *next* month and leave this one wrong.
+    #
+    # `assert_correctable` is the guard that makes this safe: an approved month
+    # refuses, because what a model was told they earned does not get rewritten
+    # underneath them. Reopen it first, deliberately, with a written reason.
+    replacing = db.scalar(
+        select(CompensationPeriod)
+        .where(CompensationPeriod.affiliate_id == affiliate.id)
+        .where(CompensationPeriod.end_month.is_(None))
+        .where(CompensationPeriod.start_month == start_month)
+    )
+    if replacing is not None:
+        assert_correctable(db, replacing)
+        before = {
+            "compensation_type": replacing.compensation_type,
+            "commission_rate_bp": replacing.commission_rate_bp,
+            "fixed_amount_piastres": replacing.fixed_amount_piastres,
+            "base_amount_piastres": replacing.base_amount_piastres,
+        }
+        # Assigned outright rather than merged. Here a `None` means "this type
+        # has no such amount", where a merge would keep a salary belonging to
+        # an arrangement the model is no longer on - money nothing reads, which
+        # the next person to look assumes is paid.
+        replacing.compensation_type = compensation_type
+        replacing.commission_rate_bp = commission_rate_bp
+        replacing.fixed_amount_piastres = fixed_amount_piastres
+        replacing.base_amount_piastres = base_amount_piastres
+        replacing.expected_customer_discount_bp = expected_customer_discount_bp
+        replacing.end_month = end_month
+        db.flush()
+        record_audit(
+            db,
+            action="compensation.corrected",
+            subject=f"affiliate:{affiliate.id}",
+            actor_id=actor_id,
+            actor_email=actor_email,
+            before=before,
+            after={
+                "compensation_type": compensation_type,
+                "commission_rate_bp": commission_rate_bp,
+                "fixed_amount_piastres": fixed_amount_piastres,
+                "base_amount_piastres": base_amount_piastres,
+                "start_month": start_month,
+            },
+        )
+        return replacing
+
     # Ends whatever is currently in force, in this same transaction, so the
     # change cannot half-happen. See `_supersede_open_terms`.
     _supersede_open_terms(
@@ -277,94 +340,6 @@ def set_terms(
             "base_amount_piastres": base_amount_piastres,
             "expected_customer_discount_bp": expected_customer_discount_bp,
         },
-    )
-    return terms
-
-
-def correct_terms(
-    db: Session,
-    terms: CompensationPeriod,
-    *,
-    compensation_type: str | None = None,
-    commission_rate_bp: int | None = None,
-    fixed_amount_piastres: int | None = None,
-    base_amount_piastres: int | None = None,
-    expected_customer_discount_bp: int | None = None,
-    actor_id: int | None = None,
-    actor_email: str | None = None,
-) -> CompensationPeriod:
-    """Fix a mistyped arrangement - the rate, the salary, or the base amount.
-
-    All three are money that decides what somebody is paid, and all three are
-    typed by a person. Without this, a rate entered as 100% instead of 10%, or
-    a salary with a zero too many, could only be fixed in the database by hand.
-
-    This corrects **what the arrangement says**, not when it applies. Moving a
-    model onto different terms from a given month is a new period, not a
-    correction - close this one and set new terms, so the months they were on the
-    old arrangement keep saying so.
-
-    An amount belonging to another type is cleared rather than left behind: a
-    model moved from salary to commission-only must not keep a fixed amount
-    that nothing reads, because the next person to look assumes it is paid.
-    """
-    assert_correctable(db, terms)
-
-    new_type = compensation_type or terms.compensation_type
-    changing_type = new_type != terms.compensation_type
-
-    def keep_or_clear(supplied, current):
-        if supplied is not None:
-            return supplied
-        return None if changing_type else current
-
-    proposed = {
-        "compensation_type": new_type,
-        "commission_rate_bp": (
-            commission_rate_bp
-            if commission_rate_bp is not None
-            else terms.commission_rate_bp
-        ),
-        "fixed_amount_piastres": keep_or_clear(
-            fixed_amount_piastres, terms.fixed_amount_piastres
-        ),
-        "base_amount_piastres": keep_or_clear(
-            base_amount_piastres, terms.base_amount_piastres
-        ),
-        "expected_customer_discount_bp": (
-            expected_customer_discount_bp
-            if expected_customer_discount_bp is not None
-            else terms.expected_customer_discount_bp
-        ),
-    }
-
-    validate_terms(
-        proposed["compensation_type"],
-        proposed["commission_rate_bp"],
-        proposed["fixed_amount_piastres"],
-        proposed["base_amount_piastres"],
-        proposed["expected_customer_discount_bp"],
-    )
-
-    changed = {
-        field: getattr(terms, field)
-        for field in proposed
-        if getattr(terms, field) != proposed[field]
-    }
-    if not changed:
-        return terms
-
-    for field, value in proposed.items():
-        setattr(terms, field, value)
-
-    record_audit(
-        db,
-        action="compensation.corrected",
-        subject=f"affiliate:{terms.affiliate_id}",
-        actor_id=actor_id,
-        actor_email=actor_email,
-        before=changed,
-        after={field: proposed[field] for field in changed},
     )
     return terms
 

@@ -1331,30 +1331,35 @@ def test_changing_a_rate_through_the_api_is_one_call(client):
     assert changed.json()["start_month"] == "2026-09"
 
 
-def test_the_terms_carry_their_own_id(client):
-    """Without it the browser cannot address `PATCH .../compensation/{id}`.
+def test_naming_the_same_month_rewrites_the_arrangement(client):
+    """There is no separate correction endpoint any more.
 
-    Correcting a mistyped rate was unreachable not because the route was
-    missing but because nothing ever told the screen which period to correct.
+    The month is the whole instruction: a later one opens a new arrangement,
+    the month one already starts in rewrites it. The terms no longer carry an
+    id either - the browser addressed `PATCH .../compensation/{period_id}`
+    with it, and that route is gone.
     """
     affiliate = _register(client)
-    created = client.post(
+    client.post(
         f"/api/affiliates/{affiliate['id']}/compensation",
         json={
-            "start_month": "2026-01",
+            "start_month": "2026-09",
             "compensation_type": "commission",
             "commission_rate_bp": 800,
         },
     )
-    period_id = created.json()["id"]
-    assert isinstance(period_id, int)
 
-    corrected = client.patch(
-        f"/api/affiliates/{affiliate['id']}/compensation/{period_id}",
-        json={"commission_rate_bp": 850},
+    rewritten = client.post(
+        f"/api/affiliates/{affiliate['id']}/compensation",
+        json={
+            "start_month": "2026-09",
+            "compensation_type": "commission",
+            "commission_rate_bp": 850,
+        },
     )
-    assert corrected.status_code == 200, corrected.text
-    assert corrected.json()["commission_rate_bp"] == 850
+    assert rewritten.status_code == 201, rewritten.text
 
     detail = client.get(f"/api/affiliates/{affiliate['id']}").json()
-    assert detail["compensation"]["id"] == period_id
+    assert detail["compensation"]["commission_rate_bp"] == 850
+    assert detail["compensation"]["start_month"] == "2026-09"
+    assert "id" not in detail["compensation"]

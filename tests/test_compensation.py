@@ -15,7 +15,6 @@ from app.models.identity import UserAccount
 from app.services.affiliates import create_affiliate
 from app.services.compensation import (
     close_terms,
-    correct_terms,
     set_terms,
     terms_for,
 )
@@ -474,29 +473,40 @@ def test_deleting_an_affiliate_takes_their_terms(db):
     assert db.query(CompensationPeriod).count() == 0
 
 
-# ── Correcting a mistyped arrangement ──────────────────────────────────────────
+# ── Rewriting a mistyped arrangement ───────────────────────────────────────
+#
+# There is no separate "correct" call any more. Naming the month an
+# arrangement already starts in rewrites it; a later month opens a new one.
+# The rules these tests protect did not change - only the door they are
+# reached through.
 
 
-def test_a_mistyped_rate_can_be_corrected(db):
-    """100% instead of 10% is one keystroke, and until now it could only be
-    fixed in the database by hand.
-    """
-    nour = _affiliate(db)
-    terms = _commission(db, nour, rate_bp=10_000)
+def _rewrite(db, affiliate, terms, **fields):
+    """Rewrite an arrangement by naming its own start month."""
+    body = {
+        "compensation_type": terms.compensation_type,
+        "commission_rate_bp": terms.commission_rate_bp,
+        "fixed_amount_piastres": terms.fixed_amount_piastres,
+        "base_amount_piastres": terms.base_amount_piastres,
+        "expected_customer_discount_bp": terms.expected_customer_discount_bp,
+    }
+    body.update(fields)
+    return set_terms(db, affiliate, start_month=terms.start_month, **body)
+
+
+def test_a_mistyped_rate_can_be_rewritten(db):
+    affiliate = _affiliate(db)
+    terms = _commission(db, affiliate, rate_bp=100)
     db.flush()
 
-    correct_terms(db, terms, commission_rate_bp=1000)
-    db.flush()
-
-    assert terms_for(db, nour, "2026-05").commission_rate_bp == 1000
+    assert _rewrite(db, affiliate, terms, commission_rate_bp=1000).commission_rate_bp == 1000
 
 
-def test_a_mistyped_fixed_salary_can_be_corrected(db):
-    """A zero too many on a salary is the same class of mistake as a rate."""
-    nour = _affiliate(db)
+def test_a_mistyped_salary_can_be_rewritten(db):
+    affiliate = _affiliate(db)
     terms = set_terms(
         db,
-        nour,
+        affiliate,
         start_month="2026-03",
         compensation_type=CompensationType.FIXED_PLUS_COMMISSION,
         commission_rate_bp=1000,
@@ -504,20 +514,15 @@ def test_a_mistyped_fixed_salary_can_be_corrected(db):
     )
     db.flush()
 
-    correct_terms(db, terms, fixed_amount_piastres=500_000)
-    db.flush()
-
-    assert terms_for(db, nour, "2026-05").fixed_amount_piastres == 500_000
+    rewritten = _rewrite(db, affiliate, terms, fixed_amount_piastres=500_000)
+    assert rewritten.fixed_amount_piastres == 500_000
 
 
-def test_a_mistyped_base_amount_can_be_corrected(db):
-    """The guaranteed floor decides what a base-guarantee model is paid when
-    their commission falls short. It has to be fixable.
-    """
-    nour = _affiliate(db)
+def test_a_mistyped_base_amount_can_be_rewritten(db):
+    affiliate = _affiliate(db)
     terms = set_terms(
         db,
-        nour,
+        affiliate,
         start_month="2026-03",
         compensation_type=CompensationType.BASE_GUARANTEE,
         commission_rate_bp=1000,
@@ -525,80 +530,69 @@ def test_a_mistyped_base_amount_can_be_corrected(db):
     )
     db.flush()
 
-    correct_terms(db, terms, base_amount_piastres=800_000)
+    rewritten = _rewrite(db, affiliate, terms, base_amount_piastres=800_000)
+    assert rewritten.base_amount_piastres == 800_000
+
+
+def test_the_customer_discount_can_be_rewritten(db):
+    affiliate = _affiliate(db)
+    terms = _commission(db, affiliate)
     db.flush()
 
-    assert terms_for(db, nour, "2026-05").base_amount_piastres == 800_000
+    rewritten = _rewrite(db, affiliate, terms, expected_customer_discount_bp=1500)
+    assert rewritten.expected_customer_discount_bp == 1500
 
 
-def test_the_customer_discount_can_be_corrected(db):
-    nour = _affiliate(db)
-    terms = _commission(db, nour)
+def test_a_rewrite_records_what_it_changed_from(db):
+    """The audit carries the old figure. Without it there is no way to answer
+    "what was this before somebody fixed it".
+    """
+    from sqlalchemy import text as sql_text
+
+    affiliate = _affiliate(db)
+    terms = _commission(db, affiliate, rate_bp=100)
+    db.flush()
+    _rewrite(db, affiliate, terms, commission_rate_bp=1000)
     db.flush()
 
-    correct_terms(db, terms, expected_customer_discount_bp=1500)
-    db.flush()
-
-    assert terms_for(db, nour, "2026-05").expected_customer_discount_bp == 1500
-
-
-def test_a_correction_records_what_it_changed_from(db):
-    """Pay terms are the records most worth being able to reconstruct."""
-    nour = _affiliate(db)
-    terms = _commission(db, nour, rate_bp=10_000)
-    db.flush()
-
-    correct_terms(db, terms, commission_rate_bp=1000)
-    db.flush()
-
-    before, after = db.execute(
-        text(
-            "SELECT before_json, after_json FROM audit_event "
-            "WHERE action = 'compensation.corrected'"
+    row = db.execute(
+        sql_text(
+            "select before_json, after_json from audit_event "
+            "where action = 'compensation.corrected' order by id desc limit 1"
         )
-    ).one()
-    assert before["commission_rate_bp"] == 10_000
-    assert after["commission_rate_bp"] == 1000
+    ).fetchone()
+    assert row is not None
+    assert "100" in str(row.before_json)
+    assert "1000" in str(row.after_json)
 
 
-def test_correcting_nothing_records_nothing(db):
-    nour = _affiliate(db)
-    terms = _commission(db, nour, rate_bp=1000)
-    db.flush()
-
-    correct_terms(db, terms, commission_rate_bp=1000)
-    db.flush()
-
-    actions = [row[0] for row in db.execute(text("SELECT action FROM audit_event"))]
-    assert "compensation.corrected" not in actions
-
-
-def test_a_correction_cannot_produce_an_invalid_arrangement(db):
-    """Correction uses the same rules as creation, so it cannot produce
+def test_a_rewrite_cannot_produce_an_invalid_arrangement(db):
+    """Validation is shared with creating, so a rewrite cannot produce
     something creation would have refused.
     """
-    nour = _affiliate(db)
-    terms = _commission(db, nour)
-    db.flush()
-
-    with pytest.raises(ValueError, match="must not carry"):
-        correct_terms(db, terms, fixed_amount_piastres=500_000)
-
-
-def test_a_correction_refuses_an_impossible_rate(db):
-    nour = _affiliate(db)
-    terms = _commission(db, nour)
+    affiliate = _affiliate(db)
+    terms = _commission(db, affiliate)
     db.flush()
 
     with pytest.raises(ValueError):
-        correct_terms(db, terms, commission_rate_bp=10_001)
+        _rewrite(db, affiliate, terms, fixed_amount_piastres=500_000)
 
 
-def test_a_correction_refuses_a_float(db):
-    nour = _affiliate(db)
+def test_a_rewrite_refuses_an_impossible_rate(db):
+    affiliate = _affiliate(db)
+    terms = _commission(db, affiliate)
+    db.flush()
+
+    with pytest.raises(ValueError):
+        _rewrite(db, affiliate, terms, commission_rate_bp=10_001)
+
+
+def test_a_rewrite_refuses_a_float(db):
+    """Piastres are integers. A float is a rounding error waiting to be paid."""
+    affiliate = _affiliate(db)
     terms = set_terms(
         db,
-        nour,
+        affiliate,
         start_month="2026-03",
         compensation_type=CompensationType.FIXED_PLUS_COMMISSION,
         commission_rate_bp=1000,
@@ -607,39 +601,22 @@ def test_a_correction_refuses_a_float(db):
     db.flush()
 
     with pytest.raises(TypeError):
-        correct_terms(db, terms, fixed_amount_piastres=5000.50)
-
-
-def test_changing_type_clears_the_amount_that_no_longer_applies(db):
-    """A model moved off a salary must not keep a fixed amount nothing reads -
-    the next person to look assumes it is being paid.
-    """
-    nour = _affiliate(db)
-    terms = set_terms(
-        db,
-        nour,
-        start_month="2026-03",
-        compensation_type=CompensationType.FIXED_PLUS_COMMISSION,
-        commission_rate_bp=1000,
-        fixed_amount_piastres=500_000,
-    )
-    db.flush()
-
-    correct_terms(db, terms, compensation_type=CompensationType.COMMISSION)
-    db.flush()
-
-    corrected = terms_for(db, nour, "2026-05")
-    assert corrected.compensation_type == CompensationType.COMMISSION
-    assert corrected.fixed_amount_piastres is None
+        _rewrite(db, affiliate, terms, fixed_amount_piastres=5000.50)
 
 
 def test_changing_type_to_one_needing_an_amount_requires_it(db):
-    nour = _affiliate(db)
-    terms = _commission(db, nour)
+    affiliate = _affiliate(db)
+    terms = _commission(db, affiliate)
     db.flush()
 
-    with pytest.raises(ValueError, match="requires"):
-        correct_terms(db, terms, compensation_type=CompensationType.BASE_GUARANTEE)
+    with pytest.raises(ValueError):
+        _rewrite(
+            db,
+            affiliate,
+            terms,
+            compensation_type=CompensationType.BASE_GUARANTEE,
+            base_amount_piastres=None,
+        )
 
 
 # ── Ending an arrangement so another can start ─────────────────────────────────
@@ -788,11 +765,68 @@ def test_backfilling_earlier_history_does_not_end_the_current_arrangement(db):
     assert terms_for(db, affiliate, "2026-06").commission_rate_bp == 800
 
 
-def test_starting_new_terms_in_the_same_month_is_refused_readably(db):
-    """Two arrangements cannot both start in September.
+def test_the_same_month_rewrites_the_arrangement_rather_than_refusing(db):
+    """Naming the month one already starts in means "I meant this instead".
 
-    The maintainer meant one of two things and the platform must not guess:
-    correct what is there, or start the replacement later.
+    It used to refuse and tell the maintainer to *correct* it instead - a
+    second control, chosen from a radio, whose difference from this one was
+    real but almost impossible to hold in mind at the moment of use. The
+    walkthrough asked for one control; this is how one control keeps both
+    meanings.
+    """
+    affiliate = _affiliate(db)
+    first = set_terms(
+        db,
+        affiliate,
+        start_month="2026-09",
+        compensation_type="commission",
+        commission_rate_bp=800,
+    )
+    db.flush()
+
+    again = set_terms(
+        db,
+        affiliate,
+        start_month="2026-09",
+        compensation_type="commission",
+        commission_rate_bp=1200,
+    )
+    db.flush()
+
+    assert again.id == first.id, "rewritten in place, not a second period"
+    assert again.commission_rate_bp == 1200
+
+
+def test_rewriting_clears_an_amount_the_new_type_does_not_use(db):
+    """A salary left behind on a commission-only arrangement is money nothing
+    reads, which the next person to look assumes is being paid.
+    """
+    affiliate = _affiliate(db)
+    set_terms(
+        db,
+        affiliate,
+        start_month="2026-09",
+        compensation_type="fixed_plus_commission",
+        commission_rate_bp=800,
+        fixed_amount_piastres=500_000,
+    )
+    db.flush()
+
+    rewritten = set_terms(
+        db,
+        affiliate,
+        start_month="2026-09",
+        compensation_type="commission",
+        commission_rate_bp=800,
+    )
+    db.flush()
+
+    assert rewritten.fixed_amount_piastres is None
+
+
+def test_rewriting_an_approved_month_is_still_refused(db):
+    """The guard that makes one control safe. What a model was told they
+    earned is not rewritten underneath them - reopen the month first.
     """
     affiliate = _affiliate(db)
     set_terms(
@@ -802,6 +836,8 @@ def test_starting_new_terms_in_the_same_month_is_refused_readably(db):
         compensation_type="commission",
         commission_rate_bp=800,
     )
+    db.flush()
+    _approved_month(db, affiliate, "2026-09")
 
     with pytest.raises(ValueError) as refused:
         set_terms(
@@ -811,7 +847,31 @@ def test_starting_new_terms_in_the_same_month_is_refused_readably(db):
             compensation_type="commission",
             commission_rate_bp=1200,
         )
+    assert "approved" in str(refused.value)
 
+
+def test_starting_before_an_arrangement_in_force_is_still_refused(db):
+    """Rewriting is only ever the *same* month. Starting one earlier would
+    swallow months nobody looked at.
+    """
+    affiliate = _affiliate(db)
+    set_terms(
+        db,
+        affiliate,
+        start_month="2026-09",
+        compensation_type="commission",
+        commission_rate_bp=800,
+    )
+    db.flush()
+
+    with pytest.raises(ValueError) as refused:
+        set_terms(
+            db,
+            affiliate,
+            start_month="2026-06",
+            compensation_type="commission",
+            commission_rate_bp=1200,
+        )
     assert "already starts in 2026-09" in str(refused.value)
 
 

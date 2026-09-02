@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { usePortal } from "../components/AffiliateLayout";
 import { Money } from "../components/Money";
 import { api } from "../lib/api";
-import { formatMonth } from "../lib/money";
+import { formatEgp, formatMonth } from "../lib/money";
 import type { MyEarnings } from "../lib/portal";
 import "./MyMonth.css";
 
@@ -111,6 +111,38 @@ export function MyMonth() {
                 <Link to={`/policy/${body.policy_version.id}`}>Read them</Link>
               </p>
             )}
+
+            {/*
+             * **A figure that changed after it was agreed says so, here, on
+             * the month that changed.** A settled month is meant to be final,
+             * so the number quietly becoming a different number is the worst
+             * way for somebody to find out. Both figures are given: "it
+             * changed" without the old one is not something anybody can check
+             * against their own record.
+             */}
+            {body.recalculated && (
+              <p className="figure__note figure__note--changed">
+                This month was looked at again and recalculated. It was{" "}
+                <strong>{formatEgp(body.recalculated.was_piastres)}</strong>;
+                it is now{" "}
+                <strong>{formatEgp(body.recalculated.now_piastres)}</strong>.
+                HBA emailed you about this.
+              </p>
+            )}
+
+            {/*
+             * A separate sentence on a separate month, deliberately. This one
+             * is not about *this* month changing - it is about this month
+             * carrying money earned in another. Folding both into one notice
+             * would leave the earlier month showing a changed figure with
+             * nothing attached to it.
+             */}
+            {body.credited_from.map((credit) => (
+              <p className="figure__note" key={credit.month}>
+                Includes <strong>{formatEgp(credit.piastres)}</strong> from{" "}
+                {formatMonth(credit.month)}, after that month was corrected.
+              </p>
+            ))}
           </>
         )}
       </section>

@@ -70,6 +70,7 @@ from app.services.payroll import (
     blockers_for,
     get_month,
     is_historical,
+    snapshots_for,
     working_month,
 )
 from app.services.targets import get_target
@@ -567,8 +568,73 @@ def my_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
             if agreed and snapshot.policy_version_id is not None
             else None
         ),
+        # **A figure that changed after it was agreed says so.**
+        #
+        # A settled month is meant to be final, so when a correction moves one
+        # the model has already been told about, the number quietly becoming a
+        # different number is the worst possible way for them to find out.
+        # These two facts are deliberately separate sentences on separate
+        # months, because they are separate things: one month was recalculated,
+        # and a *different* month is carrying money that did not come from it.
+        # Explaining both on the later month would leave the earlier one
+        # showing a changed figure with nothing attached to it.
+        "recalculated": _recalculated(db, payroll_month) if agreed else None,
+        "credited_from": _credited_from(db, affiliate, payroll_month),
         "note": None,
     }
+
+
+def _recalculated(db: Session, payroll_month: PayrollMonth | None) -> dict | None:
+    """What this month was worth before it was reopened, if it ever was.
+
+    More than one snapshot means it was agreed, reopened and agreed again. The
+    first figure is what the model was originally told; the last is what stands
+    now. Both are needed - "it changed" without the old number is not something
+    anybody can check against their own record.
+    """
+    if payroll_month is None:
+        return None
+
+    versions = snapshots_for(db, payroll_month)
+    if len(versions) < 2:
+        return None
+
+    previous, latest = versions[-2], versions[-1]
+    if previous.approved_obligation_piastres == latest.approved_obligation_piastres:
+        # Reopened and re-approved at the same figure - a correction that
+        # turned out to change nothing they are owed. Saying "this was
+        # recalculated" over an unchanged number invites a question with no
+        # answer.
+        return None
+
+    return {
+        "was_piastres": previous.approved_obligation_piastres,
+        "now_piastres": latest.approved_obligation_piastres,
+        "at": latest.approved_at.isoformat() if latest.approved_at else None,
+    }
+
+
+def _credited_from(
+    db: Session, affiliate: AffiliateProfile, payroll_month: PayrollMonth | None
+) -> list[dict]:
+    """Money landing on this month that was earned in another one.
+
+    An overpayment found when an earlier month is corrected is carried onto a
+    later one rather than clawed back. Without this the later month simply
+    contains more money than its own orders explain, which reads as an error in
+    the platform.
+    """
+    if payroll_month is None:
+        return []
+
+    return [
+        {
+            "month": adjustment.source_month.month,
+            "piastres": adjustment.amount_piastres,
+        }
+        for adjustment in adjustments_for(db, affiliate)
+        if adjustment.destination_payroll_month_id == payroll_month.id
+    ]
 
 
 def my_orders(db: Session, affiliate: AffiliateProfile, month: str) -> list[dict]:

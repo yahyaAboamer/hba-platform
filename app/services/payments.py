@@ -263,6 +263,35 @@ def record_payment(
     if amount_piastres <= 0:
         raise ValueError("A payment must be for more than nothing")
 
+    # **Nothing is paid while one of this model's months is mid-correction.**
+    #
+    # Correcting a rate across several months means reopening each of them -
+    # reopen May, reopen June, edit, re-approve both. Between the first reopen
+    # and the last re-approval the figures disagree with themselves: a
+    # reopened month has no active snapshot, so what is owed is unknown, while
+    # the payment already made against the superseded one still stands.
+    #
+    # Paying into that gap is how somebody gets paid twice. `reopen_month`
+    # already calls itself the most dangerous operation here, and its real
+    # danger is not reopening but *forgetting* - which is what
+    # `months_left_reopened` exists to surface. This refuses to let money move
+    # until the correction is finished.
+    from app.services.payroll import months_left_reopened
+
+    unfinished = sorted(
+        row.month
+        for row in months_left_reopened(db)
+        if row.affiliate_id == affiliate.id
+    )
+    if unfinished:
+        raise ValueError(
+            f"{affiliate.name} has "
+            + ", ".join(unfinished)
+            + " reopened and not yet agreed again. Finish the correction "
+            "before recording a payment - until every reopened month is "
+            "approved, what is owed is still changing."
+        )
+
     requested = allocations or {}
     if sum(requested.values()) > amount_piastres:
         raise ValueError(

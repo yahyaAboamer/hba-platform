@@ -120,6 +120,18 @@ export type MyEarnings = {
    * that is not agreed yet, or one approved before any policy existed.
    */
   policy_version: { id: number; effective_month: string } | null;
+  /**
+   * Set only when this month was agreed, reopened and agreed again at a
+   * different figure. A settled month is meant to be final, so one that moved
+   * has to say so rather than quietly becoming a different number.
+   */
+  recalculated: {
+    was_piastres: number;
+    now_piastres: number;
+    at: string | null;
+  } | null;
+  /** Money landing on this month that was earned in an earlier one. */
+  credited_from: { month: string; piastres: number }[];
   orders_detail: MyOrder[];
 };
 

@@ -669,3 +669,71 @@ def test_a_month_opened_only_to_receive_a_credit_is_not_reported_as_forgotten(db
     db.flush()
 
     assert months_left_reopened(db, SEPTEMBER) == []
+
+
+# ── Nothing is paid mid-correction ──────────────────────────────────────────
+#
+# Correcting a rate across several months means reopening each of them, editing,
+# and re-approving each. Between the first reopen and the last re-approval the
+# figures disagree with themselves: a reopened month has no active snapshot, so
+# what is owed is unknown, while the payment already made against the superseded
+# one still stands. Paying into that gap is how somebody gets paid twice.
+
+
+def test_a_payment_is_refused_while_a_month_sits_reopened(db):
+    affiliate = _affiliate(db)
+    _owed(db, affiliate, AUGUST)
+    db.flush()
+    reopen_month(db, affiliate, AUGUST, reason="rate was wrong")
+    db.flush()
+
+    with pytest.raises(ValueError) as refused:
+        record_payment(db, affiliate, amount_piastres=200_000)
+    assert AUGUST in str(refused.value)
+
+
+def test_the_refusal_names_every_month_still_open(db):
+    """A correction spanning May and June leaves two. Naming only one would
+    send somebody back to the screen twice.
+    """
+    affiliate = _affiliate(db)
+    _owed(db, affiliate, "2026-05")
+    _owed(db, affiliate, "2026-06")
+    db.flush()
+    reopen_month(db, affiliate, "2026-05", reason="rate was wrong")
+    reopen_month(db, affiliate, "2026-06", reason="rate was wrong")
+    db.flush()
+
+    with pytest.raises(ValueError) as refused:
+        record_payment(db, affiliate, amount_piastres=200_000)
+    assert "2026-05" in str(refused.value)
+    assert "2026-06" in str(refused.value)
+
+
+def test_paying_works_again_once_every_reopened_month_is_agreed(db):
+    affiliate = _affiliate(db)
+    _owed(db, affiliate, AUGUST)
+    db.flush()
+    reopen_month(db, affiliate, AUGUST, reason="rate was wrong")
+    db.flush()
+    approve_month(db, affiliate, AUGUST)
+    db.flush()
+
+    payment = record_payment(db, affiliate, amount_piastres=200_000)
+    assert payment.id is not None
+
+
+def test_one_models_correction_never_blocks_another(db):
+    """The guard is per affiliate. Somebody else's half-finished correction is
+    not a reason to hold this person's money.
+    """
+    correcting = _affiliate(db, name="Nour")
+    unaffected = _affiliate(db, name="Sara")
+    _owed(db, correcting, AUGUST)
+    _owed(db, unaffected, AUGUST)
+    db.flush()
+    reopen_month(db, correcting, AUGUST, reason="rate was wrong")
+    db.flush()
+
+    payment = record_payment(db, unaffected, amount_piastres=200_000)
+    assert payment.id is not None

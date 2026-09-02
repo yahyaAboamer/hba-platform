@@ -428,8 +428,8 @@ export function AffiliateDetail({ session }: { session: Session }) {
           </div>
           {detail.compensation === null ? (
             <p className="empty">
-              No pay terms for this month, so nothing can be calculated. Sales
-              are still recorded.
+              No pay terms for {formatMonth(detail.current_month)}, so nothing
+              can be calculated. Sales are still recorded.
             </p>
           ) : (
             <dl className="detail__list">
@@ -490,12 +490,11 @@ export function AffiliateDetail({ session }: { session: Session }) {
         <section className="panel">
           <div className="panel__head">
             <h2 className="panel__title">Discount codes</h2>
-            <span className="page__subtitle">
-              {formatMonth(detail.current_month)}
-            </span>
           </div>
           {detail.codes.length === 0 ? (
-            <p className="empty">None registered for this month.</p>
+            <p className="empty">
+              None registered for {formatMonth(detail.current_month)}.
+            </p>
           ) : (
             <ul className="detail__codes">
               {detail.codes.map((entry) => (
