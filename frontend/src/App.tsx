@@ -5,6 +5,7 @@ import { Layout } from "./components/Layout";
 import { api, currentUser } from "./lib/api";
 import type { Session } from "./lib/api";
 import { AcceptInvitation } from "./screens/AcceptInvitation";
+import { ResetPassword } from "./screens/ResetPassword";
 import { AffiliateDetail } from "./screens/AffiliateDetail";
 import { AffiliatePortal } from "./screens/AffiliatePortal";
 import { AffiliatePayments } from "./screens/AffiliatePayments";
@@ -86,6 +87,16 @@ export default function App() {
         <Route
           path="/accept-invitation"
           element={<AcceptInvitation onSignedIn={setSession} />}
+        />
+        {/*
+         * Unauthenticated for the same reason: somebody who has lost their
+         * password has no session to check. Rendered whatever the session
+         * state, because an already-signed-in person following a reset link
+         * from their own inbox is an ordinary case, not a misuse.
+         */}
+        <Route
+          path="/reset-password"
+          element={<ResetPassword onSignedIn={setSession} />}
         />
         {/*
          * §6.1. The split is on **what the session is**, not on what it may

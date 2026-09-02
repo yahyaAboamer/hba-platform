@@ -27,7 +27,7 @@ from app.services.codes import register_code
 def _affiliate(db, name="Nour", kind=AccountKind.MODEL):
     account = UserAccount(
         email=f"{name.lower()}@example.com",
-        password_hash=hash_password("a-long-enough-password"),
+        password_hash=hash_password("quiet-harbour-lantern"),
         status="active",
         display_name=name,
     )

@@ -42,7 +42,7 @@ def _go_live(monkeypatch):
 def _affiliate(db, name="Nour Mahmoud", email="nour@example.com"):
     account = UserAccount(
         email=email,
-        password_hash=hash_password("a-long-enough-password"),
+        password_hash=hash_password("quiet-harbour-lantern"),
         status="active",
         display_name=name,
     )

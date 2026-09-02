@@ -145,3 +145,43 @@ class Invitation(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )
+
+
+class PasswordReset(Base):
+    """A single-use link back into an account whose password is lost.
+
+    **Without this there was no way back at all.** No reset route existed, and
+    re-inviting was refused too - `create_invitation` turns away an address
+    that already holds an account ("already on the programme"). A model who
+    forgot their password could only be helped by editing the database by
+    hand. Survivable with one administrator who knows their own password;
+    not survivable with twenty people.
+
+    The same shape as `Invitation` and for the same reasons: the raw token is
+    a credential, so only its hash is stored, and it is single-use. Shorter
+    lived, though - an invitation waits on somebody who has not heard of the
+    platform yet, while a reset is answered by somebody already at the screen
+    asking for it.
+    """
+
+    __tablename__ = "password_reset"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_account_id: Mapped[int] = mapped_column(
+        ForeignKey("user_account.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    #: Set the moment it is spent. Kept rather than deleted so "when did
+    #: somebody last reset this account" survives, which is the question asked
+    #: when an account behaves oddly.
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    #: What asked for it. Not shown to anybody; recorded because a reset
+    #: request nobody made is the first sign of somebody probing addresses.
+    requested_ip: Mapped[str | None] = mapped_column(String(45))
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )

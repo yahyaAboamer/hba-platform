@@ -69,6 +69,7 @@ class Event:
     MONTH_APPROVED = "month.approved"
     PAYMENT_RECORDED = "payment.recorded"
     DESTINATION_CHANGED = "destination.changed"
+    PASSWORD_RESET = "password.reset"
 
     #: Not in §16's table. Added with the maintainer's own
     #: payout-destination screen, because that screen is the first way one
@@ -161,6 +162,26 @@ def invitation_sent(
         recipient_email=email,
         subject_ref=f"invitation:{email}",
         payload={"email": email, "role": role, "_secret": {"token": token}},
+    )
+
+
+def password_reset_requested(
+    db: Session, account, token: str
+) -> NotificationOutbox | None:
+    """The way back in, emailed to the address that asked for it.
+
+    **The token is a credential**, so it travels in `_secret` and is erased
+    the moment the mail goes out - the same handling `invitation_sent` gives
+    its own. The outbox keeps the record that a reset was sent; it stops being
+    a way in.
+    """
+    return queue(
+        db,
+        event=Event.PASSWORD_RESET,
+        recipient_email=account.email,
+        recipient_name=account.display_name,
+        subject_ref=f"user:{account.id}",
+        payload={"email": account.email, "_secret": {"token": token}},
     )
 
 
@@ -470,6 +491,35 @@ def render(event: str, payload: dict) -> Message | None:
             to_address=payload["email"],
             to_name=None,
             subject="Your HBA affiliate account",
+            body=body + _sign_off(),
+        )
+
+    if event == Event.PASSWORD_RESET:
+        # The link is the whole email, for the same reason the invitation's is:
+        # anything else competes with the one thing they came here to do.
+        token = (payload.get("_secret") or {}).get("token", "")
+        link = _link(f"/reset-password?token={token}") if token else ""
+        body = (
+            f"Hi {first},\n\n"
+            "Somebody asked to reset the password on your HBA affiliate "
+            "account."
+        )
+        if link:
+            body += (
+                "\n\nOpen this link to choose a new one. It works once, and "
+                "it expires in two hours:\n" + link
+            )
+        # **Said even when it was them.** Somebody who did not ask needs to
+        # know a stranger typed their address into a reset form, and the
+        # reassurance costs a sentence.
+        body += (
+            "\n\nIf this was not you, nothing has changed and you can ignore "
+            "this - your password still works, and nobody can see it."
+        )
+        return Message(
+            to_address=payload["email"],
+            to_name=name or None,
+            subject="Reset your HBA password",
             body=body + _sign_off(),
         )
 

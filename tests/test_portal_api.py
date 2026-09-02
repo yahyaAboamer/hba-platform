@@ -33,9 +33,9 @@ ADDRESS = 'https://ipn.eg/S/nour.mahmoud/instapay/8Xk2Qp'
 BOOTSTRAP = {
     "email": "owner@example.com",
     "display_name": "Owner",
-    "password": "a-long-enough-password",
+    "password": "quiet-harbour-lantern",
 }
-PASSWORD = "a-long-enough-password"
+PASSWORD = "quiet-harbour-lantern"
 AUGUST = "2026-08"
 SEPTEMBER = "2026-09"
 

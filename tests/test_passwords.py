@@ -25,11 +25,11 @@ def test_wrong_password_fails():
 def test_same_password_produces_different_hashes():
     # A random salt per hash means identical passwords never collide, so a
     # leaked table cannot reveal which accounts share a password.
-    assert hash_password("a-long-enough-password") != hash_password("a-long-enough-password")
+    assert hash_password("quiet-harbour-lantern") != hash_password("quiet-harbour-lantern")
 
 
 def test_the_password_never_appears_in_the_hash():
-    secret = "a-long-enough-password"
+    secret = "quiet-harbour-lantern"
     assert secret not in hash_password(secret)
 
 
@@ -79,9 +79,9 @@ def test_malformed_hash_returns_false_rather_than_raising():
 
 def test_unknown_algorithm_is_refused():
     # Prevents a downgrade to a weaker scheme by editing the stored prefix.
-    encoded = hash_password("a-long-enough-password")
+    encoded = hash_password("quiet-harbour-lantern")
     tampered = encoded.replace("pbkdf2_sha256", "md5", 1)
-    assert verify_password("a-long-enough-password", tampered) is False
+    assert verify_password("quiet-harbour-lantern", tampered) is False
 
 
 def test_encoded_format_is_self_describing():
@@ -97,7 +97,7 @@ def test_encoded_format_is_self_describing():
     session had set.
     """
     algorithm, iterations, salt, digest = hash_password(
-        "a-long-enough-password"
+        "quiet-harbour-lantern"
     ).split("$")
 
     assert algorithm == "pbkdf2_sha256"
@@ -117,14 +117,14 @@ def test_a_hash_verifies_at_whatever_cost_it_was_made_with():
     original = passwords.ITERATIONS
     try:
         passwords.ITERATIONS = 1_000
-        cheap = hash_password("a-long-enough-password")
+        cheap = hash_password("quiet-harbour-lantern")
         passwords.ITERATIONS = 50_000
-        dearer = hash_password("a-long-enough-password")
+        dearer = hash_password("quiet-harbour-lantern")
     finally:
         passwords.ITERATIONS = original
 
-    assert verify_password("a-long-enough-password", cheap)
-    assert verify_password("a-long-enough-password", dearer)
+    assert verify_password("quiet-harbour-lantern", cheap)
+    assert verify_password("quiet-harbour-lantern", dearer)
     assert cheap.split("$")[1] != dearer.split("$")[1]
 
 

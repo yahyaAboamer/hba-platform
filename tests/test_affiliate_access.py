@@ -23,7 +23,7 @@ from fastapi import HTTPException
 def _account(db, email: str, status: str = "active") -> UserAccount:
     account = UserAccount(
         email=email,
-        password_hash=hash_password("a-long-enough-password"),
+        password_hash=hash_password("quiet-harbour-lantern"),
         status=status,
         display_name=email.split("@")[0].title(),
     )

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
+import { PasswordField } from "../components/PasswordField";
 import { ApiError, acceptInvitation, previewInvitation } from "../lib/api";
 import type { Session } from "../lib/api";
 import "./SignIn.css";
@@ -42,9 +43,9 @@ export function AcceptInvitation({
   const [checking, setChecking] = useState(true);
 
   const [password, setPassword] = useState("");
-  const [reveal, setReveal] = useState(false);
   // §5.1, and stated here so the rule arrives before the refusal does.
   const tooShort = password.length > 0 && password.length < MINIMUM_PASSWORD;
+  const [passwordProblem, setPasswordProblem] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
 
@@ -167,32 +168,13 @@ export function AcceptInvitation({
           password — we will ask for your details next.
         </p>
 
-        <label className="field">
-          <span className="field__label">Choose a password</span>
-          <input
-            className="input"
-            type={reveal ? "text" : "password"}
-            autoComplete="new-password"
-            required
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            aria-invalid={tooShort}
-          />
-          <span className="field__hint">
-            At least {MINIMUM_PASSWORD} characters.{" "}
-            {/*
-             * The single biggest reducer of typos on a phone, and the reason
-             * people paste passwords they cannot then reproduce.
-             */}
-            <button
-              type="button"
-              className="sign-in__reveal"
-              onClick={() => setReveal((was) => !was)}
-            >
-              {reveal ? "Hide" : "Show"}
-            </button>
-          </span>
-        </label>
+        <PasswordField
+          value={password}
+          onChange={setPassword}
+          personal={{ email: invitedEmail ?? undefined }}
+          minimum={MINIMUM_PASSWORD}
+          onProblemChange={setPasswordProblem}
+        />
 
         {tooShort && (
           <p className="blocker sign-in__error">
@@ -210,7 +192,12 @@ export function AcceptInvitation({
         <button
           type="submit"
           className="button button--primary sign-in__submit"
-          disabled={working || tooShort || password.length === 0}
+          disabled={
+            working ||
+            tooShort ||
+            password.length === 0 ||
+            passwordProblem !== null
+          }
         >
           {working ? "Setting up…" : "Continue"}
         </button>

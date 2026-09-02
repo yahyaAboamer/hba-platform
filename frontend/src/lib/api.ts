@@ -270,6 +270,57 @@ export async function previewInvitation(
   );
 }
 
+/**
+ * How strong a password is, and why it might be refused.
+ *
+ * Asked of the server rather than worked out here. The rules would otherwise
+ * exist twice, and the day the two drifted the symptom would be a green bar
+ * over a password the server rejects - a screen telling somebody they are
+ * fine while the button does not work.
+ */
+export async function checkPassword(
+  password: string,
+  personal: { email?: string; name?: string } = {},
+): Promise<{ strength: number; problem: string | null; minimum: number }> {
+  return api.post<{ strength: number; problem: string | null; minimum: number }>(
+    "/api/auth/password-quality",
+    { password, email: personal.email ?? "", name: personal.name ?? "" },
+  );
+}
+
+/** Ask for a reset link. Answers the same way whether or not the account
+ *  exists, so this can never be used to ask who is on the programme. */
+export async function requestPasswordReset(email: string): Promise<void> {
+  await api.post("/api/auth/password-reset/request", { email });
+}
+
+/** Whose reset link this is, checked when the page opens rather than when the
+ *  form is submitted. */
+export async function previewPasswordReset(
+  token: string,
+): Promise<{ email: string }> {
+  return api.get<{ email: string }>(
+    `/api/auth/password-reset/preview?token=${encodeURIComponent(token)}`,
+  );
+}
+
+export async function completePasswordReset(
+  token: string,
+  password: string,
+): Promise<Session> {
+  const result = await api.post<{ csrf: string; actor: Actor }>(
+    "/api/auth/password-reset",
+    { token, password },
+  );
+  rememberToken(result.csrf);
+
+  const session = await currentUser();
+  if (session === null) {
+    throw new ApiError(401, "Password changed, but the session did not stick.");
+  }
+  return session;
+}
+
 export async function acceptInvitation(
   token: string,
   password: string,

@@ -17,7 +17,7 @@ from app.main import app
 BOOTSTRAP = {
     "email": "owner@example.com",
     "display_name": "Owner",
-    "password": "a-long-enough-password",
+    "password": "quiet-harbour-lantern",
 }
 
 
@@ -45,7 +45,7 @@ def _second_staff_account(role: str, email: str = "sara@example.com") -> int:
                 "INSERT INTO user_account (email, password_hash, status, display_name) "
                 "VALUES (:e, :p, 'active', 'Sara') RETURNING id"
             ),
-            {"e": email, "p": hash_password("a-long-enough-password")},
+            {"e": email, "p": hash_password("quiet-harbour-lantern")},
         ).scalar_one()
         connection.execute(
             text(
@@ -257,7 +257,7 @@ def test_revoking_an_invitation_closes_the_link(client):
         json={
             "token": token,
             "display_name": "Layla",
-            "password": "a-long-enough-password",
+            "password": "quiet-harbour-lantern",
         },
     )
     assert accept.status_code == 422
@@ -297,7 +297,7 @@ def test_revoking_an_already_used_invitation_is_refused(client):
             json={
                 "token": invite["token"],
                 "display_name": "Layla",
-                "password": "a-long-enough-password",
+                "password": "quiet-harbour-lantern",
             },
         )
         assert accept.status_code == 201, accept.text

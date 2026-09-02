@@ -15,7 +15,7 @@ from app.main import app
 BOOTSTRAP = {
     "email": "owner@example.com",
     "display_name": "Owner",
-    "password": "a-long-enough-password",
+    "password": "quiet-harbour-lantern",
 }
 
 
@@ -83,4 +83,4 @@ def test_a_sensitive_value_never_reaches_the_response_unmasked(client):
     events = client.get("/api/audit").json()["events"]
     raw = str(events)
 
-    assert "a-long-enough-password" not in raw
+    assert "quiet-harbour-lantern" not in raw

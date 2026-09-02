@@ -23,7 +23,7 @@ from app.services.compensation import (
 def _affiliate(db, name="Nour"):
     account = UserAccount(
         email=f"{name.lower()}@example.com",
-        password_hash=hash_password("a-long-enough-password"),
+        password_hash=hash_password("quiet-harbour-lantern"),
         status="active",
         display_name=name,
     )
