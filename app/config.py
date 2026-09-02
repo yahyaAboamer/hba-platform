@@ -7,6 +7,40 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
+    @field_validator(
+        "session_hours",
+        "smtp_port",
+        "smtp_use_tls",
+        "smtp_timeout_seconds",
+        "shopify_timeout_seconds",
+        mode="before",
+    )
+    @classmethod
+    def _blank_means_unset(cls, value, info):
+        """An emptied variable is an absent one, not a broken one.
+
+        A dashboard offers two ways to stop using a setting: delete it, or
+        clear the box. Deleting it falls back to the default here; clearing it
+        used to hand pydantic `''`, which is not an integer or a boolean, so
+        `Settings()` raised at import and **the whole application failed to
+        start** - before logging, before the health check, with a traceback
+        that names pydantic rather than the variable somebody just edited.
+
+        That is exactly how staging went down on 2026-09-02: SMTP_PORT and
+        SMTP_USE_TLS were blanked rather than removed, and every deploy then
+        died in `alembic upgrade head`, which imports this module.
+
+        Only the fields where a blank cannot mean anything else. A string
+        setting keeps its empty value, because `smtp_host = ""` genuinely
+        means "no SMTP host" and the code already reads it that way.
+
+        The declared default is returned rather than `None`, which would fail
+        the same validation one line later for a field that is not optional.
+        """
+        if isinstance(value, str) and not value.strip():
+            return cls.model_fields[info.field_name].default
+        return value
+
     # 127.0.0.1 rather than localhost: localhost resolves to both ::1 and
     # 127.0.0.1, so every failed connection is attempted twice.
     database_url: str = "postgresql+psycopg://hba:hba@127.0.0.1:5433/hba_platform"

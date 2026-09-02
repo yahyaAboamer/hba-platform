@@ -1,0 +1,5 @@
+# Shell scripts must keep LF endings. docker-entrypoint.sh is execed inside
+# a Linux container, and a CRLF shebang fails as "no such file or directory" -
+# a confusing way to lose a deploy.
+*.sh text eol=lf
+Dockerfile text eol=lf
