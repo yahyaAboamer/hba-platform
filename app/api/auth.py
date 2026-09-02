@@ -26,8 +26,12 @@ from app.services.auth import (
     resolve_session,
     revoke_session,
 )
-from app.services.invitations import accept_invitation, create_invitation
-from app.services.notifications import invitation_sent
+from app.services.invitations import (
+    accept_invitation,
+    create_invitation,
+    preview_invitation,
+)
+from app.services.notifications import invitation_link, invitation_sent
 from app.services.payroll import go_live_month, working_month
 
 router = APIRouter(prefix="/api/auth")
@@ -51,7 +55,12 @@ class InviteBody(BaseModel):
 
 class AcceptInviteBody(BaseModel):
     token: str = Field(min_length=1, max_length=200)
-    display_name: str = Field(min_length=1, max_length=120)
+    # Optional, because the screen that used to ask for it no longer does. A
+    # model is asked their name once, on the details step that follows, and
+    # `submit_application` writes it to the account as well - so there is one
+    # name rather than two that disagree. Staff, who have no details step,
+    # still send one.
+    display_name: str = Field(default="", max_length=120)
     password: str = Field(min_length=MINIMUM_PASSWORD_LENGTH, max_length=256)
 
 
@@ -342,6 +351,13 @@ def invite(
             "expires_at": invitation.expires_at.isoformat(),
         },
         "token": token,
+        # **Built here, not by the screen.** The screen used to assemble its
+        # own link from the browser's address bar while the email assembled a
+        # different one from PUBLIC_BASE_URL - and on 2026-09-02 they differed,
+        # so the maintainer saw a working link and the model received a dead
+        # one. Empty means the platform does not know its own address, which
+        # the screen reports rather than hiding.
+        "link": invitation_link(token),
         # Whether the platform will actually send it: a notification was
         # queued, and there are credentials to send it with. The screen shows
         # the copyable link either way - a link that was emailed is still worth
@@ -350,6 +366,34 @@ def invite(
         # it did send.
         "emailed": queued is not None and settings.mail_configured,
     }
+
+
+@router.get("/invitations/preview")
+def preview(token: str, db: Session = Depends(get_session)) -> dict:
+    """Is this link still good, and who is it for?
+
+    Unauthenticated by necessity - the person opening it has no account yet,
+    which is the entire point of the link. The token is the credential, exactly
+    as it is for accepting, and the same three checks apply.
+
+    Two problems this solves at once:
+
+    - **A dead link used to render the whole form.** Somebody withdrawn hours
+      earlier still chose a name and a password before being refused, and
+      withdrawing looked like it had done nothing.
+    - **The first screen could not name the account.** It asked for a password
+      with no indication of which address it belonged to, which reads as a
+      form arriving out of nowhere.
+
+    Returning the address is safe: whoever holds the link was sent it.
+    """
+    try:
+        invitation = preview_invitation(db, token)
+    except ValueError as exc:
+        # 410, not 404: the link was real and is now spent. The screen shows
+        # this message verbatim, so it has to read as a sentence.
+        raise HTTPException(410, str(exc)) from exc
+    return {"email": invitation.email, "role": invitation.role}
 
 
 @router.post("/invitations/accept", status_code=201)

@@ -70,9 +70,15 @@ def submit_application(
     if existing_application(db, user) is not None:
         raise ValueError("You have already applied")
 
-    name = str(name or "").strip()
+    name = " ".join(str(name or "").split())
     if not name:
         raise ValueError("Tell us your name")
+    if len(name.split(" ")) < 2:
+        # Two parts, not exactly two: "Mohamed Abdel Rahman" is an ordinary
+        # name, not a mistake, and refusing it would be worse than the problem
+        # this solves - which is a roster of single first names nobody can tell
+        # apart when three models are called Nour.
+        raise ValueError("Please give your first and family name")
 
     phone = str(phone or "").strip()
     if not phone:
@@ -110,6 +116,15 @@ def submit_application(
         actor_id=user.id,
         actor_email=user.email,
     )
+
+    # **One name, in both places.** The account carried whatever was typed on
+    # the very first screen and the profile carried what was typed on the
+    # second, so a model saw one name in their own portal while the maintainer
+    # saw a different one in admin - and neither could see the other's. Tested
+    # directly during the walkthrough: "Ahmed Mohamed" and "Ahmed" for one
+    # person. The name asked for here is the one a person actually gives, so
+    # it becomes the account's too.
+    user.display_name = name
 
     # Unverified. §10.4's gate is `set_status`, and it stays the only gate.
     #

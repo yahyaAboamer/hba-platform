@@ -255,14 +255,28 @@ export async function signIn(
  * one step"), so the same "ask `/me` once more for the permission list"
  * pattern applies here too.
  */
+/**
+ * Is this invitation link still good, and whose is it?
+ *
+ * Called when the page opens, not when the form is submitted. A withdrawn or
+ * lapsed link used to render the whole form and refuse only at the end, after
+ * somebody had chosen a name and a password.
+ */
+export async function previewInvitation(
+  token: string,
+): Promise<{ email: string; role: string }> {
+  return api.get<{ email: string; role: string }>(
+    `/api/auth/invitations/preview?token=${encodeURIComponent(token)}`,
+  );
+}
+
 export async function acceptInvitation(
   token: string,
-  displayName: string,
   password: string,
 ): Promise<Session> {
   const result = await api.post<{ csrf: string; actor: Actor }>(
     "/api/auth/invitations/accept",
-    { token, display_name: displayName, password },
+    { token, password },
   );
   rememberToken(result.csrf);
 
