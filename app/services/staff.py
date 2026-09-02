@@ -14,7 +14,7 @@ This is where that promise is kept. `settings.manage`, `invitations.send` and
 `audit.view` were defined with this screen in mind and had no UI until now.
 """
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.businesstime import utcnow
@@ -84,8 +84,22 @@ def list_pending_invitations(
     `exclude_roles` keeps model invitations off the staff panel. They are not
     hidden: they appear on Affiliates, beside the models they will become, so
     every invitation is still withdrawable from the screen it belongs to.
+
+    **An address that already has an account is not pending anything.** Only
+    the invitation actually used is marked accepted, so a person invited four
+    times kept three rows for ever - and they sat on the affiliates screen
+    above the model they had become. Filtering on the account rather than on
+    the invitation clears the ones already on file too, with no migration and
+    nothing deleted.
     """
-    query = select(Invitation).where(Invitation.accepted_at.is_(None))
+    has_account = (
+        select(UserAccount.id)
+        .where(func.lower(UserAccount.email) == func.lower(Invitation.email))
+        .exists()
+    )
+    query = select(Invitation).where(
+        Invitation.accepted_at.is_(None), ~has_account
+    )
     if exclude_roles:
         query = query.where(Invitation.role.notin_(exclude_roles))
     return list(db.scalars(query.order_by(Invitation.created_at)))

@@ -41,6 +41,7 @@ from app.services.affiliates import (
 )
 from app.services.codes import (
     codes_for,
+    registered_codes,
     codes_with_status,
     mark_verified,
     normalise_code,
@@ -272,10 +273,25 @@ def list_affiliates_route(
     from app.services.staff import list_pending_invitations
 
     affiliates = list_affiliates(db, include_archived=include_archived)
-    setup = readiness(db, working_month())
+    month = working_month()
+    setup = readiness(db, month)
+    # The code is how an order is recognised as somebody's, so it is how a
+    # person is recognised on this list too - asked for by name during the
+    # walkthrough.
+    #
+    # Built by inverting `registered_codes`, which already answers this set-wise
+    # from the one definition of "owned in this month". A second query with its
+    # own copy of that filter is precisely what `codes_for` warns against: two
+    # copies eventually disagree, and the way anybody finds out is a model
+    # being shown somebody else's code.
+    codes = {
+        affiliate_id: code
+        for code, affiliate_id in registered_codes(db, month).items()
+    }
     return {
         "affiliates": [
-            {**_affiliate_payload(a), **setup.get(a.id, {})} for a in affiliates
+            {**_affiliate_payload(a), **setup.get(a.id, {}), "code": codes.get(a.id)}
+            for a in affiliates
         ],
         # Invitations that have not been opened yet. They belong here rather
         # than on the staff panel: a model is not staff, and an invitation
@@ -286,6 +302,11 @@ def list_affiliates_route(
                 "email": invitation.email,
                 "expires_at": invitation.expires_at.isoformat(),
                 "expired": invitation.expires_at <= utcnow(),
+                # When it was sent. Two rows for one address are otherwise
+                # indistinguishable, which is exactly the state the affiliates
+                # screen was found in - several identical lines, no way to tell
+                # which was which or which had been acted on.
+                "created_at": invitation.created_at.isoformat(),
             }
             for invitation in list_pending_invitations(db)
             if invitation.role == "affiliate"

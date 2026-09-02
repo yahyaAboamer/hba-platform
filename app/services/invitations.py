@@ -75,6 +75,34 @@ def create_invitation(
     return token, invitation
 
 
+def preview_invitation(db: Session, token: str) -> Invitation:
+    """Read an invitation without consuming it, for the page it opens.
+
+    The accept screen used to render its whole form on any URL that carried a
+    token-shaped string, and only discover the token was dead when the form was
+    submitted - so somebody withdrawn hours earlier still chose a name and a
+    password before being refused. Worse, it made withdrawing look like it had
+    done nothing.
+
+    The checks and their wording are deliberately the same ones
+    `accept_invitation` applies, so the page cannot say the link is fine and
+    then refuse it a moment later.
+    """
+    if not token:
+        raise ValueError("This invitation link is not valid")
+
+    invitation = db.scalar(
+        select(Invitation).where(Invitation.token_hash == _hash(token))
+    )
+    if invitation is None:
+        raise ValueError("This invitation link is not valid")
+    if invitation.accepted_at is not None:
+        raise ValueError("This invitation has already been used")
+    if invitation.expires_at <= utcnow():
+        raise ValueError("This invitation has expired")
+    return invitation
+
+
 def accept_invitation(
     db: Session, token: str, password: str, display_name: str
 ) -> UserAccount:
@@ -124,5 +152,29 @@ def accept_invitation(
             granted_by=invitation.invited_by,
         )
     )
-    invitation.accepted_at = utcnow()
+    accepted_at = utcnow()
+    invitation.accepted_at = accepted_at
+
+    # Every other outstanding invitation to this address dies with it.
+    #
+    # Sending a second invitation is allowed on purpose - it is how somebody
+    # who never received the first one gets another. But accepting used to
+    # close only the link that was actually used, leaving the rest live: two
+    # working credentials for one person, and a row on the affiliates screen
+    # for somebody who is now a model sitting right below it.
+    #
+    # Expired rather than deleted, and through the same `expires_at` the
+    # accept check already reads, so a closed link and a lapsed one fail
+    # identically and there is no second rule to disagree with the first.
+    siblings = db.scalars(
+        select(Invitation).where(
+            func.lower(Invitation.email) == invitation.email.lower(),
+            Invitation.id != invitation.id,
+            Invitation.accepted_at.is_(None),
+            Invitation.expires_at > accepted_at,
+        )
+    ).all()
+    for sibling in siblings:
+        sibling.expires_at = accepted_at
+
     return user

@@ -17,6 +17,8 @@ export type Affiliate = {
   archived_at: string | null;
   has_verified_code?: boolean;
   has_terms?: boolean;
+  /** The code they sell under this month, if they have one registered. */
+  code?: string | null;
 };
 
 /** An invitation nobody has opened yet. Not a model, and still ours. */
@@ -25,7 +27,30 @@ type Invited = {
   email: string;
   expires_at: string;
   expired: boolean;
+  created_at: string;
 };
+
+/**
+ * When an invitation went out, said the way somebody actually reads it.
+ *
+ * "today at 14:20" and "yesterday" answer the question being asked - which of
+ * these two identical rows is the recent one - where a full date makes the
+ * reader do the arithmetic themselves.
+ */
+function formatSentAt(iso: string): string {
+  const sent = new Date(iso);
+  const time = sent.toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const days = Math.floor(
+    (new Date().setHours(0, 0, 0, 0) - new Date(sent).setHours(0, 0, 0, 0)) /
+      86_400_000,
+  );
+  if (days === 0) return `today at ${time}`;
+  if (days === 1) return `yesterday at ${time}`;
+  return sent.toLocaleDateString("en-GB", { day: "numeric", month: "long" });
+}
 
 type View = "table" | "cards";
 
@@ -219,9 +244,17 @@ export function Affiliates() {
           <span>
             <strong>{waiting.length}</strong> waiting for you to approve
           </span>
+          {/*
+           * One counter, not two. It read as two separate facts sharing a
+           * line, and the dash looked like it joined them - so "0 cannot earn
+           * yet — no code confirmed, or no pay terms" was read as a second
+           * count of something. The reason moves behind the count, where the
+           * per-model detail already lives in Needs attention.
+           */}
           <span className={stuck.length > 0 ? "affiliates__stuck" : undefined}>
-            <strong>{stuck.length}</strong> cannot earn yet — no code confirmed,
-            or no pay terms
+            <strong>{stuck.length}</strong>{" "}
+            {stuck.length === 1 ? "model cannot" : "models cannot"} earn yet
+            {stuck.length > 0 && " — see Needs attention"}
           </span>
         </div>
       )}
@@ -232,33 +265,71 @@ export function Affiliates() {
        * an invitation sent to the wrong address could never be withdrawn.
        */}
       {invited.length > 0 && (
-        <section className="panel affiliates__invited">
-          <div className="panel__head">
-            <h2 className="panel__title">Invited, not opened yet</h2>
-          </div>
+        <details className="panel affiliates__invited">
+          {/*
+           * Collapsed to one line. An invitation waiting on somebody is worth
+           * seeing, so it stays at the top rather than moving to the bottom -
+           * but seven of them once buried the four models this screen exists
+           * to show. Closing an address when its owner accepts (server side)
+           * keeps this short; collapsing keeps it short even when it is not.
+           */}
+          <summary className="affiliates__invited-summary">
+            <strong>{invited.length}</strong>{" "}
+            {invited.length === 1 ? "invitation" : "invitations"} outstanding
+          </summary>
           <ul className="affiliates__invited-list">
             {invited.map((row) => (
               <li key={row.id}>
-                <span>{row.email}</span>
+                <span className="affiliates__invited-who">
+                  <span>{row.email}</span>
+                  {/*
+                   * Sent-when, because two rows for one address were otherwise
+                   * identical and there was no way to tell which was which.
+                   */}
+                  <span className="affiliates__invited-when">
+                    sent {formatSentAt(row.created_at)}
+                  </span>
+                </span>
                 <span className="affiliates__invited-state">
                   {row.expired ? "Link expired" : "Still waiting"}
                 </span>
+                {/*
+                 * Resend always; withdraw only where it can actually work.
+                 * Withdrawing backdates the expiry and the server refuses an
+                 * invitation that has already lapsed - so offering Withdraw on
+                 * a row marked "Link expired" was offering an action that
+                 * could only fail, which is exactly what it did.
+                 */}
                 <button
                   type="button"
                   className="button"
                   onClick={() =>
                     api
-                      .post(`/api/staff/invitations/${row.id}/revoke`)
+                      .post(`/api/staff/invitations/${row.id}/resend`)
                       .then(reload)
                       .catch((caught) => setError(caught.message))
                   }
                 >
-                  Withdraw
+                  Resend
                 </button>
+                {!row.expired && (
+                  <button
+                    type="button"
+                    className="button"
+                    onClick={() =>
+                      api
+                        .post(`/api/staff/invitations/${row.id}/revoke`)
+                        .then(reload)
+                        .catch((caught) => setError(caught.message))
+                    }
+                  >
+                    Withdraw
+                  </button>
+                )}
               </li>
             ))}
           </ul>
-        </section>
+        </details>
       )}
 
       {rows === null && <p className="empty">Loading…</p>}
@@ -275,6 +346,12 @@ export function Affiliates() {
           <thead>
             <tr>
               <th>Name</th>
+              {/*
+               * Second column, asked for by name: the code is how an order is
+               * recognised as somebody's, so it is how a person is recognised
+               * on this list. In the mono face the app reserves for codes.
+               */}
+              <th>Code</th>
               <th>Status</th>
               <th>Kind</th>
               <th>Needs attention</th>
@@ -292,6 +369,13 @@ export function Affiliates() {
                     >
                       {row.name}
                     </Link>
+                  </td>
+                  <td>
+                    {row.code ? (
+                      <span className="code">{row.code}</span>
+                    ) : (
+                      <span className="affiliates__no-code">none yet</span>
+                    )}
                   </td>
                   <td>{STATUS_LABEL[row.status]}</td>
                   <td>

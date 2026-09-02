@@ -233,3 +233,65 @@ def test_applying_never_sets_compensation_terms(db):
     db.flush()
 
     assert terms_for(db, affiliate, "2026-08") is None
+
+
+# ── The name a model gives ──────────────────────────────────────────────────
+#
+# One name is not enough to tell three models apart on a payroll screen, and
+# the roster is the maintainer's, not the model's. Asked for during the flow-1
+# walkthrough after "Ahmed" and "Ahmed Mohamed" turned out to be the same
+# person seen from two sides.
+
+
+def test_a_single_name_is_refused(db):
+    account = _account(db)
+    with pytest.raises(ValueError) as refused:
+        _apply(db, account, name="Nour")
+    assert "family name" in str(refused.value)
+
+
+def test_a_first_and_family_name_is_enough(db):
+    account = _account(db)
+    assert _apply(db, account, name="Nour Mahmoud").name == "Nour Mahmoud"
+
+
+def test_more_than_two_parts_is_not_a_mistake(db):
+    """The rule is *at least* two, deliberately. Capping it would reject
+    "Mohamed Abdel Rahman", which is an ordinary name rather than an error -
+    and refusing somebody's real name is a worse failure than the one this
+    rule exists to prevent.
+    """
+    account = _account(db)
+    assert (
+        _apply(db, account, name="Mohamed Abdel Rahman").name
+        == "Mohamed Abdel Rahman"
+    )
+
+
+def test_spacing_does_not_decide_whether_a_name_is_accepted(db):
+    """Somebody typing on a phone produces double spaces and trailing ones.
+    Counting raw gaps would accept "Nour " on one device and refuse it on
+    another, which is the kind of rule that looks broken.
+    """
+    account = _account(db)
+    assert _apply(db, account, name="  Nour   Mahmoud  ").name == "Nour Mahmoud"
+
+
+def test_a_padded_single_name_is_still_a_single_name(db):
+    account = _account(db)
+    with pytest.raises(ValueError):
+        _apply(db, account, name="   Nour   ")
+
+
+def test_the_account_takes_the_name_the_model_gave(db):
+    """One name, in both places. The account carried what was typed on the
+    first screen and the profile what was typed on the second, so a model saw
+    one name in their portal while the maintainer saw another in admin.
+    """
+    account = _account(db)
+    account.display_name = "whatever was typed first"
+
+    _apply(db, account, name="Nour Mahmoud")
+    db.flush()
+
+    assert account.display_name == "Nour Mahmoud"

@@ -411,6 +411,23 @@ def _link(path: str) -> str:
     return f"{base}{path}" if base else ""
 
 
+def invitation_link(token: str) -> str:
+    """The invitation link, built once, for whoever needs it.
+
+    **The screen and the email must be incapable of disagreeing.** They used
+    to: the email built its link from `PUBLIC_BASE_URL` while the invite screen
+    built its own from `window.location.origin`, so on 2026-09-02 the screen
+    showed a working link and the email carried a dead one - and the only
+    person who could see both was the model who could not sign in.
+
+    Two sources of truth for one string, where one of them is only ever read by
+    somebody outside the company. So there is one source now, and it is this.
+    An empty result means the platform does not know its own address, which is
+    a thing the invite screen says out loud rather than papering over.
+    """
+    return _link(f"/accept-invitation?token={token}")
+
+
 def _sign_off() -> str:
     return "\n\nHBA Aesthetics"
 
@@ -437,7 +454,7 @@ def render(event: str, payload: dict) -> Message | None:
         # the whole email - anything else in it competes with the one thing they
         # are meant to do.
         token = (payload.get("_secret") or {}).get("token", "")
-        link = _link(f"/accept-invitation?token={token}") if token else ""
+        link = invitation_link(token) if token else ""
         body = (
             "Hi,\n\n"
             "HBA Aesthetics has set up an account for you on the affiliate "

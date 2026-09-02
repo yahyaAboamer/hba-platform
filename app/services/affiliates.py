@@ -362,3 +362,4 @@ def readiness(db: Session, month: str) -> dict[int, dict[str, bool]]:
         }
         for affiliate_id in db.scalars(select(AffiliateProfile.id))
     }
+

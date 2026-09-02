@@ -202,3 +202,152 @@ def test_display_name_is_optional(db):
     user = accept_invitation(db, token, PASSWORD, "")
     db.flush()
     assert user.display_name is None
+
+
+# ── Reading a link before it is used ────────────────────────────────────────
+#
+# The accept screen used to render its whole form on any token-shaped string
+# and only discover the link was dead when the form was submitted - so somebody
+# withdrawn hours earlier still chose a name and a password before being
+# refused, and withdrawing looked like it had done nothing.
+
+
+def test_a_live_link_previews_the_address_it_belongs_to(db):
+    from app.services.invitations import preview_invitation
+
+    admin = _admin(db)
+    token, _ = create_invitation(db, "nour@example.com", "affiliate", admin.id)
+    db.flush()
+
+    assert preview_invitation(db, token).email == "nour@example.com"
+
+
+def test_previewing_does_not_consume_the_link(db):
+    """Looking must not spend it - the page loads before anybody fills it in."""
+    from app.services.invitations import preview_invitation
+
+    admin = _admin(db)
+    token, invitation = create_invitation(db, "nour@example.com", "affiliate", admin.id)
+    db.flush()
+
+    preview_invitation(db, token)
+    assert invitation.accepted_at is None
+    accept_invitation(db, token, PASSWORD, "Nour")  # still works
+
+
+def test_an_expired_link_previews_as_expired(db):
+    from app.services.invitations import preview_invitation
+
+    admin = _admin(db)
+    token, invitation = create_invitation(db, "nour@example.com", "affiliate", admin.id)
+    invitation.expires_at = utcnow() - timedelta(minutes=1)
+    db.flush()
+
+    with pytest.raises(ValueError) as refused:
+        preview_invitation(db, token)
+    assert "expired" in str(refused.value)
+
+
+def test_a_used_link_previews_as_used(db):
+    from app.services.invitations import preview_invitation
+
+    admin = _admin(db)
+    token, _ = create_invitation(db, "nour@example.com", "affiliate", admin.id)
+    db.flush()
+    accept_invitation(db, token, PASSWORD, "Nour")
+    db.flush()
+
+    with pytest.raises(ValueError):
+        preview_invitation(db, token)
+
+
+def test_a_made_up_token_previews_as_invalid(db):
+    from app.services.invitations import preview_invitation
+
+    with pytest.raises(ValueError):
+        preview_invitation(db, "not-a-real-token")
+
+
+def test_preview_and_accept_agree_on_the_wording(db):
+    """One set of checks, so the page cannot say a link is fine and then have
+    it refused a moment later."""
+    from app.services.invitations import preview_invitation
+
+    admin = _admin(db)
+    token, invitation = create_invitation(db, "nour@example.com", "affiliate", admin.id)
+    invitation.expires_at = utcnow() - timedelta(minutes=1)
+    db.flush()
+
+    with pytest.raises(ValueError) as previewed:
+        preview_invitation(db, token)
+    with pytest.raises(ValueError) as accepted:
+        accept_invitation(db, token, PASSWORD, "Nour")
+    assert str(previewed.value) == str(accepted.value)
+
+
+# ── Accepting closes the others ─────────────────────────────────────────────
+#
+# Sending twice is allowed on purpose - it is how somebody who never received
+# the first link gets another. Accepting used to close only the link actually
+# used, leaving the rest live: two working credentials for one person.
+
+
+def test_accepting_closes_every_other_invitation_to_that_address(db):
+    admin = _admin(db)
+    stale_token, stale = create_invitation(db, "nour@example.com", "affiliate", admin.id)
+    db.flush()
+    fresh_token, _ = create_invitation(db, "nour@example.com", "affiliate", admin.id)
+    db.flush()
+
+    accept_invitation(db, fresh_token, PASSWORD, "Nour")
+    db.flush()
+
+    assert stale.expires_at <= utcnow()
+    with pytest.raises(ValueError):
+        accept_invitation(db, stale_token, PASSWORD, "Nour")
+
+
+def test_accepting_leaves_other_peoples_invitations_alone(db):
+    admin = _admin(db)
+    other_token, other = create_invitation(db, "jana@example.com", "affiliate", admin.id)
+    mine_token, _ = create_invitation(db, "nour@example.com", "affiliate", admin.id)
+    db.flush()
+
+    accept_invitation(db, mine_token, PASSWORD, "Nour")
+    db.flush()
+
+    assert other.expires_at > utcnow()
+    assert other_token  # still usable by its own owner
+
+
+# ── The list stops showing people who are already here ──────────────────────
+
+
+def test_an_address_that_now_has_an_account_is_not_pending(db):
+    """Seven dead rows sat above the models they had become. Only the
+    invitation actually used is marked accepted, so filtering on the *account*
+    clears the ones already on file too - no migration, nothing deleted.
+    """
+    from app.services.staff import list_pending_invitations
+
+    admin = _admin(db)
+    create_invitation(db, "nour@example.com", "affiliate", admin.id)
+    db.flush()
+    token, _ = create_invitation(db, "nour@example.com", "affiliate", admin.id)
+    db.flush()
+    assert len(list_pending_invitations(db)) == 2
+
+    accept_invitation(db, token, PASSWORD, "Nour")
+    db.flush()
+
+    assert [i.email for i in list_pending_invitations(db)] == []
+
+
+def test_somebody_still_waiting_is_still_listed(db):
+    from app.services.staff import list_pending_invitations
+
+    admin = _admin(db)
+    create_invitation(db, "waiting@example.com", "affiliate", admin.id)
+    db.flush()
+
+    assert [i.email for i in list_pending_invitations(db)] == ["waiting@example.com"]

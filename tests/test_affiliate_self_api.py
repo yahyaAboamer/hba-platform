@@ -72,11 +72,11 @@ def _model(admin, email: str, name: str, code: str) -> TestClient:
 
 
 def test_a_model_sees_their_own_record(admin):
-    model = _model(admin, "nour@example.com", "Nour", "NOUR10")
+    model = _model(admin, "nour@example.com", "Nour Hassan", "NOUR10")
 
     body = model.get("/api/me").json()
 
-    assert body["name"] == "Nour"
+    assert body["name"] == "Nour Hassan"
     assert body["status"] == "pending"
     assert body["state"] == "waiting"
 
@@ -86,7 +86,7 @@ def test_a_payout_destination_is_masked_even_to_its_owner(admin):
     screen printing a full account number is one worth photographing over
     somebody's shoulder.
     """
-    model = _model(admin, "nour@example.com", "Nour", "NOUR10")
+    model = _model(admin, "nour@example.com", "Nour Hassan", "NOUR10")
 
     destination = model.get("/api/me").json()["payout_destination"]
 
@@ -113,7 +113,7 @@ def test_changing_a_destination_needs_the_password(admin):
     """§6.4.1. A session is what an attacker has; the password is what they
     may not.
     """
-    model = _model(admin, "nour@example.com", "Nour", "NOUR10")
+    model = _model(admin, "nour@example.com", "Nour Hassan", "NOUR10")
 
     refused = model.put(
         "/api/me/payout-destination",
@@ -129,7 +129,7 @@ def test_changing_a_destination_needs_the_password(admin):
 
 
 def test_a_wrong_password_changes_nothing(admin):
-    model = _model(admin, "nour@example.com", "Nour", "NOUR10")
+    model = _model(admin, "nour@example.com", "Nour Hassan", "NOUR10")
     model.put(
         "/api/me/payout-destination",
         json={
@@ -152,7 +152,7 @@ def test_a_wrong_password_changes_nothing(admin):
 
 
 def test_the_right_password_moves_it(admin):
-    model = _model(admin, "nour@example.com", "Nour", "NOUR10")
+    model = _model(admin, "nour@example.com", "Nour Hassan", "NOUR10")
 
     changed = model.put(
         "/api/me/payout-destination",
@@ -180,7 +180,7 @@ def test_both_sides_come_back_masked(admin):
     either value in full - and the response body is a second place a raw value
     could be logged.
     """
-    model = _model(admin, "nour@example.com", "Nour", "NOUR10")
+    model = _model(admin, "nour@example.com", "Nour Hassan", "NOUR10")
 
     body = model.put(
         "/api/me/payout-destination",
@@ -202,7 +202,7 @@ def test_the_old_destination_is_superseded_not_overwritten(admin):
     """A payment made in March must still resolve the destination in force
     then.
     """
-    model = _model(admin, "nour@example.com", "Nour", "NOUR10")
+    model = _model(admin, "nour@example.com", "Nour Hassan", "NOUR10")
     model.put(
         "/api/me/payout-destination",
         json={
@@ -228,7 +228,7 @@ def test_the_change_is_audited_with_the_values_masked(admin):
     """§6.4.4. The audit table is append-only, so the only safe moment to mask
     is before the insert.
     """
-    model = _model(admin, "nour@example.com", "Nour", "NOUR10")
+    model = _model(admin, "nour@example.com", "Nour Hassan", "NOUR10")
     model.put(
         "/api/me/payout-destination",
         json={
@@ -253,7 +253,7 @@ def test_a_phone_number_in_the_link_field_is_refused_here_too(admin):
     """The validator lives in `set_destination`, so every path that writes a
     destination is checked by the same rule - not only the application form.
     """
-    model = _model(admin, "nour@example.com", "Nour", "NOUR10")
+    model = _model(admin, "nour@example.com", "Nour Hassan", "NOUR10")
 
     refused = model.put(
         "/api/me/payout-destination",
@@ -270,7 +270,7 @@ def test_a_phone_number_in_the_link_field_is_refused_here_too(admin):
 
 
 def test_a_missing_field_is_refused_before_the_password_is_spent(admin):
-    model = _model(admin, "nour@example.com", "Nour", "NOUR10")
+    model = _model(admin, "nour@example.com", "Nour Hassan", "NOUR10")
 
     refused = model.put(
         "/api/me/payout-destination",
@@ -295,16 +295,16 @@ def test_the_routes_take_no_affiliate_id_at_all(admin):
     tamper with. Asserted by driving two real models rather than by reading
     the signatures.
     """
-    nour = _model(admin, "nour@example.com", "Nour", "NOUR10")
-    sara = _model(admin, "sara@example.com", "Sara", "SARA10")
+    nour = _model(admin, "nour@example.com", "Nour Hassan", "NOUR10")
+    sara = _model(admin, "sara@example.com", "Sara Fouad", "SARA10")
 
-    assert nour.get("/api/me").json()["name"] == "Nour"
-    assert sara.get("/api/me").json()["name"] == "Sara"
+    assert nour.get("/api/me").json()["name"] == "Nour Hassan"
+    assert sara.get("/api/me").json()["name"] == "Sara Fouad"
 
 
 def test_one_models_change_never_touches_another(admin):
-    nour = _model(admin, "nour@example.com", "Nour", "NOUR10")
-    _model(admin, "sara@example.com", "Sara", "SARA10")
+    nour = _model(admin, "nour@example.com", "Nour Hassan", "NOUR10")
+    _model(admin, "sara@example.com", "Sara Fouad", "SARA10")
 
     nour.put(
         "/api/me/payout-destination",
@@ -325,8 +325,8 @@ def test_one_models_change_never_touches_another(admin):
         ).all()
 
     assert [tuple(row) for row in live] == [
-        ("Nour", PayoutMethod.WALLET),
-        ("Sara", PayoutMethod.INSTAPAY),
+        ("Nour Hassan", PayoutMethod.WALLET),
+        ("Sara Fouad", PayoutMethod.INSTAPAY),
     ]
 
 
@@ -337,7 +337,7 @@ def test_they_can_see_that_their_destination_moved_lately(admin):
     """A model who did not make that change is the first person who would
     notice, and the only one who can say so.
     """
-    model = _model(admin, "nour@example.com", "Nour", "NOUR10")
+    model = _model(admin, "nour@example.com", "Nour Hassan", "NOUR10")
     model.put(
         "/api/me/payout-destination",
         json={
@@ -358,7 +358,7 @@ def test_the_payment_screen_is_told_a_destination_moved_lately(admin):
     screen until now - it had nothing to warn about while only the maintainer
     could change a destination.
     """
-    model = _model(admin, "nour@example.com", "Nour", "NOUR10")
+    model = _model(admin, "nour@example.com", "Nour Hassan", "NOUR10")
     model.put(
         "/api/me/payout-destination",
         json={
@@ -370,16 +370,16 @@ def test_the_payment_screen_is_told_a_destination_moved_lately(admin):
     )
 
     rows = admin.get("/api/payments/2026-08").json()["affiliates"]
-    nour = next(row for row in rows if row["name"] == "Nour")
+    nour = next(row for row in rows if row["name"] == "Nour Hassan")
 
     assert nour["destination_changed_at"] is not None
 
 
 def test_an_untouched_destination_raises_no_warning(admin):
     """A warning that is always on is one nobody reads."""
-    _model(admin, "nour@example.com", "Nour", "NOUR10")
+    _model(admin, "nour@example.com", "Nour Hassan", "NOUR10")
 
     rows = admin.get("/api/payments/2026-08").json()["affiliates"]
-    nour = next(row for row in rows if row["name"] == "Nour")
+    nour = next(row for row in rows if row["name"] == "Nour Hassan")
 
     assert nour["destination_changed_at"] is None

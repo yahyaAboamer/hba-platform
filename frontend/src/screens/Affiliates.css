@@ -118,8 +118,42 @@
  * because a model is not a staff role: they hold no permission at all, and
  * offering both from one list said they were variations of one decision.
  */
+/* An overlay, not an inline panel.
+ *
+ * Opening it inline pushed the page's own toolbar sideways - "Add a house
+ * code" and the Table/Cards toggle were squeezed and clipped, which is what
+ * the walkthrough caught in images 2 and 3. Inviting is a task you start,
+ * finish and leave, which is exactly what an overlay is for: nothing else on
+ * the page has to move to make room for it. */
+.invite-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: var(--space-8) var(--space-4);
+  overflow-y: auto;
+  background: rgb(20 24 31 / 45%);
+}
+
 .invite {
-  margin-bottom: var(--space-5);
+  width: min(34rem, 100%);
+  margin-bottom: 0;
+  background: var(--surface);
+}
+
+.invite__explainer {
+  margin-bottom: var(--space-4);
+}
+
+/* The ⓘ carries a label here, unlike the bare markers inside a table row:
+   this one sits alone above a form, where an unlabelled circle is a thing to
+   wonder about rather than a thing to press. */
+.invite__explainer-label {
+  margin-left: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--quiet);
 }
 
 .invite__body {
@@ -188,6 +222,33 @@
 
 .affiliates__invited-state {
   flex: 1;
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}
+
+/* No code registered yet. Quiet rather than a blocker: it is a normal state
+   for somebody who has only just been invited, and Needs attention already
+   says so where it actually stops them earning. */
+.affiliates__no-code {
+  color: var(--quiet);
+  font-size: var(--text-sm);
+}
+
+/* ── Invited, collapsed ─────────────────────────────────────────────────── */
+
+.affiliates__invited-summary {
+  padding: var(--space-3) var(--space-4);
+  cursor: pointer;
+  font-size: var(--text-sm);
+}
+
+.affiliates__invited-who {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.affiliates__invited-when {
   font-size: var(--text-xs);
   color: var(--quiet);
 }

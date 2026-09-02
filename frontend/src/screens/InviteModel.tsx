@@ -39,13 +39,19 @@ export function InviteModel({ onInvited }: { onInvited: () => void }) {
     setError(null);
     setLink(null);
     try {
-      const result = await api.post<{ token: string; emailed: boolean }>(
+      const result = await api.post<{ link: string; emailed: boolean }>(
         "/api/auth/invitations",
         { email: email.trim(), role: "affiliate" },
       );
       setEmailed(result.emailed);
       setSentTo(email.trim());
-      setLink(`${window.location.origin}/accept-invitation?token=${result.token}`);
+      // **The server's link, not one assembled here.** This screen used to
+      // build its own from the browser's address bar while the email built a
+      // different one from PUBLIC_BASE_URL - so on 2026-09-02 the maintainer
+      // read a working link off this panel while the model received a dead
+      // one, and only the model could tell. An empty string means the platform
+      // does not know its own address, which is said below rather than hidden.
+      setLink(result.link);
       setEmail("");
       onInvited();
     } catch (caught) {
@@ -55,6 +61,13 @@ export function InviteModel({ onInvited }: { onInvited: () => void }) {
     } finally {
       setWorking(false);
     }
+  }
+
+  function close() {
+    setOpen(false);
+    setLink(null);
+    setError(null);
+    setSentTo("");
   }
 
   if (!open) {
@@ -70,7 +83,18 @@ export function InviteModel({ onInvited }: { onInvited: () => void }) {
   }
 
   return (
-    <section className="panel invite">
+    <div
+      className="invite-overlay"
+      // Escape and a click on the backdrop both close it, because an overlay
+      // that can only be dismissed by finding the right button is a trap.
+      onKeyDown={(event) => {
+        if (event.key === "Escape") close();
+      }}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) close();
+      }}
+    >
+    <section className="panel invite" role="dialog" aria-modal="true" aria-label="Invite a model">
       <div className="panel__head">
         <h2 className="panel__title">Invite a model</h2>
       </div>
@@ -99,11 +123,39 @@ export function InviteModel({ onInvited }: { onInvited: () => void }) {
           </div>
         )}
 
-        <p className="invite__lead">
-          The link opens a form: a password, their own details, and where they
-          want to be paid. You approve the application and set the pay after
-          that — nothing about pay is decided here.
-        </p>
+        {/*
+         * The one state that must never be silent: the platform does not know
+         * its own public address, so the email it just queued carries no link
+         * at all. Saying nothing here would leave somebody waiting for a mail
+         * that can never work.
+         */}
+        {link === "" && sentTo && (
+          <div className="notice notice--refused" role="alert">
+            <p>
+              The invitation was recorded, but the platform does not know its
+              own web address, so no link could be built — the email will not
+              contain one. Set <code className="code">PUBLIC_BASE_URL</code> on
+              the service, then use Resend on {sentTo}.
+            </p>
+          </div>
+        )}
+
+        {/*
+         * Behind an ⓘ rather than above the field. It explains the whole flow,
+         * which is worth reading once and never again - and as a paragraph it
+         * pushed the only field on the panel further down every single time.
+         */}
+        <details className="expl invite__explainer">
+          <summary aria-label="What this link opens">
+            <span className="info" aria-hidden="true">i</span>
+            <span className="invite__explainer-label">What the link opens</span>
+          </summary>
+          <div className="expl__body">
+            A form: a password, their own details, and where they want to be
+            paid. You approve the application and set the pay after that —
+            nothing about pay is decided here.
+          </div>
+        </details>
 
         <form onSubmit={submit} className="invite__form">
           <label className="field invite__field">
@@ -124,11 +176,7 @@ export function InviteModel({ onInvited }: { onInvited: () => void }) {
             <button
               type="button"
               className="button"
-              onClick={() => {
-                setOpen(false);
-                setLink(null);
-                setError(null);
-              }}
+              onClick={close}
             >
               Done
             </button>
@@ -143,5 +191,6 @@ export function InviteModel({ onInvited }: { onInvited: () => void }) {
         </form>
       </div>
     </section>
+    </div>
   );
 }
