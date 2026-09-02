@@ -25,7 +25,7 @@ from app.main import app
 BOOTSTRAP = {
     "email": "owner@example.com",
     "display_name": "Owner",
-    "password": "a-long-enough-password",
+    "password": "quiet-harbour-lantern",
 }
 
 
@@ -59,7 +59,7 @@ def _make_account(email: str) -> int:
                 "INSERT INTO user_account (email, password_hash, status, display_name) "
                 "VALUES (:e, :p, 'active', 'Nour') RETURNING id"
             ),
-            {"e": email, "p": hash_password("a-long-enough-password")},
+            {"e": email, "p": hash_password("quiet-harbour-lantern")},
         ).scalar()
 
 

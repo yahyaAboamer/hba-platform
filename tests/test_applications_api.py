@@ -20,9 +20,9 @@ from app.models.payouts import PayoutMethod
 BOOTSTRAP = {
     "email": "owner@example.com",
     "display_name": "Owner",
-    "password": "a-long-enough-password",
+    "password": "quiet-harbour-lantern",
 }
-PASSWORD = "a-long-enough-password"
+PASSWORD = "quiet-harbour-lantern"
 
 APPLICATION = {
     "name": "Nour Mahmoud",

@@ -25,7 +25,7 @@ from app.services.codes import owner_of, register_code
 def _account(db, email="nour@example.com") -> UserAccount:
     account = UserAccount(
         email=email,
-        password_hash=hash_password("a-long-enough-password"),
+        password_hash=hash_password("quiet-harbour-lantern"),
         status="active",
         display_name="Nour",
     )

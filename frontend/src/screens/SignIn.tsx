@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 
 import { ApiError, signIn } from "../lib/api";
 import type { Session } from "../lib/api";
@@ -83,6 +84,16 @@ export function SignIn({ onSignedIn }: { onSignedIn: (session: Session) => void 
         >
           {working ? "Signing in…" : "Sign in"}
         </button>
+
+        {/*
+         * The way out of the one situation this screen cannot otherwise
+         * resolve. Under the button rather than beside the password field: it
+         * is the answer to "that did not work", which is a thing people reach
+         * for after trying, not before.
+         */}
+        <p className="sign-in__forgot">
+          <Link to="/reset-password">Forgotten your password?</Link>
+        </p>
       </form>
     </main>
   );

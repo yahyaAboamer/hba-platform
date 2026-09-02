@@ -17,9 +17,9 @@ from app.models.payouts import PayoutMethod
 BOOTSTRAP = {
     "email": "owner@example.com",
     "display_name": "Owner",
-    "password": "a-long-enough-password",
+    "password": "quiet-harbour-lantern",
 }
-PASSWORD = "a-long-enough-password"
+PASSWORD = "quiet-harbour-lantern"
 ADDRESS = "https://ipn.eg/S/nour.mahmoud/instapay/8Xk2Qp"
 NEW_ADDRESS = "https://ipn.eg/S/nour.mahmoud/instapay/NEWaddr"
 

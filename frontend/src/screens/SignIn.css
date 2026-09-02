@@ -48,21 +48,21 @@
   color: var(--quiet);
 }
 
-/* The show/hide control inside a field hint. A button rather than a link
-   because it changes this page rather than going anywhere, and it inherits the
-   hint's size so it reads as part of the sentence it sits in. */
-.sign-in__reveal {
-  background: none;
-  border: 0;
-  padding: 0;
-  font: inherit;
-  color: var(--focus);
-  cursor: pointer;
-  text-decoration: underline;
+
+/* The way out of the one situation this screen cannot otherwise resolve.
+   Quiet and below the button: it answers "that did not work", which people
+   reach for after trying rather than before. */
+.sign-in__forgot {
+  margin: var(--space-4) 0 0;
+  text-align: center;
+  font-size: var(--text-sm);
+}
+
+.sign-in__forgot a {
+  color: var(--quiet);
   text-underline-offset: 2px;
 }
 
-.sign-in__reveal:hover,
-.sign-in__reveal:focus-visible {
+.sign-in__forgot a:hover {
   color: var(--ink);
 }

@@ -19,7 +19,7 @@ from app.main import app
 BOOTSTRAP = {
     "email": "owner@example.com",
     "display_name": "Owner",
-    "password": "a-long-enough-password",
+    "password": "quiet-harbour-lantern",
 }
 
 
@@ -335,7 +335,7 @@ def test_accepting_an_invitation_creates_a_working_account(client):
         json={
             "token": invite["token"],
             "display_name": "Sara",
-            "password": "sara-long-enough-password",
+            "password": "sarquiet-harbour-lantern",
         },
     )
     assert accepted.status_code == 201
@@ -357,7 +357,7 @@ def test_the_invited_role_gets_exactly_its_permissions(client):
         json={
             "token": invite["token"],
             "display_name": "Sara",
-            "password": "sara-long-enough-password",
+            "password": "sarquiet-harbour-lantern",
         },
     )
     permissions = client.get("/api/auth/me").json()["permissions"]
@@ -384,7 +384,7 @@ def test_a_role_without_invitation_rights_cannot_invite(client):
         json={
             "token": invite["token"],
             "display_name": "Sara",
-            "password": "sara-long-enough-password",
+            "password": "sarquiet-harbour-lantern",
         },
     ).json()
 
@@ -409,7 +409,7 @@ def test_an_invitation_cannot_be_accepted_twice(client):
     payload = {
         "token": invite["token"],
         "display_name": "Sara",
-        "password": "sara-long-enough-password",
+        "password": "sarquiet-harbour-lantern",
     }
     assert client.post("/api/auth/invitations/accept", json=payload).status_code == 201
     client.cookies.clear()
@@ -522,7 +522,7 @@ def test_it_reveals_nothing_the_bootstrap_endpoint_did_not(client):
             json={
                 "email": "someone@example.com",
                 "display_name": "Someone",
-                "password": "a-long-enough-password",
+                "password": "quiet-harbour-lantern",
             },
         )
 

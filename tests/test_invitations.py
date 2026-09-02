@@ -15,7 +15,7 @@ from app.core.permissions import VALID_ROLES
 from app.models.identity import UserAccount
 from app.services.invitations import accept_invitation, create_invitation
 
-PASSWORD = "a-long-enough-password"
+PASSWORD = "quiet-harbour-lantern"
 
 
 def _admin(db, email="admin@example.com"):
@@ -104,9 +104,9 @@ def test_the_invitee_chooses_their_own_password(db):
     """Nobody ever sets or sees another person's credentials."""
     token, _ = create_invitation(db, "own@example.com", "admin", None)
     db.flush()
-    user = accept_invitation(db, token, "the-password-i-chose", "Owner")
+    user = accept_invitation(db, token, "the-one-i-chose-myself", "Owner")
     db.flush()
-    assert verify_password("the-password-i-chose", user.password_hash)
+    assert verify_password("the-one-i-chose-myself", user.password_hash)
 
 
 def test_an_invitation_can_only_be_accepted_once(db):

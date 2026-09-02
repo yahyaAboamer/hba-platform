@@ -25,7 +25,7 @@ from app.services.proof import MAX_UPLOAD_BYTES, ProofRejected, sanitise
 BOOTSTRAP = {
     "email": "owner@example.com",
     "display_name": "Owner",
-    "password": "a-long-enough-password",
+    "password": "quiet-harbour-lantern",
 }
 AUGUST = "2026-08"
 SEPTEMBER = "2026-09"
@@ -68,7 +68,7 @@ def _make_account(email: str) -> int:
                 "INSERT INTO user_account (email, password_hash, status, display_name) "
                 "VALUES (:e, :p, 'active', 'Model') RETURNING id"
             ),
-            {"e": email, "p": hash_password("a-long-enough-password")},
+            {"e": email, "p": hash_password("quiet-harbour-lantern")},
         ).scalar_one()
 
 

@@ -14,6 +14,7 @@ from app.api.deps import (
     require_permission,
 )
 from app.config import settings
+from app.core.password_quality import password_problem, password_strength
 from app.core.passwords import MINIMUM_PASSWORD_LENGTH, hash_password
 from app.core.permissions import VALID_ROLES, Permission
 from app.db import get_session
@@ -24,6 +25,7 @@ from app.services.auth import (
     ensure_csrf,
     issue_session,
     resolve_session,
+    revoke_all_sessions,
     revoke_session,
 )
 from app.services.invitations import (
@@ -31,7 +33,16 @@ from app.services.invitations import (
     create_invitation,
     preview_invitation,
 )
-from app.services.notifications import invitation_link, invitation_sent
+from app.services.notifications import (
+    invitation_link,
+    invitation_sent,
+    password_reset_requested,
+)
+from app.services.password_resets import (
+    complete_reset,
+    preview_reset,
+    request_reset,
+)
 from app.services.payroll import go_live_month, working_month
 
 router = APIRouter(prefix="/api/auth")
@@ -155,6 +166,15 @@ def bootstrap(
     """
     if db.scalar(select(func.count()).select_from(UserAccount)):
         raise HTTPException(409, "An account already exists")
+
+    # The very first administrator, and the account with the most reach in the
+    # platform. The same rules everybody else gets - there is no argument for
+    # holding the owner to a lower standard than the people they pay.
+    problem = password_problem(
+        body.password, personal=(str(body.email), body.display_name)
+    )
+    if problem is not None:
+        raise HTTPException(422, problem)
 
     user = UserAccount(
         email=str(body.email).lower(),
@@ -366,6 +386,141 @@ def invite(
         # it did send.
         "emailed": queued is not None and settings.mail_configured,
     }
+
+
+class PasswordCheckBody(BaseModel):
+    password: str = Field(max_length=256)
+    #: Their own address, when the screen knows it. The accept page does; the
+    #: bootstrap form does too.
+    email: str = Field(default="", max_length=320)
+    name: str = Field(default="", max_length=120)
+
+
+@router.post("/password-quality")
+def password_quality(body: PasswordCheckBody) -> dict:
+    """How strong this password is, and why it might be refused.
+
+    **A POST, and never a GET.** The password is in the body because a query
+    string is written to every access log it passes through; that is the whole
+    reason this is not the obvious `?password=` route.
+
+    **Unauthenticated by necessity** - it is called before an account exists,
+    which is the moment it is needed. It touches no database and hashes
+    nothing, so there is nothing here to exhaust.
+
+    ## Why the server answers this at all
+
+    The meter could have been written in the browser and saved a round trip.
+    It would then be a second implementation of the rules, and the day it
+    drifted the symptom would be a green bar over a password the server
+    refuses - a screen telling somebody they are fine while the button does
+    not work. This codebase already carries a comment about two copies of a
+    filter ending in a model paid for somebody else's orders. Same class of
+    problem, so: one implementation, and the meter asks it.
+    """
+    personal = tuple(part for part in (body.email, body.name) if part.strip())
+    return {
+        "strength": password_strength(body.password, personal=personal),
+        "problem": password_problem(body.password, personal=personal),
+        "minimum": MINIMUM_PASSWORD_LENGTH,
+    }
+
+
+class ResetRequestBody(BaseModel):
+    email: EmailStr
+
+
+class ResetBody(BaseModel):
+    token: str = Field(min_length=1, max_length=200)
+    password: str = Field(min_length=MINIMUM_PASSWORD_LENGTH, max_length=256)
+
+
+@router.post("/password-reset/request", status_code=202)
+def request_password_reset(
+    body: ResetRequestBody,
+    request: Request,
+    db: Session = Depends(get_session),
+) -> dict:
+    """Ask for a link back into an account.
+
+    **202 always, whatever happened.** An address with no account, a suspended
+    one, and a live one all get the same answer. Anything else would make this
+    a way to ask "is this person on the programme" - and the people on this
+    programme are named individuals whose association with HBA is theirs to
+    disclose, not this endpoint's.
+
+    The person who genuinely owns the address learns the answer the only way
+    that matters: an email arrives, or it does not.
+    """
+    started = request_reset(db, str(body.email), ip_address=_client_ip(request))
+    if started is not None:
+        token, account = started
+        password_reset_requested(db, account, token)
+        record_audit(
+            db,
+            action="auth.password_reset_requested",
+            subject=f"user:{account.id}",
+            actor_id=account.id,
+            actor_email=account.email,
+            ip_address=_client_ip(request),
+        )
+    db.commit()
+    return {"sent": True}
+
+
+@router.get("/password-reset/preview")
+def preview_password_reset(token: str, db: Session = Depends(get_session)) -> dict:
+    """Whose link this is, without spending it.
+
+    Checked on load rather than on submit, for the reason the invitation
+    screen is: a dead link that renders a whole form makes somebody choose a
+    password before telling them it was never going to work.
+    """
+    try:
+        account = preview_reset(db, token)
+    except ValueError as exc:
+        raise HTTPException(410, str(exc)) from exc
+    return {"email": account.email}
+
+
+@router.post("/password-reset")
+def complete_password_reset(
+    body: ResetBody,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_session),
+) -> dict:
+    """Set the new password, and sign them in.
+
+    **Every other session ends here.** If the password was reset because
+    somebody else had it, the sessions they opened with it must not outlive
+    the change - and the person doing the resetting has no way to know which
+    of those two situations they are in.
+
+    Signed straight in afterwards, because the alternative is a sign-in form
+    asking for the password they typed ten seconds ago.
+    """
+    try:
+        account = complete_reset(db, body.token, body.password)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+    ended = revoke_all_sessions(db, account.id)
+    token, csrf, _ = issue_session(
+        db, account.id, _client_ip(request), request.headers.get("user-agent")
+    )
+    record_audit(
+        db,
+        action="auth.password_reset",
+        subject=f"user:{account.id}",
+        actor_id=account.id,
+        actor_email=account.email,
+        after={"sessions_ended": ended},
+        ip_address=_client_ip(request),
+    )
+    db.commit()
+    _set_cookie(response, token, csrf)
+    return {"actor": actor_payload(db, account), "csrf": csrf}
 
 
 @router.get("/invitations/preview")

@@ -12,7 +12,7 @@ from app.core.passwords import hash_password
 from app.models.identity import UserAccount
 from app.services.auth import authenticate, issue_session, resolve_session, revoke_session
 
-PASSWORD = "a-long-enough-password"
+PASSWORD = "quiet-harbour-lantern"
 
 
 def _user(db, email="u@example.com", password=PASSWORD, status="active"):

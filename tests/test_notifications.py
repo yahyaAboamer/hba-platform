@@ -39,7 +39,7 @@ ADDRESS = "https://ipn.eg/S/nour.mahmoud/instapay/8Xk2Qp"
 def affiliate(db):
     account = UserAccount(
         email="nour@example.com",
-        password_hash=hash_password("a-long-enough-password"),
+        password_hash=hash_password("quiet-harbour-lantern"),
         display_name="Nour",
         status="active",
     )

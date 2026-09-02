@@ -17,6 +17,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.businesstime import utcnow
+from app.core.password_quality import password_problem
 from app.core.passwords import hash_password
 from app.core.permissions import VALID_ROLES
 from app.models.affiliates import AffiliateProfile
@@ -132,6 +133,15 @@ def accept_invitation(
     )
     if existing is not None:
         raise ValueError("An account already exists for this email address")
+
+    # Refused before the invitation is consumed, so a rejected password does
+    # not burn the link - the same reasoning as hashing first, extended to the
+    # quality rules. The invitation's own address is passed in because a
+    # password containing it is guessable by anybody who has ever received an
+    # email from them.
+    problem = password_problem(password, personal=(invitation.email,))
+    if problem is not None:
+        raise ValueError(problem)
 
     # Hash first: this raises on a password that is too short, and doing it
     # before consuming the invitation means the link survives a failed attempt.

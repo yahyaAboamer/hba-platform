@@ -46,7 +46,7 @@ from app.services.payroll import (
 BOOTSTRAP = {
     "email": "owner@example.com",
     "display_name": "Owner",
-    "password": "a-long-enough-password",
+    "password": "quiet-harbour-lantern",
 }
 AUGUST = "2026-08"
 SEPTEMBER = "2026-09"
@@ -72,7 +72,7 @@ def client(fresh_database):
 def _affiliate(db, name="Nour", kind=AccountKind.MODEL):
     account = UserAccount(
         email=f"{name.lower()}@example.com",
-        password_hash=hash_password("a-long-enough-password"),
+        password_hash=hash_password("quiet-harbour-lantern"),
         status="active",
         display_name=name,
     )
@@ -465,7 +465,7 @@ def _make_account(email: str) -> int:
                 "INSERT INTO user_account (email, password_hash, status, display_name) "
                 "VALUES (:e, :p, 'active', 'Model') RETURNING id"
             ),
-            {"e": email, "p": hash_password("a-long-enough-password")},
+            {"e": email, "p": hash_password("quiet-harbour-lantern")},
         ).scalar_one()
 
 
