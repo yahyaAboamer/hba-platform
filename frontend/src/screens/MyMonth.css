@@ -216,3 +216,15 @@
     font-size: var(--text-xs);
   }
 }
+
+/* The one note on this screen that reports a figure moving after it was
+   agreed. Marked, because a settled month is meant to be final and this is
+   the sentence saying it was not - it should not read like the quiet
+   footnotes around it. Not --refused: nothing here is refused or wrong, and
+   colouring it as a failure would alarm somebody whose pay went *up*. */
+.figure__note--changed {
+  padding: var(--space-2) var(--space-3);
+  border-left: 2px solid var(--owed);
+  background: var(--owed-quiet);
+  color: var(--ink);
+}

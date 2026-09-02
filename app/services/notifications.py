@@ -551,10 +551,28 @@ def render(event: str, payload: dict) -> Message | None:
                 # bank account, so it has to be said outright.
                 detail += f"\n\n{payload['resolution']}"
 
+        # **A recalculation must not look like a routine approval.**
+        #
+        # The body has always been honest about a month being looked at again,
+        # but both cases carried the same subject - so in an inbox, a month
+        # whose figure had changed after somebody was already paid for it was
+        # indistinguishable from an ordinary closing. The one email a model
+        # most needs to open was the easiest to skim past.
+        #
+        # The new figure goes in the subject because that is the fact: seeing
+        # it in the list is what makes somebody open it, and a subject that
+        # only said "has changed" would make them open it to find out how much
+        # anyway.
+        subject = (
+            f"{month} is agreed"
+            if not reopened
+            else f"{month} has changed - now {agreed}"
+        )
+
         return Message(
             to_address=payload["email"],
             to_name=name or None,
-            subject=f"{month} is agreed",
+            subject=subject,
             body=_with_link(
                 opening + detail,
                 "/",
