@@ -46,7 +46,11 @@ RUN cd frontend && npm run build
 ENV PATH="/opt/venv/bin:$PATH" \
     PYTHONUNBUFFERED=1
 
-# Migrations run at start, so a deploy that cannot migrate fails its health
-# check rather than serving a half-migrated database. Unchanged from the
-# nixpacks.toml start command this replaces.
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Made executable here rather than relying on the checkout: git on Windows
+# does not carry the permission bit, so a mode set locally would not survive
+# to the build.
+RUN chmod +x /app/docker-entrypoint.sh
+
+# A file, not a string - see docker-entrypoint.sh for why that distinction
+# matters to Railway.
+CMD ["/app/docker-entrypoint.sh"]
