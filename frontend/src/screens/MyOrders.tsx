@@ -167,19 +167,30 @@ function Row({
         </span>
         <span className="orders__right">
           {/*
-           * An order that did not arrive keeps its figure, struck through.
+           * **An amount is printed only where there is one.**
            *
-           * The business asked whether to show it at all. Showing it is the
-           * safer answer: hiding a cancelled order's amount invites the worse
-           * guess — that the platform lost it — where a struck-through
-           * E£1,200 lets them check it against their own record and move on.
-           * It can never be mistaken for money coming.
+           * An order that did not arrive keeps its figure struck through
+           * wherever the figure survives - that is the rule, and it lets
+           * somebody check a cancelled order against their own record instead
+           * of guessing the platform lost it.
+           *
+           * But it does not always survive. `normalise.py` stores Shopify's
+           * *current* totals, which is correct for commission (§9.3 pays on
+           * what the customer actually paid) and means a cancelled order
+           * comes back worth zero. A struck-through E£0.00 then claims the
+           * order was worth nothing *and* was cancelled, which is not a fact
+           * about anything - it reads as a bug, and was reported as one.
+           *
+           * So: the figure where there is a figure, and the reason in the
+           * expansion where there is not.
            */}
-          <Money
-            piastres={order.base_piastres}
-            kind={order.state === "earned" ? "agreed" : "provisional"}
-            className={order.state === "void" ? "money--void" : undefined}
-          />
+          {order.base_piastres > 0 && (
+            <Money
+              piastres={order.base_piastres}
+              kind={order.state === "earned" ? "agreed" : "provisional"}
+              className={order.state === "void" ? "money--void" : undefined}
+            />
+          )}
           <span
             className={
               order.commission
@@ -236,7 +247,13 @@ function explain(order: MyOrder, month: string): string {
   if (order.state === "pending") {
     return `It counts the day it reaches the customer. If that is after HBA closes ${formatMonth(month)}, it is paid with the next month — still at this month's rate.`;
   }
-  return "This parcel did not reach the customer, so it earns nothing. The amount stays here so you can match it against your own record.";
+  // Two different void rows. Where the amount survived, it is on screen and
+  // they can match it; where the order was cancelled outright, Shopify clears
+  // its value and there is nothing to match - so the row says that rather
+  // than leaving somebody to wonder what the missing figure was.
+  return order.base_piastres > 0
+    ? "This parcel did not reach the customer, so it earns nothing. The amount stays here so you can match it against your own record."
+    : "This order was cancelled, so it earns nothing. The shop clears the value of a cancelled order, which is why no amount is shown — the order number and the date are what to match it against.";
 }
 
 /**

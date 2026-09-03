@@ -116,6 +116,13 @@
   text-align: right;
 }
 
+/* A row with no amount is one line rather than two. The flex row centres it
+   on its own - `:has()` would buy three pixels and a browser-support
+   question. */
+.orders__earned:only-child {
+  margin-top: 0;
+}
+
 /* What the order was worth to them, under what the customer paid. The accent
    only where there is money in it — "counts on delivery" and "nothing earned"
    are states, not amounts, and colouring them would say otherwise. */

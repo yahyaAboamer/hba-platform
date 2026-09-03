@@ -72,10 +72,14 @@
 .chart__hit {
   fill: transparent;
   cursor: pointer;
+  /* A tap on a chart should read a month, not select the SVG's text or
+     trigger the double-tap zoom that eats the second tap of a toggle. */
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 .chart__hit:focus-visible {
-  outline: 2px solid var(--focus);
+  outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
 
