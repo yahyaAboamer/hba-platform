@@ -149,6 +149,7 @@ def _order(
     state="earned",
     code="NOUR10",
     number=None,
+    placed=None,
 ):
     """An order already attributed, written straight in.
 
@@ -160,8 +161,9 @@ def _order(
             text(
                 "INSERT INTO order_index (shopify_order_id, order_number, "
                 "placed_at, business_month, discount_codes, subtotal_piastres, "
-                "total_piastres, shipping_piastres, tax_piastres, currency) "
-                "VALUES (:i, :n, now(), :m, ARRAY[:c], :b, :b, 0, 0, 'EGP')"
+                "total_piastres, shipping_piastres, tax_piastres, currency, "
+                "original_subtotal_piastres, original_total_piastres) "
+                "VALUES (:i, :n, now(), :m, ARRAY[:c], :b, :b, 0, 0, 'EGP', :p, :p)"
             ),
             {
                 "i": order_id,
@@ -169,6 +171,9 @@ def _order(
                 "m": month,
                 "c": code,
                 "b": base,
+                # What the order came to when it was placed. `None` reproduces
+                # a row indexed before the platform started asking for it.
+                "p": placed,
             },
         )
         connection.execute(
@@ -1566,3 +1571,77 @@ def test_an_order_is_worth_the_rate_of_its_own_month(admin):
     (row,) = [o for o in august["orders_detail"] if o["order_number"] == "#9501"]
 
     assert row["commission_piastres"] == 10_000, "August is 10%, not September's 20%"
+
+
+# ── A cancelled order still says what it was ────────────────────────────────
+#
+# Shopify zeroes the current totals on a cancelled order, and the platform
+# stores those because §9.3 pays on what the customer actually paid. The
+# consequence reached a model's screen: a struck-through E£0.00, which claims
+# the order was worth nothing *and* was cancelled. `original_total_piastres`
+# keeps the placed-at figure so the row can say what it was.
+
+
+def test_a_cancelled_order_still_says_what_it_came_to(admin):
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"])
+    # Cancelled: Shopify reports it worth nothing now, and E£1,200 when placed.
+    _order(affiliate["id"], "9601", 0, month=SEPTEMBER, state="void", placed=120_000)
+
+    body = _sign_in().get(f"/api/me/earnings/{SEPTEMBER}").json()
+    (row,) = [o for o in body["orders_detail"] if o["order_number"] == "#9601"]
+
+    assert row["base_piastres"] == 0, "it is worth nothing now, and says so"
+    assert row["placed_piastres"] == 120_000
+    assert row["placed"] == _egp(120_000)
+
+
+def test_the_placed_figure_is_absent_where_the_base_already_says_it(admin):
+    """No screen should be able to show the same money twice under two labels."""
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"])
+    _order(affiliate["id"], "9602", 120_000, month=SEPTEMBER, placed=120_000)
+    _deliver("9602")
+
+    body = _sign_in().get(f"/api/me/earnings/{SEPTEMBER}").json()
+    (row,) = [o for o in body["orders_detail"] if o["order_number"] == "#9602"]
+
+    assert row["base_piastres"] == 120_000
+    assert row["placed_piastres"] is None
+
+
+def test_an_order_indexed_before_the_column_existed_offers_no_figure(admin):
+    """`NULL` is *we never asked Shopify*, and must not become a zero.
+
+    A zero would be indistinguishable from an order that was genuinely free,
+    and would put "E£0.00" back on the screen this whole change removed it
+    from.
+    """
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"])
+    _order(affiliate["id"], "9603", 0, month=SEPTEMBER, state="void", placed=None)
+
+    body = _sign_in().get(f"/api/me/earnings/{SEPTEMBER}").json()
+    (row,) = [o for o in body["orders_detail"] if o["order_number"] == "#9603"]
+
+    assert row["placed_piastres"] is None
+    assert row["placed"] is None
+
+
+def test_the_placed_figure_is_never_paid_on(admin):
+    """The rule the whole change hangs on.
+
+    These columns exist so a screen can say what a cancelled order was. If
+    they ever reached `calculate.py`, HBA would be paying commission on
+    parcels that were cancelled.
+    """
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"], rate_bp=1500)
+    _order(affiliate["id"], "9604", 0, month=SEPTEMBER, state="void", placed=500_000)
+
+    body = _sign_in().get(f"/api/me/earnings/{SEPTEMBER}").json()
+
+    assert body["amount_piastres"] == 0, "a cancelled order earns nothing"
+    assert body["sales"]["earned_piastres"] == 0
+    (row,) = [o for o in body["orders_detail"] if o["order_number"] == "#9604"]
+    assert row["commission_piastres"] is None

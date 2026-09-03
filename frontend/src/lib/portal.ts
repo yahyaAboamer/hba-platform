@@ -44,6 +44,19 @@ export type MyOrder = {
    */
   commission_piastres: number | null;
   commission: string | null;
+  /**
+   * What the order came to when it was placed, where the base no longer says.
+   *
+   * Shopify zeroes a cancelled order's totals — correct for commission, since
+   * §9.3 pays on what the customer actually paid — so a cancelled row's
+   * `base_piastres` is `0` and tells you nothing about what it was.
+   *
+   * `null` where the base already carries the figure, so no screen shows the
+   * same money twice, and `null` on rows indexed before the platform asked
+   * Shopify for it. That is *we never asked*, not *it was free*.
+   */
+  placed_piastres: number | null;
+  placed: string | null;
 };
 
 export type MyEarnings = {

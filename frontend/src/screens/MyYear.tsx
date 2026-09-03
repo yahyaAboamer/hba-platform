@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useEffect } from "react";
 
 import { Money } from "../components/Money";
 import { api } from "../lib/api";
@@ -24,6 +25,9 @@ type Year = {
   total_orders: number;
 };
 
+/** Which of the two questions is on screen. */
+type Chart = "earned" | "orders";
+
 /**
  * Their year.
  *
@@ -37,11 +41,21 @@ type Year = {
  *
  * - **What you earned** — a line, because money is a trend and the question is
  *   *am I going up?*, which the eye answers from a slope.
- * - **Orders that counted** — bars, because a count is a tally and bar heights
+ * - **Orders counted** — bars, because a count is a tally and bar heights
  *   compare exactly in a way points on a line do not.
  *
- * Sales appear only in the orders tooltip, where they make a bar mean
+ * Sales appear only when a month is being read, where they make a bar mean
  * something. They are not a third series.
+ *
+ * **One at a time, chosen by a control**, rather than both stacked. Two full
+ * charts and a facts row is more than a phone screen holds, and the pair were
+ * being scrolled past rather than compared.
+ *
+ * **The month being read has a panel of its own, above the chart**, rather
+ * than a tooltip floating over it. A tooltip has to be positioned, clamped to
+ * the card, flipped when it would overflow, and dismissed - and on a phone it
+ * covers the very months somebody is trying to compare it against. A fixed
+ * panel has none of those problems and is always readable.
  *
  * A month before go-live is drawn hollow rather than at zero. Its sales are
  * real; the commission was agreed elsewhere, and a zero would be a claim that
@@ -50,6 +64,8 @@ type Year = {
 export function MyYear() {
   const [year, setYear] = useState<Year | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [chart, setChart] = useState<Chart>("earned");
+  const [pick, setPick] = useState<number | null>(null);
 
   useEffect(() => {
     api
@@ -67,13 +83,6 @@ export function MyYear() {
   }
   if (year === null) return <p className="empty">Loading…</p>;
 
-  // Months the platform actually paid for. The rest are real months with real
-  // sales whose commission was agreed elsewhere.
-  const paidMonths = year.months.filter(
-    (m) => m.earned_piastres !== null,
-  ).length;
-  const before = year.months.length - paidMonths;
-
   if (year.months.length < 2) {
     return (
       <p className="empty">
@@ -82,141 +91,167 @@ export function MyYear() {
     );
   }
 
+  // Months the platform actually paid for. The rest are real months with real
+  // sales whose commission was agreed elsewhere.
+  const paidMonths = year.months.filter((m) => m.earned_piastres !== null).length;
+  const before = year.months.length - paidMonths;
+
+  // Opens on the most recent month rather than on nothing. An empty reading
+  // panel above a chart is a hole somebody has to work out how to fill.
+  const index = pick ?? year.months.length - 1;
+  const active = year.months[index];
+
   return (
     <>
+      <section className="year__lead">
+        <p className="year__kicker">Your year</p>
+        <Money
+          piastres={year.total_earned_piastres}
+          kind="agreed"
+          className="year__total"
+        />
+        <p className="year__since">
+          {/*
+           * The months that have a figure, not every month they have. It said
+           * "across 8 months" when seven of them contributed nothing to that
+           * total — which reads as a very bad year rather than as a total that
+           * does not cover them.
+           */}
+          earned across {paidMonths} {paidMonths === 1 ? "month" : "months"} on
+          the platform
+        </p>
+      </section>
+
+      <div className="filters" role="group" aria-label="What to compare">
+        <button
+          type="button"
+          className="filters__option"
+          aria-pressed={chart === "earned"}
+          onClick={() => setChart("earned")}
+        >
+          What you earned
+        </button>
+        <button
+          type="button"
+          className="filters__option"
+          aria-pressed={chart === "orders"}
+          onClick={() => setChart("orders")}
+        >
+          Orders counted
+        </button>
+      </div>
+
       <section className="panel year">
-        <div className="panel__head">
-          <h2 className="panel__title">What you have earned</h2>
+        {/*
+         * The month being read, above the chart rather than over it. Always
+         * present, so there is never a state where the chart is showing
+         * something nobody can name.
+         */}
+        <div className="reading" aria-live="polite">
+          <p className="reading__month">{active.label}</p>
+          <p className="reading__figure">
+            {chart === "earned"
+              ? active.earned_piastres === null
+                ? "Not shown here"
+                : formatEgp(active.earned_piastres)
+              : `${active.orders} ${active.orders === 1 ? "order" : "orders"}`}
+          </p>
+          <p className="reading__note">{note(active, chart)}</p>
         </div>
-        <EarningsLine months={year.months} />
+
+        {chart === "earned" ? (
+          <EarningsLine months={year.months} pick={index} onPick={setPick} />
+        ) : (
+          <OrdersBars months={year.months} pick={index} onPick={setPick} />
+        )}
 
         {/*
          * **Why the chart is mostly empty**, said on the chart.
          *
          * A model who joined before go-live sees seven hollow months and one
-         * point, and reads it as broken - which is exactly what happened. The
+         * point, and reads it as broken — which is exactly what happened. The
          * figures are missing on purpose: HBA paid those months before this
          * page existed and their rates live in the old system (ADR 0014).
          *
-         * The sales are not missing, and the bars below prove it, so the
-         * sentence points at them rather than apologising.
+         * The sales are not missing, and the bars prove it, so the sentence
+         * points at them rather than apologising.
          */}
-        {before > 0 && (
+        {chart === "earned" && before > 0 && (
           <p className="year__caveat">
-            {before === 1 ? "One month is" : `${before} months are`} not shown
-            here — HBA paid {before === 1 ? "it" : "them"} before this page
-            existed. Everything you sold in {before === 1 ? "it" : "them"} is in{" "}
-            <strong>Orders that counted</strong> below.
+            {before === 1 ? "One month sits" : `${before} months sit`} on the
+            line without a figure — HBA paid{" "}
+            {before === 1 ? "it" : "them"} before this page existed. Everything
+            you sold in {before === 1 ? "it" : "them"} is counted under{" "}
+            <strong>Orders counted</strong>.
           </p>
         )}
-        <div className="year__facts">
-          {year.best_month_label && (
-            <div>
-              <dt>Best month</dt>
-              <dd>
-                <Money piastres={year.best_month_piastres ?? 0} kind="agreed" />
-                <span className="year__facts-sub">{year.best_month_label}</span>
-              </dd>
-            </div>
-          )}
-          <div>
-            <dt>Since you joined</dt>
-            <dd>
-              <Money piastres={year.total_earned_piastres} kind="agreed" />
-              {/*
-               * The months that have a figure, not every month they have. It
-               * said "E£3,829 across 8 months" when seven of them contributed
-               * nothing to that total - which reads as a very bad year rather
-               * than as a total that does not cover them.
-               */}
-              <span className="year__facts-sub">
-                across {paidMonths} {paidMonths === 1 ? "month" : "months"}
-              </span>
-            </dd>
-          </div>
-        </div>
+        {chart === "orders" && (
+          <p className="year__caveat">
+            Every order that counted under your code, including the months HBA
+            paid before this page existed.
+          </p>
+        )}
       </section>
 
-      <section className="panel year">
-        <div className="panel__head">
-          <h2 className="panel__title">Orders that counted</h2>
-          <span className="chip chip--quiet">{year.total_orders} in total</span>
+      <div className="year__facts">
+        {year.best_month_label && (
+          <div className="tile">
+            <span className="tile__label">Best month</span>
+            <Money piastres={year.best_month_piastres ?? 0} kind="agreed" />
+            <span className="tile__sub">{year.best_month_label}</span>
+          </div>
+        )}
+        <div className="tile">
+          <span className="tile__label">Orders counted</span>
+          <span className="tile__figure">{year.total_orders}</span>
+          <span className="tile__sub">all time</span>
         </div>
-        <OrdersBars months={year.months} />
-      </section>
+      </div>
     </>
   );
 }
 
-/** Where the pointer is, if anywhere. `null` means no tooltip. */
-type Hover = { index: number; x: number; y: number } | null;
-
-/**
- * Keep the tooltip inside the card.
- *
- * Centred on the point and lifted above it, which is right in the middle of a
- * chart and wrong at both ends: on the last month it ran off the right edge
- * and lost half the figure, and on a tall point it was cut off by the top of
- * the card. Both were photographed on a phone before anybody noticed here.
- *
- * So it is clamped horizontally, and flips below the point when there is not
- * room above. The transform has to change with the flip, because the whole
- * position is relative to a corner that moves.
- */
-function tipStyle(hover: NonNullable<Hover>): React.CSSProperties {
-  const below = hover.y < 0.34;
-  // 18% keeps a two-line tooltip clear of either edge at phone widths without
-  // pulling it so far from its point that it stops pointing at anything.
-  const left = Math.min(Math.max(hover.x, 0.18), 0.82);
-  return {
-    left: `${left * 100}%`,
-    top: `${hover.y * 100}%`,
-    transform: below
-      ? `translate(-${left * 100}%, 22%)`
-      : `translate(-${left * 100}%, -118%)`,
-  };
+/** What the month being read is, under its figure. */
+function note(month: YearMonth, chart: Chart): string {
+  if (chart === "orders") {
+    return `${formatEgp(month.sales_piastres)} of sales`;
+  }
+  if (month.earned_piastres === null) {
+    return `${month.orders} ${month.orders === 1 ? "order" : "orders"} counted · HBA paid you the old way`;
+  }
+  return month.state === "agreed" ? "Agreed" : "Still adding up";
 }
 
 /**
- * How a month gets read, on a phone as well as on a laptop.
+ * One wide target per month, because fingers are not pointers.
  *
- * **These charts only answered a hover**, which is a thing a phone does not
- * have. Every model reads this on one, so the tooltips were unreachable for
- * everybody they were built for - the pointer handlers were written on a
- * laptop and tested on one.
- *
- * So: a **tap** selects a month and a second tap on the same month clears it,
- * which is the only way to dismiss a tooltip on a touch screen. Hover is kept
- * for a mouse, and guarded on `pointerType` - a touch also emits enter and
- * leave events, and letting those through makes the tooltip appear and vanish
- * in the same gesture.
- *
- * `onFocus` stays, so the charts are still readable by keyboard.
+ * The charts used to answer a hover and nothing else, which is a thing a phone
+ * does not have — so for every model who reads this on one, they answered
+ * nothing at all.
  */
-function reading(
-  index: number,
-  x: number,
-  y: number,
-  setHover: React.Dispatch<React.SetStateAction<Hover>>,
-) {
-  const at = { index, x, y };
+function pickable(index: number, onPick: (index: number) => void, label: string) {
   return {
-    onClick: () =>
-      setHover((was) => (was?.index === index ? null : at)),
+    className: "chart__hit",
+    tabIndex: 0,
+    role: "button" as const,
+    "aria-label": label,
+    onClick: () => onPick(index),
+    onFocus: () => onPick(index),
     onPointerEnter: (event: React.PointerEvent) => {
-      if (event.pointerType === "mouse") setHover(at);
+      if (event.pointerType === "mouse") onPick(index);
     },
-    onPointerLeave: (event: React.PointerEvent) => {
-      if (event.pointerType === "mouse") setHover(null);
-    },
-    onFocus: () => setHover(at),
-    onBlur: () => setHover(null),
   };
 }
 
-function EarningsLine({ months }: { months: YearMonth[] }) {
-  const [hover, setHover] = useState<Hover>(null);
-
+function EarningsLine({
+  months,
+  pick,
+  onPick,
+}: {
+  months: YearMonth[];
+  pick: number;
+  onPick: (index: number) => void;
+}) {
   const W = 320;
   const H = 140;
   const L = 8;
@@ -240,11 +275,13 @@ function EarningsLine({ months }: { months: YearMonth[] }) {
     .map((p, k) => `${k ? "L" : "M"}${x(p.i)},${y(p.m.earned_piastres ?? 0)}`)
     .join(" ");
 
-  const active = hover === null ? null : months[hover.index];
-
   return (
     <div className="chart">
-      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="What you earned each month">
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        role="img"
+        aria-label="What you earned each month"
+      >
         <defs>
           <linearGradient id="earn" x1="0" x2="0" y1="0" y2="1">
             <stop offset="0" stopColor="currentColor" stopOpacity="0.16" />
@@ -264,131 +301,119 @@ function EarningsLine({ months }: { months: YearMonth[] }) {
 
         {months.map((m, i) =>
           m.earned_piastres === null ? (
-            // Hollow, on the baseline. Its sales are real and its commission is
-            // not ours to state, so it is present and not plotted.
-            <circle key={m.month} className="chart__hollow" cx={x(i)} cy={y(0)} r={3.5} />
-          ) : (
+            // Hollow, on the baseline. Its sales are real and its commission
+            // is not ours to state, so it is present and not plotted.
             <circle
               key={m.month}
               className={
-                hover?.index === i ? "chart__point chart__point--on" : "chart__point"
+                pick === i ? "chart__hollow chart__hollow--on" : "chart__hollow"
               }
               cx={x(i)}
+              cy={y(0)}
+              r={pick === i ? 4.5 : 3.5}
+            />
+          ) : (
+            <circle
+              key={m.month}
+              className={pick === i ? "chart__point chart__point--on" : "chart__point"}
+              cx={x(i)}
               cy={y(m.earned_piastres)}
-              r={4}
+              r={pick === i ? 5 : 4}
             />
           ),
         )}
 
         {months.map((m, i) => (
-          <text key={m.month} className="chart__tick" x={x(i)} y={H - 7} textAnchor="middle">
+          <text
+            key={m.month}
+            className={pick === i ? "chart__tick chart__tick--on" : "chart__tick"}
+            x={x(i)}
+            y={H - 7}
+            textAnchor="middle"
+          >
             {m.number}
           </text>
         ))}
 
-        {/* One wide target per month. Fingers are not pointers. */}
         {months.map((m, i) => (
           <rect
             key={m.month}
-            className="chart__hit"
+            {...pickable(
+              i,
+              onPick,
+              `${m.label}: ${m.earned_piastres === null ? "not shown here" : formatEgp(m.earned_piastres)}`,
+            )}
             x={x(i) - (W - L - R) / months.length / 2}
             y={0}
             width={(W - L - R) / months.length}
             height={H}
-            {...reading(i, x(i) / W, y(m.earned_piastres ?? 0) / H, setHover)}
-            tabIndex={0}
-            role="button"
-            aria-label={`${m.label}: ${m.earned_piastres === null ? "not shown here" : formatEgp(m.earned_piastres)}`}
           />
         ))}
       </svg>
-
-      {active && (
-        <div className="chart__tip" style={tipStyle(hover!)}>
-          {active.label}
-          <b>
-            {active.earned_piastres === null
-              ? "Not shown here"
-              : formatEgp(active.earned_piastres)}
-          </b>
-          <i>
-            {active.state === "historical"
-              ? "HBA paid you the old way"
-              : active.state === "agreed"
-                ? "Agreed"
-                : "Still adding up"}
-          </i>
-        </div>
-      )}
     </div>
   );
 }
 
-function OrdersBars({ months }: { months: YearMonth[] }) {
-  const [hover, setHover] = useState<Hover>(null);
-
+function OrdersBars({
+  months,
+  pick,
+  onPick,
+}: {
+  months: YearMonth[];
+  pick: number;
+  onPick: (index: number) => void;
+}) {
   const W = 320;
-  const H = 124;
+  const H = 140;
   const L = 8;
   const R = 8;
-  const T = 10;
+  const T = 12;
   const B = 24;
 
   const max = Math.max(...months.map((m) => m.orders), 1) * 1.15;
   const step = (W - L - R) / months.length;
   const width = step * 0.6;
   const y = (v: number) => T + (H - T - B) * (1 - v / max);
-  const active = hover === null ? null : months[hover.index];
 
   return (
     <div className="chart">
-      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Orders that counted each month">
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        role="img"
+        aria-label="Orders that counted each month"
+      >
         <line className="chart__base" x1={L} x2={W - R} y1={y(0)} y2={y(0)} />
         {months.map((m, i) => {
           const cx = L + step * i + step / 2;
           return (
             <g key={m.month}>
               <rect
-                className={
-                  hover?.index === i ? "chart__bar chart__bar--on" : "chart__bar"
-                }
+                className={pick === i ? "chart__bar chart__bar--on" : "chart__bar"}
                 x={cx - width / 2}
                 y={y(m.orders)}
                 width={width}
                 height={Math.max(y(0) - y(m.orders), 1)}
                 rx={3}
               />
-              <text className="chart__tick" x={cx} y={H - 7} textAnchor="middle">
+              <text
+                className={pick === i ? "chart__tick chart__tick--on" : "chart__tick"}
+                x={cx}
+                y={H - 7}
+                textAnchor="middle"
+              >
                 {m.number}
               </text>
               <rect
-                className="chart__hit"
+                {...pickable(i, onPick, `${m.label}: ${m.orders} orders counted`)}
                 x={cx - step / 2}
                 y={0}
                 width={step}
                 height={H}
-                {...reading(i, cx / W, y(m.orders) / H, setHover)}
-                tabIndex={0}
-                role="button"
-                aria-label={`${m.label}: ${m.orders} orders counted`}
               />
             </g>
           );
         })}
       </svg>
-
-      {active && (
-        <div className="chart__tip" style={tipStyle(hover!)}>
-          {active.label}
-          <b>
-            {active.orders} {active.orders === 1 ? "order" : "orders"}
-          </b>
-          {/* Sales live here rather than on a chart of their own. They make a
-              bar mean something; as a second line they would restate the
-              first. */}
-          <i>{formatEgp(active.sales_piastres)} of sales</i>
-        </div>
-      )}
     </div>
   );
 }

@@ -25,6 +25,17 @@ ORDER_FIELDS = """
     discountCodes
     currentSubtotalPriceSet { shopMoney { amount currencyCode } }
     currentTotalPriceSet { shopMoney { amount currencyCode } }
+    # **The order as it was placed**, kept for display only.
+    #
+    # Shopify zeroes the `current*` sets when an order is cancelled, which is
+    # correct for commission - §9.3 pays on what the customer actually paid -
+    # and left a model's Orders screen printing a struck-through E£0.00 for a
+    # cancelled order, because the value it wanted no longer existed anywhere.
+    #
+    # These two must never reach `calculate.py`. Paying on them would pay for
+    # parcels that were cancelled.
+    subtotalPriceSet { shopMoney { amount currencyCode } }
+    totalPriceSet { shopMoney { amount currencyCode } }
     totalShippingPriceSet { shopMoney { amount currencyCode } }
     currentTotalTaxSet { shopMoney { amount currencyCode } }
     returnStatus

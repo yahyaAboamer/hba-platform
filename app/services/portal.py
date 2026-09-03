@@ -73,6 +73,7 @@ from app.models.payments import (
     PayrollAdjustment,
 )
 from app.models.payroll import CalculationState, PayrollMonth, PayrollSnapshot
+from app.services.commission.base import commission_base
 from app.services.commission.calculate import MonthCalculation
 from app.services.compensation import terms_for
 from app.services.payments import adjustments_for, balance_for, payments_for
@@ -722,6 +723,33 @@ def _credited_from(
     ]
 
 
+def _placed_value(order: AttributedOrder, index: OrderIndex) -> int | None:
+    """What the customer's order came to when it was placed, if that differs.
+
+    Only where the commission base has lost it. A cancelled order comes back
+    from Shopify worth nothing (§9.3 pays on the current totals, deliberately),
+    and a screen with no other figure to show was printing a struck-through
+    zero - which claims the order was worth nothing *and* was cancelled, and is
+    not a fact about anything.
+
+    `None` where the base already tells the story, so no screen can end up
+    showing the same money twice under two labels. `None` too on a row indexed
+    before `original_total_piastres` existed: that is *we never asked*, not
+    *it was free*.
+    """
+    if order.commission_base_piastres > 0:
+        return None
+    if index.original_total_piastres is None:
+        return None
+
+    placed = commission_base(
+        index.original_total_piastres,
+        index.shipping_piastres,
+        index.tax_piastres,
+    )
+    return placed or None
+
+
 def _order_commission(base: int, rate_bp: int | None, state: str) -> int | None:
     """What one counted order was worth in commission, exact to the piastre.
 
@@ -780,6 +808,7 @@ def my_orders(db: Session, affiliate: AffiliateProfile, month: str) -> list[dict
         commission = _order_commission(
             order.commission_base_piastres, rate_bp, order.commission_state
         )
+        placed = _placed_value(order, index)
         detail.append(
         {
             "order_number": index.order_number,
@@ -808,6 +837,18 @@ def my_orders(db: Session, affiliate: AffiliateProfile, month: str) -> list[dict
             # the one thing a breakdown must never do.
             "commission_piastres": commission,
             "commission": format_egp(commission) if commission is not None else None,
+            # **What the order was placed at**, where the base no longer says.
+            #
+            # Shopify zeroes a cancelled order's totals, so `base_piastres` is
+            # the truth about what it is worth *now* and says nothing about
+            # what it was. A model matching a cancelled row against their own
+            # record needs the second figure, and only the second.
+            #
+            # `None` where the base already carries it - offering the same
+            # number twice invites a screen to show both - and `None` on rows
+            # indexed before the columns existed, which a re-import fills in.
+            "placed_piastres": placed,
+            "placed": format_egp(placed) if placed is not None else None,
             # §11.4. Named only when a *different* month paid it - an order
             # settled by its own month needs no explanation, and labelling
             # every row would bury the two that matter.
