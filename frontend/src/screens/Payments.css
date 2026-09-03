@@ -225,3 +225,11 @@
   font-size: var(--text-xs);
   color: var(--quiet);
 }
+
+/* More than is owed. Quiet for a part payment, which is ordinary and
+   deliberate; loud for an overpayment, which somebody has to reconcile
+   afterwards — and which happened on staging past a grey note saying so. */
+.pay__over {
+  color: var(--owed);
+  font-weight: 500;
+}

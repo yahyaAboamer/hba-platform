@@ -425,12 +425,31 @@ export function PaymentRecord() {
               onChange={(event) => setAmount(event.target.value)}
               aria-describedby="amount-help"
             />
-            <span className="detail__note" id="amount-help">
+            {/*
+             * **Louder when it is more, quiet when it is less.**
+             *
+             * Both were the same grey note, and paying under is ordinary -
+             * a part payment, recorded on purpose. Paying *over* is the one
+             * that has to be reconciled afterwards, and on staging somebody
+             * typed the full agreed figure over a correctly pre-filled
+             * remainder and sent E£760 twice. The note said so. Nobody read
+             * a grey line.
+             */}
+            <span
+              className={
+                piastres !== null && piastres > owed
+                  ? "detail__note pay__over"
+                  : "detail__note"
+              }
+              id="amount-help"
+            >
               {piastres === null
                 ? "Type a figure, for example 5512.35"
-                : differs
-                  ? `${formatEgp(piastres)} — ${formatEgp(Math.abs(piastres - owed))} ${piastres > owed ? "more than" : "less than"} what is owed`
-                  : `${formatEgp(piastres)} — exactly what is owed`}
+                : piastres > owed
+                  ? `${formatEgp(piastres)} — ${formatEgp(piastres - owed)} more than is owed. This month will be overpaid, and you will have to credit or write off the difference.`
+                  : differs
+                    ? `${formatEgp(piastres)} — ${formatEgp(owed - piastres)} less than what is owed`
+                    : `${formatEgp(piastres)} — exactly what is owed`}
             </span>
           </label>
 

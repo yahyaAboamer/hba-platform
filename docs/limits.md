@@ -2471,22 +2471,31 @@ take both.**
 **Watch for the shape.** A test whose docstring describes one scenario and
 whose fixture sets up another will pass forever and defend the wrong thing.
 
-## Paying a reopened month offered the whole figure again
+## The overpayment was typed, not offered
 
-**What it looked like:** August was approved at E£760 and paid. It was reopened,
-re-approved at E£3,829, and the Pay button offered **E£3,829** — with nothing
-on screen mentioning the E£760 sent for the same month minutes earlier. The
-full amount was sent, and E£760 went out twice.
+**Recorded because the first version of this entry was wrong**, and a wrong
+entry in this file is worse than no entry.
 
-This is the origin of every number in the entry above. The settle loop
-amplified it; this created it.
+August was approved at E£760 and paid; reopened; re-approved at E£3,829; and
+paid **in full again**, so E£760 went out twice. The obvious explanation was
+that the Pay screen had offered the whole new figure.
 
-**Fixed by** showing what has already been sent for the month and defaulting
-the amount to the remaining balance rather than the obligation.
+**It had not.** `allocated_to_month` already sums across every version of a
+month — a defect fixed earlier and documented above — so the screen showed
+*"Already sent, across versions −E£760.00"*, computed *"Still owed E£3,069.00"*,
+pre-filled the amount box with **E£3,069**, and printed *"E£760.00 more than
+what is owed"* when the full figure was typed over it.
 
-**The general rule:** a form that pre-fills a total, on a screen where part of
-that total may already have been paid, is a form that will eventually pay it
-twice.
+Everything the screen could say, it said. It said all of it in the same grey.
+
+**Changed:** an amount above what is owed now reads as a warning rather than a
+note, and says what it will cost — *"This month will be overpaid, and you will
+have to credit or write off the difference."* The under-payment case stays
+quiet, because a part payment is ordinary and deliberate.
+
+**The lesson is about severity, not information.** A screen that states the
+consequence in the same weight as everything else has not warned anybody. Check
+what a note *looks* like before concluding a screen failed to say something.
 
 ## A cancelled order's value is not in the database
 

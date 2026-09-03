@@ -124,11 +124,16 @@ def version_history(db: Session, payroll_month: PayrollMonth) -> list[dict]:
 
 
 def adjusted_against(db: Session, payroll_month: PayrollMonth) -> int:
-    """Credits and write-offs reducing what this month still owes.
+    """Credits and write-offs closing this month's difference.
 
-    A **credit** moves the excess to a later month, so it reduces the source and
-    is expected to increase the destination. A **write-off** reduces the source
-    and goes nowhere - HBA absorbs it.
+    ADR 0035. Both kinds **close a difference, whichever way it runs**: a
+    write-off against an underpaid month discharges the debt, and either kind
+    against an overpaid month absorbs the excess. Neither ever opens a larger
+    difference than the one it was created to settle.
+
+    A **credit** moves the excess to a later month, where the model already
+    holds it and that month therefore needs less sent. A **write-off** goes
+    nowhere - HBA absorbs it.
     """
     return int(
         db.scalar(
@@ -204,11 +209,33 @@ def balance_for(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
     adjusted = adjusted_against(db, payroll_month)
     credited = credited_into(db, payroll_month)
 
-    balance = obligation + credited - paid - adjusted
+    # **A credit landing here is money the model already holds** (§11.5, ADR
+    # 0035). It came from an earlier month they were overpaid, so it covers
+    # this month exactly as a transfer does - this month needs that much less
+    # sent, which is what the reconcile screen promises in words.
+    difference = obligation - paid - credited
+
+    # **An adjustment closes a difference; it never opens a larger one.**
+    #
+    # Which way it closes depends on which way the difference runs, and that
+    # is the whole of ADR 0035. Writing off a *debt* reduces what is owed;
+    # settling an *excess* reduces the overpayment. Subtracting in both cases
+    # - which is what this did - pushes an already-overpaid month further
+    # into overpayment, so every press of "settle the difference" doubled it:
+    # a real overpayment of E£257 was reported as E£5,074.
+    #
+    # The clamp is the second guard. Even if an adjustment is larger than the
+    # difference it closes - and one was, four times over, before the cap
+    # below existed - the balance stops at zero rather than crossing it.
+    balance = (
+        max(difference - adjusted, 0)
+        if difference > 0
+        else min(difference + adjusted, 0)
+    )
 
     return {
         "month": month,
-        "state": SettlementState.of(obligation + credited, paid + adjusted),
+        "state": SettlementState.of_balance(balance, paid),
         # Payments allocate to a **snapshot**, not to a month (§11.5): money
         # paid against a superseded version has to stay attached to the version
         # it settled. Anything recording a payment therefore needs this id, so
@@ -483,6 +510,47 @@ def adjust(
     elif destination_month is not None:
         raise ValueError(
             f"A {kind} goes nowhere. Only a credit lands on another month."
+        )
+
+    # **Nothing may be settled twice, and nothing more than once over.**
+    #
+    # ADR 0035. The screen already caps at the difference it displays, and
+    # that was not enough: while the displayed difference was itself wrong,
+    # the cap moved with it and each settle doubled the figure. A cap the
+    # browser cannot see past is the one that holds - so this asks the balance
+    # again, here, and refuses anything larger than what is genuinely open.
+    #
+    # `settling` is what is left after every adjustment already recorded, so
+    # two half-settlements are fine and a second full one is not.
+    open_difference = balance_for(db, affiliate, source_month)["balance_piastres"]
+    settling = abs(open_difference)
+    if settling == 0:
+        raise ValueError(
+            f"{source_month} has nothing left to settle. Its difference has "
+            "already been closed."
+        )
+    if int(amount_piastres) > settling:
+        raise ValueError(
+            f"That is more than the difference. {source_month} has "
+            f"{settling} piastres open, and an adjustment can only close what "
+            "is there."
+        )
+
+    # **A credit carries an excess. It cannot carry a debt.**
+    #
+    # A write-off works in either direction - absorbing an overpayment, or
+    # forgiving what is still owed - because both end with HBA out of pocket
+    # and the month at zero. A credit does not: it says the model *already
+    # holds* this money, so the later month needs less sent.
+    #
+    # From a month that is still owed, that sentence is false twice over. The
+    # source would drop by the amount and the destination would drop by it
+    # again, and the model would end up short by exactly the credit. Refusing
+    # is not a restriction on a legitimate act; there is no such act.
+    if kind == AdjustmentType.CREDIT and open_difference > 0:
+        raise ValueError(
+            f"{source_month} is still owed money, so there is no excess to "
+            "carry forward. Pay it, or write it off."
         )
 
     adjustment = PayrollAdjustment(
