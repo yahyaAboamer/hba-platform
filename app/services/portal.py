@@ -57,7 +57,11 @@ from app.core.businesstime import (
     parse_month,
     utcnow,
 )
-from app.core.money import format_egp
+from app.core.money import (
+    commission_numerator,
+    exact_commission_piastres,
+    format_egp,
+)
 from app.models.affiliates import AffiliateProfile
 from app.models.attributed_orders import AttributedOrder, CommissionState
 from app.models.compensation import CompensationType
@@ -70,6 +74,7 @@ from app.models.payments import (
 )
 from app.models.payroll import CalculationState, PayrollMonth, PayrollSnapshot
 from app.services.commission.calculate import MonthCalculation
+from app.services.compensation import terms_for
 from app.services.payments import adjustments_for, balance_for, payments_for
 from app.services.payments_state import SettlementState
 from app.services.payroll import (
@@ -717,6 +722,27 @@ def _credited_from(
     ]
 
 
+def _order_commission(base: int, rate_bp: int | None, state: str) -> int | None:
+    """What one counted order was worth in commission, exact to the piastre.
+
+    `None` where there is no answer rather than zero: an order still in
+    transit has earned nothing *yet*, a void one never will, and a month
+    nobody has set a rate for cannot be answered at all. A zero beside any of
+    the three would read as a figure rather than an absence.
+
+    **A worked example, not a ledger line.** The month's commission is one
+    numerator divided once (ADR 0004); these are the same arithmetic applied
+    to a single order so somebody can check a row against their own record.
+    Summed, they can miss the month's rounded total by up to half a pound -
+    which is why the screen showing them says what the total is, rather than
+    inviting an addition.
+    """
+    if state != CommissionState.EARNED or not rate_bp or base <= 0:
+        return None
+    exact = exact_commission_piastres(commission_numerator(base, rate_bp))
+    return int(exact.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+
+
 def my_orders(db: Session, affiliate: AffiliateProfile, month: str) -> list[dict]:
     """The orders behind the figure, so they can count them against their own list.
 
@@ -732,6 +758,12 @@ def my_orders(db: Session, affiliate: AffiliateProfile, month: str) -> list[dict
     parse_month(month)
     settled = _settled_months(db, affiliate, month)
 
+    # **The rate that month was on, not the rate they are on now.** An order
+    # sold in July is worth July's percentage even when it is read in
+    # September, which is the same rule §11.4 applies to a carried order.
+    terms = terms_for(db, affiliate, month)
+    rate_bp = terms.commission_rate_bp if terms else None
+
     rows = db.execute(
         select(AttributedOrder, OrderIndex)
         .join(
@@ -743,7 +775,12 @@ def my_orders(db: Session, affiliate: AffiliateProfile, month: str) -> list[dict
         .order_by(OrderIndex.placed_at.desc())
     ).all()
 
-    return [
+    detail = []
+    for order, index in rows:
+        commission = _order_commission(
+            order.commission_base_piastres, rate_bp, order.commission_state
+        )
+        detail.append(
         {
             "order_number": index.order_number,
             "placed_at": index.placed_at.isoformat(),
@@ -756,6 +793,21 @@ def my_orders(db: Session, affiliate: AffiliateProfile, month: str) -> list[dict
             "delivered_at": (
                 order.delivered_at.isoformat() if order.delivered_at else None
             ),
+            # **What this one order was worth to them**, computed here because
+            # nothing about money is calculated in the browser - a second
+            # implementation would be a second answer waiting to disagree in
+            # front of the one person guaranteed to check.
+            #
+            # Counted orders only. An order still travelling has earned
+            # nothing yet and a void one never will, and putting a figure
+            # beside either would be describing money that does not exist.
+            #
+            # Exact to the piastre, and **deliberately not rounded**: ADR 0004
+            # rounds once, on the month's total. Rounding here as well would
+            # produce rows that do not sum to the figure above them, which is
+            # the one thing a breakdown must never do.
+            "commission_piastres": commission,
+            "commission": format_egp(commission) if commission is not None else None,
             # §11.4. Named only when a *different* month paid it - an order
             # settled by its own month needs no explanation, and labelling
             # every row would bury the two that matter.
@@ -765,8 +817,8 @@ def my_orders(db: Session, affiliate: AffiliateProfile, month: str) -> list[dict
                 else None
             ),
         }
-        for order, index in rows
-    ]
+        )
+    return detail
 
 
 def _targets(

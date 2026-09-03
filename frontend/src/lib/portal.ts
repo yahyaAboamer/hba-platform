@@ -30,6 +30,20 @@ export type MyOrder = {
   delivered_at: string | null;
   /** §11.4. Set only where a **different** month's payroll paid it. */
   paid_in_month: string | null;
+  /**
+   * What this one order was worth in commission, exact to the piastre.
+   *
+   * `null` where there is no answer rather than zero: an order still in
+   * transit has earned nothing *yet*, a void one never will, and a month with
+   * no rate set cannot be answered at all.
+   *
+   * **A worked example, not a ledger line.** ADR 0004 divides one numerator
+   * once for the whole month, so these can miss the month's rounded total by
+   * up to half a pound when summed. The screen says what the total is rather
+   * than inviting an addition.
+   */
+  commission_piastres: number | null;
+  commission: string | null;
 };
 
 export type MyEarnings = {

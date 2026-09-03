@@ -1,8 +1,12 @@
 import { useEffect, useState } from "react";
 
+import { Link } from "react-router-dom";
+
+import { usePortal } from "../components/AffiliateLayout";
 import { Money } from "../components/Money";
 import { api } from "../lib/api";
 import { formatMonth } from "../lib/money";
+import { describeDestination } from "../lib/payouts";
 import type { MyPayments as Body, Payment } from "../lib/portal";
 import "./MyPayments.css";
 
@@ -31,6 +35,7 @@ const STATE_TEXT: Record<string, string> = {
  * money* is a question about all of them at once.
  */
 export function MyPayments() {
+  const { me } = usePortal();
   const [body, setBody] = useState<Body | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -78,6 +83,30 @@ export function MyPayments() {
             ? "Agreed and not yet transferred. Months still being worked out are not counted here."
             : "Every month HBA has closed has been paid in full."}
         </p>
+      </section>
+
+      {/*
+       * **Where it goes**, on the screen that is about money arriving.
+       *
+       * It only ever lived on the You screen, which is the wrong place for
+       * it: somebody checking on a payment is right there, already thinking
+       * about the account it lands in, and making them go and find it
+       * elsewhere is what turns a glance into a message to HBA.
+       *
+       * Deliberately *not* an editable field here. Changing where money goes
+       * is a decision, and a decision belongs on the screen built for it with
+       * its own confirmation - not one press away from a balance.
+       */}
+      <section className="panel destination">
+        <div className="destination__row">
+          <span className="destination__label">Going to</span>
+          <span className="destination__value">
+            {describeDestination(me.payout_destination)}
+          </span>
+        </div>
+        <Link to="/you" className="destination__change">
+          Change where I am paid
+        </Link>
       </section>
 
       <section className="panel settle">

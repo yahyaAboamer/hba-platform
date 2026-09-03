@@ -1476,3 +1476,93 @@ def test_an_order_still_travelling_is_left_out_of_the_average(admin):
     body = _sign_in().get(f"/api/me/earnings/{SEPTEMBER}").json()
 
     assert body["sales"]["average_order_piastres"] == 100_000
+
+
+# ── Phase 3: what one order was worth ────────────────────────────────────────
+
+
+def test_an_order_row_carries_the_commission_it_earned(admin):
+    """The worked example, computed on the server like every other figure.
+
+    §11.1's rule about a second implementation of what somebody is owed
+    applies to one order as much as to a month. The browser is handed the
+    answer; it never multiplies anything.
+    """
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"], rate_bp=1500)
+    _order(affiliate["id"], "9201", 84_915, month=SEPTEMBER)
+    _deliver("9201")
+
+    body = _sign_in().get(f"/api/me/earnings/{SEPTEMBER}").json()
+    (row,) = [o for o in body["orders_detail"] if o["order_number"] == "#9201"]
+
+    # 15% of E£849.15 is E£127.3725, exact to the piastre before any rounding.
+    assert row["commission_piastres"] == 12_737
+    assert row["commission"] == _egp(12_737)
+
+
+def test_the_rows_agree_with_the_month_they_are_part_of(admin):
+    """Per-order figures and the month's commission line describe one thing.
+
+    ADR 0004 divides one numerator once for the whole month, so the rows can
+    miss the total by rounding - but only by rounding. A gap wider than the
+    number of rows would mean the two were computed from different rates or
+    different orders, which is the failure this is here to catch.
+    """
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"], rate_bp=1500)
+    for index, base in enumerate((84_915, 50_915, 50_915), start=1):
+        _order(affiliate["id"], f"930{index}", base, month=SEPTEMBER)
+        _deliver(f"930{index}")
+
+    body = _sign_in().get(f"/api/me/earnings/{SEPTEMBER}").json()
+
+    rows = sum(
+        o["commission_piastres"]
+        for o in body["orders_detail"]
+        if o["commission_piastres"] is not None
+    )
+    (line,) = [
+        m for m in body["makeup"] if m["label"] == "Commission on this month's sales"
+    ]
+    counted = len([o for o in body["orders_detail"] if o["state"] == "earned"])
+
+    assert abs(rows - line["piastres"]) <= counted
+
+
+def test_no_figure_is_put_beside_an_order_that_earned_nothing(admin):
+    """A zero would read as an amount. These are absences.
+
+    An order still travelling has earned nothing *yet* and a void one never
+    will - two different sentences, neither of them "E£0.00".
+    """
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"])
+    _order(affiliate["id"], "9401", 100_000, month=SEPTEMBER, state="pending")
+    _order(affiliate["id"], "9402", 100_000, month=SEPTEMBER, state="void")
+
+    body = _sign_in().get(f"/api/me/earnings/{SEPTEMBER}").json()
+
+    for row in body["orders_detail"]:
+        assert row["commission_piastres"] is None, row["order_number"]
+        assert row["commission"] is None, row["order_number"]
+
+
+def test_an_order_is_worth_the_rate_of_its_own_month(admin):
+    """§11.4's rule, applied to the row as well as to the carry.
+
+    An order sold in August is worth August's percentage when it is read in
+    September. Reading it at today's rate would show somebody a figure their
+    payment never used.
+    """
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"], rate_bp=1000, start="2026-01")
+    # A raise from September onward. August must not follow it.
+    _terms(admin, affiliate["id"], rate_bp=2000, start=SEPTEMBER)
+    _order(affiliate["id"], "9501", 100_000, month=AUGUST)
+    _deliver("9501")
+
+    august = _sign_in().get(f"/api/me/earnings/{AUGUST}").json()
+    (row,) = [o for o in august["orders_detail"] if o["order_number"] == "#9501"]
+
+    assert row["commission_piastres"] == 10_000, "August is 10%, not September's 20%"

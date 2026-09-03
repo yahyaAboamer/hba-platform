@@ -144,7 +144,7 @@ export function AffiliatePortal({ session }: { session: Session }) {
     );
   }
 
-  const context: PortalContext = { month, months, setMonth, reload: load };
+  const context: PortalContext = { me, month, months, setMonth, reload: load };
 
   return (
     <main className="affiliate" data-theme={theme}>
