@@ -32,6 +32,7 @@ disagree, and the model will be reading both.
 """
 
 import logging
+from dataclasses import replace
 from datetime import timedelta
 
 from sqlalchemy import select
@@ -43,6 +44,7 @@ from app.core.money import format_egp
 from app.models.notifications import NotificationOutbox, NotificationState
 from app.services.jobs import BACKOFF_BASE_SECONDS, PermanentFailure, enqueue
 from app.services.mail import MailRefused, Message, send
+from app.services.mail_branding import wrap
 from app.worker import register_handler
 
 logger = logging.getLogger(__name__)
@@ -181,7 +183,14 @@ def password_reset_requested(
         recipient_email=account.email,
         recipient_name=account.display_name,
         subject_ref=f"user:{account.id}",
-        payload={"email": account.email, "_secret": {"token": token}},
+        # The name goes in the payload, not only on the row: the renderer
+        # greets from `payload["name"]`, so without it every reset email
+        # opened "Hi there," to somebody the platform knows perfectly well.
+        payload={
+            "email": account.email,
+            "name": account.display_name or "",
+            "_secret": {"token": token},
+        },
     )
 
 
@@ -757,6 +766,15 @@ def send_notification(db: Session, payload: dict) -> None:
     if message is None:
         # A code failure, not a delivery one. Loud, and in the failed-jobs view.
         raise PermanentFailure(f"No template for {row.event!r}")
+
+    # **The brand is added once, here, rather than in nine templates.**
+    #
+    # Each template writes plain text and nothing else, so there is one place
+    # the wording lives and the tests keep asserting on it. This derives the
+    # HTML from that same text, which means the two versions of an email
+    # cannot say different things - and a template added later is branded
+    # without anybody remembering to brand it.
+    message = replace(message, html=wrap(message.body))
 
     row.attempts += 1
 

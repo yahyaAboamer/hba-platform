@@ -55,6 +55,9 @@ const KIND_MEANING: Record<Kind, string> = {
  * they were on 10%. That is enforced server-side; this page exists to make it
  * legible before it is committed.
  */
+/** The first month the platform holds data for. See the default below. */
+const PLATFORM_FIRST_MONTH = "2026-01";
+
 export function Compensation() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
@@ -77,7 +80,21 @@ export function Compensation() {
       .get<Detail>(`/api/affiliates/${id}`)
       .then((body) => {
         setDetail(body);
-        setStartMonth(body.current_month);
+        // **A model with no arrangement yet starts from the platform's first
+        // month, not this one.**
+        //
+        // Almost every model here was already selling before the platform
+        // existed and their rate never changed, so the honest start is the
+        // beginning of the data. Defaulting to the current month silently
+        // meant "they were on nothing until September", which is wrong for
+        // every one of them and invisible until a past month is opened.
+        //
+        // Terms starting earlier than a model's code costs nothing: the code
+        // decides which orders are theirs, so the months before it simply
+        // have a rate and no sales. Somebody whose pay genuinely changed
+        // mid-year sets the later arrangement afterwards, which is what a
+        // later month already does.
+        setStartMonth(body.compensation ? body.current_month : PLATFORM_FIRST_MONTH);
         if (body.compensation) {
           setKind(body.compensation.compensation_type);
           setRate(String(body.compensation.commission_rate_bp / 100));

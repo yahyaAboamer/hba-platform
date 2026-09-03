@@ -3,7 +3,34 @@ import { useEffect, useState } from "react";
 import { checkPassword } from "../lib/api";
 import "./PasswordField.css";
 
-const LABELS = ["Too weak", "Weak", "Fair", "Good", "Strong"];
+const LABELS = ["Too weak", "Weak", "Getting there", "Good", "Strong"];
+
+/**
+ * The eye everybody already knows, crossed out when the password is hidden.
+ *
+ * A "Show" button read as a control that might *do* something rather than
+ * reveal something - and every other password field on the internet uses this
+ * icon, so a word here is a small thing to have to learn.
+ */
+function Eye({ open }: { open: boolean }) {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M1.5 12S5 5.5 12 5.5 22.5 12 22.5 12 19 18.5 12 18.5 1.5 12 1.5 12Z" />
+      <circle cx="12" cy="12" r="3.2" />
+      {!open && <path d="M3 21 21 3" />}
+    </svg>
+  );
+}
 
 /**
  * Choosing a password, with the platform saying what it thinks as you type.
@@ -104,8 +131,9 @@ export function PasswordField({
           className="password__reveal"
           onClick={() => setReveal((was) => !was)}
           aria-label={reveal ? "Hide the password" : "Show the password"}
+          aria-pressed={reveal}
         >
-          {reveal ? "Hide" : "Show"}
+          <Eye open={reveal} />
         </button>
       </span>
 

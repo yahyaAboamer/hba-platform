@@ -168,3 +168,12 @@
 .apply__compare dd {
   margin: var(--space-1) 0 0;
 }
+
+/* Somebody abroad, told plainly rather than left to invent details that fit
+   the form. Not --refused: they have done nothing wrong, and colouring it as
+   a failure would read as a rejection of them rather than a limit of ours. */
+.apply__abroad {
+  margin: 0 0 var(--space-4);
+  border-left: 2px solid var(--owed);
+  background: var(--owed-quiet);
+}

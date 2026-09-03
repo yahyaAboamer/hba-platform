@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import instapayGuide from "../assets/instapay-link.png";
 import { api } from "../lib/api";
+import { cardProblem, mobileProblem } from "../lib/payouts";
 import "./Apply.css";
 
 type Mine = {
@@ -74,6 +75,21 @@ export function Apply({ onApplied }: { onApplied: () => void }) {
   const addressProblem =
     method === "instapay" ? instapayProblem(fields.instapay_address_url ?? "") : null;
 
+  // Everything below assumes an Egyptian bank, an Egyptian mobile and Egyptian
+  // pounds. Somebody abroad has none of those, and inventing details that fit
+  // the form would produce money addressed nowhere - so the question is asked
+  // before the fields, and answered honestly if the answer is "not yet".
+  const [inEgypt, setInEgypt] = useState(true);
+
+  const numberProblem =
+    method === "instapay"
+      ? mobileProblem(fields.instapay_phone ?? "", "The InstaPay number")
+      : method === "wallet"
+        ? mobileProblem(fields.wallet_phone ?? "", "The wallet number")
+        : method === "bank"
+          ? cardProblem(fields.bank_account_number ?? "")
+          : null;
+
   useEffect(() => {
     api
       .get<Mine>("/api/applications/mine")
@@ -142,7 +158,7 @@ export function Apply({ onApplied }: { onApplied: () => void }) {
 
       <form onSubmit={submit}>
         <label className="field">
-          <span className="field__label">Your full name</span>
+          <span className="field__label">Your name</span>
           <input
             className="input"
             required
@@ -177,6 +193,55 @@ export function Apply({ onApplied }: { onApplied: () => void }) {
           </span>
         </label>
 
+        {/*
+         * **Asked before how, because it decides whether how is answerable.**
+         * Every option below is Egyptian - an Egyptian mobile, an Egyptian
+         * bank card, Egyptian pounds. Somebody abroad filling those in
+         * produces details nobody can pay, and the first anybody learns of it
+         * is a failed transfer.
+         *
+         * Plain words rather than "domestic" and "international": the person
+         * reading this is telling us where they are, not classifying
+         * themselves.
+         */}
+        <fieldset className="apply__choice">
+          <legend className="field__label">Where is your bank or wallet?</legend>
+          <label className={inEgypt ? "pay__option pay__option--on" : "pay__option"}>
+            <input
+              type="radio"
+              name="based"
+              checked={inEgypt}
+              onChange={() => setInEgypt(true)}
+            />
+            <span className="pay__option-body">
+              <strong>In Egypt</strong>
+            </span>
+          </label>
+          <label className={!inEgypt ? "pay__option pay__option--on" : "pay__option"}>
+            <input
+              type="radio"
+              name="based"
+              checked={!inEgypt}
+              onChange={() => setInEgypt(false)}
+            />
+            <span className="pay__option-body">
+              <strong>Outside Egypt</strong>
+            </span>
+          </label>
+        </fieldset>
+
+        {!inEgypt && (
+          <p className="notice apply__abroad">
+            We pay in Egyptian pounds through InstaPay, a local bank or a mobile
+            wallet, and none of those will reach you outside Egypt. Email us at{" "}
+            <a href="mailto:yahyaaboaamer@gmail.com">yahyaaboaamer@gmail.com</a>{" "}
+            and we will arrange it with you directly — please do not fill in
+            somebody else's account here.
+          </p>
+        )}
+
+        {inEgypt && (
+        <>
         <fieldset className="apply__choice">
           <legend className="field__label">How should we pay you?</legend>
           {(Object.keys(METHOD_LABEL) as Method[]).map((option) => (
@@ -291,13 +356,23 @@ export function Apply({ onApplied }: { onApplied: () => void }) {
               <span className="apply__hint">Exactly as the bank has it.</span>
             </label>
             <label className="field">
-              <span className="field__label">Account number</span>
+              <span className="field__label">Card number</span>
               <input
                 className="input"
                 required
+                inputMode="numeric"
                 value={fields.bank_account_number ?? ""}
                 onChange={(event) => set("bank_account_number", event.target.value)}
               />
+              {/*
+               * The card, not the account number. Egyptian account numbers
+               * vary in length by bank, so no single rule could check one
+               * without refusing somebody's real account - and the card is
+               * sixteen digits everywhere.
+               */}
+              <span className="apply__hint">
+                The 16 digits on the front of your bank card.
+              </span>
             </label>
           </>
         )}
@@ -315,10 +390,27 @@ export function Apply({ onApplied }: { onApplied: () => void }) {
           </label>
         )}
 
+        {/*
+         * One place for whichever number is in play, said while the field is
+         * still under their finger. The form used to take a five-digit
+         * "phone" and a nine-digit "card" without a word - money addressed to
+         * nowhere, and nobody finds out until a transfer fails.
+         */}
+        {numberProblem && (
+          <span className="blocker apply__problem">{numberProblem}</span>
+        )}
+        </>
+        )}
+
         <button
           type="submit"
           className="button button--primary apply__submit"
-          disabled={working || addressProblem !== null}
+          disabled={
+            working ||
+            !inEgypt ||
+            addressProblem !== null ||
+            numberProblem !== null
+          }
         >
           {working ? "Sending…" : "Send my application"}
         </button>

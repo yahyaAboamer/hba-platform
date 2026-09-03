@@ -351,3 +351,49 @@ def test_somebody_still_waiting_is_still_listed(db):
     db.flush()
 
     assert [i.email for i in list_pending_invitations(db)] == ["waiting@example.com"]
+
+
+# ── Withdrawn, or simply lapsed ─────────────────────────────────────────────
+#
+# Withdrawing works by backdating the expiry, which keeps one rule rather than
+# two that could disagree. The cost was that afterwards both read "Link
+# expired" - and only one of them is worth resending.
+
+
+def test_withdrawing_records_that_it_was_deliberate(db):
+    from app.services.staff import revoke_invitation
+
+    admin = _admin(db)
+    _, invitation = create_invitation(db, "nour@example.com", "affiliate", admin.id)
+    db.flush()
+
+    revoke_invitation(db, invitation, actor_id=admin.id, actor_email=admin.email)
+    db.flush()
+
+    assert invitation.withdrawn_at is not None
+    assert invitation.expires_at <= utcnow()
+
+
+def test_a_link_that_merely_lapsed_is_not_marked_withdrawn(db):
+    admin = _admin(db)
+    _, invitation = create_invitation(db, "nour@example.com", "affiliate", admin.id)
+    invitation.expires_at = utcnow() - timedelta(minutes=1)
+    db.flush()
+
+    assert invitation.withdrawn_at is None
+
+
+def test_invitations_are_listed_newest_first(db):
+    """The one somebody just sent is the one they are looking for, and it sat
+    at the bottom under every dead one above it.
+    """
+    from app.services.staff import list_pending_invitations
+
+    admin = _admin(db)
+    create_invitation(db, "first@example.com", "affiliate", admin.id)
+    db.flush()
+    create_invitation(db, "second@example.com", "affiliate", admin.id)
+    db.flush()
+
+    listed = [row.email for row in list_pending_invitations(db)]
+    assert listed[0] == "second@example.com"

@@ -176,13 +176,6 @@ export function AcceptInvitation({
           onProblemChange={setPasswordProblem}
         />
 
-        {tooShort && (
-          <p className="blocker sign-in__error">
-            That is {MINIMUM_PASSWORD - password.length} character
-            {MINIMUM_PASSWORD - password.length === 1 ? "" : "s"} short.
-          </p>
-        )}
-
         {error && (
           <p className="notice notice--refused sign-in__error" role="alert">
             {error}

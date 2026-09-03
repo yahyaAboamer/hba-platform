@@ -274,6 +274,10 @@ def list_affiliates_route(
                 "email": invitation.email,
                 "expires_at": invitation.expires_at.isoformat(),
                 "expired": invitation.expires_at <= utcnow(),
+                # Cancelled on purpose, rather than simply lapsed. The screen
+                # keeps the two apart because only one of them is worth
+                # resending.
+                "withdrawn": invitation.withdrawn_at is not None,
                 # When it was sent. Two rows for one address are otherwise
                 # indistinguishable, which is exactly the state the affiliates
                 # screen was found in - several identical lines, no way to tell

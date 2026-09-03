@@ -739,3 +739,69 @@ def test_the_message_reaches_the_provider_intact(monkeypatch):
     assert captured["json"]["to"] == [{"email": "nour@example.com"}]
     assert "accept-invitation?token=abc" in captured["json"]["textContent"]
     assert captured["headers"]["api-key"] == "a-key"
+
+
+# ── The brand around the words ──────────────────────────────────────────────
+#
+# The plain text is the source and the HTML is derived from it, so the two can
+# never say different things - and a template added later is branded without
+# anybody remembering to brand it.
+
+
+def test_the_html_carries_the_same_words_as_the_text(monkeypatch):
+    from app.services.mail_branding import wrap
+
+    body = "Hi Nour,\n\nSeptember is closed and agreed at E£280.00."
+    rendered = wrap(body)
+
+    assert "September is closed and agreed at E£280.00." in rendered
+    assert "Hi Nour," in rendered
+
+
+def test_a_link_becomes_a_button_and_stays_copyable(monkeypatch):
+    """A button cannot be forwarded to a laptop or read out over the phone,
+    and a client that refuses to render it still needs the address."""
+    from app.config import settings
+    from app.services.mail_branding import wrap
+
+    monkeypatch.setattr(settings, "public_base_url", "https://example.test")
+    rendered = wrap("Open this:\nhttps://example.test/accept-invitation?token=x")
+
+    assert "Open it" in rendered
+    assert "Or copy this" in rendered
+    assert rendered.count("https://example.test/accept-invitation?token=x") >= 2
+
+
+def test_the_words_are_escaped(monkeypatch):
+    """A model's name is data. `Nour <script>` must arrive as text."""
+    from app.services.mail_branding import wrap
+
+    rendered = wrap("Hi Nour <script>alert(1)</script>,\n\nSomething happened.")
+
+    assert "<script>" not in rendered
+    assert "&lt;script&gt;" in rendered
+
+
+def test_an_email_survives_the_platform_not_knowing_its_address(monkeypatch):
+    """Same condition that leaves invitation links empty. An email with no
+    logo is fine; one with a broken image is not."""
+    from app.config import settings
+    from app.services.mail_branding import wrap
+
+    monkeypatch.setattr(settings, "public_base_url", "")
+    rendered = wrap("Hi Nour,\n\nSomething happened.")
+
+    assert "<img" not in rendered
+    assert "HBA" in rendered
+    assert "Something happened." in rendered
+
+
+def test_the_signature_is_not_printed_twice(monkeypatch):
+    """The templates end with a plain-text sign-off written for text. The HTML
+    has a signature block of its own."""
+    from app.services.mail_branding import wrap
+
+    rendered = wrap("Hi Nour,\n\nSomething happened.\n\nHBA Aesthetics")
+
+    assert "HBA Aesthetics" not in rendered
+    assert rendered.count("The HBA Team") == 1

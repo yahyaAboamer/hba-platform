@@ -133,6 +133,23 @@ app.include_router(policy.router)
 if (WEB_DIR / "index.html").exists():
     app.mount("/assets", StaticFiles(directory=WEB_DIR / "assets"), name="assets")
 
+    @app.get("/hba-logo.png", include_in_schema=False)
+    def brand_logo() -> FileResponse:
+        """The mark at the top of every email.
+
+        **A route of its own, on purpose.** Emails cannot embed an image
+        reliably - most clients refuse a data URI - so they reference a URL,
+        and an email sent today is opened next year. That rules out
+        `/assets/`, where Vite renames every file with a content hash on each
+        build: the logo in a September email would 404 by October.
+
+        This path never changes, so neither does the picture in anybody's
+        inbox. It sits above the SPA fallback because that fallback answers
+        every unclaimed path with the HTML shell, which would otherwise send
+        a page of markup where a PNG was asked for.
+        """
+        return FileResponse(WEB_DIR / "hba-logo.png", media_type="image/png")
+
     @app.get("/{full_path:path}", include_in_schema=False)
     def serve_spa(full_path: str) -> FileResponse:
         """Serve the single-page app for any route the API did not claim.

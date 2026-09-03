@@ -102,7 +102,17 @@ def list_pending_invitations(
     )
     if exclude_roles:
         query = query.where(Invitation.role.notin_(exclude_roles))
-    return list(db.scalars(query.order_by(Invitation.created_at)))
+    # **Newest first.** They were oldest-first, so the invitation somebody
+    # just sent - the only one they are usually looking for - sat at the
+    # bottom under every dead one above it.
+    #
+    # `id` breaks the tie, and it is not decoration: `created_at` defaults to
+    # `now()`, which in Postgres is the *transaction* start time, so rows
+    # written together share a timestamp exactly and their order is otherwise
+    # undefined. Two invitations sent in the same second would shuffle.
+    return list(
+        db.scalars(query.order_by(Invitation.created_at.desc(), Invitation.id.desc()))
+    )
 
 
 def _admin_count(db: Session, *, excluding: int | None = None) -> int:
@@ -271,7 +281,11 @@ def revoke_invitation(
     if invitation.expires_at <= utcnow():
         raise ValueError("This invitation has already expired")
 
-    invitation.expires_at = utcnow()
+    now = utcnow()
+    invitation.expires_at = now
+    # Recorded as well as expired, so a link somebody cancelled can be told
+    # from one nobody opened in time. Only one of those is worth resending.
+    invitation.withdrawn_at = now
 
     record_audit(
         db,

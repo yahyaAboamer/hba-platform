@@ -67,7 +67,16 @@ class Message:
     to_address: str
     to_name: str | None
     subject: str
+
+    #: The words, as plain text. **This is the source.** Every template writes
+    #: this and every test asserts on it; the HTML below is derived from it, so
+    #: the two can never say different things.
     body: str
+
+    #: The same words wrapped in the brand, or `None` to send text only.
+    #: Providers are given both: a client that cannot or will not render HTML
+    #: falls back to the text, which is the version that was written.
+    html: str | None = None
 
 
 def _address(name: str | None, email: str) -> str:
@@ -169,6 +178,7 @@ def _send_over_http(message: Message) -> bool:
             "to": [message.to_address],
             "subject": message.subject,
             "text": message.body,
+            **({"html": message.html} if message.html else {}),
         }
     else:
         url = "https://api.brevo.com/v3/smtp/email"
@@ -178,6 +188,7 @@ def _send_over_http(message: Message) -> bool:
             "to": [{"email": message.to_address}],
             "subject": message.subject,
             "textContent": message.body,
+            **({"htmlContent": message.html} if message.html else {}),
         }
 
     try:

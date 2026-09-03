@@ -252,3 +252,21 @@
   font-size: var(--text-xs);
   color: var(--quiet);
 }
+
+/* Dead links, kept and out of the way. Nested inside the outstanding panel
+   rather than given a panel of their own: they are a footnote to that list,
+   not a second subject. */
+.affiliates__invited-dead {
+  border-top: 1px solid var(--rule);
+  padding: var(--space-2) var(--space-4);
+}
+
+.affiliates__invited-dead > summary {
+  cursor: pointer;
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}
+
+.affiliates__invited-dead .affiliates__invited-list li:first-child {
+  border-top: 1px solid var(--rule);
+}
