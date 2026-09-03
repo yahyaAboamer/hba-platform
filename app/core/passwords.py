@@ -22,7 +22,12 @@ import os
 ALGORITHM = "pbkdf2_sha256"
 ITERATIONS = 600_000
 SALT_BYTES = 16
-MINIMUM_PASSWORD_LENGTH = 12
+#: Eight, not twelve. Twelve was above every mainstream floor and the meter
+#: was doing none of the persuading - the bar sat empty until the twelfth
+#: character, so the rule felt arbitrary and the feedback taught nothing.
+#: Eight is the floor NIST SP 800-63B sets for a user-chosen password; the
+#: meter now does the work of pushing past it.
+MINIMUM_PASSWORD_LENGTH = 8
 
 
 def hash_password(password: str) -> str:

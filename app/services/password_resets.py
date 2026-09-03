@@ -34,7 +34,7 @@ from sqlalchemy.orm import Session
 
 from app.core.businesstime import utcnow
 from app.core.password_quality import password_problem
-from app.core.passwords import hash_password
+from app.core.passwords import hash_password, verify_password
 from app.models.identity import PasswordReset, UserAccount
 
 TOKEN_BYTES = 32
@@ -142,6 +142,16 @@ def complete_reset(db: Session, token: str, password: str) -> UserAccount:
     problem = password_problem(password, personal=(account.email, account.display_name or ""))
     if problem is not None:
         raise ValueError(problem)
+
+    # **The old password must not survive a reset.** There are only two reasons
+    # to be here: it was forgotten, or somebody else has it. In the second case
+    # keeping it defeats the entire exercise, and the person resetting cannot
+    # tell which case they are in - so neither can we.
+    if verify_password(password, account.password_hash):
+        raise ValueError(
+            "That is the password you already had. Choose a different one - "
+            "resetting is only worth doing if the old one stops working."
+        )
 
     account.password_hash = hash_password(password)
     row.used_at = utcnow()

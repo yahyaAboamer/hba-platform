@@ -1,0 +1,321 @@
+<title>Portal Redesign Plan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Type and colour are the platform's own: IBM Plex from tokens.css, the
+   serif the portal already wears, and the one brand red this plan is about.
+   Nothing here is picked for the page; it is picked from the project. */
+:root{
+  --paper:#f7f7f9; --surface:#ffffff; --ink:#16181f; --quiet:#5a606e;
+  --faint:#878d0000; --faint:#868c9b; --rule:#e2e5ec; --rule-soft:#eef0f5;
+  --red:#c1001a; --red-soft:#fdf2f3; --red-line:#f3cdd2;
+  --good:#0d6b41; --warn:#8a5300;
+  --shadow:0 1px 2px rgba(18,20,28,.05), 0 10px 30px rgba(18,20,28,.05);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#101219; --surface:#191c25; --ink:#e8eaf0; --quiet:#a0a6b6; --faint:#727888;
+    --rule:#2a2e3a; --rule-soft:#22252f;
+    --red:#ff8a7c; --red-soft:#2a1519; --red-line:#4a2229;
+    --good:#5fd095; --warn:#e0b063;
+    --shadow:0 0 0 1px #2a2e3a, 0 14px 36px rgba(0,0,0,.5);
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#101219; --surface:#191c25; --ink:#e8eaf0; --quiet:#a0a6b6; --faint:#727888;
+  --rule:#2a2e3a; --rule-soft:#22252f;
+  --red:#ff8a7c; --red-soft:#2a1519; --red-line:#4a2229;
+  --good:#5fd095; --warn:#e0b063;
+  --shadow:0 0 0 1px #2a2e3a, 0 14px 36px rgba(0,0,0,.5);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font-family:"IBM Plex Sans",ui-sans-serif,system-ui,-apple-system,sans-serif;
+  font-size:16px;line-height:1.62;-webkit-font-smoothing:antialiased}
+.page{max-width:74ch;margin:0 auto;padding:56px 22px 96px}
+
+h1,h2,h3{font-family:Fraunces,Georgia,"Times New Roman",serif;font-weight:600;
+  letter-spacing:-.015em;text-wrap:balance;margin:0}
+h1{font-size:clamp(30px,5.5vw,42px);line-height:1.12}
+h2{font-size:clamp(21px,3.4vw,26px);line-height:1.2;margin:52px 0 4px;padding-top:26px;
+  border-top:1px solid var(--rule)}
+h3{font-size:17px;line-height:1.3;margin:30px 0 6px;font-weight:600}
+p{margin:14px 0}
+a{color:var(--red)}
+
+.eyebrow{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:11px;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}
+.lede{font-size:17.5px;color:var(--quiet);margin:16px 0 0;text-wrap:pretty}
+.meta{margin:22px 0 0;padding-top:16px;border-top:1px solid var(--rule);
+  font-size:13px;color:var(--faint);display:flex;flex-wrap:wrap;gap:6px 20px}
+.meta b{color:var(--quiet);font-weight:500}
+
+ul,ol{margin:14px 0;padding-left:20px}
+li{margin:7px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600}
+code{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.86em;
+  background:var(--rule-soft);padding:2px 5px;border-radius:3px;color:var(--ink)}
+pre{margin:18px 0;padding:15px 16px;background:var(--surface);border:1px solid var(--rule);
+  border-radius:8px;overflow-x:auto;box-shadow:var(--shadow)}
+pre code{background:none;padding:0;font-size:12.5px;line-height:1.65;display:block;white-space:pre}
+
+.scroll{overflow-x:auto;margin:20px 0;border:1px solid var(--rule);border-radius:8px;
+  background:var(--surface);box-shadow:var(--shadow)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;font-weight:500;font-family:"IBM Plex Mono",monospace;font-size:10.5px;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--faint);
+  padding:12px 14px;border-bottom:1px solid var(--rule);white-space:nowrap}
+td{padding:12px 14px;border-bottom:1px solid var(--rule-soft);vertical-align:top}
+tr:last-child td{border-bottom:0}
+td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+td.k{font-family:"IBM Plex Mono",monospace;font-size:12.5px;white-space:nowrap}
+
+.callout{margin:22px 0;padding:16px 18px;border-radius:8px;background:var(--surface);
+  border:1px solid var(--rule);border-left:3px solid var(--red);box-shadow:var(--shadow)}
+.callout .h{font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--red);margin-bottom:7px}
+.callout p:first-of-type{margin-top:0}
+.callout p:last-child{margin-bottom:0}
+.callout.q{border-left-color:var(--warn)}
+.callout.q .h{color:var(--warn)}
+.callout.ok{border-left-color:var(--good)}
+.callout.ok .h{color:var(--good)}
+
+.pill{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:10px;
+  letter-spacing:.08em;text-transform:uppercase;padding:2px 8px;border-radius:999px;
+  border:1px solid var(--red-line);color:var(--red);background:var(--red-soft);
+  vertical-align:2px;margin-left:8px;font-weight:500}
+.pill.no{border-color:var(--rule);color:var(--faint);background:transparent}
+
+.phase{margin:26px 0;padding:18px 19px;background:var(--surface);border:1px solid var(--rule);
+  border-radius:10px;box-shadow:var(--shadow)}
+.phase>h3{margin-top:0;display:flex;align-items:baseline;flex-wrap:wrap;gap:0}
+.phase .n{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--faint);
+  margin-right:10px;font-weight:400}
+.phase p:last-child,.phase ul:last-child{margin-bottom:0}
+.em{font-style:italic;color:var(--quiet)}
+hr{border:0;border-top:1px solid var(--rule);margin:34px 0}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="page">
+
+<div class="eyebrow">HBA · plan</div>
+<h1>The model-facing portal, redesigned</h1>
+<p class="lede">What it takes to build the Claude Design bundle, corrected for the four things the design tool could not know — and sequenced against the date a real month gets paid.</p>
+<div class="meta">
+  <span>Written <b>3 September 2026</b></span>
+  <span>Deadline <b>30 September 2026</b></span>
+  <span>Accent <b>HBA red</b></span>
+  <span>Supersedes <b>the M2–M4 walkthroughs</b></span>
+</div>
+
+<p style="margin-top:26px"><span class="em">Canonical copy: <code>docs/plans/2026-09-03-portal-redesign.md</code>. This page is for reading away from the machine.</span></p>
+
+<h2>What is being adopted</h2>
+<p>The bundle holds three things, not one.</p>
+<div class="scroll"><table>
+  <thead><tr><th>File</th><th>What it is</th></tr></thead>
+  <tbody>
+    <tr><td class="k">Affiliate Portal Redesign</td><td>A comparison board. Section 0 rebuilds our five tabs as they are today; section 1 offers four directions plus a critique.</td></tr>
+    <tr><td class="k">Affiliate Portal v2</td><td><strong>The design being built.</strong> An interactive prototype — a different, later design from all four directions.</td></tr>
+    <tr><td class="k">_ds/nocturne-…</td><td>The design system v2 sits on. Dark ground, Inter, 8px radii, compact 0.7× spacing, outlined buttons.</td></tr>
+  </tbody>
+</table></div>
+<p><strong>Nocturne's structure is adopted; Nocturne's accent is not.</strong> Everything else — the tonal ramps, the spacing scale, the elevation model, the rule that the accent is a line and never a flood — is taken as written.</p>
+
+<h2>What the design tool did not know</h2>
+<p>It read our real source on 2 September, so its recreation of today's screens is accurate. But it only ever saw one kind of model. None of these is a stylistic disagreement; each would be a false statement about somebody's money.</p>
+
+<h3>1. There are three arrangements, not one</h3>
+<p>Every screen in the prototype assumes pure commission. <code>CompensationType</code> carries three, and their real names say what they do.</p>
+<div class="scroll"><table>
+  <thead><tr><th>Type</th><th>What is paid</th></tr></thead>
+  <tbody>
+    <tr><td class="k">commission</td><td>Sales commission alone.</td></tr>
+    <tr><td class="k">fixed_plus_commission</td><td><strong>Both.</strong> <code>exact = commission + fixed</code>. The salary does not replace the commission.</td></tr>
+    <tr><td class="k">base_guarantee</td><td><code>max(commission, base)</code> — and only when targets are achieved <em>and</em> verified. A floor, never a bonus and never a cap.</td></tr>
+  </tbody>
+</table></div>
+<div class="callout"><div class="h">Got wrong twice — but never by the engine</div>
+<p>The middle one is the easiest to misread from its name, and it was misread twice: by the design prototype, and by the first version of the preview page, which showed the salary alone and printed <em>"Your sales do not change what you are paid"</em>.</p>
+<p><strong><code>calculate.py</code> has always been right</strong> — it computes <code>commission + fixed</code> and rounds once on the total. Only the mock-ups were wrong. Both are corrected.</p></div>
+<p><strong>Consequence:</strong> the Month screen is built from <code>makeup</code>, which already carries whichever lines apply. No screen may hard-code an arrangement, and no screen may imply that sales are irrelevant to anyone.</p>
+
+<h3>2. Targets sometimes decide pay</h3>
+<p>The prototype prints <em>"These are for HBA's records. What you are paid is your commission either way."</em> For anyone on a guaranteed minimum that is false — meeting the targets is exactly what makes the guarantee apply. <code>_targets()</code> already returns <code>determines_pay</code>, and the copy is driven by it.</p>
+<div class="scroll"><table>
+  <thead><tr><th>Arrangement</th><th>What the card says</th></tr></thead>
+  <tbody>
+    <tr><td class="k">commission</td><td>These are for HBA's records. What you are paid is your commission either way.</td></tr>
+    <tr><td class="k">fixed_plus_commission</td><td>These are for HBA's records. You are paid your salary and your commission either way.</td></tr>
+    <tr><td class="k">base_guarantee</td><td><strong>These decide what you are paid this month.</strong> Your guaranteed minimum applies only in a month where you meet them — otherwise you are paid your commission.</td></tr>
+  </tbody>
+</table></div>
+<p>Neither of the first two may say the targets make no difference <em>to the sales</em> — only that they make no difference to the basis of pay.</p>
+
+<h3>3. The customer discount stays off the model's screen</h3>
+<p>The prototype writes <em>"15% off for them, 15% of the sale to you"</em>, treating the customer discount and the commission rate as one number. They are independent, and flow 1 already agreed the customer discount is never shown to a model again. The Grow tab says only: <em>"You earn 15% of every sale that counts."</em></p>
+
+<h3>4. Nothing existed for a month that is blocked, or that changed</h3>
+<p>The prototype has no state for "HBA has not set your rate yet", and none for a figure that moved after the model was told it. Both already exist in the API — <code>waiting_on</code>, <code>recalculated</code>, <code>credited_from</code> — and all three matter more, not less, once real money moves. Each gets a designed state in Phase 2. None may be dropped for being ugly.</p>
+
+<h2>Corrections, and what is already built</h2>
+<p>Beyond the four above: the <strong>share link is removed</strong> (<code>?code=</code> is not how the storefront applies a discount — the code alone, copyable from every screen); <strong>three notification toggles become two</strong>; <strong>"what sells under your code" is phase 6</strong>, because it needs Shopify line items the platform does not store.</p>
+
+<div class="callout ok"><div class="h">Already built — not rebuilt</div>
+<p>The prototype lists these as new. They are not.</p>
+<ul>
+<li><strong>Transfer receipts on each paid month.</strong> The endpoint exists and the image already renders. Restyle only.</li>
+<li><strong>Pre-platform months hollow on the line.</strong> <code>my_year</code> already returns <code>null</code> — never <code>0</code> — with the real order count, and the chart already draws them hollow. This closes what was recorded as M2/M3 work.</li>
+<li><strong>A void order keeps its amount, struck through.</strong></li>
+</ul>
+</div>
+
+<h2>The colour problem, and how it is settled</h2>
+<p>HBA red is a well-formed system colour: built on Nocturne's own lightness scale at our hue, the ramp's 600 step is <code>#e5001c</code> against a brand <code>#e6001c</code>. The difficulty is only the dark ground.</p>
+<div class="scroll"><table>
+  <thead><tr><th>Against</th><th>HBA red #e6001c</th><th>Nocturne #9184d9</th></tr></thead>
+  <tbody>
+    <tr><td>Page <code>#161826</code></td><td class="num">3.67 : 1</td><td class="num">5.45 : 1</td></tr>
+    <tr><td>Card <code>#232532</code></td><td class="num"><strong>3.17 : 1</strong></td><td class="num">4.71 : 1</td></tr>
+  </tbody>
+</table></div>
+<p>3:1 is enough to draw a border. 4.5:1 is what text needs. So on the dark theme the brand red draws lines, borders and the active tab, and <strong>a lighter step of the red ramp carries any figure that has to be read</strong>. On the light theme the problem disappears entirely.</p>
+
+<div class="callout ok"><div class="h">Settled — errors move to amber</div>
+<p><code>portal.css</code> sets <code>--refused: #a83224</code>, and six model-facing screens use it for errors. With a red accent, an error and a brand element become the same colour family.</p>
+<p><code>tokens.css</code> already defines <code>--owed: #b54708</code> as "attention, not alarm", and void orders are already grey and struck through rather than red — which frees red for the brand entirely. The alternative would have left two reds one step apart on the same screen.</p>
+</div>
+
+<h2>Decided</h2>
+<ul>
+<li><strong>Accent: HBA red</strong>, dark by default with a light toggle.</li>
+<li><strong>Grow ships whole, products included</strong> — in phases. <code>read_products</code> was added to the Shopify app when it was built, for this.</li>
+<li><strong>Two notifications only</strong>: a month closed, a payment sent.</li>
+<li><strong>No share link.</strong></li>
+<li><strong>The redesign replaces the M2–M4 walkthroughs.</strong></li>
+</ul>
+
+<p>The accent must stay cheap to change. The entire brand decision lives in eight declarations in one file:</p>
+<pre><code>/* frontend/src/styles/portal-accent.css — the whole decision */
+.affiliate {
+  --accent:      #e6001c;              /* chrome: lines, fills, active tab */
+  --accent-text: #b20013;              /* the step legible as text (light) */
+  --accent-soft: rgba(230, 0, 28, .10);
+  --accent-on:   #ffffff;              /* text on a filled accent */
+}
+.affiliate[data-theme="dark"] {
+  --accent:      #e6001c;
+  --accent-text: #ff968b;              /* lifted, because 3.17:1 cannot be read */
+  --accent-soft: rgba(230, 0, 28, .18);
+  --accent-on:   #ffffff;
+}</code></pre>
+<p>Switching to Nocturne after testing is editing those eight lines. <strong>No component may name a colour directly</strong> — that rule is what keeps the promise, and it is enforced by review, not by hope.</p>
+
+<h2>Settled, 3 September</h2>
+<div class="callout ok"><div class="h">1 · Errors move to amber</div>
+<p>Red is the brand's.</p></div>
+<div class="callout ok"><div class="h">2 · The month-on-month comparison is cut entirely</div>
+<p>A part-month measured against a whole one reads as a collapse on the 2nd and a triumph on the 30th, and no threshold rule made it honest. <code>compared_to_last</code> is not built. One less field, and one less way to mislead.</p></div>
+<div class="callout ok"><div class="h">3 · Sales are shown to everyone, and matter to everyone</div>
+<p>On <code>fixed_plus_commission</code> the sales <em>are</em> part of the pay — the salary is added to the commission, not swapped for it. No screen says otherwise.</p></div>
+<p>No open questions remain. Phase 1 can start.</p>
+
+<h2>The phases</h2>
+<p>Everything is scoped to <code>.affiliate</code>. <strong>No maintainer screen is touched by any phase below</strong> — that isolation already exists in <code>portal.css</code>, and is why this is safe to do four weeks before payroll. Each phase merges to <code>main</code>, deploys to staging, and promotes to production.</p>
+
+<div class="phase">
+  <h3><span class="n">Phase 1</span> Foundation<span class="pill">launch-blocking</span></h3>
+  <p>The shell everything else sits on.</p>
+  <ul>
+    <li><code>portal-accent.css</code> (new): the eight declarations above, and nothing else.</li>
+    <li><code>portal.css</code>: rewritten onto Nocturne's ramps, spacing and elevation. Light and dark, <code>data-theme</code> on the portal root, dark as the default, remembered per device.</li>
+    <li><code>AffiliateLayout</code>: header becomes avatar → <strong>You</strong>, name, and a copy-code button present on every screen. Tabs become Month · Orders · Payments · Year · Grow.</li>
+    <li>Errors resolved to whichever answer open question 1 gets.</li>
+  </ul>
+  <p class="em">Closes the owed flow-1 item "the sign-out and glossary links wrap" — they leave the header entirely.</p>
+  <p><strong>Done when</strong> every screen renders in both themes with no colour named outside <code>portal-accent.css</code>, and the accent can be swapped by editing that one file.</p>
+</div>
+
+<div class="phase">
+  <h3><span class="n">Phase 2</span> The Month screen<span class="pill">launch-blocking</span></h3>
+  <p>The screen that answers <em>how much, and when does it land</em>.</p>
+  <div class="scroll"><table>
+    <thead><tr><th>New backend field</th><th>What it is</th></tr></thead>
+    <tbody>
+      <tr><td class="k">window</td><td>Opens, closes, the words for both, progress %, days left. For an agreed month, the date it was paid.</td></tr>
+      <tr><td class="k">average_order</td><td>Counted sales ÷ counted orders. <code>null</code> at zero orders.</td></tr>
+    </tbody>
+  </table></div>
+  <p>Frontend: headline and state tag; progress line from month start to close; counted-sales and average-order tiles; "On its way" with its ⓘ; collapsible breakdown built from <code>makeup</code> <strong>for all three compensation types</strong>; targets card driven by <code>determines_pay</code>; blockers rendered; <code>recalculated</code> and <code>credited_from</code> notices designed rather than dropped.</p>
+  <p><strong>Done when</strong> all three arrangements read correctly, a blocked month says whose move it is, and a month that changed says so.</p>
+</div>
+
+<div class="phase">
+  <h3><span class="n">Phase 3</span> Orders and Payments<span class="pill">launch-blocking</span></h3>
+  <ul>
+    <li><strong>Orders</strong>: All / Counted / Moving filter with counts; a row expands to show the commission that order earned and why. <span class="em">Closes the owed flow-1 item "show the commission figure in the worked example", on the screen where a model actually asks.</span></li>
+    <li><strong>Payments</strong>: "Next payment" leading with amount, window and destination; paid months restyled; receipts kept as they are.</li>
+  </ul>
+</div>
+
+<div class="phase">
+  <h3><span class="n">Phase 4</span> Your year, and Grow without products<span class="pill no">not blocking</span></h3>
+  <ul>
+    <li><strong>Year</strong>: money as a line, orders as bars, tap a month to read it, hollow months for pre-platform. Best month and month-on-month tiles.</li>
+    <li><strong>Grow</strong>: the code, large, with copy. This month's asks with progress. No share link. The products card present but marked as coming.</li>
+  </ul>
+</div>
+
+<div class="phase">
+  <h3><span class="n">Phase 5</span> You, and notifications<span class="pill">screen blocking</span></h3>
+  <ul>
+    <li><strong>You</strong>: reached from the avatar. Payout change as a bottom sheet, with the confirmation said out loud. Glossary, policy and sign-out as a list.</li>
+    <li>Closes three owed flow-1 items: a model may <strong>reveal their own payout details in full</strong>; a <strong>dropdown of Egyptian banks</strong> with a sanity check on the account-holder field; a <strong>dropdown of wallet providers</strong>.</li>
+    <li><strong>Notifications</strong>: a preference table, two kinds, both on by default, read at the single send point. One migration.</li>
+  </ul>
+</div>
+
+<div class="phase">
+  <h3><span class="n">Phase 6</span> What sells under your code<span class="pill no">after go-live</span></h3>
+  <p>The largest item, and the only one that is genuinely new system rather than a new screen. <code>order_index</code> is deliberately thin and holds no products.</p>
+  <ol>
+    <li>A line-item table keyed on the Shopify order.</li>
+    <li>Ingestion on the order webhook, plus a backfill for existing orders.</li>
+    <li>An aggregate endpoint: products under one affiliate's code, for one month.</li>
+    <li>The card on Grow.</li>
+  </ol>
+  <p><strong>No customer data is added.</strong> Products only — the same rule the rest of the platform already keeps.</p>
+</div>
+
+<h2>Sequence</h2>
+<div class="scroll"><table>
+  <thead><tr><th></th><th>Phase</th><th>Blocking?</th></tr></thead>
+  <tbody>
+    <tr><td class="num">1</td><td>Foundation</td><td><strong>Yes</strong></td></tr>
+    <tr><td class="num">2</td><td>Month</td><td><strong>Yes</strong></td></tr>
+    <tr><td class="num">3</td><td>Orders and Payments</td><td><strong>Yes</strong></td></tr>
+    <tr><td class="num">4</td><td>Year and Grow</td><td>No</td></tr>
+    <tr><td class="num">5</td><td>You and notifications</td><td>The screen yes, the toggles no</td></tr>
+    <tr><td class="num">—</td><td><em>Onboard the twenty</em></td><td></td></tr>
+    <tr><td class="num">6</td><td>Products</td><td>After</td></tr>
+  </tbody>
+</table></div>
+<p>Phases 1–3 and the You screen are what must be true before a model is invited. Everything after can land while the twenty are already using it.</p>
+
+<h2>Still deferred, and still owed</h2>
+<p>These are admin-side, agreed during flow 1. The pause on them is not a decision: removing the customer discount field, the worked-example commission figure, adding targets from a model's own page, more columns on the affiliates list, verifying the same-code no-op, and splitting the discount-code copy. Flows 2 to 6 — attribution, payroll, payments, targets — remain unstarted.</p>
+
+<h2>How each phase is verified</h2>
+<p>The existing suite is the floor: <strong>1,516 backend tests</strong> passed before this work began, and no phase merges below that number. Beyond it, each phase adds tests for the thing it claims.</p>
+<ul>
+  <li><strong>Phase 2</strong> — one test per compensation type asserting the targets sentence; one asserting <code>fixed_plus_commission</code> shows <strong>both</strong> the commission line and the salary line and totals them; one asserting a blocked month names HBA.</li>
+  <li><strong>Phase 3</strong> — the expanded order row's arithmetic matches <code>makeup</code>.</li>
+  <li><strong>Phase 5</strong> — a disabled preference stops exactly one message and no other.</li>
+  <li><strong>Phase 6</strong> — an order with line items adds no customer field to any response, the same structural test that keeps the order index thin.</li>
+</ul>
+
+</div>

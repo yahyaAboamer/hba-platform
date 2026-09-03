@@ -27,6 +27,8 @@ type Invited = {
   email: string;
   expires_at: string;
   expired: boolean;
+  /** Cancelled on purpose, as opposed to simply lapsed. */
+  withdrawn: boolean;
   created_at: string;
 };
 
@@ -141,6 +143,11 @@ export function Affiliates() {
   }, [includeArchived]);
 
   useEffect(reload, [reload]);
+
+  // Live is what somebody is still waiting on; dead is history that should
+  // not be in the way of it.
+  const live = invited.filter((row) => !row.expired);
+  const dead = invited.filter((row) => row.expired);
 
   const waiting = rows?.filter((row) => row.status === "pending") ?? [];
   const stuck = rows?.filter((row) => missingSetup(row).length > 0) ?? [];
@@ -273,12 +280,23 @@ export function Affiliates() {
            * to show. Closing an address when its owner accepts (server side)
            * keeps this short; collapsing keeps it short even when it is not.
            */}
+          {/*
+           * **The count is of live ones only.** Dead invitations are not
+           * outstanding - nobody is waiting on them - and counting them made
+           * the number grow for ever while meaning less each time.
+           */}
           <summary className="affiliates__invited-summary">
-            <strong>{invited.length}</strong>{" "}
-            {invited.length === 1 ? "invitation" : "invitations"} outstanding
+            {live.length > 0 ? (
+              <>
+                <strong>{live.length}</strong>{" "}
+                {live.length === 1 ? "invitation" : "invitations"} outstanding
+              </>
+            ) : (
+              <>No invitations outstanding</>
+            )}
           </summary>
           <ul className="affiliates__invited-list">
-            {invited.map((row) => (
+            {live.map((row) => (
               <li key={row.id}>
                 <span className="affiliates__invited-who">
                   <span>{row.email}</span>
@@ -291,7 +309,7 @@ export function Affiliates() {
                   </span>
                 </span>
                 <span className="affiliates__invited-state">
-                  {row.expired ? "Link expired" : "Still waiting"}
+                  Still waiting
                 </span>
                 {/*
                  * Resend always; withdraw only where it can actually work.
@@ -312,23 +330,70 @@ export function Affiliates() {
                 >
                   Resend
                 </button>
-                {!row.expired && (
-                  <button
-                    type="button"
-                    className="button"
-                    onClick={() =>
-                      api
-                        .post(`/api/staff/invitations/${row.id}/revoke`)
-                        .then(reload)
-                        .catch((caught) => setError(caught.message))
-                    }
-                  >
-                    Withdraw
-                  </button>
-                )}
+                {/*
+                 * No guard needed: this list holds live invitations only, and
+                 * withdrawing is refused on anything already lapsed. The
+                 * condition that used to be here described a row that can no
+                 * longer appear.
+                 */}
+                <button
+                  type="button"
+                  className="button"
+                  onClick={() =>
+                    api
+                      .post(`/api/staff/invitations/${row.id}/revoke`)
+                      .then(reload)
+                      .catch((caught) => setError(caught.message))
+                  }
+                >
+                  Withdraw
+                </button>
               </li>
             ))}
           </ul>
+
+          {/*
+           * **Kept, not deleted, and not in the way.** Twenty models onboarded
+           * means a long tail of typos and lapsed links, and every one of them
+           * was sitting above the list of people who actually matter. They are
+           * still here when somebody wants to know whether a link expired -
+           * which is the only question they answer.
+           */}
+          {dead.length > 0 && (
+            <details className="affiliates__invited-dead">
+              <summary>
+                {dead.length} {dead.length === 1 ? "link" : "links"} no longer
+                usable
+              </summary>
+              <ul className="affiliates__invited-list">
+                {dead.map((row) => (
+                  <li key={row.id}>
+                    <span className="affiliates__invited-who">
+                      <span>{row.email}</span>
+                      <span className="affiliates__invited-when">
+                        sent {formatSentAt(row.created_at)}
+                      </span>
+                    </span>
+                    <span className="affiliates__invited-state">
+                      {row.withdrawn ? "Withdrawn" : "Link expired"}
+                    </span>
+                    <button
+                      type="button"
+                      className="button"
+                      onClick={() =>
+                        api
+                          .post(`/api/staff/invitations/${row.id}/resend`)
+                          .then(reload)
+                          .catch((caught) => setError(caught.message))
+                      }
+                    >
+                      Resend
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
         </details>
       )}
 

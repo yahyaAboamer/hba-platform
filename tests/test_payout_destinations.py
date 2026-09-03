@@ -26,7 +26,7 @@ from app.services.payouts import (
 )
 
 INSTAPAY_URL = "https://ipn.eg/S/nour.mahmoud/instapay/8Xk2Qp"
-ACCOUNT_NUMBER = "10098877665544"
+ACCOUNT_NUMBER = "1009887766554433"
 
 
 def _affiliate(db, name="Nour"):
@@ -262,12 +262,12 @@ def test_a_short_value_does_not_leak_by_being_short(db):
         method=PayoutMethod.BANK,
         bank_name="CIB",
         bank_account_holder="N",
-        bank_account_number="1234",
+        bank_account_number="1234567890123456",
     )
     db.flush()
 
     masked = mask_destination(destination)
-    assert "1234" not in masked["bank_account_number"]
+    assert "1234567890123456" not in masked["bank_account_number"]
 
 
 def test_the_account_holder_name_is_not_masked(db):
@@ -428,7 +428,7 @@ def test_a_bank_payout_reveals_the_number_the_payer_has_to_type(db):
         method=PayoutMethod.BANK,
         bank_name="CIB",
         bank_account_holder="Nour Abdelrahman",
-        bank_account_number="100029384756",
+        bank_account_number="1000293847561234",
     )
     db.flush()
 
@@ -438,7 +438,7 @@ def test_a_bank_payout_reveals_the_number_the_payer_has_to_type(db):
         "method": PayoutMethod.BANK,
         "bank_name": "CIB",
         "bank_account_holder": "Nour Abdelrahman",
-        "bank_account_number": "100029384756",
+        "bank_account_number": "1000293847561234",
     }
 
 
@@ -454,7 +454,7 @@ def test_revealing_returns_only_what_that_method_needs(db):
         nour,
         method=PayoutMethod.WALLET,
         wallet_phone="01012345678",
-        bank_account_number="100029384756",
+        bank_account_number="1000293847561234",
     )
     db.flush()
 
@@ -481,7 +481,7 @@ def test_revealing_is_recorded_without_the_value(db):
         method=PayoutMethod.BANK,
         bank_name="CIB",
         bank_account_holder="Nour Abdelrahman",
-        bank_account_number="100029384756",
+        bank_account_number="1000293847561234",
     )
     db.flush()
     reveal_destination(
@@ -503,7 +503,7 @@ def test_revealing_is_recorded_without_the_value(db):
     action, actor_email, before, after = rows[0]
     assert actor_email == "owner@example.com"
     written = json.dumps([before, after], default=str)
-    assert "100029384756" not in written, "the account number reached the audit log"
+    assert "1000293847561234" not in written, "the account number reached the audit log"
 
 
 def test_revealing_a_destination_that_does_not_exist_is_refused(db):
@@ -710,3 +710,92 @@ def test_the_first_destination_is_not_a_change(db):
     events = [row.event for row in _queued(db)]
     assert Event.DESTINATION_CHANGED_FOR_THEM not in events
     assert Event.DESTINATION_CHANGED not in events
+
+
+# ── The details have to be payable ──────────────────────────────────────────
+#
+# The form took a five-digit "phone" and a nine-digit "card" without a word.
+# That is money addressed to nowhere, and nobody finds out until a transfer
+# fails - by which time the model has been waiting and nobody knows why.
+
+
+def test_a_wallet_number_that_is_not_an_egyptian_mobile_is_refused(db):
+    nour = _affiliate(db)
+    with pytest.raises(ValueError) as refused:
+        set_destination(
+            db, nour, method=PayoutMethod.WALLET, wallet_phone="12345"
+        )
+    assert "Egyptian mobile" in str(refused.value)
+
+
+def test_a_wallet_number_on_an_unknown_network_is_refused(db):
+    """010, 011, 012 and 015 are the Egyptian mobile prefixes. 019 is not."""
+    nour = _affiliate(db)
+    with pytest.raises(ValueError):
+        set_destination(
+            db, nour, method=PayoutMethod.WALLET, wallet_phone="01961234567"
+        )
+
+
+def test_a_number_is_accepted_however_somebody_types_it(db):
+    """`+20 106 123 4567` and `01061234567` are the same number, and the first
+    is how people actually write it. Strict about what it is, tolerant about
+    how it is written.
+    """
+    for index, written in enumerate(("01061234567", "+20 106 123 4567", "0106-123-4567")):
+        model = _affiliate(db, name=f"Nour{index}")
+        assert set_destination(
+            db, model, method=PayoutMethod.WALLET, wallet_phone=written
+        )
+
+
+def test_a_card_number_of_the_wrong_length_is_refused(db):
+    nour = _affiliate(db)
+    with pytest.raises(ValueError) as refused:
+        set_destination(
+            db,
+            nour,
+            method=PayoutMethod.BANK,
+            bank_name="CIB",
+            bank_account_holder="Nour Mahmoud",
+            bank_account_number="12345678",
+        )
+    assert "16 digits" in str(refused.value)
+    assert "has 8" in str(refused.value)
+
+
+def test_a_card_number_with_spaces_is_accepted(db):
+    """Nobody types sixteen digits in one run."""
+    nour = _affiliate(db)
+    assert set_destination(
+        db,
+        nour,
+        method=PayoutMethod.BANK,
+        bank_name="CIB",
+        bank_account_holder="Nour Mahmoud",
+        bank_account_number="1234 5678 1234 5678",
+    )
+
+
+def test_an_instapay_number_is_still_optional(db):
+    """Format checking must not quietly make an optional field mandatory. For
+    InstaPay the *address* is what is required; the number is the fallback for
+    when the link will not open.
+    """
+    nour = _affiliate(db)
+    assert set_destination(
+        db, nour, method=PayoutMethod.INSTAPAY, instapay_address_url=INSTAPAY_URL
+    )
+
+
+def test_an_instapay_number_that_is_given_is_still_checked(db):
+    """Optional does not mean unchecked."""
+    nour = _affiliate(db)
+    with pytest.raises(ValueError):
+        set_destination(
+            db,
+            nour,
+            method=PayoutMethod.INSTAPAY,
+            instapay_address_url=INSTAPAY_URL,
+            instapay_phone="12345",
+        )

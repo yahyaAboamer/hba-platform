@@ -10,6 +10,7 @@ masking everything would make the confirmation meaningless - but the audit
 trail must not become a way to read everybody's banking details.
 """
 
+import re
 from datetime import datetime
 
 from sqlalchemy import select
@@ -115,6 +116,82 @@ def normalise_instapay_address(value: str) -> str:
     return cleaned
 
 
+#: An Egyptian mobile number: eleven digits beginning 010, 011, 012 or 015.
+#: InstaPay and every mobile wallet here are addressed by one, so a number that
+#: is not one cannot be paid - and the walkthrough found the form accepting
+#: anything at all.
+_EGYPTIAN_MOBILE = re.compile(r"^01[0125]\d{8}$")
+
+#: Sixteen digits, the number on the front of the card.
+#:
+#: **Deliberately the card number rather than the account number.** Egyptian
+#: account numbers vary in length by bank, so no single rule could check one
+#: without refusing somebody's real account; the card is sixteen digits at
+#: every bank, and it is what people are used to being asked for.
+_CARD_DIGITS = 16
+
+
+def _digits(value: str | None) -> str:
+    """Just the digits. People type numbers with spaces, dashes and a +20."""
+    return re.sub(r"\D", "", str(value or ""))
+
+
+def mobile_problem(value: str | None, *, what: str) -> str | None:
+    """Why this is not a payable Egyptian mobile number, or `None`.
+
+    Tolerant about how it is written and strict about what it is: `+20 106
+    123 4567`, `0106 123 4567` and `01061234567` are the same number, and the
+    first two are how people actually type it.
+    """
+    digits = _digits(value)
+    if digits.startswith("20") and len(digits) == 12:
+        digits = "0" + digits[2:]
+    if not digits:
+        # **Empty is not this check's business.** `_REQUIRED_FIELD` already
+        # decides which field each method cannot go without, and for InstaPay
+        # that is the address - the number is a fallback for when the link
+        # will not open. Treating blank as wrong here quietly made an optional
+        # field mandatory, which the tests caught.
+        return None
+    if not _EGYPTIAN_MOBILE.match(digits):
+        return (
+            f"{what} does not look like an Egyptian mobile number. It should "
+            "be 11 digits starting 010, 011, 012 or 015."
+        )
+    return None
+
+
+def card_problem(value: str | None) -> str | None:
+    """Why this is not a card number, or `None`."""
+    digits = _digits(value)
+    if not digits:
+        # As above: presence is `_REQUIRED_FIELD`'s job, format is this one's.
+        return None
+    if len(digits) != _CARD_DIGITS:
+        return (
+            f"A card number is {_CARD_DIGITS} digits. That one has "
+            f"{len(digits)}."
+        )
+    return None
+
+
+def payout_problem(method: str, fields: dict[str, str | None]) -> str | None:
+    """Everything wrong with a set of payout details, in one place.
+
+    Here rather than on the screen, for the reason `set_destination` gives
+    about its own checks: the application form, a model changing where they
+    are paid, and a maintainer correcting it are three ways to the same row,
+    and a rule enforced on one of them is a rule with two ways around it.
+    """
+    if method == PayoutMethod.INSTAPAY:
+        return mobile_problem(fields.get("instapay_phone"), what="The InstaPay number")
+    if method == PayoutMethod.WALLET:
+        return mobile_problem(fields.get("wallet_phone"), what="The wallet number")
+    if method == PayoutMethod.BANK:
+        return card_problem(fields.get("bank_account_number"))
+    return None
+
+
 def mask_value(value: str | None) -> str | None:
     """Keep enough to recognise, never enough to use."""
     if value is None:
@@ -212,6 +289,13 @@ def set_destination(
     required = _REQUIRED_FIELD[method]
     if not (fields[required] or "").strip():
         raise ValueError(f"A {method} destination requires {required}")
+
+    # Format, not just presence. The form used to accept a five-digit "phone"
+    # and a nine-digit "card" without a word, which is money addressed to
+    # nowhere - and nobody finds out until a transfer fails.
+    problem = payout_problem(method, fields)
+    if problem is not None:
+        raise ValueError(problem)
 
     previous = current_destination(db, affiliate)
     now = utcnow()

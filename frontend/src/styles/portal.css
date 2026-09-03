@@ -1,58 +1,151 @@
 /*
  * The affiliate portal's own surface.
  *
- * `tokens.css` says it in writing: *"Cool near-neutrals: the warmth belongs to
- * the affiliate portal, not to a tool for reconciling twenty payments at month
- * end."* The maintainer's half was built. The portal's warm half never was — it
- * inherited the payroll tool's palette, and the business's verdict on opening
- * it was exactly that: *"pure white background with black text, so I don't know
- * which is which."*
- *
  * **Scoped to `.affiliate`, deliberately.** Everything here lives under the
  * portal's root element, so no maintainer screen can be reached by it. Those
- * screens are a dense month-end tool and the cool neutrals were always right
- * for them.
+ * screens are a dense month-end tool and `tokens.css`'s cool neutrals were
+ * always right for them. That isolation is what made it safe to redesign this
+ * half four weeks before payroll.
+ *
+ * ## Where this comes from
+ *
+ * The ramps, the spacing density, the elevation model and the rule that the
+ * accent is a line rather than a flood are Nocturne's, from the design bundle
+ * the business built (`docs/plans/2026-09-03-portal-redesign.md`). Nocturne's
+ * own blurple accent is not - `portal-accent.css` holds ours, alone, so it
+ * can be swapped back in one file.
+ *
+ * ## Two themes, and dark is the default
+ *
+ * `data-theme` is stamped on the portal root by `AffiliatePortal`, and the
+ * choice is remembered per device. There is no `prefers-color-scheme` here on
+ * purpose: the business asked for dark by default with a toggle, so following
+ * the operating system instead would quietly overrule that on half the
+ * phones it opened on.
+ *
+ * Every colour is a token redefined in both blocks. **A colour whose only
+ * definition sits inside one theme renders that theme's text on the other
+ * theme's ground** - the classic way a two-theme sheet breaks.
  *
  * ## What does not change
  *
- * ADR 0027 is intact. The typeface still says whether a figure is an
- * obligation — mono for agreed, prose for a working number — and colour is
- * still spent on money state and nothing else. The palette is warmer; the
- * rules it expresses are identical.
+ * ADR 0027 is intact in the part that carries meaning: the typeface still
+ * says whether a figure is an obligation - mono for agreed money, prose for a
+ * working number - and colour is still spent on state rather than decoration.
+ * The serif display face is gone, because the design that replaced it has no
+ * job for one.
  */
 
 .affiliate {
-  /* Surfaces. Paper rather than screen-white: this is a statement of account,
-     read in daylight, on a phone. */
-  --paper: #fbf8f4;
-  --surface: #ffffff;
-  --ink: #1a1714;
-  --quiet: #6b635b;
-  --rule: #eae3da;
-  --rule-strong: #d8cec1;
-  --hover: #f5f1eb;
+  /* ── Ground and ink ───────────────────────────────────────────────────
+   * Nocturne's neutral ramp, verbatim. Light is written first and in full,
+   * so nothing is left defined in only one theme.
+   */
+  --paper: #e4e7f5;
+  --surface: #f3f5fe;
+  --raise: #ffffff;
+  --ink: #292b31;
+  --quiet: color-mix(in srgb, #292b31 62%, transparent);
+  --faint: color-mix(in srgb, #292b31 42%, transparent);
+  --rule: color-mix(in srgb, #292b31 13%, transparent);
+  --rule-strong: #cfd3e5;
+  --hover: #e9ecf7;
+  --bar: #b2b6ca;
 
-  /* Money state, unchanged in meaning and warmed to sit on this paper. Each
-     is checked against the surface behind it rather than carried over. */
-  --owed: #a65b14;
+  /* Money state. `--settled` keeps its green: it means *this arrived*, and it
+     is the one meaning the accent must never be confused with.
+
+     `--refused` is **amber, not red.** Red is the brand's accent in this half
+     of the platform, and an error notice sitting one step away from the
+     active tab would leave two reds on a screen, neither able to mean
+     anything. `tokens.css` already calls this hue "attention, not alarm", and
+     a void order was never red anyway - it is struck through and faded. */
+  --owed: #8a5300;
   --settled: #0f6b45;
-  --refused: #a83224;
-  --owed-quiet: #fbf1e6;
+  --refused: #8a5300;
+  --owed-quiet: #fdf4e6;
   --settled-quiet: #edf6f1;
-  --refused-quiet: #fbefec;
+  --refused-quiet: #fdf4e6;
 
-  --radius: 14px;
+  /* Elevation. On light, a hairline plus a soft shadow; on dark, an edge and
+     ambient darkness - stacking heavy shadows on a dark ground reads as fog. */
+  --elev: 0 1px 2px rgba(41, 43, 49, 0.08), 0 0 0 1px rgba(41, 43, 49, 0.05);
+  --scrim: rgba(41, 43, 49, 0.5);
+
+  /* Type. Inter for prose and headings; mono stays for agreed money, order
+     numbers and codes, which is the distinction ADR 0027 rests on. */
+  --sans: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --display: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
+
+  /* Nocturne's compact scale. Dense on purpose - this is a phone screen with
+     a figure, its explanation and a tab bar all in one hand. */
+  --space-1: 3px;
+  --space-2: 6px;
+  --space-3: 9px;
+  --space-4: 12px;
+  --space-5: 16px;
+  --space-6: 20px;
+  --space-8: 28px;
+
+  --radius-sm: 4px;
+  --radius: 8px;
+  --radius-lg: 14px;
+
+  /* Kept out of the spacing scale on purpose. Tightening `--space-8` is a
+     density decision; the room under the last line of a screen is a
+     "content must not sit under the tab bar" decision, and tying them
+     together is how the two get changed by accident. */
+  --tab-clearance: 4.5rem;
+
+  /* Tells the browser to draw its *own* furniture to match - placeholder
+     text, autofill, scrollbars, the select dropdown, the date picker. Without
+     it a dark form still gets a light-mode caret and a white autofill block,
+     which is the give-away that a theme was painted on rather than switched. */
+  color-scheme: light;
 
   background: var(--paper);
   color: var(--ink);
+  font-family: var(--sans);
   min-height: 100vh;
 }
 
-/* The serif carries headings and the one big figure. It is the only thing on
-   the page that is allowed to be expressive, which is why it is confined to
-   those two jobs. */
-.affiliate {
-  --display: "Fraunces", Georgia, "Times New Roman", serif;
+.affiliate[data-theme="dark"] {
+  --paper: #161826;
+  --surface: #232532;
+  --raise: #2b2e3d;
+  --ink: #e9e9ed;
+  --quiet: color-mix(in srgb, #e9e9ed 58%, transparent);
+  --faint: color-mix(in srgb, #e9e9ed 34%, transparent);
+  --rule: color-mix(in srgb, #e9e9ed 16%, transparent);
+  --rule-strong: #3f424d;
+  --hover: #2b2e3d;
+  --bar: #595d6c;
+
+  /* Amber and green both lift on the dark ground. Carried over unchanged,
+     they would sit at about 2:1 and be unreadable. */
+  --owed: #e0b063;
+  --settled: #5fd095;
+  --refused: #e0b063;
+  --owed-quiet: #2a2015;
+  --settled-quiet: #12261d;
+  --refused-quiet: #2a2015;
+
+  --elev: 0 0 0 1px #3f424d;
+  --scrim: rgba(10, 11, 18, 0.68);
+
+  color-scheme: dark;
+}
+
+/* Focus is the accent here rather than `--focus`. On the maintainer's screens
+   the indigo is deliberately a colour used nowhere else; in the portal the
+   accent is already the only colour, so a third one would be noise. */
+.affiliate :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.affiliate ::selection {
+  background: var(--accent-soft);
 }
 
 /* ── The figure ───────────────────────────────────────────────────────────
@@ -76,12 +169,12 @@
 }
 
 /* A dot rather than a word. It carries the same distinction the typeface
-   does — settled or still moving — without repeating it in prose. */
+   does - settled or still moving - without repeating it in prose. */
 .affiliate .figure__pip {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--rule-strong);
+  background: var(--bar);
 }
 
 .affiliate .figure__pip--agreed {
@@ -91,8 +184,9 @@
 .affiliate .figure__amount {
   display: block;
   font-size: 2.75rem;
-  line-height: 1;
-  letter-spacing: -0.045em;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
 }
 
 .affiliate .figure__note {
@@ -103,7 +197,7 @@
   color: var(--quiet);
 }
 
-/* The month that has not started. No figure at all — a zero is a statement
+/* The month that has not started. No figure at all - a zero is a statement
    about what they earned, and this is a statement about the calendar. */
 .affiliate .figure__note--lead {
   max-width: 32ch;
@@ -111,18 +205,23 @@
   color: var(--ink);
 }
 
-/* ── Cards ───────────────────────────────────────────────────────────────── */
-
+/* ── Cards ───────────────────────────────────────────────────────────────
+ *
+ * Surface-filled and lifted by an edge, rather than outlined on the ground.
+ * On a dark theme a 1px rule around a same-coloured box disappears; a filled
+ * surface one step off the ground does not.
+ */
 .affiliate .panel {
-  border: 1px solid var(--rule);
+  border: 0;
   border-radius: var(--radius);
   background: var(--surface);
+  box-shadow: var(--elev);
   margin-bottom: var(--space-4);
   overflow: hidden;
 }
 
 .affiliate .panel__head {
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-4) var(--space-5);
   border-bottom: 1px solid var(--rule);
 }
 
@@ -159,38 +258,32 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 17px;
-  height: 17px;
+  width: 18px;
+  height: 18px;
   margin-left: var(--space-1);
-  border: 1px solid var(--rule-strong);
+  border: 1px solid var(--rule);
   border-radius: 50%;
-  background: var(--surface);
+  background: transparent;
   color: var(--quiet);
-  font-family: var(--display);
   font-size: 0.66rem;
   line-height: 1;
 }
 
 .affiliate .expl[open] .info,
 .affiliate .expl > summary:hover .info {
-  border-color: var(--ink);
-  color: var(--ink);
-}
-
-.affiliate .expl > summary:focus-visible .info {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
+  border-color: var(--accent);
+  color: var(--accent-text);
 }
 
 .affiliate .expl__body {
   margin-top: var(--space-2);
-  padding: var(--space-3);
-  border: 1px solid var(--rule);
-  border-radius: 10px;
-  background: var(--paper);
+  padding: var(--space-4);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
   font-size: var(--text-xs);
   line-height: 1.6;
-  color: var(--quiet);
+  color: var(--ink);
 }
 
 /* ── A chip ──────────────────────────────────────────────────────────────
@@ -200,32 +293,28 @@
  */
 .affiliate .chip {
   display: inline-block;
-  padding: 3px var(--space-2);
+  padding: 3px var(--space-3);
+  border: 1px solid var(--rule);
   border-radius: 999px;
-  background: var(--owed-quiet);
-  color: var(--owed);
+  background: transparent;
+  color: var(--quiet);
   font-size: var(--text-xs);
   white-space: nowrap;
 }
 
 .affiliate .chip--ok {
-  background: var(--settled-quiet);
-  color: var(--settled);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-text);
 }
 
 .affiliate .chip--quiet {
-  background: var(--hover);
-  color: var(--quiet);
+  border-color: var(--rule);
+  background: transparent;
+  color: var(--faint);
 }
 
-/* ── The head and the month bar ─────────────────────────────────────────── */
-
-.affiliate .affiliate__mark {
-  font-family: var(--display);
-  font-size: var(--text-lg);
-  font-weight: 600;
-  letter-spacing: -0.02em;
-}
+/* ── The month bar ──────────────────────────────────────────────────────── */
 
 .affiliate .months__current {
   font-family: var(--mono);
@@ -234,16 +323,77 @@
 }
 
 .affiliate .months__step {
-  border-radius: 10px;
+  border-radius: var(--radius);
 }
 
 /* ── Struck-through money ────────────────────────────────────────────────
  *
  * An order that did not arrive. The business asked whether to show the amount
  * at all: yes, because hiding it invites the worse guess. Struck through and
- * faded, it can never be mistaken for money coming.
+ * faded, it can never be mistaken for money coming - and it is deliberately
+ * not coloured, which is what leaves red free to be the brand's.
  */
 .affiliate .money--void {
   text-decoration: line-through;
-  opacity: 0.55;
+  color: var(--faint);
+}
+
+/* ── Actions ─────────────────────────────────────────────────────────────
+ *
+ * **Outlined, never filled.** Nocturne's rule, and the right one here: the
+ * accent is a line in this system, and a solid red button is the loudest
+ * thing that could sit on a screen whose loudest thing is meant to be the
+ * figure.
+ *
+ * This also removes a real bug rather than only a stylistic one. `base.css`
+ * hovers `.button--primary` to a literal `#000`, which is correct on the
+ * maintainer's light screens and inverts a near-white button to black on this
+ * one. Overriding here rather than editing `base.css` keeps the promise that
+ * no maintainer screen is touched by this redesign.
+ */
+.affiliate .button {
+  border-color: var(--rule);
+  background: transparent;
+  color: var(--ink);
+}
+
+.affiliate .button:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.affiliate .button--primary,
+.affiliate .button--primary:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.affiliate .button--primary {
+  background: transparent;
+}
+
+.affiliate .button--primary:hover:not(:disabled) {
+  background: var(--accent-soft);
+}
+
+.affiliate .button:disabled,
+.affiliate .button--primary:disabled {
+  border-color: var(--rule);
+  background: transparent;
+  color: var(--faint);
+}
+
+/* The input follows the theme through its tokens; only the placeholder needs
+   saying, because `color-scheme` alone leaves it at the browser's guess. */
+.affiliate .input {
+  border-color: var(--rule);
+  background: var(--surface);
+}
+
+.affiliate .input::placeholder {
+  color: var(--faint);
+}
+
+.affiliate .input:focus {
+  border-color: var(--accent);
 }

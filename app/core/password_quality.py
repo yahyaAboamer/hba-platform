@@ -31,6 +31,8 @@ the common shapes, plus the words this particular business makes likely.
 import re
 import unicodedata
 
+from app.core.passwords import MINIMUM_PASSWORD_LENGTH
+
 #: Passwords refused outright, and the shapes they are generated from.
 #:
 #: Compared after normalising, so `P@ssw0rd123!` and `password123` collapse to
@@ -182,26 +184,43 @@ def password_strength(
     stronger as they type, which is what actually makes people lengthen one. A
     meter that blocked would be a composition rule wearing a friendlier face.
 
-    It takes ``personal`` for one reason: a meter that reads "good" on a
-    password the server is about to refuse is worse than no meter at all.
-    Anything `password_problem` would reject scores zero here.
+    The bands were chosen by the business after using it on a phone:
+
+    ==========  =====================================================
+    8           the minimum, and weak - it clears the floor, no more
+    10          getting there
+    12          good
+    12 + mixed  strong, and 16+ is strong regardless
+    ==========  =====================================================
+
+    **It moves on every character**, deliberately. The first version scored
+    nothing at all until twelve characters and then jumped to two bars, so the
+    bar sat empty through the whole of typing - which teaches somebody that it
+    is broken rather than that they are getting somewhere.
+
+    It takes ``personal`` for one reason: a meter reading "good" on a password
+    the server is about to refuse is worse than no meter at all. Anything
+    `password_problem` would reject scores zero.
     """
     if not password or password_problem(password, personal=personal) is not None:
         return 0
 
-    score = 0
-    if len(password) >= 12:
-        score += 1
-    if len(password) >= 16:
-        score += 1
-    if len(password) >= 20:
-        score += 1
-
+    length = len(password)
     kinds = sum(
         bool(re.search(pattern, password))
         for pattern in (r"[a-z]", r"[A-Z]", r"\d", r"[^A-Za-z0-9]")
     )
-    if kinds >= 3 and len(password) >= 12:
-        score += 1
 
-    return min(score, 4)
+    if length >= 16 or (length >= 12 and kinds >= 3):
+        return 4
+    if length >= 12:
+        return 3
+    if length >= 10:
+        return 2
+    if length >= MINIMUM_PASSWORD_LENGTH:
+        return 1
+
+    # Below the minimum it cannot be accepted at all, but the bar still has to
+    # move - somebody typing their fourth character should see something
+    # happen, or they learn the meter is ornamental.
+    return 1 if length >= MINIMUM_PASSWORD_LENGTH - 3 else 0

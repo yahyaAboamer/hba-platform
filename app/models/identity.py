@@ -141,6 +141,17 @@ class Invitation(Base):
     token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    #: Withdrawn on purpose, as opposed to simply lapsed.
+    #:
+    #: Withdrawing works by backdating `expires_at`, which is deliberate - the
+    #: link then dies through the same check accepting already applies, rather
+    #: than a second rule that could disagree with the first. But it left the
+    #: two indistinguishable afterwards: a link somebody cancelled and one
+    #: nobody opened in time both read "Link expired", and only one of them is
+    #: worth resending.
+    withdrawn_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
     invited_by: Mapped[int | None] = mapped_column(ForeignKey("user_account.id"))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")

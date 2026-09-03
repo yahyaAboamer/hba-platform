@@ -1235,7 +1235,7 @@ def _bank_destination(client, affiliate_id: int) -> None:
             "method": "bank",
             "bank_name": "CIB",
             "bank_account_holder": "Nour Abdelrahman",
-            "bank_account_number": "100029384756",
+            "bank_account_number": "1000293847561234",
         },
     )
     assert response.status_code == 200, response.text
@@ -1251,7 +1251,7 @@ def test_the_profile_shows_a_bank_account_masked(client):
 
     body = client.get(f"/api/affiliates/{affiliate['id']}").json()
 
-    assert body["payout_destination"]["bank_account_number"] == "…756"
+    assert body["payout_destination"]["bank_account_number"] == "…234"
     assert body["payout_destination"]["bank_account_holder"] == "Nour Abdelrahman"
 
 
@@ -1268,7 +1268,7 @@ def test_revealing_gives_the_payer_the_real_number(client):
         "method": "bank",
         "bank_name": "CIB",
         "bank_account_holder": "Nour Abdelrahman",
-        "bank_account_number": "100029384756",
+        "bank_account_number": "1000293847561234",
     }
 
 

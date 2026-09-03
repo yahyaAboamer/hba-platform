@@ -1,12 +1,108 @@
 /* The affiliate portal's shell. §12.5: phone-first.
  *
  * The maintainer's sidebar is the opposite instruction — seven sections down
- * the left, for a laptop at month end. Here there are three, at the bottom,
+ * the left, for a laptop at month end. Here there are five, at the bottom,
  * where a thumb reaches. */
 
 /* Room for the tab bar, so the last line of a screen is never under it. */
 .portal__body {
-  padding-bottom: calc(var(--space-8) + 2.5rem);
+  padding-bottom: var(--tab-clearance);
+}
+
+/* ── The header ─────────────────────────────────────────────────────────
+ *
+ * Their name, their code, and the way in to their own details. It replaced a
+ * heading, a mark, a code chip and two text links that wrapped into each
+ * other on a phone — the M1 walkthrough caught "What these words mean"
+ * breaking into four stacked lines beside an overflowing email address. Those
+ * links now live on the You screen, which is where somebody goes looking for
+ * them rather than somewhere they get in the way.
+ */
+.phead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: 3.25rem;
+  margin-bottom: var(--space-4);
+}
+
+.phead--back {
+  justify-content: flex-start;
+}
+
+.phead__back {
+  padding: var(--space-2) var(--space-1);
+  color: var(--accent-text);
+  font-size: var(--text-sm);
+  text-decoration: none;
+}
+
+.phead__avatar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 1px solid var(--rule);
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-size: var(--text-base);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+/* A flex child will not shrink below its content unless told to, which is how
+   a long unbroken name forces its parent wider than the screen. This is the
+   guard, and it has to be here as well as on the text inside. */
+.phead__who {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.phead__name {
+  display: block;
+  font-size: var(--text-base);
+  font-weight: 600;
+  line-height: 1.2;
+  /* Truncated rather than wrapped. Wrapping a long name pushes the code
+     button off the bottom of a 3.25rem header; an ellipsis keeps the row one
+     line tall whatever is in it, and the full name is the heading on the You
+     screen one tap away. */
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.phead__since {
+  display: block;
+  overflow: hidden;
+  color: var(--quiet);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Outlined, never filled. The accent is a line in this system, and a solid
+   red button beside their name would be the loudest thing on a screen whose
+   loudest thing is meant to be the figure. */
+.phead__code {
+  flex: 0 0 auto;
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--accent-text);
+  font-family: var(--mono);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.phead__code:hover {
+  background: var(--accent-soft);
 }
 
 /* ── Which month ────────────────────────────────────────────────────────── */
@@ -36,15 +132,20 @@
   padding: 0;
   border: 1px solid var(--rule);
   border-radius: var(--radius);
-  background: var(--surface);
+  background: transparent;
   color: var(--ink);
   font-size: var(--text-base);
   cursor: pointer;
 }
 
+.months__step:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
 .months__step:disabled {
   border-color: var(--rule);
-  color: var(--rule-strong);
+  color: var(--faint);
   cursor: default;
 }
 
@@ -64,8 +165,8 @@
 
 /* The bar spans the window - a tab bar inset from the edges of a phone looks
    broken - but the tabs themselves keep the same measure as the content above
-   them. On a desktop window the alternative is three labels stranded across a
-   metre of screen, and an active-tab rule running a third of the way across
+   them. On a desktop window the alternative is five labels stranded across a
+   metre of screen, and an active-tab rule running a fifth of the way across
    under a column that is 30rem wide. */
 .tabs__inner {
   display: flex;
@@ -76,23 +177,28 @@
 
 .tabs__tab {
   flex: 1;
-  padding: var(--space-3) var(--space-2);
+  min-width: 0;
+  padding: var(--space-4) var(--space-1);
   border-top: 2px solid transparent;
+  margin-top: -1px;
   color: var(--quiet);
   font-size: var(--text-sm);
   text-align: center;
   text-decoration: none;
 }
 
-/* A rule and a weight, no colour. ADR 0027 keeps colour for money state, and
-   a coloured tab bar would spend it on navigation. */
+/* The one place navigation carries the accent. ADR 0027 kept colour for money
+   state on the maintainer's screens and that still holds there; here the
+   accent is the brand, and the active tab is the single mark that says which
+   of five screens you are on — a weight change alone was not enough to find
+   at a glance on a phone. */
 .tabs__tab--on {
-  border-top-color: var(--ink);
-  color: var(--ink);
-  font-weight: 500;
+  border-top-color: var(--accent);
+  color: var(--accent-text);
+  font-weight: 600;
 }
 
 .tabs__tab:focus-visible {
-  outline: 2px solid var(--focus);
+  outline: 2px solid var(--accent);
   outline-offset: -2px;
 }

@@ -216,7 +216,20 @@ export function AffiliateDetail({ session }: { session: Session }) {
         </p>
       )}
 
-      {notice && (
+      {/*
+       * **A refusal must not outlive the thing it refused.**
+       *
+       * `notice` is state that survives until something replaces it; `verified`
+       * is read from the record every time it reloads. So a red "Shopify has
+       * never heard of HBA15" could still be on screen while the checklist
+       * below it said "Shopify knows HBA15" - the platform contradicting
+       * itself in two places a centimetre apart, caught in the M1 walkthrough.
+       *
+       * The record wins. A bad notice is dropped the moment the code is
+       * actually verified; a good one stays, because it is the confirmation
+       * somebody just asked for.
+       */}
+      {notice && !(verified && !notice.good) && (
         <p
           className={
             notice.good

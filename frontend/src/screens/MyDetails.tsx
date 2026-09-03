@@ -1,5 +1,9 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 
+import { signOutAndLeave } from "../lib/api";
+import { storeTheme } from "../lib/theme";
+import type { Theme } from "../lib/theme";
 import { MyPayout } from "./MyPayout";
 import "./Apply.css";
 
@@ -28,9 +32,18 @@ const METHOD_LABEL: Record<string, string> = {
 export function MyDetails({
   me,
   onChanged,
+  theme,
+  onTheme,
 }: {
   me: Me;
   onChanged: () => void | Promise<void>;
+  /**
+   * Absent on the screen shown to somebody whose application is still being
+   * checked. They are not on the programme yet, so that screen is one
+   * paragraph and their details - no navigation, and nothing to configure.
+   */
+  theme?: Theme;
+  onTheme?: (theme: Theme) => void;
 }) {
   const [changing, setChanging] = useState(false);
   const [changed, setChanged] = useState(false);
@@ -53,7 +66,8 @@ export function MyDetails({
   }
 
   return (
-    <section className="panel affiliate__panel affiliate__details">
+    <>
+      <section className="panel affiliate__panel affiliate__details">
       <h2 className="panel__title">Your details</h2>
 
       {/*
@@ -103,6 +117,65 @@ export function MyDetails({
         Change where I am paid
       </button>
     </section>
+
+      {/*
+       * **The way the portal looks, and the way out of it.**
+       *
+       * Both used to sit in the header of every screen, where they wrapped
+       * into the model's name on a phone - the M1 walkthrough caught "What
+       * these words mean" breaking across four lines beside a truncated
+       * email. They belong here: this is the screen somebody opens when they
+       * are looking for something *about their account* rather than about
+       * their money.
+       */}
+      {onTheme && (
+        <section className="panel affiliate__panel">
+          <h2 className="panel__title">How this looks</h2>
+          <div className="pref">
+            <span className="pref__label">Dark</span>
+            <button
+              type="button"
+              className="pref__switch"
+              role="switch"
+              aria-checked={theme === "dark"}
+              aria-label="Dark theme"
+              onClick={() => {
+                const next: Theme = theme === "dark" ? "light" : "dark";
+                storeTheme(next);
+                onTheme(next);
+              }}
+            >
+              <span className="pref__knob" />
+            </button>
+          </div>
+        </section>
+      )}
+
+      {onTheme && (
+        <nav className="panel menu" aria-label="About your account">
+          {/*
+           * Only once they are actually on the programme. Somebody still
+           * waiting to be approved has never seen a figure, so a glossary of
+           * carried-forward and guaranteed-minimum explains words they have
+           * no use for yet.
+           */}
+          {me.state === "active" && (
+            <Link className="menu__row" to="/glossary">
+              <span>What these words mean</span>
+              <span className="menu__go">→</span>
+            </Link>
+          )}
+          <button
+            type="button"
+            className="menu__row"
+            onClick={signOutAndLeave}
+          >
+            <span>Sign out</span>
+            <span className="menu__go menu__go--quiet">→</span>
+          </button>
+        </nav>
+      )}
+    </>
   );
 }
 
