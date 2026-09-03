@@ -8,7 +8,10 @@
 .chart {
   position: relative;
   padding: var(--space-3) var(--space-4) var(--space-2);
-  color: var(--ink);
+  /* `currentColor` is what the line, the area gradient, the selected point and
+     the selected bar all take. Setting it once here is what lets the accent be
+     swapped in one file. */
+  color: var(--accent);
 }
 
 .chart svg {
@@ -49,12 +52,20 @@
    nothing. */
 .chart__hollow {
   fill: var(--surface);
-  stroke: var(--rule-strong);
+  stroke: var(--bar);
   stroke-width: 1.5;
 }
 
+/* Selected, but still hollow. It has no figure to show and enlarging it is
+   the whole feedback — filling it would make it look like a month that
+   earned. */
+.chart__hollow--on {
+  stroke: currentColor;
+  stroke-width: 2;
+}
+
 .chart__bar {
-  fill: var(--rule-strong);
+  fill: var(--bar);
 }
 
 .chart__bar--on {
@@ -64,7 +75,15 @@
 .chart__tick {
   font-family: var(--mono);
   font-size: 9px;
-  fill: var(--quiet);
+  fill: var(--faint);
+}
+
+/* The month being read, named on the axis as well as in the panel above -
+   otherwise the panel says "August" and nothing on the chart says which one
+   that is. */
+.chart__tick--on {
+  fill: var(--accent-text);
+  font-weight: 500;
 }
 
 /* One wide target per month, because a finger is not a pointer. Invisible and
@@ -83,77 +102,114 @@
   outline-offset: -2px;
 }
 
-/* Positioned by `tipStyle`, which clamps it inside the card and flips it
-   below the point when there is no room above. The transform is set there
-   too, because it changes with the flip. */
-.chart__tip {
-  position: absolute;
-  z-index: 3;
-  max-width: 88%;
-  white-space: normal;
-  padding: var(--space-2) var(--space-3);
-  border-radius: 10px;
-  background: var(--ink);
-  color: var(--paper);
-  font-size: var(--text-xs);
-  line-height: 1.5;
-  pointer-events: none;
-}
-
-.chart__tip b {
-  display: block;
-  margin-top: 2px;
-  font-family: var(--mono);
-  font-weight: 500;
-  font-size: var(--text-sm);
-}
-
-.chart__tip i {
-  display: block;
-  margin-top: 3px;
-  font-style: normal;
-  font-size: var(--text-xs);
-  opacity: 0.72;
-}
-
-.year__facts {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-4);
-  margin: 0;
-  padding: var(--space-4);
-  border-top: 1px solid var(--rule);
-}
-
-.year__facts dt {
-  font-size: var(--text-xs);
-  color: var(--quiet);
-}
-
-.year__facts dd {
-  margin: var(--space-1) 0 0;
-}
-
-.year__facts-sub {
-  display: block;
-  margin-top: 2px;
-  font-size: var(--text-xs);
-  color: var(--quiet);
-}
 
 /* Why the chart is mostly empty, said on the chart. A model who joined before
    go-live saw seven hollow months and one point and read it as broken. */
-.year__caveat {
-  max-width: 60ch;
+
+/* ── The headline ───────────────────────────────────────────────────────── */
+
+.year__lead {
+  padding: var(--space-3) 0 var(--space-5);
+}
+
+.year__kicker {
   margin: 0;
-  padding: var(--space-3) var(--space-4);
-  border-top: 1px solid var(--rule);
   font-size: var(--text-xs);
-  line-height: 1.6;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.year__total {
+  display: block;
+  margin-top: var(--space-3);
+  font-size: 1.75rem;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+
+.year__since {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
   color: var(--quiet);
 }
 
-.year__caveat strong {
-  color: var(--ink);
-  font-weight: 500;
+/* ── The month being read ───────────────────────────────────────────────
+ *
+ * Above the chart, not over it. A tooltip has to be positioned, clamped to
+ * the card, flipped when it would overflow and dismissed — and on a phone it
+ * covers the months somebody is comparing against. A fixed panel has none of
+ * those problems, and `aria-live` means a screen reader hears the change
+ * rather than having to go hunting for it.
+ */
+.reading {
+  padding: var(--space-4) var(--space-5) 0;
+  min-height: 4.5rem;
+}
+
+.reading__month {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--faint);
+}
+
+.reading__figure {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-lg);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.reading__note {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}
+
+/* Why part of the chart carries no figure. Quiet, because nothing is wrong. */
+.year__caveat {
+  max-width: 44ch;
+  margin: 0;
+  padding: 0 var(--space-5) var(--space-5);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  color: var(--faint);
+}
+
+/* ── The two facts ──────────────────────────────────────────────────────── */
+
+.year__facts {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.tile {
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--elev);
+}
+
+.tile__label {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}
+
+.tile .money,
+.tile__figure {
+  display: block;
+  margin-top: var(--space-2);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.tile__sub {
+  display: block;
+  margin-top: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--faint);
 }

@@ -80,6 +80,10 @@ def normalise_order(node: dict) -> dict:
 
     subtotal, currency = _money(node.get("currentSubtotalPriceSet"))
     total, total_currency = _money(node.get("currentTotalPriceSet"))
+    # What the order was placed at, before any cancellation or refund. Display
+    # only - see the comment on the query fragment.
+    original_subtotal, _ = _money(node.get("subtotalPriceSet"))
+    original_total, _ = _money(node.get("totalPriceSet"))
     shipping, _ = _money(node.get("totalShippingPriceSet"))
     tax, _ = _money(node.get("currentTotalTaxSet"))
 
@@ -130,6 +134,8 @@ def normalise_order(node: dict) -> dict:
         "discount_codes": codes,
         "subtotal_piastres": subtotal,
         "total_piastres": total,
+        "original_subtotal_piastres": original_subtotal,
+        "original_total_piastres": original_total,
         "shipping_piastres": shipping,
         "tax_piastres": tax,
         "currency": currency or total_currency or "EGP",

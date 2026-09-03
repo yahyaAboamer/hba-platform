@@ -96,3 +96,8 @@
   line-height: 1.55;
   color: var(--quiet);
 }
+
+/* The only thing in the card, so it needs no gap above it. */
+.grow__foot--only {
+  margin-top: 0;
+}

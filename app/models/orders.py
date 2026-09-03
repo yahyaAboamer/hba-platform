@@ -103,6 +103,23 @@ class OrderIndex(Base):
     )
     # BigInteger throughout: piastres are 100x the pound figure, so a 32-bit
     # column would overflow at roughly E£21 million.
+    #: **The order as it was placed.** Display only, and never paid on.
+    #:
+    #: Shopify zeroes the `current*` totals when an order is cancelled. That is
+    #: right for commission - §9.3 pays on what the customer actually paid -
+    #: and it left a model's Orders screen printing a struck-through E£0.00 for
+    #: a cancelled order, because the figure it wanted no longer existed
+    #: anywhere. These keep it.
+    #:
+    #: Nullable, because every row indexed before this existed has no answer
+    #: and a zero would be indistinguishable from a genuinely free order. A
+    #: re-import fills them in.
+    #:
+    #: **Never read by `calculate.py`.** Paying on these would pay for parcels
+    #: that were cancelled.
+    original_subtotal_piastres: Mapped[int | None] = mapped_column(BigInteger)
+    original_total_piastres: Mapped[int | None] = mapped_column(BigInteger)
+
     subtotal_piastres: Mapped[int] = mapped_column(
         BigInteger, nullable=False, server_default="0"
     )

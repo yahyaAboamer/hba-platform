@@ -181,15 +181,22 @@ function Row({
            * order was worth nothing *and* was cancelled, which is not a fact
            * about anything - it reads as a bug, and was reported as one.
            *
-           * So: the figure where there is a figure, and the reason in the
-           * expansion where there is not.
+           * `placed_piastres` is the order as it was placed, which the
+           * platform now keeps for exactly this row. It is `null` only where
+           * the base already carries the figure, or on an order indexed
+           * before the platform started asking Shopify for it - and there,
+           * still, no zero is printed.
            */}
-          {order.base_piastres > 0 && (
+          {order.base_piastres > 0 ? (
             <Money
               piastres={order.base_piastres}
               kind={order.state === "earned" ? "agreed" : "provisional"}
               className={order.state === "void" ? "money--void" : undefined}
             />
+          ) : (
+            order.placed_piastres !== null && (
+              <Money piastres={order.placed_piastres} className="money--void" />
+            )
           )}
           <span
             className={
@@ -251,9 +258,15 @@ function explain(order: MyOrder, month: string): string {
   // they can match it; where the order was cancelled outright, Shopify clears
   // its value and there is nothing to match - so the row says that rather
   // than leaving somebody to wonder what the missing figure was.
-  return order.base_piastres > 0
-    ? "This parcel did not reach the customer, so it earns nothing. The amount stays here so you can match it against your own record."
-    : "This order was cancelled, so it earns nothing. The shop clears the value of a cancelled order, which is why no amount is shown — the order number and the date are what to match it against.";
+  if (order.base_piastres > 0) {
+    return "This parcel did not reach the customer, so it earns nothing. The amount stays here so you can match it against your own record.";
+  }
+  if (order.placed_piastres !== null) {
+    return `This order was cancelled, so it earns nothing. ${order.placed} is what it came to when it was placed — kept here so you can match it against your own record.`;
+  }
+  // An order indexed before the platform started keeping the placed-at
+  // figure. The order number and the date are still enough to match it.
+  return "This order was cancelled, so it earns nothing, and the shop no longer holds what it came to. The order number and the date are what to match it against.";
 }
 
 /**

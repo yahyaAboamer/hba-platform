@@ -20,17 +20,27 @@ import "./MyGrow.css";
  * deliberately does not store. That is phase 6, and a placeholder promising it
  * would be a promise on somebody's earnings screen.
  */
-export function MyGrow({ codes }: { codes: { code: string; verified: boolean }[] }) {
+export function MyGrow({
+  codes,
+}: {
+  codes: { code: string; verified: boolean }[];
+}) {
   const { month } = usePortal();
   const [copied, setCopied] = useState<string | null>(null);
   const [targets, setTargets] = useState<MyEarnings["targets"]>(null);
+  // Three states, not two. `null` targets and *not having asked yet* look
+  // identical otherwise, and the card silently not appearing is what made
+  // this screen look like it held nothing but a copy button.
+  const [asked, setAsked] = useState(false);
 
   useEffect(() => {
     let current = true;
     api
       .get<MyEarnings>(`/api/me/earnings/${month}`)
       .then((body) => {
-        if (current) setTargets(body.targets);
+        if (!current) return;
+        setTargets(body.targets);
+        setAsked(true);
       })
       .catch(() => {
         // Silently. The code is the reason this screen exists and it is
@@ -93,38 +103,58 @@ export function MyGrow({ codes }: { codes: { code: string; verified: boolean }[]
        * "4 of 6" answers *how many* and a bar answers *how close*, and the
        * second is the question somebody opens this tab with.
        */}
-      {targets && (
+      {asked && (
         <section className="panel grow__card">
           <div className="grow__head">
             <h2 className="panel__title">{formatMonth(month)} asks</h2>
           </div>
-          <Ask
-            label="Videos"
-            required={targets.required_videos}
-            actual={targets.actual_videos}
-          />
-          <Ask
-            label="Stories"
-            required={targets.required_stories}
-            actual={targets.actual_stories}
-          />
+
           {/*
-           * Driven by the same flag the Month screen's sentence is, so the
-           * two cannot come to disagree: targets decide money on a guaranteed
-           * minimum and on nothing else. Where they do not, this card says
-           * nothing about pay at all rather than reassuring somebody about a
-           * risk they were never under.
+           * **The card appears even when there is nothing in it.**
+           *
+           * It used to render only where a target row existed, so a model
+           * whose month HBA had not set up yet saw a Grow tab holding one
+           * button — which reads as a half-built screen rather than as a
+           * month nobody has filled in. An empty state that says whose move
+           * it is costs one sentence and answers the question.
            */}
-          {targets.determines_pay && (
-            <p className="grow__foot">
-              These decide whether your guaranteed minimum applies this month.
+          {targets === null ? (
+            <p className="grow__foot grow__foot--only">
+              HBA has not set what they are asking for in {formatMonth(month)}{" "}
+              yet. Nothing here is waiting on you.
             </p>
-          )}
-          {targets.actual_videos === null && (
-            <p className="grow__foot">
-              HBA records these. Nothing has been recorded for{" "}
-              {formatMonth(month)} yet.
-            </p>
+          ) : (
+            <>
+              <Ask
+                label="Videos"
+                required={targets.required_videos}
+                actual={targets.actual_videos}
+              />
+              <Ask
+                label="Stories"
+                required={targets.required_stories}
+                actual={targets.actual_stories}
+              />
+              {/*
+               * Driven by the same flag the Month screen's sentence is, so the
+               * two cannot come to disagree: targets decide money on a guaranteed
+               * minimum and on nothing else. Where they do not, this card says
+               * nothing about pay at all rather than reassuring somebody about a
+               * risk they were never under.
+               */}
+              {targets.determines_pay && (
+                <p className="grow__foot">
+                  These decide whether your guaranteed minimum applies this
+                  month.
+                </p>
+              )}
+              {targets.actual_videos === null && (
+                <p className="grow__foot">
+                  HBA records what you posted. Nothing has been recorded for{" "}
+                  {formatMonth(month)} yet.
+                </p>
+              )}
+            </>
           )}
         </section>
       )}
@@ -150,7 +180,8 @@ function Ask({
 }) {
   // Capped at the full bar. Somebody who posted nine of six videos has done
   // more than was asked, not 150% of a bar.
-  const done = actual === null ? 0 : Math.min(actual / Math.max(required, 1), 1);
+  const done =
+    actual === null ? 0 : Math.min(actual / Math.max(required, 1), 1);
 
   return (
     <div className="ask">
