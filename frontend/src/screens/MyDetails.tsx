@@ -1,6 +1,12 @@
 import { useState } from "react";
 
 import { MyPayout } from "./MyPayout";
+import {
+  applyTheme,
+  readThemePreference,
+  storeThemePreference,
+  type ThemePreference,
+} from "../lib/theme";
 import "./Apply.css";
 
 export type Me = {
@@ -18,6 +24,12 @@ const METHOD_LABEL: Record<string, string> = {
   bank: "Bank transfer",
   wallet: "Mobile wallet",
 };
+const THEME_OPTIONS: ThemePreference[] = ["light", "dark", "auto"];
+const THEME_LABEL: Record<ThemePreference, string> = {
+  light: "Light",
+  dark: "Dark",
+  auto: "Auto",
+};
 
 /**
  * Their code and where their money goes. §6.4 and §6.5.
@@ -34,6 +46,14 @@ export function MyDetails({
 }) {
   const [changing, setChanging] = useState(false);
   const [changed, setChanged] = useState(false);
+  const [themePreference, setThemePreference] = useState<ThemePreference>(
+    readThemePreference,
+  );
+  function pickTheme(preference: ThemePreference) {
+    setThemePreference(preference);
+    storeThemePreference(preference);
+    applyTheme(preference);
+  }
 
   if (changing) {
     return (
@@ -102,6 +122,31 @@ export function MyDetails({
       <button type="button" className="button" onClick={() => setChanging(true)}>
         Change where I am paid
       </button>
+      {/*
+       * Appearance is the model's own business, and this is where the model's
+       * own things live. Three answers: light, dark, or Auto - which follows
+       * the setting already chosen on this device. Nothing about what the
+       * figures say, so no money colour appears here.
+       */}
+      <div className="theme-pick">
+        <h3 className="theme-pick__title">Appearance</h3>
+        <div className="theme-pick__row" role="group" aria-label="Appearance">
+          {THEME_OPTIONS.map((option) => (
+            <button
+              key={option}
+              type="button"
+              className="theme-pick__option"
+              aria-pressed={themePreference === option}
+              onClick={() => pickTheme(option)}
+            >
+              {THEME_LABEL[option]}
+            </button>
+          ))}
+        </div>
+        <p className="theme-pick__hint">
+          Auto follows the dark or light setting on this device.
+        </p>
+      </div>
     </section>
   );
 }

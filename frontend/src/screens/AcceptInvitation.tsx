@@ -109,7 +109,7 @@ export function AcceptInvitation({
 
   function shell(children: React.ReactNode) {
     return (
-      <main className="sign-in">
+      <main className="sign-in accept-invite">
         <div className="sign-in__form">
           <div className="sign-in__brand">
             <span className="sign-in__mark">HBA</span>
@@ -150,7 +150,7 @@ export function AcceptInvitation({
   }
 
   return (
-    <main className="sign-in">
+    <main className="sign-in accept-invite">
       <form className="sign-in__form" onSubmit={submit}>
         <div className="sign-in__brand">
           <span className="sign-in__mark">HBA</span>

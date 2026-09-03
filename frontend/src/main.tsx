@@ -21,8 +21,12 @@ import "./styles/portal.css";
 import "./screens/Overview.css";
 import "./screens/Affiliates.css";
 import "./screens/AffiliateDetail.css";
+import { initTheme } from "./lib/theme";
 import App from "./App";
 
+// Re-applies the stored preference (and follows the device while Auto) — the
+// inline script in index.html already painted, so this only catches up.
+initTheme();
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <App />
