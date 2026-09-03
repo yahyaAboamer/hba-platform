@@ -416,9 +416,48 @@ def test_a_credit_needs_somewhere_to_land(client):
 
 
 def test_a_credit_moves_the_money_forward(client):
+    """ADR 0035: the month it came from ends settled, and the month it lands
+    on needs that much less sent — which is what the reconcile screen has
+    always promised in words."""
     affiliate = _affiliate(client)
-    _owed(client, affiliate, AUGUST)
+    august = _owed(client, affiliate, AUGUST)
     _owed(client, affiliate, SEPTEMBER, base=1_000_000)
+
+    # A credit carries an excess, so there has to be one: E£2,200 against
+    # E£2,000 agreed.
+    # Pay it in full, correctly.
+    paid = client.post(
+        "/api/payments",
+        json={
+            "affiliate_id": affiliate["id"],
+            "amount_piastres": 200_000,
+            "allocations": [{"payroll_snapshot_id": august, "piastres": 200_000}],
+        },
+    )
+    assert paid.status_code == 201, paid.text
+
+    # Then the excess, the way it actually arises: a second transfer against
+    # a second version of the same month. The API refuses over-allocating a
+    # *snapshot*, and rightly - Jana's overpayment came from two snapshots
+    # after a reopen, each allocation legitimate on its own and the month
+    # overpaid all the same. Written directly so this test can stay about the
+    # credit rather than about the reopen.
+    with engine.begin() as connection:
+        payment = connection.execute(
+            text(
+                "INSERT INTO payment_transaction (affiliate_id, amount_piastres, "
+                "occurred_at) VALUES (:a, 20000, now()) "
+                "RETURNING id"
+            ),
+            {"a": affiliate["id"]},
+        ).scalar_one()
+        connection.execute(
+            text(
+                "INSERT INTO payment_allocation (payment_transaction_id, "
+                "payroll_snapshot_id, allocated_piastres) VALUES (:p, :s, 20000)"
+            ),
+            {"p": payment, "s": august},
+        )
 
     client.post(
         "/api/adjustments",
@@ -434,8 +473,8 @@ def test_a_credit_moves_the_money_forward(client):
 
     august = client.get(f"/api/payments/{AUGUST}").json()["affiliates"][0]
     september = client.get(f"/api/payments/{SEPTEMBER}").json()["affiliates"][0]
-    assert august["balance_piastres"] == 180_000
-    assert september["balance_piastres"] == 120_000
+    assert august["balance_piastres"] == 0
+    assert september["balance_piastres"] == 80_000
 
 
 def test_an_adjustment_needs_a_reason(client):

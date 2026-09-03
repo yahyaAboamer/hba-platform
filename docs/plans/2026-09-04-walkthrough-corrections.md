@@ -32,9 +32,15 @@ overpayment was **E£257**. The screen reported **E£5,074** and each press of
 *Settle the difference* doubled it. One sign in `balance_for`. ADR 0035.
 
 **Its cause, one step earlier.** August was approved at E£760 and paid; then
-reopened, re-approved at E£3,829, and paid **in full again** — because the Pay
-button offered the whole new figure and said nothing about the E£760 already
-sent. The difference owed was E£3,069.
+reopened, re-approved at E£3,829, and paid **in full again**, so E£760 went out
+twice.
+
+The Pay screen was not at fault, though the first draft of this plan said it
+was. It showed *"Already sent, across versions −E£760.00"*, computed *"Still
+owed E£3,069.00"*, pre-filled that figure, and printed *"E£760.00 more than
+what is owed"* when the full amount was typed over it. It said everything —
+all of it in the same grey. An overpayment now reads as a warning and names its
+consequence.
 
 ### The Month screen was never rebuilt
 
@@ -71,8 +77,8 @@ every day, then the rest.
 - **Clear the three junk adjustments on staging** (E£4,817 against a real
   E£257). `payroll_adjustment` is append-only, so they are deleted at the
   database. **Production has never had an adjustment recorded.**
-- **"Already sent" on the payment screen** — show what has gone out for the
-  month, default the amount to the remainder.
+- **Make an overpayment look like one.** The screen already shows what has
+  gone out and defaults to the remainder; the warning was styled as a note.
 
 ### 2 · The Month screen, properly
 

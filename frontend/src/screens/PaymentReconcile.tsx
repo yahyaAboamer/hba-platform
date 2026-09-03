@@ -232,6 +232,11 @@ export function PaymentReconcile() {
                 kind === null ||
                 piastres === null ||
                 piastres <= 0 ||
+                /* ADR 0035. The server refuses this too, and that is the cap
+                   that matters - but a button that submits a figure the
+                   server will reject teaches somebody the screen is unreliable
+                   rather than that the figure is wrong. */
+                piastres > over ||
                 reason.trim() === ""
               }
             >

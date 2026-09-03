@@ -33,6 +33,7 @@ from app.services.affiliates import create_affiliate
 from app.services.compensation import set_terms
 from app.services.payments import (
     allocate,
+    adjust,
     balance_due,
     balance_for,
     payments_for,
@@ -107,6 +108,15 @@ def _owed(db, affiliate, month=AUGUST, base=2_000_000):
     """An approved month with a round obligation. 10% of E£20,000 = E£2,000."""
     _order(db, affiliate, f"{affiliate.id}-{month}", base, month=month)
     return approve_month(db, affiliate, month)
+
+
+def _pay(db, affiliate, month, piastres):
+    """Send money against a month's current version."""
+    snapshot = get_month(db, affiliate, month).active_snapshot
+    record_payment(
+        db, affiliate, amount_piastres=piastres, allocations={snapshot.id: piastres}
+    )
+    db.flush()
 
 
 # ── What is owed ───────────────────────────────────────────────────────────────
@@ -516,15 +526,25 @@ def test_a_write_off_clears_the_rest(db):
     assert balance_for(db, affiliate, AUGUST)["state"] == SettlementState.SETTLED
 
 
-def test_a_credit_increases_what_a_later_month_owes(db):
-    """A credit moves an overpayment forward: it reduces the month it came from
-    and is expected to raise the one it lands on.
+def test_a_credit_leaves_the_overpaid_month_settled(db):
+    """ADR 0035. A credit carries an excess forward, so the month it came from
+    ends at zero — not further from zero.
+
+    **This test used to assert the opposite**, and its fixture is why nobody
+    noticed: it set up a month that had never been paid at all, so it was
+    really testing *moving an unpaid debt forward*, which is a different
+    operation with the opposite sign. The docstring said "overpayment" while
+    the arithmetic said "debt", and both passed for a month.
     """
     affiliate = _affiliate(db)
-    _owed(db, affiliate, AUGUST)
-    _owed(db, affiliate, SEPTEMBER, base=1_000_000)
+    _owed(db, affiliate, AUGUST)  # E£2,000 agreed
+    _owed(db, affiliate, SEPTEMBER, base=1_000_000)  # E£1,000 agreed
     august = get_month(db, affiliate, AUGUST)
     september = get_month(db, affiliate, SEPTEMBER)
+
+    # Overpaid by E£200: sent E£2,200 against E£2,000.
+    _pay(db, affiliate, AUGUST, 220_000)
+    assert balance_for(db, affiliate, AUGUST)["balance_piastres"] == -20_000
 
     db.add(
         PayrollAdjustment(
@@ -537,8 +557,13 @@ def test_a_credit_increases_what_a_later_month_owes(db):
     )
     db.flush()
 
-    assert balance_for(db, affiliate, AUGUST)["balance_piastres"] == 180_000
-    assert balance_for(db, affiliate, SEPTEMBER)["balance_piastres"] == 120_000
+    august_now = balance_for(db, affiliate, AUGUST)
+    assert august_now["balance_piastres"] == 0
+    assert august_now["state"] == SettlementState.SETTLED
+
+    # And September needs E£200 less sent, because she is already holding it —
+    # which is exactly what the reconcile screen promises in words.
+    assert balance_for(db, affiliate, SEPTEMBER)["balance_piastres"] == 80_000
 
 
 def test_an_adjustment_needs_a_reason(db):
@@ -592,6 +617,7 @@ def test_a_credit_opens_the_month_it_lands_on(db):
 
     affiliate = _affiliate(db)
     _owed(db, affiliate, AUGUST)
+    _pay(db, affiliate, AUGUST, 220_000)  # a credit needs an excess to carry
 
     assert get_month(db, affiliate, SEPTEMBER) is None, "September is untouched"
 
@@ -621,6 +647,9 @@ def test_a_credit_waits_on_a_draft_month_and_applies_when_it_is_approved(db):
 
     affiliate = _affiliate(db)
     _owed(db, affiliate, AUGUST)
+    # A credit carries an excess, so there has to be one: E£2,200 sent
+    # against E£2,000 agreed.
+    _pay(db, affiliate, AUGUST, 220_000)
     adjust(
         db,
         affiliate,
@@ -639,10 +668,10 @@ def test_a_credit_waits_on_a_draft_month_and_applies_when_it_is_approved(db):
     _owed(db, affiliate, SEPTEMBER, base=1_000_000)
     db.flush()
 
-    # E£1,000 agreed, plus E£200 carried in, and nothing paid yet.
+    # E£1,000 agreed, less the E£200 she is already holding.
     settled = balance_for(db, affiliate, SEPTEMBER)
     assert settled["credited_piastres"] == 20_000
-    assert settled["balance_piastres"] == 120_000
+    assert settled["balance_piastres"] == 80_000
 
 
 def test_a_month_opened_only_to_receive_a_credit_is_not_reported_as_forgotten(db):
@@ -657,6 +686,7 @@ def test_a_month_opened_only_to_receive_a_credit_is_not_reported_as_forgotten(db
 
     affiliate = _affiliate(db)
     _owed(db, affiliate, AUGUST)
+    _pay(db, affiliate, AUGUST, 220_000)  # a credit needs an excess to carry
     adjust(
         db,
         affiliate,
@@ -737,3 +767,146 @@ def test_one_models_correction_never_blocks_another(db):
 
     payment = record_payment(db, unaffected, amount_piastres=200_000)
     assert payment.id is not None
+
+
+# ── ADR 0035: an adjustment closes a difference ─────────────────────────────
+#
+# Reproduced from staging, where a real overpayment of E£257 was reported as
+# E£5,074 and doubled on every press of "Settle the difference".
+
+
+def test_settling_an_overpayment_does_not_make_it_larger(db):
+    """The defect, in the shape it actually took.
+
+    August agreed at E£2,000 and paid E£2,200. The excess is E£200. Settling
+    it must leave the month at zero — and settling it again must be refused
+    rather than doubling it, which is what happened four times on staging
+    before anybody noticed the figure was growing.
+    """
+    affiliate = _affiliate(db)
+    _owed(db, affiliate, AUGUST)
+    _pay(db, affiliate, AUGUST, 220_000)
+
+    assert balance_for(db, affiliate, AUGUST)["balance_piastres"] == -20_000
+
+    adjust(
+        db,
+        affiliate,
+        kind=AdjustmentType.WRITEOFF,
+        source_month=AUGUST,
+        amount_piastres=20_000,
+        reason="absorbed",
+    )
+    db.flush()
+
+    settled = balance_for(db, affiliate, AUGUST)
+    assert settled["balance_piastres"] == 0
+    assert settled["state"] == SettlementState.SETTLED
+
+    # And there is nothing left to settle. Before ADR 0035 this call would
+    # have been offered a difference of E£400 and accepted it.
+    with pytest.raises(ValueError, match="nothing left to settle"):
+        adjust(
+            db,
+            affiliate,
+            kind=AdjustmentType.WRITEOFF,
+            source_month=AUGUST,
+            amount_piastres=20_000,
+            reason="again",
+        )
+
+
+def test_an_adjustment_cannot_exceed_the_difference_it_closes(db):
+    """The second guard, and the one that would have held on its own.
+
+    While the displayed difference was itself wrong, the screen's cap moved
+    with it. A cap the browser cannot see past is the one that works.
+    """
+    affiliate = _affiliate(db)
+    _owed(db, affiliate, AUGUST)
+    _pay(db, affiliate, AUGUST, 220_000)  # E£200 over
+
+    with pytest.raises(ValueError, match="more than the difference"):
+        adjust(
+            db,
+            affiliate,
+            kind=AdjustmentType.WRITEOFF,
+            source_month=AUGUST,
+            amount_piastres=500_000,
+            reason="far too much",
+        )
+
+
+def test_two_half_settlements_are_allowed_and_a_third_is_not(db):
+    """The cap is against what remains open, not against the original
+    difference — otherwise settling a difference in two parts would be
+    refused halfway through."""
+    affiliate = _affiliate(db)
+    _owed(db, affiliate, AUGUST)
+    _pay(db, affiliate, AUGUST, 220_000)  # E£200 over
+
+    for _ in range(2):
+        adjust(
+            db,
+            affiliate,
+            kind=AdjustmentType.WRITEOFF,
+            source_month=AUGUST,
+            amount_piastres=10_000,
+            reason="half",
+        )
+        db.flush()
+
+    assert balance_for(db, affiliate, AUGUST)["balance_piastres"] == 0
+    with pytest.raises(ValueError, match="nothing left to settle"):
+        adjust(
+            db,
+            affiliate,
+            kind=AdjustmentType.WRITEOFF,
+            source_month=AUGUST,
+            amount_piastres=1,
+            reason="one too many",
+        )
+
+
+def test_writing_off_a_debt_still_settles_it(db):
+    """The other direction, which the old formula got right and which the fix
+    must not break. An underpaid month written off ends at zero, not at twice
+    what it owed."""
+    affiliate = _affiliate(db)
+    _owed(db, affiliate, AUGUST)
+    _pay(db, affiliate, AUGUST, 150_000)  # E£500 short
+
+    assert balance_for(db, affiliate, AUGUST)["balance_piastres"] == 50_000
+
+    adjust(
+        db,
+        affiliate,
+        kind=AdjustmentType.WRITEOFF,
+        source_month=AUGUST,
+        amount_piastres=50_000,
+        reason="not chasing it",
+    )
+    db.flush()
+
+    assert balance_for(db, affiliate, AUGUST)["balance_piastres"] == 0
+    assert balance_for(db, affiliate, AUGUST)["state"] == SettlementState.SETTLED
+
+
+def test_a_credit_cannot_carry_a_debt_forward(db):
+    """A credit says the model already holds the money. From a month that is
+    still owed, that is false twice over — the source would drop by the amount
+    and the destination would drop by it again, leaving her short by exactly
+    the credit."""
+    affiliate = _affiliate(db)
+    _owed(db, affiliate, AUGUST)  # agreed, nothing paid
+
+    with pytest.raises(ValueError, match="no excess to carry forward"):
+        adjust(
+            db,
+            affiliate,
+            kind=AdjustmentType.CREDIT,
+            source_month=AUGUST,
+            amount_piastres=20_000,
+            reason="move it to September",
+            destination_month=SEPTEMBER,
+        )

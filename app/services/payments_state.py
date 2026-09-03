@@ -51,6 +51,27 @@ class SettlementState:
             return SettlementState.UNPAID
         return SettlementState.PARTIALLY_PAID
 
+    @staticmethod
+    def of_balance(balance_piastres: int, paid_piastres: int) -> str:
+        """The same question, asked of a balance that adjustments have closed.
+
+        `of` compares two totals, which works only while every part of the
+        month pushes in one direction. It stops working once an adjustment can
+        close a difference from either side (ADR 0035): a month settled by a
+        write-off has `covered` far below `owed` and is not `partially_paid`.
+
+        So the balance decides, and `paid` only separates *nothing has been
+        sent* from *some has*. Zero is `settled` whether it arrived there by a
+        transfer, by an adjustment, or by there being nothing to settle.
+        """
+        if balance_piastres < 0:
+            return SettlementState.OVERPAID
+        if balance_piastres == 0:
+            return SettlementState.SETTLED
+        if paid_piastres <= 0:
+            return SettlementState.UNPAID
+        return SettlementState.PARTIALLY_PAID
+
 
 VALID_SETTLEMENT_STATES = frozenset(
     value

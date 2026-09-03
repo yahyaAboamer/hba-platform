@@ -22,7 +22,7 @@ from app.models.orders import OrderIndex
 from app.models.payments import AdjustmentType
 from app.services.affiliates import create_affiliate
 from app.services.compensation import set_terms
-from app.services.payments import adjust
+from app.services.payments import adjust, record_payment
 from app.services.payroll import approve_month, reopen_month
 from app.services.portal import my_month
 
@@ -182,9 +182,14 @@ def test_a_month_carrying_a_credit_names_the_month_it_came_from(db):
     """
     affiliate = _affiliate(db)
     _order(db, affiliate, "1", 2_000_000, MAY)
-    approve_month(db, affiliate, MAY)
+    may = approve_month(db, affiliate, MAY)
     _order(db, affiliate, "2", 3_000_000, JULY)
     approve_month(db, affiliate, JULY)
+    # A credit carries an excess (ADR 0035): May agreed E£2,000 and was sent
+    # E£2,600.
+    record_payment(
+        db, affiliate, amount_piastres=260_000, allocations={may.id: 260_000}
+    )
     db.flush()
 
     adjust(
@@ -208,9 +213,14 @@ def test_the_month_the_credit_came_from_does_not_claim_to_carry_it(db):
     """
     affiliate = _affiliate(db)
     _order(db, affiliate, "1", 2_000_000, MAY)
-    approve_month(db, affiliate, MAY)
+    may = approve_month(db, affiliate, MAY)
     _order(db, affiliate, "2", 3_000_000, JULY)
     approve_month(db, affiliate, JULY)
+    # A credit carries an excess (ADR 0035): May agreed E£2,000 and was sent
+    # E£2,600.
+    record_payment(
+        db, affiliate, amount_piastres=260_000, allocations={may.id: 260_000}
+    )
     db.flush()
 
     adjust(
