@@ -115,6 +115,21 @@ export function formatMonth(month: string): string {
   return name ? `${name} ${year}` : month;
 }
 
+/**
+ * A `YYYY-MM-DD` as "30 September".
+ *
+ * **Parsed by hand, never through `Date`.** `new Date("2026-09-30")` is
+ * midnight UTC, and rendering that with `toLocaleDateString` shows the 29th to
+ * anybody west of Greenwich. These dates are computed in Cairo on purpose
+ * (ADR 0005) precisely so the browser's timezone cannot move them, and handing
+ * them to `Date` would give that back.
+ */
+export function formatDay(day: string): string {
+  const [, index, date] = day.split("-");
+  const name = MONTH_NAMES[Number(index) - 1];
+  return name ? `${Number(date)} ${name}` : day;
+}
+
 export function shortMonth(month: string): string {
   const [, index] = month.split("-");
   return MONTH_NAMES[Number(index) - 1]?.slice(0, 3) ?? month;

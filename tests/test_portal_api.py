@@ -1325,3 +1325,154 @@ def test_the_year_is_hers_alone(admin):
 
     assert admin.get("/api/me/year").status_code == 403
     assert _sign_in().get("/api/me/year").status_code == 200
+
+
+# ── Phase 2: the month window, the average order, and the three arrangements ──
+#
+# `docs/plans/2026-09-03-portal-redesign.md`. The design prototype the business
+# built modelled one kind of model - pure commission - and printed a sentence
+# under the targets saying they never affect pay. These are the tests that stop
+# that sentence, or anything like it, reaching a screen where it would be false.
+
+
+def test_a_salary_model_is_paid_the_salary_and_the_commission(admin):
+    """`fixed_plus_commission` means *both*, and the breakdown has to show both.
+
+    The one rule in the whole compensation model most easily got wrong from its
+    name, and it was got wrong twice while this screen was being designed - by
+    the prototype, and by the first preview built from it, which showed the
+    salary alone. The engine was right each time. This is here so the screen
+    cannot drift away from it again.
+    """
+    affiliate = _affiliate(admin)
+    _terms(
+        admin,
+        affiliate["id"],
+        compensation_type="fixed_plus_commission",
+        fixed_amount_piastres=900_000,
+    )
+    _order(affiliate["id"], "9101", 100_000, month=SEPTEMBER)
+    _deliver("9101")
+
+    body = _sign_in().get(f"/api/me/earnings/{SEPTEMBER}").json()
+    labels = [line["label"] for line in body["makeup"]]
+
+    assert "Commission on this month's sales" in labels
+    assert "Your monthly salary" in labels
+    # 10% of E£1,000 is E£100, and the salary is E£9,000 on top - never instead.
+    assert body["amount_piastres"] == 910_000
+    assert sum(line["piastres"] for line in body["makeup"]) == body["amount_piastres"]
+
+
+@pytest.mark.parametrize(
+    ("kind", "extra", "decides"),
+    [
+        ("commission", {}, False),
+        ("fixed_plus_commission", {"fixed_amount_piastres": 900_000}, False),
+        ("base_guarantee", {"base_amount_piastres": 500_000}, True),
+    ],
+)
+def test_only_a_guarantee_lets_targets_decide_pay(admin, kind, extra, decides):
+    """`determines_pay` is what the sentence under the targets is driven by.
+
+    It is true on exactly one arrangement. On the other two a missed target
+    costs nothing, and a screen that could not tell the difference would teach
+    somebody to read every shortfall as money gone.
+    """
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"], compensation_type=kind, **extra)
+    _hit_targets(admin, affiliate["id"], SEPTEMBER, verified=False)
+
+    body = _sign_in().get(f"/api/me/earnings/{SEPTEMBER}").json()
+
+    assert body["targets"]["determines_pay"] is decides
+
+
+def test_a_month_with_no_terms_says_it_is_hba_who_has_not_finished(admin):
+    """Every blocker is HBA's own work, and the screen has to say so.
+
+    §11.3 blocks on missing information, and all of the information missing is
+    information HBA records. A blocker that did not name whose move it is reads
+    as an accusation - `targets_achieved_but_not_verified` especially, which
+    means they hit them and somebody here is slow.
+    """
+    affiliate = _affiliate(admin)  # deliberately no compensation terms
+
+    body = _sign_in().get(f"/api/me/earnings/{SEPTEMBER}").json()
+
+    assert body["waiting_on"], "a month nobody can calculate must say why"
+    assert all(item["who"] == "hba" for item in body["waiting_on"])
+    assert any("HBA" in item["text"] for item in body["waiting_on"])
+
+
+def test_the_month_window_says_when_it_closes(admin):
+    """The second question - *when does it land* - had no answer on the screen."""
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"])
+
+    body = _sign_in().get(f"/api/me/earnings/{SEPTEMBER}").json()
+
+    assert body["window"]["opens"] == "2026-09-01"
+    # September has thirty days, and a table of month lengths is exactly the
+    # sort of thing that is right until February.
+    assert body["window"]["closes"] == "2026-09-30"
+    assert 0 <= body["window"]["progress_pct"] <= 100
+
+
+def test_an_agreed_month_is_finished_whatever_the_calendar_says(admin):
+    """Approval is what ends a month, not the last day of it.
+
+    So a month agreed early is full and has no days left - a progress bar
+    still filling under a figure that cannot change would be describing a
+    month that is already over.
+    """
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"])
+    _order(affiliate["id"], "9102", 100_000, month=SEPTEMBER)
+    _deliver("9102")
+    _approve(admin, affiliate["id"], SEPTEMBER)
+
+    body = _sign_in().get(f"/api/me/earnings/{SEPTEMBER}").json()
+
+    assert body["state"] == "agreed"
+    assert body["window"]["progress_pct"] == 100
+    assert body["window"]["days_left"] is None
+
+
+def test_the_average_order_is_absent_rather_than_zero(admin):
+    """Nothing to average is not the same as an average of nothing.
+
+    A zero here would be a claim that a typical order under their code is worth
+    nothing, which on a month before their first sale is both false and the
+    worst possible first impression.
+    """
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"])
+    client = _sign_in()
+
+    empty = client.get(f"/api/me/earnings/{SEPTEMBER}").json()
+    assert empty["sales"]["average_order_piastres"] is None
+    assert empty["sales"]["average_order"] is None
+
+    _order(affiliate["id"], "9103", 100_000, month=SEPTEMBER)
+    _order(affiliate["id"], "9104", 50_000, month=SEPTEMBER)
+    _deliver("9103")
+    _deliver("9104")
+
+    counted = client.get(f"/api/me/earnings/{SEPTEMBER}").json()
+    assert counted["sales"]["average_order_piastres"] == 75_000
+    assert counted["sales"]["average_order"] == _egp(75_000)
+
+
+def test_an_order_still_travelling_is_left_out_of_the_average(admin):
+    """It has no settled base to average, and including it would describe no
+    order they actually made."""
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"])
+    _order(affiliate["id"], "9105", 100_000, month=SEPTEMBER)
+    _deliver("9105")
+    _order(affiliate["id"], "9106", 900_000, month=SEPTEMBER, state="pending")
+
+    body = _sign_in().get(f"/api/me/earnings/{SEPTEMBER}").json()
+
+    assert body["sales"]["average_order_piastres"] == 100_000

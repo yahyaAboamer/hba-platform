@@ -29,6 +29,50 @@
   color: var(--quiet);
 }
 
+/* ── How far through the month is ───────────────────────────────────────
+ *
+ * A line from the first of the month to the day it closes, under the figure
+ * it explains. **The point is not the fraction** - nobody needs to know that
+ * September is 43% gone. The point is that a figure which keeps moving is
+ * moving for a reason, and that the reason has an end date.
+ */
+
+.window {
+  margin-top: var(--space-5);
+  max-width: 34ch;
+}
+
+.window__track {
+  height: 5px;
+  border-radius: 3px;
+  background: var(--rule);
+  overflow: hidden;
+}
+
+.window__fill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--accent);
+  /* A month at 0% would otherwise show nothing at all, which reads as a
+     broken bar rather than as a month that has just begun. */
+  min-width: 3px;
+}
+
+.window__ends {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}
+
+.window__closes {
+  text-align: right;
+  color: var(--ink);
+}
+
 /* ── Whose move it is ───────────────────────────────────────────────────── */
 
 /* No colour. §11.3 blocks on missing information, never on poor performance,
@@ -64,6 +108,54 @@
 
 .makeup {
   margin-bottom: var(--space-4);
+}
+
+/* The whole head is the control, so the target is the full width of the card
+   rather than a chevron somebody has to hit exactly. */
+.makeup__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  list-style: none;
+  cursor: pointer;
+}
+
+.makeup__head::-webkit-details-marker {
+  display: none;
+}
+
+.makeup__head:hover {
+  background: var(--hover);
+}
+
+.makeup__head:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* A chevron drawn from a border, so it needs no icon font and no SVG - and it
+   rotates rather than swapping, which is what makes the fold read as one
+   thing opening instead of two states flickering. */
+.makeup__toggle {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin-right: var(--space-2);
+  border-right: 1.5px solid var(--quiet);
+  border-bottom: 1.5px solid var(--quiet);
+  transform: rotate(45deg) translate(-2px, -2px);
+  transition: transform 0.15s;
+}
+
+.makeup[open] .makeup__toggle {
+  transform: rotate(-135deg) translate(-2px, -2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .makeup__toggle {
+    transition: none;
+  }
 }
 
 .makeup__lines {
