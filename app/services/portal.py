@@ -45,12 +45,18 @@ The test asserting it stays that way is what keeps this structural.
 """
 
 from dataclasses import asdict
+from datetime import date, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.businesstime import business_month, parse_month, utcnow
+from app.core.businesstime import (
+    business_date,
+    business_month,
+    parse_month,
+    utcnow,
+)
 from app.core.money import format_egp
 from app.models.affiliates import AffiliateProfile
 from app.models.attributed_orders import AttributedOrder, CommissionState
@@ -237,6 +243,67 @@ def _not_started(month: str) -> bool:
     not started when it has.
     """
     return month > business_month(utcnow())
+
+
+def _average_order(figures: dict) -> int | None:
+    """What a counted order under their code was worth, on average.
+
+    Counted orders only. An order still in transit has no settled base to
+    average, and a void one earned nothing - including either would drag the
+    figure toward a number that describes no order they actually made.
+
+    `None` at zero counted orders, never zero: the difference between *your
+    average order is worth nothing* and *there is nothing to average yet*.
+    """
+    orders = figures.get("earned_orders") or 0
+    if not orders:
+        return None
+    return round((figures.get("earned_base_piastres") or 0) / orders)
+
+
+def _window(month: str, agreed: bool) -> dict:
+    """When the month opens, when it closes, and how far through it is.
+
+    **The second question had no answer.** The first thing a model wants is
+    *how much*; the second is *when does it land*. A figure captioned "still
+    adding up", with no closing date anywhere near it, reads as a number that
+    might keep moving for ever - and the walkthrough said exactly that.
+
+    Dates are Cairo's (ADR 0005), never the browser's. A model travelling, or
+    one of HBA's people looking at this from another timezone, must not be
+    told a month closes a day early.
+
+    Facts only - no words. Every other sentence on this screen is written in
+    `MyMonth.tsx` next to the thing it describes, and a date phrased here
+    would be the one piece of its copy that had to be changed in Python.
+
+    An **agreed** month is finished by definition, whatever the calendar says.
+    Approval is what ends it, so the progress line is full and there are no
+    days left even in the case where somebody approves early.
+    """
+    start = date(int(month[:4]), int(month[5:7]), 1)
+    # The first of next month, minus a day. Correct in February and in
+    # December, which is more than can be said for a table of month lengths.
+    end = (start.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
+    span = (end - start).days + 1
+    today = business_date(utcnow())
+
+    if agreed or today > end:
+        return {
+            "opens": start.isoformat(),
+            "closes": end.isoformat(),
+            "progress_pct": 100,
+            "days_left": None,
+        }
+
+    # `+ 1` because a month is one day through on its first day, not none.
+    elapsed = 0 if today < start else (today - start).days + 1
+    return {
+        "opens": start.isoformat(),
+        "closes": end.isoformat(),
+        "progress_pct": round(100 * elapsed / span),
+        "days_left": (end - today).days if today >= start else span,
+    }
 
 
 def _carried_out(db: Session, affiliate: AffiliateProfile, month: str) -> list[dict]:
@@ -499,6 +566,7 @@ def my_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
     total = (
         snapshot.approved_obligation_piastres if agreed else calculation.payout_piastres
     )
+    average_order = _average_order(figures)
 
     return {
         "month": month,
@@ -516,7 +584,19 @@ def my_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
             # this platform exists to stop their having to ask.
             "pending_piastres": figures["pending_base_piastres"],
             "pending": format_egp(figures["pending_base_piastres"]),
+            # **What a typical order under their code is worth.** Their own
+            # figure, and one they cannot work out from anything else on the
+            # screen without dividing two numbers in their head.
+            #
+            # `None` rather than zero at no counted orders: a zero here is a
+            # claim that their average order is worth nothing, and the truth
+            # is that there is nothing yet to average.
+            "average_order_piastres": average_order,
+            "average_order": (
+                format_egp(average_order) if average_order is not None else None
+            ),
         },
+        "window": _window(month, agreed),
         "orders": {
             "earned": figures["earned_orders"],
             "pending": figures["pending_orders"],

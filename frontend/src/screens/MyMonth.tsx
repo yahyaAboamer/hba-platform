@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { usePortal } from "../components/AffiliateLayout";
 import { Money } from "../components/Money";
 import { api } from "../lib/api";
-import { formatEgp, formatMonth } from "../lib/money";
+import { formatDay, formatEgp, formatMonth } from "../lib/money";
 import type { MyEarnings } from "../lib/portal";
 import "./MyMonth.css";
 
@@ -99,6 +99,44 @@ export function MyMonth() {
                 : "Orders are still arriving, so this will move. It becomes final when HBA closes the month."}
             </p>
             {/*
+             * **When it lands.** The first question is how much; the second
+             * is when, and this screen had no answer to it anywhere. A figure
+             * captioned "still adding up" with no closing date reads as a
+             * number that might move for ever.
+             *
+             * Only on a month that is open and has started. On an agreed
+             * month the figure is final and a progress bar at 100% is a
+             * decoration; on a month that has not begun there is nothing to
+             * be part-way through.
+             */}
+            {!settled && (
+              <div className="window">
+                <div
+                  className="window__track"
+                  role="img"
+                  aria-label={`${body.window.progress_pct}% of ${formatMonth(body.month)} gone`}
+                >
+                  <span
+                    className="window__fill"
+                    style={{ width: `${body.window.progress_pct}%` }}
+                  />
+                </div>
+                <p className="window__ends">
+                  <span>{formatDay(body.window.opens)}</span>
+                  <span className="window__closes">
+                    closes {formatDay(body.window.closes)}
+                    {body.window.days_left !== null &&
+                      (body.window.days_left === 0
+                        ? " · last day"
+                        : body.window.days_left === 1
+                          ? " · 1 day to go"
+                          : ` · ${body.window.days_left} days to go`)}
+                  </span>
+                </p>
+              </div>
+            )}
+
+            {/*
              * §16, Phase 10 Batch C. Named, not restated - the rules a month
              * was calculated under can matter later even when they never
              * change, and the day they do change this is the sentence that
@@ -177,10 +215,18 @@ export function MyMonth() {
       )}
 
       {body.makeup.length > 0 && !body.not_started && (
-        <section className="panel makeup">
-          <div className="panel__head">
+        <details className="panel makeup" open>
+          {/*
+           * **Open by default, and foldable.** The arithmetic is the reason
+           * this screen can be trusted, so hiding it by default would be
+           * hiding the evidence. But somebody who has read it once, and reads
+           * it every month after, should be able to put it away - especially
+           * on the arrangements where it runs to four or five lines.
+           */}
+          <summary className="panel__head makeup__head">
             <h2 className="panel__title">How this adds up</h2>
-          </div>
+            <span className="makeup__toggle" aria-hidden="true" />
+          </summary>
           <dl className="makeup__lines">
             {body.makeup.map((line) => (
               <div key={line.label} className="makeup__line">
@@ -208,7 +254,7 @@ export function MyMonth() {
               </dd>
             </div>
           </dl>
-        </section>
+        </details>
       )}
 
       {/*
@@ -273,6 +319,24 @@ export function MyMonth() {
               </span>
             </dd>
           </div>
+          {/*
+           * Their own figure, and one they cannot read off this screen
+           * without dividing two numbers in their head. Absent rather than
+           * zero where nothing has counted yet - `average_order` is `null`
+           * there, because there is nothing to average.
+           */}
+          {body.sales.average_order !== null && (
+            <div>
+              <dt>Average order</dt>
+              <dd>
+                <Money
+                  piastres={body.sales.average_order_piastres ?? 0}
+                  kind={settled ? "agreed" : "provisional"}
+                />
+                <span className="sales__count">across counted orders</span>
+              </dd>
+            </div>
+          )}
           {/*
            * Shown, never hidden. An order still in transit makes their month
            * look smaller than it is, and hiding it produces exactly the
@@ -419,15 +483,19 @@ function TargetRow({
  * It costs them the guarantee and nothing else - they are paid their commission,
  * promptly, and the month closes (§11.3). Any wording that makes that sound
  * like a penalty is wrong about the rule as well as unkind.
+ *
+ * **Only called where `determines_pay` is true**, which is why there is no
+ * branch for the other arrangements. There used to be one, and it read *"what
+ * you are paid is your commission either way"* - unreachable, but wrong twice
+ * over if anybody ever reached it: a `fixed_plus_commission` model is paid
+ * their salary *and* their commission, so the sentence would have quietly
+ * dropped half their money. A branch that can only ever be wrong is better
+ * deleted than corrected.
  */
 function describeTargets(targets: {
   achieved: boolean | null;
   verified: boolean;
-  determines_pay: boolean;
 }): string {
-  if (!targets.determines_pay) {
-    return "These are for HBA's records. What you are paid is your commission either way.";
-  }
   if (targets.achieved === null) {
     return "Nobody has recorded what you posted yet, so it is not settled whether your guaranteed minimum applies.";
   }

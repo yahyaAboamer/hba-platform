@@ -53,6 +53,27 @@ export type MyEarnings = {
     earned: string;
     pending_piastres: number;
     pending: string;
+    /**
+     * What a counted order was worth, on average. `null` at zero counted
+     * orders - the difference between *your average order is worth nothing*
+     * and *there is nothing to average yet*.
+     */
+    average_order_piastres: number | null;
+    average_order: string | null;
+  };
+  /**
+   * When the month opens, closes, and how far through it is.
+   *
+   * Facts, not words: the sentences are written in `MyMonth.tsx` beside
+   * everything else this screen says. `days_left` is `null` once the month is
+   * over, and an agreed month is finished by definition whatever the calendar
+   * says - approval is what ends it.
+   */
+  window: {
+    opens: string;
+    closes: string;
+    progress_pct: number;
+    days_left: number | null;
   };
   orders: { earned: number; pending: number; void: number };
   /** `null` on a historical month, where no figure was ever calculated. */
