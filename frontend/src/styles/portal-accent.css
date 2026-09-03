@@ -1,0 +1,53 @@
+/*
+ * The accent. This file is the whole brand decision.
+ *
+ * Eight declarations, and switching the affiliate portal from HBA red to
+ * Nocturne's blurple - or to anything else - is editing them and nothing
+ * else. That promise was made when the accent was chosen, and it only holds
+ * while one rule holds with it:
+ *
+ *   **No component names a colour directly.** Every rule takes its accent
+ *   from `var(--accent)`, `var(--accent-text)`, `var(--accent-soft)` or
+ *   `var(--accent-on)`. A hex typed into a component is the thing that turns
+ *   a one-file change back into a two-day change.
+ *
+ * ## Why there are two reds and not one
+ *
+ * HBA red is a well-formed system colour: built on Nocturne's own lightness
+ * scale at our hue, the ramp's 600 step comes out `#e5001c` against a brand
+ * `#e6001c`. The difficulty is the dark ground, and it is only about
+ * contrast:
+ *
+ *   | against               | #e6001c | Nocturne #9184d9 |
+ *   | page    #161826       |  3.67:1 |           5.45:1 |
+ *   | card    #232532       |  3.17:1 |           4.71:1 |
+ *
+ * 3:1 is enough to draw a border. 4.5:1 is what text needs. So on dark, the
+ * brand red draws - lines, borders, the active tab, a progress fill - and a
+ * lighter step of the same ramp carries anything that has to be *read*. That
+ * is what `--accent-text` is: not a second brand colour, the same colour at
+ * the lightness the ground demands.
+ *
+ * On light the problem disappears, and `--accent-text` is a deeper step
+ * instead. Red is not bad here; red is bad on black.
+ *
+ * ## Errors are not red in this half of the platform
+ *
+ * `portal.css` moves `--refused` to amber, because two reds one step apart on
+ * the same screen cannot both mean something. That belongs there rather than
+ * here - it is a consequence of this choice, not part of it.
+ */
+
+.affiliate {
+  --accent: #e6001c; /* chrome: lines, borders, fills, the active tab */
+  --accent-text: #b20013; /* the step legible as text on a light ground */
+  --accent-soft: rgba(230, 0, 28, 0.1); /* tints and pressed states */
+  --accent-on: #ffffff; /* text on a filled accent */
+}
+
+.affiliate[data-theme="dark"] {
+  --accent: #e6001c;
+  --accent-text: #ff968b; /* lifted: 3.17:1 cannot be read, 7.23:1 can */
+  --accent-soft: rgba(230, 0, 28, 0.18);
+  --accent-on: #ffffff;
+}

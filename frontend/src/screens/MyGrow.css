@@ -1,0 +1,51 @@
+/* The code, at the size of the thing it is. */
+
+.grow__card {
+  padding: var(--space-5) var(--space-5) var(--space-6);
+}
+
+.grow__label {
+  display: block;
+  color: var(--quiet);
+  font-size: var(--text-xs);
+}
+
+/* Mono, and large. ADR 0027 gives mono to the things that must be read
+   character by character and not mistaken for prose — a discount code is the
+   original example. Nothing else on this screen competes with it. */
+.grow__code {
+  margin: var(--space-2) 0 0;
+  font-family: var(--mono);
+  font-size: 2.125rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.grow__note {
+  max-width: 36ch;
+  margin: var(--space-3) 0 0;
+  color: var(--quiet);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+}
+
+/* Outlined, like every primary action in this system. */
+.grow__copy {
+  width: 100%;
+  margin-top: var(--space-5);
+  padding: var(--space-4);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--accent-text);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.grow__copy:hover {
+  background: var(--accent-soft);
+}

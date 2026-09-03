@@ -1,0 +1,903 @@
+<title>Red on Nocturne</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ---------------------------------------------------------------
+   The page around the phone is deliberately colourless. This page
+   exists to judge one accent; chrome that carried a hue of its own
+   would put a thumb on the scale.
+   The neutral ramp is Nocturne's own, verbatim.
+   --------------------------------------------------------------- */
+:root{
+  --page:#eef0f8;--card:#f9fafe;--ink:#22242c;--mut:#5c6070;--faint:#83879a;--rule:#d6dae9;
+  --n500:#9397ab;
+  --good:#1a7f4b;--bad:#b42318;
+  --shadow:0 1px 2px rgba(20,22,32,.06),0 8px 24px rgba(20,22,32,.06);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --page:#101119;--card:#191b25;--ink:#e6e7ee;--mut:#9599ab;--faint:#6e7286;--rule:#2b2e3b;
+    --good:#5fd08a;--bad:#ff8a7a;
+    --shadow:0 0 0 1px #2b2e3b,0 12px 32px rgba(0,0,0,.5);
+  }
+}
+:root[data-theme="dark"]{
+  --page:#101119;--card:#191b25;--ink:#e6e7ee;--mut:#9599ab;--faint:#6e7286;--rule:#2b2e3b;
+  --good:#5fd08a;--bad:#ff8a7a;
+  --shadow:0 0 0 1px #2b2e3b,0 12px 32px rgba(0,0,0,.5);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--ink);
+  font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+h1,h2{margin:0;font-weight:600;text-wrap:balance}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.92em;
+  background:color-mix(in srgb,var(--ink) 8%,transparent);padding:1px 4px;border-radius:3px}
+:focus-visible{outline:2px solid var(--n500);outline-offset:2px}
+
+.wrap{max-width:1180px;margin:0 auto;padding:34px 24px 72px}
+.masthead{margin-bottom:26px}
+.eyebrow{font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--faint);font-weight:600}
+.masthead h1{font-size:26px;letter-spacing:-.02em;margin:9px 0 7px}
+.masthead p{margin:0;max-width:66ch;font-size:13.5px;color:var(--mut)}
+
+.split{display:flex;gap:30px;align-items:flex-start;flex-wrap:wrap}
+.rail{flex:1;min-width:300px;display:flex;flex-direction:column;gap:14px}
+
+/* ---- controls ------------------------------------------------ */
+.panel{background:var(--card);border-radius:12px;padding:16px 17px;box-shadow:var(--shadow)}
+.panel h2{font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--faint);margin-bottom:12px}
+.ctl+.ctl{margin-top:14px}
+.ctl>span{display:block;font-size:12px;color:var(--mut);margin-bottom:7px}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.seg button{flex:1;min-width:82px;padding:8px 9px;border:1px solid var(--rule);border-radius:7px;
+  background:transparent;color:var(--mut);font:inherit;font-size:12px;cursor:pointer;
+  transition:background .12s,border-color .12s,color .12s}
+.seg button:hover{border-color:var(--n500);color:var(--ink)}
+.seg button[aria-pressed="true"]{border-color:var(--ink);color:var(--ink);
+  background:color-mix(in srgb,var(--ink) 7%,transparent);font-weight:500}
+.swatch{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+
+/* ---- readout ------------------------------------------------- */
+table.read{width:100%;border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}
+table.read th{text-align:left;font-weight:500;color:var(--faint);font-size:10.5px;
+  letter-spacing:.08em;text-transform:uppercase;padding-bottom:7px}
+table.read td{padding:6px 0;border-top:1px solid var(--rule);vertical-align:top}
+table.read td:last-child{text-align:right;font-weight:600;white-space:nowrap}
+table.read i{display:block;font-style:normal;font-size:10.5px;color:var(--faint)}
+.pass{color:var(--good)}
+.fail{color:var(--bad)}
+.verdict{font-size:11.5px;line-height:1.6;color:var(--mut);margin:11px 0 0;
+  padding-top:11px;border-top:1px solid var(--rule)}
+.verdict b{color:var(--ink)}
+
+/* ---- note lists ---------------------------------------------- */
+.notes{display:flex;flex-direction:column;font-size:12.5px;line-height:1.55}
+.notes div{padding:9px 0;border-top:1px solid var(--rule);display:flex;gap:9px}
+.notes div:first-child{border-top:0;padding-top:2px}
+.notes b{font-weight:600}
+.mark{flex:none;width:14px;font-size:11px;font-weight:700;padding-top:2px}
+.mark.ok{color:var(--good)}
+.mark.no{color:var(--bad)}
+
+/* ===============================================================
+   THE PHONE. Its theme is its own — it is a device preview, so it
+   must not follow whatever theme this page is being read in.
+   Tokens are Nocturne's; only the accent triplet is swapped.
+   =============================================================== */
+.stage{flex:none;display:flex;flex-direction:column;gap:11px;align-items:center}
+.phone{
+  width:390px;height:812px;flex:none;position:relative;display:flex;flex-direction:column;
+  overflow:hidden;border-radius:38px;font-size:14px;
+  background:var(--p-bg);color:var(--p-txt);
+  box-shadow:0 0 0 1px rgba(0,0,0,.22),0 22px 60px rgba(16,18,26,.3);
+}
+.phone[data-p="dark"]{
+  --p-bg:#161826;--p-surf:#232532;--p-txt:#e9e9ed;
+  --p-mut:color-mix(in srgb,#e9e9ed 58%,transparent);
+  --p-faint:color-mix(in srgb,#e9e9ed 34%,transparent);
+  --p-div:color-mix(in srgb,#e9e9ed 16%,transparent);
+  --p-line:#3f424d;--p-bar:#595d6c;--p-elev:0 0 0 1px #3f424d;
+  --p-scrim:rgba(10,11,18,.68);
+}
+.phone[data-p="light"]{
+  --p-bg:#e4e7f5;--p-surf:#f3f5fe;--p-txt:#292b31;
+  --p-mut:color-mix(in srgb,#292b31 62%,transparent);
+  --p-faint:color-mix(in srgb,#292b31 42%,transparent);
+  --p-div:color-mix(in srgb,#292b31 13%,transparent);
+  --p-line:#cfd3e5;--p-bar:#b2b6ca;
+  --p-elev:0 1px 2px rgba(41,43,49,.08),0 0 0 1px rgba(41,43,49,.05);
+  --p-scrim:rgba(41,43,49,.5);
+}
+/* Accent triplets. --acc is chrome (lines, fills, marks); --acc-txt is the
+   ramp step that stays legible at paragraph size; --acc-soft is the tint. */
+.phone[data-a="hba"][data-p="dark"]   {--acc:#e6001c;--acc-txt:#ff968b;--acc-soft:rgba(230,0,28,.18);--acc-on:#ffffff}
+.phone[data-a="hba"][data-p="light"]  {--acc:#e5001c;--acc-txt:#b20013;--acc-soft:rgba(229,0,28,.10);--acc-on:#ffffff}
+.phone[data-a="lift"][data-p="dark"]  {--acc:#ff534c;--acc-txt:#ffc3bc;--acc-soft:rgba(255,83,76,.17);--acc-on:#2b0b08}
+.phone[data-a="lift"][data-p="light"] {--acc:#e5001c;--acc-txt:#b20013;--acc-soft:rgba(229,0,28,.10);--acc-on:#ffffff}
+.phone[data-a="blur"][data-p="dark"]  {--acc:#9184d9;--acc-txt:#d2cefd;--acc-soft:rgba(145,132,217,.19);--acc-on:#16121f}
+.phone[data-a="blur"][data-p="light"] {--acc:#796cbf;--acc-txt:#5d5294;--acc-soft:rgba(121,108,191,.12);--acc-on:#ffffff}
+
+.phone *{box-sizing:border-box}
+.phone button{font:inherit;cursor:pointer;color:inherit}
+.phone :focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+
+.status{display:flex;align-items:center;justify-content:space-between;
+  padding:13px 26px 2px;font-size:13px;font-weight:600;flex:none}
+.batt{display:block;width:17px;height:9px;border:1.2px solid currentColor;border-radius:2px;opacity:.75}
+
+.top{display:flex;align-items:center;gap:11px;padding:10px 18px 12px;flex:none;min-height:58px}
+.avatar{width:36px;height:36px;flex:none;border-radius:50%;border:1px solid var(--p-div);
+  background:var(--acc-soft);color:var(--acc-txt);font-size:15px;font-weight:600}
+.who{min-width:0;flex:1}
+.who b{display:block;font-size:15px;font-weight:600;line-height:1.2;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.who span{display:block;font-size:11px;color:var(--p-mut);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.codebtn{display:flex;align-items:center;padding:7px 12px;flex:none;
+  border:1px solid var(--acc);border-radius:8px;background:transparent;color:var(--acc-txt);
+  font-size:13px;font-weight:600;letter-spacing:.04em}
+.codebtn:hover{background:var(--acc-soft)}
+.backbtn{border:0;background:transparent;color:var(--acc-txt);font-size:13px;padding:7px 4px}
+
+.body{flex:1;overflow-y:auto;overflow-x:hidden;padding:0 18px 26px;scrollbar-width:thin}
+
+.monthnav{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:2px 0 14px}
+.navbtn{width:34px;height:34px;flex:none;border:1px solid var(--p-div);border-radius:8px;
+  background:transparent;color:var(--p-txt);font-size:15px}
+.navbtn:disabled{color:var(--p-faint);cursor:default}
+.navbtn:not(:disabled):hover{background:var(--acc-soft);border-color:var(--acc)}
+.monthname{text-align:center;min-width:0}
+.monthname b{display:block;font-size:14px;font-weight:600}
+.monthname span{display:block;font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--p-faint);margin-top:2px}
+
+.card{padding:14px 16px 16px;border-radius:14px;background:var(--p-surf);box-shadow:var(--p-elev)}
+.card+.card,.card+.fold,.fold+.card,.card+.outline,.outline+.card,.card+.pair{margin-top:12px}
+.pair{display:flex;gap:10px;margin-top:12px}
+.tile{flex:1;min-width:0;padding:12px 13px;border-radius:8px;background:var(--p-surf);box-shadow:var(--p-elev)}
+.tile>span{font-size:11px;color:var(--p-mut)}
+.tile>b{display:block;font-size:17px;font-weight:600;margin-top:6px;font-variant-numeric:tabular-nums}
+.tile>i{display:block;font-style:normal;font-size:11px;color:var(--p-faint);margin-top:3px}
+.outline{margin-top:12px;padding:13px 14px;border-radius:8px;border:1px solid var(--p-div)}
+
+.figure{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.figure .kick{font-size:11px;color:var(--p-mut)}
+.figure .big{font-size:42px;font-weight:600;line-height:1.05;letter-spacing:-.03em;
+  margin-top:8px;font-variant-numeric:tabular-nums}
+.tag{flex:none;display:inline-block;padding:3px 9px;border-radius:999px;font-size:10.5px;
+  border:1px solid var(--p-div);color:var(--p-mut);white-space:nowrap}
+.tag.on{border-color:var(--acc);color:var(--acc-txt);background:var(--acc-soft)}
+
+.track{height:5px;border-radius:3px;background:var(--p-line);overflow:hidden;margin-top:16px}
+.track i{display:block;height:100%;border-radius:3px;background:var(--acc)}
+.ends{display:flex;justify-content:space-between;margin-top:7px;font-size:11px;
+  color:var(--p-faint);gap:8px}
+.ends b{color:var(--p-mut);font-weight:400;text-align:right}
+
+.fold{border-radius:8px;background:var(--p-surf);box-shadow:var(--p-elev);overflow:hidden;margin-top:12px}
+.rowhead{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:13px 14px;border:0;background:transparent;font-size:14px;font-weight:600;text-align:left}
+.foldbody{padding:0 14px 13px}
+.line{display:flex;align-items:baseline;justify-content:space-between;gap:12px;
+  padding:9px 0;border-top:1px solid var(--p-div);font-size:13px}
+.line i{display:block;font-style:normal;font-size:11px;color:var(--p-faint);margin-top:2px}
+.line b{flex:none;font-weight:400;font-variant-numeric:tabular-nums}
+.total{display:flex;align-items:baseline;justify-content:space-between;gap:12px;
+  padding:11px 0 0;border-top:1px solid var(--p-line);font-size:14px;font-weight:600}
+.total b{font-variant-numeric:tabular-nums}
+.hint{font-size:11px;font-weight:400;color:var(--p-mut)}
+
+.explain{margin:10px 0 0;padding:10px 11px;border-radius:4px;background:var(--acc-soft);
+  font-size:11.5px;line-height:1.55;color:var(--p-txt)}
+.iBtn{width:22px;height:22px;flex:none;border-radius:50%;border:1px solid var(--p-div);
+  background:transparent;color:var(--p-mut);font-size:11px;line-height:1}
+.iBtn:hover{border-color:var(--acc);color:var(--acc-txt)}
+
+.waiting{margin-top:12px;padding:12px 13px;border-radius:8px;
+  border:1px solid var(--p-div);border-left:3px solid var(--acc);
+  background:var(--acc-soft);font-size:12px;line-height:1.55}
+.waiting b{display:block;font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--acc-txt);margin-bottom:5px}
+
+.goal+.goal{margin-top:11px}
+.goal .top2{display:flex;justify-content:space-between;font-size:12px;color:var(--p-mut)}
+.goal .bar{height:4px;margin-top:5px;border-radius:2px;background:var(--p-line);overflow:hidden}
+.goal .bar i{display:block;height:100%;border-radius:2px;background:var(--acc)}
+.foot{margin:11px 0 0;font-size:11px;line-height:1.55;color:var(--p-faint)}
+.foot.loud{color:var(--p-mut)}
+.foot.loud b{color:var(--acc-txt)}
+
+.block{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;
+  margin-top:12px;padding:12px 14px;border:1px solid var(--p-div);border-radius:8px;
+  background:transparent;font-size:13.5px}
+.block:hover{border-color:var(--acc);background:var(--acc-soft)}
+.block em{font-style:normal;color:var(--acc-txt)}
+
+.filters{display:flex;border:1px solid var(--p-div);border-radius:8px;overflow:hidden}
+.filters button{flex:1;padding:9px 4px;border:0;border-left:1px solid var(--p-div);
+  background:transparent;color:var(--p-mut);font-size:11.5px}
+.filters button:first-child{border-left:0}
+.filters button[aria-pressed="true"]{background:var(--acc-soft);color:var(--acc-txt);font-weight:600}
+
+.order{margin-top:10px;border-radius:8px;background:var(--p-surf);box-shadow:var(--p-elev);overflow:hidden}
+.order>button{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:12px 14px;border:0;background:transparent;text-align:left}
+.order .num{display:block;font-size:13px;letter-spacing:.02em}
+.order .met{display:block;font-size:11px;color:var(--p-faint);margin-top:3px}
+.order .right{flex:none;text-align:right}
+.order .amt{display:block;font-size:15px;font-weight:600;font-variant-numeric:tabular-nums}
+.order .sub{display:block;font-size:11px;margin-top:3px;color:var(--p-faint)}
+.order .sub.paid{color:var(--acc-txt)}
+.order button.void .amt{color:var(--p-faint);text-decoration:line-through}
+
+.kicker{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--p-faint);padding:2px 0 12px}
+.paidrow{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:13px 14px}
+.paidrow .m{display:block;font-size:14px;font-weight:600}
+.paidrow .w{display:block;font-size:11px;color:var(--p-faint);margin-top:3px}
+.paidrow .right{flex:none;text-align:right}
+.paidrow .a{display:block;font-size:15px;font-weight:600;color:var(--acc-txt);font-variant-numeric:tabular-nums}
+.paidrow .r{display:block;font-size:10.5px;color:var(--p-faint);margin-top:3px}
+.linkbtn{border:0;background:transparent;padding:0;color:var(--acc-txt);font-size:11.5px;
+  text-decoration:underline;text-underline-offset:2px}
+.receipt{margin-top:10px;padding:14px;border:1px dashed var(--p-div);border-radius:4px;text-align:center}
+.receipt .cap{font-size:11px;color:var(--p-faint);letter-spacing:.06em;text-transform:uppercase}
+.receipt .img{height:118px;margin-top:9px;border-radius:4px;opacity:.55;
+  background:repeating-linear-gradient(135deg,var(--p-line) 0 6px,transparent 6px 12px)}
+
+.chart{margin-top:12px;padding:14px 12px 10px;border-radius:8px;background:var(--p-surf);box-shadow:var(--p-elev)}
+.tip{min-height:52px;padding:0 4px 8px}
+.tip .t1{font-size:11px;color:var(--p-faint)}
+.tip .t2{font-size:17px;font-weight:600;margin-top:3px;font-variant-numeric:tabular-nums}
+.tip .t3{font-size:11px;color:var(--p-mut);margin-top:2px}
+.chart svg{display:block;width:100%;overflow:visible}
+.chart rect.hit{cursor:pointer}
+
+.bigcode{font-size:34px;font-weight:600;letter-spacing:.03em;margin-top:6px}
+.primary{width:100%;padding:11px 14px;border:1px solid var(--acc);border-radius:8px;
+  background:transparent;color:var(--acc-txt);font-size:13.5px;font-weight:600}
+.primary:hover{background:var(--acc-soft)}
+.prodline{display:flex;align-items:baseline;justify-content:space-between;gap:12px;
+  padding:10px 0;border-bottom:1px solid var(--p-div);font-size:13px}
+.prodline b{flex:none;font-weight:400;color:var(--acc-txt);font-variant-numeric:tabular-nums}
+.prodline i{display:block;font-style:normal;font-size:11px;color:var(--p-faint);margin-top:2px}
+.soon{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;font-size:9px;
+  border:1px dashed var(--p-div);color:var(--p-faint);vertical-align:2px;letter-spacing:.04em;font-weight:400}
+
+.toggle{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:11px 0;border:0;border-bottom:1px solid var(--p-div);background:transparent;
+  text-align:left;font-size:12.5px}
+.toggle:last-of-type{border-bottom:0}
+.knobtrack{flex:none;width:38px;height:22px;border-radius:11px;position:relative;
+  border:1px solid var(--p-div);transition:background .15s,border-color .15s}
+.knobtrack i{position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;
+  background:var(--p-faint);transition:left .15s,background .15s}
+.toggle[aria-pressed="true"] .knobtrack{background:var(--acc);border-color:var(--acc)}
+.toggle[aria-pressed="true"] .knobtrack i{left:18px;background:var(--acc-on)}
+
+.menu{margin-top:12px;border-radius:8px;background:var(--p-surf);box-shadow:var(--p-elev);overflow:hidden}
+.menu div{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:13px 14px;font-size:13px;border-bottom:1px solid var(--p-div)}
+.menu div:last-child{border-bottom:0}
+.menu em{font-style:normal;color:var(--acc-txt)}
+
+.tabs{flex:none;display:flex;padding:0 4px;background:var(--p-surf);border-top:1px solid var(--p-div)}
+.tabs button{flex:1;padding:11px 2px 20px;border:0;border-top:2px solid transparent;margin-top:-1px;
+  background:transparent;color:var(--p-mut);font-size:11.5px}
+.tabs button[aria-current="true"]{border-top-color:var(--acc);color:var(--acc-txt);font-weight:600}
+
+.sheet{position:absolute;inset:0;display:flex;align-items:flex-end;background:var(--p-scrim)}
+.sheetbox{width:100%;padding:20px 18px 26px;border-radius:22px 22px 38px 38px;background:var(--p-surf)}
+.sheetbox h4{margin:0;font-size:18px;font-weight:600}
+.sheetbox p{margin:7px 0 0;font-size:12px;color:var(--p-mut)}
+.method{width:100%;display:flex;align-items:center;gap:11px;padding:12px 13px;margin-top:11px;
+  border:1px solid var(--p-div);border-radius:8px;background:transparent;text-align:left}
+.method[aria-pressed="true"]{border-color:var(--acc);background:var(--acc-soft)}
+.method .dot{width:16px;height:16px;flex:none;border-radius:50%;border:1.5px solid var(--p-div)}
+.method[aria-pressed="true"] .dot{border-color:var(--acc);background:var(--acc);
+  box-shadow:inset 0 0 0 3px var(--p-surf)}
+.method b{display:block;font-size:13.5px;font-weight:400}
+.method i{display:block;font-style:normal;font-size:11px;color:var(--p-faint);margin-top:2px}
+.sheetacts{display:flex;gap:9px;margin-top:18px}
+.sheetacts button{flex:1;padding:11px;border-radius:8px;font-size:13.5px;font-weight:600}
+.sheetacts .cancel{border:1px solid var(--p-div);background:transparent;color:var(--p-txt)}
+.sheetacts .save{border:1px solid var(--acc);background:transparent;color:var(--acc-txt)}
+.saved{margin-bottom:12px;padding:11px 13px;border-radius:8px;border:1px solid var(--acc);
+  background:var(--acc-soft);font-size:12px}
+
+.caption{font-size:11.5px;color:var(--mut);text-align:center;max-width:390px;margin:0}
+@media (max-width:900px){
+  .phone{width:100%;max-width:390px;height:760px}
+  .stage{width:100%}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header class="masthead">
+    <div class="eyebrow">HBA · affiliate portal</div>
+    <h1>The redesign, in HBA red</h1>
+    <p>The v2 layout rebuilt on Nocturne's structure with our own accent in place of its blurple. Everything works — switch tabs, step back through months, filter orders, open a row, change where you are paid. Use the controls to swap the accent, the theme, and the kind of model who is looking at it.</p>
+  </header>
+
+  <div class="split">
+    <div class="stage">
+      <div class="phone" id="phone" data-p="dark" data-a="hba">
+        <div class="status"><span>9:48</span><span class="batt"></span></div>
+        <div class="top" id="top"></div>
+        <div class="body" id="screen"></div>
+        <div class="tabs" id="tabs"></div>
+        <div id="sheet"></div>
+      </div>
+      <p class="caption">390 × 812 — an iPhone 14 in Safari, the way every model will open it.</p>
+    </div>
+
+    <div class="rail">
+      <div class="panel">
+        <h2>Controls</h2>
+        <div class="ctl"><span>Accent under test</span>
+          <div class="seg" id="accentSeg">
+            <button data-a="hba" aria-pressed="true"><span class="swatch" style="background:#e6001c"></span>HBA red</button>
+            <button data-a="lift"><span class="swatch" style="background:#ff534c"></span>Red, lifted</button>
+            <button data-a="blur"><span class="swatch" style="background:#9184d9"></span>Nocturne</button>
+          </div>
+        </div>
+        <div class="ctl"><span>Phone theme — dark is the default</span>
+          <div class="seg" id="themeSeg">
+            <button data-p="dark" aria-pressed="true">Dark</button>
+            <button data-p="light">Light</button>
+          </div>
+        </div>
+        <div class="ctl"><span>Who is looking — the three arrangements</span>
+          <div class="seg" id="compSeg">
+            <button data-c="commission" aria-pressed="true">Commission</button>
+            <button data-c="salary">Salary + commission</button>
+            <button data-c="guarantee">Guarantee</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>What that accent measures</h2>
+        <table class="read">
+          <thead><tr><th>Accent against</th><th style="text-align:right">Ratio</th></tr></thead>
+          <tbody id="readout"></tbody>
+        </table>
+        <p class="verdict" id="verdict"></p>
+      </div>
+
+      <div class="panel">
+        <h2>Corrections the prototype needed</h2>
+        <div class="notes">
+          <div><span class="mark no">✕</span><span><b>"Targets never affect your pay."</b> False for anyone on a guaranteed minimum. The line is conditional now — switch to <b>Guarantee</b> and read it.</span></div>
+          <div><span class="mark no">✕</span><span><b>Only commission models existed.</b> All three arrangements are here — and <b>salary + commission pays both</b>, which the prototype (and this page, at first) got wrong.</span></div>
+          <div><span class="mark no">✕</span><span><b>"15% off for them, 15% to you."</b> The customer discount is gone from the model's view, as agreed in flow 1. Only the commission rate remains.</span></div>
+          <div><span class="mark no">✕</span><span><b>The share link is gone.</b> <code>?code=</code> is not how the storefront applies a discount. The code alone, copyable from every screen.</span></div>
+          <div><span class="mark no">✕</span><span><b>Nothing for a blocked month.</b> The guarantee model shows a real blocker, in the platform's own words.</span></div>
+          <div><span class="mark no">✕</span><span><b>A changed figure said nothing.</b> Step back to <b>August</b> — it was reopened and recalculated, and now says so.</span></div>
+          <div><span class="mark no">✕</span><span><b>The month-on-month comparison is gone.</b> A part-month against a whole one reads as a collapse on the 2nd and a triumph on the 30th. No rule made it honest.</span></div>
+          <div><span class="mark no">✕</span><span><b>Three notification toggles.</b> Two. Per-order alerts would be an email an order.</span></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Already built — do not rebuild</h2>
+        <div class="notes">
+          <div><span class="mark ok">✓</span><span>Transfer receipts on each paid month. Endpoint and image are both live today.</span></div>
+          <div><span class="mark ok">✓</span><span>Pre-platform months hollow on the line, never at zero — the backend already returns <code>null</code>, not <code>0</code>.</span></div>
+          <div><span class="mark ok">✓</span><span>An order that did not arrive keeps its amount, struck through.</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =================================================================
+   Figures are internally consistent, so nothing on screen
+   contradicts anything else: 849.15 + 509.15 + 509.15 = 1,867.45,
+   15% of which is 280.12, rounded down to 280.00.
+   ================================================================= */
+const egp = p => (p < 0 ? "−" : "") + "E£" +
+  Math.trunc(Math.abs(p) / 100).toLocaleString("en-GB") + "." +
+  String(Math.abs(p) % 100).padStart(2, "0");
+
+const MONTHS = [
+  { id: "2026-09", label: "September 2026", open: true,
+    counted: 186745, countedOrders: 3, pending: 255765, pendingOrders: 2,
+    progress: 10, start: "1 Sept", pay: "closes 30 Sept · paid early Oct",
+    orders: [
+      { n: "#29746", d: "2 September", s: "void",    base: 49900 },
+      { n: "#29744", d: "2 September", s: "moving",  base: 158100 },
+      { n: "#29741", d: "1 September", s: "moving",  base: 97665 },
+      { n: "#29727", d: "1 September", s: "counted", base: 84915 },
+      { n: "#29723", d: "1 September", s: "counted", base: 50915 },
+      { n: "#29719", d: "1 September", s: "counted", base: 50915 },
+      { n: "#29714", d: "1 September", s: "void",    base: 62400 }
+    ] },
+  { id: "2026-08", label: "August 2026", open: false,
+    counted: 142667, countedOrders: 3, pending: 0, pendingOrders: 0,
+    progress: 100, start: "1 Aug", pay: "paid 4 Sept",
+    recalculated: { was: 20800, now: 21400, at: "6 September" },
+    orders: [
+      { n: "#29610", d: "22 August", s: "counted", base: 74200 },
+      { n: "#29588", d: "14 August", s: "counted", base: 48467 },
+      { n: "#29540", d: "3 August",  s: "counted", base: 20000 }
+    ] },
+  { id: "2026-07", label: "July 2026", open: false,
+    counted: 128333, countedOrders: 2, pending: 0, pendingOrders: 0,
+    progress: 100, start: "1 July", pay: "paid 5 Aug",
+    orders: [
+      { n: "#29411", d: "26 July", s: "counted", base: 78333 },
+      { n: "#29377", d: "9 July",  s: "counted", base: 50000 }
+    ] }
+];
+
+const YEAR = [
+  { n: 2, label: "February", earned: null,  orders: 1 },
+  { n: 3, label: "March",    earned: null,  orders: 2 },
+  { n: 4, label: "April",    earned: null,  orders: 1 },
+  { n: 5, label: "May",      earned: null,  orders: 2 },
+  { n: 6, label: "June",     earned: null,  orders: 2 },
+  { n: 7, label: "July",     earned: 19250, orders: 2 },
+  { n: 8, label: "August",   earned: 21400, orders: 3 },
+  { n: 9, label: "September",earned: 28000, orders: 3 }
+];
+
+/* The three ways a model is paid. This is the thing the design tool did
+   not know existed, so it is a first-class control here. */
+function comp(kind, m) {
+  const commission = Math.round(m.counted * 0.15);
+  const rounded = Math.floor(commission / 100) * 100;
+
+  if (kind === "salary") {
+    /* fixed_plus_commission — the salary AND the commission, both paid.
+       exact = commission + fixed, rounded once on the total. */
+    const fixed = 900000;
+    const total = Math.round((commission + fixed) / 100) * 100;
+    return {
+      total: total,
+      kicker: m.open ? "Building up for " + m.label.split(" ")[0] : "Agreed — this is yours",
+      lines: [
+        { l: "Commission on this month's sales", d: "15% of " + egp(m.counted), v: commission },
+        { l: "Your fixed monthly amount", d: "Set by HBA from July 2026", v: fixed },
+        { l: "Rounded to the nearest pound", d: "", v: total - commission - fixed, mut: true }
+      ],
+      totalLabel: m.open ? "So far" : "Agreed",
+      targetTag: "not confirmed yet",
+      targetCopy: "These are for HBA's records. You are paid your salary and your commission either way.",
+      loud: false, blocker: null
+    };
+  }
+  if (kind === "guarantee") {
+    return {
+      total: 500000,
+      kicker: m.open ? "Your guaranteed minimum for " + m.label.split(" ")[0] : "Agreed — this is yours",
+      lines: [
+        { l: "Commission on this month's sales", d: "15% of " + egp(m.counted), v: commission },
+        { l: "Your guaranteed minimum", d: "Larger than the commission, so this is what applies", v: 500000 }
+      ],
+      totalLabel: m.open ? "So far" : "Agreed",
+      targetTag: "decides your pay",
+      targetCopy: "<b>These decide what you are paid this month.</b> Your guaranteed minimum applies only in a month where you meet them — otherwise you are paid your commission.",
+      loud: true,
+      blocker: m.open ? {
+        h: "Waiting on HBA",
+        t: "You hit your targets. Someone at HBA still has to confirm the numbers before your guaranteed minimum can apply."
+      } : null,
+    };
+  }
+  return {
+    total: rounded,
+    kicker: m.open ? "Building up for " + m.label.split(" ")[0] : "Agreed — this is yours",
+    lines: [
+      { l: "Commission on this month's sales", d: "15% of " + egp(m.counted), v: commission },
+      { l: "Rounded to the nearest pound", d: "", v: rounded - commission, mut: true }
+    ],
+    totalLabel: m.open ? "So far" : "Agreed",
+    targetTag: "not confirmed yet",
+    targetCopy: "These are for HBA's records. What you are paid is your commission either way.",
+    loud: false, blocker: null
+  };
+}
+
+const STATE = {
+  theme: "dark", accent: "hba", comp: "commission",
+  tab: "month", mi: 0, filter: "all",
+  fold: true, fate: false, openOrder: null, openProof: null,
+  chart: "line", pick: 7,
+  sheet: false, method: "instapay", saved: false,
+  notify: { closed: true, paid: true },
+  copied: null
+};
+
+const PAYOUT = { instapay: "InstaPay · …WLU", wallet: "Mobile wallet · …441", bank: "Bank card · …3092" };
+const $ = id => document.getElementById(id);
+
+/* ---------- contrast readout ------------------------------------ */
+const lin = c => { c /= 255; return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+const lum = h => { h = h.replace("#", "");
+  const p = [0, 2, 4].map(i => lin(parseInt(h.slice(i, i + 2), 16)));
+  return 0.2126 * p[0] + 0.7152 * p[1] + 0.0722 * p[2]; };
+const ratio = (a, b) => { const x = lum(a), y = lum(b);
+  return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+
+const ACC = {
+  hba:  { dark: { c: "#e6001c", t: "#ff968b" }, light: { c: "#e5001c", t: "#b20013" } },
+  lift: { dark: { c: "#ff534c", t: "#ffc3bc" }, light: { c: "#e5001c", t: "#b20013" } },
+  blur: { dark: { c: "#9184d9", t: "#d2cefd" }, light: { c: "#796cbf", t: "#5d5294" } }
+};
+const GROUND = { dark: { bg: "#161826", surf: "#232532" }, light: { bg: "#e4e7f5", surf: "#f3f5fe" } };
+
+function readout() {
+  const a = ACC[STATE.accent][STATE.theme], g = GROUND[STATE.theme];
+  const rows = [
+    ["Chrome on the page", ratio(a.c, g.bg), 3],
+    ["Chrome on a card", ratio(a.c, g.surf), 3],
+    ["Money text on a card", ratio(a.t, g.surf), 4.5]
+  ];
+  $("readout").innerHTML = rows.map(r =>
+    '<tr><td>' + r[0] + '<i>needs ' + r[2] + ':1</i></td>' +
+    '<td class="' + (r[1] >= r[2] ? "pass" : "fail") + '">' + r[1].toFixed(2) + ':1</td></tr>').join("");
+
+  const card = ratio(a.c, g.surf);
+  let v;
+  if (STATE.theme === "light") {
+    v = "On the light theme the problem disappears: the accent sits at <b>" + card.toFixed(2) +
+        ":1</b> on a card and the deep step reads as body text. Red is not bad here — " +
+        "<b>red is bad on black</b>.";
+  } else if (STATE.accent === "hba") {
+    v = "Your true red reaches <b>" + card.toFixed(2) + ":1</b> on a card — past the 3:1 an " +
+        "interface needs, but only just, and never enough for text. Every figure you see in the " +
+        "accent is already a lighter step of the ramp, not the brand colour. On dark, HBA red can " +
+        "outline and underline; it cannot speak.";
+  } else if (STATE.accent === "lift") {
+    v = "Lifted to <b>#ff534c</b> it carries exactly the weight Nocturne's own accent does (" +
+        card.toFixed(2) + ":1 against 4.71). It is legible and it is confident — and it is a " +
+        "coral, not HBA red. That is the honest cost of red on a dark ground.";
+  } else {
+    v = "Nocturne's own accent, for comparison: <b>" + card.toFixed(2) +
+        ":1</b>. This is the bar the red has to clear.";
+  }
+  $("verdict").innerHTML = v;
+}
+
+/* ---------- screens --------------------------------------------- */
+function topBar() {
+  if (STATE.tab === "you") return '<button class="backbtn" data-go="month">← Back</button>';
+  return '<button class="avatar" data-go="you" aria-label="Your details">Y</button>' +
+    '<div class="who"><b>Yahya Abo Aamer</b><span>HBA affiliate since July</span></div>' +
+    '<button class="codebtn" data-copy="code">' + (STATE.copied === "code" ? "Copied" : "HBA15") + '</button>';
+}
+
+function nav(m, withState) {
+  return '<div class="monthnav">' +
+    '<button class="navbtn" data-mi="1"' + (STATE.mi >= MONTHS.length - 1 ? " disabled" : "") + '>←</button>' +
+    '<div class="monthname"><b>' + m.label + '</b>' +
+      (withState ? '<span>' + (m.open ? "open · still adding up" : "agreed · paid") + '</span>' : "") +
+    '</div>' +
+    '<button class="navbtn" data-mi="-1"' + (STATE.mi <= 0 ? " disabled" : "") + '>→</button></div>';
+}
+
+function monthScreen() {
+  const m = MONTHS[STATE.mi], c = comp(STATE.comp, m);
+  const aov = Math.round(m.counted / m.countedOrders);
+  let h = nav(m, true);
+
+  if (m.recalculated) {
+    h += '<div class="waiting"><b>This figure changed</b>' + m.label + " was " + egp(m.recalculated.was) +
+      " when you were first told. It was reopened and agreed again on " + m.recalculated.at +
+      " at " + egp(m.recalculated.now) + ".</div>";
+  }
+
+  h += '<div class="card"><div class="figure">' +
+    '<div><div class="kick">' + c.kicker + '</div><div class="big">' + egp(c.total) + '</div></div>' +
+    '<span class="tag ' + (m.open ? "" : "on") + '">' + (m.open ? "open" : "final") + '</span></div>' +
+    '<div class="track"><i style="width:' + m.progress + '%"></i></div>' +
+    '<div class="ends"><span>' + m.start + '</span><b>' + m.pay + '</b></div></div>';
+
+  if (c.blocker) h += '<div class="waiting"><b>' + c.blocker.h + '</b>' + c.blocker.t + '</div>';
+
+  h += '<div class="pair">' +
+    '<div class="tile"><span>Counted sales</span><b>' + egp(m.counted) + '</b><i>' +
+      m.countedOrders + " order" + (m.countedOrders === 1 ? "" : "s") + ' counted</i></div>' +
+    '<div class="tile"><span>Average order</span><b>' + egp(aov) + '</b><i>across counted orders</i></div></div>';
+
+  if (m.pendingOrders) {
+    h += '<div class="outline"><div class="figure">' +
+      '<div><div class="kick">On its way</div><div style="font-size:16px;font-weight:600;' +
+      'margin-top:5px;font-variant-numeric:tabular-nums">' + egp(m.pending) + '</div></div>' +
+      '<button class="iBtn" data-t="fate" aria-label="What happens to these">i</button></div>' +
+      '<div style="font-size:11px;color:var(--p-faint);margin-top:4px">' + m.pendingOrders +
+      ' not delivered yet</div>' +
+      (STATE.fate ? '<p class="explain">An order counts once it reaches the customer. If it arrives ' +
+        'before HBA closes the month it counts here — if not, it is paid with the next month, ' +
+        'still at this month’s rate.</p>' : "") + '</div>';
+  }
+
+  h += '<div class="fold"><button class="rowhead" data-t="fold"><span>How this adds up</span>' +
+    '<span class="hint">' + (STATE.fold ? "hide" : "show") + '</span></button>';
+  if (STATE.fold) {
+    h += '<div class="foldbody">' + c.lines.map(l =>
+      '<div class="line"><span>' + l.l + (l.d ? '<i>' + l.d + '</i>' : "") + '</span>' +
+      '<b' + (l.mut ? ' style="color:var(--p-mut)"' : "") + '>' + egp(l.v) + '</b></div>').join("") +
+      '<div class="total"><span>' + c.totalLabel + '</span><b>' + egp(c.total) + '</b></div></div>';
+  }
+  h += '</div>';
+
+  h += '<div class="card"><div class="figure" style="align-items:center">' +
+    '<span style="font-size:14px;font-weight:600">What HBA asked for</span>' +
+    '<span class="tag ' + (c.loud ? "on" : "") + '">' + c.targetTag + '</span></div>' +
+    '<div class="goal"><div class="top2"><span>Videos</span><span>4 of 6</span></div>' +
+      '<div class="bar"><i style="width:67%"></i></div></div>' +
+    '<div class="goal"><div class="top2"><span>Stories</span><span>8 of 12</span></div>' +
+      '<div class="bar"><i style="width:67%"></i></div></div>' +
+    '<p class="foot ' + (c.loud ? "loud" : "") + '">' + c.targetCopy + '</p></div>';
+
+  h += '<button class="block" data-go="orders"><span>See every order</span><em>→</em></button>';
+  return h;
+}
+
+function ordersScreen() {
+  const m = MONTHS[STATE.mi];
+  const txt = { counted: "counted", moving: "on its way", void: "did not arrive · not counted" };
+  const shown = m.orders.filter(o => STATE.filter === "all" ? true : o.s === STATE.filter);
+  const n = s => m.orders.filter(o => o.s === s).length;
+
+  let h = nav(m, false);
+  h += '<div class="filters">' +
+    '<button data-f="all" aria-pressed="' + (STATE.filter === "all") + '">All ' + m.orders.length + '</button>' +
+    '<button data-f="counted" aria-pressed="' + (STATE.filter === "counted") + '">Counted ' + n("counted") + '</button>' +
+    '<button data-f="moving" aria-pressed="' + (STATE.filter === "moving") + '">Moving ' + n("moving") + '</button></div>';
+
+  h += shown.map(o => {
+    const paid = o.s === "counted";
+    const detail = paid
+      ? "Delivered, so it counts in " + m.label + ". 15% of " + egp(o.base) + " is " +
+        egp(Math.round(o.base * 0.15)) + "."
+      : o.s === "moving"
+        ? "It counts the day it reaches the customer. If that is after HBA closes " + m.label +
+          ", it is paid with the next month — at this month’s rate."
+        : "This parcel did not reach the customer, so it earns nothing. The amount stays here so you " +
+          "can match it against your own record.";
+    const sub = paid ? egp(Math.round(o.base * 0.15)) + " to you"
+      : o.s === "moving" ? "counts on delivery" : "nothing earned";
+    return '<div class="order"><button data-o="' + o.n + '"' + (o.s === "void" ? ' class="void"' : "") + '>' +
+      '<span><span class="num">' + o.n + '</span><span class="met">' + o.d + " · " + txt[o.s] + '</span></span>' +
+      '<span class="right"><span class="amt">' + egp(o.base) + '</span>' +
+      '<span class="sub' + (paid ? " paid" : "") + '">' + sub + '</span></span></button>' +
+      (STATE.openOrder === o.n ? '<div class="foldbody"><p class="explain">' + detail + '</p></div>' : "") +
+      '</div>';
+  }).join("");
+
+  h += '<p class="foot">No customer details are stored against an order, so none appear here. A row is ' +
+    'never removed — an order that did not arrive stays, struck through.</p>';
+  return h;
+}
+
+function paymentsScreen() {
+  const rows = [
+    { m: "August 2026", w: "4 September", meth: "InstaPay", a: 21400, r: "INSTA·77341", k: "aug", note: "Sent 4 Sept, 14:02" },
+    { m: "July 2026", w: "5 August", meth: "InstaPay", a: 19250, r: "INSTA·76102", k: "jul", note: "Sent 5 Aug, 11:20" }
+  ];
+  let h = '<div class="kicker">Payments</div>' +
+    '<div class="card"><div class="figure">' +
+    '<div><div class="kick">Next payment</div><div class="big" style="font-size:30px">' +
+      egp(comp(STATE.comp, MONTHS[0]).total) + '</div></div>' +
+    '<span class="tag on">early Oct</span></div>' +
+    '<p style="margin:11px 0 0;font-size:12px;line-height:1.55;color:var(--p-mut)">September, once HBA ' +
+      'closes it. Two orders on the way could still raise it.</p>' +
+    '<div style="display:flex;align-items:center;gap:9px;margin-top:13px;padding-top:12px;' +
+      'border-top:1px solid var(--p-div);font-size:12px">' +
+      '<span style="color:var(--p-faint)">to</span><span>' + PAYOUT[STATE.method] + '</span>' +
+      '<button class="linkbtn" style="margin-left:auto" data-sheet="1">Change</button></div></div>';
+
+  h += '<div style="display:flex;align-items:center;justify-content:space-between;margin:20px 0 4px">' +
+    '<span class="kicker" style="padding:0">Already paid</span>' +
+    '<span style="font-size:11px;color:var(--p-mut)">' + egp(40650) + ' in 2 payments</span></div>';
+
+  h += rows.map(p => '<div class="fold" style="margin-top:10px"><div class="paidrow">' +
+    '<span><span class="m">' + p.m + '</span><span class="w">' + p.w + " · " + p.meth + '</span></span>' +
+    '<span class="right"><span class="a">' + egp(p.a) + '</span><span class="r">' + p.r + '</span></span></div>' +
+    '<div class="foldbody"><button class="linkbtn" data-proof="' + p.k + '">' +
+      (STATE.openProof === p.k ? "Hide the receipt" : "See the receipt") + '</button>' +
+    (STATE.openProof === p.k ? '<div class="receipt"><div class="cap">transfer screenshot</div>' +
+      '<div class="img"></div><div style="margin-top:9px;font-size:11px;color:var(--p-mut)">' +
+      p.note + '</div></div>' : "") + '</div></div>').join("");
+
+  h += '<div class="outline" style="margin-top:18px;font-size:11.5px;line-height:1.6;color:var(--p-mut)">' +
+    'A month is paid within a week of HBA closing it. If a transfer does not cover the whole month, the ' +
+    'reason somebody wrote at the time appears on the row.</div>';
+  return h;
+}
+
+function yearScreen() {
+  const paid = YEAR.filter(y => y.earned !== null);
+  const maxE = Math.max.apply(null, paid.map(y => y.earned)) * 1.18;
+  const maxO = Math.max.apply(null, YEAR.map(y => y.orders)) * 1.25;
+  const x = i => 10 + 280 * i / (YEAR.length - 1);
+  const yE = v => 14 + 90 * (1 - v / maxE);
+  const step = 280 / YEAR.length;
+  const path = YEAR.map((y, i) => ({ y: y, i: i })).filter(p => p.y.earned !== null)
+    .map((p, k) => (k ? "L" : "M") + x(p.i) + "," + yE(p.y.earned)).join(" ");
+  const pick = YEAR[STATE.pick];
+
+  const dots = YEAR.map((y, i) => y.earned === null
+    ? '<circle cx="' + x(i) + '" cy="104" r="3.5" fill="var(--p-surf)" stroke="var(--p-bar)" stroke-width="2"/>'
+    : '<circle cx="' + x(i) + '" cy="' + yE(y.earned) + '" r="' + (STATE.pick === i ? 5 : 4) +
+      '" fill="' + (STATE.pick === i ? "var(--acc)" : "var(--p-surf)") +
+      '" stroke="var(--acc)" stroke-width="2"/>').join("");
+  const lineTicks = YEAR.map((y, i) => '<text x="' + x(i) + '" y="124" text-anchor="middle" ' +
+    'font-size="9" fill="var(--p-faint)">' + y.n + '</text>').join("");
+  const hits = YEAR.map((y, i) => '<rect class="hit" data-pick="' + i + '" x="' + (10 + step * i) +
+    '" y="0" width="' + step + '" height="112" fill="transparent"/>').join("");
+
+  const line = '<svg viewBox="0 0 300 132" role="img" aria-label="What you earned, by month">' +
+    '<line x1="10" x2="290" y1="104" y2="104" stroke="var(--p-line)" stroke-width="1"/>' +
+    '<path d="' + path + '" fill="none" stroke="var(--acc)" stroke-width="2.25" ' +
+      'stroke-linejoin="round" stroke-linecap="round"/>' + dots + lineTicks + hits + '</svg>' +
+    '<p class="foot">Hollow months sit on the line because HBA paid them before this page existed. ' +
+    'Their orders are still counted — tap a month to see it.</p>';
+
+  const barShapes = YEAR.map((y, i) => {
+    const hgt = Math.max(90 * y.orders / maxO, 2);
+    return '<rect class="hit" data-pick="' + i + '" x="' + (10 + step * i + step * 0.2) + '" y="' +
+      (104 - hgt) + '" width="' + (step * 0.6) + '" height="' + hgt + '" rx="3" fill="' +
+      (STATE.pick === i ? "var(--acc)" : "var(--p-bar)") + '"/>';
+  }).join("");
+  const barTicks = YEAR.map((y, i) => '<text x="' + (10 + step * i + step / 2) + '" y="124" ' +
+    'text-anchor="middle" font-size="9" fill="var(--p-faint)">' + y.n + '</text>').join("");
+
+  const bars = '<svg viewBox="0 0 300 132" role="img" aria-label="Orders counted, by month">' +
+    '<line x1="10" x2="290" y1="104" y2="104" stroke="var(--p-line)" stroke-width="1"/>' +
+    barShapes + barTicks + '</svg>' +
+    '<p class="foot">16 orders have counted under your code. Bars compare a tally; the line ' +
+    'compares money.</p>';
+
+  return '<div style="padding:2px 0 12px"><div class="kicker" style="padding:0">Your year</div>' +
+    '<div style="font-size:26px;font-weight:600;letter-spacing:-.03em;margin-top:8px;' +
+      'font-variant-numeric:tabular-nums">' + egp(68650) + '</div>' +
+    '<div style="font-size:12px;color:var(--p-mut);margin-top:3px">earned across 3 months on the ' +
+      'platform</div></div>' +
+    '<div class="filters">' +
+      '<button data-ch="line" aria-pressed="' + (STATE.chart === "line") + '">What you earned</button>' +
+      '<button data-ch="bars" aria-pressed="' + (STATE.chart === "bars") + '">Orders counted</button></div>' +
+    '<div class="chart"><div class="tip">' +
+      '<div class="t1">' + pick.label + ' 2026</div>' +
+      '<div class="t2">' + (pick.earned === null ? "Not shown here" : egp(pick.earned)) + '</div>' +
+      '<div class="t3">' + pick.orders + " order" + (pick.orders === 1 ? "" : "s") + " counted" +
+        (pick.earned === null ? " · HBA paid you the old way" : "") + '</div></div>' +
+      (STATE.chart === "line" ? line : bars) + '</div>' +
+    '<div class="pair">' +
+      '<div class="tile"><span>Best month</span><b>' + egp(28000) + '</b><i>September</i></div>' +
+      '<div class="tile"><span>Month on month</span><b style="color:var(--acc-txt)">+31%</b>' +
+        '<i>3 months rising</i></div></div>';
+}
+
+function growScreen() {
+  const products = [["Sculpt legging", "6 orders", 9420], ["Ribbed crop top", "4 orders", 5180],
+                    ["Everyday set", "3 orders", 4610]];
+  return '<div class="kicker">Grow</div>' +
+    '<div class="card"><div class="kick" style="font-size:11px;color:var(--p-mut)">Your code</div>' +
+    '<div class="bigcode">HBA15</div>' +
+    '<div style="font-size:12px;color:var(--p-mut);margin-top:4px">You earn 15% of every sale that ' +
+      'counts.</div>' +
+    '<button class="primary" style="margin-top:14px" data-copy="code2">' +
+      (STATE.copied === "code2" ? "Copied" : "Copy my code") + '</button></div>' +
+
+    '<div class="card"><div class="figure" style="align-items:center">' +
+      '<span style="font-size:14px;font-weight:600">September asks</span>' +
+      '<span class="tag">4 of 6 videos</span></div>' +
+      '<div class="goal"><div class="top2"><span>Videos</span><span>4 of 6</span></div>' +
+        '<div class="bar"><i style="width:67%"></i></div></div>' +
+      '<div class="goal"><div class="top2"><span>Stories</span><span>8 of 12</span></div>' +
+        '<div class="bar"><i style="width:67%"></i></div></div></div>' +
+
+    '<div class="card"><div style="font-size:14px;font-weight:600">What sells under your code' +
+      '<span class="soon">phase 3</span></div>' +
+    products.map(p => '<div class="prodline"><span>' + p[0] + '<i>' + p[1] + '</i></span><b>' +
+      egp(p[2]) + '</b></div>').join("") +
+    '<p class="foot">Products only — no customer is ever shown, because none is stored. This needs ' +
+      'Shopify line items, which the platform does not keep yet.</p></div>';
+}
+
+function youScreen() {
+  const items = [["closed", "A month closes and my figure is final"], ["paid", "A payment is sent"]];
+  return '<div style="padding:2px 0 14px">' +
+    '<div style="font-size:22px;font-weight:600">Yahya Abo Aamer</div>' +
+    '<div style="font-size:12px;color:var(--p-mut);margin-top:3px">yahyaaboaamer@gmail.com · code ' +
+      'HBA15</div></div>' +
+    (STATE.saved ? '<div class="saved">Changed. This is where your money will be sent from now on.</div>' : "") +
+
+    '<div class="card"><div style="font-size:14px;font-weight:600">Where you are paid</div>' +
+    '<div style="font-size:13px;margin-top:9px">' + PAYOUT[STATE.method] + '</div>' +
+    '<p class="foot">Shortened on purpose. You gave us these, so this is only here for you to recognise ' +
+      'which account it is.</p>' +
+    '<button class="primary" style="margin-top:13px" data-sheet="1">Change where I am paid</button></div>' +
+
+    '<div class="card"><div style="font-size:14px;font-weight:600">Tell me when</div>' +
+    items.map(i => '<button class="toggle" data-n="' + i[0] + '" aria-pressed="' + STATE.notify[i[0]] +
+      '"><span>' + i[1] + '</span><span class="knobtrack"><i></i></span></button>').join("") +
+    '<p class="foot">Two, on purpose. An alert for every single order would be an email an order.</p></div>' +
+
+    '<div class="menu">' +
+      '<div><span>What these words mean</span><em>→</em></div>' +
+      '<div><span>The rules your pay is calculated under</span><em>→</em></div>' +
+      '<div><span>Sign out</span><span style="color:var(--p-mut)">→</span></div></div>';
+}
+
+const SCREENS = { month: monthScreen, orders: ordersScreen, payments: paymentsScreen,
+                  year: yearScreen, grow: growScreen, you: youScreen };
+const TABS = [["month", "Month"], ["orders", "Orders"], ["payments", "Payments"],
+              ["year", "Year"], ["grow", "Grow"]];
+
+function sheet() {
+  if (!STATE.sheet) return "";
+  const ms = [["instapay", "InstaPay", "…WLU · what you use now"],
+              ["wallet", "Mobile wallet", "Vodafone Cash, Orange Money"],
+              ["bank", "Bank card", "16 digits, and the name on it"]];
+  return '<div class="sheet"><div class="sheetbox">' +
+    '<h4>Where should we send it?</h4>' +
+    '<p>Changing this does not change anything you are owed.</p>' +
+    ms.map(m => '<button class="method" data-m="' + m[0] + '" aria-pressed="' +
+      (STATE.method === m[0]) + '"><span class="dot"></span><span><b>' + m[1] + '</b><i>' +
+      m[2] + '</i></span></button>').join("") +
+    '<div class="sheetacts"><button class="cancel" data-sheet="0">Cancel</button>' +
+    '<button class="save" data-save="1">Save</button></div></div></div>';
+}
+
+function render() {
+  const p = $("phone");
+  p.dataset.p = STATE.theme;
+  p.dataset.a = STATE.accent;
+  $("top").innerHTML = topBar();
+  $("screen").innerHTML = SCREENS[STATE.tab]();
+  $("tabs").innerHTML = TABS.map(t => '<button data-tab="' + t[0] + '" aria-current="' +
+    (STATE.tab === t[0]) + '">' + t[1] + '</button>').join("");
+  $("sheet").innerHTML = sheet();
+  readout();
+}
+
+/* ---------- one delegated listener for the whole phone ---------- */
+$("phone").addEventListener("click", function (e) {
+  const t = e.target.closest("[data-go],[data-copy],[data-mi],[data-t],[data-f],[data-o]," +
+    "[data-proof],[data-ch],[data-pick],[data-tab],[data-sheet],[data-save],[data-m],[data-n]");
+  if (!t) return;
+  const d = t.dataset;
+  if (d.go) { STATE.tab = d.go; STATE.saved = false; }
+  else if (d.copy) { STATE.copied = d.copy;
+    setTimeout(function () { STATE.copied = null; render(); }, 1400); }
+  else if (d.mi) { STATE.mi = Math.min(Math.max(STATE.mi + Number(d.mi), 0), MONTHS.length - 1);
+    STATE.openOrder = null; }
+  else if (d.t) { STATE[d.t] = !STATE[d.t]; }
+  else if (d.f) { STATE.filter = d.f; STATE.openOrder = null; }
+  else if (d.o) { STATE.openOrder = STATE.openOrder === d.o ? null : d.o; }
+  else if (d.proof) { STATE.openProof = STATE.openProof === d.proof ? null : d.proof; }
+  else if (d.ch) { STATE.chart = d.ch; }
+  else if (d.pick) { STATE.pick = Number(d.pick); }
+  else if (d.tab) { STATE.tab = d.tab; STATE.saved = false; }
+  else if (d.sheet) { STATE.sheet = d.sheet === "1"; if (STATE.sheet) STATE.saved = false; }
+  else if (d.save) { STATE.sheet = false; STATE.saved = true; STATE.tab = "you"; }
+  else if (d.m) { STATE.method = d.m; }
+  else if (d.n) { STATE.notify[d.n] = !STATE.notify[d.n]; }
+  render();
+});
+
+function seg(id, key, attr) {
+  $(id).addEventListener("click", function (e) {
+    const b = e.target.closest("button");
+    if (!b) return;
+    STATE[key] = b.dataset[attr];
+    Array.prototype.forEach.call($(id).children, function (x) {
+      x.setAttribute("aria-pressed", String(x === b));
+    });
+    render();
+  });
+}
+seg("accentSeg", "accent", "a");
+seg("themeSeg", "theme", "p");
+seg("compSeg", "comp", "c");
+
+render();
+</script>

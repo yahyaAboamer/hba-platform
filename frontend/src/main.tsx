@@ -8,16 +8,25 @@ import "@fontsource/ibm-plex-sans/500.css";
 import "@fontsource/ibm-plex-sans/600.css";
 import "@fontsource/ibm-plex-mono/400.css";
 import "@fontsource/ibm-plex-mono/500.css";
-// One weight, latin only. The portal's display face carries headings and the
-// single large figure and nothing else, so a second weight would be bytes
-// spent on nothing - and the fallback stack is a real serif on every platform
-// the models use.
-import "@fontsource/fraunces/latin-600.css";
+// Inter, for the affiliate portal alone (`portal.css` scopes it to
+// `.affiliate`). It is the face the redesign was drawn in, and it replaced
+// Fraunces - the portal's old serif display face - which nothing asks for any
+// more now that headings carry weight and size rather than a second voice.
+//
+// Self-hosted like the rest, for the same reason: latin only, three weights,
+// and no third-party request on a phone opening this over Egyptian mobile
+// data.
+import "@fontsource/inter/latin-400.css";
+import "@fontsource/inter/latin-500.css";
+import "@fontsource/inter/latin-600.css";
 
 import "./styles/tokens.css";
 import "./styles/base.css";
 // Scoped to `.affiliate`, so no maintainer screen can be reached by it.
 import "./styles/portal.css";
+// The whole brand decision, in eight declarations. Loaded after `portal.css`
+// so the accent it defines is available to every rule that consumes it.
+import "./styles/portal-accent.css";
 import "./screens/Overview.css";
 import "./screens/Affiliates.css";
 import "./screens/AffiliateDetail.css";

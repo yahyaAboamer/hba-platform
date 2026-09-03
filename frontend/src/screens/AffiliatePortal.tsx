@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link, Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 
-import { AffiliateLayout } from "../components/AffiliateLayout";
+import { AffiliateLayout, PortalHeader } from "../components/AffiliateLayout";
 import type { PortalContext } from "../components/AffiliateLayout";
-import { api, signOutAndLeave } from "../lib/api";
+import { api } from "../lib/api";
 import type { Session } from "../lib/api";
+import { storedTheme } from "../lib/theme";
 import { Apply } from "./Apply";
 import { Glossary } from "./Glossary";
 import { MyDetails } from "./MyDetails";
 import type { Me } from "./MyDetails";
+import { MyGrow } from "./MyGrow";
 import { MyMonth } from "./MyMonth";
 import { MyOrders } from "./MyOrders";
 import { MyPayments } from "./MyPayments";
@@ -72,60 +74,29 @@ export function AffiliatePortal({ session }: { session: Session }) {
     void load();
   }, [load]);
 
-  // Rendered before `me` arrives as well as after, so every field it reads
-  // has to tolerate not being there yet.
-  const head = (
-    <div className="affiliate__head">
-      <div>
-        {/*
-         * **Their name is the heading; HBA is the address.** It was the other
-         * way round - the brand set large in a serif with their name small
-         * underneath - which is right for a shop window and wrong for
-         * somebody's own account page. They know who HBA is; what they need
-         * to see is that this is *theirs*.
-         *
-         * The mark stays, small and quiet, because it is the only thing on
-         * screen saying whose site this is - and most people arrive here from
-         * an email, where that matters.
-         */}
-        <span className="affiliate__mark">HBA</span>
-        <h1 className="affiliate__title">
-          {session.actor.display_name || session.actor.email}
-        </h1>
-        {/*
-         * Their code, beside their name. It is the thing they give out, the thing
-         * customers type, and the reason any of these figures exist - and it
-         * lived three taps away on the You screen.
-         */}
-        {me?.codes?.length ? (
-          <span className="affiliate__codes">
-            {me.codes.map((entry) => (
-              <span key={entry.code} className="code affiliate__code-chip">
-                {entry.code}
-                {!entry.verified && (
-                  <span className="affiliate__code-pending">being checked</span>
-                )}
-              </span>
-            ))}
-          </span>
-        ) : null}
-      </div>
-      <Link to="/glossary" className="affiliate__sign-out">
-        What these words mean
-      </Link>
-      <button
-        type="button"
-        className="affiliate__sign-out"
-        onClick={signOutAndLeave}
-      >
-        Sign out
-      </button>
-    </div>
+  /**
+   * Which theme this device is in.
+   *
+   * Read once, stamped on the portal root, and changed from the You screen.
+   * It lives here rather than in the layout because the screens a model sees
+   * *before* they are on the programme - loading, waiting on an application -
+   * are outside the layout and would otherwise paint in the wrong theme for
+   * the split second before the real one arrived.
+   */
+  const [theme, setTheme] = useState(storedTheme);
+
+  const firstCode = me?.codes?.[0] ?? null;
+  const header = (
+    <PortalHeader
+      name={me?.name || session.actor.display_name || session.actor.email}
+      code={firstCode?.code ?? null}
+      codePending={firstCode ? !firstCode.verified : false}
+    />
   );
 
   if (error) {
     return (
-      <main className="affiliate">
+      <main className="affiliate" data-theme={theme}>
         <p className="notice notice--refused" role="alert">
           {error}
         </p>
@@ -135,7 +106,7 @@ export function AffiliatePortal({ session }: { session: Session }) {
 
   if (mine === null) {
     return (
-      <main className="affiliate">
+      <main className="affiliate" data-theme={theme}>
         <p className="empty">Loading…</p>
       </main>
     );
@@ -147,8 +118,8 @@ export function AffiliatePortal({ session }: { session: Session }) {
 
   if (me === null || month === null) {
     return (
-      <main className="affiliate">
-        {head}
+      <main className="affiliate" data-theme={theme}>
+        {header}
         <p className="empty">Loading…</p>
       </main>
     );
@@ -158,8 +129,8 @@ export function AffiliatePortal({ session }: { session: Session }) {
   // one person they are about, so they are never the same screen.
   if (mine.status === "pending") {
     return (
-      <main className="affiliate">
-        {head}
+      <main className="affiliate" data-theme={theme}>
+        {header}
         <section className="panel affiliate__panel">
           <h2 className="panel__title">We have your application</h2>
           <p className="affiliate__lead">
@@ -176,9 +147,7 @@ export function AffiliatePortal({ session }: { session: Session }) {
   const context: PortalContext = { month, months, setMonth, reload: load };
 
   return (
-    <main className="affiliate">
-      {head}
-
+    <main className="affiliate" data-theme={theme}>
       {/*
        * True across every tab, so it sits above them rather than on one. §8:
        * *not earning, may return* - and anything they were already owed still
@@ -192,12 +161,23 @@ export function AffiliatePortal({ session }: { session: Session }) {
       )}
 
       <Routes>
-        <Route element={<AffiliateLayout context={context} />}>
+        <Route element={<AffiliateLayout context={context} header={header} />}>
           <Route index element={<MyMonth />} />
           <Route path="orders" element={<MyOrders />} />
           <Route path="payments" element={<MyPayments />} />
           <Route path="year" element={<MyYear />} />
-          <Route path="you" element={<MyDetails me={me} onChanged={load} />} />
+          <Route path="grow" element={<MyGrow codes={me.codes} />} />
+          <Route
+            path="you"
+            element={
+              <MyDetails
+                me={me}
+                onChanged={load}
+                theme={theme}
+                onTheme={setTheme}
+              />
+            }
+          />
           <Route path="policy/:id" element={<MyPolicy />} />
           <Route path="glossary" element={<Glossary />} />
           <Route path="*" element={<Navigate to="/" replace />} />
