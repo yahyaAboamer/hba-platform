@@ -1,7 +1,22 @@
 # 0014. Pre-go-live months show sales, never commission
 
-**Status:** Accepted
+**Status:** Superseded by [0036](0036-pre-go-live-months-are-ordinary-months.md)
 **Date:** 2026-08-22
+**Superseded:** 2026-09-04
+
+> **Why this was superseded.** The decision below rests on one premise: that
+> the compensation terms in force before go-live *"exist only in the old system
+> and in people's memory"*. That stopped being true when the business chose to
+> enter them by hand, month by month, through the pay-history editor. With the
+> terms in the database, those months can be calculated by the same engine as
+> any other month.
+>
+> **What ADR 0036 keeps:** a pre-go-live month can never be paid. The
+> protection moves from refusing to calculate the month to the month's balance
+> being structurally zero, which is the stronger guarantee.
+>
+> **What ADR 0036 changes:** those months now show a commission figure, and
+> the `historical` state disappears from every model-facing screen.
 
 ## Context
 

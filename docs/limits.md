@@ -2443,6 +2443,82 @@ a destructive command's help text, and prefer testing on something cheap
 first - which is possible for most operations, and is exactly not possible
 for a delete.
 
+## Settling an overpayment made it larger, every time
+
+**What it looked like:** the payments screen offered to settle a difference of
+E£2,537. Settling it produced a difference of E£5,074, which the screen then
+offered to settle. The real overpayment throughout was **E£257**.
+
+**The cause:** one sign. `balance_for` computed
+`obligation + credited - paid - adjusted`, which on the *source* month
+subtracts an adjustment from a balance that is already negative — pushing an
+overpaid month further into overpayment rather than closing it. Each settle
+therefore added the displayed figure to `adjusted`, which doubled the displayed
+figure.
+
+Three docstrings, the word *credit*, and the reconcile screen's own promise
+(*"next month owes that much less"*) all described carrying an **overpayment**
+forward. The arithmetic implemented moving an **unpaid obligation** forward —
+the opposite operation. `test_a_credit_increases_what_a_later_month_owes`
+pinned the second while its docstring claimed the first; its fixture is a month
+that was never paid at all, which is how it passed for a month.
+
+**Fixed by** ADR 0035: an adjustment moves the balance toward zero, and is
+capped at the true difference (`paid - obligation`). The cap alone would have
+held this at E£257 with the sign still wrong — **when two guards are cheap,
+take both.**
+
+**Watch for the shape.** A test whose docstring describes one scenario and
+whose fixture sets up another will pass forever and defend the wrong thing.
+
+## Paying a reopened month offered the whole figure again
+
+**What it looked like:** August was approved at E£760 and paid. It was reopened,
+re-approved at E£3,829, and the Pay button offered **E£3,829** — with nothing
+on screen mentioning the E£760 sent for the same month minutes earlier. The
+full amount was sent, and E£760 went out twice.
+
+This is the origin of every number in the entry above. The settle loop
+amplified it; this created it.
+
+**Fixed by** showing what has already been sent for the month and defaulting
+the amount to the remaining balance rather than the obligation.
+
+**The general rule:** a form that pre-fills a total, on a screen where part of
+that total may already have been paid, is a form that will eventually pay it
+twice.
+
+## A cancelled order's value is not in the database
+
+**What it looked like:** a void order on the model's Orders screen showed
+`E£0.00` struck through — which claims the order was worth nothing *and* was
+cancelled, and reads as a bug.
+
+**The cause:** `normalise.py` stores Shopify's `currentTotalPriceSet`, and
+Shopify zeroes the current totals on cancellation. Storing the current figure
+is correct — §9.3 pays commission on what the customer actually paid — so the
+placed-at value simply was not kept.
+
+**Fixed by** also storing `totalPriceSet` and `subtotalPriceSet` in
+`original_*_piastres`, display only, never read by `calculate.py`.
+
+**Still open:** the columns are nullable and **existing rows are `NULL` until a
+re-import runs** (Operations → start import). `NULL` means *we never asked
+Shopify*, not *it was free*, and the screen shows no amount rather than a zero
+until the backfill lands.
+
+## Targets on a backfilled month have an outcome but no counts
+
+**Not a defect — a limit of what exists.** The business knows whether a model
+met her targets in March. It does not have the video and story counts from
+March, and inventing them to reach a known outcome would be fabricating
+evidence for a figure that decides money (§15, ADR 0036).
+
+So a backfilled target records **met** or **missed** only. The model's Targets
+card shows an em dash for the counts and says the numbers were not kept on the
+old dashboard. This is the one place a pre-go-live month reads differently from
+a current one.
+
 ## Business rules with deliberate exposure
 
 These are not bugs. They are accepted costs, recorded so nobody "fixes" them.

@@ -1,0 +1,542 @@
+<title>Pay History Editor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* The maintainer's palette, verbatim from tokens.css. This is a mockup of an
+   admin screen and has to look like one — cool near-neutrals, dense, laptop
+   first. The portal's dark theme has no business here. */
+:root{
+  --paper:#fbfbfc; --surface:#ffffff; --ink:#14181f; --quiet:#5c6673;
+  --rule:#e4e7ec; --rule-strong:#cdd3db; --hover:#f4f5f7;
+  --owed:#b54708; --settled:#067647; --refused:#b42318;
+  --owed-quiet:#fdf6ef; --settled-quiet:#f0faf5; --refused-quiet:#fdf3f2;
+  --focus:#3538cd;
+  /* Arrangement tints. ADR 0027 reserves colour for money state, and this
+     screen bends that on purpose: the whole task is telling three
+     arrangements apart across nine months, and a strip in one colour cannot
+     do it. Tints, never fills, and they appear nowhere outside this editor. */
+  --commission:#5c6673; --commission-bg:#f2f4f6;
+  --salary:#3538cd;     --salary-bg:#f0f1fd;
+  --guarantee:#8a5300;  --guarantee-bg:#fdf6ea;
+  --sans:"IBM Plex Sans",ui-sans-serif,system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#14161c; --surface:#1b1e26; --ink:#e8eaf0; --quiet:#9aa0ae;
+    --rule:#2a2e38; --rule-strong:#3a3f4c; --hover:#222630;
+    --owed:#e0a458; --settled:#5fd095; --refused:#ff8a7a;
+    --owed-quiet:#2a2015; --settled-quiet:#12261d; --refused-quiet:#2a1719;
+    --focus:#8f92ff;
+    --commission:#9aa0ae; --commission-bg:#23262f;
+    --salary:#8f92ff;     --salary-bg:#1e2036;
+    --guarantee:#e0a458;  --guarantee-bg:#2a2015;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#14161c; --surface:#1b1e26; --ink:#e8eaf0; --quiet:#9aa0ae;
+  --rule:#2a2e38; --rule-strong:#3a3f4c; --hover:#222630;
+  --owed:#e0a458; --settled:#5fd095; --refused:#ff8a7a;
+  --owed-quiet:#2a2015; --settled-quiet:#12261d; --refused-quiet:#2a1719;
+  --focus:#8f92ff;
+  --commission:#9aa0ae; --commission-bg:#23262f;
+  --salary:#8f92ff;     --salary-bg:#1e2036;
+  --guarantee:#e0a458;  --guarantee-bg:#2a2015;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);
+  font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
+h1,h2,h3{margin:0;font-weight:600;text-wrap:balance}
+button{font:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+code,.mono{font-family:var(--mono)}
+
+.page{max-width:1000px;margin:0 auto;padding:34px 22px 90px}
+.crumb{font-size:12px;color:var(--quiet)}
+h1{font-size:26px;letter-spacing:-.015em;margin:6px 0 6px}
+.lede{margin:0;max-width:70ch;color:var(--quiet);font-size:14px}
+
+.note{margin:18px 0 0;padding:12px 14px;border:1px solid var(--rule);
+  border-left:3px solid var(--focus);border-radius:3px;background:var(--surface);
+  font-size:13px;line-height:1.6;color:var(--quiet)}
+.note b{color:var(--ink)}
+
+section.card{margin-top:22px;padding:18px 20px;background:var(--surface);
+  border:1px solid var(--rule);border-radius:3px}
+section.card>h2{font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--quiet);margin-bottom:14px}
+
+/* ── the fork ───────────────────────────────────────────────────────────── */
+.fork{display:flex;gap:12px;flex-wrap:wrap}
+.fork button{flex:1;min-width:250px;text-align:left;padding:14px 16px;
+  border:1px solid var(--rule-strong);border-radius:3px;background:transparent;color:var(--ink)}
+.fork button:hover{background:var(--hover)}
+.fork button[aria-pressed="true"]{border-color:var(--focus);background:var(--hover);
+  box-shadow:inset 0 0 0 1px var(--focus)}
+.fork b{display:block;font-weight:600}
+.fork span{display:block;margin-top:3px;font-size:13px;color:var(--quiet)}
+
+/* ── the month strip ────────────────────────────────────────────────────── */
+.striphead{display:flex;align-items:baseline;justify-content:space-between;
+  gap:14px;flex-wrap:wrap;margin-bottom:10px}
+.hint{font-size:12.5px;color:var(--quiet)}
+.strip{display:grid;grid-template-columns:repeat(9,1fr);gap:6px;
+  user-select:none;-webkit-user-select:none}
+@media (max-width:720px){.strip{grid-template-columns:repeat(5,1fr)}}
+.mo{position:relative;padding:10px 6px 12px;border:1px solid var(--rule-strong);
+  border-radius:3px;background:transparent;color:var(--ink);text-align:center;
+  transition:background .1s,border-color .1s}
+.mo:hover{background:var(--hover)}
+.mo .name{display:block;font-family:var(--mono);font-size:12px;color:var(--quiet)}
+.mo .what{display:block;margin-top:6px;font-size:11px;line-height:1.3;min-height:26px}
+.mo .amt{display:block;font-family:var(--mono);font-size:11px;margin-top:2px}
+.mo[data-set="commission"]{background:var(--commission-bg);border-color:var(--commission)}
+.mo[data-set="salary"]{background:var(--salary-bg);border-color:var(--salary)}
+.mo[data-set="guarantee"]{background:var(--guarantee-bg);border-color:var(--guarantee)}
+.mo[data-set="none"] .what{color:var(--quiet);font-style:italic}
+.mo[aria-pressed="true"]{box-shadow:inset 0 0 0 2px var(--focus);border-color:var(--focus)}
+.mo[disabled]{opacity:.4;cursor:not-allowed;background:repeating-linear-gradient(
+  135deg,var(--rule) 0 4px,transparent 4px 8px)}
+.mo .met{display:block;margin-top:3px;font-size:10px;letter-spacing:.04em;text-transform:uppercase}
+.mo .met.yes{color:var(--settled)}
+.mo .met.no{color:var(--quiet)}
+
+.legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:12px;font-size:12px;color:var(--quiet)}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;
+  vertical-align:0;border:1px solid}
+.legend .c{background:var(--commission-bg);border-color:var(--commission)}
+.legend .s{background:var(--salary-bg);border-color:var(--salary)}
+.legend .g{background:var(--guarantee-bg);border-color:var(--guarantee)}
+
+/* ── the editor panel ───────────────────────────────────────────────────── */
+.panel{margin-top:18px;padding:16px 18px;border:1px solid var(--focus);
+  border-radius:3px;background:var(--surface)}
+.panel h3{font-size:14px;margin-bottom:4px}
+.panel .for{font-size:12.5px;color:var(--quiet);margin-bottom:14px}
+.kinds{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.kinds button{padding:9px 13px;border:1px solid var(--rule-strong);border-radius:3px;
+  background:transparent;color:var(--ink);font-size:13.5px}
+.kinds button:hover{background:var(--hover)}
+.kinds button[aria-pressed="true"]{border-color:var(--focus);background:var(--hover);
+  box-shadow:inset 0 0 0 1px var(--focus);font-weight:500}
+
+.fields{display:flex;gap:16px;flex-wrap:wrap}
+label.f{display:block;font-size:12.5px;color:var(--quiet)}
+label.f input{display:block;margin-top:5px;width:170px;padding:8px 10px;
+  border:1px solid var(--rule-strong);border-radius:3px;background:var(--surface);
+  color:var(--ink);font-family:var(--mono);font-size:14px}
+
+.targets{margin-top:16px;padding-top:14px;border-top:1px solid var(--rule)}
+.targets>p{margin:0 0 10px;font-size:12.5px;color:var(--quiet);max-width:66ch}
+.trow{display:flex;align-items:center;justify-content:space-between;gap:14px;
+  padding:7px 0;border-bottom:1px solid var(--rule);font-size:13.5px}
+.trow:last-child{border-bottom:0}
+.trow .m{font-family:var(--mono);font-size:13px}
+.seg{display:inline-flex;border:1px solid var(--rule-strong);border-radius:3px;overflow:hidden}
+.seg button{padding:5px 11px;border:0;border-left:1px solid var(--rule-strong);
+  background:transparent;color:var(--quiet);font-size:12.5px}
+.seg button:first-child{border-left:0}
+.seg button[aria-pressed="true"]{background:var(--hover);color:var(--ink);font-weight:500}
+.seg button[aria-pressed="true"][data-v="met"]{color:var(--settled)}
+
+.acts{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}
+.btn{padding:9px 15px;border:1px solid var(--rule-strong);border-radius:3px;
+  background:transparent;color:var(--ink);font-size:13.5px}
+.btn:hover:not(:disabled){background:var(--hover)}
+.btn--primary{background:var(--ink);border-color:var(--ink);color:var(--surface);font-weight:500}
+.btn--primary:hover:not(:disabled){opacity:.9;background:var(--ink)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+
+/* ── the summary ────────────────────────────────────────────────────────── */
+.scroll{overflow-x:auto;margin-top:4px}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{text-align:left;font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--quiet);font-weight:500;
+  padding:8px 10px;border-bottom:1px solid var(--rule-strong);white-space:nowrap}
+td{padding:9px 10px;border-bottom:1px solid var(--rule);vertical-align:top}
+tr:last-child td{border-bottom:0}
+td.mono{font-family:var(--mono);white-space:nowrap}
+.pill{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11.5px;border:1px solid}
+.pill.c{color:var(--commission);border-color:var(--commission);background:var(--commission-bg)}
+.pill.s{color:var(--salary);border-color:var(--salary);background:var(--salary-bg)}
+.pill.g{color:var(--guarantee);border-color:var(--guarantee);background:var(--guarantee-bg)}
+.link{border:0;background:none;padding:0;color:var(--refused);font-size:12.5px;
+  text-decoration:underline;text-underline-offset:2px}
+
+.save{position:sticky;bottom:0;margin-top:24px;padding:14px 18px;background:var(--surface);
+  border:1px solid var(--rule);border-radius:3px;display:flex;align-items:center;
+  justify-content:space-between;gap:16px;flex-wrap:wrap}
+.save p{margin:0;font-size:13px;color:var(--quiet)}
+.save p.ready{color:var(--settled)}
+.empty{padding:16px 0;color:var(--quiet);font-size:13.5px}
+.hide{display:none!important}
+</style>
+
+<div class="page">
+  <p class="crumb">Affiliates / jana adel / Pay</p>
+  <h1>Set up jana adel&rsquo;s pay</h1>
+  <p class="lede">What she is paid on, and from when. A model who was with HBA before the platform needs every month she sold in to have an arrangement, or those months cannot be calculated.</p>
+
+  <div class="note">
+    <b>Mockup, not the real screen.</b> Nothing here saves. It exists so the interaction can be argued with before it is built — the data model behind it already supports every arrangement shown, including a different one each month.
+  </div>
+
+  <section class="card">
+    <h2>Is she new, or was she with HBA already?</h2>
+    <div class="fork" id="fork">
+      <button data-who="new" aria-pressed="false">
+        <b>New model</b>
+        <span>Starts now. One arrangement, from this month onwards.</span>
+      </button>
+      <button data-who="old" aria-pressed="false">
+        <b>Already with HBA</b>
+        <span>Has sales before the platform. Every one of those months needs an arrangement.</span>
+      </button>
+    </div>
+  </section>
+
+  <!-- NEW MODEL ------------------------------------------------------------->
+  <section class="card hide" id="newCard">
+    <h2>Her arrangement</h2>
+    <div id="newMount"></div>
+  </section>
+
+  <!-- OLD MODEL ------------------------------------------------------------->
+  <section class="card hide" id="sameCard">
+    <h2>Was it the same the whole time?</h2>
+    <div class="fork" id="same">
+      <button data-same="yes" aria-pressed="false">
+        <b>The same throughout</b>
+        <span>One arrangement covers every month from when she started until now.</span>
+      </button>
+      <button data-same="no" aria-pressed="false">
+        <b>It changed</b>
+        <span>Her salary, her guarantee, or the way she was paid was not the same all year.</span>
+      </button>
+    </div>
+  </section>
+
+  <section class="card hide" id="stripCard">
+    <div class="striphead">
+      <h2 style="margin:0">Her months in 2026</h2>
+      <p class="hint" id="hint">Click a month. Shift-click another to take everything between them.</p>
+    </div>
+    <div class="strip" id="strip"></div>
+    <div class="legend">
+      <span><i class="c"></i>Commission only</span>
+      <span><i class="s"></i>Salary + commission</span>
+      <span><i class="g"></i>Guaranteed minimum</span>
+      <span style="opacity:.7">Hatched months are before she joined</span>
+    </div>
+    <div id="panelMount"></div>
+  </section>
+
+  <section class="card hide" id="summaryCard">
+    <h2>What will be recorded</h2>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Months</th><th>Arrangement</th><th>Rate</th><th>Amount</th><th>Targets</th><th></th></tr></thead>
+        <tbody id="summary"></tbody>
+      </table>
+    </div>
+    <p class="empty hide" id="summaryEmpty">Nothing set yet.</p>
+  </section>
+
+  <div class="save hide" id="saveBar">
+    <p id="saveNote"></p>
+    <button class="btn btn--primary" id="saveBtn" disabled>Save her pay history</button>
+  </div>
+</div>
+
+<script>
+/* =================================================================
+   State. `months` is the calendar; `periods` is what gets written.
+   ================================================================= */
+const NAMES = ["January","February","March","April","May","June","July","August","September"];
+const SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep"];
+
+/* She sold from February. Months before that are not hers to arrange, and the
+   strip hatches them rather than pretending they are choices. */
+const JOINED = 1; // index into NAMES — February
+
+const S = {
+  who: null,          // "new" | "old"
+  same: null,         // "yes" | "no"
+  set: {},            // monthIndex -> {kind, rate, amount, met}
+  sel: [],            // currently selected month indexes
+  anchor: null,       // for shift-click
+  draft: null,        // the panel's working arrangement
+};
+
+const KINDS = {
+  commission: { label: "Commission only", pill: "c",
+    note: "Paid a percentage of what her code sold. Nothing else." },
+  salary: { label: "Salary + commission", pill: "s",
+    note: "Both. The salary is paid on top of the commission, never instead of it." },
+  guarantee: { label: "Guaranteed minimum", pill: "g",
+    note: "Whichever is larger — her commission, or the floor — and only in a month where she met her targets." },
+};
+
+const $ = id => document.getElementById(id);
+const egp = n => "E£" + Number(n || 0).toLocaleString("en-GB", {minimumFractionDigits:2, maximumFractionDigits:2});
+
+/* ---------- the fork ------------------------------------------------- */
+$("fork").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  S.who = b.dataset.who; S.same = null; S.set = {}; S.sel = [];
+  [...$("fork").children].forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+  render();
+});
+
+$("same").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  S.same = b.dataset.same;
+  S.set = {}; S.sel = [];
+  [...$("same").children].forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+  if (S.same === "yes") {
+    // The whole run, selected for them. "Same throughout" is one arrangement
+    // over every month she has — making them draw that themselves would be
+    // asking for work the answer already contains.
+    S.sel = months().slice();
+    S.draft = { kind: "commission", rate: 10, amount: "", met: {} };
+  }
+  render();
+});
+
+const months = () => NAMES.map((_, i) => i).filter(i => i >= JOINED);
+
+/* ---------- the strip ------------------------------------------------- */
+function strip() {
+  $("strip").innerHTML = NAMES.map((name, i) => {
+    const before = i < JOINED;
+    const set = S.set[i];
+    const on = S.sel.includes(i);
+    const kind = set ? set.kind : "none";
+    let what = "not set", amt = "", met = "";
+    if (set) {
+      what = KINDS[set.kind].label.replace(" + commission", " +");
+      if (set.kind === "salary") amt = egp(set.amount);
+      if (set.kind === "guarantee") {
+        amt = egp(set.amount);
+        met = set.met ? '<span class="met yes">target met</span>'
+                      : '<span class="met no">target missed</span>';
+      }
+    }
+    return `<button class="mo" data-i="${i}" data-set="${before ? "off" : kind}"
+      aria-pressed="${on}" ${before ? "disabled" : ""}
+      title="${before ? "Before she joined" : NAMES[i] + " 2026"}">
+      <span class="name">${SHORT[i]}</span>
+      <span class="what">${before ? "—" : what}</span>
+      <span class="amt">${amt}</span>${met}
+    </button>`;
+  }).join("");
+}
+
+$("strip").addEventListener("click", e => {
+  const b = e.target.closest(".mo"); if (!b || b.disabled) return;
+  const i = Number(b.dataset.i);
+
+  if (e.shiftKey && S.anchor !== null) {
+    const [a, z] = [Math.min(S.anchor, i), Math.max(S.anchor, i)];
+    S.sel = months().filter(m => m >= a && m <= z);
+  } else if (S.sel.includes(i) && S.sel.length === 1) {
+    S.sel = []; S.anchor = null;
+  } else {
+    S.sel = [i]; S.anchor = i;
+  }
+
+  // Opening on what the first selected month already says means correcting one
+  // month is a change to one field, not a re-entry of the whole arrangement.
+  const existing = S.set[S.sel[0]];
+  S.draft = existing
+    ? { kind: existing.kind, rate: existing.rate, amount: existing.amount, met: {} }
+    : { kind: "commission", rate: 10, amount: "", met: {} };
+  if (existing) S.sel.forEach(m => { if (S.set[m]) S.draft.met[m] = S.set[m].met; });
+  render();
+});
+
+/* ---------- the panel ------------------------------------------------- */
+function panel() {
+  const mount = $("panelMount");
+  if (!S.sel.length || !S.draft) { mount.innerHTML = ""; return; }
+
+  const d = S.draft;
+  const list = S.sel.slice().sort((a, b) => a - b);
+  const label = list.length === 1
+    ? `${NAMES[list[0]]} 2026`
+    : `${NAMES[list[0]]} – ${NAMES[list[list.length - 1]]} 2026 · ${list.length} months`;
+
+  const needsAmount = d.kind === "salary" || d.kind === "guarantee";
+  const amountLabel = d.kind === "salary" ? "Monthly salary" : "Guaranteed minimum";
+  const ready = d.rate !== "" && Number(d.rate) > 0 && (!needsAmount || Number(d.amount) > 0);
+
+  mount.innerHTML = `
+    <div class="panel">
+      <h3>${label}</h3>
+      <p class="for">${KINDS[d.kind].note}</p>
+
+      <div class="kinds" id="kinds">
+        ${Object.entries(KINDS).map(([k, v]) =>
+          `<button data-k="${k}" aria-pressed="${d.kind === k}">${v.label}</button>`).join("")}
+      </div>
+
+      <div class="fields">
+        <label class="f">Commission rate
+          <input id="rate" inputmode="decimal" value="${d.rate}" aria-label="Commission rate, percent">
+        </label>
+        ${needsAmount ? `<label class="f">${amountLabel}
+          <input id="amount" inputmode="decimal" value="${d.amount}" placeholder="0.00">
+        </label>` : ""}
+      </div>
+
+      ${d.kind === "guarantee" ? `
+      <div class="targets">
+        <p><b>Did she meet her targets?</b> The guarantee only applies in a month where she did — so this decides, month by month, whether she was paid the floor or her commission.</p>
+        ${list.map(m => `
+          <div class="trow">
+            <span class="m">${NAMES[m]} 2026</span>
+            <span class="seg" data-m="${m}">
+              <button data-v="met" aria-pressed="${d.met[m] === true}">Met</button>
+              <button data-v="missed" aria-pressed="${d.met[m] === false}">Missed</button>
+            </span>
+          </div>`).join("")}
+      </div>` : ""}
+
+      <div class="acts">
+        <button class="btn btn--primary" id="apply" ${ready ? "" : "disabled"}>
+          Apply to ${list.length === 1 ? "this month" : `these ${list.length} months`}
+        </button>
+        <button class="btn" id="clearSel">Cancel</button>
+      </div>
+    </div>`;
+
+  $("kinds").addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    S.draft.kind = b.dataset.k;
+    if (S.draft.kind !== "guarantee") S.draft.met = {};
+    render();
+  });
+  $("rate").addEventListener("input", e => { S.draft.rate = e.target.value; refreshApply(); });
+  const amt = $("amount");
+  if (amt) amt.addEventListener("input", e => { S.draft.amount = e.target.value; refreshApply(); });
+
+  mount.querySelectorAll(".seg").forEach(seg => {
+    seg.addEventListener("click", e => {
+      const b = e.target.closest("button"); if (!b) return;
+      S.draft.met[Number(seg.dataset.m)] = b.dataset.v === "met";
+      render();
+    });
+  });
+
+  $("apply").addEventListener("click", () => {
+    list.forEach(m => {
+      S.set[m] = {
+        kind: d.kind,
+        rate: Number(d.rate),
+        amount: needsAmount ? Number(d.amount) : 0,
+        met: d.kind === "guarantee" ? d.met[m] === true : null,
+      };
+    });
+    S.sel = []; S.anchor = null; S.draft = null;
+    render();
+  });
+  $("clearSel").addEventListener("click", () => {
+    S.sel = []; S.anchor = null; S.draft = null; render();
+  });
+}
+
+/* Enable or disable Apply without redrawing the panel, so a field does not
+   lose focus on every keystroke. */
+function refreshApply() {
+  const d = S.draft, btn = $("apply");
+  if (!btn) return;
+  const needsAmount = d.kind === "salary" || d.kind === "guarantee";
+  btn.disabled = !(d.rate !== "" && Number(d.rate) > 0 && (!needsAmount || Number(d.amount) > 0));
+}
+
+/* ---------- the new-model form --------------------------------------- */
+function newForm() {
+  $("newMount").innerHTML = `
+    <p class="hint" style="margin:0 0 14px">One arrangement, starting this month. Nothing before September exists for her, so there is nothing to backfill.</p>
+    <div class="kinds" id="nkinds">
+      ${Object.entries(KINDS).map(([k, v]) =>
+        `<button data-k="${k}" aria-pressed="${k === "commission"}">${v.label}</button>`).join("")}
+    </div>
+    <div class="fields">
+      <label class="f">Commission rate<input value="10" inputmode="decimal"></label>
+    </div>`;
+}
+
+/* ---------- the summary ---------------------------------------------- */
+function runs() {
+  // Consecutive months with an identical arrangement collapse into one period,
+  // because that is what actually gets written: `set_terms` records a run, not
+  // a month. Showing nine rows for one decision would misrepresent the record.
+  const out = [];
+  months().forEach(m => {
+    const s = S.set[m];
+    if (!s) return;
+    const last = out[out.length - 1];
+    const same = last && last.kind === s.kind && last.rate === s.rate
+      && last.amount === s.amount && last.to === m - 1
+      && (s.kind !== "guarantee" || last.met === s.met);
+    if (same) last.to = m;
+    else out.push({ from: m, to: m, ...s });
+  });
+  return out;
+}
+
+function summary() {
+  const rows = runs();
+  $("summaryEmpty").classList.toggle("hide", rows.length > 0);
+  $("summary").innerHTML = rows.map((r, i) => `
+    <tr>
+      <td class="mono">${SHORT[r.from]}${r.from === r.to ? "" : " – " + SHORT[r.to]} 2026</td>
+      <td><span class="pill ${KINDS[r.kind].pill}">${KINDS[r.kind].label}</span></td>
+      <td class="mono">${r.rate}%</td>
+      <td class="mono">${r.kind === "commission" ? "—" : egp(r.amount)}</td>
+      <td>${r.kind === "guarantee" ? (r.met ? "met" : "missed") : "—"}</td>
+      <td><button class="link" data-clear="${i}">Clear</button></td>
+    </tr>`).join("");
+
+  $("summary").querySelectorAll("[data-clear]").forEach(b => {
+    b.addEventListener("click", () => {
+      const r = rows[Number(b.dataset.clear)];
+      for (let m = r.from; m <= r.to; m++) delete S.set[m];
+      render();
+    });
+  });
+}
+
+/* ---------- save state ------------------------------------------------ */
+function save() {
+  const need = months();
+  const missing = need.filter(m => !S.set[m]);
+  const done = missing.length === 0;
+  $("saveBtn").disabled = !done;
+  $("saveNote").className = done ? "ready" : "";
+  $("saveNote").textContent = done
+    ? `Every month from ${NAMES[need[0]]} is covered. ${runs().length} arrangement${runs().length === 1 ? "" : "s"} will be recorded.`
+    : `${missing.length} month${missing.length === 1 ? "" : "s"} still without an arrangement: ${missing.map(m => SHORT[m]).join(", ")}. A month with no arrangement cannot be calculated.`;
+}
+
+/* ---------- render ---------------------------------------------------- */
+function render() {
+  $("newCard").classList.toggle("hide", S.who !== "new");
+  $("sameCard").classList.toggle("hide", S.who !== "old");
+  const showStrip = S.who === "old" && S.same !== null;
+  $("stripCard").classList.toggle("hide", !showStrip);
+  $("summaryCard").classList.toggle("hide", !showStrip);
+  $("saveBar").classList.toggle("hide", !showStrip);
+
+  $("hint").textContent = S.same === "yes"
+    ? "Every month is selected. Set the arrangement once and it applies to all of them."
+    : "Click a month. Shift-click another to take everything between them.";
+
+  if (S.who === "new") newForm();
+  if (showStrip) { strip(); panel(); summary(); save(); }
+}
+
+render();
+</script>
