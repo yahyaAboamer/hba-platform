@@ -177,6 +177,43 @@ function tipStyle(hover: NonNullable<Hover>): React.CSSProperties {
   };
 }
 
+/**
+ * How a month gets read, on a phone as well as on a laptop.
+ *
+ * **These charts only answered a hover**, which is a thing a phone does not
+ * have. Every model reads this on one, so the tooltips were unreachable for
+ * everybody they were built for - the pointer handlers were written on a
+ * laptop and tested on one.
+ *
+ * So: a **tap** selects a month and a second tap on the same month clears it,
+ * which is the only way to dismiss a tooltip on a touch screen. Hover is kept
+ * for a mouse, and guarded on `pointerType` - a touch also emits enter and
+ * leave events, and letting those through makes the tooltip appear and vanish
+ * in the same gesture.
+ *
+ * `onFocus` stays, so the charts are still readable by keyboard.
+ */
+function reading(
+  index: number,
+  x: number,
+  y: number,
+  setHover: React.Dispatch<React.SetStateAction<Hover>>,
+) {
+  const at = { index, x, y };
+  return {
+    onClick: () =>
+      setHover((was) => (was?.index === index ? null : at)),
+    onPointerEnter: (event: React.PointerEvent) => {
+      if (event.pointerType === "mouse") setHover(at);
+    },
+    onPointerLeave: (event: React.PointerEvent) => {
+      if (event.pointerType === "mouse") setHover(null);
+    },
+    onFocus: () => setHover(at),
+    onBlur: () => setHover(null),
+  };
+}
+
 function EarningsLine({ months }: { months: YearMonth[] }) {
   const [hover, setHover] = useState<Hover>(null);
 
@@ -258,14 +295,7 @@ function EarningsLine({ months }: { months: YearMonth[] }) {
             y={0}
             width={(W - L - R) / months.length}
             height={H}
-            onMouseEnter={() =>
-              setHover({ index: i, x: x(i) / W, y: y(m.earned_piastres ?? 0) / H })
-            }
-            onFocus={() =>
-              setHover({ index: i, x: x(i) / W, y: y(m.earned_piastres ?? 0) / H })
-            }
-            onMouseLeave={() => setHover(null)}
-            onBlur={() => setHover(null)}
+            {...reading(i, x(i) / W, y(m.earned_piastres ?? 0) / H, setHover)}
             tabIndex={0}
             role="button"
             aria-label={`${m.label}: ${m.earned_piastres === null ? "not shown here" : formatEgp(m.earned_piastres)}`}
@@ -337,10 +367,7 @@ function OrdersBars({ months }: { months: YearMonth[] }) {
                 y={0}
                 width={step}
                 height={H}
-                onMouseEnter={() => setHover({ index: i, x: cx / W, y: y(m.orders) / H })}
-                onFocus={() => setHover({ index: i, x: cx / W, y: y(m.orders) / H })}
-                onMouseLeave={() => setHover(null)}
-                onBlur={() => setHover(null)}
+                {...reading(i, cx / W, y(m.orders) / H, setHover)}
                 tabIndex={0}
                 role="button"
                 aria-label={`${m.label}: ${m.orders} orders counted`}

@@ -49,3 +49,50 @@
 .grow__copy:hover {
   background: var(--accent-soft);
 }
+
+/* ── What was asked ─────────────────────────────────────────────────────── */
+
+.grow__head {
+  margin-bottom: var(--space-4);
+}
+
+.ask + .ask {
+  margin-top: var(--space-4);
+}
+
+.ask__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--quiet);
+}
+
+.ask__count {
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.ask__track {
+  height: 4px;
+  margin-top: var(--space-2);
+  border-radius: 2px;
+  background: var(--rule);
+  overflow: hidden;
+}
+
+.ask__fill {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+.grow__foot {
+  max-width: 40ch;
+  margin: var(--space-4) 0 0;
+  font-size: var(--text-xs);
+  line-height: 1.55;
+  color: var(--quiet);
+}
