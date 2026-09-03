@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import { signOutAndLeave } from "../lib/api";
+import { describeDestination } from "../lib/payouts";
 import { storeTheme } from "../lib/theme";
 import type { Theme } from "../lib/theme";
 import { MyPayout } from "./MyPayout";
@@ -15,12 +16,6 @@ export type Me = {
   codes: { code: string; verified: boolean }[];
   payout_destination: Record<string, string | null> | null;
   required_fields: Record<string, string[]>;
-};
-
-const METHOD_LABEL: Record<string, string> = {
-  instapay: "InstaPay",
-  bank: "Bank transfer",
-  wallet: "Mobile wallet",
 };
 
 /**
@@ -177,17 +172,4 @@ export function MyDetails({
       )}
     </>
   );
-}
-
-function describeDestination(
-  destination: Record<string, string | null> | null,
-): string {
-  if (!destination) return "Nothing on file yet";
-  const method = destination.method ?? "";
-  const shown =
-    destination.instapay_address_url ??
-    destination.bank_account_number ??
-    destination.wallet_phone ??
-    "";
-  return `${METHOD_LABEL[method] ?? method} · ${shown}`;
 }

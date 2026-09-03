@@ -48,3 +48,35 @@ export function cardProblem(value: string): string | null {
     ? null
     : `A card number is 16 digits. That one has ${only.length}.`;
 }
+
+/** The payout methods, in their words rather than the column's. */
+const METHOD_LABEL: Record<string, string> = {
+  instapay: "InstaPay",
+  bank: "Bank transfer",
+  wallet: "Mobile wallet",
+};
+
+/**
+ * Where their money goes, shortened.
+ *
+ * **One implementation, used by both screens that say it.** It lived on the
+ * You screen alone until Payments needed it too, and the obvious move - a
+ * second copy - is how the same account ends up described two different ways
+ * on two tabs of the same portal.
+ *
+ * Shortened even to them: they supplied these, so the tail tells them nothing
+ * they do not know, and a screen printing a full account number is one worth
+ * photographing over their shoulder on a bus.
+ */
+export function describeDestination(
+  destination: Record<string, string | null> | null,
+): string {
+  if (!destination) return "Nothing on file yet";
+  const method = destination.method ?? "";
+  const shown =
+    destination.instapay_address_url ??
+    destination.bank_account_number ??
+    destination.wallet_phone ??
+    "";
+  return `${METHOD_LABEL[method] ?? method} · ${shown}`;
+}

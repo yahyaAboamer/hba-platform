@@ -8,6 +8,7 @@ import {
 } from "react-router-dom";
 
 import { formatMonth } from "../lib/money";
+import type { Me } from "../screens/MyDetails";
 import "./AffiliateLayout.css";
 
 /**
@@ -42,6 +43,14 @@ const TABS = [
 const MONTH_SCOPED = new Set(["/", "/orders"]);
 
 export type PortalContext = {
+  /**
+   * Their record, already loaded by `AffiliatePortal`.
+   *
+   * Passed down rather than fetched again: two screens want the payout
+   * destination, and a second request for it would be a second answer that
+   * goes stale the moment the first one changes.
+   */
+  me: Me;
   month: string;
   months: string[];
   setMonth: (month: string) => void;
