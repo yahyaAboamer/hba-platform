@@ -2,7 +2,14 @@ import { useEffect, useState } from "react";
 
 import instapayGuide from "../assets/instapay-link.png";
 import { api } from "../lib/api";
-import { cardProblem, mobileProblem } from "../lib/payouts";
+import {
+  accountHolderProblem,
+  cardProblem,
+  EGYPTIAN_BANKS,
+  mobileProblem,
+  OTHER_BANK,
+  WALLET_PROVIDERS,
+} from "../lib/payouts";
 import "./Apply.css";
 
 type Mine = {
@@ -74,6 +81,14 @@ export function Apply({ onApplied }: { onApplied: () => void }) {
 
   const addressProblem =
     method === "instapay" ? instapayProblem(fields.instapay_address_url ?? "") : null;
+
+  // The field accepted sixteen digits as a name, which is what somebody does
+  // when two number fields sit next to each other. The transfer then goes out
+  // addressed to a number and the bank returns it.
+  const holderProblem =
+    method === "bank"
+      ? accountHolderProblem(fields.bank_account_holder ?? "")
+      : null;
 
   // Everything below assumes an Egyptian bank, an Egyptian mobile and Egyptian
   // pounds. Somebody abroad has none of those, and inventing details that fit
@@ -336,24 +351,23 @@ export function Apply({ onApplied }: { onApplied: () => void }) {
 
         {method === "bank" && (
           <>
+            <BankField
+              value={fields.bank_name ?? ""}
+              onChange={(next) => set("bank_name", next)}
+            />
             <label className="field">
-              <span className="field__label">Bank</span>
-              <input
-                className="input"
-                required
-                value={fields.bank_name ?? ""}
-                onChange={(event) => set("bank_name", event.target.value)}
-              />
-            </label>
-            <label className="field">
-              <span className="field__label">Account holder's name</span>
+              <span className="field__label">Account holder&rsquo;s name</span>
               <input
                 className="input"
                 required
                 value={fields.bank_account_holder ?? ""}
                 onChange={(event) => set("bank_account_holder", event.target.value)}
+                aria-invalid={holderProblem !== null}
               />
               <span className="apply__hint">Exactly as the bank has it.</span>
+              {holderProblem && (
+                <span className="blocker apply__problem">{holderProblem}</span>
+              )}
             </label>
             <label className="field">
               <span className="field__label">Card number</span>
@@ -378,16 +392,46 @@ export function Apply({ onApplied }: { onApplied: () => void }) {
         )}
 
         {method === "wallet" && (
-          <label className="field">
-            <span className="field__label">Wallet number</span>
-            <input
-              className="input"
-              type="tel"
-              required
-              value={fields.wallet_phone ?? ""}
-              onChange={(event) => set("wallet_phone", event.target.value)}
-            />
-          </label>
+          <>
+            <label className="field">
+              <span className="field__label">Which wallet</span>
+              <select
+                className="input"
+                required
+                value={fields.wallet_provider ?? ""}
+                onChange={(event) => set("wallet_provider", event.target.value)}
+              >
+                <option value="" disabled>
+                  Choose one
+                </option>
+                {WALLET_PROVIDERS.map((provider) => (
+                  <option key={provider} value={provider}>
+                    {provider}
+                  </option>
+                ))}
+              </select>
+              {/*
+               * All four take the same eleven digits, so the number alone
+               * does not say where a transfer should go — whoever sends it
+               * has been guessing from the prefix, and prefixes have been
+               * portable in Egypt for years.
+               */}
+              <span className="apply__hint">
+                Every wallet uses the same number format, so this is what says
+                where the money should go.
+              </span>
+            </label>
+            <label className="field">
+              <span className="field__label">Wallet number</span>
+              <input
+                className="input"
+                type="tel"
+                required
+                value={fields.wallet_phone ?? ""}
+                onChange={(event) => set("wallet_phone", event.target.value)}
+              />
+            </label>
+          </>
         )}
 
         {/*
@@ -409,12 +453,85 @@ export function Apply({ onApplied }: { onApplied: () => void }) {
             working ||
             !inEgypt ||
             addressProblem !== null ||
-            numberProblem !== null
+            numberProblem !== null ||
+            holderProblem !== null
           }
         >
           {working ? "Sending…" : "Send my application"}
         </button>
       </form>
     </main>
+  );
+}
+
+
+/**
+ * Which bank, from a list, with a way out.
+ *
+ * The field was free text and collected "cib", "بنك مصر" and "Bank" - none of
+ * them wrong exactly, and none of them the same as each other when somebody
+ * is sending twenty transfers at month end.
+ *
+ * **"Another bank" reveals a text field rather than blocking.** This list
+ * will be out of date the first time two banks merge, and a model who cannot
+ * name their own bank cannot be paid. Constraining the common case is worth
+ * doing; refusing the uncommon one is not.
+ */
+function BankField({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const listed = (EGYPTIAN_BANKS as readonly string[]).includes(value);
+  // Anything already typed that is not on the list keeps the form in its
+  // "other" state, so an existing destination does not silently lose its bank
+  // the first time somebody opens this screen.
+  const [other, setOther] = useState(value !== "" && !listed);
+
+  return (
+    <>
+      <label className="field">
+        <span className="field__label">Bank</span>
+        <select
+          className="input"
+          required
+          value={other ? OTHER_BANK : value}
+          onChange={(event) => {
+            const chosen = event.target.value;
+            if (chosen === OTHER_BANK) {
+              setOther(true);
+              onChange("");
+            } else {
+              setOther(false);
+              onChange(chosen);
+            }
+          }}
+        >
+          <option value="" disabled>
+            Choose your bank
+          </option>
+          {EGYPTIAN_BANKS.map((bank) => (
+            <option key={bank} value={bank}>
+              {bank}
+            </option>
+          ))}
+          <option value={OTHER_BANK}>{OTHER_BANK}…</option>
+        </select>
+      </label>
+
+      {other && (
+        <label className="field">
+          <span className="field__label">Which bank</span>
+          <input
+            className="input"
+            required
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+          />
+        </label>
+      )}
+    </>
   );
 }

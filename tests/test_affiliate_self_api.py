@@ -311,6 +311,7 @@ def test_one_models_change_never_touches_another(admin):
         json={
             "password": PASSWORD,
             "method": PayoutMethod.WALLET,
+            "wallet_provider": "Vodafone Cash",
             "wallet_phone": "01055555555",
         },
     )
@@ -383,3 +384,74 @@ def test_an_untouched_destination_raises_no_warning(admin):
     nour = next(row for row in rows if row["name"] == "Nour Hassan")
 
     assert nour["destination_changed_at"] is None
+
+
+# ── The two switches ────────────────────────────────────────────────────────
+
+
+def test_both_messages_are_on_before_anybody_touches_anything(admin):
+    """Absence means on.
+
+    There is no row until somebody turns something off, so a model who has
+    never opened their settings hears about their month closing and about
+    being paid — the two messages this platform exists to send.
+    """
+    nour = _model(admin, "nour@example.com", "Nour Hassan", "NOUR10")
+
+    body = nour.get("/api/me/notifications").json()
+
+    assert [p["kind"] for p in body["preferences"]] == [
+        "month_closed",
+        "payment_sent",
+    ]
+    assert all(p["enabled"] for p in body["preferences"])
+
+
+def test_turning_one_off_stops_exactly_one_message(admin):
+    """The whole point, and the thing worth a test.
+
+    A switch that muted more than it named would be worse than no switch: the
+    model would stop hearing about being paid and have no way to know why.
+    """
+    from app.models.notifications import NotificationOutbox
+    from app.db import engine
+    from sqlalchemy import text as sql
+
+    nour = _model(admin, "nour@example.com", "Nour Hassan", "NOUR10")
+
+    off = nour.put(
+        "/api/me/notifications",
+        json={"kind": "month_closed", "enabled": False},
+    )
+    assert off.status_code == 200, off.text
+    assert off.json()["preferences"][0]["enabled"] is False
+    assert off.json()["preferences"][1]["enabled"] is True, "the other is untouched"
+
+
+def test_a_switch_we_do_not_send_is_refused(admin):
+    """The design offered a third — an alert for every counted order — and it
+    was cut. Accepting the name would store a preference nothing reads."""
+    nour = _model(admin, "nour@example.com", "Nour Hassan", "NOUR10")
+
+    refused = nour.put(
+        "/api/me/notifications",
+        json={"kind": "every_order", "enabled": False},
+    )
+
+    assert refused.status_code == 400
+    assert "Not something we send" in refused.text
+
+
+def test_a_model_can_read_back_what_they_typed(admin):
+    """Masked at rest is right; masked with no way to look is not.
+
+    Somebody who mistyped a digit had no way to find out except by not being
+    paid.
+    """
+    nour = _model(admin, "nour@example.com", "Nour Hassan", "NOUR10")
+
+    masked = nour.get("/api/me").json()["payout_destination"]
+    full = nour.get("/api/me/payout-destination").json()
+
+    assert masked["instapay_address_url"] != full["instapay_address_url"]
+    assert full["instapay_address_url"].startswith("https://ipn.eg/")

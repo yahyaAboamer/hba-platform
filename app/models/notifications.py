@@ -27,12 +27,15 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     DateTime,
+    ForeignKey,
     Index,
     SmallInteger,
     String,
     Text,
+    UniqueConstraint,
     text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
@@ -132,3 +135,56 @@ class NotificationOutbox(Base):
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class NotificationKind:
+    """The two messages a model is allowed to turn off.
+
+    Both are routine news about money arriving, and both repeat: a month
+    closes every month, a payment is sent every month. Everything else this
+    platform emails - an invitation, a password reset, the notice that
+    somebody moved where their money goes - is not news, it is security, and
+    is not gateable at all.
+
+    **A third was cut before it was built.** The design offered an alert for
+    every order that counts; twenty models on a busy month is an email an
+    order, which is the volume that gets a sending domain marked as spam and
+    takes the two useful messages down with it.
+    """
+
+    #: The figure stopped moving. The most asked question this platform
+    #: answers, and the one that arrives as a message to HBA when nobody is
+    #: told.
+    MONTH_CLOSED = "month_closed"
+
+    #: The transfer went out.
+    PAYMENT_SENT = "payment_sent"
+
+
+VALID_KINDS = frozenset({NotificationKind.MONTH_CLOSED, NotificationKind.PAYMENT_SENT})
+
+
+class NotificationPreference(Base):
+    """One affiliate's answer about one kind of message.
+
+    **Absence means on.** There is no row until somebody touches a switch, so
+    a model who has never opened their settings hears about both - which are
+    the two messages this platform exists to send. Seeding a row per model at
+    sign-up would be tidier and would silently mute anybody the seeding
+    missed.
+    """
+
+    __tablename__ = "notification_preference"
+    __table_args__ = (
+        UniqueConstraint("affiliate_id", "kind", name="notification_preference_unique"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    affiliate_id: Mapped[int] = mapped_column(
+        ForeignKey("affiliate_profile.id", ondelete="CASCADE"), nullable=False
+    )
+    kind: Mapped[str] = mapped_column(String(40), nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )

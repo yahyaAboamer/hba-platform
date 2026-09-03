@@ -21,7 +21,9 @@ from app.models.payments import PaymentTransaction
 from app.services.applications import REQUIRED_PAYOUT_FIELDS, application_state
 from app.services.auth import authenticate
 from app.services.codes import codes_with_status
+from app.services.notification_prefs import preferences_for, set_preference
 from app.services.payouts import (
+    reveal_destination,
     changed_recently,
     current_destination,
     mask_destination,
@@ -50,6 +52,7 @@ class PayoutChangeBody(BaseModel):
     bank_name: str | None = Field(default=None, max_length=120)
     bank_account_holder: str | None = Field(default=None, max_length=120)
     bank_account_number: str | None = Field(default=None, max_length=60)
+    wallet_provider: str | None = Field(default=None, max_length=60)
     wallet_phone: str | None = Field(default=None, max_length=40)
 
 
@@ -79,6 +82,87 @@ def me(
             method: list(fields) for method, fields in REQUIRED_PAYOUT_FIELDS.items()
         },
     }
+
+
+class NotificationPreferenceBody(BaseModel):
+    kind: str = Field(max_length=40)
+    enabled: bool
+
+
+@router.get("/notifications")
+def my_notification_preferences(
+    affiliate: AffiliateProfile = Depends(current_affiliate),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Which of the two messages they want.
+
+    Both on until they say otherwise - there is no row for the default, so a
+    model who has never opened this screen hears about their month closing and
+    about being paid.
+    """
+    return {"preferences": preferences_for(db, affiliate)}
+
+
+@router.put("/notifications")
+def change_my_notification_preferences(
+    body: NotificationPreferenceBody,
+    affiliate: AffiliateProfile = Depends(current_affiliate),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Turn one switch on or off.
+
+    **No password.** §6.4 asks for one where money moves; muting an email
+    moves nothing, and asking for a password to change a notification setting
+    teaches people to type it whenever a screen asks.
+
+    One switch per request rather than the whole set, so two tabs open on this
+    screen cannot write over each other's other switch.
+    """
+    try:
+        set_preference(db, affiliate, kind=body.kind, enabled=body.enabled)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+    db.commit()
+    return {"preferences": preferences_for(db, affiliate)}
+
+
+@router.get("/payout-destination")
+def my_payout_destination_in_full(
+    affiliate: AffiliateProfile = Depends(current_affiliate),
+    user: UserAccount = Depends(current_user),
+    db: Session = Depends(get_session),
+) -> dict:
+    """The same details, unmasked, for the person who typed them.
+
+    **Masked at rest is right; masked with no way to look is not.** `/me`
+    returns the destination masked, which is correct for a screen that sits
+    open on a phone on a table. But the one person entitled to check the whole
+    thing is the person whose account it is, and until now they could not - so
+    somebody who mistyped a digit had no way to find out except by not being
+    paid.
+
+    Behind a deliberate press on their own screen, and **no password**. §6.4
+    asks for the password to *change* where money goes, because that is the
+    act an attacker with a stolen session wants. Reading back a number they
+    typed themselves is not that act, and demanding a password to look at your
+    own bank details teaches people to type passwords whenever a screen asks -
+    which costs more security than it buys.
+
+    Goes through the same `reveal_destination` the maintainer's payer uses, so
+    there is one implementation and one audit trail. The audit row records
+    that somebody looked and never what they saw - writing the value into the
+    log would recreate exactly the leak masking exists to prevent.
+    """
+    try:
+        return reveal_destination(
+            db,
+            affiliate,
+            actor_id=user.id,
+            actor_email=user.email,
+        )
+    except ValueError as exc:
+        raise HTTPException(404, str(exc)) from exc
 
 
 @router.put("/payout-destination")

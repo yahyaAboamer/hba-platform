@@ -80,6 +80,14 @@ class PayoutDestination(Base):
     bank_account_holder: Mapped[str | None] = mapped_column(String(200))
     bank_account_number: Mapped[str | None] = mapped_column(String(64))
 
+    #: Which wallet. Vodafone Cash, Orange Money, Etisalat Cash and WE Pay all
+    #: use the same eleven-digit mobile number, so the number alone does not
+    #: say where a transfer should go - the person sending it has to guess
+    #: from the prefix, and prefixes have been portable in Egypt for years.
+    #:
+    #: Not a credential: it names a company, so it is shown in full.
+    wallet_provider: Mapped[str | None] = mapped_column(String(60))
+
     wallet_phone: Mapped[str | None] = mapped_column(String(40))
 
     approved_by: Mapped[int | None] = mapped_column(

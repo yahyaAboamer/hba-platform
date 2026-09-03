@@ -46,7 +46,7 @@ _SENSITIVE = (
 
 #: Fields safe to show in full. The account holder's name is what a person
 #: actually checks, and it is not a credential.
-_VISIBLE = ("method", "bank_name", "bank_account_holder")
+_VISIBLE = ("method", "bank_name", "bank_account_holder", "wallet_provider")
 
 
 #: InstaPay issues payment addresses on this domain. Confirmed by the
@@ -175,6 +175,36 @@ def card_problem(value: str | None) -> str | None:
     return None
 
 
+#: A name has letters in it. Two, at least - the shortest real Egyptian given
+#: name in use is three, and one letter is a typo rather than a name.
+_LETTERS = re.compile(r"[^\W\d_]", re.UNICODE)
+
+
+def account_holder_problem(value: str | None) -> str | None:
+    """Why this is not the name on an account, or `None`.
+
+    **The field accepted sixteen digits as a name**, which is exactly what
+    somebody does when two number fields sit next to each other and one of
+    them is labelled in a language they read second. The transfer then goes
+    out addressed to a number and the bank returns it.
+
+    Deliberately not a name *format* check. Arabic and Latin script both pass,
+    one name passes, a hyphen or an apostrophe passes - the rule is only that
+    a name contains letters, because the failure worth catching is a number
+    in the wrong box.
+    """
+    text = (value or "").strip()
+    if not text:
+        # Presence is `_REQUIRED_FIELD`'s job, as everywhere else here.
+        return None
+    if len(_LETTERS.findall(text)) < 2:
+        return (
+            "That does not look like a name. This is the name printed on the "
+            "account, not its number."
+        )
+    return None
+
+
 def payout_problem(method: str, fields: dict[str, str | None]) -> str | None:
     """Everything wrong with a set of payout details, in one place.
 
@@ -188,7 +218,9 @@ def payout_problem(method: str, fields: dict[str, str | None]) -> str | None:
     if method == PayoutMethod.WALLET:
         return mobile_problem(fields.get("wallet_phone"), what="The wallet number")
     if method == PayoutMethod.BANK:
-        return card_problem(fields.get("bank_account_number"))
+        return card_problem(fields.get("bank_account_number")) or (
+            account_holder_problem(fields.get("bank_account_holder"))
+        )
     return None
 
 
@@ -254,6 +286,7 @@ def set_destination(
     bank_name: str | None = None,
     bank_account_holder: str | None = None,
     bank_account_number: str | None = None,
+    wallet_provider: str | None = None,
     wallet_phone: str | None = None,
     approved_by: int | None = None,
     actor_id: int | None = None,
@@ -281,6 +314,7 @@ def set_destination(
         "instapay_address_url": instapay_address_url,
         "instapay_phone": instapay_phone,
         "bank_name": bank_name,
+        "wallet_provider": wallet_provider,
         "bank_account_holder": bank_account_holder,
         "bank_account_number": bank_account_number,
         "wallet_phone": wallet_phone,
@@ -391,7 +425,7 @@ def changed_recently(
 PAYABLE_FIELDS = {
     PayoutMethod.INSTAPAY: ("instapay_address_url", "instapay_phone"),
     PayoutMethod.BANK: ("bank_name", "bank_account_holder", "bank_account_number"),
-    PayoutMethod.WALLET: ("wallet_phone",),
+    PayoutMethod.WALLET: ("wallet_provider", "wallet_phone"),
 }
 
 

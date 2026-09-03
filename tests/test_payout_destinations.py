@@ -261,7 +261,10 @@ def test_a_short_value_does_not_leak_by_being_short(db):
         nour,
         method=PayoutMethod.BANK,
         bank_name="CIB",
-        bank_account_holder="N",
+        # A real name, because `account_holder_problem` now refuses one that
+        # is not - this test is about masking the *number*, and the holder is
+        # only here because the method requires one.
+        bank_account_holder="Nour Hassan",
         bank_account_number="1234567890123456",
     )
     db.flush()
@@ -453,6 +456,7 @@ def test_revealing_returns_only_what_that_method_needs(db):
         db,
         nour,
         method=PayoutMethod.WALLET,
+        wallet_provider="Vodafone Cash",
         wallet_phone="01012345678",
         bank_account_number="1000293847561234",
     )
@@ -460,7 +464,11 @@ def test_revealing_returns_only_what_that_method_needs(db):
 
     revealed = reveal_destination(db, nour, actor_id=1, actor_email="o@example.com")
 
-    assert revealed == {"method": PayoutMethod.WALLET, "wallet_phone": "01012345678"}
+    assert revealed == {
+        "method": PayoutMethod.WALLET,
+        "wallet_provider": "Vodafone Cash",
+        "wallet_phone": "01012345678",
+    }
     assert "bank_account_number" not in revealed
 
 
@@ -799,3 +807,61 @@ def test_an_instapay_number_that_is_given_is_still_checked(db):
             instapay_address_url=INSTAPAY_URL,
             instapay_phone="12345",
         )
+
+
+def test_an_account_number_is_refused_as_an_account_holder(db):
+    """The field accepted sixteen digits as a name.
+
+    Which is exactly what somebody does when two number fields sit next to
+    each other and one is labelled in a language they read second. The
+    transfer then goes out addressed to a number, and the bank returns it.
+    """
+    nour = _affiliate(db)
+
+    with pytest.raises(ValueError, match="does not look like a name"):
+        set_destination(
+            db,
+            nour,
+            method=PayoutMethod.BANK,
+            bank_name="CIB",
+            bank_account_holder="1234567890123456",
+            bank_account_number="1234567890123456",
+        )
+
+
+def test_an_arabic_name_is_a_name(db):
+    """The rule is *has letters*, not *looks like a Latin name*.
+
+    Most of the twenty write their own name in Arabic. A check that refused it
+    would be a check that stopped them being paid.
+    """
+    nour = _affiliate(db)
+
+    destination = set_destination(
+        db,
+        nour,
+        method=PayoutMethod.BANK,
+        bank_name="CIB",
+        bank_account_holder="نور حسن",
+        bank_account_number="1234567890123456",
+    )
+
+    assert destination.bank_account_holder == "نور حسن"
+
+
+def test_a_wallet_records_which_wallet(db):
+    """Four providers share one eleven-digit number format, so the number
+    alone does not say where a transfer should go."""
+    nour = _affiliate(db)
+
+    destination = set_destination(
+        db,
+        nour,
+        method=PayoutMethod.WALLET,
+        wallet_provider="Vodafone Cash",
+        wallet_phone="01061234567",
+    )
+
+    assert destination.wallet_provider == "Vodafone Cash"
+    # Not a credential - it names a company, so it is shown in full.
+    assert mask_destination(destination)["wallet_provider"] == "Vodafone Cash"

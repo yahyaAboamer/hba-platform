@@ -1,6 +1,14 @@
 import { useState } from "react";
 
 import { api } from "../lib/api";
+import {
+  accountHolderProblem,
+  cardProblem,
+  mobileProblem,
+  EGYPTIAN_BANKS,
+  OTHER_BANK,
+  WALLET_PROVIDERS,
+} from "../lib/payouts";
 import { instapayProblem } from "./Apply";
 import "./Apply.css";
 
@@ -18,10 +26,33 @@ const FIELD_LABEL: Record<string, string> = {
   instapay_address_url: "InstaPay payment address",
   instapay_phone: "InstaPay number",
   bank_name: "Bank",
-  bank_account_holder: "Account holder",
-  bank_account_number: "Account number",
+  bank_account_holder: "Account holder's name",
+  bank_account_number: "Card number",
+  wallet_provider: "Which wallet",
   wallet_phone: "Wallet number",
 };
+
+/** The fields that are a choice rather than something to type. */
+const CHOICES: Record<string, readonly string[]> = {
+  bank_name: EGYPTIAN_BANKS,
+  wallet_provider: WALLET_PROVIDERS,
+};
+
+/**
+ * What is wrong with one field, said while it is still under their finger.
+ *
+ * The server holds the same rules and is the authority — three paths reach
+ * this row and only it sees all three. These exist so nobody meets a rule as
+ * a rejection after pressing the button.
+ */
+function fieldProblem(field: string, value: string): string | null {
+  if (field === "instapay_address_url") return instapayProblem(value);
+  if (field === "bank_account_holder") return accountHolderProblem(value);
+  if (field === "bank_account_number") return cardProblem(value);
+  if (field === "wallet_phone") return mobileProblem(value, "The wallet number");
+  if (field === "instapay_phone") return mobileProblem(value, "The InstaPay number");
+  return null;
+}
 
 /**
  * §6.4. Where their money goes — the highest-risk thing they can do.
@@ -52,10 +83,8 @@ export function MyPayout({
   const [working, setWorking] = useState(false);
 
   const needed = required[method] ?? [];
-  const addressProblem =
-    method === "instapay"
-      ? instapayProblem(fields.instapay_address_url ?? "")
-      : null;
+  const problems = needed.map((field) => fieldProblem(field, fields[field] ?? ""));
+  const anyProblem = problems.some((problem) => problem !== null);
   const incomplete = needed.some((field) => !(fields[field] ?? "").trim());
 
   async function commit(event: React.FormEvent) {
@@ -122,24 +151,66 @@ export function MyPayout({
             ))}
           </fieldset>
 
-          {needed.map((field) => (
-            <label className="field" key={field}>
-              <span className="field__label">{FIELD_LABEL[field] ?? field}</span>
-              <input
-                className="input"
-                value={fields[field] ?? ""}
-                onChange={(event) =>
-                  setFields((was) => ({ ...was, [field]: event.target.value }))
-                }
-                aria-invalid={
-                  field === "instapay_address_url" && addressProblem !== null
-                }
-              />
-              {field === "instapay_address_url" && addressProblem && (
-                <span className="blocker apply__problem">{addressProblem}</span>
-              )}
-            </label>
-          ))}
+          {needed.map((field, index) => {
+            const problem = problems[index];
+            const choices = CHOICES[field];
+            return (
+              <label className="field" key={field}>
+                <span className="field__label">{FIELD_LABEL[field] ?? field}</span>
+                {choices ? (
+                  /*
+                   * A chooser where the answer is one of a known set. The
+                   * bank keeps a way out - the list is out of date the first
+                   * time two banks merge, and a model who cannot name their
+                   * own bank cannot be paid.
+                   */
+                  <select
+                    className="input"
+                    value={
+                      choices.includes(fields[field] ?? "")
+                        ? (fields[field] ?? "")
+                        : (fields[field] ?? "") === ""
+                          ? ""
+                          : OTHER_BANK
+                    }
+                    onChange={(event) =>
+                      setFields((was) => ({
+                        ...was,
+                        [field]:
+                          event.target.value === OTHER_BANK
+                            ? ""
+                            : event.target.value,
+                      }))
+                    }
+                  >
+                    <option value="" disabled>
+                      Choose one
+                    </option>
+                    {choices.map((choice) => (
+                      <option key={choice} value={choice}>
+                        {choice}
+                      </option>
+                    ))}
+                    {field === "bank_name" && (
+                      <option value={OTHER_BANK}>{OTHER_BANK}…</option>
+                    )}
+                  </select>
+                ) : (
+                  <input
+                    className="input"
+                    value={fields[field] ?? ""}
+                    onChange={(event) =>
+                      setFields((was) => ({ ...was, [field]: event.target.value }))
+                    }
+                    aria-invalid={problem !== null}
+                  />
+                )}
+                {problem && (
+                  <span className="blocker apply__problem">{problem}</span>
+                )}
+              </label>
+            );
+          })}
 
           <div className="apply__actions">
             <button type="button" className="button" onClick={onCancel}>
@@ -148,7 +219,7 @@ export function MyPayout({
             <button
               type="button"
               className="button button--primary"
-              disabled={incomplete || addressProblem !== null}
+              disabled={incomplete || anyProblem}
               onClick={() => setConfirming(true)}
             >
               Continue

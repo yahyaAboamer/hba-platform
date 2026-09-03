@@ -35,7 +35,9 @@ from app.services.payouts import set_destination
 REQUIRED_PAYOUT_FIELDS = {
     PayoutMethod.INSTAPAY: ("instapay_address_url", "instapay_phone"),
     PayoutMethod.BANK: ("bank_name", "bank_account_holder", "bank_account_number"),
-    PayoutMethod.WALLET: ("wallet_phone",),
+    # The provider as well as the number: all four wallets take the same
+    # eleven digits, so the number alone does not say where to send it.
+    PayoutMethod.WALLET: ("wallet_provider", "wallet_phone"),
 }
 
 
