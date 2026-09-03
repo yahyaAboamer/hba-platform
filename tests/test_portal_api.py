@@ -942,7 +942,17 @@ def test_nothing_about_a_target_can_be_changed_from_their_side(admin):
         if set(route.methods) - {"GET", "HEAD", "OPTIONS"}
     ]
 
-    assert writable == ["/api/me/payout-destination"]
+    # **The whole list, on purpose.** This is the guard that says what a model
+    # is allowed to change about themselves, and it fails when anybody adds a
+    # route rather than when they add a bad one - which is the only way it
+    # stays a decision rather than a habit.
+    #
+    # Neither of these touches a figure: one moves where money is sent, the
+    # other mutes an email.
+    assert sorted(writable) == [
+        "/api/me/notifications",
+        "/api/me/payout-destination",
+    ]
 
 
 # -- §14: what has arrived ---------------------------------------------------

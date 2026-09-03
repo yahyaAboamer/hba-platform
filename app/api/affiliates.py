@@ -156,6 +156,7 @@ class SetPayoutDestinationBody(BaseModel):
     bank_name: str | None = None
     bank_account_holder: str | None = None
     bank_account_number: str | None = None
+    wallet_provider: str | None = None
     wallet_phone: str | None = None
 
 
@@ -827,6 +828,7 @@ def set_payout_destination_route(
             bank_name=body.bank_name,
             bank_account_holder=body.bank_account_holder,
             bank_account_number=body.bank_account_number,
+            wallet_provider=body.wallet_provider,
             wallet_phone=body.wallet_phone,
             approved_by=actor.id,
             actor_id=actor.id,

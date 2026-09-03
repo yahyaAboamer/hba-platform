@@ -80,6 +80,28 @@
   font-size: var(--text-sm);
 }
 
+/* The notification switches are the whole row, so the target is the width of
+   the card rather than a 38px control somebody has to aim at one-handed. */
+.pref--row {
+  width: 100%;
+  border: 0;
+  border-top: 1px solid var(--rule);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.pref--row:hover {
+  background: var(--hover);
+}
+
+.pref--row .pref__label {
+  max-width: 32ch;
+}
+
 .pref__label {
   color: var(--ink);
 }
@@ -87,7 +109,8 @@
 /* A switch, not a checkbox: it takes effect the moment it is pressed and
    there is nothing to save. `role="switch"` is what tells a screen reader
    that. */
-.pref__switch {
+.pref__switch,
+.pref--row .pref__switch {
   position: relative;
   flex: none;
   width: 2.375rem;
@@ -99,7 +122,8 @@
   cursor: pointer;
 }
 
-.pref__switch[aria-checked="true"] {
+.pref__switch[aria-checked="true"],
+.pref--row[aria-checked="true"] .pref__switch {
   border-color: var(--accent);
   background: var(--accent);
 }
@@ -115,7 +139,8 @@
   transition: left 0.15s, background 0.15s;
 }
 
-.pref__switch[aria-checked="true"] .pref__knob {
+.pref__switch[aria-checked="true"] .pref__knob,
+.pref--row[aria-checked="true"] .pref__knob {
   left: calc(100% - 1rem - 2px);
   background: var(--accent-on);
 }
@@ -168,4 +193,31 @@
    screen wants you to do. */
 .menu__go--quiet {
   color: var(--quiet);
+}
+
+
+/* ── Reading back what they typed ───────────────────────────────────────── */
+
+.affiliate__reveal {
+  margin-top: var(--space-3);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent-text);
+  font: inherit;
+  font-size: var(--text-xs);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.affiliate__reveal:disabled {
+  color: var(--faint);
+  cursor: default;
+}
+
+/* The one place in the portal that shows an account number in full. Given
+   room to be read and checked digit by digit. */
+.affiliate__full dd {
+  overflow-wrap: anywhere;
 }

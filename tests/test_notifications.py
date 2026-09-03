@@ -805,3 +805,68 @@ def test_the_signature_is_not_printed_twice(monkeypatch):
 
     assert "HBA Aesthetics" not in rendered
     assert rendered.count("The HBA Team") == 1
+
+
+# -- What a model asked not to hear -------------------------------------------
+#
+# Two switches, and the rule that matters is that each stops exactly what it
+# names. A switch that muted more than it said would be worse than no switch:
+# the model would stop hearing about being paid and have no way to know why.
+
+
+class _Transaction:
+    """The two fields `payment_recorded` reads. Enough, and no fixture."""
+
+    amount_piastres = 250_000
+    proof_file_id = None
+
+
+def test_turning_off_one_message_leaves_the_other_alone(db, affiliate):
+    from app.models.notifications import NotificationKind
+    from app.services.notification_prefs import set_preference
+    from app.services.notifications import payment_recorded
+
+    set_preference(
+        db, affiliate, kind=NotificationKind.PAYMENT_SENT, enabled=False
+    )
+    db.flush()
+
+    payment_recorded(db, affiliate, _Transaction())
+    db.flush()
+
+    assert _outbox(db) == [], "they asked not to hear about payments"
+
+    # And the switch they did not touch still sends.
+    set_preference(db, affiliate, kind=NotificationKind.PAYMENT_SENT, enabled=True)
+    db.flush()
+    payment_recorded(db, affiliate, _Transaction())
+    db.flush()
+
+    assert [row.event for row in _outbox(db)] == ["payment.recorded"]
+
+
+def test_a_model_who_never_opened_the_screen_still_hears(db, affiliate):
+    """Absence means on.
+
+    The alternative - a row seeded per model at sign-up - silently mutes
+    anybody the seeding misses, and nobody finds out until a month closes in
+    silence.
+    """
+    from app.services.notifications import payment_recorded
+
+    payment_recorded(db, affiliate, _Transaction())
+    db.flush()
+
+    assert [row.event for row in _outbox(db)] == ["payment.recorded"]
+
+
+def test_security_mail_is_not_something_a_model_can_mute(db, affiliate):
+    """Only the two routine messages are gateable.
+
+    An invitation, a password reset and the notice that somebody moved where
+    your money goes are not news, they are security. There is no switch for
+    them, and `GATED_BY` is the list that says so.
+    """
+    from app.services.notification_prefs import GATED_BY
+
+    assert set(GATED_BY) == {Event.MONTH_APPROVED, Event.PAYMENT_RECORDED}

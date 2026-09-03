@@ -44,7 +44,9 @@ from app.core.money import format_egp
 from app.models.notifications import NotificationOutbox, NotificationState
 from app.services.jobs import BACKOFF_BASE_SECONDS, PermanentFailure, enqueue
 from app.services.mail import MailRefused, Message, send
+from app.models.notifications import NotificationKind
 from app.services.mail_branding import wrap
+from app.services.notification_prefs import wants
 from app.worker import register_handler
 
 logger = logging.getLogger(__name__)
@@ -283,6 +285,12 @@ def month_approved(db: Session, affiliate, snapshot, month: str) -> None:
                 "payment or is written off - there is nothing for you to do."
             )
 
+    # **Gated on their own choice.** One of the two messages a model may turn
+    # off - see `notification_prefs`. The month still closes and the figure is
+    # still on their screen; only the email is silent.
+    if not wants(db, affiliate, NotificationKind.MONTH_CLOSED):
+        return
+
     queue(
         db,
         event=Event.MONTH_APPROVED,
@@ -295,6 +303,9 @@ def month_approved(db: Session, affiliate, snapshot, month: str) -> None:
 
 def payment_recorded(db: Session, affiliate, transaction) -> None:
     """§14. Money moved, with the receipt on their payments screen."""
+    if not wants(db, affiliate, NotificationKind.PAYMENT_SENT):
+        return
+
     email, name = _email_for(db, affiliate)
     queue(
         db,

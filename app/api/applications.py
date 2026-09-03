@@ -37,6 +37,7 @@ class ApplicationBody(BaseModel):
     bank_name: str | None = Field(default=None, max_length=120)
     bank_account_holder: str | None = Field(default=None, max_length=120)
     bank_account_number: str | None = Field(default=None, max_length=60)
+    wallet_provider: str | None = Field(default=None, max_length=60)
     wallet_phone: str | None = Field(default=None, max_length=40)
 
     # No compensation_type, no commission_rate_bp, no fixed_amount_piastres,
@@ -99,6 +100,7 @@ def apply(
                 "bank_name": body.bank_name,
                 "bank_account_holder": body.bank_account_holder,
                 "bank_account_number": body.bank_account_number,
+                "wallet_provider": body.wallet_provider,
                 "wallet_phone": body.wallet_phone,
             },
         )
