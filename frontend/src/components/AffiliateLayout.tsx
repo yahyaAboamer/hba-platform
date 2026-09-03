@@ -44,6 +44,15 @@ const MONTH_SCOPED = new Set(["/", "/orders"]);
 
 export type PortalContext = {
   /**
+   * What the month on screen is, in a word. Set by whichever screen loaded
+   * it, because only the screen has the figure — the bar sits above them all
+   * and has no data of its own.
+   *
+   * `null` until something says, so the bar never guesses.
+   */
+  monthState?: string | null;
+  setMonthState?: (state: string | null) => void;
+  /**
    * Their record, already loaded by `AffiliatePortal`.
    *
    * Passed down rather than fetched again: two screens want the payout
@@ -160,7 +169,12 @@ export function AffiliateLayout({
           >
             ←
           </button>
-          <span className="months__current">{formatMonth(month)}</span>
+          <span className="months__current">
+            {formatMonth(month)}
+            {context.monthState && (
+              <span className="months__state">{context.monthState}</span>
+            )}
+          </span>
           <button
             type="button"
             className="months__step"

@@ -194,56 +194,69 @@
   font-weight: 500;
 }
 
-/* ── Sales ──────────────────────────────────────────────────────────────── */
+/* ── Sales ──────────────────────────────────────────────────────────────
+ *
+ * Two tiles, side by side. Counted and average answer one question - *how is
+ * my code selling* - and stacked in a list they read as two unrelated facts.
+ */
 
-.sales__list {
+.tiles {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  margin: 0;
-  padding: var(--space-4);
-}
-
-.sales__list dt {
-  font-size: var(--text-xs);
-  color: var(--quiet);
-}
-
-.sales__list dd {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
   gap: var(--space-3);
-  margin: var(--space-1) 0 0;
+  margin-bottom: var(--space-4);
 }
 
-.sales__count {
+.tiles .tile {
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--elev);
+}
+
+.tile__label {
+  display: block;
   font-size: var(--text-xs);
   color: var(--quiet);
 }
 
-/* What becomes of an order still travelling. On its own line because it is a
-   sentence, not a label - and because the row above it is where somebody stops
-   reading and starts worrying. */
-.sales__fate {
-  flex-basis: 100%;
-  max-width: 40ch;
+.tile__figure {
+  display: block;
+  margin-top: var(--space-2);
+  font-size: var(--text-lg);
+  font-variant-numeric: tabular-nums;
+}
+
+.tile__sub {
+  display: block;
   margin-top: var(--space-1);
   font-size: var(--text-xs);
-  color: var(--quiet);
+  color: var(--faint);
 }
 
-.sales__link {
+/* **Outlined, not filled.** An order still travelling is a promise rather
+   than money, and the box says so before anybody reads the label - every
+   card that holds real money on this screen is a filled surface. */
+.coming {
+  margin-bottom: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+}
+
+.coming__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.coming__figure {
   display: block;
-  padding: var(--space-3) var(--space-4);
-  border-top: 1px solid var(--rule);
-  font-size: var(--text-sm);
-  color: var(--ink);
-  text-decoration: none;
-}
-
-.sales__link:hover {
-  background: var(--hover);
+  margin-top: var(--space-2);
+  font-size: var(--text-base);
+  font-variant-numeric: tabular-nums;
 }
 
 /* ── Carried forward ────────────────────────────────────────────────────── */
@@ -263,17 +276,35 @@
   padding: var(--space-4) var(--space-4) var(--space-2);
 }
 
-.targets__row {
+.targets__row + .targets__row {
+  margin-top: var(--space-4);
+}
+
+.targets__top {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: var(--space-4);
-  padding-bottom: var(--space-2);
   font-size: var(--text-sm);
+  color: var(--quiet);
 }
 
-.targets__row dd {
-  margin: 0;
+/* "4 of 6" answers how many; the bar answers how close, and the second is the
+   question somebody actually has. Grow had these and Month did not, so the
+   same two numbers looked like two different facts on two screens. */
+.targets__track {
+  height: 4px;
+  margin-top: var(--space-2);
+  border-radius: 2px;
+  background: var(--rule);
+  overflow: hidden;
+}
+
+.targets__fill {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--accent);
 }
 
 /* Mono, like every other pair of figures meant to be compared down a column. */
@@ -319,4 +350,33 @@
   border-left: 2px solid var(--owed);
   background: var(--owed-quiet);
   color: var(--ink);
+}
+
+
+/* ── The headline ───────────────────────────────────────────────────────
+ *
+ * The figure was loose on the page, which read as a heading. In a card it
+ * reads as the one thing the screen is about, and the chip answers "is this
+ * final?" without anybody having to read a sentence.
+ */
+.headline {
+  padding: var(--space-5);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--elev);
+}
+
+.headline__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.headline .figure__state {
+  margin-bottom: 0;
+}
+
+.headline .figure__amount {
+  margin-top: var(--space-3);
 }

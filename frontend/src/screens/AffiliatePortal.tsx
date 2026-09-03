@@ -84,6 +84,10 @@ export function AffiliatePortal({ session }: { session: Session }) {
    * the split second before the real one arrived.
    */
   const [theme, setTheme] = useState(storedTheme);
+  // What the month on screen is, in a word, for the bar above it. Held here
+  // rather than in the bar because only the screen that loaded the month has
+  // the figure — the bar has no data of its own and must never guess.
+  const [monthState, setMonthState] = useState<string | null>(null);
 
   const firstCode = me?.codes?.[0] ?? null;
   const header = (
@@ -144,7 +148,15 @@ export function AffiliatePortal({ session }: { session: Session }) {
     );
   }
 
-  const context: PortalContext = { me, month, months, setMonth, reload: load };
+  const context: PortalContext = {
+    me,
+    month,
+    months,
+    setMonth,
+    reload: load,
+    monthState,
+    setMonthState,
+  };
 
   return (
     <main className="affiliate" data-theme={theme}>

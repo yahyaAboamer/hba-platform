@@ -202,3 +202,17 @@
   outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
+
+/* What state the month is in, under its name. The bar names a month; this
+   says whether its figure is finished — which is the first thing somebody
+   wants to know on arriving at a month that is not the current one. */
+.months__state {
+  display: block;
+  margin-top: var(--space-1);
+  font-family: var(--sans);
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--faint);
+}

@@ -23,7 +23,7 @@ import "./MyMonth.css";
  * front of them.
  */
 export function MyMonth() {
-  const { month } = usePortal();
+  const { month, setMonthState } = usePortal();
   const [body, setBody] = useState<MyEarnings | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,9 +32,24 @@ export function MyMonth() {
     setError(null);
     api
       .get<MyEarnings>(`/api/me/earnings/${month}`)
-      .then(setBody)
+      .then((loaded) => {
+        setBody(loaded);
+        // The bar sits above every screen and has no figure of its own, so
+        // the screen that fetched one tells it what to say.
+        setMonthState?.(
+          loaded.state === "agreed"
+            ? "agreed · paid"
+            : loaded.not_started
+              ? "not started"
+              : "open · still adding up",
+        );
+      })
       .catch((caught) => setError(caught.message));
-  }, [month]);
+
+    // Cleared on the way out, so the Orders tab does not inherit a label
+    // describing a month it is not showing.
+    return () => setMonthState?.(null);
+  }, [month, setMonthState]);
 
   if (error) {
     return (
@@ -80,19 +95,32 @@ export function MyMonth() {
           </>
         ) : (
           <>
-            <p className="figure__state">
-              <span
-                className={
-                  settled ? "figure__pip figure__pip--agreed" : "figure__pip"
-                }
+            {/*
+             * **The figure sits in a card**, with its state on a chip beside
+             * it rather than only in a line of prose above. Loose on the page
+             * it read as a heading; in a card it reads as the one thing the
+             * screen is about, and the chip answers "is this final?" without
+             * anybody reading a sentence.
+             */}
+            <div className="headline">
+              <div className="headline__top">
+                <p className="figure__state">
+                  <span
+                    className={
+                      settled ? "figure__pip figure__pip--agreed" : "figure__pip"
+                    }
+                  />
+                  {settled ? "Agreed — this is yours" : "Still adding up"}
+                </p>
+                <span className={settled ? "chip chip--ok" : "chip"}>
+                  {settled ? "final" : "open"}
+                </span>
+              </div>
+              <Money
+                piastres={body.amount_piastres ?? 0}
+                kind={settled ? "agreed" : "provisional"}
+                className="figure__amount"
               />
-              {settled ? "Agreed — this is yours" : "Still adding up"}
-            </p>
-            <Money
-              piastres={body.amount_piastres ?? 0}
-              kind={settled ? "agreed" : "provisional"}
-              className="figure__amount"
-            />
             <p className="figure__note">
               {settled
                 ? "This month is closed. The figure will not change again."
@@ -181,6 +209,7 @@ export function MyMonth() {
                 {formatMonth(credit.month)}, after that month was corrected.
               </p>
             ))}
+            </div>
           </>
         )}
       </section>
@@ -272,7 +301,7 @@ export function MyMonth() {
               </span>
             )}
           </div>
-          <dl className="targets__list">
+          <div className="targets__list">
             <TargetRow
               label="Videos"
               required={body.targets.required_videos}
@@ -283,7 +312,7 @@ export function MyMonth() {
               required={body.targets.required_stories}
               actual={body.targets.actual_stories}
             />
-          </dl>
+          </div>
           {/*
            * Only where it decides money. A commission or salary model already
            * knows targets do not change their pay, and being told so every month
@@ -302,65 +331,72 @@ export function MyMonth() {
        * other month rather than like a month that did not happen.
        */}
       {!body.not_started && (
-      <section className="panel sales">
-        <div className="panel__head">
-          <h2 className="panel__title">Your sales</h2>
-        </div>
-        <dl className="sales__list">
-          <div>
-            <dt>Counted</dt>
-            <dd>
+        <>
+          {/*
+           * **Two tiles, side by side.** Counted and average answer the same
+           * question - *how is my code selling* - and a stacked list made
+           * them look like two unrelated facts. Shown on a historical month
+           * too: the orders are real and the counting is real, only the
+           * payment happened elsewhere.
+           */}
+          <div className="tiles">
+            <div className="tile">
+              <span className="tile__label">Counted sales</span>
               <Money
                 piastres={body.sales.earned_piastres}
                 kind={settled ? "agreed" : "provisional"}
+                className="tile__figure"
               />
-              <span className="sales__count">
-                {counted === 1 ? "1 order" : `${counted} orders`}
+              <span className="tile__sub">
+                {counted === 1 ? "1 order counted" : `${counted} orders counted`}
               </span>
-            </dd>
-          </div>
-          {/*
-           * Their own figure, and one they cannot read off this screen
-           * without dividing two numbers in their head. Absent rather than
-           * zero where nothing has counted yet - `average_order` is `null`
-           * there, because there is nothing to average.
-           */}
-          {body.sales.average_order !== null && (
-            <div>
-              <dt>Average order</dt>
-              <dd>
+            </div>
+            {/*
+             * Absent rather than zero where nothing has counted yet -
+             * `average_order` is `null` there, because there is nothing to
+             * average, and a zero would claim a typical order is worth
+             * nothing.
+             */}
+            {body.sales.average_order !== null && (
+              <div className="tile">
+                <span className="tile__label">Average order</span>
                 <Money
                   piastres={body.sales.average_order_piastres ?? 0}
                   kind={settled ? "agreed" : "provisional"}
+                  className="tile__figure"
                 />
-                <span className="sales__count">across counted orders</span>
-              </dd>
-            </div>
-          )}
+                <span className="tile__sub">across counted orders</span>
+              </div>
+            )}
+          </div>
+
           {/*
-           * Shown, never hidden. An order still in transit makes their month
-           * look smaller than it is, and hiding it produces exactly the
-           * question this platform exists to stop their having to ask.
+           * **Its own outlined box**, not a third row in a list. An order
+           * still travelling is a different kind of fact from one that has
+           * counted - it is a promise, not money - and outlining rather than
+           * filling it says so before anybody reads the label.
+           *
+           * Shown, never hidden: hiding it makes their month look smaller
+           * than it is, which produces exactly the question this platform
+           * exists to stop them having to ask.
            */}
           {body.orders.pending > 0 && (
-            <div>
-              <dt>On its way</dt>
-              <dd>
-                <Money piastres={body.sales.pending_piastres} />
-                <span className="sales__count">
-                  {body.orders.pending === 1
-                    ? "1 order not delivered yet"
-                    : `${body.orders.pending} orders not delivered yet`}
-                </span>
+            <div className="coming">
+              <div className="coming__top">
+                <div>
+                  <span className="tile__label">On its way</span>
+                  <Money
+                    piastres={body.sales.pending_piastres}
+                    className="coming__figure"
+                  />
+                </div>
                 {/*
-                 * §11.4, before the carry has happened - and behind an ⓘ
-                 * rather than on the page. The business's own reasoning, and
-                 * a better rule than mine: *an information button makes it
-                 * like, okay, there is something I need to know about.* They
-                 * will not ask every month, and when they do the answer is
-                 * one press away.
+                 * §11.4, behind an ⓘ rather than on the page. The business's
+                 * own reasoning, and a better rule than mine: *an information
+                 * button makes it like, okay, there is something I need to
+                 * know about.*
                  */}
-                <details className="expl sales__fate">
+                <details className="expl">
                   <summary aria-label="What happens to these orders">
                     <span className="info" aria-hidden="true">i</span>
                   </summary>
@@ -371,14 +407,25 @@ export function MyMonth() {
                       : "If they arrive before HBA closes the month they count here. If not, they are paid with the next one — still at this month's rate."}
                   </div>
                 </details>
-              </dd>
+              </div>
+              <span className="tile__sub">
+                {body.orders.pending === 1
+                  ? "1 order not delivered yet"
+                  : `${body.orders.pending} orders not delivered yet`}
+              </span>
             </div>
           )}
-        </dl>
-        <Link to="/orders" className="sales__link">
-          See every order →
-        </Link>
-      </section>
+
+          {/*
+           * A block, not a link in the corner of a card. It is the one thing
+           * to do from this screen, and a thumb finds a full-width target
+           * without aiming.
+           */}
+          <Link to="/orders" className="block">
+            <span>See every order</span>
+            <em>→</em>
+          </Link>
+        </>
       )}
 
       {/*
@@ -450,6 +497,18 @@ function describeGuarantee(guarantee: {
   return "Your commission came to more than it this month, so you are paid the larger of the two.";
 }
 
+/**
+ * One target, as a count **and** a bar.
+ *
+ * "4 of 6" answers *how many*; the bar answers *how close*, and the second is
+ * the question somebody actually has. Grow had the bars and Month did not,
+ * which left the same two numbers looking like two different facts on two
+ * screens.
+ *
+ * `actual` is `null` when nobody has recorded the month yet — a third state,
+ * not a zero. An empty bar under "0 of 6" is an accusation; "— of 6" is the
+ * truth.
+ */
 function TargetRow({
   label,
   required,
@@ -459,14 +518,21 @@ function TargetRow({
   required: number;
   actual: number | null;
 }) {
+  // Capped at the full bar. Somebody who posted nine of six videos has done
+  // more than was asked, not 150% of a bar.
+  const done = actual === null ? 0 : Math.min(actual / Math.max(required, 1), 1);
+
   return (
     <div className="targets__row">
-      <dt>{label}</dt>
-      <dd>
+      <div className="targets__top">
+        <span>{label}</span>
         <span className="code targets__figures">
           {actual === null ? "—" : actual} of {required}
         </span>
-      </dd>
+      </div>
+      <div className="targets__track">
+        <span className="targets__fill" style={{ width: `${done * 100}%` }} />
+      </div>
     </div>
   );
 }
