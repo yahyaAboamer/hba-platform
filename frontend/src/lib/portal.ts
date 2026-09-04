@@ -156,10 +156,16 @@ export type MyEarnings = {
    * set for the month - a target that does not exist is not one they failed.
    */
   targets: {
-    required_videos: number;
-    required_stories: number;
+    /**
+     * All four are `null` on a month from before the platform (ADR 0036),
+     * where the old dashboard kept whether the target was met and never what
+     * was counted to decide it. `numbers_kept` says which kind this is.
+     */
+    required_videos: number | null;
+    required_stories: number | null;
     actual_videos: number | null;
     actual_stories: number | null;
+    numbers_kept: boolean;
     /** §15. `null` means nobody has recorded what they produced. */
     achieved: boolean | null;
     verified: boolean;
@@ -252,4 +258,13 @@ export type MyPayments = {
   adjustments: Adjustment[];
   outstanding_piastres: number;
   outstanding: string;
+  /**
+   * ADR 0036. `null` for a model with no month before go-live — she never
+   * learns there was an old dashboard, because there is nothing about it she
+   * needs to know.
+   *
+   * The only place in the portal that mentions it. Every other screen shows
+   * those months in full, exactly like the rest of her year.
+   */
+  settled_outside: { months: string[]; since: string; text: string } | null;
 };

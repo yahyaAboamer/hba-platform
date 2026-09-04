@@ -390,18 +390,44 @@ export function MyMonth() {
               </span>
             )}
           </div>
-          <div className="targets__list">
-            <TargetRow
-              label="Videos"
-              required={body.targets.required_videos}
-              actual={body.targets.actual_videos}
-            />
-            <TargetRow
-              label="Stories"
-              required={body.targets.required_stories}
-              actual={body.targets.actual_stories}
-            />
-          </div>
+          {/*
+           * ADR 0036. A month from before the platform has an outcome and no
+           * counts, because the old dashboard never kept them. Two bars drawn
+           * against a missing requirement would read as *nothing was asked of
+           * you and you did nothing*, which is the opposite of what the chip
+           * above says — so the bars give way to the sentence.
+           *
+           * The one place a month before go-live reads differently from a new
+           * one, and it reads differently because it is different.
+           */}
+          {body.targets.numbers_kept ? (
+            <div className="targets__list">
+              <TargetRow
+                label="Videos"
+                required={body.targets.required_videos ?? 0}
+                actual={body.targets.actual_videos}
+              />
+              <TargetRow
+                label="Stories"
+                required={body.targets.required_stories ?? 0}
+                actual={body.targets.actual_stories}
+              />
+            </div>
+          ) : (
+            <div className="targets__list">
+              <div className="targets__row">
+                <div className="targets__top">
+                  <span>Videos and stories</span>
+                  <span className="code targets__figures">—</span>
+                </div>
+              </div>
+              <p className="targets__unkept">
+                The counts for this month were not kept, so there are none to
+                show. Whether you met the target was recorded, and that is what
+                decided your pay.
+              </p>
+            </div>
+          )}
           {/*
            * Only where it decides money. A commission or salary model already
            * knows targets do not change their pay, and being told so every month
@@ -524,6 +550,8 @@ function TargetRow({
   required: number;
   actual: number | null;
 }) {
+  // `required` arrives already defaulted. It is null only on a month before
+  // the platform, and that month never reaches this component (ADR 0036).
   // Capped at the full bar. Somebody who posted nine of six videos has done
   // more than was asked, not 150% of a bar.
   const done = actual === null ? 0 : Math.min(actual / Math.max(required, 1), 1);

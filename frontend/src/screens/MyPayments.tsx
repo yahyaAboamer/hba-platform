@@ -113,6 +113,18 @@ export function MyPayments() {
         <div className="panel__head">
           <h2 className="panel__title">Month by month</h2>
         </div>
+        {/*
+         * ADR 0036. One line, and only for somebody who has such a month.
+         *
+         * The list below starts at go-live, because those are the months this
+         * platform has a transfer to show. Without a word it reads as *my
+         * earlier months are missing*; with a banner it reads as an apology
+         * for records nobody had reason to doubt. So: one sentence, saying
+         * where the money went and where the months themselves are.
+         */}
+        {body.settled_outside && (
+          <p className="settle__before">{body.settled_outside.text}</p>
+        )}
         <ul className="settle__list">
           {body.months.map((row) => (
             <li key={row.month} className="settle__row">

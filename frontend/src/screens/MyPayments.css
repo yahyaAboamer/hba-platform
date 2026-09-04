@@ -22,6 +22,15 @@
   border-bottom: none;
 }
 
+/* ADR 0036. One line saying why the list starts where it does. Quiet, above
+   the rows, and never shown to a model who has no month before go-live. */
+.settle__before {
+  margin: 0;
+  padding: var(--space-4) var(--space-5) 0;
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}
+
 .settle__head {
   display: flex;
   align-items: baseline;

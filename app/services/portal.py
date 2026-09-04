@@ -134,12 +134,13 @@ WAITING_ON: dict[str, dict[str, str]] = {
 }
 
 #: Not blockers to them - states. "Already approved" is the good outcome, and
-#: "settled before the platform" is what a historical month *is*. Showing
-#: either under "waiting on" would turn a finished month into a stuck one.
+#: showing it under "waiting on" would turn a finished month into a stuck one.
+#:
+#: `month_predates_the_platform` was here too, until ADR 0036 removed the
+#: blocker itself. Those months are approved like any other now.
 NOT_HER_PROBLEM = frozenset(
     {
         "month_is_already_approved",
-        "month_predates_the_platform",
         # A house account holds no user account and cannot sign in. Listed so
         # that one which somehow could would not render an empty screen.
         "house_accounts_are_never_owed",
@@ -483,21 +484,37 @@ def my_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
     Three shapes, and which one they get is the most important thing on the
     screen (§11.1).
 
-    *Historical* - before go-live. Their sales are real and there is no
-    commission figure, because March's rates live in the old system and in
-    somebody's memory (ADR 0014). Shown with the reason attached: an empty
-    commission on a month full of sales reads as *HBA did not pay me for
-    March*, which is the opposite of true.
-
     *Open* - still moving. Orders are still arriving and the figure will
     change.
 
     *Agreed* - frozen. This is what they are owed, and it does not move again.
+
+    *Historical* - **the fallback, and no longer the normal shape of an old
+    month.** ADR 0036 gave the months before go-live compensation terms of
+    their own, so March is calculated, approved and frozen exactly like August
+    and comes back here as *agreed*. The business's reason for wanting that:
+    *"I don't want the models to feel that we treated them differently."*
+
+    This branch is what is left when that has not happened yet - a month before
+    go-live whose terms nobody has entered, which cannot be calculated and must
+    not be guessed at. It shows the sales, which are real, and says why the
+    amount is absent. ADR 0036 kept it deliberately as the fallback where a
+    model's historical rates genuinely cannot be established.
     """
     parse_month(month)
     working = working_month()
 
-    if is_historical(month):
+    # Read before the branch below, because *has this month been agreed* is now
+    # what decides which shape it takes - not when it happened.
+    payroll_month = get_month(db, affiliate, month)
+    snapshot = payroll_month.active_snapshot if payroll_month else None
+    agreed = (
+        payroll_month is not None
+        and payroll_month.calculation_state == CalculationState.APPROVED
+        and snapshot is not None
+    )
+
+    if is_historical(month) and not agreed:
         # **A normal month with one thing missing.** The business asked for
         # this and was right: the orders are real, the counting is real, only
         # the *payment* happened elsewhere. Reporting one lump of sales and
@@ -557,13 +574,6 @@ def my_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
         }
 
     blockers, calculation = blockers_for(db, affiliate, month)
-    payroll_month = get_month(db, affiliate, month)
-    snapshot = payroll_month.active_snapshot if payroll_month else None
-    agreed = (
-        payroll_month is not None
-        and payroll_month.calculation_state == CalculationState.APPROVED
-        and snapshot is not None
-    )
 
     # An agreed month comes out of the snapshot in full - total *and* lines.
     # See the module docstring: a live recalculation underneath a frozen total
@@ -919,10 +929,20 @@ def _targets(
         return None
 
     return {
+        # All four are `null` on a month from before the platform (ADR 0036).
+        # The card shows an em dash and says the numbers were not kept, which
+        # is the truth: the old dashboard recorded whether a target was met and
+        # not what was counted to decide it.
+        #
+        # **This is the one place a month before go-live reads differently from
+        # a new one, and it reads differently because it is different.** Filling
+        # these in to match the outcome would be inventing evidence for a figure
+        # that decides money.
         "required_videos": target.required_videos,
         "required_stories": target.required_stories,
         "actual_videos": target.actual_videos,
         "actual_stories": target.actual_stories,
+        "numbers_kept": not target.is_backfilled,
         # Three answers, not two. `null` is *nobody has recorded what you
         # produced*, which is a different thing from missing the target and is
         # the only one of the three that stops a month closing (§11.3).
@@ -1020,11 +1040,19 @@ def my_payments(db: Session, affiliate: AffiliateProfile) -> dict:
     their shoulder.
     """
     months = []
+    settled_outside = []
     for month in months_for(db, affiliate):
         if is_historical(month):
-            # ADR 0014. Settled outside the platform, so there is no agreed
-            # figure and no balance - and a row reading "unpaid, nothing" would
-            # be a debt that never existed.
+            # ADR 0036. The month is agreed and shown in full on every other
+            # screen; what it never has is a *balance*. HBA paid it outside
+            # this platform, so there is no transfer to list, nothing
+            # outstanding, and a row here reading "unpaid, nothing" would be a
+            # debt that never existed.
+            #
+            # Collected rather than merely skipped, because the list starting
+            # in September with no explanation is its own question - and it is
+            # the one place the old dashboard is still worth naming.
+            settled_outside.append(month)
             continue
         balance = balance_for(db, affiliate, month)
         if balance["state"] == SettlementState.NOT_APPROVED:
@@ -1103,6 +1131,28 @@ def my_payments(db: Session, affiliate: AffiliateProfile) -> dict:
         "adjustments": adjustments,
         "outstanding_piastres": outstanding,
         "outstanding": format_egp(outstanding),
+        # ADR 0036. **One line, on this screen only, and only for somebody who
+        # has such a month.** A model who joins in October never learns there
+        # was an old dashboard, because there is nothing about it she needs to
+        # know - and telling her invites a question about records she has no
+        # reason to doubt.
+        #
+        # It says where the money went, not that the months are lesser. Every
+        # other screen shows them in full.
+        "settled_outside": (
+            {
+                "months": settled_outside,
+                "since": settled_outside[0],
+                "text": (
+                    f"HBA paid you for the months up to "
+                    f"{_month_words(settled_outside[-1])} before this page "
+                    "existed, so those payments are not listed here. What you "
+                    "earned in them is on your Earnings and Year screens."
+                ),
+            }
+            if settled_outside
+            else None
+        ),
     }
 
 

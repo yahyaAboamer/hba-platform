@@ -322,6 +322,19 @@
   color: var(--quiet);
 }
 
+/* ADR 0036. A month from before the platform kept whether the target was met
+   and not what was counted to decide it. An em dash, and a sentence saying so —
+   two bars against a missing requirement would read as "nothing was asked of
+   you and you did nothing", which is the opposite of what the chip says.
+
+   Inside the list rather than below it, so the sentence sits where the bars
+   would have been and answers the question the dash raises. */
+.targets__unkept {
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}
+
 /* The month that has not started. No figure at all - a zero is a statement
    about what they have earned, and this is a statement about the calendar. */
 .figure__note--lead {

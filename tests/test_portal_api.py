@@ -732,12 +732,21 @@ def test_every_order_state_is_shown_in_their_words(admin):
     assert body["sales"]["pending_piastres"] == 200_000
 
 
-# -- ADR 0014: a month from before the platform --------------------------------
+# -- ADR 0036: a month from before the platform --------------------------------
 
 
-def test_a_month_before_go_live_behaves_like_any_other_month(admin, monkeypatch):
-    """An empty commission on a month full of sales reads as *HBA did not pay
-    me for March*, which is the opposite of true.
+def test_a_month_before_go_live_with_no_terms_shows_sales_and_says_why(
+    admin, monkeypatch
+):
+    """**The fallback, not the normal shape.** ADR 0036 kept it deliberately.
+
+    Once the pay history has been entered and the month approved, it comes back
+    `agreed` like any other - see the test below. This is what is left when
+    that has not happened, and a month whose terms nobody has entered cannot be
+    calculated and must not be guessed at.
+
+    An empty commission on a month full of sales reads as *HBA did not pay me
+    for March*, so the reason travels with it.
     """
     from app.config import settings
 
@@ -1312,8 +1321,11 @@ def test_the_year_reads_left_to_right(admin):
 
 
 def test_a_month_before_go_live_has_no_figure_rather_than_a_zero(admin, monkeypatch):
-    """A zero on a chart is a claim that they earned nothing. They did not - the
-    commission was agreed elsewhere (ADR 0014), and the sales are still real.
+    """The same fallback, on the Year chart.
+
+    A zero is a claim that they earned nothing. They did not - the commission
+    was agreed elsewhere, and the sales are still real. Once the month is
+    approved the point fills in, which is the test below.
     """
     from app.config import settings
 
@@ -1755,3 +1767,160 @@ def test_orders_are_counted_across_every_month_including_today(admin):
     body = _sign_in().get("/api/me/year").json()
 
     assert body["total_orders"] == 2
+
+
+# -- ADR 0036: an approved month from before the platform is an ordinary month --
+
+
+MARCH = "2026-03"
+
+
+def _backfilled(admin, monkeypatch, *, base=500_000, rate_bp=1000, outcome=None):
+    """A model whose March has terms, orders and an approved payroll.
+
+    **The order of these lines is the order the business has to work in, and it
+    is not a convenience.** Terms, then targets, then approval: both
+    `assert_correctable` and `assert_month_recordable` refuse to change what an
+    approved month was calculated from, so approving comes last.
+
+    The go-live month moves partway through on purpose. The terms and the
+    orders are entered while March is still an ordinary month; approval happens
+    once it is behind go-live, which is the situation in production.
+    """
+    from app.config import settings
+    from app.db import SessionLocal
+    from app.services.affiliates import get_affiliate
+    from app.services.targets import record_outcome
+
+    monkeypatch.setattr(settings, "go_live_month", "2026-01", raising=False)
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"], rate_bp=rate_bp, start="2026-01")
+    _order(affiliate["id"], "march", base, month=MARCH)
+    _order(affiliate["id"], "august", 100_000, month=AUGUST)
+    monkeypatch.setattr(settings, "go_live_month", "2026-08", raising=False)
+
+    if outcome is not None:
+        with SessionLocal() as session:
+            record_outcome(
+                session,
+                get_affiliate(session, affiliate["id"]),
+                MARCH,
+                outcome=outcome,
+            )
+            session.commit()
+
+    _approve(admin, affiliate["id"], MARCH)
+    return affiliate
+
+
+def test_an_approved_month_before_go_live_reads_exactly_like_a_later_one(
+    admin, monkeypatch
+):
+    """**The whole of task #17, in one assertion.**
+
+    The business's words: *"I don't want the models to feel that we treated
+    them differently."* March has a figure, a state of `agreed`, and no word
+    anywhere saying it is a lesser kind of month.
+    """
+    _backfilled(admin, monkeypatch)
+
+    body = _sign_in().get(f"/api/me/earnings/{MARCH}").json()
+
+    assert body["state"] == "agreed"
+    assert body["amount_piastres"] == 50_000
+    assert body["sales"]["earned_piastres"] == 500_000
+    assert body["note"] is None
+    assert "historical" not in str(body).lower()
+
+
+def test_the_year_chart_draws_a_backfilled_month_like_the_rest(
+    admin, monkeypatch
+):
+    """ADR 0036. Seven months of her own year drawn hollow, next to two that
+    were real, is the feeling being removed.
+    """
+    _backfilled(admin, monkeypatch)
+
+    body = _sign_in().get("/api/me/year").json()
+    march = next(m for m in body["months"] if m["month"] == MARCH)
+
+    assert march["earned_piastres"] == 50_000
+    assert march["state"] == "agreed"
+    # And it counts. A total that skipped it would disagree with the chart it
+    # sits under, which is the one thing the Year screen may never do.
+    assert body["total_earned_piastres"] >= 50_000
+
+
+def test_a_backfilled_month_is_never_owed_and_never_listed_as_unpaid(
+    admin, monkeypatch
+):
+    """The protection ADR 0014 gave, kept where approving cannot bypass it.
+
+    March is agreed at E£500 and nothing about it is outstanding. A row here
+    reading "not paid yet" would be a debt that never existed.
+    """
+    _backfilled(admin, monkeypatch)
+
+    body = _sign_in().get("/api/me/payments").json()
+
+    assert [row["month"] for row in body["months"]] == []
+    assert body["outstanding_piastres"] == 0
+
+
+def test_the_old_dashboard_is_named_once_and_only_to_somebody_who_had_one(
+    admin, monkeypatch
+):
+    """ADR 0036. One line, on the Payments tab, and nowhere else.
+
+    Without it the list starting at go-live reads as *my earlier months are
+    missing*. With a banner it reads as an apology for records nobody had
+    reason to doubt.
+    """
+    _backfilled(admin, monkeypatch)
+
+    body = _sign_in().get("/api/me/payments").json()
+
+    assert body["settled_outside"] is not None
+    assert MARCH in body["settled_outside"]["months"]
+    assert "HBA paid you" in body["settled_outside"]["text"]
+
+
+def test_a_model_who_joined_after_go_live_never_learns_there_was_an_old_one(
+    admin, monkeypatch
+):
+    """The conditional half of the decision, and the reason it is conditional.
+
+    A model who joins in October has no month before go-live. Telling her the
+    platform replaced something invites a question about records she has no
+    reason to doubt.
+    """
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "go_live_month", "2026-08", raising=False)
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"], start=AUGUST)
+    _order(affiliate["id"], "august", 100_000, month=AUGUST)
+    _approve(admin, affiliate["id"], AUGUST)
+
+    body = _sign_in().get("/api/me/payments").json()
+
+    assert body["settled_outside"] is None
+
+
+def test_a_backfilled_target_shows_an_outcome_and_no_counts(admin, monkeypatch):
+    """ADR 0036, and the one place a month before go-live reads differently
+    from a new one - because it *is* different.
+
+    The business knows March's target was met. It does not have March's video
+    and story numbers, and inventing them to match would be fabricating
+    evidence for a figure that decides money.
+    """
+    _backfilled(admin, monkeypatch, outcome="met")
+
+    body = _sign_in().get(f"/api/me/earnings/{MARCH}").json()
+
+    assert body["targets"]["numbers_kept"] is False
+    assert body["targets"]["required_videos"] is None
+    assert body["targets"]["actual_videos"] is None
+    assert body["targets"]["achieved"] is True
+    assert body["targets"]["verified"] is True
