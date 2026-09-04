@@ -15,6 +15,13 @@ type YearMonth = {
   earned_piastres: number | null;
   sales_piastres: number;
   orders: number;
+  /**
+   * The month the calendar is in. Dropped from both charts and from every
+   * summary — a part-month plotted beside finished ones reads as a collapse,
+   * and a total including it could not be reached by adding up the points on
+   * screen.
+   */
+  in_progress: boolean;
 };
 
 type Year = {
@@ -23,6 +30,8 @@ type Year = {
   best_month_label: string | null;
   best_month_piastres: number | null;
   total_orders: number;
+  /** How many months the total covers. Never includes the one in progress. */
+  closed_months: number;
 };
 
 /** Which of the two questions is on screen. */
@@ -39,8 +48,10 @@ type Chart = "earned" | "orders";
  * So one is money and the other is a count, and they cannot restate each
  * other:
  *
- * - **What you earned** — a line, because money is a trend and the question is
- *   *am I going up?*, which the eye answers from a slope.
+ * - **What your sales earned** — a line, because money is a trend and the
+ *   question is *am I going up?*, which the eye answers from a slope. It plots
+ *   commission and nothing else, on every arrangement: it was called "what you
+ *   earned", and on a salary or a guaranteed minimum that was false (ADR 0037).
  * - **Orders counted** — bars, because a count is a tally and bar heights
  *   compare exactly in a way points on a line do not.
  *
@@ -83,23 +94,26 @@ export function MyYear() {
   }
   if (year === null) return <p className="empty">Loading…</p>;
 
-  if (year.months.length < 2) {
+  // **The month in progress is not on this screen.** It is three days old
+  // against months that are finished, and drawn beside them it reads as a
+  // collapse rather than as a month that has not happened yet. Its live
+  // figure belongs on the Month tab, which says "still adding up" beside it.
+  const months = year.months.filter((m) => !m.in_progress);
+  const before = months.filter((m) => m.earned_piastres === null).length;
+
+  if (months.length < 2) {
     return (
       <p className="empty">
-        Once you have a few months here, this page will show how they compare.
+        Once you have a few closed months here, this page will show how they
+        compare.
       </p>
     );
   }
 
-  // Months the platform actually paid for. The rest are real months with real
-  // sales whose commission was agreed elsewhere.
-  const paidMonths = year.months.filter((m) => m.earned_piastres !== null).length;
-  const before = year.months.length - paidMonths;
-
   // Opens on the most recent month rather than on nothing. An empty reading
   // panel above a chart is a hole somebody has to work out how to fill.
-  const index = pick ?? year.months.length - 1;
-  const active = year.months[index];
+  const index = Math.min(pick ?? months.length - 1, months.length - 1);
+  const active = months[index];
 
   return (
     <>
@@ -117,8 +131,8 @@ export function MyYear() {
            * total — which reads as a very bad year rather than as a total that
            * does not cover them.
            */}
-          earned across {paidMonths} {paidMonths === 1 ? "month" : "months"} on
-          the platform
+          earned across {year.closed_months}{" "}
+          {year.closed_months === 1 ? "closed month" : "closed months"}
         </p>
       </section>
 
@@ -129,7 +143,7 @@ export function MyYear() {
           aria-pressed={chart === "earned"}
           onClick={() => setChart("earned")}
         >
-          What you earned
+          What your sales earned
         </button>
         <button
           type="button"
@@ -160,9 +174,9 @@ export function MyYear() {
         </div>
 
         {chart === "earned" ? (
-          <EarningsLine months={year.months} pick={index} onPick={setPick} />
+          <EarningsLine months={months} pick={index} onPick={setPick} />
         ) : (
-          <OrdersBars months={year.months} pick={index} onPick={setPick} />
+          <OrdersBars months={months} pick={index} onPick={setPick} />
         )}
 
         {/*
@@ -185,6 +199,16 @@ export function MyYear() {
             <strong>Orders counted</strong>.
           </p>
         )}
+        {/*
+         * Said once, on the chart it applies to. Without it a model steps back
+         * from the Month tab — where September is live and adding up — to a
+         * Year screen where September is simply absent, and reads that as the
+         * platform having lost it.
+         */}
+        <p className="year__caveat">
+          This month is not here yet. It appears once it closes, so a month
+          three days old is never drawn beside months that are finished.
+        </p>
         {chart === "orders" && (
           <p className="year__caveat">
             Every order that counted under your code, including the months HBA

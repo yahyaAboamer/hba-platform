@@ -57,6 +57,18 @@ export type MyOrder = {
    */
   placed_piastres: number | null;
   placed: string | null;
+  /**
+   * What a void order **would** have earned, had it arrived.
+   *
+   * Struck through beside the value it would have earned it on, so a row that
+   * earned nothing still shows the figure rather than only the words. `null`
+   * on anything that has not lost something yet — an order still travelling
+   * has not.
+   *
+   * **Never summed.** No total on any screen includes it.
+   */
+  forgone_piastres: number | null;
+  forgone: string | null;
 };
 
 export type MyEarnings = {

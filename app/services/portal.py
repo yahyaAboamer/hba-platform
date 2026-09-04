@@ -750,6 +750,27 @@ def _placed_value(order: AttributedOrder, index: OrderIndex) -> int | None:
     return placed or None
 
 
+def _forgone_commission(
+    placed: int | None, rate_bp: int | None, state: str
+) -> int | None:
+    """What a void order would have earned, had it arrived.
+
+    Only on a void row, and only where the placed-at value survived. A model
+    matching a cancelled order against her own record wants the figure she
+    *would* have had - the business asked for it explicitly, struck through
+    rather than replaced by the words "nothing earned".
+
+    **Never paid, never summed.** It is the same arithmetic as a counted
+    order applied to a sale that did not complete, and no total on any screen
+    includes it. `None` on an order that is still travelling: that one has not
+    lost anything yet.
+    """
+    if state != CommissionState.VOID or not rate_bp or not placed:
+        return None
+    exact = exact_commission_piastres(commission_numerator(placed, rate_bp))
+    return int(exact.quantize(Decimal("1"), rounding=ROUND_HALF_UP)) or None
+
+
 def _order_commission(base: int, rate_bp: int | None, state: str) -> int | None:
     """What one counted order was worth in commission, exact to the piastre.
 
@@ -809,6 +830,7 @@ def my_orders(db: Session, affiliate: AffiliateProfile, month: str) -> list[dict
             order.commission_base_piastres, rate_bp, order.commission_state
         )
         placed = _placed_value(order, index)
+        forgone = _forgone_commission(placed, rate_bp, order.commission_state)
         detail.append(
         {
             "order_number": index.order_number,
@@ -849,6 +871,16 @@ def my_orders(db: Session, affiliate: AffiliateProfile, month: str) -> list[dict
             # indexed before the columns existed, which a re-import fills in.
             "placed_piastres": placed,
             "placed": format_egp(placed) if placed is not None else None,
+            # **What it would have been worth**, on a row that earned
+            # nothing. The business asked for the figure to stay visible
+            # rather than be replaced by the words "nothing earned" - struck
+            # through, so it reads as what was lost rather than what is owed.
+            #
+            # Never added to anything. It is the same arithmetic as a counted
+            # order applied to a sale that did not complete, and it exists so
+            # a model can match a cancelled row against her own record.
+            "forgone_piastres": forgone,
+            "forgone": format_egp(forgone) if forgone is not None else None,
             # §11.4. Named only when a *different* month paid it - an order
             # settled by its own month needs no explanation, and labelling
             # every row would bury the two that matter.
@@ -1103,12 +1135,23 @@ def my_year(db: Session, affiliate: AffiliateProfile) -> dict:
     """
     months = months_for(db, affiliate)
     series = []
+    working = working_month()
 
     for month in reversed(months):  # oldest first: a chart reads left to right
         figures = my_month(db, affiliate, month)
         series.append(
             {
                 "month": month,
+                # **The month in progress is marked, not hidden here.**
+                #
+                # A part-month plotted beside finished ones reads as a
+                # collapse: September at E£503 next to August at E£3,829
+                # drew a line falling off a cliff, when September was three
+                # days old. The charts drop it; this screen still returns it,
+                # because the Month tab is where a live figure belongs and one
+                # service answering two questions differently is how they
+                # come to disagree.
+                "in_progress": month == working,
                 # 1-12, because an axis wants a number and a number needs no
                 # translating.
                 "number": int(month.split("-")[1]),
@@ -1123,7 +1166,17 @@ def my_year(db: Session, affiliate: AffiliateProfile) -> dict:
             }
         )
 
-    paid_months = [row for row in series if row["earned_piastres"] is not None]
+    # **Closed months only, for every summary on the screen.**
+    #
+    # The total has to agree with the chart, and the chart drops the month in
+    # progress. A headline that included it would be a figure nobody could
+    # reach by adding up the points in front of them - and "best month" could
+    # be won by a month that is three days old.
+    paid_months = [
+        row
+        for row in series
+        if row["earned_piastres"] is not None and not row["in_progress"]
+    ]
     best = max(paid_months, key=lambda r: r["earned_piastres"], default=None)
     total = sum(row["earned_piastres"] for row in paid_months)
 
@@ -1134,7 +1187,12 @@ def my_year(db: Session, affiliate: AffiliateProfile) -> dict:
         "best_month": best["month"] if best else None,
         "best_month_label": best["label"] if best else None,
         "best_month_piastres": best["earned_piastres"] if best else None,
+        # **Orders are counted across every month**, including the one in
+        # progress. An order that counted, counted - it is a tally of things
+        # that happened, not a figure still being decided, so leaving today's
+        # out would be under-reporting her own work.
         "total_orders": sum(row["orders"] for row in series),
+        "closed_months": len(paid_months),
     }
 
 
