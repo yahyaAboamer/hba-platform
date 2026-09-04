@@ -14,7 +14,8 @@ export type SettlementState =
   | "partially_paid"
   | "settled"
   | "overpaid"
-  | "not_approved";
+  | "not_approved"
+  | "settled_externally";
 
 export type Balance = {
   affiliate_id: number;
@@ -68,6 +69,11 @@ type Outstanding = {
  * has not been run or because the month was reopened. Saying "nothing
  * outstanding" about a month that may have been paid in full against a
  * superseded version is the most misleading answer available (§11.1).
+ *
+ * `settled_externally` is the other one. Its balance is the same zero as
+ * `settled`, and the difference matters to the person reading it: `settled`
+ * means *this platform sent the money and can show you when*, and there is no
+ * transfer here to show. ADR 0036.
  */
 export const STATE_LABEL: Record<SettlementState, string> = {
   unpaid: "Not paid yet",
@@ -75,6 +81,7 @@ export const STATE_LABEL: Record<SettlementState, string> = {
   settled: "Settled",
   overpaid: "Overpaid",
   not_approved: "Nothing agreed yet",
+  settled_externally: "Paid outside the platform",
 };
 
 /** Money and money alone carries colour (ADR 0027). */
@@ -140,7 +147,7 @@ export function Payments({ session }: { session: Session }) {
           onLockedClick={(candidate, lock) =>
             setLockNote(
               lock === "historical"
-                ? `${formatMonth(candidate)} was settled before the platform, so nothing here was paid through it.`
+                ? `${formatMonth(candidate)} was paid outside the platform. It is agreed here so it appears on a model’s dashboard, and nothing is ever sent against it.`
                 : `${formatMonth(candidate)} has not finished, so nothing has been agreed to pay yet.`,
             )
           }

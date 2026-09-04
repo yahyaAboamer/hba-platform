@@ -1,4 +1,4 @@
-"""The four settlement states, §11.1.
+"""The five settlement states, §11.1.
 
 Separated from the ledger so the *names* have one home. Calculation state and
 settlement state were a single column in the old dashboard, which is what
@@ -33,6 +33,20 @@ class SettlementState:
     #: may have been paid in full against a superseded version is the most
     #: misleading answer available.
     NOT_APPROVED = "not_approved"
+
+    #: Before go-live. Agreed and frozen like any other month, and **paid
+    #: outside the platform months ago** (ADR 0036).
+    #:
+    #: Not `settled`, though the balance is the same zero. `settled` means
+    #: *this platform sent the money and the ledger can show you when*; there
+    #: is no transfer here to show, and a screen offering to reconcile one
+    #: would be offering to pay a second time.
+    #:
+    #: This state is what replaced the blocker that used to refuse approval.
+    #: ADR 0014 kept these months safe by refusing to calculate them; the
+    #: safety now comes from the balance being structurally zero, which
+    #: survives somebody approving the month - a blocker does not.
+    SETTLED_EXTERNALLY = "settled_externally"
 
     @staticmethod
     def of(owed_piastres: int, covered_piastres: int) -> str:

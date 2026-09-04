@@ -13,7 +13,7 @@ export type PayrollRow = {
   affiliate_id: number;
   name: string;
   month: string;
-  calculation_state: "draft" | "approved" | "historical";
+  calculation_state: "draft" | "approved";
   orders: { earned: number; pending: number; void: number };
   /** What it would come to if calculated now. Free to move. */
   obligation_piastres: number;
@@ -31,23 +31,18 @@ export type PayrollRow = {
   blockers: string[];
   is_payable: boolean;
   version: number | null;
-};
-
-type HistoricalRow = {
-  affiliate_id: number;
-  name: string;
-  month: string;
-  calculation_state: "historical";
-  orders: number;
-  net_sales_piastres: number;
-  label: string;
-  is_payable: false;
+  /**
+   * ADR 0036. Before go-live: approved like any other month, and never
+   * payable. Two separate facts, and the row needs both — it offers approval
+   * and must not offer to send money.
+   */
+  settled_outside: boolean;
 };
 
 export type PayrollMonth = {
   month: string;
-  is_historical: boolean;
-  affiliates: (PayrollRow | HistoricalRow)[];
+  settled_outside: boolean;
+  affiliates: PayrollRow[];
   totals: {
     affiliates: number;
     payable_affiliates: number;
@@ -71,12 +66,15 @@ type Reopened = {
  * and told somebody to go and set pay terms for an account that must never
  * have any.
  *
- * These two answer the question by themselves. A house account is never owed
- * money whatever else is true of it, and a month settled before the platform
- * is not ours to agree. Nothing listed beside them is worth reading.
+ * `NEVER_OWED` answers it by itself: a house account is never owed money
+ * whatever else is true of it, and nothing listed beside it is worth reading.
+ *
+ * There used to be a second one here, `month_predates_the_platform`. ADR 0036
+ * retired it — those months are approved like any other now, so nothing blocks
+ * them and there is nothing to explain away. What they are is *never payable*,
+ * which is `settled_outside` on the row and not a blocker at all.
  */
 const NEVER_OWED = "house_accounts_are_never_owed";
-const BEFORE_THE_PLATFORM = "month_predates_the_platform";
 
 /**
  * Blockers that are ordinary states rather than obstacles.
@@ -85,18 +83,13 @@ const BEFORE_THE_PLATFORM = "month_predates_the_platform";
  * the page has on rows that need nothing — the same mistake as warning about a
  * working discount code (docs/limits.md).
  */
-const NOT_A_PROBLEM = new Set([
-  NEVER_OWED,
-  BEFORE_THE_PLATFORM,
-  "month_is_already_approved",
-]);
+const NOT_A_PROBLEM = new Set([NEVER_OWED, "month_is_already_approved"]);
 
 export type RowState = "ready" | "needs-you" | "approved" | "nothing-to-do";
 
 export function rowState(row: PayrollRow): RowState {
   if (row.calculation_state === "approved") return "approved";
   if (row.blockers.includes(NEVER_OWED)) return "nothing-to-do";
-  if (row.blockers.includes(BEFORE_THE_PLATFORM)) return "nothing-to-do";
   if (row.is_payable) return "ready";
   return row.blockers.every((key) => NOT_A_PROBLEM.has(key))
     ? "nothing-to-do"
@@ -117,14 +110,7 @@ export function actionable(row: PayrollRow): string[] {
  */
 export function settledReason(row: PayrollRow): string | null {
   if (row.blockers.includes(NEVER_OWED)) return NEVER_OWED;
-  if (row.blockers.includes(BEFORE_THE_PLATFORM)) return BEFORE_THE_PLATFORM;
   return row.blockers.find((key) => NOT_A_PROBLEM.has(key)) ?? null;
-}
-
-function isHistorical(
-  row: PayrollRow | HistoricalRow,
-): row is HistoricalRow {
-  return row.calculation_state === "historical";
 }
 
 const STATE_LABEL: Record<RowState, string> = {
@@ -169,10 +155,9 @@ export function Payroll({ session }: { session: Session }) {
   }, [month]);
 
   const rows = data?.affiliates ?? [];
-  const live = rows.filter((row): row is PayrollRow => !isHistorical(row));
-  const ready = live.filter((row) => rowState(row) === "ready");
-  const needsYou = live.filter((row) => rowState(row) === "needs-you");
-  const approved = live.filter((row) => rowState(row) === "approved");
+  const ready = rows.filter((row) => rowState(row) === "ready");
+  const needsYou = rows.filter((row) => rowState(row) === "needs-you");
+  const approved = rows.filter((row) => rowState(row) === "approved");
   const agreedTotal = approved.reduce(
     (sum, row) => sum + (row.approved_obligation_piastres ?? 0),
     0,
@@ -214,7 +199,7 @@ export function Payroll({ session }: { session: Session }) {
           onLockedClick={(candidate, lock) =>
             setLockNote(
               lock === "historical"
-                ? `${formatMonth(candidate)} was settled before the platform. It shows sales, and no commission figure — the rates that applied then live in the old system.`
+                ? `${formatMonth(candidate)} was paid outside the platform. It is calculated and agreed here like any other month, and nothing is ever sent against it.`
                 : `${formatMonth(candidate)} has not finished. Orders are still arriving, so anything here will move.`,
             )
           }
@@ -250,15 +235,21 @@ export function Payroll({ session }: { session: Session }) {
 
       {data === null && !error && <p className="empty">Loading…</p>}
 
-      {data?.is_historical && (
+      {/*
+       * ADR 0036. The month is ordinary in every way except one, and that one
+       * is worth a sentence rather than a mark on twenty-one rows: approving
+       * it agrees what she earned, and sends nothing. The money moved months
+       * ago, outside here.
+       */}
+      {data?.settled_outside && (
         <p className="notice payroll__note">
-          Paid outside the platform, so this month shows sales and no commission
-          figure. Applying today’s rates to a month settled under the old ones
-          would be a guess presented as a fact.
+          This month was paid outside the platform. Approve it the same way —
+          it fixes what each model earned so her dashboard can show the month
+          in full — and nothing is ever owed or sent against it.
         </p>
       )}
 
-      {data && !data.is_historical && (
+      {data && (
         <div className="payroll__figures">
           {/*
            * Two figures, and they are deliberately not added together. One is
@@ -314,7 +305,7 @@ export function Payroll({ session }: { session: Session }) {
           <thead>
             <tr>
               <th className="payroll__pick">
-                {!data.is_historical && ready.length > 0 && (
+                {ready.length > 0 && (
                   <input
                     type="checkbox"
                     checked={allReadyChosen}
@@ -332,9 +323,7 @@ export function Payroll({ session }: { session: Session }) {
               <th>Name</th>
               <th>State</th>
               <th>Orders</th>
-              <th className="payroll__amount">
-                {data.is_historical ? "Net sales" : "Would be paid"}
-              </th>
+              <th className="payroll__amount">Would be paid</th>
               <th>
                 <Link to="/glossary#carried-forward" className="glossary-link">
                   Carried forward
@@ -344,35 +333,14 @@ export function Payroll({ session }: { session: Session }) {
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) =>
-              isHistorical(row) ? (
-                <tr key={row.affiliate_id} className="payroll__row--quiet">
-                  <td />
-                  <td>
-                    <Link
-                      className="payroll__name"
-                      to={`/affiliates/${row.affiliate_id}`}
-                    >
-                      {row.name}
-                    </Link>
-                  </td>
-                  <td className="payroll__state">Settled before</td>
-                  <td className="code">{row.orders}</td>
-                  <td className="payroll__amount">
-                    <Money piastres={row.net_sales_piastres} />
-                  </td>
-                  <td />
-                  <td />
-                </tr>
-              ) : (
-                <PayrollTableRow
-                  key={row.affiliate_id}
-                  row={row}
-                  chosen={chosen.has(row.affiliate_id)}
-                  onToggle={() => toggle(row.affiliate_id)}
-                />
-              ),
-            )}
+            {rows.map((row) => (
+              <PayrollTableRow
+                key={row.affiliate_id}
+                row={row}
+                chosen={chosen.has(row.affiliate_id)}
+                onToggle={() => toggle(row.affiliate_id)}
+              />
+            ))}
           </tbody>
         </table>
       )}
@@ -382,7 +350,7 @@ export function Payroll({ session }: { session: Session }) {
        * the person to work out what they just agreed to, and the whole point
        * of §11.3 is that nobody should have to.
        */}
-      {data && !data.is_historical && can(session, "payroll.approve") && (
+      {data && can(session, "payroll.approve") && (
         <div className="payroll__actions">
           <button
             type="button"

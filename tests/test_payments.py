@@ -910,3 +910,95 @@ def test_a_credit_cannot_carry_a_debt_forward(db):
             reason="move it to September",
             destination_month=SEPTEMBER,
         )
+
+
+# -- A month settled outside the platform (ADR 0036) --------------------------
+
+
+def _settled_outside(db, monkeypatch, affiliate):
+    """An approved August, with go-live moved to September behind it.
+
+    Approved first, so the snapshot exists exactly as it will in production
+    after the backfill - the tests below are about a month that *has* an agreed
+    figure and still owes nothing.
+    """
+    from app.config import settings
+
+    snapshot = _owed(db, affiliate)
+    monkeypatch.setattr(settings, "go_live_month", "2026-09", raising=False)
+    return snapshot
+
+
+def test_a_month_before_go_live_owes_nothing_however_it_was_approved(
+    db, monkeypatch
+):
+    """ADR 0036, and the whole of what replaced ADR 0014's blocker.
+
+    August is worth E£2,000 and that figure is real - her dashboard shows it.
+    What is **outstanding** is nothing, because the money moved outside the
+    platform months ago.
+    """
+    affiliate = _affiliate(db)
+    _settled_outside(db, monkeypatch, affiliate)
+
+    balance = balance_for(db, affiliate, AUGUST)
+
+    assert balance["state"] == SettlementState.SETTLED_EXTERNALLY
+    assert balance["balance_piastres"] == 0
+    assert balance_due(db, affiliate, AUGUST) == 0
+
+
+def test_a_transfer_cannot_be_recorded_against_a_month_settled_outside(
+    db, monkeypatch
+):
+    """**The failure ADR 0014 was written to prevent, arriving by another door.**
+
+    These months now have snapshots, and a snapshot id is all an allocation
+    needs. Nothing on any screen offers one - but the screens are not the
+    guarantee.
+    """
+    affiliate = _affiliate(db)
+    snapshot = _settled_outside(db, monkeypatch, affiliate)
+
+    with pytest.raises(ValueError, match="before the platform started paying"):
+        record_payment(
+            db,
+            affiliate,
+            amount_piastres=200_000,
+            allocations={snapshot.id: 200_000},
+        )
+
+
+def test_an_unallocated_transfer_cannot_be_allocated_there_afterwards(
+    db, monkeypatch
+):
+    """The second door. A transfer may arrive before anybody has decided which
+    months it covers, and is split afterwards - which would otherwise be the
+    way in.
+    """
+    affiliate = _affiliate(db)
+    snapshot = _settled_outside(db, monkeypatch, affiliate)
+    transaction = record_payment(db, affiliate, amount_piastres=200_000)
+    db.flush()
+
+    with pytest.raises(ValueError, match="before the platform started paying"):
+        allocate(db, transaction, snapshot, 200_000)
+
+
+def test_an_adjustment_cannot_touch_a_month_settled_outside(db, monkeypatch):
+    """An adjustment closes a difference, and a month settled outside has none:
+    its balance is zero by construction. A credit out of one would conjure
+    money the platform never owed.
+    """
+    affiliate = _affiliate(db)
+    _settled_outside(db, monkeypatch, affiliate)
+
+    with pytest.raises(ValueError, match="settled outside the platform"):
+        adjust(
+            db,
+            affiliate,
+            kind=AdjustmentType.WRITEOFF,
+            source_month=AUGUST,
+            amount_piastres=100,
+            reason="tidying up",
+        )

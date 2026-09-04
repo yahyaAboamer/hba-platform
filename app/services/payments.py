@@ -41,7 +41,7 @@ from app.models.payroll import PayrollMonth, PayrollSnapshot
 from app.services.audit import record_audit
 from app.services.payments_state import SettlementState
 from app.services.payouts import current_destination, mask_destination
-from app.services.payroll import get_month, open_month
+from app.services.payroll import get_month, is_historical, open_month
 
 
 def allocated_to(db: Session, snapshot: PayrollSnapshot) -> int:
@@ -164,6 +164,33 @@ def balance_for(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
     figure is *"what makes it up?"*
     """
     parse_month(month)
+
+    # **ADR 0036, and this is checked before anything else on purpose.**
+    #
+    # A month before go-live was paid outside the platform. It is calculated,
+    # approved and frozen like any other month - what it is *not* is payable,
+    # and that has to be true no matter what state the month reached or what
+    # somebody managed to allocate against it.
+    #
+    # ADR 0014 got this guarantee by refusing to approve the month. That
+    # blocker was removed here, so the guarantee moved to where it cannot be
+    # bypassed by approving: the balance itself. **A month that cannot carry a
+    # balance cannot be paid twice.** Returning before the snapshot is even
+    # loaded is what makes that structural rather than arithmetical.
+    if is_historical(month):
+        return {
+            "month": month,
+            "state": SettlementState.SETTLED_EXTERNALLY,
+            # Zero, not the snapshot's figure. What the month is *worth* is a
+            # real number and their dashboard shows it; what is **outstanding**
+            # is nothing, and this function answers only the second question.
+            "obligation_piastres": 0,
+            "paid_piastres": 0,
+            "adjusted_piastres": 0,
+            "credited_piastres": 0,
+            "balance_piastres": 0,
+        }
+
     payroll_month = get_month(db, affiliate, month)
 
     if payroll_month is None:
@@ -264,6 +291,27 @@ def balance_due(db: Session, affiliate: AffiliateProfile, month: str) -> int:
     return balance_for(db, affiliate, month)["balance_piastres"]
 
 
+def _refuse_settled_outside(db: Session, allocations: dict[int, int]) -> None:
+    """Refuse any allocation onto a month the platform did not pay. ADR 0036."""
+    if not allocations:
+        return
+    months = db.execute(
+        select(PayrollSnapshot.id, PayrollMonth.month)
+        .join(PayrollMonth, PayrollMonth.id == PayrollSnapshot.payroll_month_id)
+        .where(PayrollSnapshot.id.in_(list(allocations)))
+    ).all()
+    settled_outside = sorted(
+        {month for _, month in months if is_historical(month)}
+    )
+    if settled_outside:
+        raise ValueError(
+            ", ".join(settled_outside)
+            + " happened before the platform started paying, and was settled "
+            "outside it. Those months owe nothing here, and recording a "
+            "transfer against one would pay it a second time."
+        )
+
+
 def record_payment(
     db: Session,
     affiliate: AffiliateProfile,
@@ -325,6 +373,17 @@ def record_payment(
             f"Those allocations come to {sum(requested.values())} piastres, "
             f"which is more than the {amount_piastres} that was sent"
         )
+
+    # **ADR 0036. Nothing is ever allocated to a month from before go-live.**
+    #
+    # Those months are approved and frozen like any other, so they now have
+    # snapshots, and a snapshot id is all an allocation needs. `balance_for`
+    # already reports them as owing nothing, so no screen offers one - but the
+    # screens are not the guarantee. This is: the money for March moved outside
+    # the platform in March, and recording a transfer against it here is the
+    # one failure ADR 0014 was written to prevent, arriving by a different
+    # door.
+    _refuse_settled_outside(db, requested)
 
     transaction = PaymentTransaction(
         affiliate_id=affiliate.id,
@@ -399,6 +458,11 @@ def allocate(
     if piastres <= 0:
         raise ValueError("An allocation must be for more than nothing")
 
+    # ADR 0036, the same refusal `record_payment` makes. Both doors, because a
+    # transfer recorded with no months against it is normal and is allocated
+    # here afterwards - which would otherwise be the way in.
+    _refuse_settled_outside(db, {snapshot.id: piastres})
+
     allocation = PaymentAllocation(
         payment_transaction_id=transaction.id,
         payroll_snapshot_id=snapshot.id,
@@ -468,6 +532,19 @@ def adjust(
         raise ValueError(f"Unknown adjustment type: {kind!r}")
     if amount_piastres <= 0:
         raise ValueError("An adjustment must be for more than nothing")
+    # ADR 0036. An adjustment closes a difference, and a month settled outside
+    # the platform has none: its balance is zero by construction. A credit out
+    # of one would conjure money the platform never owed, and a credit *into*
+    # one would be swallowed by a balance that ignores it.
+    for name, candidate in (
+        ("source", source_month),
+        ("destination", destination_month),
+    ):
+        if candidate and is_historical(candidate):
+            raise ValueError(
+                f"{candidate} was settled outside the platform and owes "
+                f"nothing here, so it cannot be the {name} of an adjustment."
+            )
     if not str(reason or "").strip():
         raise ValueError(
             "An adjustment needs a reason. It is money moving with no bank "

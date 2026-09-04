@@ -21,6 +21,19 @@ entries say Phase 6 must wire them. This is that. Correcting somebody's rate or
 their target after payroll would change what a month was worth **after the money
 moved**, and the snapshot would silently disagree with the data it came from.
 
+## A month before go-live is approved here too
+
+ADR 0036, superseding 0014. There used to be a blocker, `month_predates_the
+_platform`, refusing to approve any month the platform did not pay for. It has
+been removed - not relaxed - and the guarantee it gave moved into
+`balance_for`, which reports such a month as owing nothing whatever state it
+reached.
+
+That is the stronger place for it. A blocker lives in one function, refuses one
+verb, and is gone the moment somebody deletes the line. A balance of zero
+survives the month being approved, and there is no way to send money against a
+month that is not owed any.
+
 ## The snapshot holds everything, not references to it
 
 `payload_json` carries the whole calculation. A snapshot storing ids would
@@ -57,9 +70,6 @@ ORDERS_ON_HOLD = "orders_held_for_multi_code_review"
 #: §8, §17. A house account is a real code used by real customers and is never
 #: owed money. Approving one would create an obligation to HBA itself.
 HOUSE_ACCOUNT = "house_accounts_are_never_owed"
-
-#: §11.2. Before go-live, and settled outside the platform.
-ALREADY_SETTLED_OUTSIDE = "month_predates_the_platform"
 
 #: Approving twice would create a second obligation for one month.
 ALREADY_APPROVED = "month_is_already_approved"
@@ -135,22 +145,23 @@ def blockers_for(
         blockers.append(HOUSE_ACCOUNT)
 
     existing = get_month(db, affiliate, month)
-    if existing is not None:
-        if existing.calculation_state == CalculationState.APPROVED:
-            blockers.append(ALREADY_APPROVED)
-        elif existing.calculation_state == CalculationState.HISTORICAL:
-            blockers.append(ALREADY_SETTLED_OUTSIDE)
+    if existing is not None and existing.calculation_state == CalculationState.APPROVED:
+        blockers.append(ALREADY_APPROVED)
 
     if held_order_count(db, affiliate, month):
         blockers.append(ORDERS_ON_HOLD)
 
-    # Section 11.2. An unset go-live would silently make eight months of
-    # imported orders approvable - money already settled outside the platform,
-    # ready to be paid a second time.
+    # Section 11.2. An unset go-live still refuses everything, and for the
+    # original reason: without it nothing here can tell a month the platform
+    # is responsible for from one it is not, and every imported month reads as
+    # ours to pay.
+    #
+    # **What is no longer here is the refusal of the months themselves**
+    # (ADR 0036). They are approved and frozen like any other month, which is
+    # what gives a model a March that looks like her August. The protection
+    # moved into `balance_for`, where approving cannot bypass it.
     if not go_live_month():
         blockers.append(NO_GO_LIVE_MONTH)
-    elif is_historical(month):
-        blockers.append(ALREADY_SETTLED_OUTSIDE)
 
     return blockers, calculation
 
@@ -296,9 +307,22 @@ def approve_month(
     # email covers the first approval and every re-approval after it. Queued in
     # the same transaction as the snapshot, so an agreed month and the notice
     # about it commit together.
-    from app.services.notifications import month_approved
+    #
+    # **Except for a month before go-live** (ADR 0036). Backfilling the history
+    # of twenty-one models means approving eight months each, and this line
+    # would send about a hundred and seventy mails announcing that a month
+    # closed - months that closed and were paid before the platform existed.
+    # Every one of them would read as a new payment on its way.
+    #
+    # Suppressed rather than made optional: there is no reading of "your month
+    # is closed, here is what you earned" that is true about March, and a flag
+    # somebody has to remember to set is a flag somebody forgets on the run
+    # that matters. The business tells the models about the older months
+    # directly, before the portal opens.
+    if not is_historical(month):
+        from app.services.notifications import month_approved
 
-    month_approved(db, affiliate, snapshot, month)
+        month_approved(db, affiliate, snapshot, month)
     return snapshot
 
 
@@ -328,7 +352,7 @@ def snapshots_for(
     )
 
 
-# -- Historical months (Section 11.2, ADR 0014) --------------------------------
+# -- Months before go-live (Section 11.2, ADR 0036) ----------------------------
 
 #: Section 11.2. Nobody has said which month the platform starts paying for, so
 #: it refuses to pay for any of them.
@@ -376,33 +400,6 @@ def is_historical(month: str) -> bool:
     if not configured:
         return False
     return month < parse_month(configured)
-
-
-def historical_sales(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
-    """What a historical month shows: sales, and no commission figure.
-
-    **Decided, and worth restating** (ADR 0014). Computing March's commission
-    needs March's rates, which exist only in the old system and in somebody's
-    memory. Applying today's rates to last March would be actively misleading,
-    and reconstructing them by hand invites errors nobody could later verify.
-    """
-    rows = list(
-        db.scalars(
-            select(AttributedOrder)
-            .where(AttributedOrder.affiliate_id == affiliate.id)
-            .where(AttributedOrder.business_month == month)
-        )
-    )
-    return {
-        "affiliate_id": affiliate.id,
-        "month": month,
-        "calculation_state": CalculationState.HISTORICAL,
-        "orders": len(rows),
-        "net_sales_piastres": sum(row.commission_base_piastres for row in rows),
-        "commission": None,
-        "label": "Settled before the platform - commission not calculated",
-        "is_payable": False,
-    }
 
 
 # -- Carry-forward (Section 11.4) ---------------------------------------------

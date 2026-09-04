@@ -42,7 +42,6 @@ from app.services.payroll import (
     blockers_for,
     carry_forward_summary,
     get_month,
-    historical_sales,
     is_historical,
     months_left_reopened,
     reconciliation_for,
@@ -93,12 +92,18 @@ def _display_piastres(exact: Decimal | str) -> int:
 
 
 def _row(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
-    """One model's month: the figure, what blocks it, and what it carries."""
-    if is_historical(month):
-        # §11.2. Sales only, never a commission figure - March's rates exist
-        # only in the old system and in somebody's memory.
-        return {**historical_sales(db, affiliate, month), "name": affiliate.name}
+    """One model's month: the figure, what blocks it, and what it carries.
 
+    **The same shape for every month, including the ones before go-live**
+    (ADR 0036). Those used to return a sales-only row with no commission and
+    no blockers, which also meant no way to approve them - and the whole of
+    task #17 is that they are approved like any other month, so a model's
+    March reads like her August.
+
+    They differ in one thing, and it is not on this row: what they are worth
+    is never *owed*. `balance_for` says so, structurally, and no amount of
+    approving changes it.
+    """
     blockers, calculation = blockers_for(db, affiliate, month)
     payroll_month = get_month(db, affiliate, month)
     snapshot = payroll_month.active_snapshot if payroll_month else None
@@ -149,6 +154,9 @@ def _row(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
         "blockers": blockers,
         "is_payable": not blockers,
         "version": snapshot.version if snapshot else None,
+        # ADR 0036. Approvable, and never payable. The screen needs both
+        # facts: it offers approval, and it must not offer to send money.
+        "settled_outside": is_historical(month),
     }
 
 
@@ -169,7 +177,9 @@ def payroll_month_view(
 
     return {
         "month": month,
-        "is_historical": is_historical(month),
+        # ADR 0036. Approvable like any other month, and never payable. The
+        # screen says so once, at the top, rather than on twenty-one rows.
+        "settled_outside": is_historical(month),
         "affiliates": rows,
         "totals": {
             "affiliates": len(rows),

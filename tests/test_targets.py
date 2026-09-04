@@ -457,3 +457,197 @@ def test_a_model_with_no_terms_has_no_target_deciding_anything(db):
     db.flush()
 
     assert _determines_pay(db, nobody, MONTH) is False
+
+
+# -- An outcome, for a month that happened before the platform (ADR 0036) -----
+
+
+BEFORE = "2026-03"
+
+
+@pytest.fixture
+def _go_live(monkeypatch):
+    """September onward is ours; March is not."""
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "go_live_month", "2026-09", raising=False)
+
+
+def test_a_month_before_the_platform_records_an_outcome(db, _go_live):
+    """ADR 0036. The old dashboard kept whether March was met, and nothing
+    else. That answer, by itself, is the whole record.
+    """
+    from app.services.targets import record_outcome
+
+    affiliate = _affiliate(db)
+
+    target = record_outcome(db, affiliate, BEFORE, outcome="met")
+
+    assert target.is_backfilled is True
+    assert target.is_achieved is True
+    assert target.is_recorded is True
+    assert target.required_videos is None
+    assert target.required_stories is None
+    assert target.actual_videos is None
+
+
+def test_a_missed_outcome_is_achieved_false_not_unknown(db, _go_live):
+    """The distinction §11.3 turns on. *Missed* pays the commission and lets
+    the month approve; *nobody looked* blocks it. An outcome always answers.
+    """
+    from app.services.targets import record_outcome
+
+    affiliate = _affiliate(db)
+
+    target = record_outcome(db, affiliate, BEFORE, outcome="missed")
+
+    assert target.is_achieved is False
+    assert target.is_recorded is True
+
+
+def test_recording_an_outcome_verifies_it_in_the_same_act(db, _go_live):
+    """The one place in the platform where recording and confirming are one act.
+
+    Verification exists to stop one person inventing numbers that unlock a
+    payment. There are no numbers here, and the month can never be paid - its
+    balance is structurally zero. The split protects nothing, and requiring it
+    would mean a second pass through a screen built around counts for every
+    guarantee month of every model.
+    """
+    from app.services.targets import record_outcome
+
+    affiliate = _affiliate(db)
+
+    target = record_outcome(db, affiliate, BEFORE, outcome="met")
+
+    assert target.is_verified is True
+    assert _audits(db, "target.outcome_recorded")
+
+
+def test_an_outcome_is_refused_for_a_month_that_can_still_be_paid(db, _go_live):
+    """**The whole safety of the shortcut above.**
+
+    Allowed after go-live, somebody could unlock a base guarantee by asserting
+    it - no counts, no second person, and a real payment at the end of it.
+    """
+    from app.services.targets import record_outcome
+
+    affiliate = _affiliate(db)
+
+    with pytest.raises(ValueError, match="not before the platform"):
+        record_outcome(db, affiliate, "2026-09", outcome="met")
+
+
+def test_an_outcome_is_refused_when_nobody_has_set_a_go_live_month(db, monkeypatch):
+    """With no go-live there is no such thing as *before* it, and every month
+    would qualify.
+    """
+    from app.config import settings
+    from app.services.targets import record_outcome
+
+    monkeypatch.setattr(settings, "go_live_month", "", raising=False)
+    affiliate = _affiliate(db)
+
+    with pytest.raises(ValueError, match="go-live"):
+        record_outcome(db, affiliate, BEFORE, outcome="met")
+
+
+def test_an_outcome_never_overwrites_counts_somebody_recorded(db, _go_live):
+    """An outcome replaces numbers nobody kept, not numbers somebody took the
+    trouble to record. Clearing those to store a one-word summary of them
+    destroys the better record.
+    """
+    from app.services.targets import record_outcome
+
+    affiliate = _affiliate(db)
+    target = _target(db, affiliate, month=BEFORE)
+    record_actuals(db, target, videos=8, stories=5)
+
+    with pytest.raises(ValueError, match="already has recorded counts"):
+        record_outcome(db, affiliate, BEFORE, outcome="met")
+
+
+def test_an_outcome_replaces_a_requirement_nothing_was_ever_measured_against(
+    db, _go_live
+):
+    """A requirement with no actuals is a plan, not a record - and left in
+    place it would sit beside an outcome it was never compared against, which
+    is the mixture the check constraint refuses.
+    """
+    from app.services.targets import record_outcome
+
+    affiliate = _affiliate(db)
+    _target(db, affiliate, month=BEFORE)
+
+    target = record_outcome(db, affiliate, BEFORE, outcome="missed")
+
+    assert target.required_videos is None
+    assert target.recorded_outcome == "missed"
+
+
+def test_counts_are_refused_on_a_backfilled_month(db, _go_live):
+    """ADR 0036. The counts were never kept, and typing some in now would
+    invent evidence for a figure that decides money.
+    """
+    from app.services.targets import record_outcome
+
+    affiliate = _affiliate(db)
+    record_outcome(db, affiliate, BEFORE, outcome="met")
+
+    with pytest.raises(ValueError, match="were never kept"):
+        set_requirements(db, affiliate, BEFORE, videos=8, stories=5)
+
+
+def test_the_database_refuses_a_row_holding_counts_and_an_outcome(db, _go_live):
+    """The service says why; this is the half that cannot be talked round.
+
+    A row with a requirement of 8 and an outcome of *met* asks "met against
+    what?" of every screen that reads it, and has no answer.
+    """
+    from app.services.targets import record_outcome
+
+    affiliate = _affiliate(db)
+    target = record_outcome(db, affiliate, BEFORE, outcome="met")
+
+    with pytest.raises(IntegrityError):
+        db.execute(
+            text(
+                "UPDATE monthly_target SET required_videos = 8 WHERE id = :id"
+            ),
+            {"id": target.id},
+        )
+        db.flush()
+
+
+def test_an_outcome_is_either_met_or_missed(db, _go_live):
+    from app.services.targets import record_outcome
+
+    affiliate = _affiliate(db)
+
+    with pytest.raises(ValueError, match="'met' or 'missed'"):
+        record_outcome(db, affiliate, BEFORE, outcome="probably")
+
+
+def test_an_outcome_is_refused_once_the_month_is_approved(db, _go_live):
+    """**Found by a test, not by reasoning.** `record_outcome` creates the row
+    it writes to, so guarding only the existing-row path left this open.
+
+    Recording it after approval would not move the frozen figure - and that is
+    the danger. Every screen would then say a guarantee applied to a month
+    calculated without it.
+    """
+    from app.services.payroll import approve_month
+    from app.services.targets import record_outcome
+
+    affiliate = _affiliate(db)
+    set_terms(
+        db,
+        affiliate,
+        start_month="2026-01",
+        compensation_type="commission",
+        commission_rate_bp=1000,
+    )
+    approve_month(db, affiliate, BEFORE)
+
+    with pytest.raises(ValueError, match="Reopen the month first"):
+        record_outcome(db, affiliate, BEFORE, outcome="met")

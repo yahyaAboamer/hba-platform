@@ -75,7 +75,6 @@ const BLOCKER_TEXT: Record<string, string> = {
   targets_achieved_but_not_verified: "Targets met, not yet verified",
   orders_held_for_multi_code_review: "An order two models both claim",
   house_accounts_are_never_owed: "House account — never owed",
-  month_predates_the_platform: "Settled before the platform",
   month_is_already_approved: "Already approved",
   go_live_month_is_not_configured: "Go-live month is not set",
   no_compensation_terms_for_a_carried_month:

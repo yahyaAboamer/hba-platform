@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import text
+from sqlalchemy import select, text
 
 from app.core.passwords import hash_password
 from app.db import engine
@@ -28,14 +28,12 @@ from app.services.affiliates import create_affiliate
 from app.services.audit import AuditEvent
 from app.services.compensation import set_terms
 from app.services.payroll import (
-    ALREADY_SETTLED_OUTSIDE,
     NO_GO_LIVE_MONTH,
     approve_month,
     blockers_for,
     carried_into,
     carry_forward_summary,
     get_month,
-    historical_sales,
     is_historical,
     months_left_reopened,
     reconciliation_for,
@@ -406,9 +404,12 @@ def test_a_month_before_go_live_is_historical(db, monkeypatch):
     assert is_historical("2026-09") is False
 
 
-def test_a_historical_month_is_not_approvable(db, monkeypatch):
-    """§11.2. Money already settled outside the platform, ready to be paid a
-    second time.
+def test_a_month_before_go_live_is_approved_like_any_other(db, monkeypatch):
+    """ADR 0036, superseding 0014. The blocker became a mode.
+
+    The business's words: *"I don't want the models to feel that we treated
+    them differently."* A model opening March must see what she sees in
+    August - which starts with March being calculated and agreed at all.
     """
     from app.config import settings
 
@@ -417,25 +418,73 @@ def test_a_historical_month_is_not_approvable(db, monkeypatch):
     _order(db, affiliate, "1", 200_000)
 
     blockers, _ = blockers_for(db, affiliate, AUGUST)
+    assert blockers == []
 
-    assert ALREADY_SETTLED_OUTSIDE in blockers
-    with pytest.raises(ValueError):
-        approve_month(db, affiliate, AUGUST)
+    snapshot = approve_month(db, affiliate, AUGUST)
+
+    assert snapshot.approved_obligation_piastres == 20_000
+    assert get_month(db, affiliate, AUGUST).calculation_state == (
+        CalculationState.APPROVED
+    )
 
 
-def test_a_historical_month_shows_sales_and_no_commission(db):
-    """ADR 0014. March's rates exist only in the old system and in somebody's
-    memory; applying today's would be actively misleading.
+def test_a_month_before_go_live_can_never_be_paid(db, monkeypatch):
+    """**The guarantee ADR 0014 gave, kept somewhere stronger.**
+
+    0014 protected these months by refusing to approve them, which is a
+    protection anybody who removes the blocker removes. This one survives the
+    month being approved, because it is the balance itself: the month is worth
+    a real figure, and nothing about it is ever *owed*.
     """
+    from app.config import settings
+    from app.services.payments import balance_for
+    from app.services.payments_state import SettlementState
+
+    monkeypatch.setattr(settings, "go_live_month", "2026-09", raising=False)
+    affiliate = _affiliate(db)
+    _order(db, affiliate, "1", 200_000)
+    approve_month(db, affiliate, AUGUST)
+
+    balance = balance_for(db, affiliate, AUGUST)
+
+    assert balance["state"] == SettlementState.SETTLED_EXTERNALLY
+    assert balance["balance_piastres"] == 0
+    assert balance["obligation_piastres"] == 0
+
+
+def test_approving_a_month_before_go_live_announces_nothing(db, monkeypatch):
+    """ADR 0036. Eight months times twenty-one models is a hundred and seventy
+    mails saying a month has closed - about months that closed and were paid
+    before the platform existed. Every one would read as money on its way.
+    """
+    from app.config import settings
+    from app.models.notifications import NotificationOutbox
+
+    monkeypatch.setattr(settings, "go_live_month", "2026-09", raising=False)
     affiliate = _affiliate(db)
     _order(db, affiliate, "1", 200_000)
 
-    result = historical_sales(db, affiliate, AUGUST)
+    approve_month(db, affiliate, AUGUST)
+    db.flush()
 
-    assert result["net_sales_piastres"] == 200_000
-    assert result["commission"] is None
-    assert result["is_payable"] is False
-    assert "Settled before the platform" in result["label"]
+    assert db.scalars(select(NotificationOutbox)).all() == []
+
+
+def test_approving_a_live_month_still_announces_it(db, monkeypatch):
+    """The other half of the one above, so the suppression cannot widen
+    unnoticed into silence on the months that matter.
+    """
+    from app.config import settings
+    from app.models.notifications import NotificationOutbox
+
+    monkeypatch.setattr(settings, "go_live_month", "2026-08", raising=False)
+    affiliate = _affiliate(db)
+    _order(db, affiliate, "1", 200_000)
+
+    approve_month(db, affiliate, AUGUST)
+    db.flush()
+
+    assert db.scalars(select(NotificationOutbox)).all() != []
 
 
 def test_an_unconfigured_go_live_blocks_every_approval(db, monkeypatch):

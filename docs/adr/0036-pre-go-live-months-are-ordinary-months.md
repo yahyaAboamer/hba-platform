@@ -83,6 +83,35 @@ months nobody would otherwise have questioned.
 **Approving eight months for twenty-one models is real work**, even with
 ranges. It is one-time, and it is the price of the year looking like a year.
 
+**Approving them announces nothing.** `approve_month` queues one email — *your
+month is closed, here is what you earned* — and the backfill would send about a
+hundred and seventy of them, every one about a month that closed and was paid
+before this platform existed. There is no reading of that sentence which is
+true about March, so the mail is suppressed for any month before go-live.
+Suppressed rather than made optional: a flag somebody has to remember to set is
+a flag somebody forgets on the one run that matters. The business tells the
+models about the older months directly, before the portal opens, which was
+already the decision.
+
+**Recording a backfilled outcome also verifies it, in the same act.** This is
+the only place in the platform where the two are not separate, and the
+exception is narrow on purpose.
+
+Verification exists (§15) to stop one person inventing numbers that unlock a
+payment. Neither half of that is available here. There are **no numbers** — the
+outcome is the entire record, so a second person has nothing to check it
+against — and the month **cannot be paid**: its balance is structurally zero,
+and the payments screen refuses a transfer, an allocation and an adjustment
+against it. The split would protect nothing, while requiring it would mean a
+second pass through a screen built around counts for every guarantee month of
+every model.
+
+It is confined to months before go-live, in the service rather than in the
+database, because go-live is configuration and differs between staging and
+production — a constraint that moves with an environment variable is not a
+constraint. Allowed one month later, it would let somebody unlock a guarantee
+by asserting it.
+
 ## Alternatives considered
 
 **Backdate the terms in code.** Rejected by the business, and rightly: the
