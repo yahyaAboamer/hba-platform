@@ -78,6 +78,29 @@ payroll without touching a maintainer screen. **Keep that isolation.**
   accent; the writable-routes guard fails when anybody adds a route a model
   can call. **These failing is them working.**
 
+## Handing over to a new session
+
+This project outruns a single conversation. **Hand over at a milestone, not at
+a breakdown** — the end of a batch, once it is merged and promoted, is the
+cheapest moment: nothing is half-finished and the state is a sentence.
+
+When Yahya says he wants to start a new chat, do this before he closes it:
+
+1. **Update `docs/plans/<date>-continuation-handoff.md`** — replace it, do not
+   append. It says what shipped, what is left and in what order, what somebody
+   is waiting on, and the decisions not to reopen. Add anything you got wrong,
+   so the next session does not repeat it.
+2. **Update this file** if a rule changed, a batch finished, or the test count
+   moved.
+3. **Write a memory** for anything about *how he wants to work* that is not
+   already there. Facts about the code belong in the repo, not in memory.
+4. **Leave the tree clean and both branches level.** A new session should never
+   inherit uncommitted work.
+
+His first message in the new chat is then two lines: read the handoff, start
+the next task. Never tell him to "read the whole project" — `limits.md` alone
+is 2,500 lines and would spend the context that was the point of starting over.
+
 ## Environment
 
 - Windows, Git Bash. Use `.venv/Scripts/python.exe`, not `python`.
