@@ -397,3 +397,52 @@
 .affiliate .input:focus {
   border-color: var(--accent);
 }
+
+/* ── The one thing to do from a screen ──────────────────────────────────
+ *
+ * A full-width target a thumb finds without aiming. It existed in the design
+ * preview and never reached this file, so "See every order" rendered as a
+ * browser-default link - blue, underlined, and the only unstyled thing in the
+ * portal.
+ *
+ * `a` and `button` both, because it is a link on the Month screen and will be
+ * a button elsewhere, and they should not look like two different controls.
+ */
+.affiliate .block {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  width: 100%;
+  margin-top: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.affiliate .block:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.affiliate .block em {
+  font-style: normal;
+  color: var(--accent-text);
+}
+
+/* Links inside the portal's prose take the accent. Left to the browser they
+   were the default blue - the one colour in a red interface that belongs to
+   nothing. */
+.affiliate .figure__note a,
+.affiliate .expl__body a,
+.affiliate .orders__explain a {
+  color: var(--accent-text);
+  text-underline-offset: 2px;
+}
