@@ -151,7 +151,7 @@ def test_writing_requires_authentication(anonymous):
     for method, path in [
         ("PATCH", "/api/affiliates/1"),
         ("POST", "/api/affiliates/1/codes"),
-        ("POST", "/api/affiliates/1/compensation"),
+        ("PUT", "/api/affiliates/1/pay-history"),
         ("PUT", "/api/affiliates/1/payout-destination"),
         ("POST", "/api/affiliates/1/payout-destination/reveal"),
     ]:
@@ -180,12 +180,17 @@ def test_an_affiliate_cannot_create_or_change_anything(client):
         "/api/affiliates/1/codes",
         json={"code": "X10"},
     ).status_code == 403
-    assert client.post(
-        "/api/affiliates/1/compensation",
+    assert client.put(
+        "/api/affiliates/1/pay-history",
         json={
-            "start_month": "2026-01",
-            "compensation_type": "commission",
-            "commission_rate_bp": 1000,
+            "periods": [
+                {
+                    "start_month": "2026-01",
+                    "compensation_type": "commission",
+                    "commission_rate_bp": 1000,
+                }
+            ],
+            "outcomes": {},
         },
     ).status_code == 403
     assert client.put(
@@ -462,96 +467,78 @@ def test_registering_a_code_for_an_unknown_affiliate_is_404(client):
     assert response.status_code == 404
 
 
-# ── Compensation ───────────────────────────────────────────────────────────────
+# ── Pay terms ──────────────────────────────────────────────
+
+# ADR 0036, task #17. `POST /compensation` recorded one arrangement from one
+# month and was the only way to set pay; the pay-history route replaced it,
+# because a model can have been on three arrangements in a year and writing
+# that history a period at a time was three saves that refused each other over
+# a one-month overlap. These are the same guarantees, asked of the route that
+# survived.
 
 
-def test_setting_compensation(client):
+def _one_period(**overrides) -> dict:
+    period = {
+        "start_month": "2026-01",
+        "compensation_type": "commission",
+        "commission_rate_bp": 1000,
+    }
+    period.update(overrides)
+    return {"periods": [period], "outcomes": {}}
+
+
+def test_setting_pay_terms(client):
     affiliate = _register(client)
-    response = client.post(
-        f"/api/affiliates/{affiliate['id']}/compensation",
-        json={
-            "start_month": "2026-01",
-            "compensation_type": "commission",
-            "commission_rate_bp": 1000,
-        },
+
+    response = client.put(
+        f"/api/affiliates/{affiliate['id']}/pay-history", json=_one_period()
     )
-    assert response.status_code == 201
-    body = response.json()
-    assert body["compensation_type"] == "commission"
-    assert body["commission_rate_bp"] == 1000
+
+    assert response.status_code == 200, response.text
+    period = response.json()["periods"][0]
+    assert period["compensation_type"] == "commission"
+    assert period["commission_rate_bp"] == 1000
 
 
 def test_a_base_guarantee_requires_a_base_amount(client):
+    """Each type carries exactly the money fields it uses. A guarantee with no
+    floor is an arrangement that cannot be calculated.
+    """
     affiliate = _register(client)
-    response = client.post(
-        f"/api/affiliates/{affiliate['id']}/compensation",
-        json={
-            "start_month": "2026-01",
-            "compensation_type": "base_guarantee",
-            "commission_rate_bp": 1000,
-        },
+
+    response = client.put(
+        f"/api/affiliates/{affiliate['id']}/pay-history",
+        json=_one_period(compensation_type="base_guarantee"),
     )
+
     assert response.status_code == 400
 
 
-def test_overlapping_compensation_periods_are_refused(client):
+def test_an_unknown_arrangement_is_refused(client):
     affiliate = _register(client)
-    client.post(
-        f"/api/affiliates/{affiliate['id']}/compensation",
-        json={
-            "start_month": "2026-01",
-            "end_month": "2026-06",
-            "compensation_type": "commission",
-            "commission_rate_bp": 800,
-        },
-    )
-    response = client.post(
-        f"/api/affiliates/{affiliate['id']}/compensation",
-        json={
-            "start_month": "2026-04",
-            "compensation_type": "commission",
-            "commission_rate_bp": 1000,
-        },
-    )
-    assert response.status_code == 409
 
-
-def test_an_unknown_compensation_type_is_refused(client):
-    affiliate = _register(client)
-    response = client.post(
-        f"/api/affiliates/{affiliate['id']}/compensation",
-        json={
-            "start_month": "2026-01",
-            "compensation_type": "generous",
-            "commission_rate_bp": 1000,
-        },
+    response = client.put(
+        f"/api/affiliates/{affiliate['id']}/pay-history",
+        json=_one_period(compensation_type="generous"),
     )
+
     assert response.status_code == 400
 
 
-def test_current_compensation_shows_up_on_the_affiliate(client):
+def test_current_pay_terms_show_up_on_the_affiliate(client):
     affiliate = _register(client)
-    client.post(
-        f"/api/affiliates/{affiliate['id']}/compensation",
-        json={
-            "start_month": "2026-01",
-            "compensation_type": "commission",
-            "commission_rate_bp": 1234,
-        },
+
+    client.put(
+        f"/api/affiliates/{affiliate['id']}/pay-history",
+        json=_one_period(commission_rate_bp=1234),
     )
+
     body = client.get(f"/api/affiliates/{affiliate['id']}").json()
     assert body["compensation"]["commission_rate_bp"] == 1234
 
 
-def test_setting_compensation_for_an_unknown_affiliate_is_404(client):
-    response = client.post(
-        "/api/affiliates/999999/compensation",
-        json={
-            "start_month": "2026-01",
-            "compensation_type": "commission",
-            "commission_rate_bp": 1000,
-        },
-    )
+def test_setting_pay_terms_for_an_unknown_affiliate_is_404(client):
+    response = client.put("/api/affiliates/999999/pay-history", json=_one_period())
     assert response.status_code == 404
 
 
@@ -624,15 +611,20 @@ def test_content_manager_can_manage_affiliates_and_compensation(client):
     )
     assert created.status_code == 201
 
-    response = client.post(
-        f"/api/affiliates/{created.json()['id']}/compensation",
+    response = client.put(
+        f"/api/affiliates/{created.json()['id']}/pay-history",
         json={
-            "start_month": "2026-01",
-            "compensation_type": "commission",
-            "commission_rate_bp": 1000,
+            "periods": [
+                {
+                    "start_month": "2026-01",
+                    "compensation_type": "commission",
+                    "commission_rate_bp": 1000,
+                }
+            ],
+            "outcomes": {},
         },
     )
-    assert response.status_code == 201
+    assert response.status_code == 200, response.text
 
 
 # ── History is captured by default (the flow the business described) ───────────
@@ -1207,15 +1199,20 @@ def test_the_list_reports_terms_once_they_exist(client):
         "/api/affiliates", json={"user_account_id": account, "name": "Nour"}
     ).json()["id"]
 
-    set_terms = client.post(
-        f"/api/affiliates/{affiliate_id}/compensation",
+    set_terms = client.put(
+        f"/api/affiliates/{affiliate_id}/pay-history",
         json={
-            "start_month": "2020-01",
-            "compensation_type": "commission",
-            "commission_rate_bp": 1000,
+            "periods": [
+                {
+                    "start_month": "2020-01",
+                    "compensation_type": "commission",
+                    "commission_rate_bp": 1000,
+                }
+            ],
+            "outcomes": {},
         },
     )
-    assert set_terms.status_code in (200, 201), set_terms.text
+    assert set_terms.status_code == 200, set_terms.text
 
     row = client.get("/api/affiliates").json()["affiliates"][0]
 
@@ -1297,69 +1294,355 @@ def test_revealing_with_nothing_on_file_is_a_404(client):
     assert response.status_code == 404
 
 
-def test_changing_a_rate_through_the_api_is_one_call(client):
-    """What the Compensation screen has always claimed to do.
+def test_changing_a_rate_is_one_call_that_either_happens_or_does_not(client):
+    """What the pay screen has always claimed to do.
 
-    The screen says "Saving this ends that arrangement and starts a new one".
-    It returned 409 - the second arrangement overlapped the first, and every
-    rate change after the very first one failed with a message nobody could
-    act on. One call now, and it either happens completely or not at all.
+    It said *"saving this ends that arrangement and starts a new one"* and
+    returned 409 — the second arrangement overlapped the first, and every rate
+    change after the very first failed with a message nobody could act on. It
+    is one call now, carrying both arrangements, and it either happens
+    completely or not at all.
+
+    **`set_terms`' own semantics** — a later month opening a new arrangement, a
+    repeated month rewriting the one already there — are unchanged and covered
+    at the service level in `test_compensation.py`. They no longer have a route
+    of their own: `POST /compensation` was removed with the form that called
+    it, and `test_reachability` is what noticed.
     """
     affiliate = _register(client)
 
-    first = client.post(
-        f"/api/affiliates/{affiliate['id']}/compensation",
+    response = client.put(
+        f"/api/affiliates/{affiliate['id']}/pay-history",
         json={
-            "start_month": "2026-01",
-            "compensation_type": "commission",
-            "commission_rate_bp": 800,
-        },
-    )
-    assert first.status_code == 201, first.text
-    assert first.json()["end_month"] is None
-
-    changed = client.post(
-        f"/api/affiliates/{affiliate['id']}/compensation",
-        json={
-            "start_month": "2026-09",
-            "compensation_type": "commission",
-            "commission_rate_bp": 1200,
-        },
-    )
-    assert changed.status_code == 201, changed.text
-    assert changed.json()["commission_rate_bp"] == 1200
-    assert changed.json()["start_month"] == "2026-09"
-
-
-def test_naming_the_same_month_rewrites_the_arrangement(client):
-    """There is no separate correction endpoint any more.
-
-    The month is the whole instruction: a later one opens a new arrangement,
-    the month one already starts in rewrites it. The terms no longer carry an
-    id either - the browser addressed `PATCH .../compensation/{period_id}`
-    with it, and that route is gone.
-    """
-    affiliate = _register(client)
-    client.post(
-        f"/api/affiliates/{affiliate['id']}/compensation",
-        json={
-            "start_month": "2026-09",
-            "compensation_type": "commission",
-            "commission_rate_bp": 800,
+            "periods": [
+                {
+                    "start_month": "2026-01",
+                    "end_month": "2026-08",
+                    "compensation_type": "commission",
+                    "commission_rate_bp": 800,
+                },
+                {
+                    "start_month": "2026-09",
+                    "compensation_type": "commission",
+                    "commission_rate_bp": 1200,
+                },
+            ],
+            "outcomes": {},
         },
     )
 
-    rewritten = client.post(
-        f"/api/affiliates/{affiliate['id']}/compensation",
-        json={
-            "start_month": "2026-09",
-            "compensation_type": "commission",
-            "commission_rate_bp": 850,
-        },
-    )
-    assert rewritten.status_code == 201, rewritten.text
+    assert response.status_code == 200, response.text
+    periods = response.json()["periods"]
+    assert [p["commission_rate_bp"] for p in periods] == [800, 1200]
+    assert periods[0]["end_month"] == "2026-08"
+    assert periods[1]["end_month"] is None
 
     detail = client.get(f"/api/affiliates/{affiliate['id']}").json()
-    assert detail["compensation"]["commission_rate_bp"] == 850
-    assert detail["compensation"]["start_month"] == "2026-09"
+    assert detail["compensation"]["commission_rate_bp"] == 1200
+    # The terms no longer carry an id: the browser addressed
+    # `PATCH .../compensation/{period_id}` with it, and that route is gone.
     assert "id" not in detail["compensation"]
+
+
+# ── ADR 0036: the pay-history editor ──────────────────────────────────────────
+
+
+@pytest.fixture()
+def _go_live(monkeypatch):
+    """September is ours; everything earlier was settled outside.
+
+    Requested by name rather than autouse. An autouse fixture appended to the
+    bottom of a module quietly changes the environment of every test above it,
+    and the eighty-three already here were written without a go-live month.
+    """
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "go_live_month", "2026-09", raising=False)
+
+
+def _attributed(affiliate_id: int, order_id: str, month: str, base: int = 100_000):
+    """An order that already belongs to her, without going through Shopify."""
+    _add_order(order_id, "NOUR10", month=month)
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO attributed_order (shopify_order_id, affiliate_id, "
+                "business_month, commission_base_piastres, commission_state) "
+                "VALUES (:o, :a, :m, :b, 'earned')"
+            ),
+            {"o": order_id, "a": affiliate_id, "m": month, "b": base},
+        )
+
+
+def _history(client, affiliate_id, periods, outcomes=None):
+    return client.put(
+        f"/api/affiliates/{affiliate_id}/pay-history",
+        json={"periods": periods, "outcomes": outcomes or {}},
+    )
+
+
+COMMISSION = {"compensation_type": "commission", "commission_rate_bp": 1000}
+GUARANTEE = {
+    "compensation_type": "base_guarantee",
+    "commission_rate_bp": 1000,
+    "base_amount_piastres": 300_000,
+}
+
+
+def test_the_editor_opens_on_every_month_from_the_horizon_to_now(client, _go_live):
+    """One call, not one per month. The strip draws nine at a time for
+    twenty-one models in a sitting.
+    """
+    affiliate = _register(client)
+    _attributed(affiliate["id"], "1", "2026-03")
+
+    body = client.get(f"/api/affiliates/{affiliate['id']}/pay-history").json()
+
+    months = [row["month"] for row in body["months"]]
+    assert months[0] == "2026-01"
+    assert body["working_month"] in months
+    assert body["joined_month"] == "2026-03"
+    # What the strip hatches: a month she did not sell in is not hers to
+    # arrange, and offering it invites a year of arrangements for months that
+    # never existed.
+    assert [row["month"] for row in body["months"] if row["has_orders"]] == [
+        "2026-03"
+    ]
+
+
+def test_a_whole_history_is_written_in_one_act(client, _go_live):
+    """Three arrangements over seven months, one Save. Applied as three
+    separate `set_terms` calls this left a one-month remnant of whatever was
+    there before, quietly deciding what an old month was worth.
+    """
+    affiliate = _register(client)
+
+    response = _history(
+        client,
+        affiliate["id"],
+        [
+            {"start_month": "2026-02", "end_month": "2026-03", **COMMISSION},
+            {
+                "start_month": "2026-04",
+                "end_month": "2026-06",
+                "compensation_type": "fixed_plus_commission",
+                "commission_rate_bp": 1000,
+                "fixed_amount_piastres": 500_000,
+            },
+            {"start_month": "2026-07", "end_month": None, **COMMISSION},
+        ],
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert [(p["start_month"], p["end_month"]) for p in body["periods"]] == [
+        ("2026-02", "2026-03"),
+        ("2026-04", "2026-06"),
+        ("2026-07", None),
+    ]
+
+
+def test_rewriting_a_history_leaves_nothing_of_the_old_one(client, _go_live):
+    """The whole point of not looping over `set_terms`. A second Save replaces
+    what the first wrote rather than layering on top of it.
+    """
+    affiliate = _register(client)
+    _history(
+        client,
+        affiliate["id"],
+        [{"start_month": "2026-01", "end_month": None, **COMMISSION}],
+    )
+
+    _history(
+        client,
+        affiliate["id"],
+        [
+            {
+                "start_month": "2026-05",
+                "end_month": None,
+                "compensation_type": "commission",
+                "commission_rate_bp": 1200,
+            }
+        ],
+    )
+
+    body = client.get(f"/api/affiliates/{affiliate['id']}/pay-history").json()
+    assert len(body["periods"]) == 1
+    assert body["periods"][0]["start_month"] == "2026-05"
+    assert body["periods"][0]["commission_rate_bp"] == 1200
+
+
+def test_overlapping_arrangements_are_refused_in_months_not_dateranges(client, _go_live):
+    """The database refuses this too. This is the half that says it in months."""
+    affiliate = _register(client)
+
+    response = _history(
+        client,
+        affiliate["id"],
+        [
+            {"start_month": "2026-02", "end_month": "2026-06", **COMMISSION},
+            {"start_month": "2026-05", "end_month": None, **COMMISSION},
+        ],
+    )
+
+    assert response.status_code == 400
+    assert "overlap" in response.json()["detail"]
+
+
+def test_only_the_last_arrangement_may_run_until_further_notice(client, _go_live):
+    affiliate = _register(client)
+
+    response = _history(
+        client,
+        affiliate["id"],
+        [
+            {"start_month": "2026-02", "end_month": None, **COMMISSION},
+            {"start_month": "2026-07", "end_month": None, **COMMISSION},
+        ],
+    )
+
+    assert response.status_code == 400
+    assert "until further notice" in response.json()["detail"]
+
+
+def test_an_approved_month_may_be_written_around_but_never_moved(client, monkeypatch):
+    """**The real case, and the one a cruder rule would refuse.**
+
+    A model with August already agreed and February to July still to enter.
+    The rule is *the answer does not move*, not *the row does not change*, so
+    an open-ended arrangement may be shortened around an approved month while
+    the arrangement that month resolves to stays identical.
+    """
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "go_live_month", "2026-08", raising=False)
+    affiliate = _register(client)
+    _attributed(affiliate["id"], "1", "2026-08")
+    _history(
+        client,
+        affiliate["id"],
+        [{"start_month": "2026-01", "end_month": None, **COMMISSION}],
+    )
+    approve = client.post(
+        "/api/payroll/2026-08/approve",
+        json={"affiliate_ids": [affiliate["id"]], "preview": False},
+    )
+    assert approve.json()["results"][0]["approved"] is True, approve.text
+
+    # August still resolves to commission at 10%, so this is allowed even
+    # though every row is rewritten.
+    response = _history(
+        client,
+        affiliate["id"],
+        [
+            {"start_month": "2026-01", "end_month": "2026-05", **COMMISSION},
+            {"start_month": "2026-06", "end_month": None, **COMMISSION},
+        ],
+    )
+
+    assert response.status_code == 200, response.text
+
+
+def test_a_rate_an_approved_month_was_calculated_from_cannot_be_rewritten(
+    client, monkeypatch
+):
+    """§11.1. Changing it now would change what August was worth after the
+    money moved, and the frozen snapshot would disagree with the data it came
+    from.
+    """
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "go_live_month", "2026-08", raising=False)
+    affiliate = _register(client)
+    _attributed(affiliate["id"], "1", "2026-08")
+    _history(
+        client,
+        affiliate["id"],
+        [{"start_month": "2026-01", "end_month": None, **COMMISSION}],
+    )
+    client.post(
+        "/api/payroll/2026-08/approve",
+        json={"affiliate_ids": [affiliate["id"]], "preview": False},
+    )
+
+    response = _history(
+        client,
+        affiliate["id"],
+        [
+            {
+                "start_month": "2026-01",
+                "end_month": None,
+                "compensation_type": "commission",
+                "commission_rate_bp": 1200,
+            }
+        ],
+    )
+
+    assert response.status_code == 400
+    assert "2026-08" in response.json()["detail"]
+    assert "Reopen" in response.json()["detail"]
+
+
+def test_a_guarantee_month_before_go_live_carries_its_outcome(client, _go_live):
+    """ADR 0036. The arrangement and the outcome are one decision on the screen
+    and commit together here - a history saved without its outcomes leaves
+    every guarantee month blocked on a target nobody can record from it.
+    """
+    affiliate = _register(client)
+    _attributed(affiliate["id"], "1", "2026-03")
+
+    response = _history(
+        client,
+        affiliate["id"],
+        [{"start_month": "2026-01", "end_month": "2026-08", **GUARANTEE}],
+        outcomes={"2026-03": "met", "2026-04": "missed"},
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    outcomes = {row["month"]: row["outcome"] for row in body["months"]}
+    assert outcomes["2026-03"] == "met"
+    assert outcomes["2026-04"] == "missed"
+
+
+def test_an_outcome_for_a_month_the_platform_pays_for_is_refused(client, _go_live):
+    """Allowed there, somebody could unlock a base guarantee by asserting it -
+    no counts, no second person, and a real payment at the end of it.
+    """
+    affiliate = _register(client)
+
+    response = _history(
+        client,
+        affiliate["id"],
+        [{"start_month": "2026-01", "end_month": None, **GUARANTEE}],
+        outcomes={"2026-09": "met"},
+    )
+
+    assert response.status_code == 400
+    assert "not before the platform" in response.json()["detail"]
+
+
+def test_a_refused_save_writes_nothing_at_all(client, _go_live):
+    """All or nothing. A half-written history is a model with months that
+    cannot be calculated, and the screen promised one Save.
+    """
+    affiliate = _register(client)
+    _history(
+        client,
+        affiliate["id"],
+        [{"start_month": "2026-01", "end_month": None, **COMMISSION}],
+    )
+
+    # The periods are valid; the outcome is not, and it is applied second.
+    response = _history(
+        client,
+        affiliate["id"],
+        [{"start_month": "2026-04", "end_month": None, **GUARANTEE}],
+        outcomes={"2026-09": "met"},
+    )
+    assert response.status_code == 400
+
+    body = client.get(f"/api/affiliates/{affiliate['id']}/pay-history").json()
+    assert len(body["periods"]) == 1
+    assert body["periods"][0]["start_month"] == "2026-01"
+    assert body["periods"][0]["compensation_type"] == "commission"

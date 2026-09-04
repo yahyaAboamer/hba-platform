@@ -523,12 +523,17 @@ def _api_affiliate(client, name="Nour", email="nour@example.com") -> dict:
     response = client.post("/api/affiliates", json=body)
     assert response.status_code == 201, response.text
     affiliate = response.json()
-    client.post(
-        f"/api/affiliates/{affiliate['id']}/compensation",
+    client.put(
+        f"/api/affiliates/{affiliate['id']}/pay-history",
         json={
-            "start_month": "2026-01",
-            "compensation_type": "commission",
-            "commission_rate_bp": 1000,
+            "periods": [
+                {
+                    "start_month": "2026-01",
+                    "compensation_type": "commission",
+                    "commission_rate_bp": 1000,
+                }
+            ],
+            "outcomes": {},
         },
     )
     return affiliate

@@ -70,9 +70,9 @@ payroll without touching a maintainer screen. **Keep that isolation.**
 
 ## Verification
 
-- Backend: `.venv/Scripts/python.exe -m pytest -q` — **1558 passing**, and no
+- Backend: `.venv/Scripts/python.exe -m pytest -q` — **1589 passing**, and no
   change merges below that. It takes 5–15 minutes; run it in the background.
-- Frontend: `cd frontend && npm test` (87) and `npm run build`.
+- Frontend: `cd frontend && npm test` (104) and `npm run build`.
 - The suite is the ratchet. `test_reachability.py` fails when a route has no
   way in from the interface; `accent-isolation.test.ts` fails on a hard-coded
   accent; the writable-routes guard fails when anybody adds a route a model
@@ -89,7 +89,10 @@ The waste is never where you expect it.
 - **Pipe every Bash result** through `head`, `tail` or `grep`. A bare `grep -rn`
   across the repo once returned 180KB.
 - **`pytest -q --color=no | tail -5`.** The colour codes in a full run are
-  thousands of tokens of `[32m.[0m`, and only the last line matters.
+  thousands of tokens of `[32m.[0m`, and only the last line matters. **Redirect
+  to a file and echo `$?`** rather than piping straight to `tail`: the pipeline
+  reports *`tail`'s* exit code, so a run with a hundred failures still exits 0
+  and reads as a pass if you only check the status.
 - The suite takes 5–15 minutes: run it with `run_in_background` and poll.
 
 ## Handing over to a new session

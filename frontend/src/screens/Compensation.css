@@ -1,21 +1,478 @@
-.comp__form {
-  max-width: 44rem;
+/* The pay-history editor. ADR 0036, task #17.
+
+   Laptop first and dense, like every maintainer screen — the portal's dark
+   theme has no business here, and `tokens.css` is light-only for exactly that
+   reason.
+
+   ## The one place this codebase spends colour on something other than money
+
+   ADR 0027 reserves colour for money state, and this bends it deliberately.
+   The whole task is telling three arrangements apart across nine months at a
+   glance, and a strip in one colour cannot do it — somebody checking whether
+   April is salary or guarantee would be reading nine labels instead of seeing
+   a shape.
+
+   Tints, never fills, so nothing here competes with an owed figure. And they
+   appear nowhere outside this file: these are not tokens, and adding a fourth
+   screen that uses them is the moment to ask whether they should be. */
+
+/* Deeper than the mockup's, and for a reason found by looking at the built
+   screen rather than at a picture of it. The mockup's `#f2f4f6` is a two
+   percent step off `--surface`, which in a static image with two tiles set
+   looks like restraint and in a strip of nine looks like nothing at all: a
+   month on commission was distinguishable from a month with no arrangement
+   only by reading the word on it, which is exactly what the colour is here to
+   save somebody from doing.
+
+   Still tints. Nothing here approaches a fill, and none of them competes with
+   an owed figure elsewhere on the screen. */
+.comp {
+  --commission: #5c6673;
+  --commission-bg: #e8ecf1;
+  --salary: #3538cd;
+  --salary-bg: #e6e8fc;
+  --guarantee: #8a5300;
+  --guarantee-bg: #fbeeda;
 }
 
-.comp__choice {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
+.crumb {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}
+
+.comp__lede {
+  max-width: 70ch;
   margin: 0 0 var(--space-5);
+  color: var(--quiet);
+  font-size: var(--text-sm);
+}
+
+.comp__card {
+  margin-bottom: var(--space-5);
+  padding: var(--space-4) var(--space-5) var(--space-5);
+}
+
+.comp__cardtitle {
+  margin: 0 0 var(--space-4);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--quiet);
+}
+
+/* ── the fork ─────────────────────────────────────────────────────────────── */
+
+.fork {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.fork button {
+  flex: 1;
+  min-width: 250px;
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+  font: inherit;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.fork button:hover {
+  background: var(--hover);
+}
+
+.fork b {
+  display: block;
+  font-weight: 600;
+}
+
+.fork span {
+  display: block;
+  margin-top: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--quiet);
+}
+
+/* ── the month strip ──────────────────────────────────────────────────────── */
+
+.striphead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.hint {
+  margin: 0 0 var(--space-4);
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}
+
+.strip {
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  gap: var(--space-2);
+  user-select: none;
+}
+
+@media (max-width: 900px) {
+  .strip {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
+
+.mo {
+  position: relative;
+  padding: var(--space-3) var(--space-1);
+  font: inherit;
+  text-align: center;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition:
+    background 0.1s,
+    border-color 0.1s;
+}
+
+.mo:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.mo[data-set="commission"] {
+  background: var(--commission-bg);
+  border-color: var(--commission);
+}
+
+.mo[data-set="fixed_plus_commission"] {
+  background: var(--salary-bg);
+  border-color: var(--salary);
+}
+
+.mo[data-set="base_guarantee"] {
+  background: var(--guarantee-bg);
+  border-color: var(--guarantee);
+}
+
+.mo[data-set="none"] .mo__what {
+  color: var(--quiet);
+  font-style: italic;
+}
+
+.mo[aria-pressed="true"] {
+  border-color: var(--focus);
+  box-shadow: inset 0 0 0 2px var(--focus);
+}
+
+/* Hatched, not merely dimmed. A month before she sold anything and a month
+   already approved are both *not yours to set*, and a flat grey reads as
+   "loading" rather than as a decision the screen has already made. */
+.mo:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  background: repeating-linear-gradient(
+    135deg,
+    var(--rule) 0 4px,
+    transparent 4px 8px
+  );
+}
+
+.mo__name {
+  display: block;
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}
+
+.mo__what {
+  display: block;
+  margin-top: var(--space-2);
+  min-height: 1.6em;
+  font-size: var(--text-xs);
+  line-height: 1.3;
+}
+
+.mo__amt {
+  display: block;
+  min-height: 1.2em;
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+}
+
+.mo__met {
+  display: block;
+  margin-top: var(--space-1);
+  font-size: 0.625rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.mo__met--yes {
+  color: var(--settled);
+}
+
+.mo__met--no {
+  color: var(--quiet);
+}
+
+.legend {
+  display: flex;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-top: var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}
+
+.legend i {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: var(--space-1);
+  border: 1px solid;
+  border-radius: 2px;
+}
+
+.legend--commission {
+  background: var(--commission-bg);
+  border-color: var(--commission);
+}
+
+.legend--salary {
+  background: var(--salary-bg);
+  border-color: var(--salary);
+}
+
+.legend--guarantee {
+  background: var(--guarantee-bg);
+  border-color: var(--guarantee);
+}
+
+.legend__quiet {
+  opacity: 0.7;
+}
+
+/* ── the editor panel ─────────────────────────────────────────────────────── */
+
+.cpanel {
+  margin-top: var(--space-5);
+  padding: var(--space-4) var(--space-5);
+  background: var(--surface);
+  border: 1px solid var(--focus);
+  border-radius: var(--radius);
+}
+
+.cpanel h3 {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-base);
+}
+
+.cpanel__for {
+  margin: 0 0 var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--quiet);
+}
+
+/* Where the answer is not this screen's to give. Quiet and factual: a
+   guaranteed minimum in a month the platform pays for records what was
+   produced, and is counted rather than asserted (ADR 0036). */
+.cpanel__elsewhere {
+  margin: var(--space-4) 0 0;
+  font-size: var(--text-sm);
+  color: var(--quiet);
+}
+
+.kinds {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-4);
+}
+
+.kinds button {
+  padding: var(--space-2) var(--space-3);
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.kinds button:hover {
+  background: var(--hover);
+}
+
+.kinds button[aria-pressed="true"] {
+  font-weight: 500;
+  background: var(--hover);
+  border-color: var(--focus);
+  box-shadow: inset 0 0 0 1px var(--focus);
+}
+
+.fields {
+  display: flex;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.fields .field {
+  display: block;
+  font-size: var(--text-sm);
+  color: var(--quiet);
+}
+
+.fields .input {
+  margin-top: var(--space-1);
+  width: 11rem;
+}
+
+.targets {
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--rule);
+}
+
+.targets > p {
+  max-width: 66ch;
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--quiet);
+}
+
+.trow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--rule);
+  font-size: var(--text-sm);
+}
+
+.trow:last-child {
+  border-bottom: none;
+}
+
+.seg {
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+}
+
+.seg button {
+  padding: var(--space-1) var(--space-3);
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--quiet);
+  background: transparent;
+  border: 0;
+  border-left: 1px solid var(--rule-strong);
+  cursor: pointer;
+}
+
+.seg button:first-child {
+  border-left: 0;
+}
+
+.seg button[aria-pressed="true"] {
+  font-weight: 500;
+  color: var(--ink);
+  background: var(--hover);
+}
+
+.seg button[aria-pressed="true"][data-value="met"] {
+  color: var(--settled);
+}
+
+.acts {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-top: var(--space-5);
+}
+
+/* ── the summary, and saving ──────────────────────────────────────────────── */
+
+.comp__scroll {
+  overflow-x: auto;
+}
+
+.pill {
+  display: inline-block;
+  padding: 0 var(--space-2);
+  font-size: var(--text-xs);
+  border: 1px solid;
+  border-radius: 999px;
+}
+
+.pill--commission {
+  color: var(--commission);
+  background: var(--commission-bg);
+  border-color: var(--commission);
+}
+
+.pill--fixed_plus_commission {
+  color: var(--salary);
+  background: var(--salary-bg);
+  border-color: var(--salary);
+}
+
+.pill--base_guarantee {
+  color: var(--guarantee);
+  background: var(--guarantee-bg);
+  border-color: var(--guarantee);
+}
+
+.comp__clear {
   padding: 0;
-  border: none;
+  font: inherit;
+  font-size: var(--text-xs);
+  color: var(--refused);
+  background: none;
+  border: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
 }
 
-.comp__field {
-  max-width: 22rem;
+/* Sticky, because the strip is long and the thing it says — which months are
+   still without an arrangement — is the reason somebody is still on the page. */
+.comp__save {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  padding: var(--space-4) var(--space-5);
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
 }
 
-/* A percentage sign belongs to the number, not to the label - somebody
+.comp__save p {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--quiet);
+}
+
+.comp__save p.comp__ready {
+  color: var(--settled);
+}
+
+/* A percentage sign belongs to the number, not to the label — somebody
    checking "did I type 10 or 100" should not have to read the hint to know
    which unit they are in. */
 .comp__suffixed {
@@ -28,18 +485,4 @@
   font-family: var(--mono);
   font-size: var(--text-sm);
   color: var(--quiet);
-}
-
-.comp__summary {
-  margin-top: var(--space-4);
-  border: 1px solid var(--rule);
-  border-radius: var(--radius);
-}
-
-/* The arrangement being replaced. Stated plainly rather than in the refused
-   colour: ending one period and starting another is the ordinary way a rate
-   changes, not a fault. */
-.comp__note {
-  max-width: 60ch;
-  margin-top: var(--space-4);
 }

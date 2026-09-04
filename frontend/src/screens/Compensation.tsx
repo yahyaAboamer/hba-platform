@@ -1,198 +1,282 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { Money } from "../components/Money";
-import { MonthPicker } from "../components/MonthPicker";
 import { api } from "../lib/api";
-import { egpPlain, formatMonth, parseEgp } from "../lib/money";
-import type { Affiliate } from "./Affiliates";
+import {
+  egpPlain,
+  formatEgp,
+  formatMonth,
+  parseEgp,
+  shortMonth,
+} from "../lib/money";
+import {
+  fromServer,
+  outcomesFrom,
+  periodsToWrite,
+  runs,
+  toBasisPoints,
+} from "../lib/payHistory";
+import type {
+  Arrangement,
+  Kind,
+  MonthRow,
+  PayHistory,
+} from "../lib/payHistory";
 import "./Payroll.css";
 import "./Compensation.css";
 
-type Compensation = {
-  id: number;
-  start_month: string;
-  end_month: string | null;
-  compensation_type: Kind;
-  commission_rate_bp: number;
-  fixed_amount_piastres: number | null;
-  base_amount_piastres: number | null;
-  expected_customer_discount_bp: number | null;
-};
-
-type Detail = Affiliate & {
-  current_month: string;
-  compensation: Compensation | null;
-};
-
-type Kind = "commission" | "fixed_plus_commission" | "base_guarantee";
-
 const KIND_LABEL: Record<Kind, string> = {
   commission: "Commission only",
-  fixed_plus_commission: "Salary plus commission",
+  fixed_plus_commission: "Salary + commission",
   base_guarantee: "Guaranteed minimum",
 };
 
-const KIND_MEANING: Record<Kind, string> = {
-  commission: "A share of what the code sells, and nothing else.",
+const KIND_NOTE: Record<Kind, string> = {
+  commission: "Paid a percentage of what her code sold. Nothing else.",
   fixed_plus_commission:
-    "A fixed amount every month, and commission on top of it.",
+    "Both. The salary is paid on top of the commission, never instead of it.",
   base_guarantee:
-    "Whichever is larger — commission, or the guaranteed amount. Never both. The guarantee only applies in a month where targets were met and confirmed.",
+    "Whichever is larger — her commission, or the floor — and only in a month where she met her targets.",
 };
 
-/**
- * Setting what an affiliate is paid on. §12.2's Pattern C: its own page, its
- * own URL, and a mandatory "what this changes" preview.
- *
- * This is the one screen in the platform that had no interface at all until
- * now — the endpoint has existed since Phase 3 and nothing called it, so a
- * model could be approved and then sit on the payroll screen blocked on
- * *no pay terms* forever, with no way to resolve it.
- *
- * **A rate change is a new period, never an edit.** The database refuses two
- * periods that overlap, so the months they were on 8% cannot later become months
- * they were on 10%. That is enforced server-side; this page exists to make it
- * legible before it is committed.
- */
-/** The first month the platform holds data for. See the default below. */
-const PLATFORM_FIRST_MONTH = "2026-01";
+/** The short word used on a strip tile, where "+ commission" will not fit. */
+const KIND_SHORT: Record<Kind, string> = {
+  commission: "Commission",
+  fixed_plus_commission: "Salary +",
+  base_guarantee: "Guaranteed",
+};
 
+/** Which money field each arrangement carries, and what to call it. */
+const AMOUNT_LABEL: Partial<Record<Kind, string>> = {
+  fixed_plus_commission: "Monthly salary",
+  base_guarantee: "Guaranteed minimum",
+};
+
+const KINDS = Object.keys(KIND_LABEL) as Kind[];
+
+/**
+ * Setting up what a model is paid on, for every month she has sold in.
+ *
+ * ADR 0036 and task #17. **This replaced a form that could record one
+ * arrangement from one month**, which was the whole of what the platform could
+ * express and nothing like what actually happened: a model can have been on
+ * commission in January, on a salary from April, and on a guaranteed minimum
+ * from June, and every one of those months has to be calculable or her
+ * dashboard shows a hole where her year should be.
+ *
+ * The old form could technically write that history — three saves, each
+ * naming a start and an end month by hand, each refused if the months
+ * overlapped by one. The strip is the same information asked for in the shape
+ * the answer already has.
+ *
+ * ## What it will not let somebody do
+ *
+ * **Arrange a month she did not sell in.** Those are hatched. Offering them
+ * invites a year of arrangements for months that never existed.
+ *
+ * **Touch an approved month.** §11.1: changing what it was calculated from
+ * after the money moved would leave the frozen snapshot disagreeing with the
+ * data it came from. The server refuses it; this marks it before it is
+ * clicked, which is the difference between a rule and a surprise.
+ *
+ * **Assert a target for a month that can still be paid.** The met/missed
+ * toggle appears only on a guaranteed minimum *before go-live*, where the
+ * outcome is the whole of what the old dashboard kept. Later months record
+ * what was produced, on the Targets screen, and are counted rather than
+ * asserted.
+ *
+ * ## Consecutive identical months collapse
+ *
+ * Because that is what gets written: `set_terms` records a run, not a month.
+ * Showing nine rows for one decision would misrepresent the record somebody is
+ * about to agree to.
+ */
 export function Compensation() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
 
-  const [detail, setDetail] = useState<Detail | null>(null);
-  const [kind, setKind] = useState<Kind>("commission");
-  const [rate, setRate] = useState("10");
-  const [fixed, setFixed] = useState("");
-  const [base, setBase] = useState("");
-  const [discount, setDiscount] = useState("");
-  const [startMonth, setStartMonth] = useState("");
-  //: Changing what somebody is paid from a month, or fixing what was typed
-  //: into the arrangement they are already on. Only offered once there is
-  //: something to correct.
+  const [data, setData] = useState<PayHistory | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [working, setWorking] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const [who, setWho] = useState<"new" | "old" | null>(null);
+  const [same, setSame] = useState<"yes" | "no" | null>(null);
+  const [set, setSet] = useState<Record<string, Arrangement>>({});
+  const [sel, setSel] = useState<string[]>([]);
+  const [anchor, setAnchor] = useState<string | null>(null);
+  const [draft, setDraft] = useState<Draft | null>(null);
 
   useEffect(() => {
     api
-      .get<Detail>(`/api/affiliates/${id}`)
+      .get<PayHistory>(`/api/affiliates/${id}/pay-history`)
       .then((body) => {
-        setDetail(body);
-        // **A model with no arrangement yet starts from the platform's first
-        // month, not this one.**
+        setData(body);
+        setSet(fromServer(body));
+        // **A model who already has a history opens straight on the strip.**
         //
-        // Almost every model here was already selling before the platform
-        // existed and their rate never changed, so the honest start is the
-        // beginning of the data. Defaulting to the current month silently
-        // meant "they were on nothing until September", which is wrong for
-        // every one of them and invisible until a past month is opened.
-        //
-        // Terms starting earlier than a model's code costs nothing: the code
-        // decides which orders are theirs, so the months before it simply
-        // have a rate and no sales. Somebody whose pay genuinely changed
-        // mid-year sets the later arrangement afterwards, which is what a
-        // later month already does.
-        setStartMonth(body.compensation ? body.current_month : PLATFORM_FIRST_MONTH);
-        if (body.compensation) {
-          setKind(body.compensation.compensation_type);
-          setRate(String(body.compensation.commission_rate_bp / 100));
-          if (body.compensation.fixed_amount_piastres !== null) {
-            setFixed(egpPlain(body.compensation.fixed_amount_piastres));
-          }
-          if (body.compensation.base_amount_piastres !== null) {
-            setBase(egpPlain(body.compensation.base_amount_piastres));
-          }
-          if (body.compensation.expected_customer_discount_bp !== null) {
-            setDiscount(String(body.compensation.expected_customer_discount_bp / 100));
-          }
+        // The fork asks a question her record has already answered, and
+        // making somebody answer it again before they can correct one month
+        // is the difference between a screen you edit and a wizard you
+        // endure.
+        if (body.periods.length > 0) {
+          setWho("old");
+          setSame("no");
         }
       })
       .catch((caught) => setError(caught.message));
   }, [id]);
 
-  // Percentages are held as basis points, never as a float. 10% is 1000, and
-  // 12.5% is 1250 - the multiply happens on a string, so a rate can never
-  // arrive as 1249.9999 (ADR 0002).
-  const rateBp = toBasisPoints(rate);
-  const discountBp = discount.trim() === "" ? null : toBasisPoints(discount);
-  const fixedPiastres = fixed.trim() === "" ? null : parseEgp(fixed);
-  const basePiastres = base.trim() === "" ? null : parseEgp(base);
+  /** The months she may be arranged in: from her first sale to this month. */
+  const arrangeable = useMemo(
+    () =>
+      (data?.months ?? []).filter(
+        (row) => data?.joined_month !== null && row.month >= (data?.joined_month ?? ""),
+      ),
+    [data],
+  );
 
+  const open = arrangeable.filter((row) => !row.approved);
+  const missing = open.filter((row) => !set[row.month]);
+  // Two collapses of the same months, and they are not the same list. `rows`
+  // splits June-met from July-missed because a single row could not say which
+  // month was paid the floor; `periods` does not, because the arrangement is
+  // identical and the outcome lives on the target. Only `periods` is written,
+  // and only `periods` is counted in the save note.
+  const rows = useMemo(() => runs(arrangeable, set), [arrangeable, set]);
+  const periods = useMemo(
+    () => periodsToWrite(arrangeable, set),
+    [arrangeable, set],
+  );
 
-  const problem =
-    rateBp === null
-      ? "The commission rate needs to be a percentage, like 10 or 12.5."
-      : rateBp <= 0 || rateBp > 10_000
-        ? "The commission rate has to be above 0% and at most 100%."
-        : kind === "fixed_plus_commission" && !fixedPiastres
-          ? "A salary-plus-commission arrangement needs a salary."
-          : kind === "base_guarantee" && !basePiastres
-            ? "A guaranteed minimum needs an amount."
-            : discount.trim() !== "" && discountBp === null
-              ? "The customer discount needs to be a percentage, like 10."
-              : null;
+  function choose(month: string, withShift: boolean) {
+    const row = arrangeable.find((candidate) => candidate.month === month);
+    if (!row || row.approved) return;
 
-  async function submit(event: React.FormEvent) {
-    event.preventDefault();
-    if (problem) return;
-    setWorking(true);
+    let next: string[];
+    if (withShift && anchor !== null) {
+      const [first, last] = [anchor, month].sort();
+      next = open
+        .filter((candidate) => candidate.month >= first && candidate.month <= last)
+        .map((candidate) => candidate.month);
+    } else if (sel.length === 1 && sel[0] === month) {
+      setSel([]);
+      setAnchor(null);
+      setDraft(null);
+      return;
+    } else {
+      next = [month];
+      setAnchor(month);
+    }
+
+    setSel(next);
+    // Opening on what the first selected month already says means correcting
+    // one month is a change to one field, not a re-entry of the arrangement.
+    setDraft(draftFor(next, set));
+  }
+
+  function apply() {
+    if (!draft) return;
+    const parsed = readDraft(draft);
+    if (parsed === null) return;
+
+    setSet((was) => {
+      const next = { ...was };
+      for (const month of sel) {
+        const row = arrangeable.find((candidate) => candidate.month === month);
+        next[month] = {
+          ...parsed,
+          met:
+            parsed.kind === "base_guarantee" && row?.settled_outside
+              ? draft.met[month] ?? null
+              : null,
+        };
+      }
+      return next;
+    });
+    setSel([]);
+    setAnchor(null);
+    setDraft(null);
+  }
+
+  function clearRun(from: string, to: string) {
+    setSet((was) => {
+      const next = { ...was };
+      for (const row of arrangeable) {
+        if (row.month >= from && row.month <= to && !row.approved) {
+          delete next[row.month];
+        }
+      }
+      return next;
+    });
+  }
+
+  async function save() {
+    if (!data) return;
+    setSaving(true);
     setError(null);
-    const terms = {
-      compensation_type: kind,
-      commission_rate_bp: rateBp,
-      fixed_amount_piastres: kind === "fixed_plus_commission" ? fixedPiastres : null,
-      base_amount_piastres: kind === "base_guarantee" ? basePiastres : null,
-      expected_customer_discount_bp: discountBp,
-    };
     try {
-      // One call, one meaning. The month decides which: a later month ends
-      // whatever is in force and opens a new arrangement, the month one
-      // already starts in rewrites it. Both happen in a single transaction,
-      // so a rate change cannot half-happen - and the server refuses either
-      // outright if a month it covers is already approved.
-      await api.post(`/api/affiliates/${id}/compensation`, {
-        start_month: startMonth,
-        ...terms,
+      await api.put(`/api/affiliates/${id}/pay-history`, {
+        periods: periods.map((run) => ({
+          start_month: run.from,
+          // The last run reaches this month and is left open: "from here on,
+          // until further notice", which is what an arrangement still in
+          // force means. Closing it at this month would silently end her pay
+          // at the end of it.
+          end_month: run.to === data.working_month ? null : run.to,
+          compensation_type: run.kind,
+          commission_rate_bp: run.rateBp,
+          fixed_amount_piastres:
+            run.kind === "fixed_plus_commission" ? run.amountPiastres : null,
+          base_amount_piastres:
+            run.kind === "base_guarantee" ? run.amountPiastres : null,
+        })),
+        outcomes: outcomesFrom(arrangeable, set),
       });
       navigate(`/affiliates/${id}`);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not save that.");
-    } finally {
-      setWorking(false);
+      setError((caught as Error).message);
+      setSaving(false);
     }
   }
 
-  const head = (
-    <div className="page__head">
-      <div className="page__title">
-        <Link to={`/affiliates/${id}`} className="detail__back">
-          {detail?.name ?? "Affiliate"}
-        </Link>
-        <h1>How {detail?.name ?? "this model"} is paid</h1>
-      </div>
-    </div>
-  );
-
-  if (detail === null) {
+  if (error && data === null) {
     return (
-      <>
-        {head}
-        {error ? (
-          <p className="notice notice--refused" role="alert">
-            {error}
-          </p>
-        ) : (
-          <p className="empty">Loading…</p>
-        )}
-      </>
+      <p className="notice notice--refused" role="alert">
+        {error}
+      </p>
     );
   }
+  if (data === null) return <p className="empty">Loading…</p>;
+
+  const neverSold = data.joined_month === null;
 
   return (
-    <>
-      {head}
+    // The arrangement tints are defined on this wrapper, not on `:root`. They
+    // are the one place this codebase spends colour on something other than
+    // money state (ADR 0027), and scoping them here is what keeps that bend
+    // confined to the screen that argued for it.
+    <div className="comp">
+      {/*
+       * Above the heading, not inside `page__title` — which is a flex row, so
+       * a crumb placed in it sits *beside* the h1 on the same baseline and
+       * reads as part of the title. Caught by looking at the screen.
+       */}
+      <p className="crumb">
+        <Link to="/affiliates">Affiliates</Link> ·{" "}
+        <Link to={`/affiliates/${id}`}>{data.name}</Link>
+      </p>
+      <div className="page__head">
+        <div className="page__title">
+          <h1>Set up {data.name}’s pay</h1>
+        </div>
+      </div>
+
+      <p className="comp__lede">
+        What she is paid on, and from when. A model who was with HBA before the
+        platform needs every month she sold in to have an arrangement, or those
+        months cannot be calculated.
+      </p>
 
       {error && (
         <p className="notice notice--refused" role="alert">
@@ -200,256 +284,578 @@ export function Compensation() {
         </p>
       )}
 
-      <form onSubmit={submit} className="comp__form">
-        <fieldset className="comp__choice">
-          <legend className="field__label">What is the arrangement?</legend>
-          {(Object.keys(KIND_LABEL) as Kind[]).map((option) => (
-            <label
-              key={option}
-              className={
-                kind === option ? "pay__option pay__option--on" : "pay__option"
-              }
-            >
-              <input
-                type="radio"
-                name="kind"
-                checked={kind === option}
-                onChange={() => setKind(option)}
-              />
-              <span className="pay__option-body">
-                <strong>{KIND_LABEL[option]}</strong>
-                <span className="detail__note">{KIND_MEANING[option]}</span>
+      {/*
+       * Skipped for a model with no sales at all. There is nothing to fork
+       * about — she has no history to backfill, and asking would be asking
+       * about months that do not exist.
+       */}
+      {who === null && !neverSold && (
+        <section className="panel comp__card">
+          <h2 className="comp__cardtitle">
+            Is she new, or was she with HBA already?
+          </h2>
+          <div className="fork">
+            <button type="button" onClick={() => setWho("new")}>
+              <b>New model</b>
+              <span>Starts now. One arrangement, from this month onwards.</span>
+            </button>
+            <button type="button" onClick={() => setWho("old")}>
+              <b>Already with HBA</b>
+              <span>
+                Has sales before the platform. Every one of those months needs an
+                arrangement.
               </span>
-            </label>
-          ))}
-        </fieldset>
-
-        <label className="field comp__field">
-          <span className="field__label">Commission rate</span>
-          <span className="comp__suffixed">
-            <input
-              className="input"
-              inputMode="decimal"
-              value={rate}
-              onChange={(event) => setRate(event.target.value)}
-            />
-            <span className="comp__suffix">%</span>
-          </span>
-          <span className="detail__note">Of what the code sells, after shipping and tax.</span>
-        </label>
-
-        {kind === "fixed_plus_commission" && (
-          <label className="field comp__field">
-            <span className="field__label">Salary, every month</span>
-            <input
-              className="input"
-              inputMode="decimal"
-              value={fixed}
-              onChange={(event) => setFixed(event.target.value)}
-              placeholder="5000.00"
-            />
-          </label>
-        )}
-
-        {kind === "base_guarantee" && (
-          <label className="field comp__field">
-            <span className="field__label">Guaranteed minimum</span>
-            <input
-              className="input"
-              inputMode="decimal"
-              value={base}
-              onChange={(event) => setBase(event.target.value)}
-              placeholder="8000.00"
-            />
-            <span className="detail__note">
-              Only applies in a month where targets are met and confirmed.
-            </span>
-          </label>
-        )}
-
-        <label className="field comp__field">
-          <span className="field__label">Customer discount (optional)</span>
-          <span className="comp__suffixed">
-            <input
-              className="input"
-              inputMode="decimal"
-              value={discount}
-              onChange={(event) => setDiscount(event.target.value)}
-              placeholder="10"
-            />
-            <span className="comp__suffix">%</span>
-          </span>
-          <span className="detail__note">
-            What the code takes off for the customer. Recorded for reference; it
-            does not change what is paid.
-          </span>
-        </label>
-
-        {/*
-         * A month, chosen from a calendar. It was a text box accepting any
-         * string, which is how "2026-9" or a typed sentence gets as far as the
-         * server - and the business asked for the picker every other screen
-         * already uses.
-         *
-         * It also needed saying what it means. *In force from* is when this
-         * arrangement starts applying, not when their orders start counting:
-         * orders are counted from the month their code was registered, which may
-         * be long before. Setting it to September does not hide their August
-         * sales; it means August is paid on whatever they were on in August.
-         */}
-
-        <div className="field comp__field">
-            <span className="field__label">
-              {detail.compensation ? "New rate applies from" : "Applies from"}
-            </span>
-            <MonthPicker value={startMonth} onChange={setStartMonth} />
-            <span className="detail__note">
-              {detail.compensation
-                ? "The months before this keep the current arrangement."
-                : "Sales are counted from the month the code was registered, whichever month you choose here."}
-            </span>
+            </button>
           </div>
-
-        {/*
-         * §12.2 requires this, and it is the reason the page exists rather
-         * than a dialog: the figures below are what somebody is actually
-         * agreeing to, and they should be readable before the button is
-         * pressed rather than inferred from four inputs.
-         */}
-        <section className="panel approve__summary">
-          <h2 className="panel__title">What this changes</h2>
-
-          {problem ? (
-            <p className="blocker">{problem}</p>
-          ) : (
-            <>
-              <p className="approve__lead">
-                {(
-                  <>
-                    From <strong>{formatMonth(startMonth)}</strong> onwards,{" "}
-                    {detail.name} is paid{" "}
-                    <strong>{KIND_LABEL[kind].toLowerCase()}</strong>.
-                  </>
-                )}
-              </p>
-              <p className="approve__lead">{KIND_MEANING[kind]}</p>
-
-              <dl className="detail__list comp__summary">
-                <Row label="Commission">
-                  <span className="code">{(rateBp ?? 0) / 100}%</span> of sales
-                </Row>
-                {kind === "fixed_plus_commission" && fixedPiastres !== null && (
-                  <Row label="Salary">
-                    <Money piastres={fixedPiastres} kind="agreed" /> every month
-                  </Row>
-                )}
-                {kind === "base_guarantee" && basePiastres !== null && (
-                  <Row
-                    label={
-                      <Link
-                        to="/glossary#guaranteed-minimum"
-                        className="glossary-link"
-                      >
-                        Guaranteed minimum
-                      </Link>
-                    }
-                  >
-                    <Money piastres={basePiastres} kind="agreed" />
-                  </Row>
-                )}
-                <Row label="On E£10,000 of sales">
-                  {/*
-                   * A worked example, because a rate is abstract and a figure
-                   * is not. This is the number somebody checks the rate
-                   * against when they are not sure they typed it right.
-                   */}
-                  <Money piastres={exampleOn(1_000_000, kind, rateBp, fixedPiastres, basePiastres)} />
-                  <span className="detail__note">
-                    {kind === "base_guarantee"
-                      ? "the larger of commission and the guarantee, if targets were met"
-                      : "in a month with no other adjustments"}
-                  </span>
-                </Row>
-              </dl>
-            </>
-          )}
         </section>
+      )}
 
-        {detail.compensation && (
-          <p className="notice comp__note">
-            {detail.name} is currently on{" "}
-            <strong>{KIND_LABEL[detail.compensation.compensation_type].toLowerCase()}</strong>{" "}
-            at {detail.compensation.commission_rate_bp / 100}%, from{" "}
-            {formatMonth(detail.compensation.start_month)}. Saving this ends
-            that arrangement and starts a new one — the months already on the
-            old rate keep it.
-          </p>
-        )}
+      {(who === "new" || neverSold) && (
+        <NewModel
+          working={data.working_month}
+          saving={saving}
+          onSave={async (arrangement) => {
+            setSaving(true);
+            setError(null);
+            try {
+              await api.put(`/api/affiliates/${id}/pay-history`, {
+                periods: [
+                  {
+                    start_month: data.working_month,
+                    end_month: null,
+                    compensation_type: arrangement.kind,
+                    commission_rate_bp: arrangement.rateBp,
+                    fixed_amount_piastres:
+                      arrangement.kind === "fixed_plus_commission"
+                        ? arrangement.amountPiastres
+                        : null,
+                    base_amount_piastres:
+                      arrangement.kind === "base_guarantee"
+                        ? arrangement.amountPiastres
+                        : null,
+                  },
+                ],
+                outcomes: {},
+              });
+              navigate(`/affiliates/${id}`);
+            } catch (caught) {
+              setError((caught as Error).message);
+              setSaving(false);
+            }
+          }}
+        />
+      )}
 
-        <div className="payroll__actions">
-          <button
-            type="button"
-            className="button"
-            onClick={() => navigate(`/affiliates/${id}`)}
-            disabled={working}
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            className="button button--primary"
-            disabled={working || problem !== null}
-          >
-            {working
-              ? "Saving…"
-              : `Pay ${detail.name} this from ${formatMonth(startMonth)}`}
-          </button>
-        </div>
-      </form>
-    </>
+      {who === "old" && same === null && (
+        <section className="panel comp__card">
+          <h2 className="comp__cardtitle">Was it the same the whole time?</h2>
+          <div className="fork">
+            <button
+              type="button"
+              onClick={() => {
+                setSame("yes");
+                // "Same throughout" is one arrangement over every month she
+                // has. Making somebody select them by hand would be asking
+                // for work the answer already contains.
+                setSel(open.map((row) => row.month));
+                setDraft(blankDraft());
+              }}
+            >
+              <b>The same throughout</b>
+              <span>
+                One arrangement covers every month from when she started until
+                now.
+              </span>
+            </button>
+            <button type="button" onClick={() => setSame("no")}>
+              <b>It changed</b>
+              <span>
+                Her salary, her guarantee, or the way she was paid was not the
+                same all year.
+              </span>
+            </button>
+          </div>
+        </section>
+      )}
+
+      {who === "old" && same !== null && (
+        <>
+          <section className="panel comp__card">
+            <div className="striphead">
+              <h2 className="comp__cardtitle">Her months</h2>
+              <p className="hint">
+                {same === "yes"
+                  ? "Every month is selected. Set the arrangement once and it applies to all of them."
+                  : "Click a month. Shift-click another to take everything between them."}
+              </p>
+            </div>
+
+            <div className="strip">
+              {data.months.map((row) => (
+                <MonthTile
+                  key={row.month}
+                  row={row}
+                  before={
+                    data.joined_month === null || row.month < data.joined_month
+                  }
+                  arrangement={set[row.month]}
+                  selected={sel.includes(row.month)}
+                  onChoose={(withShift) => choose(row.month, withShift)}
+                />
+              ))}
+            </div>
+
+            <div className="legend">
+              <span>
+                <i className="legend--commission" />
+                Commission only
+              </span>
+              <span>
+                <i className="legend--salary" />
+                Salary + commission
+              </span>
+              <span>
+                <i className="legend--guarantee" />
+                Guaranteed minimum
+              </span>
+              <span className="legend__quiet">
+                Hatched months are before she joined, or already approved
+              </span>
+            </div>
+
+            {draft && sel.length > 0 && (
+              <Panel
+                draft={draft}
+                months={sel}
+                rows={arrangeable}
+                onChange={setDraft}
+                onApply={apply}
+                onCancel={() => {
+                  setSel([]);
+                  setAnchor(null);
+                  setDraft(null);
+                }}
+              />
+            )}
+          </section>
+
+          <section className="panel comp__card">
+            <h2 className="comp__cardtitle">What will be recorded</h2>
+            {rows.length === 0 ? (
+              <p className="empty">Nothing set yet.</p>
+            ) : (
+              <div className="comp__scroll">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Months</th>
+                      <th>Arrangement</th>
+                      <th>Rate</th>
+                      <th>Amount</th>
+                      <th>Targets</th>
+                      <th />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((run) => (
+                      <tr key={run.from}>
+                        <td className="code">
+                          {shortMonth(run.from)}
+                          {run.from === run.to ? "" : ` – ${shortMonth(run.to)}`}
+                        </td>
+                        <td>
+                          <span className={`pill pill--${run.kind}`}>
+                            {KIND_LABEL[run.kind]}
+                          </span>
+                        </td>
+                        <td className="code">{run.rateBp / 100}%</td>
+                        <td className="code">
+                          {run.kind === "commission" ? (
+                            "—"
+                          ) : (
+                            <Money piastres={run.amountPiastres} />
+                          )}
+                        </td>
+                        <td>
+                          {run.met === null
+                            ? "—"
+                            : run.met
+                              ? "met"
+                              : "missed"}
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="comp__clear"
+                            onClick={() => clearRun(run.from, run.to)}
+                          >
+                            Clear
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+
+          <div className="comp__save">
+            <p className={missing.length === 0 ? "comp__ready" : undefined}>
+              {missing.length === 0
+                ? `Every month from ${formatMonth(open[0]?.month ?? data.working_month)} is covered. ${periods.length} arrangement${periods.length === 1 ? "" : "s"} will be recorded.`
+                : `${missing.length} month${missing.length === 1 ? "" : "s"} still without an arrangement: ${missing.map((row) => shortMonth(row.month)).join(", ")}. A month with no arrangement cannot be calculated.`}
+            </p>
+            <button
+              type="button"
+              className="button button--primary"
+              disabled={missing.length > 0 || saving}
+              onClick={save}
+            >
+              {saving ? "Saving…" : "Save her pay history"}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 
-/**
- * `"12.5"` → `1250` basis points. Integer arithmetic on the text, never
- * `parseFloat(x) * 100` — that is `1249.9999999999998` for some inputs, and a
- * rate is money by another name (ADR 0002).
- */
-function toBasisPoints(text: string): number | null {
-  const cleaned = text.trim().replace(/%$/, "").trim();
-  if (!/^\d*(\.\d{1,2})?$/.test(cleaned) || cleaned === "" || cleaned === ".") {
-    return null;
-  }
-  const [whole = "0", fraction = ""] = cleaned.split(".");
-  return Number(whole) * 100 + Number(fraction.padEnd(2, "0"));
-}
+/* ── the strip ─────────────────────────────────────────────────────────────── */
 
-function exampleOn(
-  salesPiastres: number,
-  kind: Kind,
-  rateBp: number | null,
-  fixedPiastres: number | null,
-  basePiastres: number | null,
-): number {
-  const commission = Math.round((salesPiastres * (rateBp ?? 0)) / 10_000);
-  if (kind === "fixed_plus_commission") return commission + (fixedPiastres ?? 0);
-  if (kind === "base_guarantee") return Math.max(commission, basePiastres ?? 0);
-  return commission;
-}
-
-/** `label` takes a node, not a string, so a term that has a glossary entry can
- *  link to it from the label itself rather than growing a second column. */
-function Row({
-  label,
-  children,
+function MonthTile({
+  row,
+  before,
+  arrangement,
+  selected,
+  onChoose,
 }: {
-  label: React.ReactNode;
-  children: React.ReactNode;
+  row: MonthRow;
+  before: boolean;
+  arrangement: Arrangement | undefined;
+  selected: boolean;
+  onChoose: (withShift: boolean) => void;
 }) {
+  const locked = before || row.approved;
   return (
-    <div className="detail__row">
-      <dt className="detail__label">{label}</dt>
-      <dd className="detail__value">{children}</dd>
+    <button
+      type="button"
+      className="mo"
+      data-set={locked ? "off" : (arrangement?.kind ?? "none")}
+      aria-pressed={selected}
+      disabled={locked}
+      title={
+        before
+          ? "Before she sold anything"
+          : row.approved
+            ? `${formatMonth(row.month)} is approved. Reopen it before changing what it was calculated from.`
+            : formatMonth(row.month)
+      }
+      onClick={(event) => onChoose(event.shiftKey)}
+    >
+      <span className="mo__name">{shortMonth(row.month)}</span>
+      <span className="mo__what">
+        {before ? "—" : row.approved ? "approved" : arrangement ? KIND_SHORT[arrangement.kind] : "not set"}
+      </span>
+      {/*
+       * Formatted, not plain. `egpPlain` is for filling an input, where a
+       * currency mark and thousands separators would have to be stripped
+       * again; on a tile "5000.00" beside a percentage is a figure whose
+       * unit somebody has to guess.
+       */}
+      <span className="mo__amt">
+        {arrangement && arrangement.kind !== "commission" && !locked
+          ? formatEgp(arrangement.amountPiastres)
+          : ""}
+      </span>
+      {arrangement?.met !== null && arrangement?.met !== undefined && (
+        <span className={`mo__met mo__met--${arrangement.met ? "yes" : "no"}`}>
+          {arrangement.met ? "target met" : "target missed"}
+        </span>
+      )}
+    </button>
+  );
+}
+
+/* ── the editor panel ──────────────────────────────────────────────────────── */
+
+type Draft = {
+  kind: Kind;
+  /** Held as typed, so a half-typed "1" is not read as 1%. */
+  rate: string;
+  amount: string;
+  met: Record<string, boolean>;
+};
+
+function blankDraft(): Draft {
+  return { kind: "commission", rate: "10", amount: "", met: {} };
+}
+
+function draftFor(months: string[], set: Record<string, Arrangement>): Draft {
+  const existing = set[months[0]];
+  if (!existing) return blankDraft();
+  const met: Record<string, boolean> = {};
+  for (const month of months) {
+    const current = set[month];
+    if (current?.met !== null && current?.met !== undefined) met[month] = current.met;
+  }
+  return {
+    kind: existing.kind,
+    rate: String(existing.rateBp / 100),
+    amount: existing.kind === "commission" ? "" : egpPlain(existing.amountPiastres),
+    met,
+  };
+}
+
+/** The draft as numbers, or `null` while it is not yet a valid arrangement. */
+function readDraft(draft: Draft): Omit<Arrangement, "met"> | null {
+  const rateBp = toBasisPoints(draft.rate);
+  if (rateBp === null || rateBp <= 0) return null;
+  if (draft.kind === "commission") {
+    return { kind: draft.kind, rateBp, amountPiastres: 0 };
+  }
+  const amountPiastres = parseEgp(draft.amount);
+  if (amountPiastres === null || amountPiastres <= 0) return null;
+  return { kind: draft.kind, rateBp, amountPiastres };
+}
+
+function Panel({
+  draft,
+  months,
+  rows,
+  onChange,
+  onApply,
+  onCancel,
+}: {
+  draft: Draft;
+  months: string[];
+  rows: MonthRow[];
+  onChange: (draft: Draft) => void;
+  onApply: () => void;
+  onCancel: () => void;
+}) {
+  const ordered = [...months].sort();
+  const label =
+    ordered.length === 1
+      ? formatMonth(ordered[0])
+      : `${formatMonth(ordered[0])} – ${formatMonth(ordered[ordered.length - 1])} · ${ordered.length} months`;
+
+  const amountLabel = AMOUNT_LABEL[draft.kind];
+  // Only where the old dashboard is the only record. A guaranteed minimum in a
+  // month the platform pays for records what was produced, on the Targets
+  // screen, and is counted rather than asserted (ADR 0036).
+  const outcomeMonths =
+    draft.kind === "base_guarantee"
+      ? ordered.filter(
+          (month) => rows.find((row) => row.month === month)?.settled_outside,
+        )
+      : [];
+  const laterGuaranteeMonths =
+    draft.kind === "base_guarantee"
+      ? ordered.filter(
+          (month) => !rows.find((row) => row.month === month)?.settled_outside,
+        )
+      : [];
+
+  const ready = readDraft(draft) !== null;
+
+  return (
+    <div className="cpanel">
+      <h3>{label}</h3>
+      <p className="cpanel__for">{KIND_NOTE[draft.kind]}</p>
+
+      <div className="kinds">
+        {KINDS.map((kind) => (
+          <button
+            key={kind}
+            type="button"
+            aria-pressed={draft.kind === kind}
+            onClick={() =>
+              onChange({
+                ...draft,
+                kind,
+                met: kind === "base_guarantee" ? draft.met : {},
+              })
+            }
+          >
+            {KIND_LABEL[kind]}
+          </button>
+        ))}
+      </div>
+
+      <div className="fields">
+        <label className="field">
+          Commission rate
+          <div className="comp__suffixed">
+            <input
+              className="input"
+              inputMode="decimal"
+              value={draft.rate}
+              aria-label="Commission rate, percent"
+              onChange={(event) =>
+                onChange({ ...draft, rate: event.target.value })
+              }
+            />
+            <span className="comp__suffix">%</span>
+          </div>
+        </label>
+        {amountLabel && (
+          <label className="field">
+            {amountLabel}
+            <input
+              className="input"
+              inputMode="decimal"
+              value={draft.amount}
+              placeholder="0.00"
+              onChange={(event) =>
+                onChange({ ...draft, amount: event.target.value })
+              }
+            />
+          </label>
+        )}
+      </div>
+
+      {outcomeMonths.length > 0 && (
+        <div className="targets">
+          <p>
+            <b>Did she meet her targets?</b> The guarantee only applies in a
+            month where she did — so this decides, month by month, whether she
+            was paid the floor or her commission. The video and story counts
+            were not kept on the old dashboard, so the outcome is the whole
+            record.
+          </p>
+          {outcomeMonths.map((month) => (
+            <div key={month} className="trow">
+              <span className="code">{formatMonth(month)}</span>
+              <span className="seg">
+                <button
+                  type="button"
+                  aria-pressed={draft.met[month] === true}
+                  data-value="met"
+                  onClick={() =>
+                    onChange({ ...draft, met: { ...draft.met, [month]: true } })
+                  }
+                >
+                  Met
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={draft.met[month] === false}
+                  onClick={() =>
+                    onChange({ ...draft, met: { ...draft.met, [month]: false } })
+                  }
+                >
+                  Missed
+                </button>
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {laterGuaranteeMonths.length > 0 && (
+        <p className="cpanel__elsewhere">
+          {laterGuaranteeMonths.map(formatMonth).join(", ")}{" "}
+          {laterGuaranteeMonths.length === 1 ? "is" : "are"} paid through this
+          platform, so {laterGuaranteeMonths.length === 1 ? "its" : "their"}{" "}
+          targets are recorded and confirmed on the{" "}
+          <Link to="/targets">Targets screen</Link> rather than set here.
+        </p>
+      )}
+
+      <div className="acts">
+        <button
+          type="button"
+          className="button button--primary"
+          disabled={!ready}
+          onClick={onApply}
+        >
+          Apply to{" "}
+          {ordered.length === 1 ? "this month" : `these ${ordered.length} months`}
+        </button>
+        <button type="button" className="button" onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
     </div>
+  );
+}
+
+/* ── the new-model form ────────────────────────────────────────────────────── */
+
+function NewModel({
+  working,
+  saving,
+  onSave,
+}: {
+  working: string;
+  saving: boolean;
+  onSave: (arrangement: Omit<Arrangement, "met">) => void;
+}) {
+  const [draft, setDraft] = useState<Draft>(blankDraft);
+  const parsed = readDraft(draft);
+  const amountLabel = AMOUNT_LABEL[draft.kind];
+
+  return (
+    <section className="panel comp__card">
+      <h2 className="comp__cardtitle">Her arrangement</h2>
+      <p className="hint">
+        One arrangement, starting {formatMonth(working)}. Nothing before it
+        exists for her, so there is nothing to backfill.
+      </p>
+
+      <div className="kinds">
+        {KINDS.map((kind) => (
+          <button
+            key={kind}
+            type="button"
+            aria-pressed={draft.kind === kind}
+            onClick={() => setDraft({ ...draft, kind })}
+          >
+            {KIND_LABEL[kind]}
+          </button>
+        ))}
+      </div>
+      <p className="cpanel__for">{KIND_NOTE[draft.kind]}</p>
+
+      <div className="fields">
+        <label className="field">
+          Commission rate
+          <div className="comp__suffixed">
+            <input
+              className="input"
+              inputMode="decimal"
+              value={draft.rate}
+              aria-label="Commission rate, percent"
+              onChange={(event) => setDraft({ ...draft, rate: event.target.value })}
+            />
+            <span className="comp__suffix">%</span>
+          </div>
+        </label>
+        {amountLabel && (
+          <label className="field">
+            {amountLabel}
+            <input
+              className="input"
+              inputMode="decimal"
+              value={draft.amount}
+              placeholder="0.00"
+              onChange={(event) => setDraft({ ...draft, amount: event.target.value })}
+            />
+          </label>
+        )}
+      </div>
+
+      <div className="acts">
+        <button
+          type="button"
+          className="button button--primary"
+          disabled={parsed === null || saving}
+          onClick={() => parsed && onSave(parsed)}
+        >
+          {saving ? "Saving…" : "Save her arrangement"}
+        </button>
+      </div>
+    </section>
   );
 }

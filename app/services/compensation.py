@@ -405,3 +405,213 @@ def terms_for(
             | (CompensationPeriod.end_month >= month)
         )
     )
+
+
+def all_terms(db: Session, affiliate: AffiliateProfile) -> list[CompensationPeriod]:
+    """Every arrangement this affiliate has ever been on, oldest first.
+
+    `terms_for` answers *what applied in April*; this answers *what has she
+    been on*, which is the question the pay-history editor opens with and the
+    only one a single current period cannot answer.
+    """
+    return list(
+        db.scalars(
+            select(CompensationPeriod)
+            .where(CompensationPeriod.affiliate_id == affiliate.id)
+            .order_by(CompensationPeriod.start_month)
+        )
+    )
+
+
+def _covering(periods: list[dict], month: str) -> dict | None:
+    """Which of a proposed set of periods covers a month, if any."""
+    for period in periods:
+        if period["start_month"] <= month and (
+            period["end_month"] is None or month <= period["end_month"]
+        ):
+            return period
+    return None
+
+
+def _shape(terms: CompensationPeriod | dict) -> tuple:
+    """What makes two arrangements the same arrangement.
+
+    **The months are deliberately not part of it.** Replacing an open-ended
+    period with one that ends in August changes when it stops, not what it
+    pays, so an approved August calculated under it is untouched. That
+    distinction is what lets a whole history be rewritten around months that
+    are already agreed.
+    """
+    read = terms.get if isinstance(terms, dict) else lambda name: getattr(terms, name)
+    return (
+        read("compensation_type"),
+        read("commission_rate_bp"),
+        read("fixed_amount_piastres"),
+        read("base_amount_piastres"),
+    )
+
+
+def _refuse_to_move_an_approved_month(
+    db: Session, affiliate: AffiliateProfile, prepared: list[dict]
+) -> None:
+    """Every approved month must come out on the arrangement it is on now.
+
+    Section 11.1 and 11.5. Changing a rate after payroll would change what a
+    month was worth **after the money moved**, and the frozen snapshot would
+    silently disagree with the data it came from.
+
+    Stated as *the answer does not move* rather than *the row does not change*,
+    which is what lets a whole history be rewritten around months that are
+    already agreed. That is the real case and the one a cruder rule would
+    refuse: a model with August agreed, and February to July still to enter.
+    """
+    from app.models.payroll import CalculationState, PayrollMonth
+
+    approved = db.scalars(
+        select(PayrollMonth)
+        .where(PayrollMonth.affiliate_id == affiliate.id)
+        .where(PayrollMonth.calculation_state == CalculationState.APPROVED)
+        .order_by(PayrollMonth.month)
+    )
+
+    moved = []
+    for payroll_month in approved:
+        now = terms_for(db, affiliate, payroll_month.month)
+        proposed = _covering(prepared, payroll_month.month)
+        if now is None and proposed is None:
+            continue
+        if now is None or proposed is None or _shape(now) != _shape(proposed):
+            moved.append(payroll_month.month)
+
+    if not moved:
+        return
+
+    months = ", ".join(moved)
+    one = len(moved) == 1
+    raise ValueError(
+        f"{months} {'is' if one else 'are'} already approved, and this would "
+        f"change what {'it was' if one else 'they were'} calculated from - "
+        "after the figure was agreed and possibly paid. Reopen "
+        f"{'that month' if one else 'those months'} first; it requires a "
+        "written reason."
+    )
+
+
+def replace_pay_history(
+    db: Session,
+    affiliate: AffiliateProfile,
+    periods: list[dict],
+    *,
+    actor_id: int | None = None,
+    actor_email: str | None = None,
+) -> list[CompensationPeriod]:
+    """Write a model's whole pay history in one act. ADR 0036.
+
+    ## Why this is not a loop over `set_terms`
+
+    `set_terms` records **one decision**: *from September she is on 12%.* It
+    ends whatever is currently open, refuses to start before an arrangement
+    already in force, and reads a repeated start month as a correction. Every
+    one of those is right for that act and wrong for this one.
+
+    This act is different: *here is every arrangement she has ever been on,
+    from the month she joined until now.* Applied as a sequence of `set_terms`
+    calls it leaves stray remnants of whatever was there before - a one-month
+    arrangement nobody chose, sitting in a month nobody looked at, quietly
+    deciding what an old month is worth.
+
+    So the whole set is written at once, and it is **all or nothing**. A
+    half-written history is a model with months that cannot be calculated, and
+    the screen promised one Save.
+
+    ## What it refuses
+
+    Anything that would change what an approved month was calculated from - see
+    `_refuse_to_move_an_approved_month`, which states that as *the answer does
+    not move* rather than *the row does not change*.
+    """
+    prepared: list[dict] = []
+    for raw in periods:
+        compensation_type = raw.get("compensation_type")
+        commission_rate_bp = raw.get("commission_rate_bp")
+        fixed = raw.get("fixed_amount_piastres")
+        base = raw.get("base_amount_piastres")
+        discount = raw.get("expected_customer_discount_bp")
+        validate_terms(compensation_type, commission_rate_bp, fixed, base, discount)
+        start_month, end_month = validate_period(
+            raw.get("start_month"), raw.get("end_month", OPEN_ENDED)
+        )
+        prepared.append(
+            {
+                "start_month": start_month,
+                "end_month": end_month,
+                "compensation_type": compensation_type,
+                "commission_rate_bp": commission_rate_bp,
+                "fixed_amount_piastres": fixed,
+                "base_amount_piastres": base,
+                "expected_customer_discount_bp": discount,
+            }
+        )
+
+    prepared.sort(key=lambda row: row["start_month"])
+    for earlier, later in zip(prepared, prepared[1:]):
+        # Checked here as well as by the exclusion constraint, because the
+        # constraint's message names a daterange and this one names two months.
+        # Both are wanted: this is the readable half, and the constraint is the
+        # half nobody can forget to call.
+        if earlier["end_month"] is None:
+            raise ValueError(
+                f"The arrangement starting {earlier['start_month']} runs until "
+                "further notice, so nothing can start after it. Only the last "
+                "one may be open-ended."
+            )
+        if later["start_month"] <= earlier["end_month"]:
+            raise ValueError(
+                f"{earlier['start_month']} to {earlier['end_month']} and "
+                f"{later['start_month']} overlap. A month cannot have been on "
+                "two arrangements at once."
+            )
+
+    _refuse_to_move_an_approved_month(db, affiliate, prepared)
+
+    existing = all_terms(db, affiliate)
+    before = [
+        {
+            "start_month": row.start_month,
+            "end_month": row.end_month,
+            "compensation_type": row.compensation_type,
+            "commission_rate_bp": row.commission_rate_bp,
+            "fixed_amount_piastres": row.fixed_amount_piastres,
+            "base_amount_piastres": row.base_amount_piastres,
+        }
+        for row in existing
+    ]
+
+    # Cleared and rewritten rather than reconciled row by row. The exclusion
+    # constraint refuses overlaps at every intermediate step, so a reconciling
+    # update would have to find an order of operations that is valid the whole
+    # way through - and there is not always one. Deleting first always has one.
+    #
+    # Safe only because of the refusal above: nothing deleted here is what an
+    # approved month was calculated from.
+    for row in existing:
+        db.delete(row)
+    db.flush()
+
+    written = []
+    for row in prepared:
+        terms = CompensationPeriod(affiliate_id=affiliate.id, **row)
+        db.add(terms)
+        written.append(terms)
+    db.flush()
+
+    record_audit(
+        db,
+        action="compensation.history_replaced",
+        subject=f"affiliate:{affiliate.id}",
+        actor_id=actor_id,
+        actor_email=actor_email,
+        before={"periods": before},
+        after={"periods": prepared},
+    )
+    return written

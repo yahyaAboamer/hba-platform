@@ -320,15 +320,20 @@ def test_the_maintainer_and_the_model_can_get_all_the_way_through(browser):
     assert nour["status"] == "pending"
 
     # 6. Sets what they are paid - which §6.5 keeps off their application form.
-    terms = browser.post(
-        f"/api/affiliates/{nour['id']}/compensation",
+    terms = browser.put(
+        f"/api/affiliates/{nour['id']}/pay-history",
         json={
-            "start_month": "2026-01",
-            "compensation_type": "commission",
-            "commission_rate_bp": 1000,
+            "periods": [
+                {
+                    "start_month": "2026-01",
+                    "compensation_type": "commission",
+                    "commission_rate_bp": 1000,
+                }
+            ],
+            "outcomes": {},
         },
     )
-    assert terms.status_code == 201, terms.text
+    assert terms.status_code == 200, terms.text
 
     # 7. Approving needs a code Shopify has confirmed (§10.4). Without one it
     #    refuses, and that refusal is the gate working.

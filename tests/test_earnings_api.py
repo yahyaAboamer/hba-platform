@@ -68,14 +68,19 @@ def _affiliate(client, name="Nour", email="nour@example.com", **extra) -> dict:
 
 def _terms(client, affiliate_id, rate_bp=1000, **extra):
     body = {
-        "start_month": "2026-01",
-        "compensation_type": "commission",
-        "commission_rate_bp": rate_bp,
-        **extra,
+        "periods": [
+            {
+                "start_month": "2026-01",
+                "compensation_type": "commission",
+                "commission_rate_bp": rate_bp,
+                **extra,
+            }
+        ],
+        "outcomes": {},
     }
-    response = client.post(f"/api/affiliates/{affiliate_id}/compensation", json=body)
-    assert response.status_code == 201, response.text
-    return response.json()
+    response = client.put(f"/api/affiliates/{affiliate_id}/pay-history", json=body)
+    assert response.status_code == 200, response.text
+    return response.json()["periods"][0]
 
 
 def _paid_order(affiliate_id, order_id, base, *, month=MONTH, state="earned"):

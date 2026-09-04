@@ -12,19 +12,20 @@ proven per endpoint in tests/test_affiliates_api.py, because "enforced
 server-side" is a claim that needs a failing request to back it up.
 
 **`compensation.manage` is a distinct permission from `affiliates.manage`,
-used only on the compensation route.** Adding a code is administrative;
+used only on the pay-history route.** Adding a code is administrative;
 changing a rate is money, and the two must be gateable separately even where
 today's roles happen to grant both together (ADR 0018).
 """
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_permission
-from app.core.businesstime import business_month, utcnow
-from app.core.periods import OPEN_ENDED
+from app.core.businesstime import business_month, month_add, utcnow
+from app.core.periods import OPEN_ENDED, PLATFORM_START_MONTH
 from app.core.permissions import Permission
 from app.db import get_session
 from app.models.affiliates import AffiliateProfile, AffiliateStatus
@@ -54,8 +55,8 @@ from app.services.codes import (
 )
 from app.services.applications import REQUIRED_PAYOUT_FIELDS
 from app.services.compensation import (
-    get_terms,
-    set_terms,
+    all_terms,
+    replace_pay_history,
     terms_for,
 )
 from app.services.payouts import (
@@ -65,6 +66,7 @@ from app.services.payouts import (
     set_destination,
 )
 from app.services.payroll import working_month
+from app.services.targets import record_outcome
 from app.services.shopify.client import (
     ShopifyError,
     ShopifyMissingScope,
@@ -121,16 +123,6 @@ class RegisterCodeBody(BaseModel):
     """
 
     code: str = Field(min_length=1, max_length=120)
-
-
-class SetCompensationBody(BaseModel):
-    start_month: str
-    end_month: str | None = None
-    compensation_type: str
-    commission_rate_bp: int
-    fixed_amount_piastres: int | None = None
-    base_amount_piastres: int | None = None
-    expected_customer_discount_bp: int | None = None
 
 
 class ReplaceCodeBody(BaseModel):
@@ -738,40 +730,6 @@ def replace_code_route(
     }
 
 
-@router.post("/{affiliate_id}/compensation", status_code=201)
-def set_compensation_route(
-    affiliate_id: int,
-    body: SetCompensationBody,
-    actor: UserAccount = Depends(require_permission(Permission.COMPENSATION_MANAGE)),
-    db: Session = Depends(get_session),
-) -> dict:
-    affiliate = _get_affiliate_or_404(db, affiliate_id)
-    try:
-        terms = set_terms(
-            db,
-            affiliate,
-            start_month=body.start_month,
-            end_month=body.end_month,
-            compensation_type=body.compensation_type,
-            commission_rate_bp=body.commission_rate_bp,
-            fixed_amount_piastres=body.fixed_amount_piastres,
-            base_amount_piastres=body.base_amount_piastres,
-            expected_customer_discount_bp=body.expected_customer_discount_bp,
-            actor_id=actor.id,
-            actor_email=actor.email,
-        )
-    except (ValueError, TypeError) as exc:
-        raise HTTPException(400, str(exc)) from exc
-    except IntegrityError as exc:
-        db.rollback()
-        raise HTTPException(
-            409, "These months overlap pay terms already on record for this affiliate"
-        ) from exc
-
-    db.commit()
-    return _compensation_payload(terms)
-
-
 @router.post("/{affiliate_id}/payout-destination/reveal")
 def reveal_payout_destination_route(
     affiliate_id: int,
@@ -839,3 +797,174 @@ def set_payout_destination_route(
 
     db.commit()
     return mask_destination(destination)
+
+
+class PayHistoryPeriodBody(BaseModel):
+    """One run of months on one arrangement.
+
+    `end_month` absent means *until further notice*, and only the last period
+    may leave it out - the service refuses the rest.
+    """
+
+    start_month: str
+    end_month: str | None = None
+    compensation_type: str
+    commission_rate_bp: int
+    fixed_amount_piastres: int | None = None
+    base_amount_piastres: int | None = None
+    expected_customer_discount_bp: int | None = None
+
+
+class PayHistoryBody(BaseModel):
+    """A model's whole pay history, as one act.
+
+    ADR 0036. `outcomes` maps a month to *met* or *missed*, for the months
+    before go-live on a guaranteed minimum - the only thing the old dashboard
+    kept about a target. Every other month records what was produced, on the
+    Targets screen, and this refuses to take one.
+    """
+
+    periods: list[PayHistoryPeriodBody]
+    outcomes: dict[str, str] = Field(default_factory=dict)
+
+
+def _pay_history_payload(db: Session, affiliate: AffiliateProfile) -> dict:
+    """Every month the editor draws, and what is already true of each.
+
+    **One call, not one per month.** The screen shows nine months at once for
+    twenty-one models in a sitting; asking per month would be nine round trips
+    to draw a strip that has not changed.
+    """
+    from app.models.attributed_orders import AttributedOrder
+    from app.models.payroll import CalculationState, PayrollMonth
+    from app.models.targets import MonthlyTarget
+    from app.services.payroll import go_live_month, is_historical
+
+    working = working_month()
+
+    sold_in = set(
+        db.scalars(
+            select(AttributedOrder.business_month)
+            .where(AttributedOrder.affiliate_id == affiliate.id)
+            .distinct()
+        )
+    )
+    approved = set(
+        db.scalars(
+            select(PayrollMonth.month)
+            .where(PayrollMonth.affiliate_id == affiliate.id)
+            .where(PayrollMonth.calculation_state == CalculationState.APPROVED)
+        )
+    )
+    outcomes = {
+        row.month: row.recorded_outcome
+        for row in db.scalars(
+            select(MonthlyTarget).where(
+                MonthlyTarget.affiliate_id == affiliate.id
+            )
+        )
+        if row.recorded_outcome is not None
+    }
+
+    periods = all_terms(db, affiliate)
+    covers = {}
+    for period in periods:
+        month = period.start_month
+        while month <= (period.end_month or working):
+            covers[month] = period
+            month = month_add(month, 1)
+
+    months = []
+    month = PLATFORM_START_MONTH
+    while month <= working:
+        terms = covers.get(month)
+        months.append(
+            {
+                "month": month,
+                # **What the strip hatches.** A month she did not sell in is
+                # not hers to arrange, and offering it as a choice invites
+                # somebody to fill in a year of arrangements for months that
+                # never existed.
+                "has_orders": month in sold_in,
+                # Locked, and the reason is worth carrying: an approved month
+                # was calculated from these terms, and changing them now would
+                # change what it was worth after the money moved.
+                "approved": month in approved,
+                # ADR 0036. Before go-live, so a guaranteed minimum here
+                # records an outcome rather than counts.
+                "settled_outside": is_historical(month),
+                "terms": _compensation_payload(terms),
+                "outcome": outcomes.get(month),
+            }
+        )
+        month = month_add(month, 1)
+
+    return {
+        "affiliate_id": affiliate.id,
+        "name": affiliate.name,
+        "working_month": working,
+        "go_live_month": go_live_month() or None,
+        # The earliest month she has an order in. `null` for a model who has
+        # never sold, where there is no history to backfill and the screen
+        # offers the one-arrangement form instead.
+        "joined_month": min(sold_in) if sold_in else None,
+        "months": months,
+        "periods": [_compensation_payload(row) for row in periods],
+    }
+
+
+@router.get("/{affiliate_id}/pay-history")
+def pay_history_route(
+    affiliate_id: int,
+    _actor: UserAccount = Depends(require_permission(Permission.COMPENSATION_MANAGE)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """What she has been paid on, month by month, for the editor to open on."""
+    affiliate = _get_affiliate_or_404(db, affiliate_id)
+    return _pay_history_payload(db, affiliate)
+
+
+@router.put("/{affiliate_id}/pay-history")
+def set_pay_history_route(
+    affiliate_id: int,
+    body: PayHistoryBody,
+    actor: UserAccount = Depends(require_permission(Permission.COMPENSATION_MANAGE)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Write her whole pay history, and the outcomes that go with it. ADR 0036.
+
+    **One transaction.** The arrangements and the target outcomes are one
+    decision on the screen and commit together here - a history written without
+    its outcomes leaves every guarantee month blocked on a target nobody can
+    now record from this screen, which is a state the maintainer would have to
+    discover from the payroll page.
+    """
+    affiliate = _get_affiliate_or_404(db, affiliate_id)
+    try:
+        replace_pay_history(
+            db,
+            affiliate,
+            [period.model_dump() for period in body.periods],
+            actor_id=actor.id,
+            actor_email=actor.email,
+        )
+        for month, outcome in sorted(body.outcomes.items()):
+            record_outcome(
+                db,
+                affiliate,
+                month,
+                outcome=outcome,
+                actor_id=actor.id,
+                actor_email=actor.email,
+            )
+    except (ValueError, TypeError) as exc:
+        db.rollback()
+        raise HTTPException(400, str(exc)) from exc
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            409, "These months overlap pay terms already on record for this affiliate"
+        ) from exc
+
+    db.commit()
+    return _pay_history_payload(db, affiliate)

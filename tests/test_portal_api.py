@@ -119,17 +119,58 @@ def _sign_in(email: str = "nour@example.com") -> TestClient:
 
 
 def _terms(admin, affiliate_id, rate_bp=1000, start="2026-01", **extra):
-    response = admin.post(
-        f"/api/affiliates/{affiliate_id}/compensation",
+    response = admin.put(
+        f"/api/affiliates/{affiliate_id}/pay-history",
         json={
-            "start_month": start,
-            "compensation_type": "commission",
-            "commission_rate_bp": rate_bp,
-            **extra,
+            "periods": [
+                {
+                    "start_month": start,
+                    "compensation_type": "commission",
+                    "commission_rate_bp": rate_bp,
+                    **extra,
+                }
+            ],
+            "outcomes": {},
         },
     )
-    assert response.status_code == 201, response.text
-    return response.json()
+    assert response.status_code == 200, response.text
+    return response.json()["periods"][0]
+
+
+def _rate_change(admin, affiliate_id, *, until, before_bp, after_bp, from_month):
+    """Two arrangements, written together, because that is now one act.
+
+    ADR 0036 replaced `POST /compensation` — which recorded one period and
+    superseded whatever was open — with a route that writes the **whole**
+    history. Calling `_terms` twice against it is not a rate change any more;
+    it is a rewrite, and the second call would leave the earlier months with no
+    arrangement at all.
+
+    Which is the right behaviour for a screen that shows a model's whole year
+    and saves it once, and the wrong helper for a test whose subject is a rate
+    changing mid-year.
+    """
+    response = admin.put(
+        f"/api/affiliates/{affiliate_id}/pay-history",
+        json={
+            "periods": [
+                {
+                    "start_month": "2026-01",
+                    "end_month": until,
+                    "compensation_type": "commission",
+                    "commission_rate_bp": before_bp,
+                },
+                {
+                    "start_month": from_month,
+                    "compensation_type": "commission",
+                    "commission_rate_bp": after_bp,
+                },
+            ],
+            "outcomes": {},
+        },
+    )
+    assert response.status_code == 200, response.text
+    return response.json()["periods"]
 
 
 #: Values a customer would recognise as their own. Written into the order index
@@ -685,12 +726,18 @@ def test_the_month_that_paid_it_says_where_it_came_from(admin):
     affiliate = _affiliate(admin)
     # A rate change is a new period, never an edit - the database refuses two
     # that overlap, which is what keeps August's months on August's rate.
-    _terms(admin, affiliate["id"], rate_bp=1000, end_month=AUGUST)
+    _rate_change(
+        admin,
+        affiliate["id"],
+        until=AUGUST,
+        before_bp=1000,
+        after_bp=2000,
+        from_month=SEPTEMBER,
+    )
     _order(affiliate["id"], "1", 100_000)
     _order(affiliate["id"], "2", 200_000, state="pending")
     _approve(admin, affiliate["id"], AUGUST)
 
-    _terms(admin, affiliate["id"], rate_bp=2000, start=SEPTEMBER)
     _deliver("2")
 
     september = _sign_in().get(f"/api/me/earnings/{SEPTEMBER}").json()
@@ -1583,9 +1630,15 @@ def test_an_order_is_worth_the_rate_of_its_own_month(admin):
     payment never used.
     """
     affiliate = _affiliate(admin)
-    _terms(admin, affiliate["id"], rate_bp=1000, start="2026-01")
     # A raise from September onward. August must not follow it.
-    _terms(admin, affiliate["id"], rate_bp=2000, start=SEPTEMBER)
+    _rate_change(
+        admin,
+        affiliate["id"],
+        until=AUGUST,
+        before_bp=1000,
+        after_bp=2000,
+        from_month=SEPTEMBER,
+    )
     _order(affiliate["id"], "9501", 100_000, month=AUGUST)
     _deliver("9501")
 
