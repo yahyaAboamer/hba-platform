@@ -198,18 +198,32 @@ function Row({
               <Money piastres={order.placed_piastres} className="money--void" />
             )
           )}
+          {/*
+           * **A void row mirrors a counted one**: the sale on top, what it
+           * was worth to her underneath, both struck through. The business
+           * asked for the figure rather than the words - "nothing earned"
+           * says what did not happen and gives her nothing to check her own
+           * record against.
+           *
+           * Struck rather than coloured. It is not money coming, and it must
+           * never read as though it were.
+           */}
           <span
             className={
               order.commission
                 ? "orders__earned orders__earned--paid"
-                : "orders__earned"
+                : order.forgone
+                  ? "orders__earned money--void"
+                  : "orders__earned"
             }
           >
             {order.commission
               ? `${order.commission} to you`
-              : order.state === "pending"
-                ? "counts on delivery"
-                : "nothing earned"}
+              : order.forgone
+                ? `${order.forgone} to you`
+                : order.state === "pending"
+                  ? "counts on delivery"
+                  : "nothing earned"}
           </span>
         </span>
       </button>
@@ -262,7 +276,9 @@ function explain(order: MyOrder, month: string): string {
     return "This parcel did not reach the customer, so it earns nothing. The amount stays here so you can match it against your own record.";
   }
   if (order.placed_piastres !== null) {
-    return `This order was cancelled, so it earns nothing. ${order.placed} is what it came to when it was placed — kept here so you can match it against your own record.`;
+    return order.forgone
+      ? `This order was cancelled, so it earns nothing. It came to ${order.placed} when it was placed, and would have been worth ${order.forgone} to you had it arrived — both shown struck through so you can match them against your own record.`
+      : `This order was cancelled, so it earns nothing. ${order.placed} is what it came to when it was placed — kept here so you can match it against your own record.`;
   }
   // An order indexed before the platform started keeping the placed-at
   // figure. The order number and the date are still enough to match it.

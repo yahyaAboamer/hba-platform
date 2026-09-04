@@ -1655,3 +1655,103 @@ def test_the_placed_figure_is_never_paid_on(admin):
     assert body["sales"]["earned_piastres"] == 0
     (row,) = [o for o in body["orders_detail"] if o["order_number"] == "#9604"]
     assert row["commission_piastres"] is None
+
+
+# ── Batch 3: a void row keeps its figures, and the year drops today ─────────
+
+
+def test_a_void_order_says_what_it_would_have_earned(admin):
+    """The business asked for the figure rather than the words.
+
+    "Nothing earned" says what did not happen and gives a model nothing to
+    check against her own record. The forgone commission is shown struck
+    through beside the value it would have earned it on.
+    """
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"], rate_bp=1500)
+    _order(
+        affiliate["id"], "9701", 0, month=SEPTEMBER, state="void", placed=120_000
+    )
+
+    body = _sign_in().get(f"/api/me/earnings/{SEPTEMBER}").json()
+    (row,) = [o for o in body["orders_detail"] if o["order_number"] == "#9701"]
+
+    assert row["placed_piastres"] == 120_000
+    # 15% of E£1,200 is E£180.
+    assert row["forgone_piastres"] == 18_000
+    assert row["forgone"] == _egp(18_000)
+
+
+def test_the_forgone_figure_never_reaches_a_total(admin):
+    """It is money that did not happen. No figure on any screen includes it."""
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"], rate_bp=1500)
+    _order(
+        affiliate["id"], "9702", 0, month=SEPTEMBER, state="void", placed=500_000
+    )
+
+    body = _sign_in().get(f"/api/me/earnings/{SEPTEMBER}").json()
+
+    assert body["amount_piastres"] == 0
+    assert body["sales"]["earned_piastres"] == 0
+    assert body["sales"]["average_order_piastres"] is None
+
+
+def test_an_order_still_travelling_has_forgone_nothing(admin):
+    """It has not lost anything *yet*, which is a different sentence from a
+    parcel that never arrived."""
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"])
+    _order(affiliate["id"], "9703", 100_000, month=SEPTEMBER, state="pending")
+
+    body = _sign_in().get(f"/api/me/earnings/{SEPTEMBER}").json()
+    (row,) = [o for o in body["orders_detail"] if o["order_number"] == "#9703"]
+
+    assert row["forgone_piastres"] is None
+
+
+def test_the_year_leaves_out_the_month_in_progress(admin):
+    """A part-month drawn beside finished ones reads as a collapse.
+
+    September at three days old plotted next to a full August made the line
+    fall off a cliff, and the business asked for it to wait until the month
+    ends.
+    """
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"])
+    _order(affiliate["id"], "9801", 1_000_000, month=AUGUST)
+    _deliver("9801")
+    _approve(admin, affiliate["id"], AUGUST)
+    _order(affiliate["id"], "9802", 500_000, month=SEPTEMBER)
+    _deliver("9802")
+
+    body = _sign_in().get("/api/me/year").json()
+    by_month = {row["month"]: row for row in body["months"]}
+
+    # Still returned, so the screen can say why it is absent rather than
+    # simply losing it.
+    assert by_month[SEPTEMBER]["in_progress"] is True
+    assert by_month[AUGUST]["in_progress"] is False
+
+    # And every summary covers the closed months only, so the headline can be
+    # reached by adding up the points on screen.
+    assert body["total_earned_piastres"] == by_month[AUGUST]["earned_piastres"]
+    assert body["best_month"] == AUGUST
+    assert body["closed_months"] == 1
+
+
+def test_orders_are_counted_across_every_month_including_today(admin):
+    """A tally of things that happened, not a figure still being decided.
+
+    Leaving today's out would under-report her own work.
+    """
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"])
+    _order(affiliate["id"], "9803", 1_000_000, month=AUGUST)
+    _deliver("9803")
+    _order(affiliate["id"], "9804", 500_000, month=SEPTEMBER)
+    _deliver("9804")
+
+    body = _sign_in().get("/api/me/year").json()
+
+    assert body["total_orders"] == 2
