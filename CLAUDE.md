@@ -78,6 +78,20 @@ payroll without touching a maintainer screen. **Keep that isolation.**
   accent; the writable-routes guard fails when anybody adds a route a model
   can call. **These failing is them working.**
 
+## Spend context like it is the budget
+
+It is. In the session that built the redesign, **file reads cost 1.7M tokens
+and Bash results 299k** — vastly more than the conversation. MCP tools cost 66.
+The waste is never where you expect it.
+
+- **Read with `offset`/`limit`.** Never re-read a file already in context, and
+  never read a whole file for ten lines.
+- **Pipe every Bash result** through `head`, `tail` or `grep`. A bare `grep -rn`
+  across the repo once returned 180KB.
+- **`pytest -q --color=no | tail -5`.** The colour codes in a full run are
+  thousands of tokens of `[32m.[0m`, and only the last line matters.
+- The suite takes 5–15 minutes: run it with `run_in_background` and poll.
+
 ## Handing over to a new session
 
 This project outruns a single conversation. **Hand over at a milestone, not at
