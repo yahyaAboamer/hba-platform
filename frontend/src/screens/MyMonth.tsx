@@ -243,6 +243,95 @@ export function MyMonth() {
         </p>
       )}
 
+      {!body.not_started && (
+        <>
+          {/*
+           * **Two tiles, side by side.** Counted and average answer the same
+           * question - *how is my code selling* - and a stacked list made
+           * them look like two unrelated facts. Shown on a historical month
+           * too: the orders are real and the counting is real, only the
+           * payment happened elsewhere.
+           */}
+          <div className="tiles">
+            <div className="tile">
+              <span className="tile__label">Counted sales</span>
+              <Money
+                piastres={body.sales.earned_piastres}
+                kind={settled ? "agreed" : "provisional"}
+                className="tile__figure"
+              />
+              <span className="tile__sub">
+                {counted === 1 ? "1 order counted" : `${counted} orders counted`}
+              </span>
+            </div>
+            {/*
+             * Absent rather than zero where nothing has counted yet -
+             * `average_order` is `null` there, because there is nothing to
+             * average, and a zero would claim a typical order is worth
+             * nothing.
+             */}
+            {body.sales.average_order !== null && (
+              <div className="tile">
+                <span className="tile__label">Average order</span>
+                <Money
+                  piastres={body.sales.average_order_piastres ?? 0}
+                  kind={settled ? "agreed" : "provisional"}
+                  className="tile__figure"
+                />
+                <span className="tile__sub">across counted orders</span>
+              </div>
+            )}
+          </div>
+
+          {/*
+           * **Its own outlined box**, not a third row in a list. An order
+           * still travelling is a different kind of fact from one that has
+           * counted - it is a promise, not money - and outlining rather than
+           * filling it says so before anybody reads the label.
+           *
+           * Shown, never hidden: hiding it makes their month look smaller
+           * than it is, which produces exactly the question this platform
+           * exists to stop them having to ask.
+           */}
+          {body.orders.pending > 0 && (
+            <div className="coming">
+              <div className="coming__top">
+                <div>
+                  <span className="tile__label">On its way</span>
+                  <Money
+                    piastres={body.sales.pending_piastres}
+                    className="coming__figure"
+                  />
+                </div>
+                {/*
+                 * §11.4, behind an ⓘ rather than on the page. The business's
+                 * own reasoning, and a better rule than mine: *an information
+                 * button makes it like, okay, there is something I need to
+                 * know about.*
+                 */}
+                <details className="expl">
+                  <summary aria-label="What happens to these orders">
+                    <span className="info" aria-hidden="true">i</span>
+                  </summary>
+                  <div className="expl__body">
+                    An order counts once it reaches the customer.{" "}
+                    {settled
+                      ? "This month is closed, so these will be paid with a later month — still at this month's rate. Nothing is lost."
+                      : "If they arrive before HBA closes the month they count here. If not, they are paid with the next one — still at this month's rate."}
+                  </div>
+                </details>
+              </div>
+              <span className="tile__sub">
+                {body.orders.pending === 1
+                  ? "1 order not delivered yet"
+                  : `${body.orders.pending} orders not delivered yet`}
+              </span>
+            </div>
+          )}
+
+        </>
+      )}
+
       {body.makeup.length > 0 && !body.not_started && (
         <details className="panel makeup" open>
           {/*
@@ -330,109 +419,26 @@ export function MyMonth() {
        * is real - only the payment happened elsewhere - so it behaves like any
        * other month rather than like a month that did not happen.
        */}
-      {!body.not_started && (
-        <>
-          {/*
-           * **Two tiles, side by side.** Counted and average answer the same
-           * question - *how is my code selling* - and a stacked list made
-           * them look like two unrelated facts. Shown on a historical month
-           * too: the orders are real and the counting is real, only the
-           * payment happened elsewhere.
-           */}
-          <div className="tiles">
-            <div className="tile">
-              <span className="tile__label">Counted sales</span>
-              <Money
-                piastres={body.sales.earned_piastres}
-                kind={settled ? "agreed" : "provisional"}
-                className="tile__figure"
-              />
-              <span className="tile__sub">
-                {counted === 1 ? "1 order counted" : `${counted} orders counted`}
-              </span>
-            </div>
-            {/*
-             * Absent rather than zero where nothing has counted yet -
-             * `average_order` is `null` there, because there is nothing to
-             * average, and a zero would claim a typical order is worth
-             * nothing.
-             */}
-            {body.sales.average_order !== null && (
-              <div className="tile">
-                <span className="tile__label">Average order</span>
-                <Money
-                  piastres={body.sales.average_order_piastres ?? 0}
-                  kind={settled ? "agreed" : "provisional"}
-                  className="tile__figure"
-                />
-                <span className="tile__sub">across counted orders</span>
-              </div>
-            )}
-          </div>
 
-          {/*
-           * **Its own outlined box**, not a third row in a list. An order
-           * still travelling is a different kind of fact from one that has
-           * counted - it is a promise, not money - and outlining rather than
-           * filling it says so before anybody reads the label.
-           *
-           * Shown, never hidden: hiding it makes their month look smaller
-           * than it is, which produces exactly the question this platform
-           * exists to stop them having to ask.
-           */}
-          {body.orders.pending > 0 && (
-            <div className="coming">
-              <div className="coming__top">
-                <div>
-                  <span className="tile__label">On its way</span>
-                  <Money
-                    piastres={body.sales.pending_piastres}
-                    className="coming__figure"
-                  />
-                </div>
-                {/*
-                 * §11.4, behind an ⓘ rather than on the page. The business's
-                 * own reasoning, and a better rule than mine: *an information
-                 * button makes it like, okay, there is something I need to
-                 * know about.*
-                 */}
-                <details className="expl">
-                  <summary aria-label="What happens to these orders">
-                    <span className="info" aria-hidden="true">i</span>
-                  </summary>
-                  <div className="expl__body">
-                    An order counts once it reaches the customer.{" "}
-                    {settled
-                      ? "This month is closed, so these will be paid with a later month — still at this month's rate. Nothing is lost."
-                      : "If they arrive before HBA closes the month they count here. If not, they are paid with the next one — still at this month's rate."}
-                  </div>
-                </details>
-              </div>
-              <span className="tile__sub">
-                {body.orders.pending === 1
-                  ? "1 order not delivered yet"
-                  : `${body.orders.pending} orders not delivered yet`}
-              </span>
-            </div>
-          )}
-
-          {/*
-           * A block, not a link in the corner of a card. It is the one thing
-           * to do from this screen, and a thumb finds a full-width target
-           * without aiming.
-           */}
-          <Link to="/orders" className="block">
-            <span>See every order</span>
-            <em>→</em>
-          </Link>
-        </>
-      )}
 
       {/*
        * §11.4, their side of it. They counted this month's orders themselves and the
        * total is short by one - this is the line that closes the gap, and
        * without it their arithmetic cannot arrive at their own payment.
        */}
+      {/*
+       * A block, not a link in the corner of a card. It is the one thing to do
+       * from this screen, and a thumb finds a full-width target without
+       * aiming. Last, because a control that leaves the screen belongs under
+       * everything the screen had to say.
+       */}
+      {!body.not_started && (
+        <Link to="/orders" className="block">
+          <span>See every order</span>
+          <em>→</em>
+        </Link>
+      )}
+
       {body.carried_out.map((line) => (
         <p key={line.to_month} className="notice carried">
           {line.orders === 1
