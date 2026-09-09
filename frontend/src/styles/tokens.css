@@ -1,48 +1,127 @@
 /*
- * Design tokens. ADR 0027.
+ * Design tokens. ADR 0027, as amended by ADR 0039.
  *
- * Colour is reserved for money state. Navigation, headings, panels and active
- * states carry none of it — an interface where everything is coloured has no
- * way left to say "this one matters".
+ * ## One system, two halves
  *
- * The single exception is --focus, which appears nowhere else, because focus is
- * the one thing that must never blend into its surroundings.
+ * This file used to describe the maintainer's tool alone — cool neutrals, no
+ * dark theme, colour reserved for money state — while `portal.css` carried a
+ * second, parallel ramp for the affiliate portal. The approved redesign draws
+ * **both halves in one palette**: the two exported references
+ * (`docs/redesign/designs/`) declare byte-identical token blocks, green accent
+ * and all. So the ramp lives here now, once, and `portal.css` is left with
+ * what is genuinely the portal's own — its denser spacing, its elevation, its
+ * phone-shaped furniture.
+ *
+ * ADR 0039 records that change and supersedes 0038, which had said the
+ * maintainer's tool wears no brand. It does now, because the business drew it
+ * that way.
+ *
+ * ## Two themes, and a colour is never defined in only one
+ *
+ * Light is written first and in full at `:root`. Dark redefines the same
+ * names under `[data-theme="dark"]`. **A colour whose only definition sits
+ * inside one theme renders that theme's text on the other theme's ground** —
+ * the classic way a two-theme sheet breaks, and the reason both blocks below
+ * list the same keys.
+ *
+ * The attribute selector is deliberately unanchored. The portal stamps
+ * `data-theme` on its own root element (`AffiliatePortal`), and the
+ * maintainer's shell stamps it on `<html>`; one block serves both.
+ * `prefers-color-scheme` is not consulted — the business asked for an explicit
+ * choice with a toggle, and following the operating system would quietly
+ * overrule it.
+ *
+ * ## What colour still means
+ *
+ * Colour is still spent on state, not decoration. What changed is that the
+ * accent is now green, and green already meant *this resolved* — so
+ * `--settled` and the accent are the same hue on purpose rather than by
+ * accident, and `--refused` can go back to red. (It had been amber only
+ * because the old accent was red, and two reds one step apart on a screen
+ * cannot both mean something. That constraint is gone with the red.)
+ *
+ * No hex here is a brand colour. Every accent-derived token below reads
+ * through `var(--accent*)`, which lives in `accent.css` and nowhere else —
+ * `styles/__tests__/accent-isolation.test.ts` fails the build otherwise.
  */
 
 :root {
-  /* Surfaces and text. Cool near-neutrals: the warmth belongs to the affiliate
-     portal, not to a tool for reconciling twenty payments at month end. */
-  --paper: #fbfbfc;
+  /* ── Ground and ink — light ───────────────────────────────────────────
+   * The approved palette's neutral ramp, verbatim from both exports. */
+  --paper: #eff1ee;
   --surface: #ffffff;
-  --ink: #14181f;
-  --quiet: #5c6673;
-  --rule: #e4e7ec;
-  --rule-strong: #cdd3db;
-  --hover: #f4f5f7;
-
-  /* Money state, and nothing else. */
-  --owed: #b54708; /* outstanding — attention, not alarm */
-  --settled: #067647; /* resolved */
-  --refused: #b42318; /* blocked, or void */
-  --owed-quiet: #fdf6ef;
-  --settled-quiet: #f0faf5;
-  --refused-quiet: #fdf3f2;
-
-  /* Never used for anything else. */
-  --focus: #3538cd;
+  --raise: #ffffff;
+  --ink: #101214;
+  /* One step past `--ink`, for the pressed state of a filled button. It exists
+     as a token because the alternative was a literal `#000`, which is right on
+     a light ground and inverts a near-white button to black on a dark one. */
+  --ink-strong: #000000;
+  --quiet: #4e534e;
+  --faint: #5e645e;
+  --rule: #dde1dc;
+  --rule-strong: #c9cec8;
+  --hover: #eff1ee;
+  --bar: #c9cec8;
 
   /*
-   * Two faces from one superfamily, drawn together, so mixing them inside a
-   * single row reads as intentional rather than as a fallback.
+   * Money state.
    *
-   * Sans carries prose and provisional figures. Mono carries agreed money,
-   * months, discount codes and order numbers — the things that must line up in
-   * a column and must not be mistaken for a working number.
+   * `--settled` takes the accent ramp rather than a green of its own. The
+   * portal's old sheet argued the opposite — that settled "is the one meaning
+   * the accent must never be confused with" — and it was right *while the
+   * accent was red*. The business then chose, as its brand, the colour that
+   * already meant resolved. Keeping a second, near-identical green beside it
+   * would reproduce the two-reds problem in another hue.
+   *
+   * Measured against the approved grounds:
+   *
+   *   | text            | on card  | on page  |
+   *   | --------------- | -------- | -------- |
+   *   | amber, light    |  5.91:1  |          |
+   *   | red,   light    |  7.49:1  |          |
+   *   | amber, dark     |  8.23:1  |          |
+   *   | red,   dark     |  5.74:1  |          |
+   *
+   * All above 4.5:1, which is what text needs.
    */
-  --sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
-  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --owed: #8a5a16; /* outstanding — attention, not alarm */
+  --settled: var(--accent-text); /* resolved */
+  --refused: #9a2f22; /* blocked, or void */
+  --owed-quiet: rgba(138, 90, 22, 0.1);
+  --settled-quiet: var(--accent-soft);
+  --refused-quiet: rgba(154, 47, 34, 0.1);
 
-  /* Dense, laptop-first (§12.5). Built for scanning twenty affiliates. */
+  /*
+   * Focus takes the accent, as both exports do
+   * (`outline: 2px solid var(--acc)`). It was indigo when the accent was a
+   * colour you could not put an outline in; it is not any more.
+   */
+  --focus: var(--accent);
+
+  /*
+   * Type. **One face, everywhere**, as both exports draw it.
+   *
+   * There used to be two. ADR 0027 set an *agreed* figure in a mono face and a
+   * *provisional* one in prose, so the typeface itself said whether a number
+   * was final. The business ended that rule on 9 September, and the reasoning
+   * is worth keeping because it is the sort of thing that gets re-invented:
+   *
+   *   > If we kept it, they wouldn't necessarily know that this font is for a
+   *   > month that is still open or a month that is fixed and closed.
+   *
+   * Which is the whole objection. A signal only works if the reader has been
+   * told what it means, and a model opening this from an email has not been.
+   * The distinction was legible to the people who built it and to nobody else.
+   *
+   * What carries it instead is what the exports use and what a reader can
+   * actually act on: the words on the screen — "still adding up", "open",
+   * "closed" — plus weight and colour. `tabular-nums` is set on `body`, so
+   * figures still line up in a column without a second family.
+   */
+  --sans: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
+
+  /* Dense, laptop-first (§12.5). Built for scanning twenty affiliates.
+     `portal.css` tightens these for a phone. */
   --text-xs: 0.75rem;
   --text-sm: 0.8125rem;
   --text-base: 0.9375rem;
@@ -60,8 +139,52 @@
   --sidebar-width: 216px;
   --row-height: 2.5rem;
 
-  /* No shadows and no elevation anywhere. §12.1 asks for trustworthy rather
-     than decorative, and a drop shadow is decoration that has learned to look
-     like structure. Radius is small enough to read as a rule, not a card. */
-  --radius: 3px;
+  /*
+   * The approved radius scale, from the design bundle: 4 / 8 / 14. The old
+   * 3px hairline radius said "this is a rule, not a card" — which was the
+   * right thing to say about a screen that had no cards. The redesign is
+   * built out of them.
+   */
+  --radius-sm: 4px;
+  --radius: 8px;
+  --radius-lg: 14px;
+
+  /* Elevation. On light, a hairline plus a soft shadow; on dark, an edge and
+     ambient darkness — stacking heavy shadows on a dark ground reads as fog. */
+  --elev: 0 1px 2px rgba(16, 18, 20, 0.08), 0 0 0 1px rgba(16, 18, 20, 0.05);
+  --scrim: rgba(16, 18, 20, 0.5);
+
+  /* Tells the browser to draw its *own* furniture to match — placeholder text,
+     autofill, scrollbars, the select dropdown, the caret. Without it a dark
+     form still gets a light-mode caret and a white autofill block, which is
+     the give-away that a theme was painted on rather than switched. */
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --paper: #08090a;
+  --surface: #15171a;
+  --raise: #1d2126;
+  --ink: #ecefea;
+  --ink-strong: #ffffff;
+  --quiet: #a7ada6;
+  --faint: #8a918a;
+  --rule: #23272b;
+  --rule-strong: #2d3237;
+  --hover: #1d2126;
+  --bar: #343a3f;
+
+  --owed: #e0a458;
+  --settled: var(--accent-text);
+  --refused: #e2705f;
+  --owed-quiet: rgba(224, 164, 88, 0.12);
+  --settled-quiet: var(--accent-soft);
+  --refused-quiet: rgba(226, 112, 95, 0.12);
+
+  --focus: var(--accent);
+
+  --elev: 0 1px 2px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(236, 239, 234, 0.06);
+  --scrim: rgba(8, 9, 10, 0.66);
+
+  color-scheme: dark;
 }

@@ -35,6 +35,24 @@
   --guarantee-bg: #fbeeda;
 }
 
+/* The same three, lifted for the dark ground the maintainer's half gained in
+   ADR 0039. The light values above are unchanged: they were chosen against
+   the built screen and there is no reason to retune them.
+
+   Written out rather than derived. These are the one place on this screen
+   where colour separates three arrangements at a glance, and `color-mix`ing
+   them off a neutral would have made "is guarantee still distinguishable from
+   commission at 3am in October" a question nobody could answer by reading.
+   Measured against `--surface` (#15171A): 7.84:1, 8.05:1, 8.23:1. */
+[data-theme="dark"] .comp {
+  --commission: #a7ada6;
+  --commission-bg: rgba(236, 239, 234, 0.08);
+  --salary: #a3a8f0;
+  --salary-bg: rgba(120, 128, 240, 0.16);
+  --guarantee: #e0a458;
+  --guarantee-bg: rgba(224, 164, 88, 0.14);
+}
+
 .crumb {
   margin: 0 0 var(--space-2);
   font-size: var(--text-xs);
@@ -187,7 +205,6 @@
 
 .mo__name {
   display: block;
-  font-family: var(--mono);
   font-size: var(--text-xs);
   color: var(--quiet);
 }
@@ -203,7 +220,6 @@
 .mo__amt {
   display: block;
   min-height: 1.2em;
-  font-family: var(--mono);
   font-size: var(--text-xs);
 }
 
@@ -482,7 +498,6 @@
 }
 
 .comp__suffix {
-  font-family: var(--mono);
   font-size: var(--text-sm);
   color: var(--quiet);
 }

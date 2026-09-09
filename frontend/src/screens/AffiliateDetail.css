@@ -168,6 +168,5 @@
    for character against Shopify (ADR 0027). */
 .detail__correction {
   width: 9rem;
-  font-family: var(--mono);
   text-transform: uppercase;
 }

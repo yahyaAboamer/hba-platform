@@ -1,0 +1,89 @@
+{
+  "unit": "integer piastres unless a field explicitly says EGP",
+  "status": "business examples for implementation tests; not executable production calculations",
+  "examples": [
+    {
+      "id": "pending_once",
+      "source_sales_piastres": 2000000,
+      "rate_bp": 1000,
+      "commission_piastres": 200000,
+      "on_later_delivery_extra_commission_piastres": 0
+    },
+    {
+      "id": "guarantee_met_late_failure",
+      "original_commission_piastres": 210000,
+      "revised_commission_piastres": 190000,
+      "minimum_piastres": 200000,
+      "qualified": true,
+      "original_entitlement_piastres": 210000,
+      "revised_entitlement_piastres": 200000,
+      "recoverable_piastres": 10000
+    },
+    {
+      "id": "guarantee_missed_late_failure",
+      "original_commission_piastres": 210000,
+      "revised_commission_piastres": 190000,
+      "minimum_piastres": 200000,
+      "qualified": false,
+      "original_entitlement_piastres": 210000,
+      "revised_entitlement_piastres": 190000,
+      "recoverable_piastres": 20000
+    },
+    {
+      "id": "insufficient",
+      "destination_earnings_piastres": 10000,
+      "chosen_deduction_piastres": 20000,
+      "applied_piastres": 10000,
+      "transfer_due_piastres": 0,
+      "remaining_piastres": 10000
+    },
+    {
+      "id": "two_deductions_one_capacity",
+      "destination_earnings_piastres": 10000,
+      "chosen_deductions_piastres": [
+        8000,
+        8000
+      ],
+      "total_applied_piastres": 10000,
+      "transfer_due_piastres": 0,
+      "total_remaining_piastres": 6000
+    },
+    {
+      "id": "guarantee_cumulative",
+      "original_commission_piastres": 210000,
+      "minimum_piastres": 200000,
+      "qualified": true,
+      "first_revised_commission_piastres": 205000,
+      "first_cumulative_difference_piastres": 5000,
+      "second_revised_commission_piastres": 190000,
+      "second_cumulative_difference_piastres": 10000,
+      "second_incremental_difference_piastres": 5000
+    },
+    {
+      "id": "base_and_rounding",
+      "customer_total_piastres": 115700,
+      "shipping_piastres": 9500,
+      "tax_piastres": 0,
+      "base_piastres": 106200,
+      "rate_bp": 1000,
+      "exact_commission_piastres": "10620",
+      "payout_piastres_under_existing_rule": 10600
+    },
+    {
+      "id": "fixed_plus_commission",
+      "commission_piastres": 50000,
+      "fixed_piastres": 100000,
+      "earlier_deduction_piastres": 20000,
+      "transfer_due_piastres": 130000
+    },
+    {
+      "id": "history",
+      "actual_start_month": "2026-06",
+      "platform_signup_month": "2026-09",
+      "first_selectable_month": "2026-06",
+      "july_orders": 0,
+      "july_still_selectable": true,
+      "old_external_month_transfer_rows_to_create": 0
+    }
+  ]
+}

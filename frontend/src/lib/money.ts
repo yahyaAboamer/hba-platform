@@ -5,9 +5,12 @@
  * this side of the wire too — a figure arrives as an integer and is formatted
  * for display only. Nothing here is ever used to calculate anything.
  *
- * ADR 0027: the typeface says whether a figure is an obligation. That decision
- * lives in `moneyClass` rather than in each screen, so twenty screens cannot
- * drift apart on the one distinction the platform is built around.
+ * ADR 0027, as amended by 0039: how a figure is set says whether it is an
+ * obligation. It was the typeface until 9 September; it is weight and colour
+ * now, because a font only signals to a reader who has been told what it
+ * means. Either way the decision lives in `moneyClass` rather than in each
+ * screen, so twenty screens cannot drift apart on the one distinction the
+ * platform is built around.
  */
 
 const PIASTRES_PER_POUND = 100;
@@ -29,9 +32,9 @@ export function formatEgp(piastres: number): string {
 
 /** What a figure is, which decides how it is set. */
 export type MoneyKind =
-  /** Calculated now, and free to change. Set in the prose face. */
+  /** Calculated now, and free to change. Set quiet. */
   | "provisional"
-  /** Frozen in an approved snapshot. Set in the mono face. */
+  /** Frozen in an approved snapshot. Set in full weight and ink. */
   | "agreed"
   /** Cannot be approved yet, so it is not owed. */
   | "blocked";

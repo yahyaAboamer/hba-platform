@@ -32,7 +32,6 @@
 }
 
 .payroll__count {
-  font-family: var(--mono);
   font-size: var(--text-lg);
   font-weight: 500;
   letter-spacing: -0.02em;
@@ -89,7 +88,6 @@
 
 .payroll__version {
   margin-left: var(--space-2);
-  font-family: var(--mono);
   font-size: var(--text-xs);
   color: var(--quiet);
 }

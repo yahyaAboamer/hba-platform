@@ -10,12 +10,12 @@
   font-size: var(--text-xs);
 }
 
-/* Mono, and large. ADR 0027 gives mono to the things that must be read
-   character by character and not mistaken for prose — a discount code is the
-   original example. Nothing else on this screen competes with it. */
+/* Large, and spaced. This is read character by character and typed into a
+   checkout, so it gets size, weight and letter-spacing rather than the mono
+   face it used to have — ADR 0039 left one family. Nothing else on this screen
+   competes with it. */
 .grow__code {
   margin: var(--space-2) 0 0;
-  font-family: var(--mono);
   font-size: 2.125rem;
   font-weight: 600;
   letter-spacing: 0.03em;

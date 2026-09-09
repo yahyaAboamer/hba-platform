@@ -14,8 +14,8 @@ import "./MyMonth.css";
  * §11.1 is the whole screen. A month still open is a working number that will
  * move because orders are still arriving; a month agreed is what they are owed
  * and cannot move. They are the one who screenshots a figure in the third week
- * and asks why it changed, so the distinction is said in words as well as
- * carried by the typeface (ADR 0027).
+ * and asks why it changed, so the distinction is said in words - which, since
+ * ADR 0039 dropped the second typeface, is now the whole of how it is said.
  *
  * Nothing here is calculated in the browser. The server sends the figure, the
  * breakdown and the total; adding them up on this side would be a second
@@ -459,10 +459,27 @@ export function MyMonth() {
        * everything the screen had to say.
        */}
       {!body.not_started && (
-        <Link to="/orders" className="block">
-          <span>See every order</span>
-          <em>→</em>
-        </Link>
+        <>
+          <Link to="/orders" className="block">
+            <span>See every order</span>
+            <em>→</em>
+          </Link>
+          {/*
+           * Year and Grow left the tab bar in the redesign (S03): the design
+           * puts the year's performance on Home and the code in the header
+           * chip. Folding them in is Phase 07A, and until it happens these
+           * are how both screens are reached - deleting a working screen to
+           * match a drawing is not a redesign.
+           */}
+          <Link to="/year" className="block">
+            <span>Your year so far</span>
+            <em>→</em>
+          </Link>
+          <Link to="/grow" className="block">
+            <span>Selling more</span>
+            <em>→</em>
+          </Link>
+        </>
       )}
 
       {body.carried_out.map((line) => (

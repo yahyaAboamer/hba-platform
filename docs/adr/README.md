@@ -66,7 +66,7 @@ what was chosen.
 | [0024](0024-an-order-can-be-finished-with.md) | An order can be finished with, and an exchange finishes it | Accepted |
 | [0025](0025-delivery-is-final.md) | Delivery is final: V1 ignores what happens afterwards | Accepted |
 | [0026](0026-proof-lives-in-postgres.md) | Payment proof is stored in Postgres, in its own table | Accepted |
-| [0027](0027-numerals-change-face-when-a-figure-becomes-an-obligation.md) | Numerals change face when a figure becomes an obligation | Accepted |
+| [0027](0027-numerals-change-face-when-a-figure-becomes-an-obligation.md) | Numerals change face when a figure becomes an obligation | Typeface rule superseded by 0039 |
 | [0028](0028-paying-by-bank-or-wallet-needs-a-number-not-a-link.md) | Paying by bank or wallet needs a number, not a link | Accepted, amended 2026-08-27, deep link verified 2026-08-27 |
 | [0029](0029-a-late-order-is-paid-at-its-own-months-rate.md) | A late order is paid at its own month's rate, on top of any guarantee | Accepted |
 | [0030](0030-a-reopened-month-emails-once-on-reapproval.md) | A reopened month emails once, on re-approval, and says why | Accepted |
@@ -77,11 +77,14 @@ what was chosen.
 | [0035](0035-an-adjustment-closes-a-difference.md) | An adjustment closes a difference; it never opens a larger one | Accepted |
 | [0036](0036-pre-go-live-months-are-ordinary-months.md) | Months before go-live are ordinary months, settled outside | Accepted |
 | [0037](0037-what-you-were-paid-is-not-how-you-sold.md) | What a model was paid and how their sales performed are two numbers | Accepted |
-| [0038](0038-the-portal-wears-the-brand-the-tool-does-not.md) | The portal wears the brand; the maintainer's tool does not | Accepted |
+| [0038](0038-the-portal-wears-the-brand-the-tool-does-not.md) | The portal wears the brand; the maintainer's tool does not | Superseded by 0039 |
+| [0039](0039-one-palette-across-both-halves.md) | One palette and one typeface across both halves | Accepted |
 
-**0014 is superseded by 0036**, and **0027 is amended by 0038** for the
-affiliate portal only. Both carry the reasoning at the top of the superseded
-file rather than only in the one that replaced it.
+**0014 is superseded by 0036** and **0038 by 0039**. **0027 keeps its
+principle and loses its mechanism to 0039**: an agreed figure is still set
+apart from a working one, but by weight and colour rather than by a second
+typeface. Each carries the reasoning at the top of the superseded file rather
+than only in the one that replaced it.
 
 See also [`../limits.md`](../limits.md) — the register of known limits and
 foreseeable failures, which records what will eventually break rather than what

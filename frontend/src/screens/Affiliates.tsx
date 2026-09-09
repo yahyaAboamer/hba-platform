@@ -156,7 +156,7 @@ export function Affiliates() {
     <>
       <div className="page__head">
         <div className="page__title">
-          <h1>Affiliates</h1>
+          <h1>Models</h1>
           {rows && (
             <span className="page__subtitle">{rows.length} on file</span>
           )}
@@ -414,7 +414,7 @@ export function Affiliates() {
               {/*
                * Second column, asked for by name: the code is how an order is
                * recognised as somebody's, so it is how a person is recognised
-               * on this list. In the mono face the app reserves for codes.
+               * on this list.
                */}
               <th>Code</th>
               <th>Status</th>

@@ -212,7 +212,7 @@ function InvitePanel() {
        * one decision.
        */}
       <p className="settings__note">
-        For models, use <strong>Invite a model</strong> on the Affiliates
+        For models, use <strong>Invite a model</strong> on the Models
         screen.
       </p>
 

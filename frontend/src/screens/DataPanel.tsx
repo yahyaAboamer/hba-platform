@@ -213,7 +213,7 @@ export function DataPanel() {
             </table>
             <p className="data__note">
               Register one on the model's own page under{" "}
-              <Link to="/affiliates">Affiliates</Link>.
+              <Link to="/affiliates">Models</Link>.
             </p>
           </div>
         )}

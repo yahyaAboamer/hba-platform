@@ -34,7 +34,6 @@
 }
 
 .layout__brand-name {
-  font-family: var(--mono);
   font-size: var(--text-lg);
   font-weight: 600;
   letter-spacing: -0.03em;
@@ -94,8 +93,10 @@
 }
 
 .layout__glossary,
+.layout__theme,
 .layout__sign-out {
   padding: 0;
+  text-align: left;
   border: none;
   background: none;
   font-size: var(--text-xs);
@@ -106,6 +107,7 @@
 }
 
 .layout__glossary:hover,
+.layout__theme:hover,
 .layout__sign-out:hover {
   color: var(--ink);
 }
