@@ -387,3 +387,15 @@
   gap: var(--space-3);
   margin-top: var(--space-4);
 }
+
+/* Her address. Stacked rather than a row of inputs - an address read back as
+   one line is quick to check and impossible to correct. */
+.affiliate .address {
+  display: grid;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.affiliate .address .field {
+  margin-bottom: 0;
+}

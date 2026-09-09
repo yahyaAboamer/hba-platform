@@ -1015,6 +1015,15 @@ def test_nothing_about_a_target_can_be_changed_from_their_side(admin):
     #   notifications      mutes an email.
     #   payout-destination moves where money is sent. The one that asks for a
     #                      password (§6.4.1).
+    #   shipping-address   where a parcel goes. **Staff write this one too**
+    #                      (D11), unlike her measurements - HBA types it into
+    #                      the order, so a model who has moved must not become
+    #                      a parcel that cannot be sent. Added in 03B.
+    #
+    # Only one of the four asks for a password, and the difference is the
+    # subject rather than the sensitivity: the payout destination is where
+    # *money* goes. Asking for a password before she corrects a house number
+    # teaches her to type it into anything that asks.
     #
     # What is still absent is the point: nothing here writes a target, a rate,
     # an order or a month state.
@@ -1022,6 +1031,7 @@ def test_nothing_about_a_target_can_be_changed_from_their_side(admin):
         "/api/me/measurements",
         "/api/me/notifications",
         "/api/me/payout-destination",
+        "/api/me/shipping-address",
     ]
 
 

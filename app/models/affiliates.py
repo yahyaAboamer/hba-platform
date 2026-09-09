@@ -119,6 +119,29 @@ class AffiliateProfile(Base):
     #: `months_for` says which of the two it used.
     collaboration_start_month: Mapped[str | None] = mapped_column(String(7))
 
+    #: **Where HBA sends her things** (D11, 10 September 2026).
+    #:
+    #: Not a Shopify fact. HBA types this into the order, so the platform is
+    #: the source and Shopify holds the copy - which is why `W03` can match a
+    #: parcel by its shipping phone at all, and why the comparison is against a
+    #: record rather than a guess.
+    #:
+    #: **Both sides edit it**, unlike measurements. She may give it once and
+    #: move, and the person shipping to her needs the current one without
+    #: having to ask her to update it first.
+    #:
+    #: `shipping_phone` is separate from `phone` deliberately: that one is an
+    #: InstaPay fallback for *paying* her, this is the number on a *parcel*.
+    #: They are the same number often enough that merging them would look
+    #: harmless right up until the month somebody changes one.
+    shipping_phone: Mapped[str | None] = mapped_column(String(40))
+    shipping_name: Mapped[str | None] = mapped_column(String(200))
+    shipping_line1: Mapped[str | None] = mapped_column(String(300))
+    shipping_line2: Mapped[str | None] = mapped_column(String(300))
+    shipping_city: Mapped[str | None] = mapped_column(String(120))
+    shipping_governorate: Mapped[str | None] = mapped_column(String(120))
+    shipping_notes: Mapped[str | None] = mapped_column(String(500))
+
     #: Optional measurements (A05). Marketing needs sizes and sometimes these.
     #:
     #: **A model writes them; staff read them.** That is a rule about who, so

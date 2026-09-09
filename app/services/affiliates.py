@@ -510,3 +510,89 @@ def readiness(db: Session, month: str) -> dict[int, dict[str, bool]]:
         for affiliate_id in db.scalars(select(AffiliateProfile.id))
     }
 
+
+
+#: The address fields, named once. Two routes write them - hers and staff's
+#: (D11) - and two lists that must agree is how a field ends up editable from
+#: one side and invisible from the other.
+SHIPPING_FIELDS = (
+    "shipping_name",
+    "shipping_phone",
+    "shipping_line1",
+    "shipping_line2",
+    "shipping_city",
+    "shipping_governorate",
+    "shipping_notes",
+)
+
+
+def update_shipping_address(
+    db: Session,
+    affiliate: AffiliateProfile,
+    values: dict,
+    *,
+    actor_id: int | None = None,
+    actor_email: str | None = None,
+    actor_is_staff: bool,
+) -> None:
+    """Where HBA sends her things.
+
+    **Both sides write this** (D11, 10 September 2026), which is what makes it
+    different from her measurements:
+
+    > It's a protected data for the models. But the admins can see it because
+    > these are the data that will be used when creating their orders.
+
+    She may give it once and move; the person shipping to her needs the current
+    one without having to ask her to update it first. So there is one service
+    and two callers, and `actor_is_staff` records **which**, because "who
+    changed the address a parcel then went to" is a question that gets asked
+    exactly once, urgently, after a parcel goes to the wrong place.
+
+    Only supplied keys change. An empty string clears a field, which is a real
+    answer - a second address line that no longer applies should be removable.
+
+    **The phone is validated as an Egyptian mobile.** Not decoration: it is the
+    token W03 matches on, and a number that cannot normalise is a parcel that
+    can never be attached to her. Refusing it here is the last point where
+    somebody can still fix it.
+    """
+    from app.services.recipients import normalise_phone
+
+    before: dict = {}
+    after: dict = {}
+
+    for field in SHIPPING_FIELDS:
+        if field not in values:
+            continue
+        raw = values[field]
+        cleaned = (str(raw).strip() or None) if raw is not None else None
+
+        if field == "shipping_phone" and cleaned and normalise_phone(cleaned) is None:
+            raise ValueError(
+                "That does not look like an Egyptian mobile number. It should "
+                "be 11 digits starting 010, 011, 012 or 015 - it is the number "
+                "that goes on the parcel."
+            )
+
+        if cleaned != getattr(affiliate, field):
+            before[field] = getattr(affiliate, field)
+            after[field] = cleaned
+            setattr(affiliate, field, cleaned)
+
+    if not after:
+        return
+
+    # **Which fields changed, not what to.** An address is hers; the audit
+    # trail is read by staff, and "she changed her address" plus who did it is
+    # the whole of what an audit needs. The values live on the profile, where
+    # the people who need them already look.
+    record_audit(
+        db,
+        action="affiliate.shipping_address_updated",
+        subject=f"affiliate:{affiliate.id}",
+        actor_id=actor_id,
+        actor_email=actor_email,
+        before={"fields": sorted(before)},
+        after={"fields": sorted(after), "by": "staff" if actor_is_staff else "model"},
+    )

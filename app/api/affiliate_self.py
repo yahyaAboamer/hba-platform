@@ -18,7 +18,11 @@ from app.db import get_session
 from app.models.affiliates import AffiliateProfile
 from app.models.identity import UserAccount
 from app.models.payments import PaymentTransaction
-from app.services.affiliates import update_measurements
+from app.services.affiliates import (
+    SHIPPING_FIELDS,
+    update_measurements,
+    update_shipping_address,
+)
 from app.services.applications import REQUIRED_PAYOUT_FIELDS, application_state
 from app.services.auth import authenticate
 from app.services.codes import codes_with_status
@@ -83,6 +87,8 @@ def me(
         #: them; the maintainer's payload carries them read-only.
         "height_cm": affiliate.height_cm,
         "weight_kg": affiliate.weight_kg,
+        #: D11. Hers, and staff write it too - they type it into the order.
+        "shipping": {field: getattr(affiliate, field) for field in SHIPPING_FIELDS},
         "status": affiliate.status,
         "state": application_state(db, affiliate),
         "codes": codes_with_status(db, affiliate, affiliate.created_at.strftime("%Y-%m"))
@@ -461,3 +467,60 @@ def update_my_measurements(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     return {"height_cm": affiliate.height_cm, "weight_kg": affiliate.weight_kg}
+
+
+class ShippingBody(BaseModel):
+    """Where HBA sends her things.
+
+    **No password**, for the same reason measurements need none: this decides
+    where a parcel goes, not where money goes. §6.4.1 reserves reauthentication
+    for the payout destination, and asking for it on every ordinary edit is how
+    somebody learns to type their password into anything that asks.
+
+    Every field optional, and an empty string clears one - a second address
+    line that no longer applies should be removable.
+    """
+
+    shipping_name: str | None = Field(default=None, max_length=200)
+    shipping_phone: str | None = Field(default=None, max_length=40)
+    shipping_line1: str | None = Field(default=None, max_length=300)
+    shipping_line2: str | None = Field(default=None, max_length=300)
+    shipping_city: str | None = Field(default=None, max_length=120)
+    shipping_governorate: str | None = Field(default=None, max_length=120)
+    shipping_notes: str | None = Field(default=None, max_length=500)
+
+
+@router.put("/shipping-address")
+def update_my_shipping_address(
+    body: ShippingBody,
+    affiliate: AffiliateProfile = Depends(current_affiliate),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Her address, written by her.
+
+    D11: **both sides edit this.** Unlike her measurements, which are hers
+    alone, staff may write it too - they are the ones typing it into an order,
+    and a model who has moved should not be a parcel that cannot be sent. The
+    audit records which side made each change.
+
+    Only the keys she actually sends are touched, so a form that edits one line
+    cannot blank the rest.
+    """
+    supplied = body.model_dump(exclude_unset=True)
+    try:
+        update_shipping_address(
+            db,
+            affiliate,
+            supplied,
+            actor_id=affiliate.user_account_id,
+            actor_email=affiliate.account.email,
+            actor_is_staff=False,
+        )
+        db.commit()
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return {
+        field: getattr(affiliate, field) for field in SHIPPING_FIELDS
+    }

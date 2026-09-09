@@ -20,6 +20,13 @@ type Sync = {
  * `last_synced_at` is the half that matters: a catalogue nobody has read for a
  * fortnight looks identical to a fresh one until it says so.
  */
+/** A parcel the platform looked at and could not attach to a model (W12). */
+type Unmatched = {
+  shopify_order_id: string;
+  reason: "ambiguous" | "no_match";
+  classification: string;
+};
+
 type Catalogue = {
   products: number;
   active_products: number;
@@ -82,6 +89,8 @@ export function DataPanel() {
   const [working, setWorking] = useState(false);
   const [catalogue, setCatalogue] = useState<Catalogue | null>(null);
   const [syncingCatalogue, setSyncingCatalogue] = useState(false);
+  const [parcels, setParcels] = useState<Unmatched[] | null>(null);
+  const [scanning, setScanning] = useState(false);
 
   const load = useCallback(() => {
     Promise.all([
@@ -90,13 +99,15 @@ export function DataPanel() {
       api.get<{ codes: UnownedCode[] }>("/api/operations/unregistered-codes"),
       api.get<MailHealth>("/api/operations/notifications"),
       api.get<Catalogue>("/api/operations/catalogue"),
+      api.get<{ parcels: Unmatched[] }>("/api/operations/unmatched-parcels"),
     ])
-      .then(([status, failed, unowned, health, products]) => {
+      .then(([status, failed, unowned, health, products, unattached]) => {
         setSync(status);
         setJobs(failed.jobs);
         setCodes(unowned.codes);
         setMail(health);
         setCatalogue(products);
+        setParcels(unattached.parcels);
       })
       .catch((caught) => setError(caught.message));
   }, []);
@@ -119,6 +130,25 @@ export function DataPanel() {
       );
     } finally {
       setSyncingCatalogue(false);
+    }
+  }
+
+  async function scanRecipients() {
+    setScanning(true);
+    setError(null);
+    setNotice(null);
+    try {
+      await api.post("/api/operations/scan-recipients", { since });
+      setNotice(
+        "Queued. It works through the history a few pages at a time and carries on by itself.",
+      );
+      load();
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "Could not start it.",
+      );
+    } finally {
+      setScanning(false);
     }
   }
 
@@ -245,6 +275,51 @@ export function DataPanel() {
               {syncingCatalogue ? "Starting…" : "Read the catalogue"}
             </button>
           </div>
+        </div>
+
+        {/*
+         * **Matching, not attribution.** Attribution asks who *sold* an order
+         * - a code on it. This asks who it was *sent to* - the phone on the
+         * parcel, which HBA typed from her profile (D11). A model can sell a
+         * hundred orders she never touched.
+         */}
+        <div className="data__import">
+          <h3 className="data__heading">Parcels sent to models</h3>
+          <p className="data__note">
+            Works out which orders were shipments to a model, by the phone on
+            the parcel. Ordinary paginated reads — safe to run at any time, and
+            it carries on by itself until the history is done.
+          </p>
+          <div className="data__import-row">
+            <button
+              type="button"
+              className="button"
+              onClick={scanRecipients}
+              disabled={scanning || !sync?.shopify_configured}
+            >
+              {scanning ? "Starting…" : "Match parcels from " + since}
+            </button>
+          </div>
+          {/*
+           * Silent when empty, and deliberately not a work queue. Most
+           * unmatched orders are ordinary customers and always will be; a
+           * backlog of a thousand rows that were never HBA's parcels is worse
+           * than no list at all. Only real ambiguities reach here.
+           */}
+          {parcels && parcels.length > 0 && (
+            <ul className="data__parcels">
+              {parcels.map((row) => (
+                <li key={row.shopify_order_id}>
+                  <span className="code">{row.shopify_order_id}</span>
+                  <span className="data__parcel-why">
+                    {row.reason === "ambiguous"
+                      ? "two models share that number — one of them is wrong"
+                      : "no model has that number on file"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         {/*

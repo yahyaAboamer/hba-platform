@@ -188,3 +188,26 @@
   width: auto;
   min-width: 10rem;
 }
+
+/* ── Where parcels go ──────────────────────────────────────────────────────
+ *
+ * D11: staff write this, unlike her measurements. A stacked form rather than a
+ * row of inputs — an address read back as one line is quick to check, and
+ * typed as one line is impossible to correct.
+ */
+.detail__address {
+  display: block;
+  max-width: 46ch;
+  line-height: 1.5;
+}
+
+.detail__address-form {
+  display: grid;
+  gap: var(--space-3);
+  max-width: 26rem;
+  margin-top: var(--space-2);
+}
+
+.detail__address-form .field {
+  margin-bottom: 0;
+}

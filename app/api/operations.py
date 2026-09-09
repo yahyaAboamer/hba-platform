@@ -25,6 +25,7 @@ from app.services.shopify.client import (
     ShopifyNotConfigured,
 )
 from app.services.shopify.client import REQUIRED_SCOPES
+from app.services.recipients import unmatched
 from app.services.shopify.catalogue import catalogue_state
 from app.services.shopify.discounts import REQUIRED_SCOPE, verify_discount_code
 from app.services.shopify.facts import DEFAULT_SAMPLE
@@ -465,6 +466,61 @@ def catalogue_route(
     lying one.
     """
     return catalogue_state(db)
+
+
+@router.post("/scan-recipients")
+def scan_recipients_route(
+    body: StartImportBody,
+    _actor: UserAccount = Depends(require_permission(Permission.SETTINGS_MANAGE)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Queue the walk that works out which parcels went to which model.
+
+    **Safe against the shared shop.** Ordinary paginated reads, like the
+    catalogue and unlike the bulk import - it costs rate limit and nothing
+    else, and every write it makes is an upsert keyed by order.
+
+    Resumable: each run does a few pages, commits them, and queues the next
+    slice with its cursor. A backfill of thousands of orders that must finish
+    in one go is a backfill that never finishes.
+
+    Reuses the import's date body, because it answers the same question -
+    *from when* - and W05's answer is January 2026.
+    """
+    job = enqueue(
+        db,
+        JobKind.SCAN_RECIPIENTS,
+        {"since": body.since},
+        dedupe_key=JobKind.SCAN_RECIPIENTS,
+    )
+    if job is None:
+        raise HTTPException(
+            409, "A recipient scan is already running. Wait for it to finish."
+        )
+
+    db.commit()
+    return {
+        "status": "queued",
+        "job_id": job.id,
+        "since": body.since,
+        "queued_at": _isoformat(utcnow()),
+    }
+
+
+@router.get("/unmatched-parcels")
+def unmatched_parcels_route(
+    _actor: UserAccount = Depends(require_permission(Permission.SETTINGS_MANAGE)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Parcels the platform looked at and could not attach to a model.
+
+    W12's bounded staff path, and deliberately **not** a work queue. Most
+    unmatched orders are ordinary customers and always will be; presenting
+    every one as a backlog would invite somebody to clear a thousand rows that
+    were never HBA's parcels. Only genuine ambiguities and near-misses are
+    listed - an order with no phone at all is recorded and not shown.
+    """
+    return {"parcels": unmatched(db)}
 
 
 @router.get("/notifications")

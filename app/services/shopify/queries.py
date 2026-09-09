@@ -177,3 +177,36 @@ query OrderLineItems($id: ID!) {
   }
 }
 """
+
+
+# ── Who a parcel was sent to ─────────────────────────────────────────────────
+#
+# **The narrowest document in this file, on purpose.** W03 matches on the
+# shipping-address phone and nothing else, so nothing else is asked for: no
+# customer block, no name, no address lines, no email. A field never requested
+# cannot leak, and this one runs across the whole shop's history.
+#
+# `shippingAddress.phone` is **protected customer data**. Shopify gates it on
+# an app-level approval that is separate from any scope, so a shop that grants
+# every scope may still return `null` here. That is why matching records a
+# reason rather than assuming a null means "no phone was on the order" -
+# `no_phone` and "we are not allowed to see it" look identical from here, and
+# `/api/operations/order-facts` is what tells them apart against the real shop.
+#
+# Its own document rather than fields added to `ORDER_FIELDS`, for the reason
+# 03A established: GraphQL rejects an entire document when one field is
+# refused, and `ORDER_FIELDS` runs on every webhook. A denial here must cost a
+# wardrobe, never commission.
+
+ORDERS_RECIPIENT_PAGE = """
+query OrdersRecipientPage($first: Int!, $after: String, $query: String) {
+  orders(first: $first, after: $after, query: $query, sortKey: CREATED_AT) {
+    pageInfo { hasNextPage endCursor }
+    nodes {
+      id
+      legacyResourceId
+      shippingAddress { phone }
+    }
+  }
+}
+"""
