@@ -32,6 +32,44 @@ export type MonthRow = {
   outcome: "met" | "missed" | null;
 };
 
+/**
+ * Whether a month is actually set up, and what is missing where it is not.
+ *
+ * **The server's verdict on what is recorded**, which is a different question
+ * from the screen's own check on what is typed. The editor knows whether every
+ * month in the draft has an arrangement; only the server knows whether a
+ * guaranteed-minimum month also has the target outcome that decides it (F06),
+ * and whether the months in question are the ones she was actually here for
+ * (H01).
+ *
+ * Computed on every request, never stored. H06: a first terms record, or a
+ * clicked Reviewed button, does not prove readiness.
+ */
+export type Readiness = {
+  /** Her first eligible month, or `null` if she has no history to arrange. */
+  start_month: string | null;
+  /**
+   * Whether that came from somebody who knew, or from her earliest order.
+   * A screen should be able to tell those apart.
+   */
+  start_is_recorded: boolean;
+  months: ReadinessMonth[];
+  eligible: number;
+  ready: number;
+  blocking: number;
+};
+
+export type ReadinessMonth = {
+  month: string;
+  has_terms: boolean;
+  compensation_type: Kind | null;
+  settled_outside: boolean;
+  approved: boolean;
+  /** Empty when the month is ready. Reasons, not sentences. */
+  missing: ("no_terms" | "no_target_outcome" | "target_not_verified")[];
+  ready: boolean;
+};
+
 export type PayHistory = {
   affiliate_id: number;
   name: string;
@@ -41,6 +79,14 @@ export type PayHistory = {
   joined_month: string | null;
   months: MonthRow[];
   periods: Terms[];
+  readiness: Readiness;
+};
+
+/** Each reason, as the person reading it would say it. */
+export const MISSING_REASON: Record<ReadinessMonth["missing"][number], string> = {
+  no_terms: "no arrangement",
+  no_target_outcome: "no target outcome recorded",
+  target_not_verified: "her targets are not confirmed",
 };
 
 /** What is set for one month while the screen is being used. */

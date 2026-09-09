@@ -188,6 +188,17 @@ describe("fromServer", () => {
       go_live_month: "2026-08",
       joined_month: "2026-02",
       periods: [],
+      // `fromServer` reads the strip, not the verdict. Present because the
+      // payload carries it, and deliberately empty: this test is about
+      // arrangements coming back onto the tiles.
+      readiness: {
+        start_month: "2026-02",
+        start_is_recorded: false,
+        months: [],
+        eligible: 0,
+        ready: 0,
+        blocking: 0,
+      },
       months: [
         month("2026-02", {
           settled_outside: true,

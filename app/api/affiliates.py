@@ -74,6 +74,7 @@ from app.services.shopify.client import (
     ShopifyNotConfigured,
 )
 from app.services.shopify.discounts import REQUIRED_SCOPE, verify_discount_code
+from app.services.setup import setup_readiness
 
 router = APIRouter(prefix="/api/affiliates")
 
@@ -941,6 +942,15 @@ def _pay_history_payload(db: Session, affiliate: AffiliateProfile) -> dict:
         "name": affiliate.name,
         "working_month": working,
         "go_live_month": go_live_month() or None,
+        # **The verdict, beside the facts.** The months above say what is
+        # recorded; this says whether it is enough, per month, and what is
+        # missing where it is not (H06, and V09 in `DESIGN_REVIEW.md`).
+        #
+        # Computed, never stored. A first terms record does not prove
+        # readiness and neither would a flag written when somebody looked.
+        "readiness": setup_readiness(
+            db, affiliate, working=working, is_historical=is_historical
+        ),
         # The earliest month she has an order in. `null` for a model who has
         # never sold, where there is no history to backfill and the screen
         # offers the one-arrangement form instead.

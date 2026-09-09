@@ -10,14 +10,13 @@ Package prepared: 9 September 2026. Phase 00 completed 9 September 2026.
   `63c64c3`. `production` stays at `025d8a8` deliberately; the branches are not
   level and that is the owner's current choice, not an oversight.
 - Active branch: **`phase01a/design-tokens`**, based on `63c64c3`. Not merged.
-- Current phase/batch: **02A and 02B complete. 02C next, and mostly pre-built.**
+- Current phase/batch: **Phase 02 complete (02A, 02B, 02C). 03A next.**
 - Application files changed: **frontend styling only** (Phase 01A). No API,
   service, model, migration or money code has been touched.
-- Runtime tests: green before and after every batch so far. Backend **1620
+- Runtime tests: green before and after every batch so far. Backend **1637
   passed** (exit 0) against a disposable `hba_platform_test` - 1589 at baseline,
-  24 from 02A, 7 from 02B; frontend **190 passed** (106 before 02B's payout
-  label guard, which runs per file); `npm run build` exit 0. The `1558 / 87` in
-  `REPOSITORY_AUDIT.md` is stale.
+  then 24 / 7 / 17 from 02A, 02B and 02C; frontend **190 passed**;
+  `npm run build` exit 0. The `1558 / 87` in `REPOSITORY_AUDIT.md` is stale.
 - Browser acceptance: **both design references and both halves of the running
   app were opened and compared** (synthetic seed data). Per-screen visual
   acceptance remains owed batch by batch.
@@ -31,16 +30,18 @@ Package prepared: 9 September 2026. Phase 00 completed 9 September 2026.
   to dark**, following the approved admin export. One word reverts it.
   D01-D10 stand, each due at its own phase; D06 is confirmed a real card-number
   vs account-number conflict, not a relabel.
-- Next instruction: `prompts/02_MODELS_AND_SETUP.md`, **batch 02C only**. Read
-  `BASELINE_REPORT.md` §5 first: **the terms editor already exists**, shipped in
-  `63c64c3`. What 02C owes is the *readiness* half - per-month setup coverage
-  across every eligible month - not the editor.
+- Next instruction: `prompts/03_PRODUCTS_AND_WARDROBE.md`, **batch 03A only**.
+  The largest gap in the platform - UI12-UI20 are entirely absent. Two
+  engineering facts to establish first, against the real shop rather than by
+  assumption: `read_products` is **not** in `REQUIRED_SCOPES` today, and access
+  to the **shipping-address phone** (protected customer data) was never
+  confirmed. Staging and production share one Shopify shop.
 
 | Phase | State | Report / commit / evidence |
 |---|---|---|
 | 00 Baseline | **Complete** | `BASELINE_REPORT.md`; checkout `63c64c3`; 1589 + 104 green |
 | 01 UI foundations | **Complete** | `reports/01A-design-tokens.md`, `reports/01B-navigation-and-shells.md`; ADR 0039; `ROUTE_AND_PERMISSION_MAP.md` |
-| 02 Models and setup | **02A + 02B done; 02C mostly pre-built** | `reports/02A-model-entry.md`, `reports/02B-profile-and-self.md`; migration `d4b81c07af22`; D06 and D07 closed; 02C's editor shipped in `63c64c3`, its readiness checks still owed |
+| 02 Models and setup | **Complete** | `reports/02A-model-entry.md`, `02B-profile-and-self.md`, `02C-setup-readiness.md`; migration `d4b81c07af22`; D06 and D07 closed. Finalisation is deliberately Phase 09 |
 | 03 Products and wardrobe | Not started | Entirely absent from the codebase (UI12–UI20) |
 | 04 Targets | **Partly built already** | Outcome-only historical targets shipped in `1fe55de` |
 | 05 Financial rules | Not started | Commission still pays delivered-only; carry-forward still live |
