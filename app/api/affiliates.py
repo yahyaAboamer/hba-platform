@@ -39,6 +39,7 @@ from app.services.affiliates import (
     readiness,
     set_collaboration_start,
     set_status,
+    update_shipping_address,
     update_details,
 )
 from app.services.codes import (
@@ -74,6 +75,7 @@ from app.services.shopify.client import (
     ShopifyNotConfigured,
 )
 from app.services.shopify.discounts import REQUIRED_SCOPE, verify_discount_code
+from app.services.affiliates import SHIPPING_FIELDS
 from app.services.setup import setup_readiness
 
 router = APIRouter(prefix="/api/affiliates")
@@ -102,6 +104,10 @@ class UpdateStatusBody(BaseModel):
     #: is how it is *cleared*, and a plain omission must not do that silently.
     collaboration_start_month: str | None = Field(default=None, max_length=7)
     collaboration_start_month_set: bool = False
+    #: Where HBA sends her things (D11). **Staff may write this**, unlike her
+    #: measurements - it is what somebody types into an order, and she may have
+    #: moved without telling the platform first. Only keys present are touched.
+    shipping: dict[str, str | None] | None = None
 
 
 class RecheckCodeBody(BaseModel):
@@ -220,6 +226,11 @@ def _affiliate_detail(db: Session, affiliate: AffiliateProfile) -> dict:
     month = working_month()
     return {
         **_affiliate_payload(affiliate),
+        #: **On the profile only, deliberately.** `_affiliate_payload` is
+        #: shared with the directory, and a list of twenty models does not need
+        #: twenty home addresses crossing the wire to render a table of names.
+        #: D11 makes this staff-readable, not staff-broadcast.
+        "shipping": {field: getattr(affiliate, field) for field in SHIPPING_FIELDS},
         "current_month": month,
         "codes": codes_with_status(db, affiliate, month),
         "compensation": _compensation_payload(terms_for(db, affiliate, month)),
@@ -481,6 +492,16 @@ def update_affiliate_status_route(
                 body.collaboration_start_month,
                 actor_id=actor.id,
                 actor_email=actor.email,
+            )
+
+        if body.shipping is not None:
+            update_shipping_address(
+                db,
+                affiliate,
+                body.shipping,
+                actor_id=actor.id,
+                actor_email=actor.email,
+                actor_is_staff=True,
             )
 
         if body.status is None:

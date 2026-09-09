@@ -20,6 +20,22 @@ export type Me = {
   /** Hers to change (A05). `null` means she has not said, which is fine. */
   height_cm: number | null;
   weight_kg: number | null;
+  /**
+   * Where HBA sends her things (D11).
+   *
+   * **Both sides edit this**, unlike her measurements: HBA types it into the
+   * order, so the person shipping to her needs the current one without having
+   * to ask her to update it first.
+   */
+  shipping: {
+    shipping_name: string | null;
+    shipping_phone: string | null;
+    shipping_line1: string | null;
+    shipping_line2: string | null;
+    shipping_city: string | null;
+    shipping_governorate: string | null;
+    shipping_notes: string | null;
+  };
   status: string;
   state: string;
   codes: { code: string; verified: boolean }[];
@@ -140,6 +156,15 @@ export function MyDetails({
        * Only once she is actually on the programme. Somebody still waiting to
        * be approved has a screen whose whole job is the waiting.
        */}
+      {/*
+       * D11. Hers, and HBA's too - it is what goes on a parcel. Above her
+       * size because it is the one somebody actually needs to keep current:
+       * a wrong height sends the wrong size, a wrong address sends nothing.
+       */}
+      {onTheme && me.state === "active" && (
+        <ShippingAddress me={me} onChanged={onChanged} />
+      )}
+
       {onTheme && me.state === "active" && (
         <Measurements me={me} onChanged={onChanged} />
       )}
@@ -326,6 +351,124 @@ type Preference = { kind: string; label: string; enabled: boolean };
  * Saved on the press, one switch per request — two tabs open on this screen
  * cannot then write over each other's other switch.
  */
+/**
+ * Where HBA sends her things.
+ *
+ * D11: **both sides edit this.** Her measurements are hers alone; this is not,
+ * because staff type it into an order and a model who has moved should not be
+ * a parcel that cannot be sent.
+ *
+ * The phone is checked as an Egyptian mobile before it saves, and the reason
+ * is worth knowing: it is the number a parcel is matched back to her by, so a
+ * number that cannot be read is a delivery that never reaches her wardrobe.
+ */
+function ShippingAddress({ me, onChanged }: { me: Me; onChanged: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState(me.shipping);
+  const [saving, setSaving] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+
+  const lines = [
+    me.shipping.shipping_line1,
+    me.shipping.shipping_line2,
+    me.shipping.shipping_city,
+    me.shipping.shipping_governorate,
+  ].filter(Boolean);
+
+  async function save() {
+    setSaving(true);
+    setProblem(null);
+    try {
+      await api.put("/api/me/shipping-address", draft);
+      setOpen(false);
+      onChanged();
+    } catch (caught) {
+      setProblem(
+        caught instanceof Error ? caught.message : "Could not save that.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const FIELDS: [keyof Me["shipping"], string][] = [
+    ["shipping_name", "Name on the parcel"],
+    ["shipping_phone", "Phone the courier calls"],
+    ["shipping_line1", "Street and number"],
+    ["shipping_line2", "Flat, floor"],
+    ["shipping_city", "Area"],
+    ["shipping_governorate", "Governorate"],
+    ["shipping_notes", "Anything else the courier needs"],
+  ];
+
+  return (
+    <section className="panel affiliate__panel">
+      <h2 className="panel__title">Where we send things</h2>
+      {!open ? (
+        <>
+          <p className="affiliate__lead">
+            {lines.length > 0
+              ? lines.join(", ")
+              : "You have not given us an address. We cannot send you anything without one."}
+          </p>
+          <button
+            type="button"
+            className="button"
+            onClick={() => {
+              setDraft(me.shipping);
+              setProblem(null);
+              setOpen(true);
+            }}
+          >
+            {lines.length > 0 ? "Change it" : "Add it"}
+          </button>
+        </>
+      ) : (
+        <>
+          {problem && (
+            <p className="notice notice--refused" role="alert">
+              {problem}
+            </p>
+          )}
+          <div className="address">
+            {FIELDS.map(([field, label]) => (
+              <label key={field} className="field">
+                <span className="field__label">{label}</span>
+                <input
+                  className="input"
+                  value={draft[field] ?? ""}
+                  onChange={(event) =>
+                    setDraft({ ...draft, [field]: event.target.value })
+                  }
+                />
+              </label>
+            ))}
+          </div>
+          <div className="sizes__actions">
+            <button
+              type="button"
+              className="button button--primary"
+              disabled={saving}
+              onClick={save}
+            >
+              {saving ? "Saving…" : "Save"}
+            </button>
+            <button
+              type="button"
+              className="button"
+              disabled={saving}
+              onClick={() => setOpen(false)}
+            >
+              Cancel
+            </button>
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
+
 /**
  * Her height and her weight.
  *

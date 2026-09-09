@@ -13,9 +13,9 @@ Package prepared: 9 September 2026. Phase 00 completed 9 September 2026.
 - Current phase/batch: **Phase 02 complete (02A, 02B, 02C). 03A next.**
 - Application files changed: **frontend styling only** (Phase 01A). No API,
   service, model, migration or money code has been touched.
-- Runtime tests: green before and after every batch so far. Backend **1659
-  passed** on merged `main` (1589 at baseline, then 24 / 7 / 17 / 22 from 02A,
-  02B, 02C and 03A); frontend **190 passed**; `npm run build` exit 0. The
+- Runtime tests: green before and after every batch so far. Backend **1694
+  passed** (1589 at baseline, then 24 / 7 / 17 / 22 / 35 from 02A, 02B, 02C,
+  03A and 03B); frontend **190 passed**; `npm run build` exit 0. The
   `1558 / 87` in `REPOSITORY_AUDIT.md` is stale.
 - Browser acceptance: **both design references and both halves of the running
   app were opened and compared** (synthetic seed data). Per-screen visual
@@ -42,7 +42,7 @@ Package prepared: 9 September 2026. Phase 00 completed 9 September 2026.
 | 00 Baseline | **Complete** | `BASELINE_REPORT.md`; checkout `63c64c3`; 1589 + 104 green |
 | 01 UI foundations | **Complete** | `reports/01A-design-tokens.md`, `reports/01B-navigation-and-shells.md`; ADR 0039; `ROUTE_AND_PERMISSION_MAP.md` |
 | 02 Models and setup | **Complete** | `reports/02A-model-entry.md`, `02B-profile-and-self.md`, `02C-setup-readiness.md`; migration `d4b81c07af22`; D06 and D07 closed. Finalisation is deliberately Phase 09 |
-| 03 Products and wardrobe | **03A done** | `reports/03A-catalogue-and-line-items.md`; migration `e7c2a5f1b930`; `read_products` required and **confirmed granted**. UI12-UI20 still Not started - 03A is the data underneath them |
+| 03 Products and wardrobe | **03A + 03B done** | `reports/03A-catalogue-and-line-items.md`, `03B-recipient-matching.md`; migrations `e7c2a5f1b930`, `f1a93d6c48e2`; `read_products` **confirmed granted**; D11 implemented. UI13-UI19 still owed - that is 03C |
 | 04 Targets | **Partly built already** | Outcome-only historical targets shipped in `1fe55de` |
 | 05 Financial rules | Not started | Commission still pays delivered-only; carry-forward still live |
 | 06 Payments | Not started | Recording/proof/reconciliation already exist and are reusable |

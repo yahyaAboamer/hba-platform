@@ -39,7 +39,19 @@ type Code = {
   end_month: string | null;
 };
 
+/** Where HBA sends her things (D11). Staff read *and* write it. */
+type Shipping = {
+  shipping_name: string | null;
+  shipping_phone: string | null;
+  shipping_line1: string | null;
+  shipping_line2: string | null;
+  shipping_city: string | null;
+  shipping_governorate: string | null;
+  shipping_notes: string | null;
+};
+
 type Detail = Affiliate & {
+  shipping: Shipping;
   current_month: string;
   codes: Code[];
   compensation: Compensation | null;
@@ -96,6 +108,11 @@ export function AffiliateDetail({ session }: { session: Session }) {
    * here because it is the same failure either side of the platform).
    */
   const [startDraft, setStartDraft] = useState<string | null>(null);
+  /**
+   * The address, as a draft. `null` means "not editing", so Cancel puts back
+   * what the server said rather than what was typed last time.
+   */
+  const [shipDraft, setShipDraft] = useState<Shipping | null>(null);
 
   function load() {
     setError(null);
@@ -170,6 +187,25 @@ export function AffiliateDetail({ session }: { session: Session }) {
     } catch (caught) {
       setError(
         caught instanceof Error ? caught.message : "Could not save that month.",
+      );
+    } finally {
+      setWorking(null);
+    }
+  }
+
+  async function saveShipping() {
+    if (!shipDraft) return;
+    setWorking("shipping");
+    setError(null);
+    setNotice(null);
+    try {
+      await api.patch(`/api/affiliates/${id}`, { shipping: shipDraft });
+      setShipDraft(null);
+      setNotice({ good: true, text: "Saved. This is what goes on her parcels." });
+      load();
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "Could not save that.",
       );
     } finally {
       setWorking(null);
@@ -498,6 +534,101 @@ export function AffiliateDetail({ session }: { session: Session }) {
              */}
             <Row label="Signs in with">
               <span className="code">{detail.email}</span>
+            </Row>
+            {/*
+             * **Staff write this one** (D11), unlike the measurements below.
+             * It is what somebody types into an order, and a model who has
+             * moved should not be a parcel that cannot be sent.
+             *
+             * On the profile and not in the directory: a list of twenty models
+             * does not need twenty home addresses to render a table of names.
+             */}
+            <Row label="Parcels go to">
+              {shipDraft === null ? (
+                <>
+                  {detail.shipping.shipping_line1 ? (
+                    <span className="detail__address">
+                      {[
+                        detail.shipping.shipping_name,
+                        detail.shipping.shipping_line1,
+                        detail.shipping.shipping_line2,
+                        detail.shipping.shipping_city,
+                        detail.shipping.shipping_governorate,
+                      ]
+                        .filter(Boolean)
+                        .join(", ")}
+                      {detail.shipping.shipping_phone && (
+                        <>
+                          {" · "}
+                          <span className="code">
+                            {detail.shipping.shipping_phone}
+                          </span>
+                        </>
+                      )}
+                    </span>
+                  ) : (
+                    <span className="detail__note">
+                      Not recorded. Without it a parcel sent to her cannot be
+                      matched back to her wardrobe.
+                    </span>
+                  )}
+                  {can(session, "affiliates.manage") && (
+                    <button
+                      type="button"
+                      className="button detail__start-edit"
+                      onClick={() => setShipDraft({ ...detail.shipping })}
+                    >
+                      {detail.shipping.shipping_line1 ? "Change" : "Record it"}
+                    </button>
+                  )}
+                </>
+              ) : (
+                <div className="detail__address-form">
+                  {(
+                    [
+                      ["shipping_name", "Name on the parcel"],
+                      ["shipping_phone", "Phone on the parcel"],
+                      ["shipping_line1", "Street and number"],
+                      ["shipping_line2", "Flat, floor (optional)"],
+                      ["shipping_city", "Area"],
+                      ["shipping_governorate", "Governorate"],
+                      ["shipping_notes", "Anything the courier needs"],
+                    ] as [keyof Shipping, string][]
+                  ).map(([field, label]) => (
+                    <label key={field} className="field">
+                      <span className="field__label">{label}</span>
+                      <input
+                        className="input"
+                        value={shipDraft[field] ?? ""}
+                        onChange={(event) =>
+                          setShipDraft({
+                            ...shipDraft,
+                            [field]: event.target.value,
+                          })
+                        }
+                      />
+                    </label>
+                  ))}
+                  <span className="detail__step-action">
+                    <button
+                      type="button"
+                      className="button button--primary"
+                      disabled={working === "shipping"}
+                      onClick={saveShipping}
+                    >
+                      {working === "shipping" ? "Saving…" : "Save"}
+                    </button>
+                    <button
+                      type="button"
+                      className="button"
+                      disabled={working === "shipping"}
+                      onClick={() => setShipDraft(null)}
+                    >
+                      Cancel
+                    </button>
+                  </span>
+                </div>
+              )}
             </Row>
             {/*
              * Read, never written here. A05 gives these to the model alone,

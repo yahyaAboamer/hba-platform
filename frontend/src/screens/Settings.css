@@ -243,3 +243,27 @@
   gap: var(--space-2);
   margin-bottom: var(--space-3);
 }
+
+/* Parcels that could not be attached to a model (W12). A short list of real
+   ambiguities, not a queue - see DataPanel for why that distinction matters. */
+.data__parcels {
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+}
+
+.data__parcels li {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.data__parcels li:last-child {
+  border-bottom: 0;
+}
+
+.data__parcel-why {
+  color: var(--owed);
+}
