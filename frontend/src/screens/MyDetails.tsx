@@ -153,6 +153,18 @@ export function MyDetails({
            * carried-forward and guaranteed-minimum explains words they have
            * no use for yet.
            */}
+          {/*
+           * Payments moved off the tab bar and behind the avatar in the
+           * redesign (S03), so this row is now the way to it. First in the
+           * menu because it is the one thing here somebody actually comes
+           * looking for; the rest of this list is settings.
+           */}
+          {me.state === "active" && (
+            <Link className="menu__row" to="/payments">
+              <span>What you have been paid</span>
+              <span className="menu__go">→</span>
+            </Link>
+          )}
           {me.state === "active" && (
             <Link className="menu__row" to="/glossary">
               <span>What these words mean</span>

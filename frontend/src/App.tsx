@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
 import { Layout } from "./components/Layout";
+import { NotBuiltYet } from "./components/NotBuiltYet";
 import { api, currentUser } from "./lib/api";
 import type { Session } from "./lib/api";
 import { AcceptInvitation } from "./screens/AcceptInvitation";
@@ -127,6 +128,26 @@ export default function App() {
               path="/affiliates/:id/payout-destination"
               element={<AffiliatePayout />}
             />
+            {/*
+             * Products is in the approved navigation and has no backend yet.
+             * It says so rather than rendering an empty catalogue - §S06.
+             */}
+            <Route
+              path="/products"
+              element={
+                <NotBuiltYet
+                  title="Products"
+                  phase="Phase 03A and 03C"
+                  what="The Shopify catalogue, who was sent what, and which models can be asked to feature a product."
+                />
+              }
+            />
+            {/*
+             * Off the sidebar since the redesign, and deliberately still
+             * routed. Orders is linked from Home, Payroll from Payments -
+             * S02 keeps every necessary operation reachable, and neither
+             * screen was rebuilt in this batch, only moved.
+             */}
             <Route path="/orders" element={<Orders session={session} />} />
             <Route path="/payroll" element={<Payroll session={session} />} />
             <Route path="/payroll/:month/approve" element={<PayrollApprove />} />

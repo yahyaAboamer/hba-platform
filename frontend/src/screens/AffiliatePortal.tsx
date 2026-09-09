@@ -5,6 +5,7 @@ import { AffiliateLayout, PortalHeader } from "../components/AffiliateLayout";
 import type { PortalContext } from "../components/AffiliateLayout";
 import { api } from "../lib/api";
 import type { Session } from "../lib/api";
+import { NotBuiltYet } from "../components/NotBuiltYet";
 import { storedTheme } from "../lib/theme";
 import { Apply } from "./Apply";
 import { Glossary } from "./Glossary";
@@ -176,6 +177,46 @@ export function AffiliatePortal({ session }: { session: Session }) {
         <Route element={<AffiliateLayout context={context} header={header} />}>
           <Route index element={<MyMonth />} />
           <Route path="orders" element={<MyOrders />} />
+          {/*
+           * The three the approved tab bar has and the platform does not.
+           * They say so rather than rendering an empty state - §S06, and
+           * `NotBuiltYet` explains why the difference matters.
+           */}
+          <Route
+            path="wardrobe"
+            element={
+              <NotBuiltYet
+                title="Wardrobe"
+                phase="Phase 03C"
+                what="What HBA has sent you, with photos and sizes, and what is still on its way."
+              />
+            }
+          />
+          <Route
+            path="targets"
+            element={
+              <NotBuiltYet
+                title="Targets"
+                phase="Phase 04B"
+                what="What you have been asked for this month, and what has been recorded so far."
+              />
+            }
+          />
+          <Route
+            path="ranking"
+            element={
+              <NotBuiltYet
+                title="Ranking"
+                phase="Phase 07B"
+                what="Where you sit against the other models, by sales."
+              />
+            }
+          />
+          {/*
+           * Off the tab bar since the redesign, and deliberately still here.
+           * Payments is linked from You, Year and Grow from Home. A receipt
+           * email and a bookmark both still land on the screen they name.
+           */}
           <Route path="payments" element={<MyPayments />} />
           <Route path="year" element={<MyYear />} />
           <Route path="grow" element={<MyGrow codes={me.codes} />} />

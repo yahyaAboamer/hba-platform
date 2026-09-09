@@ -51,6 +51,22 @@ select {
   color: inherit;
 }
 
+/*
+ * Links take the accent, as both exported references do (`a{color:#23A95C}`).
+ *
+ * They had no rule at all before, which meant the browser's blue. That was
+ * survivable on a white ground and is not on the approved ones - and it was
+ * the one colour on the page that no token could reach.
+ *
+ * `--accent-text` rather than `--accent`: this is text, and on dark the text
+ * step is the legible one. Components that want the link to disappear into
+ * running prose still say so themselves - see `.glossary-link`.
+ */
+a {
+  color: var(--accent-text);
+  text-underline-offset: 2px;
+}
+
 /* Visible, and the same everywhere. `--focus` is the accent now, as both
    exported references draw it - it was a colour used nowhere else back when
    the accent was a red you could not put an outline in. */

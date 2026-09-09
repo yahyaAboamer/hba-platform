@@ -157,7 +157,7 @@ export function Orders({ session }: { session: Session }) {
     <>
       <div className="page__head">
         <div className="page__title">
-          <h1>Orders</h1>
+          <h1>Attributed orders</h1>
           <span className="page__subtitle">{formatMonth(month)}</span>
         </div>
         <MonthPicker

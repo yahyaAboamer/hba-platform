@@ -163,6 +163,20 @@ export function Payments({ session }: { session: Session }) {
       {lockNote && <p className="notice payments__note">{lockNote}</p>}
 
       {/*
+       * Payroll left the sidebar in the redesign (S02) and this is its way in.
+       * It belongs beside Payments because it is the same money one step
+       * earlier: agreeing what is owed, then sending it.
+       *
+       * In the finished design there is no separate payroll screen at all -
+       * approval happens inside one model's payment. Merging them is 05B/06A.
+       * Until then this is a link rather than a rebuild, which leaves the
+       * operation exactly where it works today.
+       */}
+      <p className="payments__agree-link">
+        <Link to="/payroll">Agree a month before paying it</Link>
+      </p>
+
+      {/*
        * §11.5. A month reopened has no agreed figure, but may already have been
        * paid in full against the version that was withdrawn. The row would
        * otherwise read a flat "Nothing agreed yet" and look like a month

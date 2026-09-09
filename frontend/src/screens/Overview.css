@@ -60,3 +60,11 @@
   flex-direction: column;
   gap: 2px;
 }
+
+/* The way to Attributed orders, which left the sidebar in the redesign. Quiet
+   and directly under the count it explains - it is a support path, not a step
+   in the month. */
+.overview__all-orders {
+  margin: 0 0 var(--space-5);
+  font-size: var(--text-sm);
+}

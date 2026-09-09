@@ -263,7 +263,7 @@ export function Compensation() {
        * reads as part of the title. Caught by looking at the screen.
        */}
       <p className="crumb">
-        <Link to="/affiliates">Affiliates</Link> ·{" "}
+        <Link to="/affiliates">Models</Link> ·{" "}
         <Link to={`/affiliates/${id}`}>{data.name}</Link>
       </p>
       <div className="page__head">

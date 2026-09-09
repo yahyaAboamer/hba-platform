@@ -156,7 +156,7 @@ export function Affiliates() {
     <>
       <div className="page__head">
         <div className="page__title">
-          <h1>Affiliates</h1>
+          <h1>Models</h1>
           {rows && (
             <span className="page__subtitle">{rows.length} on file</span>
           )}

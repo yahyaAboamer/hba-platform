@@ -19,27 +19,49 @@ import "./AffiliateLayout.css";
  * The maintainer's `Layout` is the opposite instruction: seven sections down
  * the left, built for scanning twenty models at month end on a laptop.
  *
- * Earnings and Payments are separate tabs and stay separate. *What I have
- * earned* and *what has arrived* are different questions with different
- * answers for most of any month, and merging them is how a model ends up
- * believing they have been paid twice or not at all.
+ * ## The five, from the approved design
  *
- * ## Why "You" is not a tab any more
+ * **Home · Orders · Wardrobe · Targets · Ranking** (rule S03,
+ * `docs/redesign/designs/Affiliate Portal v3.dc.html`). Three of them are new
+ * or renamed, so what happened to the old ones is worth writing down rather
+ * than leaving somebody to diff it:
+ *
+ * - **Month → Home.** The same screen. The word "month" was the tool's word
+ *   for it; "home" is where a person thinks they are.
+ * - **Payments moved into You**, behind the avatar. It is a record of what
+ *   has arrived rather than something checked weekly, and the slot was needed.
+ *   The route is unchanged and the You screen links to it, so a bookmark and
+ *   a receipt email both still land.
+ * - **Year and Grow left the bar** and kept their routes. The design puts the
+ *   year's performance on Home (rule M01) and the discount code in the header
+ *   chip, which is where Grow's only real content already is. Folding them in
+ *   properly is Phase 07A; until then Home links to both, because deleting a
+ *   working screen to match a drawing is not a redesign.
+ * - **Wardrobe, Targets and Ranking** have nothing behind them yet. They say
+ *   so — see `NotBuiltYet`. They are here early because a tab bar that grows
+ *   a slot every few weeks moves every other tab under her thumb each time.
+ *
+ * ## Why "You" is not a tab
  *
  * It is reached from the avatar in the header instead. That is where a person
  * looks for their own account on every other application they use, and it
- * frees the fifth slot for **Grow** - the only tab that is about what they do
- * rather than what they are owed.
+ * leaves all five slots for what she came to find out.
  */
 const TABS = [
-  { to: "/", label: "Month", end: true },
+  { to: "/", label: "Home", end: true },
   { to: "/orders", label: "Orders" },
-  { to: "/payments", label: "Payments" },
-  { to: "/year", label: "Year" },
-  { to: "/grow", label: "Grow" },
+  { to: "/wardrobe", label: "Wardrobe" },
+  { to: "/targets", label: "Targets" },
+  { to: "/ranking", label: "Ranking" },
 ];
 
-/** Tabs that are about one month. The rest are not, and get no month bar. */
+/**
+ * Tabs that are about one month. The rest are not, and get no month bar.
+ *
+ * Ranking is month-scoped in the design's proposal (D03) but has no screen to
+ * scope yet, so it is left out until Phase 07B decides its period rather than
+ * being given a bar it does not use.
+ */
 const MONTH_SCOPED = new Set(["/", "/orders"]);
 
 export type PortalContext = {

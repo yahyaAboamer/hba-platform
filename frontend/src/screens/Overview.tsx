@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 
 import { Money } from "../components/Money";
 import { MonthPicker } from "../components/MonthPicker";
@@ -98,7 +99,7 @@ export function Overview({ session }: { session: Session }) {
     <>
       <div className="page__head">
         <div className="page__title">
-          <h1>Overview</h1>
+          <h1>Home</h1>
           <span className="page__subtitle">{formatMonth(month)}</span>
         </div>
         <MonthPicker
@@ -235,6 +236,17 @@ export function Overview({ session }: { session: Session }) {
               note={sync?.jobs.failed ? `${sync.jobs.failed} failed jobs` : "Sync healthy"}
             />
           </div>
+
+          {/*
+           * Orders left the sidebar in the redesign (S02) and this is its way
+           * in - beside the count it explains, which is where the design puts
+           * it too. Without a link here the screen would still exist and
+           * nothing would reach it, which is the exact failure
+           * `test_reachability.py` was written after.
+           */}
+          <p className="overview__all-orders">
+            <Link to="/orders">See every attributed order</Link>
+          </p>
 
           <section className="panel">
             <div className="panel__head">

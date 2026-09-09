@@ -459,10 +459,27 @@ export function MyMonth() {
        * everything the screen had to say.
        */}
       {!body.not_started && (
-        <Link to="/orders" className="block">
-          <span>See every order</span>
-          <em>→</em>
-        </Link>
+        <>
+          <Link to="/orders" className="block">
+            <span>See every order</span>
+            <em>→</em>
+          </Link>
+          {/*
+           * Year and Grow left the tab bar in the redesign (S03): the design
+           * puts the year's performance on Home and the code in the header
+           * chip. Folding them in is Phase 07A, and until it happens these
+           * are how both screens are reached - deleting a working screen to
+           * match a drawing is not a redesign.
+           */}
+          <Link to="/year" className="block">
+            <span>Your year so far</span>
+            <em>→</em>
+          </Link>
+          <Link to="/grow" className="block">
+            <span>Selling more</span>
+            <em>→</em>
+          </Link>
+        </>
       )}
 
       {body.carried_out.map((line) => (

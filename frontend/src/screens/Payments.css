@@ -231,3 +231,12 @@
   color: var(--owed);
   font-weight: 500;
 }
+
+/* The way to Payroll, which left the sidebar in the redesign. Above the
+   figures rather than below them: agreeing a month comes before paying it,
+   and somebody arriving to pay a month that is not agreed yet needs the link
+   before they read a total that does not include it. */
+.payments__agree-link {
+  margin: 0 0 var(--space-4);
+  font-size: var(--text-sm);
+}
