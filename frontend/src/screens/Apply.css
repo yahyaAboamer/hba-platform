@@ -15,7 +15,6 @@
 
 .apply__mark {
   display: block;
-  font-family: var(--mono);
   font-size: var(--text-xl);
   font-weight: 600;
   letter-spacing: -0.04em;
@@ -41,7 +40,6 @@
 /* A code is compared character for character against Shopify, so it is set in
    the face that makes a mistyped one visible (ADR 0027). */
 .apply__code {
-  font-family: var(--mono);
   text-transform: uppercase;
 }
 

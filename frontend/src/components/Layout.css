@@ -34,7 +34,6 @@
 }
 
 .layout__brand-name {
-  font-family: var(--mono);
   font-size: var(--text-lg);
   font-weight: 600;
   letter-spacing: -0.03em;

@@ -22,9 +22,9 @@ Package prepared: 9 September 2026. Phase 00 completed 9 September 2026.
 - Package integrity: `verify-package.py` → 19 assets, 52 rows, 64 checks,
   **0 issues** (needs `PYTHONUTF8=1` on Windows).
 - Current prototype defects: see `DESIGN_REVIEW.md` (V01–V16). Unchanged.
-- User business decisions pending: **nothing blocks 01B.** One open question
-  from 01A, answerable at leisure: keep the mono face for agreed money (ADR
-  0027) or take the design's single face — see `reports/01A-design-tokens.md`.
+- User business decisions pending: **none outstanding.** 01A's one question was
+  answered on 9 September — **one typeface everywhere**; ADR 0027's mono rule is
+  superseded by 0039 and the glossary entry that promised it was rewritten.
   D01-D10 stand, each due at its own phase; D06 is confirmed a real card-number
   vs account-number conflict, not a relabel.
 - Next instruction: `prompts/01_UI_FOUNDATIONS.md`, **batch 01B only**.
@@ -32,7 +32,7 @@ Package prepared: 9 September 2026. Phase 00 completed 9 September 2026.
 | Phase | State | Report / commit / evidence |
 |---|---|---|
 | 00 Baseline | **Complete** | `BASELINE_REPORT.md`; checkout `63c64c3`; 1589 + 104 green |
-| 01 UI foundations | **01A done, 01B next** | `reports/01A-design-tokens.md`; branch `phase01a/design-tokens`; ADR 0039 |
+| 01 UI foundations | **01A done, 01B next** | `reports/01A-design-tokens.md`; branch `phase01a/design-tokens`; ADR 0039 (palette + one typeface) |
 | 02 Models and setup | **Partly built already** | 02C's terms editor shipped in `63c64c3`; historical readiness and profile fields still owed |
 | 03 Products and wardrobe | Not started | Entirely absent from the codebase (UI12–UI20) |
 | 04 Targets | **Partly built already** | Outcome-only historical targets shipped in `1fe55de` |

@@ -38,25 +38,36 @@ Run the app locally (commands in `BASELINE_REPORT.md` §10) and look at:
 | Maintainer, light, 1920px (Overview, pay history) | ✅ Re-skinned; green "covered", red "Clear", amber owed figure |
 | Maintainer, **dark**, 1920px (Overview, pay history) | ✅ Nothing unreadable; blockers, owed amber and the primary button all correct |
 | Portal, light | ⚠️ **Not seen rendered** — see limitations |
+| Payroll, light **and** dark, after dropping mono | ✅ Both re-checked. Money columns still align on `tabular-nums`; no figure wraps |
 
-### Approved-design deviations, and why
+### Approved-design deviations
 
-**One, and it is deliberate: the mono face stays for agreed money.**
+**None.** The implementation follows both exports.
 
-Both exports use a single typeface throughout with `font-variant-numeric:
-tabular-nums`, and no mono anywhere. The implementation keeps ADR 0027's rule
-that an *agreed* figure wears a different face from a *provisional* one.
+There was one open question when this batch was first written — whether to keep
+ADR 0027's rule that an *agreed* figure wears a mono face and a *provisional*
+one wears prose, which neither export does. I kept it initially rather than
+drop a documented guarantee quietly, and put it to the owner.
 
-That is not stylistic stubbornness. It is a meaning the platform already
-explains to models in the glossary, in these words — *"shown in a different
-typeface from an agreed figure on purpose, so the two are never mistaken for
-each other"* — and a provisional figure that looks exactly like a settled one is
-the specific confusion that costs somebody money.
+**Answered 9 September: drop it, one font everywhere.** The reasoning is better
+than the rule was:
 
-**This is yours to overrule.** If you would rather have the single face the
-design draws, say so and it is a two-line change in `tokens.css`; the glossary
-entry then has to change with it. I did not want to drop a documented guarantee
-quietly on the way to a colour change.
+> If we kept it, they wouldn't necessarily know that this font is for a month
+> that is still open or a month that is fixed and closed.
+
+Which is the whole objection. A signal only works if the reader has been told
+what it means, and a model opening the portal from an email never was. It read
+to the people who built it and to nobody else.
+
+So: `--mono` is gone, 26 `font-family: var(--mono)` declarations across 20 files
+with it, and `@fontsource/ibm-plex-mono` is uninstalled. Inter is the only
+family that ships. **ADR 0027's principle survives** — an agreed figure is still
+set apart from a working one, from one place in the code, on every screen — by
+weight and colour now, with the words beside it doing the actual saying.
+
+The glossary's **Provisional** entry used to promise the typeface distinction in
+so many words. It was rewritten to describe what the screen now shows, so the
+platform is not telling models about a signal that no longer exists.
 
 Two smaller judgements, recorded in ADR 0039 rather than asked about, because
 they follow from the approved design rather than changing it:
@@ -71,8 +82,8 @@ they follow from the approved design rather than changing it:
 
 ### Confirmation needed before the next batch
 
-**None.** 01B is not blocked. The mono question above can be answered whenever
-you have looked at a screen — it does not hold anything up.
+**None.** Nothing is outstanding; the one open question was answered and applied
+inside this batch.
 
 ---
 
@@ -89,16 +100,18 @@ the roadmap warns about. 01B is where UI01/UI02/UI51 actually move.
 
 | File | What |
 |---|---|
-| `frontend/src/styles/tokens.css` | Rewritten. Approved ramp for both halves; light at `:root`, dark at `[data-theme="dark"]`. Radius scale 4/8/14, Inter, `--elev`, `--scrim`, new `--ink-strong`. |
+| `frontend/src/styles/tokens.css` | Rewritten. Approved ramp for both halves; light at `:root`, dark at `[data-theme="dark"]`. Radius scale 4/8/14, Inter, `--elev`, `--scrim`, new `--ink-strong`. `--mono` removed. |
 | `frontend/src/styles/portal-accent.css` → **`accent.css`** | Renamed and re-scoped from `.affiliate` to the root. Green. Still eight declarations. |
 | `frontend/src/styles/portal.css` | Lost its duplicate colour ramp, dark block, type stack and radius scale (−88 lines). Keeps the portal's denser spacing, tab clearance and furniture. |
 | `frontend/src/styles/base.css` | Added `.card` / `.card--rows` / `.card__row`, `.overlay` / `.modal` / `.sheet`, `.loading` / `.skeleton`. Fixed the `#000` button hover. |
 | `frontend/src/screens/Compensation.css` | Dark values for the three arrangement tints. |
 | `frontend/src/screens/Affiliates.css` | Modal scrim `rgb(20 24 31 / 45%)` → `var(--scrim)`. |
 | `frontend/src/styles/__tests__/accent-isolation.test.ts` | Path, names and prose follow the rename. Shape unchanged. |
-| `frontend/src/main.tsx` | Inter for both halves; `@fontsource/ibm-plex-sans` imports dropped, Plex Mono kept. |
-| `frontend/package.json`, `package-lock.json` | `@fontsource/ibm-plex-sans` removed. |
-| `docs/adr/0039-…md` (new), `0038`, `docs/adr/README.md` | 0039 accepted; 0038 marked superseded; index updated. |
+| `frontend/src/main.tsx` | Inter and nothing else; both IBM Plex families dropped. |
+| `frontend/package.json`, `package-lock.json` | Both `@fontsource/ibm-plex-*` packages removed. |
+| `frontend/src/lib/glossary.ts` | **Provisional** no longer promises a typeface distinction. |
+| 20 stylesheets, 7 screens/libs | 26 mono declarations removed; every comment describing the old rule rewritten. |
+| `docs/adr/0039-…md` (new), `0038`, `0027`, `docs/adr/README.md` | 0039 accepted; 0038 superseded; 0027's typeface mechanism superseded, its principle kept; index updated. |
 | `CLAUDE.md` | "The two halves" and the accent rule now describe one palette and `accent.css`. |
 
 **No API, service, model or migration was touched.** No schema change, no
@@ -134,9 +147,9 @@ because the design uses it, not because contrast compels it.
 | Check | Result |
 |---|---|
 | `cd frontend && npm test` | **104 passed**, exit 0 |
-| `cd frontend && npm run build` | exit 0, 10.17s. CSS **73.62 kB → 67.69 kB** (the duplicate ramp is gone) |
+| `cd frontend && npm run build` | exit 0. CSS **73.62 kB → 63.19 kB** (duplicate ramp gone, then the mono face) |
 | `pytest -q --color=no` against `hba_platform_test` | **1589 passed**, 327.59s, **exit 0** |
-| `npm uninstall @fontsource/ibm-plex-sans` | exit 0; Plex Sans woff files no longer emitted |
+| `npm uninstall @fontsource/ibm-plex-{sans,mono}` | exit 0; neither family is emitted any more |
 
 Environment: Windows, `.venv/Scripts/python.exe` 3.14.5, Node v24.16.0, Docker
 Postgres 17 on `127.0.0.1:5433`. Backend ran as a single pytest process against

@@ -4,8 +4,9 @@
   padding: var(--space-5) 0 var(--space-6);
 }
 
-/* Said in words as well as in the typeface. They do not know which months are
-   closed; the maintainer does. */
+/* Said in words. They do not know which months are closed; the maintainer
+   does - and since ADR 0039 there is no second typeface hinting at it either,
+   which is the point: the words were always the part they could read. */
 .figure__state {
   margin: 0 0 var(--space-2);
   font-size: var(--text-xs);

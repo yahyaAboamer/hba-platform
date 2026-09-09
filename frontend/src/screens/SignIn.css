@@ -16,7 +16,6 @@
 
 .sign-in__mark {
   display: block;
-  font-family: var(--mono);
   font-size: var(--text-xl);
   font-weight: 600;
   letter-spacing: -0.04em;

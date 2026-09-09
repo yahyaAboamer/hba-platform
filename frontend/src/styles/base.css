@@ -71,11 +71,17 @@ select {
 
 /* ── Money ────────────────────────────────────────────────────────────────
  *
- * ADR 0027. The typeface says whether a figure is real.
+ * ADR 0027, as amended by 0039.
  *
- *   .money            provisional — a working number, in the prose face
- *   .money--agreed    frozen in an approved snapshot, in the mono face
+ *   .money            provisional — a working number, quiet
+ *   .money--agreed    frozen in an approved snapshot — full weight and ink
  *   .money--blocked   cannot be approved; the reason sits beside it
+ *
+ * **The typeface no longer carries this.** It used to: an agreed figure was
+ * set in a mono face and a provisional one in prose. The business ended that
+ * on 9 September, because a font is only a signal to someone who has been told
+ * what it means, and a model had not been. Weight and colour separate them
+ * now, and the words on the screen do the actual saying.
  *
  * §12.5: money never wraps or truncates at any width. If a figure does not
  * fit, the layout changes — never the number.
@@ -88,7 +94,6 @@ select {
 }
 
 .money--agreed {
-  font-family: var(--mono);
   font-weight: 500;
   color: var(--ink);
   letter-spacing: -0.02em;
@@ -112,7 +117,6 @@ select {
 
 /* Codes, months, order numbers. Things that line up in a column. */
 .code {
-  font-family: var(--mono);
   font-size: var(--text-sm);
   letter-spacing: -0.01em;
 }

@@ -1,9 +1,10 @@
-# 0039 — One palette across both halves
+# 0039 — One palette, and one typeface, across both halves
 
 **Status:** accepted
 **Date:** 2026-09-09
-**Supersedes:** [0038](0038-the-portal-wears-the-brand-the-tool-does-not.md)
-**Amends:** [0027](0027-numerals-change-face-when-a-figure-becomes-an-obligation.md) — colour, not typeface
+**Supersedes:** [0038](0038-the-portal-wears-the-brand-the-tool-does-not.md) entirely, and
+[0027](0027-numerals-change-face-when-a-figure-becomes-an-obligation.md)'s
+two-typeface mechanism — not 0027's principle, which stands
 **Related:** `docs/redesign/BASELINE_REPORT.md`, `docs/redesign/designs/`
 
 ## The situation
@@ -67,16 +68,35 @@ would reproduce, in another hue, exactly the two-reds problem 0038 described.
   (`outline: 2px solid var(--acc)`). It was indigo because red could not be put
   in an outline. Green can: 5.90:1 on a card, against the 4.5:1 text needs.
 
-### What does not change
+### One typeface, and why ADR 0027's mechanism goes
 
-**ADR 0027's typeface rule stands.** An agreed figure wears the mono face and a
-provisional one does not. The exports use a single face with `tabular-nums`
-throughout, and this is the one place the implementation deliberately does not
-follow them — the distinction is a *meaning*, the glossary explains it to models
-in those words, and a provisional figure that looks exactly like a settled one
-is the specific confusion that costs somebody money. Flagged in the Phase 01A
-batch report for the business to accept or reject on a real screen rather than
-changed quietly.
+Both exports use a single face throughout with `tabular-nums`. ADR 0027 had set
+an *agreed* figure in a mono face and a *provisional* one in prose, so the
+typeface itself said whether a number was final.
+
+I kept that at first and put it to the business rather than dropping a
+documented guarantee quietly. They ended it, and the reason is better than the
+rule:
+
+> If we kept it, they wouldn't necessarily know that this font is for a month
+> that is still open or a month that is fixed and closed.
+
+That is the whole objection, and it is correct. A signal only works if the
+reader has been told what it means. The people who built the platform could
+read it; a model opening the portal from an email never could. It was a private
+convention wearing the costume of an affordance — and the fallback, in the one
+place it was explained, was a glossary entry describing the mechanism instead
+of the fact.
+
+**The principle in 0027 survives; only its mechanism goes.** An agreed figure is
+still set apart from a working one, in one place in the code (`moneyClass`), on
+every screen — by weight and colour now, with the words beside it doing the
+actual saying: *still adding up*, *open*, *closed*. `tabular-nums` on `body`
+keeps figures aligned in a column without a second family.
+
+The glossary entry for **Provisional** was rewritten to match. It used to
+promise the typeface distinction in as many words; it now says what the screen
+actually shows.
 
 ## Consequences
 
@@ -89,8 +109,10 @@ changed quietly.
   dark block). There will be more; they surface a screen at a time.
 - The maintainer's half does not *default* to dark yet. The token layer supports
   it; stamping and toggling it is shell work, in Phase 01B.
-- `@fontsource/ibm-plex-sans` is removed. Inter carries prose on both halves,
-  and Plex Mono stays for the one thing it still says.
+- **One font family ships**: Inter, latin, three weights. `@fontsource/ibm-plex-sans`
+  went with the two-halves split and `@fontsource/ibm-plex-mono` with the
+  typeface rule. 26 `font-family: var(--mono)` declarations across 20 files are
+  gone, and no rule was left empty by removing them.
 - ADR 0038 is superseded, not deleted. It records why the split existed, which
   is worth keeping — the isolation it bought is the reason this change is a
   token edit rather than a rewrite.

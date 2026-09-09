@@ -27,9 +27,9 @@
  *
  * ## What does not change
  *
- * ADR 0027 is intact in the part that carries meaning: the typeface still
- * says whether a figure is an obligation — mono for agreed money, prose for a
- * working number — and colour is still spent on state rather than decoration.
+ * Colour is still spent on state rather than decoration. ADR 0027's *typeface*
+ * rule is gone (0039) — one face now, and an agreed figure is separated by
+ * weight, colour and the words beside it instead.
  */
 
 .affiliate {
@@ -80,8 +80,8 @@
   color: var(--quiet);
 }
 
-/* A dot rather than a word. It carries the same distinction the typeface
-   does - settled or still moving - without repeating it in prose. */
+/* A dot rather than a word. Settled or still moving, without repeating in
+   prose what the state line above already says. */
 .affiliate .figure__pip {
   width: 6px;
   height: 6px;
@@ -229,7 +229,6 @@
 /* ── The month bar ──────────────────────────────────────────────────────── */
 
 .affiliate .months__current {
-  font-family: var(--mono);
   font-size: var(--text-base);
   font-weight: 500;
 }

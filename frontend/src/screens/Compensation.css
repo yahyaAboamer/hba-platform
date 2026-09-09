@@ -205,7 +205,6 @@
 
 .mo__name {
   display: block;
-  font-family: var(--mono);
   font-size: var(--text-xs);
   color: var(--quiet);
 }
@@ -221,7 +220,6 @@
 .mo__amt {
   display: block;
   min-height: 1.2em;
-  font-family: var(--mono);
   font-size: var(--text-xs);
 }
 
@@ -500,7 +498,6 @@
 }
 
 .comp__suffix {
-  font-family: var(--mono);
   font-size: var(--text-sm);
   color: var(--quiet);
 }

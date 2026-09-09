@@ -52,7 +52,6 @@
 }
 
 .affiliates__figures strong {
-  font-family: var(--mono);
   font-weight: 500;
   color: var(--ink);
 }

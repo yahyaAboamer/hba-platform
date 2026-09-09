@@ -99,25 +99,26 @@
   --focus: var(--accent);
 
   /*
-   * Type.
+   * Type. **One face, everywhere**, as both exports draw it.
    *
-   * **Inter carries prose and headings on both halves now** — it is the face
-   * the redesign was drawn in, and the exports declare it for body and
-   * heading alike.
+   * There used to be two. ADR 0027 set an *agreed* figure in a mono face and a
+   * *provisional* one in prose, so the typeface itself said whether a number
+   * was final. The business ended that rule on 9 September, and the reasoning
+   * is worth keeping because it is the sort of thing that gets re-invented:
    *
-   * **Mono stays, and only for agreed money, codes, months and order
-   * numbers.** The exports use one face throughout with `tabular-nums`, and
-   * this is the one place the implementation deliberately does not follow
-   * them: ADR 0027's rule that *the typeface says whether a figure is an
-   * obligation* is a meaning, not a decoration. The glossary explains it to
-   * models in those words — "shown in a different typeface from an agreed
-   * figure on purpose, so the two are never mistaken for each other" — and a
-   * provisional figure that looks exactly like a settled one is the specific
-   * confusion that costs somebody money. Flagged for review rather than
-   * changed quietly.
+   *   > If we kept it, they wouldn't necessarily know that this font is for a
+   *   > month that is still open or a month that is fixed and closed.
+   *
+   * Which is the whole objection. A signal only works if the reader has been
+   * told what it means, and a model opening this from an email has not been.
+   * The distinction was legible to the people who built it and to nobody else.
+   *
+   * What carries it instead is what the exports use and what a reader can
+   * actually act on: the words on the screen — "still adding up", "open",
+   * "closed" — plus weight and colour. `tabular-nums` is set on `body`, so
+   * figures still line up in a column without a second family.
    */
   --sans: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
-  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
 
   /* Dense, laptop-first (§12.5). Built for scanning twenty affiliates.
      `portal.css` tightens these for a phone. */

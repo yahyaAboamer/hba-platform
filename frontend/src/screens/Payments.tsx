@@ -250,7 +250,7 @@ export function Payments({ session }: { session: Session }) {
                   )}
                 </td>
                 {/* Everything in these three columns is settled money, so all
-                    of it is set in the mono face (ADR 0027). */}
+                    of it is set as agreed (ADR 0027). */}
                 <td className="payments__amount">
                   <Money piastres={row.obligation_piastres} kind="agreed" />
                   {row.credited_piastres > 0 && (

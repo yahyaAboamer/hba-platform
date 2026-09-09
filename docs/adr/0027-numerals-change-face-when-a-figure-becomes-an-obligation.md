@@ -1,7 +1,19 @@
 # 0027. Numerals change face when a figure becomes an obligation
 
-**Status:** Accepted
+**Status:** Accepted; the two-typeface rule is **superseded by
+[0039](0039-one-palette-across-both-halves.md)** (9 September 2026)
 **Date:** 2026-08-26
+
+> **What still holds:** colour is reserved for money state, money never wraps
+> or truncates, and an agreed figure is set apart from a working one on every
+> screen from one place in the code.
+>
+> **What does not:** the *typeface* is no longer what sets them apart. The
+> business ended that on 9 September — *"they wouldn't necessarily know that
+> this font is for a month that is still open or a month that is fixed and
+> closed"* — and weight, colour and the words on the screen carry it instead.
+> The reasoning below is kept because the distinction it argues for survived;
+> only its mechanism changed.
 
 ## Context
 

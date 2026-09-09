@@ -73,7 +73,6 @@
 }
 
 .chart__tick {
-  font-family: var(--mono);
   font-size: 9px;
   fill: var(--faint);
 }

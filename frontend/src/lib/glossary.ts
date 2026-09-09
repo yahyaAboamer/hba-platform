@@ -46,7 +46,7 @@ export const GLOSSARY_TERMS: GlossaryTerm[] = [
     id: "provisional",
     term: "Provisional",
     definition:
-      "A figure that can still change, because the month it belongs to has not closed yet. Shown in a different typeface from an agreed figure on purpose, so the two are never mistaken for each other.",
+      "A figure that can still change, because the month it belongs to has not closed yet. The screen says so beside it - still adding up, or open - and it becomes final when HBA closes the month.",
   },
   {
     id: "historical",

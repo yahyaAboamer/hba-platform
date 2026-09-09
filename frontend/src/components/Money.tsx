@@ -3,14 +3,14 @@ import type { MoneyKind, MoneyTone } from "../lib/money";
 
 type Props = {
   piastres: number;
-  /** ADR 0027. `agreed` sets it in the mono face; anything else does not. */
+  /** ADR 0027 as amended by 0039. `agreed` sets it in full weight and ink. */
   kind?: MoneyKind;
   tone?: MoneyTone;
   title?: string;
   /**
    * Layout only — size and placement.
    *
-   * The face and the colour are decided by `kind` and `tone` and are not
+   * The weight and the colour are decided by `kind` and `tone` and are not
    * open to a caller, because the whole value of ADR 0027 is that the same
    * distinction looks the same on every screen.
    */

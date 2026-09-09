@@ -255,7 +255,8 @@ export function Payroll({ session }: { session: Session }) {
            * Two figures, and they are deliberately not added together. One is
            * an obligation and one is a working number, and ADR 0027 exists so
            * that the difference is visible before the digits are read — the
-           * agreed total is set in mono, the projected one in prose.
+           * agreed total carries full weight and ink, the projected one does
+           * not.
            */}
           <div className="payroll__figure">
             <Money
@@ -421,10 +422,10 @@ function PayrollTableRow({
         )}
       </td>
       {/*
-       * ADR 0027. An approved figure is set in the mono face because it is an
-       * obligation and cannot change; a draft one is prose because it is still
-       * being worked out. A blocked figure is neither owed nor coloured as if
-       * it were.
+       * ADR 0027. An approved figure is set in full weight and ink because it
+       * is an obligation and cannot change; a draft one is quiet because it is
+       * still being worked out. A blocked figure is neither owed nor coloured
+       * as if it were.
        */}
       <td className="payroll__amount">
         <Money

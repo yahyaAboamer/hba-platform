@@ -10,7 +10,6 @@
 }
 
 .targets__lead strong {
-  font-family: var(--mono);
   color: var(--ink);
 }
 
@@ -55,7 +54,6 @@
   border: 1px solid var(--rule);
   border-radius: var(--radius);
   background: var(--surface);
-  font-family: var(--mono);
   font-size: var(--text-sm);
   text-align: center;
   color: var(--ink);
