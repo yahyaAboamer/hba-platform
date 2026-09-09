@@ -25,6 +25,7 @@ from app.services.shopify.client import (
     ShopifyNotConfigured,
 )
 from app.services.shopify.client import REQUIRED_SCOPES
+from app.services.shopify.catalogue import catalogue_state
 from app.services.shopify.discounts import REQUIRED_SCOPE, verify_discount_code
 from app.services.shopify.facts import DEFAULT_SAMPLE
 
@@ -410,6 +411,60 @@ def start_import(
         "since": body.since,
         "queued_at": _isoformat(utcnow()),
     }
+
+
+@router.post("/sync-catalogue")
+def sync_catalogue_route(
+    _actor: UserAccount = Depends(require_permission(Permission.SETTINGS_MANAGE)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Queue a walk of the shop's products, variants and images.
+
+    **Safe to run against the shared shop**, unlike the historical order
+    import. That one is a bulk operation and Shopify permits one per shop at a
+    time, which is why the old docs say never to start it from staging. This is
+    ordinary paginated reads: it costs rate limit and nothing else, and running
+    it twice is an upsert.
+
+    Queued rather than run. A catalogue is not a page, and an HTTP request is
+    not the place to wait for the walk. Watch it under `jobs` in
+    /api/operations/sync.
+
+    Deduped, so a second click while one is running joins the first rather than
+    starting a second walk over the same shop.
+    """
+    job = enqueue(
+        db,
+        JobKind.SYNC_CATALOGUE,
+        {},
+        dedupe_key=JobKind.SYNC_CATALOGUE,
+    )
+    if job is None:
+        raise HTTPException(
+            409, "A catalogue sync is already running. Wait for it to finish."
+        )
+
+    db.commit()
+    return {
+        "status": "queued",
+        "job_id": job.id,
+        "queued_at": _isoformat(utcnow()),
+    }
+
+
+@router.get("/catalogue")
+def catalogue_route(
+    _actor: UserAccount = Depends(require_permission(Permission.SETTINGS_MANAGE)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """What the catalogue holds, and when HBA last heard about it.
+
+    The freshness half matters more than the counts. A catalogue nobody has
+    synced for a fortnight looks identical to a fresh one until something says
+    otherwise, and *"as of"* is the difference between a stale screen and a
+    lying one.
+    """
+    return catalogue_state(db)
 
 
 @router.get("/notifications")

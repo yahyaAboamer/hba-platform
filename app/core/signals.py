@@ -77,6 +77,11 @@ class Anomaly:
     #: A bulk import finished having matched no orders at all.
     IMPORT_EMPTY = "import_empty"
 
+    #: Products in a catalogue walk that carried no usable id. The rest of the
+    #: walk went ahead; those products are simply not in the catalogue, which
+    #: shows up later as a wardrobe row with no picture.
+    CATALOGUE_PRODUCT_SKIPPED = "catalogue_product_skipped"
+
     #: A reconciliation sweep stopped before reading the whole window, so the
     #: tail of it went unchecked this time round.
     RECONCILE_TRUNCATED = "reconcile_truncated"

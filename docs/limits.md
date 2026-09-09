@@ -1060,6 +1060,23 @@ import log line. A handful of skips is usually child objects. A large number
 means the export's shape is not what `normalise_order` expects — likely a
 Shopify API version change.
 
+### `catalogue_product_skipped`
+
+Products in a catalogue walk that carried no usable id — neither
+`legacyResourceId` nor a GID whose last segment is a number. The rest of the
+walk went ahead and **those products are simply not in the catalogue**, which
+surfaces much later and much less obviously: a wardrobe row with a title and no
+picture, or a product roster missing something somebody knows was sent.
+
+Skipping one is deliberate. A page of a hundred products should not be lost to
+one malformed node, and raising would have made the whole walk fail on it.
+
+*What to do:* compare `skipped` against `products` in the same line. One or two
+is usually a product mid-deletion. A large number means the payload's shape is
+not what `normalise_product` expects — most likely a Shopify API version change,
+in which case the order queries are worth checking too, since they are pinned to
+the same version.
+
 ### `import_empty`
 
 A bulk import completed having matched no orders at all.

@@ -52,6 +52,11 @@ class JobKind:
     #: this everything earned before registration belongs to nobody.
     BACKFILL_CODE = "backfill_code"
 
+    #: Walk the shop's products, variants and images (Phase 3, W01). Its own
+    #: kind rather than a step inside the order sync, because a product field
+    #: Shopify refuses must never be able to stop orders indexing.
+    SYNC_CATALOGUE = "shopify_sync_catalogue"
+
 
 class PermanentFailure(Exception):
     """A job failure that retrying cannot fix.

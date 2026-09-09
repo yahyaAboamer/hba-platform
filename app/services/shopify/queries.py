@@ -91,3 +91,89 @@ SHOP_NAME = "query { shop { name myshopifyDomain } }"
 BULK_ORDER_FIELDS = "\n".join(
     line for line in ORDER_FIELDS.splitlines() if "refundLineItems" not in line
 )
+
+
+# ── The catalogue ────────────────────────────────────────────────────────────
+#
+# Needs `read_products`, which is a **separate grant** from the order scopes
+# above. `client.REQUIRED_SCOPES` carries it, and `/api/operations/shopify-scopes`
+# is what proves it is actually granted rather than merely typed into the Dev
+# Dashboard - the two are not the same thing, and an already-issued token never
+# gains a scope retroactively.
+#
+# Deliberately small. One image, not a gallery: the roster shows a thumbnail
+# and storing every media node would be storing what nothing reads. No
+# description, no SEO block, no metafields - the same rule the order query
+# follows, that a field never asked for cannot leak.
+
+PRODUCT_FIELDS = """
+    id
+    legacyResourceId
+    title
+    handle
+    status
+    updatedAt
+    featuredMedia {
+      ... on MediaImage {
+        image { url altText }
+      }
+    }
+    variants(first: 100) {
+      nodes {
+        id
+        legacyResourceId
+        title
+        sku
+        position
+      }
+    }
+"""
+
+PRODUCTS_PAGE = f"""
+query ProductsPage($first: Int!, $after: String) {{
+  products(first: $first, after: $after, sortKey: UPDATED_AT) {{
+    pageInfo {{ hasNextPage endCursor }}
+    nodes {{
+      {PRODUCT_FIELDS}
+    }}
+  }}
+}}
+"""
+
+# ── What was in an order ─────────────────────────────────────────────────────
+#
+# Its own document rather than fields bolted onto `ORDER_FIELDS`, for one
+# reason: **GraphQL rejects an entire document when one field is wrong.**
+# `ORDER_FIELDS` runs on every webhook, and adding an unproven selection to it
+# would risk stopping commission ingestion outright to gain a wardrobe.
+#
+# That is 03A's requirement in as many words - *new recipient field denial
+# cannot break existing commission sync* - and keeping the documents apart is
+# what makes it structural rather than careful.
+#
+# `discountedTotalSet` is after the customer's discounts, which is the basis
+# W11 asks for. `originalTotalSet` is kept beside it because their difference
+# is the only evidence a discount applied at all.
+
+ORDER_LINE_ITEMS = """
+query OrderLineItems($id: ID!) {
+  order(id: $id) {
+    id
+    legacyResourceId
+    lineItems(first: 100) {
+      pageInfo { hasNextPage endCursor }
+      nodes {
+        id
+        title
+        sku
+        quantity
+        variantTitle
+        product { id legacyResourceId }
+        variant { id legacyResourceId }
+        discountedTotalSet { shopMoney { amount currencyCode } }
+        originalTotalSet { shopMoney { amount currencyCode } }
+      }
+    }
+  }
+}
+"""

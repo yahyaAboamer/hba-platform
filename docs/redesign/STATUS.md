@@ -41,7 +41,7 @@ Package prepared: 9 September 2026. Phase 00 completed 9 September 2026.
 | 00 Baseline | **Complete** | `BASELINE_REPORT.md`; checkout `63c64c3`; 1589 + 104 green |
 | 01 UI foundations | **Complete** | `reports/01A-design-tokens.md`, `reports/01B-navigation-and-shells.md`; ADR 0039; `ROUTE_AND_PERMISSION_MAP.md` |
 | 02 Models and setup | **02A + 02B done; 02C mostly pre-built** | `reports/02A-model-entry.md`, `reports/02B-profile-and-self.md`; migration `d4b81c07af22`; D06 and D07 closed; 02C's editor shipped in `63c64c3`, its readiness checks still owed |
-| 03 Products and wardrobe | Not started | Entirely absent from the codebase (UI12–UI20) |
+| 03 Products and wardrobe | **03A done** | `reports/03A-catalogue-and-line-items.md`; migration `e7c2a5f1b930`; `read_products` now required. UI12-UI20 still Not started - 03A is the data underneath them |
 | 04 Targets | **Partly built already** | Outcome-only historical targets shipped in `1fe55de` |
 | 05 Financial rules | Not started | Commission still pays delivered-only; carry-forward still live |
 | 06 Payments | Not started | Recording/proof/reconciliation already exist and are reusable |
