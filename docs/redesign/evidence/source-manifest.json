@@ -1,0 +1,109 @@
+{
+  "source_archive": "Dashboard redesign for affiliate platform (4).zip",
+  "source_archive_sha256": "fd49b9b0a447de839233725502a36cbf89e72d3cdc03f309993f715351924e89",
+  "selected_designs": [
+    "designs/Affiliate Portal v3.dc.html",
+    "designs/Admin Dashboard.dc.html"
+  ],
+  "repository": "https://github.com/yahyaAboamer/hba-platform",
+  "reviewed_commit": "025d8a8b059978e6c8113d3c998465be80730f91",
+  "remote_head_verified": false,
+  "review_date": "2026-09-09",
+  "files": [
+    {
+      "path": "designs/Admin Dashboard.dc.html",
+      "bytes": 259260,
+      "sha256": "c592a4869559b8002d267aa182cf5d14570ec75fc21aa0189506d525be446306"
+    },
+    {
+      "path": "designs/Affiliate Portal v3.dc.html",
+      "bytes": 98923,
+      "sha256": "d53c9d717f23ab887b30e069f71fe5664b5c7a01ef0957bceaeaf20758be8c10"
+    },
+    {
+      "path": "designs/_ds/nocturne-dd174091-aec4-4a7e-9d27-c62cc837eb15/_adherence.oxlintrc.json",
+      "bytes": 4195,
+      "sha256": "06186bb46f06c0fa5afd27543508082248de52d249988265ce294511a684923d"
+    },
+    {
+      "path": "designs/_ds/nocturne-dd174091-aec4-4a7e-9d27-c62cc837eb15/_ds_bundle.js",
+      "bytes": 300,
+      "sha256": "aceb66bfea8c86f6ebf519525c4669e2d6bda22791fdf24db8f2cff09deabfb0"
+    },
+    {
+      "path": "designs/_ds/nocturne-dd174091-aec4-4a7e-9d27-c62cc837eb15/_ds_manifest.json",
+      "bytes": 7480,
+      "sha256": "232f36fe241f1d1dba230d5c82f4dc02baeb28ffae6172db00d0a952d909da4c"
+    },
+    {
+      "path": "designs/_ds/nocturne-dd174091-aec4-4a7e-9d27-c62cc837eb15/readme.md",
+      "bytes": 8307,
+      "sha256": "dcc4460813d2feb7cc696c1a6f881626137537c96dd57a504cca7de330fc7499"
+    },
+    {
+      "path": "designs/_ds/nocturne-dd174091-aec4-4a7e-9d27-c62cc837eb15/styles.css",
+      "bytes": 13029,
+      "sha256": "6fea354710ec4e3b2b979b723ed37d8e8959bb7d9137425d0d562b4ad8733cda"
+    },
+    {
+      "path": "designs/support.js",
+      "bytes": 69150,
+      "sha256": "8fe7df74405f3c55f49b7249c74ea1397e65d07dea2b1bd3b4a489bec2e28cbe"
+    },
+    {
+      "path": "designs/uploads/HBA_Final_Admin_Revision_Prompt.md",
+      "bytes": 18582,
+      "sha256": "3ed5bf686050d0518cad7250a0cd6489c10fa943dafd2796766f794361ccc59f"
+    },
+    {
+      "path": "designs/uploads/pasted-1788632456552-0.png",
+      "bytes": 368412,
+      "sha256": "49fa74ef5e83973c1b0c2e28a8525b748fbe0a8c2b5c7385b34a86d81077467a"
+    },
+    {
+      "path": "designs/uploads/pasted-1788632459084-0.png",
+      "bytes": 158195,
+      "sha256": "0dd9172df7ef61fd1ca99b45771b6cd51d2a2ddf1325057e6e005ef7b60c8cb8"
+    },
+    {
+      "path": "designs/uploads/pasted-1788632461755-0.png",
+      "bytes": 165056,
+      "sha256": "d6606d70d1e53546c03385f94ec0f668108a8423487d4e628f1bf3502cb7cd97"
+    },
+    {
+      "path": "designs/uploads/photo_1_2026-09-02_22-53-34.jpg",
+      "bytes": 126358,
+      "sha256": "b51174598d70c9f87b142db07d01c022884dc738c84222abb291cb7f4340c144"
+    },
+    {
+      "path": "designs/uploads/photo_2_2026-09-02_22-53-34.jpg",
+      "bytes": 123971,
+      "sha256": "53a438aff4cebb7cf1582f0b8c4b10446cbb7adb3c72173821a5c5ac89a5542a"
+    },
+    {
+      "path": "designs/uploads/photo_3_2026-09-02_22-53-34.jpg",
+      "bytes": 118935,
+      "sha256": "8e37f1cdf59f7617a104e239e66661eea5e9621feef1a1f694e6834fd7551c62"
+    },
+    {
+      "path": "designs/uploads/photo_4_2026-09-02_22-53-34.jpg",
+      "bytes": 82051,
+      "sha256": "71bf19f121b33fe28b891a49fcc683453638081eee5611e9b179d799085de1e1"
+    },
+    {
+      "path": "designs/uploads/photo_5_2026-09-02_22-53-34.jpg",
+      "bytes": 123707,
+      "sha256": "577f26a8efb1d70f68eb8a8a1a2bb3febecc21f2aea7aa96de76cc79a32b2772"
+    },
+    {
+      "path": "designs/uploads/photo_6_2026-09-02_22-53-34.jpg",
+      "bytes": 109314,
+      "sha256": "9bb0914682e23a9827eb1019e3db15789ad2a3cf13bddf99d1a0efb2fa689953"
+    },
+    {
+      "path": "designs/uploads/photo_7_2026-09-02_22-53-34.jpg",
+      "bytes": 105670,
+      "sha256": "6e324ee2a2c93ea50fed920d05a0d3e864b5c9763c7a41b002d5da6dbc4e457f"
+    }
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "scope": "Targeted source logic only, not a rendered walkthrough or app test suite",
+  "model": [
+    {
+      "check": "Approved-but-unpaid month uses live commission",
+      "observed": true,
+      "evidence": "isApprovedFixed excludes approved state",
+      "required": "Use frozen approval for approved and paid statements"
+    },
+    {
+      "check": "Receipt calculation context",
+      "receipt": "September 2026",
+      "earningsContext": "November 2026",
+      "correct": false
+    },
+    {
+      "check": "Payout draft mutates shared form before Save",
+      "original": "ipn.eg/yahya.hba",
+      "draftStillInAccountForm": "https://ipn.eg/UNSAVED",
+      "required": "Separate persisted value from discardable draft"
+    },
+    {
+      "check": "One-month chart",
+      "finite": false,
+      "path": "MNaN,25.47826086956521"
+    },
+    {
+      "check": "All-zero chart",
+      "finite": false,
+      "path": "M8,NaN L36.4,NaN L64.8,NaN L93.2,NaN L121.6,NaN L150,NaN L178.4,NaN L206.8,NaN L235.2,NaN L263.6,NaN L292,NaN"
+    }
+  ],
+  "admin": [
+    {
+      "check": "Guarantee approval when stories are unknown",
+      "targetsKnown": false,
+      "canApprove": true,
+      "required": "Both required outcomes must be known and valid before approval"
+    },
+    {
+      "check": "Fixture calendar ends in February 2027",
+      "yearOptions": [
+        "2026",
+        "2027"
+      ],
+      "monthsIn2027": 2,
+      "required": "Generate eligible and schedulable months from server dates, not fixture arrays"
+    },
+    {
+      "check": "Historical readiness after selected-month terms supplied",
+      "model": "Sara Edrees",
+      "displayedState": "Terms missing",
+      "required": "Read every selected month override and actual data coverage"
+    }
+  ]
+}

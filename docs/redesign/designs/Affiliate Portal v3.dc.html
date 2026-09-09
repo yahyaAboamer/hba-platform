@@ -1,0 +1,1462 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics="">
+<link rel="stylesheet" href="_ds/nocturne-dd174091-aec4-4a7e-9d27-c62cc837eb15/styles.css">
+<script src="_ds/nocturne-dd174091-aec4-4a7e-9d27-c62cc837eb15/_ds_bundle.js"></script>
+<style>
+:root{--color-bg:#08090A;--color-surface:#15171A;--color-divider:#23272B;--color-text:#ECEFEA;--color-accent:#23A95C;--color-accent-300:#7BE0A6;--color-accent-400:#38C273;--color-accent-600:#1B8A4B;--color-accent-700:#14653A;--color-neutral-100:#FAFBF9;--color-neutral-200:#EFF1EE;--color-neutral-300:#D8DBD6;--color-neutral-400:#B4B8B3;--color-neutral-700:#2D3237;--color-neutral-800:#24282C;--color-neutral-900:#101214;--color-section:#0A2A1A}
+body{margin:0;background:var(--color-bg);color:var(--color-text);font-family:var(--font-body)}
+a{color:var(--color-accent)}a:hover{color:var(--color-accent-400)}
+.pt{--bg:#08090A;--surf:#15171A;--raise:#1D2126;--txt:#ECEFEA;--mut:#A7ADA6;--faint:#8A918A;--div:#23272B;--line:#2D3237;--acc:#23A95C;--accsoft:rgba(35,169,92,.14);--acctext:#7BE0A6;--amber:#E0A458;--red:#E2705F;--bar:#343A3F}
+.pt[data-t="light"]{--bg:#EFF1EE;--surf:#FFFFFF;--raise:#FFFFFF;--txt:#101214;--mut:#4E534E;--faint:#5E645E;--div:#DDE1DC;--line:#C9CEC8;--acc:#14653A;--accsoft:rgba(20,101,58,.09);--acctext:#14653A;--amber:#8A5A16;--red:#9A2F22;--bar:#C9CEC8}
+.pt button:focus-visible,.pt input:focus-visible,.pt select:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+</style></helmet>
+
+<div style="min-height:100vh;padding:26px 30px 44px">
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:22px;flex-wrap:wrap;margin-bottom:18px">
+    <div>
+      <div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--color-accent)">HBA · model dashboard</div>
+      <h3 style="margin:8px 0 4px">Interactive prototype — v3</h3>
+      <p style="margin:0;font-size:13px;color:#A7ADA6;max-width:76ch">Five tabs, You behind the avatar, payments inside You. The controls in this row are review controls and are not part of the app.</p>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:26px;flex-wrap:wrap;align-items:flex-start;margin-bottom:16px">
+    <div>
+      <div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#8A918A;margin-bottom:7px">Compensation arrangement (set by HBA)</div>
+      <div class="seg">
+        <label class="seg-opt"><input type="radio" name="v3-arr" checked="{{ arrCommission }}" onChange="{{ setArrCommission }}"><span>Commission</span></label>
+        <label class="seg-opt"><input type="radio" name="v3-arr" checked="{{ arrSalary }}" onChange="{{ setArrSalary }}"><span>Salary + commission</span></label>
+        <label class="seg-opt"><input type="radio" name="v3-arr" checked="{{ arrGuarantee }}" onChange="{{ setArrGuarantee }}"><span>Guaranteed minimum</span></label>
+      </div>
+    </div>
+    <div>
+      <div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#8A918A;margin-bottom:7px">Screen width</div>
+      <div class="seg">
+        <label class="seg-opt"><input type="radio" name="v3-w" checked="{{ w360 }}" onChange="{{ setW360 }}"><span>360</span></label>
+        <label class="seg-opt"><input type="radio" name="v3-w" checked="{{ w390 }}" onChange="{{ setW390 }}"><span>390</span></label>
+        <label class="seg-opt"><input type="radio" name="v3-w" checked="{{ w430 }}" onChange="{{ setW430 }}"><span>430</span></label>
+      </div>
+    </div>
+    <div>
+      <div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#8A918A;margin-bottom:7px">Jump to a review state</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button type="button" class="btn btn-secondary" onClick="{{ jumpOrdinary }}" style="font-size:12px">Ordinary month</button>
+        <button type="button" class="btn btn-secondary" onClick="{{ jumpDeduction }}" style="font-size:12px">Later deduction</button>
+        <button type="button" class="btn btn-secondary" onClick="{{ jumpNoRecord }}" style="font-size:12px">Settled, no record</button>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:26px;align-items:flex-start;flex-wrap:wrap">
+
+  <div class="pt" data-t="{{ theme }}" style="flex:none;width:{{ frameW }};height:844px;position:relative;display:flex;flex-direction:column;overflow:hidden;border-radius:38px;background:var(--bg);color:var(--txt);box-shadow:0 6px 30px rgba(0,0,0,.45)">
+
+    <div style="flex:none;display:flex;align-items:center;justify-content:space-between;padding:13px 24px 2px;font-size:13px;font-weight:600">
+      <span>9:41</span>
+      <span style="display:block;width:17px;height:9px;border:1.2px solid currentColor;border-radius:2px;opacity:.75"></span>
+    </div>
+
+    <sc-if value="{{ inApp }}" hint-placeholder-val="{{ true }}">
+      <div style="flex:none;display:flex;align-items:center;gap:10px;padding:12px 16px 13px;border-bottom:1px solid var(--div)">
+        <button type="button" onClick="{{ openYou }}" aria-label="Your account" style="width:40px;height:40px;flex:none;border-radius:50%;border:1px solid var(--div);background:var(--accsoft);color:var(--acc);font-family:var(--font-heading);font-size:16px;cursor:pointer">Y</button>
+        <div style="flex:1;min-width:0">
+          <div style="font-family:var(--font-heading);font-size:15px;line-height:1.25">Yahya Aboamer</div>
+          <div style="font-size:12.5px;color:var(--mut)">HBA ambassador · HBA15</div>
+        </div>
+        <sc-if value="{{ showPicker }}" hint-placeholder-val="{{ true }}">
+          <button type="button" onClick="{{ togglePicker }}" style="flex:none;display:flex;align-items:center;gap:6px;padding:9px 11px;border:1px solid var(--div);border-radius:var(--radius-md);background:transparent;color:var(--txt);font-size:13px;cursor:pointer">
+            <span>{{ monthShort }}</span><span style="color:var(--mut);font-size:9px">▼</span>
+          </button>
+        </sc-if>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ inView }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:none;display:flex;align-items:center;gap:10px;padding:12px 14px 13px;border-bottom:1px solid var(--div)">
+        <button type="button" onClick="{{ back }}" style="flex:none;display:flex;align-items:center;gap:6px;padding:9px 11px;border:1px solid var(--div);border-radius:var(--radius-md);background:transparent;color:var(--txt);font-size:13px;cursor:pointer">← Back</button>
+        <div style="flex:1;min-width:0;font-family:var(--font-heading);font-size:15px;text-align:center;padding-right:60px">{{ viewTitle }}</div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ pickerOpen }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:none;max-height:250px;overflow-y:auto;margin:10px 16px 0;border:1px solid var(--div);border-radius:var(--radius-md);background:var(--raise)">
+        <sc-for list="{{ monthOptions }}" as="mo" hint-placeholder-count="4">
+          <button type="button" onClick="{{ mo.onPick }}" style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 13px;border:0;border-bottom:1px solid var(--div);background:{{ mo.bg }};color:var(--txt);text-align:left;font-size:14px;cursor:pointer">
+            <span>{{ mo.label }}</span>
+            <span style="font-size:12.5px;color:{{ mo.tone }}">{{ mo.state }}</span>
+          </button>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <div style="flex:1;overflow-y:auto;overflow-x:hidden;padding:16px 16px 28px">
+
+      <sc-if value="{{ onHome }}" hint-placeholder-val="{{ true }}">
+        <div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+            <span style="font-family:var(--font-heading);font-size:15px">{{ monthLabel }}</span>
+            <span style="padding:4px 10px;border:1px solid {{ stateTone }};border-radius:999px;font-size:12px;color:{{ stateTone }}">{{ stateLabel }}</span>
+          </div>
+
+          <div style="margin-top:14px;padding:16px;border-radius:var(--radius-lg);background:var(--surf)">
+            <div style="font-size:13px;color:var(--mut)">{{ heroLabel }}</div>
+            <div style="font-family:var(--font-heading);font-size:36px;line-height:1.1;letter-spacing:-.02em;margin-top:8px;font-variant-numeric:tabular-nums">{{ heroAmount }}</div>
+            
+
+            <div style="display:flex;gap:12px;margin-top:16px;padding-top:14px;border-top:1px solid var(--div)">
+              <div style="flex:1;min-width:0">
+                <div style="font-size:12.5px;color:var(--mut)">Net sales counted</div>
+                <div style="font-family:var(--font-heading);font-size:17px;margin-top:5px;font-variant-numeric:tabular-nums">{{ countedText }}</div>
+              </div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:12.5px;color:var(--mut)">Code uses</div>
+                <div style="font-family:var(--font-heading);font-size:17px;margin-top:5px;font-variant-numeric:tabular-nums">{{ usesText }}</div>
+              </div>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:11px">
+              <span style="padding:3px 9px;border-radius:999px;background:var(--accsoft);font-size:12px;color:var(--acctext)">{{ nDelivered }} delivered</span>
+              <span style="padding:3px 9px;border-radius:999px;border:1px solid var(--amber);font-size:12px;color:var(--amber)">{{ nPending }} pending</span>
+              <span style="padding:3px 9px;border-radius:999px;border:1px solid var(--red);font-size:12px;color:var(--red)">{{ nFailed }} failed delivery</span>
+            </div>
+            
+          </div>
+
+          <div style="margin-top:18px;padding:15px 13px 12px;border-radius:var(--radius-md);background:var(--surf)">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px">
+              <span style="font-family:var(--font-heading);font-size:15px">Your year</span>
+              <span style="font-size:12px;color:var(--faint)">2026</span>
+            </div>
+            <div class="seg" style="width:100%;border-color:var(--div)">
+              <label class="seg-opt" style="flex:1;justify-content:center"><input type="radio" name="v3-chart" checked="{{ chartSales }}" onChange="{{ setChartSales }}"><span>Sales</span></label>
+              <label class="seg-opt" style="flex:1;justify-content:center;border-color:var(--div)"><input type="radio" name="v3-chart" checked="{{ chartUses }}" onChange="{{ setChartUses }}"><span>Uses</span></label>
+            </div>
+
+            <div style="min-height:52px;padding:12px 3px 8px">
+              <div style="font-size:12.5px;color:var(--mut)">{{ tipMonth }}</div>
+              <div style="font-family:var(--font-heading);font-size:18px;margin-top:4px;font-variant-numeric:tabular-nums">{{ tipValue }}</div>
+              <div style="font-size:12.5px;color:var(--faint);margin-top:3px">{{ tipNote }}</div>
+            </div>
+
+            <sc-if value="{{ chartSales }}" hint-placeholder-val="{{ true }}">
+              <svg viewBox="-24 0 324 130" style="display:block;width:100%;overflow:visible">
+                <sc-for list="{{ grid }}" as="g" hint-placeholder-count="3">
+                  <line x1="8" x2="292" y1="{{ g.y }}" y2="{{ g.y }}" stroke="var(--line)" stroke-width="1"></line>
+                </sc-for>
+                <sc-for list="{{ grid }}" as="g" hint-placeholder-count="3">
+                  <text x="2" y="{{ g.ty }}" text-anchor="end" font-family="Inter, sans-serif" font-size="10" fill="var(--faint)">{{ g.label }}</text>
+                </sc-for>
+                <path d="{{ linePath }}" fill="none" stroke="var(--acc)" stroke-width="2.25" stroke-linejoin="round" stroke-linecap="round"></path>
+                <sc-for list="{{ points }}" as="p" hint-placeholder-count="11">
+                  <circle cx="{{ p.cx }}" cy="{{ p.cy }}" r="{{ p.r }}" fill="{{ p.fill }}" stroke="var(--acc)" stroke-width="2"></circle>
+                </sc-for>
+                <sc-for list="{{ ticks }}" as="t" hint-placeholder-count="11">
+                  <text x="{{ t.x }}" y="122" text-anchor="middle" font-family="Inter, sans-serif" font-size="10" fill="{{ t.tone }}">{{ t.label }}</text>
+                </sc-for>
+                <sc-for list="{{ hits }}" as="h" hint-placeholder-count="11">
+                  <rect x="{{ h.x }}" y="0" width="{{ h.w }}" height="110" fill="transparent" style="cursor:pointer" onClick="{{ h.onPick }}"></rect>
+                </sc-for>
+              </svg>
+            </sc-if>
+            <sc-if value="{{ chartUses }}" hint-placeholder-val="{{ false }}">
+              <svg viewBox="-24 0 324 130" style="display:block;width:100%;overflow:visible">
+                <sc-for list="{{ grid }}" as="g" hint-placeholder-count="3">
+                  <line x1="8" x2="292" y1="{{ g.y }}" y2="{{ g.y }}" stroke="var(--line)" stroke-width="1"></line>
+                </sc-for>
+                <sc-for list="{{ grid }}" as="g" hint-placeholder-count="3">
+                  <text x="2" y="{{ g.ty }}" text-anchor="end" font-family="Inter, sans-serif" font-size="10" fill="var(--faint)">{{ g.label }}</text>
+                </sc-for>
+                <sc-for list="{{ bars }}" as="b" hint-placeholder-count="11">
+                  <rect x="{{ b.x }}" y="{{ b.y }}" width="{{ b.w }}" height="{{ b.h }}" rx="3" fill="{{ b.fill }}" style="cursor:pointer" onClick="{{ b.onPick }}"></rect>
+                </sc-for>
+                <sc-for list="{{ bars }}" as="b" hint-placeholder-count="11">
+                  <text x="{{ b.tx }}" y="{{ b.ty }}" text-anchor="middle" font-family="Inter, sans-serif" font-size="10" fill="var(--mut)">{{ b.count }}</text>
+                </sc-for>
+                <sc-for list="{{ ticks }}" as="t" hint-placeholder-count="11">
+                  <text x="{{ t.bx }}" y="122" text-anchor="middle" font-family="Inter, sans-serif" font-size="10" fill="{{ t.tone }}">{{ t.label }}</text>
+                </sc-for>
+              </svg>
+            </sc-if>
+            
+          </div><button type="button" onClick="{{ openEarnings }}" style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;padding:14px 15px;border:1px solid var(--div);border-radius:var(--radius-md);background:transparent;color:var(--txt);font-size:14px;cursor:pointer">
+            <span>How this adds up</span><span style="color:var(--acc)">→</span>
+          </button>
+
+          <sc-if value="{{ hasChange }}" hint-placeholder-val="{{ false }}">
+            <button type="button" onClick="{{ openEarnings }}" style="width:100%;margin-top:10px;padding:13px 15px;border:1px solid var(--amber);border-radius:var(--radius-md);background:transparent;color:var(--txt);text-align:left;font-size:13px;line-height:1.5;cursor:pointer">
+              <span style="display:block;color:var(--amber);font-size:12.5px">Sales performance has changed since approval</span>
+              <span style="display:block;margin-top:4px">{{ changeShort }}</span>
+              <span style="display:block;margin-top:6px;color:var(--acc);font-size:12.5px">See the detail →</span>
+            </button>
+          </sc-if>
+
+          <div style="margin-top:10px;padding:15px;border-radius:var(--radius-md);background:var(--surf)">
+            <div style="font-size:13px;color:var(--mut)">{{ paymentTitle }}</div>
+            <div style="font-family:var(--font-heading);font-size:16px;margin-top:6px">{{ paymentLine }}</div>
+            <div style="font-size:12.5px;color:var(--faint);margin-top:6px;line-height:1.5">{{ paymentNote }}</div>
+            <button type="button" onClick="{{ openPayments }}" style="margin-top:11px;padding:0;border:0;background:transparent;color:var(--acc);font-size:13px;cursor:pointer">Payment history →</button>
+          </div>
+
+          
+
+          
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ onOrders }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+            <span style="font-family:var(--font-heading);font-size:15px">Orders</span>
+            <span style="font-size:12.5px;color:var(--mut)">{{ monthLabel }}</span>
+          </div>
+
+          <div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:13px">
+            <sc-for list="{{ filters }}" as="f" hint-placeholder-count="4">
+              <button type="button" onClick="{{ f.onPick }}" style="flex:1 1 auto;min-height:38px;padding:8px 10px;border:1px solid {{ f.border }};border-radius:var(--radius-md);background:{{ f.bg }};color:{{ f.tone }};font-size:12.5px;cursor:pointer">{{ f.label }}</button>
+            </sc-for>
+          </div>
+
+          <sc-for list="{{ orderRows }}" as="o" hint-placeholder-count="5">
+            <div style="margin-top:10px;border-radius:var(--radius-md);background:var(--surf);overflow:hidden">
+              <button type="button" onClick="{{ o.onOpen }}" style="width:100%;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:14px 15px;border:0;background:transparent;color:var(--txt);text-align:left;cursor:pointer">
+                <span style="min-width:0">
+                  <span style="display:block;font-size:14px">{{ o.ref }}</span>
+                  <span style="display:block;font-size:12.5px;color:var(--faint);margin-top:4px">{{ o.date }} · {{ o.items }}</span>
+                  <span style="display:inline-block;margin-top:8px;padding:3px 9px;border-radius:999px;border:1px solid {{ o.tone }};font-size:12px;color:{{ o.tone }}">{{ o.status }}</span>
+                </span>
+                <span style="flex:none;text-align:right">
+                  <span style="display:block;font-family:var(--font-heading);font-size:16px;font-variant-numeric:tabular-nums;color:{{ o.amountTone }};text-decoration:{{ o.strike }}">{{ o.commission }}</span>
+                  <span style="display:block;font-size:12.5px;color:var(--mut);margin-top:5px">{{ o.netLine }}</span>
+                </span>
+              </button>
+              <sc-if value="{{ o.open }}" hint-placeholder-val="{{ false }}">
+                <div style="padding:0 15px 14px">
+                  <sc-for list="{{ o.products }}" as="p" hint-placeholder-count="2">
+                    <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--div);font-size:13.5px">
+                      <span>{{ p.name }}<span style="display:block;font-size:12.5px;color:var(--faint);margin-top:3px">Size {{ p.size }}</span></span>
+                      <span style="flex:none;font-variant-numeric:tabular-nums">{{ p.price }}</span>
+                    </div>
+                  </sc-for>
+                  <div style="padding:11px 0 0;border-top:1px solid var(--line);font-size:13px;line-height:1.55;color:var(--mut)">{{ o.detail }}</div>
+                </div>
+              </sc-if>
+            </div>
+          </sc-for>
+
+          <p style="margin:14px 0 0;font-size:12.5px;color:var(--faint)">Customer details aren't shown here.</p>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ onWardrobe }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <div style="font-family:var(--font-heading);font-size:15px">Your best sellers</div>
+          <div style="font-size:12.5px;color:var(--mut);margin-top:5px">Sales through HBA15 · all time · delivered and pending</div>
+
+          <div style="margin-top:12px;border-radius:var(--radius-md);background:var(--surf);overflow:hidden">
+            <sc-for list="{{ bestSellers }}" as="p" hint-placeholder-count="3">
+              <div style="display:flex;align-items:center;gap:12px;padding:13px 14px;border-bottom:1px solid var(--div)">
+                <span style="flex:none;width:20px;font-family:var(--font-heading);font-size:14px;color:{{ p.rankTone }};font-variant-numeric:tabular-nums">{{ p.rank }}</span>
+                <span style="flex:none;width:48px;height:48px;border-radius:var(--radius-sm);border:1px dashed var(--line);background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--faint)">image</span>
+                <span style="flex:1;min-width:0">
+                  <span style="display:block;font-size:13.5px">{{ p.name }}</span>
+                  <span style="display:block;font-size:12.5px;color:var(--faint);margin-top:4px">{{ p.units }}</span>
+                </span>
+                <span style="flex:none;font-family:var(--font-heading);font-size:14px;font-variant-numeric:tabular-nums;color:var(--acctext)">{{ p.sales }}</span>
+              </div>
+            </sc-for>
+          </div>
+          <button type="button" onClick="{{ openBest }}" style="width:100%;margin-top:10px;padding:12px;border:1px solid var(--div);border-radius:var(--radius-md);background:transparent;color:var(--txt);font-size:13.5px;cursor:pointer">{{ bestAllLabel }}</button>
+
+          <sc-if value="{{ hasFeatured }}" hint-placeholder-val="{{ true }}">
+            <div>
+              <div style="margin-top:24px;font-family:var(--font-heading);font-size:15px">HBA would like you to feature</div>
+              <div style="font-size:12.5px;color:var(--mut);margin-top:5px">Chosen by the HBA team</div>
+
+              <div style="display:flex;flex-direction:column;gap:10px;margin-top:12px">
+                <sc-for list="{{ featured }}" as="f" hint-placeholder-count="3">
+                  <div style="display:flex;gap:12px;padding:13px 14px;border-radius:var(--radius-md);background:var(--surf)">
+                    <span style="flex:none;width:62px;height:72px;border-radius:var(--radius-sm);border:1px dashed var(--line);background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--faint)">image</span>
+                    <span style="flex:1;min-width:0">
+                      <span style="display:block;font-size:14px">{{ f.name }}</span>
+                      <span style="display:block;font-size:12.5px;color:{{ f.ownTone }};margin-top:5px">{{ f.ownership }}</span>
+                      <span style="display:block;font-size:13px;color:var(--mut);margin-top:7px;line-height:1.5">{{ f.request }}</span>
+                    </span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+
+          <div style="margin-top:24px;display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+            <span style="font-family:var(--font-heading);font-size:15px">Your wardrobe</span>
+            <span style="font-size:12.5px;color:var(--mut)">{{ wardrobeCount }}</span>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:10px;margin-top:12px">
+            <sc-for list="{{ wardrobe }}" as="w" hint-placeholder-count="6">
+              <div style="display:flex;gap:12px;align-items:center;padding:12px 14px;border-radius:var(--radius-md);background:var(--surf)">
+                <span style="flex:none;width:66px;height:76px;border-radius:var(--radius-sm);border:1px dashed var(--line);background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--faint)">image</span>
+                <span style="flex:1;min-width:0">
+                  <span style="display:block;font-size:14px">{{ w.name }}</span>
+                  <span style="display:block;font-size:13px;color:var(--mut);margin-top:5px">Size {{ w.size }}</span>
+                  <span style="display:block;font-size:12.5px;color:var(--faint);margin-top:5px">{{ w.when }}</span>
+                </span>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="margin-top:20px;padding:13px 14px;border-radius:var(--radius-md);border:1px solid var(--div)">
+            <div style="font-size:13.5px">Not received yet</div>
+            <sc-for list="{{ incoming }}" as="i" hint-placeholder-count="2">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-top:10px;font-size:13px">
+                <span>{{ i.name }}<span style="display:block;font-size:12.5px;color:var(--faint);margin-top:3px">Size {{ i.size }}</span></span>
+                <span style="flex:none;font-size:12.5px;color:{{ i.tone }}">{{ i.state }}</span>
+              </div>
+            </sc-for>
+            
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ onTargets }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <div style="font-family:var(--font-heading);font-size:15px">Content record</div>
+          <div style="font-size:12.5px;color:var(--mut);margin-top:5px">{{ targetsUpdatedLine }}</div>
+
+          <div style="margin-top:14px;padding:16px;border-radius:var(--radius-lg);background:var(--surf)">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+              <span style="font-family:var(--font-heading);font-size:15px">{{ liveMonthLabel }}</span>
+              <span style="padding:4px 10px;border-radius:999px;border:1px solid var(--div);font-size:12px;color:var(--mut)">{{ liveTargetState }}</span>
+            </div>
+            <sc-for list="{{ liveTargets }}" as="t" hint-placeholder-count="2">
+              <div style="margin-top:15px">
+                <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                  <span style="font-size:14px">{{ t.label }}</span>
+                  <span style="font-size:13px;color:var(--mut);font-variant-numeric:tabular-nums">{{ t.count }}</span>
+                </div>
+                <div style="height:6px;margin-top:7px;border-radius:3px;background:var(--line);overflow:hidden">
+                  <div style="height:100%;border-radius:3px;background:{{ t.fill }};width:{{ t.pct }}"></div>
+                </div>
+              </div>
+            </sc-for>
+            <sc-if value="{{ showGuaranteeInfo }}" hint-placeholder-val="{{ false }}">
+              <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--div)">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span style="font-size:13px;color:var(--mut)">Guaranteed minimum</span>
+                  <button type="button" onClick="{{ onGuaranteeInfo }}" aria-label="How the guaranteed minimum works" style="flex:none;width:22px;height:22px;border-radius:50%;border:1px solid var(--div);background:transparent;color:var(--mut);font-size:12px;line-height:1;cursor:pointer">i</button>
+                </div>
+                <sc-if value="{{ guaranteeOpen }}" hint-placeholder-val="{{ false }}">
+                  <div style="margin-top:10px;padding:12px 13px;border-radius:var(--radius-sm);background:var(--bg);font-size:13px;line-height:1.6;color:var(--mut)">{{ guaranteeLine }}</div>
+                </sc-if>
+              </div>
+            </sc-if>
+          </div>
+
+          <div style="margin-top:20px;font-family:var(--font-heading);font-size:15px">Earlier months</div>
+          <div style="margin-top:12px;border-radius:var(--radius-md);background:var(--surf);overflow:hidden">
+            <sc-for list="{{ targetHistory }}" as="h" hint-placeholder-count="5">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 14px;border-bottom:1px solid var(--div)">
+                <span style="min-width:0">
+                  <span style="display:block;font-size:13.5px">{{ h.month }}</span>
+                  <span style="display:block;font-size:12.5px;color:var(--faint);margin-top:4px">{{ h.detail }}</span>
+                </span>
+                <span style="flex:none;padding:3px 9px;border-radius:999px;border:1px solid {{ h.tone }};font-size:12px;color:{{ h.tone }}">{{ h.state }}</span>
+              </div>
+            </sc-for>
+          </div>
+          
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ onRanking }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+            <span style="font-family:var(--font-heading);font-size:15px">Ranking</span>
+            <span style="font-size:12.5px;color:var(--mut)">{{ monthLabel }}</span>
+          </div>
+
+          <div style="margin-top:14px;padding:15px 16px;border-radius:var(--radius-lg);background:var(--surf)">
+            <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px">
+              <div>
+                <div style="font-size:12.5px;color:var(--mut)">Your position</div>
+                <div style="font-family:var(--font-heading);font-size:30px;margin-top:6px">{{ myPlace }}</div>
+              </div>
+              <div style="text-align:right">
+                <div style="font-family:var(--font-heading);font-size:20px;font-variant-numeric:tabular-nums">{{ myUses }}</div>
+                <div style="font-size:12.5px;color:var(--mut);margin-top:4px">uses of HBA15</div>
+              </div>
+            </div>
+            <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--div);font-size:12.5px;color:var(--mut);line-height:1.55">Ordered by the sales each code generated. Only use counts are shown.</div>
+          </div>
+
+          <div style="margin-top:12px;border-radius:var(--radius-md);background:var(--surf);overflow:hidden">
+            <sc-for list="{{ ranking }}" as="r" hint-placeholder-count="9">
+              <div style="display:flex;align-items:center;gap:12px;padding:13px 14px;border-bottom:1px solid var(--div);background:{{ r.bg }}">
+                <span style="flex:none;width:20px;font-family:var(--font-heading);font-size:14px;color:{{ r.rankTone }};font-variant-numeric:tabular-nums">{{ r.rank }}</span>
+                <span style="flex:none;width:34px;height:34px;border-radius:50%;border:1px solid var(--div);background:{{ r.avatarBg }};color:{{ r.avatarTone }};display:flex;align-items:center;justify-content:center;font-family:var(--font-heading);font-size:13px">{{ r.initial }}</span>
+                <span style="flex:1;min-width:0">
+                  <span style="display:block;font-size:13.5px;color:{{ r.nameTone }}">{{ r.name }}</span>
+                  <span style="display:block;font-size:12.5px;color:var(--faint);margin-top:3px">{{ r.code }}</span>
+                </span>
+                <span style="flex:none;text-align:right">
+                  <span style="display:block;font-family:var(--font-heading);font-size:15px;font-variant-numeric:tabular-nums">{{ r.uses }}</span>
+                  <span style="display:block;font-size:12px;color:var(--faint);margin-top:3px">uses</span>
+                </span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ vYou }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <div style="display:flex;align-items:center;gap:13px">
+            <span style="flex:none;width:52px;height:52px;border-radius:50%;border:1px solid var(--div);background:var(--accsoft);color:var(--acc);display:flex;align-items:center;justify-content:center;font-family:var(--font-heading);font-size:20px">Y</span>
+            <span style="min-width:0">
+              <span style="display:block;font-family:var(--font-heading);font-size:18px">Yahya Aboamer</span>
+              <span style="display:block;font-size:13px;color:var(--mut);margin-top:4px">HBA ambassador since January 2026</span>
+            </span>
+          </div>
+
+          <div style="margin-top:16px;padding:14px 15px;border-radius:var(--radius-md);background:var(--surf)">
+            <div style="font-size:13px;color:var(--mut)">Your arrangement</div>
+            <div style="font-size:14px;margin-top:6px">{{ arrangementLabel }}</div>
+            <div style="font-size:12.5px;color:var(--faint);margin-top:6px;line-height:1.55">{{ arrangementNote }} Set by HBA.</div>
+          </div>
+
+          <div style="margin-top:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 15px;border-radius:var(--radius-md);background:var(--surf)">
+            <span style="font-size:14px">Appearance</span>
+            <span class="seg">
+              <label class="seg-opt"><input type="radio" name="v3-theme" checked="{{ isDark }}" onChange="{{ setDark }}"><span>Dark</span></label>
+              <label class="seg-opt"><input type="radio" name="v3-theme" checked="{{ isLight }}" onChange="{{ setLight }}"><span>Light</span></label>
+            </span>
+          </div>
+
+          <div style="margin-top:14px;border-radius:var(--radius-md);background:var(--surf);overflow:hidden">
+            <sc-for list="{{ youRows }}" as="r" hint-placeholder-count="6">
+              <button type="button" onClick="{{ r.onOpen }}" style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:52px;padding:14px 15px;border:0;border-bottom:1px solid var(--div);background:transparent;color:var(--txt);text-align:left;font-size:14px;cursor:pointer">
+                <span>{{ r.label }}<span style="display:block;font-size:12.5px;color:var(--faint);margin-top:3px">{{ r.hint }}</span></span>
+                <span style="flex:none;color:var(--acc)">→</span>
+              </button>
+            </sc-for>
+          </div>
+
+          <sc-if value="{{ confirmSignOut }}" hint-placeholder-val="{{ false }}">
+            <div style="margin-top:14px;padding:15px;border-radius:var(--radius-md);border:1px solid var(--div)">
+              <div style="font-size:14px">Sign out of the HBA dashboard?</div>
+              
+              <div style="display:flex;gap:10px;margin-top:14px">
+                <button type="button" onClick="{{ cancelSignOut }}" style="flex:1;min-height:46px;border:1px solid var(--div);border-radius:var(--radius-md);background:transparent;color:var(--txt);font-size:14px;cursor:pointer">Stay signed in</button>
+                <button type="button" onClick="{{ cancelSignOut }}" style="flex:1;min-height:46px;border:1px solid var(--red);border-radius:var(--radius-md);background:transparent;color:var(--red);font-size:14px;cursor:pointer">Sign out</button>
+              </div>
+              <div style="margin-top:11px;font-size:12px;color:var(--amber);line-height:1.5">Review prototype — signing out returns you here.</div>
+            </div>
+          </sc-if>
+          <sc-if value="{{ notConfirmSignOut }}" hint-placeholder-val="{{ true }}">
+            <button type="button" onClick="{{ askSignOut }}" style="width:100%;margin-top:14px;min-height:48px;padding:13px;border:1px solid var(--div);border-radius:var(--radius-md);background:transparent;color:var(--mut);font-size:14px;cursor:pointer">Sign out</button>
+          </sc-if>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ vEarnings }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+            <span style="font-family:var(--font-heading);font-size:15px">{{ monthLabel }}</span>
+            <span style="padding:4px 10px;border:1px solid {{ stateTone }};border-radius:999px;font-size:12px;color:{{ stateTone }}">{{ stateLabel }}</span>
+          </div>
+
+          <div style="margin-top:14px;border-radius:var(--radius-md);background:var(--surf);overflow:hidden">
+            <sc-for list="{{ breakdown }}" as="b" hint-placeholder-count="4">
+              <div style="border-bottom:1px solid var(--div)">
+                <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:14px 15px;font-size:14px">
+                  <span>
+                    <span style="display:flex;align-items:center;gap:8px">
+                      <span>{{ b.label }}</span>
+                      <sc-if value="{{ b.hasInfo }}" hint-placeholder-val="{{ false }}">
+                        <button type="button" onClick="{{ b.onInfo }}" aria-label="Why this row is here" style="flex:none;width:22px;height:22px;border-radius:50%;border:1px solid var(--div);background:transparent;color:var(--mut);font-size:12px;line-height:1;cursor:pointer">i</button>
+                      </sc-if>
+                    </span>
+                    <span style="display:block;font-size:12.5px;color:var(--faint);margin-top:4px;line-height:1.5">{{ b.detail }}</span>
+                  </span>
+                  <span style="flex:none;font-variant-numeric:tabular-nums;color:{{ b.tone }}">{{ b.value }}</span>
+                </div>
+                <sc-if value="{{ b.infoOpen }}" hint-placeholder-val="{{ false }}">
+                  <div style="margin:0 15px 14px;padding:12px 13px;border-radius:var(--radius-sm);background:var(--bg);font-size:13px;line-height:1.6;color:var(--mut)">{{ b.info }}</div>
+                </sc-if>
+              </div>
+            </sc-for>
+            <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:15px;font-family:var(--font-heading);font-size:16px">
+              <span>{{ totalLabel }}</span>
+              <span style="font-variant-numeric:tabular-nums">{{ heroAmount }}</span>
+            </div>
+          </div>
+
+          <sc-if value="{{ hasChange }}" hint-placeholder-val="{{ false }}">
+            <div style="margin-top:12px;padding:15px;border-radius:var(--radius-md);border:1px solid var(--amber)">
+              <div style="font-size:13px;color:var(--amber)">Why this month's sales differ from the approved calculation</div>
+              <div style="font-size:13.5px;line-height:1.6;margin-top:8px">{{ changeLong }}</div>
+              <div style="font-size:13px;color:var(--mut);line-height:1.6;margin-top:9px">{{ changeRecovery }}</div>
+            </div>
+          </sc-if>
+
+          <div style="margin-top:12px;padding:14px 15px;border-radius:var(--radius-md);background:var(--surf);font-size:12.5px;color:var(--faint);line-height:1.6">Commission is 10% of net sales on delivered and pending orders. Failed deliveries are excluded.</div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ vPayments }}" hint-placeholder-val="{{ false }}">
+        <div>
+          
+
+          <sc-if value="{{ hasAwaiting }}" hint-placeholder-val="{{ false }}">
+            <div style="margin-top:14px;padding:15px;border-radius:var(--radius-md);border:1px solid var(--acc)">
+              <div style="font-size:13px;color:var(--acc)">Approved, payment not yet recorded</div>
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-top:9px">
+                <span style="font-size:14px">{{ awaitingMonth }}</span>
+                <span style="font-family:var(--font-heading);font-size:16px;font-variant-numeric:tabular-nums">{{ awaitingAmount }}</span>
+              </div>
+              
+            </div>
+          </sc-if>
+
+          <div style="margin-top:18px;font-family:var(--font-heading);font-size:15px">Recorded payments</div>
+          <div style="margin-top:12px;border-radius:var(--radius-md);background:var(--surf);overflow:hidden">
+            <sc-for list="{{ paymentList }}" as="p" hint-placeholder-count="6">
+              <button type="button" onClick="{{ p.onOpen }}" style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 15px;border:0;border-bottom:1px solid var(--div);background:transparent;color:var(--txt);text-align:left;cursor:pointer">
+                <span style="min-width:0">
+                  <span style="display:block;font-size:14px">{{ p.month }}</span>
+                  <span style="display:block;font-size:12.5px;color:var(--faint);margin-top:4px">Recorded {{ p.date }} · {{ p.ref }}</span>
+                </span>
+                <span style="flex:none;text-align:right">
+                  <span style="display:block;font-family:var(--font-heading);font-size:15px;font-variant-numeric:tabular-nums;color:var(--acctext)">{{ p.amount }}</span>
+                  <span style="display:block;font-size:12px;color:var(--acc);margin-top:4px">Receipt →</span>
+                </span>
+              </button>
+            </sc-for>
+          </div>
+
+          <div style="margin-top:18px;font-family:var(--font-heading);font-size:15px">Months with no recorded payment</div>
+          <div style="margin-top:12px;border-radius:var(--radius-md);border:1px solid var(--div);overflow:hidden">
+            <sc-for list="{{ noRecordList }}" as="n" hint-placeholder-count="2">
+              <div style="padding:13px 15px;border-bottom:1px solid var(--div);font-size:13.5px">
+                {{ n.month }}<span style="display:block;font-size:12.5px;color:var(--faint);margin-top:4px">{{ n.note }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ vReceipt }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <div style="padding:5px 11px;border:1px solid var(--amber);border-radius:999px;font-size:12px;color:var(--amber);display:inline-block">Sample receipt for review</div>
+          <div style="margin-top:14px;padding:17px;border-radius:var(--radius-lg);background:var(--surf)">
+            <div style="font-size:13px;color:var(--mut)">{{ receiptMonth }}</div>
+            <div style="font-family:var(--font-heading);font-size:28px;margin-top:8px;font-variant-numeric:tabular-nums">{{ receiptAmount }}</div>
+            <sc-for list="{{ receiptRows }}" as="r" hint-placeholder-count="4">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid var(--div);font-size:13.5px">
+                <span style="color:var(--mut)">{{ r.label }}</span><span style="flex:none;text-align:right">{{ r.value }}</span>
+              </div>
+            </sc-for>
+            <div style="margin-top:14px;height:120px;border-radius:var(--radius-sm);border:1px dashed var(--line);display:flex;align-items:center;justify-content:center;font-size:12.5px;color:var(--faint)">transfer screenshot placeholder</div>
+          </div>
+          <button type="button" onClick="{{ openEarnings }}" style="width:100%;margin-top:12px;min-height:48px;padding:13px;border:1px solid var(--div);border-radius:var(--radius-md);background:transparent;color:var(--txt);font-size:14px;cursor:pointer">See how this month was calculated</button>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ vPayout }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <sc-if value="{{ savedPayout }}" hint-placeholder-val="{{ false }}">
+            <div style="margin-bottom:14px;padding:13px 15px;border-radius:var(--radius-md);border:1px solid var(--acc);background:var(--accsoft);font-size:13.5px">Saved. HBA will use these details for the next recorded payment.</div>
+          </sc-if>
+
+          <div style="font-size:13px;color:var(--mut);line-height:1.6">Where HBA should send your payment</div>
+
+          <div style="margin-top:16px">
+            <div style="font-size:12.5px;color:var(--mut);margin-bottom:7px">Method</div>
+            <div class="seg" style="width:100%;border-color:var(--div)">
+              <label class="seg-opt" style="flex:1;justify-content:center"><input type="radio" name="v3-method" checked="{{ mInsta }}" onChange="{{ setInsta }}"><span>InstaPay</span></label>
+              <label class="seg-opt" style="flex:1;justify-content:center;border-color:var(--div)"><input type="radio" name="v3-method" checked="{{ mWallet }}" onChange="{{ setWallet }}"><span>Wallet</span></label>
+              <label class="seg-opt" style="flex:1;justify-content:center;border-color:var(--div)"><input type="radio" name="v3-method" checked="{{ mBank }}" onChange="{{ setBank }}"><span>Bank</span></label>
+            </div>
+          </div>
+
+          <sc-if value="{{ mInsta }}" hint-placeholder-val="{{ true }}">
+            <div>
+              <div style="margin-top:16px">
+                <label for="v3-insta-acct" style="display:block;font-size:12.5px;color:var(--mut);margin-bottom:6px">Account number</label>
+                <input id="v3-insta-acct" type="text" value="{{ fInstaAccount }}" onInput="{{ onInstaAccount }}" style="width:100%;box-sizing:border-box;min-height:46px;padding:12px 13px;border:1px solid var(--div);border-radius:var(--radius-md);background:var(--surf);color:var(--txt);font-family:var(--font-body);font-size:14px">
+              </div>
+              <div style="margin-top:14px">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                  <label for="v3-insta-link" style="font-size:12.5px;color:var(--mut)">Payment link</label>
+                  <button type="button" onClick="{{ toggleInstaHelp }}" aria-label="Where to find your InstaPay payment link" style="flex:none;width:22px;height:22px;border-radius:50%;border:1px solid var(--div);background:transparent;color:var(--mut);font-size:12px;line-height:1;cursor:pointer">i</button>
+                </div>
+                <input id="v3-insta-link" type="text" value="{{ fInstaLink }}" onInput="{{ onInstaLink }}" style="width:100%;box-sizing:border-box;min-height:46px;padding:12px 13px;border:1px solid var(--div);border-radius:var(--radius-md);background:var(--surf);color:var(--txt);font-family:var(--font-body);font-size:14px">
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ mWallet }}" hint-placeholder-val="{{ false }}">
+            <div>
+              <div style="margin-top:16px">
+                <div style="font-size:12.5px;color:var(--mut);margin-bottom:7px">Wallet provider</div>
+                <div style="display:flex;flex-direction:column;gap:9px">
+                  <sc-for list="{{ walletOptions }}" as="w" hint-placeholder-count="3">
+                    <button type="button" onClick="{{ w.onPick }}" style="width:100%;min-height:46px;padding:12px 13px;border:1px solid {{ w.border }};border-radius:var(--radius-md);background:{{ w.bg }};color:{{ w.tone }};text-align:left;font-size:14px;cursor:pointer">{{ w.label }}</button>
+                  </sc-for>
+                </div>
+              </div>
+              <div style="margin-top:14px">
+                <label for="v3-wallet-num" style="display:block;font-size:12.5px;color:var(--mut);margin-bottom:6px">Wallet number</label>
+                <input id="v3-wallet-num" type="text" value="{{ fWalletNumber }}" onInput="{{ onWalletNumber }}" style="width:100%;box-sizing:border-box;min-height:46px;padding:12px 13px;border:1px solid var(--div);border-radius:var(--radius-md);background:var(--surf);color:var(--txt);font-family:var(--font-body);font-size:14px">
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ mBank }}" hint-placeholder-val="{{ false }}">
+            <div>
+              <div style="margin-top:16px">
+                <label for="v3-bank-holder" style="display:block;font-size:12.5px;color:var(--mut);margin-bottom:6px">Account holder</label>
+                <input id="v3-bank-holder" type="text" value="{{ fBankHolder }}" onInput="{{ onBankHolder }}" style="width:100%;box-sizing:border-box;min-height:46px;padding:12px 13px;border:1px solid var(--div);border-radius:var(--radius-md);background:var(--surf);color:var(--txt);font-family:var(--font-body);font-size:14px">
+              </div>
+              <div style="margin-top:14px">
+                <label for="v3-bank-card" style="display:block;font-size:12.5px;color:var(--mut);margin-bottom:6px">Card number</label>
+                <input id="v3-bank-card" type="text" value="{{ fBankCard }}" onInput="{{ onBankCard }}" style="width:100%;box-sizing:border-box;min-height:46px;padding:12px 13px;border:1px solid var(--div);border-radius:var(--radius-md);background:var(--surf);color:var(--txt);font-family:var(--font-body);font-size:14px">
+              </div>
+              <div style="margin-top:14px">
+                <label for="v3-bank-name" style="display:block;font-size:12.5px;color:var(--mut);margin-bottom:6px">Bank</label>
+                <select id="v3-bank-name" value="{{ fBankName }}" onChange="{{ onBankName }}" style="width:100%;box-sizing:border-box;min-height:46px;padding:12px 13px;border:1px solid var(--div);border-radius:var(--radius-md);background:var(--surf);color:var(--txt);font-family:var(--font-body);font-size:14px">
+                  <sc-for list="{{ bankNames }}" as="b" hint-placeholder-count="5">
+                    <option value="{{ b }}">{{ b }}</option>
+                  </sc-for>
+                </select>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ instaHelp }}" hint-placeholder-val="{{ false }}">
+            <div style="margin-top:14px;padding:14px;border-radius:var(--radius-md);border:1px solid var(--div);background:var(--surf)">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+                <span style="font-size:13px;color:var(--mut)">Where to find your payment link</span>
+                <button type="button" onClick="{{ toggleInstaHelp }}" style="flex:none;padding:6px 10px;border:1px solid var(--div);border-radius:var(--radius-sm);background:transparent;color:var(--mut);font-size:12.5px;cursor:pointer">Close</button>
+              </div>
+              <div style="margin-top:11px;height:190px;border-radius:var(--radius-sm);border:1px dashed var(--line);background:var(--bg);display:flex;align-items:center;justify-content:center;text-align:center;font-size:12.5px;color:var(--faint);padding:14px;line-height:1.55">Screenshot placeholder — the InstaPay tab with the payment link circled</div>
+              <div style="margin-top:10px;font-size:12.5px;color:var(--faint);line-height:1.55">Open InstaPay, go to your profile tab and copy the link shown there.</div>
+            </div>
+          </sc-if>
+
+          <div style="display:flex;gap:10px;margin-top:20px">
+            <button type="button" onClick="{{ back }}" style="flex:1;min-height:48px;border:1px solid var(--div);border-radius:var(--radius-md);background:transparent;color:var(--txt);font-size:14px;cursor:pointer">Cancel</button>
+            <button type="button" onClick="{{ savePayout }}" style="flex:1;min-height:48px;border:1px solid var(--acc);border-radius:var(--radius-md);background:var(--accsoft);color:var(--acc);font-size:14px;cursor:pointer">Save details</button>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ vDetails }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <div style="font-size:13px;color:var(--mut);line-height:1.6">Used for shipping your pieces and for HBA to reach you.</div>
+          <sc-for list="{{ detailFields }}" as="d" hint-placeholder-count="5">
+            <div style="margin-top:14px">
+              <label style="display:block;font-size:12.5px;color:var(--mut);margin-bottom:6px">{{ d.label }}</label>
+              <input type="text" value="{{ d.value }}" onInput="{{ d.onInput }}" style="width:100%;box-sizing:border-box;min-height:46px;padding:12px 13px;border:1px solid var(--div);border-radius:var(--radius-md);background:var(--surf);color:var(--txt);font-family:var(--font-body);font-size:14px">
+            </div>
+          </sc-for>
+          <button type="button" onClick="{{ saveDetails }}" style="width:100%;margin-top:20px;min-height:48px;border:1px solid var(--acc);border-radius:var(--radius-md);background:var(--accsoft);color:var(--acc);font-size:14px;cursor:pointer">{{ detailsSaveLabel }}</button>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ vSizes }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <div style="font-size:13px;color:var(--mut);line-height:1.6">Height and weight help HBA pick sizes. Only you can change them.</div>
+          <div style="margin-top:16px">
+            <label for="v3-height" style="display:block;font-size:12.5px;color:var(--mut);margin-bottom:6px">Height (cm)</label>
+            <input id="v3-height" type="text" value="{{ fHeight }}" onInput="{{ onHeight }}" style="width:100%;box-sizing:border-box;min-height:46px;padding:12px 13px;border:1px solid var(--div);border-radius:var(--radius-md);background:var(--surf);color:var(--txt);font-family:var(--font-body);font-size:14px">
+          </div>
+          <div style="margin-top:14px">
+            <label for="v3-weight" style="display:block;font-size:12.5px;color:var(--mut);margin-bottom:6px">Weight (kg)</label>
+            <input id="v3-weight" type="text" value="{{ fWeight }}" onInput="{{ onWeight }}" style="width:100%;box-sizing:border-box;min-height:46px;padding:12px 13px;border:1px solid var(--div);border-radius:var(--radius-md);background:var(--surf);color:var(--txt);font-family:var(--font-body);font-size:14px">
+          </div>
+          
+          <button type="button" onClick="{{ saveSizes }}" style="width:100%;margin-top:20px;min-height:48px;border:1px solid var(--acc);border-radius:var(--radius-md);background:var(--accsoft);color:var(--acc);font-size:14px;cursor:pointer">{{ sizesSaveLabel }}</button>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ vNotify }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <div style="font-size:13px;color:var(--mut);line-height:1.6">Choose what HBA notifies you about.</div>
+          <div style="margin-top:14px;border-radius:var(--radius-md);background:var(--surf);overflow:hidden">
+            <sc-for list="{{ notifications }}" as="n" hint-placeholder-count="3">
+              <button type="button" onClick="{{ n.onToggle }}" style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:52px;padding:14px 15px;border:0;border-bottom:1px solid var(--div);background:transparent;color:var(--txt);text-align:left;font-size:14px;cursor:pointer">
+                <span>{{ n.label }}</span>
+                <span style="flex:none;width:44px;height:26px;border-radius:13px;border:1px solid {{ n.border }};background:{{ n.track }};position:relative">
+                  <span style="position:absolute;top:3px;left:{{ n.knobLeft }};width:18px;height:18px;border-radius:50%;background:{{ n.knob }}"></span>
+                </span>
+              </button>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ vBest }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <div style="font-size:13px;color:var(--mut);line-height:1.6">Every product sold through HBA15, all time. Delivered and pending orders; failed deliveries excluded.</div>
+          <div style="margin-top:14px;border-radius:var(--radius-md);background:var(--surf);overflow:hidden">
+            <sc-for list="{{ bestAll }}" as="p" hint-placeholder-count="8">
+              <div style="display:flex;align-items:center;gap:12px;padding:13px 14px;border-bottom:1px solid var(--div)">
+                <span style="flex:none;width:20px;font-family:var(--font-heading);font-size:14px;color:{{ p.rankTone }};font-variant-numeric:tabular-nums">{{ p.rank }}</span>
+                <span style="flex:none;width:44px;height:44px;border-radius:var(--radius-sm);border:1px dashed var(--line);background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--faint)">image</span>
+                <span style="flex:1;min-width:0">
+                  <span style="display:block;font-size:13.5px">{{ p.name }}</span>
+                  <span style="display:block;font-size:12.5px;color:var(--faint);margin-top:4px">{{ p.units }}</span>
+                </span>
+                <span style="flex:none;font-family:var(--font-heading);font-size:14px;font-variant-numeric:tabular-nums;color:var(--acctext)">{{ p.sales }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ vHelp }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <sc-for list="{{ faqs }}" as="f" hint-placeholder-count="3">
+            <div style="margin-bottom:12px;padding:14px 15px;border-radius:var(--radius-md);background:var(--surf)">
+              <div style="font-size:14px">{{ f.q }}</div>
+              <div style="font-size:13px;color:var(--mut);line-height:1.6;margin-top:7px">{{ f.a }}</div>
+            </div>
+          </sc-for>
+          <div style="padding:13px 15px;border-radius:var(--radius-md);border:1px solid var(--amber);font-size:12.5px;color:var(--amber);line-height:1.55">Sample content for review — the full set of answers is still to be written with HBA.</div>
+        </div>
+      </sc-if>
+
+    </div>
+
+    <sc-if value="{{ inApp }}" hint-placeholder-val="{{ true }}">
+      <div style="flex:none;display:flex;padding:0 2px;background:var(--surf);border-top:1px solid var(--div)">
+        <sc-for list="{{ tabs }}" as="tab" hint-placeholder-count="5">
+          <button type="button" onClick="{{ tab.onPick }}" style="flex:1;min-height:56px;padding:11px 2px 20px;border:0;border-top:2px solid {{ tab.edge }};margin-top:-1px;background:transparent;color:{{ tab.tone }};font-family:{{ tab.font }};font-size:12px;cursor:pointer">{{ tab.label }}</button>
+        </sc-for>
+      </div>
+    </sc-if>
+  </div>
+
+  <div style="flex:1;min-width:300px;max-width:420px;display:flex;flex-direction:column;gap:14px">
+    <div class="card elev-sm">
+      <div class="card-kicker">Review states</div>
+      <div style="display:flex;flex-direction:column;gap:10px;margin-top:4px;font-size:12.5px;line-height:1.55">
+        <div><strong>November 2026</strong> — ordinary open month. Delivered and pending both counted, failed excluded.</div>
+        <div><strong>October 2026</strong> — approved, payment not yet recorded, and carries the September recovery as a separate line.</div>
+        <div><strong>September 2026</strong> — paid, then an order failed. Approved figure and recorded payment stay fixed; the month's sales performance now differs, explained in How this adds up.</div>
+        <div><strong>February and January 2026</strong> — settled with no imported receipt. Performance history intact.</div>
+        <div><strong>August 2026</strong> — content targets missed. Commission and salary are unaffected; only the guarantee does not apply.</div>
+      </div>
+    </div>
+
+    <div class="card elev-sm">
+      <div class="card-kicker">Changed in this revision</div>
+      <div style="display:flex;flex-direction:column;gap:9px;margin-top:4px;font-size:12.5px;line-height:1.55">
+        <div>Pending orders now count towards sales and commission; no “on delivery” wording, and nothing counts twice.</div>
+        <div>Sales chart shows amounts, Uses chart shows counts with the count in the tooltip and above each bar.</div>
+        <div>Order breakdown accounts for every order in the month, failed included.</div>
+        <div>Percentage comparisons replaced with a stated two-period comparison in EGP.</div>
+        <div>Three compensation arrangements as review examples, switched outside the app.</div>
+        <div>Ranking uses the supplied counts — no estimate from average order value — and explains the ordering.</div>
+        <div>Promotion requests are display-only: no posted state, counts or completion styling.</div>
+        <div>Payment details ask for what each method needs: InstaPay account number and payment link (with a help image behind ⓘ), wallet provider and number, or account holder, card number and bank.</div>
+        <div>Explanations that used to sit as body text — the later deduction and the guaranteed minimum — now open from an ⓘ beside their own row.</div>
+        <div>Theme lives in You. History starts January 2026 and the picker and chart both start there.</div>
+        <div>Body text 14px, secondary 12.5–13px, touch targets 46px and up.</div>
+      </div>
+    </div>
+
+    <div class="card elev-sm">
+      <div class="card-kicker">Missing assets</div>
+      <div style="display:flex;flex-direction:column;gap:9px;margin-top:4px;font-size:12.5px;line-height:1.55">
+        <div>Product photography for: BLACK HBA CLUB 06 JERSEY, Black basic pants, Gray basic pants, Sculpt legging, Ribbed crop top, Everyday set, Forest green short sleeve, HBA cap, HBA socks.</div>
+        <div>Every image area is a marked placeholder. No stand-in garments have been generated.</div>
+        <div>A permitted real transfer receipt, to replace the sample.</div>
+      </div>
+    </div>
+
+    <div class="card elev-sm">
+      <div class="card-kicker">Open decisions</div>
+      <div style="display:flex;flex-direction:column;gap:9px;margin-top:4px;font-size:12.5px;line-height:1.55">
+        <div>Audience for featured products — a request is shown only to models who have received the product or have one on the way. Not-sent and failed-only models never see it.</div>
+        <div>Whether a code use means an order placed or an order that counted. Shown here as orders placed, with the delivered/pending/failed split beside it.</div>
+        <div>Whether the Failed filter stays in Orders on the narrowest width.</div>
+        <div>Full FAQ content and its destination.</div>
+      </div>
+    </div>
+  </div>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1220,&quot;height&quot;:1010}}">
+const RATE = 0.1, SALARY = 1200000, GUARANTEE = 200000;
+const P = (name, size, price) => ({ name, size, price });
+const O = (ref, date, status, net, products, extra) =>
+  Object.assign({ ref, date, status, net, products: products || [] }, extra || {});
+
+const MONTHS = [
+  {
+    id: "2026-11", label: "November 2026", short: "Nov", n: 11, state: "open",
+    targets: { videos: { done: 1, of: 6 }, stories: { done: 3, of: 12 } },
+    updated: "6 November 2026", payment: null, expect: "around 3 December 2026",
+    rank: { place: 4, peers: [
+      { name: "Sara Edrees", code: "SARAED", uses: 7 }, { name: "Malak Fahmy", code: "MALAK10", uses: 4 },
+      { name: "Hana Wagih", code: "HANAW", uses: 5 }, { name: "Omar Sabry", code: "OMARS", uses: 3 },
+      { name: "Nadine Kamal", code: "NADK", uses: 2 }, { name: "Farida Zaki", code: "FARIDA", uses: 1 },
+      { name: "Youssef Adel", code: "YADEL", uses: 1 }, { name: "Laila Mostafa", code: "LAILAM", uses: 1 }] },
+    orders: [
+      O("#30140", "6 November", "pending", 268000, [P("Ribbed crop top", "S", 268000)]),
+      O("#30112", "2 November", "delivered", 412000, [P("Sculpt legging", "M", 412000)]),
+    ],
+  },
+  {
+    id: "2026-10", label: "October 2026", short: "Oct", n: 10, state: "approved",
+    targets: { videos: { done: 6, of: 6 }, stories: { done: 12, of: 12 } },
+    updated: "1 November 2026", payment: null, expect: "around 3 November 2026",
+    adjustFrom: "2026-09",
+    rank: { place: 3, peers: [
+      { name: "Sara Edrees", code: "SARAED", uses: 9 }, { name: "Malak Fahmy", code: "MALAK10", uses: 6 },
+      { name: "Hana Wagih", code: "HANAW", uses: 4 }, { name: "Omar Sabry", code: "OMARS", uses: 4 },
+      { name: "Nadine Kamal", code: "NADK", uses: 3 }, { name: "Farida Zaki", code: "FARIDA", uses: 2 },
+      { name: "Youssef Adel", code: "YADEL", uses: 2 }, { name: "Laila Mostafa", code: "LAILAM", uses: 1 }] },
+    orders: [
+      O("#30044", "28 October", "failed", 118000, [P("Gray basic pants", "M", 118000)]),
+      O("#30020", "22 October", "pending", 305000, [P("Everyday set", "S", 305000)]),
+      O("#29994", "14 October", "delivered", 621000, [P("BLACK HBA CLUB 06 JERSEY", "M", 380000), P("HBA socks", "41–44", 241000)]),
+      O("#29980", "5 October", "delivered", 934000, [P("Sculpt legging", "S", 520000), P("Ribbed crop top", "S", 268000), P("HBA cap", "one size", 146000)]),
+    ],
+  },
+  {
+    id: "2026-09", label: "September 2026", short: "Sep", n: 9, state: "paid",
+    targets: { videos: { done: 6, of: 6 }, stories: { done: 12, of: 12 } },
+    updated: "1 October 2026", payment: { date: "3 October 2026", ref: "INSTA·77341", method: "InstaPay", account: "yahya.hba@instapay" },
+    approvedCommission: 210000,
+    changed: { ref: "#29741", on: "12 October 2026", appliedIn: "October 2026" },
+    rank: { place: 2, peers: [
+      { name: "Sara Edrees", code: "SARAED", uses: 8 }, { name: "Malak Fahmy", code: "MALAK10", uses: 5 },
+      { name: "Hana Wagih", code: "HANAW", uses: 5 }, { name: "Omar Sabry", code: "OMARS", uses: 4 },
+      { name: "Nadine Kamal", code: "NADK", uses: 3 }, { name: "Farida Zaki", code: "FARIDA", uses: 2 },
+      { name: "Youssef Adel", code: "YADEL", uses: 1 }, { name: "Laila Mostafa", code: "LAILAM", uses: 1 }] },
+    orders: [
+      O("#29746", "24 September", "failed", 63400, [P("HBA socks", "37–40", 63400)]),
+      O("#29744", "18 September", "delivered", 541700, [P("Everyday set", "M", 541700)]),
+      O("#29741", "12 September", "failed", 200000, [P("Black basic pants", "L", 200000)], { lateFail: true }),
+      O("#29727", "8 September", "delivered", 849150, [P("Ribbed crop top", "S", 324000), P("Black basic pants", "M", 341150), P("HBA cap", "one size", 184000)]),
+      O("#29723", "3 September", "delivered", 509150, [P("Forest green short sleeve", "L", 299150), P("HBA socks", "41–44", 210000)]),
+      O("#29720", "1 September", "failed", null, [], { cancelled: true }),
+    ],
+  },
+  {
+    id: "2026-08", label: "August 2026", short: "Aug", n: 8, state: "paid",
+    targets: { videos: { done: 4, of: 6 }, stories: { done: 9, of: 12 } },
+    updated: "1 September 2026", payment: { date: "3 September 2026", ref: "INSTA·76102", method: "InstaPay", account: "yahya.hba@instapay" },
+    orders: [
+      O("#29610", "22 August", "delivered", 742000, [P("Sculpt legging", "M", 418000), P("Ribbed crop top", "S", 324000)]),
+      O("#29588", "14 August", "delivered", 484670, [P("Everyday set", "S", 484670)]),
+      O("#29540", "3 August", "delivered", 200000, [P("HBA socks", "37–40", 200000)]),
+    ],
+  },
+  {
+    id: "2026-07", label: "July 2026", short: "Jul", n: 7, state: "paid",
+    targets: { videos: { done: 6, of: 6 }, stories: { done: 12, of: 12 } },
+    updated: "1 August 2026", payment: { date: "3 August 2026", ref: "INSTA·75410", method: "InstaPay", account: "yahya.hba@instapay" },
+    orders: [
+      O("#29411", "26 July", "delivered", 783300, [P("BLACK HBA CLUB 06 JERSEY", "M", 783300)]),
+      O("#29377", "9 July", "delivered", 500000, [P("Black basic pants", "M", 500000)]),
+    ],
+  },
+  {
+    id: "2026-06", label: "June 2026", short: "Jun", n: 6, state: "paid",
+    targets: { videos: { done: 6, of: 6 }, stories: { done: 12, of: 12 } },
+    updated: "1 July 2026", payment: { date: "3 July 2026", ref: "INSTA·74233", method: "InstaPay", account: "yahya.hba@instapay" },
+    orders: [
+      O("#29210", "20 June", "delivered", 615000, [P("Sculpt legging", "M", 615000)]),
+      O("#29188", "6 June", "delivered", 400000, [P("HBA cap", "one size", 400000)]),
+    ],
+  },
+  {
+    id: "2026-05", label: "May 2026", short: "May", n: 5, state: "paid",
+    targets: { videos: { done: 5, of: 6 }, stories: { done: 11, of: 12 } },
+    updated: "1 June 2026", payment: { date: "3 June 2026", ref: "INSTA·73118", method: "InstaPay", account: "yahya.hba@instapay" },
+    orders: [
+      O("#29050", "18 May", "delivered", 526000, [P("Everyday set", "M", 526000)]),
+      O("#29011", "4 May", "delivered", 300000, [P("HBA socks", "41–44", 300000)]),
+    ],
+  },
+  {
+    id: "2026-04", label: "April 2026", short: "Apr", n: 4, state: "paid",
+    targets: { videos: { done: 6, of: 6 }, stories: { done: 12, of: 12 } },
+    updated: "1 May 2026", payment: { date: "3 May 2026", ref: "WALLET·72004", method: "Mobile wallet", account: "0100 441 8827" },
+    orders: [
+      O("#28900", "16 April", "delivered", 394000, [P("Ribbed crop top", "S", 394000)]),
+      O("#28880", "2 April", "delivered", 200000, [P("HBA socks", "37–40", 200000)]),
+    ],
+  },
+  {
+    id: "2026-03", label: "March 2026", short: "Mar", n: 3, state: "paid",
+    targets: { videos: { done: 4, of: 6 }, stories: { done: 8, of: 12 } },
+    updated: "1 April 2026", payment: { date: "3 April 2026", ref: "WALLET·70911", method: "Mobile wallet", account: "0100 441 8827" },
+    orders: [
+      O("#28700", "19 March", "delivered", 448000, [P("Sculpt legging", "S", 448000)]),
+      O("#28690", "5 March", "delivered", 200000, [P("HBA cap", "one size", 200000)]),
+    ],
+  },
+  {
+    id: "2026-02", label: "February 2026", short: "Feb", n: 2, state: "settled",
+    targets: { videos: { done: 3, of: 6 }, stories: { done: 6, of: 12 } },
+    updated: "1 March 2026", payment: null,
+    orders: [O("#28500", "12 February", "delivered", 412000, [P("Black basic pants", "M", 412000)])],
+  },
+  {
+    id: "2026-01", label: "January 2026", short: "Jan", n: 1, state: "settled",
+    targets: { videos: { done: 2, of: 6 }, stories: { done: 5, of: 12 } },
+    updated: "1 February 2026", payment: null,
+    orders: [O("#28400", "20 January", "delivered", 260000, [P("Everyday set", "M", 260000)])],
+  },
+];
+
+const DEFAULT_RANK = { place: 5, peers: [
+  { name: "Sara Edrees", code: "SARAED", uses: 6 }, { name: "Malak Fahmy", code: "MALAK10", uses: 4 },
+  { name: "Hana Wagih", code: "HANAW", uses: 3 }, { name: "Omar Sabry", code: "OMARS", uses: 3 },
+  { name: "Nadine Kamal", code: "NADK", uses: 2 }, { name: "Farida Zaki", code: "FARIDA", uses: 2 },
+  { name: "Youssef Adel", code: "YADEL", uses: 1 }, { name: "Laila Mostafa", code: "LAILAM", uses: 1 }] };
+
+const ARR = {
+  commission: { label: "Commission", note: "10% of net sales on delivered and pending orders." },
+  salary: { label: "Fixed salary plus commission", note: "EGP 12,000.00 each month, plus 10% commission." },
+  guarantee: { label: "Guaranteed minimum with commission", note: "10% commission, brought up to EGP 2,000.00 when the month's content targets are recorded as met." },
+};
+
+const WARDROBE = [
+  { name: "BLACK HBA CLUB 06 JERSEY", size: "M", when: "Received 12 July 2026" },
+  { name: "Sculpt legging", size: "S", when: "Received 12 July 2026" },
+  { name: "Ribbed crop top", size: "S", when: "Received 3 August 2026" },
+  { name: "Everyday set", size: "M", when: "Received 3 August 2026" },
+  { name: "HBA cap", size: "one size", when: "Received 28 August 2026" },
+  { name: "Black basic pants", size: "M", when: "Received 14 September 2026" },
+];
+
+const INCOMING = [
+  { name: "Forest green short sleeve", size: "M", state: "In transit", ok: true },
+  { name: "HBA socks", size: "41–44", state: "Shipment failed", ok: false },
+];
+
+const FEATURED = [
+  { name: "Forest green short sleeve", owned: false, ownership: "On the way · size M", request: "Back in stock — please feature this in your upcoming content." },
+  { name: "HBA cap", owned: true, ownership: "In your wardrobe · size one size", request: "Sales push this week — include it where it fits." },
+  { name: "Everyday set", owned: true, ownership: "In your wardrobe · size M", request: "" },
+];
+
+const FAQS = [
+  { q: "When is a sale counted?", a: "As soon as the order is placed with your code. Delivered and pending orders both count; a failed delivery is removed." },
+  { q: "Why did an approved month change?", a: "An order can fail after a month is approved. The approved figure and the recorded payment stay as they were, and the difference is shown separately in a later month." },
+  { q: "When is payment recorded?", a: "HBA transfers outside this dashboard and records it here, usually around the 3rd of the following month." },
+];
+
+const VIEW_TITLES = {
+  you: "You", earnings: "How this adds up", payments: "Payments", receipt: "Payment receipt",
+  payout: "Payment details", details: "Personal details", sizes: "Height and weight",
+  notify: "Notifications", best: "All products sold", help: "Help",
+};
+
+class Component extends DCLogic {
+  state = {
+    arrangement: "guarantee", frameW: 390, theme: "dark",
+    tab: "home", monthIndex: 0, pickerOpen: false, stack: [],
+    filter: "all", chart: "sales", pick: null, pickFor: null, openOrder: null,
+    receiptFor: null, savedPayout: false, savedDetails: false, savedSizes: false,
+    method: "insta", openInfo: null, instaHelp: false,
+    form: {
+      holder: "Yahya Aboamer", account: "yahya.hba@instapay", provider: "InstaPay",
+      instaAccount: "1002 4471 3092", instaLink: "ipn.eg/yahya.hba",
+      walletProvider: "Vodafone Cash", walletNumber: "0100 441 8827",
+      bankHolder: "Yahya Aboamer", bankCard: "5321 4478 9012 3456", bankName: "CIB",
+      name: "Yahya Aboamer", email: "yahya@example.com", phone: "0100 441 8827",
+      address: "14 Mohamed Mahmoud St, Apt 3", city: "Cairo", height: "182", weight: "76",
+    },
+    notify: { approved: true, recorded: true, failed: false }, confirmSignOut: false,
+  };
+
+  egp(p) {
+    const neg = p < 0, a = Math.abs(Math.round(p));
+    return (neg ? "−" : "") + "EGP " + Math.trunc(a / 100).toLocaleString("en-GB") + "." + String(a % 100).padStart(2, "0");
+  }
+
+  set(patch) { this.setState(patch); }
+
+  push(view) { this.setState((s) => ({ stack: s.stack.concat([view]), pickerOpen: false })); }
+
+  qualified(mo) {
+    return mo.targets.videos.done >= mo.targets.videos.of && mo.targets.stories.done >= mo.targets.stories.of;
+  }
+
+  counted(mo) {
+    return mo.orders.filter((o) => o.status !== "failed").reduce((n, o) => n + (o.net || 0), 0);
+  }
+
+  commissionOf(mo) { return Math.round(this.counted(mo) * RATE); }
+
+  // what the arrangement turns a commission figure into, for a given month
+  entitlement(commission, mo) {
+    const arr = this.state.arrangement;
+    if (arr === "salary") return SALARY + commission;
+    if (arr === "guarantee" && this.qualified(mo)) return Math.max(commission, GUARANTEE);
+    return commission;
+  }
+
+  recoveryOf(sourceId) {
+    const src = MONTHS.find((mm) => mm.id === sourceId);
+    if (!src) return { amount: 0, src: null };
+    const approved = this.entitlement(src.approvedCommission != null ? src.approvedCommission : this.commissionOf(src), src);
+    const now = this.entitlement(this.commissionOf(src), src);
+    return { amount: Math.max(approved - now, 0), src };
+  }
+
+  renderVals() {
+    const s = this.state;
+    const m = MONTHS[s.monthIndex];
+    const live = MONTHS[0];
+    const view = s.stack.length ? s.stack[s.stack.length - 1] : null;
+
+    const counted = this.counted(m);
+    const commission = this.commissionOf(m);
+    const approvedCommission = m.approvedCommission != null ? m.approvedCommission : commission;
+    const isApprovedFixed = m.state === "paid" || m.state === "settled";
+    const baseCommission = isApprovedFixed ? approvedCommission : commission;
+    const entitlement = this.entitlement(baseCommission, m);
+
+    const adj = m.adjustFrom ? this.recoveryOf(m.adjustFrom) : { amount: 0, src: null };
+    const payable = entitlement - adj.amount;
+
+    const nDelivered = m.orders.filter((o) => o.status === "delivered").length;
+    const nPending = m.orders.filter((o) => o.status === "pending").length;
+    const nFailed = m.orders.filter((o) => o.status === "failed").length;
+
+    const stateMap = {
+      open: { label: "in progress", tone: "var(--amber)" },
+      approved: { label: "approved", tone: "var(--acc)" },
+      paid: { label: "payment recorded", tone: "var(--acc)" },
+      settled: { label: "settled", tone: "var(--mut)" },
+    }[m.state];
+
+    const heroLabel = m.state === "open" ? "Your earnings so far"
+      : m.state === "approved" ? "Approved for payment"
+        : m.state === "paid" ? "Recorded payment" : "Settled earnings";
+    const heroNote = m.state === "open"
+      ? "Still moving — orders are still being placed and can still fail."
+      : m.state === "approved" ? "HBA has approved this. Payment is usually recorded " + m.expect + "."
+        : m.state === "paid" ? "Recorded " + m.payment.date + " · " + m.payment.ref
+          : "This month is closed. No payment has been recorded here.";
+
+    // ---- breakdown
+    const breakdown = [
+      { label: "Net sales counted", detail: nDelivered + " delivered · " + nPending + " pending · " + nFailed + " failed", value: this.egp(counted), tone: "var(--mut)" },
+      { label: "Commission at 10%", detail: isApprovedFixed && approvedCommission !== commission ? "As approved, before the change below" : "Of net sales counted", value: this.egp(baseCommission), tone: "var(--txt)" },
+    ];
+    if (s.arrangement === "salary") {
+      breakdown.push({ label: "Fixed salary", detail: "", value: this.egp(SALARY), tone: "var(--txt)" });
+    }
+    if (s.arrangement === "guarantee") {
+      if (this.qualified(m) && baseCommission < GUARANTEE) {
+        breakdown.push({ label: "Guaranteed minimum top-up", detail: "Content targets recorded as met, so the month is brought up to " + this.egp(GUARANTEE), value: this.egp(GUARANTEE - baseCommission), tone: "var(--acctext)" });
+      } else if (this.qualified(m)) {
+        breakdown.push({ label: "Guaranteed minimum", detail: "Targets met, and your commission is already above " + this.egp(GUARANTEE), value: "not needed", tone: "var(--mut)" });
+      } else {
+        breakdown.push({ label: "Guaranteed minimum not applied", detail: "Content targets for this month were not recorded as met. Your commission is unaffected.", value: this.egp(0), tone: "var(--mut)" });
+      }
+    }
+    if (adj.amount > 0) {
+      breakdown.push({
+        label: "Recovery carried from " + adj.src.label, detail: "", value: this.egp(-adj.amount), tone: "var(--red)",
+        hasInfo: true, infoOpen: s.openInfo === "adj",
+        info: this.egp(adj.amount) + " is being recovered from " + adj.src.label + ", where order " + adj.src.changed.ref + " failed after that month was approved. This month's own sales and its point on the sales chart are not reduced by it.",
+        onInfo: () => this.set({ openInfo: s.openInfo === "adj" ? null : "adj" }),
+      });
+    }
+
+    // ---- orders
+    const statusLabel = { delivered: "Delivered", pending: "Pending", failed: "Failed delivery" };
+    const statusTone = { delivered: "var(--acc)", pending: "var(--amber)", failed: "var(--red)" };
+    const shown = m.orders.filter((o) => (s.filter === "all" ? true : o.status === s.filter));
+    const orderRows = shown.map((o) => {
+      const fee = o.net == null ? null : Math.round(o.net * RATE);
+      const failed = o.status === "failed";
+      return {
+        ref: o.ref, date: o.date,
+        items: o.products.length ? o.products.length + (o.products.length === 1 ? " product" : " products") : "no product lines available",
+        status: statusLabel[o.status], tone: statusTone[o.status],
+        commission: fee == null ? "—" : this.egp(fee),
+        amountTone: failed ? "var(--faint)" : "var(--txt)",
+        strike: failed && fee != null ? "line-through" : "none",
+        netLine: o.net == null ? "amount not available" : this.egp(o.net) + " net sales",
+        products: o.products.map((p) => ({ name: p.name, size: p.size, price: this.egp(p.price) })),
+        open: s.openOrder === o.ref,
+        onOpen: () => this.set({ openOrder: s.openOrder === o.ref ? null : o.ref }),
+        detail: o.cancelled
+          ? "This order was cancelled, so the original sales amount is not available and nothing is counted."
+          : failed
+            ? "Delivery failed, so this order is excluded from " + m.label + "." + (o.lateFail ? " It failed after the month was approved, so " + this.egp(this.recoveryOf(m.id).amount) + " is recovered in " + m.changed.appliedIn + "." : "")
+            : o.status === "pending"
+              ? "Counted in " + m.label + " while it is on its way. If it fails, it is removed and the difference is settled in a later month."
+              : "Delivered and counted in " + m.label + ". Commission is 10% of " + this.egp(o.net) + ".",
+      };
+    });
+
+    const filters = [
+      { id: "all", label: "All " + m.orders.length },
+      { id: "delivered", label: "Delivered " + nDelivered },
+      { id: "pending", label: "Pending " + nPending },
+      { id: "failed", label: "Failed " + nFailed },
+    ].map((f) => ({
+      label: f.label,
+      bg: s.filter === f.id ? "var(--accsoft)" : "transparent",
+      border: s.filter === f.id ? "var(--acc)" : "var(--div)",
+      tone: s.filter === f.id ? "var(--acc)" : "var(--mut)",
+      onPick: () => this.set({ filter: f.id, openOrder: null }),
+    }));
+
+    // ---- chart series, January first
+    const series = MONTHS.slice().reverse().map((mo) => ({
+      label: mo.label, n: mo.n, id: mo.id,
+      sales: this.counted(mo), uses: mo.orders.length,
+    }));
+    const pickIndex = s.pickFor === m.id && s.pick != null
+      ? s.pick : Math.max(series.findIndex((p) => p.id === m.id), 0);
+    const picked = series[pickIndex];
+    const maxSales = Math.max.apply(null, series.map((p) => p.sales)) * 1.15;
+    const maxUses = Math.max.apply(null, series.map((p) => p.uses)) * 1.35;
+    const x = (i) => 8 + (284 * i) / (series.length - 1);
+    const yS = (v) => 14 + 88 * (1 - v / maxSales);
+    const step = 284 / series.length;
+
+    const points = series.map((p, i) => ({
+      cx: x(i), cy: yS(p.sales), r: pickIndex === i ? 5 : 3.5,
+      fill: pickIndex === i ? "var(--acc)" : "var(--surf)",
+    }));
+    const bars = series.map((p, i) => {
+      const h = Math.max((88 * p.uses) / maxUses, 3);
+      return {
+        x: 8 + step * i + step * 0.22, y: 102 - h, w: step * 0.56, h,
+        tx: 8 + step * i + step * 0.5, ty: 102 - h - 5, count: String(p.uses),
+        fill: pickIndex === i ? "var(--acc)" : "var(--bar)",
+        onPick: () => this.set({ pick: i, pickFor: m.id }),
+      };
+    });
+
+    // ---- comparison, both periods named
+    const prev = MONTHS[s.monthIndex + 1];
+    const prevCounted = prev ? this.counted(prev) : null;
+    const diff = prev ? counted - prevCounted : 0;
+
+    // ---- best sellers, all time
+    const byProduct = new Map();
+    MONTHS.forEach((mo) => mo.orders.filter((o) => o.status !== "failed").forEach((o) => o.products.forEach((p) => {
+      const row = byProduct.get(p.name) || { name: p.name, units: 0, sales: 0 };
+      row.units += 1; row.sales += p.price;
+      byProduct.set(p.name, row);
+    })));
+    const bestAll = [...byProduct.values()].sort((a, b) => b.sales - a.sales).map((p, i) => ({
+      rank: String(i + 1), name: p.name,
+      units: p.units + (p.units === 1 ? " unit sold" : " units sold"),
+      sales: this.egp(p.sales),
+      rankTone: i === 0 ? "var(--acc)" : "var(--faint)",
+    }));
+
+    // ---- ranking, supplied counts only
+    const rk = m.rank || DEFAULT_RANK;
+    const rows = rk.peers.slice();
+    rows.splice(Math.min(rk.place - 1, rows.length), 0, { name: "You", code: "HBA15", uses: m.orders.length, me: true });
+    const ranking = rows.map((r, i) => ({
+      rank: String(i + 1), name: r.name, code: r.code, uses: String(r.uses),
+      initial: r.me ? "Y" : r.name[0],
+      bg: r.me ? "var(--accsoft)" : "transparent",
+      rankTone: r.me ? "var(--acc)" : "var(--faint)",
+      nameTone: r.me ? "var(--acc)" : "var(--txt)",
+      avatarBg: r.me ? "var(--acc)" : "transparent",
+      avatarTone: r.me ? "var(--bg)" : "var(--mut)",
+    }));
+
+    // ---- payments
+    const paid = MONTHS.filter((mo) => mo.payment);
+    const paymentList = paid.map((mo) => {
+      const base = mo.approvedCommission != null ? mo.approvedCommission : this.commissionOf(mo);
+      return {
+        month: mo.label, date: mo.payment.date, ref: mo.payment.ref,
+        amount: this.egp(this.entitlement(base, mo)),
+        onOpen: () => this.setState((st) => ({ receiptFor: mo.id, stack: st.stack.concat(["receipt"]) })),
+      };
+    });
+    const noRecordList = MONTHS.filter((mo) => !mo.payment && mo.state === "settled")
+      .map((mo) => ({ month: mo.label, note: "No payments recorded here for this month. Its performance history is unchanged." }));
+    const awaiting = MONTHS.find((mo) => mo.state === "approved");
+    const awaitingAdj = awaiting && awaiting.adjustFrom ? this.recoveryOf(awaiting.adjustFrom).amount : 0;
+
+    const receiptMonth = MONTHS.find((mo) => mo.id === s.receiptFor) || paid[0];
+    const receiptBase = receiptMonth ? (receiptMonth.approvedCommission != null ? receiptMonth.approvedCommission : this.commissionOf(receiptMonth)) : 0;
+
+    // ---- targets
+    const targetRow = (mo) => [
+      { label: "Videos", done: mo.targets.videos.done, of: mo.targets.videos.of },
+      { label: "Stories", done: mo.targets.stories.done, of: mo.targets.stories.of },
+    ].map((t) => ({
+      label: t.label, count: t.done + " of " + t.of + " recorded",
+      pct: Math.min(Math.round((t.done / t.of) * 100), 100) + "%",
+      fill: t.done >= t.of ? "var(--acctext)" : "var(--acc)",
+    }));
+
+    const detailField = (key, label) => ({
+      label, value: s.form[key],
+      onInput: (e) => this.setState((st) => ({ form: Object.assign({}, st.form, { [key]: e.target.value }), savedDetails: false })),
+    });
+
+    const notifications = [
+      { id: "approved", label: "A month is approved" },
+      { id: "recorded", label: "A payment is recorded" },
+    ].map((n) => {
+      const on = !!s.notify[n.id];
+      return {
+        label: n.label,
+        track: on ? "var(--acc)" : "transparent",
+        border: on ? "var(--acc)" : "var(--div)",
+        knob: on ? "var(--bg)" : "var(--faint)",
+        knobLeft: on ? "21px" : "3px",
+        onToggle: () => this.setState((st) => ({ notify: Object.assign({}, st.notify, { [n.id]: !st.notify[n.id] }) })),
+      };
+    });
+
+    const tabs = [
+      { id: "home", label: "Home" }, { id: "orders", label: "Orders" }, { id: "wardrobe", label: "Wardrobe" },
+      { id: "targets", label: "Targets" }, { id: "ranking", label: "Ranking" },
+    ].map((t) => ({
+      label: t.label,
+      edge: s.tab === t.id ? "var(--acc)" : "transparent",
+      tone: s.tab === t.id ? "var(--acc)" : "var(--mut)",
+      font: s.tab === t.id ? "var(--font-heading)" : "var(--font-body)",
+      onPick: () => this.set({ tab: t.id, stack: [], pickerOpen: false, openOrder: null }),
+    }));
+
+    const field = (key) => (e) => this.setState((st) => ({ form: Object.assign({}, st.form, { [key]: e.target.value }), savedPayout: false }));
+    const payoutSummary = s.method === "insta" ? s.form.instaLink
+      : s.method === "wallet" ? s.form.walletProvider + " · " + s.form.walletNumber
+        : s.form.bankName + " · " + s.form.bankHolder;
+
+    return {
+      // review controls
+      arrCommission: s.arrangement === "commission", arrSalary: s.arrangement === "salary", arrGuarantee: s.arrangement === "guarantee",
+      setArrCommission: () => this.set({ arrangement: "commission" }),
+      setArrSalary: () => this.set({ arrangement: "salary" }),
+      setArrGuarantee: () => this.set({ arrangement: "guarantee" }),
+      w360: s.frameW === 360, w390: s.frameW === 390, w430: s.frameW === 430,
+      setW360: () => this.set({ frameW: 360 }), setW390: () => this.set({ frameW: 390 }), setW430: () => this.set({ frameW: 430 }),
+      frameW: s.frameW + "px",
+      jumpOrdinary: () => this.set({ tab: "home", stack: [], monthIndex: 0, pick: null, pickFor: null }),
+      jumpDeduction: () => this.set({ tab: "home", stack: [], monthIndex: 1, pick: null, pickFor: null }),
+      jumpNoRecord: () => this.set({ tab: "home", stack: [], monthIndex: 9, pick: null, pickFor: null }),
+
+      theme: s.theme, isDark: s.theme === "dark", isLight: s.theme === "light",
+      setDark: () => this.set({ theme: "dark" }), setLight: () => this.set({ theme: "light" }),
+
+      inApp: view === null, inView: view !== null, viewTitle: VIEW_TITLES[view] || "",
+      back: () => this.setState((st) => ({ stack: st.stack.slice(0, -1) })),
+      vYou: view === "you", vEarnings: view === "earnings", vPayments: view === "payments",
+      vReceipt: view === "receipt", vPayout: view === "payout", vDetails: view === "details",
+      vSizes: view === "sizes", vNotify: view === "notify", vBest: view === "best", vHelp: view === "help",
+      openYou: () => this.push("you"),
+      openEarnings: () => this.push("earnings"),
+      openPayments: () => this.push("payments"),
+      openBest: () => this.push("best"),
+
+      onHome: s.tab === "home" && view === null, onOrders: s.tab === "orders" && view === null,
+      onWardrobe: s.tab === "wardrobe" && view === null, onTargets: s.tab === "targets" && view === null,
+      onRanking: s.tab === "ranking" && view === null,
+      tabs,
+
+      showPicker: s.tab === "home" || s.tab === "orders" || s.tab === "ranking",
+      monthShort: m.short, pickerOpen: s.pickerOpen,
+      togglePicker: () => this.set({ pickerOpen: !s.pickerOpen }),
+      monthOptions: MONTHS.map((mo, i) => ({
+        label: mo.label,
+        state: { open: "in progress", approved: "approved", paid: "paid", settled: "settled" }[mo.state],
+        tone: mo.state === "settled" ? "var(--mut)" : mo.state === "open" ? "var(--amber)" : "var(--acctext)",
+        bg: i === s.monthIndex ? "var(--accsoft)" : "transparent",
+        onPick: () => this.set({ monthIndex: i, pickerOpen: false, openOrder: null, pick: null, pickFor: null }),
+      })),
+
+      monthLabel: m.label, stateLabel: stateMap.label, stateTone: stateMap.tone,
+      heroLabel, heroAmount: this.egp(payable), heroNote,
+      countedText: this.egp(counted), usesText: String(m.orders.length),
+      nDelivered, nPending, nFailed,
+
+      breakdown,
+      totalLabel: m.state === "open" ? "Earnings so far" : m.state === "approved" ? "Approved for payment" : m.state === "paid" ? "Recorded payment" : "Settled",
+
+      hasChange: !!m.changed,
+      changeShort: m.changed ? "Order " + m.changed.ref + " failed on " + m.changed.on + "." : "",
+      changeLong: m.changed
+        ? "Order " + m.changed.ref + " failed on " + m.changed.on + ", after " + m.label + " was approved at " + this.egp(this.entitlement(approvedCommission, m)) + ". That approved figure and the payment recorded against it have not changed."
+        : "",
+      changeRecovery: m.changed
+        ? "Recalculated commission for " + m.label + " is " + this.egp(commission) + ", so " + this.egp(this.recoveryOf(m.id).amount) + " is recovered in " + m.changed.appliedIn + "."
+        : "",
+
+      paymentTitle: m.state === "paid" ? "Payment" : m.state === "approved" ? "Payment" : m.state === "settled" ? "Payment" : "Expected payment",
+      paymentLine: m.state === "paid" ? this.egp(this.entitlement(approvedCommission, m)) + " recorded"
+        : m.state === "approved" ? "Not yet recorded"
+          : m.state === "settled" ? "No payments recorded here for this month" : "After the month closes",
+      paymentNote: m.state === "paid" ? m.payment.date + " · " + m.payment.ref
+        : m.state === "approved" ? "Approved. HBA usually records the transfer " + m.expect + "."
+          : m.state === "settled" ? "Your performance history for this month is unchanged."
+            : "Usually recorded " + m.expect + ".",
+
+      filters, orderRows,
+
+      chartSales: s.chart === "sales", chartUses: s.chart === "uses",
+      setChartSales: () => this.set({ chart: "sales" }), setChartUses: () => this.set({ chart: "uses" }),
+      linePath: series.map((p, i) => (i ? "L" : "M") + x(i) + "," + yS(p.sales)).join(" "),
+      points, bars,
+      ticks: series.map((p, i) => ({
+        x: x(i), bx: 8 + step * i + step * 0.5, label: String(p.n),
+        tone: pickIndex === i ? "var(--acc)" : "var(--faint)",
+      })),
+      hits: series.map((p, i) => ({ x: 8 + step * i, w: step, onPick: () => this.set({ pick: i, pickFor: m.id }) })),
+      grid: [0, 0.5, 1].map((f) => {
+        const salesVal = maxSales * f, usesVal = maxUses * f;
+        return {
+          y: 102 - 88 * f, ty: 102 - 88 * f + 3.5,
+          label: s.chart === "sales"
+            ? (salesVal >= 100000 ? Math.round(salesVal / 100000) + "k" : String(Math.round(salesVal / 100)))
+            : String(Math.round(usesVal)),
+        };
+      }),
+      tipMonth: picked.label,
+      tipValue: s.chart === "sales" ? this.egp(picked.sales) : picked.uses + (picked.uses === 1 ? " use" : " uses"),
+      tipNote: s.chart === "sales" ? "net sales counted" : "orders placed with HBA15",
+
+      chartScaleNote: s.chart === "sales" ? "Left scale is net sales in thousands of EGP." : "Left scale is the number of code uses.",
+      compareTitle: "Net sales, two periods",
+      compareThisLabel: m.state === "open" ? m.label + " to date" : m.label,
+      compareThis: this.egp(counted),
+      comparePrevLabel: prev ? prev.label : "no earlier month",
+      comparePrev: prev ? this.egp(prevCounted) : "—",
+      compareDiff: prev ? (diff >= 0 ? "+" : "") + this.egp(diff) : "—",
+      compareTone: prev ? (diff >= 0 ? "var(--acctext)" : "var(--red)") : "var(--mut)",
+
+      bestSellers: bestAll.slice(0, 3), bestAll,
+      bestAllLabel: "Show all " + bestAll.length + " products",
+      featured: FEATURED.map((f) => ({
+        name: f.name, ownership: f.ownership,
+        ownTone: f.owned ? "var(--acctext)" : "var(--amber)",
+        request: f.request || "Requested by the HBA team.",
+      })),
+      hasFeatured: FEATURED.length > 0,
+      wardrobe: WARDROBE, wardrobeCount: WARDROBE.length + " pieces received",
+      incoming: INCOMING.map((i) => ({ name: i.name, size: i.size, state: i.state, tone: i.ok ? "var(--amber)" : "var(--red)" })),
+
+      liveMonthLabel: live.label,
+      liveTargetState: this.qualified(live) ? "targets met" : "in progress",
+      liveTargets: targetRow(live),
+      targetsUpdatedLine: "Recorded by HBA · updated " + live.updated,
+      showGuaranteeInfo: s.arrangement === "guarantee",
+      guaranteeOpen: s.openInfo === "guarantee",
+      onGuaranteeInfo: () => this.set({ openInfo: s.openInfo === "guarantee" ? null : "guarantee" }),
+      guaranteeLine: "Your guaranteed minimum of " + this.egp(GUARANTEE) + " applies in a month where both targets are recorded as met. Commission is paid either way.",
+      targetHistory: MONTHS.slice(1).map((mo) => {
+        const met = this.qualified(mo);
+        return {
+          month: mo.label,
+          detail: mo.targets.videos.done + "/" + mo.targets.videos.of + " videos · " + mo.targets.stories.done + "/" + mo.targets.stories.of + " stories · updated " + mo.updated,
+          state: met ? "met" : "not met",
+          tone: met ? "var(--acctext)" : "var(--mut)",
+        };
+      }),
+
+      myPlace: ordinal(rows.findIndex((r) => r.me) + 1),
+      myUses: String(m.orders.length),
+      ranking,
+
+      paymentList, noRecordList,
+      hasAwaiting: !!awaiting,
+      awaitingMonth: awaiting ? awaiting.label : "",
+      awaitingAmount: awaiting ? this.egp(this.entitlement(this.commissionOf(awaiting), awaiting) - awaitingAdj) : "",
+      awaitingNote: awaiting ? "Approved. HBA usually records the transfer " + awaiting.expect + ". Approval and a recorded payment are separate facts." : "",
+
+      receiptMonth: receiptMonth ? receiptMonth.label : "",
+      receiptAmount: receiptMonth ? this.egp(this.entitlement(receiptBase, receiptMonth)) : "",
+      receiptRows: receiptMonth ? [
+        { label: "Recorded", value: receiptMonth.payment.date },
+        { label: "Reference", value: receiptMonth.payment.ref },
+        { label: "Method", value: receiptMonth.payment.method + " · " + receiptMonth.payment.account },
+        { label: "Commission approved", value: this.egp(receiptBase) },
+      ] : [],
+
+      arrangementLabel: ARR[s.arrangement].label, arrangementNote: ARR[s.arrangement].note,
+      youRows: [
+        { label: "Personal and contact details", hint: s.form.city + " · " + s.form.phone, onOpen: () => this.push("details") },
+        { label: "Height and weight", hint: s.form.height + " cm · " + s.form.weight + " kg", onOpen: () => this.push("sizes") },
+        { label: "Payment details", hint: payoutSummary, onOpen: () => this.push("payout") },
+        { label: "Payment history", hint: paymentList.length + " recorded payments", onOpen: () => this.push("payments") },
+        { label: "Notifications", hint: "What HBA tells you about", onOpen: () => this.push("notify") },
+        { label: "Help", hint: "Sample answers for review", onOpen: () => this.push("help") },
+      ],
+
+      mInsta: s.method === "insta", mWallet: s.method === "wallet", mBank: s.method === "bank",
+      setInsta: () => this.set({ method: "insta", savedPayout: false }),
+      setWallet: () => this.set({ method: "wallet", savedPayout: false }),
+      setBank: () => this.set({ method: "bank", savedPayout: false }),
+      fInstaAccount: s.form.instaAccount, fInstaLink: s.form.instaLink,
+      onInstaAccount: field("instaAccount"), onInstaLink: field("instaLink"),
+      instaHelp: s.instaHelp, notInstaHelp: !s.instaHelp,
+      toggleInstaHelp: () => this.set({ instaHelp: !s.instaHelp }),
+      walletOptions: ["Vodafone Cash", "Etisalat Cash", "Orange Money"].map((w) => ({
+        label: w,
+        border: s.form.walletProvider === w ? "var(--acc)" : "var(--div)",
+        bg: s.form.walletProvider === w ? "var(--accsoft)" : "transparent",
+        tone: s.form.walletProvider === w ? "var(--acc)" : "var(--txt)",
+        onPick: () => this.setState((st) => ({ form: Object.assign({}, st.form, { walletProvider: w }), savedPayout: false })),
+      })),
+      fWalletNumber: s.form.walletNumber, onWalletNumber: field("walletNumber"),
+      fBankHolder: s.form.bankHolder, onBankHolder: field("bankHolder"),
+      fBankCard: s.form.bankCard, onBankCard: field("bankCard"),
+      fBankName: s.form.bankName, onBankName: field("bankName"),
+      bankNames: ["CIB", "Banque Misr", "National Bank of Egypt", "QNB Alahli", "Bank of Alexandria"],
+      savedPayout: s.savedPayout,
+      savePayout: () => this.set({ savedPayout: true }),
+
+      detailFields: [
+        detailField("name", "Full name"), detailField("email", "Email"), detailField("phone", "Phone"),
+        detailField("address", "Shipping address"), detailField("city", "City"),
+      ],
+      saveDetails: () => this.set({ savedDetails: true }),
+      detailsSaveLabel: s.savedDetails ? "Saved" : "Save changes",
+
+      fHeight: s.form.height, fWeight: s.form.weight,
+      onHeight: (e) => this.setState((st) => ({ form: Object.assign({}, st.form, { height: e.target.value }), savedSizes: false })),
+      onWeight: (e) => this.setState((st) => ({ form: Object.assign({}, st.form, { weight: e.target.value }), savedSizes: false })),
+      saveSizes: () => this.set({ savedSizes: true }),
+      sizesSaveLabel: s.savedSizes ? "Saved" : "Save",
+
+      notifications, faqs: FAQS,
+      confirmSignOut: s.confirmSignOut, notConfirmSignOut: !s.confirmSignOut,
+      askSignOut: () => this.set({ confirmSignOut: true }),
+      cancelSignOut: () => this.set({ confirmSignOut: false }),
+    };
+  }
+}
+
+function ordinal(n) {
+  const t = n % 100;
+  if (t > 10 && t < 14) return n + "th";
+  return n + (["th", "st", "nd", "rd"][Math.min(n % 10, 4)] || "th");
+}
+</script>
+</body>
+</html>
