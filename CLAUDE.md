@@ -73,7 +73,7 @@ payroll without touching a maintainer screen.
 
 ## Verification
 
-- Backend: `.venv/Scripts/python.exe -m pytest -q` — **1637 passing**, and no
+- Backend: `.venv/Scripts/python.exe -m pytest -q` — **1659 passing**, and no
   change merges below that. It takes 5–15 minutes; run it in the background.
 - Frontend: `cd frontend && npm test` (190) and `npm run build`.
 - The suite is the ratchet. `test_reachability.py` fails when a route has no
