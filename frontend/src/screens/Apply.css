@@ -175,3 +175,33 @@
   border-left: 2px solid var(--owed);
   background: var(--owed-quiet);
 }
+
+/* ── Height and weight ─────────────────────────────────────────────────────
+ *
+ * Two small fields on one row, because they are one question. Given a row of
+ * their own rather than squeezed beside the phone number: A05 makes them
+ * optional, and something optional sitting inside a run of required fields
+ * reads as required.
+ */
+.apply__sizes {
+  border: 0;
+  padding: 0;
+  margin: 0 0 var(--space-5);
+}
+
+.apply__sizes-row {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.apply__size {
+  flex: 1;
+  min-width: 0;
+}
+
+.apply__size-label {
+  display: block;
+  margin-bottom: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}

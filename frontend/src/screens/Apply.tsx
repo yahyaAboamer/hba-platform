@@ -74,6 +74,12 @@ export function Apply({ onApplied }: { onApplied: () => void }) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
+  /**
+   * Optional, and kept as text rather than as numbers on purpose: an empty
+   * string is a person who did not answer, and `0` would be a measurement.
+   */
+  const [height, setHeight] = useState("");
+  const [weight, setWeight] = useState("");
   const [method, setMethod] = useState<Method>("instapay");
   const [fields, setFields] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
@@ -126,6 +132,11 @@ export function Apply({ onApplied }: { onApplied: () => void }) {
         phone: phone.trim(),
         code: code.trim(),
         payout_method: method,
+        // Omitted entirely when blank, so the server sees "not supplied"
+        // rather than a null it has to interpret. A05: never a reason to
+        // refuse an application.
+        ...(height.trim() ? { height_cm: Number(height) } : {}),
+        ...(weight.trim() ? { weight_kg: Number(weight) } : {}),
         ...fields,
       });
       onApplied();
@@ -207,6 +218,54 @@ export function Apply({ onApplied }: { onApplied: () => void }) {
             shop exactly, your sales will not reach you.
           </span>
         </label>
+
+        {/*
+         * Optional, and it says so on the label rather than in a hint below
+         * it - a person filling this in standing up reads labels and skips
+         * hints, and "optional" discovered after typing is not optional.
+         *
+         * A05: marketing would like these for sizing. Nothing refuses an
+         * application without them, here or on the server, and the two are
+         * side by side so the pair reads as one question she can skip once.
+         */}
+        <fieldset className="field apply__sizes">
+          <legend className="field__label">
+            Your height and weight — optional
+          </legend>
+          <div className="apply__sizes-row">
+            <label className="apply__size">
+              <span className="apply__size-label">Height</span>
+              <input
+                className="input"
+                type="number"
+                inputMode="numeric"
+                min={100}
+                max={250}
+                value={height}
+                onChange={(event) => setHeight(event.target.value)}
+                placeholder="cm"
+              />
+            </label>
+            <label className="apply__size">
+              <span className="apply__size-label">Weight</span>
+              <input
+                className="input"
+                type="number"
+                inputMode="numeric"
+                min={30}
+                max={250}
+                value={weight}
+                onChange={(event) => setWeight(event.target.value)}
+                placeholder="kg"
+              />
+            </label>
+          </div>
+          <span className="apply__hint">
+            Only so HBA sends you things that fit. Leave them blank if you would
+            rather not — nothing about your application changes either way, and
+            you can add or remove them later.
+          </span>
+        </fieldset>
 
         {/*
          * **Asked before how, because it decides whether how is answerable.**

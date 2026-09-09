@@ -40,6 +40,17 @@ class ApplicationBody(BaseModel):
     wallet_provider: str | None = Field(default=None, max_length=60)
     wallet_phone: str | None = Field(default=None, max_length=40)
 
+    #: Optional, and optional all the way down (A05). Marketing would like a
+    #: height and a weight for sizing; a model who would rather not say is on
+    #: the programme just the same, and nothing here or below treats a missing
+    #: one as a reason to refuse.
+    #:
+    #: Bounded at the edge as well as in the service and the database, so a
+    #: mistyped phone number in the height field is refused three times over
+    #: and explained once.
+    height_cm: int | None = Field(default=None, ge=100, le=250)
+    weight_kg: int | None = Field(default=None, ge=30, le=250)
+
     # No compensation_type, no commission_rate_bp, no fixed_amount_piastres,
     # no base_amount_piastres, no targets. §6.5 - and their absence from the
     # body is what makes the rule enforceable rather than merely intended.
@@ -103,6 +114,8 @@ def apply(
                 "wallet_provider": body.wallet_provider,
                 "wallet_phone": body.wallet_phone,
             },
+            height_cm=body.height_cm,
+            weight_kg=body.weight_kg,
         )
     except ValueError as exc:
         db.rollback()

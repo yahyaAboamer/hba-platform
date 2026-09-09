@@ -212,3 +212,60 @@ def test_inviting_an_email_already_on_the_programme_is_refused(admin):
 
     assert again.status_code == 409
     assert "already on the programme" in again.json()["detail"]
+
+
+# ── Height and weight, optional all the way down ─────────────────────────────
+#
+# A05. Marketing would like them; a model who would rather not say is on the
+# programme exactly the same. "Optional" that turns out to block on submit is
+# the failure this guards.
+
+
+def test_an_application_without_measurements_is_accepted(admin):
+    token = _invite(admin, "nour@example.com")
+    model = _accept(token, "Nour")
+
+    response = model.post("/api/applications", json=APPLICATION)
+
+    assert response.status_code == 201, response.text
+
+
+def test_measurements_are_kept_when_they_are_given(admin):
+    token = _invite(admin, "nour@example.com")
+    model = _accept(token, "Nour")
+
+    response = model.post(
+        "/api/applications",
+        json={**APPLICATION, "height_cm": 172, "weight_kg": 58},
+    )
+    assert response.status_code == 201, response.text
+
+    listed = admin.get("/api/affiliates").json()
+    mine = [row for row in listed["affiliates"] if row["name"] == "Nour Mahmoud"]
+    assert mine, listed
+    detail = admin.get(f"/api/affiliates/{mine[0]['id']}").json()
+    assert detail["height_cm"] == 172
+    assert detail["weight_kg"] == 58
+
+
+def test_one_measurement_without_the_other_is_accepted(admin):
+    token = _invite(admin, "nour@example.com")
+    model = _accept(token, "Nour")
+
+    response = model.post("/api/applications", json={**APPLICATION, "height_cm": 172})
+
+    assert response.status_code == 201, response.text
+
+
+def test_a_nonsense_measurement_is_refused_without_creating_a_half_application(admin):
+    """A typo in a field she did not have to fill in must not leave a pending
+    profile behind - the whole application is one transaction."""
+    token = _invite(admin, "nour@example.com")
+    model = _accept(token, "Nour")
+
+    response = model.post(
+        "/api/applications", json={**APPLICATION, "height_cm": 1012345678}
+    )
+
+    assert response.status_code == 422, response.text
+    assert admin.get("/api/affiliates").json()["affiliates"] == []

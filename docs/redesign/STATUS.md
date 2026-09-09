@@ -10,13 +10,13 @@ Package prepared: 9 September 2026. Phase 00 completed 9 September 2026.
   `63c64c3`. `production` stays at `025d8a8` deliberately; the branches are not
   level and that is the owner's current choice, not an oversight.
 - Active branch: **`phase01a/design-tokens`**, based on `63c64c3`. Not merged.
-- Current phase/batch: **01 complete (01A + 01B). 02A next.**
+- Current phase/batch: **02A complete. 02B next, and it is blocked on D06/D07.**
 - Application files changed: **frontend styling only** (Phase 01A). No API,
   service, model, migration or money code has been touched.
-- Runtime tests: green before and after every batch so far. Backend **1589
-  passed** (exit 0) against a disposable `hba_platform_test`; frontend **106
-  passed** (up from 104 - the accent guard walks two new files); `npm run build`
-  exit 0. The `1558 / 87` in `REPOSITORY_AUDIT.md` is stale.
+- Runtime tests: green before and after every batch so far. Backend **1613
+  passed** (exit 0) against a disposable `hba_platform_test` - 1589 at baseline,
+  24 added by 02A; frontend **106 passed**; `npm run build` exit 0. The
+  `1558 / 87` in `REPOSITORY_AUDIT.md` is stale.
 - Browser acceptance: **both design references and both halves of the running
   app were opened and compared** (synthetic seed data). Per-screen visual
   acceptance remains owed batch by batch.
@@ -30,14 +30,15 @@ Package prepared: 9 September 2026. Phase 00 completed 9 September 2026.
   to dark**, following the approved admin export. One word reverts it.
   D01-D10 stand, each due at its own phase; D06 is confirmed a real card-number
   vs account-number conflict, not a relabel.
-- Next instruction: `prompts/02_MODELS_AND_SETUP.md`, **batch 02A only**. Read
-  `BASELINE_REPORT.md` §5 first: **02C already exists**, shipped in `63c64c3`.
+- Next instruction: `prompts/02_MODELS_AND_SETUP.md`, **batch 02B only**.
+  **Answer D07 before any new contact write and D06 before touching payout
+  semantics** - 02B is the first batch a pending decision actually blocks.
 
 | Phase | State | Report / commit / evidence |
 |---|---|---|
 | 00 Baseline | **Complete** | `BASELINE_REPORT.md`; checkout `63c64c3`; 1589 + 104 green |
 | 01 UI foundations | **Complete** | `reports/01A-design-tokens.md`, `reports/01B-navigation-and-shells.md`; ADR 0039; `ROUTE_AND_PERMISSION_MAP.md` |
-| 02 Models and setup | **Partly built already** | 02C's terms editor shipped in `63c64c3`; historical readiness and profile fields still owed |
+| 02 Models and setup | **02A done; 02C mostly pre-built** | `reports/02A-model-entry.md`; migration `d4b81c07af22`; 02C's editor shipped in `63c64c3`, its readiness checks still owed |
 | 03 Products and wardrobe | Not started | Entirely absent from the codebase (UI12–UI20) |
 | 04 Targets | **Partly built already** | Outcome-only historical targets shipped in `1fe55de` |
 | 05 Financial rules | Not started | Commission still pays delivered-only; carry-forward still live |
@@ -52,12 +53,14 @@ Package prepared: 9 September 2026. Phase 00 completed 9 September 2026.
 design-reference server are all recorded in `BASELINE_REPORT.md` §10.** Read
 that rather than rediscovering them.
 
-- Migration head: `a71f4c9be830` (32 files). Dev DB `hba_platform` and test DB
-  `hba_platform_test` both at head. No secrets in this package.
+- Migration head: **`d4b81c07af22`** (33 files). Dev DB `hba_platform` and test
+  DB `hba_platform_test` both at head. No secrets in this package.
+- **Migrations do not run on `uvicorn` startup**, only in `docker-entrypoint.sh`.
+  A local run after a new migration needs `alembic upgrade head` first.
 - **Verify `current_database()` before running pytest.** `conftest.py` runs
   `DROP SCHEMA public CASCADE`. One pytest process at a time; never a
   concurrent `alembic` against the same database.
-- Blockers: none for 02A. **C: is 99% full (1.9 GB free)**, still, since
+- Blockers: **D06 and D07 block 02B** (see above). **C: is 99% full (1.9 GB free)**, still, since
   4 September. There is **no CI**; every check is local.
 - `production` is deliberately one release behind `main`. Promoting it is a
   separate, owner-authorised act, not a tidy-up.

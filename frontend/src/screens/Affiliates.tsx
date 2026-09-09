@@ -19,6 +19,17 @@ export type Affiliate = {
   has_terms?: boolean;
   /** The code they sell under this month, if they have one registered. */
   code?: string | null;
+  /**
+   * The month she actually started with HBA (H01).
+   *
+   * `null` means nobody has recorded it, which is a real answer and not a
+   * missing one - her month list falls back to a derivation from her earliest
+   * order, and the profile says so rather than showing a date it guessed.
+   */
+  collaboration_start_month?: string | null;
+  /** Optional, hers to write and ours to read (A05). */
+  height_cm?: number | null;
+  weight_kg?: number | null;
 };
 
 /** An invitation nobody has opened yet. Not a model, and still ours. */

@@ -15,6 +15,7 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    SmallInteger,
     String,
     text,
 )
@@ -72,6 +73,24 @@ class AffiliateProfile(Base):
         CheckConstraint(
             f"account_kind IN ({_KIND_LIST})", name="affiliate_profile_kind_valid"
         ),
+        # Shape, not truth. No constraint can know when she started; this only
+        # keeps a transposed `2026-31` out of a column that gets compared
+        # against every other month string in the platform.
+        CheckConstraint(
+            "collaboration_start_month IS NULL OR "
+            "collaboration_start_month ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'",
+            name="affiliate_profile_start_month_well_formed",
+        ),
+        # Wide on purpose: a check against a mistyped phone number landing in a
+        # height, not an opinion about bodies.
+        CheckConstraint(
+            "height_cm IS NULL OR (height_cm >= 100 AND height_cm <= 250)",
+            name="affiliate_profile_height_sane",
+        ),
+        CheckConstraint(
+            "weight_kg IS NULL OR (weight_kg >= 30 AND weight_kg <= 250)",
+            name="affiliate_profile_weight_sane",
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -86,6 +105,28 @@ class AffiliateProfile(Base):
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     #: Collected as an InstaPay fallback (§13.1), not required to exist.
     phone: Mapped[str | None] = mapped_column(String(40))
+
+    #: **The month she actually started with HBA**, as the business knows it.
+    #:
+    #: Rule H01: invitation date, a code's first order and platform signup are
+    #: *not* interchangeable with this. `portal.months_for` used to derive her
+    #: first month from her earliest attributed order, which is a different
+    #: fact that usually agrees and sometimes does not - and when it disagrees
+    #: it hides a month she sold nothing in, which H01 requires stay visible.
+    #:
+    #: `None` means nobody has told us. Nothing derives it, because nothing
+    #: can; the derivation stays in place until a real value arrives, and
+    #: `months_for` says which of the two it used.
+    collaboration_start_month: Mapped[str | None] = mapped_column(String(7))
+
+    #: Optional measurements (A05). Marketing needs sizes and sometimes these.
+    #:
+    #: **A model writes them; staff read them.** That is a rule about who, so
+    #: it lives in the service - `update_measurements` - and not on the column.
+    #: Missing is a normal state and never blocks an application, which is why
+    #: there is no default: a zero here would be a measurement.
+    height_cm: Mapped[int | None] = mapped_column(SmallInteger)
+    weight_kg: Mapped[int | None] = mapped_column(SmallInteger)
 
     status: Mapped[str] = mapped_column(
         String(20), nullable=False, server_default=AffiliateStatus.PENDING

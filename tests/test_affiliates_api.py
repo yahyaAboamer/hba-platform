@@ -1646,3 +1646,106 @@ def test_a_refused_save_writes_nothing_at_all(client, _go_live):
     assert len(body["periods"]) == 1
     assert body["periods"][0]["start_month"] == "2026-01"
     assert body["periods"][0]["compensation_type"] == "commission"
+
+
+# ── When she started, over HTTP ───────────────────────────────────────────────
+#
+# H01. The value itself and its refusals are covered in
+# `test_collaboration_start.py`; these are the things only the route decides.
+
+
+def test_a_start_month_is_recorded_through_the_profile(client):
+    affiliate = _register(client)
+
+    response = client.patch(
+        f"/api/affiliates/{affiliate['id']}",
+        json={
+            "collaboration_start_month": "2026-02",
+            "collaboration_start_month_set": True,
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["collaboration_start_month"] == "2026-02"
+
+
+def test_omitting_the_field_leaves_a_recorded_start_alone(client):
+    """The flag is the whole point of the flag.
+
+    A request that changes a phone number must not clear a start month it
+    never mentioned - and `null` is how the field is *cleared*, so absence and
+    null cannot mean the same thing.
+    """
+    affiliate = _register(client)
+    client.patch(
+        f"/api/affiliates/{affiliate['id']}",
+        json={
+            "collaboration_start_month": "2026-02",
+            "collaboration_start_month_set": True,
+        },
+    )
+
+    response = client.patch(
+        f"/api/affiliates/{affiliate['id']}", json={"phone": "01000000000"}
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["collaboration_start_month"] == "2026-02"
+
+
+def test_sending_null_with_the_flag_clears_it(client):
+    affiliate = _register(client)
+    client.patch(
+        f"/api/affiliates/{affiliate['id']}",
+        json={
+            "collaboration_start_month": "2026-02",
+            "collaboration_start_month_set": True,
+        },
+    )
+
+    response = client.patch(
+        f"/api/affiliates/{affiliate['id']}",
+        json={
+            "collaboration_start_month": None,
+            "collaboration_start_month_set": True,
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["collaboration_start_month"] is None
+
+
+def test_a_refused_start_month_says_why_and_changes_nothing(client):
+    affiliate = _register(client)
+
+    response = client.patch(
+        f"/api/affiliates/{affiliate['id']}",
+        json={
+            "collaboration_start_month": "2025-04",
+            "collaboration_start_month_set": True,
+        },
+    )
+
+    assert response.status_code == 400, response.text
+    assert "settled before the platform" in response.text
+
+    after = client.get(f"/api/affiliates/{affiliate['id']}")
+    assert after.json()["collaboration_start_month"] is None
+
+
+def test_no_staff_route_can_write_a_measurement(client):
+    """A05: a model writes her measurements and staff read them.
+
+    The enforcement is that no such route exists, so this proves the absence
+    rather than a refusal - a `height_cm` in the body is ignored, not obeyed.
+    """
+    affiliate = _register(client)
+
+    response = client.patch(
+        f"/api/affiliates/{affiliate['id']}",
+        json={"height_cm": 170, "weight_kg": 55},
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["height_cm"] is None
+    assert response.json()["weight_kg"] is None

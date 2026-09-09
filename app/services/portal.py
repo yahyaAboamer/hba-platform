@@ -62,6 +62,7 @@ from app.core.money import (
     exact_commission_piastres,
     format_egp,
 )
+from app.core.periods import PLATFORM_START_MONTH
 from app.models.affiliates import AffiliateProfile
 from app.models.attributed_orders import AttributedOrder, CommissionState
 from app.models.compensation import CompensationType
@@ -182,6 +183,26 @@ def _as_payload(calculation: MonthCalculation) -> dict:
     return body
 
 
+def _months_between(first: str, working: str) -> list[str]:
+    """Every month from `first` to `working` inclusive, newest first.
+
+    Bounded at both ends by real values, so it cannot run away - and capped
+    anyway, because a mis-set go-live month is exactly the sort of thing that
+    makes a month-walking loop run to the heat death.
+    """
+    months: list[str] = []
+    year, index = (int(part) for part in first.split("-"))
+    cursor = f"{year:04d}-{index:02d}"
+    while cursor <= working and len(months) < 120:
+        months.append(cursor)
+        index += 1
+        if index == 13:
+            year, index = year + 1, 1
+        cursor = f"{year:04d}-{index:02d}"
+
+    return list(reversed(months))
+
+
 def months_for(db: Session, affiliate: AffiliateProfile) -> list[str]:
     """Every month they can look at, newest first.
 
@@ -191,11 +212,36 @@ def months_for(db: Session, affiliate: AffiliateProfile) -> list[str]:
     predates them would find an empty screen with no way to tell whether that
     meant nothing happened or something is broken.
 
-    Their first month is the earliest month they have an order in or a payroll
-    record for, whichever is earlier. Not their join date: an order can be
-    attributed to a month before their profile row was created, and it is the
-    orders they will be looking for.
+    ## Which month is her first
+
+    **Her recorded collaboration start, when there is one.** That is the fact
+    rule H01 is about: the month she actually began with HBA, entered by
+    somebody who knows, because nothing derives it.
+
+    When there is not one, the old derivation stands: the earliest month she
+    has an attributed order or a payroll record in. It is a good guess and it
+    is a different fact - it answers *when did money first appear* rather than
+    *when did she start*. The two usually agree. When they do not, the
+    derivation hides a month she was here for and sold nothing in, and H01 says
+    that month should be visible and empty rather than absent.
+
+    So the recorded value wins outright where it exists, **even when it is
+    later than her first order**. An order attributed to a month before she
+    started is a matching error, not a reason to open that month to her; the
+    diagnostics for that live on the maintainer's side, not in her picker.
+
+    One floor and one ceiling either way. Nothing before `PLATFORM_START_MONTH`,
+    because there are no orders there to show, and nothing after the working
+    month, because it has not happened.
     """
+    recorded = affiliate.collaboration_start_month
+    if recorded:
+        working = working_month()
+        first = max(recorded, PLATFORM_START_MONTH)
+        if first > working:
+            return [working]
+        return _months_between(first, working)
+
     earliest_order = db.scalar(
         select(AttributedOrder.business_month)
         .where(AttributedOrder.affiliate_id == affiliate.id)
@@ -219,20 +265,7 @@ def months_for(db: Session, affiliate: AffiliateProfile) -> list[str]:
     if first > working:
         return [working]
 
-    months: list[str] = []
-    year, index = (int(part) for part in first.split("-"))
-    cursor = f"{year:04d}-{index:02d}"
-    # Bounded by real data at one end and by today at the other, so this cannot
-    # run away. The cap is here because a mis-set go-live month is exactly the
-    # sort of thing that makes a month-walking loop run to the heat death.
-    while cursor <= working and len(months) < 120:
-        months.append(cursor)
-        index += 1
-        if index == 13:
-            year, index = year + 1, 1
-        cursor = f"{year:04d}-{index:02d}"
-
-    return list(reversed(months))
+    return _months_between(first, working)
 
 
 def _not_started(month: str) -> bool:
