@@ -501,3 +501,49 @@
   font-size: var(--text-sm);
   color: var(--quiet);
 }
+
+/* ── What is still missing ─────────────────────────────────────────────────
+ *
+ * Silent when there is nothing to say, so it is worth reading when it speaks.
+ * Amber rather than red throughout: nothing here is wrong, something is
+ * unfinished, and `tokens.css` already calls that hue "attention, not alarm".
+ */
+.setup {
+  border-left: 2px solid var(--owed);
+}
+
+.setup__count {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--quiet);
+}
+
+.setup__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+}
+
+.setup__list li {
+  display: flex;
+  gap: var(--space-4);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.setup__list li:last-child {
+  border-bottom: 0;
+}
+
+/* Fixed, so the reasons line up in a column and the shape of the list is
+   readable before a word of it is. */
+.setup__month {
+  flex: none;
+  width: 9rem;
+  font-weight: 500;
+}
+
+.setup__why {
+  color: var(--owed);
+}

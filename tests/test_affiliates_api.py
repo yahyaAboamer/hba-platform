@@ -1749,3 +1749,69 @@ def test_no_staff_route_can_write_a_measurement(client):
     assert response.status_code == 200, response.text
     assert response.json()["height_cm"] is None
     assert response.json()["weight_kg"] is None
+
+
+# ── Setup readiness, over HTTP ────────────────────────────────────────────────
+#
+# H06 and V09. The verdict is covered month by month in
+# `test_setup_readiness.py`; these are the things only the route decides.
+
+
+def test_the_pay_history_payload_carries_a_readiness_verdict(client):
+    affiliate = _register(client)
+    client.patch(
+        f"/api/affiliates/{affiliate['id']}",
+        json={
+            "collaboration_start_month": "2026-01",
+            "collaboration_start_month_set": True,
+        },
+    )
+
+    body = client.get(f"/api/affiliates/{affiliate['id']}/pay-history").json()
+
+    assert "readiness" in body
+    assert body["readiness"]["start_month"] == "2026-01"
+    assert body["readiness"]["start_is_recorded"] is True
+    # No terms anywhere, so every eligible month is blocking and says why.
+    assert body["readiness"]["ready"] == 0
+    assert body["readiness"]["blocking"] == body["readiness"]["eligible"] > 0
+    assert body["readiness"]["months"][0]["missing"] == ["no_terms"]
+
+
+def test_readiness_is_computed_and_not_remembered(client):
+    """H06: a first terms record does not prove readiness.
+
+    Nothing is stored, so moving her start month changes the verdict on the
+    very next request without anybody re-reviewing anything.
+    """
+    affiliate = _register(client)
+    client.patch(
+        f"/api/affiliates/{affiliate['id']}",
+        json={
+            "collaboration_start_month": "2026-06",
+            "collaboration_start_month_set": True,
+        },
+    )
+    first = client.get(f"/api/affiliates/{affiliate['id']}/pay-history").json()
+
+    client.patch(
+        f"/api/affiliates/{affiliate['id']}",
+        json={
+            "collaboration_start_month": "2026-01",
+            "collaboration_start_month_set": True,
+        },
+    )
+    second = client.get(f"/api/affiliates/{affiliate['id']}/pay-history").json()
+
+    assert second["readiness"]["eligible"] > first["readiness"]["eligible"]
+
+
+def test_a_model_with_nothing_to_arrange_is_not_reported_as_blocked(client):
+    """No recorded start and no orders. Not an error, and not a backlog."""
+    affiliate = _register(client)
+
+    body = client.get(f"/api/affiliates/{affiliate['id']}/pay-history").json()
+
+    assert body["readiness"]["months"] == []
+    assert body["readiness"]["blocking"] == 0
+    assert body["readiness"]["start_month"] is None

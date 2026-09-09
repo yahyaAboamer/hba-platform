@@ -16,12 +16,14 @@ import {
   periodsToWrite,
   runs,
   toBasisPoints,
+  MISSING_REASON,
 } from "../lib/payHistory";
 import type {
   Arrangement,
   Kind,
   MonthRow,
   PayHistory,
+  Readiness,
 } from "../lib/payHistory";
 import "./Payroll.css";
 import "./Compensation.css";
@@ -278,6 +280,23 @@ export function Compensation() {
         months cannot be calculated.
       </p>
 
+      {/*
+       * **What is recorded, not what is typed.** The line above the Save
+       * button checks the draft: has every month on the strip been given an
+       * arrangement. This checks the server's answer about what is stored, and
+       * it asks two things the draft cannot:
+       *
+       * - whether a guaranteed-minimum month also has the target outcome that
+       *   decides it (F06) - terms alone do not finish one;
+       * - whether the months in question are the ones she was actually here
+       *   for (H01), rather than every month since the platform's horizon.
+       *
+       * V09 in `DESIGN_REVIEW.md` is the failure this replaces: readiness that
+       * reads the *first* terms record reports a woman as arranged when four
+       * of her eleven months are.
+       */}
+      <SetupReadiness readiness={data.readiness} />
+
       {error && (
         <p className="notice notice--refused" role="alert">
           {error}
@@ -518,6 +537,51 @@ export function Compensation() {
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * What is still missing from her history, by month.
+ *
+ * Silent when there is nothing to say. A panel announcing "all set" on every
+ * visit is a panel that stops being read, and the one time it matters is the
+ * one time somebody has already learned to scroll past it.
+ */
+function SetupReadiness({ readiness }: { readiness: Readiness }) {
+  const blocking = readiness.months.filter((row) => !row.ready);
+  if (blocking.length === 0) return null;
+
+  return (
+    <section className="panel comp__card setup">
+      <p className="comp__cardtitle">Still needed before these months pay</p>
+      <p className="setup__count">
+        {readiness.ready} of {readiness.eligible} month
+        {readiness.eligible === 1 ? "" : "s"} ready
+        {/*
+         * Said out loud where the first month is a guess. "Her months are
+         * being worked out from her earliest order" is a different claim from
+         * "she started in June", and only one of them is a fact somebody
+         * checked (H01).
+         */}
+        {!readiness.start_is_recorded && readiness.start_month && (
+          <>
+            {" "}
+            · counted from {formatMonth(readiness.start_month)}, which is her
+            earliest order rather than a start anybody recorded
+          </>
+        )}
+      </p>
+      <ul className="setup__list">
+        {blocking.map((row) => (
+          <li key={row.month}>
+            <span className="setup__month">{formatMonth(row.month)}</span>
+            <span className="setup__why">
+              {row.missing.map((reason) => MISSING_REASON[reason]).join(" · ")}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
