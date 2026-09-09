@@ -1003,9 +1003,23 @@ def test_nothing_about_a_target_can_be_changed_from_their_side(admin):
     # route rather than when they add a bad one - which is the only way it
     # stays a decision rather than a habit.
     #
-    # Neither of these touches a figure: one moves where money is sent, the
-    # other mutes an email.
+    # None of these touches a figure:
+    #
+    #   measurements       her height and her weight. A05 gives that write to
+    #                      her and the read to staff, and **the absence of a
+    #                      maintainer route is the enforcement** - a permission
+    #                      check inside a shared service would still leave a
+    #                      function an admin route could call. Added in 02B,
+    #                      and this assertion failing is what made adding it a
+    #                      decision rather than an afternoon.
+    #   notifications      mutes an email.
+    #   payout-destination moves where money is sent. The one that asks for a
+    #                      password (§6.4.1).
+    #
+    # What is still absent is the point: nothing here writes a target, a rate,
+    # an order or a month state.
     assert sorted(writable) == [
+        "/api/me/measurements",
         "/api/me/notifications",
         "/api/me/payout-destination",
     ]

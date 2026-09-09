@@ -144,8 +144,10 @@ def submit_application(
         update_measurements(
             db,
             affiliate,
-            height_cm=height_cm,
-            weight_kg=weight_kg,
+            # Only what she actually gave. An application that mentions a
+            # height and not a weight must not record "she cleared her weight".
+            **({"height_cm": height_cm} if height_cm is not None else {}),
+            **({"weight_kg": weight_kg} if weight_kg is not None else {}),
             actor_id=user.id,
             actor_email=user.email,
         )

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { api } from "../lib/api";
+import { PAYOUT_FIELD_LABEL } from "../lib/payouts";
 import type { Affiliate } from "./Affiliates";
 import { instapayProblem } from "./Apply";
 import "./Payroll.css";
@@ -15,14 +16,12 @@ const METHOD_LABEL: Record<Method, string> = {
   wallet: "Mobile wallet",
 };
 
-const FIELD_LABEL: Record<string, string> = {
-  instapay_address_url: "InstaPay payment address",
-  instapay_phone: "InstaPay number",
-  bank_name: "Bank",
-  bank_account_holder: "Account holder",
-  bank_account_number: "Account number",
-  wallet_phone: "Wallet number",
-};
+/**
+ * From `lib/payouts.ts`. This file used to carry its own copy, which called
+ * `bank_account_number` an *account number* while the model's screen called
+ * the same digits a *card number* - see D06 and the map itself.
+ */
+const FIELD_LABEL = PAYOUT_FIELD_LABEL;
 
 type Detail = Affiliate & {
   payout_destination: Record<string, string | null> | null;

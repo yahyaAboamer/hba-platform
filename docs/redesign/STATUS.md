@@ -10,13 +10,14 @@ Package prepared: 9 September 2026. Phase 00 completed 9 September 2026.
   `63c64c3`. `production` stays at `025d8a8` deliberately; the branches are not
   level and that is the owner's current choice, not an oversight.
 - Active branch: **`phase01a/design-tokens`**, based on `63c64c3`. Not merged.
-- Current phase/batch: **02A complete. 02B next, and it is blocked on D06/D07.**
+- Current phase/batch: **02A and 02B complete. 02C next, and mostly pre-built.**
 - Application files changed: **frontend styling only** (Phase 01A). No API,
   service, model, migration or money code has been touched.
-- Runtime tests: green before and after every batch so far. Backend **1613
+- Runtime tests: green before and after every batch so far. Backend **1620
   passed** (exit 0) against a disposable `hba_platform_test` - 1589 at baseline,
-  24 added by 02A; frontend **106 passed**; `npm run build` exit 0. The
-  `1558 / 87` in `REPOSITORY_AUDIT.md` is stale.
+  24 from 02A, 7 from 02B; frontend **190 passed** (106 before 02B's payout
+  label guard, which runs per file); `npm run build` exit 0. The `1558 / 87` in
+  `REPOSITORY_AUDIT.md` is stale.
 - Browser acceptance: **both design references and both halves of the running
   app were opened and compared** (synthetic seed data). Per-screen visual
   acceptance remains owed batch by batch.
@@ -30,15 +31,16 @@ Package prepared: 9 September 2026. Phase 00 completed 9 September 2026.
   to dark**, following the approved admin export. One word reverts it.
   D01-D10 stand, each due at its own phase; D06 is confirmed a real card-number
   vs account-number conflict, not a relabel.
-- Next instruction: `prompts/02_MODELS_AND_SETUP.md`, **batch 02B only**.
-  **Answer D07 before any new contact write and D06 before touching payout
-  semantics** - 02B is the first batch a pending decision actually blocks.
+- Next instruction: `prompts/02_MODELS_AND_SETUP.md`, **batch 02C only**. Read
+  `BASELINE_REPORT.md` §5 first: **the terms editor already exists**, shipped in
+  `63c64c3`. What 02C owes is the *readiness* half - per-month setup coverage
+  across every eligible month - not the editor.
 
 | Phase | State | Report / commit / evidence |
 |---|---|---|
 | 00 Baseline | **Complete** | `BASELINE_REPORT.md`; checkout `63c64c3`; 1589 + 104 green |
 | 01 UI foundations | **Complete** | `reports/01A-design-tokens.md`, `reports/01B-navigation-and-shells.md`; ADR 0039; `ROUTE_AND_PERMISSION_MAP.md` |
-| 02 Models and setup | **02A done; 02C mostly pre-built** | `reports/02A-model-entry.md`; migration `d4b81c07af22`; 02C's editor shipped in `63c64c3`, its readiness checks still owed |
+| 02 Models and setup | **02A + 02B done; 02C mostly pre-built** | `reports/02A-model-entry.md`, `reports/02B-profile-and-self.md`; migration `d4b81c07af22`; D06 and D07 closed; 02C's editor shipped in `63c64c3`, its readiness checks still owed |
 | 03 Products and wardrobe | Not started | Entirely absent from the codebase (UI12–UI20) |
 | 04 Targets | **Partly built already** | Outcome-only historical targets shipped in `1fe55de` |
 | 05 Financial rules | Not started | Commission still pays delivered-only; carry-forward still live |
@@ -60,7 +62,10 @@ that rather than rediscovering them.
 - **Verify `current_database()` before running pytest.** `conftest.py` runs
   `DROP SCHEMA public CASCADE`. One pytest process at a time; never a
   concurrent `alembic` against the same database.
-- Blockers: **D06 and D07 block 02B** (see above). **C: is 99% full (1.9 GB free)**, still, since
+- Blockers: none. **Visual acceptance is owed for 02A and 02B**: browser
+  automation cannot sign in (the typed value never reaches the field, so the
+  form's own `required` check blocks it and no request is made). Backend work
+  was verified over HTTP instead; the new screens are built and unseen. **C: is 99% full (1.9 GB free)**, still, since
   4 September. There is **no CI**; every check is local.
 - `production` is deliberately one release behind `main`. Promoting it is a
   separate, owner-authorised act, not a tidy-up.

@@ -167,6 +167,9 @@ def _affiliate_payload(affiliate: AffiliateProfile) -> dict:
         "id": affiliate.id,
         "user_account_id": affiliate.user_account_id,
         "name": affiliate.name,
+        #: A05: marketing needs a way to reach her. D07: there is exactly one
+        #: address and it is her login, so the screens that show it say so.
+        "email": affiliate.account.email,
         "phone": affiliate.phone,
         "status": affiliate.status,
         "account_kind": affiliate.account_kind,

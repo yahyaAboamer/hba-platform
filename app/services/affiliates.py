@@ -355,12 +355,21 @@ def set_collaboration_start(
     )
 
 
+#: "Not supplied", as distinct from "make it empty".
+#:
+#: `None` cannot carry both meanings here. A model correcting only her height
+#: sends nothing for her weight, and a model who no longer wants her weight on
+#: file sends it as empty - and reading those as the same request would either
+#: clear a field she did not touch or refuse to clear one she did.
+UNSET = object()
+
+
 def update_measurements(
     db: Session,
     affiliate: AffiliateProfile,
     *,
-    height_cm: int | None = None,
-    weight_kg: int | None = None,
+    height_cm: int | None | object = UNSET,
+    weight_kg: int | None | object = UNSET,
     actor_id: int | None = None,
     actor_email: str | None = None,
 ) -> None:
@@ -396,13 +405,13 @@ def update_measurements(
             raise ValueError(f"{label} should be between {low} and {high}")
         return number
 
-    if height_cm is not None:
+    if height_cm is not UNSET:
         cleaned = _clean(height_cm, "A height in centimetres", 100, 250)
         if cleaned != affiliate.height_cm:
             before["height_cm"], after["height_cm"] = affiliate.height_cm, cleaned
             affiliate.height_cm = cleaned
 
-    if weight_kg is not None:
+    if weight_kg is not UNSET:
         cleaned = _clean(weight_kg, "A weight in kilograms", 30, 250)
         if cleaned != affiliate.weight_kg:
             before["weight_kg"], after["weight_kg"] = affiliate.weight_kg, cleaned

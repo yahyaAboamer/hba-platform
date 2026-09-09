@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 
 import { Money } from "../components/Money";
 import { api, can } from "../lib/api";
+import { PAYOUT_FIELD_LABEL } from "../lib/payouts";
 import type { Session } from "../lib/api";
 import { describeBlocker, formatMonth } from "../lib/money";
 import { STATUS_LABEL } from "./Affiliates";
@@ -488,6 +489,17 @@ export function AffiliateDetail({ session }: { session: Session }) {
               )}
             </Row>
             {/*
+             * **"Signs in with"**, not "Email" (D07, 9 September 2026). She
+             * has one address: it is her login and it is how marketing reaches
+             * her (A05). Naming it plainly is the whole of what that decision
+             * costs - a field called "email" on a profile is one somebody
+             * eventually edits as a contact detail, and what they have
+             * actually done is move her login.
+             */}
+            <Row label="Signs in with">
+              <span className="code">{detail.email}</span>
+            </Row>
+            {/*
              * Read, never written here. A05 gives these to the model alone,
              * and the enforcement is that no staff route can write them - so
              * there is deliberately no control beside them, not a disabled one.
@@ -716,7 +728,11 @@ export function AffiliateDetail({ session }: { session: Session }) {
                 </Row>
               )}
               {detail.payout_destination.bank_account_number && (
-                <Row label="Account number">
+                /* Card number, from the one map that names these (D06). She
+                   is asked for the digits on the front of her card; showing
+                   them back as an "account number" is how a payer types the
+                   wrong thing into a banking app. */
+                <Row label={PAYOUT_FIELD_LABEL.bank_account_number}>
                   <span className="code">
                     {detail.payout_destination.bank_account_number}
                   </span>

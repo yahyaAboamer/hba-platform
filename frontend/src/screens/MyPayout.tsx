@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import { api } from "../lib/api";
 import {
+  PAYOUT_FIELD_LABEL,
   accountHolderProblem,
   cardProblem,
   mobileProblem,
@@ -22,15 +23,8 @@ const METHOD_LABEL: Record<Method, string> = {
   wallet: "Mobile wallet",
 };
 
-const FIELD_LABEL: Record<string, string> = {
-  instapay_address_url: "InstaPay payment address",
-  instapay_phone: "InstaPay number",
-  bank_name: "Bank",
-  bank_account_holder: "Account holder's name",
-  bank_account_number: "Card number",
-  wallet_provider: "Which wallet",
-  wallet_phone: "Wallet number",
-};
+/** From `lib/payouts.ts`, so her screen and the maintainer's cannot drift. */
+const FIELD_LABEL = PAYOUT_FIELD_LABEL;
 
 /** The fields that are a choice rather than something to type. */
 const CHOICES: Record<string, readonly string[]> = {

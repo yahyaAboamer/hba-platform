@@ -11,6 +11,15 @@ import "./Apply.css";
 export type Me = {
   name: string;
   phone: string | null;
+  /**
+   * **Her one email** (D07). It is what she signs in with *and* where HBA
+   * writes to her; there is no second contact address, so every screen that
+   * shows it says which it is rather than calling it "email".
+   */
+  email: string;
+  /** Hers to change (A05). `null` means she has not said, which is fine. */
+  height_cm: number | null;
+  weight_kg: number | null;
   status: string;
   state: string;
   codes: { code: string; verified: boolean }[];
@@ -98,6 +107,19 @@ export function MyDetails({
           <dt>Paid to</dt>
           <dd>{describeDestination(me.payout_destination)}</dd>
         </div>
+        {/*
+         * **"You sign in with"**, not "Email" (D07). She has one address and
+         * it is her login; a screen that calls it a contact detail is a screen
+         * somebody eventually edits as one, and the first anybody learns of
+         * that is a model who cannot get in.
+         *
+         * Shown and not editable here. Moving a login is a real change and it
+         * is not something to do by tabbing past it on a settings screen.
+         */}
+        <div>
+          <dt>You sign in with</dt>
+          <dd>{me.email}</dd>
+        </div>
       </dl>
       {/*
        * Shortened even to them. They supplied it, so it tells them nothing they
@@ -109,6 +131,18 @@ export function MyDetails({
         Change where I am paid
       </button>
     </section>
+
+      {/*
+       * A05: hers to write, and staff read them. There is no admin control
+       * anywhere for these - not a disabled one, none - and this is the only
+       * way they ever change.
+       *
+       * Only once she is actually on the programme. Somebody still waiting to
+       * be approved has a screen whose whole job is the waiting.
+       */}
+      {onTheme && me.state === "active" && (
+        <Measurements me={me} onChanged={onChanged} />
+      )}
 
       {onTheme && <Notifications />}
 
@@ -292,6 +326,141 @@ type Preference = { kind: string; label: string; enabled: boolean };
  * Saved on the press, one switch per request — two tabs open on this screen
  * cannot then write over each other's other switch.
  */
+/**
+ * Her height and her weight.
+ *
+ * **Optional in both directions**, which is the part worth building carefully.
+ * A05 makes them optional at every point in her life with the business, not
+ * only on the day she applied - so taking one back has to be as ordinary as
+ * giving it, and Save with a field emptied clears it rather than being read as
+ * "she did not mention it".
+ *
+ * No password. The payout screen asks for one because that is where money
+ * goes; a height is not that, and asking for a password every time she
+ * corrects a number she volunteered teaches her to type it into anything.
+ */
+function Measurements({ me, onChanged }: { me: Me; onChanged: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [height, setHeight] = useState("");
+  const [weight, setWeight] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+
+  function start() {
+    // From the server's values, so Cancel discards the draft rather than
+    // whatever was typed last time (M03).
+    setHeight(me.height_cm ? String(me.height_cm) : "");
+    setWeight(me.weight_kg ? String(me.weight_kg) : "");
+    setProblem(null);
+    setOpen(true);
+  }
+
+  async function save() {
+    setSaving(true);
+    setProblem(null);
+    try {
+      await api.put("/api/me/measurements", {
+        // `_set` on both, always: this form is the whole of what she is
+        // saying, so an emptied field means "take it off" rather than
+        // "unchanged". The flags are what let the server tell those apart.
+        height_cm: height.trim() ? Number(height) : null,
+        height_cm_set: true,
+        weight_kg: weight.trim() ? Number(weight) : null,
+        weight_kg_set: true,
+      });
+      setOpen(false);
+      onChanged();
+    } catch (caught) {
+      setProblem(
+        caught instanceof Error ? caught.message : "Could not save that.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <section className="panel affiliate__panel">
+      <h2 className="panel__title">Your size</h2>
+      {!open ? (
+        <>
+          <p className="affiliate__lead">
+            {me.height_cm || me.weight_kg ? (
+              <>
+                {me.height_cm ? `${me.height_cm} cm` : "No height"} ·{" "}
+                {me.weight_kg ? `${me.weight_kg} kg` : "no weight"}
+              </>
+            ) : (
+              "You have not given these. They are optional — HBA only uses them to send you things that fit."
+            )}
+          </p>
+          <button type="button" className="button" onClick={start}>
+            {me.height_cm || me.weight_kg ? "Change these" : "Add them"}
+          </button>
+        </>
+      ) : (
+        <>
+          {problem && (
+            <p className="notice notice--refused" role="alert">
+              {problem}
+            </p>
+          )}
+          <div className="sizes">
+            <label className="sizes__field">
+              <span className="sizes__label">Height</span>
+              <input
+                className="input"
+                type="number"
+                inputMode="numeric"
+                min={100}
+                max={250}
+                value={height}
+                onChange={(event) => setHeight(event.target.value)}
+                placeholder="cm"
+              />
+            </label>
+            <label className="sizes__field">
+              <span className="sizes__label">Weight</span>
+              <input
+                className="input"
+                type="number"
+                inputMode="numeric"
+                min={30}
+                max={250}
+                value={weight}
+                onChange={(event) => setWeight(event.target.value)}
+                placeholder="kg"
+              />
+            </label>
+          </div>
+          <p className="affiliate__lead">
+            Leave either one empty to take it off your record.
+          </p>
+          <div className="sizes__actions">
+            <button
+              type="button"
+              className="button button--primary"
+              disabled={saving}
+              onClick={save}
+            >
+              {saving ? "Saving…" : "Save"}
+            </button>
+            <button
+              type="button"
+              className="button"
+              disabled={saving}
+              onClick={() => setOpen(false)}
+            >
+              Cancel
+            </button>
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
+
 function Notifications() {
   const [preferences, setPreferences] = useState<Preference[] | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
