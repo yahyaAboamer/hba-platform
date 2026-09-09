@@ -357,3 +357,33 @@
   color: var(--accent-text);
   text-underline-offset: 2px;
 }
+
+/* ── Her size ─────────────────────────────────────────────────────────────
+ *
+ * Two small fields on one row, because they are one question (A05). She may
+ * give one, give both, or take either back, so nothing here is required and
+ * the pair reads as something she can skip.
+ */
+.affiliate .sizes {
+  display: flex;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.affiliate .sizes__field {
+  flex: 1;
+  min-width: 0;
+}
+
+.affiliate .sizes__label {
+  display: block;
+  margin-bottom: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}
+
+.affiliate .sizes__actions {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}

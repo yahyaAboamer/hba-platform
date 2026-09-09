@@ -18,6 +18,7 @@ from app.db import get_session
 from app.models.affiliates import AffiliateProfile
 from app.models.identity import UserAccount
 from app.models.payments import PaymentTransaction
+from app.services.affiliates import update_measurements
 from app.services.applications import REQUIRED_PAYOUT_FIELDS, application_state
 from app.services.auth import authenticate
 from app.services.codes import codes_with_status
@@ -72,6 +73,16 @@ def me(
     return {
         "name": affiliate.name,
         "phone": affiliate.phone,
+        #: **The one email she has** (D07, 9 September 2026). It is what she
+        #: signs in with and where HBA writes to her, and there is no second
+        #: contact address - so every screen that shows it says which it is,
+        #: rather than "email", which invites somebody to treat a login as a
+        #: contact detail.
+        "email": affiliate.account.email,
+        #: Hers to write (A05). Returned so her own screen can show and edit
+        #: them; the maintainer's payload carries them read-only.
+        "height_cm": affiliate.height_cm,
+        "weight_kg": affiliate.weight_kg,
         "status": affiliate.status,
         "state": application_state(db, affiliate),
         "codes": codes_with_status(db, affiliate, affiliate.created_at.strftime("%Y-%m"))
@@ -391,3 +402,62 @@ def my_policy_version(
         "effective_month": version.effective_month,
         "summary_markdown": version.summary_markdown,
     }
+
+
+class MeasurementsBody(BaseModel):
+    """Her height and her weight, and nothing else.
+
+    **No password.** §6.4.1 asks for one before a payout destination changes,
+    because that is where money goes and a session is what an attacker already
+    has. A height is not that: the worst an intruder does here is make HBA send
+    the wrong size, and asking her for a password every time she corrects a
+    number she volunteered would teach her to type it into anything that asked.
+
+    Both nullable and both optional. `None` for a field means *leave it alone*;
+    clearing one is done by sending it with `_set`, the same shape the
+    maintainer's start-month field uses, and for the same reason - absence and
+    "make it empty" cannot be the same request.
+    """
+
+    height_cm: int | None = Field(default=None, ge=100, le=250)
+    height_cm_set: bool = False
+    weight_kg: int | None = Field(default=None, ge=30, le=250)
+    weight_kg_set: bool = False
+
+
+@router.put("/measurements")
+def update_my_measurements(
+    body: MeasurementsBody,
+    affiliate: AffiliateProfile = Depends(current_affiliate),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Her measurements, written by her.
+
+    **A05: she writes these and staff read them.** This is the only route into
+    `update_measurements`, and its absence from the maintainer's API is the
+    enforcement - not a permission check inside a function an admin route could
+    still call. `test_affiliates_api.py` proves the staff PATCH ignores a
+    `height_cm` rather than obeying it.
+
+    Optional in both directions. She may give one and not the other, give
+    neither, or take one back after giving it - and none of those is an error,
+    because A05 makes them optional at every point in her life with the
+    business rather than only on the day she applies.
+    """
+    try:
+        update_measurements(
+            db,
+            affiliate,
+            # `UNSET` where she said nothing, so the service can tell "leave it
+            # alone" from "take it off my record" - and both are audited.
+            **({"height_cm": body.height_cm} if body.height_cm_set else {}),
+            **({"weight_kg": body.weight_kg} if body.weight_kg_set else {}),
+            actor_id=affiliate.user_account_id,
+            actor_email=affiliate.account.email,
+        )
+        db.commit()
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return {"height_cm": affiliate.height_cm, "weight_kg": affiliate.weight_kg}

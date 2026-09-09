@@ -455,3 +455,107 @@ def test_a_model_can_read_back_what_they_typed(admin):
 
     assert masked["instapay_address_url"] != full["instapay_address_url"]
     assert full["instapay_address_url"].startswith("https://ipn.eg/")
+
+
+# ── Her measurements, and her one email ──────────────────────────────────────
+#
+# A05 gives the write to her and the read to staff. D07 (9 September 2026)
+# settles that she has exactly one email address, which is her login.
+
+
+def test_she_writes_her_own_measurements(admin):
+    model = _model(admin, "nour@example.com", "Nour Hassan", "NOUR10")
+
+    response = model.put(
+        "/api/me/measurements",
+        json={"height_cm": 170, "height_cm_set": True},
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["height_cm"] == 170
+    assert model.get("/api/me").json()["height_cm"] == 170
+
+
+def test_a_field_she_does_not_mention_is_left_alone(admin):
+    """The difference between "leave it alone" and "take it off".
+
+    She corrects her height without mentioning her weight. Reading the absent
+    weight as a clear would quietly delete something she never touched.
+    """
+    model = _model(admin, "nour@example.com", "Nour Hassan", "NOUR10")
+    model.put(
+        "/api/me/measurements",
+        json={
+            "height_cm": 170,
+            "height_cm_set": True,
+            "weight_kg": 55,
+            "weight_kg_set": True,
+        },
+    )
+
+    model.put(
+        "/api/me/measurements", json={"height_cm": 172, "height_cm_set": True}
+    )
+
+    body = model.get("/api/me").json()
+    assert body["height_cm"] == 172
+    assert body["weight_kg"] == 55
+
+
+def test_she_can_take_a_measurement_back(admin):
+    """A05 makes these optional at every point, not only on the day she
+    applied. Giving one and regretting it is an ordinary thing to do."""
+    model = _model(admin, "nour@example.com", "Nour Hassan", "NOUR10")
+    model.put(
+        "/api/me/measurements", json={"weight_kg": 55, "weight_kg_set": True}
+    )
+
+    response = model.put(
+        "/api/me/measurements", json={"weight_kg": None, "weight_kg_set": True}
+    )
+
+    assert response.status_code == 200, response.text
+    assert model.get("/api/me").json()["weight_kg"] is None
+
+
+def test_a_nonsense_measurement_is_refused(admin):
+    model = _model(admin, "nour@example.com", "Nour Hassan", "NOUR10")
+
+    response = model.put(
+        "/api/me/measurements",
+        json={"height_cm": 1012345678, "height_cm_set": True},
+    )
+
+    assert response.status_code == 422, response.text
+
+
+def test_one_model_cannot_write_anothers_measurements(admin):
+    """There is no id to tamper with - the route acts on the caller's own
+    profile and takes no parameter at all (§6.1). This proves the shape."""
+    nour = _model(admin, "nour@example.com", "Nour Hassan", "NOUR10")
+    layla = _model(admin, "layla@example.com", "Layla Adel", "LAYLA10")
+
+    nour.put(
+        "/api/me/measurements", json={"height_cm": 170, "height_cm_set": True}
+    )
+
+    assert layla.get("/api/me").json()["height_cm"] is None
+
+
+def test_a_maintainer_cannot_reach_the_measurements_route(admin):
+    """It is on `/api/me`, gated on owning an affiliate record. A maintainer
+    owns none, so the route is not refused by a permission - it has no subject
+    to act on."""
+    response = admin.put(
+        "/api/me/measurements", json={"height_cm": 170, "height_cm_set": True}
+    )
+
+    assert response.status_code in (403, 404), response.text
+
+
+def test_her_record_carries_the_one_email_she_signs_in_with(admin):
+    """D07: one address, and it is her login. Screens say which it is; the
+    payload simply has to carry it, because nothing else does."""
+    model = _model(admin, "nour@example.com", "Nour Hassan", "NOUR10")
+
+    assert model.get("/api/me").json()["email"] == "nour@example.com"

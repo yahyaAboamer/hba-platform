@@ -24,7 +24,7 @@ from sqlalchemy.orm import Session
 from app.models.affiliates import AccountKind, AffiliateProfile, AffiliateStatus
 from app.models.identity import UserAccount
 from app.models.payouts import VALID_METHODS, PayoutMethod
-from app.services.affiliates import create_affiliate
+from app.services.affiliates import create_affiliate, update_measurements
 from app.services.audit import record_audit
 from app.services.codes import normalise_code, register_code, start_month_for
 from app.services.payouts import set_destination
@@ -57,6 +57,8 @@ def submit_application(
     code: str,
     payout_method: str,
     payout_fields: dict[str, str | None],
+    height_cm: int | None = None,
+    weight_kg: int | None = None,
 ) -> AffiliateProfile:
     """Create the affiliate record a model has applied with.
 
@@ -68,6 +70,12 @@ def submit_application(
     **Applying twice is refused.** A double-tapped submit would otherwise
     produce two pending profiles and two code registrations for one person, one
     of which quietly wins.
+
+    **Height and weight are optional and never block this** (rule A05).
+    Marketing would like them; a model who would rather not say is on the
+    programme exactly the same. They are validated when given and ignored when
+    not, and there is no branch anywhere that treats a missing one as a reason
+    to refuse - which is the difference between optional and optional-in-theory.
     """
     if existing_application(db, user) is not None:
         raise ValueError("You have already applied")
@@ -127,6 +135,22 @@ def submit_application(
     # person. The name asked for here is the one a person actually gives, so
     # it becomes the account's too.
     user.display_name = name
+
+    # After the profile exists and before anything else can fail on it. A bad
+    # height raises here, which rolls the whole application back - but a bad
+    # height is a typo in a field she did not have to fill in, so the message
+    # says what a height is rather than refusing the application in general.
+    if height_cm is not None or weight_kg is not None:
+        update_measurements(
+            db,
+            affiliate,
+            # Only what she actually gave. An application that mentions a
+            # height and not a weight must not record "she cleared her weight".
+            **({"height_cm": height_cm} if height_cm is not None else {}),
+            **({"weight_kg": weight_kg} if weight_kg is not None else {}),
+            actor_id=user.id,
+            actor_email=user.email,
+        )
 
     # Unverified. §10.4's gate is `set_status`, and it stays the only gate.
     #

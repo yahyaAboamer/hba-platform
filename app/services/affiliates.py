@@ -12,6 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.businesstime import business_month, utcnow
+from app.core.periods import PLATFORM_START_MONTH
 from app.core.passwords import hash_password
 from app.models.affiliates import (
     VALID_KINDS,
@@ -284,6 +285,152 @@ def update_details(
         actor_email=actor_email,
         before=before,
         after=after,
+    )
+
+
+def set_collaboration_start(
+    db: Session,
+    affiliate: AffiliateProfile,
+    month: str | None,
+    *,
+    actor_id: int | None = None,
+    actor_email: str | None = None,
+) -> None:
+    """Record the month she actually started with HBA.
+
+    **Nothing derives this and nothing ever will**, which is the reason the
+    column exists. Rule H01: a code's first order, the invitation and the
+    platform signup are three different dates, none of them this one, and they
+    agree often enough that using one as a proxy fails quietly rather than
+    loudly. So it is entered, by somebody who knows, per model.
+
+    Refuses a month before the platform's data horizon. Not because a model
+    cannot have started earlier — many did — but because there are no orders
+    before `PLATFORM_START_MONTH` for the platform to show her, so a start of
+    `2025-04` would open eleven months that are empty for a reason nothing on
+    the screen could explain. Her real earlier history was settled outside and
+    stays there (H03).
+
+    Refuses a month in the future for the same class of reason: it would offer
+    her a month that has not happened.
+
+    `None` clears it, and clearing is a real answer — it puts her back on the
+    derivation until somebody knows better. Recorded either way, because "who
+    said she started in March" is a question that decides which months she can
+    open.
+    """
+    # Imported here rather than at the top: `payroll` pulls in the commission
+    # engine, and this module is imported by half of it. The codebase already
+    # does this where the same knot appears - see `carried_forward`.
+    from app.services.payroll import working_month
+
+    cleaned = (month or "").strip() or None
+
+    if cleaned is not None:
+        if not re.fullmatch(r"[0-9]{4}-(0[1-9]|1[0-2])", cleaned):
+            raise ValueError("A start month looks like 2026-03")
+        if cleaned < PLATFORM_START_MONTH:
+            raise ValueError(
+                f"The platform holds no orders before {PLATFORM_START_MONTH}, "
+                "so a start before then would open months it cannot explain. "
+                "Months settled before the platform are handled separately."
+            )
+        if cleaned > working_month():
+            raise ValueError("A start month cannot be in the future")
+
+    if cleaned == affiliate.collaboration_start_month:
+        return
+
+    before = {"collaboration_start_month": affiliate.collaboration_start_month}
+    affiliate.collaboration_start_month = cleaned
+
+    record_audit(
+        db,
+        action="affiliate.collaboration_start_set",
+        subject=f"affiliate:{affiliate.id}",
+        actor_id=actor_id,
+        actor_email=actor_email,
+        before=before,
+        after={"collaboration_start_month": cleaned},
+    )
+
+
+#: "Not supplied", as distinct from "make it empty".
+#:
+#: `None` cannot carry both meanings here. A model correcting only her height
+#: sends nothing for her weight, and a model who no longer wants her weight on
+#: file sends it as empty - and reading those as the same request would either
+#: clear a field she did not touch or refuse to clear one she did.
+UNSET = object()
+
+
+def update_measurements(
+    db: Session,
+    affiliate: AffiliateProfile,
+    *,
+    height_cm: int | None | object = UNSET,
+    weight_kg: int | None | object = UNSET,
+    actor_id: int | None = None,
+    actor_email: str | None = None,
+) -> None:
+    """Her own measurements, written by her.
+
+    **Rule A05: a model edits these and staff read them.** There is no admin
+    path into this function, and that is the enforcement — a permission check
+    here would still be a function an admin route could call, and the point is
+    that no such route exists. Staff see the values on her profile and have
+    nowhere to type into.
+
+    Both are optional at every point in her life with the business. Missing is
+    a normal state and never blocks anything (A05), so `None` for a field means
+    *leave it alone* and an explicitly cleared value is written as `None`
+    rather than as a zero — a zero would be a measurement.
+
+    Bounds are checked here as well as in the database, so the message a person
+    reads says what a height is rather than naming a constraint.
+    """
+    before: dict = {}
+    after: dict = {}
+
+    def _clean(value, label: str, low: int, high: int):
+        if value is None:
+            return None
+        if isinstance(value, str) and not value.strip():
+            return None
+        try:
+            number = int(value)
+        except (TypeError, ValueError):
+            raise ValueError(f"{label} should be a number") from None
+        if not low <= number <= high:
+            raise ValueError(f"{label} should be between {low} and {high}")
+        return number
+
+    if height_cm is not UNSET:
+        cleaned = _clean(height_cm, "A height in centimetres", 100, 250)
+        if cleaned != affiliate.height_cm:
+            before["height_cm"], after["height_cm"] = affiliate.height_cm, cleaned
+            affiliate.height_cm = cleaned
+
+    if weight_kg is not UNSET:
+        cleaned = _clean(weight_kg, "A weight in kilograms", 30, 250)
+        if cleaned != affiliate.weight_kg:
+            before["weight_kg"], after["weight_kg"] = affiliate.weight_kg, cleaned
+            affiliate.weight_kg = cleaned
+
+    if not after:
+        return
+
+    # Recorded without the values. They are hers, the audit trail is read by
+    # staff who may not change them, and "she updated her measurements" is the
+    # whole of what an audit needs to know.
+    record_audit(
+        db,
+        action="affiliate.measurements_updated",
+        subject=f"affiliate:{affiliate.id}",
+        actor_id=actor_id,
+        actor_email=actor_email,
+        before={key: before[key] is not None for key in before},
+        after={key: after[key] is not None for key in after},
     )
 
 

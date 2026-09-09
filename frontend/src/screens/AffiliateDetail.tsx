@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 
 import { Money } from "../components/Money";
 import { api, can } from "../lib/api";
+import { PAYOUT_FIELD_LABEL } from "../lib/payouts";
 import type { Session } from "../lib/api";
 import { describeBlocker, formatMonth } from "../lib/money";
 import { STATUS_LABEL } from "./Affiliates";
@@ -88,6 +89,13 @@ export function AffiliateDetail({ session }: { session: Session }) {
   );
   const [working, setWorking] = useState<string | null>(null);
   const [correction, setCorrection] = useState("");
+  /**
+   * A draft, not the value. `null` means "not editing" - so the field shows
+   * what is recorded until somebody deliberately opens it, and Cancel puts
+   * back what the server said rather than what was typed (M03's rule, applied
+   * here because it is the same failure either side of the platform).
+   */
+  const [startDraft, setStartDraft] = useState<string | null>(null);
 
   function load() {
     setError(null);
@@ -134,6 +142,35 @@ export function AffiliateDetail({ session }: { session: Session }) {
       load();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not check it.");
+    } finally {
+      setWorking(null);
+    }
+  }
+
+  async function saveStartMonth() {
+    setWorking("start");
+    setError(null);
+    setNotice(null);
+    try {
+      // `_set` distinguishes "clear it" from "not supplied". Sending an empty
+      // month without it would be indistinguishable from a request that never
+      // mentioned the field, and clearing a recorded start is a real answer.
+      await api.patch(`/api/affiliates/${id}`, {
+        collaboration_start_month: startDraft?.trim() ? startDraft.trim() : null,
+        collaboration_start_month_set: true,
+      });
+      setStartDraft(null);
+      setNotice({
+        good: true,
+        text: startDraft?.trim()
+          ? "Recorded. This is the first month she can open."
+          : "Cleared. Her months fall back to her earliest order again.",
+      });
+      load();
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "Could not save that month.",
+      );
     } finally {
       setWorking(null);
     }
@@ -361,6 +398,129 @@ export function AffiliateDetail({ session }: { session: Session }) {
 
       <div className="detail__grid">
         {/*
+         * First in the grid, and on a pending profile too - unlike the money
+         * panels below it. When she started is knowable before she is
+         * approved, it is the one thing on this screen nothing can derive, and
+         * it decides which months she can open at all (H01).
+         */}
+        <section className="panel">
+          <div className="panel__head">
+            <h2 className="panel__title">Who {detail.name} is</h2>
+          </div>
+          <dl className="detail__list">
+            <Row label="Started with HBA">
+              {startDraft === null ? (
+                <>
+                  {detail.collaboration_start_month ? (
+                    <span className="code">
+                      {formatMonth(detail.collaboration_start_month)}
+                    </span>
+                  ) : (
+                    <span className="detail__note">Not recorded</span>
+                  )}
+                  {can(session, "affiliates.manage") && (
+                    <button
+                      type="button"
+                      className="button detail__start-edit"
+                      onClick={() =>
+                        setStartDraft(detail.collaboration_start_month ?? "")
+                      }
+                    >
+                      {detail.collaboration_start_month ? "Change" : "Record it"}
+                    </button>
+                  )}
+                  {/*
+                   * Said plainly rather than left to be inferred from a blank.
+                   * An empty month here does not mean she has no history - it
+                   * means the platform is guessing from her earliest order,
+                   * which is a different fact and is usually but not always
+                   * the same one.
+                   */}
+                  {!detail.collaboration_start_month && (
+                    <span className="detail__note">
+                      Her months are being worked out from her earliest order.
+                      That is a good guess and a different fact — a month she
+                      was here for and sold nothing in is missing from it.
+                    </span>
+                  )}
+                </>
+              ) : (
+                <>
+                  <input
+                    className="input detail__start-input"
+                    type="month"
+                    value={startDraft}
+                    min="2026-01"
+                    max={detail.current_month}
+                    onChange={(event) => setStartDraft(event.target.value)}
+                    aria-label="The month she started with HBA"
+                  />
+                  <span className="detail__step-action">
+                    <button
+                      type="button"
+                      className="button button--primary"
+                      disabled={working === "start"}
+                      onClick={saveStartMonth}
+                    >
+                      {working === "start" ? "Saving…" : "Save"}
+                    </button>
+                    <button
+                      type="button"
+                      className="button"
+                      disabled={working === "start"}
+                      onClick={() => setStartDraft(null)}
+                    >
+                      Cancel
+                    </button>
+                  </span>
+                  <span className="detail__note">
+                    The month she actually started, not when her code was made
+                    or when she signed up. Months before it are not offered to
+                    her; months after it are, even the ones she sold nothing in.
+                  </span>
+                </>
+              )}
+            </Row>
+            <Row label="Phone">
+              {detail.phone ? (
+                <span className="code">{detail.phone}</span>
+              ) : (
+                <span className="detail__note">Not given</span>
+              )}
+            </Row>
+            {/*
+             * **"Signs in with"**, not "Email" (D07, 9 September 2026). She
+             * has one address: it is her login and it is how marketing reaches
+             * her (A05). Naming it plainly is the whole of what that decision
+             * costs - a field called "email" on a profile is one somebody
+             * eventually edits as a contact detail, and what they have
+             * actually done is move her login.
+             */}
+            <Row label="Signs in with">
+              <span className="code">{detail.email}</span>
+            </Row>
+            {/*
+             * Read, never written here. A05 gives these to the model alone,
+             * and the enforcement is that no staff route can write them - so
+             * there is deliberately no control beside them, not a disabled one.
+             */}
+            <Row label="Height and weight">
+              {detail.height_cm || detail.weight_kg ? (
+                <span className="code">
+                  {detail.height_cm ? `${detail.height_cm} cm` : "—"}
+                  {" · "}
+                  {detail.weight_kg ? `${detail.weight_kg} kg` : "—"}
+                </span>
+              ) : (
+                <span className="detail__note">
+                  Not given. Optional, and hers to fill in.
+                </span>
+              )}
+            </Row>
+          </dl>
+        </section>
+
+        {/*
          * Not before they are approved. A pending affiliate has no terms, so
          * this panel could only ever show zero owed and "no pay terms for this
          * month" - an answer to a question nobody is asking yet, on a page
@@ -568,7 +728,11 @@ export function AffiliateDetail({ session }: { session: Session }) {
                 </Row>
               )}
               {detail.payout_destination.bank_account_number && (
-                <Row label="Account number">
+                /* Card number, from the one map that names these (D06). She
+                   is asked for the digits on the front of her card; showing
+                   them back as an "account number" is how a payer types the
+                   wrong thing into a banking app. */
+                <Row label={PAYOUT_FIELD_LABEL.bank_account_number}>
                   <span className="code">
                     {detail.payout_destination.bank_account_number}
                   </span>

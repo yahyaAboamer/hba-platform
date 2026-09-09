@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { Money } from "../components/Money";
 import { api } from "../lib/api";
+import { PAYOUT_FIELD_LABEL } from "../lib/payouts";
 import { egpPlain, formatEgp, formatMonth, parseEgp } from "../lib/money";
 import type { Balance } from "./Payments";
 import { STATE_LABEL } from "./Payments";
@@ -355,13 +356,18 @@ export function PaymentRecord() {
                 )}
                 {revealed.bank_account_holder && (
                   <Detail
-                    label="Account holder"
+                    label={PAYOUT_FIELD_LABEL.bank_account_holder}
                     value={revealed.bank_account_holder}
                   />
                 )}
                 {revealed.bank_account_number && (
+                  /* **This is the screen the digits are copied from**, so of
+                     everywhere the label mattered it mattered most here. D06:
+                     it is the number on the front of her card. Calling it an
+                     account number to the one person about to paste it into a
+                     banking app was the whole risk. */
                   <Copyable
-                    label="Account number"
+                    label={PAYOUT_FIELD_LABEL.bank_account_number}
                     value={revealed.bank_account_number}
                     copied={copied}
                     onCopy={copy}

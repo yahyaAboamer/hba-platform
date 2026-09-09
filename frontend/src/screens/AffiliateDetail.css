@@ -170,3 +170,21 @@
   width: 9rem;
   text-transform: uppercase;
 }
+
+/* ── When she started ──────────────────────────────────────────────────────
+ *
+ * The one fact on this profile nothing can derive (H01), so it gets a control
+ * rather than a row of text - and the control is a draft, opened deliberately,
+ * because a month that decides which screens she can open is not something to
+ * change by tabbing past it.
+ */
+.detail__start-edit {
+  margin-left: var(--space-3);
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-xs);
+}
+
+.detail__start-input {
+  width: auto;
+  min-width: 10rem;
+}

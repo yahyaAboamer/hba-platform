@@ -37,6 +37,7 @@ from app.services.affiliates import (
     get_affiliate,
     list_affiliates,
     readiness,
+    set_collaboration_start,
     set_status,
     update_details,
 )
@@ -95,6 +96,11 @@ class UpdateStatusBody(BaseModel):
     name: str | None = Field(default=None, max_length=120)
     phone: str | None = Field(default=None, max_length=40)
     email: str | None = Field(default=None, max_length=320)
+    #: The month she actually started with HBA (H01). Distinguished from "not
+    #: supplied" by `collaboration_start_month_set`: sending the month as null
+    #: is how it is *cleared*, and a plain omission must not do that silently.
+    collaboration_start_month: str | None = Field(default=None, max_length=7)
+    collaboration_start_month_set: bool = False
 
 
 class RecheckCodeBody(BaseModel):
@@ -161,12 +167,24 @@ def _affiliate_payload(affiliate: AffiliateProfile) -> dict:
         "id": affiliate.id,
         "user_account_id": affiliate.user_account_id,
         "name": affiliate.name,
+        #: A05: marketing needs a way to reach her. D07: there is exactly one
+        #: address and it is her login, so the screens that show it say so.
+        "email": affiliate.account.email,
         "phone": affiliate.phone,
         "status": affiliate.status,
         "account_kind": affiliate.account_kind,
         "is_payable": affiliate.is_payable,
         "created_at": _isoformat(affiliate.created_at),
         "archived_at": _isoformat(affiliate.archived_at),
+        #: When she actually started with HBA (H01). `None` means nobody has
+        #: said, and her month list falls back to a derivation - which is a
+        #: different fact and one the screen should be able to say so about.
+        "collaboration_start_month": affiliate.collaboration_start_month,
+        #: Read here, written only by her (A05). There is no admin route into
+        #: these, which is the enforcement; showing them is the whole of what
+        #: marketing needs.
+        "height_cm": affiliate.height_cm,
+        "weight_kg": affiliate.weight_kg,
     }
 
 
@@ -424,10 +442,12 @@ def update_affiliate_status_route(
     actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_MANAGE)),
     db: Session = Depends(get_session),
 ) -> dict:
-    """Change an affiliate's status.
+    """Change an affiliate's status, details, or recorded start month.
 
-    Only status, for now: renaming or updating contact details has no service
-    function yet, and this task does not add one.
+    Three different kinds of change through one request because they are made
+    on one screen, each through its own service function and each audited
+    separately - a status change and a corrected phone number should never
+    appear in the trail as one event.
 
     Archiving goes through archive_affiliate rather than a bare status write,
     because archiving also closes any code the affiliate still holds, from
@@ -444,6 +464,23 @@ def update_affiliate_status_route(
             actor_id=actor.id,
             actor_email=actor.email,
         )
+
+        # Deliberately not part of `update_details`. That function corrects
+        # what a model typed about herself; this records a business fact about
+        # when she started, which decides which months she can open at all.
+        # Same request, separate audit entry, separate reason.
+        #
+        # **Measurements are not here and must not be.** A05 gives that write
+        # to the model alone, and the enforcement is that no staff route calls
+        # `update_measurements` - not a check inside one.
+        if body.collaboration_start_month_set:
+            set_collaboration_start(
+                db,
+                affiliate,
+                body.collaboration_start_month,
+                actor_id=actor.id,
+                actor_email=actor.email,
+            )
 
         if body.status is None:
             pass

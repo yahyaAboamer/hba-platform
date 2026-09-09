@@ -49,6 +49,43 @@ export function cardProblem(value: string): string | null {
     : `A card number is 16 digits. That one has ${only.length}.`;
 }
 
+/**
+ * What each payout field is called, everywhere it is called anything.
+ *
+ * **One map, because two disagreed.** The model's screen asked her for a
+ * *card number* and the maintainer's profile showed it back as an *account
+ * number* — the same column, the same digits, two different words, on two
+ * screens read by two people about to move money between them. Nobody had
+ * done anything wrong; there were simply two copies of this object and only
+ * one of them got corrected.
+ *
+ * ## `bank_account_number` is a card number, and that is settled
+ *
+ * D06, answered 9 September 2026: *card number*. The question was put as
+ * "when you send a bank transfer to a model, what do you type into the
+ * banking app", and that is the answer.
+ *
+ * The column keeps its name because renaming it is a migration and a sweep in
+ * exchange for a tidier identifier. The **label** is what a person reads, so
+ * the label is what had to be right. `cardProblem` above already validated it
+ * as sixteen digits and explains why an account number cannot be checked the
+ * same way.
+ *
+ * The approved design says *account number*. It is superseded here, on
+ * purpose: a label on a mockup does not change what somebody types when money
+ * moves, and adopting it would either reject every real account number or
+ * cost the field its only check.
+ */
+export const PAYOUT_FIELD_LABEL: Record<string, string> = {
+  instapay_address_url: "InstaPay payment address",
+  instapay_phone: "InstaPay number",
+  bank_name: "Bank",
+  bank_account_holder: "Account holder's name",
+  bank_account_number: "Card number",
+  wallet_provider: "Which wallet",
+  wallet_phone: "Wallet number",
+};
+
 /** The payout methods, in their words rather than the column's. */
 const METHOD_LABEL: Record<string, string> = {
   instapay: "InstaPay",
