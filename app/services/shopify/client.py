@@ -51,7 +51,16 @@ class ShopifyMissingScope(ShopifyError):
 #: What Phase 2 needs. read_all_orders matters specifically because Shopify's
 #: ordinary read_orders scope only reaches back 60 days, and the historical
 #: import starts in January 2026.
-REQUIRED_SCOPES = frozenset({"read_orders", "read_all_orders", "read_discounts"})
+#:
+#: **read_products** joins them in Phase 3, for the catalogue and for the line
+#: items a wardrobe is built from. Adding it here is not the same as being
+#: granted it: editing the scope in the Dev Dashboard saves a draft, the change
+#: takes effect when a new app version is released and approved on the store,
+#: and an already-issued token never gains a scope retroactively.
+#: `/api/operations/shopify-scopes` is what turns that into an answer.
+REQUIRED_SCOPES = frozenset(
+    {"read_orders", "read_all_orders", "read_discounts", "read_products"}
+)
 
 MAX_ATTEMPTS = 4
 RETRYABLE_STATUS = frozenset({429, 500, 502, 503, 504})

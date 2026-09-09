@@ -14,6 +14,20 @@ type Sync = {
   jobs: { pending: number; running: number; succeeded: number; failed: number };
 };
 
+/**
+ * The catalogue, and when HBA last heard about it.
+ *
+ * `last_synced_at` is the half that matters: a catalogue nobody has read for a
+ * fortnight looks identical to a fresh one until it says so.
+ */
+type Catalogue = {
+  products: number;
+  active_products: number;
+  variants: number;
+  line_items: number;
+  last_synced_at: string | null;
+};
+
 type FailedJob = {
   id: number;
   kind: string;
@@ -66,6 +80,8 @@ export function DataPanel() {
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
+  const [catalogue, setCatalogue] = useState<Catalogue | null>(null);
+  const [syncingCatalogue, setSyncingCatalogue] = useState(false);
 
   const load = useCallback(() => {
     Promise.all([
@@ -73,17 +89,38 @@ export function DataPanel() {
       api.get<{ jobs: FailedJob[] }>("/api/operations/failed-jobs"),
       api.get<{ codes: UnownedCode[] }>("/api/operations/unregistered-codes"),
       api.get<MailHealth>("/api/operations/notifications"),
+      api.get<Catalogue>("/api/operations/catalogue"),
     ])
-      .then(([status, failed, unowned, health]) => {
+      .then(([status, failed, unowned, health, products]) => {
         setSync(status);
         setJobs(failed.jobs);
         setCodes(unowned.codes);
         setMail(health);
+        setCatalogue(products);
       })
       .catch((caught) => setError(caught.message));
   }, []);
 
   useEffect(load, [load]);
+
+  async function syncCatalogue() {
+    setSyncingCatalogue(true);
+    setError(null);
+    setNotice(null);
+    try {
+      await api.post("/api/operations/sync-catalogue", {});
+      setNotice(
+        "Queued. It walks the shop a page at a time — the counts below will climb.",
+      );
+      load();
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "Could not start it.",
+      );
+    } finally {
+      setSyncingCatalogue(false);
+    }
+  }
 
   async function startImport() {
     setWorking(true);
@@ -170,6 +207,42 @@ export function DataPanel() {
               disabled={working || !sync?.shopify_configured}
             >
               {working ? "Starting…" : "Import from Shopify"}
+            </button>
+          </div>
+        </div>
+
+        {/*
+         * **Safe against the shared shop**, unlike the import above it, and
+         * said here because the two sit side by side and one of them is not.
+         * The import is a bulk operation and Shopify allows one per shop; this
+         * is ordinary paginated reads.
+         *
+         * The freshness line matters more than the counts. A catalogue nobody
+         * has synced for a fortnight looks identical to a fresh one until
+         * something says otherwise.
+         */}
+        <div className="data__import">
+          <h3 className="data__heading">Product catalogue</h3>
+          <p className="data__note">
+            {catalogue === null
+              ? "Checking…"
+              : catalogue.products === 0
+                ? "Nothing read yet. Products, sizes and images are what a wardrobe is built from."
+                : `${catalogue.products} product${catalogue.products === 1 ? "" : "s"} · ${catalogue.active_products} active · ${catalogue.variants} size${catalogue.variants === 1 ? "" : "s"}`}
+          </p>
+          <p className="data__note">
+            {catalogue?.last_synced_at
+              ? `Last read from Shopify ${when(catalogue.last_synced_at)}.`
+              : "Reading it is ordinary paginated requests — safe to run at any time, unlike the import above."}
+          </p>
+          <div className="data__import-row">
+            <button
+              type="button"
+              className="button"
+              onClick={syncCatalogue}
+              disabled={syncingCatalogue || !sync?.shopify_configured}
+            >
+              {syncingCatalogue ? "Starting…" : "Read the catalogue"}
             </button>
           </div>
         </div>

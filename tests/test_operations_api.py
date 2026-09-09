@@ -471,18 +471,29 @@ def _stub_client(monkeypatch, granted: set[str]):
 def test_scopes_reports_what_is_granted_and_what_is_missing(client, monkeypatch):
     """The question "is read_discounts actually granted?" has to be answerable
     with a fact rather than by trying something and reading the error.
+
+    **This is the route that answers it for `read_products` too**, which Phase
+    3 added to the required set. Adding a scope in the Dev Dashboard saves a
+    draft; the grant arrives when a new app version is released and approved on
+    the store, and an already-issued token never gains one retroactively. So
+    "I added it" and "it is granted" are different claims, and only this can
+    tell them apart.
     """
     _stub_client(monkeypatch, {"read_orders", "read_all_orders"})
     body = client.get("/api/operations/shopify-scopes").json()
 
     assert body["granted"] == ["read_all_orders", "read_orders"]
-    assert body["missing"] == ["read_discounts"]
+    assert body["missing"] == ["read_discounts", "read_products"]
     assert "read_discounts" in body["required"]
+    assert "read_products" in body["required"]
     assert body["reported_by_shopify"] is True
 
 
 def test_scopes_reports_nothing_missing_once_everything_is_granted(client, monkeypatch):
-    _stub_client(monkeypatch, {"read_orders", "read_all_orders", "read_discounts"})
+    _stub_client(
+        monkeypatch,
+        {"read_orders", "read_all_orders", "read_discounts", "read_products"},
+    )
     body = client.get("/api/operations/shopify-scopes").json()
 
     assert body["missing"] == []

@@ -246,8 +246,24 @@ def test_require_scope_raises_with_the_scope_named():
 
 
 def test_the_required_scopes_are_the_ones_this_phase_needs():
+    """The whole set, so adding a scope is a decision rather than an afternoon.
+
+    Each one is here for a reason worth keeping:
+
+      read_orders      the orders commission is calculated from.
+      read_all_orders  the ordinary scope reaches back 60 days; the history
+                       starts in January 2026.
+      read_discounts   verifying that a model's code exists on the shop.
+      read_products    the catalogue and the line items a wardrobe is built
+                       from. **Added in Phase 3A**, and this assertion failing
+                       is what made adding it deliberate.
+
+    Asking for a scope is asking the business to release a new app version and
+    approve it on the store. It is not free, and it is not reversible for an
+    already-issued token, so the set only grows on purpose.
+    """
     assert REQUIRED_SCOPES == frozenset(
-        {"read_orders", "read_all_orders", "read_discounts"}
+        {"read_orders", "read_all_orders", "read_discounts", "read_products"}
     )
 
 
