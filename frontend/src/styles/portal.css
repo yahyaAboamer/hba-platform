@@ -2,83 +2,40 @@
  * The affiliate portal's own surface.
  *
  * **Scoped to `.affiliate`, deliberately.** Everything here lives under the
- * portal's root element, so no maintainer screen can be reached by it. Those
- * screens are a dense month-end tool and `tokens.css`'s cool neutrals were
- * always right for them. That isolation is what made it safe to redesign this
- * half four weeks before payroll.
+ * portal's root element, so no maintainer screen can be reached by it. That
+ * isolation is what made it safe to redesign this half four weeks before
+ * payroll, and it is worth keeping even now that both halves share a palette.
  *
- * ## Where this comes from
+ * ## What moved out, and why
  *
- * The ramps, the spacing density, the elevation model and the rule that the
- * accent is a line rather than a flood are Nocturne's, from the design bundle
- * the business built (`docs/plans/2026-09-03-portal-redesign.md`). Nocturne's
- * own blurple accent is not - `portal-accent.css` holds ours, alone, so it
- * can be swapped back in one file.
+ * This file used to carry a complete second colour ramp, its own dark block,
+ * its own type stack and its own radius scale — a parallel system to
+ * `tokens.css`, because the two halves genuinely looked different. The
+ * approved redesign draws them in **one** palette: the exported admin and
+ * model references declare byte-identical token blocks. So the ramp, the
+ * themes, the fonts and the radii went to `tokens.css` (ADR 0039), and what
+ * is left here is what is actually the portal's own — the denser spacing of a
+ * phone screen, the room under the tab bar, and the furniture below.
  *
- * ## Two themes, and dark is the default
+ * Two consequences worth naming, because they undo earlier decisions:
  *
- * `data-theme` is stamped on the portal root by `AffiliatePortal`, and the
- * choice is remembered per device. There is no `prefers-color-scheme` here on
- * purpose: the business asked for dark by default with a toggle, so following
- * the operating system instead would quietly overrule that on half the
- * phones it opened on.
- *
- * Every colour is a token redefined in both blocks. **A colour whose only
- * definition sits inside one theme renders that theme's text on the other
- * theme's ground** - the classic way a two-theme sheet breaks.
+ * - **`--refused` is red again.** It was amber here only because the accent
+ *   used to be red, and two reds one step apart on a screen cannot both mean
+ *   something. The accent is green now; the reason is gone.
+ * - **Focus no longer needs a local override.** `--focus` is the accent
+ *   platform-wide, which is what both exports do.
  *
  * ## What does not change
  *
  * ADR 0027 is intact in the part that carries meaning: the typeface still
- * says whether a figure is an obligation - mono for agreed money, prose for a
- * working number - and colour is still spent on state rather than decoration.
- * The serif display face is gone, because the design that replaced it has no
- * job for one.
+ * says whether a figure is an obligation — mono for agreed money, prose for a
+ * working number — and colour is still spent on state rather than decoration.
  */
 
 .affiliate {
-  /* ── Ground and ink ───────────────────────────────────────────────────
-   * Nocturne's neutral ramp, verbatim. Light is written first and in full,
-   * so nothing is left defined in only one theme.
-   */
-  --paper: #e4e7f5;
-  --surface: #f3f5fe;
-  --raise: #ffffff;
-  --ink: #292b31;
-  --quiet: color-mix(in srgb, #292b31 62%, transparent);
-  --faint: color-mix(in srgb, #292b31 42%, transparent);
-  --rule: color-mix(in srgb, #292b31 13%, transparent);
-  --rule-strong: #cfd3e5;
-  --hover: #e9ecf7;
-  --bar: #b2b6ca;
-
-  /* Money state. `--settled` keeps its green: it means *this arrived*, and it
-     is the one meaning the accent must never be confused with.
-
-     `--refused` is **amber, not red.** Red is the brand's accent in this half
-     of the platform, and an error notice sitting one step away from the
-     active tab would leave two reds on a screen, neither able to mean
-     anything. `tokens.css` already calls this hue "attention, not alarm", and
-     a void order was never red anyway - it is struck through and faded. */
-  --owed: #8a5300;
-  --settled: #0f6b45;
-  --refused: #8a5300;
-  --owed-quiet: #fdf4e6;
-  --settled-quiet: #edf6f1;
-  --refused-quiet: #fdf4e6;
-
-  /* Elevation. On light, a hairline plus a soft shadow; on dark, an edge and
-     ambient darkness - stacking heavy shadows on a dark ground reads as fog. */
-  --elev: 0 1px 2px rgba(41, 43, 49, 0.08), 0 0 0 1px rgba(41, 43, 49, 0.05);
-  --scrim: rgba(41, 43, 49, 0.5);
-
-  /* Type. Inter for prose and headings; mono stays for agreed money, order
-     numbers and codes, which is the distinction ADR 0027 rests on. */
-  --sans: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
-  --display: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
-
-  /* Nocturne's compact scale. Dense on purpose - this is a phone screen with
-     a figure, its explanation and a tab bar all in one hand. */
+  /* Nocturne's compact scale, kept. Dense on purpose - this is a phone screen
+     with a figure, its explanation and a tab bar all in one hand. The
+     maintainer's laptop-first scale in `tokens.css` is looser. */
   --space-1: 3px;
   --space-2: 6px;
   --space-3: 9px;
@@ -87,61 +44,16 @@
   --space-6: 20px;
   --space-8: 28px;
 
-  --radius-sm: 4px;
-  --radius: 8px;
-  --radius-lg: 14px;
-
   /* Kept out of the spacing scale on purpose. Tightening `--space-8` is a
      density decision; the room under the last line of a screen is a
      "content must not sit under the tab bar" decision, and tying them
      together is how the two get changed by accident. */
   --tab-clearance: 4.5rem;
 
-  /* Tells the browser to draw its *own* furniture to match - placeholder
-     text, autofill, scrollbars, the select dropdown, the date picker. Without
-     it a dark form still gets a light-mode caret and a white autofill block,
-     which is the give-away that a theme was painted on rather than switched. */
-  color-scheme: light;
-
   background: var(--paper);
   color: var(--ink);
   font-family: var(--sans);
   min-height: 100vh;
-}
-
-.affiliate[data-theme="dark"] {
-  --paper: #161826;
-  --surface: #232532;
-  --raise: #2b2e3d;
-  --ink: #e9e9ed;
-  --quiet: color-mix(in srgb, #e9e9ed 58%, transparent);
-  --faint: color-mix(in srgb, #e9e9ed 34%, transparent);
-  --rule: color-mix(in srgb, #e9e9ed 16%, transparent);
-  --rule-strong: #3f424d;
-  --hover: #2b2e3d;
-  --bar: #595d6c;
-
-  /* Amber and green both lift on the dark ground. Carried over unchanged,
-     they would sit at about 2:1 and be unreadable. */
-  --owed: #e0b063;
-  --settled: #5fd095;
-  --refused: #e0b063;
-  --owed-quiet: #2a2015;
-  --settled-quiet: #12261d;
-  --refused-quiet: #2a2015;
-
-  --elev: 0 0 0 1px #3f424d;
-  --scrim: rgba(10, 11, 18, 0.68);
-
-  color-scheme: dark;
-}
-
-/* Focus is the accent here rather than `--focus`. On the maintainer's screens
-   the indigo is deliberately a colour used nowhere else; in the portal the
-   accent is already the only colour, so a third one would be noise. */
-.affiliate :focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
 }
 
 .affiliate ::selection {
@@ -341,15 +253,15 @@
 /* ── Actions ─────────────────────────────────────────────────────────────
  *
  * **Outlined, never filled.** Nocturne's rule, and the right one here: the
- * accent is a line in this system, and a solid red button is the loudest
+ * accent is a line in this system, and a solid accent button is the loudest
  * thing that could sit on a screen whose loudest thing is meant to be the
- * figure.
+ * figure. The approved exports agree — they fill with the accent only a
+ * progress bar and a status dot, never a button.
  *
- * This also removes a real bug rather than only a stylistic one. `base.css`
- * hovers `.button--primary` to a literal `#000`, which is correct on the
- * maintainer's light screens and inverts a near-white button to black on this
- * one. Overriding here rather than editing `base.css` keeps the promise that
- * no maintainer screen is touched by this redesign.
+ * This used to also work around a bug: `base.css` hovered `.button--primary`
+ * to a literal `#000`, which inverted a near-white button to black here. That
+ * is fixed at source now (`--ink-strong`), because the maintainer's half can
+ * be dark too and the workaround would no longer have covered it.
  */
 .affiliate .button {
   border-color: var(--rule);

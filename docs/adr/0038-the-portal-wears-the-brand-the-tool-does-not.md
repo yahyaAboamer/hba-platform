@@ -1,6 +1,6 @@
 # 0038 — The portal wears the brand; the maintainer's tool does not
 
-**Status:** accepted
+**Status:** Superseded by [0039](0039-one-palette-across-both-halves.md)
 **Date:** 2026-09-04
 **Amends:** [0027](0027-numerals-change-face-when-a-figure-becomes-an-obligation.md) — for the affiliate portal only
 **Related:** `docs/plans/2026-09-03-portal-redesign.md`

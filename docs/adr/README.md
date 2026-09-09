@@ -77,11 +77,13 @@ what was chosen.
 | [0035](0035-an-adjustment-closes-a-difference.md) | An adjustment closes a difference; it never opens a larger one | Accepted |
 | [0036](0036-pre-go-live-months-are-ordinary-months.md) | Months before go-live are ordinary months, settled outside | Accepted |
 | [0037](0037-what-you-were-paid-is-not-how-you-sold.md) | What a model was paid and how their sales performed are two numbers | Accepted |
-| [0038](0038-the-portal-wears-the-brand-the-tool-does-not.md) | The portal wears the brand; the maintainer's tool does not | Accepted |
+| [0038](0038-the-portal-wears-the-brand-the-tool-does-not.md) | The portal wears the brand; the maintainer's tool does not | Superseded by 0039 |
+| [0039](0039-one-palette-across-both-halves.md) | One palette across both halves; the accent leaves `.affiliate` | Accepted |
 
-**0014 is superseded by 0036**, and **0027 is amended by 0038** for the
-affiliate portal only. Both carry the reasoning at the top of the superseded
-file rather than only in the one that replaced it.
+**0014 is superseded by 0036** and **0038 by 0039**; **0027 is amended by
+0039**, for colour rather than typeface — the rule that an agreed figure wears
+a different face is untouched. Each carries the reasoning at the top of the
+superseded file rather than only in the one that replaced it.
 
 See also [`../limits.md`](../limits.md) — the register of known limits and
 foreseeable failures, which records what will eventually break rather than what

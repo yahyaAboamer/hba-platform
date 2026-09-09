@@ -6,32 +6,35 @@ import { describe, expect, it } from "vitest";
 /**
  * **The accent lives in one file, and this is what keeps it there.**
  *
- * `portal-accent.css` was written with a promise attached: switching the
- * affiliate portal from HBA red to Nocturne's blurple - or to anything else -
- * is editing eight declarations and nothing else. That promise is worth
- * exactly as much as the rule underneath it, which is that no other file may
- * name an accent colour directly.
+ * `accent.css` was written with a promise attached: switching the platform
+ * from HBA green to anything else is editing eight declarations and nothing
+ * else. That promise is worth exactly as much as the rule underneath it,
+ * which is that no other file may name an accent colour directly.
  *
- * A rule like that decays. Somebody in a hurry types `#e6001c` into a hover
+ * A rule like that decays. Somebody in a hurry types `#23a95c` into a hover
  * state, nobody notices in review, and a year later the one-file change is a
  * two-day change and the promise is a lie in a comment. So it is checked
  * rather than trusted.
  *
  * The check is deliberately narrow: it asserts nothing about colour in
- * general - `portal.css` carries a whole neutral ramp and should - only that
+ * general - `tokens.css` carries a whole neutral ramp and should - only that
  * **the specific values the accent file defines appear nowhere else.**
+ *
+ * It survived the accent changing colour and losing its `.affiliate` scope
+ * (ADR 0039) without changing shape, because it reads the values out of the
+ * file rather than knowing them.
  */
 
 const SRC = resolve(__dirname, "..", "..");
-const ACCENT = resolve(SRC, "styles", "portal-accent.css");
+const ACCENT = resolve(SRC, "styles", "accent.css");
 
 /**
  * Comments stripped first.
  *
  * A comment that quotes the brand hex while explaining the contrast problem
  * is documentation, not a hard-coded colour - and a check that punished it
- * would be a check that discouraged the explanation. `portal-accent.css` is
- * mostly such a comment, and so is the top of this file.
+ * would be a check that discouraged the explanation. `accent.css` is mostly
+ * such a comment, and so is the top of this file.
  *
  * `//` is only treated as a comment when nothing precedes it on the line but
  * whitespace, so a `https://` inside a `url()` survives.
@@ -76,7 +79,7 @@ function walk(dir: string): string[] {
   });
 }
 
-describe("the accent is confined to portal-accent.css", () => {
+describe("the accent is confined to accent.css", () => {
   const accentCss = readFileSync(ACCENT, "utf8");
 
   // Only the declarations, never the comment block above them - that comment
@@ -110,7 +113,7 @@ describe("the accent is confined to portal-accent.css", () => {
         found,
         `${relativePath} hard-codes an accent colour (${[...new Set(found)].join(", ")}). ` +
           "Take it from var(--accent), var(--accent-text), var(--accent-soft) " +
-          "or var(--accent-on) instead - see styles/portal-accent.css.",
+          "or var(--accent-on) instead - see styles/accent.css.",
       ).toEqual([]);
     },
   );

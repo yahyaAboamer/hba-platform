@@ -1,0 +1,67 @@
+/*
+ * The accent. This file is the whole brand decision.
+ *
+ * Eight declarations, and switching the platform from HBA green to anything
+ * else is editing them and nothing else. That promise was made when the
+ * accent was chosen, and it only holds while one rule holds with it:
+ *
+ *   **No component names a colour directly.** Every rule takes its accent
+ *   from `var(--accent)`, `var(--accent-text)`, `var(--accent-soft)` or
+ *   `var(--accent-on)`. A hex typed into a component is the thing that turns
+ *   a one-file change back into a two-day change.
+ *
+ * `styles/__tests__/accent-isolation.test.ts` reads the declarations below,
+ * walks every other file under `src/`, and fails the build on any of them
+ * appearing elsewhere. Those failures are the test working.
+ *
+ * ## Why this is no longer scoped to the portal
+ *
+ * It used to be `portal-accent.css`, defining its values under `.affiliate`,
+ * because ADR 0038 had decided the portal wears the brand and the
+ * maintainer's tool does not. The approved redesign draws both halves in the
+ * same green — the two exported references declare identical accent blocks —
+ * so the scope moved to the root and ADR 0039 records why. The mechanism is
+ * unchanged; only what it covers is.
+ *
+ * ## Why there are still two greens and not one
+ *
+ * Not for the reason there were two reds. HBA red could not be read on the
+ * dark ground at all — 3.17:1 on a card, where text needs 4.5:1 — so a
+ * lighter step of the same ramp had to carry anything that was text. Green
+ * has no such problem:
+ *
+ *   | against              | #23A95C | #7BE0A6 |
+ *   | page    #08090A      |  6.55:1 | 12.39:1 |
+ *   | card    #15171A      |  5.90:1 | 11.16:1 |
+ *   | raise   #1D2126      |  5.32:1 | 10.06:1 |
+ *
+ * Both are legible everywhere. The split survives because the approved design
+ * uses it — `#23A95C` for chrome on dark, `#7BE0A6` lifted for accented text
+ * — and because keeping the four-token contract stable means no component has
+ * to know which of those reasons applies today.
+ *
+ * On light the design uses the deep step for both roles: `#14653A`, which
+ * reads at 7.11:1 on a card and 6.26:1 on the page. One value, written twice,
+ * so neither token is left undefined in a theme.
+ *
+ * ## Green already meant something
+ *
+ * `tokens.css` points `--settled` and `--settled-quiet` at these values
+ * rather than at a green of their own. That is deliberate and explained
+ * there: the brand colour and the resolved-money colour are the same colour
+ * because the business chose, as its brand, the colour that already said so.
+ */
+
+:root {
+  --accent: #14653a; /* chrome: lines, borders, fills, the active tab */
+  --accent-text: #14653a; /* on light, chrome and text are one step */
+  --accent-soft: rgba(20, 101, 58, 0.09); /* tints and pressed states */
+  --accent-on: #ffffff; /* text on a filled accent */
+}
+
+[data-theme="dark"] {
+  --accent: #23a95c;
+  --accent-text: #7be0a6; /* lifted, as the design draws accented text on dark */
+  --accent-soft: rgba(35, 169, 92, 0.14);
+  --accent-on: #ffffff;
+}

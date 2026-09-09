@@ -134,7 +134,9 @@
   justify-content: center;
   padding: var(--space-8) var(--space-4);
   overflow-y: auto;
-  background: rgb(20 24 31 / 45%);
+  /* `--scrim`, not a literal. A fixed dark wash is right over a light page and
+     invisible over a dark one, which the maintainer's half can now be. */
+  background: var(--scrim);
 }
 
 .invite {

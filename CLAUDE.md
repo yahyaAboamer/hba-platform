@@ -12,12 +12,15 @@ the work is right now. Everything below is the part that does not change.
 
 | | Who | Look |
 |---|---|---|
-| **Maintainer** | 2 people, laptop, month end | Cool neutrals, dense, colour only for money state |
-| **Affiliate portal** (`.affiliate`) | ~20 models, phone, arriving from an email | Dark by default, HBA red, Nocturne's ramps |
+| **Maintainer** | 2 people, laptop, month end | Dense, laptop-first, colour only for money state |
+| **Affiliate portal** (`.affiliate`) | ~20 models, phone, arriving from an email | Dark by default, denser, phone-shaped |
 
-They share `tokens.css` and nothing else. `portal.css` is scoped to
-`.affiliate`, which is why the portal could be redesigned three weeks before
-payroll without touching a maintainer screen. **Keep that isolation.**
+**One palette across both, since ADR 0039** — HBA green, both themes, defined
+once in `tokens.css` with the accent alone in `accent.css`. `portal.css` is
+still scoped to `.affiliate`, but it now isolates *layout* rather than colour:
+the phone's spacing, its tab-bar clearance, its furniture. **Keep that
+isolation** — it is why the portal could be redesigned three weeks before
+payroll without touching a maintainer screen.
 
 ## Rules that must not be broken
 
@@ -28,10 +31,10 @@ payroll without touching a maintainer screen. **Keep that isolation.**
   front of the one person guaranteed to check.
 - **An agreed month is read from its snapshot**, never recalculated. A live
   recalculation under the word "paid" presents a working number as a debt.
-- **No component names a colour directly.** The portal's accent lives in
-  `frontend/src/styles/portal-accent.css` — eight declarations — and
-  `styles/__tests__/accent-isolation.test.ts` fails the build if those values
-  appear anywhere else.
+- **No component names a colour directly.** The accent lives in
+  `frontend/src/styles/accent.css` — eight declarations, now covering both
+  halves (ADR 0039) — and `styles/__tests__/accent-isolation.test.ts` fails the
+  build if those values appear anywhere else.
 - **No customer data.** `order_index` and `attributed_order` hold no name,
   address, phone or email, and a test keeps it structural.
 - **Append-only tables stay append-only**: `payroll_snapshot`,

@@ -1,4 +1,4 @@
-/* Reset, typography, and the shared primitives. ADR 0027. */
+/* Reset, typography, and the shared primitives. ADR 0027, 0039. */
 
 *,
 *::before,
@@ -51,8 +51,9 @@ select {
   color: inherit;
 }
 
-/* Visible, and the same everywhere. The one place colour appears outside money
-   state, because focus is the one thing that must never blend in. */
+/* Visible, and the same everywhere. `--focus` is the accent now, as both
+   exported references draw it - it was a colour used nowhere else back when
+   the accent was a red you could not put an outline in. */
 :focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
@@ -157,6 +158,111 @@ select {
   white-space: nowrap;
 }
 
+/* ── Cards ────────────────────────────────────────────────────────────────
+ *
+ * The unit the redesign is built out of. Both exported references use one
+ * shape for it — a lifted surface at the 8px radius, and **no border**. The
+ * lift is the edge; adding a rule as well draws the box twice.
+ *
+ * `--surface` is white on light and a step above the page on dark, so the
+ * same declaration reads as a card in both themes without a second rule.
+ */
+.card {
+  background: var(--surface);
+  border-radius: var(--radius);
+}
+
+/* A card that is a list. `overflow: hidden` so the first and last rows are
+   clipped to the radius instead of squaring off its corners. */
+.card--rows {
+  overflow: hidden;
+}
+
+.card__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--rule);
+}
+
+/* The last rule in a list is the card's own bottom edge drawn a second time. */
+.card__row:last-child {
+  border-bottom: 0;
+}
+
+/* ── Modals and sheets ────────────────────────────────────────────────────
+ *
+ * One overlay, two shapes: centred on a laptop, and rising from the bottom
+ * edge on a phone, which is where a thumb is.
+ *
+ * The scrim is `--scrim` rather than a fixed dark wash. A literal is right
+ * over a light page and nearly invisible over a dark one, and both halves can
+ * now be either.
+ */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  justify-content: center;
+  padding: var(--space-6) var(--space-4);
+  overflow-y: auto;
+  background: var(--scrim);
+}
+
+.overlay--centred {
+  align-items: center;
+}
+
+.modal {
+  width: min(34rem, 100%);
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--elev);
+}
+
+/* Rising from the bottom edge. `max-height` leaves the top of the page
+   visible on purpose - a sheet that covers everything is a page, and should
+   have been one. */
+.sheet {
+  width: 100%;
+  max-height: 85vh;
+  margin-top: auto;
+  overflow-y: auto;
+  background: var(--surface);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  box-shadow: var(--elev);
+}
+
+/* ── Waiting ──────────────────────────────────────────────────────────────
+ *
+ * §S06: loading, empty, unavailable and stale mean different things, and a
+ * failed request must never render as zero earnings. So this says *waiting*
+ * and nothing else - it never occupies the shape of a figure, because a grey
+ * block where a number goes is read as a number that is nearly there.
+ */
+.loading {
+  padding: var(--space-6) var(--space-4);
+  color: var(--quiet);
+  font-size: var(--text-sm);
+}
+
+/* For a row or tile whose shape is known before its content is. Animated only
+   where motion is welcome; the reduced-motion rule above stops it otherwise,
+   and a still block still reads as "not yet". */
+.skeleton {
+  border-radius: var(--radius-sm);
+  background: var(--rule);
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes skeleton-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+
 /* ── Tables ───────────────────────────────────────────────────────────────
  *
  * Hairlines and space. Calm density (§12.1): built for scanning twenty
@@ -230,7 +336,8 @@ select {
 }
 
 .button--primary:hover:not(:disabled) {
-  background: #000;
+  background: var(--ink-strong);
+  border-color: var(--ink-strong);
 }
 
 .button--primary:disabled {
