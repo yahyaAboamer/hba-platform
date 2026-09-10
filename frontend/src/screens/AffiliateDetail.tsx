@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { Money } from "../components/Money";
+import { FinancialRulesPreview } from "../components/FinancialRulesPreview";
 import { api, can } from "../lib/api";
 import { PAYOUT_FIELD_LABEL } from "../lib/payouts";
 import type { Session } from "../lib/api";
@@ -799,6 +800,10 @@ export function AffiliateDetail({ session }: { session: Session }) {
         </section>
 
         )}
+
+        {id && <FinancialRulesPreview key={id} affiliateId={id} currentMonth={detail.current_month}
+          firstMonth={detail.collaboration_start_month && detail.collaboration_start_month > "2026-01"
+            ? detail.collaboration_start_month : "2026-01"} />}
 
         <section className="panel">
           <div className="panel__head">

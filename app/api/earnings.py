@@ -34,6 +34,7 @@ from app.models.attributed_orders import AttributedOrder
 from app.models.identity import UserAccount
 from app.services.affiliates import list_affiliates
 from app.services.commission.calculate import MonthCalculation, calculate_month
+from app.services.commission.preview import preview_month
 
 router = APIRouter(prefix="/api")
 
@@ -100,6 +101,7 @@ def _render(result: MonthCalculation, name: str | None = None) -> dict:
 def affiliate_earnings(
     affiliate_id: int,
     month: str,
+    rules_preview: bool = False,
     _actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_VIEW)),
     db: Session = Depends(get_session),
 ) -> dict:
@@ -125,6 +127,7 @@ def affiliate_earnings(
 
     return {
         **_render(result, affiliate.name),
+        **({"financial_rules_preview": preview_month(db, affiliate, month)} if rules_preview else {}),
         "orders_detail": [
             {
                 "shopify_order_id": row.shopify_order_id,

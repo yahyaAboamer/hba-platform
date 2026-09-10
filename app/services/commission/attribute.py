@@ -110,7 +110,12 @@ def attribute_order(db: Session, order: OrderIndex) -> AttributedOrder | None:
         )
         db.add(existing)
 
-    existing.commission_base_piastres = base.piastres
+    # F03 / 05A: retain a known pre-failure basis for the struck-out amount.
+    # A failed order is excluded by state in both policies; zeroing its basis
+    # destroys evidence without changing what it pays. First-seen failures
+    # still use their observed basis and never invent an original figure.
+    if not (state == CommissionState.VOID and existing.commission_base_piastres):
+        existing.commission_base_piastres = base.piastres
     existing.base_frozen_at = order.delivered_at if base.is_final else None
     existing.commission_state = state
     existing.refunded_merchandise_piastres = order.refunded_merchandise_piastres or 0

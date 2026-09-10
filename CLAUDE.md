@@ -73,9 +73,12 @@ payroll without touching a maintainer screen.
 
 ## Verification
 
-- Backend: `.venv/Scripts/python.exe -m pytest -q` — **1744 passing**, and no
+- Backend: `.venv/Scripts/python.exe -m pytest -q` — **1767 passing**, and no
   change merges below that. It takes 5–15 minutes; run it in the background.
-- Frontend: `cd frontend && npm test` (224) and `npm run build`.
+- Frontend: `cd frontend && npm test` (231) and `npm run build`.
+- Redesign 05A is a **read-only rules preview**. The normal calculation and
+  approval remain delivered-only until the later financial batches and D01;
+  do not mistake the preview's entitlement for a transfer instruction.
 - The suite is the ratchet. `test_reachability.py` fails when a route has no
   way in from the interface; `accent-isolation.test.ts` fails on a hard-coded
   accent; the writable-routes guard fails when anybody adds a route a model
