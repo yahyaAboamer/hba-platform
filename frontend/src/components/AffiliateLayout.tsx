@@ -37,9 +37,10 @@ import "./AffiliateLayout.css";
  *   chip, which is where Grow's only real content already is. Folding them in
  *   properly is Phase 07A; until then Home links to both, because deleting a
  *   working screen to match a drawing is not a redesign.
- * - **Wardrobe, Targets and Ranking** have nothing behind them yet. They say
- *   so — see `NotBuiltYet`. They are here early because a tab bar that grows
- *   a slot every few weeks moves every other tab under her thumb each time.
+ * - **Wardrobe** (03C) and **Targets** (04B) are built. **Ranking** is not,
+ *   and says so — see `NotBuiltYet`. All three were here before their screens
+ *   were, because a tab bar that grows a slot every few weeks moves every
+ *   other tab under her thumb each time.
  *
  * ## Why "You" is not a tab
  *
