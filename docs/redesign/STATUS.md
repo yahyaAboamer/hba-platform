@@ -15,7 +15,8 @@ Package prepared: 9 September 2026. Phase 00 completed 9 September 2026.
   service, model, migration or money code has been touched.
 - Runtime tests: green before and after every batch so far. Backend **1716
   passed** (1589 at baseline, then 24 / 7 / 17 / 22 / 35 / 22 from 02A, 02B,
-  02C, 03A, 03B and 03C); frontend **198 passed**; `npm run build` exit 0. The
+  02C, 03A, 03B, 03C, 03D and 03E - now **1727**); frontend **198 passed**;
+  `npm run build` exit 0. The
   `1558 / 87` in `REPOSITORY_AUDIT.md` is stale.
 - Browser acceptance: **both design references and both halves of the running
   app were opened and compared** (synthetic seed data). Per-screen visual

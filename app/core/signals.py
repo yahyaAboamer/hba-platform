@@ -77,6 +77,10 @@ class Anomaly:
     #: A bulk import finished having matched no orders at all.
     IMPORT_EMPTY = "import_empty"
 
+    #: An order carried more than one page of line items, so what was stored
+    #: is the first hundred and not the whole parcel.
+    LINE_ITEMS_TRUNCATED = "line_items_truncated"
+
     #: Products in a catalogue walk that carried no usable id. The rest of the
     #: walk went ahead; those products are simply not in the catalogue, which
     #: shows up later as a wardrobe row with no picture.

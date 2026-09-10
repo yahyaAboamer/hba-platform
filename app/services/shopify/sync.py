@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.core.signals import Anomaly, report
 from app.models.orders import OrderIndex
-from app.services.jobs import JobKind, PermanentFailure
+from app.services.jobs import JobKind, PermanentFailure, enqueue
 from app.services.shopify.client import (
     ShopifyClient,
     ShopifyMissingScope,
@@ -92,4 +92,20 @@ def _handle_sync_order(db: Session, payload: dict) -> None:
             f"{SYNC_ORDER} requires an order_id; got payload keys "
             f"{sorted(payload)!r}"
         )
-    sync_one_order(db, order_id)
+    order = sync_one_order(db, order_id)
+
+    # **Live matching** (W05: *backfill from January and perform live
+    # matching*). The bulk scan walks history; without this a parcel that
+    # shipped this morning would sit unmatched until somebody re-ran it.
+    #
+    # Its own job, and deliberately after the index is written: matching needs
+    # a protected Shopify field, and a denial of that field must never be able
+    # to stop an order being indexed. That is the same separation 03A drew
+    # between the catalogue and commission, for the same reason.
+    if order is not None:
+        enqueue(
+            db,
+            JobKind.MATCH_ORDER,
+            {"order_id": order_id},
+            dedupe_key=f"{JobKind.MATCH_ORDER}:{order_id}",
+        )

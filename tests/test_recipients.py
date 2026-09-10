@@ -394,3 +394,120 @@ def test_the_audit_says_which_side_changed_it_and_not_what_to(db):
     assert rows, "the change was not recorded at all"
     assert '"by": "staff"' in rows[0][1]
     assert "Maadi" not in rows[0][1]
+
+
+# ── Reading what was in the parcel ─────────────────────────────────────────
+#
+# Until this existed, a matched parcel had nothing in it and every wardrobe was
+# empty however much had been sent.
+
+
+class _RecipientClient:
+    """Answers the recipient query, and records what was asked."""
+
+    def __init__(self, phone=None):
+        self.phone = phone
+        self.asked = []
+
+    def require_scope(self, scope):
+        pass
+
+    def execute(self, document, variables=None):
+        self.asked.append(variables)
+        return {
+            "order": {
+                "id": (variables or {}).get("id"),
+                "legacyResourceId": str((variables or {}).get("id", "")).split("/")[-1],
+                "shippingAddress": {"phone": self.phone},
+            }
+        }
+
+
+def _queued(db, kind):
+    return [
+        row[0]
+        for row in db.execute(
+            text("SELECT payload::text FROM background_job WHERE kind = :k"),
+            {"k": kind},
+        )
+    ]
+
+
+def test_a_matched_parcel_queues_a_read_of_what_was_in_it(db):
+    """The piece that turns an empty wardrobe into a real one."""
+    from app.services.jobs import JobKind
+    from app.services.recipients import match_one_order
+
+    _model(db)
+    order = _order(db, "4001")
+
+    match_one_order(db, _RecipientClient(phone=HERS), order)
+    db.flush()
+
+    assert _queued(db, JobKind.SYNC_LINE_ITEMS)
+
+
+def test_an_unmatched_parcel_queues_nothing(db):
+    """**Only matched ones.** Reading every line of every order in the shop to
+    build twenty wardrobes is the wrong trade, and the great majority of the
+    shop's orders are customers."""
+    from app.services.jobs import JobKind
+    from app.services.recipients import match_one_order
+
+    _model(db)
+    order = _order(db, "4002")
+
+    match_one_order(db, _RecipientClient(phone="01099999999"), order)
+    db.flush()
+
+    assert _queued(db, JobKind.SYNC_LINE_ITEMS) == []
+
+
+def test_matching_one_order_twice_queues_one_read(db):
+    """A webhook, a sweep and a backfill all reach this."""
+    from app.services.jobs import JobKind
+    from app.services.recipients import match_one_order
+
+    _model(db)
+    order = _order(db, "4003")
+    client = _RecipientClient(phone=HERS)
+
+    match_one_order(db, client, order)
+    db.flush()
+    match_one_order(db, client, order)
+    db.flush()
+
+    assert len(_queued(db, JobKind.SYNC_LINE_ITEMS)) == 1
+
+
+def test_a_live_order_is_matched_after_it_is_indexed(db, monkeypatch):
+    """W05's live half.
+
+    Queued **after** the index is written, and as its own job: matching needs a
+    protected Shopify field, and a denial of that field must never be able to
+    stop an order being indexed.
+    """
+    from app.services.jobs import JobKind
+    from app.services.shopify import sync
+
+    order = _order(db, "4004")
+    monkeypatch.setattr(sync, "sync_one_order", lambda db_, order_id: order)
+
+    sync._handle_sync_order(db, {"order_id": "4004"})
+    db.flush()
+
+    assert _queued(db, JobKind.MATCH_ORDER)
+
+
+def test_an_order_shopify_no_longer_has_queues_no_match(db, monkeypatch):
+    """`sync_one_order` returns None for an order deleted between the webhook
+    firing and the job running. Not an error, and not something to match."""
+    from app.services.jobs import JobKind
+    from app.services.shopify import sync
+
+    monkeypatch.setattr(sync, "sync_one_order", lambda db_, order_id: None)
+
+    sync._handle_sync_order(db, {"order_id": "4005"})
+    db.flush()
+
+    assert _queued(db, JobKind.MATCH_ORDER) == []

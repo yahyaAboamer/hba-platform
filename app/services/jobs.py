@@ -62,6 +62,16 @@ class JobKind:
     #: a lease held for minutes and lost entirely if it dies at the end.
     SCAN_RECIPIENTS = "shopify_scan_recipients"
 
+    #: Check one order against the model roster, for orders arriving live
+    #: (W05: *backfill from January and perform live matching*). The bulk scan
+    #: handles history; this handles the parcel that shipped this morning.
+    MATCH_ORDER = "shopify_match_order"
+
+    #: Read what was actually inside one matched parcel. **Only matched ones** -
+    #: fetching every line of every order in the shop to build twenty wardrobes
+    #: is the wrong trade, and the great majority of orders are customers.
+    SYNC_LINE_ITEMS = "shopify_sync_line_items"
+
 
 class PermanentFailure(Exception):
     """A job failure that retrying cannot fix.
