@@ -44,8 +44,8 @@ Package prepared: 9 September 2026. Phase 00 completed 9 September 2026.
 | 01 UI foundations | **Complete** | `reports/01A-design-tokens.md`, `reports/01B-navigation-and-shells.md`; ADR 0039; `ROUTE_AND_PERMISSION_MAP.md` |
 | 02 Models and setup | **Complete** | `reports/02A-model-entry.md`, `02B-profile-and-self.md`, `02C-setup-readiness.md`; migration `d4b81c07af22`; D06 and D07 closed. Finalisation is deliberately Phase 09 |
 | 03 Products and wardrobe | **Complete** | `reports/03A…`, `03B…`, `03C-wardrobes-and-requests.md`; migrations `e7c2a5f1b930`, `f1a93d6c48e2`, `a2f47b8e1c53`; D05 and D11 implemented. **Line items are not fetched yet, so wardrobes are empty on real data** - the next piece |
-| 04 Targets | **04A done; 04B next** | `reports/04A-targets-editor.md`; outcome-only historical targets shipped in `1fe55de`. The grid now carries a revision - a save without one is refused |
-| 05 Financial rules | Not started | Commission still pays delivered-only; carry-forward still live |
+| 04 Targets | **Complete** | `reports/04A-targets-editor.md`, `04B-model-targets.md`. The grid carries a revision - a save without one is refused. The model's Targets tab is built (UI24); verification and historical outcomes existed and were verified rather than rebuilt |
+| 05 Financial rules | **Next** | Commission still pays delivered-only; carry-forward still live |
 | 06 Payments | Not started | Recording/proof/reconciliation already exist and are reusable |
 | 07 Performance screens | Not started | Ranking absent |
 | 08 Settings and notifications | Not started | Notice dismissal persistence absent |

@@ -74,7 +74,7 @@ function count(text: string): number | null | undefined {
  */
 function waitingOn(row: Row): string | null {
   if (!row.determines_pay) return null;
-  if (row.actual_videos === null) return "Blocks this month — nothing recorded";
+  if (row.achieved === null) return "Blocks this month — nothing recorded";
   if (row.achieved && !row.verified) {
     return "Blocks this month — met, and not yet confirmed";
   }
@@ -272,7 +272,7 @@ export function Targets({ session }: { session: Session }) {
   const rows = (grid?.rows ?? []).filter((row) => row.account_kind !== "house");
   const blocking = rows.filter((row) => waitingOn(row) !== null);
   const confirmable = rows.filter(
-    (row) => row.actual_videos !== null && !row.verified,
+    (row) => row.achieved !== null && !row.verified,
   );
   const confirmed = rows.filter((row) => row.verified);
 
@@ -347,7 +347,7 @@ export function Targets({ session }: { session: Session }) {
                   <tr key={row.affiliate_id}>
                     <td className="targets__pick">
                       {can(session, "targets.verify") &&
-                        row.actual_videos !== null &&
+                        row.achieved !== null &&
                         !row.verified && (
                           <input
                             type="checkbox"
@@ -591,7 +591,13 @@ function Cell({
 }
 
 function Outcome({ row }: { row: Row }) {
-  if (row.actual_videos === null) {
+  // **The outcome, not the counts**, though on this screen they agree: the
+  // picker locks every month before go-live (`lockFor`), so the one row shape
+  // where they differ — an outcome kept without counts, ADR 0036 — cannot be
+  // reached here. Said in terms of the outcome anyway, because that is what
+  // the column is for and the next person to widen the picker will not read
+  // this file first.
+  if (row.achieved === null) {
     return <span className="targets__unknown">Not recorded</span>;
   }
   if (row.achieved) {

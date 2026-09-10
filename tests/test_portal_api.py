@@ -2020,3 +2020,127 @@ def _target_revision(admin, month):
     the revision is only here to satisfy the concurrency check 04A added.
     """
     return admin.get(f"/api/targets/{month}").json()["revision"]
+
+
+# -- §15 / UI24: her own targets, current and past ----------------------------
+
+
+def test_her_targets_cover_every_month_she_can_look_at(admin):
+    """The tab answers *how has this been going*, which one month cannot.
+
+    Same months as her picker, newest first. A history that stopped at the
+    months somebody happened to set a target for would silently hide the ones
+    nobody set - and those are the months that block a guaranteed minimum.
+    """
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"])
+    _order(affiliate["id"], "1", 100_000, month=AUGUST)
+    _hit_targets(admin, affiliate["id"], AUGUST, verified=True)
+
+    her = _sign_in()
+    listed = her.get("/api/me/months").json()["months"]
+    rows = her.get("/api/me/targets").json()["months"]
+
+    assert [row["month"] for row in rows] == listed
+
+
+def test_an_unrecorded_month_is_not_a_missed_one(admin):
+    """§11.3, and the mistake that would matter most.
+
+    An unrecorded month is what stops a guaranteed minimum. Showing it as a
+    miss tells her the month is lost when it is merely waiting on HBA, and
+    sends her to ask about the wrong thing.
+    """
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"])
+    _order(affiliate["id"], "1", 100_000, month=AUGUST)
+
+    rows = _sign_in().get("/api/me/targets").json()["months"]
+    august = next(row for row in rows if row["month"] == AUGUST)
+
+    assert august["achieved"] is None
+    assert august["actual_videos"] is None
+    assert august["required_videos"] is None
+    # Not `False`, which would say *the numbers were lost* about a month where
+    # nothing was ever asked.
+    assert august["numbers_kept"] is None
+
+
+def test_her_history_shows_an_outcome_and_no_counts_for_an_old_month(
+    admin, monkeypatch
+):
+    """ADR 0036 and H02, from her side of the screen.
+
+    The business knows March was met. It does not know March's numbers, and
+    inventing them to match the outcome would be fabricating the evidence for
+    a figure that decided her pay.
+    """
+    _backfilled(admin, monkeypatch, outcome="met")
+
+    rows = _sign_in().get("/api/me/targets").json()["months"]
+    march = next(row for row in rows if row["month"] == MARCH)
+
+    assert march["achieved"] is True
+    assert march["numbers_kept"] is False
+    assert march["required_videos"] is None
+    assert march["actual_videos"] is None
+
+
+def test_whether_a_month_decided_her_pay_follows_the_arrangement_of_that_month(
+    admin,
+):
+    """§15, and the reason it is computed per month rather than once.
+
+    She was on a guaranteed minimum until August and on commission from
+    September. August's targets decided money and September's do not, and a
+    screen reading only her *current* arrangement would tell her the opposite
+    about one of them.
+    """
+    affiliate = _affiliate(admin)
+    # Written as one history, because `PUT /pay-history` replaces the whole of
+    # it (ADR 0036) and two `_terms` calls would leave August with none.
+    written = admin.put(
+        f"/api/affiliates/{affiliate['id']}/pay-history",
+        json={
+            "periods": [
+                {
+                    "start_month": "2026-01",
+                    "end_month": AUGUST,
+                    "compensation_type": "base_guarantee",
+                    "commission_rate_bp": 1000,
+                    "base_amount_piastres": 800_000,
+                },
+                {
+                    "start_month": SEPTEMBER,
+                    "compensation_type": "commission",
+                    "commission_rate_bp": 1000,
+                },
+            ],
+            "outcomes": {},
+        },
+    )
+    assert written.status_code == 200, written.text
+    _order(affiliate["id"], "1", 100_000, month=AUGUST)
+
+    rows = {
+        row["month"]: row
+        for row in _sign_in().get("/api/me/targets").json()["months"]
+    }
+
+    assert rows[AUGUST]["determines_pay"] is True
+    assert rows[SEPTEMBER]["determines_pay"] is False
+
+
+def test_her_targets_are_only_ever_hers(admin):
+    """The self endpoints take no id, so there is nothing to tamper with - but
+    the assertion is worth having in the file that would notice if one grew.
+    """
+    mine = _affiliate(admin)
+    other = _affiliate(admin, "Sara", "sara@example.com", "SARA10")
+    _terms(admin, mine["id"])
+    _terms(admin, other["id"])
+    _hit_targets(admin, other["id"], AUGUST, verified=True)
+
+    rows = _sign_in().get("/api/me/targets").json()["months"]
+
+    assert all(row["achieved"] is None for row in rows)
