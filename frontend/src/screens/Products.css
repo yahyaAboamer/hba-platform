@@ -119,3 +119,8 @@
   padding: var(--space-1) 0;
   break-inside: avoid;
 }
+
+.products__more {
+  margin: var(--space-5) auto 0;
+  display: block;
+}

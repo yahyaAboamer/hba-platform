@@ -41,23 +41,53 @@ type Detail = {
  * Search is on the name, because W01 puts colour in the product name and there
  * is no separate colour taxonomy to filter by.
  */
+const PAGE = 60;
+
 export function Products({ session }: { session: Session }) {
   const [rows, setRows] = useState<Row[] | null>(null);
+  const [total, setTotal] = useState(0);
   const [all, setAll] = useState(false);
   const [search, setSearch] = useState("");
+  /**
+   * What was actually asked for, as opposed to what is being typed.
+   *
+   * The first version fetched on every keystroke: typing "dress" was five
+   * requests, four of them already stale before they returned, and on a real
+   * catalogue each one is a query and a page of images. A third of a second is
+   * long enough to finish a word and short enough not to feel laggy.
+   */
+  const [asked, setAsked] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(() => {
-    const query = new URLSearchParams();
-    if (all) query.set("all_products", "true");
-    if (search.trim()) query.set("search", search.trim());
-    api
-      .get<{ products: Row[] }>(`/api/products?${query}`)
-      .then((body) => setRows(body.products))
-      .catch((caught) => setError(caught.message));
-  }, [all, search]);
+  useEffect(() => {
+    const timer = setTimeout(() => setAsked(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
-  useEffect(load, [load]);
+  const load = useCallback(
+    (offset = 0) => {
+      const query = new URLSearchParams();
+      if (all) query.set("all_products", "true");
+      if (asked.trim()) query.set("search", asked.trim());
+      query.set("limit", String(PAGE));
+      query.set("offset", String(offset));
+      api
+        .get<{ products: Row[]; total: number }>(`/api/products?${query}`)
+        .then((body) => {
+          // Appended when paging, replaced when the filter changed. Replacing
+          // on a "show more" would scroll somebody back to the top of a list
+          // they were reading.
+          setRows((was) =>
+            offset === 0 ? body.products : [...(was ?? []), ...body.products],
+          );
+          setTotal(body.total);
+        })
+        .catch((caught) => setError(caught.message));
+    },
+    [all, asked],
+  );
+
+  useEffect(() => load(0), [load]);
 
   return (
     <>
@@ -65,7 +95,11 @@ export function Products({ session }: { session: Session }) {
         <div className="page__title">
           <h1>Products</h1>
           <span className="page__subtitle">
-            {rows === null ? "…" : `${rows.length} ${all ? "in the catalogue" : "active"}`}
+            {rows === null
+              ? "…"
+              : rows.length < total
+                ? `${rows.length} of ${total}`
+                : `${total} ${all ? "in the catalogue" : "active"}`}
           </span>
         </div>
         <div className="products__controls">
@@ -136,6 +170,21 @@ export function Products({ session }: { session: Session }) {
             </li>
           ))}
         </ul>
+      )}
+
+      {/*
+       * **More, rather than every page as a number.** Nobody navigating a
+       * catalogue knows which page a garment is on, and a page count invites
+       * clicking through six of them to find out.
+       */}
+      {rows !== null && rows.length < total && (
+        <button
+          type="button"
+          className="button products__more"
+          onClick={() => load(rows.length)}
+        >
+          Show {Math.min(PAGE, total - rows.length)} more
+        </button>
       )}
       {session && null}
     </>

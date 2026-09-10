@@ -491,3 +491,120 @@ def test_something_she_bought_does_not_make_a_request_visible_to_her(db):
     _request(db, PANTS)
 
     assert eligible_requests(db, affiliate.id) == []
+
+
+# ── Making the screens load ────────────────────────────────────────────────
+#
+# The wardrobe and the roster were built as loops: one query per parcel for its
+# lines, then one per line for its product. That is invisible on a seeded
+# database with three orders and is the reason the Products screen was slow on
+# a real catalogue - which is the worst way for a performance bug to behave,
+# because it only appears in front of somebody.
+
+
+def test_a_shopify_image_is_asked_for_at_the_size_it_is_drawn(db):
+    """A product photograph is commonly 2000px. Sixty of those is tens of
+    megabytes to draw a page of thumbnails, and Shopify resizes on request."""
+    from app.services.wardrobe import THUMBNAIL_WIDTH, thumbnail
+
+    assert thumbnail("https://cdn.shopify.com/s/files/1/x.jpg") == (
+        f"https://cdn.shopify.com/s/files/1/x.jpg?width={THUMBNAIL_WIDTH}"
+    )
+
+
+def test_an_image_that_already_has_a_width_is_left_alone(db):
+    from app.services.wardrobe import thumbnail
+
+    already = "https://cdn.shopify.com/s/files/1/x.jpg?width=800"
+    assert thumbnail(already) == already
+
+
+def test_a_url_with_a_query_keeps_it(db):
+    from app.services.wardrobe import THUMBNAIL_WIDTH, thumbnail
+
+    assert thumbnail("https://cdn.shopify.com/x.jpg?v=2") == (
+        f"https://cdn.shopify.com/x.jpg?v=2&width={THUMBNAIL_WIDTH}"
+    )
+
+
+def test_a_foreign_host_is_never_rewritten(db):
+    """Guessing at another host's resizing scheme produces a broken image
+    rather than a smaller one."""
+    from app.services.wardrobe import thumbnail
+
+    other = "https://images.example.com/x.jpg"
+    assert thumbnail(other) == other
+    assert thumbnail(None) is None
+
+
+def test_a_wardrobe_costs_the_same_number_of_queries_however_big_it_is(db):
+    """The guard against the loop coming back.
+
+    Counts statements rather than timing anything: a timing test on a laptop
+    proves nothing, and the failure being guarded is a *shape*, not a speed.
+    """
+    from sqlalchemy import event
+
+    affiliate = _model(db)
+    for index in range(6):
+        product_id = f"99{index}"
+        _product(db, product_id, f"Thing {index}")
+        _parcel(
+            db,
+            affiliate,
+            f"9{index:03d}",
+            [(product_id, f"Thing {index}", "M")],
+            placed=f"2026-08-{index + 1:02d}",
+        )
+
+    seen: list[str] = []
+
+    def count(conn, cursor, statement, *rest):
+        if statement.lstrip().upper().startswith("SELECT"):
+            seen.append(statement)
+
+    event.listen(db.get_bind(), "before_cursor_execute", count)
+    try:
+        wardrobe_for(db, affiliate.id)
+    finally:
+        event.remove(db.get_bind(), "before_cursor_execute", count)
+
+    # One for the lines, one for the products. Six parcels must not cost
+    # thirteen queries, and sixty must not cost a hundred and twenty-one.
+    assert len(seen) <= 3, "\n".join(seen)
+
+
+def test_a_roster_costs_the_same_number_of_queries_however_many_parcels(db):
+    """The same guard on the other screen.
+
+    `roster_for` asked "does this parcel contain this product" once per parcel.
+    On a shop with a year of orders that is the query count that made the
+    Products screen slow, and it is invisible on a seeded database.
+    """
+    from sqlalchemy import event
+
+    _product(db, PANTS, "Wide-leg trousers")
+    for index in range(6):
+        model = _model(db, name=f"Model {index}", email=f"m{index}@example.com")
+        _parcel(
+            db,
+            model,
+            f"9{index:03d}",
+            [(PANTS, "Wide-leg trousers", "M")],
+            placed=f"2026-08-{index + 1:02d}",
+        )
+
+    seen: list[str] = []
+
+    def count(conn, cursor, statement, *rest):
+        if statement.lstrip().upper().startswith("SELECT"):
+            seen.append(statement)
+
+    event.listen(db.get_bind(), "before_cursor_execute", count)
+    try:
+        roster_for(db, PANTS)
+    finally:
+        event.remove(db.get_bind(), "before_cursor_execute", count)
+
+    # One for the matched lines, one for the models. Not one per parcel.
+    assert len(seen) <= 3, "\n".join(seen)

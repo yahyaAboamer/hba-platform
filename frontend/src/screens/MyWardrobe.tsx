@@ -10,6 +10,8 @@ type Item = {
   quantity: number;
   state: string;
   image_url: string | null;
+  /** Sized for this grid. The full one stays beside it (see wardrobe.py). */
+  image_thumb_url: string | null;
   shopify_order_id: string;
 };
 
@@ -173,10 +175,9 @@ export function MyWardrobe() {
  * this says the picture is gone and the garment is not.
  */
 function Picture({ item }: { item: Item }) {
-  if (!item.image_url) {
+  const source = item.image_thumb_url ?? item.image_url;
+  if (!source) {
     return <span className="wardrobe__nopic" aria-hidden="true" />;
   }
-  return (
-    <img className="wardrobe__pic" src={item.image_url} alt="" loading="lazy" />
-  );
+  return <img className="wardrobe__pic" src={source} alt="" loading="lazy" />;
 }

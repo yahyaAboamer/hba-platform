@@ -48,6 +48,34 @@ from app.models.catalogue import OrderLineItem, Product
 from app.models.orders import OrderIndex
 from app.models.shipments import Classification, ModelShipment
 
+#: How wide a grid thumbnail needs to be, at 2x for a retina phone.
+#:
+#: Shopify's CDN resizes on request, so asking for one is free and **not
+#: asking is not**: a product photograph is commonly 2000px and several hundred
+#: kilobytes, and a grid of sixty of them is tens of megabytes of image to draw
+#: a page of thumbnails. That is the difference between a screen that appears
+#: and one somebody waits for.
+THUMBNAIL_WIDTH = 400
+
+
+def thumbnail(url: str | None, width: int = THUMBNAIL_WIDTH) -> str | None:
+    """The same image, asked for at the size it will actually be drawn.
+
+    Only rewrites Shopify's own CDN, and only by adding a query parameter it
+    documents. Anything else - a URL from somewhere else, or one that already
+    carries a width - is returned untouched, because guessing at a foreign
+    host's resizing scheme produces a broken image rather than a smaller one.
+    """
+    if not url:
+        return None
+    if "cdn.shopify.com" not in url:
+        return url
+    if "width=" in url:
+        return url
+    separator = "&" if "?" in url else "?"
+    return f"{url}{separator}width={width}"
+
+
 #: What a model sees against each product.
 RECEIVED = "received"
 PROCESSING = "processing"
@@ -67,24 +95,49 @@ def _state_for(order: OrderIndex) -> str:
     return _FROM_DELIVERY.get(order.delivery_state or "", PROCESSING)
 
 
-def _gift_shipments(db: Session, affiliate_id: int | None = None):
-    """Every matched gift shipment, newest order first.
+def _gift_lines(db: Session, affiliate_id: int | None = None, product_id: str | None = None):
+    """Every line of every matched gift, newest order first, in **one query**.
 
-    Gift only, by D05. Ordered by when the order was placed so that "the latest
+    This used to be a loop: one query per shipment for its lines, then one more
+    per line for its product. Twenty models with a year of parcels is a
+    thousand round trips to draw one grid, and it is the shape that only shows
+    itself once there is real data in the shop - which is exactly when somebody
+    is watching a screen not load.
+
+    Gift only, by D05. Ordered by when the order was *placed*, so "the latest
     relevant shipment" is decided by the calendar rather than by row id - a
     backfill inserts history out of order, and row id would make the oldest
     parcel look like the newest.
     """
     query = (
-        select(ModelShipment, OrderIndex)
+        select(ModelShipment, OrderIndex, OrderLineItem)
         .join(OrderIndex, OrderIndex.shopify_order_id == ModelShipment.shopify_order_id)
+        .join(
+            OrderLineItem,
+            OrderLineItem.shopify_order_id == ModelShipment.shopify_order_id,
+        )
         .where(ModelShipment.affiliate_id.is_not(None))
         .where(ModelShipment.classification == Classification.GIFT)
         .order_by(OrderIndex.placed_at.desc())
     )
     if affiliate_id is not None:
         query = query.where(ModelShipment.affiliate_id == affiliate_id)
+    if product_id is not None:
+        query = query.where(OrderLineItem.shopify_product_id == product_id)
     return db.execute(query).all()
+
+
+def _products_by_id(db: Session, ids: set[str]) -> dict[str, Product]:
+    """Every product named, in one query rather than one each."""
+    clean = {value for value in ids if value}
+    if not clean:
+        return {}
+    return {
+        row.shopify_product_id: row
+        for row in db.scalars(
+            select(Product).where(Product.shopify_product_id.in_(clean))
+        )
+    }
 
 
 def wardrobe_for(db: Session, affiliate_id: int) -> dict:
@@ -97,57 +150,51 @@ def wardrobe_for(db: Session, affiliate_id: int) -> dict:
     A product deleted from Shopify still appears. The line item carries its own
     title and size (03A), so the entry is complete without the catalogue row -
     it simply has no picture, which is the honest version of that state.
+
+    Two queries total, whatever the size of her history.
     """
+    rows = _gift_lines(db, affiliate_id)
+    products = _products_by_id(db, {line.shopify_product_id for _, _, line in rows})
+
     entries: dict[str, dict] = {}
 
-    for shipment, order in _gift_shipments(db, affiliate_id):
-        lines = db.scalars(
-            select(OrderLineItem).where(
-                OrderLineItem.shopify_order_id == shipment.shopify_order_id
-            )
-        )
+    for shipment, order, line in rows:
         state = _state_for(order)
+        # Keyed by product where there is one, and by the line's own title
+        # otherwise. A deleted product still belongs to her, and grouping every
+        # untitled line together would merge two different garments.
+        key = line.shopify_product_id or f"title:{line.title}"
 
-        for line in lines:
-            # Keyed by product where there is one, and by the line's own title
-            # otherwise. A deleted product still belongs to her, and grouping
-            # every untitled line together would merge two different garments.
-            key = line.shopify_product_id or f"title:{line.title}"
-
-            if key in entries:
-                # Already have a newer shipment of this product. W06: the
-                # latest wins and this one becomes history.
-                entries[key]["history"].append(
-                    {
-                        "shopify_order_id": shipment.shopify_order_id,
-                        "state": state,
-                        "placed_at": order.placed_at.isoformat()
-                        if order.placed_at
-                        else None,
-                    }
-                )
-                continue
-
-            product = (
-                db.get(Product, line.shopify_product_id)
-                if line.shopify_product_id
-                else None
+        if key in entries:
+            # Already have a newer shipment of this product. W06: the latest
+            # wins and this one becomes history.
+            entries[key]["history"].append(
+                {
+                    "shopify_order_id": shipment.shopify_order_id,
+                    "state": state,
+                    "placed_at": order.placed_at.isoformat()
+                    if order.placed_at
+                    else None,
+                }
             )
+            continue
 
-            entries[key] = {
-                "shopify_product_id": line.shopify_product_id,
-                "title": line.title,
-                "size": line.variant_title,
-                "quantity": line.quantity,
-                "state": state,
-                # From the live catalogue where the product still exists. A
-                # deleted one leaves this `None` and the interface draws an
-                # honest fallback rather than a broken frame.
-                "image_url": product.image_url if product else None,
-                "shopify_order_id": shipment.shopify_order_id,
-                "placed_at": order.placed_at.isoformat() if order.placed_at else None,
-                "history": [],
-            }
+        product = products.get(line.shopify_product_id or "")
+
+        entries[key] = {
+            "shopify_product_id": line.shopify_product_id,
+            "title": line.title,
+            "size": line.variant_title,
+            "quantity": line.quantity,
+            "state": state,
+            "image_url": product.image_url if product else None,
+            # Sized for a phone grid rather than a product page. The full one
+            # stays beside it for anything that wants it.
+            "image_thumb_url": thumbnail(product.image_url if product else None),
+            "shopify_order_id": shipment.shopify_order_id,
+            "placed_at": order.placed_at.isoformat() if order.placed_at else None,
+            "history": [],
+        }
 
     items = list(entries.values())
     return {
@@ -170,21 +217,16 @@ def roster_for(db: Session, shopify_product_id: str) -> dict:
     **Not sent is everybody else**, which is what makes this a roster rather
     than a list of shipments - the question the screen answers is *who could I
     ask*, and a model who never received it is part of that answer.
+
+    Two queries, not one per shipment in the shop. The first version asked
+    "does this parcel contain this product" once per parcel, which is a
+    thousand round trips on a real catalogue and invisible on an empty one.
     """
     from app.models.affiliates import AccountKind, AffiliateProfile
 
     latest: dict[int, str] = {}
-
-    for shipment, order in _gift_shipments(db):
-        has_product = db.scalar(
-            select(OrderLineItem.shopify_line_item_id)
-            .where(OrderLineItem.shopify_order_id == shipment.shopify_order_id)
-            .where(OrderLineItem.shopify_product_id == shopify_product_id)
-            .limit(1)
-        )
-        if not has_product:
-            continue
-        # Newest first, so the first one seen for a model is the one that
+    for shipment, order, _line in _gift_lines(db, product_id=shopify_product_id):
+        # Newest first, so the first row seen for a model is the one that
         # counts and later rows are her earlier history.
         latest.setdefault(shipment.affiliate_id, _state_for(order))
 

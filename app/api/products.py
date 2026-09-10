@@ -17,6 +17,7 @@ from app.models.catalogue import Product, ProductStatus, ProductVariant
 from app.models.identity import UserAccount
 from app.services.wardrobe import (
     feature_request_for,
+    thumbnail,
     remove_feature_request,
     roster_for,
     set_feature_request,
@@ -36,7 +37,8 @@ class FeatureRequestBody(BaseModel):
 def list_products(
     all_products: bool = False,
     search: str | None = None,
-    limit: int = 100,
+    limit: int = 60,
+    offset: int = 0,
     _actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_VIEW)),
     db: Session = Depends(get_session),
 ) -> dict:
@@ -49,6 +51,14 @@ def list_products(
 
     Search is on the name, because W01 puts colour in the product name and
     there is no separate colour taxonomy to filter by.
+
+    **Paged, and the page is small.** Sixty is about three scrolls on a laptop
+    and it is sixty images rather than five hundred - the first version handed
+    back everything up to a cap, which is fine on a shop with twelve products
+    and is the reason this screen was slow on a shop with hundreds.
+
+    `total` comes back so the interface can say *60 of 340* rather than
+    implying that sixty is all there is.
     """
     query = select(Product)
     if not all_products:
@@ -56,7 +66,17 @@ def list_products(
     if search and search.strip():
         query = query.where(Product.title.ilike(f"%{search.strip()}%"))
 
-    rows = list(db.scalars(query.order_by(Product.title).limit(min(limit, 500))))
+    total = db.scalar(
+        select(func.count()).select_from(query.subquery())
+    ) or 0
+
+    rows = list(
+        db.scalars(
+            query.order_by(Product.title)
+            .offset(max(0, offset))
+            .limit(min(max(1, limit), 200))
+        )
+    )
 
     sizes = {}
     if rows:
@@ -77,7 +97,10 @@ def list_products(
                 "shopify_product_id": row.shopify_product_id,
                 "title": row.title,
                 "status": row.status,
-                "image_url": row.image_url,
+                # **The sized one**, because this is a grid of thumbnails.
+                # A product photograph is commonly 2000px; sixty of those is
+                # tens of megabytes to draw one page.
+                "image_url": thumbnail(row.image_url),
                 "sizes": sizes.get(row.shopify_product_id, 0),
                 # Freshness, said rather than implied. A catalogue nobody has
                 # read for a fortnight looks identical to a fresh one.
@@ -86,6 +109,8 @@ def list_products(
             for row in rows
         ],
         "showing": "all" if all_products else "active",
+        "total": total,
+        "offset": max(0, offset),
     }
 
 
