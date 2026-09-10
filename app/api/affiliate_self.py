@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.api.deps import current_affiliate, current_user
+from app.core.money import format_egp
 from app.db import get_session
 from app.models.affiliates import AffiliateProfile
 from app.models.identity import UserAccount
@@ -572,3 +573,53 @@ def my_targets_view(
     until somebody writes down why.
     """
     return my_targets(db, affiliate)
+
+
+@router.get("/ranking/{month}")
+def my_ranking(
+    month: str,
+    affiliate: AffiliateProfile = Depends(current_affiliate),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Where she stands against the other models. M02, and D03.
+
+    **Ordered by sales; the figures shown are uses.** M02 is explicit that a
+    peer value is never another model's sales, commission or salary — so the
+    board carries a rank, a name and a use count, and her own sales appear only
+    on her own row.
+
+    That gap is deliberate and it has to be explained rather than hidden: two
+    models can show the same uses and rank differently, because uses only break
+    a tie. The screen says the order is by sales, without promising that
+    matching somebody's uses would match her rank.
+    """
+    from app.services.performance import month_performance
+
+    month = _month_or_400(month)
+    board = month_performance(db, month)
+
+    return {
+        "month": month,
+        "basis": "sales",
+        "rows": [
+            {
+                "affiliate_id": row.affiliate_id,
+                "rank": row.rank,
+                # Her own name, and nobody else's - a leaderboard that names
+                # everybody turns twenty colleagues into a public table.
+                "name": row.name if row.affiliate_id == affiliate.id else None,
+                "is_me": row.affiliate_id == affiliate.id,
+                "uses": row.uses,
+                # Only ever her own. M02.
+                "sales_piastres": (
+                    row.sales_piastres if row.affiliate_id == affiliate.id else None
+                ),
+                "sales": (
+                    format_egp(row.sales_piastres)
+                    if row.affiliate_id == affiliate.id
+                    else None
+                ),
+            }
+            for row in board
+        ],
+    }

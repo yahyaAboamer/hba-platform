@@ -49,6 +49,7 @@ from app.services.targets import (
     get_target,
     record_actuals,
     set_requirements,
+    set_requirements_for_year,
     targets_for,
     unverify,
     verify,
@@ -77,6 +78,14 @@ class GridRow(BaseModel):
 
 class GridBody(BaseModel):
     rows: list[GridRow]
+    #: Write these requirements to **every month of the year**, not just this
+    #: one (owner, 11 September 2026): a model's targets are fixed across a
+    #: year, and varying a single month is the exception you opt out into.
+    #:
+    #: Off by default, because that is how it was described - *if we wanted to
+    #: edit a model's month, not the entire year, we just don't click this*.
+    #: Counts are never year-wide: what she produced is a fact about one month.
+    apply_to_year: bool = False
     #: What the screen was looking at when it started editing.
     #:
     #: Optional, and its absence is not treated as agreement: a save without
@@ -139,6 +148,30 @@ def _render(
     }
 
 
+def _pace(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
+    """Whether she is keeping up with the month, week by week. D08.
+
+    **On this screen and nowhere else.** The owner was asked directly and chose
+    to keep it internal, so nothing about being behind reaches a model's own
+    screens in any wording. The consequence he accepted: she cannot catch up on
+    a warning she never sees.
+
+    It decides no money. §15 is untouched - a target pays only on a guaranteed
+    minimum, only at month end, and only when met *and* verified.
+    """
+    from app.services.pace import pace_for
+
+    found = pace_for(db, affiliate, month)
+    return {
+        "state": found.state,
+        "week": found.week,
+        "required": found.required,
+        "expected_by_now": found.expected_by_now,
+        "done": found.done,
+        "week_started": found.week_started.isoformat(),
+    }
+
+
 def _revision(targets: dict) -> str:
     """What this month looked like when it was handed out.
 
@@ -181,11 +214,14 @@ def target_grid(
         # one month is not hypothetical - the same two people run payroll.
         "revision": _revision(found),
         "rows": [
-            _render(
-                affiliate,
-                found.get(affiliate.id),
-                determines_pay=_determines_pay(db, affiliate, month),
-            )
+            {
+                **_render(
+                    affiliate,
+                    found.get(affiliate.id),
+                    determines_pay=_determines_pay(db, affiliate, month),
+                ),
+                "pace": _pace(db, affiliate, month),
+            }
             for affiliate in affiliates
         ],
     }
@@ -238,6 +274,10 @@ def save_grid(
         for affiliate in list_affiliates(db, include_archived=True)
     }
     saved = 0
+    #: What a year-wide change reached and what it refused, per model. Reported
+    #: rather than assumed: it rewrites months that may already have been
+    #: counted, and it silently cannot touch ones that are agreed.
+    year_report: list[dict] = []
 
     for index, row in enumerate(body.rows):
         affiliate = by_id.get(row.affiliate_id)
@@ -263,15 +303,35 @@ def save_grid(
             )
 
         try:
-            target = set_requirements(
-                db,
-                affiliate,
-                month,
-                videos=row.required_videos,
-                stories=row.required_stories,
-                actor_id=actor.id,
-                actor_email=actor.email,
-            )
+            if body.apply_to_year:
+                # The year first, so this month is written by the same call
+                # that writes the rest and cannot disagree with it.
+                spread = set_requirements_for_year(
+                    db,
+                    affiliate,
+                    month,
+                    videos=row.required_videos,
+                    stories=row.required_stories,
+                    actor_id=actor.id,
+                    actor_email=actor.email,
+                )
+                year_report.append({"name": affiliate.name, **spread})
+                target = get_target(db, affiliate, month)
+                if target is None:
+                    # This month itself was refused - agreed, or from before
+                    # the platform. Nothing to record counts against.
+                    saved += 1
+                    continue
+            else:
+                target = set_requirements(
+                    db,
+                    affiliate,
+                    month,
+                    videos=row.required_videos,
+                    stories=row.required_stories,
+                    actor_id=actor.id,
+                    actor_email=actor.email,
+                )
             if row.clear_actuals:
                 clear_actuals_service(
                     db, target, actor_id=actor.id, actor_email=actor.email
@@ -299,6 +359,7 @@ def save_grid(
         "month": month,
         "saved": saved,
         "revision": _revision(targets_for(db, month)),
+        "applied_to_year": year_report,
     }
 
 

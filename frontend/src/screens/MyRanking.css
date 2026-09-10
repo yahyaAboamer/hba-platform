@@ -1,0 +1,72 @@
+/* Where she stands. M02: ordered by sales, showing uses. */
+
+.affiliate .ranking {
+  padding-bottom: var(--tab-clearance);
+}
+
+.affiliate .ranking__mine {
+  margin-bottom: var(--space-5);
+  padding: var(--space-4);
+}
+
+.affiliate .ranking__place {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.affiliate .ranking__number {
+  font-size: var(--text-2xl);
+  font-weight: 600;
+}
+
+.affiliate .ranking__of,
+.affiliate .ranking__figures {
+  color: var(--quiet);
+}
+
+.affiliate .ranking__figures {
+  margin: var(--space-2) 0 0;
+}
+
+/* The sentence that stops the board reading as broken. Quiet, and never
+   hidden behind a disclosure: somebody reading down a column of uses and
+   finding a smaller number above a bigger one needs it in the same glance. */
+.affiliate .ranking__basis {
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}
+
+.affiliate .ranking__board {
+  margin: 0;
+  padding: var(--space-2) var(--space-4);
+  list-style: none;
+}
+
+.affiliate .ranking__row {
+  display: grid;
+  grid-template-columns: 3.5rem 1fr auto;
+  align-items: baseline;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+/* Her own row, and the only place colour is spent here. A leaderboard is a
+   list of strangers until she can find herself in it. */
+.affiliate .ranking__row--me {
+  font-weight: 600;
+}
+
+.affiliate .ranking__rank {
+  color: var(--quiet);
+}
+
+.affiliate .ranking__row--me .ranking__rank {
+  color: var(--accent-text);
+}
+
+.affiliate .ranking__uses {
+  color: var(--quiet);
+}

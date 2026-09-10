@@ -56,7 +56,7 @@ Package prepared: 9 September 2026. Phase 00 completed 9 September 2026.
 | 04 Targets | **Complete** | `reports/04A-targets-editor.md`, `04B-model-targets.md`. The grid carries a revision - a save without one is refused. The model's Targets tab is built (UI24); verification and historical outcomes existed and were verified rather than rebuilt |
 | 05 Financial rules | **Complete.** 05A, 05B and 05C merged to `main` | `reports/05A-pending-inclusive-earnings.md`, `05B-immutable-approval.md`, `05C-late-failure-corrections.md`; immutable approval, retired reopening and explicit corrections. D04 closed |
 | 06 Payments | **06A merged; 06B implemented, unmerged** | `reports/06A-admin-month-end-payment-journey.md`, `06B-model-payment-views.md`. 06A is the admin month-end journey - forecast, approved and recorded money kept apart, corrections listed across every model, and a retry-safe transfer record (migration `1c4b06a5f8d2`). 06B is the model's side: a receipt names the destination it actually went to and links to the month that explains it. 06B is frontend only |
-| 07 Performance screens | **Next.** D03 and D08 are open and both belong here | Ranking absent |
+| 07 Performance screens | **Partly built, unmerged** | `reports/07-d03-d08-ranking-and-pace.md`. D03 and D08 are implemented - the Ranking board and the maintainer's weekly-pace column - which is part of **07B**. **07A (Model Home and Orders) is unstarted**, and so is the rest of 07B: owner Home, top sellers, product analytics |
 | 08 Settings and notifications | Not started | Notice dismissal persistence absent |
 | 09 Rehearsal and release | Not started | |
 

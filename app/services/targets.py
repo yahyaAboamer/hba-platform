@@ -208,6 +208,7 @@ def record_actuals(
     stories: int,
     actor_id: int | None = None,
     actor_email: str | None = None,
+    recorded_at: datetime | None = None,
 ) -> MonthlyTarget:
     """What they actually produced.
 
@@ -218,6 +219,12 @@ def record_actuals(
     **Re-recording clears any verification.** The confirmation was of the old
     numbers; leaving it in place would let a correction inherit somebody else's
     approval and unlock a guarantee nobody agreed to.
+
+    `recorded_at` is injectable, exactly as `verify`'s is and for the same
+    reason. **When** a count was recorded became a fact with consequences in
+    07A: weekly pace compares it against the week she is in, and a test that
+    could not choose the date would only exercise whichever week the suite
+    happened to run in.
     """
     assert_recordable(db, target)
     _refuse_counts_on_a_backfilled_month(target)
@@ -230,7 +237,7 @@ def record_actuals(
     target.actual_videos = int(videos)
     target.actual_stories = int(stories)
     target.recorded_by = actor_id
-    target.recorded_at = utcnow()
+    target.recorded_at = recorded_at or utcnow()
     if was_verified:
         target.verified_by = None
         target.verified_at = None
@@ -489,3 +496,100 @@ def clear_actuals(
         after={**_snapshot(target), "verification_cleared": was_verified},
     )
     return target
+
+
+#: Why a month was left out of a year-wide requirement change.
+ALREADY_AGREED = "already_agreed"
+BEFORE_THE_PLATFORM = "before_the_platform"
+
+
+def set_requirements_for_year(
+    db: Session,
+    affiliate: AffiliateProfile,
+    month: str,
+    *,
+    videos: int,
+    stories: int,
+    actor_id: int | None = None,
+    actor_email: str | None = None,
+) -> dict:
+    """Set the same requirement on every month of that month's year.
+
+    **Because a model's targets are fixed across a year** (owner, 11 September
+    2026). Varying a single month is the exception, and the exception is what
+    the caller opts out into — so this writes the whole calendar year and the
+    ordinary per-month save is left alone.
+
+    ## January included, deliberately
+
+    Asked directly whether "the whole year" meant this month onward or every
+    month including ones already gone, the owner chose **every month of the
+    year, January included**. The risk was put to him in the same sentence and
+    is worth repeating here, because it is the reason this function returns a
+    report instead of nothing:
+
+    **A month that has already been counted can change what it means.** Raising
+    March's requirement after March's counts were recorded can turn a month
+    that was achieved into one that was missed — and on a guaranteed minimum
+    that is the difference between a floor applying and not applying. Nothing
+    is silently rewritten: every month this touches and every month it refuses
+    comes back named.
+
+    ## What it will not touch, and why that is not a choice
+
+    **An agreed month.** `assert_month_recordable` refuses it, and that refusal
+    is the whole of 05B — an agreed month is not unmade, and its snapshot froze
+    the requirement it was agreed against. Skipping is therefore forced rather
+    than decided; the alternative is that a year-wide change becomes impossible
+    the moment anything is approved, which by December is most of the year.
+
+    **A month from before the platform.** ADR 0036: it carries an outcome and
+    no counts, because the old dashboard never kept them. Giving it a
+    requirement would invent the very evidence that record exists to say
+    nobody has.
+    """
+    parse_month(month)
+    year = month[:4]
+
+    applied: list[str] = []
+    skipped: list[dict] = []
+
+    for index in range(1, 13):
+        candidate = f"{year}-{index:02d}"
+        existing = get_target(db, affiliate, candidate)
+
+        if existing is not None and existing.is_backfilled:
+            skipped.append({"month": candidate, "why": BEFORE_THE_PLATFORM})
+            continue
+        try:
+            assert_month_recordable(db, affiliate.id, candidate)
+        except ValueError:
+            skipped.append({"month": candidate, "why": ALREADY_AGREED})
+            continue
+
+        set_requirements(
+            db,
+            affiliate,
+            candidate,
+            videos=videos,
+            stories=stories,
+            actor_id=actor_id,
+            actor_email=actor_email,
+        )
+        applied.append(candidate)
+
+    record_audit(
+        db,
+        action="target.requirements_set_for_year",
+        subject=f"affiliate:{affiliate.id}",
+        actor_id=actor_id,
+        actor_email=actor_email,
+        after={
+            "year": year,
+            "videos": int(videos),
+            "stories": int(stories),
+            "applied": applied,
+            "skipped": skipped,
+        },
+    )
+    return {"applied": applied, "skipped": skipped}

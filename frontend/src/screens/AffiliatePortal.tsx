@@ -5,7 +5,6 @@ import { AffiliateLayout, PortalHeader } from "../components/AffiliateLayout";
 import type { PortalContext } from "../components/AffiliateLayout";
 import { api } from "../lib/api";
 import type { Session } from "../lib/api";
-import { NotBuiltYet } from "../components/NotBuiltYet";
 import { MyWardrobe } from "./MyWardrobe";
 import { storedTheme } from "../lib/theme";
 import { Apply } from "./Apply";
@@ -17,6 +16,7 @@ import { MyMonth } from "./MyMonth";
 import { MyOrders } from "./MyOrders";
 import { MyPayments } from "./MyPayments";
 import { MyPolicy } from "./MyPolicy";
+import { MyRanking } from "./MyRanking";
 import { MyTargets } from "./MyTargets";
 import { MyYear } from "./MyYear";
 import "./Apply.css";
@@ -203,21 +203,8 @@ export function AffiliatePortal({ session }: { session: Session }) {
           <Route path="orders" element={<MyOrders />} />
           <Route path="wardrobe" element={<MyWardrobe />} />
           <Route path="targets" element={<MyTargets />} />
-          {/*
-           * The last one the approved tab bar has and the platform does not.
-           * It says so rather than rendering an empty state - §S06, and
-           * `NotBuiltYet` explains why the difference matters.
-           */}
-          <Route
-            path="ranking"
-            element={
-              <NotBuiltYet
-                title="Ranking"
-                phase="Phase 07B"
-                what="Where you sit against the other models, by sales."
-              />
-            }
-          />
+          <Route path="ranking" element={<MyRanking />} />
+
           {/*
            * Off the tab bar since the redesign, and deliberately still here.
            * Payments is linked from You, Year and Grow from Home. A receipt

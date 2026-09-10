@@ -22,6 +22,15 @@ type Row = {
   verified: boolean;
   verified_at: string | null;
   recorded_at: string | null;
+  /** D08. HBA only — nothing about pace reaches a model's own screens. */
+  pace: {
+    state: string;
+    week: number;
+    required: number;
+    expected_by_now: number;
+    done: number;
+    week_started: string;
+  };
 };
 
 type Grid = {
@@ -99,6 +108,16 @@ export function Targets({ session }: { session: Session }) {
   const [saved, setSaved] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
   const [chosen, setChosen] = useState<Set<number>>(new Set());
+  /**
+   * Write these requirements to every month of the year (owner, 11 September
+   * 2026): a model's targets are fixed across a year, and varying one month is
+   * the exception.
+   *
+   * **Off by default and reset after every save.** It rewrites twelve months
+   * at once, including ones already gone, so it is a deliberate act each time
+   * rather than a setting that stays on.
+   */
+  const [wholeYear, setWholeYear] = useState(false);
   //: Undoing is its own selection and its own reason. Sharing `chosen`
   //: with confirming would let one button act on rows picked for the
   //: other, which on a screen that releases guarantees is not a mistake
@@ -204,16 +223,26 @@ export function Targets({ session }: { session: Session }) {
         });
       }
 
-      const result = await api.put<{ saved: number; revision: string }>(
-        `/api/targets/${month}`,
-        { rows, revision: grid.revision },
-      );
+      const result = await api.put<{
+        saved: number;
+        revision: string;
+        applied_to_year: {
+          name: string;
+          applied: string[];
+          skipped: { month: string; why: string }[];
+        }[];
+      }>(`/api/targets/${month}`, {
+        rows,
+        revision: grid.revision,
+        apply_to_year: wholeYear,
+      });
       // Carried forward, so saving twice in a row does not need a reload
       // between them.
       setGrid({ ...grid, revision: result.revision });
-      setSaved(
-        result.saved === 1 ? "One row saved." : `${result.saved} rows saved.`,
-      );
+      setSaved(describeSave(result.saved, result.applied_to_year));
+      // Off again after every save. It rewrites twelve months, so leaving it
+      // armed for the next save is how somebody changes a year by accident.
+      setWholeYear(false);
       load();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Nothing saved.");
@@ -336,6 +365,7 @@ export function Targets({ session }: { session: Session }) {
                 <th className="targets__number">Stories</th>
                 <th />
                 <th />
+                <th />
               </tr>
             </thead>
             <tbody>
@@ -401,6 +431,9 @@ export function Targets({ session }: { session: Session }) {
                     <td className="targets__outcome">
                       <Outcome row={row} />
                     </td>
+                    <td className="targets__pace">
+                      <PaceCell row={row} />
+                    </td>
                     <td>
                       {waiting && <span className="blocker">{waiting}</span>}
                     </td>
@@ -412,14 +445,37 @@ export function Targets({ session }: { session: Session }) {
 
           <div className="payroll__actions">
             {can(session, "targets.record") && (
-              <button
-                type="button"
-                className="button button--primary"
-                onClick={save}
-                disabled={working}
-              >
-                {working ? "Saving…" : "Save the month"}
-              </button>
+              <>
+                {/*
+                 * A model's targets are fixed across a year (owner, 11
+                 * September 2026), so this is the ordinary way to set them and
+                 * a single-month edit is the exception you opt out into.
+                 *
+                 * Beside the save rather than in the header: it changes what
+                 * the button does, and a control that changes a button belongs
+                 * next to it.
+                 */}
+                <label className="targets__year">
+                  <input
+                    type="checkbox"
+                    checked={wholeYear}
+                    onChange={(event) => setWholeYear(event.target.checked)}
+                  />
+                  Apply these targets to the whole year
+                </label>
+                <button
+                  type="button"
+                  className="button button--primary"
+                  onClick={save}
+                  disabled={working}
+                >
+                  {working
+                    ? "Saving…"
+                    : wholeYear
+                      ? "Save the year"
+                      : "Save the month"}
+                </button>
+              </>
             )}
             {can(session, "targets.verify") && confirmable.length > 0 && (
               <button
@@ -589,6 +645,84 @@ function Cell({
     </td>
   );
 }
+
+/**
+ * Whether she is keeping up with the month, week by week. D08.
+ *
+ * **This screen and nowhere else.** The owner was asked and chose to keep it
+ * internal, so nothing about being behind appears in the portal in any
+ * wording. The consequence he accepted knowingly: a model cannot catch up on a
+ * warning she never sees, so this is a prompt for the conversation rather than
+ * a substitute for it.
+ *
+ * ## Not recorded is not behind
+ *
+ * The platform keeps one cumulative pair of counts a month and no weekly
+ * history, so a figure last typed in week one cannot answer a question about
+ * week three. Where nothing has been recorded since the week began it says so
+ * — otherwise this column would quietly report how often HBA types rather
+ * than how she is doing.
+ */
+/**
+ * What a save actually did, when it was a year-wide one.
+ *
+ * A year-wide change writes twelve months and **silently cannot touch an
+ * agreed one** — that refusal is 05B and it is not negotiable. It also
+ * rewrites months already gone, which the owner chose knowingly on 11
+ * September 2026 and which can turn a month that was achieved into one that
+ * was missed.
+ *
+ * So it says what it reached and what it refused. "12 rows saved" would be
+ * true and would hide both.
+ */
+function describeSave(
+  saved: number,
+  spread: { name: string; applied: string[]; skipped: { month: string }[] }[],
+): string {
+  const rows = saved === 1 ? "One row saved." : `${saved} rows saved.`;
+  if (!spread?.length) return rows;
+
+  const reached = spread.reduce((count, row) => count + row.applied.length, 0);
+  const refused = spread.reduce((count, row) => count + row.skipped.length, 0);
+  const months = `${reached} ${reached === 1 ? "month" : "months"} across the year`;
+  return refused === 0
+    ? `${rows} Applied to ${months}.`
+    : `${rows} Applied to ${months}. ${refused} left alone — already agreed, ` +
+      `or from before the platform.`;
+}
+
+
+function PaceCell({ row }: { row: Row }) {
+  const pace = row.pace;
+  if (!pace || pace.state === "not_started") return null;
+
+  // **A month nobody has asked anything of is a gap, not a blank** (owner, 11
+  // September 2026). It was rendering as nothing at all, which is exactly how
+  // it stays unnoticed until payroll cannot close on it.
+  if (pace.state === "no_target") {
+    return <span className="targets__unknown">Nothing asked for yet</span>;
+  }
+  if (pace.state === "not_recorded_this_week") {
+    return (
+      <span className="targets__unknown">
+        Nothing recorded in week {pace.week}
+      </span>
+    );
+  }
+  if (pace.state === "behind") {
+    return (
+      <span className="targets__missed">
+        {pace.done} of {pace.expected_by_now} by week {pace.week}
+      </span>
+    );
+  }
+  return (
+    <span className="targets__met">
+      On pace · {pace.done} of {pace.expected_by_now}
+    </span>
+  );
+}
+
 
 function Outcome({ row }: { row: Row }) {
   // **The outcome, not the counts**, though on this screen they agree: the
