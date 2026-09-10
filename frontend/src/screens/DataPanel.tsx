@@ -20,11 +20,29 @@ type Sync = {
  * `last_synced_at` is the half that matters: a catalogue nobody has read for a
  * fortnight looks identical to a fresh one until it says so.
  */
-/** A parcel the platform looked at and could not attach to a model (W12). */
+/**
+ * A parcel that needs a person (W12).
+ *
+ * Only ambiguities reach here. A parcel matching no model is a customer, which
+ * is what almost every order in the shop is — listing those buried the ones
+ * that mattered under fourteen thousand rows that were never HBA's parcels.
+ */
 type Unmatched = {
   shopify_order_id: string;
   reason: "ambiguous" | "no_match";
   classification: string;
+  /** A model's own number, which is what makes it safe to show. */
+  phone: string | null;
+  /** The models sharing it. This is the thing to fix. */
+  models: string[];
+};
+
+type ParcelSummary = {
+  needs_you: number;
+  customers: number;
+  unusable_phone: number;
+  no_phone: number;
+  matched: number;
 };
 
 type Catalogue = {
@@ -90,6 +108,7 @@ export function DataPanel() {
   const [catalogue, setCatalogue] = useState<Catalogue | null>(null);
   const [syncingCatalogue, setSyncingCatalogue] = useState(false);
   const [parcels, setParcels] = useState<Unmatched[] | null>(null);
+  const [parcelSummary, setParcelSummary] = useState<ParcelSummary | null>(null);
   const [scanning, setScanning] = useState(false);
 
   const load = useCallback(() => {
@@ -99,7 +118,9 @@ export function DataPanel() {
       api.get<{ codes: UnownedCode[] }>("/api/operations/unregistered-codes"),
       api.get<MailHealth>("/api/operations/notifications"),
       api.get<Catalogue>("/api/operations/catalogue"),
-      api.get<{ parcels: Unmatched[] }>("/api/operations/unmatched-parcels"),
+      api.get<{ parcels: Unmatched[]; summary: ParcelSummary }>(
+        "/api/operations/unmatched-parcels",
+      ),
     ])
       .then(([status, failed, unowned, health, products, unattached]) => {
         setSync(status);
@@ -108,6 +129,7 @@ export function DataPanel() {
         setMail(health);
         setCatalogue(products);
         setParcels(unattached.parcels);
+        setParcelSummary(unattached.summary);
       })
       .catch((caught) => setError(caught.message));
   }, []);
@@ -301,24 +323,55 @@ export function DataPanel() {
             </button>
           </div>
           {/*
-           * Silent when empty, and deliberately not a work queue. Most
-           * unmatched orders are ordinary customers and always will be; a
-           * backlog of a thousand rows that were never HBA's parcels is worse
-           * than no list at all. Only real ambiguities reach here.
+           * **The shape first, then the work.** Almost every order in the shop
+           * is a customer's, and saying so as a number is the difference
+           * between a screen that reports and one that appears to demand
+           * fourteen thousand things.
+           */}
+          {parcelSummary !== null && parcelSummary.matched + parcelSummary.customers > 0 && (
+            <p className="data__note">
+              {parcelSummary.matched} parcel
+              {parcelSummary.matched === 1 ? "" : "s"} attached to a model ·{" "}
+              {parcelSummary.customers} customer order
+              {parcelSummary.customers === 1 ? "" : "s"}, which is normal
+              {parcelSummary.unusable_phone > 0 &&
+                ` · ${parcelSummary.unusable_phone} with a number that is not an Egyptian mobile`}
+              .
+            </p>
+          )}
+
+          {/*
+           * Only ambiguities. A parcel matching no model is a customer, not a
+           * problem — and the only genuinely stuck state is two models sharing
+           * a number, because then a real parcel cannot reach either of them.
            */}
           {parcels && parcels.length > 0 && (
-            <ul className="data__parcels">
-              {parcels.map((row) => (
-                <li key={row.shopify_order_id}>
-                  <span className="code">{row.shopify_order_id}</span>
-                  <span className="data__parcel-why">
-                    {row.reason === "ambiguous"
-                      ? "two models share that number — one of them is wrong"
-                      : "no model has that number on file"}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <>
+              <p className="data__note data__parcels-lede">
+                <strong>
+                  {parcels.length} parcel{parcels.length === 1 ? "" : "s"} cannot
+                  be attached to anyone.
+                </strong>{" "}
+                More than one model has the same phone number on file, so the
+                platform cannot tell whose parcel it is. Give each model her own
+                number under <Link to="/affiliates">Models</Link> → her profile →
+                Parcels go to, then run this again.
+              </p>
+              <ul className="data__parcels">
+                {parcels.map((row) => (
+                  <li key={row.shopify_order_id}>
+                    <span className="data__parcel-order">
+                      Order {row.shopify_order_id}
+                    </span>
+                    <span className="data__parcel-why">
+                      {row.phone}
+                      {row.models.length > 0 &&
+                        ` — ${row.models.join(", ")}`}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </>
           )}
         </div>
 

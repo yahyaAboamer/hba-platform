@@ -49,7 +49,7 @@ original net rather than from anything on this page.
 
 import re
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.businesstime import utcnow
@@ -267,31 +267,88 @@ def record_shipment(db: Session, order, *, phone: str | None) -> "ModelShipment"
     return existing
 
 
-def unmatched(db: Session, limit: int = 200) -> list[dict]:
-    """Parcels the platform looked at and could not attach.
+def unmatched(db: Session, limit: int = 200) -> dict:
+    """Parcels that need a person, and a count of the ones that do not.
 
-    W12's bounded staff path. Deliberately a list of *reasons* rather than a
-    queue of work: most of these are ordinary customer orders and always will
-    be, and presenting them as a backlog would invite somebody to clear a
-    thousand rows that were never HBA's parcels.
+    W12's bounded staff path.
+
+    ## Why this shows only ambiguities
+
+    The first version listed `no_match` too, and on the real shop that is
+    **every customer order there has ever been** - fourteen thousand rows on
+    staging, burying the thirty-six that actually needed somebody. The design
+    note written at the time said a backlog of rows that were never HBA's
+    parcels is worse than no list; the query did not match the note.
+
+    A parcel that matches no model is not a problem. It is a customer, which is
+    what almost every order is. The only genuinely stuck state is **two models
+    sharing one phone**, because then a real parcel to a real model cannot be
+    attached to either.
+
+    So: ambiguities are listed with the models involved, and everything else is
+    a number in a summary - visible, countable, and not a to-do list.
     """
-    from app.models.shipments import ModelShipment
+    counts = {
+        reason: count
+        for reason, count in db.execute(
+            select(ModelShipment.match_reason, func.count())
+            .where(ModelShipment.affiliate_id.is_(None))
+            .group_by(ModelShipment.match_reason)
+        )
+    }
 
-    rows = db.scalars(
-        select(ModelShipment)
-        .where(ModelShipment.affiliate_id.is_(None))
-        .where(ModelShipment.match_reason.in_({AMBIGUOUS, NO_MATCH}))
-        .order_by(ModelShipment.id.desc())
-        .limit(limit)
+    rows = list(
+        db.scalars(
+            select(ModelShipment)
+            .where(ModelShipment.affiliate_id.is_(None))
+            .where(ModelShipment.match_reason == AMBIGUOUS)
+            .order_by(ModelShipment.id.desc())
+            .limit(limit)
+        )
     )
-    return [
-        {
-            "shopify_order_id": row.shopify_order_id,
-            "reason": row.match_reason,
-            "classification": row.classification,
-        }
-        for row in rows
-    ]
+
+    # Who is colliding, by token. One pass over the roster rather than one
+    # query per parcel - thirty-six parcels usually share two or three numbers.
+    models = list(
+        db.scalars(
+            select(AffiliateProfile).where(
+                AffiliateProfile.account_kind != AccountKind.HOUSE
+            )
+        )
+    )
+    by_token: dict[str, list[str]] = {}
+    for model in models:
+        token = normalise_phone(model.shipping_phone or model.phone)
+        if token:
+            by_token.setdefault(token, []).append(model.name)
+
+    return {
+        "parcels": [
+            {
+                "shopify_order_id": row.shopify_order_id,
+                "reason": row.match_reason,
+                "classification": row.classification,
+                # A model's own number, not a customer's - that is what makes
+                # it safe to show here and what makes it useful.
+                "phone": row.recipient_token,
+                "models": sorted(by_token.get(row.recipient_token or "", [])),
+            }
+            for row in rows
+        ],
+        "summary": {
+            "needs_you": counts.get(AMBIGUOUS, 0),
+            # Not a backlog. Almost every order in the shop is a customer's.
+            "customers": counts.get(NO_MATCH, 0),
+            "unusable_phone": counts.get(UNUSABLE_PHONE, 0),
+            "no_phone": counts.get(NO_PHONE, 0),
+            "matched": db.scalar(
+                select(func.count())
+                .select_from(ModelShipment)
+                .where(ModelShipment.affiliate_id.is_not(None))
+            )
+            or 0,
+        },
+    }
 
 
 # ── Walking the history (W05) ────────────────────────────────────────────────

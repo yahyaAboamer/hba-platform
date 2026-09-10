@@ -267,3 +267,15 @@
 .data__parcel-why {
   color: var(--owed);
 }
+
+.data__parcels-lede {
+  margin-top: var(--space-3);
+  max-width: 60ch;
+}
+
+/* The order, so nobody reads a thirteen-digit id as a phone number - which is
+   exactly what happened when it was rendered bare. */
+.data__parcel-order {
+  flex: none;
+  width: 15rem;
+}

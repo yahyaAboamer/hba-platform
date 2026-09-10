@@ -260,21 +260,54 @@ def test_an_unmatched_row_records_why(db):
     assert shipment.matched_at is None
 
 
-def test_the_staff_list_shows_only_what_is_worth_looking_at(db):
-    """Most unmatched parcels are ordinary customer orders and always will be.
+def test_the_staff_list_shows_only_what_actually_needs_a_person(db):
+    """The bug this replaced.
 
-    Presenting every one as a backlog would invite somebody to clear a thousand
-    rows that were never HBA's parcels — so a missing phone is recorded and not
-    listed, while an ambiguity is both.
+    The list included every parcel matching no model - which on the real shop
+    is **every customer order there has ever been**: fourteen thousand rows on
+    staging, burying the thirty-six that needed somebody. A parcel matching no
+    model is a customer, not a problem.
     """
     _model(db, name="Nour", email="nour@example.com")
     _model(db, name="Layla", email="layla@example.com")
     record_shipment(db, _order(db, "3001"), phone=None)
-    record_shipment(db, _order(db, "3002"), phone=HERS)
+    record_shipment(db, _order(db, "3002"), phone="01099999999")
+    record_shipment(db, _order(db, "3003"), phone=HERS)
 
-    rows = unmatched(db)
+    result = unmatched(db)
 
-    assert [row["reason"] for row in rows] == [AMBIGUOUS]
+    assert [row["reason"] for row in result["parcels"]] == [AMBIGUOUS]
+
+
+def test_the_summary_counts_what_is_not_listed(db):
+    """Visible and countable, rather than a to-do list. Somebody should be able
+    to see that fourteen thousand customer orders is the normal shape."""
+    _model(db, name="Nour", email="nour@example.com")
+    _model(db, name="Layla", email="layla@example.com")
+    record_shipment(db, _order(db, "3001"), phone=None)
+    record_shipment(db, _order(db, "3002"), phone="01099999999")
+    record_shipment(db, _order(db, "3003"), phone="0221234567")
+    record_shipment(db, _order(db, "3004"), phone=HERS)
+
+    summary = unmatched(db)["summary"]
+
+    assert summary["needs_you"] == 1
+    assert summary["customers"] == 1
+    assert summary["no_phone"] == 1
+    assert summary["unusable_phone"] == 1
+
+
+def test_an_ambiguous_parcel_names_the_models_colliding(db):
+    """The actionable half. "Order 7929561219303" says nothing; *these two
+    models share this number* is the thing somebody can fix."""
+    _model(db, name="Nour", email="nour@example.com")
+    _model(db, name="Layla", email="layla@example.com")
+    record_shipment(db, _order(db, "3001"), phone=HERS)
+
+    row = unmatched(db)["parcels"][0]
+
+    assert row["phone"] == HERS
+    assert row["models"] == ["Layla", "Nour"]
 
 
 # ── The boundary ───────────────────────────────────────────────────────────
