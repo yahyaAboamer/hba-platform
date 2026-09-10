@@ -43,7 +43,7 @@ Package prepared: 9 September 2026. Phase 00 completed 9 September 2026.
 | 00 Baseline | **Complete** | `BASELINE_REPORT.md`; checkout `63c64c3`; 1589 + 104 green |
 | 01 UI foundations | **Complete** | `reports/01A-design-tokens.md`, `reports/01B-navigation-and-shells.md`; ADR 0039; `ROUTE_AND_PERMISSION_MAP.md` |
 | 02 Models and setup | **Complete** | `reports/02A-model-entry.md`, `02B-profile-and-self.md`, `02C-setup-readiness.md`; migration `d4b81c07af22`; D06 and D07 closed. Finalisation is deliberately Phase 09 |
-| 03 Products and wardrobe | **Complete** | `reports/03A…`, `03B…`, `03C-wardrobes-and-requests.md`; migrations `e7c2a5f1b930`, `f1a93d6c48e2`, `a2f47b8e1c53`; D05 and D11 implemented. **Line items are not fetched yet, so wardrobes are empty on real data** - the next piece |
+| 03 Products and wardrobe | **Complete** | `reports/03A…`, `03B…`, `03C-wardrobes-and-requests.md`, `03D-making-the-product-screens-load.md`, `03E-what-was-in-the-parcel.md`; migrations `e7c2a5f1b930`, `f1a93d6c48e2`, `a2f47b8e1c53`; D05 and D11 implemented. Line items are fetched and matching runs live (03E), so a wardrobe fills on real data - **re-run the scan once to fill parcels matched before that** |
 | 04 Targets | **Complete** | `reports/04A-targets-editor.md`, `04B-model-targets.md`. The grid carries a revision - a save without one is refused. The model's Targets tab is built (UI24); verification and historical outcomes existed and were verified rather than rebuilt |
 | 05 Financial rules | **Next** | Commission still pays delivered-only; carry-forward still live |
 | 06 Payments | Not started | Recording/proof/reconciliation already exist and are reusable |
@@ -57,16 +57,23 @@ Package prepared: 9 September 2026. Phase 00 completed 9 September 2026.
 design-reference server are all recorded in `BASELINE_REPORT.md` §10.** Read
 that rather than rediscovering them.
 
-- Migration head: **`d4b81c07af22`** (33 files). Dev DB `hba_platform` and test
-  DB `hba_platform_test` both at head. No secrets in this package.
+- Migration head: **`a2f47b8e1c53`** (35 revisions), unchanged since 03C —
+  **Phase 04 added none**. Dev DB `hba_platform` and test DB
+  `hba_platform_test` both at head. No secrets in this package.
 - **Migrations do not run on `uvicorn` startup**, only in `docker-entrypoint.sh`.
   A local run after a new migration needs `alembic upgrade head` first.
 - **Verify `current_database()` before running pytest.** `conftest.py` runs
   `DROP SCHEMA public CASCADE`. One pytest process at a time; never a
   concurrent `alembic` against the same database.
-- Blockers: none.
-- **Visual acceptance for 01, 02A, 02B, 02C and 03A: done by the owner on
-  staging, 10 September**, and reported correct. Browser automation still
+- Blockers: none. Phase 04 opened no business question. **D01, D02, D03, D04,
+  D08, D09 and D10 remain open**; D05, D06, D07 and D11 are closed and recorded
+  under `decisions/`. **D02 is the one 05A runs into** - whole-pound payout
+  rounding - and its recommendation is to preserve what the repo already does,
+  so 05A proceeds and raises it rather than stopping on it.
+- **Visual acceptance for 01, 02A, 02B, 02C, 03A, 03B and 03C: done by the
+  owner on staging, 10 September**. **03D, 03E, 04A and 04B are merged and
+  unseen** - the maintainer Targets screen and the whole model Targets tab have
+  never been rendered in front of anybody, and reported correct. Browser automation still
   cannot sign in - the typed value never reaches the field, so the form's own
   `required` check blocks it and no request is made - so screens continue to be
   verified over HTTP by the agent and by eye by the owner. Say so plainly in

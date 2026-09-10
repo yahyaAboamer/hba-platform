@@ -1,5 +1,10 @@
 # Where the work is — 4 September 2026
 
+> **SUPERSEDED by `2026-09-10-continuation-handoff.md`.** Kept because it is
+> the record of the portal redesign that shipped *before* the current handoff
+> package, and the batch list below is still the history of that work. It is no
+> longer where the work is.
+
 **Written to be the first thing a new session reads.** `CLAUDE.md` says what
 the platform is and what may never be broken; this says what is done, what is
 next, and what somebody is waiting on.

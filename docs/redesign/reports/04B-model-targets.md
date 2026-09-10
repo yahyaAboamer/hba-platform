@@ -1,7 +1,8 @@
 # Batch report — Phase 04B, verification, historical outcome and the model's Targets tab
 
 **Date:** 10 September 2026
-**Branch:** `phase04b/model-targets`, based on `main` @ `3fef111`
+**Branch:** `phase04b/model-targets`, based on `main` @ `3fef111`; merged to
+`main` as `036ea94`
 **Requested scope:** Known met/missed outcomes without invented counts for old months; current verification behaviour and evidence; models read current and history; protect target data used by immutable approval.
 
 **Delivered behaviour:** The Targets tab is real. Two thirds of this batch
@@ -73,6 +74,14 @@ which reads as a failure at something nobody asked for. It now says *none
 asked* and draws nothing. Nothing counted is still an em dash rather than a
 zero, in both places.
 
+### Preview and screenshots
+
+**None, and not for want of trying.** Browser automation cannot sign in to this
+platform — the typed value never reaches the field, so the form's own
+`required` check blocks it and no request is ever made. The screens below are
+reachable on staging once `main` deploys; every claim in this report is
+evidenced by a test or by reading the code, and none by a look.
+
 ### What the owner should try
 
 1. **Portal → Targets.** The month you are in at the top, every month before it
@@ -88,6 +97,14 @@ zero, in both places.
 ### Approved-design deviations
 
 **None.** The tab is the one the approved tab bar has always had.
+
+### Confirmation needed before the next dependent decision
+
+**Nothing for this batch.** The next batch, 05A, runs into **D02** — whether
+final payouts stay whole-pound half-up or move to two decimals. Its recorded
+recommendation is to preserve the existing rule, which is what the repo already
+does, so 05A can build on that and put the question in its own report rather
+than stopping for an answer now.
 
 ---
 
@@ -113,7 +130,21 @@ zero, in both places.
 | `tests/test_targets.py` | 2 new |
 | `frontend/src/lib/__tests__/targets.test.ts` | 14 new |
 
-**No migration. No new write path anywhere.**
+### Schema, migration and compatibility
+
+**No migration.** Migration head is unchanged at **`a2f47b8e1c53`** (35
+revisions), the same head 03C left. Nothing was backfilled and no column was
+added, read differently or dropped: `my_targets` reads `monthly_target` rows
+that already existed, through properties (`is_achieved`, `is_backfilled`,
+`is_verified`) that already existed.
+
+**Forward and backward compatible.** The API change is one new `GET` and one
+type hoisted in the frontend; every existing field of `/api/me/earnings/{month}`
+is still present and unchanged. An older frontend against this backend behaves
+identically — it simply never calls the new route. A rollback needs no data
+work.
+
+**No new write path anywhere.**
 
 ### Three decisions worth naming
 
@@ -157,6 +188,49 @@ difference does not currently arise. **No behaviour changed.**
 | `tests/test_reachability.py` | Failed on `GET /api/me/targets` until the tab existed, then passed |
 | Writable-routes guard | Unchanged and passing — this batch adds a read and nothing else |
 
+**Re-run on `main` after the merge**, not only on the branch: `pytest -q
+--color=no` → **1744 passed in 419.66s, exit 0**; `npx tsc --noEmit` → exit 0;
+`npm test` → **224 passed**, exit 0; `npm run build` → exit 0. Environment:
+Windows, Git Bash, `.venv/Scripts/python.exe` 3.14, local Postgres container
+against `hba_platform_test`, migration head `a2f47b8e1c53`. No CI — every check
+here was run locally and the numbers above are the ones the terminal printed.
+
+### Authorisation, idempotency and money
+
+**Authorisation.** `GET /api/me/targets` sits behind `current_affiliate`, the
+same dependency as every other self route. It takes **no identifier** — there
+is no id to tamper with, and `test_her_targets_are_only_ever_hers` asserts that
+one model's recorded month does not appear in another's history.
+
+**No write, so no idempotency question.** The writable-routes guard in
+`tests/test_portal_api.py` still lists exactly four writable self routes, and
+this batch did not touch that list. That guard failing is how anybody who adds
+a fifth is made to write down why.
+
+**No money is calculated, formatted or moved here.** The tab shows counts and
+outcomes; every sentence about pay describes a rule (§15) rather than a figure,
+and the figures themselves stay on the month card, which reads its snapshot.
+The one money-adjacent property — that an unrecorded month blocks a guaranteed
+minimum rather than reading as a miss — is asserted directly.
+
+### Existing failures distinguished from regressions
+
+**No pre-existing failures and no regressions.** `main` was at 1737 backend and
+206 frontend before this batch and both were green; the branch is 1744 and 224,
+green, and every added test is new rather than a repaired one.
+
+Two ratchet guards failed **during** the work and both were meant to: the
+reachability guard on `GET /api/me/targets` until the Targets tab called it,
+and nothing else. The writable-routes guard was never touched. No test was
+skipped, weakened or marked expected-to-fail.
+
+### No real credentials or personal data in evidence
+
+Nothing in this batch reads, stores or renders a name, address, phone number or
+email. The tests use the file's existing fixtures — invented models, an example
+InstaPay handle already in the repo — and no evidence in this report contains a
+credential, a token or a real person's details.
+
 ### Visual comparison — not performed
 
 Automation still cannot sign in. **The Targets tab has never been seen**, and
@@ -180,11 +254,39 @@ case, but that is an argument, not a look.
 
 ### Decisions recorded
 
-**None new.** No business question is open for this batch.
+**None new**, and none needed — Phase 04 asked nothing of the business.
 
-### Next
+**Two older ones were finally written down properly.** D05 and D11 were
+answered on 10 September and had records under `decisions/`, but the register
+in `DECISIONS.md` still listed D05 as an open question and did not mention D11
+at all. Both are now marked closed in the table and listed under *Answered so
+far*, and the register states which decisions remain open and which phase each
+belongs to. Nothing about either answer changed; a coding agent reading the
+register would simply have been told D05 was still to be decided.
 
-**Phase 05A — commission and financial rules.** `docs/redesign/prompts/05_FINANCIAL_RULES.md`.
+### STATUS.md and coverage rows updated
+
+- `docs/redesign/STATUS.md` — Phase 04 marked **Complete**, Phase 05 **Next**,
+  migration head corrected to `a2f47b8e1c53`.
+- `docs/redesign/ACCEPTANCE_CHECKS.csv` — **AC29 Pass** (outcome provenance,
+  with the test that shows it from the model's side), **AC30 Partly** (the
+  zero-required and unrecorded halves are done and tested; the low-performer
+  threshold half belongs to 07B and is untouched).
+- `CLAUDE.md` — test counts moved to 1744 / 224.
+
+### Exact next batch and prompt
+
+**Phase 05A — commission and financial rules.**
+
+Prompt: `docs/redesign/prompts/05_FINANCIAL_RULES.md`. Read
+`docs/redesign/STATUS.md` first, then that prompt, and run **only 05A** — the
+prompt itself says to stop at the batch boundary.
+
+Coverage it names: F01–F15, H03; UI26, UI30, UI31, UI52; AC28, AC33–AC35,
+AC42–AC48, AC50, AC52, AC62, AC63. **AC28 (guarantee evidence) inherits
+directly from this batch** — the three-valued `achieved` and the
+verified/unverified split are the inputs it gates on, and neither should be
+re-derived.
 
 ### Live changes
 

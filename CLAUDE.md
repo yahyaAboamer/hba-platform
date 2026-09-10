@@ -3,7 +3,7 @@
 Commission and payroll for ~20 Egyptian beauty models at **HBA Aesthetics**.
 FastAPI + SQLAlchemy + Postgres, React + Vite, on Railway.
 
-**Read `docs/plans/2026-09-04-continuation-handoff.md` first** — it says where
+**Read `docs/plans/2026-09-10-continuation-handoff.md` first** — it says where
 the work is right now. Everything below is the part that does not change.
 
 ---
