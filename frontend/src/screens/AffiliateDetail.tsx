@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { Money } from "../components/Money";
+import { FinancialRulesPreview } from "../components/FinancialRulesPreview";
 import { api, can } from "../lib/api";
 import { PAYOUT_FIELD_LABEL } from "../lib/payouts";
 import type { Session } from "../lib/api";
@@ -60,6 +61,7 @@ type WardrobeItem = {
 type Detail = Affiliate & {
   shipping: Shipping;
   current_month: string;
+  platform_start_month: string;
   codes: Code[];
   compensation: Compensation | null;
   payout_destination: Destination | null;
@@ -560,7 +562,7 @@ export function AffiliateDetail({ session }: { session: Session }) {
                     className="input detail__start-input"
                     type="month"
                     value={startDraft}
-                    min="2026-01"
+                    min={detail.platform_start_month}
                     max={detail.current_month}
                     onChange={(event) => setStartDraft(event.target.value)}
                     aria-label="The month she started with HBA"
@@ -798,6 +800,20 @@ export function AffiliateDetail({ session }: { session: Session }) {
           </dl>
         </section>
 
+        )}
+
+        {id && (
+          <FinancialRulesPreview
+            key={id}
+            affiliateId={id}
+            currentMonth={detail.current_month}
+            firstMonth={
+              detail.collaboration_start_month &&
+              detail.collaboration_start_month > detail.platform_start_month
+                ? detail.collaboration_start_month
+                : detail.platform_start_month
+            }
+          />
         )}
 
         <section className="panel">

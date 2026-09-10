@@ -125,6 +125,54 @@ def test_a_month_reports_what_it_is_worth(client):
     assert body["is_payable"] is True
 
 
+def test_pending_rules_preview_counts_pending_without_switching_payroll(client):
+    affiliate = _affiliate(client)
+    _terms(client, affiliate["id"])
+    _paid_order(affiliate["id"], "pending-preview", 2_000_000, state="pending")
+    with engine.begin() as connection:
+        connection.execute(text(
+            "UPDATE order_index SET delivery_state = 'in_flight' "
+            "WHERE shopify_order_id = 'pending-preview'"
+        ))
+    url = f"/api/affiliates/{affiliate['id']}/earnings/{MONTH}"
+    response = client.get(url + "?rules_preview=true")
+    assert response.status_code == 200
+    body = response.json()
+    preview = body.get("financial_rules_preview")
+    assert preview is not None, "05A must expose a read-only pending-inclusive preview"
+    assert preview["current_entitlement"]["payout"]["piastres"] == 200_000
+    assert preview["performance"]["counted_sales_piastres"] == 2_000_000
+    assert preview["can_approve"] is False
+    assert body["payout"]["piastres"] == 0
+    assert client.get(url).json()["payout"]["piastres"] == 0
+    with engine.connect() as connection:
+        assert connection.scalar(text("SELECT count(*) FROM payroll_snapshot")) == 0
+        assert connection.scalar(text("SELECT count(*) FROM payment_transaction")) == 0
+        assert connection.scalar(text(
+            "SELECT settled_in_snapshot_id FROM attributed_order "
+            "WHERE shopify_order_id = 'pending-preview'"
+        )) is None
+
+
+def test_profile_sends_the_server_platform_start_month(client, monkeypatch):
+    affiliate = _affiliate(client)
+    monkeypatch.setattr("app.api.affiliates.PLATFORM_START_MONTH", "2026-03")
+
+    response = client.get(f"/api/affiliates/{affiliate['id']}")
+
+    assert response.status_code == 200
+    assert response.json().get("platform_start_month") == "2026-03"
+
+
+def test_model_cannot_read_another_models_rules_preview(client):
+    affiliate = _affiliate(client)
+    _demote_to("affiliate")
+    response = client.get(
+        f"/api/affiliates/{affiliate['id']}/earnings/{MONTH}?rules_preview=true"
+    )
+    assert response.status_code == 403
+
+
 def test_the_orders_behind_the_figure_come_with_it(client):
     """A figure nobody can take apart is a figure nobody can argue with, and
     the first question about a payout is always *which sales is that?*

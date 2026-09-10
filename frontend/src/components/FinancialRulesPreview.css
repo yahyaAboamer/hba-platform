@@ -1,0 +1,88 @@
+/* Own the panel's layout: the preview is also useful away from a profile and
+   must not depend on AffiliateDetail's stylesheet being loaded first. */
+.rules-preview__heading {
+  padding: var(--space-3) var(--space-4);
+  cursor: pointer;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.rules-preview[open] > .rules-preview__heading {
+  border-bottom: 1px solid var(--rule);
+}
+
+.rules-preview__body {
+  padding: var(--space-4);
+}
+
+.rules-preview__month {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+  font-size: var(--text-sm);
+}
+
+.rules-preview__note {
+  margin: 0 0 var(--space-3);
+  color: var(--quiet);
+  font-size: var(--text-sm);
+}
+
+/* These are separate facts, not a payout waterfall. No visual subtraction or
+   money-state colour should imply that this candidate amount has been agreed. */
+.rules-preview__figures {
+  margin: 0;
+}
+
+.rules-preview__row {
+  display: grid;
+  grid-template-columns: minmax(0, 10rem) minmax(0, 1fr);
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--rule);
+  font-size: var(--text-sm);
+}
+
+.rules-preview__row:last-child {
+  border-bottom: none;
+}
+
+.rules-preview__label {
+  color: var(--quiet);
+}
+
+.rules-preview__value {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.rules-preview__issues {
+  margin: var(--space-3) 0 0;
+  padding-left: var(--space-4);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.rules-preview__reconciliation {
+  margin-top: var(--space-4);
+  font-size: var(--text-sm);
+}
+
+.rules-preview__reconciliation p,
+.rules-preview__error p {
+  margin: 0 0 var(--space-3);
+}
+
+.rules-preview__error {
+  font-size: var(--text-sm);
+}
+
+/* Staff can review on a narrow screen too; labels must not squeeze amounts. */
+@media (max-width: 480px) {
+  .rules-preview__row {
+    grid-template-columns: 1fr;
+    gap: var(--space-1);
+  }
+}

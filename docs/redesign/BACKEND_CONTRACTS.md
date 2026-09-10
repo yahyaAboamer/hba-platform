@@ -100,6 +100,51 @@ Keep draft/proposed allocations separate from committed approved allocations. A 
 
 At transition, old late-delivery allocations remain read-only evidence. New pending orders included in approval must not be queued into another month's earnings later. Do not clear legacy settled-in links wholesale; reconcile their meaning for each affected historical month.
 
+### 05A implemented contract — read-only, not activated
+
+`GET /api/affiliates/{affiliate_id}/earnings/{month}?rules_preview=true` adds
+`financial_rules_preview`; without the flag the response is unchanged. The
+existing `affiliates.view` permission applies; models cannot call this staff
+endpoint. The staff model profile exposes the preview with a month selector.
+
+- `performance`: source-month counted sales and delivered/pending/failed/
+  unavailable counts. Legacy carry links never remove the source's sales or
+  add them to a destination's own sales.
+- `current_entitlement`: that month's terms, shared exact commission/fixed/
+  guarantee calculation, rounded candidate payout and blockers. Pending counts
+  once; no incoming late-delivery commission is added by this path.
+- `source_complete` and per-order `issues`: missing delivery facts, uncertain
+  original post-delivery basis and reversed failures needing D09 review.
+  Incomplete figures are candidates, never approval instructions; the UI hides
+  incomplete sales/earnings behind an explicit missing-information message.
+- `approval`: existing active snapshot ID/version and frozen obligation, or
+  null. `settlement`: recorded payment allocations, existing ledger state and
+  explicitly named `legacy_balance_piastres`. Historical classification does
+  not hide actual allocations or invent new transfer rows.
+- `legacy_allocations`: source month, allocated month, order and snapshot IDs,
+  for both ends of old carry. `requires_transition_reconciliation` flags them.
+  Allocation is not labelled proof of payment. No links are reset or deleted.
+- `orders`: raw source diagnostics, including state, known display basis (null
+  when unavailable), completeness issues and legacy settled links. No per-order
+  commission is computed or consumed by the preview screen. Order-screen
+  earned/forgone presentation remains owned by `portal.py::_order_commission`;
+  it is not reimplemented here. No customer identifiers/contact details.
+- `can_approve=false` and `activation_blockers=[live_transition_not_enabled]`
+  are unconditional. `calculate_month` has no source-orders parameter; only
+  the separately named `preview_calculation` can select the pending-inclusive
+  path through private shared arithmetic. Approval does not accept this mode.
+  05B/05C and D01 still own immutable pending-inclusive approval, correction
+  handling and activation.
+
+The staff model-detail response sends `platform_start_month` from the server's
+`PLATFORM_START_MONTH`. The preview's MonthPicker window combines that floor
+with the model's collaboration start and the server's current month; there is
+no hard-coded platform start date in the profile component.
+
+Ingestion now retains a known base when an in-flight order becomes void; both
+policies still exclude it by state. This preserves evidence, not entitlement.
+Already-lost historical bases are not fabricated. No schema migration in 05A.
+
 ## Payment destinations and proof
 
 The payment detail may request full destination through the existing audited, permission-gated reveal endpoint as part of opening the explicit payout view. This follows the owner's latest preference to see complete details there. It does not authorize every roster API to expose bank details or marketing roles to record payments.

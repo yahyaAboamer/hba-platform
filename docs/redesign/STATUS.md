@@ -2,41 +2,40 @@
 
 Package prepared: 9 September 2026. Phase 00 completed 9 September 2026.
 
-- Repository baseline reviewed by the package author: `025d8a8b059978e6c8113d3c998465be80730f91`.
-- **Remote HEAD verified: Yes.** `origin/main` = `origin/production` =
-  `025d8a8`. Authentication works from the implementation environment; the
-  package author's 404 was theirs alone.
-- **B1 answered 9 September: push `main` only.** Done — `origin/main` is now
-  `63c64c3`. `production` stays at `025d8a8` deliberately; the branches are not
-  level and that is the owner's current choice, not an oversight.
-- Active branch: **`phase01a/design-tokens`**, based on `63c64c3`. Not merged.
-- Current phase/batch: **Phase 02 complete (02A, 02B, 02C). 03A next.**
-- Application files changed: **frontend styling only** (Phase 01A). No API,
-  service, model, migration or money code has been touched.
-- Runtime tests: green before and after every batch so far. Backend **1716
-  passed** (1589 at baseline, then 24 / 7 / 17 / 22 / 35 / 22 from 02A, 02B,
-  02C, 03A, 03B, 03C, 03D and 03E - now **1727**); frontend **198 passed**;
-  `npm run build` exit 0. The
-  `1558 / 87` in `REPOSITORY_AUDIT.md` is stale.
-- Browser acceptance: **both design references and both halves of the running
-  app were opened and compared** (synthetic seed data). Per-screen visual
-  acceptance remains owed batch by batch.
-- Package integrity: `verify-package.py` → 19 assets, 52 rows, 64 checks,
-  **0 issues** (needs `PYTHONUTF8=1` on Windows).
-- Current prototype defects: see `DESIGN_REVIEW.md` (V01–V16). Unchanged.
-- User business decisions pending: **none blocking.** 01A's question was
-  answered on 9 September — **one typeface everywhere**; ADR 0027's mono rule is
-  superseded by 0039 and the glossary entry that promised it was rewritten.
-  One thing to look at rather than answer: **the maintainer's tool now defaults
-  to dark**, following the approved admin export. One word reverts it.
-  D01-D10 stand, each due at its own phase; D06 is confirmed a real card-number
-  vs account-number conflict, not a relabel.
-- Next instruction: `prompts/03_PRODUCTS_AND_WARDROBE.md`, **batch 03A only**.
-  The largest gap in the platform - UI12-UI20 are entirely absent. Two
-  engineering facts to establish first, against the real shop rather than by
-  assumption: `read_products` is **not** in `REQUIRED_SCOPES` today, and access
-  to the **shipping-address phone** (protected customer data) was never
-  confirmed. Staging and production share one Shopify shop.
+- **Updated after the Phase 05A fix-up, 10 September 2026.** This replaces the stale
+  Phase 01/02 summary previously at the top of this file.
+- Started on clean local `main` at the required completed commit
+  **`8ad14a6cd7453bc8140d52b6f5c64faf91927b67`**. Ancestor check passed.
+- Active branch: **`phase05a/pending-inclusive-earnings`**, based on that commit.
+  The original batch was committed untouched as **`5320fd6`** before fixes.
+  Code corrections are **`8a20ca5`**; the documentation handoff follows in its
+  own commit. Push this review branch only, not `main` or `production`.
+  Do not merge, deploy or start 05B under this authorization.
+- **05A implemented and verified locally; batch review/visual acceptance pending.**
+  Read `reports/05A-pending-inclusive-earnings.md` before continuing.
+- Staff can open **Models → model → Financial rules preview**. It uses the
+  real earnings API with `rules_preview=true`, counts pending + delivered in
+  the source month, and shows legacy allocations separately. **No live policy
+  switch:** existing approval, reopen and payment paths remain legacy pending
+  05B/05C and D01. No new financial write endpoint or migration.
+- Verification: **1769 backend tests passed**, final full run **383.46s**
+  using `.venv/Scripts/python.exe -m pytest -q --color=no` (one non-failing
+  local cache warning). **233 frontend tests passed**; `npx.cmd tsc --noEmit`
+  and `npm.cmd run build` both exit 0. All ran after the final code fixes.
+- A separate read-only reviewer returned no findings because it hit an account
+  usage limit before completing review. Direct diff review and automated
+  checks completed; no independent sign-off is claimed.
+- **No screen in 05A has been seen by anybody.** Evidence is limited to a
+  sign-in screenshot and three HTTP 200s, followed by a browser inspection
+  rejection before any rendered review. See the precise evidence below.
+- Package checker: **52 screen/action rows, 64 checks, 19 source assets**;
+  raw-byte verification reports **8 CRLF/LF mismatches**. All eight match the
+  manifest after LF normalization; design files have no Git changes from the
+  starting commit. No assets or manifest were rewritten to hide this result.
+- D02 remains open; **existing whole-pound half-up rounding preserved**, as
+  instructed by the continuation handoff. D01 still gates live transition.
+- Stop for **05A review**. After acceptance, the exact next implementation is
+  **05B — Immutable per-model approval**, in `prompts/05_FINANCIAL_RULES.md`.
 
 | Phase | State | Report / commit / evidence |
 |---|---|---|
@@ -45,7 +44,7 @@ Package prepared: 9 September 2026. Phase 00 completed 9 September 2026.
 | 02 Models and setup | **Complete** | `reports/02A-model-entry.md`, `02B-profile-and-self.md`, `02C-setup-readiness.md`; migration `d4b81c07af22`; D06 and D07 closed. Finalisation is deliberately Phase 09 |
 | 03 Products and wardrobe | **Complete** | `reports/03A…`, `03B…`, `03C-wardrobes-and-requests.md`, `03D-making-the-product-screens-load.md`, `03E-what-was-in-the-parcel.md`; migrations `e7c2a5f1b930`, `f1a93d6c48e2`, `a2f47b8e1c53`; D05 and D11 implemented. Line items are fetched and matching runs live (03E), so a wardrobe fills on real data - **re-run the scan once to fill parcels matched before that** |
 | 04 Targets | **Complete** | `reports/04A-targets-editor.md`, `04B-model-targets.md`. The grid carries a revision - a save without one is refused. The model's Targets tab is built (UI24); verification and historical outcomes existed and were verified rather than rebuilt |
-| 05 Financial rules | **Next** | Commission still pays delivered-only; carry-forward still live |
+| 05 Financial rules | **05A local implementation complete; review pending** | `reports/05A-pending-inclusive-earnings.md`; read-only pending-inclusive preview and source-performance service. Existing live financial paths unchanged. 05B next after review; 05C not started |
 | 06 Payments | Not started | Recording/proof/reconciliation already exist and are reusable |
 | 07 Performance screens | Not started | Ranking absent |
 | 08 Settings and notifications | Not started | Notice dismissal persistence absent |
@@ -58,18 +57,17 @@ design-reference server are all recorded in `BASELINE_REPORT.md` §10.** Read
 that rather than rediscovering them.
 
 - Migration head: **`a2f47b8e1c53`** (35 revisions), unchanged since 03C —
-  **Phase 04 added none**. Dev DB `hba_platform` and test DB
+  **Phases 04 and 05A added none**. Dev DB `hba_platform` and test DB
   `hba_platform_test` both at head. No secrets in this package.
 - **Migrations do not run on `uvicorn` startup**, only in `docker-entrypoint.sh`.
   A local run after a new migration needs `alembic upgrade head` first.
 - **Verify `current_database()` before running pytest.** `conftest.py` runs
   `DROP SCHEMA public CASCADE`. One pytest process at a time; never a
   concurrent `alembic` against the same database.
-- Blockers: none. Phase 04 opened no business question. **D01, D02, D03, D04,
+- No business question blocked 05A. Its rendered visual acceptance is pending.
+  **D01, D02, D03, D04,
   D08, D09 and D10 remain open**; D05, D06, D07 and D11 are closed and recorded
-  under `decisions/`. **D02 is the one 05A runs into** - whole-pound payout
-  rounding - and its recommendation is to preserve what the repo already does,
-  so 05A proceeds and raises it rather than stopping on it.
+  under `decisions/`. 05A preserved whole-pound rounding without closing D02.
 - **Visual acceptance done by the owner on staging, 10 September: 01, 02A,
   02B, 02C, 03A, 03B, 03C, and now 03D, 04A and 04B** - reported as *everything
   works perfectly*, which covers the Products grid's paging and speed, all four
@@ -83,18 +81,18 @@ that rather than rediscovering them.
   will re-run *Settings → Shopify & data → Match parcels from 2026-01-01*
   before wardrobes can be judged. Until then, an empty wardrobe on staging is
   expected and says nothing about 03C or 03E.
-- **Browser automation still cannot sign in** - the typed value never reaches
-  the field, so the form's own `required` check blocks it and no request is
-  made - so screens continue to be verified over HTTP by the agent and by eye
-  by the owner. Say so plainly in
-  each batch report rather than implying a screen was seen.
+- **05A browser evidence is limited.** DOM snapshots and read-only value
+  inspection reported empty fields, while a sign-in screenshot showed typed
+  values. The requests `POST /api/auth/login`, `GET /api/auth/me` and
+  `GET /api/payroll/2026-09` returned HTTP 200. Automatic approval review then
+  blocked further inspection for a usage limit, before any rendered review.
+  Neither the screenshot nor those responses proves a rendered 05A screen.
+  **No screen in 05A has been seen by anybody.**
 - **`read_products` confirmed granted** on the shop, 10 September, after the
   owner deployed a new app version. `/api/operations/shopify-scopes` is the
   route that answers it; there is no button, by design.
-- **C: is 99% full (1.9 GB free)**, still, since 4 September. There is **no
-  CI**; every check is local.
+- **C: is 99% full (1.9 GB free). There is no CI.** Every check is local.
 - `production` is deliberately one release behind `main`. Promoting it is a
   separate, owner-authorised act, not a tidy-up.
-- Do not infer completion from a screen file or from this package. Phase 02 and
-  04 are marked *partly built* because their code was read and run, not because
-  a plan said so.
+- Do not infer acceptance from source files or passing unit tests. Phase 02/04
+  have recorded owner acceptance; 05A's rendered review remains separate.

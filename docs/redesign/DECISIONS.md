@@ -42,12 +42,17 @@ current*, *does something she bought belong in her wardrobe* — and all four
 were answered in a sentence. The records carry what each one settles and what
 it leaves alone.
 
-**Still open: D01, D02, D03, D04, D08, D09, D10.** Of those, **D02 is the one
-the next batch runs into** (whole-pound payout rounding, scheduled for 05A);
-its recommendation is to preserve the existing exact-arithmetic whole-pound
-rule, which is what the repo already does, so 05A can proceed on that basis and
-raise it rather than stop on it.
+**Still open: D01, D02, D03, D04, D08, D09, D10.** D02 applies to final payout
+rounding. 05A preserved and tested the existing exact-arithmetic whole-pound
+rule under the continuation handoff's instruction to proceed. It remains an
+open owner decision; D01 still gates live activation.
 
 ## Recording an answer
+
+05A implementation note (10 September 2026): D02's existing whole-pound
+half-up rule was retained and verified with the supplied financial examples.
+This follows the continuation handoff's instruction to proceed; it is not a
+new owner answer and does not close D02. D01 remains the live-transition gate;
+the new financial rules are available only as a read-only preview.
 
 Append the owner's actual choice, its date/source and affected rules/checks using `templates/DECISION_RECORD.md`. Update `STATUS.md` and the relevant contract. Do not mark a proposal confirmed because it was convenient to implement.
