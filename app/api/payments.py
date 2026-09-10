@@ -25,6 +25,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
 from pydantic import BaseModel, Field
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_permission
@@ -36,13 +37,18 @@ from app.models.affiliates import AffiliateProfile
 from app.models.identity import UserAccount
 from app.models.payments import AdjustmentType, PaymentTransaction
 from app.services.affiliates import list_affiliates
+from app.services.corrections import open_corrections
 from app.services.payments import (
+    PaymentOperationConflict,
     adjust,
     adjustments_for,
+    assert_same_payment,
     balance_for,
+    payment_for_operation_key,
     payments_for,
     record_payment,
 )
+from app.services.payroll import blockers_for, is_historical
 from app.services.payouts import changed_recently
 from app.services.proof import ProofRejected, readable_by, store_proof
 
@@ -55,6 +61,7 @@ class AllocationBody(BaseModel):
 
 
 class PaymentBody(BaseModel):
+    operation_key: str | None = Field(default=None, min_length=8, max_length=64)
     affiliate_id: int
     amount_piastres: int = Field(gt=0)
     allocations: list[AllocationBody] = Field(default_factory=list)
@@ -89,14 +96,17 @@ def _affiliate_or_404(db: Session, affiliate_id: int) -> AffiliateProfile:
 
 
 def _render_balance(
+    db: Session,
     affiliate: AffiliateProfile,
+    month: str,
     balance: dict,
     destination_changed_at=None,
 ) -> dict:
-    return {
+    row = {
         **balance,
         "affiliate_id": affiliate.id,
         "name": affiliate.name,
+        "status": affiliate.status,
         # §6.4.5. Surfaced at the moment a redirected payout would actually
         # cost money. `changed_recently` has existed since Phase 3 and reached
         # no screen until now - it had nothing to warn about while only the
@@ -108,6 +118,68 @@ def _render_balance(
         "paid": format_egp(balance["paid_piastres"]),
         "balance": format_egp(balance["balance_piastres"]),
     }
+
+    # F14. An approved obligation is a debt; a forecast is still moving. The
+    # payments desk needs both, but they must never share a label or silently
+    # add an incomplete calculation to the cash request.
+    if balance["state"] == "not_approved" and not is_historical(month):
+        blockers, calculation = blockers_for(db, affiliate, month)
+        forecast = calculation.payout_piastres if not blockers else None
+        row.update(
+            forecast_piastres=forecast,
+            forecast_blockers=blockers,
+            required_kind="forecast" if forecast is not None else "unavailable",
+            required_piastres=forecast or 0,
+        )
+    elif balance["state"] == "settled_externally":
+        row.update(
+            forecast_piastres=None,
+            forecast_blockers=[],
+            required_kind="settled_externally",
+            required_piastres=0,
+        )
+    else:
+        # Funds required is the bank movement for this month, not its gross
+        # approved earnings. A credit is money already in her hands, so D04's
+        # valid zero-transfer month must contribute zero here while retaining
+        # the approved obligation beside it. Recorded + remaining also keeps
+        # this figure stable as ordinary partial transfers are entered.
+        transfer_requirement = balance["paid_piastres"] + max(
+            balance["balance_piastres"], 0
+        )
+        row.update(
+            forecast_piastres=None,
+            forecast_blockers=[],
+            required_kind="approved",
+            required_piastres=transfer_requirement,
+        )
+
+    row["required"] = format_egp(row["required_piastres"])
+    return row
+
+
+def _all_open_corrections(db: Session) -> list[dict]:
+    """Every unresolved recovery choice, including for someone archived.
+
+    05C deliberately answered the per-model question. Month end asks a
+    different one: *is there any money HBA has already advanced and not dealt
+    with?* Scanning every payable profile here is what stops an inactive or
+    departed model's correction disappearing from the only place finance is
+    certain to visit.
+    """
+    rows = []
+    for affiliate in list_affiliates(db, include_archived=True):
+        if not affiliate.is_payable:
+            continue
+        rows.extend(
+            {
+                **_render_correction(correction),
+                "name": affiliate.name,
+                "status": affiliate.status,
+            }
+            for correction in open_corrections(db, affiliate)
+        )
+    return rows
 
 
 @router.get("/payments/{month}")
@@ -123,28 +195,63 @@ def outstanding(
     settlement state, because there isn't one (§11.1).
     """
     month = _month_or_400(month)
+    # A house code has real sales and no payee. Filtering it before any
+    # calculation prevents it entering model counts as well as money totals;
+    # inactive models stay because an old obligation does not leave with them.
+    affiliates = [
+        affiliate
+        for affiliate in list_affiliates(db, include_archived=include_archived)
+        if affiliate.is_payable
+    ]
     rows = [
         _render_balance(
+            db,
             affiliate,
+            month,
             balance_for(db, affiliate, month),
             changed_recently(db, affiliate),
         )
-        for affiliate in list_affiliates(db, include_archived=include_archived)
+        for affiliate in affiliates
     ]
     outstanding_rows = [row for row in rows if row["balance_piastres"] > 0]
+    corrections = _all_open_corrections(db)
+    required = sum(row["required_piastres"] for row in rows)
+    forecast = sum(
+        row["required_piastres"]
+        for row in rows
+        if row["required_kind"] == "forecast"
+    )
+    approved = sum(
+        row["obligation_piastres"]
+        for row in rows
+        if row["required_kind"] == "approved"
+    )
+    recorded = sum(row["paid_piastres"] for row in rows)
+    still_owed = sum(row["balance_piastres"] for row in outstanding_rows)
+    open_correction_total = sum(
+        row["recoverable_piastres"] for row in corrections
+    )
 
     return {
         "month": month,
         "affiliates": rows,
+        "open_corrections": corrections,
         "totals": {
             "affiliates": len(rows),
+            "required_piastres": required,
+            "required": format_egp(required),
+            "forecast_piastres": forecast,
+            "forecast": format_egp(forecast),
+            "approved_piastres": approved,
+            "approved": format_egp(approved),
+            "recorded_piastres": recorded,
+            "recorded": format_egp(recorded),
             "still_owed_affiliates": len(outstanding_rows),
-            "still_owed_piastres": sum(
-                row["balance_piastres"] for row in outstanding_rows
-            ),
-            "still_owed": format_egp(
-                sum(row["balance_piastres"] for row in outstanding_rows)
-            ),
+            "still_owed_piastres": still_owed,
+            "still_owed": format_egp(still_owed),
+            "open_corrections": len(corrections),
+            "open_corrections_piastres": open_correction_total,
+            "open_corrections_amount": format_egp(open_correction_total),
         },
     }
 
@@ -163,6 +270,26 @@ def record(
     """
     affiliate = _affiliate_or_404(db, body.affiliate_id)
     allocations = {row.payroll_snapshot_id: row.piastres for row in body.allocations}
+
+    # Resolve a retry before asking what is owed now. The first request may
+    # have committed and lost its response; in that case the balance is already
+    # zero, which made the old endpoint reject the retry as a different amount.
+    existing = payment_for_operation_key(db, body.operation_key)
+    if existing is not None:
+        try:
+            assert_same_payment(
+                existing,
+                affiliate=affiliate,
+                amount_piastres=body.amount_piastres,
+                allocations=allocations,
+                occurred_at=body.occurred_at,
+                reference=body.reference,
+                note=body.note,
+                proof_file_id=body.proof_file_id,
+            )
+        except PaymentOperationConflict as exc:
+            raise HTTPException(409, str(exc)) from exc
+        return _render_recorded_payment(existing, replayed=True)
 
     # §14. A difference from what was owed is refused without a note - the note
     # is what separates a deliberate partial payment from a typo, and only the
@@ -184,6 +311,7 @@ def record(
             db,
             affiliate,
             amount_piastres=body.amount_piastres,
+            operation_key=body.operation_key,
             allocations=allocations,
             occurred_at=body.occurred_at,
             reference=body.reference,
@@ -192,18 +320,49 @@ def record(
             actor_id=actor.id,
             actor_email=actor.email,
         )
+    except PaymentOperationConflict as exc:
+        db.rollback()
+        raise HTTPException(409, str(exc)) from exc
+    except IntegrityError:
+        # A genuine double-click can pass the read above twice. The unique key
+        # chooses the winner; after rollback the loser returns that same row.
+        db.rollback()
+        existing = payment_for_operation_key(db, body.operation_key)
+        if existing is None:
+            raise
+        try:
+            assert_same_payment(
+                existing,
+                affiliate=affiliate,
+                amount_piastres=body.amount_piastres,
+                allocations=allocations,
+                occurred_at=body.occurred_at,
+                reference=body.reference,
+                note=body.note,
+                proof_file_id=body.proof_file_id,
+            )
+        except PaymentOperationConflict as exc:
+            raise HTTPException(409, str(exc)) from exc
+        return _render_recorded_payment(existing, replayed=True)
     except ValueError as exc:
         db.rollback()
         raise HTTPException(400, str(exc)) from exc
 
     db.commit()
+    return _render_recorded_payment(transaction, replayed=False)
+
+
+def _render_recorded_payment(
+    transaction: PaymentTransaction, *, replayed: bool
+) -> dict:
     return {
         "id": transaction.id,
-        "affiliate_id": affiliate.id,
+        "affiliate_id": transaction.affiliate_id,
         "amount_piastres": transaction.amount_piastres,
         "amount": format_egp(transaction.amount_piastres),
         "unallocated_piastres": transaction.unallocated_piastres,
         "has_proof": transaction.proof_file_id is not None,
+        "replayed": replayed,
     }
 
 
@@ -286,9 +445,9 @@ def make_adjustment(
 ) -> dict:
     """A credit or a write-off (§11.5).
 
-    Where the maintainer's choice after a reopen is recorded. The platform
-    reports that a model was overpaid and refuses to decide which of these it
-    is - that is a judgement about a person HBA knows.
+    Where the maintainer's choice after an agreed month's source facts change
+    is recorded. The platform reports that a model was overpaid and refuses to
+    decide which of these it is - that is a judgement about a person HBA knows.
     """
     affiliate = _affiliate_or_404(db, body.affiliate_id)
     _month_or_400(body.source_month)
@@ -350,6 +509,18 @@ def affiliate_payments(
                 "destination": row.destination_snapshot_json,
                 "allocated_piastres": row.allocated_piastres,
                 "unallocated_piastres": row.unallocated_piastres,
+                # The receipt must identify the agreed statement the transfer
+                # settled. An aggregate alone is real money with its month
+                # erased, which cannot answer a later payment question.
+                "allocations": [
+                    {
+                        "month": allocation.snapshot.month.month,
+                        "snapshot_id": allocation.payroll_snapshot_id,
+                        "snapshot_version": allocation.snapshot.version,
+                        "allocated_piastres": allocation.allocated_piastres,
+                    }
+                    for allocation in row.allocations
+                ],
             }
             for row in payments_for(db, affiliate)
         ],

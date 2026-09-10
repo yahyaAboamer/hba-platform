@@ -155,6 +155,29 @@ Record the actual external transfer against the correct approved statement and d
 
 Reuse the existing InstaPay instructional asset; supplying that image is frontend asset work. Payout validation/persistence and secure receipt retrieval are backend work. Product images similarly require both upstream ingestion and proper frontend rendering.
 
+### 06A implemented payment contract
+
+- `GET /api/payments/month/{month}` is the server-authoritative admin month-end
+  view. It retains inactive models with obligations and excludes house
+  accounts. Each row distinguishes forecast, approved gross, recorded and
+  remaining amounts instead of asking the browser to infer accounting state.
+- `required_piastres` is funds required for the month: recorded money plus the
+  positive amount still outstanding. `approved_piastres` remains the frozen
+  gross obligation. They deliberately differ when a carried correction covers
+  a valid earned month; that row requires zero transfer and must not create a
+  zero-value payment.
+- The same response includes every unresolved correction for non-house models,
+  including archived models, so month-end review does not depend on opening
+  profiles one by one.
+- The record call accepts a durable `operation_key`. Replaying the same key and
+  same facts returns the original transaction with `replayed=true`; reusing it
+  for different transfer facts is a conflict. The database unique constraint
+  is the race boundary. Existing callers and historical rows remain compatible
+  because the key is nullable.
+- Admin payment history returns each allocation's month, amount and immutable
+  calculation snapshot ID/version. The transaction continues to own the
+  actual destination snapshot and proof; recalculation never rewrites them.
+
 ## Notices, settings and operational support
 
 Use durable notice identity from the affected issue plus relevant revision. Store temporary dismissal separately from persistent item mute; avoid browser-only behavior if the chosen persistence is account-wide. Resolved issues vanish; a new distinct issue must not inherit an unrelated mute. Preserve the original attention service's permission checks.

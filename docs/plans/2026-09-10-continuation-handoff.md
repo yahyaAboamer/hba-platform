@@ -1,4 +1,4 @@
-# Where the work is — 10 September 2026
+# Where the work is — 11 September 2026
 
 **Written to be the first thing a new session reads.** `CLAUDE.md` says what
 the platform is and what may never be broken; this says what is done, what is
@@ -24,47 +24,52 @@ file's summary; detailed evidence lives in the latest batch report.
 |---|---|
 | 00 Baseline · 01 UI foundations · 02 Models and setup · 03 Products and wardrobe · **04 Targets** | **Complete** |
 | 05 Financial rules | **Complete** |
-| **06 Payments** | **Next** |
+| **06 Payments** | **06A complete locally; 06B next** |
 | 07 Performance screens · 08 Settings and notifications · 09 Rehearsal and release | Not started |
 
-**1797+ backend tests, 237 frontend.** Migration head `a2f47b8e1c53`; **no
-phase since 03 has added a migration.**
+**1807 full-suite backend tests, 252 focused 06A backend tests and 246 frontend
+tests passed.** Migration head `1c4b06a5f8d2`.
 
-**`main` is at `99907f1`** — the whole redesign through 05C. **`production` is
-at `9cbfcdb`**, one batch behind: Phases 01–05B were promoted on 10 September
-on the owner's explicit instruction (39 commits and 5 migrations in a single
-deploy, both environments healthy), and 05C has not been promoted. Promoting is
-a separate owner-authorised act.
+**06A started from clean `main` at `0f0ce641f81a2209cb211a5f51251e82c5f44159`**
+on `phase06a/admin-month-end-payments`. Its implementation, report and this
+handoff form one local batch commit. It is not merged, pushed or deployed.
+Production was not inspected or changed in 06A; promoting remains a separate
+owner-authorised act.
 
-**None of Phase 05 has been seen by anybody.** No rendered review of the
+**None of Phase 05 or 06A has been seen by anybody.** No rendered review of the
 financial preview, the approve screen, the retired reopen page or the
-corrections panel — and 04A/04B before them are unreviewed too. Automation
-cannot sign in here, so the only way any of it gets looked at is the owner
-walking it on staging.
+corrections panel, nor of the new admin payment journey. Phase 04 was accepted
+on staging on 10 September. Passing API/React checks are not visual acceptance.
 
 ---
 
 ## Start here
 
 1. Read `docs/redesign/STATUS.md`.
-2. Read `docs/redesign/reports/05C-late-failure-corrections.md` — the batch that
-   just closed. Phase 05 is complete and merged; its screens are unreviewed.
-3. Then `docs/redesign/prompts/06_PAYMENTS.md`, and run **06A only** — the
-   admin month-end payment journey. The prompt itself says to stop at the batch
-   boundary.
+2. Read `docs/redesign/reports/06A-admin-month-end-payment-journey.md` — the
+   batch that just closed locally. Review/merge/deploy are separate acts.
+3. Then read `docs/redesign/prompts/06_PAYMENTS.md`, and run **06B only** —
+   model payment views and destination changes. Do not redo 06A or continue to
+   Phase 07.
 
-**What 06A inherits and must not rebuild.** Recording, proof, allocation and
-reconciliation all exist in `app/services/payments.py` and are reusable; 06A is
-the journey around them, not a second ledger. Its own prompt says so. Two
-Phase 05 facts land directly on the screen money is sent from:
+**What 06B inherits and must not rebuild.** 06A made Payments the admin
+month-end journey around the existing recording, proof, allocation and
+reconciliation services; it did not create a second ledger. Preserve its
+server-authoritative totals, cross-model correction queue, complete authorized
+destination reveal, stable operation-key retry and append-only history.
 
 - A month reduced by a carried correction can be **zero**, in a month the model
-  met her targets in (D04). The payments screen has to read correctly for that
-  and not present it as an error.
-- `GET /api/affiliates/{id}/corrections` already answers *what is outstanding
-  against her*. There is **no cross-model view** — Payments does not list every
-  open correction at month end, which is exactly where somebody would notice
-  one they had forgotten. That is the most valuable thing 06A could add.
+  met her targets in (D04). 06A calls it No transfer due, preserves the approved
+  gross figure separately and never creates a zero payment.
+- The month response now lists unresolved corrections across non-house models,
+  including archived models. Profile-only correction visibility is no longer
+  the admin month-end blind spot.
+- Migration `1c4b06a5f8d2` adds the nullable unique operation key. Historical
+  rows remain valid; a browser retry returns the original transaction and a
+  same-key/different-facts request conflicts.
+- 06B still owns the model's payout edit, reauthentication, self payment
+  history/receipt, calculation link and later-destination-change context. AC41
+  and AC55 were deliberately not claimed by 06A.
 
 ## Three rules that arrived in Phase 05 and are easy to break
 
@@ -137,6 +142,13 @@ new business decision.
   A separate read-only code reviewer also hit an account usage limit and
   returned no review; direct diff review and the four required checks completed.
 
+- **06A local review/visual acceptance.** No live browser walkthrough was
+  performed. React server-rendering covers the three destination shapes, and
+  API/unit/build verification passed, but no person has reviewed the month-end
+  journey. The 1807-test full backend suite and the 252-test focused finance/
+  correction/destination/permission set passed against the explicit isolated
+  database, one process at a time.
+
 - **03E data cleanup.** Everything else through 04B was walked on staging on 10
   September and approved - Products paging and speed, all four Targets-grid
   behaviours, and the model's Targets tab.
@@ -153,9 +165,9 @@ new business decision.
 
 ## Open decisions
 
-**D01, D02, D03, D04, D08, D09, D10.** D05, D06, D07 and D11 are closed, each
+**D01, D02, D03, D08, D09, D10.** D04, D05, D06, D07 and D11 are closed, each
 with a record under `docs/redesign/decisions/`. None of the open ones blocks
-05A; see `docs/redesign/DECISIONS.md` for which phase each belongs to.
+06B; see `docs/redesign/DECISIONS.md` for which phase each belongs to.
 
 ---
 
@@ -180,15 +192,6 @@ with a record under `docs/redesign/decisions/`. None of the open ones blocks
 - **This machine may not have memory for the full suite.** Three runs were
   killed on 10 September with 0.56 GB free of 7.9 GB. Check free memory before
   concluding a run "failed"; restarting Docker Desktop reclaims most of it.
-- **A killed pytest run leaves an idle database connection holding locks**,
-  and every later `TRUNCATE` deadlocks against it. The failures surface in
-  unrelated files as "An account already exists" and unique violations, and
-  read exactly like a regression in what you just changed. Terminate
-  connections to `hba_platform_test` (`pg_terminate_backend`), empty it, then
-  re-run one file alone before believing anything.
-- **This machine may not have memory for the full suite.** Three runs were
-  killed on 10 September with 0.56 GB free of 7.9 GB. Check free memory before
-  concluding a run failed; restarting Docker Desktop reclaims most of it.
 - **One pytest process at a time**, and never one while another runs in the
   background. Two against the same database deadlock and leak committed rows
   into each other, and the failures look exactly like a regression in whatever
@@ -238,6 +241,10 @@ its target, so it was not run against the existing dev database. The isolated
 additive seed helper is `design-preview/seed-05a.py` (gitignored local artifact).
 It checks the exact database name and refuses to reseed a nonempty database.
 Runtime/review commands and synthetic account details are in the batch report.
+
+06A used only the isolated `hba_platform_test` database for automated backend
+checks. It added migration head `1c4b06a5f8d2`; no local dev, staging or
+production financial data was edited.
 
 - **C: is 99% full (1.9 GB free)** and has been since 4 September. There is
   **no CI**; every check is local.

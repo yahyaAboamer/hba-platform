@@ -317,6 +317,7 @@ def record_payment(
     affiliate: AffiliateProfile,
     *,
     amount_piastres: int,
+    operation_key: str | None = None,
     allocations: dict[int, int] | None = None,
     occurred_at: datetime | None = None,
     reference: str | None = None,
@@ -335,6 +336,22 @@ def record_payment(
     reference to `payout_destination`, which is append-only precisely so a past
     payment resolves the destination in force at the time.
     """
+    operation_key = (operation_key or "").strip() or None
+    if operation_key:
+        existing = payment_for_operation_key(db, operation_key)
+        if existing is not None:
+            assert_same_payment(
+                existing,
+                affiliate=affiliate,
+                amount_piastres=amount_piastres,
+                allocations=allocations or {},
+                occurred_at=occurred_at,
+                reference=reference,
+                note=note,
+                proof_file_id=proof_file_id,
+            )
+            return existing
+
     if amount_piastres <= 0:
         raise ValueError("A payment must be for more than nothing")
 
@@ -388,6 +405,7 @@ def record_payment(
     transaction = PaymentTransaction(
         affiliate_id=affiliate.id,
         amount_piastres=int(amount_piastres),
+        operation_key=operation_key,
         occurred_at=occurred_at or utcnow(),
         destination_snapshot_json=mask_destination(
             current_destination(db, affiliate)
@@ -438,6 +456,60 @@ def record_payment(
 
     payment_recorded(db, affiliate, transaction)
     return transaction
+
+
+class PaymentOperationConflict(ValueError):
+    """One retry identity was presented with two different transfer facts."""
+
+
+def payment_for_operation_key(
+    db: Session, operation_key: str | None
+) -> PaymentTransaction | None:
+    """The transfer already recorded for a retry identity, if there is one."""
+    key = (operation_key or "").strip()
+    if not key:
+        return None
+    return db.scalar(
+        select(PaymentTransaction).where(PaymentTransaction.operation_key == key)
+    )
+
+
+def assert_same_payment(
+    transaction: PaymentTransaction,
+    *,
+    affiliate: AffiliateProfile,
+    amount_piastres: int,
+    allocations: dict[int, int],
+    occurred_at: datetime | None,
+    reference: str | None,
+    note: str | None,
+    proof_file_id: str | None,
+) -> None:
+    """Refuse to turn an idempotency key into an append-only overwrite.
+
+    A retry may recover the original row, but it may not quietly reinterpret
+    that row as a different amount, destination month, proof or bank event.
+    ``occurred_at=None`` remains compatible with older callers whose timestamp
+    was assigned by the server on the first attempt.
+    """
+    recorded_allocations = {
+        row.payroll_snapshot_id: row.allocated_piastres
+        for row in transaction.allocations
+    }
+    same = (
+        transaction.affiliate_id == affiliate.id
+        and transaction.amount_piastres == int(amount_piastres)
+        and recorded_allocations == allocations
+        and transaction.reference == ((reference or "").strip() or None)
+        and transaction.note == ((note or "").strip() or None)
+        and transaction.proof_file_id == proof_file_id
+        and (occurred_at is None or transaction.occurred_at == occurred_at)
+    )
+    if not same:
+        raise PaymentOperationConflict(
+            "That operation key already identifies a different payment. "
+            "Reload the payment history before recording anything else."
+        )
 
 
 def allocate(

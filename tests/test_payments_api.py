@@ -267,6 +267,110 @@ def test_a_payment_can_be_recorded_with_its_proof(client):
     assert response.json()["has_proof"] is True
 
 
+def test_retrying_the_same_transfer_returns_the_original_record(client):
+    """AC38. A timeout after commit must not turn one bank transfer into two
+    ledger rows when the operator retries the same operation.
+    """
+    affiliate = _affiliate(client)
+    snapshot = _owed(client, affiliate)
+    payload = {
+        "operation_key": "06a-timeout-retry-0001",
+        "affiliate_id": affiliate["id"],
+        "amount_piastres": 200_000,
+        "allocations": [
+            {"payroll_snapshot_id": snapshot, "piastres": 200_000}
+        ],
+        "occurred_at": "2026-09-03T12:00:00+03:00",
+        "reference": "IPN-06A-1",
+    }
+
+    first = client.post("/api/payments", json=payload)
+    retry = client.post("/api/payments", json=payload)
+
+    assert first.status_code == 201, first.text
+    assert retry.status_code == 201, retry.text
+    assert retry.json()["id"] == first.json()["id"]
+    assert first.json().get("replayed") is False
+    assert retry.json().get("replayed") is True
+    history = client.get(f"/api/affiliates/{affiliate['id']}/payments").json()
+    recorded_at = datetime.fromisoformat(history["payments"][0]["occurred_at"])
+    assert recorded_at.astimezone(timezone.utc) == datetime(
+        2026, 9, 3, 9, tzinfo=timezone.utc
+    )
+    assert history["payments"][0]["reference"] == "IPN-06A-1"
+    with engine.begin() as connection:
+        assert connection.scalar(text("SELECT count(*) FROM payment_transaction")) == 1
+        assert connection.scalar(text("SELECT count(*) FROM payment_allocation")) == 1
+        assert connection.scalar(
+            text(
+                "SELECT count(*) FROM notification_outbox "
+                "WHERE event = 'payment.recorded'"
+            )
+        ) == 1
+
+
+def test_an_operation_key_cannot_be_reused_for_different_money(client):
+    """An idempotency key identifies one act, not an overwrite handle."""
+    affiliate = _affiliate(client)
+    snapshot = _owed(client, affiliate)
+    original = {
+        "operation_key": "06a-collision-0001",
+        "affiliate_id": affiliate["id"],
+        "amount_piastres": 200_000,
+        "allocations": [
+            {"payroll_snapshot_id": snapshot, "piastres": 200_000}
+        ],
+    }
+    assert client.post("/api/payments", json=original).status_code == 201
+
+    changed = {
+        **original,
+        "amount_piastres": 150_000,
+        "allocations": [
+            {"payroll_snapshot_id": snapshot, "piastres": 150_000}
+        ],
+        "note": "This is deliberately a different transfer",
+    }
+    response = client.post("/api/payments", json=changed)
+
+    assert response.status_code == 409
+    assert "already identifies a different payment" in response.json()["detail"]
+    with engine.begin() as connection:
+        assert connection.scalar(text("SELECT count(*) FROM payment_transaction")) == 1
+
+
+def test_a_uploaded_proof_survives_a_failed_record_and_retry(client):
+    """AC39. Retry the ledger write, not the transfer or proof upload."""
+    affiliate = _affiliate(client)
+    snapshot = _owed(client, affiliate)
+    proof = client.post(
+        f"/api/affiliates/{affiliate['id']}/proof",
+        files={"file": ("p.jpg", _screenshot(), "image/jpeg")},
+    ).json()["proof_file_id"]
+    payload = {
+        "operation_key": "06a-proof-retry-0001",
+        "affiliate_id": affiliate["id"],
+        "amount_piastres": 150_000,
+        "allocations": [
+            {"payroll_snapshot_id": snapshot, "piastres": 150_000}
+        ],
+        "proof_file_id": proof,
+    }
+
+    refused = client.post("/api/payments", json=payload)
+    recorded = client.post(
+        "/api/payments",
+        json={**payload, "note": "InstaPay limit; the remainder goes tomorrow"},
+    )
+
+    assert refused.status_code == 400
+    assert recorded.status_code == 201, recorded.text
+    assert recorded.json()["has_proof"] is True
+    with engine.begin() as connection:
+        assert connection.scalar(text("SELECT count(*) FROM proof_file")) == 1
+        assert connection.scalar(text("SELECT count(*) FROM payment_transaction")) == 1
+
+
 def test_proof_is_served_only_for_the_payment_it_belongs_to(client):
     """§14. A URL is not a permission - the check is against the session, in
     the same place as every other permission check.
@@ -558,6 +662,131 @@ def test_the_month_shows_who_is_still_owed(client):
     assert body["totals"]["still_owed_piastres"] == 200_000
 
 
+def test_month_end_separates_forecast_approved_and_recorded_money(client):
+    """AC31/AC32. Inactive debts remain; HBA's house code never enters pay."""
+    inactive = _affiliate(client, "Inactive", "inactive@example.com")
+    _owed(client, inactive)
+    forecast = _affiliate(client, "Forecast", "forecast@example.com")
+    _order(forecast["id"], "forecast-august", 2_000_000)
+    house = _affiliate(client, "HBA house", "house@example.com")
+
+    with engine.begin() as connection:
+        connection.execute(
+            text("UPDATE affiliate_profile SET status = 'inactive' WHERE id = :id"),
+            {"id": inactive["id"]},
+        )
+        connection.execute(
+            text("UPDATE affiliate_profile SET account_kind = 'house' WHERE id = :id"),
+            {"id": house["id"]},
+        )
+
+    body = client.get(f"/api/payments/{AUGUST}").json()
+    by_name = {row["name"]: row for row in body["affiliates"]}
+
+    assert set(by_name) == {"Forecast", "Inactive"}
+    assert by_name["Inactive"]["status"] == "inactive"
+    assert by_name["Inactive"]["required_kind"] == "approved"
+    assert by_name["Inactive"]["required_piastres"] == 200_000
+    assert by_name["Forecast"]["required_kind"] == "forecast"
+    assert by_name["Forecast"]["required_piastres"] == 200_000
+    assert body["totals"] == {
+        **body["totals"],
+        "affiliates": 2,
+        "required_piastres": 400_000,
+        "forecast_piastres": 200_000,
+        "approved_piastres": 200_000,
+        "recorded_piastres": 0,
+        "still_owed_affiliates": 1,
+        "still_owed_piastres": 200_000,
+    }
+
+
+def test_month_end_lists_open_corrections_across_models(client):
+    """05C answers per model; 06A makes every unanswered choice findable."""
+    nour = _affiliate(client, "Nour", "nour-correction@example.com")
+    sara = _affiliate(client, "Sara", "sara-correction@example.com")
+
+    for affiliate in (nour, sara):
+        snapshot = _owed(client, affiliate)
+        paid = client.post(
+            "/api/payments",
+            json={
+                "affiliate_id": affiliate["id"],
+                "amount_piastres": 200_000,
+                "allocations": [
+                    {"payroll_snapshot_id": snapshot, "piastres": 200_000}
+                ],
+            },
+        )
+        assert paid.status_code == 201, paid.text
+
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "UPDATE attributed_order SET commission_state = 'void' "
+                "WHERE affiliate_id IN (:nour, :sara)"
+            ),
+            {"nour": nour["id"], "sara": sara["id"]},
+        )
+
+    body = client.get(f"/api/payments/{SEPTEMBER}").json()
+
+    assert {(row["name"], row["month"]) for row in body["open_corrections"]} == {
+        ("Nour", AUGUST),
+        ("Sara", AUGUST),
+    }
+    assert all(row["recoverable_piastres"] == 200_000 for row in body["open_corrections"])
+    assert body["totals"]["open_corrections"] == 2
+    assert body["totals"]["open_corrections_piastres"] == 400_000
+
+
+def test_a_carried_correction_can_leave_no_transfer_due(client):
+    """D04. Zero after recovery is a valid month, including after earnings."""
+    affiliate = _affiliate(client)
+    august_snapshot = _owed(client, affiliate, AUGUST)
+    _owed(client, affiliate, SEPTEMBER)
+    paid = client.post(
+        "/api/payments",
+        json={
+            "affiliate_id": affiliate["id"],
+            "amount_piastres": 200_000,
+            "allocations": [
+                {"payroll_snapshot_id": august_snapshot, "piastres": 200_000}
+            ],
+        },
+    )
+    assert paid.status_code == 201, paid.text
+
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "UPDATE attributed_order SET commission_state = 'void' "
+                "WHERE affiliate_id = :affiliate AND business_month = :month"
+            ),
+            {"affiliate": affiliate["id"], "month": AUGUST},
+        )
+
+    resolved = client.post(
+        "/api/corrections",
+        json={
+            "affiliate_id": affiliate["id"],
+            "month": AUGUST,
+            "choice": "credit",
+            "reason": "Recover the transfer after the order failed",
+            "destination_month": SEPTEMBER,
+        },
+    )
+    assert resolved.status_code == 201, resolved.text
+
+    row = client.get(f"/api/payments/{SEPTEMBER}").json()["affiliates"][0]
+    assert row["obligation_piastres"] == 200_000
+    assert row["credited_piastres"] == 200_000
+    assert row["paid_piastres"] == 0
+    assert row["balance_piastres"] == 0
+    assert row["required_piastres"] == 0
+    assert row["state"] == "settled"
+
+
 def test_their_history_shows_payments_and_adjustments(client):
     """§11.5 requires adjustments to be visible to them - a credit they cannot
     see is a credit they cannot check.
@@ -588,6 +817,14 @@ def test_their_history_shows_payments_and_adjustments(client):
 
     assert len(body["payments"]) == 1
     assert len(body["adjustments"]) == 1
+    assert body["payments"][0]["allocations"] == [
+        {
+            "month": AUGUST,
+            "snapshot_id": snapshot,
+            "snapshot_version": 1,
+            "allocated_piastres": 190_000,
+        }
+    ]
     assert body["adjustments"][0]["reason"] == "transfer fee absorbed"
 
 

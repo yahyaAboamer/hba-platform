@@ -47,6 +47,7 @@ from sqlalchemy import (
     Index,
     String,
     Text,
+    UniqueConstraint,
     text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
@@ -123,6 +124,9 @@ class PaymentTransaction(Base):
         CheckConstraint(
             "amount_piastres > 0", name="payment_transaction_amount_positive"
         ),
+        UniqueConstraint(
+            "operation_key", name="payment_transaction_operation_key_unique"
+        ),
         Index("payment_transaction_affiliate_idx", "affiliate_id"),
     )
 
@@ -134,6 +138,11 @@ class PaymentTransaction(Base):
     )
 
     amount_piastres: Mapped[int] = mapped_column(BigInteger, nullable=False)
+
+    #: One browser act, retained across a timeout and Retry. Nullable for the
+    #: genuine transfer history recorded before 06A. It is not a bank
+    #: reference: two different transfers may legitimately share that text.
+    operation_key: Mapped[str | None] = mapped_column(String(64))
 
     #: When the money moved, which is not when it was recorded. A transfer sent
     #: on Friday and entered on Monday belongs to Friday.

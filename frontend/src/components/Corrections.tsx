@@ -99,7 +99,10 @@ export function Corrections({
   if (!body || body.corrections.length === 0) return null;
 
   return (
-    <section className="panel corrections">
+    <section
+      className="panel corrections"
+      id="corrections"
+    >
       <div className="panel__head">
         <h2 className="panel__title">Agreed months that have changed</h2>
         <span className="chip chip--quiet">

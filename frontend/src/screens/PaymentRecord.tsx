@@ -6,20 +6,71 @@ import { api } from "../lib/api";
 import { PAYOUT_FIELD_LABEL } from "../lib/payouts";
 import { egpPlain, formatEgp, formatMonth, parseEgp } from "../lib/money";
 import type { Balance } from "./Payments";
-import { STATE_LABEL } from "./Payments";
+import { paymentRowPresentation, STATE_LABEL } from "./Payments";
 import "./Payments.css";
 
-type Revealed = {
+export type Revealed = {
   method: "instapay" | "bank" | "wallet";
   instapay_address_url?: string | null;
   instapay_phone?: string | null;
   bank_name?: string | null;
   bank_account_holder?: string | null;
   bank_account_number?: string | null;
+  wallet_provider?: string | null;
   wallet_phone?: string | null;
 };
 
 type Outstanding = { affiliates: Balance[] };
+
+type PaymentDraft = {
+  operationKey: string;
+  affiliateId: number;
+  amountPiastres: number;
+  payrollSnapshotId?: number;
+  transferDate: string;
+  reference: string;
+  note: string;
+  proofFileId?: string;
+};
+
+/**
+ * The exact external event handed to the append-only payment ledger.
+ *
+ * Noon UTC preserves the date the payer selected in every timezone. The
+ * operation key belongs to the form, not one network attempt, so a timeout
+ * can replay the same act without creating another transfer or allocation.
+ */
+export function paymentRequest(draft: PaymentDraft) {
+  return {
+    operation_key: draft.operationKey,
+    affiliate_id: draft.affiliateId,
+    amount_piastres: draft.amountPiastres,
+    allocations:
+      draft.payrollSnapshotId === undefined
+        ? []
+        : [
+            {
+              payroll_snapshot_id: draft.payrollSnapshotId,
+              piastres: draft.amountPiastres,
+            },
+          ],
+    occurred_at: `${draft.transferDate}T12:00:00Z`,
+    reference: draft.reference.trim() || null,
+    note: draft.note.trim() || null,
+    proof_file_id: draft.proofFileId ?? null,
+  };
+}
+
+function cairoToday(): string {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Africa/Cairo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${value.year}-${value.month}-${value.day}`;
+}
 
 /** "2 days ago", in the words §6.4.5 uses. */
 function describeWhen(iso: string): string {
@@ -58,12 +109,16 @@ export function PaymentRecord() {
   const [revealed, setRevealed] = useState<Revealed | null>(null);
   const [revealing, setRevealing] = useState(false);
   const [amount, setAmount] = useState("");
+  const [transferDate, setTransferDate] = useState(cairoToday);
   const [note, setNote] = useState("");
   const [reference, setReference] = useState("");
   const [proof, setProof] = useState<File | null>(null);
+  const [proofFileId, setProofFileId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [copyMessage, setCopyMessage] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
+  const [operationKey] = useState(() => crypto.randomUUID());
 
   useEffect(() => {
     setError(null);
@@ -102,10 +157,14 @@ export function PaymentRecord() {
     try {
       await navigator.clipboard.writeText(value);
       setCopied(label);
+      setCopyMessage(`${label} copied.`);
     } catch {
       // Clipboard access can be refused outright. The number is on screen
       // either way, which is the thing that actually matters.
       setCopied(null);
+      setCopyMessage(
+        `Could not copy ${label.toLocaleLowerCase()}. Select it and copy it instead.`,
+      );
     }
   }
 
@@ -121,32 +180,34 @@ export function PaymentRecord() {
     setError(null);
     try {
       // Proof first: the payment row cannot be updated once written.
-      let proofId: string | undefined;
-      if (proof) {
+      let proofId = proofFileId ?? undefined;
+      if (proof && !proofId) {
         const stored = await api.upload<{ proof_file_id: string }>(
           `/api/affiliates/${affiliateId}/proof`,
           proof,
         );
         proofId = stored.proof_file_id;
+        // Keep the successful upload across a failed record request. Retrying
+        // the form should retry the ledger write, not create another proof.
+        setProofFileId(proofId);
       }
 
-      await api.post("/api/payments", {
-        affiliate_id: Number(affiliateId),
-        amount_piastres: piastres,
-        allocations:
-          balance.payroll_snapshot_id === undefined
-            ? []
-            : [
-                {
-                  payroll_snapshot_id: balance.payroll_snapshot_id,
-                  piastres,
-                },
-              ],
-        reference: reference.trim() || null,
-        note: note.trim() || null,
-        proof_file_id: proofId ?? null,
-      });
-      navigate("/payments");
+      await api.post(
+        "/api/payments",
+        paymentRequest({
+          operationKey,
+          affiliateId: Number(affiliateId),
+          amountPiastres: piastres,
+          payrollSnapshotId: balance.payroll_snapshot_id,
+          transferDate,
+          reference,
+          note,
+          proofFileId: proofId,
+        }),
+      );
+      // The append-only history is the receipt. Landing there proves what was
+      // recorded and avoids a green toast standing in for persisted evidence.
+      navigate(`/affiliates/${affiliateId}/payments`);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not record it.");
     } finally {
@@ -178,6 +239,27 @@ export function PaymentRecord() {
         ) : (
           <p className="empty">Loading…</p>
         )}
+      </>
+    );
+  }
+
+  if (balance.balance_piastres <= 0) {
+    const view = paymentRowPresentation(balance);
+    return (
+      <>
+        {head}
+        <section className="panel pay__nothing-due">
+          <h2 className="panel__title">{view.label}</h2>
+          <p className="pay__lead">
+            {view.explanation ?? "There is no remaining transfer to record."}
+          </p>
+          <Link
+            className="button"
+            to={`/affiliates/${affiliateId}/payments`}
+          >
+            Open genuine payment history
+          </Link>
+        </section>
       </>
     );
   }
@@ -343,75 +425,12 @@ export function PaymentRecord() {
               </button>
             </>
           ) : (
-            <>
-              <dl className="detail__list">
-                <div className="detail__row">
-                  <dt className="detail__label">Method</dt>
-                  <dd className="detail__value">
-                    {METHOD_LABEL[revealed.method] ?? revealed.method}
-                  </dd>
-                </div>
-                {revealed.bank_name && (
-                  <Detail label="Bank" value={revealed.bank_name} />
-                )}
-                {revealed.bank_account_holder && (
-                  <Detail
-                    label={PAYOUT_FIELD_LABEL.bank_account_holder}
-                    value={revealed.bank_account_holder}
-                  />
-                )}
-                {revealed.bank_account_number && (
-                  /* **This is the screen the digits are copied from**, so of
-                     everywhere the label mattered it mattered most here. D06:
-                     it is the number on the front of her card. Calling it an
-                     account number to the one person about to paste it into a
-                     banking app was the whole risk. */
-                  <Copyable
-                    label={PAYOUT_FIELD_LABEL.bank_account_number}
-                    value={revealed.bank_account_number}
-                    copied={copied}
-                    onCopy={copy}
-                  />
-                )}
-                {revealed.wallet_phone && (
-                  <Copyable
-                    label="Wallet number"
-                    value={revealed.wallet_phone}
-                    copied={copied}
-                    onCopy={copy}
-                  />
-                )}
-                {revealed.instapay_phone && (
-                  <Copyable
-                    label="InstaPay number"
-                    value={revealed.instapay_phone}
-                    copied={copied}
-                    onCopy={copy}
-                  />
-                )}
-              </dl>
-
-              {/*
-               * ADR 0028. The link opens the app with their address filled in;
-               * the number below it is what you type when it does not open —
-               * which on a laptop is always, because there is no app to open.
-               */}
-              {revealed.method === "instapay" && revealed.instapay_address_url && (
-                <a
-                  className="button button--primary pay__instapay"
-                  href={revealed.instapay_address_url}
-                  target="_blank"
-                  rel="noreferrer noopener"
-                >
-                  Open InstaPay
-                </a>
-              )}
-
-              <p className="pay__lead">
-                Sending the money happens in your bank or in InstaPay, never
-                here. Come back and record it once it has gone.
-              </p>
-            </>
+            <PaymentDestination
+              revealed={revealed}
+              copied={copied}
+              copyMessage={copyMessage}
+              onCopy={copy}
+            />
           )}
         </section>
       </div>
@@ -483,6 +502,20 @@ export function PaymentRecord() {
           )}
 
           <label className="field pay__field">
+            <span className="field__label">Transfer date</span>
+            <input
+              className="input"
+              type="date"
+              required
+              value={transferDate}
+              onChange={(event) => setTransferDate(event.target.value)}
+            />
+            <span className="detail__note">
+              The day the money moved, which may differ from the day you record it.
+            </span>
+          </label>
+
+          <label className="field pay__field">
             <span className="field__label">Reference (optional)</span>
             <input
               className="input"
@@ -499,7 +532,10 @@ export function PaymentRecord() {
               className="input"
               type="file"
               accept="image/*"
-              onChange={(event) => setProof(event.target.files?.[0] ?? null)}
+              onChange={(event) => {
+                setProof(event.target.files?.[0] ?? null);
+                setProofFileId(null);
+              }}
             />
             <span className="detail__note">
               {balance.name} sees this, which is what stops the “did you send it?”
@@ -535,6 +571,119 @@ export function PaymentRecord() {
           </div>
         </section>
       </form>
+    </>
+  );
+}
+
+/**
+ * The authorized destination values the payer must act on.
+ *
+ * Kept as one method-aware component so InstaPay, bank/card and every wallet
+ * provider cannot drift into three partial versions. The exact submitted URL
+ * is both visible/copyable and the Open target; opening it is deliberately
+ * followed by no success state because leaving HBA never proves money moved.
+ */
+export function PaymentDestination({
+  revealed,
+  copied,
+  copyMessage,
+  onCopy,
+}: {
+  revealed: Revealed;
+  copied: string | null;
+  copyMessage: string | null;
+  onCopy: (label: string, value: string) => void;
+}) {
+  return (
+    <>
+      <dl className="detail__list">
+        <div className="detail__row">
+          <dt className="detail__label">Method</dt>
+          <dd className="detail__value">
+            {METHOD_LABEL[revealed.method] ?? revealed.method}
+          </dd>
+        </div>
+        {revealed.bank_name && (
+          <Detail
+            label="Bank"
+            value={revealed.bank_name}
+          />
+        )}
+        {revealed.bank_account_holder && (
+          <Detail
+            label={PAYOUT_FIELD_LABEL.bank_account_holder}
+            value={revealed.bank_account_holder}
+          />
+        )}
+        {revealed.bank_account_number && (
+          /* **This is the screen the digits are copied from**, so of
+             everywhere the label mattered it mattered most here. D06: it is
+             the number on the front of her card. Calling it an account number
+             to the one person about to paste it into a banking app was the
+             whole risk. */
+          <Copyable
+            label={PAYOUT_FIELD_LABEL.bank_account_number}
+            value={revealed.bank_account_number}
+            copied={copied}
+            onCopy={onCopy}
+          />
+        )}
+        {revealed.wallet_provider && (
+          <Detail
+            label="Wallet provider"
+            value={revealed.wallet_provider}
+          />
+        )}
+        {revealed.wallet_phone && (
+          <Copyable
+            label="Wallet number"
+            value={revealed.wallet_phone}
+            copied={copied}
+            onCopy={onCopy}
+          />
+        )}
+        {revealed.instapay_address_url && (
+          <Copyable
+            label="InstaPay payment address"
+            value={revealed.instapay_address_url}
+            copied={copied}
+            onCopy={onCopy}
+          />
+        )}
+        {revealed.instapay_phone && (
+          <Copyable
+            label="InstaPay number"
+            value={revealed.instapay_phone}
+            copied={copied}
+            onCopy={onCopy}
+          />
+        )}
+      </dl>
+
+      {revealed.method === "instapay" && revealed.instapay_address_url && (
+        <a
+          className="button button--primary pay__instapay"
+          href={revealed.instapay_address_url}
+          target="_blank"
+          rel="noreferrer noopener"
+        >
+          Open InstaPay
+        </a>
+      )}
+
+      {copyMessage && (
+        <p
+          className="pay__copy-message"
+          role={copied ? "status" : "alert"}
+        >
+          {copyMessage}
+        </p>
+      )}
+
+      <p className="pay__lead">
+        Sending the money happens in your bank or in InstaPay, never here. Come
+        back and record it once it has gone.
+      </p>
     </>
   );
 }
