@@ -253,28 +253,64 @@ def carried_forward(db: Session, affiliate: AffiliateProfile, month: str) -> dic
 
 
 def calculate_month(
-    db: Session, affiliate: AffiliateProfile, month: str,
-    *, source_orders: list[SourceOrder] | None = None,
+    db: Session, affiliate: AffiliateProfile, month: str
 ) -> MonthCalculation:
-    """What this affiliate is owed for this month.
+    """The delivered-only calculation used by existing approval and payments.
 
-    Reads that month's terms, not today's (Phase 3). A rate change in June must
-    not silently rewrite what April was worth.
+    No preview argument, deliberately. Approval calls this name: accepting
+    source_orders here would let a routine caller include pending and discard
+    legacy carry without deliberately choosing the new policy. 05A must not
+    make that switch. Both public entry points share _calculate's arithmetic.
+    """
+    return _calculate(db, affiliate, month, source_orders=None)
 
-    05A supplies source_orders only in the read-only rules preview. They include
-    pending and legacy carry-paid source sales, and never add incoming delivery
-    carry. Approval still calls the default legacy path until 05B/C and D01.
+
+def preview_calculation(
+    db: Session,
+    affiliate: AffiliateProfile,
+    month: str,
+    *,
+    source_orders: list[SourceOrder],
+) -> MonthCalculation:
+    """Read-only pending-inclusive entitlement, never an approval instruction.
+
+    Source facts include pending and legacy carry-paid source sales, but never
+    incoming delivery carry. The distinct name keeps this policy choice out of
+    accidental calls to calculate_month; 05B/05C and D01 still own activation.
+    """
+    return _calculate(db, affiliate, month, source_orders=source_orders)
+
+
+def _calculate(
+    db: Session,
+    affiliate: AffiliateProfile,
+    month: str,
+    *,
+    source_orders: list[SourceOrder] | None,
+) -> MonthCalculation:
+    """Shared monthly terms, target qualification and aggregate-once arithmetic.
+
+    Reads the source month's terms, not today's: a rate change in June must not
+    silently rewrite April. Only the two named entry points select the policy.
     """
     parse_month(month)
 
-    rows = list(
-        db.scalars(
-            select(AttributedOrder)
-            .where(AttributedOrder.affiliate_id == affiliate.id)
-            .where(AttributedOrder.business_month == month)
-            .where(not_settled_by_another_month(affiliate.id, month))
+    is_preview = source_orders is not None
+    if source_orders is None:
+        legacy_rows = list(
+            db.scalars(
+                select(AttributedOrder)
+                .where(AttributedOrder.affiliate_id == affiliate.id)
+                .where(AttributedOrder.business_month == month)
+                .where(not_settled_by_another_month(affiliate.id, month))
+            )
         )
-    ) if source_orders is None else []
+        order_amounts = [
+            (row.commission_state, row.commission_base_piastres)
+            for row in legacy_rows
+        ]
+    else:
+        order_amounts = [(row.state, row.base_piastres) for row in source_orders]
 
     earned_base = 0
     earned_count = 0
@@ -282,9 +318,7 @@ def calculate_month(
     pending_count = 0
     void_count = 0
 
-    for row in source_orders if source_orders is not None else rows:
-        state = row.state if isinstance(row, SourceOrder) else row.commission_state
-        base = row.base_piastres if isinstance(row, SourceOrder) else row.commission_base_piastres
+    for state, base in order_amounts:
         if state == CommissionState.EARNED:
             earned_count += 1
             earned_base += base
@@ -292,6 +326,10 @@ def calculate_month(
             pending_count += 1
             pending_base += base
         elif state == CommissionState.VOID:
+            # Equivalent to the old else for today's three real commission
+            # states. Preview also supplies the pseudo-state "unavailable",
+            # which is not a failed delivery. Revisit this classification when
+            # adding a real fourth state; it must not silently disappear here.
             void_count += 1
 
     is_house = affiliate.account_kind == AccountKind.HOUSE
@@ -304,10 +342,16 @@ def calculate_month(
     verified = bool(target and target.is_verified)
     guarantee_applied = False
 
-    carried = carried_forward(db, affiliate, month) if source_orders is None else {
-        "orders": 0, "base_piastres": 0, "exact": Decimal(0),
-        "lines": [], "months_without_terms": [],
-    }
+    if is_preview:
+        carried = {
+            "orders": 0,
+            "base_piastres": 0,
+            "exact": Decimal(0),
+            "lines": [],
+            "months_without_terms": [],
+        }
+    else:
+        carried = carried_forward(db, affiliate, month)
     if carried["months_without_terms"]:
         blockers.append(NO_TERMS_FOR_CARRIED)
 
@@ -338,7 +382,7 @@ def calculate_month(
 
     # One numerator for the whole month, divided once. Summing per-order
     # commissions instead would round each of them first.
-    counted_base = earned_base + (pending_base if source_orders is not None else 0)
+    counted_base = earned_base + (pending_base if is_preview else 0)
     numerator = (
         commission_numerator(counted_base, terms.commission_rate_bp)
         if counted_base

@@ -232,6 +232,9 @@ def _affiliate_detail(db: Session, affiliate: AffiliateProfile) -> dict:
         #: D11 makes this staff-readable, not staff-broadcast.
         "shipping": {field: getattr(affiliate, field) for field in SHIPPING_FIELDS},
         "current_month": month,
+        # The preview's history floor is a server fact, not a second calendar
+        # hard-coded into the browser. Collaboration can start later than it.
+        "platform_start_month": PLATFORM_START_MONTH,
         "codes": codes_with_status(db, affiliate, month),
         "compensation": _compensation_payload(terms_for(db, affiliate, month)),
         "payout_destination": mask_destination(current_destination(db, affiliate)),

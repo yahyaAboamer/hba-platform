@@ -154,6 +154,16 @@ def test_pending_rules_preview_counts_pending_without_switching_payroll(client):
         )) is None
 
 
+def test_profile_sends_the_server_platform_start_month(client, monkeypatch):
+    affiliate = _affiliate(client)
+    monkeypatch.setattr("app.api.affiliates.PLATFORM_START_MONTH", "2026-03")
+
+    response = client.get(f"/api/affiliates/{affiliate['id']}")
+
+    assert response.status_code == 200
+    assert response.json().get("platform_start_month") == "2026-03"
+
+
 def test_model_cannot_read_another_models_rules_preview(client):
     affiliate = _affiliate(client)
     _demote_to("affiliate")

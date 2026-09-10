@@ -19,6 +19,7 @@ from app.services.codes import register_code
 from app.services.commission.attribute import attribute_order
 from app.services.commission.calculate import calculate_month
 from app.services.commission.preview import preview_month
+from app.services.commission.source import source_order
 from app.services.compensation import set_terms
 from app.services.payroll import approve_month, content_hash
 from app.services.payments import record_payment
@@ -66,13 +67,25 @@ def pending(db, order_id="pending", **extra):
     return index
 
 
+def test_approval_calculation_cannot_opt_into_preview_source_orders(db, model):
+    pending(db)
+    facts = [source_order(db.get(AttributedOrder, "pending"))]
+
+    # Accidentally passing preview facts to the approval entry point must fail
+    # before it can turn a pending order into an approved obligation.
+    with pytest.raises(TypeError, match="source_orders"):
+        calculate_month(db, model, MONTH, source_orders=facts)
+
+    assert calculate_month(db, model, MONTH).payout_piastres == 0
+    assert approve_month(db, model, MONTH).approved_obligation_piastres == 0
+
+
 def test_pending_once_example_delivery_adds_nothing_in_either_month(db, model):
     example = EXAMPLES["pending_once"]
     index = pending(db, total_piastres=example["source_sales_piastres"], shipping_piastres=0)
     before = preview_month(db, model, MONTH)
     assert before["current_entitlement"]["payout"]["piastres"] == example["commission_piastres"]
     assert before["performance"]["pending_orders"] == 1
-    assert before["orders"][0].get("display_commission_piastres") == 200_000
     assert calculate_month(db, model, MONTH).payout_piastres == 0
     # Old approval deliberately still pays delivered-only. The preview never
     # inherits that old late-delivery carry into the destination's entitlement.
@@ -128,7 +141,9 @@ def test_failed_delivery_excludes_sales_without_requiring_cancellation(db, model
     assert view["current_entitlement"]["payout"]["piastres"] == 0
     # The known pre-failure amount must survive a webhook zeroing Shopify totals.
     assert view["orders"][0]["display_base_piastres"] == 106_200
-    assert view["orders"][0].get("display_commission_piastres") == 10_620
+    # Raw source diagnostics must not imply that a failed order earned money.
+    # Order-screen commission/forgone presentation belongs to the portal helper.
+    assert "display_commission_piastres" not in view["orders"][0]
 
 
 def test_failed_first_seen_without_original_money_is_unavailable_not_zero(db, model):
@@ -136,7 +151,6 @@ def test_failed_first_seen_without_original_money_is_unavailable_not_zero(db, mo
     attribute_order(db, index)
     detail = preview_month(db, model, MONTH)["orders"][0]
     assert detail["display_base_piastres"] is None
-    assert detail.get("display_commission_piastres") is None
 
 
 @pytest.mark.parametrize("state", [None, "unrecognised"])

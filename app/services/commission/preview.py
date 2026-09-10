@@ -5,16 +5,14 @@ never subtracted from source sales or automatically turned into new debt.
 """
 
 from dataclasses import asdict
-from decimal import Decimal, ROUND_HALF_UP
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.money import commission_numerator, exact_commission_piastres
 from app.models.affiliates import AffiliateProfile
 from app.models.attributed_orders import AttributedOrder
 from app.models.payroll import PayrollMonth, PayrollSnapshot
-from app.services.commission.calculate import calculate_month
+from app.services.commission.calculate import preview_calculation
 from app.services.commission.source import source_order
 from app.services.payments import allocated_to_month, balance_for
 from app.services.payroll import get_month, is_historical
@@ -33,7 +31,7 @@ def preview_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
         .order_by(AttributedOrder.shopify_order_id)
     ))
     facts = [source_order(row) for row in orders]
-    calculation = calculate_month(db, affiliate, month, source_orders=facts)
+    calculation = preview_calculation(db, affiliate, month, source_orders=facts)
     payroll = get_month(db, affiliate, month)
     snapshot = payroll.active_snapshot if payroll else None
     balance = balance_for(db, affiliate, month)
@@ -61,20 +59,6 @@ def preview_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
         }
         for order, settled, destination in links
     ]
-    order_lines = []
-    for fact in facts:
-        commission = None
-        if (fact.display_base_piastres is not None
-                and calculation.commission_rate_bp is not None and not fact.issues):
-            exact = exact_commission_piastres(commission_numerator(
-                fact.display_base_piastres, calculation.commission_rate_bp,
-            ))
-            # Display only. The month was already aggregated exactly above;
-            # these rounded rows must never feed its payout.
-            commission = 0 if calculation.is_house else int(
-                exact.quantize(Decimal(1), rounding=ROUND_HALF_UP)
-            )
-        order_lines.append({**asdict(fact), "display_commission_piastres": commission})
     return {
         "policy": "pending_inclusive_preview",
         "month": month,
@@ -120,5 +104,7 @@ def preview_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
         },
         "legacy_allocations": legacy_links,
         "requires_transition_reconciliation": bool(legacy_links),
-        "orders": order_lines,
+        # Diagnostic source facts only. No screen consumes per-order money in
+        # this preview; the portal owns earned/forgone commission presentation.
+        "orders": [asdict(fact) for fact in facts],
     }
