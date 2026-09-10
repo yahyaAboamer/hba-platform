@@ -258,6 +258,11 @@ def test_a_verified_target_unlocks_the_guarantee_over_http(client):
     client.put(
         f"/api/targets/{MONTH}",
         json={
+            # The revision the server last handed out. Optimistic
+            # concurrency arrived in 04A: a save without a matching one
+            # is refused, because two people run payroll and both open
+            # that screen at month end.
+            "revision": _target_revision(client, MONTH),
             "rows": [
                 {
                     "affiliate_id": affiliate["id"],
@@ -292,6 +297,11 @@ def test_an_unverified_target_still_blocks_over_http(client):
     client.put(
         f"/api/targets/{MONTH}",
         json={
+            # The revision the server last handed out. Optimistic
+            # concurrency arrived in 04A: a save without a matching one
+            # is refused, because two people run payroll and both open
+            # that screen at month end.
+            "revision": _target_revision(client, MONTH),
             "rows": [
                 {
                     "affiliate_id": affiliate["id"],
@@ -403,3 +413,12 @@ def test_a_month_with_nothing_in_it_is_zero_not_an_error(client):
     assert body["payout"]["piastres"] == 0
     assert body["orders_detail"] == []
     assert body["is_payable"] is True
+
+
+def _target_revision(client, month):
+    """What the targets grid looked like when it was last read.
+
+    Fetched rather than remembered: these helpers set a target and move on, and
+    the revision is only here to satisfy the concurrency check 04A added.
+    """
+    return client.get(f"/api/targets/{month}").json()["revision"]

@@ -24,7 +24,18 @@ type Row = {
   recorded_at: string | null;
 };
 
-type Grid = { month: string; rows: Row[] };
+type Grid = {
+  month: string;
+  /**
+   * What the month looked like when it was handed out.
+   *
+   * Sent back on save so the server can refuse a save built on figures
+   * somebody else has already changed. Two people run payroll and both open
+   * this screen at month end.
+   */
+  revision: string;
+  rows: Row[];
+};
 
 /** What is in each of the four boxes, as text, so a half-typed cell survives. */
 type Draft = Record<number, {
@@ -96,16 +107,28 @@ export function Targets({ session }: { session: Session }) {
   const [takingBack, setTakingBack] = useState<Set<number>>(new Set());
   const [why, setWhy] = useState("");
 
+  /**
+   * Load the month, and **ignore an answer that is no longer the question.**
+   *
+   * Two requests in flight for two months can return in either order, and the
+   * slower one arriving second would paint August's numbers under a September
+   * heading. The month is captured when the request goes out and checked when
+   * it comes back.
+   */
   function load() {
     setError(null);
+    const asked = month;
     api
-      .get<Grid>(`/api/targets/${month}`)
+      .get<Grid>(`/api/targets/${asked}`)
       .then((body) => {
+        if (body.month !== asked) return;
         setGrid(body);
         setDraft(draftFrom(body.rows));
         setChosen(new Set());
       })
-      .catch((caught) => setError(caught.message));
+      .catch((caught) => {
+        if (asked === month) setError(caught.message);
+      });
   }
 
   useEffect(load, [month]);
@@ -117,6 +140,25 @@ export function Targets({ session }: { session: Session }) {
 
   async function save() {
     if (grid === null) return;
+
+    /*
+     * **The numbers on screen belong to the month that loaded them.**
+     *
+     * `month` and `grid` are two pieces of state that change at different
+     * times: the picker moves first, the rows arrive later. Between those two
+     * moments the screen shows one month's figures under another month's
+     * heading, and a save there would write August's requirements into
+     * September - silently, into the data that decides whether a guaranteed
+     * minimum applies.
+     *
+     * Refused rather than reconciled. There is no correct guess about which
+     * month somebody meant.
+     */
+    if (grid.month !== month) {
+      setError("That month is still loading. Nothing was saved — try again.");
+      return;
+    }
+
     setWorking(true);
     setError(null);
     setSaved(null);
@@ -143,19 +185,32 @@ export function Targets({ session }: { session: Session }) {
         // set a requirement of nothing for every model on the programme.
         if (required_videos === null && required_stories === null) continue;
 
+        // **Emptying both count boxes means "take them off"**, not "leave
+        // them", and only where something was actually recorded before.
+        // A06: unrecorded and zero are different facts, and until this the
+        // only way to undo a mistyped count was to set it to zero - which
+        // claims she produced nothing.
+        const wasRecorded = row.actual_videos !== null;
+        const clearing =
+          wasRecorded && actual_videos === null && actual_stories === null;
+
         rows.push({
           affiliate_id: row.affiliate_id,
           required_videos: required_videos ?? 0,
           required_stories: required_stories ?? 0,
-          actual_videos,
-          actual_stories,
+          actual_videos: clearing ? null : actual_videos,
+          actual_stories: clearing ? null : actual_stories,
+          clear_actuals: clearing,
         });
       }
 
-      const result = await api.put<{ saved: number }>(
+      const result = await api.put<{ saved: number; revision: string }>(
         `/api/targets/${month}`,
-        { rows },
+        { rows, revision: grid.revision },
       );
+      // Carried forward, so saving twice in a row does not need a reload
+      // between them.
+      setGrid({ ...grid, revision: result.revision });
       setSaved(
         result.saved === 1 ? "One row saved." : `${result.saved} rows saved.`,
       );

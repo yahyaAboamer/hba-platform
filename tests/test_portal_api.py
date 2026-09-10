@@ -249,6 +249,11 @@ def _hit_targets(admin, affiliate_id, month, *, verified: bool):
     response = admin.put(
         f"/api/targets/{month}",
         json={
+            # The revision the server last handed out. Optimistic
+            # concurrency arrived in 04A: a save without a matching one
+            # is refused, because two people run payroll and both open
+            # that screen at month end.
+            "revision": _target_revision(admin, month),
             "rows": [
                 {
                     "affiliate_id": affiliate_id,
@@ -273,6 +278,11 @@ def _missed_targets(admin, affiliate_id, month):
     response = admin.put(
         f"/api/targets/{month}",
         json={
+            # The revision the server last handed out. Optimistic
+            # concurrency arrived in 04A: a save without a matching one
+            # is refused, because two people run payroll and both open
+            # that screen at month end.
+            "revision": _target_revision(admin, month),
             "rows": [
                 {
                     "affiliate_id": affiliate_id,
@@ -2001,3 +2011,12 @@ def test_a_backfilled_target_shows_an_outcome_and_no_counts(admin, monkeypatch):
     assert body["targets"]["actual_videos"] is None
     assert body["targets"]["achieved"] is True
     assert body["targets"]["verified"] is True
+
+
+def _target_revision(admin, month):
+    """What the targets grid looked like when it was last read.
+
+    Fetched rather than remembered: these helpers set a target and move on, and
+    the revision is only here to satisfy the concurrency check 04A added.
+    """
+    return admin.get(f"/api/targets/{month}").json()["revision"]
