@@ -114,13 +114,26 @@ def _order(affiliate_id, order_id, base, *, month=AUGUST):
         )
 
 
+def _commit(client, month, affiliate_id):
+    """Preview, then agree what the preview said (05B)."""
+    seen = client.post(
+        f"/api/payroll/{month}/approve",
+        json={"affiliate_ids": [affiliate_id]},
+    ).json()["results"][0]
+    return client.post(
+        f"/api/payroll/{month}/approve",
+        json={
+            "affiliate_ids": [affiliate_id],
+            "preview": False,
+            "source_versions": {str(affiliate_id): seen["source_version"]},
+        },
+    )
+
+
 def _owed(client, affiliate, month=AUGUST, base=2_000_000) -> int:
     """An approved month owing E£2,000. Returns the snapshot id."""
     _order(affiliate["id"], f"{affiliate['id']}-{month}", base, month=month)
-    client.post(
-        f"/api/payroll/{month}/approve",
-        json={"affiliate_ids": [affiliate["id"]], "preview": False},
-    )
+    _commit(client, month, affiliate["id"])
     with engine.begin() as connection:
         return connection.execute(
             text(
@@ -676,16 +689,25 @@ def test_the_pay_screen_carries_every_version_of_a_reopened_month(client):
     )
     assert balance()["balance_piastres"] == 0
 
-    reopened = client.post(
-        f"/api/payroll/{AUGUST}/reopen",
-        json={"affiliate_ids": [affiliate["id"]], "reason": "orders arrived late"},
-    )
-    assert reopened.status_code == 200, reopened.text
+    # Reopened through the service, not the route: 05B retired the route, and
+    # the months this screen has to keep working for were reopened before it
+    # did. What is being tested is the pay screen carrying **every** version of
+    # such a month, which is exactly as true now as it was then.
+    from app.db import SessionLocal
+    from app.models.affiliates import AffiliateProfile
+    from app.services.payroll import reopen_month
+
+    with SessionLocal() as session:
+        reopen_month(
+            session,
+            session.get(AffiliateProfile, affiliate["id"]),
+            AUGUST,
+            reason="orders arrived late",
+        )
+        session.commit()
+
     _order(affiliate["id"], "late-one", 1_000_000)
-    client.post(
-        f"/api/payroll/{AUGUST}/approve",
-        json={"affiliate_ids": [affiliate["id"]], "preview": False},
-    )
+    _commit(client, AUGUST, affiliate["id"])
 
     after = balance()
     already = first["balance_piastres"]

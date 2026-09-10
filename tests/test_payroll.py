@@ -11,7 +11,7 @@ Phase 3 and Phase 5 start refusing.
 from datetime import datetime, timezone
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import select, text
 from sqlalchemy.exc import DBAPIError, IntegrityError
 
 from app.core.passwords import hash_password
@@ -27,6 +27,7 @@ from app.services.commission.calculate import NO_TERMS
 from app.services.compensation import set_terms
 from app.services.payroll import (
     ALREADY_APPROVED,
+    SourceMoved,
     HOUSE_ACCOUNT,
     ORDERS_ON_HOLD,
     approve_month,
@@ -649,3 +650,144 @@ def test_an_approved_row_reports_what_was_agreed_and_what_it_would_be_now(db):
 
     assert row["approved_obligation_piastres"] == agreed, "the agreed figure moved"
     assert row["obligation_piastres"] > agreed, "the calculation should have moved"
+
+
+# -- 05B: an agreement is of the figure that was shown -------------------------
+
+
+def _seen(db, affiliate, month=MONTH):
+    """The fingerprint a preview would hand out for this month."""
+    from app.services.payroll import blockers_for, carried_into, source_version
+
+    _, calculation = blockers_for(db, affiliate, month)
+    orders = list(
+        db.scalars(
+            select(AttributedOrder)
+            .where(AttributedOrder.affiliate_id == affiliate.id)
+            .where(AttributedOrder.business_month == month)
+            .order_by(AttributedOrder.shopify_order_id)
+        )
+    )
+    return source_version(calculation, orders, carried_into(db, affiliate, month))
+
+
+def test_agreeing_the_figure_that_was_shown_is_allowed(db):
+    affiliate = _ready(db)
+
+    snapshot = approve_month(
+        db, affiliate, MONTH, expected_source_version=_seen(db, affiliate)
+    )
+
+    assert snapshot.version == 1
+    # Frozen alongside the figure, so a later question - *has anything moved
+    # since we agreed this?* - is a comparison rather than a re-derivation.
+    assert snapshot.payload_json["source_version"] == _seen(db, affiliate)
+
+
+def test_a_month_that_moved_between_the_preview_and_the_commit_is_refused(db):
+    """§11.3, and the failure nobody would ever have seen.
+
+    Approving turns a working number into a debt. The old commit recalculated
+    at commit time and froze whatever was true *then* - so a webhook landing
+    between the two made the screen say one figure and the snapshot another,
+    with nothing anywhere recording the difference.
+    """
+    affiliate = _ready(db)
+    stale = _seen(db, affiliate)
+
+    _order(db, affiliate, "2", 100_000)
+
+    with pytest.raises(SourceMoved):
+        approve_month(db, affiliate, MONTH, expected_source_version=stale)
+
+    # **Nothing was written.** A refusal that half-ran would be worse than the
+    # thing it refuses.
+    assert get_month(db, affiliate, MONTH) is None or not get_month(
+        db, affiliate, MONTH
+    ).is_approved
+
+
+def test_the_same_money_from_different_orders_is_not_the_same_month(db):
+    """The fingerprint covers the evidence, not only the total.
+
+    An order failing while another delivers for the same amount leaves the
+    payout untouched and changes everything behind it - and on a guaranteed
+    minimum the evidence is what decides the money.
+    """
+    affiliate = _ready(db)
+    before = _seen(db, affiliate)
+
+    first = db.scalar(
+        select(AttributedOrder).where(AttributedOrder.affiliate_id == affiliate.id)
+    )
+    first.commission_state = CommissionState.VOID
+    _order(db, affiliate, "Nour-2", 200_000)
+    db.flush()
+
+    assert _seen(db, affiliate) != before
+
+
+def test_a_recorded_target_moves_the_fingerprint_without_moving_the_money(db):
+    """A commission month's payout does not depend on its target (§15) - and
+    the target is still part of what was agreed, because the same model may be
+    on a guarantee next month and the evidence is read the same way.
+    """
+    from app.services.targets import record_actuals, set_requirements
+
+    affiliate = _ready(db)
+    before = _seen(db, affiliate)
+    _, calculation = blockers_for(db, affiliate, MONTH)
+
+    target = set_requirements(db, affiliate, MONTH, videos=4, stories=8)
+    record_actuals(db, target, videos=4, stories=8)
+    db.flush()
+
+    _, after_calculation = blockers_for(db, affiliate, MONTH)
+    assert after_calculation.payout_piastres == calculation.payout_piastres
+    assert _seen(db, affiliate) != before
+
+
+def test_approving_without_saying_what_was_seen_still_works_for_a_backfill(db):
+    """The guard is optional in the service and required by the route.
+
+    Approval is also driven from tests, backfills and the shell, where there is
+    no screen to be stale. The place that needs the check is the one with a
+    person and a button, so that is where absence is refused.
+    """
+    affiliate = _ready(db)
+
+    assert approve_month(db, affiliate, MONTH).version == 1
+
+
+def test_a_concurrent_approval_is_answered_rather_than_crashing(db, monkeypatch):
+    """05B. Two people run payroll and both open it at month end.
+
+    `payroll_snapshot_version_unique` is what actually stops two snapshots for
+    one month, and it fires in the gap between reading `ALREADY_APPROVED` and
+    writing the row. It used to arrive as an `IntegrityError` that aborted the
+    whole transaction - so on a run of twenty models, one collision took the
+    other nineteen with it.
+
+    The race is frozen here by stopping the version read from seeing what the
+    other person already committed, which is precisely what a stale read is.
+    """
+    from app.services import payroll as service
+
+    affiliate = _ready(db)
+    approve_month(db, affiliate, MONTH)
+
+    # The other person's snapshot is in; ours has not noticed. Also drop the
+    # blocker, because in the real race it was read before they committed.
+    monkeypatch.setattr(service, "latest_version", lambda *_: 0)
+    monkeypatch.setattr(
+        service,
+        "blockers_for",
+        lambda db_, aff, m: ([], service.calculate_month(db_, aff, m)),
+    )
+
+    with pytest.raises(SourceMoved, match="agreed by somebody else"):
+        approve_month(db, affiliate, MONTH)
+
+    # **The transaction is still usable.** That is the whole point of the
+    # savepoint: the other nineteen models in the run still go through.
+    assert _seen(db, affiliate) is not None

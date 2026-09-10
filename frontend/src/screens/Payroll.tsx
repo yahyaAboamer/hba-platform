@@ -367,11 +367,16 @@ export function Payroll({ session }: { session: Session }) {
               ? "Choose who to approve"
               : `Review ${chosen.size} for approval`}
           </button>
-          {approved.length > 0 && can(session, "payroll.reopen") && (
-            <Link className="button" to={`/payroll/${month}/reopen`}>
-              Reopen an agreed month
-            </Link>
-          )}
+          {/*
+            * **No reopen button since 05B.** The operation is retired - an
+            * agreed month is not returned to draft, because a payment already
+            * made against the old figure does not un-happen when the
+            * calculation is revisited. A button offering it would advertise a
+            * capability that answers 409.
+            *
+            * The page it pointed at still exists and now explains what
+            * replaced it, for the bookmarks and the one email that link there.
+            */}
         </div>
       )}
     </>

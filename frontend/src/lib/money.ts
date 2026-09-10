@@ -79,6 +79,9 @@ const BLOCKER_TEXT: Record<string, string> = {
   orders_held_for_multi_code_review: "An order two models both claim",
   house_accounts_are_never_owed: "House account — never owed",
   month_is_already_approved: "Already approved",
+  // 05B. Not a fault in the month: the figure moved while somebody was
+  // reading it, and reloading is the whole fix.
+  source_changed_since_preview: "Changed while you were looking at it",
   go_live_month_is_not_configured: "Go-live month is not set",
   no_compensation_terms_for_a_carried_month:
     "An order carried from a month with no pay terms",

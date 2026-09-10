@@ -1505,6 +1505,27 @@ def test_only_the_last_arrangement_may_run_until_further_notice(client, _go_live
     assert "until further notice" in response.json()["detail"]
 
 
+def _commit(client, month, affiliate_id):
+    """Preview, then agree what the preview said.
+
+    05B refuses a commit that carries no record of what was on the screen: a
+    caller sending nothing has not been taught to check, and approving turns a
+    working number into a debt.
+    """
+    seen = client.post(
+        f"/api/payroll/{month}/approve",
+        json={"affiliate_ids": [affiliate_id]},
+    ).json()["results"][0]
+    return client.post(
+        f"/api/payroll/{month}/approve",
+        json={
+            "affiliate_ids": [affiliate_id],
+            "preview": False,
+            "source_versions": {str(affiliate_id): seen["source_version"]},
+        },
+    )
+
+
 def test_an_approved_month_may_be_written_around_but_never_moved(client, monkeypatch):
     """**The real case, and the one a cruder rule would refuse.**
 
@@ -1523,10 +1544,7 @@ def test_an_approved_month_may_be_written_around_but_never_moved(client, monkeyp
         affiliate["id"],
         [{"start_month": "2026-01", "end_month": None, **COMMISSION}],
     )
-    approve = client.post(
-        "/api/payroll/2026-08/approve",
-        json={"affiliate_ids": [affiliate["id"]], "preview": False},
-    )
+    approve = _commit(client, "2026-08", affiliate["id"])
     assert approve.json()["results"][0]["approved"] is True, approve.text
 
     # August still resolves to commission at 10%, so this is allowed even
@@ -1560,10 +1578,7 @@ def test_a_rate_an_approved_month_was_calculated_from_cannot_be_rewritten(
         affiliate["id"],
         [{"start_month": "2026-01", "end_month": None, **COMMISSION}],
     )
-    client.post(
-        "/api/payroll/2026-08/approve",
-        json={"affiliate_ids": [affiliate["id"]], "preview": False},
-    )
+    _commit(client, "2026-08", affiliate["id"])
 
     response = _history(
         client,

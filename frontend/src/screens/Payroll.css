@@ -193,3 +193,19 @@
     overflow-x: auto;
   }
 }
+
+/* The retired reopen page. Prose, not a form — 05B replaced the operation
+   with an explanation, and an explanation that is laid out like a control
+   invites somebody to look for the button. */
+.reopen__explains {
+  padding: var(--space-4);
+  max-width: 62ch;
+}
+
+.reopen__explains p {
+  margin: 0 0 var(--space-3);
+}
+
+.reopen__explains p:last-child {
+  margin-bottom: 0;
+}

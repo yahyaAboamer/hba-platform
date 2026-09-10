@@ -47,6 +47,7 @@ import json
 from dataclasses import asdict
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.businesstime import business_month, parse_month, utcnow
@@ -129,6 +130,14 @@ def held_order_count(db: Session, affiliate: AffiliateProfile, month: str) -> in
     return held
 
 
+#: 05B. The month moved between the preview and the commit.
+#:
+#: Not a blocker: a blocker says *this month cannot be approved by anybody
+#: yet*, and this says *the thing you looked at is not the thing in front of
+#: you now*. Reloading fixes it, and nothing is wrong with the month.
+SOURCE_MOVED = "source_changed_since_preview"
+
+
 def blockers_for(
     db: Session, affiliate: AffiliateProfile, month: str
 ) -> tuple[list[str], MonthCalculation]:
@@ -203,7 +212,63 @@ def _payload(
         {**_order_line(order), "business_month": order.business_month}
         for order in (carried or [])
     ]
+    # 05B. What this figure was computed from, in one short string. Frozen
+    # here so a later question - *has anything moved since we agreed this?* -
+    # is one comparison rather than a re-derivation of a month that is closed.
+    body["source_version"] = source_version(calculation, orders, carried)
     return body
+
+
+def source_version(
+    calculation: MonthCalculation,
+    orders: list[AttributedOrder],
+    carried: list[AttributedOrder] | None = None,
+) -> str:
+    """A short fingerprint of everything this month's figure was computed from.
+
+    §11.3, 05B. Approving is the moment a working number becomes a debt, and
+    the operator agrees to **the figure they were shown**. Between the preview
+    and the commit a webhook can settle an order, a delivery can fail, a
+    target can be recorded or a rate can be corrected — and the old approve
+    route recalculated at commit time and froze whatever was true *then*,
+    silently. Nobody would ever see the difference: the screen said one number
+    and the snapshot said another.
+
+    So the preview hands this out, the commit hands it back, and a mismatch is
+    refused rather than reconciled. There is no correct guess about which
+    figure somebody meant, exactly as 04A found for the targets grid.
+
+    ## What goes in, and why not simply the payout
+
+    The payout alone is not enough. **Two different months can be worth the
+    same money** — an order failing while another delivers for the same amount
+    leaves the total untouched and the evidence behind it completely changed,
+    and a guarantee turns on the evidence rather than the total. So this covers
+    the orders and their states, the arrangement, and the target outcome:
+    everything §11.3 lets decide a figure.
+
+    Derived, never stored — the same reasoning as 04A's grid revision. A column
+    would need writing on every path that touches an order and would be wrong
+    the first time somebody forgot.
+    """
+    facts = {
+        "affiliate_id": calculation.affiliate_id,
+        "month": calculation.month,
+        "compensation_type": calculation.compensation_type,
+        "commission_rate_bp": calculation.commission_rate_bp,
+        "fixed_piastres": calculation.fixed_piastres,
+        "base_amount_piastres": calculation.base_amount_piastres,
+        # A target that is met but unconfirmed is a different month from one
+        # that is met and confirmed: only the second releases a guarantee.
+        "target_achieved": calculation.target_achieved,
+        "target_verified": calculation.target_verified,
+        "orders": [_order_line(order) for order in orders],
+        "carried": [
+            {**_order_line(order), "business_month": order.business_month}
+            for order in (carried or [])
+        ],
+    }
+    return content_hash(facts)[:16]
 
 
 def content_hash(payload: dict) -> str:
@@ -216,6 +281,15 @@ def content_hash(payload: dict) -> str:
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
+class SourceMoved(ValueError):
+    """The month changed between being previewed and being agreed.
+
+    Its own type rather than a message, because the API answers it with a
+    different status from an ordinary refusal: a blocker means *fix the month*
+    and this means *look again*.
+    """
+
+
 def approve_month(
     db: Session,
     affiliate: AffiliateProfile,
@@ -223,6 +297,7 @@ def approve_month(
     *,
     actor_id: int | None = None,
     actor_email: str | None = None,
+    expected_source_version: str | None = None,
 ) -> PayrollSnapshot:
     """Agree what this month is worth, and freeze it.
 
@@ -252,6 +327,20 @@ def approve_month(
     # again, because nothing about the order says it has been paid except this.
     carried = carried_into(db, affiliate, month)
 
+    # 05B. Agree the figure that was shown, or agree nothing.
+    #
+    # Optional, and its absence is **not** treated as agreement by the route
+    # above - a caller that sends nothing is one that has not been taught to
+    # check. It is optional here because approval is also driven from tests,
+    # backfills and the shell, where there is no screen to be stale.
+    if expected_source_version is not None:
+        current = source_version(calculation, orders, carried)
+        if current != expected_source_version:
+            raise SourceMoved(
+                f"{affiliate.name}'s {month} changed while you were looking at "
+                "it. Reload the month and check the figure before agreeing it."
+            )
+
     payload = _payload(calculation, orders, carried)
     previous = latest_version(db, payroll_month)
 
@@ -271,8 +360,27 @@ def approve_month(
         approved_at=utcnow(),
         policy_version_id=policy.id if policy else None,
     )
-    db.add(snapshot)
-    db.flush()
+    # 05B. **Two people run payroll and both open it at month end.**
+    #
+    # `ALREADY_APPROVED` is read a few lines above, and between that read and
+    # this insert the other person can commit. Then both compute the same next
+    # version and the database refuses the second on
+    # `payroll_snapshot_version_unique` - which is the constraint doing its
+    # job, and which arrived here as an `IntegrityError` that aborted the whole
+    # transaction. On a route approving twenty models, one collision took the
+    # other nineteen with it.
+    #
+    # A savepoint keeps the collision local, so it can be answered as *look
+    # again* for that model while the rest of the run stands.
+    try:
+        with db.begin_nested():
+            db.add(snapshot)
+            db.flush()
+    except IntegrityError as clash:
+        raise SourceMoved(
+            f"{affiliate.name}'s {month} was agreed by somebody else while you "
+            "were looking at it. Reload the month before agreeing it again."
+        ) from clash
 
     payroll_month.calculation_state = CalculationState.APPROVED
     payroll_month.active_snapshot_id = snapshot.id
@@ -488,6 +596,20 @@ def reopen_month(
     actor_email: str | None = None,
 ) -> PayrollMonth:
     """Return an approved month to draft.
+
+    **Unreachable from the interface since 05B**, and deliberately still here.
+
+    Nothing an operator can press calls this: `POST /api/payroll/{month}/reopen`
+    refuses, because unmaking an agreement is not how an agreed figure changes
+    any more - a correction is recorded against it instead (05C). What this
+    still does is *construct* the state, which the tests covering reopened
+    history need and which a future repair of an old month may need. Its own
+    audit entry has always said who and why.
+
+    **If you are reaching for this from a shell to fix a real month, stop.**
+    The month you would be unmaking may have been paid against, and the reason
+    the route is gone is that the ledger keeps the payment while the figure it
+    was made against disappears.
 
     **The most dangerous operation in the platform** - it touches a month
     somebody has been paid for. Hence: a written reason, the prior snapshot

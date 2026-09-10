@@ -73,7 +73,23 @@ payroll without touching a maintainer screen.
 
 ## Verification
 
-- Backend: `.venv/Scripts/python.exe -m pytest -q` — **1769 passing**, and no
+- **Set `DATABASE_URL` before pytest, every time.**
+
+  ```
+  DATABASE_URL='postgresql+psycopg://hba:hba@127.0.0.1:5433/hba_platform_test'     .venv/Scripts/python.exe -m pytest -q --color=no
+  ```
+
+  There is **no pytest configuration that does this for you**. Unset, it falls
+  through to `app/config.py`'s default, which is the **dev** database
+  `hba_platform` - and `conftest.py`'s `fresh_database` truncates every table
+  after each committing test. A whole session was run that way on 10 September
+  and emptied the dev data; the tests all passed, because the suite builds its
+  own rows, so nothing said anything was wrong.
+- **One pytest process at a time**, and never one while another is running in
+  the background. Two against the same database deadlock and leak committed
+  rows into each other, and the failures look exactly like a real regression
+  in whatever you just changed. Also on 10 September, and it cost an hour.
+- Backend: `.venv/Scripts/python.exe -m pytest -q` — **1780 passing**, and no
   change merges below that. It takes 5–15 minutes; run it in the background.
 - Frontend: `cd frontend && npm test` (233) and `npm run build`.
 - Redesign 05A is a **read-only rules preview**. The normal calculation and
