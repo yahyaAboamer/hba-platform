@@ -210,3 +210,20 @@ query OrdersRecipientPage($first: Int!, $after: String, $query: String) {
   }
 }
 """
+
+
+#: One order's shipping phone, for matching a parcel that arrived live.
+#:
+#: The page query above walks history; this asks about a single order, which is
+#: what a webhook gives us. Same protected field, same reason it is its own
+#: document rather than fields added to `ORDER_FIELDS`: a denial must cost a
+#: wardrobe, never commission.
+ORDER_RECIPIENT = """
+query OrderRecipient($id: ID!) {
+  order(id: $id) {
+    id
+    legacyResourceId
+    shippingAddress { phone }
+  }
+}
+"""

@@ -53,6 +53,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.businesstime import utcnow
+from app.core.signals import Anomaly, report
 from app.services.jobs import JobKind, PermanentFailure, enqueue
 from app.worker import register_handler
 from app.models.affiliates import AccountKind, AffiliateProfile
@@ -358,6 +359,21 @@ def scan_recipients(
             shipment = record_shipment(db, order, phone=phone)
             if shipment.affiliate_id is not None:
                 matched += 1
+                # **Only for matched parcels.** Reading every line of every
+                # order in the shop to build twenty wardrobes is the wrong
+                # trade, and the great majority of orders are customers.
+                #
+                # Its own job rather than a call here: the scan should not slow
+                # to Shopify's pace per parcel, and a line-item read that fails
+                # must not cost the page of matches around it.
+                enqueue(
+                    db,
+                    JobKind.SYNC_LINE_ITEMS,
+                    {"order_id": order.shopify_order_id},
+                    dedupe_key=(
+                        f"{JobKind.SYNC_LINE_ITEMS}:{order.shopify_order_id}"
+                    ),
+                )
 
         db.commit()
 
@@ -428,3 +444,96 @@ def _handle_scan_recipients(db, payload: dict) -> None:
         {"since": since, "cursor": result["cursor"]},
         dedupe_key=f"{JobKind.SCAN_RECIPIENTS}:{result['cursor']}",
     )
+
+
+def match_one_order(db, client, order) -> "ModelShipment | None":
+    """Check one order against the roster, and read it if it is a model's.
+
+    **The live half of W05.** The bulk scan walks history; this is the parcel
+    that shipped this morning, arriving through the same webhook that already
+    indexes the order.
+
+    Two Shopify calls at most, and the second only when the first one matched:
+    the great majority of the shop's orders are customers, and reading every
+    line of every one to build twenty wardrobes is the wrong trade.
+    """
+    from app.services.shopify.queries import ORDER_RECIPIENT
+
+    gid = order.shopify_order_gid or f"gid://shopify/Order/{order.shopify_order_id}"
+    payload = client.execute(ORDER_RECIPIENT, {"id": gid})
+    node = ((payload or {}).get("order")) or {}
+    phone = ((node.get("shippingAddress") or {}) or {}).get("phone")
+
+    shipment = record_shipment(db, order, phone=phone)
+
+    if shipment.affiliate_id is not None:
+        enqueue(
+            db,
+            JobKind.SYNC_LINE_ITEMS,
+            {"order_id": order.shopify_order_id},
+            dedupe_key=f"{JobKind.SYNC_LINE_ITEMS}:{order.shopify_order_id}",
+        )
+
+    return shipment
+
+
+@register_handler(JobKind.MATCH_ORDER)
+def _handle_match_order(db, payload: dict) -> None:
+    """One order, matched. Queued after the order itself is indexed."""
+    from app.models.orders import OrderIndex
+    from app.services.shopify.sync import PERMANENT, build_client
+
+    order_id = str(payload.get("order_id") or "").strip()
+    if not order_id:
+        raise PermanentFailure(
+            f"{JobKind.MATCH_ORDER} requires an order_id; got {sorted(payload)!r}"
+        )
+
+    order = db.get(OrderIndex, order_id)
+    if order is None:
+        # Indexed and then deleted, or the jobs ran out of order. Not an error
+        # worth retrying forever against something that may never come back.
+        return
+
+    try:
+        client = build_client()
+        client.require_scope("read_orders")
+        match_one_order(db, client, order)
+    except PERMANENT as exc:
+        raise PermanentFailure(str(exc)) from exc
+
+    db.commit()
+
+
+@register_handler(JobKind.SYNC_LINE_ITEMS)
+def _handle_sync_line_items(db, payload: dict) -> None:
+    """Read what was inside one parcel.
+
+    Queued only for an order already matched to a model. A wardrobe without
+    this is a list of parcels with nothing in them, which is what every
+    wardrobe was until this existed.
+    """
+    from app.services.shopify.catalogue import sync_order_line_items
+    from app.services.shopify.sync import PERMANENT, build_client
+
+    order_id = str(payload.get("order_id") or "").strip()
+    if not order_id:
+        raise PermanentFailure(
+            f"{JobKind.SYNC_LINE_ITEMS} requires an order_id; got {sorted(payload)!r}"
+        )
+
+    try:
+        client = build_client()
+        result = sync_order_line_items(
+            db, client, f"gid://shopify/Order/{order_id}"
+        )
+    except PERMANENT as exc:
+        raise PermanentFailure(str(exc)) from exc
+
+    if result.get("truncated"):
+        # An order with more than a hundred lines is not something HBA ships,
+        # and silently keeping the first hundred would make a wardrobe wrong
+        # in a way nothing could see.
+        report(Anomaly.LINE_ITEMS_TRUNCATED, order_id=order_id)
+
+    db.commit()

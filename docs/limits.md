@@ -1060,6 +1060,21 @@ import log line. A handful of skips is usually child objects. A large number
 means the export's shape is not what `normalise_order` expects — likely a
 Shopify API version change.
 
+### `line_items_truncated`
+
+An order carried more than one page of line items — a hundred — so what was
+stored is the first hundred and **not the whole parcel**. The model's wardrobe
+is then missing whatever came after, silently, because a wardrobe has no way to
+know it is short.
+
+Not expected: HBA ships garments, not warehouse pallets. If it fires, either an
+order really is that large or the page size was changed without changing the
+walk to follow `pageInfo`.
+
+*What to do:* open the order in Shopify and count. If it genuinely has more than
+a hundred lines, `sync_order_line_items` needs to page rather than report — the
+cursor is already returned, nothing consumes it yet.
+
 ### `catalogue_product_skipped`
 
 Products in a catalogue walk that carried no usable id — neither
