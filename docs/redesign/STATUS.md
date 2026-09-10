@@ -19,8 +19,12 @@ Package prepared: 9 September 2026. Phase 00 completed 9 September 2026.
   on `9cbfcdb`; production took 39 commits and 5 migrations in one promotion.
   **Neither has been seen by anybody** - no rendered review of the financial
   preview, the approve screen or the retired reopen page.
-- **05C is implemented and unmerged**, on `phase05c/late-failure-corrections`.
-  It closes the gap below, so that gap is now historical rather than live.
+- **05C is merged.** `main` is at `99907f1`; the gap below is closed and
+  historical. `production` is still at `9cbfcdb` - one batch behind, and
+  promoting it is a separate owner-authorised act.
+- **The full suite was run by the owner on 10 September and reported green**,
+  after freeing memory locally. It is not reproducible from this machine in its
+  current state: three agent runs were killed with under 0.6 GB free of 7.9 GB.
 - **05B retired reopening.** `POST /api/payroll/{month}/reopen` answers 409 and
   the button is gone; everything that *reads* reopened history still works, and
   the months already in that state are untouched. Between 05B and 05C there
@@ -58,7 +62,7 @@ Package prepared: 9 September 2026. Phase 00 completed 9 September 2026.
 | 02 Models and setup | **Complete** | `reports/02A-model-entry.md`, `02B-profile-and-self.md`, `02C-setup-readiness.md`; migration `d4b81c07af22`; D06 and D07 closed. Finalisation is deliberately Phase 09 |
 | 03 Products and wardrobe | **Complete** | `reports/03A…`, `03B…`, `03C-wardrobes-and-requests.md`, `03D-making-the-product-screens-load.md`, `03E-what-was-in-the-parcel.md`; migrations `e7c2a5f1b930`, `f1a93d6c48e2`, `a2f47b8e1c53`; D05 and D11 implemented. Line items are fetched and matching runs live (03E), so a wardrobe fills on real data - **re-run the scan once to fill parcels matched before that** |
 | 04 Targets | **Complete** | `reports/04A-targets-editor.md`, `04B-model-targets.md`. The grid carries a revision - a save without one is refused. The model's Targets tab is built (UI24); verification and historical outcomes existed and were verified rather than rebuilt |
-| 05 Financial rules | **05A and 05B merged and deployed; 05C awaiting review** | `reports/05A-pending-inclusive-earnings.md`, `05B-immutable-approval.md`. 05A is a read-only pending-inclusive preview; 05B freezes what an approval agreed to, refuses a stale or concurrent commit, and retires reopening. Existing live financial paths otherwise unchanged. `05C-late-failure-corrections.md` closes the gap 05B left: an agreed month that turns out wrong is corrected against rather than unmade. D04 closed. **Phase 06 next** |
+| 05 Financial rules | **Complete.** 05A, 05B and 05C all merged | `reports/05A-pending-inclusive-earnings.md`, `05B-immutable-approval.md`. 05A is a read-only pending-inclusive preview; 05B freezes what an approval agreed to, refuses a stale or concurrent commit, and retires reopening. Existing live financial paths otherwise unchanged. `05C-late-failure-corrections.md` closes the gap 05B left: an agreed month that turns out wrong is corrected against rather than unmade. D04 closed. **Phase 06 next** |
 | 06 Payments | Not started | Recording/proof/reconciliation already exist and are reusable |
 | 07 Performance screens | Not started | Ranking absent |
 | 08 Settings and notifications | Not started | Notice dismissal persistence absent |

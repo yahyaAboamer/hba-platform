@@ -23,21 +23,24 @@ file's summary; detailed evidence lives in the latest batch report.
 | Phase | State |
 |---|---|
 | 00 Baseline · 01 UI foundations · 02 Models and setup · 03 Products and wardrobe · **04 Targets** | **Complete** |
-| 05 Financial rules | **05A and 05B merged and deployed; 05C implemented, unmerged** |
+| 05 Financial rules | **Complete** |
 | **06 Payments** | **Next** |
 | 07 Performance screens · 08 Settings and notifications · 09 Rehearsal and release | Not started |
 
 **1797+ backend tests, 237 frontend.** Migration head `a2f47b8e1c53`; **no
 phase since 03 has added a migration.**
 
-**`main` and `production` are both at `9cbfcdb`.** The whole redesign through
-05B is live in both environments, promoted on 10 September on the owner's
-explicit instruction — production took 39 commits and 5 migrations in a single
-deploy, and both report healthy. **None of Phase 05 has been seen by anybody**:
-no rendered review of the financial preview, the approve screen, the retired
-reopen page or the corrections panel.
+**`main` is at `99907f1`** — the whole redesign through 05C. **`production` is
+at `9cbfcdb`**, one batch behind: Phases 01–05B were promoted on 10 September
+on the owner's explicit instruction (39 commits and 5 migrations in a single
+deploy, both environments healthy), and 05C has not been promoted. Promoting is
+a separate owner-authorised act.
 
-**05C is implemented and unmerged** on `phase05c/late-failure-corrections`.
+**None of Phase 05 has been seen by anybody.** No rendered review of the
+financial preview, the approve screen, the retired reopen page or the
+corrections panel — and 04A/04B before them are unreviewed too. Automation
+cannot sign in here, so the only way any of it gets looked at is the owner
+walking it on staging.
 
 ---
 
@@ -45,8 +48,23 @@ reopen page or the corrections panel.
 
 1. Read `docs/redesign/STATUS.md`.
 2. Read `docs/redesign/reports/05C-late-failure-corrections.md` — the batch that
-   just closed, and the one still awaiting review.
-3. Then `docs/redesign/prompts/06_PAYMENTS.md`, and run **06 only**.
+   just closed. Phase 05 is complete and merged; its screens are unreviewed.
+3. Then `docs/redesign/prompts/06_PAYMENTS.md`, and run **06A only** — the
+   admin month-end payment journey. The prompt itself says to stop at the batch
+   boundary.
+
+**What 06A inherits and must not rebuild.** Recording, proof, allocation and
+reconciliation all exist in `app/services/payments.py` and are reusable; 06A is
+the journey around them, not a second ledger. Its own prompt says so. Two
+Phase 05 facts land directly on the screen money is sent from:
+
+- A month reduced by a carried correction can be **zero**, in a month the model
+  met her targets in (D04). The payments screen has to read correctly for that
+  and not present it as an error.
+- `GET /api/affiliates/{id}/corrections` already answers *what is outstanding
+  against her*. There is **no cross-model view** — Payments does not list every
+  open correction at month end, which is exactly where somebody would notice
+  one they had forgotten. That is the most valuable thing 06A could add.
 
 ## Three rules that arrived in Phase 05 and are easy to break
 

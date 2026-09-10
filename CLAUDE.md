@@ -112,6 +112,11 @@ payroll without touching a maintainer screen.
   after an agreement is recorded against it as a correction (05C). An approval
   agrees the figure the preview showed, and a commit that cannot say what that
   was is refused.
+- **An agreed month that turns out wrong is corrected, never unmade** (05C).
+  `app/services/corrections.py` compares the frozen snapshot to a fresh
+  calculation; a person carries the difference into a later month or absorbs
+  it. Recovery is capped at what was actually paid, and the comparison runs the
+  real engine twice so the guarantee applies itself.
 - **A carried correction takes a whole month, guaranteed minimum included**
   (D04, 10 September 2026). A model can be sent nothing in a month she met her
   targets in, so the screens explain it - see `_credited_from` in
