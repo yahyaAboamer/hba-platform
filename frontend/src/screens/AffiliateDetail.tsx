@@ -50,6 +50,13 @@ type Shipping = {
   shipping_notes: string | null;
 };
 
+type WardrobeItem = {
+  shopify_product_id: string | null;
+  title: string;
+  size: string | null;
+  state: string;
+};
+
 type Detail = Affiliate & {
   shipping: Shipping;
   current_month: string;
@@ -113,6 +120,12 @@ export function AffiliateDetail({ session }: { session: Session }) {
    * what the server said rather than what was typed last time.
    */
   const [shipDraft, setShipDraft] = useState<Shipping | null>(null);
+  /** What HBA has sent her. The same records her own screen reads (W08). */
+  const [wardrobe, setWardrobe] = useState<{
+    received: WardrobeItem[];
+    processing: WardrobeItem[];
+    failed: WardrobeItem[];
+  } | null>(null);
 
   function load() {
     setError(null);
@@ -192,6 +205,26 @@ export function AffiliateDetail({ session }: { session: Session }) {
       setWorking(null);
     }
   }
+
+  useEffect(() => {
+    let live = true;
+    api
+      .get<{
+        received: WardrobeItem[];
+        processing: WardrobeItem[];
+        failed: WardrobeItem[];
+      }>(`/api/affiliates/${id}/wardrobe`)
+      .then((body) => {
+        if (live) setWardrobe(body);
+      })
+      .catch(() => {
+        // Quietly. A wardrobe that will not load is not a reason to replace
+        // the profile somebody opened to read something else.
+      });
+    return () => {
+      live = false;
+    };
+  }, [id]);
 
   async function saveShipping() {
     if (!shipDraft) return;
@@ -433,6 +466,47 @@ export function AffiliateDetail({ session }: { session: Session }) {
       )}
 
       <div className="detail__grid">
+        {/*
+         * **The same records her own screen reads** (W08): literally the same
+         * service function. Two readings of one truth cannot disagree, and a
+         * wardrobe that differs between her phone and this page is the
+         * argument nobody can settle.
+         *
+         * Only gifts (D05). Something she bought is not here and is not
+         * missing - it was never this screen's subject.
+         */}
+        {wardrobe !== null &&
+          (wardrobe.received.length > 0 ||
+            wardrobe.processing.length > 0 ||
+            wardrobe.failed.length > 0) && (
+            <section className="panel">
+              <div className="panel__head">
+                <h2 className="panel__title">What HBA has sent her</h2>
+              </div>
+              <dl className="detail__list">
+                {[
+                  ["Has", wardrobe.received],
+                  ["On the way", wardrobe.processing],
+                  ["Needs checking", wardrobe.failed],
+                ].map(([label, items]) =>
+                  (items as WardrobeItem[]).length === 0 ? null : (
+                    <Row key={label as string} label={label as string}>
+                      <span className="detail__wardrobe">
+                        {(items as WardrobeItem[])
+                          .map((item) =>
+                            item.size
+                              ? `${item.title} (${item.size})`
+                              : item.title,
+                          )
+                          .join(", ")}
+                      </span>
+                    </Row>
+                  ),
+                )}
+              </dl>
+            </section>
+          )}
+
         {/*
          * First in the grid, and on a pending profile too - unlike the money
          * panels below it. When she started is knowable before she is

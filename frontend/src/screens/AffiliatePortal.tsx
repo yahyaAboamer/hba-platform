@@ -6,6 +6,7 @@ import type { PortalContext } from "../components/AffiliateLayout";
 import { api } from "../lib/api";
 import type { Session } from "../lib/api";
 import { NotBuiltYet } from "../components/NotBuiltYet";
+import { MyWardrobe } from "./MyWardrobe";
 import { storedTheme } from "../lib/theme";
 import { Apply } from "./Apply";
 import { Glossary } from "./Glossary";
@@ -182,16 +183,7 @@ export function AffiliatePortal({ session }: { session: Session }) {
            * They say so rather than rendering an empty state - §S06, and
            * `NotBuiltYet` explains why the difference matters.
            */}
-          <Route
-            path="wardrobe"
-            element={
-              <NotBuiltYet
-                title="Wardrobe"
-                phase="Phase 03C"
-                what="What HBA has sent you, with photos and sizes, and what is still on its way."
-              />
-            }
-          />
+          <Route path="wardrobe" element={<MyWardrobe />} />
           <Route
             path="targets"
             element={

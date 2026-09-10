@@ -169,6 +169,18 @@ export const api = {
   post: <T>(path: string, body?: unknown) => request<T>("POST", path, body),
   put: <T>(path: string, body?: unknown) => request<T>("PUT", path, body),
   patch: <T>(path: string, body?: unknown) => request<T>("PATCH", path, body),
+  /**
+   * **The platform's only DELETE**, added in Phase 03C for withdrawing a
+   * feature request (W09).
+   *
+   * Named `del` because `delete` is a reserved word. Deliberately not used for
+   * anything financial: nothing this platform records about money is ever
+   * removed - approvals, transfers, allocations and destinations are
+   * append-only and guarded by database triggers. A request to feature a
+   * garment is not that, and withdrawing one should not leave a tombstone
+   * somebody has to read past.
+   */
+  del: <T>(path: string) => request<T>("DELETE", path),
 };
 
 /**

@@ -211,3 +211,11 @@
 .detail__address-form .field {
   margin-bottom: 0;
 }
+
+/* What HBA has sent her. A sentence rather than a grid: this page answers
+   "who is she" and the pictures belong on the product's own screen. */
+.detail__wardrobe {
+  display: block;
+  max-width: 60ch;
+  line-height: 1.5;
+}

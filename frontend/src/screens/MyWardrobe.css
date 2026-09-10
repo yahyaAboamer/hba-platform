@@ -1,0 +1,103 @@
+/* Her wardrobe. W08: what she owns, then what has not arrived. */
+
+.affiliate .wardrobe {
+  padding-bottom: var(--tab-clearance);
+}
+
+.affiliate .wardrobe__block {
+  margin-bottom: var(--space-6);
+}
+
+.affiliate .wardrobe__title {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+/* Two across on a phone. Three would make every garment a thumbnail nobody
+   can tell apart, and one would make her scroll past four things to find
+   the fifth. */
+.affiliate .wardrobe__grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.affiliate .wardrobe__item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.affiliate .wardrobe__pic,
+.affiliate .wardrobe__nopic {
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  border-radius: var(--radius);
+  background: var(--raise);
+}
+
+/* An honest gap rather than a broken frame: the garment is real, the
+   photograph is not there. */
+.affiliate .wardrobe__nopic {
+  border: 1px dashed var(--rule);
+}
+
+.affiliate .wardrobe__name {
+  font-size: var(--text-sm);
+  line-height: 1.35;
+}
+
+.affiliate .wardrobe__size {
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}
+
+/* Compact, and unmistakably not the grid above it (W08): a failed product
+   must not look owned. */
+.affiliate .wardrobe__waiting,
+.affiliate .wardrobe__requests {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.affiliate .wardrobe__waiting li,
+.affiliate .wardrobe__requests li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--rule);
+}
+
+.affiliate .wardrobe__waiting li:last-child,
+.affiliate .wardrobe__requests li:last-child {
+  border-bottom: 0;
+}
+
+.affiliate .wardrobe__state {
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}
+
+/* Amber, not red. Nothing is wrong with her - a parcel did not arrive, and
+   `tokens.css` calls that hue "attention, not alarm". */
+.affiliate .wardrobe__state--failed {
+  color: var(--owed);
+}
+
+.affiliate .wardrobe__ask {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--quiet);
+}

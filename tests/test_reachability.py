@@ -31,6 +31,11 @@ VERBS = {
     "put": "PUT",
     "patch": "PATCH",
     "upload": "POST",
+    # `del`, because `delete` is a reserved word in JavaScript. Added in 03C
+    # with the platform's first DELETE - withdrawing a feature request. It is
+    # deliberately not used for anything financial: money records are
+    # append-only and trigger-guarded.
+    "del": "DELETE",
 }
 
 #: Called by somebody other than our own interface, or superseded by a route
@@ -110,16 +115,21 @@ def _served() -> set[tuple[str, str]]:
         payments,
         payroll,
         policy,
+        products,
         staff,
         targets,
         webhooks,
     )
 
+    # **Named one by one, not discovered.** A router that is served and not
+    # listed here would make every one of its routes look unreached, and a
+    # router listed and not served would make the interface look broken - so
+    # adding an API module is a line in this tuple, on purpose.
     found: set[tuple[str, str]] = set()
     for module in (
         affiliate_self, affiliates, applications, audit, auth, earnings,
-        health, operations, orders, payments, payroll, policy, staff, targets,
-        webhooks,
+        health, operations, orders, payments, payroll, policy, products,
+        staff, targets, webhooks,
     ):
         for route in module.router.routes:
             for method in getattr(route, "methods", set()):
@@ -140,7 +150,7 @@ def _called() -> set[tuple[str, str]]:
     # allowed around the dot. An earlier version required them contiguous
     # and reported a dozen screens as having no way in.
     call = re.compile(
-        r"""api\s*\.\s*(get|post|put|patch|upload)\s*(?:<[^>]*>)?\s*\(\s*[`"']([^`"']*)[`"']"""
+        r"""api\s*\.\s*(get|post|put|patch|upload|del)\s*(?:<[^>]*>)?\s*\(\s*[`"']([^`"']*)[`"']"""
     )
     image = re.compile(r"""src=\{`(/api/[^`]*)`\}""")
 

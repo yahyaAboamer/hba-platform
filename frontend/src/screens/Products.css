@@ -1,0 +1,121 @@
+/* The catalogue, and one product's roster. W01, W02. */
+
+.products__controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.products__search {
+  width: 16rem;
+}
+
+.products__toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--quiet);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.products__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.products__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  color: inherit;
+  text-decoration: none;
+}
+
+.products__pic,
+.products__nopic {
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+/* An honest gap. The product is real; its picture is not there. */
+.products__nopic {
+  border: 1px dashed var(--rule);
+}
+
+.products__name {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.products__meta {
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}
+
+.products__panel {
+  margin-bottom: var(--space-5);
+  padding-bottom: var(--space-4);
+}
+
+.products__request,
+.products__group {
+  padding: var(--space-4) var(--space-5) 0;
+}
+
+.products__ask {
+  margin: 0 0 var(--space-2);
+  max-width: 60ch;
+}
+
+.products__textarea {
+  width: 100%;
+  max-width: 44rem;
+  resize: vertical;
+}
+
+.products__actions {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+/* W02's four groups. The heading carries the count so a row does not have to
+   repeat a status the group already states. */
+.products__group-title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.products__count {
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}
+
+/* Concise rows: a name and a link (W02). No duplicate status, size, quantity
+   or date columns - the group says the first and the profile says the rest. */
+.products__models {
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  list-style: none;
+  columns: 2;
+  font-size: var(--text-sm);
+}
+
+.products__models li {
+  padding: var(--space-1) 0;
+  break-inside: avoid;
+}
