@@ -524,3 +524,30 @@ def update_my_shipping_address(
     return {
         field: getattr(affiliate, field) for field in SHIPPING_FIELDS
     }
+
+
+@router.get("/wardrobe")
+def my_wardrobe(
+    affiliate: AffiliateProfile = Depends(current_affiliate),
+    db: Session = Depends(get_session),
+) -> dict:
+    """What HBA has sent her, and the requests she may actually see.
+
+    **Only what HBA sent** (D05, 10 September 2026). Something she bought with
+    her own money is not here — the wardrobe is a record of what the business
+    gave her, not an inventory of her cupboard.
+
+    The feature requests are the *intersection* of visible requests and what
+    she holds, computed here (W10). Filtering in the browser would still hand
+    every request to every model through this endpoint, which is the difference
+    between hiding something and not sending it.
+    """
+    from app.services.wardrobe import eligible_requests, wardrobe_for
+
+    wardrobe = wardrobe_for(db, affiliate.id)
+    return {
+        **wardrobe,
+        # An empty list means the section disappears rather than rendering an
+        # empty header (W11).
+        "feature_requests": eligible_requests(db, affiliate.id),
+    }

@@ -27,6 +27,7 @@ from app.api import (
     payments,
     payroll,
     policy,
+    products,
     staff,
     targets,
     webhooks,
@@ -127,6 +128,7 @@ app.include_router(staff.router)
 app.include_router(audit.router)
 app.include_router(payroll.router)
 app.include_router(payments.router)
+app.include_router(products.router)
 app.include_router(policy.router)
 
 

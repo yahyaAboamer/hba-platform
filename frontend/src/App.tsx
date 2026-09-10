@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
 import { Layout } from "./components/Layout";
-import { NotBuiltYet } from "./components/NotBuiltYet";
 import { api, currentUser } from "./lib/api";
 import type { Session } from "./lib/api";
 import { AcceptInvitation } from "./screens/AcceptInvitation";
@@ -17,6 +16,7 @@ import { FirstRun } from "./screens/FirstRun";
 import { Glossary } from "./screens/Glossary";
 import { Orders } from "./screens/Orders";
 import { Overview } from "./screens/Overview";
+import { ProductDetail, Products } from "./screens/Products";
 import { PaymentReconcile } from "./screens/PaymentReconcile";
 import { PaymentRecord } from "./screens/PaymentRecord";
 import { Payments } from "./screens/Payments";
@@ -128,19 +128,10 @@ export default function App() {
               path="/affiliates/:id/payout-destination"
               element={<AffiliatePayout />}
             />
-            {/*
-             * Products is in the approved navigation and has no backend yet.
-             * It says so rather than rendering an empty catalogue - §S06.
-             */}
+            <Route path="/products" element={<Products session={session} />} />
             <Route
-              path="/products"
-              element={
-                <NotBuiltYet
-                  title="Products"
-                  phase="Phase 03A and 03C"
-                  what="The Shopify catalogue, who was sent what, and which models can be asked to feature a product."
-                />
-              }
+              path="/products/:id"
+              element={<ProductDetail session={session} />}
             />
             {/*
              * Off the sidebar since the redesign, and deliberately still

@@ -1036,3 +1036,21 @@ def set_pay_history_route(
 
     db.commit()
     return _pay_history_payload(db, affiliate)
+
+
+@router.get("/{affiliate_id}/wardrobe")
+def affiliate_wardrobe_route(
+    affiliate_id: int,
+    _actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_VIEW)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """The same wardrobe the model sees, on her profile.
+
+    W08: *product and model views use the same records.* Literally the same
+    function — two readings of one truth cannot disagree, and a wardrobe that
+    differs between her screen and yours is the argument nobody can settle.
+    """
+    from app.services.wardrobe import wardrobe_for
+
+    affiliate = _get_affiliate_or_404(db, affiliate_id)
+    return wardrobe_for(db, affiliate.id)

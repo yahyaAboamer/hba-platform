@@ -1,0 +1,166 @@
+"""The catalogue, its rosters, and what marketing asks about each product.
+
+W01, W02, W09, W15. Staff-side. The model's own wardrobe lives on
+`/api/me/wardrobe`, because §6.1 splits on **what the session is** rather than
+on what it may do.
+"""
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
+
+from app.api.deps import require_permission
+from app.core.permissions import Permission
+from app.db import get_session
+from app.models.catalogue import Product, ProductStatus, ProductVariant
+from app.models.identity import UserAccount
+from app.services.wardrobe import (
+    feature_request_for,
+    remove_feature_request,
+    roster_for,
+    set_feature_request,
+)
+
+router = APIRouter(prefix="/api/products")
+
+
+class FeatureRequestBody(BaseModel):
+    """W09's three verbs. `message` writes it, `visible` shows or hides it."""
+
+    message: str | None = Field(default=None, max_length=2000)
+    visible: bool | None = None
+
+
+@router.get("")
+def list_products(
+    all_products: bool = False,
+    search: str | None = None,
+    limit: int = 100,
+    _actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_VIEW)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """The catalogue.
+
+    **Active by default; `all_products` includes draft and archived** (W01). A
+    product archived in Shopify is still in somebody's wardrobe, so it is kept
+    and hidden rather than dropped - the default answers *what are we selling*,
+    and the switch answers *what have we ever sold*.
+
+    Search is on the name, because W01 puts colour in the product name and
+    there is no separate colour taxonomy to filter by.
+    """
+    query = select(Product)
+    if not all_products:
+        query = query.where(Product.status == ProductStatus.ACTIVE)
+    if search and search.strip():
+        query = query.where(Product.title.ilike(f"%{search.strip()}%"))
+
+    rows = list(db.scalars(query.order_by(Product.title).limit(min(limit, 500))))
+
+    sizes = {}
+    if rows:
+        counts = db.execute(
+            select(ProductVariant.shopify_product_id, func.count())
+            .where(
+                ProductVariant.shopify_product_id.in_(
+                    [row.shopify_product_id for row in rows]
+                )
+            )
+            .group_by(ProductVariant.shopify_product_id)
+        )
+        sizes = {product_id: count for product_id, count in counts}
+
+    return {
+        "products": [
+            {
+                "shopify_product_id": row.shopify_product_id,
+                "title": row.title,
+                "status": row.status,
+                "image_url": row.image_url,
+                "sizes": sizes.get(row.shopify_product_id, 0),
+                # Freshness, said rather than implied. A catalogue nobody has
+                # read for a fortnight looks identical to a fresh one.
+                "synced_at": row.synced_at.isoformat() if row.synced_at else None,
+            }
+            for row in rows
+        ],
+        "showing": "all" if all_products else "active",
+    }
+
+
+@router.get("/{shopify_product_id}")
+def product_detail(
+    shopify_product_id: str,
+    _actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_VIEW)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """One product, its sizes, its roster and its feature request.
+
+    The roster is W02's four groups in W02's order. It counts every model, not
+    only those who received something - the question is *who could I ask*.
+    """
+    product = db.get(Product, shopify_product_id)
+    if product is None:
+        raise HTTPException(404, "No such product")
+
+    variants = db.scalars(
+        select(ProductVariant)
+        .where(ProductVariant.shopify_product_id == shopify_product_id)
+        .order_by(ProductVariant.position)
+    )
+
+    return {
+        "shopify_product_id": product.shopify_product_id,
+        "title": product.title,
+        "status": product.status,
+        "image_url": product.image_url,
+        "synced_at": product.synced_at.isoformat() if product.synced_at else None,
+        "sizes": [{"title": row.title, "sku": row.sku} for row in variants],
+        "roster": roster_for(db, shopify_product_id),
+        "feature_request": feature_request_for(db, shopify_product_id),
+    }
+
+
+@router.put("/{shopify_product_id}/feature-request")
+def put_feature_request(
+    shopify_product_id: str,
+    body: FeatureRequestBody,
+    actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_MANAGE)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Write, show or hide what marketing asks about this product.
+
+    **Passive guidance** (W09). There is no completion to track and no target
+    to move: a model reads it and decides. Hiding keeps the wording; removing
+    is `DELETE`, and the two are different on purpose.
+    """
+    if db.get(Product, shopify_product_id) is None:
+        raise HTTPException(404, "No such product")
+
+    try:
+        set_feature_request(
+            db,
+            shopify_product_id,
+            message=body.message,
+            visible=body.visible,
+            actor_id=actor.id,
+        )
+        db.commit()
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(400, str(exc)) from exc
+
+    return feature_request_for(db, shopify_product_id) or {}
+
+
+@router.delete("/{shopify_product_id}/feature-request")
+def delete_feature_request(
+    shopify_product_id: str,
+    _actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_MANAGE)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Withdraw it. W09 lists removing separately from hiding."""
+    removed = remove_feature_request(db, shopify_product_id)
+    db.commit()
+    return {"removed": removed}
