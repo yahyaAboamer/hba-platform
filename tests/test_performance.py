@@ -34,7 +34,7 @@ from app.services.pace import (
 )
 from app.services.performance import month_performance, rank, uses_for
 from app.services.shopify.fulfilment import DELIVERED, FAILED, IN_FLIGHT
-from app.services.targets import record_actuals, set_requirements
+from app.services.targets import get_target, record_actuals, set_requirements
 
 AUGUST = "2026-08"
 
@@ -346,3 +346,95 @@ def test_a_month_the_calendar_has_not_reached_is_not_behind(db):
     db.flush()
 
     assert pace_for(db, affiliate, AUGUST, today=date(2026, 7, 30)).state == NOT_STARTED
+
+
+# -- Targets fixed across a year -----------------------------------------------
+
+
+def test_setting_a_year_writes_every_month_of_it(db):
+    """Owner, 11 September 2026: *the required targets for a single model is
+    fixed along all year.* Setting them is normally a year-wide act; varying
+    one month is the exception you opt out into.
+    """
+    from app.services.targets import set_requirements_for_year
+
+    affiliate = _model(db, "Nour")
+
+    report = set_requirements_for_year(
+        db, affiliate, AUGUST, videos=6, stories=10
+    )
+
+    assert len(report["applied"]) == 12
+    assert report["skipped"] == []
+    for index in (1, 8, 12):
+        target = get_target(db, affiliate, f"2026-{index:02d}")
+        assert (target.required_videos, target.required_stories) == (6, 10)
+
+
+def test_a_year_includes_months_already_gone(db):
+    """Asked directly whether the whole year meant this month onward or every
+    month including ones already past, the owner chose **January included**.
+
+    The consequence was put to him and is asserted here rather than left
+    implicit: a month that was already counted can change what it means. March
+    was achieved at four of four; after the year is raised to eight it is not.
+    """
+    from app.services.targets import set_requirements_for_year
+
+    affiliate = _model(db, "Nour")
+    march = set_requirements(db, affiliate, "2026-03", videos=2, stories=2)
+    record_actuals(db, march, videos=2, stories=2)
+    db.flush()
+    assert march.is_achieved is True
+
+    set_requirements_for_year(db, affiliate, AUGUST, videos=4, stories=4)
+
+    assert get_target(db, affiliate, "2026-03").is_achieved is False, (
+        "raising the year re-decides a month that was already counted - "
+        "chosen knowingly, and the reason the save reports what it touched"
+    )
+
+
+def test_an_agreed_month_is_left_alone_and_named(db, monkeypatch):
+    """05B: an agreed month is not unmade, and its snapshot froze the
+    requirement it was agreed against. Skipping is forced rather than decided -
+    refusing the whole year instead would make this unusable by December.
+    """
+    from app.config import settings
+    from app.services.payroll import approve_month
+    from app.services.targets import ALREADY_AGREED, set_requirements_for_year
+
+    monkeypatch.setattr(settings, "go_live_month", "2026-01", raising=False)
+
+    affiliate = _model(db, "Nour")
+    _order(db, affiliate, "1", 100_000, delivery=DELIVERED,
+           state=CommissionState.EARNED, month="2026-04")
+    set_requirements(db, affiliate, "2026-04", videos=1, stories=1)
+    approve_month(db, affiliate, "2026-04")
+    db.flush()
+
+    report = set_requirements_for_year(
+        db, affiliate, AUGUST, videos=9, stories=9
+    )
+
+    assert {"month": "2026-04", "why": ALREADY_AGREED} in report["skipped"]
+    assert "2026-04" not in report["applied"]
+    kept = get_target(db, affiliate, "2026-04")
+    assert (kept.required_videos, kept.required_stories) == (1, 1)
+
+
+def test_counts_are_never_written_across_a_year(db):
+    """What she produced is a fact about one month. Only the requirement is
+    fixed across the year; recording is per month and stays that way.
+    """
+    from app.services.targets import set_requirements_for_year
+
+    affiliate = _model(db, "Nour")
+    august = set_requirements(db, affiliate, AUGUST, videos=4, stories=4)
+    record_actuals(db, august, videos=4, stories=4)
+    db.flush()
+
+    set_requirements_for_year(db, affiliate, AUGUST, videos=4, stories=4)
+
+    assert get_target(db, affiliate, "2026-09").actual_videos is None
+    assert get_target(db, affiliate, AUGUST).actual_videos == 4

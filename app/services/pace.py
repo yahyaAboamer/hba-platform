@@ -55,11 +55,20 @@ from app.core.businesstime import business_date, parse_month, utcnow
 from app.models.affiliates import AffiliateProfile
 from app.services.targets import get_target
 
-#: Nobody set a target, so there is nothing to keep up with.
+#: Nobody has set a requirement for this month.
+#:
+#: **This is an attention state, not a blank** (owner, 11 September 2026).
+#: There is nothing for her to be behind on, and a model nobody has asked
+#: anything of is a gap in HBA's own month - it is the reason a target-driven
+#: guarantee cannot be decided, and it stays invisible until somebody looks.
 NO_TARGET = "no_target"
 
 #: Her counts have not been recorded since this week started. This says
 #: nothing about her - only that nobody has typed since Thursday.
+#:
+#: Also an attention state: an uncounted month is what blocks a guaranteed
+#: minimum (§11.3), and *nobody counted* is a thing for HBA to do rather than
+#: a verdict on her.
 NOT_RECORDED = "not_recorded_this_week"
 
 #: Recorded, and at or past the line for the week she is in.

@@ -194,6 +194,52 @@ One pytest process at a time, database named explicitly.
 Automation cannot sign in. The Ranking board and the pace column have not been
 seen. Eighth consecutive batch in that position.
 
+## Added after the first pass, 11 September
+
+### Targets are fixed across a year
+
+> The required targets for a single model is fixed along all year … a checkbox
+> to select whether these targets are applied for all the months of the year or
+> just this month. So in the future, if we wanted to edit a model's month not
+> the entire year, we just don't click this checkbox.
+
+A checkbox beside the save, **off by default and reset after every save** —
+that is how it was described, and it rewrites twelve months at once, so it is a
+deliberate act each time rather than a setting that stays armed. The button
+says *Save the year* while it is ticked.
+
+**January is included.** Asked whether "the whole year" meant this month onward
+or every month including ones already gone, the owner chose every month.
+The consequence was put to him in the same sentence and is asserted by a test
+rather than left implicit: **raising a year re-decides months already counted**
+— March achieved at four of four is not achieved once the year goes to eight,
+and on a guaranteed minimum that is a floor applying or not applying.
+
+**Two kinds of month are skipped, and only one of those is a choice.** An
+agreed month is refused by `assert_month_recordable`, which is the whole of
+05B — its snapshot froze the requirement it was agreed against. Refusing the
+entire year instead would make the feature unusable by December, so it skips
+and names them. A month from before the platform is skipped because ADR 0036
+says it has an outcome and no counts, and giving it a requirement would invent
+the evidence that record exists to say nobody kept.
+
+The save reports what it reached and what it refused. *"12 rows saved"* would
+be true and would hide both.
+
+**Counts are never written across a year.** What she produced is a fact about
+one month.
+
+### A missing target is a gap, not a blank
+
+> If no targets are recorded, or no required targets are set for this month,
+> then those also are things to call for attention.
+
+Both states existed and one of them rendered as **nothing at all** — a model
+nobody had asked anything of showed an empty cell, which is exactly how it
+stays unnoticed until payroll cannot close on her. The pace column now says
+*Nothing asked for yet* and *Nothing recorded in week N*, so the two gaps that
+block a month are visible in the same column as the pace itself.
+
 ---
 
 ## Continuation

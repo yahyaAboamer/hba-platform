@@ -143,3 +143,15 @@
   white-space: nowrap;
   font-size: var(--text-xs);
 }
+
+/* Apply to the whole year. Beside the save button, because it changes what
+   that button does - and never styled as a primary control of its own: it is
+   a modifier, not an action. */
+.targets__year {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-right: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--quiet);
+}
