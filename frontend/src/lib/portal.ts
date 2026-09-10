@@ -55,6 +55,12 @@ export type MakeupLine = {
 };
 
 export type MyOrder = {
+  /**
+   * What was in the order. **Empty means not recorded, not empty**: contents
+   * are read only for orders that earned commission, and only from 07A
+   * onwards, so an older order legitimately has none.
+   */
+  contents: { title: string; variant: string | null; quantity: number }[];
   order_number: string;
   placed_at: string;
   base_piastres: number;

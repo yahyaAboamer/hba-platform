@@ -66,6 +66,7 @@ from app.core.money import (
 from app.core.periods import PLATFORM_START_MONTH
 from app.models.affiliates import AffiliateProfile
 from app.models.attributed_orders import AttributedOrder, CommissionState
+from app.models.catalogue import OrderLineItem
 from app.models.compensation import CompensationType
 from app.models.orders import OrderIndex
 from app.models.payments import (
@@ -902,6 +903,37 @@ def my_orders(db: Session, affiliate: AffiliateProfile, month: str) -> list[dict
         .order_by(OrderIndex.placed_at.desc())
     ).all()
 
+    # **What was in each order** (07A, owner 11 September 2026).
+    #
+    # One query for the whole month, keyed by order, rather than a lookup per
+    # row - a month with sixty orders would otherwise cost sixty round trips
+    # for a list nobody scrolls, which is the shape that made the products
+    # screen slow in 03D.
+    #
+    # `contents` is **empty rather than absent** where nothing has been read.
+    # Line items are fetched only for orders that earned somebody commission,
+    # and only from the moment 07A started asking for them, so an older order
+    # legitimately has none - and the screen says *not recorded* rather than
+    # implying the order was empty.
+    contents: dict[str, list[dict]] = {}
+    if rows:
+        for line in db.scalars(
+            select(OrderLineItem)
+            .where(
+                OrderLineItem.shopify_order_id.in_(
+                    [order.shopify_order_id for order, _ in rows]
+                )
+            )
+            .order_by(OrderLineItem.title)
+        ):
+            contents.setdefault(line.shopify_order_id, []).append(
+                {
+                    "title": line.title,
+                    "variant": line.variant_title,
+                    "quantity": line.quantity,
+                }
+            )
+
     detail = []
     for order, index in rows:
         commission = _order_commission(
@@ -913,6 +945,9 @@ def my_orders(db: Session, affiliate: AffiliateProfile, month: str) -> list[dict
         {
             "order_number": index.order_number,
             "placed_at": index.placed_at.isoformat(),
+            # What was in it. Empty where nothing has been read - which is an
+            # older order, not an empty one, and the screen says so.
+            "contents": contents.get(order.shopify_order_id, []),
             "base_piastres": order.commission_base_piastres,
             "base": format_egp(order.commission_base_piastres),
             "state": order.commission_state,

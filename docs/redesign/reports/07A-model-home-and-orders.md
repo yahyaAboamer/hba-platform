@@ -74,10 +74,34 @@ mattered because each row carried a multi-megabyte photograph; this payload is
 a few kilobytes. **Not built, and the reason is here rather than absent.** If a
 month ever does carry hundreds of orders, the filters move first.
 
-**Products on an order.** `order_line_item` exists from 03A and 03E, so the
-data is there. It is genuinely useful and it is also the wardrobe's subject,
-and putting the same list in two places invites them to disagree. Left for a
-decision rather than assumed.
+**Products on an order** was put to the owner rather than assumed, and he asked
+for it. **Built** — see below.
+
+### What was in each order
+
+Asked and answered on 11 September. It needed more than a screen, and the
+reason is worth stating: **the contents were not being read.**
+
+03E fetches line items only for parcels matched to a model — the wardrobe —
+and says why in as many words: *reading every line of every order in the shop
+to build twenty wardrobes is the wrong trade, and the great majority of orders
+are customers.* Her **commission** orders are exactly those customer orders, so
+they had none.
+
+The read now also runs for an order that was **attributed to a model**. That is
+the same trade 03E made, applied to a different and equally self-selecting set:
+an order that used a code is a small fraction of the shop, and it is precisely
+the set this screen shows. Deduped by order id and sharing 03E's job, so an
+order that is both somebody's parcel and somebody's commission is read once.
+
+**Empty is not the same as none.** Contents are read only from now on, so an
+older order genuinely has nothing recorded — and the screen says *what was in
+this order was not recorded* rather than implying somebody bought nothing. A
+test holds that distinction.
+
+**Old orders need a backfill to fill in.** Nothing here reads history; a
+re-import or a resync of an order picks it up. Worth knowing rather than
+wondering why September is fuller than August.
 
 ### What the owner should try
 
@@ -92,10 +116,8 @@ decision rather than assumed.
 
 ### Confirmation needed before the next dependent decision
 
-**One, and it is small.** Whether the Orders screen should list what was in
-each order. The data exists; the wardrobe already answers *what do I have*, and
-this would answer *what was in this order*. Worth a word before either is
-built.
+**None.** The one open question — whether the Orders screen should list an
+order's contents — was answered *yes* on 11 September and is built.
 
 ---
 
@@ -108,7 +130,9 @@ built.
 | `app/services/portal.py` | `uses` on the month payload, from `uses_for` |
 | `frontend/src/screens/MyMonth.tsx` | The Code uses tile |
 | `frontend/src/lib/portal.ts` | `uses` on the orders type, with why it is not a sum |
-| `tests/test_performance.py` | 3 new |
+| `app/services/shopify/sync.py` | Contents read for an attributed order, mirroring 03E's parcel path |
+| `frontend/src/screens/MyOrders.tsx`, `.css` | The contents list inside the expansion |
+| `tests/test_performance.py` | 6 new |
 
 **No migration, no new route, no new permission.** Head unchanged at
 `1c4b06a5f8d2`. The figure comes from `uses_for`, built and tested when D03 was
@@ -122,8 +146,9 @@ because the index never held any.
 
 ### Existing failures distinguished from regressions
 
-**No regressions.** `test_performance.py` 33 (3 new), `test_portal_api.py` 85,
-frontend 256 with `tsc` and build clean.
+**No regressions.** `test_performance.py` 36 (6 new), `test_portal_api.py` 85,
+`test_shopify_sync.py` 22, `test_reachability.py` 3, frontend 256 with `tsc`
+and build clean.
 
 ### No real credentials or personal data in evidence
 
@@ -135,8 +160,10 @@ Windows, Git Bash, local PostgreSQL on 5433, migration head `1c4b06a5f8d2`.
 
 | Check | Actual result |
 |---|---|
-| `tests/test_performance.py` | **33 passed**, exit 0 |
+| `tests/test_performance.py` | **36 passed**, exit 0 |
 | `tests/test_portal_api.py` | **85 passed**, exit 0 |
+| `tests/test_shopify_sync.py` | **22 passed**, exit 0 |
+| `tests/test_reachability.py` | **3 passed**, exit 0 |
 | `cd frontend && npm test` | **256 passed**, exit 0 |
 | `cd frontend && npx tsc --noEmit` | exit 0 |
 | `cd frontend && npm run build` | exit 0 |
@@ -156,7 +183,9 @@ Automation cannot sign in. The Code uses tile has not been seen.
 
 ### Remaining limitations
 
-- **Order paging and per-order products** are assessed above and not built.
+- **Order paging** is assessed above and not built.
+- **An order's contents are read from 07A onwards only.** Older orders show
+  *not recorded* until a resync picks them up.
 - **Uses is per month**, matching every other figure on Home. A year-to-date
   use count is not offered and was not asked for.
 

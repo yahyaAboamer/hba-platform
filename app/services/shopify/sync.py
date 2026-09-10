@@ -109,3 +109,42 @@ def _handle_sync_order(db: Session, payload: dict) -> None:
             {"order_id": order_id},
             dedupe_key=f"{JobKind.MATCH_ORDER}:{order_id}",
         )
+
+        # **What was in an order she earned on** (07A, owner 11 September).
+        #
+        # Read **only where the order was attributed to a model**, which is the
+        # same trade 03E made for parcels and for the same reason: the great
+        # majority of the shop's orders are ordinary customers, and reading
+        # every line of every one of them to fill in a screen twenty people
+        # look at would be Shopify's whole rate limit spent on nothing.
+        #
+        # An order that used a code is a small and self-selecting set, and it
+        # is exactly the set this screen shows.
+        #
+        # Deduped by order id, so a webhook, a sweep and a backfill all
+        # reaching the same order queue one read - and shared with 03E's
+        # parcel path, so an order that is both a model's parcel and somebody's
+        # commission is still read once.
+        if _attributed(db, order_id):
+            enqueue(
+                db,
+                JobKind.SYNC_LINE_ITEMS,
+                {"order_id": order_id},
+                dedupe_key=f"{JobKind.SYNC_LINE_ITEMS}:{order_id}",
+            )
+
+
+def _attributed(db, order_id: str) -> bool:
+    """Whether this order earned somebody commission."""
+    from sqlalchemy import select
+
+    from app.models.attributed_orders import AttributedOrder
+
+    return (
+        db.scalar(
+            select(AttributedOrder.shopify_order_id).where(
+                AttributedOrder.shopify_order_id == order_id
+            )
+        )
+        is not None
+    )
