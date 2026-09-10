@@ -40,6 +40,7 @@ from app.services.portal import (
     my_month,
     my_orders,
     my_payments,
+    my_targets,
     my_year,
 )
 from app.services.proof import readable_by
@@ -551,3 +552,23 @@ def my_wardrobe(
         # empty header (W11).
         "feature_requests": eligible_requests(db, affiliate.id),
     }
+
+
+@router.get("/targets")
+def my_targets_view(
+    affiliate: AffiliateProfile = Depends(current_affiliate),
+    db: Session = Depends(get_session),
+) -> dict:
+    """What has been asked of her and what has been recorded, month by month.
+
+    UI24. **A read and nothing else** — there is no companion `PUT` and there
+    is not going to be one. What a model produced is recorded by whoever
+    counted it (§6.5), and on a guaranteed minimum the recording decides money;
+    a route that let the person being measured edit the measurement would be
+    the one hole worth having none of.
+
+    That is also why the writable-routes guard in `tests/test_portal_api.py`
+    lists every method a model can call: adding a write here fails the suite
+    until somebody writes down why.
+    """
+    return my_targets(db, affiliate)

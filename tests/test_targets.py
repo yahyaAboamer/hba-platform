@@ -651,3 +651,100 @@ def test_an_outcome_is_refused_once_the_month_is_approved(db, _go_live):
 
     with pytest.raises(ValueError, match="Reopen the month first"):
         record_outcome(db, affiliate, BEFORE, outcome="met")
+
+
+# -- UI24: her own history, and what it costs to draw -------------------------
+
+
+def test_a_targets_history_costs_the_same_number_of_queries_however_long_it_is(
+    db, monkeypatch
+):
+    """The guard against the obvious implementation.
+
+    `my_targets` walks a year of months. Asking the database for each month's
+    target inside that loop reads perfectly well and is twelve queries in the
+    first year and twenty-four in the second - invisible on a seeded database
+    and growing with the business, which is the shape that got the Products
+    screen (03D).
+
+    Counts statements rather than timing anything: a timing test on a laptop
+    proves nothing.
+    """
+    from sqlalchemy import event
+
+    from app.services.portal import my_targets
+
+    monkeypatch.setattr(
+        "app.services.portal.working_month", lambda: "2026-12", raising=True
+    )
+
+    affiliate = _affiliate(db)
+    affiliate.collaboration_start_month = "2026-01"
+    set_terms(
+        db,
+        affiliate,
+        start_month="2026-01",
+        compensation_type="base_guarantee",
+        commission_rate_bp=1000,
+        base_amount_piastres=800_000,
+    )
+    for index in range(1, 13):
+        _target(db, affiliate, month=f"2026-{index:02d}")
+    db.flush()
+
+    seen: list[str] = []
+
+    def count(conn, cursor, statement, *rest):
+        if statement.lstrip().upper().startswith("SELECT"):
+            seen.append(statement)
+
+    event.listen(db.get_bind(), "before_cursor_execute", count)
+    try:
+        body = my_targets(db, affiliate)
+    finally:
+        event.remove(db.get_bind(), "before_cursor_execute", count)
+
+    assert len(body["months"]) == 12
+    # One for the months she can see, one for her targets, one for her
+    # arrangements. Twelve months must not cost fifteen queries.
+    assert len(seen) <= 5, "\n".join(seen)
+
+
+def test_an_open_ended_guarantee_does_not_reach_past_the_months_she_can_see(
+    db, monkeypatch
+):
+    """The loop that decides which months are about money walks from the start
+    of an arrangement to its end, and an arrangement with no end has to stop
+    somewhere. It stops at the last month she can look at.
+
+    Not a tidiness point: a period ending in 2030 would otherwise walk forty
+    months to decide nothing, and every one of them would be a month she cannot
+    open.
+    """
+    from app.services.portal import my_targets
+
+    monkeypatch.setattr(
+        "app.services.portal.working_month", lambda: "2026-04", raising=True
+    )
+
+    affiliate = _affiliate(db)
+    affiliate.collaboration_start_month = "2026-01"
+    set_terms(
+        db,
+        affiliate,
+        start_month="2026-01",
+        compensation_type="base_guarantee",
+        commission_rate_bp=1000,
+        base_amount_piastres=800_000,
+    )
+    db.flush()
+
+    months = my_targets(db, affiliate)["months"]
+
+    assert [row["month"] for row in months] == [
+        "2026-04",
+        "2026-03",
+        "2026-02",
+        "2026-01",
+    ]
+    assert all(row["determines_pay"] for row in months)

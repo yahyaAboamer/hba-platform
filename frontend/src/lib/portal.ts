@@ -11,6 +11,42 @@
  */
 
 /** A line of the breakdown. The lines add up to the total; the server ensures it. */
+/**
+ * What was asked of a model in one month, and what was recorded against it.
+ *
+ * One definition, because two screens read it — the month card and the
+ * Targets tab — and `TargetProgress` draws both from these fields. A second
+ * copy would eventually disagree about a zero or about a month before the
+ * platform, and those are the two the rules are subtle about.
+ */
+export type MonthTargets = {
+  /**
+   * All four are `null` on a month from before the platform (ADR 0036),
+   * where the old dashboard kept whether the target was met and never what
+   * was counted to decide it. `numbers_kept` says which kind this is.
+   */
+  required_videos: number | null;
+  required_stories: number | null;
+  actual_videos: number | null;
+  actual_stories: number | null;
+  /**
+   * `false` on a month before the platform; `null` where nothing was ever set
+   * for the month, which the history list can show and a single month cannot
+   * (the month payload is `null` outright in that case).
+   */
+  numbers_kept: boolean | null;
+  /** §15. `null` means nobody has recorded what they produced. */
+  achieved: boolean | null;
+  verified: boolean;
+  /**
+   * §15, and the clause that matters: targets decide money only on a
+   * guaranteed minimum. On commission they are informational, and a model
+   * who reads a missed target as money gone has been told something untrue.
+   */
+  determines_pay: boolean;
+  recorded_at: string | null;
+};
+
 export type MakeupLine = {
   label: string;
   detail: string | null;
@@ -155,28 +191,7 @@ export type MyEarnings = {
    * What was asked of them and what was recorded. `null` when nothing was ever
    * set for the month - a target that does not exist is not one they failed.
    */
-  targets: {
-    /**
-     * All four are `null` on a month from before the platform (ADR 0036),
-     * where the old dashboard kept whether the target was met and never what
-     * was counted to decide it. `numbers_kept` says which kind this is.
-     */
-    required_videos: number | null;
-    required_stories: number | null;
-    actual_videos: number | null;
-    actual_stories: number | null;
-    numbers_kept: boolean;
-    /** §15. `null` means nobody has recorded what they produced. */
-    achieved: boolean | null;
-    verified: boolean;
-    /**
-     * §15, and the clause that matters: targets decide money only on a
-     * guaranteed minimum. On commission they are informational, and a model
-     * who reads a missed target as money gone has been told something untrue.
-     */
-    determines_pay: boolean;
-    recorded_at: string | null;
-  } | null;
+  targets: MonthTargets | null;
   /** Translated, and carrying whose move it is. Today always HBA's. */
   waiting_on: { who: string; text: string }[];
   note: string | null;

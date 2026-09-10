@@ -3,7 +3,9 @@ import { Link } from "react-router-dom";
 
 import { usePortal } from "../components/AffiliateLayout";
 import { Money } from "../components/Money";
+import { TargetBars } from "../components/TargetProgress";
 import { api } from "../lib/api";
+import { describeTargetPay, targetChip } from "../lib/targets";
 import { formatDay, formatEgp, formatMonth } from "../lib/money";
 import type { MyEarnings } from "../lib/portal";
 import "./MyMonth.css";
@@ -390,44 +392,7 @@ export function MyMonth() {
               </span>
             )}
           </div>
-          {/*
-           * ADR 0036. A month from before the platform has an outcome and no
-           * counts, because the old dashboard never kept them. Two bars drawn
-           * against a missing requirement would read as *nothing was asked of
-           * you and you did nothing*, which is the opposite of what the chip
-           * above says — so the bars give way to the sentence.
-           *
-           * The one place a month before go-live reads differently from a new
-           * one, and it reads differently because it is different.
-           */}
-          {body.targets.numbers_kept ? (
-            <div className="targets__list">
-              <TargetRow
-                label="Videos"
-                required={body.targets.required_videos ?? 0}
-                actual={body.targets.actual_videos}
-              />
-              <TargetRow
-                label="Stories"
-                required={body.targets.required_stories ?? 0}
-                actual={body.targets.actual_stories}
-              />
-            </div>
-          ) : (
-            <div className="targets__list">
-              <div className="targets__row">
-                <div className="targets__top">
-                  <span>Videos and stories</span>
-                  <span className="code targets__figures">—</span>
-                </div>
-              </div>
-              <p className="targets__unkept">
-                The counts for this month were not kept, so there are none to
-                show. Whether you met the target was recorded, and that is what
-                decided your pay.
-              </p>
-            </div>
-          )}
+          <TargetBars target={body.targets} />
           {/*
            * Only where it decides money. A commission or salary model already
            * knows targets do not change their pay, and being told so every month
@@ -435,7 +400,7 @@ export function MyMonth() {
            * it is the sentence the whole card exists for.
            */}
           {body.targets.determines_pay && (
-            <p className="targets__note">{describeTargets(body.targets)}</p>
+            <p className="targets__note">{describeTargetPay(body.targets)}</p>
           )}
         </section>
       )}
@@ -497,30 +462,6 @@ export function MyMonth() {
 }
 
 /**
- * The card's own state, at a glance.
- *
- * One chip at most, and only where the numbers above it do not already say it.
- * A model who met their targets sees so from the figures; what they cannot see is
- * whether anybody has confirmed them.
- */
-function targetChip(targets: {
-  achieved: boolean | null;
-  verified: boolean;
-  determines_pay: boolean;
-}): { text: string; className: string } | null {
-  if (targets.achieved === null) {
-    return { text: "Not recorded yet", className: "chip chip--quiet" };
-  }
-  if (!targets.achieved) {
-    return { text: "Short this month", className: "chip chip--quiet" };
-  }
-  if (targets.determines_pay && !targets.verified) {
-    return { text: "Waiting to be confirmed", className: "chip" };
-  }
-  return { text: "Met", className: "chip chip--ok" };
-}
-
-/**
  * Why the guaranteed minimum is not in this month's figure.
  *
  * Three answers, because §15 has three states and they mean different things
@@ -544,83 +485,4 @@ function describeGuarantee(guarantee: {
     return "You met your targets, so it applies as soon as HBA confirms the numbers.";
   }
   return "Your commission came to more than it this month, so you are paid the larger of the two.";
-}
-
-/**
- * One target, as a count **and** a bar.
- *
- * "4 of 6" answers *how many*; the bar answers *how close*, and the second is
- * the question somebody actually has. Grow had the bars and Month did not,
- * which left the same two numbers looking like two different facts on two
- * screens.
- *
- * `actual` is `null` when nobody has recorded the month yet — a third state,
- * not a zero. An empty bar under "0 of 6" is an accusation; "— of 6" is the
- * truth.
- */
-function TargetRow({
-  label,
-  required,
-  actual,
-}: {
-  label: string;
-  required: number;
-  actual: number | null;
-}) {
-  // `required` arrives already defaulted. It is null only on a month before
-  // the platform, and that month never reaches this component (ADR 0036).
-  // Capped at the full bar. Somebody who posted nine of six videos has done
-  // more than was asked, not 150% of a bar.
-  const done = actual === null ? 0 : Math.min(actual / Math.max(required, 1), 1);
-
-  return (
-    <div className="targets__row">
-      <div className="targets__top">
-        <span>{label}</span>
-        <span className="code targets__figures">
-          {actual === null ? "—" : actual} of {required}
-        </span>
-      </div>
-      <div className="targets__track">
-        <span className="targets__fill" style={{ width: `${done * 100}%` }} />
-      </div>
-    </div>
-  );
-}
-
-/**
- * What their targets mean for their pay this month.
- *
- * §15 splits on one thing: a target decides money **only** on a guaranteed
- * minimum. On commission or salary-plus-commission it is a record, and a model
- * who reads a missed target as money gone has been told something untrue by a
- * screen that could not tell the two apart.
- *
- * Where it does decide money, the missed case is the one to be careful with.
- * It costs them the guarantee and nothing else - they are paid their commission,
- * promptly, and the month closes (§11.3). Any wording that makes that sound
- * like a penalty is wrong about the rule as well as unkind.
- *
- * **Only called where `determines_pay` is true**, which is why there is no
- * branch for the other arrangements. There used to be one, and it read *"what
- * you are paid is your commission either way"* - unreachable, but wrong twice
- * over if anybody ever reached it: a `fixed_plus_commission` model is paid
- * their salary *and* their commission, so the sentence would have quietly
- * dropped half their money. A branch that can only ever be wrong is better
- * deleted than corrected.
- */
-function describeTargets(targets: {
-  achieved: boolean | null;
-  verified: boolean;
-}): string {
-  if (targets.achieved === null) {
-    return "Nobody has recorded what you posted yet, so it is not settled whether your guaranteed minimum applies.";
-  }
-  if (!targets.achieved) {
-    return "Short this month, so your guaranteed minimum does not apply and you are paid your commission.";
-  }
-  if (!targets.verified) {
-    return "Met. Your guaranteed minimum applies as soon as HBA confirms the numbers.";
-  }
-  return "Met and confirmed, so your guaranteed minimum applies.";
 }

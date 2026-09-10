@@ -1,0 +1,83 @@
+/* Her targets. The month she is in, then every month before it. */
+
+.affiliate .mytargets {
+  padding-bottom: var(--tab-clearance);
+}
+
+/* The current month keeps the panel treatment the month card uses, so the two
+   screens read as one place rather than two designs for one subject. */
+.affiliate .mytargets__now {
+  margin-bottom: var(--space-6);
+}
+
+/* Not "0 of 0". Nothing has been asked, which is a statement about HBA's
+   month and not about hers (AC30). */
+.affiliate .mytargets__none {
+  margin: 0;
+  padding: var(--space-4);
+  color: var(--quiet);
+}
+
+/* No colour, deliberately, and the same reasoning as `.targets__note`: §15
+   makes a target informational on every arrangement but a guaranteed minimum,
+   and a red shortfall on a commission model says she has lost money she never
+   had. The sentence carries it. */
+.affiliate .mytargets__pay {
+  margin: 0;
+  padding: 0 var(--space-4) var(--space-4);
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}
+
+.affiliate .mytargets__block {
+  margin-bottom: var(--space-6);
+}
+
+.affiliate .mytargets__title {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.affiliate .mytargets__history {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A row, not a card. Twelve months of history is a list to run an eye down,
+   and twelve cards is a scroll. */
+.affiliate .mytargets__month {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--space-1) var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--rule);
+  font-size: var(--text-sm);
+}
+
+.affiliate .mytargets__label {
+  font-weight: 600;
+}
+
+/* The outcome sits under the month and the counts under nothing, so the two
+   columns line up down the list: what happened on the left, how much on the
+   right. On a 375px phone that is the only arrangement that does not wrap. */
+.affiliate .mytargets__outcome {
+  grid-column: 1;
+  color: var(--quiet);
+}
+
+.affiliate .mytargets__counts {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  text-align: right;
+  color: var(--quiet);
+}
+
+.affiliate .mytargets__foot {
+  margin: var(--space-4) 0 0;
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}

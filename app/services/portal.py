@@ -54,6 +54,7 @@ from sqlalchemy.orm import Session
 from app.core.businesstime import (
     business_date,
     business_month,
+    month_add,
     parse_month,
     utcnow,
 )
@@ -73,10 +74,11 @@ from app.models.payments import (
     PaymentTransaction,
     PayrollAdjustment,
 )
+from app.models.targets import MonthlyTarget
 from app.models.payroll import CalculationState, PayrollMonth, PayrollSnapshot
 from app.services.commission.base import commission_base
 from app.services.commission.calculate import MonthCalculation
-from app.services.compensation import terms_for
+from app.services.compensation import all_terms, terms_for
 from app.services.payments import adjustments_for, balance_for, payments_for
 from app.services.payments_state import SettlementState
 from app.services.payroll import (
@@ -1289,3 +1291,93 @@ def _month_words(month: str) -> str:
         return f"{names[int(index) - 1]} {year}"
     except (ValueError, IndexError):
         return month
+
+
+def my_targets(db: Session, affiliate: AffiliateProfile) -> dict:
+    """What has been asked of her, month by month, and how each one ended.
+
+    UI24, and **read-only in the strongest sense**: there is no route that lets
+    a model change any of this, not a disabled control and not a permission
+    check. Recording is somebody else's job (§6.5), and the absence of a write
+    path is what enforces it rather than a rule somebody has to remember.
+
+    ## Three answers, never two
+
+    Every month is one of *nothing recorded*, *missed*, or *met* - and the
+    first is not the second. A model shown "missed" for a month nobody has
+    counted yet has been told something untrue about her own work, and she has
+    been told it about the month that is blocking her pay (§11.3).
+
+    ## A month from before the platform says so
+
+    ADR 0036: the old dashboard kept whether a target was met and not what was
+    counted to decide it. Those months carry an outcome and no numbers, and the
+    screen says the numbers were not kept rather than drawing a bar against a
+    figure nobody ever set (H02). Filling them in to match the outcome would be
+    inventing evidence for something that decides money.
+
+    ## Which months are about money
+
+    §15: targets are informational on commission and on salary-plus-commission,
+    and decide pay only on a guaranteed minimum. A model on commission who sees
+    a target she missed has not lost anything, and a screen that cannot tell
+    the two apart teaches her to read every shortfall as money gone. So
+    `determines_pay` is computed per month from the arrangement she was on
+    *then*, not from the one she is on now - she may have moved between them.
+
+    Two queries however long her history is, not two per month.
+    """
+    months = months_for(db, affiliate)
+    if not months:
+        return {"months": []}
+
+    targets = {
+        row.month: row
+        for row in db.scalars(
+            select(MonthlyTarget).where(MonthlyTarget.affiliate_id == affiliate.id)
+        )
+    }
+
+    # `months` is newest first, so `months[0]` is the last month she can see.
+    # An open-ended arrangement runs to there and no further, and a recorded
+    # end month is clamped to it as well: a period ending next year must not
+    # walk this loop through months that have not happened.
+    horizon = months[0]
+    deciding: set[str] = set()
+    for period in all_terms(db, affiliate):
+        if period.compensation_type != CompensationType.BASE_GUARANTEE:
+            continue
+        cursor = period.start_month
+        last = min(period.end_month or horizon, horizon)
+        while cursor <= last:
+            deciding.add(cursor)
+            cursor = month_add(cursor, 1)
+
+    rows = []
+    for month in months:
+        target = targets.get(month)
+        rows.append(
+            {
+                "month": month,
+                "determines_pay": month in deciding,
+                # `None` throughout for a month nobody has set anything for.
+                # No target and a target of zero are different facts, and the
+                # difference is the one that fails a guaranteed minimum.
+                "required_videos": target.required_videos if target else None,
+                "required_stories": target.required_stories if target else None,
+                "actual_videos": target.actual_videos if target else None,
+                "actual_stories": target.actual_stories if target else None,
+                # Three-valued for the same reason `achieved` is: *nothing was
+                # asked of you* is not *the numbers were lost*.
+                "numbers_kept": None if target is None else not target.is_backfilled,
+                "achieved": target.is_achieved if target else None,
+                "verified": bool(target and target.is_verified),
+                "recorded_at": (
+                    target.recorded_at.isoformat()
+                    if target and target.recorded_at
+                    else None
+                ),
+            }
+        )
+
+    return {"months": rows}

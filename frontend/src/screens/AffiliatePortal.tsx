@@ -17,6 +17,7 @@ import { MyMonth } from "./MyMonth";
 import { MyOrders } from "./MyOrders";
 import { MyPayments } from "./MyPayments";
 import { MyPolicy } from "./MyPolicy";
+import { MyTargets } from "./MyTargets";
 import { MyYear } from "./MyYear";
 import "./Apply.css";
 import "./AffiliateHome.css";
@@ -178,22 +179,13 @@ export function AffiliatePortal({ session }: { session: Session }) {
         <Route element={<AffiliateLayout context={context} header={header} />}>
           <Route index element={<MyMonth />} />
           <Route path="orders" element={<MyOrders />} />
+          <Route path="wardrobe" element={<MyWardrobe />} />
+          <Route path="targets" element={<MyTargets />} />
           {/*
-           * The three the approved tab bar has and the platform does not.
-           * They say so rather than rendering an empty state - §S06, and
+           * The last one the approved tab bar has and the platform does not.
+           * It says so rather than rendering an empty state - §S06, and
            * `NotBuiltYet` explains why the difference matters.
            */}
-          <Route path="wardrobe" element={<MyWardrobe />} />
-          <Route
-            path="targets"
-            element={
-              <NotBuiltYet
-                title="Targets"
-                phase="Phase 04B"
-                what="What you have been asked for this month, and what has been recorded so far."
-              />
-            }
-          />
           <Route
             path="ranking"
             element={
