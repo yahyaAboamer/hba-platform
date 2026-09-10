@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { Money } from "../components/Money";
+import { Corrections } from "../components/Corrections";
 import { FinancialRulesPreview } from "../components/FinancialRulesPreview";
 import { api, can } from "../lib/api";
 import { PAYOUT_FIELD_LABEL } from "../lib/payouts";
@@ -801,6 +802,12 @@ export function AffiliateDetail({ session }: { session: Session }) {
         </section>
 
         )}
+
+        {/*
+          * Above the rules preview, because this one asks for a decision and
+          * that one only tells you something.
+          */}
+        {id && <Corrections key={`fix-${id}`} affiliateId={id} session={session} />}
 
         {id && (
           <FinancialRulesPreview

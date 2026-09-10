@@ -23,30 +23,48 @@ file's summary; detailed evidence lives in the latest batch report.
 | Phase | State |
 |---|---|
 | 00 Baseline · 01 UI foundations · 02 Models and setup · 03 Products and wardrobe · **04 Targets** | **Complete** |
-| 05 Financial rules | **05A implemented locally; review pending. 05B next after acceptance** |
-| 06 Payments · 07 Performance screens · 08 Settings and notifications · 09 Rehearsal and release | Not started |
+| 05 Financial rules | **05A and 05B merged and deployed; 05C implemented, unmerged** |
+| **06 Payments** | **Next** |
+| 07 Performance screens · 08 Settings and notifications · 09 Rehearsal and release | Not started |
 
-**1769 backend tests, 233 frontend.** Migration head `a2f47b8e1c53`; Phases 04
-and 05A added none. Final backend run: 1769 passed in 383.46s, with one
-non-failing local pytest cache warning. Explicit TypeScript no-emit check and
-frontend build pass. Work is committed on `phase05a/pending-inclusive-earnings`,
-based on verified `8ad14a6cd7453bc8140d52b6f5c64faf91927b67`: untouched original
-batch `5320fd6`, code fix-up `8a20ca5`, then this documentation handoff.
-The owner authorized a feature-branch push only. Nothing was merged or deployed;
-05B was not started. Final branch SHA is the documentation handoff commit.
+**1797+ backend tests, 237 frontend.** Migration head `a2f47b8e1c53`; **no
+phase since 03 has added a migration.**
+
+**`main` and `production` are both at `9cbfcdb`.** The whole redesign through
+05B is live in both environments, promoted on 10 September on the owner's
+explicit instruction — production took 39 commits and 5 migrations in a single
+deploy, and both report healthy. **None of Phase 05 has been seen by anybody**:
+no rendered review of the financial preview, the approve screen, the retired
+reopen page or the corrections panel.
+
+**05C is implemented and unmerged** on `phase05c/late-failure-corrections`.
 
 ---
 
 ## Start here
 
 1. Read `docs/redesign/STATUS.md`.
-2. Read `docs/redesign/reports/05A-pending-inclusive-earnings.md`, including its
-   fix-up evidence. The original batch is checkpoint `5320fd6`, with reviewed
-   corrections in follow-up commits. Rendered preview acceptance remains owed.
-   Review the committed branch, not an uncommitted batch.
-3. After 05A acceptance, read `docs/redesign/prompts/05_FINANCIAL_RULES.md` and
-   run **05B only — Immutable per-model approval**. Do not enable live policy
-   or implement 05C just because the pending-inclusive preview exists.
+2. Read `docs/redesign/reports/05C-late-failure-corrections.md` — the batch that
+   just closed, and the one still awaiting review.
+3. Then `docs/redesign/prompts/06_PAYMENTS.md`, and run **06 only**.
+
+## Three rules that arrived in Phase 05 and are easy to break
+
+**An agreed month is never unmade.** Reopening is retired (05B); what changes
+after an agreement is a correction recorded against it (05C). Wanting to reopen
+a month to fix it is exactly the thing that was removed on purpose.
+
+**An approval agrees the figure that was shown.** The preview hands out a source
+fingerprint and the commit hands it back; a commit carrying none is refused.
+Every test that approves over HTTP previews first — copy that shape rather than
+removing the guard.
+
+**D04: a carried correction takes a whole month, guaranteed minimum included.**
+A model can be sent nothing in a month she met her targets in. The platform
+recommended protecting the floor and was overruled;
+`decisions/D04-recovery-comes-before-the-guarantee.md` holds the answer and the
+reasoning it overrode, and the screens are obliged to explain it to her — the
+sentence is written in `_credited_from` in `app/services/portal.py`.
 
 **Do not read the whole project.** `docs/limits.md` alone is 2,500 lines and
 would spend the context that starting a fresh session was meant to save. Read
@@ -124,6 +142,42 @@ with a record under `docs/redesign/decisions/`. None of the open ones blocks
 ---
 
 ## Things this project got wrong, so you do not repeat them
+
+- **pytest has no configuration that names its database.** Unset,
+  `DATABASE_URL` falls through to `app/config.py`'s default — the **dev**
+  database — and `conftest.py` truncates every table after each committing
+  test. A whole session ran that way on 10 September and emptied the dev data;
+  every test passed throughout, because the suite builds its own rows. Always:
+
+  ```
+  DATABASE_URL='postgresql+psycopg://hba:hba@127.0.0.1:5433/hba_platform_test'     .venv/Scripts/python.exe -m pytest -q --color=no
+  ```
+
+- **A killed pytest run leaves an idle database connection holding locks**, and
+  every later `TRUNCATE` deadlocks against it. The failures appear in unrelated
+  files as "An account already exists" and unique violations, and read exactly
+  like a regression in what you just changed. Terminate connections to
+  `hba_platform_test`, empty it, then re-run one file alone before believing
+  anything.
+- **This machine may not have memory for the full suite.** Three runs were
+  killed on 10 September with 0.56 GB free of 7.9 GB. Check free memory before
+  concluding a run "failed"; restarting Docker Desktop reclaims most of it.
+- **A killed pytest run leaves an idle database connection holding locks**,
+  and every later `TRUNCATE` deadlocks against it. The failures surface in
+  unrelated files as "An account already exists" and unique violations, and
+  read exactly like a regression in what you just changed. Terminate
+  connections to `hba_platform_test` (`pg_terminate_backend`), empty it, then
+  re-run one file alone before believing anything.
+- **This machine may not have memory for the full suite.** Three runs were
+  killed on 10 September with 0.56 GB free of 7.9 GB. Check free memory before
+  concluding a run failed; restarting Docker Desktop reclaims most of it.
+- **One pytest process at a time**, and never one while another runs in the
+  background. Two against the same database deadlock and leak committed rows
+  into each other, and the failures look exactly like a regression in whatever
+  you just changed. Same day; it cost an hour.
+- **Check whether a helper already exists before writing one.** Two were
+  duplicated in Phase 05 — a per-order commission and a month-name formatter —
+  and both were dead code shadowed by the original.
 
 - **Do not overstate browser evidence.** In 05A the DOM proxy reported empty
   fields while a sign-in screenshot showed typed values. `/api/auth/login`,

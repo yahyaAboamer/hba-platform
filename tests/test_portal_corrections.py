@@ -179,6 +179,12 @@ def test_a_month_that_fell_is_reported_the_same_way(db):
 def test_a_month_carrying_a_credit_names_the_month_it_came_from(db):
     """Without this, July simply contains more money than its own orders
     explain, which reads as an error in the platform.
+
+    **The sentence arrived in 05C**, and it is the part that matters now. D04
+    lets a carried correction take a whole month, so July can come to nothing -
+    and the wording used to say *includes E£600 from May*, which reads as money
+    added rather than an advance being repaid. It is written by the service so
+    a test can hold it to account.
     """
     affiliate = _affiliate(db)
     _order(db, affiliate, "1", 2_000_000, MAY)
@@ -204,7 +210,12 @@ def test_a_month_carrying_a_credit_names_the_month_it_came_from(db):
     db.flush()
 
     credits = my_month(db, affiliate, JULY)["credited_from"]
-    assert credits == [{"month": MAY, "piastres": 60_000}]
+
+    assert [(row["month"], row["piastres"]) for row in credits] == [(MAY, 60_000)]
+    said = credits[0]["text"]
+    assert "May 2026" in said
+    assert "E£600.00" in said
+    assert "includes" not in said.lower()
 
 
 def test_the_month_the_credit_came_from_does_not_claim_to_carry_it(db):

@@ -212,7 +212,16 @@ export type MyEarnings = {
     at: string | null;
   } | null;
   /** Money landing on this month that was earned in an earlier one. */
-  credited_from: { month: string; piastres: number }[];
+  /**
+   * An earlier month's overpayment being recovered out of this one.
+   *
+   * `text` is written by the server (05C) and rendered as it arrives. Under
+   * D04 a carried overpayment can consume a whole month, so this sentence is
+   * what stands between a model opening a month worth nothing and a support
+   * message - and a sentence the browser assembles is one no backend test can
+   * hold to account.
+   */
+  credited_from: { month: string; piastres: number; text: string }[];
   orders_detail: MyOrder[];
 };
 

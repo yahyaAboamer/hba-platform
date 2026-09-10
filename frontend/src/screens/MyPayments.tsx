@@ -164,8 +164,14 @@ export function MyPayments() {
               )}
               {row.credited_piastres > 0 && (
                 <p className="settle__reconcile">
-                  Includes <Money piastres={row.credited_piastres} /> carried in
-                  from an earlier month.
+                  {/*
+                    * **Not "includes"** (05C). A credit is an earlier month's
+                    * overpayment being recovered, so it makes this month pay
+                    * *less* - and under D04 it can take all of it. The old
+                    * wording read as money added, which is the opposite.
+                    */}
+                  <Money piastres={row.credited_piastres} /> of this month
+                  repaid an earlier one you had already been sent.
                 </p>
               )}
             </li>

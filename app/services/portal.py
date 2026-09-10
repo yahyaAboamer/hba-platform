@@ -748,12 +748,25 @@ def _recalculated(db: Session, payroll_month: PayrollMonth | None) -> dict | Non
 def _credited_from(
     db: Session, affiliate: AffiliateProfile, payroll_month: PayrollMonth | None
 ) -> list[dict]:
-    """Money landing on this month that was earned in another one.
+    """An earlier month's overpayment being recovered out of this one.
 
-    An overpayment found when an earlier month is corrected is carried onto a
-    later one rather than clawed back. Without this the later month simply
-    contains more money than its own orders explain, which reads as an error in
-    the platform.
+    ## The sentence is written here, not in the browser
+
+    05C, and it matters more than it looks. **D04 (10 September 2026): a
+    carried overpayment consumes a later month's whole payable, below a
+    guaranteed minimum if it has to.** So a model can open a month she met her
+    targets in, in which she is owed nothing at all, and the only thing
+    standing between that and a support message is this sentence.
+
+    It also used to be the wrong sentence. The screen said *includes E£9,000
+    from August*, which reads as money **added** to the month - the exact
+    opposite of what is happening. She already received it; that is why nothing
+    is being sent now.
+
+    The wording lives in the service because §11.5 requires an adjustment to be
+    visible to the person it was made about - *a credit she cannot see is a
+    credit she cannot check* - and a figure the browser assembles is one no
+    test here can hold to account.
     """
     if payroll_month is None:
         return []
@@ -762,10 +775,20 @@ def _credited_from(
         {
             "month": adjustment.source_month.month,
             "piastres": adjustment.amount_piastres,
+            # Her words, and the direction stated outright. "Carried" and
+            # "credited" are the ledger's words for this and both read to a
+            # person as money arriving.
+            "text": (
+                f"{format_egp(adjustment.amount_piastres)} of this month goes "
+                f"to repay {_month_words(adjustment.source_month.month)}, "
+                "which was paid before an order from it was refused. You were "
+                "sent that money at the time, so it is not being sent again."
+            ),
         }
         for adjustment in adjustments_for(db, affiliate)
         if adjustment.destination_payroll_month_id == payroll_month.id
     ]
+
 
 
 def _placed_value(order: AttributedOrder, index: OrderIndex) -> int | None:
