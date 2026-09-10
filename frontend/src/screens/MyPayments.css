@@ -158,3 +158,28 @@
   font-size: var(--text-xs);
   text-underline-offset: 2px;
 }
+
+/* Where a transfer actually went, frozen at the moment it was paid (§6.4.4).
+   Quiet, because it is reassurance rather than news - it only becomes the
+   important line on the day she changes where her money goes and wonders
+   whether the old receipts followed. */
+.affiliate .settle__went {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-xs);
+  color: var(--quiet);
+}
+
+/* AC41. The link from what arrived to why it came to that. Stacked rather
+   than inline: a transfer can settle two months, and two links running into
+   each other on a phone is a single unreadable sentence. */
+.affiliate .settle__why {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: var(--space-2) 0 0;
+}
+
+.affiliate .settle__link {
+  font-size: var(--text-xs);
+  align-self: flex-start;
+}

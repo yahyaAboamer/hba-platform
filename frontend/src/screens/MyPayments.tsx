@@ -225,7 +225,7 @@ export function MyPayments() {
   );
 }
 
-function PaymentRow({ payment }: { payment: Payment }) {
+export function PaymentRow({ payment }: { payment: Payment }) {
   const [showing, setShowing] = useState(false);
   const [broken, setBroken] = useState(false);
 
@@ -245,6 +245,49 @@ function PaymentRow({ payment }: { payment: Payment }) {
           <span className="code settle__reference">{payment.reference}</span>
         )}
       </div>
+
+      {/*
+       * **Where it actually went, not where money goes now** (§6.4.4, AC40).
+       *
+       * The destination is masked and frozen on the transaction at the moment
+       * it was paid. The panel at the top of this screen says where her money
+       * goes *today*, and after she changes it those two are different facts —
+       * so a receipt that borrowed the current one would quietly claim an old
+       * transfer went somewhere it never went.
+       *
+       * Shown on every transfer rather than only where they differ: a receipt
+       * that names its destination sometimes is one nobody can trust the rest
+       * of the time.
+       */}
+      {payment.destination && (
+        <p className="settle__went">
+          Sent to {describeDestination(payment.destination)}
+        </p>
+      )}
+
+      {/*
+       * AC41. A transfer answers *what arrived*; the month answers *why that
+       * much*. Linking them is the difference between a receipt she can check
+       * and one she has to take on trust — and the month picker is at the top
+       * of the portal, so without this she has to remember which month a
+       * transfer was for and go and find it.
+       *
+       * One link per month the transfer settled, because a single transfer can
+       * cover two of them and "View calculation" would then be ambiguous.
+       */}
+      {payment.settles.length > 0 && (
+        <p className="settle__why">
+          {payment.settles.map((line) => (
+            <Link
+              key={line.month}
+              className="settle__link"
+              to={`/?month=${line.month}`}
+            >
+              Why {formatMonth(line.month)} came to {line.amount}
+            </Link>
+          ))}
+        </p>
+      )}
 
       {/*
        * §14 and ADR 0017. Visible proof removes an entire category of *did you
