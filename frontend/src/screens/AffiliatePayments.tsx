@@ -19,6 +19,12 @@ type Payment = {
   destination: Record<string, string | null> | null;
   allocated_piastres: number;
   unallocated_piastres: number;
+  allocations: {
+    month: string;
+    snapshot_id: number;
+    snapshot_version: number;
+    allocated_piastres: number;
+  }[];
 };
 
 type Adjustment = {
@@ -149,6 +155,19 @@ export function AffiliatePayments() {
                       </dd>
                     </div>
                   )}
+                  {payment.allocations.map((allocation) => (
+                    <div key={allocation.snapshot_id}>
+                      <dt>Applied to</dt>
+                      <dd>
+                        {formatMonth(allocation.month)} · statement v
+                        {allocation.snapshot_version} ·{" "}
+                        <Money
+                          piastres={allocation.allocated_piastres}
+                          kind="agreed"
+                        />
+                      </dd>
+                    </div>
+                  ))}
                   {payment.unallocated_piastres > 0 && (
                     <div>
                       <dt>Not yet against a month</dt>

@@ -45,8 +45,12 @@ export function PayrollApprove() {
   const { month = "" } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const chosen = (location.state as { affiliate_ids?: number[] } | null)
-    ?.affiliate_ids;
+  const routeState = location.state as {
+    affiliate_ids?: number[];
+    return_to?: string;
+  } | null;
+  const chosen = routeState?.affiliate_ids;
+  const returnTo = routeState?.return_to === "/payments" ? "/payments" : "/payroll";
 
   const [preview, setPreview] = useState<ApprovalResult | null>(null);
   const [done, setDone] = useState<ApprovalResult | null>(null);
@@ -107,7 +111,10 @@ export function PayrollApprove() {
   if (!chosen?.length) {
     return (
       <>
-        <Head month={month} />
+        <Head
+          month={month}
+          returnTo={returnTo}
+        />
         <p className="empty">
           Nobody was chosen. Pick who to approve on the{" "}
           <Link to="/payroll">payroll screen</Link> first.
@@ -121,7 +128,10 @@ export function PayrollApprove() {
     const refused = done.results.filter((row) => !row.approved);
     return (
       <>
-        <Head month={month} />
+        <Head
+          month={month}
+          returnTo={returnTo}
+        />
         <p className="notice notice--settled payroll__note">
           {formatMonth(month)} is agreed for{" "}
           {approved.length === 1 ? "one model" : `${approved.length} models`}.{" "}
@@ -195,8 +205,11 @@ export function PayrollApprove() {
         )}
 
         <div className="payroll__actions">
-          <Link className="button button--primary" to="/payroll">
-            Back to payroll
+          <Link
+            className="button button--primary"
+            to={returnTo}
+          >
+            {returnTo === "/payments" ? "Continue to payments" : "Back to payroll"}
           </Link>
         </div>
       </>
@@ -212,7 +225,10 @@ export function PayrollApprove() {
 
   return (
     <>
-      <Head month={month} />
+      <Head
+        month={month}
+        returnTo={returnTo}
+      />
 
       {error && (
         <p className="notice notice--refused" role="alert">
@@ -230,9 +246,10 @@ export function PayrollApprove() {
               {willApprove.length === 1
                 ? `One model’s ${formatMonth(month)} is agreed at the figure below.`
                 : `${willApprove.length} models’ ${formatMonth(month)} is agreed at the figures below.`}{" "}
-              From that moment the amount is fixed — later orders land in the
-              next month instead. Reopening the month undoes it and keeps both
-              versions.
+              From that moment the amount is fixed. If its source facts later
+              change, the agreement remains and Payments shows the correction
+              that needs a separate decision. Agreeing is not recording a
+              transfer.
             </p>
             <div className="approve__total">
               <Money piastres={total} tone="owed" className="payroll__total" />
@@ -290,7 +307,7 @@ export function PayrollApprove() {
             <button
               type="button"
               className="button"
-              onClick={() => navigate("/payroll")}
+              onClick={() => navigate(returnTo)}
               disabled={working}
             >
               Cancel
@@ -302,12 +319,15 @@ export function PayrollApprove() {
   );
 }
 
-function Head({ month }: { month: string }) {
+function Head({ month, returnTo }: { month: string; returnTo: string }) {
   return (
     <div className="page__head">
       <div className="page__title">
-        <Link to="/payroll" className="detail__back">
-          Payroll
+        <Link
+          to={returnTo}
+          className="detail__back"
+        >
+          {returnTo === "/payments" ? "Payments" : "Payroll"}
         </Link>
         <h1>Approve {formatMonth(month)}</h1>
       </div>
