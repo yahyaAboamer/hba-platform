@@ -511,6 +511,7 @@ def adjust(
     amount_piastres: int,
     reason: str,
     destination_month: str | None = None,
+    open_difference_piastres: int | None = None,
     actor_id: int | None = None,
     actor_email: str | None = None,
 ) -> PayrollAdjustment:
@@ -599,7 +600,28 @@ def adjust(
     #
     # `settling` is what is left after every adjustment already recorded, so
     # two half-settlements are fine and a second full one is not.
-    open_difference = balance_for(db, affiliate, source_month)["balance_piastres"]
+    # **05C supplies its own difference, and here is why it has to.**
+    #
+    # The cap below reads the month's outstanding *balance*, which is how a
+    # reopened month announced an overpayment: re-approval dropped the
+    # obligation, the payments stayed, and the balance went negative by exactly
+    # the amount to settle.
+    #
+    # 05B retired reopening, so an agreed month's obligation never drops again
+    # and its balance never goes negative. The difference is real and lives
+    # somewhere else - between the frozen snapshot and a fresh calculation -
+    # and `corrections.resolve` is the one caller that has computed it.
+    #
+    # **It is not folded into `balance_for` instead**, deliberately. A balance
+    # that went negative the moment a parcel was refused would present a debt
+    # against a model before anybody had decided to recover it, on the screen
+    # she reads (§11.1). A difference becomes money owed when a person says so,
+    # which is the act this function records.
+    open_difference = (
+        -abs(open_difference_piastres)
+        if open_difference_piastres is not None
+        else balance_for(db, affiliate, source_month)["balance_piastres"]
+    )
     settling = abs(open_difference)
     if settling == 0:
         raise ValueError(

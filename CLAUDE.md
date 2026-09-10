@@ -89,12 +89,33 @@ payroll without touching a maintainer screen.
   the background. Two against the same database deadlock and leak committed
   rows into each other, and the failures look exactly like a real regression
   in whatever you just changed. Also on 10 September, and it cost an hour.
-- Backend: `.venv/Scripts/python.exe -m pytest -q` — **1780 passing**, and no
+- Backend: `.venv/Scripts/python.exe -m pytest -q` — **1797+ passing**, and no
   change merges below that. It takes 5–15 minutes; run it in the background.
+- **A killed pytest run leaves a connection behind that deadlocks the next
+  one.** Teardown is skipped, an idle backend keeps holding locks, and every
+  later `TRUNCATE` deadlocks — producing "An account already exists" and
+  unique-violation failures across unrelated files that read exactly like a
+  regression in whatever you just changed. Clear it before believing anything:
+
+  ```
+  select pg_terminate_backend(pid) from pg_stat_activity
+  where datname = 'hba_platform_test' and pid <> pg_backend_pid();
+  ```
+
+  Then empty the database and re-run the file alone. Happened 10 September and
+  cost the best part of an hour.
 - Frontend: `cd frontend && npm test` (233) and `npm run build`.
 - Redesign 05A is a **read-only rules preview**. The normal calculation and
-  approval remain delivered-only until the later financial batches and D01;
-  do not mistake the preview's entitlement for a transfer instruction.
+  approval remain delivered-only until D01; do not mistake the preview's
+  entitlement for a transfer instruction.
+- **An agreed month is never unmade** (05B). Reopening is retired; what changes
+  after an agreement is recorded against it as a correction (05C). An approval
+  agrees the figure the preview showed, and a commit that cannot say what that
+  was is refused.
+- **A carried correction takes a whole month, guaranteed minimum included**
+  (D04, 10 September 2026). A model can be sent nothing in a month she met her
+  targets in, so the screens explain it - see `_credited_from` in
+  `app/services/portal.py`, where the sentence is written.
 - The suite is the ratchet. `test_reachability.py` fails when a route has no
   way in from the interface; `accent-isolation.test.ts` fails on a hard-coded
   accent; the writable-routes guard fails when anybody adds a route a model

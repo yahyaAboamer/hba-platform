@@ -207,8 +207,7 @@ export function MyMonth() {
              */}
             {body.credited_from.map((credit) => (
               <p className="figure__note" key={credit.month}>
-                Includes <strong>{formatEgp(credit.piastres)}</strong> from{" "}
-                {formatMonth(credit.month)}, after that month was corrected.
+                {credit.text}
               </p>
             ))}
             </div>

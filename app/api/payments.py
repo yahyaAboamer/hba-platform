@@ -368,3 +368,113 @@ def affiliate_payments(
             for row in adjustments_for(db, affiliate)
         ],
     }
+
+
+class CorrectionBody(BaseModel):
+    affiliate_id: int
+    month: str
+    #: `credit` carries it into a later month; `writeoff` absorbs it. §11.5's
+    #: two words, not a third vocabulary for the same two acts.
+    choice: str
+    reason: str = Field(min_length=1, max_length=500)
+    destination_month: str | None = None
+
+
+def _render_correction(row) -> dict:
+    return {
+        "affiliate_id": row.affiliate_id,
+        "month": row.month,
+        "outcome": row.outcome,
+        "agreed_piastres": row.agreed_piastres,
+        "agreed": format_egp(row.agreed_piastres),
+        "now_piastres": row.now_piastres,
+        "now": format_egp(row.now_piastres),
+        "paid_piastres": row.paid_piastres,
+        "paid": format_egp(row.paid_piastres),
+        "recoverable_piastres": row.recoverable_piastres,
+        "recoverable": format_egp(row.recoverable_piastres),
+        "snapshot_version": row.snapshot_version,
+        "resolved": row.resolved,
+        "resolution": row.resolution,
+    }
+
+
+@router.get("/affiliates/{affiliate_id}/corrections")
+def affiliate_corrections(
+    affiliate_id: int,
+    _actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_VIEW)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Agreed months of hers whose evidence has moved and still cost money.
+
+    05C. An agreed month is not unmade any more (05B), so this is how a
+    difference gets acted on: it is reported here, a person chooses, and the
+    choice is recorded against the month rather than replacing it.
+
+    **Read-only, and it decides nothing.** §11.5 says whether an overpayment is
+    carried or absorbed is a judgement about a person HBA knows, and that has
+    not changed.
+    """
+    from app.services.corrections import open_corrections, outstanding_piastres
+
+    affiliate = _affiliate_or_404(db, affiliate_id)
+    rows = open_corrections(db, affiliate)
+    # Handed the list rather than recomputing it: each correction runs its
+    # month's whole calculation.
+    total = outstanding_piastres(db, affiliate, rows)
+    return {
+        "affiliate_id": affiliate.id,
+        "name": affiliate.name,
+        "corrections": [_render_correction(row) for row in rows],
+        # The cumulative figure, because deciding one month at a time is how
+        # the second one gets forgotten - the failure §11.5 named about reopens
+        # and which retiring them did not remove.
+        "outstanding_piastres": total,
+        "outstanding": format_egp(total),
+    }
+
+
+@router.post("/corrections", status_code=201)
+def resolve_correction(
+    body: CorrectionBody,
+    actor: UserAccount = Depends(require_permission(Permission.PAYMENTS_RECORD)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Carry an overpayment into a later month, or absorb it.
+
+    **No amount is accepted.** It is computed from the frozen snapshot and the
+    current calculation, because a caller supplying its own could recover more
+    than was ever paid, or recover twice, and the ledger would afterwards
+    record only that somebody chose that.
+    """
+    from app.services.corrections import resolve
+
+    affiliate = _affiliate_or_404(db, body.affiliate_id)
+    _month_or_400(body.month)
+    if body.destination_month:
+        _month_or_400(body.destination_month)
+
+    try:
+        adjustment = resolve(
+            db,
+            affiliate,
+            body.month,
+            choice=body.choice,
+            reason=body.reason,
+            destination_month=body.destination_month,
+            actor_id=actor.id,
+            actor_email=actor.email,
+        )
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(400, str(exc)) from exc
+
+    db.commit()
+    return {
+        "id": adjustment.id,
+        "type": adjustment.type,
+        "amount_piastres": adjustment.amount_piastres,
+        "amount": format_egp(adjustment.amount_piastres),
+        "source_month": body.month,
+        "destination_month": body.destination_month,
+    }
