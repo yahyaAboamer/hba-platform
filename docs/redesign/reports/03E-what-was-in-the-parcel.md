@@ -99,6 +99,18 @@ nothing consumes it yet, which is the fix if it ever happens.
 No frontend change in this piece — the screens were already right and had
 nothing to show.
 
+### Not accepted yet, and blocked on data rather than code
+
+**The owner could not judge this one on 10 September.** Several models on
+staging share the phone number `01016215036`, so shipping-phone matching
+returns AMBIGUOUS and attaches nothing — which is 03B's designed behaviour, not
+a failure here. Guessing which of five models a parcel went to is worse than
+saying it cannot be told.
+
+He is separating the numbers and will then re-run the scan. **Until he does, an
+empty wardrobe on staging is expected** and says nothing about whether this
+batch works.
+
 ### Not verified against the real shop
 
 No Shopify credentials here. The jobs are driven in tests by a fake client

@@ -70,13 +70,23 @@ that rather than rediscovering them.
   under `decisions/`. **D02 is the one 05A runs into** - whole-pound payout
   rounding - and its recommendation is to preserve what the repo already does,
   so 05A proceeds and raises it rather than stopping on it.
-- **Visual acceptance for 01, 02A, 02B, 02C, 03A, 03B and 03C: done by the
-  owner on staging, 10 September**. **03D, 03E, 04A and 04B are merged and
-  unseen** - the maintainer Targets screen and the whole model Targets tab have
-  never been rendered in front of anybody, and reported correct. Browser automation still
-  cannot sign in - the typed value never reaches the field, so the form's own
-  `required` check blocks it and no request is made - so screens continue to be
-  verified over HTTP by the agent and by eye by the owner. Say so plainly in
+- **Visual acceptance done by the owner on staging, 10 September: 01, 02A,
+  02B, 02C, 03A, 03B, 03C, and now 03D, 04A and 04B** - reported as *everything
+  works perfectly*, which covers the Products grid's paging and speed, all four
+  Targets-grid behaviours (requirements independent of counts, clearing back to
+  unrecorded, the two-tab conflict refusal, the cross-month save refusal) and
+  the model's Targets tab.
+- **03E is the one still unaccepted, and it is blocked on data rather than
+  code.** Several models on staging share the phone number `01016215036`, so
+  shipping-phone matching returns AMBIGUOUS and attaches nothing - which is the
+  designed behaviour, not a failure. The owner is separating the numbers and
+  will re-run *Settings → Shopify & data → Match parcels from 2026-01-01*
+  before wardrobes can be judged. Until then, an empty wardrobe on staging is
+  expected and says nothing about 03C or 03E.
+- **Browser automation still cannot sign in** - the typed value never reaches
+  the field, so the form's own `required` check blocks it and no request is
+  made - so screens continue to be verified over HTTP by the agent and by eye
+  by the owner. Say so plainly in
   each batch report rather than implying a screen was seen.
 - **`read_products` confirmed granted** on the shop, 10 September, after the
   owner deployed a new app version. `/api/operations/shopify-scopes` is the

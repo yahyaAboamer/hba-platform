@@ -122,10 +122,15 @@ calling convention. One of them needed an explicit revision instead: the
 permission test would otherwise have been refused at the read and passed for the
 wrong reason.
 
-### Visual comparison — not performed
+### Visual comparison — performed by the owner, not by the agent
 
-Automation still cannot sign in. The Targets screen changed in three places —
-the stale guard, the refusal message, and clearing — and none has been seen.
+Automation still cannot sign in, so none of the three changes — the stale
+guard, the refusal message, and clearing — was seen from here.
+
+**The owner walked all four on staging on 10 September and reported them
+correct**: a requirement saved without moving the counts, both boxes emptied
+back to *unrecorded*, the two-tab conflict refused, and the cross-month save
+refused.
 
 ---
 

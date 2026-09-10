@@ -67,14 +67,19 @@ and raise it in the batch report; do not stop on it.
 
 ## Waiting on the owner
 
-- **Visual acceptance for 03D, 03E, 04A and 04B.** All four are merged to
-  `main` and **nobody has looked at them**. The whole model Targets tab and the
-  changes to the maintainer Targets screen have never been rendered in front of
-  a person. Everything through 03C was walked on staging on 10 September and
-  approved.
-- **A scan re-run**, once, to fill wardrobes for parcels matched before 03E
-  existed. Settings → Shopify & data → Match parcels from 2026-01-01. Already
-  told to him; not confirmed done.
+- **Only 03E.** Everything else through 04B was walked on staging on 10
+  September and approved - Products paging and speed, all four Targets-grid
+  behaviours, and the model's Targets tab.
+
+  **03E is blocked on data, not on code.** Several models on staging share the
+  phone number `01016215036`, so shipping-phone matching returns AMBIGUOUS and
+  attaches nothing. That is the designed behaviour: guessing which of five
+  models a parcel went to is worse than saying it cannot be told. The owner is
+  separating the numbers and will then re-run *Settings → Shopify & data →
+  Match parcels from 2026-01-01*.
+
+  **Until that happens, an empty wardrobe on staging is expected** and is not
+  evidence of a bug in 03C or 03E. Do not "fix" the matcher to break ties.
 
 ## Open decisions
 

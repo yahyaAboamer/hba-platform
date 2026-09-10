@@ -231,12 +231,14 @@ email. The tests use the file's existing fixtures — invented models, an exampl
 InstaPay handle already in the repo — and no evidence in this report contains a
 credential, a token or a real person's details.
 
-### Visual comparison — not performed
+### Visual comparison — performed by the owner, not by the agent
 
-Automation still cannot sign in. **The Targets tab has never been seen**, and
-neither has the month card since its bars moved into a shared component. The
-markup for the card is unchanged apart from the component boundary and the zero
-case, but that is an argument, not a look.
+Automation still cannot sign in, so nothing in this batch was seen by me.
+
+**The owner walked it on staging on 10 September and reported it correct** -
+the model's Targets tab and, in the same pass, all four 04A grid behaviours.
+That is the acceptance this batch has: a person on a phone with real data, not
+a screenshot from here.
 
 ---
 

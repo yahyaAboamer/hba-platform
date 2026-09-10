@@ -102,8 +102,11 @@ profile of staging.
 The query-count reduction is proven by test. The image saving is arithmetic —
 400px instead of 2000px is roughly a twenty-fifth of the pixels — but *how much
 faster the screen feels* depends on how many products you have and what the
-connection is like. **Tell me if it is still slow**, and the next step is
-measuring rather than guessing again.
+connection is like.
+
+**Confirmed on staging by the owner, 10 September**, walking the real
+catalogue: reported correct and no longer slow. So the guess was right, and it
+was still a guess — if it ever regresses, measure rather than guess again.
 
 ---
 
