@@ -27,6 +27,7 @@ from decimal import ROUND_HALF_UP, Decimal
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_permission
@@ -35,18 +36,22 @@ from app.core.money import format_egp
 from app.core.permissions import Permission
 from app.db import get_session
 from app.models.affiliates import AffiliateProfile
+from app.models.attributed_orders import AttributedOrder
 from app.models.identity import UserAccount
 from app.services.affiliates import list_affiliates
 from app.services.payroll import (
+    SOURCE_MOVED,
+    SourceMoved,
     approve_month,
     blockers_for,
+    carried_into,
     carry_forward_summary,
     get_month,
     is_historical,
     months_left_reopened,
     reconciliation_for,
-    reopen_month,
     snapshots_for,
+    source_version,
 )
 
 router = APIRouter(prefix="/api/payroll")
@@ -56,11 +61,40 @@ class ApproveBody(BaseModel):
     affiliate_ids: list[int]
     #: §11.3. Compute exactly what would happen and write nothing.
     preview: bool = True
+    #: 05B. What each model's month looked like in the preview the operator
+    #: read, keyed by affiliate id.
+    #:
+    #: **Required to commit, and its absence is not agreement.** A caller that
+    #: sends nothing has not been taught to check, and this route turns a
+    #: working number into a debt - so a commit without one is refused rather
+    #: than waved through. Ignored on a preview, which writes nothing.
+    source_versions: dict[int, str] | None = None
 
 
 class ReopenBody(BaseModel):
     affiliate_ids: list[int]
     reason: str = Field(min_length=1, max_length=500)
+
+
+def _source_version_for(
+    db: Session, affiliate: AffiliateProfile, month: str, calculation
+) -> str:
+    """The fingerprint of what this month is currently computed from.
+
+    Reads the same two order sets `approve_month` reads, so the string the
+    preview hands out is the string the commit recomputes. Any cheaper
+    stand-in - a timestamp, a row count - would agree when the month had
+    changed, which is the one case it exists for.
+    """
+    orders = list(
+        db.scalars(
+            select(AttributedOrder)
+            .where(AttributedOrder.affiliate_id == affiliate.id)
+            .where(AttributedOrder.business_month == month)
+            .order_by(AttributedOrder.shopify_order_id)
+        )
+    )
+    return source_version(calculation, orders, carried_into(db, affiliate, month))
 
 
 def _month_or_400(month: str) -> str:
@@ -154,6 +188,24 @@ def _row(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
         "blockers": blockers,
         "is_payable": not blockers,
         "version": snapshot.version if snapshot else None,
+        # 05B. **Something behind an agreed month has moved since it was
+        # agreed** - an order refused on delivery, a target recorded, a rate
+        # corrected.
+        #
+        # Reported and nothing else. The agreed figure does not follow it and
+        # the payment instruction does not quietly change: money owed under an
+        # agreement is owed until somebody decides otherwise, and a total that
+        # drifts under the word "agreed" is the failure §11.1 is about.
+        #
+        # What to *do* about it is a correction, which is 05C's subject. This
+        # is the flag that stops it being invisible until then - the old
+        # answer was that nobody found out at all.
+        "source_changed_since_approval": (
+            bool(snapshot)
+            and snapshot.payload_json.get("source_version") is not None
+            and snapshot.payload_json.get("source_version")
+            != _source_version_for(db, affiliate, month, calculation)
+        ),
         # ADR 0036. Approvable, and never payable. The screen needs both
         # facts: it offers approval, and it must not offer to send money.
         "settled_outside": is_historical(month),
@@ -209,11 +261,23 @@ def approve(
     that eventually writes by accident.
     """
     month = _month_or_400(month)
+    # 05B. **Absence is not agreement.** A commit that carries no record of
+    # what was on the screen is a commit from a caller that has not been taught
+    # to check, and this route turns a working number into a debt. Refused
+    # whole rather than per model: a request shaped this way is a client that
+    # needs fixing, not a month that needs reloading.
+    if not body.preview and body.source_versions is None:
+        raise HTTPException(
+            400,
+            "Agreeing a month needs the figures the preview handed you. "
+            "Reload the month and try again.",
+        )
     results = []
 
     for affiliate_id in body.affiliate_ids:
         affiliate = _affiliate_or_404(db, affiliate_id)
         blockers, calculation = blockers_for(db, affiliate, month)
+        seen = _source_version_for(db, affiliate, month, calculation)
 
         outcome = {
             "affiliate_id": affiliate.id,
@@ -223,20 +287,38 @@ def approve(
             "blockers": blockers,
             "approved": False,
             "version": None,
+            # Handed out with the preview and handed back on the commit.
+            "source_version": seen,
+            "stale": False,
         }
 
         if not blockers and not body.preview:
-            snapshot = approve_month(
-                db,
-                affiliate,
-                month,
-                actor_id=actor.id,
-                actor_email=actor.email,
-            )
+            expected = (body.source_versions or {}).get(affiliate.id)
+            try:
+                snapshot = approve_month(
+                    db,
+                    affiliate,
+                    month,
+                    actor_id=actor.id,
+                    actor_email=actor.email,
+                    expected_source_version=expected,
+                )
+            except SourceMoved as moved:
+                # **Refused for this model, and the rest of the run stands.**
+                # Payroll is agreed for twenty people in one act; one model's
+                # month moving is not a reason to refuse the other nineteen,
+                # and re-running the whole batch to pick them up is how
+                # somebody ends up approving in a hurry.
+                outcome["stale"] = True
+                outcome["blockers"] = [*blockers, SOURCE_MOVED]
+                outcome["note"] = str(moved)
+                results.append(outcome)
+                continue
             outcome["approved"] = True
             outcome["version"] = snapshot.version
             outcome["obligation_piastres"] = snapshot.approved_obligation_piastres
             outcome["obligation"] = format_egp(snapshot.approved_obligation_piastres)
+            outcome["source_version"] = snapshot.payload_json.get("source_version")
 
         results.append(outcome)
 
@@ -260,37 +342,51 @@ def approve(
 def reopen(
     month: str,
     body: ReopenBody,
-    actor: UserAccount = Depends(require_permission(Permission.PAYROLL_REOPEN)),
-    db: Session = Depends(get_session),
+    _actor: UserAccount = Depends(require_permission(Permission.PAYROLL_REOPEN)),
+    _db: Session = Depends(get_session),
 ) -> dict:
-    """Return an approved month to draft, with a written reason.
+    """**Retired in 05B.** An agreed month is not returned to draft any more.
 
-    A different permission from approving, because reaching back into a month
-    somebody has been paid for is a different act (§5.1).
+    ## Why it is gone
+
+    Reopening was the platform's only way to change an agreed figure, and it
+    worked by *unmaking the agreement*: the month went back to draft, the
+    orders it had settled were released, and the next approval wrote a new
+    version over the top. Everything about that is recoverable except the one
+    thing that matters - **money that had already moved against the old
+    figure**. The ledger kept the payment; the month it was made against no
+    longer existed in the same form; and `reconciliation_for` was written to
+    help a person work out afterwards what had happened to somebody's pay.
+
+    §11.5's own name for the dangerous state says it: *the dangerous state is
+    not reopening, it is forgetting*. A month left reopened and never agreed
+    again is a model with no figure at all, and the platform needed a
+    diagnostic to find those.
+
+    An agreed month is now what its name says. What changes after it is a
+    **correction** - an append-only event that records what moved and what is
+    owed because of it, leaving the original agreement standing. That is 05C's
+    subject, and this route is retired ahead of it so nothing new can be
+    reopened in the meantime.
+
+    ## Why the route is still here
+
+    A 404 says *this address is wrong*. A retired capability should say what
+    replaced it, to whoever is still calling it - an old tab, a bookmark, a
+    script. The permission and its audit history are untouched, and every
+    reader of past reopens still works.
+
+    **Nothing about a month that was already reopened changes.** Those months
+    are still visible, still diagnosed by `/{month}/reopened`, and still
+    agreed again through the ordinary approval.
     """
-    month = _month_or_400(month)
-    reopened = []
-
-    for affiliate_id in body.affiliate_ids:
-        affiliate = _affiliate_or_404(db, affiliate_id)
-        try:
-            reopen_month(
-                db,
-                affiliate,
-                month,
-                reason=body.reason,
-                actor_id=actor.id,
-                actor_email=actor.email,
-            )
-        except ValueError as exc:
-            db.rollback()
-            raise HTTPException(
-                400, f"{affiliate.name}: {exc}. Nothing reopened."
-            ) from exc
-        reopened.append({"affiliate_id": affiliate.id, "name": affiliate.name})
-
-    db.commit()
-    return {"month": month, "reopened": reopened}
+    _month_or_400(month)
+    raise HTTPException(
+        409,
+        "Agreed months are no longer reopened. The agreement stands and what "
+        "changed is recorded against it as a correction. Nothing has been "
+        "reopened.",
+    )
 
 
 @router.get("/{month}/reopened")

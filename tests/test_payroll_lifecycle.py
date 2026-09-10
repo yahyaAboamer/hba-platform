@@ -17,6 +17,7 @@ from sqlalchemy import select, text
 
 from app.core.passwords import hash_password
 from app.db import engine
+from app.services.payroll import SOURCE_MOVED
 from app.main import app
 from app.models.affiliates import AccountKind
 from app.models.attributed_orders import AttributedOrder, CommissionState
@@ -578,6 +579,31 @@ def test_the_month_view_shows_what_blocks_each_model(client):
     assert body["totals"]["blocked_affiliates"] == 1
 
 
+def _commit(client, month, affiliate_ids):
+    """Agree a month the way the screen does: preview first, then commit.
+
+    05B refuses a commit that carries no record of what was on the screen, so
+    every test that agrees a month over HTTP now previews first and hands the
+    fingerprints back. That keeps these testing **behaviour** rather than the
+    calling convention - and the two lines are exactly what the screen does.
+    """
+    seen = client.post(
+        f"/api/payroll/{month}/approve",
+        json={"affiliate_ids": affiliate_ids},
+    ).json()
+    return client.post(
+        f"/api/payroll/{month}/approve",
+        json={
+            "affiliate_ids": affiliate_ids,
+            "preview": False,
+            "source_versions": {
+                str(row["affiliate_id"]): row["source_version"]
+                for row in seen["results"]
+            },
+        },
+    )
+
+
 def test_approving_defaults_to_a_preview(client):
     """A default that writes is a default that eventually writes by accident."""
     affiliate = _api_affiliate(client)
@@ -602,10 +628,7 @@ def test_committing_approves_and_freezes(client):
     affiliate = _api_affiliate(client)
     _api_order(affiliate["id"], "1", 200_000)
 
-    body = client.post(
-        f"/api/payroll/{AUGUST}/approve",
-        json={"affiliate_ids": [affiliate["id"]], "preview": False},
-    ).json()
+    body = _commit(client, AUGUST, [affiliate["id"]]).json()
 
     assert body["results"][0]["approved"] is True
     assert body["results"][0]["version"] == 1
@@ -630,30 +653,26 @@ def test_one_blocked_model_does_not_stop_the_others(client):
             {"a": blocked["id"]},
         )
 
-    body = client.post(
-        f"/api/payroll/{AUGUST}/approve",
-        json={"affiliate_ids": [ready["id"], blocked["id"]], "preview": False},
-    ).json()
+    body = _commit(client, AUGUST, [ready["id"], blocked["id"]]).json()
 
     assert body["totals"]["approved"] == 1
     assert body["totals"]["blocked"] == 1
 
 
-def test_reopening_over_http_needs_a_reason(client):
+def test_reopening_over_http_is_retired_and_changes_nothing(client):
+    """05B. An agreed month is what its name says.
+
+    Reopening worked by unmaking the agreement - the month went back to draft
+    and the orders it had settled were released - and the one thing that could
+    not be unmade was money already paid against the old figure. What changes
+    after an agreement is now a correction recorded against it (05C).
+
+    A 409 rather than a 404: the address is right and the capability is gone,
+    and whoever is still calling it deserves to be told which.
+    """
     affiliate = _api_affiliate(client)
     _api_order(affiliate["id"], "1", 200_000)
-    client.post(
-        f"/api/payroll/{AUGUST}/approve",
-        json={"affiliate_ids": [affiliate["id"]], "preview": False},
-    )
-
-    assert (
-        client.post(
-            f"/api/payroll/{AUGUST}/reopen",
-            json={"affiliate_ids": [affiliate["id"]], "reason": ""},
-        ).status_code
-        == 422
-    )
+    _commit(client, AUGUST, [affiliate["id"]])
 
     response = client.post(
         f"/api/payroll/{AUGUST}/reopen",
@@ -662,20 +681,52 @@ def test_reopening_over_http_needs_a_reason(client):
             "reason": "an order was attributed wrongly",
         },
     )
-    assert response.status_code == 200
+
+    assert response.status_code == 409
+    # **And the month is untouched.** A refusal that half-ran would be worse
+    # than the operation it replaced.
+    month = client.get(f"/api/payroll/{AUGUST}").json()["affiliates"][0]
+    assert month["calculation_state"] == "approved"
+    assert (
+        db_order_settled(affiliate["id"]) is True
+    ), "a refused reopen must not release what the snapshot settled"
+
+
+def db_order_settled(affiliate_id: int) -> bool:
+    with engine.begin() as connection:
+        return connection.execute(
+            text(
+                "SELECT settled_in_snapshot_id IS NOT NULL FROM attributed_order "
+                "WHERE affiliate_id = :a"
+            ),
+            {"a": affiliate_id},
+        ).scalar()
 
 
 def test_a_month_left_reopened_is_visible_over_http(client):
+    """The diagnostic outlives the operation.
+
+    Months reopened before 05B are still out there, and *reopened and never
+    agreed again* is still a model with no figure at all - which is why §11.5
+    called forgetting the dangerous state rather than reopening. Constructed
+    through the service, because the route that used to do it is retired.
+    """
+    from app.db import SessionLocal
+    from app.models.affiliates import AffiliateProfile
+    from app.services.payroll import reopen_month
+
     affiliate = _api_affiliate(client)
     _api_order(affiliate["id"], "1", 200_000)
-    client.post(
-        f"/api/payroll/{AUGUST}/approve",
-        json={"affiliate_ids": [affiliate["id"]], "preview": False},
-    )
-    client.post(
-        f"/api/payroll/{AUGUST}/reopen",
-        json={"affiliate_ids": [affiliate["id"]], "reason": "recalculating"},
-    )
+    _commit(client, AUGUST, [affiliate["id"]])
+
+    with SessionLocal() as session:
+        reopen_month(
+            session,
+            session.get(AffiliateProfile, affiliate["id"]),
+            AUGUST,
+            reason="reopened before 05B retired the route",
+        )
+        session.commit()
 
     body = client.get(f"/api/payroll/{AUGUST}/reopened").json()
 
@@ -688,10 +739,18 @@ def test_a_model_may_not_approve_anything(client):
     with engine.begin() as connection:
         connection.execute(text("UPDATE role_assignment SET role = 'affiliate'"))
 
+    # Posted directly rather than through `_commit`: that helper previews
+    # first, and the preview would be refused too - so the test would pass on
+    # the wrong request. The fingerprint here is a placeholder that never gets
+    # read, because permission is checked before the body is.
     assert (
         client.post(
             f"/api/payroll/{AUGUST}/approve",
-            json={"affiliate_ids": [affiliate["id"]], "preview": False},
+            json={
+                "affiliate_ids": [affiliate["id"]],
+                "preview": False,
+                "source_versions": {str(affiliate["id"]): "whatever"},
+            },
         ).status_code
         == 403
     )
@@ -941,3 +1000,145 @@ def test_an_approved_month_still_reports_its_own_settled_orders(db):
     assert calculate_month(db, affiliate, AUGUST).payout_piastres == (
         snapshot.approved_obligation_piastres
     )
+
+
+# -- 05B over HTTP -------------------------------------------------------------
+
+
+def test_a_commit_that_says_nothing_about_what_was_seen_is_refused(client):
+    """Absence is not agreement.
+
+    A caller that sends no fingerprint is one that has not been taught to
+    check, and this route turns a working number into a debt. Refused whole
+    rather than per model: a request shaped this way is a client to fix, not a
+    month to reload.
+    """
+    affiliate = _api_affiliate(client)
+    _api_order(affiliate["id"], "1", 200_000)
+
+    response = client.post(
+        f"/api/payroll/{AUGUST}/approve",
+        json={"affiliate_ids": [affiliate["id"]], "preview": False},
+    )
+
+    assert response.status_code == 400
+    assert (
+        client.get(f"/api/payroll/{AUGUST}").json()["affiliates"][0][
+            "calculation_state"
+        ]
+        == "draft"
+    ), "a refused commit must write nothing"
+
+
+def test_the_preview_hands_out_what_the_commit_hands_back(client):
+    affiliate = _api_affiliate(client)
+    _api_order(affiliate["id"], "1", 200_000)
+
+    seen = client.post(
+        f"/api/payroll/{AUGUST}/approve",
+        json={"affiliate_ids": [affiliate["id"]]},
+    ).json()["results"][0]
+
+    assert seen["source_version"]
+    assert seen["stale"] is False
+
+    done = _commit(client, AUGUST, [affiliate["id"]]).json()["results"][0]
+
+    assert done["approved"] is True
+    assert done["source_version"] == seen["source_version"]
+
+
+def test_a_model_whose_month_moved_is_refused_and_the_others_go_through(client):
+    """§11.3, and the reason this is per model rather than per run.
+
+    Payroll is agreed for twenty people in one act. One model's month moving
+    between the preview and the button is not a reason to refuse the other
+    nineteen - and re-running the whole batch to pick them up is how somebody
+    ends up approving in a hurry.
+    """
+    moved = _api_affiliate(client)
+    steady = _api_affiliate(client, name="Sara", email="sara@example.com")
+    _api_order(moved["id"], "1", 200_000)
+    _api_order(steady["id"], "2", 100_000)
+
+    seen = client.post(
+        f"/api/payroll/{AUGUST}/approve",
+        json={"affiliate_ids": [moved["id"], steady["id"]]},
+    ).json()
+
+    # A delivery lands between the preview and the button, for one of them.
+    _api_order(moved["id"], "3", 50_000)
+
+    body = client.post(
+        f"/api/payroll/{AUGUST}/approve",
+        json={
+            "affiliate_ids": [moved["id"], steady["id"]],
+            "preview": False,
+            "source_versions": {
+                str(row["affiliate_id"]): row["source_version"]
+                for row in seen["results"]
+            },
+        },
+    ).json()
+
+    outcomes = {row["affiliate_id"]: row for row in body["results"]}
+
+    assert outcomes[moved["id"]]["approved"] is False
+    assert outcomes[moved["id"]]["stale"] is True
+    assert SOURCE_MOVED in outcomes[moved["id"]]["blockers"]
+    assert outcomes[steady["id"]]["approved"] is True
+
+
+def test_a_failure_after_approval_changes_nothing_and_is_reported(client):
+    """05B. An order refused *after* the month was agreed.
+
+    §11.1: money owed under an agreement is owed until somebody decides
+    otherwise. So none of this moves - not the agreed figure, not the order's
+    settled link, not what the payments screen offers to send. A total that
+    drifted under the word "agreed" would present a working number as a debt,
+    which is the failure the whole snapshot design exists to prevent.
+
+    What it *does* is stop being invisible. Deciding what to do about it is a
+    correction (05C); until then the row says the evidence behind the
+    agreement has moved, which is the fact somebody needs to act on it at all.
+    """
+    affiliate = _api_affiliate(client)
+    _api_order(affiliate["id"], "1", 200_000)
+    _commit(client, AUGUST, [affiliate["id"]])
+
+    agreed = client.get(f"/api/payroll/{AUGUST}").json()["affiliates"][0]
+    assert agreed["source_changed_since_approval"] is False
+
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "UPDATE attributed_order SET commission_state = 'void' "
+                "WHERE affiliate_id = :a"
+            ),
+            {"a": affiliate["id"]},
+        )
+
+    after = client.get(f"/api/payroll/{AUGUST}").json()["affiliates"][0]
+
+    assert after["source_changed_since_approval"] is True
+    # **Everything that decides money is where it was.**
+    assert after["calculation_state"] == "approved"
+    assert (
+        after["approved_obligation_piastres"]
+        == agreed["approved_obligation_piastres"]
+    )
+    assert after["version"] == agreed["version"]
+
+
+def test_a_month_nobody_has_agreed_never_reports_a_moved_source(client):
+    """There is nothing to have moved away from. A draft month recalculates by
+    design, and flagging that as a change would put a warning on every open
+    month in the list.
+    """
+    affiliate = _api_affiliate(client)
+    _api_order(affiliate["id"], "1", 200_000)
+
+    row = client.get(f"/api/payroll/{AUGUST}").json()["affiliates"][0]
+
+    assert row["calculation_state"] == "draft"
+    assert row["source_changed_since_approval"] is False

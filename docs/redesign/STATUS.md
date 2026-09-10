@@ -6,13 +6,20 @@ Package prepared: 9 September 2026. Phase 00 completed 9 September 2026.
   Phase 01/02 summary previously at the top of this file.
 - Started on clean local `main` at the required completed commit
   **`8ad14a6cd7453bc8140d52b6f5c64faf91927b67`**. Ancestor check passed.
-- Active branch: **`phase05a/pending-inclusive-earnings`**, based on that commit.
-  The original batch was committed untouched as **`5320fd6`** before fixes.
-  Code corrections are **`8a20ca5`**; the documentation handoff follows in its
-  own commit. Push this review branch only, not `main` or `production`.
-  Do not merge, deploy or start 05B under this authorization.
-- **05A implemented and verified locally; batch review/visual acceptance pending.**
-  Read `reports/05A-pending-inclusive-earnings.md` before continuing.
+- **05A branch:** `phase05a/pending-inclusive-earnings`, ending at `6f69bdd`.
+  The original batch is `5320fd6`, untouched; the review fixes are `8a20ca5`.
+- **05B branch:** `phase05b/immutable-approval`, based on `6f69bdd` — 05A is
+  not merged to `main`, so 05B builds on it rather than around it. Neither is
+  merged, deployed or promoted.
+- **05A and 05B implemented and verified locally; review and visual acceptance
+  pending for both.** Read `reports/05A-pending-inclusive-earnings.md` and
+  `reports/05B-immutable-approval.md` before continuing.
+- **05B retired reopening.** `POST /api/payroll/{month}/reopen` answers 409 and
+  the button is gone; everything that *reads* reopened history still works, and
+  the months already in that state are untouched. **Between 05B and 05C there
+  is no way to change an agreed month at all** - that gap is deliberate and 05C
+  closes it. Nothing real is exposed: no model is onboarded and neither batch
+  is on `production`.
 - Staff can open **Models → model → Financial rules preview**. It uses the
   real earnings API with `rules_preview=true`, counts pending + delivered in
   the source month, and shows legacy allocations separately. **No live policy
@@ -44,7 +51,7 @@ Package prepared: 9 September 2026. Phase 00 completed 9 September 2026.
 | 02 Models and setup | **Complete** | `reports/02A-model-entry.md`, `02B-profile-and-self.md`, `02C-setup-readiness.md`; migration `d4b81c07af22`; D06 and D07 closed. Finalisation is deliberately Phase 09 |
 | 03 Products and wardrobe | **Complete** | `reports/03A…`, `03B…`, `03C-wardrobes-and-requests.md`, `03D-making-the-product-screens-load.md`, `03E-what-was-in-the-parcel.md`; migrations `e7c2a5f1b930`, `f1a93d6c48e2`, `a2f47b8e1c53`; D05 and D11 implemented. Line items are fetched and matching runs live (03E), so a wardrobe fills on real data - **re-run the scan once to fill parcels matched before that** |
 | 04 Targets | **Complete** | `reports/04A-targets-editor.md`, `04B-model-targets.md`. The grid carries a revision - a save without one is refused. The model's Targets tab is built (UI24); verification and historical outcomes existed and were verified rather than rebuilt |
-| 05 Financial rules | **05A local implementation complete; review pending** | `reports/05A-pending-inclusive-earnings.md`; read-only pending-inclusive preview and source-performance service. Existing live financial paths unchanged. 05B next after review; 05C not started |
+| 05 Financial rules | **05A and 05B implemented; both awaiting review** | `reports/05A-pending-inclusive-earnings.md`, `05B-immutable-approval.md`. 05A is a read-only pending-inclusive preview; 05B freezes what an approval agreed to, refuses a stale or concurrent commit, and retires reopening. Existing live financial paths otherwise unchanged. **05C next**, and it owns the correction that replaces reopening |
 | 06 Payments | Not started | Recording/proof/reconciliation already exist and are reusable |
 | 07 Performance screens | Not started | Ranking absent |
 | 08 Settings and notifications | Not started | Notice dismissal persistence absent |

@@ -352,9 +352,19 @@ def test_the_maintainer_and_the_model_can_get_all_the_way_through(browser):
     mine = next(r for r in payroll["affiliates"] if r["affiliate_id"] == nour["id"])
     assert mine["is_payable"] is True, mine["blockers"]
 
+    # 05B: the screen previews, then agrees what the preview said. This
+    # journey follows the maintainer through the real sequence, so it does too.
+    seen = browser.post(
+        f"/api/payroll/{AUGUST}/approve",
+        json={"affiliate_ids": [nour["id"]]},
+    ).json()["results"][0]
     agreed = browser.post(
         f"/api/payroll/{AUGUST}/approve",
-        json={"affiliate_ids": [nour["id"]], "preview": False},
+        json={
+            "affiliate_ids": [nour["id"]],
+            "preview": False,
+            "source_versions": {str(nour["id"]): seen["source_version"]},
+        },
     )
     assert agreed.status_code == 200, agreed.text
     assert agreed.json()["results"][0]["approved"] is True

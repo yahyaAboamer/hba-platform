@@ -13,6 +13,15 @@ type Outcome = {
   blockers: string[];
   approved: boolean;
   version: number | null;
+  /**
+   * What this model's month was computed from when the preview was drawn.
+   * Handed straight back on the commit so the server can refuse a figure that
+   * moved while somebody was reading it (05B).
+   */
+  source_version: string;
+  /** The month moved between the preview and the commit. Reload and look again. */
+  stale: boolean;
+  note?: string;
 };
 
 type ApprovalResult = {
@@ -64,6 +73,26 @@ export function PayrollApprove() {
         await api.post<ApprovalResult>(`/api/payroll/${month}/approve`, {
           affiliate_ids: chosen,
           preview: false,
+          /*
+           * **Agree the figure that was shown, or agree nothing** (05B).
+           *
+           * Between drawing this preview and pressing the button a webhook can
+           * settle an order, a delivery can fail or a target can be recorded.
+           * The old commit recalculated and froze whatever was true at that
+           * instant — so the screen said one number and the snapshot said
+           * another, and nobody would ever have seen the difference.
+           *
+           * The server refuses a model whose month has moved and approves the
+           * rest, which is why this is a map rather than one value: twenty
+           * models are agreed in one act and one moving is not a reason to
+           * refuse the other nineteen.
+           */
+          source_versions: Object.fromEntries(
+            (preview?.results ?? []).map((row) => [
+              row.affiliate_id,
+              row.source_version,
+            ]),
+          ),
         }),
       );
     } catch (caught) {
@@ -130,10 +159,32 @@ export function PayrollApprove() {
          * row does not refuse the other nineteen. So the ones that did not go
          * through have to be named, or they are silently skipped.
          */}
-        {refused.length > 0 && (
+        {/*
+          * **A stale row is not a blocked row** (05B), and lumping the two
+          * together would send somebody hunting for a problem in a month that
+          * has nothing wrong with it. The month simply moved between the
+          * preview and the button, and looking again is the whole fix.
+          */}
+        {done.results.some((row) => row.stale) && (
+          <p className="notice payroll__note">
+            {done.results
+              .filter((row) => row.stale)
+              .map((row) => row.name)
+              .join(", ")}{" "}
+            changed while you were looking at{" "}
+            {formatMonth(month)}. Nothing was agreed for{" "}
+            {done.results.filter((row) => row.stale).length === 1
+              ? "her"
+              : "them"}
+            . Go back, check the figure and agree it again.
+          </p>
+        )}
+
+        {refused.filter((row) => !row.stale).length > 0 && (
           <p className="notice notice--refused payroll__note">
             Not approved:{" "}
             {refused
+              .filter((row) => !row.stale)
               .map(
                 (row) =>
                   `${row.name} (${row.blockers.map(describeBlocker).join(", ")})`,

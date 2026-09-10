@@ -376,9 +376,24 @@ def _pay(admin, affiliate_id, month, piastres, *, proof=None, note=None) -> int:
 
 
 def _approve(admin, affiliate_id, month):
+    """Agree a month the way the screen does: preview, then commit what it said.
+
+    05B refuses a commit that carries no record of what was on the screen, so
+    the fingerprint the preview hands out is handed straight back. Two lines,
+    and they keep these tests about **behaviour** rather than about the calling
+    convention.
+    """
+    seen = admin.post(
+        f"/api/payroll/{month}/approve",
+        json={"affiliate_ids": [affiliate_id]},
+    ).json()["results"][0]
     response = admin.post(
         f"/api/payroll/{month}/approve",
-        json={"affiliate_ids": [affiliate_id], "preview": False},
+        json={
+            "affiliate_ids": [affiliate_id],
+            "preview": False,
+            "source_versions": {str(affiliate_id): seen["source_version"]},
+        },
     )
     assert response.status_code == 200, response.text
     result = response.json()["results"][0]
