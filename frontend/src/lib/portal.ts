@@ -55,6 +55,12 @@ export type MakeupLine = {
 };
 
 export type MyOrder = {
+  /**
+   * What was in the order. **Empty means not recorded, not empty**: contents
+   * are read only for orders that earned commission, and only from 07A
+   * onwards, so an older order legitimately has none.
+   */
+  contents: { title: string; variant: string | null; quantity: number }[];
   order_number: string;
   placed_at: string;
   base_piastres: number;
@@ -150,7 +156,18 @@ export type MyEarnings = {
     progress_pct: number;
     days_left: number | null;
   };
-  orders: { earned: number; pending: number; void: number };
+  orders: {
+    earned: number;
+    pending: number;
+    void: number;
+    /**
+     * How often her code was used (M01, D03). **Not the sum of the three
+     * above**: those are commission states and this is a delivery outcome, so
+     * a delivered order later refunded counts here and pays nothing, while a
+     * parcel refused at the door counts nowhere.
+     */
+    uses: number;
+  };
   /** `null` on a historical month, where no figure was ever calculated. */
   amount_piastres: number | null;
   amount: string | null;

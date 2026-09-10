@@ -271,6 +271,25 @@ export function MyMonth() {
              * average, and a zero would claim a typical order is worth
              * nothing.
              */}
+            {/*
+             * **How often her code was used** (M01), and deliberately its own
+             * tile rather than a line under counted sales.
+             *
+             * It is a *delivery* fact, and the sales beside it are a
+             * *commission* fact, so the two move independently: a parcel going
+             * out raises this and not that, and a delivered order later
+             * refunded leaves this alone while removing the money. Two numbers
+             * that disagree without explanation are a support message, so the
+             * sub-line says which question this one answers.
+             */}
+            <div className="tile">
+              <span className="tile__label">Code uses</span>
+              <span className="tile__figure">{body.orders.uses}</span>
+              <span className="tile__sub">
+                {body.orders.uses === 1 ? "order used" : "orders used"} your
+                code, including any still on the way
+              </span>
+            </div>
             {body.sales.average_order !== null && (
               <div className="tile">
                 <span className="tile__label">Average order</span>

@@ -166,3 +166,27 @@
   line-height: 1.6;
   color: var(--faint);
 }
+
+/* What was in an order. Inside the expansion, quiet, and never beside the
+   figure on the row - a garment name next to an amount reads as though the
+   amount belonged to the garment. */
+.affiliate .orders__contents {
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.affiliate .orders__contents li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-1) 0;
+  font-size: var(--text-sm);
+}
+
+.affiliate .orders__variant,
+.affiliate .orders__qty {
+  color: var(--quiet);
+  font-size: var(--text-xs);
+}

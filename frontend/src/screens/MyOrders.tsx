@@ -233,6 +233,40 @@ function Row({
           <p className="orders__explain">{explain(order, month)}</p>
 
           {/*
+           * **What was in the order** (owner, 11 September 2026).
+           *
+           * Inside the expansion, not on the row: the list answers *what did
+           * they buy* and the row answers *what did I earn*, and a garment
+           * name printed beside a figure reads as though the figure belonged
+           * to the garment.
+           *
+           * **Empty is not the same as none.** Contents are read only for
+           * orders that earned somebody commission, and only from 07A
+           * onwards, so an older order genuinely has nothing recorded - and
+           * saying so is the difference between an honest gap and a claim
+           * that somebody bought nothing.
+           */}
+          {order.contents.length > 0 ? (
+            <ul className="orders__contents">
+              {order.contents.map((line, index) => (
+                <li key={`${line.title}-${index}`}>
+                  <span className="orders__item">{line.title}</span>
+                  {line.variant && (
+                    <span className="orders__variant">{line.variant}</span>
+                  )}
+                  {line.quantity > 1 && (
+                    <span className="orders__qty">&times;{line.quantity}</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="detail__note">
+              What was in this order was not recorded.
+            </p>
+          )}
+
+          {/*
            * §11.4, and the one row that will be asked about. Kept inside the
            * expansion now rather than printed on every row: labelling all of
            * them would bury the one or two that matter.

@@ -438,3 +438,133 @@ def test_counts_are_never_written_across_a_year(db):
 
     assert get_target(db, affiliate, "2026-09").actual_videos is None
     assert get_target(db, affiliate, AUGUST).actual_videos == 4
+
+
+# -- M01: her own Home ---------------------------------------------------------
+
+
+def test_her_home_carries_how_often_her_code_was_used(db):
+    """M01 puts code uses on Home beside her earnings and sales."""
+    from app.services.portal import my_month
+
+    affiliate = _model(db, "Nour")
+    _order(db, affiliate, "1", 100_000, delivery=DELIVERED, state=CommissionState.EARNED)
+
+    assert my_month(db, affiliate, AUGUST)["orders"]["uses"] == 1
+
+
+def test_uses_on_home_is_not_the_sum_of_the_counts_beside_it(db):
+    """**The reason it is its own figure rather than arithmetic on the others.**
+
+    The counts beside it are *commission* states; a use is a *delivery*
+    outcome, and the two disagree in both directions at once:
+
+    * an order delivered and later refunded is `void` and pays nothing, and it
+      is still a use - her code brought a parcel to a door;
+    * a parcel refused at the door is `void` too, and is not a use.
+
+    Adding earned and pending would be wrong for both. A screen deriving this
+    from what is already on it would quietly report the wrong number.
+    """
+    from app.services.portal import my_month
+
+    affiliate = _model(db, "Nour")
+    _order(db, affiliate, "kept", 100_000, delivery=DELIVERED,
+           state=CommissionState.EARNED)
+    _order(db, affiliate, "refunded", 100_000, delivery=DELIVERED,
+           state=CommissionState.VOID)
+    _order(db, affiliate, "refused", 100_000, delivery=FAILED,
+           state=CommissionState.VOID)
+
+    home = my_month(db, affiliate, AUGUST)["orders"]
+
+    assert (home["earned"], home["pending"], home["void"]) == (1, 0, 2)
+    assert home["uses"] == 2, "the refunded delivery counts; the refused one does not"
+    assert home["uses"] != home["earned"] + home["pending"]
+
+
+def test_a_month_with_nothing_in_it_reports_no_uses_rather_than_breaking(db):
+    """M01: empty values are not NaN and missing facts are not zero-by-accident.
+    Nothing used her code, which is a real answer and reads as one.
+    """
+    from app.services.portal import my_month
+
+    affiliate = _model(db, "Nour")
+
+    assert my_month(db, affiliate, AUGUST)["orders"]["uses"] == 0
+
+
+# -- What was in an order ------------------------------------------------------
+
+
+def test_an_order_carries_what_was_in_it(db):
+    """Owner, 11 September 2026: the Orders screen lists an order's contents."""
+    from app.models.catalogue import OrderLineItem
+    from app.services.portal import my_orders
+
+    affiliate = _model(db, "Nour")
+    _order(db, affiliate, "1", 100_000, delivery=DELIVERED,
+           state=CommissionState.EARNED)
+    db.add(
+        OrderLineItem(
+            shopify_line_item_id="L1",
+            shopify_order_id="1",
+            title="Wide-leg trousers",
+            variant_title="M",
+            quantity=2,
+            discounted_total_piastres=100_000,
+            original_total_piastres=100_000,
+        )
+    )
+    db.flush()
+
+    contents = my_orders(db, affiliate, AUGUST)[0]["contents"]
+
+    assert contents == [
+        {"title": "Wide-leg trousers", "variant": "M", "quantity": 2}
+    ]
+
+
+def test_an_order_nobody_read_says_so_rather_than_looking_empty(db):
+    """**Empty is not the same as none.**
+
+    Contents are read only for orders that earned somebody commission, and only
+    from 07A onwards, so an older order genuinely has nothing recorded. An
+    empty list here means *not recorded*, and the screen says exactly that
+    rather than implying somebody bought nothing.
+    """
+    from app.services.portal import my_orders
+
+    affiliate = _model(db, "Nour")
+    _order(db, affiliate, "1", 100_000, delivery=DELIVERED,
+           state=CommissionState.EARNED)
+
+    assert my_orders(db, affiliate, AUGUST)[0]["contents"] == []
+
+
+def test_reading_a_month_of_contents_costs_one_query(db):
+    """A month with sixty orders must not cost sixty round trips for a list
+    nobody scrolls - the shape that made the products screen slow in 03D.
+    """
+    from sqlalchemy import event
+
+    from app.services.portal import my_orders
+
+    affiliate = _model(db, "Nour")
+    for index in range(6):
+        _order(db, affiliate, f"o{index}", 100_000, delivery=DELIVERED,
+               state=CommissionState.EARNED)
+
+    seen: list[str] = []
+
+    def watch(conn, cursor, statement, *rest):
+        if statement.lstrip().upper().startswith("SELECT"):
+            seen.append(statement)
+
+    event.listen(db.get_bind(), "before_cursor_execute", watch)
+    try:
+        my_orders(db, affiliate, AUGUST)
+    finally:
+        event.remove(db.get_bind(), "before_cursor_execute", watch)
+
+    assert len(seen) <= 4, "\n".join(seen)
