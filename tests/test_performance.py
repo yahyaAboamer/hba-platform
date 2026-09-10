@@ -438,3 +438,57 @@ def test_counts_are_never_written_across_a_year(db):
 
     assert get_target(db, affiliate, "2026-09").actual_videos is None
     assert get_target(db, affiliate, AUGUST).actual_videos == 4
+
+
+# -- M01: her own Home ---------------------------------------------------------
+
+
+def test_her_home_carries_how_often_her_code_was_used(db):
+    """M01 puts code uses on Home beside her earnings and sales."""
+    from app.services.portal import my_month
+
+    affiliate = _model(db, "Nour")
+    _order(db, affiliate, "1", 100_000, delivery=DELIVERED, state=CommissionState.EARNED)
+
+    assert my_month(db, affiliate, AUGUST)["orders"]["uses"] == 1
+
+
+def test_uses_on_home_is_not_the_sum_of_the_counts_beside_it(db):
+    """**The reason it is its own figure rather than arithmetic on the others.**
+
+    The counts beside it are *commission* states; a use is a *delivery*
+    outcome, and the two disagree in both directions at once:
+
+    * an order delivered and later refunded is `void` and pays nothing, and it
+      is still a use - her code brought a parcel to a door;
+    * a parcel refused at the door is `void` too, and is not a use.
+
+    Adding earned and pending would be wrong for both. A screen deriving this
+    from what is already on it would quietly report the wrong number.
+    """
+    from app.services.portal import my_month
+
+    affiliate = _model(db, "Nour")
+    _order(db, affiliate, "kept", 100_000, delivery=DELIVERED,
+           state=CommissionState.EARNED)
+    _order(db, affiliate, "refunded", 100_000, delivery=DELIVERED,
+           state=CommissionState.VOID)
+    _order(db, affiliate, "refused", 100_000, delivery=FAILED,
+           state=CommissionState.VOID)
+
+    home = my_month(db, affiliate, AUGUST)["orders"]
+
+    assert (home["earned"], home["pending"], home["void"]) == (1, 0, 2)
+    assert home["uses"] == 2, "the refunded delivery counts; the refused one does not"
+    assert home["uses"] != home["earned"] + home["pending"]
+
+
+def test_a_month_with_nothing_in_it_reports_no_uses_rather_than_breaking(db):
+    """M01: empty values are not NaN and missing facts are not zero-by-accident.
+    Nothing used her code, which is a real answer and reads as one.
+    """
+    from app.services.portal import my_month
+
+    affiliate = _model(db, "Nour")
+
+    assert my_month(db, affiliate, AUGUST)["orders"]["uses"] == 0

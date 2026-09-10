@@ -80,6 +80,7 @@ from app.services.commission.base import commission_base
 from app.services.commission.calculate import MonthCalculation
 from app.services.compensation import all_terms, terms_for
 from app.services.payments import adjustments_for, balance_for, payments_for
+from app.services.performance import uses_for
 from app.services.payments_state import SettlementState
 from app.services.payroll import (
     blockers_for,
@@ -652,6 +653,15 @@ def my_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
             "earned": figures["earned_orders"],
             "pending": figures["pending_orders"],
             "void": figures["void_orders"],
+            # **How often her code was used** (M01, and D03 for what counts).
+            #
+            # Not derivable from the three counts beside it, which is why it is
+            # its own figure rather than a sum. Those are *commission* states,
+            # and a use is a **delivery** outcome: an order delivered and later
+            # refunded pays nothing and is still a use, while a parcel refused
+            # at the door is neither. Adding earned and pending would be wrong
+            # in both directions at once.
+            "uses": uses_for(db, affiliate, month),
         },
         "amount_piastres": total,
         "amount": format_egp(total),
