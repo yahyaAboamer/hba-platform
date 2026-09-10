@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useSearchParams } from "react-router-dom";
 
 import { AffiliateLayout, PortalHeader } from "../components/AffiliateLayout";
 import type { PortalContext } from "../components/AffiliateLayout";
@@ -42,6 +42,22 @@ export function AffiliatePortal({ session }: { session: Session }) {
   const [me, setMe] = useState<Me | null>(null);
   const [months, setMonths] = useState<string[]>([]);
   const [month, setMonth] = useState<string | null>(null);
+  /**
+   * A month named in the address, so a receipt can link to the month that
+   * explains it (AC41).
+   *
+   * Read once into state rather than driving the picker from the URL: moving
+   * between months is the most-used control in the portal, and putting a
+   * history entry behind every tap would turn the phone's back button into a
+   * walk through every month she looked at.
+   *
+   * **Honoured only if it is a month she can actually see.** The list comes
+   * from the server; anything else in the query string is ignored rather than
+   * loaded, so a mistyped or stale link opens her working month instead of an
+   * empty screen she cannot explain.
+   */
+  const [addressed] = useSearchParams();
+  const wanted = addressed.get("month");
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(() => {
@@ -65,11 +81,17 @@ export function AffiliatePortal({ session }: { session: Session }) {
           // Opens on the working month and stays wherever they move it. The
           // server decides which month that is - the browser's clock is not
           // in Cairo and is not authoritative about anything (ADR 0005).
-          setMonth((was) => was ?? calendar.months[0] ?? null);
+          setMonth(
+            (was) =>
+              was ??
+              (wanted && calendar.months.includes(wanted) ? wanted : null) ??
+              calendar.months[0] ??
+              null,
+          );
         });
       })
       .catch((caught) => setError(caught.message));
-  }, []);
+  }, [wanted]);
 
   // Wrapped rather than passed: `load` returns a promise now, and an effect
   // callback returning one is read by React as a cleanup function.

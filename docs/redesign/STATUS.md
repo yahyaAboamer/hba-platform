@@ -55,8 +55,8 @@ Package prepared: 9 September 2026. Phase 00 completed 9 September 2026.
 | 03 Products and wardrobe | **Complete** | `reports/03A…`, `03B…`, `03C-wardrobes-and-requests.md`, `03D-making-the-product-screens-load.md`, `03E-what-was-in-the-parcel.md`; migrations `e7c2a5f1b930`, `f1a93d6c48e2`, `a2f47b8e1c53`; D05 and D11 implemented. Line items are fetched and matching runs live (03E), so a wardrobe fills on real data - **re-run the scan once to fill parcels matched before that** |
 | 04 Targets | **Complete** | `reports/04A-targets-editor.md`, `04B-model-targets.md`. The grid carries a revision - a save without one is refused. The model's Targets tab is built (UI24); verification and historical outcomes existed and were verified rather than rebuilt |
 | 05 Financial rules | **Complete.** 05A, 05B and 05C merged to `main` | `reports/05A-pending-inclusive-earnings.md`, `05B-immutable-approval.md`, `05C-late-failure-corrections.md`; immutable approval, retired reopening and explicit corrections. D04 closed |
-| 06 Payments | **06A complete locally; review pending. 06B next** | `reports/06A-admin-month-end-payment-journey.md`; admin month-end totals/filtering, cross-model corrections, authorised destination, idempotent external record and genuine history. Not merged/deployed |
-| 07 Performance screens | Not started | Ranking absent |
+| 06 Payments | **06A merged; 06B implemented, unmerged** | `reports/06A-admin-month-end-payment-journey.md`, `06B-model-payment-views.md`. 06A is the admin month-end journey - forecast, approved and recorded money kept apart, corrections listed across every model, and a retry-safe transfer record (migration `1c4b06a5f8d2`). 06B is the model's side: a receipt names the destination it actually went to and links to the month that explains it. 06B is frontend only |
+| 07 Performance screens | **Next.** D03 and D08 are open and both belong here | Ranking absent |
 | 08 Settings and notifications | Not started | Notice dismissal persistence absent |
 | 09 Rehearsal and release | Not started | |
 
