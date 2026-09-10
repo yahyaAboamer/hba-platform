@@ -208,6 +208,7 @@ def record_actuals(
     stories: int,
     actor_id: int | None = None,
     actor_email: str | None = None,
+    recorded_at: datetime | None = None,
 ) -> MonthlyTarget:
     """What they actually produced.
 
@@ -218,6 +219,12 @@ def record_actuals(
     **Re-recording clears any verification.** The confirmation was of the old
     numbers; leaving it in place would let a correction inherit somebody else's
     approval and unlock a guarantee nobody agreed to.
+
+    `recorded_at` is injectable, exactly as `verify`'s is and for the same
+    reason. **When** a count was recorded became a fact with consequences in
+    07A: weekly pace compares it against the week she is in, and a test that
+    could not choose the date would only exercise whichever week the suite
+    happened to run in.
     """
     assert_recordable(db, target)
     _refuse_counts_on_a_backfilled_month(target)
@@ -230,7 +237,7 @@ def record_actuals(
     target.actual_videos = int(videos)
     target.actual_stories = int(stories)
     target.recorded_by = actor_id
-    target.recorded_at = utcnow()
+    target.recorded_at = recorded_at or utcnow()
     if was_verified:
         target.verified_by = None
         target.verified_at = None

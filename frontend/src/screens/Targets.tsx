@@ -22,6 +22,15 @@ type Row = {
   verified: boolean;
   verified_at: string | null;
   recorded_at: string | null;
+  /** D08. HBA only — nothing about pace reaches a model's own screens. */
+  pace: {
+    state: string;
+    week: number;
+    required: number;
+    expected_by_now: number;
+    done: number;
+    week_started: string;
+  };
 };
 
 type Grid = {
@@ -336,6 +345,7 @@ export function Targets({ session }: { session: Session }) {
                 <th className="targets__number">Stories</th>
                 <th />
                 <th />
+                <th />
               </tr>
             </thead>
             <tbody>
@@ -400,6 +410,9 @@ export function Targets({ session }: { session: Session }) {
                     />
                     <td className="targets__outcome">
                       <Outcome row={row} />
+                    </td>
+                    <td className="targets__pace">
+                      <PaceCell row={row} />
                     </td>
                     <td>
                       {waiting && <span className="blocker">{waiting}</span>}
@@ -589,6 +602,50 @@ function Cell({
     </td>
   );
 }
+
+/**
+ * Whether she is keeping up with the month, week by week. D08.
+ *
+ * **This screen and nowhere else.** The owner was asked and chose to keep it
+ * internal, so nothing about being behind appears in the portal in any
+ * wording. The consequence he accepted knowingly: a model cannot catch up on a
+ * warning she never sees, so this is a prompt for the conversation rather than
+ * a substitute for it.
+ *
+ * ## Not recorded is not behind
+ *
+ * The platform keeps one cumulative pair of counts a month and no weekly
+ * history, so a figure last typed in week one cannot answer a question about
+ * week three. Where nothing has been recorded since the week began it says so
+ * — otherwise this column would quietly report how often HBA types rather
+ * than how she is doing.
+ */
+function PaceCell({ row }: { row: Row }) {
+  const pace = row.pace;
+  if (!pace || pace.state === "no_target" || pace.state === "not_started") {
+    return null;
+  }
+  if (pace.state === "not_recorded_this_week") {
+    return (
+      <span className="targets__unknown">
+        Nothing recorded in week {pace.week}
+      </span>
+    );
+  }
+  if (pace.state === "behind") {
+    return (
+      <span className="targets__missed">
+        {pace.done} of {pace.expected_by_now} by week {pace.week}
+      </span>
+    );
+  }
+  return (
+    <span className="targets__met">
+      On pace · {pace.done} of {pace.expected_by_now}
+    </span>
+  );
+}
+
 
 function Outcome({ row }: { row: Row }) {
   // **The outcome, not the counts**, though on this screen they agree: the

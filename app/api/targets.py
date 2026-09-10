@@ -139,6 +139,30 @@ def _render(
     }
 
 
+def _pace(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
+    """Whether she is keeping up with the month, week by week. D08.
+
+    **On this screen and nowhere else.** The owner was asked directly and chose
+    to keep it internal, so nothing about being behind reaches a model's own
+    screens in any wording. The consequence he accepted: she cannot catch up on
+    a warning she never sees.
+
+    It decides no money. §15 is untouched - a target pays only on a guaranteed
+    minimum, only at month end, and only when met *and* verified.
+    """
+    from app.services.pace import pace_for
+
+    found = pace_for(db, affiliate, month)
+    return {
+        "state": found.state,
+        "week": found.week,
+        "required": found.required,
+        "expected_by_now": found.expected_by_now,
+        "done": found.done,
+        "week_started": found.week_started.isoformat(),
+    }
+
+
 def _revision(targets: dict) -> str:
     """What this month looked like when it was handed out.
 
@@ -181,11 +205,14 @@ def target_grid(
         # one month is not hypothetical - the same two people run payroll.
         "revision": _revision(found),
         "rows": [
-            _render(
-                affiliate,
-                found.get(affiliate.id),
-                determines_pay=_determines_pay(db, affiliate, month),
-            )
+            {
+                **_render(
+                    affiliate,
+                    found.get(affiliate.id),
+                    determines_pay=_determines_pay(db, affiliate, month),
+                ),
+                "pace": _pace(db, affiliate, month),
+            }
             for affiliate in affiliates
         ],
     }

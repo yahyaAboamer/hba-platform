@@ -134,3 +134,12 @@
   padding: 0;
   list-style: none;
 }
+
+/* D08. Whether she is keeping up, week by week - on this screen only, because
+   the owner chose to keep it internal. Narrow, and last after the outcome: it
+   is a prompt for a conversation rather than a second verdict competing with
+   the Achieved column beside it. */
+.targets__pace {
+  white-space: nowrap;
+  font-size: var(--text-xs);
+}
