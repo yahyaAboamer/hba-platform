@@ -28,6 +28,8 @@ staffing does not yet make — which is the point: roles change, and the check i
 what will still be here.
 """
 
+import hashlib
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -43,6 +45,7 @@ from app.models.targets import MonthlyTarget
 from app.services.affiliates import list_affiliates
 from app.services.compensation import terms_for
 from app.services.targets import (
+    clear_actuals as clear_actuals_service,
     get_target,
     record_actuals,
     set_requirements,
@@ -62,10 +65,24 @@ class GridRow(BaseModel):
     #: achieved, and the database refuses it too.
     actual_videos: int | None = Field(default=None, ge=0)
     actual_stories: int | None = Field(default=None, ge=0)
+    #: **Put this month back to unrecorded** (A06).
+    #:
+    #: `null` on the two above means *leave what is there alone*, which is what
+    #: a screen editing only a requirement sends. It cannot also mean *take the
+    #: counts off*, so this says so explicitly - and without it the only way to
+    #: undo a count typed against the wrong model was to set it to zero, which
+    #: claims she produced nothing and is the claim that fails a guarantee.
+    clear_actuals: bool = False
 
 
 class GridBody(BaseModel):
     rows: list[GridRow]
+    #: What the screen was looking at when it started editing.
+    #:
+    #: Optional, and its absence is not treated as agreement: a save without
+    #: one is refused rather than allowed through, because the callers that
+    #: send nothing are the ones that have not been taught to check.
+    revision: str | None = None
 
 
 class VerifyBody(BaseModel):
@@ -122,6 +139,26 @@ def _render(
     }
 
 
+def _revision(targets: dict) -> str:
+    """What this month looked like when it was handed out.
+
+    **Derived, not stored.** A version column would need writing on every path
+    that touches a target and would be wrong the first time somebody forgot;
+    this is computed from the rows themselves, so it cannot drift from them.
+
+    `updated_at` alone is not enough - a row *added* since the load changes no
+    existing timestamp, and adding a model to the programme mid-edit is an
+    ordinary thing to do. The count comes along for that.
+    """
+    stamps = sorted(
+        (target.updated_at.isoformat() if target.updated_at else "")
+        for target in targets.values()
+    )
+    return f"{len(stamps)}:" + hashlib.sha256(
+        "|".join(stamps).encode("utf-8")
+    ).hexdigest()[:16]
+
+
 @router.get("/{month}")
 def target_grid(
     month: str,
@@ -140,6 +177,9 @@ def target_grid(
 
     return {
         "month": month,
+        # Handed out with the rows and handed back on save. Two people editing
+        # one month is not hypothetical - the same two people run payroll.
+        "revision": _revision(found),
         "rows": [
             _render(
                 affiliate,
@@ -178,6 +218,21 @@ def save_grid(
     """
     month = _month_or_400(month)
 
+    # **Refuse a save built on figures somebody else has already changed.**
+    #
+    # Two people run payroll and both open Targets at month end. Without this
+    # the second save silently overwrites the first, and the losing edit is
+    # invisible - there is no error, no conflict, and no way to notice except
+    # by re-reading a number you already believed.
+    current = _revision(targets_for(db, month))
+    if body.revision != current:
+        raise HTTPException(
+            409,
+            "Somebody else changed this month while you were editing it. "
+            "Nothing was saved. Reload to see their numbers, then make your "
+            "changes again.",
+        )
+
     by_id = {
         affiliate.id: affiliate
         for affiliate in list_affiliates(db, include_archived=True)
@@ -189,6 +244,14 @@ def save_grid(
         if affiliate is None:
             raise HTTPException(
                 400, f"Row {index + 1}: no affiliate {row.affiliate_id}. Nothing saved."
+            )
+
+        if row.clear_actuals and row.actual_videos is not None:
+            raise HTTPException(
+                400,
+                f"Row {index + 1} ({affiliate.name}): asked to clear the "
+                "recorded counts and given counts at the same time. Nothing "
+                "saved.",
             )
 
         if (row.actual_videos is None) != (row.actual_stories is None):
@@ -209,7 +272,11 @@ def save_grid(
                 actor_id=actor.id,
                 actor_email=actor.email,
             )
-            if row.actual_videos is not None:
+            if row.clear_actuals:
+                clear_actuals_service(
+                    db, target, actor_id=actor.id, actor_email=actor.email
+                )
+            elif row.actual_videos is not None:
                 record_actuals(
                     db,
                     target,
@@ -226,7 +293,13 @@ def save_grid(
         saved += 1
 
     db.commit()
-    return {"month": month, "saved": saved}
+    # The new revision, so a screen that saves twice in a row does not have to
+    # reload between them.
+    return {
+        "month": month,
+        "saved": saved,
+        "revision": _revision(targets_for(db, month)),
+    }
 
 
 @router.post("/{month}/verify")

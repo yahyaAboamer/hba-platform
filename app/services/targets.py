@@ -434,3 +434,58 @@ def record_outcome(
         after={**_snapshot(target), "recorded_and_verified_together": True},
     )
     return target
+
+
+def clear_actuals(
+    db: Session,
+    target: MonthlyTarget,
+    *,
+    actor_id: int | None = None,
+    actor_email: str | None = None,
+) -> MonthlyTarget:
+    """Put a month back to *nobody has recorded what she did*.
+
+    **Unrecorded and zero are different facts** (A06), and until this existed
+    the platform could only move one way between them. A count typed against
+    the wrong model could be corrected to `0` and nothing else — which does not
+    say "this was a mistake", it says *she produced nothing*, and that is the
+    claim that fails a guaranteed minimum.
+
+    Clearing verification with it, for the same reason `record_actuals` does:
+    the confirmation was of numbers that are now gone, and leaving it would let
+    an empty month inherit somebody's approval.
+
+    Refused on the same months a recording is refused on — an approved month is
+    frozen in its snapshot, and a backfilled one never had counts to clear.
+    """
+    assert_recordable(db, target)
+    _refuse_counts_on_a_backfilled_month(target)
+
+    if target.actual_videos is None and target.actual_stories is None:
+        # Already unrecorded. Recording nothing about nothing is an audit entry
+        # nobody can act on.
+        return target
+
+    before = _snapshot(target)
+    was_verified = target.is_verified
+
+    target.actual_videos = None
+    target.actual_stories = None
+    target.recorded_by = None
+    target.recorded_at = None
+    if was_verified:
+        target.verified_by = None
+        target.verified_at = None
+    target.updated_at = utcnow()
+    db.flush()
+
+    record_audit(
+        db,
+        action="target.actuals_cleared",
+        subject=f"affiliate:{target.affiliate_id}",
+        actor_id=actor_id,
+        actor_email=actor_email,
+        before=before,
+        after={**_snapshot(target), "verification_cleared": was_verified},
+    )
+    return target
