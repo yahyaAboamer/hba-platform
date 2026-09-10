@@ -73,9 +73,9 @@ payroll without touching a maintainer screen.
 
 ## Verification
 
-- Backend: `.venv/Scripts/python.exe -m pytest -q` — **1767 passing**, and no
+- Backend: `.venv/Scripts/python.exe -m pytest -q` — **1769 passing**, and no
   change merges below that. It takes 5–15 minutes; run it in the background.
-- Frontend: `cd frontend && npm test` (231) and `npm run build`.
+- Frontend: `cd frontend && npm test` (233) and `npm run build`.
 - Redesign 05A is a **read-only rules preview**. The normal calculation and
   approval remain delivered-only until the later financial batches and D01;
   do not mistake the preview's entitlement for a transfer instruction.

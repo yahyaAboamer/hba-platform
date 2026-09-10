@@ -26,20 +26,24 @@ file's summary; detailed evidence lives in the latest batch report.
 | 05 Financial rules | **05A implemented locally; review pending. 05B next after acceptance** |
 | 06 Payments · 07 Performance screens · 08 Settings and notifications · 09 Rehearsal and release | Not started |
 
-**1767 backend tests, 231 frontend.** Migration head `a2f47b8e1c53`; Phases 04
-and 05A added none. Final backend run: 1767 passed in 241.10s. Frontend build
-passes. Changes are uncommitted on `phase05a/pending-inclusive-earnings`, based
-on the verified completed commit `8ad14a6cd7453bc8140d52b6f5c64faf91927b67`.
-Nothing was merged, pushed or deployed in 05A.
+**1769 backend tests, 233 frontend.** Migration head `a2f47b8e1c53`; Phases 04
+and 05A added none. Final backend run: 1769 passed in 383.46s, with one
+non-failing local pytest cache warning. Explicit TypeScript no-emit check and
+frontend build pass. Work is committed on `phase05a/pending-inclusive-earnings`,
+based on verified `8ad14a6cd7453bc8140d52b6f5c64faf91927b67`: untouched original
+batch `5320fd6`, code fix-up `8a20ca5`, then this documentation handoff.
+The owner authorized a feature-branch push only. Nothing was merged or deployed;
+05B was not started. Final branch SHA is the documentation handoff commit.
 
 ---
 
 ## Start here
 
 1. Read `docs/redesign/STATUS.md`.
-2. Read `docs/redesign/reports/05A-pending-inclusive-earnings.md`. The local
-   implementation and checks are complete; rendered preview acceptance remains
-   owed. Review the working tree rather than expecting a new completed commit.
+2. Read `docs/redesign/reports/05A-pending-inclusive-earnings.md`, including its
+   fix-up evidence. The original batch is checkpoint `5320fd6`, with reviewed
+   corrections in follow-up commits. Rendered preview acceptance remains owed.
+   Review the committed branch, not an uncommitted batch.
 3. After 05A acceptance, read `docs/redesign/prompts/05_FINANCIAL_RULES.md` and
    run **05B only — Immutable per-model approval**. Do not enable live policy
    or implement 05C just because the pending-inclusive preview exists.
@@ -58,6 +62,11 @@ preview calls the existing staff earnings endpoint with `rules_preview=true`.
 candidate entitlement, old approval, actual allocations and legacy carry links.
 `source.py` handles latest delivery facts and completeness; `calculate.py`
 shares the existing terms/targets/exact arithmetic with the legacy path.
+Its named entry points now make that boundary explicit: `calculate_month`
+cannot accept preview source orders, while `preview_calculation` is read-only;
+both use private `_calculate`. Unused per-order commission was removed, not
+replaced by another display-money implementation. The preview owns its CSS,
+uses MonthPicker, and gets the platform start month from the server.
 
 **The ordinary approval still pays delivered-only.** Pending-inclusive
 approval and concurrency are 05B, persistent corrections are 05C, and D01 gates
@@ -85,10 +94,12 @@ new business decision.
 
 ## Waiting on the owner
 
-- **05A local review/visual acceptance.** The preview is not deployed. Browser
-  sign-in succeeded locally, but further browser inspection was rejected by
-  automatic approval review due to an account usage limit. The new panel has
-  API and React rendering tests, not a completed browser comparison.
+- **05A local review/visual acceptance.** The preview is not deployed. Evidence
+  is a sign-in screenshot and three HTTP 200s, then blocked inspection before
+  any rendered review. **No screen in 05A has been seen by anybody.** API and
+  React server-rendering tests are not a completed browser comparison.
+  A separate read-only code reviewer also hit an account usage limit and
+  returned no review; direct diff review and the four required checks completed.
 
 - **03E data cleanup.** Everything else through 04B was walked on staging on 10
   September and approved - Products paging and speed, all four Targets-grid
@@ -114,11 +125,11 @@ with a record under `docs/redesign/decisions/`. None of the open ones blocks
 
 ## Things this project got wrong, so you do not repeat them
 
-- **The old browser diagnosis was wrong.** In 05A the DOM proxy reported empty
-  fields while a screenshot showed typed values. Sign-in then returned HTTP
-  200, followed by authenticated `/api/auth/me` 200. Do not infer failed typing
-  from DOM value reads alone. Further inspection hit a browser auto-review
-  usage-limit rejection; the financial panel itself was not visually checked.
+- **Do not overstate browser evidence.** In 05A the DOM proxy reported empty
+  fields while a sign-in screenshot showed typed values. `/api/auth/login`,
+  `/api/auth/me` and `/api/payroll/2026-09` returned HTTP 200. Further inspection
+  hit a browser auto-review usage-limit rejection before any rendered review.
+  Those observations establish neither failed typing nor a reviewed 05A screen.
 - **The design-package raw hashes differ on Windows.** Eight assets use CRLF
   in this checkout; all eight match the manifest after LF normalization. The
   designs have no Git changes from `8ad14a6`. Preserve the files and report the

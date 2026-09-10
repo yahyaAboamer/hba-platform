@@ -124,12 +124,22 @@ endpoint. The staff model profile exposes the preview with a month selector.
 - `legacy_allocations`: source month, allocated month, order and snapshot IDs,
   for both ends of old carry. `requires_transition_reconciliation` flags them.
   Allocation is not labelled proof of payment. No links are reset or deleted.
-- `orders`: known basis and display-only commission (also for struck-out failed
-  rows), or null when unavailable. Individual display rounding never feeds the
-  month calculation. No customer identifiers/contact details are included.
+- `orders`: raw source diagnostics, including state, known display basis (null
+  when unavailable), completeness issues and legacy settled links. No per-order
+  commission is computed or consumed by the preview screen. Order-screen
+  earned/forgone presentation remains owned by `portal.py::_order_commission`;
+  it is not reimplemented here. No customer identifiers/contact details.
 - `can_approve=false` and `activation_blockers=[live_transition_not_enabled]`
-  are unconditional. Approval does not accept this mode. 05B/05C and D01 still
-  own immutable pending-inclusive approval, correction handling and activation.
+  are unconditional. `calculate_month` has no source-orders parameter; only
+  the separately named `preview_calculation` can select the pending-inclusive
+  path through private shared arithmetic. Approval does not accept this mode.
+  05B/05C and D01 still own immutable pending-inclusive approval, correction
+  handling and activation.
+
+The staff model-detail response sends `platform_start_month` from the server's
+`PLATFORM_START_MONTH`. The preview's MonthPicker window combines that floor
+with the model's collaboration start and the server's current month; there is
+no hard-coded platform start date in the profile component.
 
 Ingestion now retains a known base when an in-flight order becomes void; both
 policies still exclude it by state. This preserves evidence, not entitlement.

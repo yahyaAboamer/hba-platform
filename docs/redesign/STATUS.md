@@ -2,13 +2,15 @@
 
 Package prepared: 9 September 2026. Phase 00 completed 9 September 2026.
 
-- **Updated after Phase 05A, 10 September 2026.** This replaces the stale
+- **Updated after the Phase 05A fix-up, 10 September 2026.** This replaces the stale
   Phase 01/02 summary previously at the top of this file.
 - Started on clean local `main` at the required completed commit
   **`8ad14a6cd7453bc8140d52b6f5c64faf91927b67`**. Ancestor check passed.
 - Active branch: **`phase05a/pending-inclusive-earnings`**, based on that commit.
-  Changes are local and uncommitted; not merged, pushed or deployed. Remote
-  branch tips were not refreshed in this batch.
+  The original batch was committed untouched as **`5320fd6`** before fixes.
+  Code corrections are **`8a20ca5`**; the documentation handoff follows in its
+  own commit. Push this review branch only, not `main` or `production`.
+  Do not merge, deploy or start 05B under this authorization.
 - **05A implemented and verified locally; batch review/visual acceptance pending.**
   Read `reports/05A-pending-inclusive-earnings.md` before continuing.
 - Staff can open **Models → model → Financial rules preview**. It uses the
@@ -16,11 +18,16 @@ Package prepared: 9 September 2026. Phase 00 completed 9 September 2026.
   the source month, and shows legacy allocations separately. **No live policy
   switch:** existing approval, reopen and payment paths remain legacy pending
   05B/05C and D01. No new financial write endpoint or migration.
-- Verification: **1767 backend tests passed**, final full run **241.10s**;
-  **231 frontend tests passed**; final `npm.cmd run build` exit 0.
-- **Rendered preview comparison remains outstanding.** Browser sign-in did
-  succeed locally (HTTP 200); subsequent inspection was rejected by automatic
-  approval review because of an account usage limit. See corrected note below.
+- Verification: **1769 backend tests passed**, final full run **383.46s**
+  using `.venv/Scripts/python.exe -m pytest -q --color=no` (one non-failing
+  local cache warning). **233 frontend tests passed**; `npx.cmd tsc --noEmit`
+  and `npm.cmd run build` both exit 0. All ran after the final code fixes.
+- A separate read-only reviewer returned no findings because it hit an account
+  usage limit before completing review. Direct diff review and automated
+  checks completed; no independent sign-off is claimed.
+- **No screen in 05A has been seen by anybody.** Evidence is limited to a
+  sign-in screenshot and three HTTP 200s, followed by a browser inspection
+  rejection before any rendered review. See the precise evidence below.
 - Package checker: **52 screen/action rows, 64 checks, 19 source assets**;
   raw-byte verification reports **8 CRLF/LF mismatches**. All eight match the
   manifest after LF normalization; design files have no Git changes from the
@@ -74,17 +81,17 @@ that rather than rediscovering them.
   will re-run *Settings → Shopify & data → Match parcels from 2026-01-01*
   before wardrobes can be judged. Until then, an empty wardrobe on staging is
   expected and says nothing about 03C or 03E.
-- **05A corrects the earlier browser diagnosis.** DOM snapshots and read-only
-  value inspection reported empty fields, but a screenshot showed the typed
-  values. Submitting once produced `POST /api/auth/login` 200 and authenticated
-  `GET /api/auth/me` 200. Do not infer a failed input from the DOM proxy alone.
-  Automatic approval review then rejected further browser inspection for a
-  usage limit; **the new financial preview was not visually inspected**.
+- **05A browser evidence is limited.** DOM snapshots and read-only value
+  inspection reported empty fields, while a sign-in screenshot showed typed
+  values. The requests `POST /api/auth/login`, `GET /api/auth/me` and
+  `GET /api/payroll/2026-09` returned HTTP 200. Automatic approval review then
+  blocked further inspection for a usage limit, before any rendered review.
+  Neither the screenshot nor those responses proves a rendered 05A screen.
+  **No screen in 05A has been seen by anybody.**
 - **`read_products` confirmed granted** on the shop, 10 September, after the
   owner deployed a new app version. `/api/operations/shopify-scopes` is the
   route that answers it; there is no button, by design.
-- Previous environment notes report limited C: space; not refreshed in 05A.
-  Checks in this batch were local, not CI.
+- **C: is 99% full (1.9 GB free). There is no CI.** Every check is local.
 - `production` is deliberately one release behind `main`. Promoting it is a
   separate, owner-authorised act, not a tidy-up.
 - Do not infer acceptance from source files or passing unit tests. Phase 02/04
