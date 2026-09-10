@@ -101,6 +101,34 @@ operation key makes retry-after-timeout and double-click safe.
 - No real credentials/PII in evidence: confirmed. Tests use synthetic models,
   destinations, references and proof bytes. No live transfer was initiated.
 
+## Review addendum, 11 September
+
+Reviewed against `main` @ `0f0ce64`. **The batch is sound and nothing was
+changed in it.** Idempotency is right: a retry returns the original row, a
+reused key presented with different money is refused, and the genuine
+double-click race is caught at the unique constraint, rolled back and resolved
+to the winning row rather than surfacing as a 500. The migration is additive,
+nullable and reversible, and rewrites no append-only history. `is_payable`
+excludes only the house account, so an inactive model who is still owed stays
+on the screen. The frontend follows the house style, which is a visible
+improvement on 05A.
+
+**One measured finding, deliberately not acted on.**
+`tests/test_payments_cost.py` was added by the review and pins the number: an
+unapproved month costs almost nothing, and an approved one costs **nine queries
+every time the screen is drawn**, because deciding whether a correction exists
+means running the commission engine against the frozen snapshot. Month end does
+this for every payable model — roughly 1,400 queries at twenty models with
+eight approved months each, growing with both.
+
+It was left alone on purpose. The obvious gate — skip unless an order changed
+since approval — is wrong, because the fingerprint also covers her terms and
+her target outcome, so a corrected rate or a recorded target moves it without
+touching an order. A gate that missed those would stop reporting real
+corrections, and a missed correction is worse than a slow screen. A correct
+gate is real work and this is about a second at present scale, so the cost is
+pinned by a test that fails loudly if it gets materially worse.
+
 ## Continuation
 
 - Remaining limitations or blocked operations: 06A has not been walked in a
