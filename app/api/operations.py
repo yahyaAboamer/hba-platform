@@ -520,7 +520,7 @@ def unmatched_parcels_route(
     were never HBA's parcels. Only genuine ambiguities and near-misses are
     listed - an order with no phone at all is recorded and not shown.
     """
-    return {"parcels": unmatched(db)}
+    return unmatched(db)
 
 
 @router.get("/notifications")
