@@ -262,7 +262,14 @@ export function Affiliates() {
         <div className="page__title">
           <h1>Models</h1>
           {rows && (
-            <span className="page__subtitle">{rows.length} on file</span>
+            <span className="page__subtitle">
+              {/* While a search or segment is narrowing the list, the count
+               *  says what is on screen as well as what exists — a bare
+               *  "6 on file" above one visible row reads as a bug. */}
+              {visible.length === rows.length
+                ? `${rows.length} on file`
+                : `${visible.length} of ${rows.length}`}
+            </span>
           )}
         </div>
 
