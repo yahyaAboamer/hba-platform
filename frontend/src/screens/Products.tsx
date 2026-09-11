@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
+import { Money } from "../components/Money";
 import { api, can } from "../lib/api";
+import { currentMonth, formatMonth } from "../lib/money";
 import type { Session } from "../lib/api";
 import "./Products.css";
 
@@ -42,6 +44,82 @@ type Detail = {
  * is no separate colour taxonomy to filter by.
  */
 const PAGE = 60;
+
+type TopSeller = {
+  shopify_product_id: string | null;
+  title: string;
+  quantity: number;
+  sales_piastres: number;
+};
+
+/**
+ * What sold through the models' codes this month. W11.
+ *
+ * **Three different questions, and this answers one.** Selling through a code,
+ * owning something from the wardrobe, and being asked to feature it look alike
+ * and are not — *a model can sell products she never received*. This counts
+ * what was bought.
+ *
+ * The figures are what customers actually paid after each model's discount,
+ * not list prices. On a ten per cent code, list prices would be a ten per cent
+ * overstatement on every row.
+ */
+function TopSellers({ month }: { month: string }) {
+  const [body, setBody] = useState<{
+    products: TopSeller[];
+    no_longer_in_shopify_piastres: number;
+  } | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    api
+      .get<{ products: TopSeller[]; no_longer_in_shopify_piastres: number }>(
+        `/api/products/top-sellers/${month}`,
+      )
+      .then((found) => {
+        if (live) setBody(found);
+      })
+      // Silent on failure, deliberately: this is context beside the
+      // catalogue, and a red banner over the whole screen because a side
+      // panel could not load would be out of proportion to what was lost.
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [month]);
+
+  if (!body || body.products.length === 0) return null;
+
+  return (
+    <section className="panel products__panel">
+      <div className="panel__head">
+        <h2 className="panel__title">Selling best through codes</h2>
+        <span className="page__subtitle">{formatMonth(month)}</span>
+      </div>
+      <ol className="products__top">
+        {body.products.slice(0, 5).map((row) => (
+          <li key={row.shopify_product_id ?? row.title}>
+            {row.shopify_product_id ? (
+              <Link to={`/products/${row.shopify_product_id}`}>{row.title}</Link>
+            ) : (
+              <span>{row.title}</span>
+            )}
+            <span className="products__sold">
+              {row.quantity} sold · <Money piastres={row.sales_piastres} />
+            </span>
+          </li>
+        ))}
+      </ol>
+      {body.no_longer_in_shopify_piastres > 0 && (
+        <p className="detail__note products__gone">
+          A further <Money piastres={body.no_longer_in_shopify_piastres} /> sold
+          products that have since been deleted from Shopify, so they cannot be
+          listed by name.
+        </p>
+      )}
+    </section>
+  );
+}
 
 export function Products({ session }: { session: Session }) {
   const [rows, setRows] = useState<Row[] | null>(null);
@@ -142,6 +220,8 @@ export function Products({ session }: { session: Session }) {
           Read the catalogue.
         </p>
       )}
+
+      <TopSellers month={currentMonth()} />
 
       {rows !== null && rows.length > 0 && (
         <ul className="products__grid">

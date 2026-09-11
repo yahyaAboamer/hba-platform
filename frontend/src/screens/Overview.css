@@ -68,3 +68,46 @@
   margin: 0 0 var(--space-5);
   font-size: var(--text-sm);
 }
+
+/* A01. The parts of a payout, the top sellers, and what needs a look. All
+   three are read at a glance before anybody opens payroll, so none of them
+   competes for attention with the figures above. */
+.overview__breakdown {
+  padding: var(--space-2) var(--space-4) var(--space-4);
+}
+
+.overview__top {
+  margin: 0;
+  padding: var(--space-2) var(--space-4) var(--space-4);
+  list-style: none;
+  counter-reset: place;
+}
+
+.overview__top li {
+  display: grid;
+  grid-template-columns: 2rem 1fr auto;
+  align-items: baseline;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+/* The place, not the row number. Two models sharing first both show 1, which
+   is the whole point of the rule and would be lost to a counter. */
+.overview__place {
+  color: var(--quiet);
+}
+
+.overview__review {
+  margin: 0;
+  padding: var(--space-2) var(--space-4) 0;
+  list-style: none;
+}
+
+.overview__review li {
+  padding: var(--space-1) 0;
+}
+
+.overview__reviewnote {
+  padding: 0 var(--space-4) var(--space-4);
+}

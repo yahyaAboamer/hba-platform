@@ -61,6 +61,44 @@ type SyncStatus = {
  *
  * Nothing here is a chart. Twenty rows is not a dataset.
  */
+/**
+ * The owner's month, in the parts a payroll decision is made from. A01.
+ *
+ * **Every figure arrives computed.** The parts of an expected payout are
+ * carved out of the one rounded total on the server, so this renders them and
+ * never sums them — three components added in a browser would disagree with
+ * the payroll screen the first time one of them rounded, on the screen whose
+ * only job is to say how much money to find.
+ */
+type Summary = {
+  active_models: number;
+  sales_piastres: number;
+  ready: number;
+  blocked: number;
+  expected: {
+    payout_piastres: number;
+    commission_piastres: number;
+    fixed_piastres: number;
+    guarantee_top_up_piastres: number;
+  };
+  /** Keyed by why: `no_target`, `not_recorded_this_week`, `behind`. */
+  needs_review: Record<string, number>;
+  top: {
+    affiliate_id: number;
+    name: string;
+    rank: number;
+    sales_piastres: number;
+    uses: number;
+  }[];
+};
+
+/** D08's three, and only the last is about her. */
+const REVIEW_TEXT: Record<string, string> = {
+  no_target: "nothing asked for yet",
+  not_recorded_this_week: "nothing recorded this week",
+  behind: "behind for the week",
+};
+
 export function Overview({ session }: { session: Session }) {
   // Opens on the working month, which before go-live is the month the
   // platform starts in rather than an August it holds nothing for.
@@ -68,6 +106,7 @@ export function Overview({ session }: { session: Session }) {
   const [payroll, setPayroll] = useState<PayrollMonth | null>(null);
   const [sync, setSync] = useState<SyncStatus | null>(null);
   const [attention, setAttention] = useState<Attention | null>(null);
+  const [summary, setSummary] = useState<Summary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [lockNote, setLockNote] = useState<string | null>(null);
 
@@ -77,11 +116,13 @@ export function Overview({ session }: { session: Session }) {
       api.get<PayrollMonth>(`/api/payroll/${month}`),
       api.get<SyncStatus>("/api/operations/sync"),
       api.get<Attention>("/api/operations/attention"),
+      api.get<Summary>(`/api/payroll/${month}/summary`),
     ])
-      .then(([months, status, needing]) => {
+      .then(([months, status, needing, month_summary]) => {
         setPayroll(months);
         setSync(status);
         setAttention(needing);
+        setSummary(month_summary);
       })
       .catch((caught) => setError(caught.message));
     setLockNote(null);
@@ -228,6 +269,22 @@ export function Overview({ session }: { session: Session }) {
                   : "Nothing waiting"
               }
             />
+            {/*
+             * A01: the active model count. Beside the money it explains,
+             * because "how much" and "across how many people" are read
+             * together and answered separately everywhere else.
+             */}
+            {summary && (
+              <Figure
+                label="Active models"
+                value={
+                  <span className="overview__count">
+                    {summary.active_models}
+                  </span>
+                }
+                note={`${summary.ready} ready · ${summary.blocked} blocked`}
+              />
+            )}
             <Figure
               label="Orders indexed"
               value={
@@ -236,6 +293,100 @@ export function Overview({ session }: { session: Session }) {
               note={sync?.jobs.failed ? `${sync.jobs.failed} failed jobs` : "Sync healthy"}
             />
           </div>
+
+          {/*
+           * **Where the money goes, and it is rendered rather than summed.**
+           * A01 asks for salaries, commissions and guarantee top-ups
+           * separately; the server carves them out of the one rounded payout
+           * so the three always add to the figure above, and this screen never
+           * does arithmetic on money.
+           *
+           * Shown only where something is ready. A breakdown of nothing is
+           * three zeroes and a heading.
+           */}
+          {summary && summary.expected.payout_piastres > 0 && (
+            <section className="panel">
+              <div className="panel__head">
+                <h2 className="panel__title">What makes up the payout</h2>
+              </div>
+              <dl className="detail__list overview__breakdown">
+                <div className="detail__row">
+                  <dt className="detail__label">Commission on sales</dt>
+                  <dd className="detail__value">
+                    <Money piastres={summary.expected.commission_piastres} />
+                  </dd>
+                </div>
+                {summary.expected.fixed_piastres > 0 && (
+                  <div className="detail__row">
+                    <dt className="detail__label">Fixed salaries</dt>
+                    <dd className="detail__value">
+                      <Money piastres={summary.expected.fixed_piastres} />
+                    </dd>
+                  </div>
+                )}
+                {summary.expected.guarantee_top_up_piastres > 0 && (
+                  <div className="detail__row">
+                    <dt className="detail__label">
+                      Guaranteed minimums, above what was sold
+                    </dt>
+                    <dd className="detail__value">
+                      <Money
+                        piastres={summary.expected.guarantee_top_up_piastres}
+                      />
+                    </dd>
+                  </div>
+                )}
+              </dl>
+            </section>
+          )}
+
+          {/*
+           * A01's top three by generated sales. Everybody in the first three
+           * places, which on a tie is more than three people - D03 shares a
+           * place and skips the next, and a list that cut one of three equals
+           * would have picked a winner the rule did not.
+           */}
+          {summary && summary.top.length > 0 && (
+            <section className="panel">
+              <div className="panel__head">
+                <h2 className="panel__title">Top sellers</h2>
+              </div>
+              <ol className="overview__top">
+                {summary.top.map((row) => (
+                  <li key={row.affiliate_id}>
+                    <span className="overview__place">{row.rank}</span>
+                    <Link to={`/affiliates/${row.affiliate_id}`}>{row.name}</Link>
+                    <Money piastres={row.sales_piastres} />
+                  </li>
+                ))}
+              </ol>
+            </section>
+          )}
+
+          {/*
+           * A01's content progress needing review, split by why. Two of the
+           * three are HBA's own work rather than anything about a model
+           * (D08), so they are never summed into one accusing number.
+           */}
+          {summary && Object.keys(summary.needs_review).length > 0 && (
+            <section className="panel">
+              <div className="panel__head">
+                <h2 className="panel__title">Content needing a look</h2>
+              </div>
+              <ul className="overview__review">
+                {Object.entries(summary.needs_review).map(([why, count]) => (
+                  <li key={why}>
+                    <span className="overview__count">{count}</span>{" "}
+                    {count === 1 ? "model" : "models"} ·{" "}
+                    {REVIEW_TEXT[why] ?? why.replace(/_/g, " ")}
+                  </li>
+                ))}
+              </ul>
+              <p className="detail__note overview__reviewnote">
+                Only the last of these is about a model. The others are ours.
+              </p>
+            </section>
+          )}
 
           {/*
            * Orders left the sidebar in the redesign (S02) and this is its way
