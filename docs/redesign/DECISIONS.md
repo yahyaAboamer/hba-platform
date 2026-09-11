@@ -6,7 +6,7 @@ Resolve a question when its dependent batch is about to begin. If an answer is m
 
 | ID | Question / input | Why it matters | Resolve before | Suggested handling until resolved |
 |---|---|---|---|---|
-| D01 | What is the first month whose payments will be recorded under the new process? Which existing statements/transfers are already real, and which model/months are externally settled? Supply actual collaboration start months and historical terms/outcomes through the setup UI. | Prototype LAUNCH=March and old repository production GO_LIVE=September are not authoritative for this release. Incorrect boundaries can double-pay old months or suppress real debts. | Phase 02 history design; final mapping before 08 rehearsal/release | Inventory existing records read-only. Use an explicit per-model/month transition manifest; never change GO_LIVE_MONTH to January just to expose history. Preserve actual old platform transfers. |
+| D01 | **ANSWERED 11 Sep 2026: September 2026 is the first month we pay.** | — | — | **Closed.** `decisions/D01-september-is-the-first-month-we-pay.md`. Everything before it was settled outside: still calculated and frozen, never payable, and the ledger refuses a transfer against one. **Production was already set this way** - the decision is no change, and the point of recording it is that the setting was a default nobody had ratified. History shown to a model is `max(her start, January 2026)`, which `months_for` already did. |
 | D02 | Keep existing whole-EGP half-up rounding for final payouts, or change to two-decimal payouts? | The prototype prints decimal totals and uses JavaScript rounding; the repo rounds the total to whole pounds. This affects actual money. | Phase 05A financial acceptance | Preserve existing exact-arithmetic and whole-pound payout rule. Display precision alone does not change settlement precision. |
 | D03 | **ANSWERED 11 Sep 2026: a use is a delivery outcome, not a financial one.** | — | — | **Closed.** `decisions/D03-uses-are-deliveries-not-money.md`. Only a failed delivery removes an order from the count; delivered counts permanently and anything in between counts until it resolves. **Do not read `commission_state`** - it folds cancelled, refunded and failed into one `void` and would silently drop the first two. Ranking orders by sales, breaks ties on uses, and gives equal rank with the next place skipped (1, 1, 3). |
 | D04 | **ANSWERED 10 Sep 2026: the whole month, below the guarantee if needed.** | — | — | **Closed.** `decisions/D04-recovery-comes-before-the-guarantee.md`. A carried overpayment consumes a later month's whole payable, not only what was earned above the floor; a month can settle at zero. It does **not** make absorption automatic — §11.5's carry-or-absorb choice is untouched. The platform recommended protecting the floor and was overruled; the record says so, and why the screens must now explain a reduced month to the model. |
@@ -31,6 +31,7 @@ Resolve a question when its dependent batch is about to begin. If an answer is m
 
 | ID | Answer | Date | Record |
 |---|---|---|---|
+| D01 | September is the first month we pay | 11 Sep 2026 | `decisions/D01-september-is-the-first-month-we-pay.md` |
 | D03 | Uses are deliveries, not money | 11 Sep 2026 | `decisions/D03-uses-are-deliveries-not-money.md` |
 | D04 | Recovery comes before the guarantee | 10 Sep 2026 | `decisions/D04-recovery-comes-before-the-guarantee.md` |
 | D08 | A quarter of the targets a week | 11 Sep 2026 | `decisions/D08-weekly-pace-is-a-quarter-a-week.md` |
@@ -45,7 +46,7 @@ current*, *does something she bought belong in her wardrobe* — and all four
 were answered in a sentence. The records carry what each one settles and what
 it leaves alone.
 
-**Still open: D01, D02, D09, D10.** D02 applies to final payout
+**Still open: D02, D09, D10.** D02 applies to final payout
 rounding. 05A preserved and tested the existing exact-arithmetic whole-pound
 rule under the continuation handoff's instruction to proceed. It remains an
 open owner decision; D01 still gates live activation.
