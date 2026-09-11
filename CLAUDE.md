@@ -106,9 +106,28 @@ payroll without touching a maintainer screen.
   cost the best part of an hour.
 - Frontend: `cd frontend && npm test` (256), `npx tsc --noEmit` and
   `npm run build`.
-- **The redesign is code-complete.** Phases 00-09 are merged. What remains is
-  09B, the owner walking every screen - automation cannot sign in here, and nine
-  batches of merged screens have never been seen by a person.
+- **A browser session is now possible.** Yahya signs in himself at
+  `https://hba-platform-staging-staging.up.railway.app/sign-in` and the session
+  is then usable for the rest of the conversation - ask for it rather than
+  writing another report that says "visual evidence: none". Serve the approved
+  exports for comparison with
+  `python -m http.server 8899` inside `docs/redesign/designs` (`file://` URLs
+  are blocked), and compare at 1280 and 1440 wide, excluding the export's own
+  demo toolbar and scenario buttons.
+- **The redesign is NOT complete, and a report that said so was wrong.**
+  Phases 00-09 are merged and every feature works, but the screens were built
+  *onto the old page structure* rather than rebuilt to the approved exports.
+  This was confirmed on 12 September by rendering the reference export and the
+  live staging app side by side: admin Home leads with four stacked notice
+  blocks and four operational tiles where the design has three compact notices
+  and three business cards; the payout breakdown sits in its own panel instead
+  of inside the payment card; *Content needing a look* shows two aggregate
+  counts where the design has a per-model table. Nine batch reports said
+  "visual evidence: none" and none of them was wrong about that - the mistake
+  was concluding that a passing test and a present feature meant parity.
+  **A test that finds a word on a page does not verify the page.**
+  The correction is `docs/plans/2026-09-12-design-parity-handoff.md`, batches
+  C1-C5, on top of the imported branch `review/approved-design-parity`.
 - Redesign 05A is a **read-only rules preview**. The normal calculation and
   approval remain delivered-only until D01; do not mistake the preview's
   entitlement for a transfer instruction.
