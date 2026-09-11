@@ -16,7 +16,7 @@
   align-items: baseline;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--rule-strong);
+  border: 1px solid var(--rule);
   border-radius: var(--radius);
   background: var(--surface);
   cursor: pointer;

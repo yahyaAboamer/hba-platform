@@ -664,3 +664,47 @@ def test_a_note_is_kept_when_one_is_written(db):
     )
 
     assert request.message == "Mention the shade"
+
+
+# -- the catalogue's model-coverage column -----------------------------------
+
+
+def test_coverage_counts_models_not_parcels(db):
+    """**Distinct models.**
+
+    Two of the same thing sent to one model is one model covered. Counting
+    shipments would overstate reach on exactly the products HBA sends most.
+    """
+    from app.services.wardrobe import coverage_for
+
+    one = _model(db)
+    _product(db, PANTS, "Wide-leg trousers")
+    _parcel(db, one, "A1", [(PANTS, "Wide-leg trousers", "M")])
+    _parcel(db, one, "A2", [(PANTS, "Wide-leg trousers", "L")])
+    db.flush()
+
+    assert coverage_for(db, [PANTS]) == {PANTS: 1}
+
+
+def test_coverage_counts_each_model_who_has_one(db):
+    from app.services.wardrobe import coverage_for
+
+    one = _model(db)
+    two = _model(db, name="Salma", email="salma@example.com")
+    _product(db, PANTS, "Wide-leg trousers")
+    _parcel(db, one, "A1", [(PANTS, "Wide-leg trousers", "M")])
+    _parcel(db, two, "A2", [(PANTS, "Wide-leg trousers", "L")])
+    db.flush()
+
+    assert coverage_for(db, [PANTS]) == {PANTS: 2}
+
+
+def test_a_product_nobody_has_is_absent_rather_than_zero(db):
+    """The caller decides how to say *nobody*; the query does not invent a row."""
+    from app.services.wardrobe import coverage_for
+
+    _product(db, PANTS, "Wide-leg trousers")
+    db.flush()
+
+    assert coverage_for(db, [PANTS]) == {}
+    assert coverage_for(db, []) == {}

@@ -39,7 +39,7 @@ owned, and must not vanish either — a model who was told something was sent ha
 to be able to see what happened to it.
 """
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.businesstime import utcnow
@@ -125,6 +125,42 @@ def _gift_lines(db: Session, affiliate_id: int | None = None, product_id: str | 
     if product_id is not None:
         query = query.where(OrderLineItem.shopify_product_id == product_id)
     return db.execute(query).all()
+
+
+def coverage_for(db: Session, product_ids: list[str]) -> dict[str, int]:
+    """How many models have each of these products, in one query.
+
+    The approved catalogue shows this beside every product, so HBA can see at
+    a glance which pieces have reached the roster and which have gone to one
+    person.
+
+    **Distinct models, not parcels.** Two of the same thing sent to one model
+    is one model covered; counting the shipments would overstate reach on
+    exactly the products HBA sends most often.
+
+    Built on the same gift rule as every other wardrobe read (D05) rather than
+    on its own filter — a second definition of *she has this* would eventually
+    disagree with her wardrobe screen, and the way anybody would find out is a
+    model saying she never received something the catalogue says she has.
+    """
+    clean = [value for value in product_ids if value]
+    if not clean:
+        return {}
+    rows = db.execute(
+        select(
+            OrderLineItem.shopify_product_id,
+            func.count(func.distinct(ModelShipment.affiliate_id)),
+        )
+        .join(
+            OrderLineItem,
+            OrderLineItem.shopify_order_id == ModelShipment.shopify_order_id,
+        )
+        .where(ModelShipment.affiliate_id.is_not(None))
+        .where(ModelShipment.classification == Classification.GIFT)
+        .where(OrderLineItem.shopify_product_id.in_(clean))
+        .group_by(OrderLineItem.shopify_product_id)
+    )
+    return {product_id: count for product_id, count in rows}
 
 
 def _products_by_id(db: Session, ids: set[str]) -> dict[str, Product]:

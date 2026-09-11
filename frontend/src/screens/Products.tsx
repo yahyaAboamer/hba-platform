@@ -13,6 +13,12 @@ type Row = {
   status: string;
   image_url: string | null;
   sizes: number;
+  sku: string | null;
+  /** Distinct models who have one, on the same gift rule as her wardrobe. */
+  models_with_it: number;
+  /** `null` where nothing has been asked for; `false` is a request that
+   *  exists and is currently hidden, which is not the same thing (W09). */
+  featured: boolean | null;
 };
 
 type RosterEntry = { affiliate_id: number; name: string; status: string };
@@ -26,6 +32,30 @@ type RosterEntry = { affiliate_id: number; name: string; status: string };
  * the route reads as one with no way in from the interface. The message is
  * optional (D12): a product can be featured on its picture alone.
  */
+/**
+ * *4 models*, or the fact that nobody has one yet.
+ *
+ * Zero is written out rather than shown as `0`, because a nought in a column
+ * of counts reads as a measurement that came back empty. **No model has one**
+ * is the thing HBA would act on.
+ */
+export function coverageLabel(count: number): string {
+  if (count === 0) return "Nobody yet";
+  return `${count} model${count === 1 ? "" : "s"}`;
+}
+
+/**
+ * Whether HBA has asked for this product to be posted about (W09).
+ *
+ * Three states, not two. **A hidden request is not the absence of one** —
+ * somebody wrote it and then took it down, and the wording is still there to
+ * put back. Collapsing hidden into none is how a paragraph gets retyped.
+ */
+export function featureLabel(featured: boolean | null): string {
+  if (featured === null) return "—";
+  return featured ? "Showing to models" : "Hidden";
+}
+
 export type FeatureRequest = { message: string | null; visible: boolean };
 
 type Detail = {
@@ -235,32 +265,57 @@ export function Products({ session }: { session: Session }) {
       <TopSellers month={currentMonth()} />
 
       {rows !== null && rows.length > 0 && (
-        <ul className="products__grid">
+        <table className="table products__table">
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th>Status</th>
+              <th className="products__figure">Model coverage</th>
+              <th>Feature request</th>
+              <th aria-hidden="true" />
+            </tr>
+          </thead>
+          <tbody>
           {rows.map((row) => (
-            <li key={row.shopify_product_id}>
-              <Link
-                className="products__card"
-                to={`/products/${row.shopify_product_id}`}
-              >
-                {row.image_url ? (
-                  <img
-                    className="products__pic"
-                    src={row.image_url}
-                    alt=""
-                    loading="lazy"
-                  />
-                ) : (
-                  <span className="products__nopic" aria-hidden="true" />
-                )}
-                <span className="products__name">{row.title}</span>
-                <span className="products__meta">
-                  {row.sizes} size{row.sizes === 1 ? "" : "s"}
-                  {row.status !== "active" && ` · ${row.status}`}
+            <tr key={row.shopify_product_id}>
+              <td>
+                <Link
+                  className="products__who"
+                  to={`/products/${row.shopify_product_id}`}
+                >
+                  {row.image_url ? (
+                    <img
+                      className="products__thumb"
+                      src={row.image_url}
+                      alt=""
+                      loading="lazy"
+                    />
+                  ) : (
+                    <span className="products__nothumb" aria-hidden="true" />
+                  )}
+                  <span className="products__who-text">
+                    <span className="products__name">{row.title}</span>
+                    {/* SKU under the name, as the export stacks them. Falls
+                     *  back to the size count rather than an empty line —
+                     *  Shopify does not always carry one. */}
+                    <span className="products__meta">
+                      {row.sku ?? `${row.sizes} size${row.sizes === 1 ? "" : "s"}`}
+                    </span>
+                  </span>
+                </Link>
+              </td>
+              <td>
+                <span className={`products__status products__status--${row.status}`}>
+                  {row.status === "active" ? "Active" : row.status}
                 </span>
-              </Link>
-            </li>
+              </td>
+              <td className="products__figure">{coverageLabel(row.models_with_it)}</td>
+              <td>{featureLabel(row.featured)}</td>
+              <td className="products__go" aria-hidden="true">→</td>
+            </tr>
           ))}
-        </ul>
+          </tbody>
+        </table>
       )}
 
       {/*

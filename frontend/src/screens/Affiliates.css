@@ -328,7 +328,7 @@
   height: 32px;
   border-radius: 50%;
   border: 1px solid var(--rule);
-  color: var(--quiet);
+  color: var(--faint);
   font-size: 12.5px;
 }
 

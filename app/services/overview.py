@@ -70,6 +70,11 @@ class Summary:
     sales_piastres: int
     breakdown: Breakdown = field(default_factory=Breakdown)
     #: Ready to approve, and what still blocks the rest.
+    #: Models with attributed sales this month, which is not the same as the
+    #: active count — the design's sales card says which of the two its figure
+    #: came from, so a quiet month reads as quiet rather than as broken.
+    selling_models: int = 0
+
     ready: int = 0
     blocked: int = 0
     #: A01's *content progress needing review*, by why.
@@ -170,6 +175,9 @@ def month_summary(db: Session, month: str) -> Summary:
         if state in NEEDS_REVIEW:
             review[state] = review.get(state, 0) + 1
 
+    summary.selling_models = sum(
+        1 for row in month_performance(db, month) if row.sales_piastres > 0
+    )
     summary.needs_review = review
     summary.content = content_rows(db, models, month)
     summary.top = _top_three(db, month)

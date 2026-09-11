@@ -133,8 +133,11 @@ a {
 
 /* Codes, months, order numbers. Things that line up in a column. */
 .code {
+  /* The code under a name — HBA15, MALAK10 — sits in the faint tier in the
+   * approved export. It identifies the row rather than competing with it. */
   font-size: var(--text-sm);
   letter-spacing: -0.01em;
+  color: var(--faint);
 }
 
 /* ── State ────────────────────────────────────────────────────────────────
@@ -300,9 +303,11 @@ a {
   font-weight: 500;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--quiet);
+  /* The export draws a column name in the faint tier, not the quiet one. A
+   * header as bright as the data it labels competes with it. */
+  color: var(--faint);
   padding: var(--space-2) var(--space-3);
-  border-bottom: 1px solid var(--rule-strong);
+  border-bottom: 1px solid var(--rule);
   white-space: nowrap;
 }
 

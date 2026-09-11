@@ -92,6 +92,27 @@ def list_products(
         )
         sizes = {product_id: count for product_id, count in counts}
 
+    # The approved catalogue is a table, and two of its columns are about the
+    # models rather than the product: **how many of them have it**, and
+    # **whether HBA has asked for it to be posted about**. Both are one
+    # grouped query over the page's rows rather than one query per row.
+    coverage: dict[str, int] = {}
+    featured: dict[str, bool] = {}
+    if rows:
+        from app.models.promotions import FeatureRequest
+        from app.services.wardrobe import coverage_for
+
+        ids = [row.shopify_product_id for row in rows]
+        coverage = coverage_for(db, ids)
+        featured = {
+            request.shopify_product_id: request.visible
+            for request in db.scalars(
+                select(FeatureRequest).where(
+                    FeatureRequest.shopify_product_id.in_(ids)
+                )
+            )
+        }
+
     return {
         "products": [
             {
@@ -103,6 +124,15 @@ def list_products(
                 # tens of megabytes to draw one page.
                 "image_url": thumbnail(row.image_url),
                 "sizes": sizes.get(row.shopify_product_id, 0),
+                "sku": row.sku,
+                # How many models have one. Distinct models, not parcels: two
+                # sent to the same person is one model covered, and counting
+                # parcels would overstate reach on exactly the products HBA
+                # sends most.
+                "models_with_it": coverage.get(row.shopify_product_id, 0),
+                # None where nothing has been asked for, which is not the same
+                # as a request that exists and is currently hidden (W09).
+                "featured": featured.get(row.shopify_product_id),
                 # Freshness, said rather than implied. A catalogue nobody has
                 # read for a fortnight looks identical to a fresh one.
                 "synced_at": row.synced_at.isoformat() if row.synced_at else None,

@@ -553,3 +553,22 @@ def test_the_leaderboard_carries_the_code_she_had_that_month(db):
     db.flush()
 
     assert month_summary(db, AUGUST).top[0]["code"] == "NOUR10"
+
+
+def test_the_sales_card_says_how_many_models_it_counted(db):
+    """The export writes the denominator under the figure.
+
+    A total with no denominator cannot tell a quiet month from a feed that
+    stopped, and those are the two readings the owner most needs kept apart.
+    Counted on sales rather than on status: a model who is active and sold
+    nothing did not contribute to the number above it.
+    """
+    selling = _model(db, "Nour")
+    _model(db, "Salma")
+    _order(db, selling, "1", 2_000_000)
+    db.flush()
+
+    summary = month_summary(db, AUGUST)
+
+    assert summary.active_models == 2
+    assert summary.selling_models == 1

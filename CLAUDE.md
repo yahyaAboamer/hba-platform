@@ -91,7 +91,7 @@ payroll without touching a maintainer screen.
   the background. Two against the same database deadlock and leak committed
   rows into each other, and the failures look exactly like a real regression
   in whatever you just changed. Also on 10 September, and it cost an hour.
-- Backend: `.venv/Scripts/python.exe -m pytest -q` — **1897 passing**, and no
+- Backend: `.venv/Scripts/python.exe -m pytest -q` — **1901 passing**, and no
   change merges below that. It takes 5–15 minutes; run it in the background.
 - **If the suite is killed for low memory, run it in four groups** rather than
   giving up on it. One pytest process grows as it goes and this machine has
@@ -118,7 +118,7 @@ payroll without touching a maintainer screen.
 
   Then empty the database and re-run the file alone. Happened 10 September and
   cost the best part of an hour.
-- Frontend: `cd frontend && npm test` (290), `npx tsc --noEmit` and
+- Frontend: `cd frontend && npm test` (296), `npx tsc --noEmit` and
   `npm run build`.
 - **A browser session is now possible.** Yahya signs in himself at
   `https://hba-platform-staging-staging.up.railway.app/sign-in` and the session
