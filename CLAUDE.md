@@ -1,6 +1,8 @@
 # hba-platform
 
-Commission and payroll for ~20 Egyptian beauty models at **HBA Aesthetics**.
+Affiliate operations, clothing gifts, sales, targets and payroll for **HBA / HBA Wear**.
+The admin serves the owner, marketing team and finance team; the model portal
+shows each model their own performance, wardrobe and payment records.
 FastAPI + SQLAlchemy + Postgres, React + Vite, on Railway.
 
 **Read `docs/plans/2026-09-11-design-parity-handoff.md` first** — it says where
@@ -12,8 +14,8 @@ the work is right now. Everything below is the part that does not change.
 
 | | Who | Look |
 |---|---|---|
-| **Maintainer** | 2 people, laptop, month end | Laptop-first; match the approved Admin HTML structure and styling |
-| **Affiliate portal** (`.affiliate`) | ~20 models, phone, arriving from an email | Dark by default, denser, phone-shaped |
+| **Maintainer** | Owner, marketing and finance teams on laptops | Laptop-first; match the approved Admin HTML structure and styling |
+| **Affiliate portal** (`.affiliate`) | Models on phones | Dark by default, denser, phone-shaped |
 
 **One palette across both, since ADR 0039** — HBA green, both themes, defined
 once in `tokens.css` with the accent alone in `accent.css`. `portal.css` is

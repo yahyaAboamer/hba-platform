@@ -3,6 +3,11 @@
 Date: 11 September 2026. Working branch: `fix/approved-design-parity`.
 Base: `2089a1fb25139518c8bb4df7b78a067f3e2b5123`.
 
+The branch is LOCAL ONLY. GitHub rejected tree creation with HTTP 403 (integration
+write access unavailable); nothing was pushed, merged or deployed. Import the
+accompanying Git bundle using its README before attempting to check out this branch
+in another workspace. Do not assume it exists on origin.
+
 **The redesign is not complete. This is a draft correction branch, not a release.**
 The owner reported that the implementation retained the old page structure.
 Source inspection and authenticated staging inspection confirmed that report.
@@ -44,6 +49,13 @@ they do not establish fidelity to the approved designs.
   Year/Grow bookmarks redirect Home. Ranking gets the eligible month picker.
 - Model receipt calculation links now open `/earnings?month=...`; that view reads
   the requested eligible month directly, instead of retaining another Home month.
+- Model Wardrobe: eligible image-based feature cards above owned product rows,
+  sizes and honestly labelled order dates, compact incoming/failed section, retry
+  and unavailable-image fallbacks. Personal top sellers still require an API.
+- Product detail: image/coverage summary, searchable four groups, compact feature
+  summary, separate query-addressable promotion editor and passive Received/On the
+  way preview. Existing authorization and save/hide/remove API calls retained.
+  Failed saves retain drafts; success appears only after the server responds.
 - Chart geometry covers empty, single-month, zero, missing and invalid samples.
   Missing API values remain missing, not invented zeroes.
 
@@ -65,8 +77,9 @@ older month does not yet substitute that month's terms. Do not treat this as don
 - Browser navigation to the local reference server was blocked. The modified branch
   has not been rendered in the supported browser. Visual acceptance remains open.
 - Frontend tests/build were run; see report for final counts. No backend files or
-  financial data were changed. Backend tests were not run: this workspace lacks
-  PostgreSQL and the Python application dependencies. Never run destructive tests
+  financial data were changed. Python application dependencies were installed.
+  Backend tests were not run: no isolated PostgreSQL instance is available here,
+  and the system package installation failed under the environment permissions. Never run destructive tests
   against a development, staging or production database to get around that.
 - At initial inspection GitHub main and production both pointed at the base above.
   Old handoff branch references were stale. A branch SHA is not proof of the running
@@ -125,8 +138,12 @@ Run these against a positively identified, disposable test database, one process
 ### C3 — Products and the complete wardrobe journey
 
 Match `vProducts`, `vProduct`, `vShipment`, `vPromo` and the model wardrobe views.
-Promotion editing is its approved secondary view, not a long inline form in the
-product roster. Show model-specific top sellers, eligible passive feature cards,
+The draft now separates promotion editing from the roster and has its preview;
+verify it visually and finish the remaining source-contract gaps. The current
+server rejects blank feature messages although the approved design calls them
+optional. Align API/storage behavior and tests before marking that control done.
+The roster API currently omits shipment/order references required by the approved
+rows; add real references and their detail navigation, never invented ones. Show model-specific top sellers, eligible passive feature cards,
 then owned/incoming products in the approved row layout. Use real product images.
 Never expose staff aggregate sales as this model's own top sellers. Feature requests
 are eligible for Received or Processing, never Not sent or failed-only. No Done

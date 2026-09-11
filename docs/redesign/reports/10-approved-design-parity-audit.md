@@ -22,8 +22,8 @@ component contains a word do not verify its page, position, hierarchy or workflo
 | Models list | Old status/kind/readiness table and invitation content | Unchanged | Approved search/segments/card and table content; setup/detail navigation |
 | Model profile | Five tabs absent, source + live | Five sections, existing forms grouped, wardrobe image cards and retry, embedded model targets | Profile hero, exact fields/layout; selected-month terms; complete performance and payment summaries |
 | Product catalogue | Catalogue and paging exist | Unchanged | Reference layout, scope/search/counts, state restoration |
-| Product detail | Inline promotion form and grouped roster | Unchanged | Approved secondary promotion editor, roster fields and shipment/detail navigation |
-| Promotion guidance | Eligibility service exists | Unchanged | Both sides visually match; passive eligible cards; no completion/target trigger |
+| Product detail | Inline promotion form and grouped roster | Image/coverage summary, query-backed name search, four collapsible groups, compact request summary | Order references absent from API; shipment/detail navigation; visual comparison |
+| Promotion guidance | Eligibility service exists | Separate editor and Received/On the way preview; visible/message saved together; failure retains draft | Optional message conflicts with current backend requirement; visual comparison |
 | Admin Targets | Older bulk editing grid | Existing revision-checked editor can render one model in profile | Exact approved main grid and editing layout; preserve latest owner-approved bulk-year behavior |
 | Admin Payments list | Server totals/filter states exist; row action passes selected model in router state | Month/affiliate links can filter selected model | Approved row content and payment-detail entry point, reload-safe selection |
 | Payment detail/receipt | Authorized destination reveal and ledger safeguards exist | Unchanged | Full approved detail hierarchy, saved InstaPay URL button, receipt context and proof |
@@ -32,7 +32,7 @@ component contains a word do not verify its page, position, hierarchy or workflo
 | Model header/navigation | Extra arrow month bar; Ranking had no picker | Compact header picker; Ranking included; back headers; Year/Grow redirect Home | Exact spacing and secondary back destinations on phone |
 | Model Home | Old month page, inline calculation/targets, separate Year/Grow links | Compact hero, inline chart, calculation page, separate payment state | Authoritative current performance/delivery counts/Uses history; exact visuals |
 | Model Orders | Legacy commission states and prose | Home chips filter orders; stale response protection; filler paragraph removed | True delivery states, pending amounts, correction explanation and approved row design |
-| Model Wardrobe | Received grid first, requests last, no top sellers | Unchanged | Personal top sellers and featured cards above owned/incoming rows; real images |
+| Model Wardrobe | Received grid first, requests last, no top sellers | Eligible feature cards above owned image rows and incoming section; sizes, order dates, retry and image fallbacks | Personal top-sellers contract/view; visual comparison |
 | Model Targets | Functional target screen exists | Unchanged | Full reference comparison including history/outcome-only states |
 | Model Ranking | Server ranking exists; peers anonymous in UI | Month picker added | Approved rows, name visibility contract, brief basis copy; never peer sales |
 | Model You/details/payout/notifications | Long account form rather than approved menu/secondary pages | Secondary header only | Approved menu and each subview, cancel/save, reauth and theme persistence |
@@ -59,7 +59,11 @@ changed by this correction batch.
 - Receipt-link test updated for its explicit calculation destination.
 - No modified-branch browser screenshots: local browser navigation was blocked.
 - No completed live model session and no backend test run. The local environment
-  lacks PostgreSQL/application Python dependencies. Do not substitute a live database.
+  has Python application dependencies but no isolated PostgreSQL instance. Do not
+  substitute a live database. PostgreSQL installation was blocked by environment
+  permissions.
+- GitHub writes were rejected with HTTP 403 by the integration. This branch is
+  local only; the importable bundle contains the actual commits, not just prompts.
 
 Completion requires all rows above to have verified outcomes, not merely a green
 build. No merge/deployment is represented as authorized by this report.
