@@ -296,6 +296,21 @@ export function AffiliateDetail({ session }: { session: Session }) {
   if (!detail) return <p className="empty">Loading…</p>;
 
   const verified = detail.codes.some((entry) => entry.verified);
+  /**
+   * The code she sells under **now** — the open-ended one, or the last
+   * registered if every period has closed. A hero that listed every code she
+   * has ever held would bury the one an order arriving today would match.
+   */
+  const current =
+    detail.codes.find((entry) => entry.end_month === null) ??
+    detail.codes[detail.codes.length - 1];
+  const appliedOn = detail.created_at
+    ? new Date(detail.created_at).toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      })
+    : null;
 
   return (
     <>
@@ -304,12 +319,38 @@ export function AffiliateDetail({ session }: { session: Session }) {
           <Link to="/affiliates" className="detail__back">
             ← Models
           </Link>
-          <h1>{detail.name}</h1>
-          <span className={`state state--${detail.status}`}>
-            {STATUS_LABEL[detail.status]}
-          </span>
         </div>
       </div>
+
+      {/*
+       * The approved profile's hero: who this is, at a glance, before any of
+       * the sections. Her initial, her name, the state she is in, and the code
+       * an order knows her by — the same four things the roster row carries,
+       * so arriving from that row does not feel like arriving somewhere else.
+       */}
+      <header className="detail__hero">
+        <span className="detail__hero-avatar" aria-hidden="true">
+          {detail.name.charAt(0).toUpperCase()}
+        </span>
+        <div className="detail__hero-who">
+          <h1>{detail.name}</h1>
+          <div className="detail__hero-facts">
+            <span className={`state state--${detail.status}`}>
+              {STATUS_LABEL[detail.status]}
+            </span>
+            {/* The code she sells under now. A profile that showed every code
+             *  she has ever held would bury the one that matters today. */}
+            {current ? (
+              <span className="code">{current.code}</span>
+            ) : (
+              <span className="detail__hero-nocode">No code yet</span>
+            )}
+            {detail.status === "pending" && appliedOn && (
+              <span className="detail__hero-applied">Applied {appliedOn}</span>
+            )}
+          </div>
+        </div>
+      </header>
 
       {/*
        * The one thing that is genuinely wrong rather than merely absent: an
