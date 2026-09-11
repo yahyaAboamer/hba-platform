@@ -124,3 +124,32 @@
   margin: var(--space-5) auto 0;
   display: block;
 }
+
+/* W11. What sold through the codes - above the catalogue grid, because it is
+   the question somebody opens this screen with, and the grid is the answer to
+   a different one. */
+.products__top {
+  margin: 0;
+  padding: var(--space-2) var(--space-4) var(--space-4);
+  list-style: none;
+  counter-reset: seller;
+}
+
+.products__top li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.products__sold {
+  color: var(--quiet);
+  font-size: var(--text-sm);
+}
+
+.products__gone {
+  padding: 0 var(--space-4) var(--space-4);
+}

@@ -33,7 +33,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.businesstime import parse_month
-from app.models.affiliates import AffiliateProfile
+from app.models.affiliates import AccountKind, AffiliateProfile
 from app.models.attributed_orders import AttributedOrder, CommissionState
 from app.models.orders import OrderIndex
 from app.services.shopify.fulfilment import FAILED
@@ -100,6 +100,11 @@ def month_performance(db: Session, month: str) -> list[Standing]:
             OrderIndex.shopify_order_id == AttributedOrder.shopify_order_id,
             isouter=True,
         )
+        # **A house code is not a model** (§8, §17). It has real sales and no
+        # payee, so it must not appear on a board of people, take a place from
+        # somebody, or enter a count of models. Filtered in the query rather
+        # than after it, so no caller can forget.
+        .where(AffiliateProfile.account_kind != AccountKind.HOUSE)
         .group_by(AffiliateProfile.id, AffiliateProfile.name)
     ).all()
 
@@ -167,3 +172,94 @@ def uses_for(db: Session, affiliate: AffiliateProfile, month: str) -> int:
         )
         or 0
     )
+
+
+@dataclass(frozen=True)
+class ProductSales:
+    """One product, and what it sold through models' codes."""
+
+    shopify_product_id: str | None
+    title: str
+    quantity: int
+    sales_piastres: int
+
+
+def top_products(db: Session, month: str, *, limit: int = 10) -> dict:
+    """Which products sell through the models' codes. W11.
+
+    ## Three different questions, and this answers only one
+
+    W11 separates **selling through a code**, **owning something from the
+    wardrobe** and **being asked to feature it**. They look alike and they are
+    not: *a model can sell products she never received.* This counts what was
+    actually bought through a code, and says nothing about who has what.
+
+    ## Real line items, discounts and quantities
+
+    W11 again, and it rules out the easy version: summing item names against
+    undiscounted prices. So this reads `order_line_item` — the lines actually
+    attributed to somebody's code — and uses **`discounted_total_piastres`**,
+    which is what the customer paid after the model's own discount, times the
+    quantity already baked into that total.
+
+    Using the undiscounted price would credit a model with money the shop never
+    took, and on a ten-percent code that is a ten-percent lie on every row.
+
+    ## Grouped by product id, not by name
+
+    A renamed product is the same product, and two products can share a name.
+    The id is the stable identity (the prompt asks for exactly that), and the
+    title is carried along for display from the line as it was written.
+
+    **Lines whose product was deleted from Shopify have no id.** They are not
+    dropped — that would make the totals disagree with the payroll figures
+    beside them — but they cannot be grouped either, so they are reported
+    together as their own figure and left out of the ranking.
+    """
+    from app.models.catalogue import OrderLineItem
+
+    month = parse_month(month)
+
+    rows = db.execute(
+        select(
+            OrderLineItem.shopify_product_id,
+            func.min(OrderLineItem.title),
+            func.sum(OrderLineItem.quantity),
+            func.sum(OrderLineItem.discounted_total_piastres),
+        )
+        .select_from(OrderLineItem)
+        .join(
+            AttributedOrder,
+            AttributedOrder.shopify_order_id == OrderLineItem.shopify_order_id,
+        )
+        .where(AttributedOrder.business_month == month)
+        # Counted sales only, matching the figure every other screen calls
+        # sales. A pending order has not sold anything yet and a failed one
+        # never will.
+        .where(AttributedOrder.commission_state == CommissionState.EARNED)
+        .group_by(OrderLineItem.shopify_product_id)
+    ).all()
+
+    known = [
+        ProductSales(
+            shopify_product_id=product_id,
+            title=title or "Untitled",
+            quantity=int(quantity or 0),
+            sales_piastres=int(sales or 0),
+        )
+        for product_id, title, quantity, sales in rows
+        if product_id is not None
+    ]
+    gone = sum(
+        int(sales or 0) for product_id, _, _, sales in rows if product_id is None
+    )
+
+    known.sort(key=lambda row: (-row.sales_piastres, -row.quantity, row.title))
+    return {
+        "month": month,
+        "products": known[:limit],
+        # Reported rather than dropped, so the totals on this screen still
+        # reconcile with the sales figures elsewhere.
+        "no_longer_in_shopify_piastres": gone,
+        "total_piastres": sum(row.sales_piastres for row in known) + gone,
+    }

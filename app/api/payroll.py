@@ -413,3 +413,53 @@ def stuck_reopened(
             for row in months_left_reopened(db, month)
         ],
     }
+
+
+@router.get("/{month}/summary")
+def month_summary_view(
+    month: str,
+    _actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_VIEW)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """The owner's whole month in one answer. A01, Phase 07B.
+
+    **The breakdown is computed here, never in the browser.** Three components
+    assembled from a payload would be a second implementation of what a month
+    is worth, and it would disagree with the payroll screen the first time
+    somebody rounded differently — on the screen whose job is to say how much
+    money to find.
+    """
+    from app.services.overview import month_summary
+
+    month = _month_or_400(month)
+    found = month_summary(db, month)
+
+    return {
+        "month": found.month,
+        "active_models": found.active_models,
+        "sales_piastres": found.sales_piastres,
+        "sales": format_egp(found.sales_piastres),
+        "ready": found.ready,
+        "blocked": found.blocked,
+        # Every part, and the total they add to. Given together so a screen
+        # never has to sum them and cannot report a different total.
+        "expected": {
+            "payout_piastres": found.breakdown.payout_piastres,
+            "payout": format_egp(found.breakdown.payout_piastres),
+            "commission_piastres": found.breakdown.commission_piastres,
+            "commission": format_egp(found.breakdown.commission_piastres),
+            "fixed_piastres": found.breakdown.fixed_piastres,
+            "fixed": format_egp(found.breakdown.fixed_piastres),
+            "guarantee_top_up_piastres": found.breakdown.guarantee_top_up_piastres,
+            "guarantee_top_up": format_egp(
+                found.breakdown.guarantee_top_up_piastres
+            ),
+        },
+        # A01's content progress needing review, by why. Two of the three are
+        # HBA's own work rather than a verdict on anybody (D08).
+        "needs_review": found.needs_review,
+        "top": [
+            {**row, "sales": format_egp(row["sales_piastres"])}
+            for row in found.top
+        ],
+    }
