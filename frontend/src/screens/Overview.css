@@ -70,3 +70,30 @@
   color: var(--quiet);
   font-size: var(--text-xs);
 }
+
+/* -- A notice's action wears the notice's severity -------------------------
+ *
+ * Measured from the approved export: the action button is not a neutral
+ * control sitting inside a coloured row — it takes the row's colour, with no
+ * fill. Drawn in the default grey it read as a button somebody had disabled,
+ * on the one row of the screen that exists to be acted on.
+ *
+ * Only the action. The ⋯ and × beside it are housekeeping and stay quiet:
+ * colouring them too would spend the signal on the controls that dismiss it.
+ */
+.overview__notice a.button {
+  background: none;
+  border-color: var(--owed);
+  color: var(--owed);
+}
+
+.overview__notice--blocking a.button {
+  border-color: var(--refused);
+  color: var(--refused);
+}
+
+.overview__notice button.button {
+  background: none;
+  border-color: transparent;
+  color: var(--quiet);
+}

@@ -85,7 +85,7 @@
    * All above 4.5:1, which is what text needs.
    */
   --owed: #8a5a16; /* outstanding — attention, not alarm */
-  --settled: var(--accent-text); /* resolved */
+  --settled: var(--accent-lift); /* resolved - lifted, it sits on a tint */
   --refused: #9a2f22; /* blocked, or void */
   --owed-quiet: rgba(138, 90, 22, 0.1);
   --settled-quiet: var(--accent-soft);
@@ -175,7 +175,7 @@
   --bar: #343a3f;
 
   --owed: #e0a458;
-  --settled: var(--accent-text);
+  --settled: var(--accent-lift);
   --refused: #e2705f;
   --owed-quiet: rgba(224, 164, 88, 0.12);
   --settled-quiet: var(--accent-soft);

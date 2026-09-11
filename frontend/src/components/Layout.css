@@ -116,14 +116,18 @@
 }
 
 /* The count beside a section name, from the approved export. Absent when
- * there is nothing waiting — a badge showing 0 is furniture. */
+ * there is nothing waiting — a badge showing 0 is furniture.
+ *
+ * **Amber, and not a grey chip.** Measured from the export: the badge is the
+ * same attention colour the notice it corresponds to wears, with no filled
+ * background. Drawn as a neutral pill it read as decoration, which is exactly
+ * what a number nobody acts on becomes. */
 .layout__count {
   margin-left: auto;
   min-width: 18px;
   padding: 0 5px;
   border-radius: 9px;
-  background: var(--raise);
-  color: var(--ink);
+  color: var(--owed);
   font-size: var(--text-xs);
   line-height: 18px;
   text-align: center;

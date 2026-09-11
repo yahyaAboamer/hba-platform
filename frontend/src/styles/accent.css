@@ -23,6 +23,24 @@
  * so the scope moved to the root and ADR 0039 records why. The mechanism is
  * unchanged; only what it covers is.
  *
+ * ## Which green is the default, and which is the exception
+ *
+ * **Measured from the approved export on 12 September 2026**, because the
+ * first implementation had this the wrong way round and the owner saw it: the
+ * accent read as a pale mint where the design is a saturated green.
+ *
+ * The export uses `color: var(--acc)` - the saturated `#23A95C` - **39 times**,
+ * and `color: var(--acctext)` - the lifted `#7BE0A6` - **9 times**. All nine
+ * are success lines sitting on a green-tinted ground: *saved*, *recorded*,
+ * *paid*, *approved*, the invite link. So:
+ *
+ *   - `--accent-text` is the **saturated** green. Links, the active nav item,
+ *     accented labels - the ordinary case.
+ *   - `--accent-lift` is the **lifted** green, for text on an accent-tinted
+ *     surface where the saturated step would sit too close to its background.
+ *     `tokens.css` points `--settled` at it, which is the same idea: money
+ *     that has resolved, said on a tinted row.
+ *
  * ## Why there are still two greens and not one
  *
  * Not for the reason there were two reds. HBA red could not be read on the
@@ -54,14 +72,16 @@
 
 :root {
   --accent: #14653a; /* chrome: lines, borders, fills, the active tab */
-  --accent-text: #14653a; /* on light, chrome and text are one step */
+  --accent-text: #14653a; /* accented text: links, active nav, labels */
+  --accent-lift: #14653a; /* on light the design uses one step for both */
   --accent-soft: rgba(20, 101, 58, 0.09); /* tints and pressed states */
   --accent-on: #ffffff; /* text on a filled accent */
 }
 
 [data-theme="dark"] {
   --accent: #23a95c;
-  --accent-text: #7be0a6; /* lifted, as the design draws accented text on dark */
+  --accent-text: #23a95c; /* the design's default accented text - 39 uses */
+  --accent-lift: #7be0a6; /* only on a tinted ground - its 9 uses */
   --accent-soft: rgba(35, 169, 92, 0.14);
   --accent-on: #ffffff;
 }
