@@ -22,35 +22,32 @@ file's summary; detailed evidence lives in the latest batch report.
 
 | Phase | State |
 |---|---|
-| 00 Baseline · 01 UI foundations · 02 Models and setup · 03 Products and wardrobe · **04 Targets** | **Complete** |
-| 05 Financial rules | **Complete** |
-| **06 Payments** | **06A complete locally; 06B next** |
-| 07 Performance screens · 08 Settings and notifications · 09 Rehearsal and release | Not started |
+| 00–09 | **All built and merged** |
+| 09B — the walk-through | **The only thing left, and it needs a person** |
 
-**1807 full-suite backend tests, 252 focused 06A backend tests and 246 frontend
-tests passed.** Migration head `1c4b06a5f8d2`.
+**1885 backend tests, 256 frontend.** Migration head `c93f2a17d4e8`.
 
-**06A started from clean `main` at `0f0ce641f81a2209cb211a5f51251e82c5f44159`**
-on `phase06a/admin-month-end-payments`. Its implementation, report and this
-handoff form one local batch commit. It is not merged, pushed or deployed.
-Production was not inspected or changed in 06A; promoting remains a separate
-owner-authorised act.
+**`main` is at `769b739`.** `production` is at `b6abcf5`, seven commits behind:
+07A, 07B and Phase 08, carrying one additive migration. Promoting is a clean
+fast-forward — `git push origin main:production` — and the release document at
+`docs/redesign/reports/09-rehearsal-and-release.md` is the candidate.
 
-**None of Phase 05 or 06A has been seen by anybody.** No rendered review of the
-financial preview, the approve screen, the retired reopen page or the
-corrections panel, nor of the new admin payment journey. Phase 04 was accepted
-on staging on 10 September. Passing API/React checks are not visual acceptance.
+**Nine batches of merged screens have never been looked at by a person.**
+Automation cannot sign in here, so 09B is the owner's walk-through and it is
+the largest piece of unfinished acceptance in the project.
 
 ---
 
 ## Start here
 
-1. Read `docs/redesign/STATUS.md`.
-2. Read `docs/redesign/reports/06A-admin-month-end-payment-journey.md` — the
-   batch that just closed locally. Review/merge/deploy are separate acts.
-3. Then read `docs/redesign/prompts/06_PAYMENTS.md`, and run **06B only** —
-   model payment views and destination changes. Do not redo 06A or continue to
-   Phase 07.
+1. Read `docs/redesign/STATUS.md` and
+   `docs/redesign/reports/09-rehearsal-and-release.md`.
+2. **There is no next batch to build.** Every phase is merged. What is left is
+   **09B** — walking every screen in both roles on a real device and recording
+   what is wrong. That is the owner's, not an agent's: automation cannot sign
+   in to this platform and has not been able to for the whole project.
+3. If the owner reports something from that walk-through, fix it as an ordinary
+   change against `main` — not as a new phase.
 
 **What 06B inherits and must not rebuild.** 06A made Payments the admin
 month-end journey around the existing recording, proof, allocation and

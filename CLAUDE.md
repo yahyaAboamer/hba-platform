@@ -106,6 +106,9 @@ payroll without touching a maintainer screen.
   cost the best part of an hour.
 - Frontend: `cd frontend && npm test` (256), `npx tsc --noEmit` and
   `npm run build`.
+- **The redesign is code-complete.** Phases 00-09 are merged. What remains is
+  09B, the owner walking every screen - automation cannot sign in here, and nine
+  batches of merged screens have never been seen by a person.
 - Redesign 05A is a **read-only rules preview**. The normal calculation and
   approval remain delivered-only until D01; do not mistake the preview's
   entitlement for a transfer instruction.
