@@ -42,6 +42,13 @@ type Attention = {
     where: string;
   }[];
   blocking: number;
+  /** Still true, still unresolved, and somebody chose to stop seeing it. */
+  muted: {
+    key: string;
+    severity: "blocking" | "attention";
+    text: string;
+    where: string;
+  }[];
 };
 
 type SyncStatus = {
@@ -107,6 +114,55 @@ export function Overview({ session }: { session: Session }) {
   const [sync, setSync] = useState<SyncStatus | null>(null);
   const [attention, setAttention] = useState<Attention | null>(null);
   const [summary, setSummary] = useState<Summary | null>(null);
+  /**
+   * Notices hidden for this browsing session only (A10's *temporary hide*).
+   *
+   * `sessionStorage`, so it comes back next time - which is the whole
+   * difference from a mute. Wrapped, because a private window or blocked site
+   * data makes the accessor itself throw, and a panel of notices is not worth
+   * a blank screen.
+   */
+  const [hidden, setHidden] = useState<string[]>(() => {
+    try {
+      return JSON.parse(sessionStorage.getItem("hidden-notices") ?? "[]");
+    } catch {
+      return [];
+    }
+  });
+
+  function hide(key: string) {
+    setHidden((was) => {
+      const next = [...was, key];
+      try {
+        sessionStorage.setItem("hidden-notices", JSON.stringify(next));
+      } catch {
+        // Hiding is a convenience. If it cannot be remembered it still works
+        // for this view, which is most of the value.
+      }
+      return next;
+    });
+  }
+
+  function reloadNotices() {
+    api
+      .get<Attention>("/api/operations/attention")
+      .then(setAttention)
+      .catch(() => undefined);
+  }
+
+  function mute(key: string) {
+    api
+      .post("/api/operations/notices/mute", { key })
+      .then(reloadNotices)
+      .catch((caught) => setError(caught.message));
+  }
+
+  function unmute(key: string) {
+    api
+      .del(`/api/operations/notices/mute/${key}`)
+      .then(reloadNotices)
+      .catch((caught) => setError(caught.message));
+  }
   const [error, setError] = useState<string | null>(null);
   const [lockNote, setLockNote] = useState<string | null>(null);
 
@@ -183,20 +239,91 @@ export function Overview({ session }: { session: Session }) {
        */}
       {attention && attention.items.length > 0 && (
         <section className="attention">
-          {attention.items.map((item) => (
-            <div
-              key={item.key}
-              className={
-                item.severity === "blocking"
-                  ? "attention__item attention__item--blocking"
-                  : "attention__item"
-              }
-            >
-              <p className="attention__text">{item.text}</p>
-              <p className="attention__detail">{item.detail}</p>
-            </div>
-          ))}
+          {attention.items
+            .filter((item) => !hidden.includes(item.key))
+            .map((item) => (
+              <div
+                key={item.key}
+                className={
+                  item.severity === "blocking"
+                    ? "attention__item attention__item--blocking"
+                    : "attention__item"
+                }
+              >
+                {/*
+                 * A10: a notice points. One for a single record opens that
+                 * record; one about several opens a filtered list. Either way
+                 * it is a link, because a notice that only describes a problem
+                 * leaves somebody hunting for it.
+                 */}
+                <Link className="attention__text" to={item.where}>
+                  {item.text}
+                </Link>
+                <p className="attention__detail">{item.detail}</p>
+                <div className="attention__actions">
+                  {/*
+                   * **Hide and mute are different promises, so they are
+                   * different buttons** (A10).
+                   *
+                   * Hide is this browser's business and comes back - it lives
+                   * in `sessionStorage` and nothing on the server knows about
+                   * it. Mute is a decision that outlives the tab, so it is
+                   * recorded.
+                   *
+                   * **Neither resolves anything.** The problem is still there
+                   * and the notice is still true; fixing it is what makes it
+                   * go away, at which point it stops being generated at all.
+                   */}
+                  <button
+                    type="button"
+                    className="attention__action"
+                    onClick={() => hide(item.key)}
+                  >
+                    Hide for now
+                  </button>
+                  {item.severity !== "blocking" && (
+                    <button
+                      type="button"
+                      className="attention__action"
+                      onClick={() => mute(item.key)}
+                    >
+                      Stop showing this
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
         </section>
+      )}
+
+      {/*
+        * Muted notices, listed rather than swallowed. A mute is not a
+        * resolution: every one of these is still true and still unfixed, and
+        * somebody who did not mute it should be able to find it and put it
+        * back.
+        */}
+      {attention && attention.muted.length > 0 && (
+        <details className="attention__muted">
+          <summary>
+            {attention.muted.length} turned off ·{" "}
+            {attention.muted.length === 1 ? "it is" : "they are"} still
+            unresolved
+          </summary>
+          <ul>
+            {attention.muted.map((item) => (
+              <li key={item.key}>
+                <Link to={item.where}>{item.text}</Link>
+                <button
+                  type="button"
+                  className="attention__action"
+                  onClick={() => unmute(item.key)}
+                >
+                  Show again
+                </button>
+              </li>
+            ))}
+          </ul>
+        </details>
       )}
 
       {/*

@@ -20,7 +20,11 @@ type Props = {
 
 const LOCK_TEXT: Record<string, string> = {
   historical: "Settled before the platform",
-  approved: "Approved — reopen to change it",
+  // **Not "reopen to change it"** any more. 05B retired reopening: an agreed
+  // month is not unmade, and what changes after it is recorded against it as a
+  // correction. Telling somebody to press a button that answers 409 is worse
+  // than saying nothing.
+  approved: "Agreed — changes are recorded against it",
   future: "Not started yet",
 };
 

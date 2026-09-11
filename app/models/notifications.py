@@ -188,3 +188,28 @@ class NotificationPreference(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )
+
+
+class NoticeMute(Base):
+    """A notice somebody has chosen to stop seeing. A10.
+
+    **A mute is not a resolution**, and the distinction is the whole rule. The
+    problem is still there, the notice is still true, and muting only stops it
+    appearing on the panel. Resolving it is what makes it go away properly —
+    at which point the notice stops being generated and this row is irrelevant
+    rather than wrong.
+
+    Keyed by the notice's key, so it follows the *kind* of problem. A row-level
+    mute keyed to a record would outlive the record and quietly suppress a
+    later, different problem that reused the id.
+    """
+
+    __tablename__ = "notice_mute"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    muted_by: Mapped[int | None] = mapped_column(
+        ForeignKey("user_account.id", ondelete="SET NULL")
+    )
+    muted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )

@@ -55,6 +55,35 @@ export const GLOSSARY_TERMS: GlossaryTerm[] = [
       "A month from before the platform existed. The sales are real and counted the same as any other month; there is no commission figure, because those months were paid the old way and their rate is not something this platform can state correctly.",
   },
   {
+    id: "uses",
+    term: "Uses",
+    definition:
+      "How many orders used your code. An order counts once it has been "
+      + "delivered, and one still on its way counts until it arrives - only a "
+      + "failed delivery takes it off. It is not the same as your sales: an "
+      + "order can be delivered and later refunded, which is still a use and "
+      + "pays nothing.",
+  },
+  {
+    id: "agreed",
+    term: "Agreed",
+    definition:
+      "A month whose figure has been settled. It does not change afterwards - "
+      + "not if an order arrives late, not if one comes back. What you were "
+      + "agreed is what you are owed, and anything that changes later is "
+      + "recorded against the month rather than rewriting it.",
+  },
+  {
+    id: "correction",
+    term: "Correction",
+    definition:
+      "When something changes after a month was agreed - usually a parcel "
+      + "refused after you were already paid - HBA either absorbs it or takes "
+      + "it out of a later month. If it comes out of a later month, that month "
+      + "can be smaller than usual, or come to nothing at all, and the month "
+      + "itself will say so. You are never asked to send money back.",
+  },
+  {
     id: "settled",
     term: "Settled",
     definition:
