@@ -90,3 +90,139 @@ def test_emptying_the_database_keeps_the_schema_migrated():
         assert connection.execute(
             sql_text("SELECT count(*) FROM alembic_version")
         ).scalar() == 1
+
+
+# -- Phase 09: the rollback nobody had run --------------------------------------
+
+
+def _head_and_previous() -> tuple[str, str]:
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+
+    scripts = ScriptDirectory.from_config(Config("alembic.ini"))
+    head = scripts.get_current_head()
+    previous = scripts.get_revision(head).down_revision
+    assert previous, "head migration has no parent"
+    return head, previous
+
+
+def test_the_latest_migration_can_be_rolled_back_and_reapplied():
+    """**AC64, and the thing a release plan asserts without evidence.**
+
+    Every migration in this repository has a `downgrade()` and, until this
+    test, not one of them had ever been run. A rollback procedure nobody has
+    executed is a paragraph, not a plan — and the moment somebody needs it is
+    the worst moment to find out it raises.
+
+    One step, because that is the real scenario: a release goes out, something
+    is wrong, and the migration it carried comes back off. Going all the way to
+    base would exercise migrations that have been settled for months and tell
+    us nothing about the release in hand.
+
+    **Restored in a `finally` whatever happens.** A test that leaves the schema
+    half-migrated poisons every test after it, which is not a hypothetical —
+    it happened on 10 September and cost an hour of chasing failures that were
+    not real.
+    """
+    from alembic import command
+    from alembic.config import Config
+
+    config = Config("alembic.ini")
+    head, previous = _head_and_previous()
+
+    try:
+        command.downgrade(config, previous)
+        with engine.connect() as connection:
+            assert (
+                connection.execute(
+                    text("SELECT version_num FROM alembic_version")
+                ).scalar()
+                == previous
+            )
+    finally:
+        command.upgrade(config, "head")
+
+    with engine.connect() as connection:
+        assert (
+            connection.execute(
+                text("SELECT version_num FROM alembic_version")
+            ).scalar()
+            == head
+        )
+
+
+def test_a_rollback_and_reapply_leaves_the_guards_on():
+    """The append-only triggers are the platform's last line, and DDL is
+    exactly the kind of thing that quietly drops one.
+
+    Asserted by trying an update that must be refused, rather than by counting
+    triggers: a trigger that exists and does nothing would pass a count.
+    """
+    from alembic import command
+    from alembic.config import Config
+    from sqlalchemy.exc import DBAPIError
+
+    config = Config("alembic.ini")
+    _, previous = _head_and_previous()
+
+    try:
+        command.downgrade(config, previous)
+    finally:
+        command.upgrade(config, "head")
+
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO audit_event (action, subject, actor_email) "
+                "VALUES ('probe', 'probe', 'probe@example.com')"
+            )
+        )
+
+    # **Both**, because the trigger refuses each separately and a guard that
+    # stopped only updates would still let a trail be erased.
+    for statement in (
+        "UPDATE audit_event SET action = 'changed' WHERE action = 'probe'",
+        "DELETE FROM audit_event WHERE action = 'probe'",
+    ):
+        with pytest.raises(DBAPIError):
+            with engine.begin() as connection:
+                connection.execute(text(statement))
+
+    # The probe row is left where it is - it cannot be deleted, which is the
+    # point. `empty_the_database` clears it between tests, with the guards
+    # disabled for the length of that one transaction.
+
+
+def test_no_migration_destroys_a_column_or_table_on_the_way_up():
+    """AC64: *no live-data loss.*
+
+    Almost every migration this platform has shipped is additive, and that is a
+    property worth holding rather than remembering. A `DROP COLUMN` in an
+    upgrade is how a deploy silently takes somebody's money history with it.
+
+    Read from the files rather than the database, so it fails on the change
+    that introduces one rather than after it has already run somewhere.
+
+    **A genuine drop belongs here by name.** A name in the allow-list is a
+    decision somebody made and wrote down; a name absent is an accident.
+    """
+    from pathlib import Path
+
+    #: The one deliberate drop this platform has shipped.
+    #: `attributed_order.needs_review` went when delivery became final and
+    #: nothing was held any more - the column had stopped describing anything,
+    #: and keeping it would have been keeping a lie. It ran on production long
+    #: ago.
+    allowed = {"ea6565864418_delivery_is_final_so_nothing_is_held"}
+    offenders = []
+
+    for path in sorted(Path("migrations/versions").glob("*.py")):
+        if path.stem in allowed:
+            continue
+        source = path.read_text(encoding="utf-8")
+        upgrade = source.split("def upgrade()")[-1].split("def downgrade()")[0]
+        for danger in ("op.drop_column", "op.drop_table"):
+            if danger in upgrade:
+                offenders.append(f"{path.name}: {danger}")
+
+    assert not offenders, "\n".join(offenders)
