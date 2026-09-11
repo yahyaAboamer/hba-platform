@@ -1,4 +1,7 @@
 import { useEffect, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
+import { AddHouseCode } from "./AddHouseCode";
+import { applyMaintainerTheme, storedTheme, storeTheme } from "../lib/theme";
 
 import { MonthPicker } from "../components/MonthPicker";
 import { PolicyText } from "../components/PolicyText";
@@ -69,25 +72,71 @@ const ROLE_LABEL: Record<string, string> = {
  * approve and reveal actions — a control that would refuse the request is
  * not offered rather than offered and refused.
  */
-export function Settings({ session }: { session: Session }) {
-  return (
-    <>
-      <div className="page__head">
-        <div className="page__title">
-          <h1>Settings</h1>
-        </div>
-      </div>
+const SETTINGS_SECTIONS = [
+  ["team", "Team"], ["shopify", "Shopify and sync"], ["historical", "Historical setup"],
+  ["codes", "Brand codes"], ["appearance", "Appearance"], ["advanced", "Reference"],
+];
 
+export function Settings({ session }: { session: Session }) {
+  const [query, setQuery] = useSearchParams();
+  const section = SETTINGS_SECTIONS.some(([id]) => id === query.get("section")) ? query.get("section")! : "team";
+  return <>
+    <div className="page__head"><div className="page__title"><h1>Settings</h1></div></div>
+    <div className="settings__workspace">
+      <nav className="settings__navigation" aria-label="Settings sections">
+        {SETTINGS_SECTIONS.map(([id,label]) => <button key={id} type="button"
+          aria-current={section === id ? "page" : undefined} className={section === id ? "settings__selected" : ""}
+          onClick={() => setQuery({section:id})}>{label}</button>)}
+      </nav>
       <div className="settings__sections">
-        <PlatformPanel session={session} />
-        {can(session, "invitations.send") && <InvitePanel />}
-        {can(session, "settings.manage") && <RosterPanel />}
-        {can(session, "settings.manage") && <PolicyPanel />}
-        {can(session, "settings.manage") && <DataPanel />}
-        {can(session, "audit.view") && <ActivityPanel />}
+        {section === "team" && <>
+          {can(session, "settings.manage") && <RosterPanel />}
+          {can(session, "invitations.send") && <InvitePanel />}
+        </>}
+        {section === "shopify" && <><PlatformPanel session={session} />{can(session, "settings.manage") && <DataPanel />}</>}
+        {section === "historical" && (can(session, "compensation.manage") ? <SetupRoster kind="model" /> : <p className="empty">Your account cannot manage payment terms.</p>)}
+        {section === "codes" && <>
+          <SetupRoster kind="house" />
+          {can(session, "affiliates.manage") && <AddHouseCode onCreated={() => undefined} />}
+          <p className="settings__note">Brand codes have no model payments and are excluded from model rankings.</p>
+        </>}
+        {section === "appearance" && <AppearancePanel />}
+        {section === "advanced" && <>
+          <Link to="/glossary">Help and definitions →</Link>
+          {can(session, "settings.manage") && <PolicyPanel />}
+          {can(session, "audit.view") && <ActivityPanel />}
+        </>}
       </div>
-    </>
-  );
+    </div>
+  </>;
+}
+
+function AppearancePanel() {
+  const [theme, setTheme] = useState(() => storedTheme("maintainer"));
+  return <section className="panel settings__appearance"><span>Theme</span>
+    <div role="group" aria-label="Theme">{(["dark", "light"] as const).map(value => <button key={value} className="button"
+      aria-pressed={theme === value} onClick={() => { setTheme(value); storeTheme(value,"maintainer"); applyMaintainerTheme(value); }}>{value === "dark" ? "Dark" : "Light"}</button>)}</div>
+  </section>;
+}
+
+function SetupRoster({kind}: {kind: "model" | "house"}) {
+  const [rows,setRows] = useState<{id:number;name:string;account_kind:string;code?:string;status:string;collaboration_start_month?:string|null}[] | null>(null);
+  const [error,setError] = useState<string | null>(null);
+  useEffect(() => { let live = true; api.get<{affiliates:NonNullable<typeof rows>}>("/api/affiliates?include_archived=true")
+    .then(body => { if(live) setRows(body.affiliates.filter(row => row.account_kind === kind)); })
+    .catch(caught => { if(live) setError(caught.message); }); return () => {live=false;}; },[kind]);
+  if(error) return <p className="notice notice--refused" role="alert">{error}</p>;
+  if(!rows) return <p className="empty">Loading…</p>;
+  return <section className="panel">
+    <div className="panel__head"><h2 className="panel__title">{kind === "house" ? "Brand codes" : "Historical setup"}</h2></div>
+    <table className="table"><thead><tr><th>{kind === "house" ? "Code" : "Model"}</th><th>{kind === "house" ? "Purpose" : "Started"}</th><th>{kind === "house" ? "State" : "Months and terms"}</th></tr></thead>
+      <tbody>{rows.map(row => <tr key={row.id}>
+        <td><Link to={`/affiliates/${row.id}`}>{kind === "house" ? row.code || "No code" : row.name}</Link></td>
+        <td>{kind === "house" ? row.name : row.collaboration_start_month ? formatMonth(row.collaboration_start_month) : "Not recorded"}</td>
+        <td>{kind === "house" ? row.status : <Link to={`/affiliates/${row.id}/compensation`}>Review months →</Link>}</td>
+      </tr>)}</tbody></table>
+    {rows.length === 0 && <p className="empty">No {kind === "house" ? "brand codes" : "models"}.</p>}
+  </section>;
 }
 
 function PlatformPanel({ session }: { session: Session }) {

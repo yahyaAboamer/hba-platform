@@ -7,12 +7,11 @@ type Item = {
   shopify_product_id: string | null;
   title: string;
   size: string | null;
-  quantity: number;
   state: string;
   image_url: string | null;
-  /** Sized for this grid. The full one stays beside it (see wardrobe.py). */
   image_thumb_url: string | null;
   shopify_order_id: string;
+  placed_at?: string | null;
 };
 
 type Request = {
@@ -29,134 +28,97 @@ type Wardrobe = {
   feature_requests: Request[];
 };
 
-/**
- * What HBA has sent her.
- *
- * W08 sets the shape: **Received first, with images and sizes**, then a
- * compact area for what has not arrived. The two are not the same kind of
- * thing and the layout says so — a grid of things she owns, and a short list
- * of things that are still in the post or did not make it.
- *
- * ## What is deliberately absent
- *
- * **Nothing she bought** (D05, 10 September 2026). The wardrobe is a record of
- * what the business gave her, not an inventory of her cupboard.
- *
- * **No Done button** on a feature request (W09). It is passive guidance:
- * marketing would like something said, she reads it and decides. The moment it
- * gains a state per model it becomes a task list, and targets already are one.
- *
- * **No arrival estimates** (W07). Shopify does not tell us when a parcel will
- * land, and a date invented here is a promise HBA cannot keep.
- */
+/** Server-selected gift products and passive, Received/Processing-only requests. */
 export function MyWardrobe() {
   const [body, setBody] = useState<Wardrobe | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let live = true;
-    api
-      .get<Wardrobe>("/api/me/wardrobe")
-      .then((found) => {
-        if (live) setBody(found);
-      })
-      .catch((caught) => {
-        // **Never rendered as an empty wardrobe** (§S06). A failed request and
-        // "HBA has not sent you anything" are different facts, and one of them
-        // is alarming to be told wrongly.
-        if (live) setError(caught.message);
-      });
-    return () => {
-      live = false;
-    };
-  }, []);
+    setError(null);
+    setBody(null);
+    api.get<Wardrobe>("/api/me/wardrobe")
+      .then((found) => { if (live) setBody(found); })
+      .catch((caught) => { if (live) setError(caught.message); });
+    return () => { live = false; };
+  }, [attempt]);
 
-  if (error) {
-    return (
-      <p className="notice notice--refused" role="alert">
-        {error}
-      </p>
-    );
-  }
+  if (error) return (
+    <div className="notice notice--refused" role="alert">
+      <p>Could not load your wardrobe.</p>
+      <button type="button" className="button" onClick={() => setAttempt((n) => n + 1)}>Try again</button>
+    </div>
+  );
+  if (body === null) return <p className="empty" role="status">Loading wardrobe…</p>;
+  return <WardrobeContents body={body} />;
+}
 
-  if (body === null) return <p className="empty">Loading…</p>;
-
+export function WardrobeContents({ body }: { body: Wardrobe }) {
   const waiting = [...body.processing, ...body.failed];
-  const nothingAtAll =
-    body.received.length === 0 && waiting.length === 0;
-
   return (
     <div className="wardrobe">
-      {nothingAtAll && (
-        <p className="empty">
-          HBA has not sent you anything yet. When they do, it appears here with
-          its size.
-        </p>
-      )}
-
-      {body.received.length > 0 && (
-        <section className="wardrobe__block">
-          <h2 className="wardrobe__title">Yours</h2>
-          <ul className="wardrobe__grid">
-            {body.received.map((item) => (
-              <li key={item.shopify_order_id + item.title} className="wardrobe__item">
-                <Picture item={item} />
-                <span className="wardrobe__name">{item.title}</span>
-                {item.size && <span className="wardrobe__size">{item.size}</span>}
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {/*
-       * Compact, and below what she owns (W08). These are two different states
-       * sharing one area because they answer one question — *what is not here
-       * yet* — and each row says which it is rather than leaving her to infer
-       * it from a colour.
-       */}
-      {waiting.length > 0 && (
-        <section className="wardrobe__block">
-          <h2 className="wardrobe__title">Not with you yet</h2>
-          <ul className="wardrobe__waiting">
-            {waiting.map((item) => (
-              <li key={item.shopify_order_id + item.title}>
-                <span className="wardrobe__name">{item.title}</span>
-                {item.size && (
-                  <span className="wardrobe__size">{item.size}</span>
-                )}
-                <span
-                  className={
-                    item.state === "failed"
-                      ? "wardrobe__state wardrobe__state--failed"
-                      : "wardrobe__state"
-                  }
-                >
-                  {item.state === "failed"
-                    ? "did not arrive — HBA is looking into it"
-                    : "on its way"}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {/*
-       * Only where she actually has the product, decided on the server (W10).
-       * The header and the cards appear and disappear together — an empty
-       * section with a heading is a section that looks broken.
-       */}
+      {/* Personal top sellers need a model-scoped API. Never substitute staff totals. */}
       {body.feature_requests.length > 0 && (
         <section className="wardrobe__block">
-          <h2 className="wardrobe__title">HBA would love to see</h2>
+          <h2 className="wardrobe__title">HBA would like you to feature</h2>
+          <p className="wardrobe__subtitle">Chosen by the HBA team</p>
           <ul className="wardrobe__requests">
-            {body.feature_requests.map((request) => (
-              <li key={request.shopify_product_id}>
-                {request.title && (
-                  <span className="wardrobe__name">{request.title}</span>
-                )}
-                <p className="wardrobe__ask">{request.message}</p>
+            {body.feature_requests.map((request) => {
+              const received = body.received.find((item) => item.shopify_product_id === request.shopify_product_id);
+              const incoming = body.processing.find((item) => item.shopify_product_id === request.shopify_product_id);
+              return (
+                <li key={request.shopify_product_id}>
+                  <Picture source={request.image_url} />
+                  <div className="wardrobe__copy">
+                    <span className="wardrobe__name">{request.title ?? received?.title ?? incoming?.title ?? "Product"}</span>
+                    {received && <span className="wardrobe__state">In your wardrobe</span>}
+                    {!received && incoming && <span className="wardrobe__state">On its way</span>}
+                    <p className="wardrobe__ask">{request.message}</p>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
+      <section className="wardrobe__block">
+        <div className="wardrobe__heading">
+          <h2 className="wardrobe__title">Your wardrobe</h2>
+          <span className="wardrobe__size">{body.received.length} {body.received.length === 1 ? "product" : "products"}</span>
+        </div>
+        {body.received.length === 0 ? (
+          <p className="empty">{waiting.length ? "Your received products will appear here." : "No products yet."}</p>
+        ) : (
+          <ul className="wardrobe__rows">
+            {body.received.map((item) => (
+              <li key={item.shopify_product_id ?? `${item.shopify_order_id}:${item.title}`}>
+                <Picture source={item.image_thumb_url ?? item.image_url} />
+                <div className="wardrobe__copy">
+                  <span className="wardrobe__name">{item.title}</span>
+                  {item.size && <span className="wardrobe__size">Size {item.size}</span>}
+                  <OrderDate value={item.placed_at} />
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {waiting.length > 0 && (
+        <section className="wardrobe__incoming">
+          <h2 className="wardrobe__title">Not received yet</h2>
+          <ul className="wardrobe__waiting">
+            {waiting.map((item) => (
+              <li key={item.shopify_product_id ?? `${item.shopify_order_id}:${item.title}`}>
+                <div className="wardrobe__copy">
+                  <span className="wardrobe__name">{item.title}</span>
+                  {item.size && <span className="wardrobe__size">Size {item.size}</span>}
+                </div>
+                <span className={`wardrobe__state${item.state === "failed" ? " wardrobe__state--failed" : ""}`}>
+                  {item.state === "failed" ? "Failed delivery" : "Processing"}
+                </span>
               </li>
             ))}
           </ul>
@@ -166,18 +128,18 @@ export function MyWardrobe() {
   );
 }
 
-/**
- * A picture, or an honest gap.
- *
- * A product deleted from Shopify takes its image with it, and the line item
- * still carries the title and size — so the entry is real and only the
- * photograph is missing. A broken frame would say something went wrong;
- * this says the picture is gone and the garment is not.
- */
-function Picture({ item }: { item: Item }) {
-  const source = item.image_thumb_url ?? item.image_url;
-  if (!source) {
-    return <span className="wardrobe__nopic" aria-hidden="true" />;
+function OrderDate({ value }: { value?: string | null }) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  // Shopify supplies the order date, not proof of when delivery happened.
+  return <span className="wardrobe__date">Ordered {date.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</span>;
+}
+
+function Picture({ source }: { source: string | null }) {
+  const [failedSource, setFailedSource] = useState<string | null>(null);
+  if (!source || source === failedSource) {
+    return <span className="wardrobe__nopic" aria-label="Product image unavailable">No image</span>;
   }
-  return <img className="wardrobe__pic" src={source} alt="" loading="lazy" />;
+  return <img className="wardrobe__pic" src={source} alt="" loading="lazy" onError={() => setFailedSource(source)} />;
 }

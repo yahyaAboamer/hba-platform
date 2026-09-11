@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 import { usePortal } from "../components/AffiliateLayout";
 import { Money } from "../components/Money";
@@ -22,22 +22,25 @@ import "./MyOrders.css";
  */
 
 /** The three questions people actually arrive with. */
-type Filter = "all" | "earned" | "pending";
+type Filter = "all" | "earned" | "pending" | "void";
 
 const FILTERS: { key: Filter; label: string }[] = [
   { key: "all", label: "All" },
   { key: "earned", label: "Counted" },
-  { key: "pending", label: "Moving" },
+  { key: "pending", label: "Pending" },
+  { key: "void", label: "Excluded" },
 ];
 
 export function MyOrders() {
   const { month } = usePortal();
   const [body, setBody] = useState<MyEarnings | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<Filter>("all");
+  const [query] = useSearchParams();
+  const [filter, setFilter] = useState<Filter>((["earned","pending","void"].includes(query.get("status") ?? "") ? query.get("status") : "all") as Filter);
   const [open, setOpen] = useState<string | null>(null);
 
   useEffect(() => {
+    let live = true;
     setBody(null);
     setError(null);
     // The month changed underneath them, so an expanded row from the last one
@@ -45,8 +48,9 @@ export function MyOrders() {
     setOpen(null);
     api
       .get<MyEarnings>(`/api/me/earnings/${month}`)
-      .then(setBody)
-      .catch((caught) => setError(caught.message));
+      .then(value => { if(live) setBody(value); })
+      .catch((caught) => {if(live) setError(caught.message);});
+    return () => {live=false;};
   }, [month]);
 
   if (error) {
@@ -75,16 +79,6 @@ export function MyOrders() {
 
   return (
     <>
-      {/*
-       * **Counted and moving, because those are the two questions.** Nobody
-       * opens this screen wondering about their orders in general; they are
-       * either checking what has already counted or chasing what has not
-       * arrived. Void has no tab of its own — an order that did not arrive is
-       * something to notice in passing, not a list to go looking for.
-       *
-       * The counts are on the controls rather than in a summary line, so
-       * choosing one and reading the answer are the same act.
-       */}
       <div className="filters" role="group" aria-label="Which orders">
         {FILTERS.map((option) => (
           <button
@@ -126,11 +120,7 @@ export function MyOrders() {
         </ul>
       )}
 
-      <p className="orders__note">
-        No customer details are stored against an order, so none appear here. A
-        row is never removed — an order that did not arrive stays, struck
-        through.
-      </p>
+
     </>
   );
 }

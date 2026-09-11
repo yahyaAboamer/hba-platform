@@ -279,3 +279,13 @@
   flex: none;
   width: 15rem;
 }
+
+.settings__workspace { display:flex; gap:20px; align-items:flex-start; }
+.settings__navigation { flex:none; width:196px; display:flex; flex-direction:column; gap:3px; }
+.settings__navigation button { min-height:38px; padding:9px 12px; border:0; border-radius:8px; background:none; color:var(--quiet); text-align:left; font-size:13.5px; cursor:pointer; }
+.settings__navigation .settings__selected { background:var(--accent-soft); color:var(--accent-text); }
+.settings__workspace > .settings__sections { flex:1; min-width:0; }
+.settings__appearance { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:14px 18px; }
+.settings__appearance [role="group"] { display:flex; gap:8px; }
+.settings__appearance [aria-pressed="true"] { background:var(--accent-soft); color:var(--accent-text); border-color:var(--accent); }
+@media(max-width:800px) { .settings__workspace { flex-direction:column; } .settings__navigation { flex-direction:row; overflow-x:auto; width:100%; } .settings__navigation button { white-space:nowrap; } .settings__workspace > .settings__sections { width:100%; } }

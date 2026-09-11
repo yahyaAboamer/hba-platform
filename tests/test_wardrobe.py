@@ -465,13 +465,25 @@ def test_hiding_a_request_keeps_its_wording_and_removing_does_not(db):
     assert feature_request_for(db, PANTS) is None
 
 
-def test_a_request_cannot_be_written_with_nothing_to_say(db):
+def test_a_request_may_be_written_with_nothing_to_say(db):
+    """**Reversed by D12, 12 September 2026.**
+
+    This test used to assert the opposite - that a blank message was refused.
+    The approved design shows a featured product as a card with the product's
+    picture and treats the note as optional, and the owner confirmed it: a
+    product can be featured on its picture alone.
+
+    Kept rather than deleted, pointing the other way, so the change is visible
+    to anybody who wonders whether the old rule was lost by accident.
+    """
     from app.services.wardrobe import set_feature_request
 
     _product(db, PANTS, "Wide-leg trousers")
 
-    with pytest.raises(ValueError, match="something to say"):
-        set_feature_request(db, PANTS, message="   ")
+    request = set_feature_request(db, PANTS, message="   ", visible=True)
+
+    assert request.message is None
+    assert request.visible is True
 
 
 def test_something_she_bought_does_not_make_a_request_visible_to_her(db):
@@ -608,3 +620,47 @@ def test_a_roster_costs_the_same_number_of_queries_however_many_parcels(db):
 
     # One for the matched lines, one for the models. Not one per parcel.
     assert len(seen) <= 3, "\n".join(seen)
+
+
+# -- D12: a featured product needs no message --------------------------------
+
+
+def test_a_product_can_be_featured_on_its_picture_alone(db):
+    """**D12, 12 September 2026.**
+
+    The approved design shows a featured product as a card with the product's
+    picture; the note is what you add when there is something extra to say.
+    Requiring one meant featuring ten products for a campaign was ten
+    identical sentences nobody reads.
+    """
+    from app.services.wardrobe import set_feature_request
+
+    request = set_feature_request(db, "gid://shopify/Product/1", visible=True)
+
+    assert request.message is None
+    assert request.visible is True
+
+
+def test_a_note_can_be_taken_back(db):
+    """Blank and absent collapse to nothing, on purpose.
+
+    Refusing an empty string would mean a sentence typed once could never be
+    removed - the same trap as the old refusal, from the other side.
+    """
+    from app.services.wardrobe import set_feature_request
+
+    set_feature_request(db, "gid://shopify/Product/1", visible=True, message="Before Thursday")
+    cleared = set_feature_request(db, "gid://shopify/Product/1", visible=True, message="   ")
+
+    assert cleared.message is None
+
+
+def test_a_note_is_kept_when_one_is_written(db):
+    """Optional is not ignored."""
+    from app.services.wardrobe import set_feature_request
+
+    request = set_feature_request(
+        db, "gid://shopify/Product/1", visible=True, message="  Mention the shade  "
+    )
+
+    assert request.message == "Mention the shade"

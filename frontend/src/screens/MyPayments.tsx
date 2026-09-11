@@ -281,7 +281,7 @@ export function PaymentRow({ payment }: { payment: Payment }) {
             <Link
               key={line.month}
               className="settle__link"
-              to={`/?month=${line.month}`}
+              to={`/earnings?month=${line.month}`}
             >
               Why {formatMonth(line.month)} came to {line.amount}
             </Link>

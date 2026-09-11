@@ -1,10 +1,22 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { Link } from "react-router-dom";
 
+import { Money } from "../components/Money";
 import { api } from "../lib/api";
+import { formatMonth } from "../lib/money";
 import { AddHouseCode } from "./AddHouseCode";
 import { InviteModel } from "./InviteModel";
 import "./Affiliates.css";
+
+/** The approved roster's segments. */
+export type Segment = "all" | "waiting" | "active" | "archived";
+
+export const SEGMENTS: { key: Segment; label: string }[] = [
+  { key: "all", label: "All" },
+  { key: "waiting", label: "Waiting to be approved" },
+  { key: "active", label: "Active" },
+  { key: "archived", label: "Archived" },
+];
 
 export type Affiliate = {
   id: number;
@@ -19,6 +31,21 @@ export type Affiliate = {
   has_terms?: boolean;
   /** The code they sell under this month, if they have one registered. */
   code?: string | null;
+  /** The month the sales and content figures below belong to. */
+  month?: string;
+  /** Sales she generated that month — the models' own leaderboard figure
+   *  (D03), not a payout and not anything owed to her. */
+  sales_piastres?: number;
+  uses?: number;
+  /** What was asked of her that month and what she produced. `null` when
+   *  nobody asked, which is not the same as having produced none. */
+  content?: {
+    required_videos: number | null;
+    required_stories: number | null;
+    actual_videos: number | null;
+    actual_stories: number | null;
+    last_update: string | null;
+  } | null;
   /**
    * The month she actually started with HBA (H01).
    *
@@ -135,16 +162,76 @@ export function missingSetup(row: Affiliate): string[] {
  * principle 5). "How many affiliates exist" is already next to the title, and
  * a second figure you can reach by subtracting two others earns no space.
  */
+/**
+ * The roster, narrowed to a segment and a search.
+ *
+ * **Search covers name and code**, because those are the two things anybody
+ * knows a model by: HBA thinks of her by name, and an order knows her only by
+ * the code on it. Matching one and not the other means the search fails
+ * exactly when somebody is holding an order and asking whose it is.
+ */
+export function rosterMatches(
+  rows: Affiliate[],
+  segment: Segment,
+  query: string,
+): Affiliate[] {
+  const needle = query.trim().toLowerCase();
+  return rows.filter((row) => {
+    if (segment === "waiting" && row.status !== "pending") return false;
+    if (segment === "active" && row.status !== "active") return false;
+    if (segment === "archived" && row.status !== "archived") return false;
+    if (!needle) return true;
+    return (
+      row.name.toLowerCase().includes(needle) ||
+      (row.code ?? "").toLowerCase().includes(needle)
+    );
+  });
+}
+
+/**
+ * *5 / 6 videos*, or why there is no figure.
+ *
+ * **Nobody asked is not the same as nothing produced**, and the roster has to
+ * keep them apart for the same reason Home does: the first is HBA's own
+ * omission and the second is a fact about her month.
+ */
+export function contentSummary(row: Affiliate): string {
+  const content = row.content;
+  if (!content || content.required_videos === null) return "Nothing asked for";
+  const videos = `${content.actual_videos ?? 0}/${content.required_videos}`;
+  const stories = `${content.actual_stories ?? 0}/${content.required_stories ?? 0}`;
+  return `${videos} · ${stories}`;
+}
+
 export function Affiliates() {
   const [rows, setRows] = useState<Affiliate[] | null>(null);
   const [invited, setInvited] = useState<Invited[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<View>("table");
   const [includeArchived, setIncludeArchived] = useState(false);
+  /**
+   * The approved roster filters and search.
+   *
+   * Both are applied here rather than asked of the server: this list is a
+   * whole roster of about twenty people, and a round trip per keystroke would
+   * be slower than the filter and would make an empty result ambiguous —
+   * nobody matches, or the answer has not come back yet.
+   */
+  const [segment, setSegment] = useState<Segment>("all");
+  const [query, setQuery] = useState("");
   const isNarrow = useIsNarrow();
   // The toggle is a preference, not an override: a table does not fit on a
   // phone however firmly somebody asked for one.
   const shown: View = isNarrow ? "cards" : view;
+  const visible = rows ? rosterMatches(rows, segment, query) : [];
+  // Archived is a segment now rather than a checkbox, so asking for it is what
+  // fetches it. Keeping both controls would let them contradict each other.
+  useEffect(() => {
+    setIncludeArchived(segment === "archived");
+  }, [segment]);
+  // The column header names the month it is showing, so a figure can never be
+  // read as "this month" when the list is answering for another one.
+  const monthLabel = rows?.[0]?.month ? formatMonth(rows[0].month) : "Month";
 
   const reload = useCallback(() => {
     setError(null);
@@ -197,14 +284,14 @@ export function Affiliates() {
            */}
           <AddHouseCode onCreated={reload} />
 
-          <label className="affiliates__toggle-archived">
-            <input
-              type="checkbox"
-              checked={includeArchived}
-              onChange={(event) => setIncludeArchived(event.target.checked)}
-            />
-            Show archived
-          </label>
+          <input
+            type="search"
+            className="affiliates__search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search name or code"
+            aria-label="Search models by name or code"
+          />
 
           {/*
            * §12.3 keeps this toggle even though width alone already chooses a
@@ -244,6 +331,30 @@ export function Affiliates() {
             </div>
           )}
         </div>
+      </div>
+
+      {/*
+       * The approved roster's segments, left of the search. They replace a
+       * *Show archived* checkbox: archived is one of the states a model can be
+       * in, and a separate control for it let the two disagree about what the
+       * list was showing.
+       */}
+      <div className="affiliates__segments" role="group" aria-label="Segments">
+        {SEGMENTS.map((option) => (
+          <button
+            key={option.key}
+            type="button"
+            className={
+              segment === option.key
+                ? "affiliates__segment affiliates__segment--on"
+                : "affiliates__segment"
+            }
+            onClick={() => setSegment(option.key)}
+            aria-pressed={segment === option.key}
+          >
+            {option.label}
+          </button>
+        ))}
       </div>
 
       {error && (
@@ -423,48 +534,63 @@ export function Affiliates() {
         </p>
       )}
 
-      {rows && rows.length > 0 && shown === "table" && (
+      {rows && rows.length > 0 && visible.length === 0 && (
+        <p className="empty">
+          Nobody here matches. Clear the search, or try another segment.
+        </p>
+      )}
+
+      {visible.length > 0 && shown === "table" && (
         <table className="table affiliates__table">
           <thead>
             <tr>
-              <th>Name</th>
               {/*
-               * Second column, asked for by name: the code is how an order is
-               * recognised as somebody's, so it is how a person is recognised
-               * on this list.
+               * Her name over her code, the way the approved roster stacks
+               * them. The code is how an order is recognised as somebody's,
+               * so it is how a person is recognised on this list — asked for
+               * by name during the walkthrough, and kept beside the name
+               * rather than in a column of its own.
                */}
-              <th>Code</th>
+              <th>Model</th>
               <th>Status</th>
-              <th>Kind</th>
+              <th className="affiliates__figure">{monthLabel} sales</th>
+              <th className="affiliates__figure">Content</th>
               <th>Needs attention</th>
+              <th aria-hidden="true" />
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => {
+            {visible.map((row) => {
               const missing = missingSetup(row);
               return (
                 <tr key={row.id}>
                   <td>
-                    <Link
-                      className="affiliates__name"
-                      to={`/affiliates/${row.id}`}
-                    >
-                      {row.name}
+                    <Link className="affiliates__who" to={`/affiliates/${row.id}`}>
+                      <span className="affiliates__avatar" aria-hidden="true">
+                        {row.name.charAt(0).toUpperCase()}
+                      </span>
+                      <span className="affiliates__who-text">
+                        <span className="affiliates__name">{row.name}</span>
+                        {row.code ? (
+                          <span className="code">{row.code}</span>
+                        ) : (
+                          <span className="affiliates__no-code">no code yet</span>
+                        )}
+                      </span>
                     </Link>
                   </td>
                   <td>
-                    {row.code ? (
-                      <span className="code">{row.code}</span>
-                    ) : (
-                      <span className="affiliates__no-code">none yet</span>
+                    <span className={`affiliates__status affiliates__status--${row.status}`}>
+                      {STATUS_LABEL[row.status]}
+                    </span>
+                    {row.account_kind === "house" && (
+                      <span className="affiliates__kind">House</span>
                     )}
                   </td>
-                  <td>{STATUS_LABEL[row.status]}</td>
-                  <td>
-                    <span className="affiliates__kind">
-                      {row.account_kind === "house" ? "House" : "Model"}
-                    </span>
+                  <td className="affiliates__figure">
+                    <Money piastres={row.sales_piastres ?? 0} />
                   </td>
+                  <td className="affiliates__figure">{contentSummary(row)}</td>
                   {/*
                    * Empty when there is nothing wrong. Marking the healthy rows
                    * too would spend the one signal the page has on the rows
@@ -475,6 +601,7 @@ export function Affiliates() {
                       <span className="blocker">{missing.join(", ")}</span>
                     )}
                   </td>
+                  <td className="affiliates__go" aria-hidden="true">→</td>
                 </tr>
               );
             })}
@@ -482,9 +609,9 @@ export function Affiliates() {
         </table>
       )}
 
-      {rows && rows.length > 0 && shown === "cards" && (
+      {visible.length > 0 && shown === "cards" && (
         <ul className="affiliates__cards">
-          {rows.map((row) => {
+          {visible.map((row) => {
             const missing = missingSetup(row);
             return (
               <li key={row.id} className="affiliates__card">

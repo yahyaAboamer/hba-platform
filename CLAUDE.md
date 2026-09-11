@@ -1,9 +1,11 @@
 # hba-platform
 
-Commission and payroll for ~20 Egyptian beauty models at **HBA Aesthetics**.
+Affiliate operations, clothing gifts, sales, targets and payroll for **HBA / HBA Wear**.
+The admin serves the owner, marketing team and finance team; the model portal
+shows each model their own performance, wardrobe and payment records.
 FastAPI + SQLAlchemy + Postgres, React + Vite, on Railway.
 
-**Read `docs/plans/2026-09-10-continuation-handoff.md` first** — it says where
+**Read `docs/plans/2026-09-11-design-parity-handoff.md` first** — it says where
 the work is right now. Everything below is the part that does not change.
 
 ---
@@ -12,8 +14,8 @@ the work is right now. Everything below is the part that does not change.
 
 | | Who | Look |
 |---|---|---|
-| **Maintainer** | 2 people, laptop, month end | Dense, laptop-first, colour only for money state |
-| **Affiliate portal** (`.affiliate`) | ~20 models, phone, arriving from an email | Dark by default, denser, phone-shaped |
+| **Maintainer** | Owner, marketing and finance teams on laptops | Laptop-first; match the approved Admin HTML structure and styling |
+| **Affiliate portal** (`.affiliate`) | Models on phones | Dark by default, denser, phone-shaped |
 
 **One palette across both, since ADR 0039** — HBA green, both themes, defined
 once in `tokens.css` with the accent alone in `accent.css`. `portal.css` is
@@ -104,7 +106,7 @@ payroll without touching a maintainer screen.
 
   Then empty the database and re-run the file alone. Happened 10 September and
   cost the best part of an hour.
-- Frontend: `cd frontend && npm test` (256), `npx tsc --noEmit` and
+- Frontend: `cd frontend && npm test` (290), `npx tsc --noEmit` and
   `npm run build`.
 - **A browser session is now possible.** Yahya signs in himself at
   `https://hba-platform-staging-staging.up.railway.app/sign-in` and the session
@@ -129,7 +131,8 @@ payroll without touching a maintainer screen.
   The correction is `docs/plans/2026-09-12-design-parity-handoff.md`, batches
   C1-C5, on top of the imported branch `review/approved-design-parity`.
 - Redesign 05A is a **read-only rules preview**. The normal calculation and
-  approval remain delivered-only until D01; do not mistake the preview's
+  approval still need verified pending-inclusive activation; D01 alone did not
+  switch the code path. Do not mistake the preview's
   entitlement for a transfer instruction.
 - **An agreed month is never unmade** (05B). Reopening is retired; what changes
   after an agreement is recorded against it as a correction (05C). An approval

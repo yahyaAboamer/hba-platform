@@ -1,4 +1,31 @@
-# Implementation status — update after every batch
+# Implementation status — correction in progress
+
+**Current position, 12 September 2026.** The redesign is **not complete**, and
+the phase table further down is historical reporting rather than acceptance.
+Phases 00-09 are merged and their features work; the screens were built onto
+the old page structure rather than rebuilt to the approved exports.
+
+**This was confirmed visually, not argued.** The reference export and live
+staging were rendered side by side at 1440px on 12 September, signed in as
+admin. Admin Home opened with four stacked notice blocks and four operational
+tiles where the design has three compact notices and three business cards, and
+its content panel showed two aggregate counts where the design has a per-model
+table. The correction package's audit was right.
+
+**What has happened since:**
+
+- The correction branch was imported from its bundle (`ef0e597`) and merged.
+- **C1 is under way.** Admin Home and the Models roster are done; the profile,
+  Settings and Products are not. See `reports/10C1-design-parity-admin.md`.
+- **D01-D12 are all closed.** D02, D09 and D10 were answered on 12 September,
+  and D12 (a featured product needs no message) was raised and answered the
+  same day.
+- **A browser session is available.** The owner signs in himself; no batch
+  report needs to say "visual evidence: none" again.
+
+**What remains:** C1's other admin screens, then the model portal — which has
+not been looked at at all — then C2's read contracts, which hold the real
+release blockers, then C3-C5.
 
 Package prepared: 9 September 2026. Phase 00 completed 9 September 2026.
 

@@ -45,7 +45,7 @@ describe("a transfer she is looking back at", () => {
     const html = render(payment);
     // AC41. Named by month rather than "View calculation", because one
     // transfer can settle two months and the generic label would be ambiguous.
-    expect(html).toContain('href="/?month=2026-07"');
+    expect(html).toContain('href="/earnings?month=2026-07"');
     expect(html).toContain("July 2026");
   });
 
