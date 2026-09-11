@@ -57,8 +57,8 @@ Package prepared: 9 September 2026. Phase 00 completed 9 September 2026.
 | 05 Financial rules | **Complete.** 05A, 05B and 05C merged to `main` | `reports/05A-pending-inclusive-earnings.md`, `05B-immutable-approval.md`, `05C-late-failure-corrections.md`; immutable approval, retired reopening and explicit corrections. D04 closed |
 | 06 Payments | **06A merged; 06B implemented, unmerged** | `reports/06A-admin-month-end-payment-journey.md`, `06B-model-payment-views.md`. 06A is the admin month-end journey - forecast, approved and recorded money kept apart, corrections listed across every model, and a retry-safe transfer record (migration `1c4b06a5f8d2`). 06B is the model's side: a receipt names the destination it actually went to and links to the month that explains it. 06B is frontend only |
 | 07 Performance screens | **Complete** | `reports/07-d03-d08-ranking-and-pace.md` (merged), `07A-model-home-and-orders.md`. D03 and D08 shipped the Ranking board and the maintainer's weekly-pace column, both part of 07B. 07A put code uses on her Home and verified the rest. `07B-owner-home-and-analytics.md` finished it: the owner's Home carries the payout broken into commission, salaries and guarantee top-ups, with the parts carved out of the one rounded total so they always add up; plus top sellers, active count and content needing review by reason. Product analytics use real attributed line items and discounted totals (W11) |
-| 08 Settings and notifications | **Next** | Notice dismissal persistence absent |
-| 09 Rehearsal and release | Not started | |
+| 08 Settings and notifications | **Complete** | `reports/08-settings-and-notices.md`. 08A audited and already present - every A09 item, and no credential field anywhere. 08B built A10's three behaviours: hide is the browser's and returns, mute persists and resolves nothing, fixing it ends it. A blocking notice cannot be muted. Stale reopen copy corrected and the glossary caught up with Phase 05. Migration `c93f2a17d4e8` |
+| 09 Rehearsal and release | **Next.** **D01 is its subject** and is still open |
 
 ## Resume notes
 

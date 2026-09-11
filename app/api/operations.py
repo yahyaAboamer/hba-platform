@@ -540,7 +540,11 @@ def notification_health(
     quietly sent nothing since it was deployed - which is the most likely way
     this goes wrong, and the least likely to be noticed.
     """
-    from app.models.notifications import NotificationOutbox, NotificationState
+    from app.models.notifications import (
+        NoticeMute,
+        NotificationOutbox,
+        NotificationState,
+    )
     from app.services.notifications import failed as failed_notifications
 
     counts = dict(
@@ -596,6 +600,11 @@ def notification_health(
 BLOCKING = "blocking"
 ATTENTION = "attention"
 
+#: Notices that may never be muted. A10 allows somebody to stop seeing a
+#: notice; it does not allow them to stop seeing a stop sign, and every one of
+#: these means the month cannot close.
+UNMUTABLE = frozenset({"go_live_month_unset"})
+
 #: §16. The payroll reminder, on the 5th unless somebody changes it.
 PAYROLL_REMINDER_DAY = 5
 
@@ -629,10 +638,25 @@ def attention(
     Months are written out. `2026-07` on a screen is a string somebody has to
     decode; *July 2026* is a month.
     """
-    from app.models.notifications import NotificationOutbox, NotificationState
+    from app.models.notifications import (
+        NoticeMute,
+        NotificationOutbox,
+        NotificationState,
+    )
     from app.services.payroll import months_left_reopened, working_month
 
     items: list[dict] = []
+
+    # **A blocking notice cannot be muted**, and that is not an oversight.
+    # A10 lets somebody stop seeing a notice; it does not let them stop seeing
+    # a stop sign. "Nothing can be approved" is not noise to be turned off -
+    # it is the reason the month will not close, and silencing it would make
+    # the platform quietly useless rather than loudly stuck.
+    muted = {
+        row.key
+        for row in db.scalars(select(NoticeMute))
+        if row.key not in UNMUTABLE
+    }
 
     def add(key: str, severity: str, text: str, where: str) -> None:
         items.append(
@@ -768,8 +792,22 @@ def attention(
             )
 
     return {
-        "items": items,
-        "blocking": sum(1 for item in items if item["severity"] == BLOCKING),
+        # **Muted notices are removed here, not earlier.** Every one was still
+        # computed, so muting cannot hide a problem from anything that counts
+        # them - only from the panel.
+        "items": [row for row in items if row["key"] not in muted],
+        "blocking": sum(
+            1
+            for row in items
+            if row["severity"] == BLOCKING and row["key"] not in muted
+        ),
+        # Listed, so a mute is reversible by somebody who did not set it and
+        # cannot become a thing nobody remembers turning off. A10: muting does
+        # not resolve anything, and a muted problem that is still true should
+        # still be findable.
+        "muted": [
+            {**row, "muted": True} for row in items if row["key"] in muted
+        ],
     }
 
 
@@ -842,3 +880,62 @@ def retry_notifications(
 
     db.commit()
     return {"queued": len(failed)}
+
+
+class MuteBody(BaseModel):
+    key: str = Field(min_length=1, max_length=64)
+
+
+@router.post("/notices/mute", status_code=201)
+def mute_notice(
+    body: MuteBody,
+    actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_VIEW)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Stop showing a notice on the panel. A10.
+
+    **This resolves nothing.** The problem is still there and the notice is
+    still true; muting only stops it appearing. That distinction is the rule,
+    and it is why a mute is listed back rather than swallowed — a muted problem
+    that is still real should stay findable by somebody who did not mute it.
+
+    A **blocking** notice cannot be muted. A10 lets somebody stop seeing a
+    notice; it does not let them stop seeing a stop sign, and every blocking
+    one means the month will not close.
+    """
+    from app.models.notifications import NoticeMute
+
+    if body.key in UNMUTABLE:
+        raise HTTPException(
+            400,
+            "That one stops the month closing, so it cannot be turned off. "
+            "Fixing it is what makes it go away.",
+        )
+
+    existing = db.get(NoticeMute, body.key)
+    if existing is None:
+        # Idempotent: muting twice is what a double-click looks like, and the
+        # second should be the same answer rather than a constraint violation.
+        db.add(NoticeMute(key=body.key, muted_by=actor.id))
+        db.commit()
+    return {"key": body.key, "muted": True}
+
+
+@router.delete("/notices/mute/{key}")
+def unmute_notice(
+    key: str,
+    _actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_VIEW)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Show a notice again.
+
+    Idempotent for the same reason muting is: asking for something that is
+    already true is not an error.
+    """
+    from app.models.notifications import NoticeMute
+
+    existing = db.get(NoticeMute, key)
+    if existing is not None:
+        db.delete(existing)
+        db.commit()
+    return {"key": key, "muted": False}

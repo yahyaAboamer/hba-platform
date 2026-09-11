@@ -89,7 +89,7 @@ payroll without touching a maintainer screen.
   the background. Two against the same database deadlock and leak committed
   rows into each other, and the failures look exactly like a real regression
   in whatever you just changed. Also on 10 September, and it cost an hour.
-- Backend: `.venv/Scripts/python.exe -m pytest -q` — **1864 passing**, and no
+- Backend: `.venv/Scripts/python.exe -m pytest -q` — **1873 passing**, and no
   change merges below that. It takes 5–15 minutes; run it in the background.
 - **A killed pytest run leaves a connection behind that deadlocks the next
   one.** Teardown is skipped, an idle backend keeps holding locks, and every

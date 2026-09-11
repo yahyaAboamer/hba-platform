@@ -15,8 +15,10 @@ type Kind = "credit" | "writeoff";
  * Settling an overpayment. §11.5, and Pattern C (§12.2).
  *
  * Reaching this page means they have been paid more than the month agreed —
- * usually because it was reopened to a lower figure after the money had gone,
- * sometimes a rounding split or a fee.
+ * usually a rounding split or a fee, or a month reopened before 05B retired
+ * reopening. **An agreed month is no longer unmade**: what changes after it is
+ * recorded against it as a correction (05C), and this screen settles the
+ * difference wherever it came from.
  *
  * **The platform reports the overpayment and refuses to decide what to do
  * about it.** Carrying it into next month or absorbing it is a judgement about
@@ -207,7 +209,7 @@ export function PaymentReconcile() {
               required
               value={reason}
               onChange={(event) => setReason(event.target.value)}
-              placeholder="September was reopened lower after a parcel came back refused."
+              placeholder="A parcel from September came back refused after she was paid."
             />
             <span className="detail__note">
               Kept in the record, and shown to {balance.name} — a credit they
