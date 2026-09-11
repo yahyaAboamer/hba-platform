@@ -11,7 +11,7 @@
 }
 
 .detail__back::after {
-  content: "/";
+  content: "";
   margin-left: var(--space-2);
   color: var(--rule-strong);
 }
@@ -218,4 +218,64 @@
   display: block;
   max-width: 60ch;
   line-height: 1.5;
+}
+
+.profile__navigation { display:flex; justify-content:space-between; align-items:center; gap:14px; margin:18px 0; flex-wrap:wrap; }
+.profile__tabs { display:flex; gap:7px; flex-wrap:wrap; }
+.profile__tab { min-height:36px; padding:8px 13px; border:0; border-radius:8px; background:none; color:var(--quiet); font:inherit; font-size:13px; cursor:pointer; }
+.profile__tab--active { color:var(--accent-text); background:var(--accent-soft); }
+.profile__wardrobe,.profile__full { grid-column:1 / -1; min-width:0; }
+.profile__wardrobe-group { margin-bottom:22px; }
+.profile__wardrobe-group h2 { margin-bottom:14px; font-size:15px; }
+.profile__products { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:14px; }
+.profile__product { display:flex; flex-direction:column; gap:8px; padding:10px; border-radius:8px; background:var(--surface); font-size:13px; }
+.profile__product img,.profile__product-image { width:100%; aspect-ratio:1; object-fit:contain; border-radius:6px; background:var(--paper); }
+.profile__product-image { display:grid; place-items:center; color:var(--quiet); font-size:12px; }
+.profile__product a { color:var(--ink); text-decoration:none; }
+.profile__product small { color:var(--quiet); }
+
+/* -- The approved profile hero --------------------------------------------
+ *
+ * Who this is, before any section: her initial, her name, her state and the
+ * code an order knows her by — the same four facts the roster row carries, so
+ * arriving from that row does not feel like arriving somewhere else.
+ */
+.detail__hero {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding-bottom: var(--space-4);
+  margin-bottom: var(--space-4);
+  border-bottom: 1px solid var(--rule);
+}
+
+.detail__hero-avatar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 1px solid var(--rule);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-size: var(--text-lg);
+}
+
+.detail__hero-who h1 {
+  margin: 0;
+}
+
+.detail__hero-facts {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-top: 5px;
+}
+
+.detail__hero-nocode,
+.detail__hero-applied {
+  color: var(--quiet);
+  font-size: var(--text-sm);
 }

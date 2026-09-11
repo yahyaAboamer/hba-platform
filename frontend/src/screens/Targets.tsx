@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 import { MonthPicker } from "../components/MonthPicker";
 import type { MonthLock } from "../components/MonthPicker";
@@ -100,8 +100,9 @@ function waitingOn(row: Row): string | null {
  * minimum these numbers decide what they are paid, and for everybody else they
  * are worth knowing and decide nothing.
  */
-export function Targets({ session }: { session: Session }) {
-  const [month, setMonth] = useState(session.platform.working_month);
+export function Targets({ session, affiliateId, initialMonth, embedded = false }: { session: Session; affiliateId?: number; initialMonth?: string; embedded?: boolean }) {
+  const [query] = useSearchParams();
+  const [month, setMonth] = useState(initialMonth ?? (query.get("month")?.match(/^\d{4}-(0[1-9]|1[0-2])$/) ? query.get("month")! : session.platform.working_month));
   const [grid, setGrid] = useState<Grid | null>(null);
   const [draft, setDraft] = useState<Draft>({});
   const [error, setError] = useState<string | null>(null);
@@ -183,7 +184,7 @@ export function Targets({ session }: { session: Session }) {
     setSaved(null);
     try {
       const rows = [];
-      for (const row of grid.rows.filter((r) => r.account_kind !== "house")) {
+      for (const row of grid.rows.filter((r) => r.account_kind !== "house" && (!affiliateId || r.affiliate_id === affiliateId))) {
         const cells = draft[row.affiliate_id];
         const required_videos = count(cells.required_videos);
         const required_stories = count(cells.required_stories);
@@ -298,7 +299,7 @@ export function Targets({ session }: { session: Session }) {
 
   // A house code publishes nothing, so a row of empty boxes beside it is
   // four things nobody will ever type into.
-  const rows = (grid?.rows ?? []).filter((row) => row.account_kind !== "house");
+  const rows = (grid?.rows ?? []).filter(row => row.account_kind !== "house" && (!affiliateId || row.affiliate_id === affiliateId) && (!query.get("pace") || row.pace?.state === query.get("pace")));
   const blocking = rows.filter((row) => waitingOn(row) !== null);
   const confirmable = rows.filter(
     (row) => row.achieved !== null && !row.verified,
@@ -307,13 +308,13 @@ export function Targets({ session }: { session: Session }) {
 
   return (
     <>
-      <div className="page__head">
+      {!embedded && <div className="page__head">
         <div className="page__title">
           <h1>Targets</h1>
           <span className="page__subtitle">{formatMonth(month)}</span>
         </div>
         <MonthPicker value={month} onChange={setMonth} lockFor={lockFor} />
-      </div>
+      </div>}
 
       {error && (
         <p className="notice notice--refused" role="alert">
@@ -325,7 +326,7 @@ export function Targets({ session }: { session: Session }) {
 
       {grid === null && !error && <p className="empty">Loading…</p>}
 
-      {grid && (
+      {grid && !embedded && (
         <p className="targets__lead">
           Videos and stories published, from your own tracking. On a guaranteed
           minimum these decide the pay; for everyone else they are worth

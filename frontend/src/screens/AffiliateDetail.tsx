@@ -1,6 +1,8 @@
-import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useEffect, useState, useRef } from "react";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 
+import { MonthPicker } from "../components/MonthPicker";
+import { Targets } from "./Targets";
 import { Money } from "../components/Money";
 import { Corrections } from "../components/Corrections";
 import { FinancialRulesPreview } from "../components/FinancialRulesPreview";
@@ -57,6 +59,9 @@ type WardrobeItem = {
   title: string;
   size: string | null;
   state: string;
+  image_url: string | null;
+  image_thumb_url: string | null;
+  shopify_order_id: string;
 };
 
 type Detail = Affiliate & {
@@ -99,6 +104,11 @@ const PAY_TYPE: Record<string, string> = {
  */
 export function AffiliateDetail({ session }: { session: Session }) {
   const { id } = useParams();
+  const [query, setQuery] = useSearchParams();
+  const section = ["overview", "wardrobe", "performance", "targets", "payments"].includes(query.get("section") ?? "") ? query.get("section")! : "overview";
+  const [month, setMonth] = useState(query.get("month")?.match(/^\d{4}-(0[1-9]|1[0-2])$/) ? query.get("month")! : session.platform.working_month);
+  const [wardrobeError, setWardrobeError] = useState<string | null>(null);
+  const [wardrobeReload, setWardrobeReload] = useState(0);
   const [detail, setDetail] = useState<Detail | null>(null);
   const [earnings, setEarnings] = useState<Earnings | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -130,22 +140,26 @@ export function AffiliateDetail({ session }: { session: Session }) {
     failed: WardrobeItem[];
   } | null>(null);
 
+  const loadVersion = useRef(0);
   function load() {
+    const version = ++loadVersion.current;
+    setEarnings(null);
     setError(null);
     api
       .get<Detail>(`/api/affiliates/${id}`)
       .then((body) => {
+        if (version !== loadVersion.current) return;
         setDetail(body);
         setCorrection("");
         return api.get<Earnings>(
-          `/api/affiliates/${id}/earnings/${body.current_month}`,
+          `/api/affiliates/${id}/earnings/${month}`,
         );
       })
-      .then(setEarnings)
-      .catch((caught) => setError(caught.message));
+      .then(value => { if (version === loadVersion.current && value) setEarnings(value); })
+      .catch((caught) => { if (version === loadVersion.current) setError(caught.message); });
   }
 
-  useEffect(load, [id]);
+  useEffect(load, [id, month]);
 
   /**
    * §10.4's gate, from the maintainer's side. Asks Shopify whether the code
@@ -211,6 +225,8 @@ export function AffiliateDetail({ session }: { session: Session }) {
 
   useEffect(() => {
     let live = true;
+    setWardrobe(null);
+    setWardrobeError(null);
     api
       .get<{
         received: WardrobeItem[];
@@ -220,14 +236,11 @@ export function AffiliateDetail({ session }: { session: Session }) {
       .then((body) => {
         if (live) setWardrobe(body);
       })
-      .catch(() => {
-        // Quietly. A wardrobe that will not load is not a reason to replace
-        // the profile somebody opened to read something else.
-      });
+      .catch((caught) => { if (live) setWardrobeError(caught.message); });
     return () => {
       live = false;
     };
-  }, [id]);
+  }, [id, wardrobeReload]);
 
   async function saveShipping() {
     if (!shipDraft) return;
@@ -283,20 +296,61 @@ export function AffiliateDetail({ session }: { session: Session }) {
   if (!detail) return <p className="empty">Loading…</p>;
 
   const verified = detail.codes.some((entry) => entry.verified);
+  /**
+   * The code she sells under **now** — the open-ended one, or the last
+   * registered if every period has closed. A hero that listed every code she
+   * has ever held would bury the one an order arriving today would match.
+   */
+  const current =
+    detail.codes.find((entry) => entry.end_month === null) ??
+    detail.codes[detail.codes.length - 1];
+  const appliedOn = detail.created_at
+    ? new Date(detail.created_at).toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      })
+    : null;
 
   return (
     <>
       <div className="page__head">
         <div className="page__title">
           <Link to="/affiliates" className="detail__back">
-            Affiliates
+            ← Models
           </Link>
-          <h1>{detail.name}</h1>
-          <span className={`state state--${detail.status}`}>
-            {STATUS_LABEL[detail.status]}
-          </span>
         </div>
       </div>
+
+      {/*
+       * The approved profile's hero: who this is, at a glance, before any of
+       * the sections. Her initial, her name, the state she is in, and the code
+       * an order knows her by — the same four things the roster row carries,
+       * so arriving from that row does not feel like arriving somewhere else.
+       */}
+      <header className="detail__hero">
+        <span className="detail__hero-avatar" aria-hidden="true">
+          {detail.name.charAt(0).toUpperCase()}
+        </span>
+        <div className="detail__hero-who">
+          <h1>{detail.name}</h1>
+          <div className="detail__hero-facts">
+            <span className={`state state--${detail.status}`}>
+              {STATUS_LABEL[detail.status]}
+            </span>
+            {/* The code she sells under now. A profile that showed every code
+             *  she has ever held would bury the one that matters today. */}
+            {current ? (
+              <span className="code">{current.code}</span>
+            ) : (
+              <span className="detail__hero-nocode">No code yet</span>
+            )}
+            {detail.status === "pending" && appliedOn && (
+              <span className="detail__hero-applied">Applied {appliedOn}</span>
+            )}
+          </div>
+        </div>
+      </header>
 
       {/*
        * The one thing that is genuinely wrong rather than merely absent: an
@@ -468,54 +522,17 @@ export function AffiliateDetail({ session }: { session: Session }) {
         </section>
       )}
 
+      <div className="profile__navigation">
+        <nav className="profile__tabs" aria-label="Model sections">
+          {["Overview", "Wardrobe", "Performance", "Targets", "Payments"].map(label => <button key={label} type="button"
+            className={section === label.toLowerCase() ? "profile__tab profile__tab--active" : "profile__tab"}
+            aria-current={section === label.toLowerCase() ? "page" : undefined}
+            onClick={() => setQuery(previous => { const next = new URLSearchParams(previous); next.set("section", label.toLowerCase()); next.set("month", month); return next; })}>{label}</button>)}
+        </nav>
+        {["performance", "targets", "payments"].includes(section) && <MonthPicker value={month} onChange={setMonth} />}
+      </div>
       <div className="detail__grid">
-        {/*
-         * **The same records her own screen reads** (W08): literally the same
-         * service function. Two readings of one truth cannot disagree, and a
-         * wardrobe that differs between her phone and this page is the
-         * argument nobody can settle.
-         *
-         * Only gifts (D05). Something she bought is not here and is not
-         * missing - it was never this screen's subject.
-         */}
-        {wardrobe !== null &&
-          (wardrobe.received.length > 0 ||
-            wardrobe.processing.length > 0 ||
-            wardrobe.failed.length > 0) && (
-            <section className="panel">
-              <div className="panel__head">
-                <h2 className="panel__title">What HBA has sent her</h2>
-              </div>
-              <dl className="detail__list">
-                {[
-                  ["Has", wardrobe.received],
-                  ["On the way", wardrobe.processing],
-                  ["Needs checking", wardrobe.failed],
-                ].map(([label, items]) =>
-                  (items as WardrobeItem[]).length === 0 ? null : (
-                    <Row key={label as string} label={label as string}>
-                      <span className="detail__wardrobe">
-                        {(items as WardrobeItem[])
-                          .map((item) =>
-                            item.size
-                              ? `${item.title} (${item.size})`
-                              : item.title,
-                          )
-                          .join(", ")}
-                      </span>
-                    </Row>
-                  ),
-                )}
-              </dl>
-            </section>
-          )}
-
-        {/*
-         * First in the grid, and on a pending profile too - unlike the money
-         * panels below it. When she started is knowable before she is
-         * approved, it is the one thing on this screen nothing can derive, and
-         * it decides which months she can open at all (H01).
-         */}
+        {section === "overview" && <>
         <section className="panel">
           <div className="panel__head">
             <h2 className="panel__title">Who {detail.name} is</h2>
@@ -727,22 +744,56 @@ export function AffiliateDetail({ session }: { session: Session }) {
             </Row>
           </dl>
         </section>
+        <section className="panel">
+          <div className="panel__head">
+            <h2 className="panel__title">Discount codes</h2>
+          </div>
+          {detail.codes.length === 0 ? (
+            <p className="empty">
+              None registered for {formatMonth(detail.current_month)}.
+            </p>
+          ) : (
+            <ul className="detail__codes">
+              {detail.codes.map((entry) => (
+                <li key={entry.code} className="detail__code-row">
+                  <span className="code detail__code">{entry.code}</span>
+                  {!entry.verified && (
+                    <span className="blocker">not confirmed by Shopify</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
 
-        {/*
-         * Not before they are approved. A pending affiliate has no terms, so
-         * this panel could only ever show zero owed and "no pay terms for this
-         * month" - an answer to a question nobody is asking yet, on a page
-         * whose whole job at that point is the list of things still to do.
-         *
-         * The business put it plainly: *what creates the model is setting her
-         * up, not her registering.* Quoted as said; it is true of any model.
-         */}
-        {detail.status !== "pending" && (
+          {can(session, "affiliates.manage") && (
+            <CodeForm
+              affiliateId={detail.id}
+              held={detail.codes}
+              onDone={load}
+            />
+          )}
+        </section>
+        </>}
+        {section === "wardrobe" && <div className="profile__wardrobe">
+          {wardrobeError && <p className="notice notice--refused" role="alert">{wardrobeError} <button className="button" onClick={() => setWardrobeReload(n => n + 1)}>Retry</button></p>}
+          {!wardrobe && !wardrobeError && <p className="empty">Loading wardrobe…</p>}
+          {wardrobe && [["Received", wardrobe.received], ["Processing", wardrobe.processing], ["Needs checking", wardrobe.failed]].map(([label, list]) => <section key={label as string} className="profile__wardrobe-group">
+            <h2>{label as string} <span className="page__subtitle">{(list as WardrobeItem[]).length}</span></h2>
+            {(list as WardrobeItem[]).length === 0 ? <p className="empty">No products.</p> : <div className="profile__products">
+              {(list as WardrobeItem[]).map((item, index) => <article className="profile__product" key={`${item.shopify_order_id}-${item.shopify_product_id}-${index}`}>
+                {item.image_thumb_url || item.image_url ? <img src={item.image_thumb_url || item.image_url!} alt={item.title} loading="lazy" /> : <div className="profile__product-image">Image unavailable</div>}
+                {item.shopify_product_id ? <Link to={`/products/${item.shopify_product_id}`}>{item.title}</Link> : <span>{item.title}</span>}
+                <small>Size {item.size || "not recorded"}</small>
+              </article>)}
+            </div>}
+          </section>)}
+        </div>}
+        {section === "performance" && <>
         <section className="panel">
           <div className="panel__head">
             <h2 className="panel__title">How the month is going</h2>
             <span className="page__subtitle">
-              {formatMonth(detail.current_month)}
+              {formatMonth(month)}
             </span>
           </div>
           <dl className="detail__list">
@@ -800,32 +851,14 @@ export function AffiliateDetail({ session }: { session: Session }) {
             )}
           </dl>
         </section>
-
-        )}
-
-        {/*
-          * Above the rules preview, because this one asks for a decision and
-          * that one only tells you something.
-          */}
-        {id && <Corrections key={`fix-${id}`} affiliateId={id} session={session} />}
-
-        {id && (
-          <FinancialRulesPreview
-            key={id}
-            affiliateId={id}
-            currentMonth={detail.current_month}
-            firstMonth={
-              detail.collaboration_start_month &&
-              detail.collaboration_start_month > detail.platform_start_month
-                ? detail.collaboration_start_month
-                : detail.platform_start_month
-            }
-          />
-        )}
-
+          <Link className="button" to={`/orders?month=${month}&affiliate=${id}`}>View attributed orders →</Link>
+        </>}
+        {section === "targets" && <div className="profile__full"><Targets key={`${id}-${month}`} session={session} affiliateId={Number(id)} initialMonth={month} embedded /></div>}
+        {section === "payments" && <>
         <section className="panel">
           <div className="panel__head">
-            <h2 className="panel__title">How {detail.name} is paid</h2>
+            <h2 className="panel__title">Payment terms</h2>
+            {can(session, "compensation.manage") && <Link className="button" to={`/affiliates/${id}/compensation`}>Edit terms</Link>}
           </div>
           {detail.compensation === null ? (
             <p className="empty">
@@ -868,7 +901,6 @@ export function AffiliateDetail({ session }: { session: Session }) {
             </dl>
           )}
         </section>
-
         <section className="panel">
           <div className="panel__head">
             <h2 className="panel__title">What has been paid</h2>
@@ -887,37 +919,6 @@ export function AffiliateDetail({ session }: { session: Session }) {
             Every payment and adjustment, with the screenshots.
           </p>
         </section>
-
-        <section className="panel">
-          <div className="panel__head">
-            <h2 className="panel__title">Discount codes</h2>
-          </div>
-          {detail.codes.length === 0 ? (
-            <p className="empty">
-              None registered for {formatMonth(detail.current_month)}.
-            </p>
-          ) : (
-            <ul className="detail__codes">
-              {detail.codes.map((entry) => (
-                <li key={entry.code} className="detail__code-row">
-                  <span className="code detail__code">{entry.code}</span>
-                  {!entry.verified && (
-                    <span className="blocker">not confirmed by Shopify</span>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-
-          {can(session, "affiliates.manage") && (
-            <CodeForm
-              affiliateId={detail.id}
-              held={detail.codes}
-              onDone={load}
-            />
-          )}
-        </section>
-
         <section className="panel">
           <div className="panel__head">
             <h2 className="panel__title">Where the money goes</h2>
@@ -998,6 +999,11 @@ export function AffiliateDetail({ session }: { session: Session }) {
             </dl>
           )}
         </section>
+          {id && <Corrections key={`fix-${id}`} affiliateId={id} session={session} />}
+          {id && <FinancialRulesPreview key={`${id}-${month}`} affiliateId={id} currentMonth={detail.current_month}
+            firstMonth={detail.collaboration_start_month && detail.collaboration_start_month > detail.platform_start_month ? detail.collaboration_start_month : detail.platform_start_month} />}
+          <Link className="button" to={`/payments?month=${month}&affiliate=${id}`}>Open this model in Payments →</Link>
+        </>}
       </div>
     </>
   );

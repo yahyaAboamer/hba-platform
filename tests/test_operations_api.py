@@ -917,3 +917,67 @@ def test_a_model_may_not_resend_everybodys_email(client):
     _demote_to("affiliate")
 
     assert client.post("/api/operations/notifications/retry").status_code == 403
+
+
+# -- the counts beside the sidebar's section names ---------------------------
+
+
+def test_the_models_count_is_the_ones_waiting_to_be_approved(client):
+    """The approved export puts a number beside *Models*.
+
+    It counts applications somebody has to look at, not the roster — a badge
+    reading 19 on a healthy platform is furniture, and the owner would stop
+    seeing it within a week.
+    """
+    from app.core.passwords import hash_password
+    from app.db import SessionLocal
+    from app.models.affiliates import AccountKind, AffiliateStatus
+    from app.models.identity import UserAccount
+    from app.services.affiliates import create_affiliate
+
+    def _person(session, name: str):
+        account = UserAccount(
+            email=f"{name.lower()}@example.com",
+            password_hash=hash_password("quiet-harbour-lantern"),
+            status="active",
+            display_name=name,
+        )
+        session.add(account)
+        session.flush()
+        return create_affiliate(
+            session,
+            user_account_id=account.id,
+            name=name,
+            account_kind=AccountKind.MODEL,
+        )
+
+    with SessionLocal() as session:
+        waiting = _person(session, "Nour")
+        assert waiting.status == AffiliateStatus.PENDING, "new means waiting"
+        _person(session, "Salma").status = AffiliateStatus.ACTIVE
+        session.commit()
+
+    body = client.get("/api/operations/counts").json()
+
+    assert body["models_awaiting_approval"] == 1
+
+
+def test_the_counts_say_nothing_about_money_yet(client):
+    """**Payments is deliberately absent**, and this holds it absent.
+
+    What is still owed is computed by the Payments screen from snapshots and
+    the ledger. A sidebar that worked it out for itself would be a second
+    implementation of a money figure, which is the one thing this codebase
+    refuses — so the badge waits for the payments batch to hand it the same
+    number from the same place.
+    """
+    body = client.get("/api/operations/counts").json()
+
+    assert "payments" not in body
+    assert not any("piastres" in key for key in body)
+
+
+def test_a_model_may_not_read_the_maintainer_counts(client):
+    _demote_to("affiliate")
+
+    assert client.get("/api/operations/counts").status_code == 403

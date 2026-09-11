@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 import { Money } from "../components/Money";
 import { MonthPicker } from "../components/MonthPicker";
@@ -106,7 +106,8 @@ const COMMISSION_LABEL: Record<string, string> = {
  * and `payroll_snapshot` already made.
  */
 export function Orders({ session }: { session: Session }) {
-  const [month, setMonth] = useState(session.platform.working_month);
+  const [query] = useSearchParams();
+  const [month, setMonth] = useState(query.get("month")?.match(/^\d{4}-(0[1-9]|1[0-2])$/) ? query.get("month")! : session.platform.working_month);
   const [grid, setGrid] = useState<Grid | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [lockNote, setLockNote] = useState<string | null>(null);
@@ -149,7 +150,7 @@ export function Orders({ session }: { session: Session }) {
     }
   }
 
-  const all = grid?.orders ?? [];
+  const all = (grid?.orders ?? []).filter(row => !query.get("affiliate") || String(row.affiliate_id) === query.get("affiliate"));
   const rows = all.filter((row) => matches(row, lens));
   const count = (of: Lens) => all.filter((row) => matches(row, of)).length;
 

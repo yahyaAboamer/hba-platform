@@ -1,51 +1,18 @@
 import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet } from "react-router-dom";
 
-import { signOutAndLeave } from "../lib/api";
+import { api, signOutAndLeave } from "../lib/api";
 import type { Session } from "../lib/api";
-import { applyMaintainerTheme, storeTheme, storedTheme } from "../lib/theme";
+import { applyMaintainerTheme, storedTheme } from "../lib/theme";
 import "./Layout.css";
 
-/**
- * **Home · Models · Products · Targets · Payments · Settings.** Six, from the
- * approved design (`docs/redesign/designs/Admin Dashboard.dc.html`, rule S02).
- *
- * The order is still the order of a month: see where things stand, check who
- * is on the programme, check what they were sent, check what they were asked
- * for, agree and pay it. Settings sits last because it is set up once and
- * revisited.
- *
- * ## What left the top level, and where it went
- *
- * **Orders** and **Payroll** were sections here and are not any more. Neither
- * was deleted — S02 is explicit that secondary destinations keep every
- * necessary operation, and both routes still work, still carry their
- * permissions, and still have a way in:
- *
- * - `/orders` — every attributed order, for support. Reached from Home, where
- *   the sales figure it explains already is. The design does the same, and
- *   titles it *Attributed orders*.
- * - `/payroll` — agreeing a month. Reached from Payments, which is the screen
- *   about the same money. In the finished design there is no separate payroll
- *   screen at all: approval happens inside one model's payment. Merging them
- *   is Phase 05B/06A work, so until then this is a link rather than a rebuild
- *   — which keeps the operation exactly where it works today.
- *
- * A tab bar that grows and shrinks as batches land moves everything under
- * somebody's cursor each time, so **Products is here now** even though Phase
- * 03 builds it. It says so, in as many words, rather than looking empty.
- *
- * ## The paths did not change
- *
- * `/affiliates` still reads *Models* rather than moving to `/models`. The
- * label is what the business says and what the design draws; the path is what
- * two people have bookmarked and what every internal link already points at.
- * Renaming it during a redesign buys a tidier URL and spends a working
- * bookmark, and S07 asks for deep links that keep working.
- */
+/** The six workspaces and account menu from the approved admin export. */
+/** Keyed by the section's `count` name, so a new badge needs no new type. */
+type Counts = Record<string, number>;
+
 const SECTIONS = [
   { to: "/", label: "Home", end: true },
-  { to: "/affiliates", label: "Models" },
+  { to: "/affiliates", label: "Models", count: "models_awaiting_approval" },
   { to: "/products", label: "Products" },
   { to: "/targets", label: "Targets" },
   { to: "/payments", label: "Payments" },
@@ -62,7 +29,23 @@ export function Layout({ session }: { session: Session }) {
    * render outside this layout, and a tool that is dark once you are in and
    * white on the way there is a tool that flashes at you every morning.
    */
-  const [theme, setTheme] = useState(() => storedTheme("maintainer"));
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [theme] = useState(() => storedTheme("maintainer"));
+  /**
+   * The counts beside the section names, as the approved export draws them.
+   *
+   * A failed fetch leaves them absent rather than zero: *no badge* reads as
+   * nothing to say, while a `0` asserts there is nothing waiting - which is a
+   * claim this component would be making up.
+   */
+  const [counts, setCounts] = useState<Counts>({});
+
+  useEffect(() => {
+    api
+      .get<Counts>("/api/operations/counts")
+      .then(setCounts)
+      .catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     applyMaintainerTheme(theme);
@@ -71,12 +54,11 @@ export function Layout({ session }: { session: Session }) {
   return (
     <div className="layout">
       <nav className="layout__sidebar" aria-label="Sections">
-        <div className="layout__brand">
-          <span className="layout__brand-name">HBA</span>
-          <span className="layout__brand-role">
-            {session.actor.role.replace(/_/g, " ")}
-          </span>
-        </div>
+        <Link to="/" className="layout__brand" aria-label="HBA Admin home">
+          <span className="layout__brand-mark">HBA</span>
+          <span><span className="layout__brand-name">Admin</span>
+            <span className="layout__brand-role">hbawear.store</span></span>
+        </Link>
 
         <ul className="layout__nav">
           {SECTIONS.map((section) => (
@@ -89,46 +71,30 @@ export function Layout({ session }: { session: Session }) {
                 }
               >
                 {section.label}
+                {section.count && counts[section.count] > 0 && (
+                  <span className="layout__count">{counts[section.count]}</span>
+                )}
               </NavLink>
             </li>
           ))}
         </ul>
 
         <div className="layout__account">
-          <span className="layout__email" title={session.actor.email}>
-            {session.actor.display_name || session.actor.email}
-          </span>
-          {/*
-           * Reference material, not a workflow step - deliberately not one of
-           * the six sections above it. What "void" or "carried forward"
-           * mean is reached from here or from a term wherever it already
-           * appears, never a destination somebody scans past every month.
-           */}
-          <Link to="/glossary" className="layout__glossary">
-            What these words mean
-          </Link>
-          {/*
-           * A switch, not a menu. There are two states and naming the one you
-           * would move to is shorter to read than a label plus a control.
-           */}
-          <button
-            type="button"
-            className="layout__theme"
-            onClick={() => {
-              const next = theme === "dark" ? "light" : "dark";
-              setTheme(next);
-              storeTheme(next, "maintainer");
-            }}
-          >
-            {theme === "dark" ? "Light theme" : "Dark theme"}
+          <button type="button" className="layout__account-toggle"
+            aria-expanded={accountOpen} aria-controls="admin-account-menu"
+            onClick={() => setAccountOpen(!accountOpen)}>
+            <span className="layout__avatar">{(session.actor.display_name || session.actor.email).charAt(0).toUpperCase()}</span>
+            <span className="layout__identity">
+              <span className="layout__email">{session.actor.display_name || session.actor.email}</span>
+              <span className="layout__brand-role">{session.actor.role.replace(/_/g, " ")}</span>
+            </span><span aria-hidden="true">▾</span>
           </button>
-          <button
-            type="button"
-            className="layout__sign-out"
-            onClick={signOutAndLeave}
-          >
-            Sign out
-          </button>
+          {accountOpen && <div id="admin-account-menu" className="layout__account-menu">
+            <Link to="/settings?section=team" onClick={() => setAccountOpen(false)}>Team and access</Link>
+            <Link to="/glossary" onClick={() => setAccountOpen(false)}>Help</Link>
+            <Link to="/settings?section=appearance" onClick={() => setAccountOpen(false)}>Appearance</Link>
+            <button type="button" onClick={signOutAndLeave}>Sign out</button>
+          </div>}
         </div>
       </nav>
 

@@ -1,9 +1,11 @@
 # hba-platform
 
-Commission and payroll for ~20 Egyptian beauty models at **HBA Aesthetics**.
+Affiliate operations, clothing gifts, sales, targets and payroll for **HBA / HBA Wear**.
+The admin serves the owner, marketing team and finance team; the model portal
+shows each model their own performance, wardrobe and payment records.
 FastAPI + SQLAlchemy + Postgres, React + Vite, on Railway.
 
-**Read `docs/plans/2026-09-10-continuation-handoff.md` first** — it says where
+**Read `docs/plans/2026-09-11-design-parity-handoff.md` first** — it says where
 the work is right now. Everything below is the part that does not change.
 
 ---
@@ -12,8 +14,8 @@ the work is right now. Everything below is the part that does not change.
 
 | | Who | Look |
 |---|---|---|
-| **Maintainer** | 2 people, laptop, month end | Dense, laptop-first, colour only for money state |
-| **Affiliate portal** (`.affiliate`) | ~20 models, phone, arriving from an email | Dark by default, denser, phone-shaped |
+| **Maintainer** | Owner, marketing and finance teams on laptops | Laptop-first; match the approved Admin HTML structure and styling |
+| **Affiliate portal** (`.affiliate`) | Models on phones | Dark by default, denser, phone-shaped |
 
 **One palette across both, since ADR 0039** — HBA green, both themes, defined
 once in `tokens.css` with the accent alone in `accent.css`. `portal.css` is
@@ -89,8 +91,20 @@ payroll without touching a maintainer screen.
   the background. Two against the same database deadlock and leak committed
   rows into each other, and the failures look exactly like a real regression
   in whatever you just changed. Also on 10 September, and it cost an hour.
-- Backend: `.venv/Scripts/python.exe -m pytest -q` — **1885 passing**, and no
+- Backend: `.venv/Scripts/python.exe -m pytest -q` — **1897 passing**, and no
   change merges below that. It takes 5–15 minutes; run it in the background.
+- **If the suite is killed for low memory, run it in four groups** rather than
+  giving up on it. One pytest process grows as it goes and this machine has
+  7.9 GB with under 1 GB free on a bad day; four shorter processes each stay
+  small enough to finish:
+
+  ```
+  ls tests/test_*.py > /tmp/all.txt && split -l 19 -d /tmp/all.txt /tmp/grp
+  for g in 00 01 02 03; do DATABASE_URL='...' .venv/Scripts/python.exe -m pytest     -q --color=no -p no:cacheprovider $(cat /tmp/grp$g | tr '
+' ' '); done
+  ```
+
+  Clear the leftover backends first — a killed run leaves one holding locks.
 - **A killed pytest run leaves a connection behind that deadlocks the next
   one.** Teardown is skipped, an idle backend keeps holding locks, and every
   later `TRUNCATE` deadlocks — producing "An account already exists" and
@@ -104,7 +118,7 @@ payroll without touching a maintainer screen.
 
   Then empty the database and re-run the file alone. Happened 10 September and
   cost the best part of an hour.
-- Frontend: `cd frontend && npm test` (256), `npx tsc --noEmit` and
+- Frontend: `cd frontend && npm test` (290), `npx tsc --noEmit` and
   `npm run build`.
 - **A browser session is now possible.** Yahya signs in himself at
   `https://hba-platform-staging-staging.up.railway.app/sign-in` and the session
@@ -129,7 +143,8 @@ payroll without touching a maintainer screen.
   The correction is `docs/plans/2026-09-12-design-parity-handoff.md`, batches
   C1-C5, on top of the imported branch `review/approved-design-parity`.
 - Redesign 05A is a **read-only rules preview**. The normal calculation and
-  approval remain delivered-only until D01; do not mistake the preview's
+  approval still need verified pending-inclusive activation; D01 alone did not
+  switch the code path. Do not mistake the preview's
   entitlement for a transfer instruction.
 - **An agreed month is never unmade** (05B). Reopening is retired; what changes
   after an agreement is recorded against it as a correction (05C). An approval

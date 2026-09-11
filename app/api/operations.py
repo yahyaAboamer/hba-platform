@@ -616,6 +616,36 @@ PAYROLL_REMINDER_DAY = 5
 STALE_SYNC_HOURS = 24
 
 
+@router.get("/counts")
+def counts(
+    _actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_VIEW)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """The numbers beside the sidebar's section names.
+
+    The approved export puts a count on *Models* and on *Payments*, so the
+    owner can see where work is waiting without opening each section to find
+    out. This serves the first of those.
+
+    **Payments is deliberately not here yet.** How much money is still to send
+    is computed by the Payments screen from snapshots and the ledger, and a
+    second implementation of it - in a sidebar, of all places - is a second
+    answer waiting to disagree with the first in front of the one person
+    guaranteed to notice. It joins this endpoint when the payments batch can
+    give it the same figure from the same place.
+    """
+    from app.models.affiliates import AffiliateProfile
+
+    return {
+        "models_awaiting_approval": db.scalar(
+            select(func.count())
+            .select_from(AffiliateProfile)
+            .where(AffiliateProfile.status == "pending")
+        )
+        or 0,
+    }
+
+
 @router.get("/attention")
 def attention(
     _actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_VIEW)),

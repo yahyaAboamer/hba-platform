@@ -437,3 +437,119 @@ def test_selling_a_product_does_not_require_owning_it(db):
           paid=100_000)
 
     assert top_products(db, AUGUST)["products"][0].shopify_product_id == "P9"
+
+
+# -- the content panel names the models, rather than counting them -----------
+#
+# C1 of the design-parity correction. The approved Home shows a table of
+# models with videos, stories and last update; what shipped showed two lines
+# of aggregate counts, which tells the owner a number and then makes her go
+# and find out which models it means.
+
+
+def test_the_content_panel_carries_a_row_for_every_model(db):
+    """Every model, not only the ones in trouble.
+
+    The panel is read to find out where content stands, and a table that hid
+    the models who are fine would answer *who is behind* while looking like it
+    answered *how is the month going*.
+    """
+    first = _model(db, "Nour")
+    second = _model(db, "Salma")
+    set_requirements(db, first, AUGUST, videos=6, stories=12)
+    set_requirements(db, second, AUGUST, videos=6, stories=12)
+    db.flush()
+
+    summary = month_summary(db, AUGUST)
+
+    assert [row["name"] for row in summary.content] == ["Nour", "Salma"]
+    assert all(row["required_videos"] == 6 for row in summary.content)
+
+
+def test_nothing_asked_for_is_not_the_same_as_nothing_produced(db):
+    """A missing target row and a row of zeroes mean opposite things.
+
+    *Nobody asked her for anything* is HBA's own omission; *she has produced
+    nothing* is a fact about her month. Collapsing both to `0` would put a
+    model in front of the owner as behind when the gap is HBA's.
+    """
+    asked = _model(db, "Nour")
+    unasked = _model(db, "Salma")
+    target = set_requirements(db, asked, AUGUST, videos=6, stories=12)
+    record_actuals(db, target, videos=0, stories=0)
+    db.flush()
+
+    rows = {row["name"]: row for row in month_summary(db, AUGUST).content}
+
+    assert rows["Nour"]["required_videos"] == 6
+    assert rows["Nour"]["actual_videos"] == 0, "asked, and has produced none"
+    assert rows["Salma"]["required_videos"] is None, "nobody asked her"
+    assert rows["Salma"]["actual_videos"] is None
+
+
+def test_the_least_done_comes_first_and_the_untouched_before_that(db):
+    """**Worst first**, because this panel exists to be acted on.
+
+    Alphabetical order would put whoever is fine at the top on a good day and
+    bury the model who has not started.
+    """
+    done = _model(db, "Aya")
+    started = _model(db, "Nour")
+    untouched = _model(db, "Salma")
+    for affiliate, videos in ((done, 6), (started, 1)):
+        target = set_requirements(db, affiliate, AUGUST, videos=6, stories=12)
+        record_actuals(db, target, videos=videos, stories=0)
+    set_requirements(db, untouched, AUGUST, videos=6, stories=12)
+    db.flush()
+
+    order = [row["name"] for row in month_summary(db, AUGUST).content]
+
+    assert order == ["Salma", "Nour", "Aya"], "untouched, least done, most done"
+
+
+def test_a_recorded_month_carries_when_it_was_last_touched(db):
+    """The design's *last update* column, and its *No update yet*.
+
+    A stale count read as current is D08's whole worry: it must be possible to
+    tell *nothing happened this week* from *nobody wrote it down*.
+    """
+    affiliate = _model(db, "Nour")
+    target = set_requirements(db, affiliate, AUGUST, videos=6, stories=12)
+    record_actuals(
+        db,
+        target,
+        videos=2,
+        stories=1,
+        recorded_at=datetime(2026, 8, 14, 9, tzinfo=timezone.utc),
+    )
+    db.flush()
+
+    row = month_summary(db, AUGUST).content[0]
+
+    assert row["last_update"].startswith("2026-08-14")
+
+
+def test_the_content_panel_leaves_house_accounts_out(db):
+    """A house code has sales and nobody to ask for a video.
+
+    It is excluded once, where every other figure excludes it, so it cannot
+    appear here as a model who has recorded nothing.
+    """
+    _model(db, "Nour")
+    _model(db, "Shop", kind=AccountKind.HOUSE)
+    db.flush()
+
+    assert [row["name"] for row in month_summary(db, AUGUST).content] == ["Nour"]
+
+
+def test_the_leaderboard_carries_the_code_she_had_that_month(db):
+    """The design shows the discount code under the name.
+
+    Read for the month rather than as *her code now*, so a code that changes
+    hands cannot relabel a month that is already settled.
+    """
+    affiliate = _model(db, "Nour")
+    _order(db, affiliate, "1", 2_000_000)
+    db.flush()
+
+    assert month_summary(db, AUGUST).top[0]["code"] == "NOUR10"

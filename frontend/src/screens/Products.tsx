@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import { Money } from "../components/Money";
 import { api, can } from "../lib/api";
@@ -17,6 +17,17 @@ type Row = {
 
 type RosterEntry = { affiliate_id: number; name: string; status: string };
 
+/**
+ * What HBA has asked the models to post about this product (W09).
+ *
+ * Named rather than written inline at the call site: `test_reachability`
+ * finds a route by scanning for `api.put<...>("/path")`, and a **nested**
+ * generic — `NonNullable<Detail["feature_request"]>` — stops it matching, so
+ * the route reads as one with no way in from the interface. The message is
+ * optional (D12): a product can be featured on its picture alone.
+ */
+export type FeatureRequest = { message: string | null; visible: boolean };
+
 type Detail = {
   shopify_product_id: string;
   title: string;
@@ -29,7 +40,7 @@ type Detail = {
     needs_checking: RosterEntry[];
     not_sent: RosterEntry[];
   };
-  feature_request: { message: string; visible: boolean } | null;
+  feature_request: FeatureRequest | null;
 };
 
 /**
@@ -271,232 +282,181 @@ export function Products({ session }: { session: Session }) {
   );
 }
 
-/**
- * One product: who has it, and what marketing asks about it.
- *
- * The roster is W02's four groups in W02's order — **Received, Processing,
- * Needs checking, Not sent** — and it lists every model rather than only those
- * who received something, because the question the screen answers is *who
- * could I ask*.
- *
- * Rows are deliberately thin: a name and a link. W02 asks for concise rows and
- * warns against duplicating status, size, quantity and date columns that the
- * group heading and the shared profile already carry.
- */
+/** Product coverage and the approved secondary promotion editor. */
 export function ProductDetail({ session }: { session: Session }) {
   const { id = "" } = useParams();
+  return <ProductDetailPage key={id} id={id} session={session} />;
+}
+
+function ProductDetailPage({ id, session }: { id: string; session: Session }) {
+  const [query, setQuery] = useSearchParams();
   const [detail, setDetail] = useState<Detail | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [draft, setDraft] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const [saving, setSaving] = useState(false);
+  const promotion = query.get("view") === "promotion";
+  const search = query.get("q") ?? "";
+  const mayEdit = can(session, "affiliates.manage");
 
-  const load = useCallback(() => {
-    api
-      .get<Detail>(`/api/products/${id}`)
-      .then(setDetail)
-      .catch((caught) => setError(caught.message));
-  }, [id]);
+  useEffect(() => {
+    let live = true;
+    setError(null);
+    api.get<Detail>(`/api/products/${id}`)
+      .then((found) => { if (live) setDetail(found); })
+      .catch((caught) => { if (live) setError(caught.message); });
+    return () => { live = false; };
+  }, [id, attempt]);
 
-  useEffect(load, [load]);
+  function setView(open: boolean) {
+    setQuery((previous) => {
+      const next = new URLSearchParams(previous);
+      if (open) next.set("view", "promotion"); else next.delete("view");
+      return next;
+    });
+    setError(null);
+  }
+
+  async function saveRequest(visible: boolean, message?: string) {
+    setSaving(true);
+    setError(null);
+    try {
+      const saved = await api.put<FeatureRequest>(`/api/products/${id}/feature-request`, {
+        visible, ...(message !== undefined ? { message } : {}),
+      });
+      setDetail((current) => current && { ...current, feature_request: saved });
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not save.");
+      throw caught;
+    } finally { setSaving(false); }
+  }
 
   async function removeRequest() {
     setSaving(true);
+    setError(null);
     try {
-      // W09 lists removing separately from hiding, and they are not the same:
-      // hiding keeps the wording for later, removing withdraws it.
       await api.del(`/api/products/${id}/feature-request`);
-      setDraft(null);
-      load();
+      setDetail((current) => current && { ...current, feature_request: null });
+      setView(false);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not remove it.");
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
   }
 
-  async function saveRequest(visible: boolean | null, message?: string) {
-    setSaving(true);
-    try {
-      await api.put(`/api/products/${id}/feature-request`, {
-        ...(message !== undefined ? { message } : {}),
-        ...(visible !== null ? { visible } : {}),
-      });
-      setDraft(null);
-      load();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not save.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  if (error && !detail) {
-    return (
-      <p className="notice notice--refused" role="alert">
-        {error}
-      </p>
-    );
-  }
-  if (!detail) return <p className="empty">Loading…</p>;
+  if (!detail) return error ? (
+    <div className="notice notice--refused" role="alert">
+      <p>{error}</p><button className="button" onClick={() => setAttempt((n) => n + 1)}>Try again</button>
+    </div>
+  ) : <p className="empty" role="status">Loading product…</p>;
 
   const groups: [string, RosterEntry[]][] = [
-    ["Received", detail.roster.received],
-    ["Processing", detail.roster.processing],
-    ["Needs checking", detail.roster.needs_checking],
-    ["Not sent", detail.roster.not_sent],
+    ["Received", detail.roster.received], ["Processing", detail.roster.processing],
+    ["Needs checking", detail.roster.needs_checking], ["Not sent", detail.roster.not_sent],
   ];
-  const audience =
-    detail.roster.received.length + detail.roster.processing.length;
+  const audience = detail.roster.received.length + detail.roster.processing.length;
 
-  return (
-    <>
-      <div className="page__head">
-        <div className="page__title">
-          <p className="crumb">
-            <Link to="/products">Products</Link>
-          </p>
-          <h1>{detail.title}</h1>
-          <span className="page__subtitle">
-            {detail.sizes.map((size) => size.title).join(" · ") || "no sizes"}
-          </span>
+  return <>
+    <div className="page__head"><div className="page__title">
+      <p className="crumb">{promotion ? <button className="button" onClick={() => setView(false)} disabled={saving}>← {detail.title}</button> : <Link to="/products">Products</Link>}</p>
+      <h1>{promotion ? "Feature request" : detail.title}</h1>
+    </div></div>
+    {error && <p className="notice notice--refused" role="alert">{error}</p>}
+    {promotion ? (
+      <PromotionEditor detail={detail} audience={audience} saving={saving} mayEdit={mayEdit}
+        onSave={saveRequest} onRemove={removeRequest} onCancel={() => setView(false)} />
+    ) : <>
+      <div className="products__hero">
+        <ProductImage source={detail.image_url} />
+        <div><span className="products__badge">{detail.status}</span>
+          <p className="detail__note">{detail.sizes.map((size) => size.title).join(" · ")}</p>
+          <div className="products__coverage-counts">{groups.map(([label, entries]) => <span className="products__badge" key={label}>{label} · {entries.length}</span>)}</div>
         </div>
       </div>
-
-      {error && (
-        <p className="notice notice--refused" role="alert">
-          {error}
-        </p>
-      )}
-
-      {/*
-       * W09: passive guidance. No completion tracking, no acknowledgement, no
-       * target moves — a model reads it and decides.
-       *
-       * The audience is stated because W10 makes it non-obvious: only models
-       * who have the product see it, so a request written for a garment nobody
-       * has is a request nobody reads.
-       */}
-      <section className="panel products__panel">
-        <div className="panel__head">
-          <h2 className="panel__title">Ask models to feature this</h2>
+      <section className="panel products__feature-summary">
+        <div className="products__summary-head">
+          <h2 className="panel__title">Feature request</h2>
+          <span className="products__badge">{detail.feature_request ? detail.feature_request.visible ? "Visible to models" : "Hidden" : "None"}</span>
+          {mayEdit && <div className="products__actions">
+            <button className="button" onClick={() => setView(true)} disabled={saving}>{detail.feature_request ? "Edit" : "Ask models to feature this"}</button>
+            {detail.feature_request && <>
+              <button className="button" disabled={saving} onClick={() => { void saveRequest(!detail.feature_request?.visible).catch(() => {}); }}>{detail.feature_request.visible ? "Hide" : "Show"}</button>
+              <button className="button button--danger" disabled={saving} onClick={removeRequest}>Remove</button>
+            </>}
+          </div>}
         </div>
-        <div className="products__request">
-          {draft === null ? (
-            <>
-              <p className="products__ask">
-                {detail.feature_request?.message ?? (
-                  <span className="detail__note">Nothing asked yet.</span>
-                )}
-              </p>
-              <p className="detail__note">
-                {detail.feature_request?.visible
-                  ? `Visible to the ${audience} model${audience === 1 ? "" : "s"} who ${audience === 1 ? "has" : "have"} it.`
-                  : "Hidden. Nobody sees it."}{" "}
-                A model who never received it never sees it, however it is set.
-              </p>
-              {can(session, "affiliates.manage") && (
-                <div className="products__actions">
-                  <button
-                    type="button"
-                    className="button"
-                    onClick={() =>
-                      setDraft(detail.feature_request?.message ?? "")
-                    }
-                  >
-                    {detail.feature_request ? "Change it" : "Write one"}
-                  </button>
-                  {detail.feature_request && (
-                    <>
-                      <button
-                        type="button"
-                        className="button"
-                        disabled={saving}
-                        onClick={() =>
-                          saveRequest(!detail.feature_request?.visible)
-                        }
-                      >
-                        {detail.feature_request.visible ? "Hide it" : "Show it"}
-                      </button>
-                      {/*
-                       * Outlined and last. Hiding is the ordinary pause;
-                       * removing throws the wording away, and W09 keeps them
-                       * separate because they are different intentions.
-                       */}
-                      <button
-                        type="button"
-                        className="button button--danger"
-                        disabled={saving}
-                        onClick={removeRequest}
-                      >
-                        Remove it
-                      </button>
-                    </>
-                  )}
-                </div>
-              )}
-            </>
-          ) : (
-            <>
-              <textarea
-                className="input products__textarea"
-                value={draft}
-                rows={3}
-                onChange={(event) => setDraft(event.target.value)}
-                placeholder="Wear it with the wide-leg trousers if you have them."
-              />
-              <div className="products__actions">
-                <button
-                  type="button"
-                  className="button button--primary"
-                  disabled={saving || !draft.trim()}
-                  onClick={() => saveRequest(null, draft)}
-                >
-                  {saving ? "Saving…" : "Save"}
-                </button>
-                <button
-                  type="button"
-                  className="button"
-                  disabled={saving}
-                  onClick={() => setDraft(null)}
-                >
-                  Cancel
-                </button>
-              </div>
-            </>
-          )}
-        </div>
+        {detail.feature_request && <p className="products__ask">{detail.feature_request.message}</p>}
       </section>
+      <div className="products__coverage-head"><h2 className="panel__title">Model coverage</h2>
+        <input className="input products__search" aria-label="Search model names" placeholder="Search model names" value={search}
+          onChange={(event) => setQuery((previous) => { const next = new URLSearchParams(previous); if (event.target.value) next.set("q", event.target.value); else next.delete("q"); return next; }, { replace: true })} />
+      </div>
+      {groups.map(([label, entries]) => {
+        const shown = entries.filter((entry) => entry.name.toLocaleLowerCase().includes(search.toLocaleLowerCase())).sort((a, b) => a.name.localeCompare(b.name));
+        return <details className="panel products__coverage-group" key={label} open>
+          <summary>{label}<span className="products__count">{search ? `${shown.length} of ` : ""}{entries.length}</span></summary>
+          {shown.length === 0 ? <p className="detail__note">{search ? "No matching models." : "None."}</p> : <ul className="products__roster">
+            {shown.map((entry) => <li key={entry.affiliate_id}><Link to={`/affiliates/${entry.affiliate_id}`}>{entry.name}</Link></li>)}
+          </ul>}
+        </details>;
+      })}
+    </>}
+  </>;
+}
 
-      <section className="panel products__panel">
-        <div className="panel__head">
-          <h2 className="panel__title">Who has it</h2>
+function PromotionEditor({ detail, audience, saving, mayEdit, onSave, onRemove, onCancel }: {
+  detail: Detail; audience: number; saving: boolean; mayEdit: boolean;
+  onSave: (visible: boolean, message: string) => Promise<void>;
+  onRemove: () => Promise<void>; onCancel: () => void;
+}) {
+  const [message, setMessage] = useState(detail.feature_request?.message ?? "");
+  const [visible, setVisible] = useState(detail.feature_request?.visible ?? true);
+  const [preview, setPreview] = useState<"received" | "processing">("received");
+  const [saved, setSaved] = useState(false);
+  async function save() {
+    setSaved(false);
+    try { await onSave(visible, message); setSaved(true); } catch { /* Parent displays API error; retain the draft. */ }
+  }
+  return <div className="products__promotion">
+    <div className="products__promotion-edit">
+      {saved && <p className="notice" role="status">Feature request saved.</p>}
+      <section className="panel products__promotion-panel">
+        <div className="products__summary-head"><h2 className="panel__title">Show to models</h2>
+          <button className="button" role="switch" aria-label="Show to models" aria-checked={visible} disabled={saving || !mayEdit} onClick={() => { setVisible(!visible); setSaved(false); }}>{visible ? "On" : "Off"}</button>
         </div>
-        {groups.map(([label, entries]) => (
-          <div key={label} className="products__group">
-            <h3 className="products__group-title">
-              {label}
-              <span className="products__count">{entries.length}</span>
-            </h3>
-            {entries.length === 0 ? (
-              <p className="detail__note">None.</p>
-            ) : (
-              <ul className="products__models">
-                {entries.map((entry) => (
-                  <li key={entry.affiliate_id}>
-                    {/*
-                     * The one shared profile (A03). Every screen that names a
-                     * model reaches the same page.
-                     */}
-                    <Link to={`/affiliates/${entry.affiliate_id}`}>
-                      {entry.name}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        ))}
+        <p className="detail__note">{audience} eligible {audience === 1 ? "model" : "models"} · Received or Processing</p>
+        {audience === 0 && <p className="detail__note">Nobody will see this until an eligible shipment is recorded.</p>}
       </section>
-    </>
-  );
+      <section className="panel products__promotion-panel">
+        <label htmlFor="promotion-message">Short message</label>
+        <textarea id="promotion-message" className="input products__textarea" value={message} rows={3} maxLength={2000} disabled={saving || !mayEdit}
+          onChange={(event) => { setMessage(event.target.value); setSaved(false); }} placeholder="Back in stock — please feature this in your upcoming content." />
+        <span className="detail__note">{message.length}/2000</span>
+      </section>
+      <div className="products__actions">
+        {mayEdit && <button className="button button--primary" disabled={saving || !message.trim()} onClick={save}>{saving ? "Saving…" : "Save"}</button>}
+        <button className="button" disabled={saving} onClick={onCancel}>Cancel</button>
+        {mayEdit && detail.feature_request && <button className="button button--danger" disabled={saving} onClick={onRemove}>Remove</button>}
+      </div>
+    </div>
+    <aside className="products__promotion-preview">
+      <p className="detail__note">Preview · model Wardrobe</p>
+      <div className="panel products__promotion-panel">
+        {visible ? <><h2 className="panel__title">HBA would like you to feature</h2><p className="detail__note">Chosen by the HBA team</p>
+          <div className="products__preview-card"><ProductImage source={detail.image_url} /><div>
+            <span>{detail.title}</span><p className="detail__note">{preview === "received" ? "In your wardrobe" : "On its way"}</p><p className="products__ask">{message}</p>
+          </div></div>
+        </> : <p className="detail__note">Nothing appears on model dashboards while this is hidden.</p>}
+      </div>
+      <div className="products__actions" aria-label="Preview shipment state">
+        <button className="button" aria-pressed={preview === "received"} onClick={() => setPreview("received")}>Received</button>
+        <button className="button" aria-pressed={preview === "processing"} onClick={() => setPreview("processing")}>On the way</button>
+      </div>
+    </aside>
+  </div>;
+}
+
+function ProductImage({ source }: { source: string | null }) {
+  const [failedSource, setFailedSource] = useState<string | null>(null);
+  return source && source !== failedSource
+    ? <img className="products__detail-image" src={source} alt="" onError={() => setFailedSource(source)} />
+    : <span className="products__detail-image products__detail-image--empty">No image</span>;
 }

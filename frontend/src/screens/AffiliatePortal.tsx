@@ -11,14 +11,13 @@ import { Apply } from "./Apply";
 import { Glossary } from "./Glossary";
 import { MyDetails } from "./MyDetails";
 import type { Me } from "./MyDetails";
-import { MyGrow } from "./MyGrow";
+import { MyCalculation } from "./MyCalculation";
 import { MyMonth } from "./MyMonth";
 import { MyOrders } from "./MyOrders";
 import { MyPayments } from "./MyPayments";
 import { MyPolicy } from "./MyPolicy";
 import { MyRanking } from "./MyRanking";
 import { MyTargets } from "./MyTargets";
-import { MyYear } from "./MyYear";
 import "./Apply.css";
 import "./AffiliateHome.css";
 
@@ -119,6 +118,7 @@ export function AffiliatePortal({ session }: { session: Session }) {
     <PortalHeader
       name={me?.name || session.actor.display_name || session.actor.email}
       code={firstCode?.code ?? null}
+      month={month ?? undefined} months={months} onMonth={setMonth}
       codePending={firstCode ? !firstCode.verified : false}
     />
   );
@@ -200,6 +200,7 @@ export function AffiliatePortal({ session }: { session: Session }) {
       <Routes>
         <Route element={<AffiliateLayout context={context} header={header} />}>
           <Route index element={<MyMonth />} />
+          <Route path="earnings" element={<MyCalculation />} />
           <Route path="orders" element={<MyOrders />} />
           <Route path="wardrobe" element={<MyWardrobe />} />
           <Route path="targets" element={<MyTargets />} />
@@ -211,8 +212,8 @@ export function AffiliatePortal({ session }: { session: Session }) {
            * email and a bookmark both still land on the screen they name.
            */}
           <Route path="payments" element={<MyPayments />} />
-          <Route path="year" element={<MyYear />} />
-          <Route path="grow" element={<MyGrow codes={me.codes} />} />
+          <Route path="year" element={<Navigate to="/" replace />} />
+          <Route path="grow" element={<Navigate to="/" replace />} />
           <Route
             path="you"
             element={

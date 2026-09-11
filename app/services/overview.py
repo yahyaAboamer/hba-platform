@@ -35,7 +35,11 @@ from decimal import ROUND_HALF_UP, Decimal
 from sqlalchemy.orm import Session
 
 from app.core.businesstime import parse_month
+from sqlalchemy import select
+
 from app.models.affiliates import AffiliateProfile
+from app.models.codes import DiscountCodePeriod
+from app.models.targets import MonthlyTarget
 from app.models.compensation import CompensationType
 from app.services.affiliates import list_affiliates
 from app.services.pace import BEHIND, NO_TARGET, NOT_RECORDED, pace_for
@@ -70,6 +74,13 @@ class Summary:
     blocked: int = 0
     #: A01's *content progress needing review*, by why.
     needs_review: dict[str, int] = field(default_factory=dict)
+
+    #: **The models themselves, not a count of them.** A panel that says
+    #: *3 models - nothing recorded this week* tells the owner a number and
+    #: then makes her go and find out which three, which is the screen doing
+    #: half a job. These rows carry what was asked for, what was produced and
+    #: when it was last touched, which is the whole question.
+    content: list[dict] = field(default_factory=list)
     #: The top three by generated sales. Shares a place on a tie, exactly as
     #: the models' own board does (D03) - a board where three people are
     #: level and only two are shown is a board that picked one of them.
@@ -160,8 +171,61 @@ def month_summary(db: Session, month: str) -> Summary:
             review[state] = review.get(state, 0) + 1
 
     summary.needs_review = review
+    summary.content = content_rows(db, models, month)
     summary.top = _top_three(db, month)
     return summary
+
+
+def content_rows(
+    db: Session, models: list[AffiliateProfile], month: str
+) -> list[dict]:
+    """What each model was asked for, what she produced, and when.
+
+    **Videos and stories stay apart here**, unlike D08's pace, which adds them
+    together to decide whether she is on track. The pace answers *is this
+    month in trouble*; this table answers *what is missing*, and four videos
+    short is a different conversation from four stories short.
+
+    One query for the month rather than one per model: the row may not exist
+    at all, and a missing row is not the same as a row of zeroes - nobody
+    asked her for anything, as against she has produced nothing.
+    """
+    targets = {
+        row.affiliate_id: row
+        for row in db.scalars(
+            select(MonthlyTarget).where(MonthlyTarget.month == month)
+        )
+    }
+
+    rows = []
+    for affiliate in models:
+        target = targets.get(affiliate.id)
+        produced = (target.actual_videos or 0) + (target.actual_stories or 0) if target else 0
+        rows.append(
+            {
+                "affiliate_id": affiliate.id,
+                "name": affiliate.name,
+                "required_videos": target.required_videos if target else None,
+                "required_stories": target.required_stories if target else None,
+                "actual_videos": target.actual_videos if target else None,
+                "actual_stories": target.actual_stories if target else None,
+                "last_update": (
+                    target.recorded_at.isoformat()
+                    if target and target.recorded_at
+                    else None
+                ),
+                "_produced": produced,
+            }
+        )
+
+    # **Worst first**, because this panel exists to be acted on. A model with
+    # nothing recorded at all leads, then the least produced. Alphabetical
+    # order would put the model who is fine at the top on a good day and bury
+    # the one who is not.
+    rows.sort(key=lambda row: (row["last_update"] is not None, row["_produced"], row["name"]))
+    for row in rows:
+        del row["_produced"]
+    return rows
 
 
 def _top_three(db: Session, month: str) -> list[dict]:
@@ -176,6 +240,19 @@ def _top_three(db: Session, month: str) -> list[dict]:
     if not board:
         return []
 
+    # Her code, as it stood **in that month** - not her current one. A code
+    # that changed hands in October must not relabel September's leaderboard.
+    codes = {
+        row.affiliate_id: row.code
+        for row in db.scalars(
+            select(DiscountCodePeriod).where(
+                DiscountCodePeriod.start_month <= month,
+                (DiscountCodePeriod.end_month.is_(None))
+                | (DiscountCodePeriod.end_month >= month),
+            )
+        )
+    }
+
     # **Everyone in the first three places, however many people that is.**
     # Ranks already skip on a tie (D03), so three level at the top are 1, 1, 1
     # and the next is 4 - and `rank <= 3` includes exactly the three of them.
@@ -185,6 +262,7 @@ def _top_three(db: Session, month: str) -> list[dict]:
         {
             "affiliate_id": row.affiliate_id,
             "name": row.name,
+            "code": codes.get(row.affiliate_id),
             "rank": row.rank,
             "sales_piastres": row.sales_piastres,
             "uses": row.uses,

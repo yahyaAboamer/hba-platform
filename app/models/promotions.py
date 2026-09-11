@@ -31,7 +31,8 @@ class FeatureRequest(Base):
     #: things to read about one garment, and nothing decides which wins.
     shopify_product_id: Mapped[str] = mapped_column(String(32), primary_key=True)
 
-    message: Mapped[str] = mapped_column(Text, nullable=False)
+    #: Optional since D12 - a product can be featured on its picture alone.
+    message: Mapped[str | None] = mapped_column(Text)
 
     #: W09: marketing can *make it visible, hide it, or remove it*. Hidden is
     #: not removed - a request being drafted, or paused, is not the same as one

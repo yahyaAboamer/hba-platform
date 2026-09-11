@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 import { Money } from "../components/Money";
 import { MonthPicker } from "../components/MonthPicker";
@@ -208,7 +208,8 @@ function matchesFilter(row: Balance, filter: Filter): boolean {
  * into a debt or make an approval look like payment (F14).
  */
 export function Payments({ session }: { session: Session }) {
-  const [month, setMonth] = useState(session.platform.working_month);
+  const [query] = useSearchParams();
+  const [month, setMonth] = useState(query.get("month")?.match(/^\d{4}-(0[1-9]|1[0-2])$/) ? query.get("month")! : session.platform.working_month);
   const [data, setData] = useState<Outstanding | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [lockNote, setLockNote] = useState<string | null>(null);
@@ -240,10 +241,11 @@ export function Payments({ session }: { session: Session }) {
     const term = search.trim().toLocaleLowerCase();
     return rows.filter(
       (row) =>
+        (!query.get("affiliate") || String(row.affiliate_id) === query.get("affiliate")) &&
         matchesFilter(row, filter) &&
         (term === "" || row.name.toLocaleLowerCase().includes(term)),
     );
-  }, [filter, rows, search]);
+  }, [filter, rows, search, query]);
 
   return (
     <>

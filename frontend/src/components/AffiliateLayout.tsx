@@ -11,43 +11,7 @@ import { formatMonth } from "../lib/money";
 import type { Me } from "../screens/MyDetails";
 import "./AffiliateLayout.css";
 
-/**
- * §12.5: **the affiliate portal is phone-first.**
- *
- * A bottom tab bar rather than the maintainer's sidebar, because they are
- * holding the phone in one hand and their thumb does not reach the top of it.
- * The maintainer's `Layout` is the opposite instruction: seven sections down
- * the left, built for scanning twenty models at month end on a laptop.
- *
- * ## The five, from the approved design
- *
- * **Home · Orders · Wardrobe · Targets · Ranking** (rule S03,
- * `docs/redesign/designs/Affiliate Portal v3.dc.html`). Three of them are new
- * or renamed, so what happened to the old ones is worth writing down rather
- * than leaving somebody to diff it:
- *
- * - **Month → Home.** The same screen. The word "month" was the tool's word
- *   for it; "home" is where a person thinks they are.
- * - **Payments moved into You**, behind the avatar. It is a record of what
- *   has arrived rather than something checked weekly, and the slot was needed.
- *   The route is unchanged and the You screen links to it, so a bookmark and
- *   a receipt email both still land.
- * - **Year and Grow left the bar** and kept their routes. The design puts the
- *   year's performance on Home (rule M01) and the discount code in the header
- *   chip, which is where Grow's only real content already is. Folding them in
- *   properly is Phase 07A; until then Home links to both, because deleting a
- *   working screen to match a drawing is not a redesign.
- * - **All five are built**: Wardrobe in 03C, Targets in 04B and Ranking in
- *   07A. All three sat here as placeholders before their screens existed,
- *   because a tab bar that grows a slot every few weeks moves every other tab
- *   under her thumb each time — and that is now finished rather than pending.
- *
- * ## Why "You" is not a tab
- *
- * It is reached from the avatar in the header instead. That is where a person
- * looks for their own account on every other application they use, and it
- * leaves all five slots for what she came to find out.
- */
+/** Approved mobile navigation; account and detail views sit outside the tab bar. */
 const TABS = [
   { to: "/", label: "Home", end: true },
   { to: "/orders", label: "Orders" },
@@ -55,15 +19,6 @@ const TABS = [
   { to: "/targets", label: "Targets" },
   { to: "/ranking", label: "Ranking" },
 ];
-
-/**
- * Tabs that are about one month. The rest are not, and get no month bar.
- *
- * Ranking is month-scoped in the design's proposal (D03) but has no screen to
- * scope yet, so it is left out until Phase 07B decides its period rather than
- * being given a bar it does not use.
- */
-const MONTH_SCOPED = new Set(["/", "/orders"]);
 
 export type PortalContext = {
   /**
@@ -109,20 +64,25 @@ export function PortalHeader({
   name,
   code,
   codePending,
+  month, months, onMonth,
 }: {
   name: string;
   code: string | null;
   codePending: boolean;
+  month?: string; months?: string[]; onMonth?: (month: string) => void;
 }) {
   const { pathname } = useLocation();
   const [copied, setCopied] = useState(false);
 
-  if (pathname === "/you") {
+  const secondaryTitles: Record<string,string> = {"/you":"You", "/earnings":"How this adds up", "/payments":"Payment history", "/you/payout":"Payment details", "/glossary":"Help"};
+  const isPrimary = TABS.some(tab => tab.to === pathname);
+  if (!isPrimary) {
     return (
       <header className="phead phead--back">
         <Link to="/" className="phead__back">
           ← Back
         </Link>
+        <span>{secondaryTitles[pathname] ?? "Details"}</span>
       </header>
     );
   }
@@ -150,14 +110,14 @@ export function PortalHeader({
       <div className="phead__who">
         <span className="phead__name">{name}</span>
         <span className="phead__since">
-          {codePending ? "code being checked" : "HBA affiliate"}
+          {codePending ? "Code being checked" : "HBA ambassador"}{code && <> · <button type="button" className="phead__inline-code" onClick={copy}>{copied ? "Copied" : code}</button></>}
         </span>
       </div>
-      {code && (
-        <button type="button" className="phead__code" onClick={copy}>
-          {copied ? "Copied" : code}
-        </button>
-      )}
+      {month && months && onMonth && ["/", "/orders", "/ranking"].includes(pathname) &&
+        <select className="phead__month" aria-label="Month" value={month} onChange={event => onMonth(event.target.value)}>
+          {months.map(value => <option key={value} value={value}>{formatMonth(value)}</option>)}
+        </select>}
+
     </header>
   );
 }
@@ -170,45 +130,9 @@ export function AffiliateLayout({
   header: React.ReactNode;
 }) {
   const { pathname } = useLocation();
-  const { month, months, setMonth } = context;
-
-  const index = months.indexOf(month);
-  // Newest first, so "older" is forward through the list.
-  const older = index >= 0 && index < months.length - 1 ? months[index + 1] : null;
-  const newer = index > 0 ? months[index - 1] : null;
-
   return (
     <>
       {header}
-
-      {MONTH_SCOPED.has(pathname) && (
-        <nav className="months" aria-label="Which month">
-          <button
-            type="button"
-            className="months__step"
-            onClick={() => older && setMonth(older)}
-            disabled={!older}
-            aria-label="The month before"
-          >
-            ←
-          </button>
-          <span className="months__current">
-            {formatMonth(month)}
-            {context.monthState && (
-              <span className="months__state">{context.monthState}</span>
-            )}
-          </span>
-          <button
-            type="button"
-            className="months__step"
-            onClick={() => newer && setMonth(newer)}
-            disabled={!newer}
-            aria-label="The month after"
-          >
-            →
-          </button>
-        </nav>
-      )}
 
       <div className="portal__body">
         <Outlet context={context} />
@@ -219,7 +143,7 @@ export function AffiliateLayout({
        * inset matters on an iPhone: without it the last tab sits under the
        * home indicator and takes two attempts to press.
        */}
-      <nav className="tabs" aria-label="Sections">
+      {TABS.some(tab => tab.to === pathname) && <nav className="tabs" aria-label="Sections">
         <div className="tabs__inner">
           {TABS.map((tab) => (
             <NavLink
@@ -234,7 +158,7 @@ export function AffiliateLayout({
             </NavLink>
           ))}
         </div>
-      </nav>
+      </nav>}
     </>
   );
 }

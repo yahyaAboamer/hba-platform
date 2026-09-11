@@ -1,103 +1,29 @@
-/* Her wardrobe. W08: what she owns, then what has not arrived. */
-
-.affiliate .wardrobe {
-  padding-bottom: var(--tab-clearance);
-}
-
-.affiliate .wardrobe__block {
-  margin-bottom: var(--space-6);
-}
-
-.affiliate .wardrobe__title {
-  margin: 0 0 var(--space-3);
-  font-size: var(--text-sm);
-  font-weight: 600;
-}
-
-/* Two across on a phone. Three would make every garment a thumbnail nobody
-   can tell apart, and one would make her scroll past four things to find
-   the fifth. */
-.affiliate .wardrobe__grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--space-4);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.affiliate .wardrobe__item {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-
+.affiliate .wardrobe { padding-bottom: var(--tab-clearance); }
+.affiliate .wardrobe__block { margin-bottom: 24px; }
+.affiliate .wardrobe__title { margin: 0; font-size: 15px; font-weight: 600; }
+.affiliate .wardrobe__subtitle { margin: 5px 0 12px; font-size: 12.5px; color: var(--quiet); }
+.affiliate .wardrobe__heading { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.affiliate .wardrobe__rows,
+.affiliate .wardrobe__requests,
+.affiliate .wardrobe__waiting { list-style: none; padding: 0; margin: 0; }
+.affiliate .wardrobe__rows,
+.affiliate .wardrobe__requests { display: flex; flex-direction: column; gap: 10px; }
+.affiliate .wardrobe__rows li,
+.affiliate .wardrobe__requests li { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: var(--radius); background: var(--surface); }
+.affiliate .wardrobe__requests li { align-items: flex-start; padding-block: 13px; }
 .affiliate .wardrobe__pic,
-.affiliate .wardrobe__nopic {
-  display: block;
-  width: 100%;
-  aspect-ratio: 3 / 4;
-  object-fit: cover;
-  border-radius: var(--radius);
-  background: var(--raise);
-}
-
-/* An honest gap rather than a broken frame: the garment is real, the
-   photograph is not there. */
-.affiliate .wardrobe__nopic {
-  border: 1px dashed var(--rule);
-}
-
-.affiliate .wardrobe__name {
-  font-size: var(--text-sm);
-  line-height: 1.35;
-}
-
-.affiliate .wardrobe__size {
-  font-size: var(--text-xs);
-  color: var(--quiet);
-}
-
-/* Compact, and unmistakably not the grid above it (W08): a failed product
-   must not look owned. */
-.affiliate .wardrobe__waiting,
-.affiliate .wardrobe__requests {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  border-radius: var(--radius);
-  background: var(--surface);
-  overflow: hidden;
-}
-
-.affiliate .wardrobe__waiting li,
-.affiliate .wardrobe__requests li {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: var(--space-4);
-  border-bottom: 1px solid var(--rule);
-}
-
-.affiliate .wardrobe__waiting li:last-child,
-.affiliate .wardrobe__requests li:last-child {
-  border-bottom: 0;
-}
-
-.affiliate .wardrobe__state {
-  font-size: var(--text-xs);
-  color: var(--quiet);
-}
-
-/* Amber, not red. Nothing is wrong with her - a parcel did not arrive, and
-   `tokens.css` calls that hue "attention, not alarm". */
-.affiliate .wardrobe__state--failed {
-  color: var(--owed);
-}
-
-.affiliate .wardrobe__ask {
-  margin: 0;
-  font-size: var(--text-sm);
-  line-height: 1.5;
-  color: var(--quiet);
-}
+.affiliate .wardrobe__nopic { flex: none; width: 66px; height: 76px; object-fit: cover; border-radius: var(--radius); background: var(--raise); }
+.affiliate .wardrobe__requests .wardrobe__pic,
+.affiliate .wardrobe__requests .wardrobe__nopic { width: 62px; height: 72px; }
+.affiliate .wardrobe__nopic { display: flex; align-items: center; justify-content: center; border: 1px dashed var(--rule); font-size: 10px; color: var(--quiet); }
+.affiliate .wardrobe__copy { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.affiliate .wardrobe__name { display: block; font-size: 14px; line-height: 1.4; }
+.affiliate .wardrobe__size,
+.affiliate .wardrobe__date { display: block; margin-top: 5px; font-size: 13px; color: var(--quiet); }
+.affiliate .wardrobe__date { font-size: 12.5px; }
+.affiliate .wardrobe__state { display: block; margin-top: 5px; font-size: 12.5px; color: var(--quiet); }
+.affiliate .wardrobe__state--failed { color: var(--owed); }
+.affiliate .wardrobe__ask { margin: 7px 0 0; font-size: 13px; line-height: 1.5; color: var(--quiet); }
+.affiliate .wardrobe__incoming { padding: 13px 14px; border: 1px solid var(--rule); border-radius: var(--radius); }
+.affiliate .wardrobe__waiting li { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 10px; }
+.affiliate .wardrobe__waiting .wardrobe__state { flex: none; }

@@ -24,7 +24,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_permission
-from app.core.businesstime import business_month, month_add, utcnow
+from app.core.businesstime import business_month, month_add, parse_month, utcnow
 from app.core.periods import OPEN_ENDED, PLATFORM_START_MONTH
 from app.core.permissions import Permission
 from app.db import get_session
@@ -258,6 +258,7 @@ def _get_affiliate_or_404(db: Session, affiliate_id: int) -> AffiliateProfile:
 @router.get("")
 def list_affiliates_route(
     include_archived: bool = False,
+    month: str | None = None,
     _actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_VIEW)),
     db: Session = Depends(get_session),
 ) -> dict:
@@ -270,9 +271,23 @@ def list_affiliates_route(
     """
     from app.services.staff import list_pending_invitations
 
+    from app.services.overview import content_rows
+    from app.services.performance import month_performance
+
     affiliates = list_affiliates(db, include_archived=include_archived)
-    month = working_month()
+    month = parse_month(month) if month else working_month()
     setup = readiness(db, month)
+
+    # **The roster's sales and content columns, from the places that already
+    # answer those questions.** Sales is the models' own leaderboard figure
+    # (D03), so the list, the Home panel and a model's own screen cannot tell
+    # three different stories about the same month; content is the same read
+    # the Home table uses.
+    #
+    # Neither is a payout. Nothing on this screen is money owed to anybody,
+    # and nothing here recalculates any.
+    sales = {row.affiliate_id: row for row in month_performance(db, month)}
+    content = {row["affiliate_id"]: row for row in content_rows(db, affiliates, month)}
     # The code is how an order is recognised as somebody's, so it is how a
     # person is recognised on this list too - asked for by name during the
     # walkthrough.
@@ -288,7 +303,17 @@ def list_affiliates_route(
     }
     return {
         "affiliates": [
-            {**_affiliate_payload(a), **setup.get(a.id, {}), "code": codes.get(a.id)}
+            {
+                **_affiliate_payload(a),
+                **setup.get(a.id, {}),
+                "code": codes.get(a.id),
+                "month": month,
+                "sales_piastres": (
+                    sales[a.id].sales_piastres if a.id in sales else 0
+                ),
+                "uses": sales[a.id].uses if a.id in sales else 0,
+                "content": content.get(a.id),
+            }
             for a in affiliates
         ],
         # Invitations that have not been opened yet. They belong here rather

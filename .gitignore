@@ -9,3 +9,8 @@ frontend/dist/
 *.log
 *.egg-info/
 design-preview/
+
+# The design-parity handoff package: its two commits are in the history
+# (imported from its bundle) and its two documents are in docs/. What is left
+# in it is a duplicate bundle and patch of commits this repository already has.
+HBA_Design_Parity_Code_Package/

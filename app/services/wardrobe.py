@@ -279,6 +279,25 @@ def holds_product(db: Session, affiliate_id: int, shopify_product_id: str) -> bo
 # ── Feature requests (W09, W10) ──────────────────────────────────────────────
 
 
+def _wording(message: str | None) -> str | None:
+    """The note that goes with a featured product, or nothing.
+
+    **D12, 12 September 2026: the message is optional.** The approved design
+    shows a featured product as a card with the product's picture, and the
+    note as something you add when there is something extra to say. The server
+    used to refuse a blank one, which meant featuring ten products for a
+    campaign was ten identical sentences nobody reads.
+
+    Blank and absent collapse to `None` on purpose, so a note can be **taken
+    back**. Refusing an empty string would mean a sentence typed once could
+    never be removed - the same trap from the other side.
+    """
+    if message is None:
+        return None
+    cleaned = str(message).strip()
+    return cleaned or None
+
+
 def set_feature_request(
     db: Session,
     shopify_product_id: str,
@@ -298,11 +317,9 @@ def set_feature_request(
 
     request = db.get(FeatureRequest, shopify_product_id)
     if request is None:
-        if message is None or not str(message).strip():
-            raise ValueError("A feature request needs something to say")
         request = FeatureRequest(
             shopify_product_id=shopify_product_id,
-            message=str(message).strip(),
+            message=_wording(message),
             visible=bool(visible),
             updated_by=actor_id,
         )
@@ -311,10 +328,7 @@ def set_feature_request(
         return request
 
     if message is not None:
-        cleaned = str(message).strip()
-        if not cleaned:
-            raise ValueError("A feature request needs something to say")
-        request.message = cleaned
+        request.message = _wording(message)
     if visible is not None:
         request.visible = bool(visible)
     request.updated_by = actor_id

@@ -458,6 +458,9 @@ def month_summary_view(
         # A01's content progress needing review, by why. Two of the three are
         # HBA's own work rather than a verdict on anybody (D08).
         "needs_review": found.needs_review,
+        # The same question answered by name rather than by count, so the
+        # panel can be acted on without opening Targets to find out who.
+        "content": found.content,
         "top": [
             {**row, "sales": format_egp(row["sales_piastres"])}
             for row in found.top
