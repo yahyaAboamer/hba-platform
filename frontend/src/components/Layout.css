@@ -1,178 +1,34 @@
-/*
- * The shell. §12.3, §12.5.
- *
- * Admin is laptop-first and dense: built for month-end work and scanning
- * twenty affiliates. The sidebar is permanent above 1024px and a drawer below,
- * which is the responsive rule rather than a preference.
- *
- * The active section is marked by a rule and weight, not colour — colour is
- * reserved for money state (ADR 0027).
- */
-
-.layout {
-  display: grid;
-  grid-template-columns: var(--sidebar-width) 1fr;
-  min-height: 100vh;
-}
-
-.layout__sidebar {
-  display: flex;
-  flex-direction: column;
-  border-right: 1px solid var(--rule);
-  background: var(--surface);
-  padding: var(--space-5) 0;
-  position: sticky;
-  top: 0;
-  height: 100vh;
-}
-
-.layout__brand {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 0 var(--space-5) var(--space-5);
-}
-
-.layout__brand-name {
-  font-size: var(--text-lg);
-  font-weight: 600;
-  letter-spacing: -0.03em;
-}
-
-.layout__brand-role {
-  font-size: var(--text-xs);
-  color: var(--quiet);
-  text-transform: lowercase;
-  letter-spacing: 0.03em;
-}
-
-.layout__nav {
-  flex: 1;
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.layout__link {
-  display: block;
-  padding: var(--space-2) var(--space-5);
-  border-left: 2px solid transparent;
-  color: var(--quiet);
-  text-decoration: none;
-  font-size: var(--text-sm);
-}
-
-.layout__link:hover {
-  color: var(--ink);
-  background: var(--hover);
-}
-
-.layout__link--active {
-  border-left-color: var(--ink);
-  color: var(--ink);
-  font-weight: 500;
-}
-
-.layout__account {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  align-items: flex-start;
-  padding: var(--space-4) var(--space-5) 0;
-  border-top: 1px solid var(--rule);
-  margin-top: var(--space-4);
-}
-
-.layout__email {
-  font-size: var(--text-xs);
-  color: var(--quiet);
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.layout__glossary,
-.layout__theme,
-.layout__sign-out {
-  padding: 0;
-  text-align: left;
-  border: none;
-  background: none;
-  font-size: var(--text-xs);
-  color: var(--quiet);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  cursor: pointer;
-}
-
-.layout__glossary:hover,
-.layout__theme:hover,
-.layout__sign-out:hover {
-  color: var(--ink);
-}
-
-.layout__main {
-  padding: var(--space-6) var(--space-6) var(--space-8);
-  max-width: 1200px;
-  width: 100%;
-}
-
-/* §12.5: sidebar becomes a top bar below the laptop breakpoint. */
-@media (max-width: 1024px) {
-  .layout {
-    grid-template-columns: 1fr;
-  }
-
-  .layout__sidebar {
-    position: static;
-    height: auto;
-    flex-direction: row;
-    align-items: center;
-    gap: var(--space-4);
-    padding: var(--space-3) var(--space-4);
-    border-right: none;
-    border-bottom: 1px solid var(--rule);
-    overflow-x: auto;
-  }
-
-  .layout__brand {
-    flex-direction: row;
-    align-items: baseline;
-    gap: var(--space-2);
-    padding: 0;
-  }
-
-  .layout__nav {
-    display: flex;
-    gap: var(--space-1);
-  }
-
-  .layout__link {
-    padding: var(--space-1) var(--space-3);
-    border-left: none;
-    border-bottom: 2px solid transparent;
-    white-space: nowrap;
-  }
-
-  .layout__link--active {
-    border-left-color: transparent;
-    border-bottom-color: var(--ink);
-  }
-
-  .layout__account {
-    flex-direction: row;
-    align-items: center;
-    gap: var(--space-3);
-    margin: 0;
-    padding: 0;
-    border-top: none;
-    margin-left: auto;
-  }
-
-  .layout__main {
-    padding: var(--space-4);
-  }
+/* Admin export: 216px sidebar, compact header and a scrolling workspace. */
+.layout { display:grid; grid-template-columns:216px minmax(0,1fr); height:100dvh; }
+.layout__sidebar { display:flex; flex-direction:column; min-height:0; background:var(--surface); border-right:1px solid var(--rule); }
+.layout__brand { display:flex; align-items:center; gap:9px; padding:16px; border-bottom:1px solid var(--rule); color:var(--ink); text-decoration:none; }
+.layout__brand-mark { display:grid; place-items:center; flex:none; width:30px; height:30px; border:1px solid var(--accent); color:var(--accent-text); border-radius:6px; font-size:12px; }
+.layout__brand-name { display:block; font-size:14px; font-weight:500; }
+.layout__brand-role { display:block; font-size:11.5px; margin-top:2px; color:var(--quiet); }
+.layout__nav { flex:1; overflow-y:auto; padding:10px 9px; margin:0; list-style:none; }
+.layout__link { display:flex; align-items:center; min-height:40px; padding:9px 11px; margin-bottom:2px; border-radius:8px; color:var(--quiet); font-size:14px; text-decoration:none; }
+.layout__link:hover { background:var(--hover); color:var(--ink); }
+.layout__link--active { background:var(--accent-soft); color:var(--accent-text); font-weight:500; }
+.layout__account { border-top:1px solid var(--rule); }
+.layout__account-toggle { width:100%; display:flex; gap:10px; align-items:center; padding:13px 16px; border:0; background:none; color:var(--ink); text-align:left; cursor:pointer; }
+.layout__avatar { display:grid; place-items:center; width:30px; height:30px; flex:none; border-radius:50%; background:var(--accent-soft); color:var(--accent-text); border:1px solid var(--rule); }
+.layout__identity { flex:1; min-width:0; }
+.layout__email { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:13px; }
+.layout__account-menu { display:flex; flex-direction:column; padding:0 9px 10px; }
+.layout__account-menu a, .layout__account-menu button { padding:9px 11px; min-height:36px; color:var(--quiet); background:none; border:0; text-align:left; font-size:13px; text-decoration:none; cursor:pointer; }
+.layout__account-menu a:hover, .layout__account-menu button:hover { background:var(--hover); color:var(--ink); border-radius:8px; }
+.layout__main { min-width:0; overflow:auto; padding:0 22px 30px; }
+.layout__main > .page__head { position:sticky; top:0; z-index:10; margin:0 -22px 20px; padding:14px 22px; min-height:68px; border-bottom:1px solid var(--rule); background:var(--paper); }
+.layout__main > .page__head h1 { font-size:18px; font-weight:500; }
+@media (max-width:800px) {
+  .layout { grid-template-columns:1fr; height:auto; min-height:100dvh; }
+  .layout__sidebar { border-right:0; }
+  .layout__brand { padding:10px 16px; }
+  .layout__nav { display:flex; overflow-x:auto; padding:6px; }
+  .layout__link { white-space:nowrap; }
+  .layout__account-toggle { padding:8px 16px; }
+  .layout__main { padding:0 16px 24px; overflow:visible; }
+  .layout__main > .page__head { position:static; margin:0 -16px 16px; padding:14px 16px; }
 }
 
 /* ── Page furniture ───────────────────────────────────────────────────────*/

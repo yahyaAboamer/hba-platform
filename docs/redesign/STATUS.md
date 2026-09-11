@@ -1,4 +1,12 @@
-# Implementation status — update after every batch
+# Implementation status — correction in progress
+
+**Current override, 11 September 2026:** the owner rejected page-structure parity.
+The older phase table below is historical reporting, not acceptance or a release
+gate. Continue `fix/approved-design-parity` using
+`../plans/2026-09-11-design-parity-handoff.md` and
+`reports/10-approved-design-parity-audit.md`. The first frontend correction is a
+draft. Financial contract wiring, other screen layouts, visual comparisons and
+release validation remain. No deployment was made by this correction batch.
 
 Package prepared: 9 September 2026. Phase 00 completed 9 September 2026.
 

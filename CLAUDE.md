@@ -3,7 +3,7 @@
 Commission and payroll for ~20 Egyptian beauty models at **HBA Aesthetics**.
 FastAPI + SQLAlchemy + Postgres, React + Vite, on Railway.
 
-**Read `docs/plans/2026-09-10-continuation-handoff.md` first** — it says where
+**Read `docs/plans/2026-09-11-design-parity-handoff.md` first** — it says where
 the work is right now. Everything below is the part that does not change.
 
 ---
@@ -12,7 +12,7 @@ the work is right now. Everything below is the part that does not change.
 
 | | Who | Look |
 |---|---|---|
-| **Maintainer** | 2 people, laptop, month end | Dense, laptop-first, colour only for money state |
+| **Maintainer** | 2 people, laptop, month end | Laptop-first; match the approved Admin HTML structure and styling |
 | **Affiliate portal** (`.affiliate`) | ~20 models, phone, arriving from an email | Dark by default, denser, phone-shaped |
 
 **One palette across both, since ADR 0039** — HBA green, both themes, defined
@@ -106,11 +106,14 @@ payroll without touching a maintainer screen.
   cost the best part of an hour.
 - Frontend: `cd frontend && npm test` (256), `npx tsc --noEmit` and
   `npm run build`.
-- **The redesign is code-complete.** Phases 00-09 are merged. What remains is
-  09B, the owner walking every screen - automation cannot sign in here, and nine
-  batches of merged screens have never been seen by a person.
+- **The redesign is incomplete.** The owner rejected the retained old structure.
+  The correction branch has a partial frontend rebuild; use the current handoff
+  and parity audit. Builds and feature tests do not establish visual parity.
+  Admin staging sign-in was verified with secure user entry; do not assume that
+  all browser inspection is impossible.
 - Redesign 05A is a **read-only rules preview**. The normal calculation and
-  approval remain delivered-only until D01; do not mistake the preview's
+  approval still need verified pending-inclusive activation; D01 alone did not
+  switch the code path. Do not mistake the preview's
   entitlement for a transfer instruction.
 - **An agreed month is never unmade** (05B). Reopening is retired; what changes
   after an agreement is recorded against it as a correction (05C). An approval
