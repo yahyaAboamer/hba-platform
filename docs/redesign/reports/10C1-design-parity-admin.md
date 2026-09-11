@@ -141,7 +141,59 @@ isolated PostgreSQL. Both are fixed by naming the type, which is better code
 anyway. The scanner is left alone — a regex that parsed nested generics would
 be a worse thing to maintain than a house rule that call sites use named types.
 
+
+### The palette was right and the mapping was wrong
+
+The owner looked at the deployed result and said the green was not green
+enough and the whites read grey. Both were true, and **measuring it rather
+than eyeballing it** found why: computed styles on the export and on staging
+side by side.
+
+**The token values already matched exactly** — `#ECEFEA` text on `#15171A`
+cards in both. What differed was which token each role used.
+
+Counting every accented text in the export: `#23A95C` **39 times**, `#7BE0A6`
+**9 times** — and all nine of the pale ones sit on a green-tinted ground
+(*saved*, *recorded*, *paid*, *approved*, the invite link). We had it
+inverted: every link, active nav item and accented label drew the pale mint.
+That is the washed-out look, and it was one token, not thirty files.
+`--accent-text` is now the saturated step; a fifth token `--accent-lift`
+carries the pale one, and `--settled` points at it — resolved money, said on a
+tint, is the same idea.
+
+Two greys that should not have been grey, also measured: the sidebar count
+badge (a filled neutral chip; the export draws it amber and unfilled, the
+colour of the notice it counts) and a notice's action button (the default grey
+control; the export gives it its row's severity). **Grey on a coloured row
+reads as disabled**, on the one row of the screen that exists to be acted on.
+
+And a whole tier we were not using. The export uses `--faint` 34 times on Home;
+we used it **zero** times and put everything in the lighter `--quiet`. That is
+the density difference the owner described. Measured to: the code under a name,
+the rank number, the avatar initial, and a table's column headers — a header as
+bright as the data it labels competes with it.
+
+A palette census on the deployed page now matches the export's value for value.
+
+### Products was a grid of pictures
+
+The approved catalogue is a table, and it answers what the screen is actually
+opened for: which pieces have reached the roster, and which have been asked
+for. Thumbnail, name over SKU, status, model coverage, feature request.
+
+**Coverage counts distinct models, not parcels** — two of the same thing sent
+to one person is one model covered, and counting shipments would overstate
+reach on exactly the products HBA sends most. It is `coverage_for`, built on
+the same gift rule (D05) as her own wardrobe rather than a filter of its own:
+the way anybody would discover a second definition is a model saying she never
+received something the catalogue says she has.
+
+**The feature column has three states.** A hidden request is not an absent one
+— somebody wrote that wording and took it down, and it is still there to put
+back. Collapsing hidden into none is how a paragraph gets retyped.
+
 ### What the owner should look at
+
 
 Staging, once this deploys: **Home** and **Models**. On Home, the content panel
 should now name models rather than count them, and the top three should show
@@ -185,8 +237,9 @@ codes. On Models, try the search with a **code** rather than a name.
 | `frontend/…/Affiliates.tsx`, `.css` | Segments, search, approved columns |
 | `frontend/…/Layout.tsx`, `.css` | The Models count badge |
 | `frontend/…/Products.tsx` | Named `FeatureRequest` type |
-| `tests/…` | 6 overview, 3 operations, 3 wardrobe; 1 reversed |
-| `frontend/…/__tests__/Overview.test.tsx`, `Affiliates.test.tsx` | **New**, 18 |
+| `tests/…` | 7 overview, 3 operations, 6 wardrobe; 1 reversed |
+| `frontend/…/__tests__/Overview.test.tsx`, `Affiliates.test.tsx`, `Products.test.tsx` | **New**, 24 |
+| `frontend/src/styles/accent.css`, `tokens.css`, `base.css` | The measured palette correction |
 
 ### Database migrations
 
