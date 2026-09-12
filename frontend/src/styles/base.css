@@ -23,7 +23,13 @@ body {
   /* Tabular figures everywhere, not only in the money column. A count of
      orders that shifts width as it changes is a count that is hard to scan. */
   font-variant-numeric: tabular-nums;
-  -webkit-font-smoothing: antialiased;
+  /* **Not `antialiased`.** The approved export leaves smoothing at `auto`,
+   * and on a dark ground the difference is not subtle: `antialiased` thins
+   * every glyph, so the same #ECEFEA that reads as white in the reference
+   * reads as grey here. The owner saw it on three separate screens and I kept
+   * measuring colours, which were identical every time. It was never the
+   * colour. */
+  -webkit-font-smoothing: auto;
 }
 
 h1,

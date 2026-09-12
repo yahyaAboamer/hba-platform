@@ -380,14 +380,23 @@ export function Overview({ session }: { session: Session }) {
                 <thead><tr><th>Model</th><th>Videos</th><th>Stories</th><th>Last update</th></tr></thead>
                 <tbody>
                   {toReview(summary.content).map(row => <tr key={row.affiliate_id}>
-                    <td><Link to={`/affiliates/${row.affiliate_id}?section=targets&month=${month}`}>{row.name}</Link></td>
+                    <td>
+                      <Link
+                        className="overview__content-name"
+                        to={`/affiliates/${row.affiliate_id}?section=targets&month=${month}`}
+                      >
+                        {row.name}
+                      </Link>
+                    </td>
                     <td>{progressLabel(row.actual_videos, row.required_videos)
                       ?? <span className="overview__unrecorded">—</span>}</td>
                     <td>{progressLabel(row.actual_stories, row.required_stories)
                       ?? <span className="overview__unrecorded">—</span>}</td>
                     <td>{row.last_update
                       ? formatDay(row.last_update)
-                      : <span className="overview__unrecorded">{row.required_videos === null ? "Nothing asked for" : "No update yet"}</span>}</td>
+                      : row.required_videos === null
+                        ? <span className="overview__unrecorded">Nothing asked for</span>
+                        : <span className="overview__stale">No update yet</span>}</td>
                   </tr>)}
                 </tbody>
               </table>

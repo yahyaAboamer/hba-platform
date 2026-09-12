@@ -13,7 +13,7 @@
 .overview__card a { display:inline-block; margin-top:13px; color:var(--accent-text); text-decoration:none; font-size:13px; }
 .overview__parts { margin:14px 0 0; padding-top:13px; border-top:1px solid var(--rule); font-size:13.5px; }
 .overview__parts > div { display:flex; justify-content:space-between; gap:12px; margin-bottom:7px; }
-.overview__parts dt { color:var(--quiet); } .overview__parts dd { margin:0; }
+.overview__parts dt { color:var(--ink); } .overview__parts dd { margin:0; color:var(--ink); }
 .overview__lower { display:flex; gap:14px; margin-top:16px; }
 .overview__lower > .panel { flex:1 1 440px; }
 /* The content table carries four columns to the leaderboard's three, and the
@@ -23,7 +23,7 @@
 .overview__top { list-style:none; margin:0; padding:0; }
 .overview__top li { display:grid; grid-template-columns:18px 32px 1fr auto; gap:13px; padding:13px 18px; align-items:center; border-bottom:1px solid var(--rule); font-size:14px; }
 .overview__top a { text-decoration:none; color:var(--ink); }
-.overview__place { color:var(--faint); }
+.overview__place { color:var(--accent-text); font-size:14px; }
 .overview__review { list-style:none; margin:0; padding:0; }
 .overview__review li { padding:14px 18px; border-bottom:1px solid var(--rule); font-size:13.5px; }
 .overview__review a { color:var(--ink); text-decoration:none; }
@@ -143,4 +143,49 @@
   margin-top: 3px;
   font-size: 12.5px;
   color: var(--quiet);
+}
+
+/* The export writes a model's name here as plain text. Six green underlined
+ * links down a column read as a list of links rather than a list of people —
+ * the row is still clickable, it just does not shout about it. */
+.overview__content-name {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.overview__content-name:hover {
+  text-decoration: underline;
+}
+
+/* *No update yet* is amber in the export: it is the one cell in this table
+ * that somebody has to do something about. In grey it spoke with the same
+ * voice as the em dash beside it. */
+.overview__stale {
+  color: var(--owed);
+}
+
+/* Measured against the export: the initial in the circle is quiet at 12.5px,
+ * and the amount beside the name is ink at 15px. Ours had the initial wearing
+ * the accent — which made a column of avatars the brightest thing on the
+ * panel — and the amount a size too small. */
+.overview__top .layout__avatar {
+  color: var(--quiet);
+  background: none;
+  font-size: 12.5px;
+}
+
+.overview__top li > :last-child {
+  font-size: 15px;
+}
+
+/* A notice's controls sit at regular weight in the export. At 500 the button,
+ * the dots and the close were all half a step bolder than every other
+ * control on the page. */
+.overview__notice .button {
+  font-weight: 400;
+  font-size: 12.5px;
+}
+
+.overview__notice button.button {
+  font-size: 13px;
 }
