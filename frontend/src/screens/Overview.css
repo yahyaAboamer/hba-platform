@@ -190,3 +190,10 @@
 .overview__notice button.button {
   font-size: 13px;
 }
+
+/* A panel head's link is 13px in the export, the same as every other link on
+ * a card. At 15px it inherited the panel title's size and read as a second
+ * heading rather than as somewhere to go. */
+.overview__lower .panel__head a {
+  font-size: 13px;
+}

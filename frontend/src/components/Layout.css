@@ -11,7 +11,7 @@
 .layout__link--active { background:var(--accent-soft); color:var(--accent-text); }
 .layout__account { border-top:1px solid var(--rule); }
 .layout__account-toggle { width:100%; display:flex; gap:10px; align-items:center; padding:13px 16px; border:0; background:none; color:var(--ink); text-align:left; cursor:pointer; }
-.layout__avatar { display:grid; place-items:center; width:30px; height:30px; flex:none; border-radius:50%; background:var(--accent-soft); color:var(--accent-text); border:1px solid var(--rule); }
+.layout__avatar { display:grid; place-items:center; width:30px; height:30px; flex:none; border-radius:50%; background:none; color:var(--quiet); font-size:12.5px; border:1px solid var(--rule); }
 .layout__identity { flex:1; min-width:0; }
 .layout__email { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:13px; }
 .layout__account-menu { display:flex; flex-direction:column; padding:0 9px 10px; }
@@ -132,7 +132,7 @@
   padding: 0 5px;
   border-radius: 9px;
   color: var(--owed);
-  font-size: var(--text-xs);
+  font-size: 11px;
   line-height: 18px;
   text-align: center;
 }
