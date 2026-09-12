@@ -6,6 +6,7 @@ import type { MonthLock } from "../components/MonthPicker";
 import { api, can } from "../lib/api";
 import type { Session } from "../lib/api";
 import { currentMonth, formatMonth } from "../lib/money";
+import { PAY_TYPE } from "../lib/payouts";
 import "./Targets.css";
 
 type Row = {
@@ -19,6 +20,10 @@ type Row = {
   actual_stories: number | null;
   /** `null` means nobody has recorded what they did — which is not a miss. */
   achieved: boolean | null;
+  /** The raw compensation type she was on that month, or `null` for nobody.
+   *  Labelled here rather than on the server, so one screen cannot start
+   *  calling an arrangement something the next screen does not. */
+  arrangement: string | null;
   verified: boolean;
   verified_at: string | null;
   recorded_at: string | null;
@@ -480,6 +485,7 @@ export function Targets({ session, affiliateId, initialMonth, embedded = false }
                      * is empty in most rows is a column of white space.
                      */}
                     <td className="targets__model">
+                      <span className="targets__who">
                       {can(session, "targets.verify") &&
                         row.achieved !== null &&
                         !row.verified && (
@@ -506,11 +512,21 @@ export function Targets({ session, affiliateId, initialMonth, embedded = false }
                       >
                         {row.name}
                       </Link>
-                      {row.determines_pay && (
-                        <span className="targets__arrangement">
-                          Guarantee needs this record
-                        </span>
-                      )}
+                      {/*
+                       * The export writes the arrangement beside every name,
+                       * and replaces it with what the record decides where a
+                       * guarantee depends on it. Ours showed the second and
+                       * nothing at all for everybody else, so the column read
+                       * as a list of names with one warning in it.
+                       */}
+                      <span className="targets__arrangement">
+                        {row.determines_pay
+                          ? "Guarantee needs this record"
+                          : row.arrangement
+                            ? PAY_TYPE[row.arrangement] ?? row.arrangement
+                            : "No terms set"}
+                      </span>
+                      </span>
                     </td>
                     <Cell
                       value={mode === "achieved" ? cells.actual_videos : cells.required_videos}

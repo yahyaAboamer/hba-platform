@@ -109,14 +109,68 @@ export function describeDestination(
   destination: Record<string, string | null> | null,
 ): string {
   if (!destination) return "Nothing on file yet";
-  const method = destination.method ?? "";
   const shown =
     destination.instapay_address_url ??
     destination.bank_account_number ??
     destination.wallet_phone ??
     "";
-  return `${METHOD_LABEL[method] ?? method} · ${shown}`;
+  return `${destinationHolder(destination)} · ${shown}`;
 }
+
+/**
+ * *Orange Money*, not *Mobile wallet*.
+ *
+ * The export names the actual provider, and so should we: somebody sending
+ * twenty transfers picks the app before they pick the number, and four
+ * wallets that all read *Mobile wallet* make them open the profile to find
+ * out which. `wallet_provider` and `bank_name` are already on the record and
+ * are not credentials — `mask_destination` has always passed them through in
+ * full.
+ */
+export function destinationHolder(
+  destination: Record<string, string | null>,
+): string {
+  const method = destination.method ?? "";
+  if (method === "wallet") {
+    return destination.wallet_provider || METHOD_LABEL.wallet || "Wallet";
+  }
+  if (method === "bank") {
+    return destination.bank_name || METHOD_LABEL.bank || "Bank";
+  }
+  return METHOD_LABEL[method] ?? method;
+}
+
+/**
+ * What the *Copy* button puts on the clipboard.
+ *
+ * The number alone, not the sentence around it. The next thing that happens
+ * to this string is being pasted into a banking app, and a paste that reads
+ * *InstaPay · ipn.eg/nour* into an account-number field is a paste somebody
+ * has to edit by hand — which is the step this button exists to remove.
+ */
+export function copyableDestination(
+  destination: Record<string, string | null>,
+): string {
+  return (
+    destination.instapay_address_url ??
+    destination.bank_account_number ??
+    destination.wallet_phone ??
+    ""
+  );
+}
+
+/**
+ * The three arrangements, in the words the screens use.
+ *
+ * One table, because it was three: Payments, the profile and Targets each
+ * carried a copy, and a copy is how *Salary plus commission* and *Salary +
+ * commission* end up on two tabs of the same tool.
+ */
+export const PAY_TYPE: Record<string, string> = {
+  commission: "Commission",
+  fixed_plus_commission: "Salary + commission",
+  base_guarantee: "Guaranteed minimum",
+};
 
 /**
  * The banks a model is likely to hold an account with.

@@ -87,16 +87,16 @@
 }
 
 .payments__correction-month,
+/*
+ * *Pending*, *archived* - a fact about the person rather than about her
+ * month. It follows the arrangement on the same quiet line the export gives
+ * that line; drawn as an outlined chip it sat on a row of its own and made
+ * every unapproved model's name block three lines tall.
+ */
 .payments__person-state {
-  margin-left: var(--space-2);
-  font-size: var(--text-xs);
-  color: var(--quiet);
-}
-
-.payments__person-state {
-  padding: 1px var(--space-2);
-  border: 1px solid var(--rule);
-  border-radius: 999px;
+  margin-left: 6px;
+  font-size: 12px;
+  color: var(--faint);
   text-transform: capitalize;
 }
 
@@ -206,16 +206,26 @@
   color: var(--quiet);
 }
 
-.table td.payments__destination {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 58px;
+/*
+ * **The flex box goes inside the cell, not on it.**
+ *
+ * `display:flex` on a `<td>` takes it out of the table's row box: it then
+ * sizes to its own content and its bottom hairline stops halfway across the
+ * row, which is exactly what it did - a short rule floating under the
+ * destination in every row.
+ */
+.payments__destination {
   font-size: 12.5px;
   color: var(--quiet);
 }
 
-.payments__destination > span:first-child {
+.payments__where {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.payments__where > span:first-child {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -457,4 +467,23 @@
 
 .payments__copy {
   flex: none;
+}
+
+/*
+ * The card's colour is the card's meaning, so a zero does not take the quiet
+ * tier here the way a zero in a table row does. *Recorded so far* is the
+ * accent whether or not anything has been recorded yet - which is the whole
+ * point of reading it - and a grey E£0.00 beside a white E£22,347.00 is the
+ * greyness the owner kept pointing at.
+ */
+.money--zero.payments__total {
+  color: var(--ink);
+}
+
+.money--settled.payments__total {
+  color: var(--settled);
+}
+
+.money--owed.payments__total {
+  color: var(--owed);
 }

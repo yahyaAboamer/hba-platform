@@ -423,7 +423,7 @@ def test_the_grid_says_whose_pay_a_target_decides(db):
     and §11.3 blocks payroll on exactly one of these kinds. Warning about the
     other three is a false alarm on every model, every month.
     """
-    from app.api.targets import _determines_pay
+    from app.api.targets import _arrangement
     from app.models.compensation import CompensationType
 
     guaranteed = _affiliate(db, "Sara")
@@ -445,18 +445,21 @@ def test_the_grid_says_whose_pay_a_target_decides(db):
     )
     db.flush()
 
-    assert _determines_pay(db, guaranteed, MONTH) is True
-    assert _determines_pay(db, on_commission, MONTH) is False
+    # The grid now carries the whole arrangement rather than the yes-or-no it
+    # used to, because the approved screen writes it beside every name - and
+    # *which* arrangement is what decides whether the target is money.
+    assert _arrangement(db, guaranteed, MONTH) == CompensationType.BASE_GUARANTEE
+    assert _arrangement(db, on_commission, MONTH) == CompensationType.COMMISSION
 
 
 def test_a_model_with_no_terms_has_no_target_deciding_anything(db):
     """No arrangement means nothing is calculable from their target either."""
-    from app.api.targets import _determines_pay
+    from app.api.targets import _arrangement
 
     nobody = _affiliate(db, "Habiba")
     db.flush()
 
-    assert _determines_pay(db, nobody, MONTH) is False
+    assert _arrangement(db, nobody, MONTH) is None
 
 
 # -- An outcome, for a month that happened before the platform (ADR 0036) -----

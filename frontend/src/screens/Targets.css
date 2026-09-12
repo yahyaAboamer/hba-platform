@@ -27,13 +27,17 @@
   min-width: 190px;
 }
 
-.table td.targets__model {
+/*
+ * The export lays this column out as one flex line with a 10px gap. The flex
+ * box goes on a span *inside* the cell: put it on the `<td>` and the cell
+ * leaves the table's row box, sizes to its own content, and its hairline
+ * stops short of the row's width.
+ */
+.targets__who {
   display: flex;
   align-items: center;
   gap: 10px;
-  /* The flex box has to be told the row's height, or the cell stops
-     stretching with its neighbours and the hairline under it steps up. */
-  min-height: 56px;
+  min-height: 36px;
 }
 
 .targets__number,
@@ -167,10 +171,14 @@
   color: var(--owed);
 }
 
+/*
+ * No `nowrap`. The column is 120px because the export makes it 120px, and a
+ * date longer than the export's samples - *10 September 2026* - has to wrap
+ * inside it rather than be sliced off at the surface's edge.
+ */
 .targets__updated {
   font-size: 12.5px;
   color: var(--quiet);
-  white-space: nowrap;
 }
 
 /* Never recorded is the thing to act on, so it is not drawn as quietly as a

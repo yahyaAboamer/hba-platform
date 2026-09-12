@@ -12,15 +12,8 @@ import {
   formatEgp,
   formatMonth,
 } from "../lib/money";
-import { describeDestination } from "../lib/payouts";
+import { copyableDestination, describeDestination, PAY_TYPE } from "../lib/payouts";
 import "./Payments.css";
-
-/** The arrangement labels, the same wording every other screen uses. */
-const PAY_TYPE: Record<string, string> = {
-  commission: "Commission only",
-  fixed_plus_commission: "Salary plus commission",
-  base_guarantee: "Guaranteed minimum",
-};
 
 export type SettlementState =
   | "unpaid"
@@ -542,10 +535,10 @@ function PaymentRow({
          *  whether it is a salary, a commission or a floor. */}
         <span className="payments__terms">
           {row.terms ? PAY_TYPE[row.terms] ?? row.terms : "No terms set"}
+          {row.status !== "active" && (
+            <span className="payments__person-state">{row.status}</span>
+          )}
         </span>
-        {row.status !== "active" && (
-          <span className="payments__person-state">{row.status}</span>
-        )}
       </td>
       <td className="payments__amount">
         {row.required_kind === "unavailable" ? (
@@ -575,10 +568,12 @@ function PaymentRow({
         {/* The same sentence her profile shows, from the same function — a
          *  second way of writing a destination is a second way of writing it
          *  wrong. Masked on the server before it ever reaches this list. */}
-        <span>{describeDestination(row.destination ?? null)}</span>
-        {row.destination && (
-          <CopyDestination text={describeDestination(row.destination)} />
-        )}
+        <span className="payments__where">
+          <span>{describeDestination(row.destination ?? null)}</span>
+          {row.destination && (
+            <CopyDestination text={copyableDestination(row.destination)} />
+          )}
+        </span>
       </td>
       {/*
        * **A pill, and nothing else.**

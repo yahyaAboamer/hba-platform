@@ -7,7 +7,7 @@ import { Money } from "../components/Money";
 import { Corrections } from "../components/Corrections";
 import { FinancialRulesPreview } from "../components/FinancialRulesPreview";
 import { api, can } from "../lib/api";
-import { PAYOUT_FIELD_LABEL } from "../lib/payouts";
+import { PAYOUT_FIELD_LABEL, PAY_TYPE } from "../lib/payouts";
 import type { Session } from "../lib/api";
 import { describeBlocker, formatMonth } from "../lib/money";
 import { STATUS_LABEL } from "./Affiliates";
@@ -88,12 +88,6 @@ const METHOD: Record<string, string> = {
   instapay: "InstaPay",
   bank: "Bank transfer",
   wallet: "Mobile wallet",
-};
-
-const PAY_TYPE: Record<string, string> = {
-  commission: "Commission only",
-  fixed_plus_commission: "Salary plus commission",
-  base_guarantee: "Guaranteed minimum",
 };
 
 /**

@@ -852,6 +852,48 @@ def test_a_recorded_destination_is_masked_in_their_history(client):
     assert "nour-abdelrahman" not in str(body)
 
 
+def test_the_month_end_desk_shows_the_whole_destination(client):
+    """The one screen where the full value is the point.
+
+    §6.4.4 masks a destination everywhere it is *mentioned* - an audit row, a
+    log line, a message, the model's own screen. The month-end desk is not a
+    mention: somebody is holding a banking app open and typing what this
+    screen says, and the approved design prints it in full for that reason. A
+    masked number makes the copy button useless and sends them into the
+    profile to find the real one, which is how a transfer goes to the previous
+    destination.
+
+    Reached only through `payments.view`, which is finance and the owner - and
+    the test below this one is what keeps it that way.
+    """
+    affiliate = _affiliate(client)
+    client.put(
+        f"/api/affiliates/{affiliate['id']}/payout-destination",
+        json={
+            "method": "instapay",
+            "instapay_address_url": "https://ipn.eg/nour-abdelrahman-2291",
+        },
+    )
+    _owed(client, affiliate)
+
+    rows = client.get(f"/api/payments/{AUGUST}").json()["affiliates"]
+    row = next(r for r in rows if r["affiliate_id"] == affiliate["id"])
+
+    assert (
+        row["destination"]["instapay_address_url"]
+        == "https://ipn.eg/nour-abdelrahman-2291"
+    )
+
+
+def test_a_model_may_not_read_the_month_end_desk(client):
+    """Which is what makes the line above it safe."""
+    _affiliate(client)
+    with engine.begin() as connection:
+        connection.execute(text("UPDATE role_assignment SET role = 'affiliate'"))
+
+    assert client.get(f"/api/payments/{AUGUST}").status_code == 403
+
+
 # ── Who may do what ────────────────────────────────────────────────────────────
 
 

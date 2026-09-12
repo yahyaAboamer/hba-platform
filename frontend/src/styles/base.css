@@ -401,6 +401,7 @@ a {
   background: transparent;
   color: var(--quiet);
   font-size: 13px;
+  line-height: normal;
   cursor: pointer;
 }
 

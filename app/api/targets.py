@@ -115,6 +115,7 @@ def _render(
     target: MonthlyTarget | None,
     *,
     determines_pay: bool = False,
+    arrangement: str | None = None,
 ) -> dict:
     return {
         "affiliate_id": affiliate.id,
@@ -131,6 +132,11 @@ def _render(
         # A screen that cannot tell them apart marks every empty row as urgent,
         # and a warning that is always on is one nobody reads.
         "determines_pay": determines_pay,
+        # The raw compensation type she was on that month, for the line the
+        # approved grid writes beside every name. Raw, and labelled in the
+        # browser: the words belong to the screen, and sending them from here
+        # is how two screens start disagreeing about what to call one thing.
+        "arrangement": arrangement,
         "required_videos": target.required_videos if target else None,
         "required_stories": target.required_stories if target else None,
         "actual_videos": target.actual_videos if target else None,
@@ -218,26 +224,34 @@ def target_grid(
                 **_render(
                     affiliate,
                     found.get(affiliate.id),
-                    determines_pay=_determines_pay(db, affiliate, month),
+                    determines_pay=arrangement
+                    == CompensationType.BASE_GUARANTEE,
+                    arrangement=arrangement,
                 ),
                 "pace": _pace(db, affiliate, month),
             }
-            for affiliate in affiliates
+            for affiliate, arrangement in (
+                (affiliate, _arrangement(db, affiliate, month))
+                for affiliate in affiliates
+            )
         ],
     }
 
 
-def _determines_pay(db: Session, affiliate: AffiliateProfile, month: str) -> bool:
-    """Whether this month's target decides what they are paid.
+def _arrangement(
+    db: Session, affiliate: AffiliateProfile, month: str
+) -> str | None:
+    """Which arrangement she was on that month, or `None` for nobody.
 
-    Only a base guarantee turns a target into money. For everyone else the
+    **Only a base guarantee turns a target into money.** For everyone else the
     numbers are worth recording and worth looking at, and nothing at all
-    depends on them.
+    depends on them - which is why the grid needs the whole arrangement and
+    not just the yes-or-no it used to ask for. A screen that cannot tell them
+    apart marks every empty row as urgent, and a warning that is always on is
+    one nobody reads.
     """
     terms = terms_for(db, affiliate, month)
-    return bool(
-        terms and terms.compensation_type == CompensationType.BASE_GUARANTEE
-    )
+    return terms.compensation_type if terms else None
 
 
 @router.put("/{month}")
