@@ -466,4 +466,11 @@ def month_summary_view(
             {**row, "sales": format_egp(row["sales_piastres"])}
             for row in found.top
         ],
+        # January to this month, one figure each, for the chart the approved
+        # Home draws under everything else. Formatted here like every other
+        # figure on this payload, so no browser ever divides by a hundred.
+        "year": [
+            {**row, "sales": format_egp(row["sales_piastres"])}
+            for row in found.year
+        ],
     }

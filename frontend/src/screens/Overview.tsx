@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { Money } from "../components/Money";
+import { SalesByMonth } from "../components/SalesByMonth";
 import { MonthPicker } from "../components/MonthPicker";
 import type { MonthLock } from "../components/MonthPicker";
 import { api } from "../lib/api";
@@ -113,13 +114,9 @@ type Summary = {
     sales_piastres: number;
     uses: number;
   }[];
-};
-
-/** D08's three, and only the last is about her. */
-const REVIEW_TEXT: Record<string, string> = {
-  no_target: "nothing asked for yet",
-  not_recorded_this_week: "nothing recorded this week",
-  behind: "behind for the week",
+  /** January to this month, one figure each, for the chart at the foot of
+   *  the approved Home. */
+  year: { month: string; sales_piastres: number; sales: string }[];
 };
 
 /**
@@ -400,13 +397,11 @@ export function Overview({ session }: { session: Session }) {
                   </tr>)}
                 </tbody>
               </table>
-              {Object.keys(summary.needs_review).length > 0 && <p className="overview__review-note">
-                {Object.entries(summary.needs_review).map(([why, count]) =>
-                  `${count} ${count === 1 ? "model" : "models"} · ${REVIEW_TEXT[why] ?? why.replace(/_/g, " ")}`).join("  ·  ")}
-              </p>}
             </>}
           </section>
         </div>
+
+        <SalesByMonth year={summary.year ?? []} month={month} onPick={setMonth} />
       </>}
     </>
   );

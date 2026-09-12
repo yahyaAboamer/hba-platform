@@ -58,18 +58,28 @@
   color: var(--quiet);
 }
 
+/*
+ * A rounded surface, and **no border around it**.
+ *
+ * Every panel in both exports is `border-radius:var(--radius-md);
+ * background:var(--surf);overflow:hidden` and nothing else. The hairline this
+ * used to draw is the one the card's own ground already implies, and on the
+ * dark theme - where the page is #08090A and the card #15171A - an outline in
+ * #23272B between them is a third value nobody asked for. `overflow:hidden`
+ * is what clips the first and last row's rules to the corner radius.
+ */
 .panel {
-  border: 1px solid var(--rule);
   border-radius: var(--radius);
   background: var(--surface);
+  overflow: hidden;
 }
 
 .panel__head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
+  padding: 14px 18px;
   border-bottom: 1px solid var(--rule);
 }
 

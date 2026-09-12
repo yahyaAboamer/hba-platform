@@ -52,23 +52,33 @@
   width: 100%;
 }
 
-.overview__content th:not(:first-child),
-.overview__content td:not(:first-child) {
-  width: 1%;
+/* The export's widths, and left-aligned as it draws them: Model takes what is
+   left, then 74 / 74 / 118. Right-aligning three short columns pushed them
+   all to the far edge and left a band of nothing across the middle of every
+   row. */
+.overview__content {
+  table-layout: fixed;
+}
+
+.overview__content th:nth-child(2),
+.overview__content td:nth-child(2),
+.overview__content th:nth-child(3),
+.overview__content td:nth-child(3) {
+  width: 74px;
   white-space: nowrap;
-  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.overview__content th:last-child,
+.overview__content td:last-child {
+  width: 118px;
+  font-size: 12.5px;
 }
 
 /* Nothing recorded, and nothing asked for, read quieter than a real figure -
  * they are the absence of a number rather than a bad one. */
 .overview__unrecorded {
   color: var(--quiet);
-}
-
-.overview__review-note {
-  margin: var(--space-3) 0 0;
-  color: var(--quiet);
-  font-size: var(--text-sm);
 }
 
 /* Her name over her code, the way the design stacks them. */
