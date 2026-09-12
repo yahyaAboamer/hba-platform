@@ -112,11 +112,19 @@ export function toneFor(state: SettlementState): "owed" | "settled" | "neutral" 
   return "neutral";
 }
 
+/**
+ * What the button in the last column says.
+ *
+ * Three of these are the export's own words. `Settle difference` is ours: an
+ * overpaid month is a state the export never drew, and it needs an act of its
+ * own rather than being folded into `Open`.
+ */
 type RowAction =
-  | "Review and agree"
+  | "Review"
   | "Record payment"
+  | "Fix terms"
   | "Settle difference"
-  | "Open history";
+  | "Open";
 
 type RowPresentation = {
   label: string;
@@ -133,25 +141,35 @@ type RowPresentation = {
  * an error would contradict the approved recovery rule.
  */
 export function paymentRowPresentation(row: Balance): RowPresentation {
+  /*
+   * **A model with no arrangement cannot be paid at all**, and the export
+   * gives that its own red pill rather than letting it read as one more month
+   * awaiting a look. It is the only state on this screen that is somebody's
+   * mistake instead of somebody's turn.
+   */
+  if (row.terms === null && row.state === "not_approved") {
+    return {
+      label: "Terms missing",
+      explanation: "Nothing can be calculated until an arrangement is set.",
+      action: "Fix terms",
+    };
+  }
   if (row.state === "not_approved") {
     return {
-      label:
-        row.required_kind === "forecast"
-          ? "Forecast — not agreed"
-          : "Needs attention before approval",
+      label: "Awaiting approval",
       explanation:
         row.forecast_blockers.length > 0
           ? row.forecast_blockers.map(describeBlocker).join(" · ")
           : "Review the moving figure before it becomes money HBA owes.",
-      action: "Review and agree",
+      action: "Review",
     };
   }
   if (row.state === "partially_paid") {
-    return { label: "Part paid", explanation: null, action: "Record payment" };
+    return { label: "Partly paid", explanation: null, action: "Record payment" };
   }
   if (row.state === "unpaid") {
     return {
-      label: "Ready to send",
+      label: "Approved",
       explanation: null,
       action: "Record payment",
     };
@@ -167,14 +185,14 @@ export function paymentRowPresentation(row: Balance): RowPresentation {
     return {
       label: "Paid outside the platform",
       explanation: "No transfer is recorded or repeated here.",
-      action: "Open history",
+      action: "Open",
     };
   }
   if (row.credited_piastres > 0 && row.paid_piastres === 0) {
     return {
       label: "No transfer due",
       explanation: `${formatEgp(row.credited_piastres)} already sent in an earlier month covers this month, so it is not sent again.`,
-      action: "Open history",
+      action: "Open",
     };
   }
   if (row.paid_piastres === 0) {
@@ -184,11 +202,28 @@ export function paymentRowPresentation(row: Balance): RowPresentation {
         row.adjusted_piastres > 0
           ? "The recorded adjustment settles this month without a transfer."
           : "There is no money to send for this agreed month.",
-      action: "Open history",
+      action: "Open",
     };
   }
-  return { label: "Fully paid", explanation: null, action: "Open history" };
+  return { label: "Fully paid", explanation: null, action: "Open" };
 }
+
+/**
+ * The colour of each state, measured off the export.
+ *
+ * Amber where somebody still has to act, the accent where money has been
+ * released, its lifted step where a month is closed, red where an arrangement
+ * is missing altogether. Anything this table does not name falls back to the
+ * quiet tier rather than borrowing a meaning it has not earned.
+ */
+const STATE_PILL: Record<string, string> = {
+  "Awaiting approval": "payments__pill--owed",
+  "Partly paid": "payments__pill--owed",
+  Approved: "payments__pill--approved",
+  "Fully paid": "payments__pill--settled",
+  "Terms missing": "payments__pill--refused",
+  "More sent than due": "payments__pill--refused",
+};
 
 type Filter = "all" | "review" | "unpaid" | "partial" | "paid" | "no_due";
 
@@ -298,29 +333,27 @@ export function Payments({ session }: { session: Session }) {
             className="payments__summary"
             aria-label="Month-end payment totals"
           >
+            {/*
+             * Three cards, three grounds, no sub-lines. Each used to carry a
+             * sentence under the figure - how much of the total was approved,
+             * that the second number came from the ledger, how many models
+             * were waiting. All three were ours, none is in the export, and
+             * together they turned a row somebody reads in one glance into
+             * three paragraphs.
+             */}
             <PaymentFigure
               label="Total required"
               piastres={data.totals.required_piastres}
-              provisional={data.totals.forecast_piastres > 0}
-              detail={
-                data.totals.forecast_piastres > 0
-                  ? `${formatEgp(data.totals.approved_piastres)} approved · ${formatEgp(data.totals.forecast_piastres)} forecast.`
-                  : `${formatEgp(data.totals.approved_piastres)} is approved.`
-              }
+              estimated={data.totals.forecast_piastres > 0}
             />
             <PaymentFigure
               label="Recorded so far"
               piastres={data.totals.recorded_piastres}
-              detail="Actual transfers in this month’s ledger."
+              settled
             />
             <PaymentFigure
               label="Remaining to send"
               piastres={data.totals.still_owed_piastres}
-              detail={
-                data.totals.still_owed_affiliates === 1
-                  ? "One model is waiting."
-                  : `${data.totals.still_owed_affiliates} models are waiting.`
-              }
               owed
             />
           </section>
@@ -379,7 +412,7 @@ export function Payments({ session }: { session: Session }) {
             </section>
           )}
 
-          <section className="panel payments__desk">
+          <section className="payments__desk" aria-label="Month-end payments">
             <div className="payments__tools">
               <div
                 className="payments__filters"
@@ -408,32 +441,30 @@ export function Payments({ session }: { session: Session }) {
                   </button>
                 ))}
               </div>
-              <label className="payments__search">
-                <span className="sr-only">Find a model</span>
-                <input
-                  className="input"
-                  type="search"
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Find a model"
-                />
-              </label>
+              <input
+                className="input input--search"
+                type="search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search model names"
+                aria-label="Search model names"
+              />
             </div>
 
             {rows.length === 0 ? (
-              <p className="empty">No models in this month-end run.</p>
+              <div className="surface"><p className="empty">No models in this month-end run.</p></div>
             ) : visibleRows.length === 0 ? (
-              <p className="empty">No models match this view.</p>
+              <div className="surface"><p className="empty">No model matches that search.</p></div>
             ) : (
-              <div className="payments__table-wrap">
+              <div className="surface payments__table-wrap">
                 <table className="table payments__table">
                   <thead>
                     <tr>
-                      <th>Model</th>
+                      <th className="payments__who">Model</th>
                       <th className="payments__amount">To receive</th>
-                      <th>Destination</th>
-                      <th>State</th>
-                      <th>Next action</th>
+                      <th className="payments__destination">Destination</th>
+                      <th className="payments__state">State</th>
+                      <th className="payments__action">Next action</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -460,26 +491,30 @@ export function Payments({ session }: { session: Session }) {
 function PaymentFigure({
   label,
   piastres,
-  detail,
   owed = false,
-  provisional = false,
+  settled = false,
+  estimated = false,
 }: {
   label: string;
   piastres: number;
-  detail: string;
   owed?: boolean;
-  provisional?: boolean;
+  settled?: boolean;
+  /** F14. A total that still contains a forecast is not a debt yet, and the
+   *  export says so with a pill beside the label rather than in a sentence. */
+  estimated?: boolean;
 }) {
   return (
     <div className="payments__figure">
-      <span className="payments__figure-label">{label}</span>
+      <span className="payments__figure-head">
+        <span className="payments__figure-label">{label}</span>
+        {estimated && <span className="pill payments__estimated">Estimated</span>}
+      </span>
       <Money
         piastres={piastres}
-        kind={provisional ? "provisional" : "agreed"}
-        tone={owed && piastres > 0 ? "owed" : "neutral"}
+        kind="agreed"
+        tone={owed && piastres > 0 ? "owed" : settled ? "settled" : "neutral"}
         className="payments__total"
       />
-      <span className="payments__figure-detail">{detail}</span>
     </div>
   );
 }
@@ -500,7 +535,7 @@ function PaymentRow({
 
   return (
     <tr>
-      <td>
+      <td className="payments__who">
         <Link className="payments__name" to={`/affiliates/${row.affiliate_id}`}>
           {row.name}
         </Link>
@@ -546,11 +581,21 @@ function PaymentRow({
           <CopyDestination text={describeDestination(row.destination)} />
         )}
       </td>
+      {/*
+       * **A pill, and nothing else.**
+       *
+       * This carried a second line of explanation - *Review the moving figure
+       * before it becomes money HBA owes* on every unapproved row, twenty
+       * times down a list. The export draws one outlined pill whose colour is
+       * the explanation: amber is somebody's turn, green is settled, red is a
+       * mistake. What the blockers actually are belongs on the model's own
+       * payment view, which is where somebody acts on them, and
+       * `view.explanation` still carries them there.
+       */}
       <td className="payments__state">
-        <span>{view.label}</span>
-        {view.explanation && (
-          <span className="payments__state-note">{view.explanation}</span>
-        )}
+        <span className={`pill ${STATE_PILL[view.label] ?? "payments__pill--quiet"}`}>
+          {view.label}
+        </span>
       </td>
       <td className="payments__action">
         <PaymentAction
@@ -575,7 +620,7 @@ function CopyDestination({ text }: { text: string }) {
   return (
     <button
       type="button"
-      className="payments__copy"
+      className="button button--quiet payments__copy"
       aria-label="Copy destination"
       onClick={() => {
         navigator.clipboard?.writeText(text).then(
@@ -605,10 +650,17 @@ function PaymentAction({
   canRecord: boolean;
   canApprove: boolean;
 }) {
-  if (action === "Review and agree" && canApprove) {
+  /*
+   * The export gives an act that moves money an accent outline and an act
+   * that only looks at something a plain one. `Open` is the second kind, and
+   * it is also the fallback for anybody without the permission to do the
+   * first - which is why the label is computed above and the link below
+   * decides nothing about wording.
+   */
+  if (action === "Review" && canApprove) {
     return (
       <Link
-        className="button"
+        className="button button--row button--primary"
         to={`/payroll/${month}/approve`}
         state={{
           affiliate_ids: [row.affiliate_id],
@@ -619,10 +671,20 @@ function PaymentAction({
       </Link>
     );
   }
+  if (action === "Fix terms") {
+    return (
+      <Link
+        className="button button--row button--primary"
+        to={`/affiliates/${row.affiliate_id}/compensation`}
+      >
+        {action}
+      </Link>
+    );
+  }
   if (action === "Record payment" && canRecord) {
     return (
       <Link
-        className="button button--primary"
+        className="button button--row button--primary"
         to={`/payments/${month}/${row.affiliate_id}`}
       >
         {action}
@@ -632,7 +694,7 @@ function PaymentAction({
   if (action === "Settle difference" && canRecord) {
     return (
       <Link
-        className="button"
+        className="button button--row"
         to={`/payments/${month}/${row.affiliate_id}/reconcile`}
       >
         {action}
@@ -641,10 +703,10 @@ function PaymentAction({
   }
   return (
     <Link
-      className="button"
+      className="button button--row"
       to={`/affiliates/${row.affiliate_id}/payments`}
     >
-      Open history
+      Open
     </Link>
   );
 }

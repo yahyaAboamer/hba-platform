@@ -32,7 +32,7 @@ describe("the month-end payment row", () => {
     expect(view.label).toBe("No transfer due");
     expect(view.explanation).toContain("already sent in an earlier month");
     expect(view.explanation).toContain("not sent again");
-    expect(view.action).toBe("Open history");
+    expect(view.action).toBe("Open");
   });
 
   it("keeps an unapproved forecast separate from money already agreed", () => {
@@ -48,8 +48,12 @@ describe("the month-end payment row", () => {
       required_piastres: 200_000,
     });
 
-    expect(view.label).toBe("Forecast — not agreed");
-    expect(view.action).toBe("Review and agree");
+    // The export names each state after the filter that collects it, so a
+    // pill and the button beside it never disagree about which bucket a row
+    // is in. The forecast half of F14 is said by the `Estimated` badge on the
+    // total and by the row's own second line, not by a longer state.
+    expect(view.label).toBe("Awaiting approval");
+    expect(view.action).toBe("Review");
   });
 
   it("sends a part-paid model back to the transfer record", () => {
@@ -61,8 +65,27 @@ describe("the month-end payment row", () => {
       balance_piastres: 150_000,
     });
 
-    expect(view.label).toBe("Part paid");
+    expect(view.label).toBe("Partly paid");
     expect(view.action).toBe("Record payment");
+  });
+
+  it("will not calculate for a model who has no arrangement", () => {
+    // The one state on this screen that is somebody's mistake rather than
+    // somebody's turn, and the export gives it its own colour and its own act.
+    const view = paymentRowPresentation({
+      ...approved,
+      state: "not_approved",
+      terms: null,
+      payroll_snapshot_id: undefined,
+      obligation_piastres: 0,
+      credited_piastres: 0,
+      balance_piastres: 0,
+      required_kind: "unavailable",
+      required_piastres: 0,
+    });
+
+    expect(view.label).toBe("Terms missing");
+    expect(view.action).toBe("Fix terms");
   });
 });
 

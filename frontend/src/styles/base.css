@@ -315,11 +315,35 @@ a {
 .table {
   width: 100%;
   border-collapse: collapse;
-  font-size: var(--text-sm);
+  font-size: 13.5px;
+}
+
+/*
+ * The export does not draw a table. It draws a rounded surface and lays flex
+ * rows on it: `padding:10px 18px`, `gap:16px`, a hairline under each row and
+ * nothing around the outside. A `<table>` reproduces that exactly as long as
+ * the gap is split between neighbouring cells - 8px each side - and the two
+ * ends are pushed out to the surface's own 18px. Everything below is that
+ * arithmetic, and the reason the numbers look odd.
+ */
+.table th,
+.table td {
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--rule);
+  text-align: left;
+}
+
+.table th:first-child,
+.table td:first-child {
+  padding-left: 18px;
+}
+
+.table th:last-child,
+.table td:last-child {
+  padding-right: 18px;
 }
 
 .table th {
-  text-align: left;
   font-size: 11px;
   font-weight: 400;
   letter-spacing: 0.06em;
@@ -327,23 +351,112 @@ a {
   /* The export draws a column name in the faint tier, not the quiet one. A
    * header as bright as the data it labels competes with it. */
   color: var(--faint);
-  padding: var(--space-2) var(--space-3);
-  border-bottom: 1px solid var(--rule);
   white-space: nowrap;
 }
 
-.table td {
-  padding: var(--space-2) var(--space-3);
-  border-bottom: 1px solid var(--rule);
-  height: var(--row-height);
+/*
+ * The last row's hairline is the surface's own bottom edge in the export, so
+ * it stays. What does not stay is a hover wash: the export gives a row no
+ * hover state at all, and a row that lights up reads as clickable when only
+ * the name inside it is.
+ */
+.table .numeric {
+  text-align: right;
 }
 
-.table tbody tr:hover {
+/*
+ * The rounded ground a table sits on. `overflow:hidden` is what clips the
+ * first and last row's hairlines to the corner radius; without it the rules
+ * run out past the curve.
+ */
+.surface {
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+/* ── Pills and chips ──────────────────────────────────────────────────────
+ *
+ * The export says a *state* with an outlined pill and offers a *choice* with
+ * an outlined chip. Both take their colour from what they mean, so both are
+ * written here without one.
+ */
+.pill {
+  display: inline-block;
+  padding: 3px 9px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 8px 13px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--quiet);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.chip--on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* ── The segmented switch ─────────────────────────────────────────────────
+ *
+ * Two radios that look like one control. The selected half is drawn with an
+ * *inset* ring rather than a border, so picking a side does not move the two
+ * halves by a pixel - which is what a border would do, and what makes a
+ * segmented control feel loose.
+ */
+.seg {
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+}
+
+.seg-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.seg-opt + .seg-opt {
+  border-left: 1px solid var(--rule);
+}
+
+.seg-opt input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.seg-opt:has(input:checked) {
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.seg-opt:not(:has(input:checked)):hover {
   background: var(--hover);
 }
 
-.table .numeric {
-  text-align: right;
+.seg-opt:has(input:focus-visible) {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
 }
 
 /* ── Buttons ──────────────────────────────────────────────────────────────
@@ -354,15 +467,21 @@ a {
 .button {
   display: inline-flex;
   text-decoration: none;
-  color: inherit;
+  color: var(--ink);
   align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-4);
-  border: 1px solid var(--rule-strong);
+  justify-content: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 9px 13px;
+  border: 1px solid var(--rule);
   border-radius: var(--radius);
-  background: var(--surface);
-  font-size: var(--text-sm);
+  /* Transparent, not `--surface`. On a screen where the table is a white or
+     near-black card, a button filled with the card colour is a card-coloured
+     rectangle floating on the page ground. The export fills nothing. */
+  background: transparent;
+  font-size: 13.5px;
   font-weight: 400;
+  line-height: 1.15;
   cursor: pointer;
 }
 
@@ -375,21 +494,57 @@ a {
   cursor: not-allowed;
 }
 
+/*
+ * **There is no filled button in the approved design.**
+ *
+ * This used to paint `--ink` on `--surface`: a solid near-black slab on light
+ * and a solid near-white one on dark, which is the loudest thing a screen can
+ * contain. The export's strongest action is an accent hairline, an accent
+ * tint and accent text - checked against every `<button>` in both exports,
+ * where `background:var(--acc)` appears three times and all three are
+ * progress bars.
+ *
+ * Kept as `--primary` rather than renamed, because what it means has not
+ * changed: this is the ordinary next step on the screen.
+ */
 .button--primary {
-  background: var(--ink);
-  border-color: var(--ink);
-  color: var(--surface);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 .button--primary:hover:not(:disabled) {
-  background: var(--ink-strong);
-  border-color: var(--ink-strong);
+  border-color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .button--primary:disabled {
-  background: var(--rule);
   border-color: var(--rule);
-  color: var(--quiet);
+  background: transparent;
+  color: var(--faint);
+}
+
+/* The action that sits inside a table row: one step smaller, so the row keeps
+   the export's height — and never tinted, because twenty tinted rectangles
+   down a column stop reading as the one thing to do next. */
+.button--row {
+  min-height: 34px;
+  padding: 7px 11px;
+  font-size: 12.5px;
+}
+
+.button--row.button--primary,
+.button--row.button--primary:hover:not(:disabled) {
+  background: transparent;
+}
+
+/* Smaller still - the `Copy` beside a payout destination. */
+.button--quiet {
+  min-height: 30px;
+  padding: 5px 8px;
+  border-radius: var(--radius-sm);
+  color: var(--faint);
+  font-size: 11.5px;
 }
 
 /*
@@ -435,10 +590,19 @@ a {
 
 .input {
   width: 100%;
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--rule-strong);
+  min-height: 38px;
+  padding: 10px 12px;
+  border: 1px solid var(--rule);
   border-radius: var(--radius);
   background: var(--surface);
+  color: var(--ink);
+  font-size: 13.5px;
+}
+
+/* The export's toolbar search is a fixed 240 rather than a stretched field. */
+.input--search {
+  width: 240px;
+  max-width: 100%;
 }
 
 /* ── Messages ─────────────────────────────────────────────────────────────

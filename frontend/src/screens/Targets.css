@@ -1,60 +1,83 @@
+/* ── Targets ───────────────────────────────────────────────────────────────
+ *
+ * Measured out of `Admin Dashboard.dc.html`, lines 465–525. The export draws
+ * this screen as a toolbar and one rounded surface: a search and a segmented
+ * switch on the left, everything that acts on the whole grid on the right,
+ * and nothing at all underneath the table.
+ *
+ * The column widths below are the export's, verbatim — 150 / 150 / 140 / 120
+ * with the name taking what is left. They are written as `width` on a fixed
+ * layout rather than as flex, because `<table>` is what carries the row and
+ * column relationship to a screen reader and a grid of `<div>`s does not.
+ */
+
 .targets__note {
   margin-bottom: var(--space-4);
 }
 
-.targets__lead {
-  max-width: 72ch;
-  margin: 0 0 var(--space-5);
-  font-size: var(--text-sm);
-  color: var(--quiet);
-}
-
-.targets__lead strong {
-  color: var(--ink);
-}
-
 .targets__grid {
-  table-layout: auto;
+  table-layout: fixed;
 }
 
-.targets__pick {
-  width: 2rem;
+.targets__model {
+  /* `flex:1;min-width:190px` in the export: the column that absorbs the
+     leftover width. On a fixed layout that is `width:auto` with the others
+     pinned. */
+  width: auto;
+  min-width: 190px;
 }
 
-/*
- * The second header row carries Videos/Stories under each of the two spanning
- * labels. It sits quietly: the reader needs it once, to learn the shape, and
- * never again.
- */
-.targets__subhead th {
-  padding-top: 0;
-  border-bottom: 1px solid var(--rule-strong);
-  font-weight: 400;
-  text-transform: none;
-  letter-spacing: 0;
+.table td.targets__model {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  /* The flex box has to be told the row's height, or the cell stops
+     stretching with its neighbours and the hairline under it steps up. */
+  min-height: 56px;
 }
 
 .targets__number,
 .table th.targets__number {
-  text-align: center;
-  width: 5.5rem;
+  width: 150px;
+  text-align: left;
+}
+
+.table th.targets__outcome,
+.table td.targets__outcome {
+  width: 140px;
+}
+
+.table th.targets__updated,
+.table td.targets__updated {
+  width: 120px;
 }
 
 /*
- * Boxes that are tabbed through, not filled in one at a time.
+ * The box, and what it is measured against beside it.
  *
- * The border is the lightest rule in the palette. Borderless was the first
- * version and it was wrong: twenty models times four numbers is eighty
- * outlined boxes and that reads as a form, but with no border at all an empty
- * cell gave no sign it could be typed into. Faint, not absent.
+ * **56px, not a column's width.** A box as wide as its column reads as a text
+ * field — something you write a sentence in — and it pushed `of 6` onto a
+ * second line, which is the difference the owner saw first. Two digits need
+ * 56px and the export gives them exactly that.
  */
+.targets__cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .targets__input {
-  width: 100%;
-  padding: var(--space-1) var(--space-2);
+  width: 56px;
+  flex: none;
+  min-height: 36px;
+  padding: 8px 9px;
   border: 1px solid var(--rule);
-  border-radius: var(--radius);
-  background: var(--surface);
-  font-size: var(--text-sm);
+  border-radius: var(--radius-sm);
+  /* The page ground, not the card's. On the export's surface a box filled
+     with the surface colour is invisible; filled with the page colour it
+     reads as a well cut into the card. */
+  background: var(--paper);
+  font-size: 13.5px;
   text-align: center;
   color: var(--ink);
 }
@@ -65,15 +88,21 @@
 
 .targets__input:focus {
   border-color: var(--focus);
-  background: var(--surface);
   outline: 2px solid var(--focus);
   outline-offset: -1px;
+}
+
+.targets__of {
+  color: var(--faint);
+  font-size: 12.5px;
+  white-space: nowrap;
 }
 
 .targets__name {
   color: var(--ink);
   text-decoration: none;
   font-weight: 400;
+  font-size: 13.5px;
 }
 
 .targets__name:hover {
@@ -81,45 +110,112 @@
   text-underline-offset: 2px;
 }
 
-/* Whose money actually depends on the four numbers beside it. */
-.targets__decides {
-  display: block;
-  font-size: var(--text-xs);
-  color: var(--quiet);
+/* Whose money depends on the numbers beside it — on the name's own line, as
+   the export writes it, and absent rather than blank for everybody else. */
+.targets__arrangement {
+  font-size: 12px;
+  color: var(--owed);
+  white-space: nowrap;
 }
 
 .targets__outcome {
-  font-size: var(--text-sm);
-  white-space: nowrap;
+  font-size: 12.5px;
+}
+
+.targets__outcome > * {
+  display: block;
+}
+
+.targets__outcome > * + * {
+  margin-top: 3px;
 }
 
 /*
  * Met and missed are both ordinary outcomes and neither is coloured. §11.3 is
  * explicit that the block is on missing information and never on a quiet
- * month, so colouring a miss would say the opposite of the rule.
+ * month, so colouring a miss would say the opposite of the rule. What is
+ * coloured is the one state that holds a month up — nothing recorded — which
+ * is how the export tones it too.
  */
 .targets__met,
-.targets__missed,
-.targets__unknown {
-  color: var(--ink);
+.targets__missed {
+  color: var(--quiet);
 }
 
 .targets__unknown {
-  color: var(--quiet);
+  color: var(--owed);
 }
 
 .targets__confirmed,
 .targets__unconfirmed {
-  display: block;
-  font-size: var(--text-xs);
-  color: var(--quiet);
+  color: var(--faint);
 }
 
-@media (max-width: 640px) {
-  .targets__grid {
-    display: block;
-    overflow-x: auto;
-  }
+/* D08. Whether she is keeping up, week by week — on this screen only, because
+   the owner chose to keep it internal. Second line and quieter: it is a
+   prompt for a conversation rather than a verdict competing with the one
+   above it. */
+.targets__pace {
+  font-size: 12px;
+  color: var(--faint);
+  white-space: nowrap;
+}
+
+.targets__updated {
+  font-size: 12.5px;
+  color: var(--quiet);
+  white-space: nowrap;
+}
+
+/* Never recorded is the thing to act on, so it is not drawn as quietly as a
+   date that exists. */
+.targets__never {
+  color: var(--owed);
+}
+
+/* ── The toolbar ───────────────────────────────────────────────────────────
+ *
+ * One row, `space-between`, wrapping. Left: what you are looking at. Right:
+ * what you can do to all of it. Nothing lives under the table — the export
+ * has no block there, and what used to sit in ours was three sentences of
+ * explanation plus a second copy of the save.
+ */
+.targets__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.targets__bar-left,
+.targets__bar-right {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+.targets__dirty {
+  color: var(--owed);
+  font-size: 12.5px;
+}
+
+.targets__saved {
+  color: var(--accent-lift);
+  font-size: 12.5px;
+}
+
+/* Apply to the whole year. Beside the save, because it changes what that
+   button does — never styled as an action of its own: it is a modifier. */
+.targets__year {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 12.5px;
+  color: var(--quiet);
+  white-space: nowrap;
 }
 
 /* Folded away on purpose. Undoing a confirmation stops a guaranteed minimum
@@ -135,136 +231,19 @@
   list-style: none;
 }
 
-/* D08. Whether she is keeping up, week by week - on this screen only, because
-   the owner chose to keep it internal. Narrow, and last after the outcome: it
-   is a prompt for a conversation rather than a second verdict competing with
-   the Achieved column beside it. */
-.targets__pace {
-  white-space: nowrap;
-  font-size: var(--text-xs);
-}
-
-/* Apply to the whole year. Beside the save button, because it changes what
-   that button does - and never styled as a primary control of its own: it is
-   a modifier, not an action. */
-.targets__year {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin-right: var(--space-3);
-  font-size: var(--text-sm);
-  color: var(--quiet);
-}
-
-/* -- The approved Targets screen -------------------------------------------
- *
- * A search and a mode switch above the table, the unsaved count and its
- * Discard beside the save. The screen edits one set of numbers at a time:
- * ours showed asked-for and produced together, which is four boxes a row and
- * no way to tell at a glance which half you were typing into.
- */
-.targets__bar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-  margin-bottom: var(--space-4);
-}
-
-.targets__bar-spacer {
-  flex: 1;
-}
-
-.targets__search {
-  width: 240px;
-  min-height: 38px;
-  padding: 10px 12px;
-  border: 1px solid var(--rule);
-  border-radius: var(--radius);
-  background: var(--surface);
-  color: var(--ink);
-  font-size: 13.5px;
-}
-
-.targets__mode {
-  display: flex;
-  border: 1px solid var(--rule);
-  border-radius: var(--radius);
-  overflow: hidden;
-}
-
-.targets__mode button {
-  padding: 8px 13px;
-  border: 0;
-  background: transparent;
-  color: var(--quiet);
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.targets__mode-on {
-  background: var(--accent-soft);
-  color: var(--accent-text);
-}
-
-.targets__dirty {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  color: var(--owed);
-  font-size: 12.5px;
-}
-
-.targets__blocking {
-  margin: 0;
+.targets__lead {
+  max-width: 72ch;
+  margin: 0 0 var(--space-4);
   font-size: 12.5px;
   color: var(--quiet);
 }
 
-.targets__blocking strong {
-  font-weight: 400;
-  color: var(--ink);
-}
+@media (max-width: 900px) {
+  .targets__grid {
+    table-layout: auto;
+  }
 
-/* Her arrangement under her name — empty for most models, so it collapses
- * rather than leaving a gap in every row. */
-.targets__arrangement:empty {
-  display: none;
-}
-
-.targets__arrangement {
-  display: block;
-  margin-top: 3px;
-  font-size: 12px;
-  color: var(--owed);
-}
-
-/* *of 6* beside the box, so a number has something to be measured against
- * without a second column of its own. */
-.targets__of {
-  margin-left: 7px;
-  color: var(--faint);
-  font-size: 12px;
-}
-
-.targets__updated {
-  white-space: nowrap;
-  font-size: 12.5px;
-  color: var(--quiet);
-}
-
-/* Never recorded is the thing to act on, so it is not drawn as quietly as a
- * date that exists. */
-.targets__never {
-  color: var(--owed);
-}
-
-/* Outcome, then pace, then what is holding the month up — three short lines
- * in one cell rather than three columns. */
-.targets__outcome > * {
-  display: block;
-}
-
-.targets__outcome > * + * {
-  margin-top: 3px;
+  .surface:has(> .targets__grid) {
+    overflow-x: auto;
+  }
 }

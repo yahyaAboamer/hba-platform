@@ -81,15 +81,6 @@ function count(text: string): number | null | undefined {
  * Three answers, not two. Nothing recorded **blocks** their month; a recorded
  * miss does not — the block is on missing information, never on a quiet month.
  */
-function waitingOn(row: Row): string | null {
-  if (!row.determines_pay) return null;
-  if (row.achieved === null) return "Blocks this month — nothing recorded";
-  if (row.achieved && !row.verified) {
-    return "Blocks this month — met, and not yet confirmed";
-  }
-  return null;
-}
-
 /**
  * Targets. §15, and the one screen §12.2 asks to be built as a grid rather
  * than a form: every model down the side, one month across, tab straight
@@ -338,7 +329,6 @@ export function Targets({ session, affiliateId, initialMonth, embedded = false }
     && (!affiliateId || row.affiliate_id === affiliateId)
     && (!query.get("pace") || row.pace?.state === query.get("pace"))
     && (!needle || row.name.toLowerCase().includes(needle)));
-  const blocking = rows.filter((row) => waitingOn(row) !== null);
   const confirmable = rows.filter(
     (row) => row.achieved !== null && !row.verified,
   );
@@ -349,7 +339,7 @@ export function Targets({ session, affiliateId, initialMonth, embedded = false }
       {!embedded && <div className="page__head">
         <div className="page__title">
           <h1>Targets</h1>
-          <span className="page__subtitle">{formatMonth(month)}</span>
+          <span className="page__subtitle">{formatMonth(month)} · recorded weekly</span>
         </div>
         <MonthPicker value={month} onChange={setMonth} lockFor={lockFor} />
       </div>}
@@ -366,71 +356,130 @@ export function Targets({ session, affiliateId, initialMonth, embedded = false }
 
       {grid && !embedded && (
         <div className="targets__bar">
-          <input
-            type="search"
-            className="targets__search"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search model names"
-            aria-label="Search model names"
-          />
-          {/*
-           * Which set of numbers this screen is editing. The export switches
-           * between them rather than showing both, and the column headings
-           * follow the switch — so there is never a question about which of
-           * four boxes in a row you are typing into.
-           */}
-          <div className="targets__mode" role="group" aria-label="What to edit">
-            <button type="button" aria-pressed={mode === "achieved"}
-              className={mode === "achieved" ? "targets__mode-on" : undefined}
-              onClick={() => setMode("achieved")}>Record achieved</button>
-            <button type="button" aria-pressed={mode === "required"}
-              className={mode === "required" ? "targets__mode-on" : undefined}
-              onClick={() => setMode("required")}>Set requirements</button>
+          <div className="targets__bar-left">
+            <input
+              type="search"
+              className="input input--search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search model names"
+              aria-label="Search model names"
+            />
+            {/*
+             * Which set of numbers this screen is editing. The export switches
+             * between them rather than showing both, and the column headings
+             * follow the switch — so there is never a question about which of
+             * four boxes in a row you are typing into.
+             *
+             * Two radios rather than two buttons: they are one choice, and a
+             * radio group is what says so to somebody arriving by keyboard.
+             */}
+            <div className="seg">
+              <label className="seg-opt">
+                <input type="radio" name="targets-mode" checked={mode === "achieved"}
+                  onChange={() => setMode("achieved")} />
+                <span>Record achieved</span>
+              </label>
+              <label className="seg-opt">
+                <input type="radio" name="targets-mode" checked={mode === "required"}
+                  onChange={() => setMode("required")} />
+                <span>Set requirements</span>
+              </label>
+            </div>
           </div>
-          <span className="targets__bar-spacer" />
-          {dirtyCount > 0 && (
-            <span className="targets__dirty">
-              {dirtyCount} unsaved {dirtyCount === 1 ? "change" : "changes"}
-              <button type="button" className="button" onClick={discard}>Discard</button>
-            </span>
-          )}
-          <p className="targets__blocking">
-            <strong>{blocking.length}</strong>{" "}
-            {blocking.length === 1 ? "model is" : "models are"} held up this month.
-          </p>
+
+          {/*
+           * The export's right-hand group: what is unsaved, the way back from
+           * it, and the save. Everything that acts on the whole grid lives
+           * here, which is why nothing sits under the table any more.
+           */}
+          <div className="targets__bar-right">
+            {dirtyCount > 0 && (
+              <>
+                <span className="targets__dirty">
+                  {dirtyCount} unsaved {dirtyCount === 1 ? "change" : "changes"}
+                </span>
+                <button type="button" className="button" onClick={discard}>Discard</button>
+              </>
+            )}
+            {saved && dirtyCount === 0 && (
+              <span className="targets__saved">{saved}</span>
+            )}
+            {/*
+             * A model's targets are fixed across a year (owner, 11 September
+             * 2026), so this is the ordinary way to set them and a
+             * single-month edit is the exception you opt out into. It changes
+             * what the save does, so it stands next to it — the export has no
+             * equivalent control, and this is the nearest place that does not
+             * invent a second row of furniture for it.
+             */}
+            {can(session, "targets.record") && mode === "required" && (
+              <label className="targets__year">
+                <input
+                  type="checkbox"
+                  checked={wholeYear}
+                  onChange={(event) => setWholeYear(event.target.checked)}
+                />
+                Whole year
+              </label>
+            )}
+            {can(session, "targets.verify") && confirmable.length > 0 && (
+              <button
+                type="button"
+                className="button"
+                onClick={confirm}
+                disabled={working || chosen.size === 0}
+              >
+                {chosen.size === 0
+                  ? "Confirm"
+                  : `Confirm ${chosen.size} ${chosen.size === 1 ? "model" : "models"}`}
+              </button>
+            )}
+            {can(session, "targets.record") && (
+              <button
+                type="button"
+                className="button button--primary"
+                onClick={save}
+                disabled={working || dirtyCount === 0}
+              >
+                {working ? "Saving…" : wholeYear ? "Save the year" : "Save changes"}
+              </button>
+            )}
+          </div>
         </div>
       )}
 
       {grid && rows.length > 0 && (
         <>
+          <div className="surface">
           <table className="table targets__grid">
             <thead>
               <tr>
-                <th className="targets__pick" />
-                <th>Model</th>
+                <th className="targets__model">Model</th>
                 <th className="targets__number">
                   {mode === "achieved" ? "Videos achieved" : "Videos required"}
                 </th>
                 <th className="targets__number">
                   {mode === "achieved" ? "Stories achieved" : "Stories required"}
                 </th>
-                <th>
-                  <Link to="/glossary#verified" className="glossary-link">
-                    Recorded
-                  </Link>
-                </th>
-                <th>Last updated</th>
+                <th className="targets__outcome">Recorded</th>
+                <th className="targets__updated">Last updated</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((row) => {
                 const cells = draft[row.affiliate_id];
                 if (!cells) return null;
-                const waiting = waitingOn(row);
                 return (
                   <tr key={row.affiliate_id}>
-                    <td className="targets__pick">
+                    {/*
+                     * Name, and beside it what the record decides - the export
+                     * lays the Model column out as one flex line with a 10px
+                     * gap, so the confirmation tick joins that line rather
+                     * than claiming a column of its own. A sixth column that
+                     * is empty in most rows is a column of white space.
+                     */}
+                    <td className="targets__model">
                       {can(session, "targets.verify") &&
                         row.achieved !== null &&
                         !row.verified && (
@@ -451,20 +500,17 @@ export function Targets({ session, affiliateId, initialMonth, embedded = false }
                             }
                           />
                         )}
-                    </td>
-                    <td>
                       <Link
                         className="targets__name"
                         to={`/affiliates/${row.affiliate_id}`}
                       >
                         {row.name}
                       </Link>
-                      {/* Her arrangement under her name, as the export writes
-                       *  it — on a guarantee the record decides the pay, and
-                       *  the row says so where the typing happens. */}
-                      <span className="targets__arrangement">
-                        {row.determines_pay ? "Guarantee needs this record" : ""}
-                      </span>
+                      {row.determines_pay && (
+                        <span className="targets__arrangement">
+                          Guarantee needs this record
+                        </span>
+                      )}
                     </td>
                     <Cell
                       value={mode === "achieved" ? cells.actual_videos : cells.required_videos}
@@ -484,17 +530,15 @@ export function Targets({ session, affiliateId, initialMonth, embedded = false }
                       onChange={(v) => edit(row.affiliate_id,
                         mode === "achieved" ? "actual_stories" : "required_stories", v)}
                     />
+                    {/*
+                     * The export draws one line here, toned by what it says.
+                     * D08's weekly pace was asked for after the export was
+                     * drawn and answers the same question a week at a time, so
+                     * it follows as a second, quieter line.
+                     */}
                     <td className="targets__outcome">
                       <Outcome row={row} />
-                      {/*
-                       * D08's weekly pace, under the outcome rather than in a
-                       * column of its own. The export has no equivalent - it
-                       * was asked for after the export was drawn - and it
-                       * belongs here because it answers the same question the
-                       * column does, one week in rather than one month.
-                       */}
                       <PaceCell row={row} />
-                      {waiting && <span className="blocker">{waiting}</span>}
                     </td>
                     <td className="targets__updated">
                       {row.recorded_at
@@ -507,68 +551,7 @@ export function Targets({ session, affiliateId, initialMonth, embedded = false }
               })}
             </tbody>
           </table>
-
-          <div className="payroll__actions">
-            {can(session, "targets.record") && (
-              <>
-                {/*
-                 * A model's targets are fixed across a year (owner, 11
-                 * September 2026), so this is the ordinary way to set them and
-                 * a single-month edit is the exception you opt out into.
-                 *
-                 * Beside the save rather than in the header: it changes what
-                 * the button does, and a control that changes a button belongs
-                 * next to it.
-                 */}
-                {mode === "required" && <label className="targets__year">
-                  <input
-                    type="checkbox"
-                    checked={wholeYear}
-                    onChange={(event) => setWholeYear(event.target.checked)}
-                  />
-                  Apply these targets to the whole year
-                </label>}
-                <button
-                  type="button"
-                  className="button button--primary"
-                  onClick={save}
-                  disabled={working}
-                >
-                  {working
-                    ? "Saving…"
-                    : wholeYear
-                      ? "Save the year"
-                      : "Save changes"}
-                </button>
-              </>
-            )}
-            {can(session, "targets.verify") && confirmable.length > 0 && (
-              <button
-                type="button"
-                className="button"
-                onClick={confirm}
-                disabled={working || chosen.size === 0}
-              >
-                {chosen.size === 0
-                  ? "Choose whose numbers to confirm"
-                  : `Confirm ${chosen.size} ${chosen.size === 1 ? "model" : "models"}`}
-              </button>
-            )}
           </div>
-
-          {/*
-           * §15 and §11.3. Confirming is what unlocks a guarantee, so it is
-           * worth saying plainly that it is about the numbers and not about
-           * their month — somebody who thinks they are approving a *result* will
-           * hesitate to confirm a miss, and a miss left unconfirmed is
-           * indistinguishable from a month nobody looked at.
-           */}
-          <p className="targets__lead">
-            Confirming says the numbers are right, not that the month went well.
-            Confirming a miss is normal and costs nothing — the commission is
-            paid either way. It is <em>nothing recorded</em> that holds a
-            month up.
-          </p>
 
           {/*
            * **The way back, and it looks like one.**
@@ -703,14 +686,16 @@ function Cell({
 }) {
   return (
     <td className="targets__number">
-      <input
-        className="targets__input"
-        inputMode="numeric"
-        aria-label={label}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      />
-      {suffix && <span className="targets__of">{suffix}</span>}
+      <span className="targets__cell">
+        <input
+          className="targets__input"
+          inputMode="numeric"
+          aria-label={label}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+        />
+        {suffix && <span className="targets__of">{suffix}</span>}
+      </span>
     </td>
   );
 }
@@ -806,19 +791,19 @@ function Outcome({ row }: { row: Row }) {
   if (row.achieved) {
     return (
       <span className="targets__met">
-        Met
+        Met{" "}
         {row.verified ? (
-          <span className="targets__confirmed">confirmed</span>
+          <span className="targets__confirmed">· confirmed</span>
         ) : (
-          <span className="targets__unconfirmed">not confirmed</span>
+          <span className="targets__unconfirmed">· not confirmed</span>
         )}
       </span>
     );
   }
   return (
     <span className="targets__missed">
-      Missed
-      {row.verified && <span className="targets__confirmed">confirmed</span>}
+      Missed{" "}
+      {row.verified && <span className="targets__confirmed">· confirmed</span>}
     </span>
   );
 }
