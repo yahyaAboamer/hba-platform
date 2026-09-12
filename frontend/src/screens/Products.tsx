@@ -164,8 +164,34 @@ function TopSellers({ month }: { month: string }) {
 export function Products({ session }: { session: Session }) {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [total, setTotal] = useState(0);
-  const [all, setAll] = useState(false);
-  const [search, setSearch] = useState("");
+  /**
+   * The scope and the search live in the URL, like the roster's.
+   *
+   * Opening a garment and pressing back used to land on the unfiltered
+   * catalogue at page one — with sixty images between somebody and the row
+   * they were looking at. What is being *typed* stays local: a URL rewritten
+   * per keystroke would fill the history with half-words.
+   */
+  const [params, setParams] = useSearchParams();
+  const all = params.get("scope") === "all";
+  const [search, setSearch] = useState(() => params.get("q") ?? "");
+
+  const remember = useCallback(
+    (next: { scope?: string; q?: string }) => {
+      setParams(
+        (previous) => {
+          const updated = new URLSearchParams(previous);
+          for (const [key, value] of Object.entries(next)) {
+            if (!value) updated.delete(key);
+            else updated.set(key, value);
+          }
+          return updated;
+        },
+        { replace: true },
+      );
+    },
+    [setParams],
+  );
   /**
    * What was actually asked for, as opposed to what is being typed.
    *
@@ -178,9 +204,13 @@ export function Products({ session }: { session: Session }) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const timer = setTimeout(() => setAsked(search), 300);
+    const timer = setTimeout(() => {
+      setAsked(search);
+      // The settled search, not every keystroke.
+      remember({ q: search.trim() });
+    }, 300);
     return () => clearTimeout(timer);
-  }, [search]);
+  }, [search, remember]);
 
   const load = useCallback(
     (offset = 0) => {
@@ -232,7 +262,7 @@ export function Products({ session }: { session: Session }) {
             <input
               type="checkbox"
               checked={all}
-              onChange={(event) => setAll(event.target.checked)}
+              onChange={(event) => remember({ scope: event.target.checked ? "all" : "" })}
             />
             All products
           </label>

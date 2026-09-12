@@ -91,16 +91,16 @@ payroll without touching a maintainer screen.
   the background. Two against the same database deadlock and leak committed
   rows into each other, and the failures look exactly like a real regression
   in whatever you just changed. Also on 10 September, and it cost an hour.
-- Backend: `.venv/Scripts/python.exe -m pytest -q` — **1901 passing**, and no
+- Backend: `.venv/Scripts/python.exe -m pytest -q` — **1910 passing**, and no
   change merges below that. It takes 5–15 minutes; run it in the background.
-- **If the suite is killed for low memory, run it in four groups** rather than
+- **If the suite is killed for low memory, run it in eight groups** rather than
   giving up on it. One pytest process grows as it goes and this machine has
   7.9 GB with under 1 GB free on a bad day; four shorter processes each stay
   small enough to finish:
 
   ```
-  ls tests/test_*.py > /tmp/all.txt && split -l 19 -d /tmp/all.txt /tmp/grp
-  for g in 00 01 02 03; do DATABASE_URL='...' .venv/Scripts/python.exe -m pytest     -q --color=no -p no:cacheprovider $(cat /tmp/grp$g | tr '
+  ls tests/test_*.py > /tmp/all.txt && split -l 10 -d /tmp/all.txt /tmp/sm
+  for g in 00 01 02 03 04 05 06 07; do DATABASE_URL='...' .venv/Scripts/python.exe -m pytest     -q --color=no -p no:cacheprovider $(cat /tmp/sm$g | tr '
 ' ' '); done
   ```
 

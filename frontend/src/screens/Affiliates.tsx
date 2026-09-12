@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 import { Money } from "../components/Money";
 import { api } from "../lib/api";
@@ -217,8 +217,37 @@ export function Affiliates() {
    * be slower than the filter and would make an empty result ambiguous —
    * nobody matches, or the answer has not come back yet.
    */
-  const [segment, setSegment] = useState<Segment>("all");
-  const [query, setQuery] = useState("");
+  /**
+   * **In the URL, not in the component.** A roster narrowed to one segment and
+   * a search is a place somebody is working; opening a model and pressing back
+   * used to drop them at the top of the unfiltered list, which is the moment a
+   * screen stops being usable for the job it exists for.
+   *
+   * It also makes the view shareable — *the two waiting to be approved* is a
+   * link now, rather than four words of instruction.
+   */
+  const [params, setParams] = useSearchParams();
+  const segment = (params.get("segment") as Segment) ?? "all";
+  const query = params.get("q") ?? "";
+
+  const narrow = useCallback(
+    (next: { segment?: Segment; q?: string }) => {
+      setParams(
+        (previous) => {
+          const updated = new URLSearchParams(previous);
+          for (const [key, value] of Object.entries(next)) {
+            // An empty search or the default segment leaves no trace: a URL
+            // carrying `?q=` says a search happened and found everything.
+            if (!value || value === "all") updated.delete(key);
+            else updated.set(key, value);
+          }
+          return updated;
+        },
+        { replace: true },
+      );
+    },
+    [setParams],
+  );
   const isNarrow = useIsNarrow();
   // The toggle is a preference, not an override: a table does not fit on a
   // phone however firmly somebody asked for one.
@@ -295,7 +324,7 @@ export function Affiliates() {
             type="search"
             className="affiliates__search"
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => narrow({ q: event.target.value })}
             placeholder="Search name or code"
             aria-label="Search models by name or code"
           />
@@ -356,7 +385,7 @@ export function Affiliates() {
                 ? "affiliates__segment affiliates__segment--on"
                 : "affiliates__segment"
             }
-            onClick={() => setSegment(option.key)}
+            onClick={() => narrow({ segment: option.key })}
             aria-pressed={segment === option.key}
           >
             {option.label}

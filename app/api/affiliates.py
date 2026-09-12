@@ -209,7 +209,21 @@ def _compensation_payload(terms) -> dict | None:
     }
 
 
-def _affiliate_detail(db: Session, affiliate: AffiliateProfile) -> dict:
+def _month_or_400(month: str) -> str:
+    """The same refusal the payments routes give, worded the same way.
+
+    A bad month is the caller's mistake, not the server's: `parse_month`
+    raises `ValueError`, which would surface as a 500 and read as an outage.
+    """
+    try:
+        return parse_month(month)
+    except ValueError as exc:
+        raise HTTPException(400, "A month looks like 2026-04") from exc
+
+
+def _affiliate_detail(
+    db: Session, affiliate: AffiliateProfile, month: str | None = None
+) -> dict:
     """The profile plus what is true about it *this month*.
 
     Codes and compensation are dated; "current" means the business month right
@@ -222,8 +236,19 @@ def _affiliate_detail(db: Session, affiliate: AffiliateProfile) -> dict:
     "Current" is the **working** month, not necessarily this one: before
     go-live the useful question is what will apply when the platform starts,
     not what applied in a month it was never responsible for.
+
+    **A month may be asked for.** The profile's month-scoped sections let the
+    owner look at March, and terms are dated: a model can be on commission in
+    one month and a guaranteed minimum in the next. Answering every month with
+    today's arrangement puts the wrong rate beside an older month's earnings,
+    which is the one place on this screen where being wrong costs money.
+
+    `current_month` keeps its meaning - the working month - and `terms_month`
+    says which month the terms and codes below actually describe. Two fields,
+    because a screen that conflated them is what produced the bug.
     """
-    month = working_month()
+    working = working_month()
+    month = _month_or_400(month) if month else working
     return {
         **_affiliate_payload(affiliate),
         #: **On the profile only, deliberately.** `_affiliate_payload` is
@@ -231,7 +256,8 @@ def _affiliate_detail(db: Session, affiliate: AffiliateProfile) -> dict:
         #: twenty home addresses crossing the wire to render a table of names.
         #: D11 makes this staff-readable, not staff-broadcast.
         "shipping": {field: getattr(affiliate, field) for field in SHIPPING_FIELDS},
-        "current_month": month,
+        "current_month": working,
+        "terms_month": month,
         # The preview's history floor is a server fact, not a second calendar
         # hard-coded into the browser. Collaboration can start later than it.
         "platform_start_month": PLATFORM_START_MONTH,
@@ -275,7 +301,7 @@ def list_affiliates_route(
     from app.services.performance import month_performance
 
     affiliates = list_affiliates(db, include_archived=include_archived)
-    month = parse_month(month) if month else working_month()
+    month = _month_or_400(month) if month else working_month()
     setup = readiness(db, month)
 
     # **The roster's sales and content columns, from the places that already
@@ -468,11 +494,12 @@ def create_house_account_route(
 @router.get("/{affiliate_id}")
 def get_affiliate_route(
     affiliate_id: int,
+    month: str | None = None,
     _actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_VIEW)),
     db: Session = Depends(get_session),
 ) -> dict:
     affiliate = _get_affiliate_or_404(db, affiliate_id)
-    return _affiliate_detail(db, affiliate)
+    return _affiliate_detail(db, affiliate, month)
 
 
 @router.patch("/{affiliate_id}")

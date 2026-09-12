@@ -1830,3 +1830,70 @@ def test_a_model_with_nothing_to_arrange_is_not_reported_as_blocked(client):
     assert body["readiness"]["months"] == []
     assert body["readiness"]["blocking"] == 0
     assert body["readiness"]["start_month"] is None
+
+
+# ── Terms are dated, and so is the profile that shows them ────────────────────
+
+
+def test_the_profile_answers_with_the_selected_months_terms(client):
+    """**The bug the design-parity audit named.**
+
+    The profile's month-scoped sections let the owner look at March. Terms are
+    dated — a model can be on plain commission in one month and a guaranteed
+    minimum in the next — and the profile answered every month with today's
+    arrangement, putting the wrong rate beside an older month's earnings.
+
+    That is the one place on this screen where being wrong costs money.
+    """
+    affiliate = _register(client)
+    written = client.put(
+        f"/api/affiliates/{affiliate['id']}/pay-history",
+        json={
+            "periods": [
+                {
+                    "start_month": "2026-01",
+                    "end_month": "2026-05",
+                    "compensation_type": "commission",
+                    "commission_rate_bp": 1000,
+                },
+                {
+                    "start_month": "2026-06",
+                    "compensation_type": "commission",
+                    "commission_rate_bp": 1500,
+                },
+            ],
+            "outcomes": {},
+        },
+    )
+    assert written.status_code == 200, written.text
+
+    march = client.get(f"/api/affiliates/{affiliate['id']}?month=2026-03").json()
+    july = client.get(f"/api/affiliates/{affiliate['id']}?month=2026-07").json()
+
+    assert march["compensation"]["commission_rate_bp"] == 1000
+    assert july["compensation"]["commission_rate_bp"] == 1500
+
+
+def test_the_profile_says_which_month_its_terms_describe(client):
+    """Two fields, because a screen that conflated them produced the bug.
+
+    `current_month` keeps meaning *the working month*; `terms_month` says what
+    the arrangement below actually applies to, so the panel can label an older
+    month rather than presenting it as today's.
+    """
+    affiliate = _register(client)
+
+    asked = client.get(f"/api/affiliates/{affiliate['id']}?month=2026-03").json()
+    default = client.get(f"/api/affiliates/{affiliate['id']}").json()
+
+    assert asked["terms_month"] == "2026-03"
+    assert asked["current_month"] != "2026-03", "the working month is unmoved"
+    assert default["terms_month"] == default["current_month"], "no month asked"
+
+
+def test_a_nonsense_month_is_refused_rather_than_guessed(client):
+    affiliate = _register(client)
+
+    assert client.get(
+        f"/api/affiliates/{affiliate['id']}?month=not-a-month"
+    ).status_code in (400, 422)

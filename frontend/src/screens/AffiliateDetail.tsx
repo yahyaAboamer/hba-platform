@@ -67,6 +67,8 @@ type WardrobeItem = {
 type Detail = Affiliate & {
   shipping: Shipping;
   current_month: string;
+  /** Which month `compensation` and `codes` below actually describe. */
+  terms_month: string;
   platform_start_month: string;
   codes: Code[];
   compensation: Compensation | null;
@@ -146,7 +148,10 @@ export function AffiliateDetail({ session }: { session: Session }) {
     setEarnings(null);
     setError(null);
     api
-      .get<Detail>(`/api/affiliates/${id}`)
+      // The selected month goes with the request: terms are dated, and a
+      // profile answering March with September's arrangement puts the wrong
+      // rate beside March's earnings.
+      .get<Detail>(`/api/affiliates/${id}?month=${month}`)
       .then((body) => {
         if (version !== loadVersion.current) return;
         setDetail(body);
@@ -857,12 +862,17 @@ export function AffiliateDetail({ session }: { session: Session }) {
         {section === "payments" && <>
         <section className="panel">
           <div className="panel__head">
-            <h2 className="panel__title">Payment terms</h2>
+            <h2 className="panel__title">
+              Payment terms
+              {detail.terms_month !== detail.current_month && (
+                <span className="page__subtitle"> {formatMonth(detail.terms_month)}</span>
+              )}
+            </h2>
             {can(session, "compensation.manage") && <Link className="button" to={`/affiliates/${id}/compensation`}>Edit terms</Link>}
           </div>
           {detail.compensation === null ? (
             <p className="empty">
-              No pay terms for {formatMonth(detail.current_month)}, so nothing
+              No pay terms for {formatMonth(detail.terms_month)}, so nothing
               can be calculated. Sales are still recorded.
             </p>
           ) : (

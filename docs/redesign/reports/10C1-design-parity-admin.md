@@ -192,6 +192,50 @@ received something the catalogue says she has.
 — somebody wrote that wording and took it down, and it is still there to put
 back. Collapsing hidden into none is how a paragraph gets retyped.
 
+### A 500 that reached staging, and the test that should have existed
+
+The new catalogue drew a SKU under each product name, as the export does, and
+I read it off `Product`. **A SKU belongs to a variant** — a garment has one per
+size — so the attribute raised and every request to `/api/products` returned
+500. The screen showed `Unexpected token 'I', "Internal S"...`: the browser
+failing to parse the word *Internal*.
+
+The field is gone, and the deviation is deliberate rather than a shortfall:
+printing any single variant's SKU would label a product with a fact about one
+of its sizes. The row carries the size count, which is true at that level; the
+product *detail* screen lists each variant with its own SKU, which is where
+that fact belongs.
+
+The useful half is why nothing caught it. The service functions were tested,
+the route was reachable, the types checked, the build passed and 1901 backend
+tests were green — and **not one of them had ever called `GET /api/products`.**
+All of that verifies the parts; none of it verifies the payload the screen
+receives. `tests/test_products_api.py` now calls it, and I confirmed it catches
+the regression by putting the bug back — five of its six tests fail — rather
+than assuming it would.
+
+### Terms are dated, and the profile was not
+
+The profile's month picker let the owner look at March while
+`_affiliate_detail` read terms for `working_month()` unconditionally. A model
+can be on plain commission in one month and a guaranteed minimum in the next,
+so an older month was shown **today's rate beside its own earnings** — the one
+place on that screen where being wrong costs money.
+
+The route takes a month now. `current_month` keeps meaning *the working
+month*; a second field, `terms_month`, says what the arrangement below
+actually applies to, and the panel labels an older one rather than presenting
+it as current. Two fields, because a screen that conflated them is what
+produced the bug.
+
+### Return state lives in the URL
+
+The roster's segment and search, and the catalogue's scope and search, are
+query parameters. Opening a model and pressing back used to land on the
+unfiltered list at the top — with sixty images between somebody and the row
+they were reading. An empty search leaves no trace in the URL: `?q=` would say
+a search happened and matched everything.
+
 ### What the owner should look at
 
 
