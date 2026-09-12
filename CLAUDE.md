@@ -5,7 +5,7 @@ The admin serves the owner, marketing team and finance team; the model portal
 shows each model their own performance, wardrobe and payment records.
 FastAPI + SQLAlchemy + Postgres, React + Vite, on Railway.
 
-**Read `docs/plans/2026-09-11-design-parity-handoff.md` first** — it says where
+**Read `docs/plans/2026-09-12-design-parity-handoff.md` first** — it says where
 the work is right now. Everything below is the part that does not change.
 
 ---
