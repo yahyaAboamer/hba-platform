@@ -362,3 +362,10 @@
   width: 16px;
   color: var(--faint);
 }
+
+/* `.table th` in base.css is two elements and a class, which outranks a bare
+ * class — so without this the header of a right-aligned column sits left of
+ * its own figures. */
+.affiliates__table th.affiliates__figure {
+  text-align: right;
+}
