@@ -8,7 +8,15 @@
 
 .month-picker {
   position: relative;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+
+/* The export's word, at the export's size, in front of the control. */
+.month-picker__label {
+  font-size: 12px;
+  color: var(--faint);
 }
 
 .month-picker__trigger {

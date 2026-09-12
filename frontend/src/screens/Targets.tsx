@@ -811,7 +811,8 @@ function Outcome({ row }: { row: Row }) {
   // the column is for and the next person to widen the picker will not read
   // this file first.
   if (row.achieved === null) {
-    return <span className="targets__unknown">Not recorded</span>;
+    // The export's words for this state, and the only one it colours.
+    return <span className="targets__unknown">No record yet</span>;
   }
   if (row.achieved) {
     return (

@@ -15,7 +15,14 @@ const SECTIONS = [
   { to: "/affiliates", label: "Models", count: "models_awaiting_approval" },
   { to: "/products", label: "Products" },
   { to: "/targets", label: "Targets" },
-  { to: "/payments", label: "Payments" },
+  {
+    to: "/payments",
+    label: "Payments",
+    /* The size of the *Awaiting approval* filter, counted by the same
+       function the Payments screen counts it with. */
+    count: "payments_awaiting_approval",
+    settled: true,
+  },
   { to: "/settings", label: "Settings" },
 ];
 
@@ -72,7 +79,9 @@ export function Layout({ session }: { session: Session }) {
               >
                 {section.label}
                 {section.count && counts[section.count] > 0 && (
-                  <span className="layout__count">{counts[section.count]}</span>
+                  <span className={section.settled
+                    ? "layout__count layout__count--settled"
+                    : "layout__count"}>{counts[section.count]}</span>
                 )}
               </NavLink>
             </li>

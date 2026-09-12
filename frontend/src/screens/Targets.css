@@ -115,11 +115,18 @@
   text-underline-offset: 2px;
 }
 
-/* Whose money depends on the numbers beside it — on the name's own line, as
-   the export writes it, and absent rather than blank for everybody else. */
+/*
+ * Her arrangement, on the name's own line as the export writes it.
+ *
+ * **Faint, including the guarantee line.** Amber was ours, and on a grid where
+ * every row carries an arrangement it turned the whole column orange - which
+ * is the opposite of what colour is for here. The export draws all of it in
+ * `--faint`; what is actually urgent on this screen is the Recorded column,
+ * and that is where the amber belongs.
+ */
 .targets__arrangement {
   font-size: 12px;
-  color: var(--owed);
+  color: var(--faint);
   white-space: nowrap;
 }
 

@@ -69,6 +69,11 @@ export function MonthPicker({ value, onChange, lockFor, onLockedClick }: Props) 
 
   return (
     <div className="month-picker">
+      {/* The export labels this control *Month*, to the left of it. Ours is a
+       *  grid rather than a `<select>` - the owner asked for that and it
+       *  stays - but the word in front of it is the export's and costs
+       *  nothing. */}
+      <span className="month-picker__label">Month</span>
       <button
         type="button"
         className="month-picker__trigger"

@@ -109,11 +109,15 @@ export function describeDestination(
   destination: Record<string, string | null> | null,
 ): string {
   if (!destination) return "Nothing on file yet";
-  const shown =
+  /* The scheme is noise in a 210px column: `https://` is eight characters
+     that identify nothing, and truncating them away leaves *https://ipn…*,
+     which identifies nothing either. */
+  const shown = (
     destination.instapay_address_url ??
     destination.bank_account_number ??
     destination.wallet_phone ??
-    "";
+    ""
+  ).replace(/^https?:\/\//, "");
   return `${destinationHolder(destination)} · ${shown}`;
 }
 

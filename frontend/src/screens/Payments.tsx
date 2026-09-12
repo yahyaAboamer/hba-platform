@@ -536,7 +536,7 @@ function PaymentRow({
         <span className="payments__terms">
           {row.terms ? PAY_TYPE[row.terms] ?? row.terms : "No terms set"}
           {row.status !== "active" && (
-            <span className="payments__person-state">{row.status}</span>
+            <span className="payments__person-state">· {row.status}</span>
           )}
         </span>
       </td>

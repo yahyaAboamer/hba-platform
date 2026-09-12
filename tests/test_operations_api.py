@@ -962,19 +962,25 @@ def test_the_models_count_is_the_ones_waiting_to_be_approved(client):
     assert body["models_awaiting_approval"] == 1
 
 
-def test_the_counts_say_nothing_about_money_yet(client):
-    """**Payments is deliberately absent**, and this holds it absent.
+def test_the_counts_still_say_nothing_about_money(client):
+    """**The Payments badge counts rows, and this holds it to that.**
 
-    What is still owed is computed by the Payments screen from snapshots and
-    the ledger. A sidebar that worked it out for itself would be a second
-    implementation of a money figure, which is the one thing this codebase
-    refuses — so the badge waits for the payments batch to hand it the same
-    number from the same place.
+    The badge was absent for a while, on the grounds that a sidebar working
+    out what is still owed would be a second implementation of a money figure
+    - which is the one thing this codebase refuses. It is here now because the
+    approved export's badge is the size of the *Awaiting approval* filter, not
+    an amount, and because it is counted by calling the same `balance_for`
+    that the Payments screen calls.
+
+    So the rule did not move: no amount reaches this payload, in any unit.
     """
     body = client.get("/api/operations/counts").json()
 
-    assert "payments" not in body
+    assert body["payments_awaiting_approval"] == 0
     assert not any("piastres" in key for key in body)
+    assert not any(
+        isinstance(value, str) and "E£" in value for value in body.values()
+    )
 
 
 def test_a_model_may_not_read_the_maintainer_counts(client):

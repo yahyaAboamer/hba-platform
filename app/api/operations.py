@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import require_permission
 from app.config import settings
-from app.core.businesstime import parse_month, utcnow
+from app.core.businesstime import business_month, parse_month, utcnow
 from app.core.permissions import Permission
 from app.db import get_session
 from app.models.identity import UserAccount
@@ -625,16 +625,29 @@ def counts(
 
     The approved export puts a count on *Models* and on *Payments*, so the
     owner can see where work is waiting without opening each section to find
-    out. This serves the first of those.
+    out.
 
-    **Payments is deliberately not here yet.** How much money is still to send
-    is computed by the Payments screen from snapshots and the ledger, and a
-    second implementation of it - in a sidebar, of all places - is a second
-    answer waiting to disagree with the first in front of the one person
-    guaranteed to notice. It joins this endpoint when the payments batch can
-    give it the same figure from the same place.
+    **Payments counts rows, not money.** An earlier note here refused to serve
+    it at all, on the grounds that a second implementation of *how much is
+    still to send* would be a second answer waiting to disagree with the
+    Payments screen in front of the one person guaranteed to notice. That
+    reasoning is right and it does not apply: the export's badge is the size
+    of the *Awaiting approval* filter - how many models still need a look -
+    and the count below is produced by calling the same `balance_for` the
+    screen itself calls, on the same month, so there is one implementation and
+    it is the screen's.
     """
     from app.models.affiliates import AffiliateProfile
+    from app.services.affiliates import list_affiliates
+    from app.services.payments import balance_for
+
+    month = business_month(utcnow())
+    awaiting = sum(
+        1
+        for affiliate in list_affiliates(db)
+        if affiliate.is_payable
+        and balance_for(db, affiliate, month)["state"] == "not_approved"
+    )
 
     return {
         "models_awaiting_approval": db.scalar(
@@ -643,6 +656,7 @@ def counts(
             .where(AffiliateProfile.status == "pending")
         )
         or 0,
+        "payments_awaiting_approval": awaiting,
     }
 
 
