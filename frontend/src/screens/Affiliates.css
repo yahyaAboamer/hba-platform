@@ -301,7 +301,8 @@
  * clicking rather than a decoration beside it. */
 .affiliates__segment-count {
   margin-left: 6px;
-  color: var(--faint);
+  color: inherit;
+  opacity: 0.7;
 }
 
 .affiliates__segment--on .affiliates__segment-count {

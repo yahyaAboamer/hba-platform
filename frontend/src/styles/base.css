@@ -194,7 +194,10 @@ a {
  * missing in words, on the row, rather than hiding it behind an icon.
  */
 .blocker {
-  font-size: var(--text-xs);
+  /* 12.5px, the export's size for a line of this kind. `--text-xs` is 12 and
+   * is the column-header step; a reason sitting half a step off every other
+   * line in its row reads as a different kind of thing. */
+  font-size: 12.5px;
   color: var(--refused);
   white-space: nowrap;
 }
