@@ -1,13 +1,25 @@
 /* Owner Home follows the approved export; operational detail lives behind notices. */
-.overview__cards { display:grid; grid-template-columns:minmax(240px,1fr) minmax(300px,1.15fr) minmax(160px,.6fr); gap:14px; align-items:stretch; }
-.overview__card { padding:18px 20px; border-radius:12px; background:var(--surface); }
+/* Flex with the export's own bases, not a grid of fractions. The third card
+ * is a count, and the export gives it `flex: 0 1 200px` — it does **not**
+ * grow. A grid column stretched it to 305px on a laptop and to half the
+ * screen on a monitor, which is a lot of furniture around the number 4. */
+.overview__cards { display:flex; gap:14px; align-items:stretch; }
+.overview__cards > .overview__card { flex:1 1 300px; }
+.overview__cards > .overview__card--payout { flex:1 1 340px; }
+.overview__cards > .overview__card--count { flex:0 1 200px; }
+.overview__card { padding:18px 20px; border-radius:var(--radius-lg); background:var(--surface); }
 .overview__card h2 { display:flex; align-items:center; gap:9px; font-size:12.5px; font-weight:400; color:var(--quiet); margin:0; }
-.overview__hero-value { margin:8px 0 14px; font-size:32px; font-weight:500; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
+.overview__hero-value { margin:8px 0 14px; font-size:32px; font-weight:400; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
 .overview__card a { display:inline-block; margin-top:13px; color:var(--accent-text); text-decoration:none; font-size:13px; }
 .overview__parts { margin:14px 0 0; padding-top:13px; border-top:1px solid var(--rule); font-size:13.5px; }
 .overview__parts > div { display:flex; justify-content:space-between; gap:12px; margin-bottom:7px; }
 .overview__parts dt { color:var(--quiet); } .overview__parts dd { margin:0; }
-.overview__lower { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:16px; }
+.overview__lower { display:flex; gap:14px; margin-top:16px; }
+.overview__lower > .panel { flex:1 1 440px; }
+/* The content table carries four columns to the leaderboard's three, and the
+ * export gives it the extra room rather than splitting the row down the
+ * middle. */
+.overview__lower > .panel:last-child { flex:1 1 480px; }
 .overview__top { list-style:none; margin:0; padding:0; }
 .overview__top li { display:grid; grid-template-columns:18px 32px 1fr auto; gap:13px; padding:13px 18px; align-items:center; border-bottom:1px solid var(--rule); font-size:14px; }
 .overview__top a { text-decoration:none; color:var(--ink); }
@@ -105,4 +117,16 @@
   margin: 5px 0 0;
   color: var(--faint);
   font-size: 12.5px;
+}
+
+/* *Estimated* is a pill in the export, outlined in the attention colour —
+ * the figure beside it is not yet agreed, and a lowercase word set in the
+ * heading's own colour said that far too quietly. */
+.overview__card .state {
+  padding: 2px 8px;
+  border: 1px solid var(--owed);
+  border-radius: 999px;
+  color: var(--owed);
+  font-size: 11px;
+  text-transform: none;
 }

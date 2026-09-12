@@ -308,13 +308,15 @@ export function Overview({ session }: { session: Session }) {
             <Link to={`/orders?month=${month}`}>All attributed orders →</Link>
           </section>
           <section className="overview__card overview__card--payout">
-            <h2>{payroll?.is_historical ? "Historical earnings" : "Expected payout"}
+            <h2>{payroll?.is_historical
+              ? `Historical earnings for ${formatMonth(month)}`
+              : `Expected payment for ${formatMonth(month)}`}
               {!payroll?.is_historical && <span className="state">Estimated</span>}</h2>
             {payroll?.is_historical ? <p className="overview__note">Settled outside this dashboard. Review historical terms in Settings.</p> : <>
               <div className="overview__hero-value"><Money piastres={summary.expected.payout_piastres} /></div>
               <dl className="overview__parts">
+                <div><dt>Fixed salary</dt><dd><Money piastres={summary.expected.fixed_piastres} /></dd></div>
                 <div><dt>Commission</dt><dd><Money piastres={summary.expected.commission_piastres} /></dd></div>
-                <div><dt>Fixed salaries</dt><dd><Money piastres={summary.expected.fixed_piastres} /></dd></div>
                 {summary.expected.guarantee_top_up_piastres > 0 && <div><dt>Guaranteed minimum top-ups</dt><dd><Money piastres={summary.expected.guarantee_top_up_piastres} /></dd></div>}
               </dl>
             </>}

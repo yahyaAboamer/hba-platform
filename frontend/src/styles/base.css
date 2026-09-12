@@ -299,9 +299,9 @@ a {
 
 .table th {
   text-align: left;
-  font-size: var(--text-xs);
-  font-weight: 500;
-  letter-spacing: 0.04em;
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   /* The export draws a column name in the faint tier, not the quiet one. A
    * header as bright as the data it labels competes with it. */
