@@ -204,6 +204,11 @@
 /* A panel head's link is 13px in the export, the same as every other link on
  * a card. At 15px it inherited the panel title's size and read as a second
  * heading rather than as somewhere to go. */
+/* The export's panel-head link is bare accent text at 12.5px - no underline,
+   no button furniture. A browser's default underline on it made a heading row
+   look like it had a form control in it. */
 .overview__lower .panel__head a {
-  font-size: 13px;
+  font-size: 12.5px;
+  color: var(--accent);
+  text-decoration: none;
 }

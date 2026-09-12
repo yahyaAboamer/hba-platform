@@ -50,8 +50,8 @@ export function SalesByMonth({
   );
   const peak = year.find((row) => row.sales_piastres === top);
 
-  /* The export's own frame: 580 wide inside a viewBox that leaves 30 to the
-     left for the axis, 130 of plot and the month names on the baseline. */
+  /* The export's own frame: 580 wide, 130 of plot, and the month names on the
+     baseline under it. */
   const WIDTH = 580;
   const PLOT = 130;
   const slot = WIDTH / year.length;
@@ -66,16 +66,24 @@ export function SalesByMonth({
         </span>
       </div>
 
-      <svg className="year__chart" viewBox="-30 0 620 150" role="img"
+      {/*
+       * The axis labels sit **inside** the plot rather than in a gutter to
+       * its left. The export can put them outside because its sample figures
+       * are three characters wide; ours are the server's full `E£63,235.70`,
+       * which at this scale is wider than the whole gutter and spilled off
+       * the card's left edge. Inside, anchored to the start, it fits at any
+       * length and still reads as the top of the scale.
+       */}
+      <svg className="year__chart" viewBox="0 -14 580 168" role="img"
         aria-label={`Sales generated each month, highest ${peak?.sales ?? "0"}`}>
         {[0, PLOT / 2, PLOT].map((y) => (
           <line key={y} x1="0" x2={WIDTH} y1={y} y2={y}
             stroke="var(--rule-strong)" strokeWidth="1" />
         ))}
-        <text x="-8" y="10" textAnchor="end" fontSize="10" fill="var(--faint)">
+        <text x="0" y="-4" textAnchor="start" fontSize="10" fill="var(--faint)">
           {peak?.sales ?? ""}
         </text>
-        <text x="-8" y={PLOT + 4} textAnchor="end" fontSize="10" fill="var(--faint)">
+        <text x="0" y={PLOT + 11} textAnchor="start" fontSize="10" fill="var(--faint)">
           0
         </text>
 
@@ -94,7 +102,7 @@ export function SalesByMonth({
         })}
 
         {year.map((row, index) => (
-          <text key={row.month} x={index * slot + slot / 2} y="146"
+          <text key={row.month} x={index * slot + slot / 2} y="150"
             textAnchor="middle" fontSize="10"
             fill={row.month === month ? "var(--ink)" : "var(--faint)"}>
             {shortMonth(row.month)}
