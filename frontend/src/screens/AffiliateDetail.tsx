@@ -540,7 +540,7 @@ export function AffiliateDetail({ session }: { session: Session }) {
         {section === "overview" && <>
         <section className="panel">
           <div className="panel__head">
-            <h2 className="panel__title">Who {detail.name} is</h2>
+            <h2 className="panel__title">Contact and shipping</h2>
           </div>
           <dl className="detail__list">
             <Row label="Started with HBA">
@@ -734,20 +734,31 @@ export function AffiliateDetail({ session }: { session: Session }) {
              * and the enforcement is that no staff route can write them - so
              * there is deliberately no control beside them, not a disabled one.
              */}
-            <Row label="Height and weight">
-              {detail.height_cm || detail.weight_kg ? (
-                <span className="code">
-                  {detail.height_cm ? `${detail.height_cm} cm` : "—"}
-                  {" · "}
-                  {detail.weight_kg ? `${detail.weight_kg} kg` : "—"}
-                </span>
-              ) : (
-                <span className="detail__note">
-                  Not given. Optional, and hers to fill in.
-                </span>
-              )}
+          </dl>
+        </section>
+
+        {/* Sizing is its own panel in the export, and says plainly why it
+         *  cannot be edited here. An absent control only tells somebody that
+         *  nothing happens when they look for one. */}
+        <section className="panel">
+          <div className="panel__head">
+            <h2 className="panel__title">Sizing</h2>
+          </div>
+          <dl className="detail__list">
+            <Row label="Height">
+              {detail.height_cm
+                ? <span className="code">{detail.height_cm} cm</span>
+                : <span className="detail__note">Not given</span>}
+            </Row>
+            <Row label="Weight">
+              {detail.weight_kg
+                ? <span className="code">{detail.weight_kg} kg</span>
+                : <span className="detail__note">Not given</span>}
             </Row>
           </dl>
+          <p className="detail__note detail__sizing-note">
+            Only the model can change these.
+          </p>
         </section>
         <section className="panel">
           <div className="panel__head">
@@ -863,12 +874,12 @@ export function AffiliateDetail({ session }: { session: Session }) {
         <section className="panel">
           <div className="panel__head">
             <h2 className="panel__title">
-              Payment terms
+              Current terms
               {detail.terms_month !== detail.current_month && (
                 <span className="page__subtitle"> {formatMonth(detail.terms_month)}</span>
               )}
             </h2>
-            {can(session, "compensation.manage") && <Link className="button" to={`/affiliates/${id}/compensation`}>Edit terms</Link>}
+            {can(session, "compensation.manage") && <Link className="button" to={`/affiliates/${id}/compensation`}>Compensation history →</Link>}
           </div>
           {detail.compensation === null ? (
             <p className="empty">

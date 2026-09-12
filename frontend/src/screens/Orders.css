@@ -173,3 +173,14 @@
 .orders__lens--on .orders__lens-count {
   color: var(--ink);
 }
+
+/* The code under the model's name rather than in a column of its own — it
+ * identifies the row rather than being another fact about it. */
+.orders__codes {
+  display: block;
+  margin-top: 3px;
+}
+
+.orders__codes .code + .code {
+  margin-left: 6px;
+}

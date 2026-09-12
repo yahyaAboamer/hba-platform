@@ -182,7 +182,7 @@ export function Orders({ session }: { session: Session }) {
       <form className="orders__search" onSubmit={lookUp}>
         <input
           className="input orders__search-input"
-          placeholder="Find an order by number — 2001 or #2001"
+          placeholder="Search orders"
           value={search}
           onChange={(event) => {
             setSearch(event.target.value);
@@ -202,7 +202,7 @@ export function Orders({ session }: { session: Session }) {
 
       {found === null && (
         <p className="notice notice--refused orders__note" role="alert">
-          No order matches "{search.trim()}".
+          No order matches that search.
         </p>
       )}
 
@@ -314,13 +314,16 @@ export function Orders({ session }: { session: Session }) {
 function OrderHead() {
   return (
     <tr>
+      {/* The export's five columns, in its words. Ours said Placed, Belongs
+       *  to and Delivery for the same three facts, and split the code into a
+       *  column of its own where the export stacks it under the model — the
+       *  code identifies the row rather than being a fact about it. */}
       <th>Order</th>
-      <th>Placed</th>
-      <th>Codes</th>
-      <th>Belongs to</th>
-      <th>Delivery</th>
+      <th>Model</th>
+      <th>Date</th>
+      <th>Status</th>
       <th>Commission</th>
-      <th className="orders__amount">Sales</th>
+      <th className="orders__amount">Net sales</th>
       <th className="orders__amount">Base</th>
       <th>
         <Link to="/glossary#carried-forward" className="glossary-link">
@@ -335,30 +338,6 @@ function OrderTableRow({ row }: { row: OrderRow }) {
   return (
     <tr>
       <td className="code">{row.order_number}</td>
-      <td className="orders__placed">
-        {new Date(row.placed_at).toLocaleDateString("en-GB", {
-          day: "numeric",
-          month: "short",
-        })}
-      </td>
-      <td>
-        {row.discount_codes.length === 0 ? (
-          <span className="orders__quiet">none</span>
-        ) : (
-          row.discount_codes.map((code) => (
-            <span
-              key={code}
-              className={
-                row.matched_codes.includes(code)
-                  ? "code orders__code"
-                  : "code orders__code orders__code--unmatched"
-              }
-            >
-              {code}
-            </span>
-          ))
-        )}
-      </td>
       <td>
         {row.outcome === "attributed" && row.affiliate_id !== null ? (
           <Link className="orders__name" to={`/affiliates/${row.affiliate_id}`}>
@@ -369,6 +348,30 @@ function OrderTableRow({ row }: { row: OrderRow }) {
         ) : (
           <span className="orders__quiet">No affiliate code</span>
         )}
+        {/* The code under the model, as the export stacks them. An unmatched
+         *  code still shows — it is the reason the row belongs to nobody. */}
+        {row.discount_codes.length > 0 && (
+          <span className="orders__codes">
+            {row.discount_codes.map((code) => (
+              <span
+                key={code}
+                className={
+                  row.matched_codes.includes(code)
+                    ? "code"
+                    : "code orders__code--unmatched"
+                }
+              >
+                {code}
+              </span>
+            ))}
+          </span>
+        )}
+      </td>
+      <td className="orders__placed">
+        {new Date(row.placed_at).toLocaleDateString("en-GB", {
+          day: "numeric",
+          month: "short",
+        })}
       </td>
       <td className="orders__delivery">
         {row.cancelled

@@ -153,7 +153,7 @@ function PlatformPanel({ session }: { session: Session }) {
   return (
     <section className="panel settings__panel">
       <div className="panel__head">
-        <h2 className="panel__title">Platform</h2>
+        <h2 className="panel__title">Connection</h2>
       </div>
 
       {error && (
@@ -224,7 +224,7 @@ function InvitePanel() {
   return (
     <section className="panel settings__panel">
       <div className="panel__head">
-        <h2 className="panel__title">Invite a member of staff</h2>
+        <h2 className="panel__title">Invite a staff member</h2>
       </div>
 
       {error && (
@@ -374,7 +374,7 @@ function RosterPanel() {
   return (
     <section className="panel settings__panel">
       <div className="panel__head">
-        <h2 className="panel__title">Staff &amp; roles</h2>
+        <h2 className="panel__title">Staff</h2>
       </div>
 
       {error && (
@@ -477,7 +477,7 @@ function RosterPanel() {
 
       {roster && roster.invitations.length > 0 && (
         <>
-          <h3 className="settings__subhead">Waiting to be accepted</h3>
+          <h3 className="settings__subhead">Pending staff invitations</h3>
           <table className="table settings__table">
             <thead>
               <tr>
