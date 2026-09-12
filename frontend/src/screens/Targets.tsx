@@ -119,6 +119,17 @@ export function Targets({ session, affiliateId, initialMonth, embedded = false }
    * rather than a setting that stays on.
    */
   const [wholeYear, setWholeYear] = useState(false);
+  /**
+   * **One set of numbers at a time**, the way the approved screen works.
+   *
+   * Ours showed *asked for* and *produced* side by side — four inputs a row,
+   * twenty rows, eighty boxes on screen, and no way to tell at a glance which
+   * half you were editing. The export switches: you are either recording what
+   * happened or setting what is being asked for, and the column headings say
+   * which.
+   */
+  const [mode, setMode] = useState<"achieved" | "required">("achieved");
+  const [search, setSearch] = useState("");
   //: Undoing is its own selection and its own reason. Sharing `chosen`
   //: with confirming would let one button act on rows picked for the
   //: other, which on a screen that releases guarantees is not a mistake
@@ -286,6 +297,28 @@ export function Targets({ session, affiliateId, initialMonth, embedded = false }
     }
   }
 
+  /**
+   * How many boxes differ from what is stored — the export's *N unsaved
+   * changes*, with a Discard beside it.
+   *
+   * Counted against the loaded grid rather than tracked as a flag, so typing
+   * a value and typing it back reports nothing to save, which is the truth.
+   */
+  const dirtyCount = grid
+    ? grid.rows.reduce((total, row) => {
+        const cells = draft[row.affiliate_id];
+        if (!cells) return total;
+        const stored = draftFrom([row])[row.affiliate_id];
+        return total + (Object.keys(cells) as (keyof typeof cells)[])
+          .filter((field) => cells[field] !== stored[field]).length;
+      }, 0)
+    : 0;
+
+  function discard() {
+    if (grid) setDraft(draftFrom(grid.rows));
+    setSaved(null);
+  }
+
   function lockFor(candidate: string): MonthLock {
     if (
       session.platform.go_live_month &&
@@ -299,7 +332,12 @@ export function Targets({ session, affiliateId, initialMonth, embedded = false }
 
   // A house code publishes nothing, so a row of empty boxes beside it is
   // four things nobody will ever type into.
-  const rows = (grid?.rows ?? []).filter(row => row.account_kind !== "house" && (!affiliateId || row.affiliate_id === affiliateId) && (!query.get("pace") || row.pace?.state === query.get("pace")));
+  const needle = search.trim().toLowerCase();
+  const rows = (grid?.rows ?? []).filter(row =>
+    row.account_kind !== "house"
+    && (!affiliateId || row.affiliate_id === affiliateId)
+    && (!query.get("pace") || row.pace?.state === query.get("pace"))
+    && (!needle || row.name.toLowerCase().includes(needle)));
   const blocking = rows.filter((row) => waitingOn(row) !== null);
   const confirmable = rows.filter(
     (row) => row.achieved !== null && !row.verified,
@@ -327,14 +365,41 @@ export function Targets({ session, affiliateId, initialMonth, embedded = false }
       {grid === null && !error && <p className="empty">Loading…</p>}
 
       {grid && !embedded && (
-        <p className="targets__lead">
-          Videos and stories published, from your own tracking. On a guaranteed
-          minimum these decide the pay; for everyone else they are worth
-          knowing and change nothing.{" "}
-          <strong>{blocking.length}</strong>{" "}
-          {blocking.length === 1 ? "model is" : "models are"} held up by them
-          this month.
-        </p>
+        <div className="targets__bar">
+          <input
+            type="search"
+            className="targets__search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search model names"
+            aria-label="Search model names"
+          />
+          {/*
+           * Which set of numbers this screen is editing. The export switches
+           * between them rather than showing both, and the column headings
+           * follow the switch — so there is never a question about which of
+           * four boxes in a row you are typing into.
+           */}
+          <div className="targets__mode" role="group" aria-label="What to edit">
+            <button type="button" aria-pressed={mode === "achieved"}
+              className={mode === "achieved" ? "targets__mode-on" : undefined}
+              onClick={() => setMode("achieved")}>Record achieved</button>
+            <button type="button" aria-pressed={mode === "required"}
+              className={mode === "required" ? "targets__mode-on" : undefined}
+              onClick={() => setMode("required")}>Set requirements</button>
+          </div>
+          <span className="targets__bar-spacer" />
+          {dirtyCount > 0 && (
+            <span className="targets__dirty">
+              {dirtyCount} unsaved {dirtyCount === 1 ? "change" : "changes"}
+              <button type="button" className="button" onClick={discard}>Discard</button>
+            </span>
+          )}
+          <p className="targets__blocking">
+            <strong>{blocking.length}</strong>{" "}
+            {blocking.length === 1 ? "model is" : "models are"} held up this month.
+          </p>
+        </div>
       )}
 
       {grid && rows.length > 0 && (
@@ -343,30 +408,19 @@ export function Targets({ session, affiliateId, initialMonth, embedded = false }
             <thead>
               <tr>
                 <th className="targets__pick" />
-                <th>Name</th>
-                <th className="targets__number" colSpan={2}>
-                  Asked for
+                <th>Model</th>
+                <th className="targets__number">
+                  {mode === "achieved" ? "Videos achieved" : "Videos required"}
                 </th>
-                <th className="targets__number" colSpan={2}>
-                  Produced
+                <th className="targets__number">
+                  {mode === "achieved" ? "Stories achieved" : "Stories required"}
                 </th>
                 <th>
                   <Link to="/glossary#verified" className="glossary-link">
-                    Outcome
+                    Recorded
                   </Link>
                 </th>
-                <th>Waiting on</th>
-              </tr>
-              <tr className="targets__subhead">
-                <th />
-                <th />
-                <th className="targets__number">Videos</th>
-                <th className="targets__number">Stories</th>
-                <th className="targets__number">Videos</th>
-                <th className="targets__number">Stories</th>
-                <th />
-                <th />
-                <th />
+                <th>Last updated</th>
               </tr>
             </thead>
             <tbody>
@@ -405,38 +459,48 @@ export function Targets({ session, affiliateId, initialMonth, embedded = false }
                       >
                         {row.name}
                       </Link>
-                      {row.determines_pay && (
-                        <span className="targets__decides">decides pay</span>
-                      )}
+                      {/* Her arrangement under her name, as the export writes
+                       *  it — on a guarantee the record decides the pay, and
+                       *  the row says so where the typing happens. */}
+                      <span className="targets__arrangement">
+                        {row.determines_pay ? "Guarantee needs this record" : ""}
+                      </span>
                     </td>
                     <Cell
-                      value={cells.required_videos}
-                      label={`${row.name} videos asked for`}
-                      onChange={(v) => edit(row.affiliate_id, "required_videos", v)}
+                      value={mode === "achieved" ? cells.actual_videos : cells.required_videos}
+                      label={`${row.name} videos ${mode === "achieved" ? "achieved" : "required"}`}
+                      suffix={mode === "achieved"
+                        ? `of ${row.required_videos ?? 0}`
+                        : "required"}
+                      onChange={(v) => edit(row.affiliate_id,
+                        mode === "achieved" ? "actual_videos" : "required_videos", v)}
                     />
                     <Cell
-                      value={cells.required_stories}
-                      label={`${row.name} stories asked for`}
-                      onChange={(v) => edit(row.affiliate_id, "required_stories", v)}
-                    />
-                    <Cell
-                      value={cells.actual_videos}
-                      label={`${row.name} videos produced`}
-                      onChange={(v) => edit(row.affiliate_id, "actual_videos", v)}
-                    />
-                    <Cell
-                      value={cells.actual_stories}
-                      label={`${row.name} stories produced`}
-                      onChange={(v) => edit(row.affiliate_id, "actual_stories", v)}
+                      value={mode === "achieved" ? cells.actual_stories : cells.required_stories}
+                      label={`${row.name} stories ${mode === "achieved" ? "achieved" : "required"}`}
+                      suffix={mode === "achieved"
+                        ? `of ${row.required_stories ?? 0}`
+                        : "required"}
+                      onChange={(v) => edit(row.affiliate_id,
+                        mode === "achieved" ? "actual_stories" : "required_stories", v)}
                     />
                     <td className="targets__outcome">
                       <Outcome row={row} />
-                    </td>
-                    <td className="targets__pace">
+                      {/*
+                       * D08's weekly pace, under the outcome rather than in a
+                       * column of its own. The export has no equivalent - it
+                       * was asked for after the export was drawn - and it
+                       * belongs here because it answers the same question the
+                       * column does, one week in rather than one month.
+                       */}
                       <PaceCell row={row} />
-                    </td>
-                    <td>
                       {waiting && <span className="blocker">{waiting}</span>}
+                    </td>
+                    <td className="targets__updated">
+                      {row.recorded_at
+                        ? new Date(row.recorded_at).toLocaleDateString("en-GB",
+                            { day: "numeric", month: "long", year: "numeric" })
+                        : <span className="targets__never">—</span>}
                     </td>
                   </tr>
                 );
@@ -456,14 +520,14 @@ export function Targets({ session, affiliateId, initialMonth, embedded = false }
                  * the button does, and a control that changes a button belongs
                  * next to it.
                  */}
-                <label className="targets__year">
+                {mode === "required" && <label className="targets__year">
                   <input
                     type="checkbox"
                     checked={wholeYear}
                     onChange={(event) => setWholeYear(event.target.checked)}
                   />
                   Apply these targets to the whole year
-                </label>
+                </label>}
                 <button
                   type="button"
                   className="button button--primary"
@@ -474,7 +538,7 @@ export function Targets({ session, affiliateId, initialMonth, embedded = false }
                     ? "Saving…"
                     : wholeYear
                       ? "Save the year"
-                      : "Save the month"}
+                      : "Save changes"}
                 </button>
               </>
             )}
@@ -628,10 +692,13 @@ export function Targets({ session, affiliateId, initialMonth, embedded = false }
 function Cell({
   value,
   label,
+  suffix,
   onChange,
 }: {
   value: string;
   label: string;
+  /** *of 6*, or *required* — what the box beside it is measured against. */
+  suffix?: string;
   onChange: (value: string) => void;
 }) {
   return (
@@ -643,6 +710,7 @@ function Cell({
         value={value}
         onChange={(event) => onChange(event.target.value)}
       />
+      {suffix && <span className="targets__of">{suffix}</span>}
     </td>
   );
 }
