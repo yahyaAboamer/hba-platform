@@ -124,7 +124,6 @@ def list_products(
                 # tens of megabytes to draw one page.
                 "image_url": thumbnail(row.image_url),
                 "sizes": sizes.get(row.shopify_product_id, 0),
-                "sku": row.sku,
                 # How many models have one. Distinct models, not parcels: two
                 # sent to the same person is one model covered, and counting
                 # parcels would overstate reach on exactly the products HBA

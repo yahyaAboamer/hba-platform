@@ -13,7 +13,6 @@ type Row = {
   status: string;
   image_url: string | null;
   sizes: number;
-  sku: string | null;
   /** Distinct models who have one, on the same gift rule as her wardrobe. */
   models_with_it: number;
   /** `null` where nothing has been asked for; `false` is a request that
@@ -295,11 +294,14 @@ export function Products({ session }: { session: Session }) {
                   )}
                   <span className="products__who-text">
                     <span className="products__name">{row.title}</span>
-                    {/* SKU under the name, as the export stacks them. Falls
-                     *  back to the size count rather than an empty line —
-                     *  Shopify does not always carry one. */}
+                    {/* The export stacks a SKU under the name. **This
+                     *  platform has no product-level SKU** — a SKU belongs to
+                     *  a variant, and a garment has one per size, so printing
+                     *  any single one of them would label the product with a
+                     *  fact about one of its sizes. The size count is what is
+                     *  true at this level. */}
                     <span className="products__meta">
-                      {row.sku ?? `${row.sizes} size${row.sizes === 1 ? "" : "s"}`}
+                      {row.sizes} size{row.sizes === 1 ? "" : "s"}
                     </span>
                   </span>
                 </Link>
