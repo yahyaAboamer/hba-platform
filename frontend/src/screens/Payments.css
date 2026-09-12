@@ -415,17 +415,20 @@
   padding: var(--space-4);
 }
 
-/* Measured again, this time off the element rather than off a screenshot:
- * the export's card figure is **27px**, and Home's larger hero is the 32 this
- * had borrowed. A card total drawn at the hero's size crowds its neighbours
- * on the 1280 width the design was drawn for. */
-.payments__total .money {
+/*
+ * Measured again, this time off the element rather than off a screenshot: the
+ * export's card figure is **27px**.
+ *
+ * And it is `.money.payments__total`, not `.payments__total .money`. `Money`
+ * puts the caller's class on the *same* span it puts `money` on, so the
+ * descendant form matched nothing and this rule - and the 32px one before it,
+ * which claimed in a comment to have been measured - had never applied to
+ * anything at all. A selector that matches nothing is silent in exactly the
+ * way a wrong value is not.
+ */
+.money.payments__total {
   font-size: 27px;
   font-variant-numeric: tabular-nums;
-}
-
-.payments__hero .money {
-  font-size: 32px;
 }
 
 /* -- The approved month-end table ------------------------------------------

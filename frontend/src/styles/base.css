@@ -597,6 +597,10 @@ a {
   background: var(--surface);
   color: var(--ink);
   font-size: 13.5px;
+  /* The page's reading line-height is 1.5, which on a 38px box is 42px of
+     content asking to fit in 38. The export leaves this at `normal` and lets
+     `min-height` decide the box. */
+  line-height: normal;
 }
 
 /* The export's toolbar search is a fixed 240 rather than a stretched field. */

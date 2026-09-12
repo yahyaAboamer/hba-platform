@@ -424,9 +424,7 @@ export function Payments({ session }: { session: Session }) {
                     key={option.value}
                     type="button"
                     className={
-                      filter === option.value
-                        ? "payments__filter payments__filter--active"
-                        : "payments__filter"
+                      filter === option.value ? "chip chip--on" : "chip"
                     }
                     aria-pressed={filter === option.value}
                     onClick={() => setFilter(option.value)}
@@ -559,16 +557,17 @@ function PaymentRow({
               kind={isForecast ? "provisional" : "agreed"}
             />
             {/* One figure, and a second line only where it is not the whole
-             *  story. The export shows what is left to send; three money
-             *  columns made somebody work out which of them to transfer. */}
+             *  story - the export puts what has already been recorded there
+             *  and nothing else. *forecast - not agreed* used to follow every
+             *  unapproved figure, which is the third place on this screen
+             *  saying the same thing: the total already wears an `Estimated`
+             *  badge and the row already wears an `Awaiting approval` pill. */}
             {row.paid_piastres > 0 && (
               <span className="payments__part">
                 <Money piastres={row.paid_piastres} /> already sent
               </span>
             )}
-            {row.paid_piastres === 0 && isForecast && (
-              <span className="payments__part">forecast — not agreed</span>
-            )}
+
           </>
         )}
       </td>

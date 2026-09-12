@@ -750,28 +750,37 @@ function PaceCell({ row }: { row: Row }) {
   const pace = row.pace;
   if (!pace || pace.state === "not_started") return null;
 
+  /*
+   * **Nothing, when the line above already says it.** Where nothing has been
+   * recorded at all, *Not recorded* has answered the question and a second
+   * line saying nothing arrived this week either is the same fact twice - in
+   * a 140px column, wrapped, which is what took the export's 56px row to 80.
+   */
+  if (row.achieved === null) return null;
+
   // **A month nobody has asked anything of is a gap, not a blank** (owner, 11
   // September 2026). It was rendering as nothing at all, which is exactly how
   // it stays unnoticed until payroll cannot close on it.
   if (pace.state === "no_target") {
-    return <span className="targets__unknown">Nothing asked for yet</span>;
+    return <span className="targets__pace">Nothing asked for yet</span>;
   }
+  /*
+   * The wording is short because the column is 140px wide and the export
+   * writes one line in it. *Nothing recorded in week 2* wrapped to two lines
+   * and every row that carried it stood 24px taller than the design.
+   */
   if (pace.state === "not_recorded_this_week") {
-    return (
-      <span className="targets__unknown">
-        Nothing recorded in week {pace.week}
-      </span>
-    );
+    return <span className="targets__pace">None in week {pace.week}</span>;
   }
   if (pace.state === "behind") {
     return (
-      <span className="targets__missed">
-        {pace.done} of {pace.expected_by_now} by week {pace.week}
+      <span className="targets__behind">
+        Behind · {pace.done} of {pace.expected_by_now}
       </span>
     );
   }
   return (
-    <span className="targets__met">
+    <span className="targets__pace">
       On pace · {pace.done} of {pace.expected_by_now}
     </span>
   );

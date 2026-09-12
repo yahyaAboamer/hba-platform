@@ -78,6 +78,7 @@
      reads as a well cut into the card. */
   background: var(--paper);
   font-size: 13.5px;
+  line-height: normal;
   text-align: center;
   color: var(--ink);
 }
@@ -155,10 +156,15 @@
    the owner chose to keep it internal. Second line and quieter: it is a
    prompt for a conversation rather than a verdict competing with the one
    above it. */
-.targets__pace {
+.targets__pace,
+.targets__behind {
   font-size: 12px;
   color: var(--faint);
   white-space: nowrap;
+}
+
+.targets__behind {
+  color: var(--owed);
 }
 
 .targets__updated {
