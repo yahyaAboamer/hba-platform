@@ -12,7 +12,15 @@ import {
   formatEgp,
   formatMonth,
 } from "../lib/money";
+import { describeDestination } from "../lib/payouts";
 import "./Payments.css";
+
+/** The arrangement labels, the same wording every other screen uses. */
+const PAY_TYPE: Record<string, string> = {
+  commission: "Commission only",
+  fixed_plus_commission: "Salary plus commission",
+  base_guarantee: "Guaranteed minimum",
+};
 
 export type SettlementState =
   | "unpaid"
@@ -32,6 +40,10 @@ export type Balance = {
   affiliate_id: number;
   name: string;
   status: "pending" | "active" | "inactive" | "archived";
+  /** Her arrangement for this month, as a type — the wording lives here. */
+  terms?: string | null;
+  /** Masked on the server. Enough to recognise, never the full number. */
+  destination?: Record<string, string | null> | null;
   month: string;
   state: SettlementState;
   payroll_snapshot_id?: number;
@@ -183,8 +195,8 @@ type Filter = "all" | "review" | "unpaid" | "partial" | "paid" | "no_due";
 const FILTERS: { value: Filter; label: string }[] = [
   { value: "all", label: "All" },
   { value: "review", label: "Awaiting approval" },
-  { value: "unpaid", label: "Not paid" },
-  { value: "partial", label: "Part paid" },
+  { value: "unpaid", label: "Approved" },
+  { value: "partial", label: "Partly paid" },
   { value: "paid", label: "Fully paid" },
   { value: "no_due", label: "No transfer due" },
 ];
@@ -287,7 +299,7 @@ export function Payments({ session }: { session: Session }) {
             aria-label="Month-end payment totals"
           >
             <PaymentFigure
-              label="Total funds required"
+              label="Total required"
               piastres={data.totals.required_piastres}
               provisional={data.totals.forecast_piastres > 0}
               detail={
@@ -297,12 +309,12 @@ export function Payments({ session }: { session: Session }) {
               }
             />
             <PaymentFigure
-              label="Recorded as sent"
+              label="Recorded so far"
               piastres={data.totals.recorded_piastres}
               detail="Actual transfers in this month’s ledger."
             />
             <PaymentFigure
-              label="Still to transfer"
+              label="Remaining to send"
               piastres={data.totals.still_owed_piastres}
               detail={
                 data.totals.still_owed_affiliates === 1
@@ -387,6 +399,12 @@ export function Payments({ session }: { session: Session }) {
                     onClick={() => setFilter(option.value)}
                   >
                     {option.label}
+                    {/* The count rides inside the label — *Approved 4* — as
+                     *  the export writes it. A filter you cannot see the size
+                     *  of is a filter you have to click to evaluate. */}
+                    <span className="payments__filter-count">
+                      {rows.filter((row) => matchesFilter(row, option.value)).length}
+                    </span>
                   </button>
                 ))}
               </div>
@@ -412,11 +430,10 @@ export function Payments({ session }: { session: Session }) {
                   <thead>
                     <tr>
                       <th>Model</th>
-                      <th>Payment state</th>
-                      <th className="payments__amount">Funds required</th>
-                      <th className="payments__amount">Recorded</th>
-                      <th className="payments__amount">Remaining</th>
-                      <th />
+                      <th className="payments__amount">To receive</th>
+                      <th>Destination</th>
+                      <th>State</th>
+                      <th>Next action</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -484,20 +501,17 @@ function PaymentRow({
   return (
     <tr>
       <td>
-        <Link
-          className="payments__name"
-          to={`/affiliates/${row.affiliate_id}`}
-        >
+        <Link className="payments__name" to={`/affiliates/${row.affiliate_id}`}>
           {row.name}
         </Link>
+        {/* Her arrangement under her name, as the export writes it: the
+         *  person about to send this money should not have to remember
+         *  whether it is a salary, a commission or a floor. */}
+        <span className="payments__terms">
+          {row.terms ? PAY_TYPE[row.terms] ?? row.terms : "No terms set"}
+        </span>
         {row.status !== "active" && (
           <span className="payments__person-state">{row.status}</span>
-        )}
-      </td>
-      <td className="payments__state">
-        <span>{view.label}</span>
-        {view.explanation && (
-          <span className="payments__state-note">{view.explanation}</span>
         )}
       </td>
       <td className="payments__amount">
@@ -506,43 +520,36 @@ function PaymentRow({
         ) : (
           <>
             <Money
-              piastres={row.required_piastres}
+              piastres={row.balance_piastres}
               kind={isForecast ? "provisional" : "agreed"}
             />
-            <span className="payments__part">
-              {isForecast ? (
-                "forecast — not agreed"
-              ) : row.required_piastres === row.obligation_piastres ? (
-                "approved"
-              ) : (
-                <>
-                  <Money
-                    piastres={row.obligation_piastres}
-                    kind="agreed"
-                  />{" "}
-                  approved
-                </>
-              )}
-            </span>
+            {/* One figure, and a second line only where it is not the whole
+             *  story. The export shows what is left to send; three money
+             *  columns made somebody work out which of them to transfer. */}
+            {row.paid_piastres > 0 && (
+              <span className="payments__part">
+                <Money piastres={row.paid_piastres} /> already sent
+              </span>
+            )}
+            {row.paid_piastres === 0 && isForecast && (
+              <span className="payments__part">forecast — not agreed</span>
+            )}
           </>
         )}
       </td>
-      <td className="payments__amount">
-        <Money
-          piastres={row.paid_piastres}
-          kind="agreed"
-        />
+      <td className="payments__destination">
+        {/* The same sentence her profile shows, from the same function — a
+         *  second way of writing a destination is a second way of writing it
+         *  wrong. Masked on the server before it ever reaches this list. */}
+        <span>{describeDestination(row.destination ?? null)}</span>
+        {row.destination && (
+          <CopyDestination text={describeDestination(row.destination)} />
+        )}
       </td>
-      <td className="payments__amount">
-        <Money
-          piastres={row.balance_piastres}
-          kind="agreed"
-          tone={toneFor(row.state)}
-        />
-        {row.credited_piastres > 0 && (
-          <span className="payments__part">
-            <Money piastres={row.credited_piastres} /> from earlier payment
-          </span>
+      <td className="payments__state">
+        <span>{view.label}</span>
+        {view.explanation && (
+          <span className="payments__state-note">{view.explanation}</span>
         )}
       </td>
       <td className="payments__action">
@@ -555,6 +562,33 @@ function PaymentRow({
         />
       </td>
     </tr>
+  );
+}
+
+/**
+ * *Copy* beside a destination, because the next thing that happens to it is
+ * being typed into a banking app. Retyping an account number off a screen is
+ * the step where a digit goes missing.
+ */
+function CopyDestination({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      className="payments__copy"
+      aria-label="Copy destination"
+      onClick={() => {
+        navigator.clipboard?.writeText(text).then(
+          () => {
+            setCopied(true);
+            window.setTimeout(() => setCopied(false), 2000);
+          },
+          () => undefined,
+        );
+      }}
+    >
+      {copied ? "Copied" : "Copy"}
+    </button>
   );
 }
 

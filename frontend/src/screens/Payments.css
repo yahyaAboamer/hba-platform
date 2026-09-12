@@ -371,3 +371,38 @@
  * total is the same kind of number as Home's. Ours sat a step small. */
 .payments__total .money,
 .payments__hero .money { font-size: 32px; }
+
+/* -- The approved month-end table ------------------------------------------
+ *
+ * Model (with her arrangement), what is left to send, where it goes with a
+ * copy beside it, the state, and the one thing to do next. Three money
+ * columns made somebody work out which of them to transfer.
+ */
+.payments__terms {
+  display: block;
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--faint);
+}
+
+.payments__destination {
+  white-space: nowrap;
+  font-size: 12.5px;
+  color: var(--quiet);
+}
+
+.payments__copy {
+  margin-left: 8px;
+  padding: 2px 8px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--accent-text);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.payments__filter-count {
+  margin-left: 6px;
+  opacity: 0.7;
+}

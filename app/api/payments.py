@@ -49,7 +49,11 @@ from app.services.payments import (
     record_payment,
 )
 from app.services.payroll import blockers_for, is_historical
-from app.services.payouts import changed_recently
+from app.services.payouts import (
+    changed_recently,
+    current_destination,
+    mask_destination,
+)
 from app.services.proof import ProofRejected, readable_by, store_proof
 
 router = APIRouter(prefix="/api")
@@ -95,6 +99,24 @@ def _affiliate_or_404(db: Session, affiliate_id: int) -> AffiliateProfile:
     return affiliate
 
 
+def _terms_label(db: Session, affiliate: AffiliateProfile, month: str) -> str | None:
+    """Her arrangement **for the month being paid**, as a type rather than a
+    sentence.
+
+    Dated, not current: terms change, and a row that labelled September with
+    October's arrangement would put the wrong explanation beside a figure
+    somebody is about to send.
+
+    The *wording* stays in the browser, where every other screen already
+    labels an arrangement. Two copies of "Guaranteed minimum" is two places to
+    change it and one of them to forget.
+    """
+    from app.services.compensation import terms_for
+
+    terms = terms_for(db, affiliate, month)
+    return terms.compensation_type if terms else None
+
+
 def _render_balance(
     db: Session,
     affiliate: AffiliateProfile,
@@ -117,6 +139,19 @@ def _render_balance(
         "obligation": format_egp(balance["obligation_piastres"]),
         "paid": format_egp(balance["paid_piastres"]),
         "balance": format_egp(balance["balance_piastres"]),
+        # **Her arrangement and where the money goes**, both on the row.
+        #
+        # The approved month-end screen puts the terms under her name and the
+        # destination in its own column with a copy button, because the person
+        # working through this list is about to open a banking app and type
+        # one of them in. Making them open a profile for it is how a transfer
+        # goes to the previous destination.
+        #
+        # The destination is **masked** by the same function the profile uses
+        # (`mask_destination`): enough to recognise, never the full number, on
+        # a screen that lists twenty of them at once.
+        "terms": _terms_label(db, affiliate, month),
+        "destination": mask_destination(current_destination(db, affiliate)),
     }
 
     # F14. An approved obligation is a debt; a forecast is still moving. The
