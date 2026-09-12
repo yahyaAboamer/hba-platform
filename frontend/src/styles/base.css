@@ -102,8 +102,20 @@ a {
  * **The typeface no longer carries this.** It used to: an agreed figure was
  * set in a mono face and a provisional one in prose. The business ended that
  * on 9 September, because a font is only a signal to someone who has been told
- * what it means, and a model had not been. Weight and colour separate them
- * now, and the words on the screen do the actual saying.
+ * what it means, and a model had not been. Weight and colour separated them
+ * after that, and the words on the screen did the actual saying.
+ *
+ * **Colour no longer carries it either, from 12 September.** Every figure in
+ * the approved export is set in ink; a provisional one drawn in `--quiet` is
+ * the single biggest reason the owner kept saying our whites read grey, and
+ * on Home it made the two headline numbers — the ones the screen exists for —
+ * the dimmest text on the card.
+ *
+ * The distinction is not lost. It is **weight**, still, and more importantly
+ * it is said in words: the payout card wears an *Estimated* pill and the
+ * screens name what they are showing. That is ADR 0027's own argument applied
+ * one step further — a colour is only a signal to somebody who has been told
+ * what it means, and nobody has been told.
  *
  * §12.5: money never wraps or truncates at any width. If a figure does not
  * fit, the layout changes — never the number.
@@ -111,7 +123,7 @@ a {
 .money {
   font-family: var(--sans);
   font-variant-numeric: tabular-nums;
-  color: var(--quiet);
+  color: var(--ink);
   white-space: nowrap;
 }
 

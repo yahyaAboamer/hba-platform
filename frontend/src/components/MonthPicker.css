@@ -27,12 +27,12 @@
 }
 
 .month-picker__value {
-  font-weight: 500;
+  font-weight: 400;
 }
 
 .month-picker__caret {
-  font-size: 0.625rem;
-  color: var(--quiet);
+  font-size: 12px;
+  color: var(--faint);
 }
 
 .month-picker__panel {
