@@ -389,6 +389,11 @@ export function Affiliates() {
             aria-pressed={segment === option.key}
           >
             {option.label}
+            {rows && (
+              <span className="affiliates__segment-count">
+                {rosterMatches(rows, option.key, "").length}
+              </span>
+            )}
           </button>
         ))}
       </div>

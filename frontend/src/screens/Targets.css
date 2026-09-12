@@ -73,7 +73,7 @@
 .targets__name {
   color: var(--ink);
   text-decoration: none;
-  font-weight: 500;
+  font-weight: 400;
 }
 
 .targets__name:hover {

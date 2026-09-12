@@ -28,7 +28,7 @@
 }
 
 .payments__figure-label {
-  font-weight: 500;
+  font-weight: 400;
   color: var(--ink);
 }
 
@@ -126,7 +126,7 @@
   border-color: var(--rule-strong);
   background: var(--hover);
   color: var(--ink);
-  font-weight: 500;
+  font-weight: 400;
 }
 
 .payments__search {
@@ -155,7 +155,7 @@
 .payments__name {
   color: var(--ink);
   text-decoration: none;
-  font-weight: 500;
+  font-weight: 400;
 }
 
 .payments__name:hover {
@@ -217,7 +217,7 @@
 /* The one line on the page somebody is actually acting on. */
 .pay__balance {
   border-top: 1px solid var(--rule-strong);
-  font-weight: 500;
+  font-weight: 400;
 }
 
 /* `.detail__value` stacks its children in a column, which put the copy
@@ -353,7 +353,7 @@
    afterwards — and which happened on staging past a grey note saying so. */
 .pay__over {
   color: var(--owed);
-  font-weight: 500;
+  font-weight: 400;
 }
 
 .pay__copy-message {
@@ -366,3 +366,8 @@
   max-width: 42rem;
   padding: var(--space-4);
 }
+
+/* Measured against the export: its headline figure is 32px, and a month-end
+ * total is the same kind of number as Home's. Ours sat a step small. */
+.payments__total .money,
+.payments__hero .money { font-size: 32px; }

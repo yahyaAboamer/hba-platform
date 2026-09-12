@@ -146,14 +146,14 @@ a {
 }
 
 .money--zero {
-  color: var(--rule-strong);
+  color: var(--faint);
 }
 
 /* Codes, months, order numbers. Things that line up in a column. */
 .code {
   /* The code under a name — HBA15, MALAK10 — sits in the faint tier in the
    * approved export. It identifies the row rather than competing with it. */
-  font-size: var(--text-sm);
+  font-size: 12px;
   letter-spacing: -0.01em;
   color: var(--faint);
 }
@@ -359,7 +359,7 @@ a {
   border-radius: var(--radius);
   background: var(--surface);
   font-size: var(--text-sm);
-  font-weight: 500;
+  font-weight: 400;
   cursor: pointer;
 }
 
@@ -368,7 +368,7 @@ a {
 }
 
 .button:disabled {
-  color: var(--rule-strong);
+  color: var(--faint);
   cursor: not-allowed;
 }
 
@@ -490,4 +490,16 @@ a {
 .glossary-link:focus-visible {
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+
+/* -- Weight, measured against the approved export -------------------------
+ *
+ * The export uses 400 for nearly everything and reserves 500 for a page title
+ * and the one bold figure. Ours had 500 on every row name, every label and
+ * every button: individually invisible, together the reason the whole tool
+ * read a step heavier than the reference.
+ */
+.table td strong,
+.table th strong {
+  font-weight: 400;
 }

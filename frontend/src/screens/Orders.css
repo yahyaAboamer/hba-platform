@@ -40,7 +40,7 @@
 
 .orders__count {
   font-size: var(--text-lg);
-  font-weight: 500;
+  font-weight: 400;
 }
 
 .orders__count--refused {
@@ -80,7 +80,7 @@
 .orders__name {
   color: var(--ink);
   text-decoration: none;
-  font-weight: 500;
+  font-weight: 400;
 }
 
 .orders__name:hover {
@@ -157,7 +157,7 @@
 .orders__lens--on {
   border-color: var(--ink);
   color: var(--ink);
-  font-weight: 500;
+  font-weight: 400;
 }
 
 .orders__lens:focus-visible {

@@ -1,0 +1,25 @@
+# The approved export's complete type scale — colour/size/weight.
+#
+# Collected 12 September 2026 by walking every admin screen in
+# `designs/Admin Dashboard.dc.html` and recording the computed colour, size
+# and weight of every leaf element that renders.
+#
+# **This is the check that screenshots could not do.** Comparing two pictures
+# finds whatever somebody happens to notice; comparing every element's voice
+# against this list finds what is actually there. Three rounds of "the whites
+# look grey" were one `-webkit-font-smoothing` and one `.money` colour, and
+# neither was visible in a colour swatch.
+#
+# A voice of ours that is absent here is not automatically wrong — our screens
+# carry controls the prototype has no equivalent for — but it is worth a look
+# every time.
+23a95c/10/400 23a95c/11.5/400 23a95c/12/400 23a95c/12.5/400 23a95c/13/400
+23a95c/13.5/400 23a95c/14/400
+7be0a6/11/400 7be0a6/12.5/400
+8a918a/9.5/400 8a918a/10/400 8a918a/11/400 8a918a/11.5/400 8a918a/12/400
+8a918a/12.5/400 8a918a/13.3333/400 8a918a/13.5/400 8a918a/14/400
+a7ada6/12.5/400 a7ada6/13/400 a7ada6/13.5/400 a7ada6/14/400
+e0a458/11/400 e0a458/12.5/400
+e2705f/12.5/400
+ecefea/12/500 ecefea/12.5/400 ecefea/12.5/700 ecefea/13/400 ecefea/13.5/400
+ecefea/14/400 ecefea/15/400 ecefea/18/500 ecefea/25/500 ecefea/32/400

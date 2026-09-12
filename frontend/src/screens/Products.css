@@ -54,7 +54,7 @@
 
 .products__name {
   font-size: var(--text-sm);
-  font-weight: 500;
+  font-weight: 400;
   line-height: 1.35;
 }
 
@@ -222,6 +222,8 @@
 }
 
 .products__status {
+  font-size: 11.5px;
+  color: var(--quiet);
   padding: 3px 9px;
   border: 1px solid var(--rule);
   border-radius: 999px;
@@ -251,3 +253,7 @@
 .products__table th.products__figure {
   text-align: right;
 }
+
+/* The arrow at the end of a row is the export's faint tier at 13.5px, the
+ * same as the roster's. */
+.products__go { font-size: 13.5px; }

@@ -52,14 +52,14 @@
 }
 
 .affiliates__figures strong {
-  font-weight: 500;
+  font-weight: 400;
   color: var(--ink);
 }
 
 .affiliates__name {
   color: var(--ink);
   text-decoration: none;
-  font-weight: 500;
+  font-weight: 400;
 }
 
 .affiliates__name:hover {
@@ -292,7 +292,20 @@
   background: transparent;
   color: var(--quiet);
   font-size: 13px;
+  font-weight: 400;
   cursor: pointer;
+}
+
+/* The count rides inside the label, as the export writes it — *Active 19*,
+ * not a separate badge. It is the number that makes the segment worth
+ * clicking rather than a decoration beside it. */
+.affiliates__segment-count {
+  margin-left: 6px;
+  color: var(--faint);
+}
+
+.affiliates__segment--on .affiliates__segment-count {
+  color: inherit;
 }
 
 .affiliates__segment--on {
@@ -369,3 +382,46 @@
 .affiliates__table th.affiliates__figure {
   text-align: right;
 }
+
+/* Measured from the export: both roster actions are accent text on an accent
+ * tint with an accent border, at 13.5px regular — not a filled light button
+ * with dark text at 500. A filled button was the loudest thing on a screen
+ * whose job is to be read. */
+.affiliates__controls .button,
+.affiliates__controls button:not(.affiliates__view-button) {
+  min-height: 38px;
+  padding: 10px 14px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-size: 13.5px;
+  font-weight: 400;
+}
+
+/* The layout toggle borrows the same shape rather than inverting to a filled
+ * chip, which made it read as the page's primary action. */
+.affiliates__view-button {
+  background: transparent;
+  color: var(--quiet);
+  font-size: 13px;
+}
+
+.affiliates__view-button--on {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+/* A status is coloured by what it means: green where she is earning, amber
+ * where somebody has to act, faint where she has left. White said all three
+ * in the same voice. */
+.affiliates__status { font-size: 11.5px; }
+.affiliates__status--active { border-color: var(--accent); color: var(--accent-text); }
+.affiliates__status--pending { border-color: var(--owed); color: var(--owed); }
+.affiliates__status--archived { border-color: var(--rule); color: var(--faint); }
+
+.affiliates__go { font-size: 13.5px; }
+
+/* The two lines above the table are a summary, not a heading. */
+.affiliates__figures { font-size: 12.5px; }
+.affiliates__figures strong { font-weight: 400; }
