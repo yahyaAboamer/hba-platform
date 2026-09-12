@@ -130,3 +130,17 @@
   font-size: 11px;
   text-transform: none;
 }
+
+/* A guarantee top-up is the platform having made somebody whole, so the
+ * export says it in the lifted green rather than the ordinary ink. */
+.overview__parts--lift dd { color: var(--accent-lift); }
+
+/* The export's second line on a notice: which model, which order. One line —
+ * the business asked for one-liners and this is the half that names the
+ * thing rather than explaining it. */
+.overview__notice-copy small {
+  display: block;
+  margin-top: 3px;
+  font-size: 12.5px;
+  color: var(--quiet);
+}

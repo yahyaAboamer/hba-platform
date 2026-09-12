@@ -448,11 +448,17 @@ def test_selling_a_product_does_not_require_owning_it(db):
 
 
 def test_the_content_panel_carries_a_row_for_every_model(db):
-    """Every model, not only the ones in trouble.
+    """**The API answers for everybody; the panel reviews six.**
 
-    The panel is read to find out where content stands, and a table that hid
-    the models who are fine would answer *who is behind* while looking like it
-    answered *how is the month going*.
+    The approved Home shows only the models needing review, worst first, at
+    most six — a model who has produced everything asked of her is not
+    something to review, and listing her pushes somebody who needs chasing off
+    the bottom.
+
+    That narrowing belongs to the screen, not to this read: the same rows feed
+    the roster's content column, which *does* answer for every model. Filtering
+    here would make the two disagree and leave no way to ask the broader
+    question at all.
     """
     first = _model(db, "Nour")
     second = _model(db, "Salma")

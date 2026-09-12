@@ -118,7 +118,7 @@ payroll without touching a maintainer screen.
 
   Then empty the database and re-run the file alone. Happened 10 September and
   cost the best part of an hour.
-- Frontend: `cd frontend && npm test` (296), `npx tsc --noEmit` and
+- Frontend: `cd frontend && npm test` (302), `npx tsc --noEmit` and
   `npm run build`.
 - **A browser session is now possible.** Yahya signs in himself at
   `https://hba-platform-staging-staging.up.railway.app/sign-in` and the session

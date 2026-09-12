@@ -38,7 +38,11 @@ type Attention = {
     key: string;
     severity: "blocking" | "attention";
     text: string;
+    /** The export's second line, naming which model or which order. */
+    detail: string | null;
     where: string;
+    /** The words on the button — *Open correction*, not *Open*. */
+    action: string;
   }[];
   blocking: number;
   /** Still true, still unresolved, and somebody chose to stop seeing it. */
@@ -112,30 +116,6 @@ type Summary = {
 };
 
 /** D08's three, and only the last is about her. */
-/**
- * What the notice's button says, by where it goes.
- *
- * The design gives each notice a labelled action - *Open sync*, not *Open* -
- * because the label is what makes the row scannable: the owner reads down the
- * buttons and knows what each one costs her before she reads the sentence.
- *
- * **No detail line.** The design shows one, and the owner has already ruled on
- * it: *"this is too much and as an admin I don't need all of this. Just one
- * liners."* What is wrong, how many, and where to go - the explanation was
- * never the useful part.
- */
-function actionFor(where: string): string {
-  const [path, query] = where.split("?");
-  if (path.startsWith("/affiliates") && query?.includes("pending")) return "Open applications";
-  if (path.startsWith("/affiliates")) return "Open roster";
-  if (path.startsWith("/payments")) return "Open payments";
-  if (path.startsWith("/payroll")) return "Open payroll";
-  if (path.startsWith("/orders")) return "Open orders";
-  if (path.startsWith("/targets")) return "Open targets";
-  if (path.startsWith("/products")) return "Open products";
-  return "Open settings";
-}
-
 const REVIEW_TEXT: Record<string, string> = {
   no_target: "nothing asked for yet",
   not_recorded_this_week: "nothing recorded this week",
@@ -156,6 +136,49 @@ export function progressLabel(
 ): string | null {
   if (required === null) return null;
   return `${done ?? 0} / ${required}`;
+}
+
+/** *Sep*, as the export abbreviates it on the count card. */
+function shortMonth(month: string): string {
+  return new Date(`${month}-01T00:00:00`).toLocaleDateString("en-GB", {
+    month: "short",
+  });
+}
+
+/**
+ * **Only the models needing review**, worst first, at most six.
+ *
+ * The panel is called *Content progress to review* and the export means it:
+ * a model who has produced everything asked of her is not something to
+ * review, and listing her pushes the one who has produced nothing off the
+ * bottom. Nothing recorded at all sorts above any shortfall, because it is
+ * the case somebody has to chase rather than measure.
+ *
+ * Six, because this is a panel beside another panel and not a screen. The
+ * whole table is one click away under *Targets →*.
+ */
+export function toReview<T extends {
+  required_videos: number | null;
+  required_stories: number | null;
+  actual_videos: number | null;
+  actual_stories: number | null;
+}>(rows: T[]): T[] {
+  const shortfall = (row: T) => {
+    if (row.required_videos === null) return null; // nobody asked
+    if (row.actual_videos === null && row.actual_stories === null) return null;
+    return (
+      Math.max((row.required_videos ?? 0) - (row.actual_videos ?? 0), 0) +
+      Math.max((row.required_stories ?? 0) - (row.actual_stories ?? 0), 0)
+    );
+  };
+  return rows
+    .map((row) => ({ row, short: shortfall(row) }))
+    // `null` is *nothing recorded* — which includes nobody having asked. Both
+    // need a person; neither can be measured.
+    .filter((x) => x.short === null || x.short > 0)
+    .sort((a, b) => (b.short ?? Infinity) - (a.short ?? Infinity))
+    .slice(0, 6)
+    .map((x) => x.row);
 }
 
 /** The day it was written down. The time of day decides nothing here. */
@@ -276,8 +299,11 @@ export function Overview({ session }: { session: Session }) {
         {attention.items.filter(item => !hidden.includes(item.key)).map(item => <div key={item.key}
           className={`overview__notice ${item.severity === "blocking" ? "overview__notice--blocking" : ""}`}>
           <span className="overview__notice-dot" aria-hidden="true" />
-          <div className="overview__notice-copy"><span>{item.text}</span></div>
-          <Link className="button" to={item.where}>{actionFor(item.where)}</Link>
+          <div className="overview__notice-copy">
+            <span>{item.text}</span>
+            {item.detail && <small>{item.detail}</small>}
+          </div>
+          <Link className="button" to={item.where}>{item.action}</Link>
           <button className="button" aria-label={`Options for ${item.text}`} aria-expanded={noticeMenu === item.key}
             onClick={() => setNoticeMenu(noticeMenu === item.key ? null : item.key)}>⋯</button>
           <button className="button" aria-label={`Dismiss ${item.text}`} onClick={() => hide(item.key)}>×</button>
@@ -317,7 +343,7 @@ export function Overview({ session }: { session: Session }) {
               <dl className="overview__parts">
                 <div><dt>Fixed salary</dt><dd><Money piastres={summary.expected.fixed_piastres} /></dd></div>
                 <div><dt>Commission</dt><dd><Money piastres={summary.expected.commission_piastres} /></dd></div>
-                {summary.expected.guarantee_top_up_piastres > 0 && <div><dt>Guaranteed minimum top-ups</dt><dd><Money piastres={summary.expected.guarantee_top_up_piastres} /></dd></div>}
+                {summary.expected.guarantee_top_up_piastres > 0 && <div className="overview__parts--lift"><dt>Guarantee top-ups</dt><dd><Money piastres={summary.expected.guarantee_top_up_piastres} /></dd></div>}
               </dl>
             </>}
             <Link to={`/payments?month=${month}`}>Open {formatMonth(month)} in Payments →</Link>
@@ -325,7 +351,7 @@ export function Overview({ session }: { session: Session }) {
           <section className="overview__card overview__card--count">
             <h2>Active models</h2><div className="overview__hero-value">{summary.active_models}</div>
             <p className="overview__card-note">
-              {summary.active_models} collaborating in {formatMonth(month)}
+              {summary.active_models} collaborating in {shortMonth(month)}
             </p>
             <Link to="/affiliates">Open roster →</Link>
           </section>
@@ -333,7 +359,7 @@ export function Overview({ session }: { session: Session }) {
         <div className="overview__lower">
           <section className="panel">
             <div className="panel__head"><h2 className="panel__title">Top three by generated sales</h2></div>
-            {summary.top.length === 0 ? <p className="empty">No attributed sales this month yet.</p> :
+            {summary.top.length === 0 ? <p className="empty">No attributed sales in {formatMonth(month)} yet.</p> :
               <ol className="overview__top">{summary.top.map(row => <li key={row.affiliate_id}>
                 <span className="overview__place">{row.rank}</span>
                 <span className="layout__avatar" aria-hidden="true">{row.name.charAt(0)}</span>
@@ -349,11 +375,11 @@ export function Overview({ session }: { session: Session }) {
               <h2 className="panel__title">Content progress to review</h2>
               <Link to={`/targets?month=${month}`}>Targets →</Link>
             </div>
-            {summary.content.length === 0 ? <p className="empty">No models to review this month.</p> : <>
+            {toReview(summary.content).length === 0 ? <p className="empty">Every model's record is up to date for {formatMonth(month)}.</p> : <>
               <table className="table overview__content">
                 <thead><tr><th>Model</th><th>Videos</th><th>Stories</th><th>Last update</th></tr></thead>
                 <tbody>
-                  {summary.content.map(row => <tr key={row.affiliate_id}>
+                  {toReview(summary.content).map(row => <tr key={row.affiliate_id}>
                     <td><Link to={`/affiliates/${row.affiliate_id}?section=targets&month=${month}`}>{row.name}</Link></td>
                     <td>{progressLabel(row.actual_videos, row.required_videos)
                       ?? <span className="overview__unrecorded">—</span>}</td>

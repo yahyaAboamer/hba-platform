@@ -688,9 +688,37 @@ def attention(
         if row.key not in UNMUTABLE
     }
 
-    def add(key: str, severity: str, text: str, where: str) -> None:
+    def add(
+        key: str,
+        severity: str,
+        text: str,
+        where: str,
+        action: str,
+        detail: str | None = None,
+    ) -> None:
+        """One notice, and **the words on its own button**.
+
+        The approved export gives every notice a named action — *Open
+        applications*, *Open correction*, *Open sync* — so the column can be
+        read down the buttons. The browser used to derive the verb from the
+        route, which produced *Open settings* four times over for four
+        unrelated problems.
+
+        `detail` is the export's second line, and it is **one line**: the
+        business's verdict on the first draft was *"this is too much and as an
+        admin I don't need all of this. Just one liners."* A short second line
+        naming the thing - which model, which order - is what makes the notice
+        actionable without opening it. A paragraph is not.
+        """
         items.append(
-            {"key": key, "severity": severity, "text": text, "where": where}
+            {
+                "key": key,
+                "severity": severity,
+                "text": text,
+                "detail": detail,
+                "where": where,
+                "action": action,
+            }
         )
 
     # -- The one that stops everything ---------------------------------------
@@ -700,6 +728,8 @@ def attention(
             BLOCKING,
             "No go-live month is set, so nothing can be approved.",
             "/settings",
+            "Open settings",
+            "Until it is set, no month can be agreed and no model can be paid.",
         )
 
     # -- Mail ----------------------------------------------------------------
@@ -707,7 +737,14 @@ def attention(
     # The most likely thing to be silently wrong, and the least likely to be
     # noticed: nothing errors, people simply never hear.
     if not settings.mail_configured:
-        add("mail_not_configured", ATTENTION, "No email is being sent.", "/settings")
+        add(
+            "mail_not_configured",
+            ATTENTION,
+            "No email is being sent.",
+            "/settings",
+            "Open settings",
+            "Invitations and receipts are written and never delivered.",
+        )
 
     failed_mail = db.scalar(
         select(func.count())
@@ -720,6 +757,8 @@ def attention(
             ATTENTION,
             f"{failed_mail} email{_s(failed_mail)} did not arrive.",
             "/settings",
+            "Open settings",
+            "They can be sent again without writing them a second time.",
         )
 
     # -- Work that did not happen --------------------------------------------
@@ -734,6 +773,8 @@ def attention(
             ATTENTION,
             f"{failed_jobs} piece{_s(failed_jobs)} of order syncing failed.",
             "/settings",
+            "Open sync",
+            "Sales in those orders are not attributed to anybody yet.",
         )
 
     # -- Orders nobody owns --------------------------------------------------
@@ -757,6 +798,8 @@ def attention(
             ATTENTION,
             f"{unowned} discount code{_s(unowned)} on orders belong{'s' if unowned == 1 else ''} to no model.",
             "/settings",
+            "Open codes",
+            "Whoever earned on them is not being credited.",
         )
 
     # -- Orders two models both claim ----------------------------------------
@@ -781,6 +824,8 @@ def attention(
             BLOCKING,
             f"{held} order{_s(held)} carry two models' codes and need a decision.",
             "/orders",
+            "Open orders",
+            "Nobody is credited until somebody says which model it belongs to.",
         )
 
     # -- Reopened and forgotten ----------------------------------------------
@@ -796,6 +841,8 @@ def attention(
             if len(months) == 1
             else f"{len(months)} months were reopened and never agreed again.",
             "/payroll",
+            "Open payroll",
+            "A month left open is a month nobody is being paid for.",
         )
 
     # -- The reminder --------------------------------------------------------
@@ -819,6 +866,8 @@ def attention(
                 f"{unapproved} model{_s(unapproved)} still unapproved for "
                 f"{_month_words(previous)}.",
                 "/payroll",
+                "Open payroll",
+                "The month cannot close while any model is still unapproved.",
             )
 
     return {

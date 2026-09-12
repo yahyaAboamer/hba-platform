@@ -39,12 +39,21 @@
   position: absolute;
   z-index: 20;
   top: calc(100% + var(--space-1));
-  left: 0;
+  /* **Hangs from the trigger's right edge.** The picker sits at the right of
+   * a page header, so a panel anchored left ran off the screen and took half
+   * its own month grid and its whole legend with it. Nobody could reach
+   * March, and the legend explaining the locks was never visible at all. */
+  right: 0;
+  left: auto;
   width: 17rem;
+  max-width: calc(100vw - var(--space-4) * 2);
   padding: var(--space-3);
   border: 1px solid var(--rule-strong);
   border-radius: var(--radius);
-  background: var(--surface);
+  /* Lifted off the page rather than flush with it: it overlaps cards, and a
+   * surface-coloured panel on a surface-coloured card has no edge. */
+  background: var(--raise);
+  box-shadow: var(--elev);
 }
 
 .month-picker__years {
@@ -132,9 +141,8 @@
 }
 
 .month-picker__legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1) var(--space-3);
+  display: grid;
+  gap: var(--space-1);
   margin: var(--space-3) 0 0;
   padding: var(--space-3) 0 0;
   border-top: 1px solid var(--rule);

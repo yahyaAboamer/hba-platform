@@ -42,14 +42,18 @@
   margin-bottom: var(--space-5);
 }
 
+/* **Stacked, as the export draws it**: the screen's name, and under it what
+ * it is currently answering for. Side by side, the month read as part of the
+ * heading — "Home September 2026" is a different sentence from "Home", and
+ * the eye has to separate them every time. */
 .page__title {
   display: flex;
-  align-items: baseline;
-  gap: var(--space-3);
+  flex-direction: column;
+  gap: 2px;
 }
 
 .page__subtitle {
-  font-size: var(--text-sm);
+  font-size: 12.5px;
   color: var(--quiet);
 }
 
