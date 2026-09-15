@@ -671,16 +671,17 @@
   font-size: 12.5px;
 }
 
+/* A grid rather than wrapping flex: a row that is not full keeps its tiles at
+   the width of the rows above it instead of stretching the last one. */
 .terms__months {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
   gap: 7px;
   margin-top: 13px;
 }
 
 .terms__month {
-  flex: 1 1 72px;
-  min-width: 70px;
+  min-width: 0;
   min-height: 56px;
   padding: 8px 6px;
   border: 1px solid var(--rule);

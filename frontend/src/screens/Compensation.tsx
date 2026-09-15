@@ -128,6 +128,14 @@ export function Compensation() {
 
   const years = [...new Set(data.months.map((row) => row.month.slice(0, 4)))];
   const monthsOfYear = data.months.filter((row) => row.month.startsWith(year));
+  /*
+   * The export draws a whole year of twelve. The server lists months only up
+   * to the working month, so the rest of the year is drawn as tiles that
+   * cannot be chosen yet - otherwise September sat alone on a second row,
+   * stretched across the whole card.
+   */
+  const laterThisYear = Array.from({ length: 12 }, (_, index) => `${year}-${String(index + 1).padStart(2, "0")}`)
+    .filter((month) => !monthsOfYear.some((row) => row.month === month));
   const editable = (row: MonthRow) => row.month >= startMonth && !row.approved;
   const ordered = [...sel].sort();
   const selectedTerms = ordered.map((month) => set[month]);
@@ -316,6 +324,13 @@ export function Compensation() {
                 </button>
               );
             })}
+            {laterThisYear.map((month) => (
+              <button key={month} type="button" className="terms__month" disabled>
+                <span className="terms__month-name">{shortMonth(month)}</span>
+                <span className="terms__month-what">Not yet</span>
+                <span className="terms__month-note">—</span>
+              </button>
+            ))}
           </div>
 
           <div className="terms__selection">
