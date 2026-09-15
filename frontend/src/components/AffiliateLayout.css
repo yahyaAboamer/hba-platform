@@ -21,20 +21,12 @@
 .phead {
   display: flex;
   align-items: center;
-  gap: var(--space-4);
-  min-height: 3.25rem;
-  margin-bottom: var(--space-4);
-}
-
-.phead--back {
-  justify-content: flex-start;
-}
-
-.phead__back {
-  padding: var(--space-2) var(--space-1);
-  color: var(--accent-text);
-  font-size: var(--text-sm);
-  text-decoration: none;
+  gap: 10px;
+  padding: 12px 0 13px;
+  margin-bottom: 14px;
+  /* The export rules the header off from the screen under it, which is what
+     stops a scrolled list from appearing to start inside her name. */
+  border-bottom: 1px solid var(--rule);
 }
 
 .phead__avatar {
@@ -42,14 +34,13 @@
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  width: 2.25rem;
-  height: 2.25rem;
+  width: 40px;
+  height: 40px;
   border: 1px solid var(--rule);
   border-radius: 50%;
   background: var(--accent-soft);
-  color: var(--accent-text);
-  font-size: var(--text-base);
-  font-weight: 600;
+  color: var(--accent);
+  font-size: 16px;
   text-decoration: none;
 }
 
@@ -63,9 +54,8 @@
 
 .phead__name {
   display: block;
-  font-size: var(--text-base);
-  font-weight: 600;
-  line-height: 1.2;
+  font-size: 15px;
+  line-height: 1.25;
   /* Truncated rather than wrapped. Wrapping a long name pushes the code
      button off the bottom of a 3.25rem header; an ellipsis keeps the row one
      line tall whatever is in it, and the full name is the heading on the You
@@ -79,7 +69,7 @@
   display: block;
   overflow: hidden;
   color: var(--quiet);
-  font-size: var(--text-xs);
+  font-size: 12.5px;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
@@ -102,49 +92,6 @@
 
 .phead__code:hover {
   background: var(--accent-soft);
-}
-
-/* ── Which month ────────────────────────────────────────────────────────── */
-
-.months {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  margin-bottom: var(--space-4);
-  padding-bottom: var(--space-3);
-  border-bottom: 1px solid var(--rule);
-}
-
-.months__current {
-  font-size: var(--text-base);
-  font-weight: 500;
-  letter-spacing: -0.02em;
-}
-
-/* Wide enough to press without looking. 44px is the smallest target that is
-   reliably hit on a phone held one-handed. */
-.months__step {
-  min-width: 2.75rem;
-  min-height: 2.75rem;
-  padding: 0;
-  border: 1px solid var(--rule);
-  border-radius: var(--radius);
-  background: transparent;
-  color: var(--ink);
-  font-size: var(--text-base);
-  cursor: pointer;
-}
-
-.months__step:hover:not(:disabled) {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-}
-
-.months__step:disabled {
-  border-color: var(--rule);
-  color: var(--faint);
-  cursor: default;
 }
 
 /* ── The tab bar ────────────────────────────────────────────────────────── */
@@ -176,11 +123,14 @@
 .tabs__tab {
   flex: 1;
   min-width: 0;
-  padding: var(--space-4) var(--space-1);
+  min-height: 56px;
+  /* Bottom-heavy on purpose: the extra 20px is what keeps the label clear of
+     the home indicator on a phone without shrinking the target. */
+  padding: 11px 2px 20px;
   border-top: 2px solid transparent;
   margin-top: -1px;
   color: var(--quiet);
-  font-size: var(--text-sm);
+  font-size: 12px;
   text-align: center;
   text-decoration: none;
 }
@@ -201,20 +151,16 @@
   outline-offset: -2px;
 }
 
-/* What state the month is in, under its name. The bar names a month; this
-   says whether its figure is finished — which is the first thing somebody
-   wants to know on arriving at a month that is not the current one. */
-.months__state {
-  display: block;
-  margin-top: var(--space-1);
-  font-family: var(--sans);
-  font-size: 10px;
-  font-weight: 400;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--faint);
-}
-
 .phead__inline-code { padding:0; border:0; color:var(--accent-text); background:none; font:inherit; cursor:pointer; }
-.phead__month { max-width:145px; min-height:36px; padding:7px 9px; border:1px solid var(--rule); border-radius:8px; color:var(--ink); background:var(--surface); font-size:12px; }
-.phead--back { justify-content:flex-start; gap:14px; font-size:15px; }
+.phead__month { max-width:145px; min-height:38px; padding:9px 11px; border:1px solid var(--rule); border-radius:8px; color:var(--ink); background:transparent; font-size:13px; }
+
+/* ── A view that is not one of the five ─────────────────────────────────
+ *
+ * A way back and the name of where you are. The title is centred against the
+ * whole header and given the width of the back button on its right, so it
+ * reads as centred on the screen rather than on the space left over.
+ */
+.phead--back { gap:10px; }
+.phead__back { flex:none; padding:9px 11px; border:1px solid var(--rule); border-radius:8px; background:transparent; color:var(--ink); font:inherit; font-size:13px; cursor:pointer; }
+.phead__back:hover { border-color:var(--accent); }
+.phead__title { flex:1; min-width:0; padding-right:60px; font-size:15px; text-align:center; }

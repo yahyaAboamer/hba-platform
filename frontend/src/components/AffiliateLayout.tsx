@@ -4,6 +4,7 @@ import {
   NavLink,
   Outlet,
   useLocation,
+  useNavigate,
   useOutletContext,
 } from "react-router-dom";
 
@@ -72,6 +73,7 @@ export function PortalHeader({
   month?: string; months?: string[]; onMonth?: (month: string) => void;
 }) {
   const { pathname } = useLocation();
+  const navigate = useNavigate();
   const [copied, setCopied] = useState(false);
 
   const secondaryTitles: Record<string,string> = {"/you":"You", "/earnings":"How this adds up", "/payments":"Payment history", "/you/payout":"Payment details", "/glossary":"Help", "/best":"All products sold"};
@@ -79,10 +81,20 @@ export function PortalHeader({
   if (!isPrimary) {
     return (
       <header className="phead phead--back">
-        <Link to="/" className="phead__back">
+        {/*
+         * Back to wherever she came from, not to Home. *All products sold* is
+         * reached from the wardrobe and the payment detail from the payment
+         * list, and a Back that always went Home would throw away her place
+         * both times. Home is the fallback for somebody who arrived on a link.
+         */}
+        <button
+          type="button"
+          className="phead__back"
+          onClick={() => (window.history.length > 1 ? navigate(-1) : navigate("/"))}
+        >
           ← Back
-        </Link>
-        <span>{secondaryTitles[pathname] ?? "Details"}</span>
+        </button>
+        <span className="phead__title">{secondaryTitles[pathname] ?? "Details"}</span>
       </header>
     );
   }

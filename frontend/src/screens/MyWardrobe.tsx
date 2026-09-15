@@ -105,8 +105,10 @@ export function WardrobeContents({ body, best = null }: { body: Wardrobe; best?:
                   <Picture source={request.image_url} />
                   <div className="wardrobe__copy">
                     <span className="wardrobe__name">{request.title ?? received?.title ?? incoming?.title ?? "Product"}</span>
-                    {received && <span className="wardrobe__state">In your wardrobe</span>}
-                    {!received && incoming && <span className="wardrobe__state">On its way</span>}
+                    {/* Whether she has it decides whether the request is one
+                        she can act on today, so it carries the tone. */}
+                    {received && <span className="wardrobe__state wardrobe__state--have">In your wardrobe</span>}
+                    {!received && incoming && <span className="wardrobe__state wardrobe__state--coming">On its way</span>}
                     <p className="wardrobe__ask">{request.message}</p>
                   </div>
                 </li>
@@ -141,7 +143,7 @@ export function WardrobeContents({ body, best = null }: { body: Wardrobe; best?:
 
       {waiting.length > 0 && (
         <section className="wardrobe__incoming">
-          <h2 className="wardrobe__title">Not received yet</h2>
+          <h2 className="wardrobe__title wardrobe__title--inset">Not received yet</h2>
           <ul className="wardrobe__waiting">
             {waiting.map((item) => (
               <li key={item.shopify_product_id ?? `${item.shopify_order_id}:${item.title}`}>
@@ -149,7 +151,7 @@ export function WardrobeContents({ body, best = null }: { body: Wardrobe; best?:
                   <span className="wardrobe__name">{item.title}</span>
                   {item.size && <span className="wardrobe__size">Size {item.size}</span>}
                 </div>
-                <span className={`wardrobe__state${item.state === "failed" ? " wardrobe__state--failed" : ""}`}>
+                <span className={`wardrobe__state ${item.state === "failed" ? "wardrobe__state--failed" : "wardrobe__state--coming"}`}>
                   {item.state === "failed" ? "Failed delivery" : "Processing"}
                 </span>
               </li>
