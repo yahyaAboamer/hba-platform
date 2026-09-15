@@ -54,7 +54,7 @@ had the wrong filter names.
 | A3 | `vProducts` | 313–373 + script 2580 | `/products` `Products.tsx` | Implemented · dark checked on staging | Three filters, coverage bar, Active pill, pager. *All products* and paging exercised on staging |
 | A4 | `vTargets` | 465–525 | `/targets` `Targets.tsx` | Implemented · dark checked on staging | §T. Checked at 1536 CSS px, dark; element sizes measured. Pending: 1280/1440, light, a save and a confirm exercised |
 | A5 | `vPayments` | 526–597 | `/payments` `Payments.tsx` | Implemented · dark checked on staging | §P. Card 101 vs export 101px, row 82 vs 84px. Pending: 1280/1440, light, Record/Open actions exercised |
-| A6 | `vSettings` | 598–786 | `/settings` `Settings.tsx` | Mapped | Not yet re-read under the script-reading method |
+| A6 | `vSettings` | 598–786 + script 3515 | `/settings` `Settings.tsx`, `DataPanel.tsx` | Team and Shopify implemented; Historical, Brand codes, Reference mapped | Rail, Team (staff, invite row, pending invitations with Resend) and Appearance switch done. Shopify and sync: store card, Connection card, operations behind *Technical detail*; *Read the catalogue* stands in for the export's *Refresh now*, which has no single backend act. Historical setup lacks the export's *Earliest terms* and *State* columns (not in the roster payload) and its bulk *Review months* button (no such operation). Reference: title renamed *Policy in force*; the version editor and activity filter are kept |
 | A7 | `vOrders` | 1060–1091 + script 3010 | `/orders` `Orders.tsx` | Implemented · dark checked on staging | Five columns, counted line, load-more. A row opening its order exercised on staging |
 
 ## B. Admin — secondary views

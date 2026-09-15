@@ -363,3 +363,104 @@
   font-size: 13px;
   color: var(--quiet);
 }
+
+/* ── Shopify and sync, measured off the export's Settings (lines 650–690) ── */
+
+.sync__card + .sync__card {
+  margin-top: 0;
+}
+
+.sync__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.sync__store {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 400;
+}
+
+.sync__state {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 7px;
+  font-size: 13px;
+}
+
+.sync__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.sync__dot--approved { background: var(--accent); }
+.sync__dot--owed { background: var(--owed); }
+.sync__dot--refused { background: var(--refused); }
+.sync__dot--quiet { background: var(--faint); }
+
+.sync__tone--approved { color: var(--accent); }
+.sync__tone--owed { color: var(--owed); }
+.sync__tone--refused { color: var(--refused); }
+.sync__tone--quiet { color: var(--faint); }
+
+.sync__when {
+  font-size: 12.5px;
+  color: var(--faint);
+}
+
+.sync__error,
+.sync__notice {
+  margin: 13px 0 0;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.sync__error {
+  border: 1px solid var(--refused);
+  background: var(--refused-quiet);
+  color: var(--refused);
+}
+
+.sync__notice {
+  border: 1px solid var(--accent);
+  background: var(--accent-soft);
+}
+
+.sync__rows {
+  margin: 4px 0 0;
+}
+
+.sync__rows > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--rule);
+  font-size: 13px;
+}
+
+.sync__rows dt {
+  color: var(--quiet);
+}
+
+.sync__rows dd {
+  margin: 0;
+}
+
+.sync__toggle {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-size: 13px;
+  cursor: pointer;
+}

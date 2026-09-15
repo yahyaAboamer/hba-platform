@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 
 import { api } from "../lib/api";
 import { formatMonth } from "../lib/money";
+import "./PaymentDetail.css";
 
 type Sync = {
   shopify_configured: boolean;
@@ -96,7 +97,23 @@ const EARLIEST = "2026-01-01";
  * "three codes belong to nobody" and "two emails could not be delivered", and
  * a number nobody can take apart is a number nobody can act on.
  */
-export function DataPanel() {
+/**
+ * *Shopify and sync* — the export's Settings subsection.
+ *
+ * A card saying whether the shop is connected and when an order last arrived,
+ * a card of what the connection is, and *Technical detail* behind a toggle.
+ *
+ * Everything this panel used to lay out at once - the history import, the
+ * catalogue read, parcel matching, codes that belong to nobody, emails that
+ * never arrived, work that stopped - is kept, behind that toggle. None of it
+ * is in the export, and all of it is real work somebody sometimes has to do.
+ *
+ * **No *Refresh now* that refreshes nothing.** The export's button re-reads
+ * the shop; orders here arrive by webhook and scheduled sync, and there is no
+ * single refresh to start. The one read that is safe to run on demand is the
+ * catalogue, so that is what the button does and what it says.
+ */
+export function DataPanel({ goLiveMonth }: { goLiveMonth: string | null }) {
   const [sync, setSync] = useState<Sync | null>(null);
   const [jobs, setJobs] = useState<FailedJob[] | null>(null);
   const [codes, setCodes] = useState<UnownedCode[] | null>(null);
@@ -110,6 +127,7 @@ export function DataPanel() {
   const [parcels, setParcels] = useState<Unmatched[] | null>(null);
   const [parcelSummary, setParcelSummary] = useState<ParcelSummary | null>(null);
   const [scanning, setScanning] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
 
   const load = useCallback(() => {
     Promise.all([
@@ -191,20 +209,68 @@ export function DataPanel() {
     }
   }
 
-  return (
-    <section className="panel settings__panel">
-      <div className="panel__head">
-        <h2 className="panel__title">Shopify &amp; data</h2>
-      </div>
+  const failed = sync?.jobs.failed ?? 0;
+  const tone = !sync ? "quiet" : !sync.shopify_configured ? "refused" : failed > 0 ? "owed" : "approved";
 
-      <div className="data__body">
-        {error && (
-          <p className="notice notice--refused" role="alert">
-            {error}
+  return (
+    <>
+      <section className="pay-detail__card sync__card">
+        <div className="sync__head">
+          <div>
+            <h2 className="sync__store">hbawear.store</h2>
+            <div className="sync__state">
+              <span className={`sync__dot sync__dot--${tone}`} aria-hidden="true" />
+              <span className={`sync__tone--${tone}`}>
+                {!sync ? "Checking…" : !sync.shopify_configured ? "Not connected" : failed > 0 ? "Connected, with work that stopped" : "Connected"}
+              </span>
+              {sync?.last_order_synced_at && (
+                <span className="sync__when">· last order arrived {when(sync.last_order_synced_at)}</span>
+              )}
+            </div>
+          </div>
+          <button
+            type="button"
+            className="button button--primary"
+            onClick={syncCatalogue}
+            disabled={syncingCatalogue || !sync?.shopify_configured}
+          >
+            {syncingCatalogue ? "Reading…" : "Read the catalogue"}
+          </button>
+        </div>
+        {failed > 0 && (
+          <p className="sync__error">
+            {failed} {failed === 1 ? "piece of work" : "pieces of work"} stopped and will not retry on its own. The technical detail below lists {failed === 1 ? "it" : "them"}.
           </p>
         )}
-        {notice && <p className="notice notice--settled">{notice}</p>}
+        {error && <p className="sync__error" role="alert">{error}</p>}
+        {notice && <p className="sync__notice">{notice}</p>}
+      </section>
 
+      <section className="pay-detail__card sync__card">
+        <h2 className="pay-detail__card-title">Connection</h2>
+        <dl className="sync__rows">
+          <div><dt>Store domain</dt><dd>hbawear.store</dd></div>
+          <div><dt>Shopify access</dt><dd>{sync?.shopify_configured ? "Configured on the server" : "Not configured"}</dd></div>
+          <div><dt>Order webhooks</dt><dd>{sync?.webhooks_configured ? "Registered" : "Not registered"}</dd></div>
+          <div><dt>Go-live month</dt><dd>{goLiveMonth ? formatMonth(goLiveMonth) : "Not set"}</dd></div>
+        </dl>
+        {/* The credentials live in the server's environment, not in the
+         *  database, so there is nothing here to type a new key into - and a
+         *  form that looked like one would be a form that did nothing. */}
+        <p className="pay-detail__faint">Set on the server. Changing the connection is a deploy, not a form.</p>
+      </section>
+
+      <button
+        type="button"
+        className="sync__toggle"
+        aria-expanded={detailOpen}
+        onClick={() => setDetailOpen(!detailOpen)}
+      >
+        Technical detail
+      </button>
+
+      {detailOpen && <section className="panel settings__panel">
+      <div className="data__body">
         <dl className="data__facts">
           <Fact
             label="Shopify"
@@ -500,7 +566,8 @@ export function DataPanel() {
           </div>
         )}
       </div>
-    </section>
+    </section>}
+    </>
   );
 }
 

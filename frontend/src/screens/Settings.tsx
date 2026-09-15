@@ -93,7 +93,9 @@ export function Settings({ session }: { session: Session }) {
         {section === "team" && (can(session, "settings.manage")
           ? <RosterPanel invite={can(session, "invitations.send")} />
           : can(session, "invitations.send") && <InvitePanel />)}
-        {section === "shopify" && <><PlatformPanel session={session} />{can(session, "settings.manage") && <DataPanel />}</>}
+        {section === "shopify" && (can(session, "settings.manage")
+          ? <DataPanel goLiveMonth={session.platform.go_live_month} />
+          : <PlatformPanel session={session} />)}
         {section === "historical" && (can(session, "compensation.manage") ? <SetupRoster kind="model" /> : <p className="empty">Your account cannot manage payment terms.</p>)}
         {section === "codes" && <>
           <SetupRoster kind="house" />
@@ -615,7 +617,7 @@ function PolicyPanel() {
   return (
     <section className="panel settings__panel">
       <div className="panel__head">
-        <h2 className="panel__title">Policy versions</h2>
+        <h2 className="panel__title">Policy in force</h2>
       </div>
 
       {error && (
