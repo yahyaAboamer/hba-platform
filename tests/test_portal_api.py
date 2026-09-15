@@ -2159,3 +2159,61 @@ def test_her_targets_are_only_ever_hers(admin):
     rows = _sign_in().get("/api/me/targets").json()["months"]
 
     assert all(row["achieved"] is None for row in rows)
+
+
+# -- Her best sellers (the approved Wardrobe's first section) ------------------
+
+
+def _line(order_id, product_id, total, quantity=1):
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO order_line_item (shopify_line_item_id, shopify_order_id, "
+                "shopify_product_id, title, quantity, discounted_total_piastres, "
+                "original_total_piastres) VALUES (:l, :o, :p, :t, :q, :d, :d)"
+            ),
+            {
+                "l": f"{order_id}-{product_id}",
+                "o": order_id,
+                "p": product_id,
+                "t": f"Product {product_id}",
+                "q": quantity,
+                "d": total,
+            },
+        )
+
+
+def test_her_best_sellers_are_her_own_sales_and_nobody_elses(admin):
+    """The programme's list with her name above it would tell her something
+    untrue about her own work."""
+    nour = _affiliate(admin)
+    sara = _affiliate(admin, name="Sara", email="sara@example.com", code="SARA10")
+    _order(nour["id"], "bs-1", 100_000)
+    _order(sara["id"], "bs-2", 900_000, code="SARA10")
+    _line("bs-1", "P1", 100_000)
+    _line("bs-2", "P2", 900_000)
+
+    body = _sign_in().get("/api/me/best-sellers").json()
+
+    assert [row["shopify_product_id"] for row in body["products"]] == ["P1"]
+
+
+def test_an_order_still_travelling_is_not_a_best_seller_yet(admin):
+    """Delivered only - the live rule, not 05A's pending-inclusive preview."""
+    nour = _affiliate(admin)
+    _order(nour["id"], "bs-3", 100_000, state="pending")
+    _line("bs-3", "P3", 100_000)
+
+    assert _sign_in().get("/api/me/best-sellers").json()["products"] == []
+
+
+def test_best_sellers_rank_by_what_the_customer_paid(admin):
+    nour = _affiliate(admin)
+    _order(nour["id"], "bs-4", 300_000)
+    _line("bs-4", "SMALL", 50_000, quantity=5)
+    _line("bs-4", "BIG", 250_000, quantity=1)
+
+    rows = _sign_in().get("/api/me/best-sellers").json()["products"]
+
+    assert [row["shopify_product_id"] for row in rows] == ["BIG", "SMALL"]
+    assert rows[1]["quantity"] == 5

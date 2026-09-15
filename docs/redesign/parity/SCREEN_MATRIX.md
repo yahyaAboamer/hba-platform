@@ -92,7 +92,7 @@ Each needs a decision: fold into the nearest approved pattern, or remove.
 |---|---|---|---|---|
 | D1 | `onHome` | 102–212 | `/` `MyMonth.tsx` | Unreviewed |
 | D2 | `onOrders` | 213–256 | `/orders` `MyOrders.tsx` | Unreviewed |
-| D3 | `onWardrobe` | 257–327 | `/wardrobe` `MyWardrobe.tsx` | Unreviewed |
+| D3 | `onWardrobe` | 257–327 | `/wardrobe` `MyWardrobe.tsx` | *Your best sellers* added; rest unreviewed. Needs a model sign-in to see |
 | D4 | `onTargets` | 328–377 | `/targets` `MyTargets.tsx` | Unreviewed |
 | D5 | `onRanking` | 378–417 | `/ranking` `MyRanking.tsx` | Unreviewed |
 
@@ -108,7 +108,7 @@ Each needs a decision: fold into the nearest approved pattern, or remove.
 | E6 | `vDetails` | 661–673 | `MyDetails.tsx` | Unreviewed |
 | E7 | `vSizes` | 674–689 | part of `MyDetails`? | Unreviewed |
 | E8 | `vNotify` | 690–705 | **none** | Unreviewed |
-| E9 | `vBest` | 706–724 | **none** — personal top sellers | Unreviewed |
+| E9 | `vBest` | 706–724 | `/best` `MyBestSellers` in `MyWardrobe.tsx` | Implemented, needs a model sign-in to see | New `GET /api/me/best-sellers`: her own delivered sales by product, never programme totals. The export counts pending orders too; that is 05A's preview, not the live rule |
 | E10 | `vHelp` | 725–738 | **none** | Unreviewed |
 
 ## F. States the export draws separately

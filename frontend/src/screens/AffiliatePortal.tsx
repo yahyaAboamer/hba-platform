@@ -5,7 +5,7 @@ import { AffiliateLayout, PortalHeader } from "../components/AffiliateLayout";
 import type { PortalContext } from "../components/AffiliateLayout";
 import { api } from "../lib/api";
 import type { Session } from "../lib/api";
-import { MyWardrobe } from "./MyWardrobe";
+import { MyBestSellers, MyWardrobe } from "./MyWardrobe";
 import { storedTheme } from "../lib/theme";
 import { Apply } from "./Apply";
 import { Glossary } from "./Glossary";
@@ -203,6 +203,7 @@ export function AffiliatePortal({ session }: { session: Session }) {
           <Route path="earnings" element={<MyCalculation />} />
           <Route path="orders" element={<MyOrders />} />
           <Route path="wardrobe" element={<MyWardrobe />} />
+          <Route path="best" element={<MyBestSellers />} />
           <Route path="targets" element={<MyTargets />} />
           <Route path="ranking" element={<MyRanking />} />
 

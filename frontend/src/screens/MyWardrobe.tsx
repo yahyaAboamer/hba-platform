@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 
 import { api } from "../lib/api";
 import "./MyWardrobe.css";
@@ -21,6 +22,16 @@ type Request = {
   image_url: string | null;
 };
 
+/** One product she sold through her own code - never the programme's list. */
+export type BestSeller = {
+  shopify_product_id: string;
+  title: string;
+  quantity: number;
+  sales_piastres: number;
+  sales: string;
+  image_url: string | null;
+};
+
 type Wardrobe = {
   received: Item[];
   processing: Item[];
@@ -33,6 +44,7 @@ export function MyWardrobe() {
   const [body, setBody] = useState<Wardrobe | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const [best, setBest] = useState<BestSeller[] | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -41,6 +53,11 @@ export function MyWardrobe() {
     api.get<Wardrobe>("/api/me/wardrobe")
       .then((found) => { if (live) setBody(found); })
       .catch((caught) => { if (live) setError(caught.message); });
+    // Her own best sellers. A failure here hides the section rather than the
+    // wardrobe: it is a second question on the same screen.
+    api.get<{ products: BestSeller[] }>("/api/me/best-sellers")
+      .then((found) => { if (live) setBest(found.products); })
+      .catch(() => { if (live) setBest([]); });
     return () => { live = false; };
   }, [attempt]);
 
@@ -51,14 +68,30 @@ export function MyWardrobe() {
     </div>
   );
   if (body === null) return <p className="empty" role="status">Loading wardrobe…</p>;
-  return <WardrobeContents body={body} />;
+  return <WardrobeContents body={body} best={best} />;
 }
 
-export function WardrobeContents({ body }: { body: Wardrobe }) {
+export function WardrobeContents({ body, best = null }: { body: Wardrobe; best?: BestSeller[] | null }) {
   const waiting = [...body.processing, ...body.failed];
   return (
     <div className="wardrobe">
-      {/* Personal top sellers need a model-scoped API. Never substitute staff totals. */}
+      {/*
+       * *Your best sellers* - the export's first section. What sold through
+       * her own code, delivered orders only, from `/api/me/best-sellers`;
+       * never the programme's totals with her name above them.
+       */}
+      {best && best.length > 0 && (
+        <section className="wardrobe__block">
+          <h2 className="wardrobe__title">Your best sellers</h2>
+          <p className="wardrobe__subtitle">Sales through your code · all time · delivered orders</p>
+          <BestSellerList rows={best.slice(0, 3)} />
+          {best.length > 3 && (
+            <Link className="wardrobe__all" to="/best">
+              Show all {best.length} products
+            </Link>
+          )}
+        </section>
+      )}
       {body.feature_requests.length > 0 && (
         <section className="wardrobe__block">
           <h2 className="wardrobe__title">HBA would like you to feature</h2>
@@ -86,7 +119,7 @@ export function WardrobeContents({ body }: { body: Wardrobe }) {
       <section className="wardrobe__block">
         <div className="wardrobe__heading">
           <h2 className="wardrobe__title">Your wardrobe</h2>
-          <span className="wardrobe__size">{body.received.length} {body.received.length === 1 ? "product" : "products"}</span>
+          <span className="wardrobe__size">{body.received.length} {body.received.length === 1 ? "piece" : "pieces"} received</span>
         </div>
         {body.received.length === 0 ? (
           <p className="empty">{waiting.length ? "Your received products will appear here." : "No products yet."}</p>
@@ -124,6 +157,70 @@ export function WardrobeContents({ body }: { body: Wardrobe }) {
           </ul>
         </section>
       )}
+    </div>
+  );
+}
+
+function BestSellerList({ rows, offset = 0 }: { rows: BestSeller[]; offset?: number }) {
+  return (
+    <ol className="wardrobe__best">
+      {rows.map((row, index) => (
+        <li key={row.shopify_product_id}>
+          <span className={index + offset === 0 ? "wardrobe__rank wardrobe__rank--first" : "wardrobe__rank"}>
+            {index + offset + 1}
+          </span>
+          <Picture source={row.image_url} />
+          <span className="wardrobe__copy">
+            <span className="wardrobe__name">{row.title}</span>
+            <span className="wardrobe__units">
+              {row.quantity} {row.quantity === 1 ? "unit sold" : "units sold"}
+            </span>
+          </span>
+          <span className="wardrobe__sales">{row.sales}</span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+/**
+ * *All products sold* - `vBest` in the approved portal.
+ *
+ * Every product sold through her code, all time, best first. Delivered orders
+ * only, as the live rule counts them; the export's line says delivered and
+ * pending, which is 05A's preview and not what she is paid on.
+ */
+export function MyBestSellers() {
+  const [rows, setRows] = useState<BestSeller[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => {
+    let live = true;
+    setError(null);
+    api.get<{ products: BestSeller[] }>("/api/me/best-sellers")
+      .then((found) => { if (live) setRows(found.products); })
+      .catch((caught) => { if (live) setError(caught.message); });
+    return () => { live = false; };
+  }, [attempt]);
+
+  if (error) return (
+    <div className="notice notice--refused" role="alert">
+      <p>Could not load what you sold.</p>
+      <button type="button" className="button" onClick={() => setAttempt((n) => n + 1)}>Try again</button>
+    </div>
+  );
+  if (rows === null) return <p className="empty" role="status">Loading…</p>;
+
+  return (
+    <div className="wardrobe">
+      <p className="wardrobe__lead">
+        Every product sold through your code, all time. Delivered orders; failed
+        deliveries and orders still on their way are not included.
+      </p>
+      {rows.length === 0
+        ? <p className="empty">Nothing has sold through your code yet.</p>
+        : <BestSellerList rows={rows} />}
     </div>
   );
 }

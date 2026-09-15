@@ -27,3 +27,77 @@
 .affiliate .wardrobe__incoming { padding: 13px 14px; border: 1px solid var(--rule); border-radius: var(--radius); }
 .affiliate .wardrobe__waiting li { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 10px; }
 .affiliate .wardrobe__waiting .wardrobe__state { flex: none; }
+
+/* ── Your best sellers (the export's first Wardrobe section) ─────────────── */
+
+.affiliate .wardrobe__best {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.affiliate .wardrobe__best li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 14px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.affiliate .wardrobe__best li:last-child {
+  border-bottom: 0;
+}
+
+.affiliate .wardrobe__best .wardrobe__pic,
+.affiliate .wardrobe__best .wardrobe__nopic {
+  width: 48px;
+  height: 48px;
+}
+
+.affiliate .wardrobe__rank {
+  flex: none;
+  width: 20px;
+  font-size: 14px;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.affiliate .wardrobe__rank--first {
+  color: var(--accent);
+}
+
+.affiliate .wardrobe__units {
+  display: block;
+  margin-top: 4px;
+  font-size: 12.5px;
+  color: var(--faint);
+}
+
+.affiliate .wardrobe__sales {
+  flex: none;
+  font-size: 14px;
+  color: var(--accent-lift);
+  font-variant-numeric: tabular-nums;
+}
+
+.affiliate .wardrobe__all {
+  display: block;
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  color: var(--ink);
+  font-size: 13.5px;
+  text-align: center;
+  text-decoration: none;
+}
+
+.affiliate .wardrobe__lead {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--quiet);
+}

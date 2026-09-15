@@ -555,6 +555,53 @@ def my_wardrobe(
     }
 
 
+@router.get("/best-sellers")
+def my_best_sellers(
+    affiliate: AffiliateProfile = Depends(current_affiliate),
+    db: Session = Depends(get_session),
+) -> dict:
+    """*Your best sellers* and *All products sold* - her own sales, by product.
+
+    Computed from her attributed, delivered orders only (`best_sellers_for`),
+    so no other model's sales can reach this payload however it is asked for:
+    the route takes no affiliate id, as nothing under `/api/me` does.
+    """
+    from sqlalchemy import select
+
+    from app.models.catalogue import Product
+    from app.services.performance import best_sellers_for
+    from app.services.wardrobe import thumbnail
+
+    rows = best_sellers_for(db, affiliate.id)
+    images = (
+        {
+            product.shopify_product_id: product.image_url
+            for product in db.scalars(
+                select(Product).where(
+                    Product.shopify_product_id.in_(
+                        [row.shopify_product_id for row in rows]
+                    )
+                )
+            )
+        }
+        if rows
+        else {}
+    )
+    return {
+        "products": [
+            {
+                "shopify_product_id": row.shopify_product_id,
+                "title": row.title,
+                "quantity": row.quantity,
+                "sales_piastres": row.sales_piastres,
+                "sales": format_egp(row.sales_piastres),
+                "image_url": thumbnail(images.get(row.shopify_product_id)),
+            }
+            for row in rows
+        ]
+    }
+
+
 @router.get("/targets")
 def my_targets_view(
     affiliate: AffiliateProfile = Depends(current_affiliate),

@@ -263,3 +263,52 @@ def top_products(db: Session, month: str, *, limit: int = 10) -> dict:
         "no_longer_in_shopify_piastres": gone,
         "total_piastres": sum(row.sales_piastres for row in known) + gone,
     }
+
+
+def best_sellers_for(db: Session, affiliate_id: int) -> list[ProductSales]:
+    """What sold through **her** code, all time, best first. W11.
+
+    The approved portal's Wardrobe opens on *Your best sellers*, and the one
+    thing it must never be is the programme's list with her name above it -
+    a model shown what other people's codes sold would be told something
+    untrue about her own work. So this is `top_products` asked about one
+    affiliate and every month, and it reads the same lines the same way:
+    what the customer paid after her discount.
+
+    **Delivered orders only**, which is the live rule. The export counts
+    pending orders too; that is 05A's pending-inclusive policy, which is still
+    a preview and is not what anything shown to a model is decided on. A
+    product whose Shopify record was deleted has no id to group by and is left
+    out of the ranking, as it is on the admin list.
+    """
+    from app.models.catalogue import OrderLineItem
+
+    rows = db.execute(
+        select(
+            OrderLineItem.shopify_product_id,
+            func.min(OrderLineItem.title),
+            func.sum(OrderLineItem.quantity),
+            func.sum(OrderLineItem.discounted_total_piastres),
+        )
+        .select_from(OrderLineItem)
+        .join(
+            AttributedOrder,
+            AttributedOrder.shopify_order_id == OrderLineItem.shopify_order_id,
+        )
+        .where(AttributedOrder.affiliate_id == affiliate_id)
+        .where(AttributedOrder.commission_state == CommissionState.EARNED)
+        .where(OrderLineItem.shopify_product_id.is_not(None))
+        .group_by(OrderLineItem.shopify_product_id)
+    ).all()
+
+    found = [
+        ProductSales(
+            shopify_product_id=product_id,
+            title=title or "Untitled",
+            quantity=int(quantity or 0),
+            sales_piastres=int(sales or 0),
+        )
+        for product_id, title, quantity, sales in rows
+    ]
+    found.sort(key=lambda row: (-row.sales_piastres, -row.quantity, row.title))
+    return found
