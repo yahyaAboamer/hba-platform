@@ -346,21 +346,47 @@
 .portal-home__states a:nth-child(3) { background:transparent; border:1px solid var(--refused); color:var(--refused); }
 .portal-home__note { font-size:12.5px; color:var(--quiet); }
 .portal-home__open { display:flex; justify-content:space-between; padding:14px 15px; border:1px solid var(--rule); border-radius:8px; color:var(--ink); text-decoration:none; font-size:14px; }
-.portal-home__payment { display:flex; justify-content:space-between; align-items:center; padding:14px 15px; border-radius:8px; background:var(--surface); font-size:13px; }
-.portal-home__payment p { margin:6px 0; } .portal-home__payment a { padding:10px; }
-.portal-home__history { text-align:center; font-size:13px; text-decoration:none; color:var(--accent-text); }
-.portal-home__correction { padding:13px 15px; border:1px solid var(--owed); border-radius:8px; font-size:13px; }
+/* Where the month has got to, in one word. Amber while it can still move,
+   accent once it is agreed or sent, quiet once it is closed. */
+.portal-home__state { padding:4px 10px; border:1px solid currentColor; border-radius:999px; font-size:12px; }
+.portal-home__state--open { color:var(--owed); }
+.portal-home__state--approved,
+.portal-home__state--paid { color:var(--accent); }
+.portal-home__state--settled { color:var(--quiet); }
+
+/* Something moved after the month was agreed. Amber and pressable, because
+   the sentence is a summary and the detail is on another screen. */
+.portal-home__change { display:block; padding:13px 15px; border:1px solid var(--owed); border-radius:8px; color:var(--ink); text-decoration:none; font-size:13px; line-height:1.5; }
+.portal-home__change-kicker { display:block; margin-bottom:4px; color:var(--owed); font-size:12.5px; }
+.portal-home__change-more { display:block; margin-top:6px; color:var(--accent); font-size:12.5px; }
+
+/* Whose move it is. No border: §11.3 blocks on missing information, never on
+   her performance, and a box around it would read as a warning about her. */
+.portal-home__waiting { font-size:13px; line-height:1.55; color:var(--quiet); }
+.portal-home__waiting p { margin:0 0 6px; }
+
+.portal-home__payment { padding:15px; border-radius:8px; background:var(--surface); }
+.portal-home__pay-title { font-size:13px; color:var(--quiet); }
+.portal-home__pay-line { margin:6px 0 0; font-size:16px; }
+.portal-home__pay-note { margin-top:6px; font-size:12.5px; line-height:1.5; color:var(--faint); }
+.portal-home__pay-more { display:inline-block; margin-top:11px; color:var(--accent); text-decoration:none; font-size:13px; }
 .portal-chart { padding:15px 13px 12px; background:var(--surface); border-radius:8px; }
 .portal-chart__heading { display:flex; justify-content:space-between; margin-bottom:12px; font-size:12px; color:var(--quiet); }
 .portal-chart__heading h2 { font-size:15px; color:var(--ink); font-weight:500; }
 .portal-chart__switch { display:flex; border:1px solid var(--rule); border-radius:8px; overflow:hidden; }
 .portal-chart__switch button { flex:1; padding:9px; border:0; background:none; color:var(--quiet); font-size:13px; cursor:pointer; }
 .portal-chart__switch [aria-pressed="true"] { color:var(--accent-text); background:var(--accent-soft); }
-.portal-chart__readout { display:flex; justify-content:space-between; align-items:center; margin-top:14px; font-size:12px; color:var(--quiet); }
-.portal-chart__readout strong { font-size:17px; color:var(--ink); font-weight:500; }
+/* The reading for whichever month is picked, above the plot it belongs to:
+   month, figure, and what the figure is. Held at a fixed height so tapping
+   from one month to another does not move the chart under the finger. */
+.portal-chart__readout { min-height:52px; padding:12px 3px 8px; font-size:12.5px; color:var(--quiet); }
+.portal-chart__readout strong { display:block; margin-top:4px; font-size:18px; color:var(--ink); font-weight:500; }
+.portal-chart__readout em { display:block; margin-top:3px; font-style:normal; color:var(--faint); }
 .portal-chart svg { display:block; width:100%; overflow:visible; margin-top:8px; }
 .portal-chart text { fill:var(--faint); font-size:9px; }
 .portal-chart__grid { stroke:var(--rule); stroke-width:.6; }
+/* The month being read, named under its own point. */
+.portal-chart__tick--on { fill:var(--accent); }
 .portal-chart__line { fill:none; stroke:var(--accent); stroke-width:2; }
 .portal-chart__point,.portal-chart__bar { fill:var(--accent); }
 .portal-chart__pick { display:block; max-width:100%; margin:2px auto 0; padding:5px; font-size:12px; border:0; background:var(--surface); color:var(--quiet); }

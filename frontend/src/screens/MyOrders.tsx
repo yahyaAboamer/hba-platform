@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 import { usePortal } from "../components/AffiliateLayout";
-import { Money } from "../components/Money";
 import { api } from "../lib/api";
 import { formatMonth } from "../lib/money";
 import type { MyEarnings, MyOrder } from "../lib/portal";
@@ -19,6 +18,13 @@ import "./MyOrders.css";
  * A row is never removed. §9.4 pays on delivery, so an order can go from
  * counting to not counting, and one that quietly disappeared would look like a
  * mistake somebody made rather than a parcel that did not arrive.
+ *
+ * ## What the row leads with
+ *
+ * The approved portal puts **her commission** in the large figure and the sale
+ * underneath it, which is the opposite of what this screen used to do. It is
+ * the right way round: the sale is the shop's number and the commission is
+ * hers, and she opened this screen to check hers.
  */
 
 /** The three questions people actually arrive with. */
@@ -28,7 +34,10 @@ const FILTERS: { key: Filter; label: string }[] = [
   { key: "all", label: "All" },
   { key: "earned", label: "Counted" },
   { key: "pending", label: "Pending" },
-  { key: "void", label: "Excluded" },
+  // Not the export's *Failed*: this one holds cancelled and refunded orders
+  // too, and calling a cancelled order a failed delivery would describe
+  // something that never happened.
+  { key: "void", label: "Not counted" },
 ];
 
 export function MyOrders() {
@@ -61,15 +70,25 @@ export function MyOrders() {
     );
   }
 
-  if (body === null) return <p className="empty">Loading…</p>;
+  const head = (
+    <div className="orders__head">
+      <h1>Orders</h1>
+      <span>{formatMonth(month)}</span>
+    </div>
+  );
+
+  if (body === null) return <>{head}<p className="empty">Loading…</p></>;
 
   const all = body.orders_detail;
 
   if (all.length === 0) {
     return (
-      <p className="empty">
-        No orders used your code in {formatMonth(month)} yet.
-      </p>
+      <>
+        {head}
+        <p className="empty">
+          No orders used your code in {formatMonth(month)} yet.
+        </p>
+      </>
     );
   }
 
@@ -79,19 +98,23 @@ export function MyOrders() {
 
   return (
     <>
-      <div className="filters" role="group" aria-label="Which orders">
+      {head}
+
+      {/* The count lives on the control, so choosing one and reading the
+          answer are the same act. */}
+      <div className="orders__filters" role="group" aria-label="Which orders">
         {FILTERS.map((option) => (
           <button
             key={option.key}
             type="button"
-            className="filters__option"
+            className="orders__filter"
             aria-pressed={filter === option.key}
             onClick={() => {
               setFilter(option.key);
               setOpen(null);
             }}
           >
-            {option.label} <span className="filters__count">{count(option.key)}</span>
+            {option.label} <span className="orders__filter-count">{count(option.key)}</span>
           </button>
         ))}
       </div>
@@ -100,7 +123,9 @@ export function MyOrders() {
         <p className="empty">
           {filter === "earned"
             ? "Nothing has counted yet this month."
-            : "Nothing is on its way — every order this month has arrived or been cancelled."}
+            : filter === "pending"
+              ? "Nothing is on its way — every order this month has arrived or been cancelled."
+              : "Every order this month counts."}
         </p>
       ) : (
         <ul className="orders">
@@ -120,9 +145,24 @@ export function MyOrders() {
         </ul>
       )}
 
-
+      <p className="orders__note">Customer details aren&rsquo;t shown here.</p>
     </>
   );
+}
+
+/**
+ * What the sale was, under the commission.
+ *
+ * Shopify zeroes a cancelled order's totals — correct for commission, since
+ * §9.3 pays on what the customer actually paid — so a cancelled row's base is
+ * `0` and says nothing about what the order was. `placed` is the figure as it
+ * was placed, kept for exactly this line, and where neither exists the row
+ * says so rather than printing a zero that reads as *it was worth nothing*.
+ */
+function saleLine(order: MyOrder): string {
+  if (order.base_piastres > 0) return `${order.base} net sales`;
+  if (order.placed !== null) return `${order.placed} when it was placed`;
+  return "amount not available";
 }
 
 function Row({
@@ -136,6 +176,7 @@ function Row({
   open: boolean;
   onToggle: () => void;
 }) {
+  const pieces = order.contents.reduce((total, line) => total + line.quantity, 0);
   return (
     <li className="orders__row">
       {/*
@@ -151,77 +192,32 @@ function Row({
         <span className="orders__left">
           <span className="code orders__number">{order.order_number}</span>
           <span className="orders__meta">
-            {onlyTheDate(order.placed_at)} · {order.state_text}
-            {order.state === "void" && " · not counted"}
+            {onlyTheDate(order.placed_at)} · {pieces > 0 ? `${pieces} ${pieces === 1 ? "piece" : "pieces"}` : "contents not recorded"}
           </span>
+          {/* Her words for the state, from the server, in the tone that
+              matches it: counted is money, on its way is not yet, and did
+              not arrive is neither. */}
+          <span className={`orders__pill orders__pill--${order.state}`}>{order.state_text}</span>
         </span>
         <span className="orders__right">
           {/*
-           * **An amount is printed only where there is one.**
+           * **What it was worth to her**, and only where there is an answer.
            *
-           * An order that did not arrive keeps its figure struck through
-           * wherever the figure survives - that is the rule, and it lets
-           * somebody check a cancelled order against their own record instead
-           * of guessing the platform lost it.
-           *
-           * But it does not always survive. `normalise.py` stores Shopify's
-           * *current* totals, which is correct for commission (§9.3 pays on
-           * what the customer actually paid) and means a cancelled order
-           * comes back worth zero. A struck-through E£0.00 then claims the
-           * order was worth nothing *and* was cancelled, which is not a fact
-           * about anything - it reads as a bug, and was reported as one.
-           *
-           * `placed_piastres` is the order as it was placed, which the
-           * platform now keeps for exactly this row. It is `null` only where
-           * the base already carries the figure, or on an order indexed
-           * before the platform started asking Shopify for it - and there,
-           * still, no zero is printed.
+           * A void order keeps what it would have earned, struck through, so
+           * she can still match the row against her own record — the business
+           * asked for the figure rather than the words. Where there is no
+           * figure at all the row prints a dash, never a zero: an order still
+           * travelling has earned nothing *yet*.
            */}
-          {order.base_piastres > 0 ? (
-            <Money
-              piastres={order.base_piastres}
-              kind={order.state === "earned" ? "agreed" : "provisional"}
-              className={order.state === "void" ? "money--void" : undefined}
-            />
-          ) : (
-            order.placed_piastres !== null && (
-              <Money piastres={order.placed_piastres} className="money--void" />
-            )
-          )}
-          {/*
-           * **A void row mirrors a counted one**: the sale on top, what it
-           * was worth to her underneath, both struck through. The business
-           * asked for the figure rather than the words - "nothing earned"
-           * says what did not happen and gives her nothing to check her own
-           * record against.
-           *
-           * Struck rather than coloured. It is not money coming, and it must
-           * never read as though it were.
-           */}
-          <span
-            className={
-              order.commission
-                ? "orders__earned orders__earned--paid"
-                : order.forgone
-                  ? "orders__earned money--void"
-                  : "orders__earned"
-            }
-          >
-            {order.commission
-              ? `${order.commission} to you`
-              : order.forgone
-                ? `${order.forgone} to you`
-                : order.state === "pending"
-                  ? "counts on delivery"
-                  : "nothing earned"}
+          <span className={order.commission ? "orders__fee" : order.forgone ? "orders__fee money--void" : "orders__fee orders__fee--none"}>
+            {order.commission ?? order.forgone ?? "—"}
           </span>
+          <span className="orders__net">{saleLine(order)}</span>
         </span>
       </button>
 
       {open && (
         <div className="orders__detail">
-          <p className="orders__explain">{explain(order, month)}</p>
-
           {/*
            * **What was in the order** (owner, 11 September 2026).
            *
@@ -240,10 +236,12 @@ function Row({
             <ul className="orders__contents">
               {order.contents.map((line, index) => (
                 <li key={`${line.title}-${index}`}>
-                  <span className="orders__item">{line.title}</span>
-                  {line.variant && (
-                    <span className="orders__variant">{line.variant}</span>
-                  )}
+                  <span className="orders__item">
+                    {line.title}
+                    {line.variant && (
+                      <span className="orders__variant">{line.variant}</span>
+                    )}
+                  </span>
                   {line.quantity > 1 && (
                     <span className="orders__qty">&times;{line.quantity}</span>
                   )}
@@ -251,10 +249,12 @@ function Row({
               ))}
             </ul>
           ) : (
-            <p className="detail__note">
+            <p className="orders__explain">
               What was in this order was not recorded.
             </p>
           )}
+
+          <p className="orders__explain">{explain(order, month)}</p>
 
           {/*
            * §11.4, and the one row that will be asked about. Kept inside the

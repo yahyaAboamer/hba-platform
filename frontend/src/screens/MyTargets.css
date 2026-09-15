@@ -1,20 +1,49 @@
-/* Her targets. The month she is in, then every month before it. */
+/* Her content record. The month she is in, then every month before it.
+
+   `onTargets` in `Affiliate Portal v3.dc.html`, lines 328–376. */
 
 .affiliate .mytargets {
   padding-bottom: var(--tab-clearance);
 }
 
-/* The current month keeps the panel treatment the month card uses, so the two
-   screens read as one place rather than two designs for one subject. */
+.affiliate .mytargets__heading {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+/* Who keeps this, and when they last touched it. */
+.affiliate .mytargets__kept {
+  margin: 5px 0 0;
+  font-size: 12.5px;
+  color: var(--quiet);
+}
+
+/* The month she is in, on the raised ground the hero figure uses. Everything
+   else on this screen is history, and history is a list. */
 .affiliate .mytargets__now {
-  margin-bottom: var(--space-6);
+  margin-top: 14px;
+  padding: 16px;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.affiliate .mytargets__now-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.affiliate .mytargets__now-month {
+  font-size: 15px;
 }
 
 /* Not "0 of 0". Nothing has been asked, which is a statement about HBA's
    month and not about hers (AC30). */
 .affiliate .mytargets__none {
-  margin: 0;
-  padding: var(--space-4);
+  margin: 15px 0 0;
+  font-size: 13px;
   color: var(--quiet);
 }
 
@@ -23,61 +52,75 @@
    and a red shortfall on a commission model says she has lost money she never
    had. The sentence carries it. */
 .affiliate .mytargets__pay {
-  margin: 0;
-  padding: 0 var(--space-4) var(--space-4);
-  font-size: var(--text-xs);
+  margin: 14px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--rule);
+  font-size: 13px;
+  line-height: 1.6;
   color: var(--quiet);
 }
 
-.affiliate .mytargets__block {
-  margin-bottom: var(--space-6);
-}
-
 .affiliate .mytargets__title {
-  margin: 0 0 var(--space-3);
-  font-size: var(--text-sm);
-  font-weight: 600;
+  margin: 20px 0 0;
+  font-size: 15px;
+  font-weight: 500;
 }
 
 .affiliate .mytargets__history {
-  margin: 0;
+  margin: 12px 0 0;
   padding: 0;
   list-style: none;
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
 }
 
 /* A row, not a card. Twelve months of history is a list to run an eye down,
    and twelve cards is a scroll. */
 .affiliate .mytargets__month {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: var(--space-1) var(--space-3);
-  padding: var(--space-3) 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 14px;
   border-bottom: 1px solid var(--rule);
-  font-size: var(--text-sm);
+}
+
+.affiliate .mytargets__month:last-child {
+  border-bottom: 0;
 }
 
 .affiliate .mytargets__label {
-  font-weight: 600;
+  min-width: 0;
+  font-size: 13.5px;
 }
 
-/* The outcome sits under the month and the counts under nothing, so the two
-   columns line up down the list: what happened on the left, how much on the
-   right. On a 375px phone that is the only arrangement that does not wrap. */
-.affiliate .mytargets__outcome {
-  grid-column: 1;
-  color: var(--quiet);
+.affiliate .mytargets__detail {
+  display: block;
+  margin-top: 4px;
+  font-size: 12.5px;
+  color: var(--faint);
 }
 
-.affiliate .mytargets__counts {
-  grid-column: 2;
-  grid-row: 1 / span 2;
-  align-self: center;
-  text-align: right;
+/* How the month ended, in the tone that matches it. Quiet for short and for
+   not recorded: neither is a failure to shout about, and one of them is not
+   about her at all. */
+.affiliate .mytargets__state {
+  flex: none;
+  padding: 3px 9px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 12px;
   color: var(--quiet);
+  white-space: nowrap;
+}
+
+.affiliate .mytargets__state--met {
+  color: var(--accent);
 }
 
 .affiliate .mytargets__foot {
-  margin: var(--space-4) 0 0;
-  font-size: var(--text-xs);
-  color: var(--quiet);
+  margin: 14px 0 0;
+  font-size: 12.5px;
+  color: var(--faint);
 }

@@ -1,59 +1,52 @@
-/* How a target is drawn, wherever it is drawn.
+/* How a target is drawn in the portal.
 
-   Two screens show the same two bars — the month card and the Targets tab —
-   and they were one implementation from the moment the second existed. Grow
-   and Month once had their own, and the same two numbers looked like two
-   different facts. */
+   **Scoped under `.affiliate`, and that is not decoration.** All CSS loads
+   into one bundle and the maintainer's Targets screen owns `.targets__note`
+   too; unscoped, this sheet restyled a column on a screen it has never been
+   on. The names stay — they describe the same thing — and the scope keeps
+   them apart.
 
-.targets__list {
+   Metrics from `onTargets` in `Affiliate Portal v3.dc.html`, lines 338–348. */
+
+.affiliate .targets__list {
   margin: 0;
-  padding: var(--space-4) var(--space-4) var(--space-2);
+  padding: 0;
 }
 
-.targets__row + .targets__row {
-  margin-top: var(--space-4);
+.affiliate .targets__row {
+  margin-top: 15px;
 }
 
-.targets__top {
+.affiliate .targets__top {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: var(--space-4);
-  font-size: var(--text-sm);
-  color: var(--quiet);
+  gap: 10px;
+  font-size: 14px;
 }
 
 /* "4 of 6" answers how many; the bar answers how close, and the second is the
    question somebody actually has. Grow had these and Month did not, so the
    same two numbers looked like two different facts on two screens. */
-.targets__track {
-  height: 4px;
-  margin-top: var(--space-2);
-  border-radius: 2px;
+.affiliate .targets__track {
+  height: 6px;
+  margin-top: 7px;
+  border-radius: 3px;
   background: var(--rule);
   overflow: hidden;
 }
 
-.targets__fill {
+.affiliate .targets__fill {
   display: block;
   height: 100%;
-  border-radius: 2px;
+  border-radius: 3px;
   background: var(--accent);
 }
 
-/* Mono, like every other pair of figures meant to be compared down a column. */
-.targets__figures {
+.affiliate .targets__figures {
+  font-size: 13px;
   color: var(--quiet);
-}
-
-/* No colour, deliberately. §15 makes a target informational on every
-   arrangement but a guaranteed minimum, and a red shortfall on a commission
-   model says they have lost money they never had. The sentence carries it. */
-.targets__note {
-  margin: 0;
-  padding: 0 var(--space-4) var(--space-4);
-  font-size: var(--text-xs);
-  color: var(--quiet);
+  font-variant-numeric: tabular-nums;
 }
 
 /* ADR 0036. A month from before the platform kept whether the target was met
@@ -63,8 +56,9 @@
 
    Inside the list rather than below it, so the sentence sits where the bars
    would have been and answers the question the dash raises. */
-.targets__unkept {
-  margin: var(--space-3) 0 0;
-  font-size: var(--text-xs);
+.affiliate .targets__unkept {
+  margin: 12px 0 0;
+  font-size: 12.5px;
+  line-height: 1.6;
   color: var(--quiet);
 }

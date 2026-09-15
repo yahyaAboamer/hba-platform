@@ -1,12 +1,243 @@
 /* Their orders. A list, not a table — a phone has no room for five columns, and
-   the maintainer's Orders screen is the one built for scanning. */
+   the maintainer's Orders screen is the one built for scanning.
+
+   **Every rule here is scoped under `.affiliate`.** All CSS loads into one
+   bundle, and `.orders__row` once gave the maintainer's table rows this card's
+   shadow and background. The names are shared on purpose — they describe the
+   same thing on two screens — so the scope is what keeps them apart.
+
+   `onOrders` in `Affiliate Portal v3.dc.html`, lines 213–255. */
+
+/* ── The heading ────────────────────────────────────────────────────────
+ *
+ * The month is beside the title rather than only in the bar above, because
+ * this is the screen somebody scrolls down and then asks *which month is
+ * this again*.
+ */
+.affiliate .orders__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.affiliate .orders__head h1 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.affiliate .orders__head span {
+  font-size: 12.5px;
+  color: var(--quiet);
+}
 
 /* ── Which orders ───────────────────────────────────────────────────────
  *
- * A segmented control rather than a dropdown: three options, all of them
- * worth seeing at once, and a dropdown would hide two of the three behind a
- * press. The counts live on the controls so that choosing one and reading the
+ * Four chips that wrap, rather than one segmented bar: the labels are words
+ * and not letters, and a bar that fits them all on a 375px phone fits none of
+ * them legibly. The count lives on the chip so choosing one and reading the
  * answer are the same act.
+ */
+.affiliate .orders__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 13px;
+}
+
+.affiliate .orders__filter {
+  flex: 1 1 auto;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--quiet);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.affiliate .orders__filter[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.affiliate .orders__filter:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.affiliate .orders__filter-count {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── The list ───────────────────────────────────────────────────────────── */
+
+.affiliate .orders {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.affiliate .orders__row {
+  margin-top: 10px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+/* The whole row is the control. A chevron would be a 12px target on a screen
+   held one-handed, and there is nothing else on the row to press. */
+.affiliate .orders__button {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 15px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.affiliate .orders__button:hover {
+  background: var(--hover);
+}
+
+.affiliate .orders__button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.affiliate .orders__left {
+  min-width: 0;
+}
+
+.affiliate .orders__number {
+  display: block;
+  font-size: 14px;
+  letter-spacing: 0.02em;
+}
+
+.affiliate .orders__meta {
+  display: block;
+  margin-top: 4px;
+  font-size: 12.5px;
+  color: var(--faint);
+}
+
+/* Her words for the state, in the tone that matches it. Outlined rather than
+   filled: none of the three is money, and a filled chip beside a figure reads
+   as though it were. */
+.affiliate .orders__pill {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 3px 9px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.affiliate .orders__pill--earned { color: var(--accent); }
+.affiliate .orders__pill--pending { color: var(--owed); }
+.affiliate .orders__pill--void { color: var(--refused); }
+
+.affiliate .orders__right {
+  flex: none;
+  text-align: right;
+}
+
+/* What it was worth to her — the figure this screen is opened for. */
+.affiliate .orders__fee {
+  display: block;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* A dash, where there is no answer yet. Quiet, so it does not read as a
+   figure somebody forgot to fill in. */
+.affiliate .orders__fee--none {
+  color: var(--faint);
+}
+
+.affiliate .orders__net {
+  display: block;
+  margin-top: 5px;
+  font-size: 12.5px;
+  color: var(--quiet);
+}
+
+/* ── The expansion ──────────────────────────────────────────────────────── */
+
+.affiliate .orders__detail {
+  padding: 0 15px 14px;
+}
+
+/* What was in an order. Inside the expansion, quiet, and never beside the
+   figure on the row - a garment name next to an amount reads as though the
+   amount belonged to the garment. */
+.affiliate .orders__contents {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.affiliate .orders__contents li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--rule);
+  font-size: 13.5px;
+}
+
+.affiliate .orders__variant {
+  display: block;
+  margin-top: 3px;
+  font-size: 12.5px;
+  color: var(--faint);
+}
+
+.affiliate .orders__qty {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The sentence that says what happened to this order. Ruled off rather than
+   tinted: it belongs to the row it sits in, and a tint would make it a second
+   card inside the first. */
+.affiliate .orders__explain {
+  margin: 0;
+  padding: 11px 0 0;
+  border-top: 1px solid var(--rule);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--quiet);
+}
+
+.affiliate .orders__explain + .orders__explain {
+  margin-top: 11px;
+}
+
+/* True of the whole list, so it sits under it rather than on any one row. */
+.affiliate .orders__note {
+  margin: 14px 0 0;
+  font-size: 12.5px;
+  color: var(--faint);
+}
+
+/* ── Two things to compare ──────────────────────────────────────────────
+ *
+ * Still used by `MyYear`, which is not on a route of its own any more. Left
+ * here rather than deleted with the Orders rewrite: removing the rules would
+ * silently unstyle that screen rather than remove it.
  */
 .filters {
   display: flex;
@@ -33,160 +264,8 @@
   border-left: 0;
 }
 
-.filters__option:hover {
-  background: var(--hover);
-}
-
 .filters__option[aria-pressed="true"] {
   background: var(--accent-soft);
   color: var(--accent-text);
   font-weight: 600;
-}
-
-.filters__count {
-  font-variant-numeric: tabular-nums;
-}
-
-.filters__option:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
-}
-
-/* ── The list ───────────────────────────────────────────────────────────── */
-
-.orders {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.orders__row {
-  margin-bottom: var(--space-3);
-  border-radius: var(--radius);
-  background: var(--surface);
-  box-shadow: var(--elev);
-  overflow: hidden;
-}
-
-/* The whole row is the control. A chevron would be a 12px target on a screen
-   held one-handed, and there is nothing else on the row to press. */
-.orders__button {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  width: 100%;
-  padding: var(--space-4) var(--space-5);
-  border: 0;
-  background: transparent;
-  color: var(--ink);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.orders__button:hover {
-  background: var(--hover);
-}
-
-.orders__button:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
-}
-
-.orders__left {
-  min-width: 0;
-}
-
-.orders__number {
-  display: block;
-  font-size: var(--text-sm);
-  letter-spacing: 0.02em;
-}
-
-.orders__meta {
-  display: block;
-  margin-top: var(--space-1);
-  font-size: var(--text-xs);
-  color: var(--quiet);
-}
-
-.orders__right {
-  flex: none;
-  text-align: right;
-}
-
-/* A row with no amount is one line rather than two. The flex row centres it
-   on its own - `:has()` would buy three pixels and a browser-support
-   question. */
-.orders__earned:only-child {
-  margin-top: 0;
-}
-
-/* What the order was worth to them, under what the customer paid. The accent
-   only where there is money in it — "counts on delivery" and "nothing earned"
-   are states, not amounts, and colouring them would say otherwise. */
-.orders__earned {
-  display: block;
-  margin-top: var(--space-1);
-  font-size: var(--text-xs);
-  color: var(--quiet);
-}
-
-.orders__earned--paid {
-  color: var(--accent-text);
-}
-
-/* ── The expansion ──────────────────────────────────────────────────────── */
-
-.orders__detail {
-  padding: 0 var(--space-5) var(--space-4);
-}
-
-/* Tinted rather than ruled. It belongs to the row above it, and a border
-   would read as a second row. */
-.orders__explain {
-  margin: 0 0 var(--space-2);
-  padding: var(--space-4);
-  border-radius: var(--radius-sm);
-  background: var(--accent-soft);
-  font-size: var(--text-xs);
-  line-height: 1.6;
-}
-
-.orders__explain:last-child {
-  margin-bottom: 0;
-}
-
-/* True of the whole list, so it sits under it rather than on any one row. */
-.orders__note {
-  max-width: 42ch;
-  margin: var(--space-5) 0 0;
-  font-size: var(--text-xs);
-  line-height: 1.6;
-  color: var(--faint);
-}
-
-/* What was in an order. Inside the expansion, quiet, and never beside the
-   figure on the row - a garment name next to an amount reads as though the
-   amount belonged to the garment. */
-.affiliate .orders__contents {
-  margin: var(--space-3) 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.affiliate .orders__contents li {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--space-2);
-  padding: var(--space-1) 0;
-  font-size: var(--text-sm);
-}
-
-.affiliate .orders__variant,
-.affiliate .orders__qty {
-  color: var(--quiet);
-  font-size: var(--text-xs);
 }

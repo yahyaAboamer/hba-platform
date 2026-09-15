@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { TargetBars } from "../components/TargetProgress";
 import { api } from "../lib/api";
 import type { MonthTargets } from "../lib/portal";
-import { formatMonth } from "../lib/money";
+import { formatDay, formatMonth } from "../lib/money";
 import {
   describeTargetPay,
   targetChip,
@@ -17,18 +17,15 @@ type Row = MonthTargets & { month: string };
 /**
  * What HBA has asked of her, this month and every month before it.
  *
- * UI24. The month card already shows the current month's bars beside the
- * money they affect; this tab exists for the question that card cannot
- * answer — *how has this been going* — and for the model who wants to check a
- * month she was paid for six months ago.
+ * UI24, and `onTargets` in the approved portal (lines 328–376), which calls it
+ * *Content record* — the right name: it is a record somebody else keeps, and
+ * the heading says so before the screen has to.
  *
  * ## Nothing here is editable, and that is the design
  *
  * There is no route to change any of it (§6.5) — not a disabled field, not a
  * permission check. On a guaranteed minimum these numbers decide money, and
  * the person being measured is not the person who records the measurement.
- * The screen says so plainly rather than leaving her to discover it by
- * looking for a button.
  *
  * ## Three states, not two
  *
@@ -36,7 +33,8 @@ type Row = MonthTargets & { month: string };
  * the difference matters most in exactly the case where it is easiest to get
  * wrong: an unrecorded month blocks a guaranteed minimum, so she sees "not
  * recorded yet" against the month that is holding up her pay and can ask
- * about the right thing.
+ * about the right thing. The export has two words for a month, *met* and *not
+ * met*; we keep the third.
  *
  * ## A month from before the platform
  *
@@ -94,9 +92,20 @@ export function MyTargets() {
 
   return (
     <div className="mytargets">
-      <section className="panel mytargets__now">
-        <div className="panel__head">
-          <h2 className="panel__title">{formatMonth(current.month)}</h2>
+      <h1 className="mytargets__heading">Content record</h1>
+      {/* Who keeps it and when they last touched it. The export prints the
+          date flatly; where nobody has recorded anything yet there is no date
+          to print, and saying so is the whole of §11.3 in one line. */}
+      <p className="mytargets__kept">
+        Recorded by HBA
+        {current.recorded_at
+          ? ` · updated ${formatDay(current.recorded_at.slice(0, 10))}`
+          : " · nothing recorded for this month yet"}
+      </p>
+
+      <section className="mytargets__now">
+        <div className="mytargets__now-head">
+          <span className="mytargets__now-month">{formatMonth(current.month)}</span>
           {targetChip(current) && (
             <span className={targetChip(current)!.className}>
               {targetChip(current)!.text}
@@ -112,20 +121,37 @@ export function MyTargets() {
         ) : (
           <TargetBars target={current} />
         )}
+        {/*
+         * The export folds this sentence behind an ⓘ. It stays in the open
+         * here: on a guaranteed minimum it is the sentence that says whether
+         * these two numbers are about to decide her pay, and that is not
+         * something to make somebody press for.
+         */}
         <p className="mytargets__pay">{describeTargetPay(current)}</p>
       </section>
 
       {history.length > 0 && (
-        <section className="mytargets__block">
-          <h2 className="mytargets__title">Before this month</h2>
+        <>
+          <h2 className="mytargets__title">Earlier months</h2>
           <ul className="mytargets__history">
             {history.map((row) => (
               <li key={row.month} className="mytargets__month">
                 <span className="mytargets__label">
                   {formatMonth(row.month)}
+                  <span className="mytargets__detail">
+                    {targetCounts(row)}
+                    {row.recorded_at && ` · updated ${formatDay(row.recorded_at.slice(0, 10))}`}
+                  </span>
                 </span>
-                <span className="code mytargets__counts">{targetCounts(row)}</span>
-                <span className="mytargets__outcome">{targetOutcome(row)}</span>
+                <span
+                  className={
+                    row.achieved
+                      ? "mytargets__state mytargets__state--met"
+                      : "mytargets__state"
+                  }
+                >
+                  {targetOutcome(row)}
+                </span>
               </li>
             ))}
           </ul>
@@ -138,7 +164,7 @@ export function MyTargets() {
             HBA records these. If something here looks wrong, tell them — there
             is nothing on this screen for you to change.
           </p>
-        </section>
+        </>
       )}
     </div>
   );

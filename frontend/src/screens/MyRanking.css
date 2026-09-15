@@ -1,72 +1,164 @@
-/* Where she stands. M02: ordered by sales, showing uses. */
+/* Where she stands. M02: ordered by sales, showing uses.
+
+   `onRanking` in `Affiliate Portal v3.dc.html`, lines 378–416, minus the
+   names, codes and avatars it prints for everybody else. */
 
 .affiliate .ranking {
   padding-bottom: var(--tab-clearance);
 }
 
-.affiliate .ranking__mine {
-  margin-bottom: var(--space-5);
-  padding: var(--space-4);
-}
-
-.affiliate .ranking__place {
+.affiliate .ranking__head {
   display: flex;
   align-items: baseline;
-  gap: var(--space-3);
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.affiliate .ranking__head h1 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.affiliate .ranking__head span {
+  font-size: 12.5px;
+  color: var(--quiet);
+}
+
+.affiliate .ranking__mine {
+  margin-top: 14px;
+  padding: 15px 16px;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.affiliate .ranking__top {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.affiliate .ranking__side {
+  text-align: right;
+}
+
+.affiliate .ranking__caption {
+  display: block;
+  font-size: 12.5px;
+  color: var(--quiet);
 }
 
 .affiliate .ranking__number {
-  font-size: var(--text-2xl);
-  font-weight: 600;
+  display: block;
+  margin-top: 6px;
+  font-size: 30px;
+  line-height: 1.1;
 }
 
-.affiliate .ranking__of,
-.affiliate .ranking__figures {
-  color: var(--quiet);
+.affiliate .ranking__tally {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
 }
 
-.affiliate .ranking__figures {
-  margin: var(--space-2) 0 0;
-}
-
-/* The sentence that stops the board reading as broken. Quiet, and never
+/* The sentences that stop the board reading as broken. Quiet, and never
    hidden behind a disclosure: somebody reading down a column of uses and
-   finding a smaller number above a bigger one needs it in the same glance. */
+   finding a smaller number above a bigger one needs them in the same glance. */
 .affiliate .ranking__basis {
-  margin: var(--space-3) 0 0;
-  font-size: var(--text-xs);
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--rule);
+  font-size: 12.5px;
+  line-height: 1.55;
   color: var(--quiet);
+}
+
+.affiliate .ranking__basis p {
+  margin: 0 0 7px;
+}
+
+.affiliate .ranking__basis p:last-child {
+  margin-bottom: 0;
 }
 
 .affiliate .ranking__board {
-  margin: 0;
-  padding: var(--space-2) var(--space-4);
+  margin: 12px 0 0;
+  padding: 0;
   list-style: none;
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
 }
 
 .affiliate .ranking__row {
-  display: grid;
-  grid-template-columns: 3.5rem 1fr auto;
-  align-items: baseline;
-  gap: var(--space-3);
-  padding: var(--space-3) 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 14px;
   border-bottom: 1px solid var(--rule);
+}
+
+.affiliate .ranking__row:last-child {
+  border-bottom: 0;
 }
 
 /* Her own row, and the only place colour is spent here. A leaderboard is a
    list of strangers until she can find herself in it. */
 .affiliate .ranking__row--me {
-  font-weight: 600;
+  background: var(--accent-soft);
 }
 
 .affiliate .ranking__rank {
+  flex: none;
+  width: 20px;
+  font-size: 14px;
   color: var(--quiet);
+  font-variant-numeric: tabular-nums;
 }
 
 .affiliate .ranking__row--me .ranking__rank {
-  color: var(--accent-text);
+  color: var(--accent);
+}
+
+.affiliate .ranking__avatar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--rule);
+  border-radius: 50%;
+  font-size: 13px;
+  color: var(--quiet);
+}
+
+.affiliate .ranking__row--me .ranking__avatar {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.affiliate .ranking__who {
+  flex: 1;
+  min-width: 0;
+  font-size: 13.5px;
+}
+
+.affiliate .ranking__figure {
+  flex: none;
+  text-align: right;
 }
 
 .affiliate .ranking__uses {
-  color: var(--quiet);
+  display: block;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+.affiliate .ranking__figure .ranking__caption {
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--faint);
 }

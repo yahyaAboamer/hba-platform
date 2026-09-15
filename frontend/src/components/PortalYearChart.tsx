@@ -36,15 +36,18 @@ export function PortalYearChart({ month, eligible }: { month: string; eligible: 
       {(["sales","uses"] as const).map(value => <button key={value} aria-pressed={metric === value} onClick={() => setMetric(value)}>{value === "sales" ? "Sales" : "Uses"}</button>)}
     </div>
     {error ? <p role="alert">Could not load your chart. <button className="button" onClick={() => setRetry(n=>n+1)}>Retry</button></p> : !data ? <p className="empty">Loading chart…</p> : !rows.length ? <p className="empty">No months to show yet.</p> : <>
+      {/* Month, figure, and what the figure is — the export's three lines,
+          above the plot they read from. */}
       <div className="portal-chart__readout"><span>{formatMonth(selected.month)}{selected.in_progress ? " · So far" : ""}</span>
-        <strong>{values[index] === null ? "Not available" : metric === "sales" ? formatEgp(values[index]!) : values[index]}</strong></div>
+        <strong>{values[index] === null ? "Not available" : metric === "sales" ? formatEgp(values[index]!) : `${values[index]} ${values[index] === 1 ? "use" : "uses"}`}</strong>
+        <em>{metric === "sales" ? "net sales counted" : "orders placed with your code"}</em></div>
       <svg viewBox="0 0 342 160" role="img" aria-label={`${metric === "sales" ? "Sales" : "Code uses"} by month`}>
         {[0,1,2,3].map(i => <g key={i}><line x1="38" x2="322" y1={132-i*34} y2={132-i*34} className="portal-chart__grid" />
           <text x="30" y={135-i*34} textAnchor="end">{metric === "sales" ? (scale*i/3 >= 100000 ? `${(scale*i/3/100000).toFixed(1)}K` : `${Math.round(scale*i/3/100)}`) : Math.round(scale*i/3)}</text></g>)}
         {metric === "sales" ? segments.map((path,i) => <polyline key={i} points={path} className="portal-chart__line" />) : points.map((p,i) => p && <rect key={i} x={p.x-7} y={p.y} width="14" height={132-p.y} rx="3" className="portal-chart__bar" />)}
         {points.map((p,i) => p && <g key={rows[i].month} onClick={() => setPicked(rows[i].month)}>
           <circle cx={p.x} cy={p.y} r={index === i ? 4 : 3} className="portal-chart__point" />
-          <text x={p.x} y="150" textAnchor="middle">{Number(rows[i].month.slice(5))}</text></g>)}
+          <text x={p.x} y="150" textAnchor="middle" className={index === i ? "portal-chart__tick--on" : undefined}>{Number(rows[i].month.slice(5))}</text></g>)}
       </svg>
       <select className="portal-chart__pick" aria-label="Inspect chart month" value={selected.month} onChange={event => setPicked(event.target.value)}>
         {rows.map(row => <option key={row.month} value={row.month}>{formatMonth(row.month)}</option>)}
