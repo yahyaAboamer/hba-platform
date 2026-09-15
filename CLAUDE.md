@@ -5,8 +5,9 @@ The admin serves the owner, marketing team and finance team; the model portal
 shows each model their own performance, wardrobe and payment records.
 FastAPI + SQLAlchemy + Postgres, React + Vite, on Railway.
 
-**Read `docs/plans/2026-09-12-design-parity-handoff.md` first** — it says where
-the work is right now. Everything below is the part that does not change.
+**Read `docs/plans/2026-09-15-exact-design-handoff.md` first** — it says where
+the work is right now, and `docs/redesign/parity/SCREEN_MATRIX.md` records
+each screen's state. Everything below is the part that does not change.
 
 ---
 
@@ -93,14 +94,16 @@ payroll without touching a maintainer screen.
   in whatever you just changed. Also on 10 September, and it cost an hour.
 - Backend: `.venv/Scripts/python.exe -m pytest -q` — **1934 passing**, and no
   change merges below that. It takes 5–15 minutes; run it in the background.
-- **If the suite is killed for low memory, run it in eight groups** rather than
-  giving up on it. One pytest process grows as it goes and this machine has
-  7.9 GB with under 1 GB free on a bad day; four shorter processes each stay
-  small enough to finish:
+- **If the suite is killed for low memory, run it in groups of five files**
+  rather than giving up on it. One pytest process grows as it goes and this
+  machine has 7.9 GB with under 1 GB free on a bad day; short processes each
+  stay small enough to finish. Groups of ten worked in early September and were
+  killed again on the 14th with Docker running, so the size came down to five —
+  fifteen groups, about twenty minutes in total:
 
   ```
-  ls tests/test_*.py > /tmp/all.txt && split -l 10 -d /tmp/all.txt /tmp/sm
-  for g in 00 01 02 03 04 05 06 07; do DATABASE_URL='...' .venv/Scripts/python.exe -m pytest     -q --color=no -p no:cacheprovider $(cat /tmp/sm$g | tr '
+  ls tests/test_*.py > /tmp/all.txt && split -l 5 -d /tmp/all.txt /tmp/sm
+  for g in /tmp/sm*; do DATABASE_URL='...' .venv/Scripts/python.exe -m pytest     -q --color=no -p no:cacheprovider $(cat $g | tr '
 ' ' '); done
   ```
 
