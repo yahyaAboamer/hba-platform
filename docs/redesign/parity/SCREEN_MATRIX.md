@@ -50,12 +50,12 @@ had the wrong filter names.
 | # | Export view | Lines | Route / component | Status | Evidence and remaining differences |
 |---|---|---|---|---|---|
 | A1 | `vHome` | 121–254 | `/` `Overview.tsx` | Implemented · dark checked on staging | Chart added (was missing). Checked at 1536 CSS px, dark. Pending: 1280/1440, light theme |
-| A2 | `vModels` | 255–312 + script 2485 | `/affiliates` `Affiliates.tsx` | Implemented, not deployed | Filters corrected to Active/Applications/Invitations/Inactive; invitations as rows. Backend test run blocked (see Blockers) |
-| A3 | `vProducts` | 313–373 + script 2580 | `/products` `Products.tsx` | Implemented, not deployed | Three filters, coverage bar, Active pill, pager. Backend test run blocked |
+| A2 | `vModels` | 255–312 + script 2485 | `/affiliates` `Affiliates.tsx` | Implemented · dark checked on staging | Filters corrected to Active/Applications/Invitations/Inactive; invitations as rows. Header overlap and the amber *No update yet* fixed after the staging check |
+| A3 | `vProducts` | 313–373 + script 2580 | `/products` `Products.tsx` | Implemented · dark checked on staging | Three filters, coverage bar, Active pill, pager. *All products* and paging exercised on staging |
 | A4 | `vTargets` | 465–525 | `/targets` `Targets.tsx` | Implemented · dark checked on staging | §T. Checked at 1536 CSS px, dark; element sizes measured. Pending: 1280/1440, light, a save and a confirm exercised |
 | A5 | `vPayments` | 526–597 | `/payments` `Payments.tsx` | Implemented · dark checked on staging | §P. Card 101 vs export 101px, row 82 vs 84px. Pending: 1280/1440, light, Record/Open actions exercised |
 | A6 | `vSettings` | 598–786 | `/settings` `Settings.tsx` | Mapped | Not yet re-read under the script-reading method |
-| A7 | `vOrders` | 1060–1091 + script 3010 | `/orders` `Orders.tsx` | Implemented, not deployed | Five columns, counted line, load-more. Backend test run blocked |
+| A7 | `vOrders` | 1060–1091 + script 3010 | `/orders` `Orders.tsx` | Implemented · dark checked on staging | Five columns, counted line, load-more. A row opening its order exercised on staging |
 
 ## B. Admin — secondary views
 
@@ -66,11 +66,11 @@ had the wrong filter names.
 | B3 | `vProduct` | 374–464 | `/products/:id` `ProductDetail` in `Products.tsx` | Implemented, not yet seen on staging | Hero with state, sizes and coverage pills; feature request surface with Edit/Hide/Remove or *Ask models to feature this*; coverage groups that fold. The order reference per model the export prints is not in the product roster payload |
 | B4 | `vPromo` | 1157–1231 | `/products/:id?view=promotion` `PromotionEditor` | Implemented, not yet seen on staging | Switch, audience, optional message (Save was wrongly disabled without one - D12), dark wardrobe preview with Received / On the way. The export's message presets are not built |
 | B5 | `vShipment` | 1135–1156 | **none** | Unreviewed | No route exists |
-| B6 | `vOrder` | 1092–1134 | `/orders/:orderId` `OrderDetail` in `Orders.tsx` | Implemented, not deployed | Route and `GET /api/orders/detail/{id}` are new |
+| B6 | `vOrder` | 1092–1134 | `/orders/:orderId` `OrderDetail` in `Orders.tsx` | Implemented · checked on staging (DOM) | Route and `GET /api/orders/detail/{id}` are new. Screenshot capture failed on that tab; content read from the rendered page instead |
 | B7 | `vPayment` | 1280–1402 + script 3171 | `/payments/:month/:affiliateId` `PaymentDetail.tsx` | Implemented · dark checked on staging | New `GET /api/payroll/{month}/statement/{id}`; approval from the page with the 05B fingerprint. Blocked month checked on staging; an approved month with transfers not yet seen on staging data |
 | B8 | `vRecord` | 1403–1445 + script 3270 | `/payments/:month/:affiliateId/record` `PaymentRecord.tsx` | Implemented | Returns to B7. Not exercised on staging (no approved month with money owed there) |
 | B9 | `vReceipt` | 1446–1461 + script 3314 | `/payments/:month/:affiliateId/receipts/:paymentId` `PaymentReceipt` | Implemented | *Recorded by* left out: the ledger payload does not carry it |
-| B10 | `vCorrection` | 1462–1513 | `/payments/:month/:affiliateId/correction` `PaymentCorrection.tsx` | Implemented, not deployed | Order reference and failure date are not in the corrections payload, so the lead line names the month instead. `/reconcile` stays for overpaid months |
+| B10 | `vCorrection` | 1462–1513 | `/payments/:month/:affiliateId/correction` `PaymentCorrection.tsx` | Implemented, deployed, not exercised | Order reference and failure date are not in the corrections payload, so the lead line names the month instead. `/reconcile` stays for overpaid months |
 | B11 | `vTerms` | 1514–1604 + script | `/affiliates/:id/compensation` `Compensation.tsx` | Implemented · dark checked on staging | Two surfaces, a year of twelve tiles, *Apply to N months* is the save. Kept: met/missed for a guarantee month before go-live (ADR 0036), the list of months still missing something. An apply not yet exercised on staging |
 
 ## C. Admin — routes we ship that the export does not draw
@@ -296,10 +296,7 @@ reached. Nothing else is a legitimate difference.
 
 ## Blockers
 
-- **The backend test suite can't run.** The test database is the
-  docker-compose PostgreSQL on port 5433, and Docker Desktop stopped during a
-  low-memory kill on 15 September. Commit `da243ff` (Models, Orders, Products)
-  is committed locally and not pushed until the suite passes.
+None open. The docker-compose test database that stopped on 15 September was restarted the same day and the full suite has run since.
 
 ## Evidence
 
