@@ -1,9 +1,13 @@
-/* ── Attributed orders ─────────────────────────────────────────────────────
+/* Class names here must not repeat the portal's `MyOrders.css`: both sheets
+ * load into one bundle, and `.orders__row` once gave this table's rows the
+ * portal card's shadow and background.
+ *
+ * ── Attributed orders ─────────────────────────────────────────────────────
  *
  * `vOrders` and `vOrder` in `Admin Dashboard.dc.html`, lines 1060–1134.
  */
 
-.orders__note {
+.orders__lock-note {
   margin-bottom: var(--space-4);
 }
 
@@ -51,7 +55,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-.orders__row {
+.orders__line {
   cursor: pointer;
 }
 

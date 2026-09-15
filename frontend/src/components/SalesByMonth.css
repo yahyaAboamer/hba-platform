@@ -1,43 +1,46 @@
-/* Measured out of `Admin Dashboard.dc.html`, the last block of `vHome`. */
+/* Measured out of `Admin Dashboard.dc.html`, the last block of `vHome`.
 
-.year {
+   `sales-year`, not `year`: the portal's own year chart already owns `.year`,
+   and every stylesheet loads into one bundle. */
+
+.sales-year {
   margin-top: 16px;
   padding: 16px 20px 12px;
   border-radius: var(--radius);
   background: var(--surface);
 }
 
-.year__head {
+.sales-year__head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
 }
 
-.year__title {
+.sales-year__title {
   margin: 0;
   font-size: 15px;
   font-weight: 400;
 }
 
-.year__range {
+.sales-year__range {
   font-size: 12px;
   color: var(--faint);
 }
 
-.year__chart {
+.sales-year__chart {
   display: block;
   width: 100%;
   margin-top: 12px;
   overflow: visible;
 }
 
-.year__bar {
+.sales-year__bar {
   fill: var(--bar);
   cursor: pointer;
 }
 
-.year__bar--on {
+.sales-year__bar--on {
   fill: var(--accent);
 }
 
@@ -49,7 +52,7 @@
  * the keyboard's and the screen reader's way to the same act, and it carries
  * each month's figure in full — which the bars only imply.
  */
-.year__months {
+.sales-year__months {
   position: absolute;
   width: 1px;
   height: 1px;

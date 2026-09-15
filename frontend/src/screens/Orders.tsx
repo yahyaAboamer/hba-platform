@@ -195,7 +195,7 @@ export function Orders({ session }: { session: Session }) {
           {error}
         </p>
       )}
-      {lockNote && <p className="notice orders__note">{lockNote}</p>}
+      {lockNote && <p className="notice orders__lock-note">{lockNote}</p>}
 
       <form className="orders__bar" onSubmit={lookUp}>
         <span className="orders__count">
@@ -283,7 +283,7 @@ function OrderTableRow({ row }: { row: OrderRow }) {
      * real link, so the row is reachable by keyboard and a middle-click opens
      * it in a tab, which a row with only an `onClick` never is.
      */
-    <tr className="orders__row" onClick={() => navigate(open)}>
+    <tr className="orders__line" onClick={() => navigate(open)}>
       <td className="orders__ref">
         <Link to={open} onClick={(event) => event.stopPropagation()}>
           {row.order_number}
