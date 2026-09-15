@@ -252,30 +252,6 @@ def mask_destination(destination: PayoutDestination | None) -> dict | None:
     return masked
 
 
-def payable_destination(destination: PayoutDestination | None) -> dict | None:
-    """A destination for the person about to send the money.
-
-    **Unmasked, deliberately, and only here.** `mask_destination` is the right
-    answer almost everywhere: an audit row, a log line, a message, and the
-    model's own screen, where the tail tells her nothing she does not already
-    know and a full account number is worth photographing over her shoulder.
-
-    The month-end payments desk is the one place where the whole value is the
-    point. Somebody is holding a banking app open and typing what this screen
-    says; a masked number makes the *Copy* button useless and sends them into
-    the profile to find the real one - which is how a transfer goes to the
-    previous destination. The approved design prints it in full for the same
-    reason.
-
-    Reached only through `payments.view`, which is finance and the owner.
-    """
-    if destination is None:
-        return None
-    return {
-        field: getattr(destination, field) for field in _VISIBLE + _SENSITIVE
-    }
-
-
 def current_destination(
     db: Session, affiliate: AffiliateProfile
 ) -> PayoutDestination | None:

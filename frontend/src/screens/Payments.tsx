@@ -13,6 +13,7 @@ import {
   formatMonth,
 } from "../lib/money";
 import { copyableDestination, describeDestination, PAY_TYPE } from "../lib/payouts";
+import type { Revealed } from "./PaymentRecord";
 import "./Payments.css";
 
 export type SettlementState =
@@ -209,7 +210,7 @@ export function paymentRowPresentation(row: Balance): RowPresentation {
  * is missing altogether. Anything this table does not name falls back to the
  * quiet tier rather than borrowing a meaning it has not earned.
  */
-const STATE_PILL: Record<string, string> = {
+export const STATE_PILL: Record<string, string> = {
   "Awaiting approval": "payments__pill--owed",
   "Partly paid": "payments__pill--owed",
   Approved: "payments__pill--approved",
@@ -527,7 +528,9 @@ function PaymentRow({
   return (
     <tr>
       <td className="payments__who">
-        <Link className="payments__name" to={`/affiliates/${row.affiliate_id}`}>
+        {/* The export opens the model's payment for this month from her name,
+         *  not her profile - the profile is one link further, from there. */}
+        <Link className="payments__name" to={`/payments/${month}/${row.affiliate_id}`}>
           {row.name}
         </Link>
         {/* Her arrangement under her name, as the export writes it: the
@@ -570,8 +573,8 @@ function PaymentRow({
          *  wrong. Masked on the server before it ever reaches this list. */}
         <span className="payments__where">
           <span>{describeDestination(row.destination ?? null)}</span>
-          {row.destination && (
-            <CopyDestination text={copyableDestination(row.destination)} />
+          {row.destination && canRecord && (
+            <CopyDestination affiliateId={row.affiliate_id} />
           )}
         </span>
       </td>
@@ -609,24 +612,33 @@ function PaymentRow({
  * being typed into a banking app. Retyping an account number off a screen is
  * the step where a digit goes missing.
  */
-function CopyDestination({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false);
+function CopyDestination({ affiliateId }: { affiliateId: number }) {
+  const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
   return (
     <button
       type="button"
       className="button button--quiet payments__copy"
       aria-label="Copy destination"
-      onClick={() => {
-        navigator.clipboard?.writeText(text).then(
-          () => {
-            setCopied(true);
-            window.setTimeout(() => setCopied(false), 2000);
-          },
-          () => undefined,
-        );
+      onClick={async () => {
+        /*
+         * The list holds the masked form (ADR 0028), so *Copy* asks for the
+         * real value through the reveal - gated on recording payments, and
+         * written to the audit log - and copies only the number, not the
+         * sentence around it.
+         */
+        try {
+          const revealed = await api.post<Revealed>(
+            `/api/affiliates/${affiliateId}/payout-destination/reveal`,
+          );
+          await navigator.clipboard.writeText(copyableDestination(revealed));
+          setState("copied");
+        } catch {
+          setState("failed");
+        }
+        window.setTimeout(() => setState("idle"), 2000);
       }}
     >
-      {copied ? "Copied" : "Copy"}
+      {state === "copied" ? "Copied" : state === "failed" ? "Not copied" : "Copy"}
     </button>
   );
 }
@@ -651,15 +663,13 @@ function PaymentAction({
    * first - which is why the label is computed above and the link below
    * decides nothing about wording.
    */
-  if (action === "Review" && canApprove) {
+  // *Review* opens the month's payment view, which carries the approval -
+  // the export approves one model's month there, beside what it adds up to.
+  if (action === "Review") {
     return (
       <Link
-        className="button button--row button--primary"
-        to={`/payroll/${month}/approve`}
-        state={{
-          affiliate_ids: [row.affiliate_id],
-          return_to: "/payments",
-        }}
+        className={canApprove ? "button button--row button--primary" : "button button--row"}
+        to={`/payments/${month}/${row.affiliate_id}`}
       >
         {action}
       </Link>
@@ -679,7 +689,7 @@ function PaymentAction({
     return (
       <Link
         className="button button--row button--primary"
-        to={`/payments/${month}/${row.affiliate_id}`}
+        to={`/payments/${month}/${row.affiliate_id}/record`}
       >
         {action}
       </Link>
@@ -698,7 +708,7 @@ function PaymentAction({
   return (
     <Link
       className="button button--row"
-      to={`/affiliates/${row.affiliate_id}/payments`}
+      to={`/payments/${month}/${row.affiliate_id}`}
     >
       Open
     </Link>

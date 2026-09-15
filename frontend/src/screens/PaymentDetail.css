@@ -1,0 +1,473 @@
+/* ── One model's month at the payments desk ────────────────────────────────
+ *
+ * `vPayment`, `vRecord` and `vReceipt` in `Admin Dashboard.dc.html`, lines
+ * 1280–1461.
+ */
+
+.page__head .pay__back {
+  min-height: 36px;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+.page__head .pay__back + .page__title {
+  flex: 1;
+  margin-left: 14px;
+}
+
+.pay-detail {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.pay-detail__main {
+  flex: 1 1 460px;
+  min-width: min(380px, 100%);
+}
+
+.pay-detail__side {
+  flex: 0 0 320px;
+  min-width: min(290px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.pay-detail__status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.pay-detail__pill {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.pay-detail__terms,
+.pay-detail__muted {
+  font-size: 13px;
+  color: var(--quiet);
+}
+
+.pay-detail__link {
+  color: var(--accent);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.pay-detail__blocked {
+  margin-top: 14px;
+  padding: 13px 15px;
+  border: 1px solid var(--refused);
+  border-radius: var(--radius);
+  background: var(--refused-quiet);
+  font-size: 13.5px;
+  color: var(--refused);
+}
+
+.pay-detail__blocked-act {
+  margin-top: 10px;
+  border-color: var(--refused);
+  color: var(--refused);
+}
+
+.pay-detail__lines {
+  margin-top: 14px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.pay-detail__line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--rule);
+  font-size: 14px;
+}
+
+.pay-detail__line-detail {
+  display: block;
+  margin-top: 4px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--faint);
+}
+
+.pay-detail__line-value {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The line's tone is the line's meaning; a zero does not fade it. */
+.pay-detail__line-value .money,
+.pay-detail__total .money {
+  color: inherit;
+}
+
+.pay-detail__tone--ink { color: var(--ink); }
+.pay-detail__tone--quiet { color: var(--quiet); }
+.pay-detail__tone--lift { color: var(--accent-lift); }
+.pay-detail__tone--owed { color: var(--owed); }
+
+.pay-detail__total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 15px 16px;
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pay-detail__note {
+  margin: 12px 0 0;
+  padding: 13px 15px;
+  border: 1px solid var(--owed);
+  border-radius: var(--radius);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--quiet);
+}
+
+.pay-detail__note--settled {
+  border-color: var(--accent);
+  color: var(--accent-lift);
+}
+
+.pay-detail__correction {
+  display: block;
+  margin-top: 12px;
+  padding: 13px 15px;
+  border: 1px solid var(--owed);
+  border-radius: var(--radius);
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.6;
+  text-decoration: none;
+}
+
+.pay-detail__correction .pay-detail__link {
+  display: block;
+  margin-top: 6px;
+  font-size: 12.5px;
+}
+
+/* ── The right-hand column ─────────────────────────────────────────────── */
+
+.pay-detail__card {
+  padding: 16px 18px;
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.pay-detail__card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.pay-detail__card-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 400;
+}
+
+.pay-detail__missing {
+  margin: 10px 0 11px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--owed);
+}
+
+.pay-detail__dest {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.pay-detail__dest-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.pay-detail__dest-label {
+  display: block;
+  font-size: 12px;
+  color: var(--quiet);
+}
+
+.pay-detail__dest-value {
+  display: block;
+  margin-top: 4px;
+  font-size: 13.5px;
+  user-select: all;
+  word-break: break-all;
+}
+
+.pay-detail__instapay {
+  margin-top: 12px;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.pay-detail__approved {
+  margin: 9px 0 0;
+  font-size: 13px;
+  color: var(--accent-lift);
+}
+
+.pay-detail__approved .money {
+  color: inherit;
+}
+
+.pay-detail__card .pay-detail__muted {
+  margin: 9px 0 0;
+  line-height: 1.55;
+}
+
+.pay-detail__summary {
+  margin-top: 8px;
+}
+
+.pay-detail__wide {
+  width: 100%;
+  min-height: 42px;
+  margin-top: 12px;
+  font-size: 14px;
+}
+
+.pay-detail__record {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.pay-detail__transfer {
+  display: block;
+  margin-top: 11px;
+  padding: 11px 12px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  color: var(--ink);
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.pay-detail__transfer-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.pay-detail__transfer-top .pay-detail__link {
+  font-size: 12px;
+}
+
+.pay-detail__transfer-meta {
+  display: block;
+  margin: 5px 0 4px;
+  color: var(--faint);
+}
+
+.pay-detail__faint {
+  margin: 11px 0 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--faint);
+}
+
+/* ── Recording a transfer (vRecord) ────────────────────────────────────── */
+
+.pay-record {
+  max-width: 560px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.pay-record__due {
+  margin: 0 0 2px;
+  font-size: 13px;
+  color: var(--quiet);
+}
+
+.pay-record__field {
+  display: block;
+}
+
+.pay-record__field > span {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12.5px;
+  color: var(--quiet);
+}
+
+.pay-record__input {
+  min-height: 44px;
+  padding: 12px 13px;
+  font-size: 14px;
+}
+
+.pay-record__file {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.pay-record__drop {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 110px;
+  padding: 16px;
+  border: 1px dashed var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--faint);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.pay-record__drop--on {
+  color: var(--accent-lift);
+}
+
+.pay-record__drop:focus-within {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.pay-record__error,
+.pay-record__warn {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.pay-record__error {
+  border: 1px solid var(--refused);
+  background: var(--refused-quiet);
+  color: var(--refused);
+}
+
+.pay-record__warn {
+  border: 1px solid var(--owed);
+  color: var(--owed);
+}
+
+.pay-record__warn .money {
+  color: inherit;
+}
+
+.pay-record__acts {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.pay-record__big {
+  min-height: 44px;
+  padding: 12px 18px;
+  font-size: 14px;
+}
+
+.pay-record__note {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--faint);
+}
+
+/* ── One transfer (vReceipt) ───────────────────────────────────────────── */
+
+.pay-receipt {
+  max-width: 520px;
+}
+
+.pay-receipt__card {
+  padding: 18px 20px;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.pay-receipt__amount {
+  margin-top: 8px;
+  font-size: 28px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pay-receipt__rows {
+  margin: 6px 0 0;
+}
+
+.pay-receipt__rows > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--rule);
+  font-size: 13.5px;
+}
+
+.pay-receipt__rows dt {
+  color: var(--quiet);
+}
+
+.pay-receipt__rows dd {
+  margin: 0;
+  text-align: right;
+}
+
+.pay-receipt__image {
+  display: block;
+  width: 100%;
+  margin-top: 14px;
+  border-radius: var(--radius-sm);
+}
+
+.pay-receipt__none {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 130px;
+  margin-top: 14px;
+  border: 1px dashed var(--rule-strong);
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  color: var(--faint);
+}
+
+.pay-receipt__back {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 14px;
+  font-size: 14px;
+}
+
+.pay-detail__dest-summary {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: var(--quiet);
+  word-break: break-all;
+}
+
+.pay-detail__reveal {
+  margin-top: 11px;
+}

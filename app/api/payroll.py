@@ -247,6 +247,101 @@ def payroll_month_view(
     }
 
 
+@router.get("/{month}/statement/{affiliate_id}")
+def statement(
+    month: str,
+    affiliate_id: int,
+    _actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_VIEW)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """One model's month as the approved payment view lays it out.
+
+    Counted sales, the commission at its rate, a fixed salary, what a
+    guarantee added, and the total they come to - the lines the export draws
+    above *Approved amount* or *Estimated amount*.
+
+    **An agreed month is read from its snapshot, never recalculated.** Once a
+    month is approved every figure here comes out of the frozen payload, so a
+    later order failing cannot move a number that sits under the word
+    *Approved*. Only a month nobody has agreed is worked out live, and that
+    one is labelled an estimate and carries the fingerprint an approval must
+    hand back (05B).
+
+    The lines are carved out of the rounded total by the same `_attribute`
+    Home uses, so they always add up to it - commission is whatever remains
+    after the exact salary and the exact top-up, carried orders included.
+    """
+    from types import SimpleNamespace
+
+    from app.services.overview import _attribute
+
+    month = _month_or_400(month)
+    affiliate = _affiliate_or_404(db, affiliate_id)
+    blockers, calculation = blockers_for(db, affiliate, month)
+    payroll_month = get_month(db, affiliate, month)
+    snapshot = payroll_month.active_snapshot if payroll_month else None
+    historical = is_historical(month)
+
+    if snapshot is not None:
+        frozen = snapshot.payload_json
+        source = SimpleNamespace(
+            payout_piastres=snapshot.approved_obligation_piastres,
+            compensation_type=frozen.get("compensation_type"),
+            fixed_piastres=int(frozen.get("fixed_piastres") or 0),
+            guarantee_applied=bool(frozen.get("guarantee_applied")),
+            commission_piastres=Decimal(str(frozen.get("commission_piastres") or "0")),
+        )
+        counted = int(frozen.get("earned_base_piastres") or 0)
+        rate = frozen.get("commission_rate_bp")
+        base_amount = int(frozen.get("base_amount_piastres") or 0)
+        carried = _display_piastres(str(frozen.get("carried_piastres") or "0"))
+        target_known = frozen.get("target_achieved") is not None
+        basis = "settled_outside" if historical else "approved"
+        shown_blockers: list[str] = []
+        fingerprint = None
+    else:
+        source = calculation
+        counted = calculation.earned_base_piastres
+        rate = calculation.commission_rate_bp
+        base_amount = calculation.base_amount_piastres
+        carried = _display_piastres(calculation.carried_piastres)
+        target_known = calculation.target_achieved is not None
+        basis = "settled_outside" if historical else "estimate"
+        shown_blockers = blockers
+        fingerprint = (
+            None if historical else _source_version_for(db, affiliate, month, calculation)
+        )
+
+    parts = _attribute(source)
+
+    return {
+        "affiliate_id": affiliate.id,
+        "name": affiliate.name,
+        "month": month,
+        "basis": basis,
+        "version": snapshot.version if snapshot else None,
+        "approved_at": snapshot.approved_at.isoformat() if snapshot else None,
+        "compensation_type": source.compensation_type,
+        "commission_rate_bp": rate,
+        "counted_sales_piastres": counted,
+        "commission_piastres": parts.commission_piastres,
+        "fixed_piastres": parts.fixed_piastres,
+        "guarantee_top_up_piastres": parts.guarantee_top_up_piastres,
+        "carried_piastres": carried,
+        "total_piastres": parts.payout_piastres,
+        "total": format_egp(parts.payout_piastres),
+        "guarantee": {
+            "base_amount_piastres": base_amount,
+            "target_known": target_known,
+        },
+        "blockers": shown_blockers,
+        # Handed back on *Approve this month*, exactly as the batch approval
+        # screen hands back its preview's - so a month that moved while this
+        # page was open is refused rather than agreed at a figure nobody saw.
+        "source_version": fingerprint,
+    }
+
+
 @router.post("/{month}/approve")
 def approve(
     month: str,

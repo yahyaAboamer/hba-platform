@@ -153,7 +153,7 @@ export function destinationHolder(
  * has to edit by hand — which is the step this button exists to remove.
  */
 export function copyableDestination(
-  destination: Record<string, string | null>,
+  destination: { [field: string]: string | null | undefined },
 ): string {
   return (
     destination.instapay_address_url ??

@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 
 import { Money } from "../components/Money";
 import { api } from "../lib/api";
-import { PAYOUT_FIELD_LABEL } from "../lib/payouts";
-import { egpPlain, formatEgp, formatMonth, parseEgp } from "../lib/money";
+import { describeDestination, PAYOUT_FIELD_LABEL } from "../lib/payouts";
+import { egpPlain, formatMonth, parseEgp } from "../lib/money";
 import type { Balance } from "./Payments";
-import { paymentRowPresentation, STATE_LABEL } from "./Payments";
 import "./Payments.css";
+import "./PaymentDetail.css";
 
 export type Revealed = {
   method: "instapay" | "bank" | "wallet";
@@ -101,13 +101,29 @@ const METHOD_LABEL: Record<string, string> = {
  * updating a row the database refuses, and carving out one column is how a
  * table stops being append-only in practice while still claiming to be.
  */
+/**
+ * *Record payment* — `vRecord` in the approved export.
+ *
+ * What is outstanding, then one column of fields: the amount, the date, the
+ * destination used, a reference and the receipt, with *Record payment* and
+ * *Cancel* under them. It returns to the month's payment view, where the new
+ * transfer appears under *Transfers*.
+ *
+ * Where to send the money is no longer on this page. The export puts it on
+ * the payment view beside the approval, which is where somebody reads it
+ * before they open their banking app; this page is for afterwards.
+ *
+ * Kept from before, because each of them is a safeguard rather than a
+ * layout: one operation key for every retry of the same transfer, the proof
+ * uploaded before the ledger row so a failed record does not create a second
+ * image, a written reason whenever the amount differs from what is
+ * outstanding, and the warning when her destination changed recently.
+ */
 export function PaymentRecord() {
   const { month = "", affiliateId = "" } = useParams();
   const navigate = useNavigate();
 
   const [balance, setBalance] = useState<Balance | null>(null);
-  const [revealed, setRevealed] = useState<Revealed | null>(null);
-  const [revealing, setRevealing] = useState(false);
   const [amount, setAmount] = useState("");
   const [transferDate, setTransferDate] = useState(cairoToday);
   const [note, setNote] = useState("");
@@ -115,10 +131,9 @@ export function PaymentRecord() {
   const [proof, setProof] = useState<File | null>(null);
   const [proofFileId, setProofFileId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState<string | null>(null);
-  const [copyMessage, setCopyMessage] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
   const [operationKey] = useState(() => crypto.randomUUID());
+  const back = `/payments/${month}/${affiliateId}`;
 
   useEffect(() => {
     setError(null);
@@ -129,49 +144,19 @@ export function PaymentRecord() {
           (candidate) => String(candidate.affiliate_id) === affiliateId,
         );
         setBalance(row ?? null);
-        // §14. Pre-filled with what is owed, and editable, because a partial
-        // payment, a transfer limit, a fee and a mistake all have to be
-        // recordable as what actually happened.
+        // §14. Pre-filled with what is outstanding, and editable, because a
+        // partial payment, a transfer limit, a fee and a mistake all have to
+        // be recordable as what actually happened.
         if (row) setAmount(egpPlain(row.balance_piastres));
       })
       .catch((caught) => setError(caught.message));
   }, [month, affiliateId]);
 
-  async function reveal() {
-    setRevealing(true);
-    setError(null);
-    try {
-      setRevealed(
-        await api.post<Revealed>(
-          `/api/affiliates/${affiliateId}/payout-destination/reveal`,
-        ),
-      );
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not read it.");
-    } finally {
-      setRevealing(false);
-    }
-  }
-
-  async function copy(label: string, value: string) {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopied(label);
-      setCopyMessage(`${label} copied.`);
-    } catch {
-      // Clipboard access can be refused outright. The number is on screen
-      // either way, which is the thing that actually matters.
-      setCopied(null);
-      setCopyMessage(
-        `Could not copy ${label.toLocaleLowerCase()}. Select it and copy it instead.`,
-      );
-    }
-  }
-
   const piastres = parseEgp(amount);
   const owed = balance?.balance_piastres ?? 0;
   const differs = piastres !== null && piastres !== owed;
   const noteMissing = differs && note.trim() === "";
+  const over = piastres !== null && piastres > owed;
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -205,9 +190,7 @@ export function PaymentRecord() {
           proofFileId: proofId,
         }),
       );
-      // The append-only history is the receipt. Landing there proves what was
-      // recorded and avoids a green toast standing in for persisted evidence.
-      navigate(`/affiliates/${affiliateId}/payments`);
+      navigate(back);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not record it.");
     } finally {
@@ -217,13 +200,12 @@ export function PaymentRecord() {
 
   const head = (
     <div className="page__head">
+      <Link className="button pay__back" to={back}>
+        ← {balance?.name ?? "Payment"}
+      </Link>
       <div className="page__title">
-        <Link to="/payments" className="detail__back">
-          Payments
-        </Link>
-        <h1>
-          Pay {balance?.name ?? "…"} — {formatMonth(month)}
-        </h1>
+        <h1>Record payment</h1>
+        <span className="page__subtitle">{formatMonth(month)}</span>
       </div>
     </div>
   );
@@ -243,346 +225,138 @@ export function PaymentRecord() {
     );
   }
 
-  if (balance.balance_piastres <= 0) {
-    const view = paymentRowPresentation(balance);
-    return (
-      <>
-        {head}
-        <section className="panel pay__nothing-due">
-          <h2 className="panel__title">{view.label}</h2>
-          <p className="pay__lead">
-            {view.explanation ?? "There is no remaining transfer to record."}
-          </p>
-          <Link
-            className="button"
-            to={`/affiliates/${affiliateId}/payments`}
-          >
-            Open genuine payment history
-          </Link>
-        </section>
-      </>
-    );
-  }
+  // Nothing outstanding: there is no transfer to record, and the payment view
+  // says why.
+  if (balance.balance_piastres <= 0) return <Navigate to={back} replace />;
 
   return (
     <>
       {head}
-
-      {error && (
-        <p className="notice notice--refused" role="alert">
-          {error}
+      <form className="pay-record" onSubmit={submit}>
+        <p className="pay-record__due">
+          <Money piastres={owed} kind="agreed" /> outstanding for {formatMonth(month)}
         </p>
-      )}
 
-      {/*
-       * §6.4.5, and the reason it is here rather than buried in the panel
-       * below: this is the moment a redirected payout would actually cost
-       * money, and the person about to send it is the only one who can tell a
-       * model who switched banks from an account somebody else is now holding.
-       *
-       * It does not block. A destination changing shortly before payday is
-       * overwhelmingly the former, and refusing to pay them would be the wrong
-       * default by a wide margin.
-       */}
-      {balance.destination_changed_at && (
-        <p className="notice notice--refused pay__changed" role="alert">
-          Where {balance.name} is paid changed{" "}
-          <strong>{describeWhen(balance.destination_changed_at)}</strong>. If
-          you were not expecting that, check with them before sending anything.
-        </p>
-      )}
-
-      <div className="pay__grid">
-        <section className="panel">
-          <div className="panel__head">
-            <h2 className="panel__title">What is owed</h2>
-            <span className="page__subtitle">
-              {STATE_LABEL[balance.state]}
-              {balance.version !== undefined && ` · v${balance.version}`}
-            </span>
-          </div>
-          {/*
-           * The parts as well as the total. The first question about any
-           * outstanding figure is what makes it up, and a balance nobody can
-           * take apart is a balance nobody can argue with.
-           */}
-          <dl className="detail__list">
-            <Line label="Agreed" piastres={balance.obligation_piastres} />
-            {balance.credited_piastres > 0 && (
-              <Line
-                label="Carried in from another month"
-                piastres={balance.credited_piastres}
-              />
-            )}
-            {balance.paid_piastres > 0 && (
-              <Line
-                label={
-                  (balance.paid_earlier_versions_piastres ?? 0) > 0
-                    ? "Already sent, across versions"
-                    : "Already sent"
-                }
-                piastres={-balance.paid_piastres}
-              />
-            )}
-            {balance.adjusted_piastres > 0 && (
-              <Line
-                label="Credited out or written off"
-                piastres={-balance.adjusted_piastres}
-              />
-            )}
-            <div className="detail__row pay__balance">
-              <dt className="detail__label">Still owed</dt>
-              <dd className="detail__value">
-                <Money
-                  piastres={balance.balance_piastres}
-                  kind="agreed"
-                  tone={balance.balance_piastres > 0 ? "owed" : "settled"}
-                />
-              </dd>
-            </div>
-          </dl>
-        </section>
-
-        {/*
-         * Only once a month has been agreed more than once. On an ordinary
-         * month there is nothing to reconcile and this would be a panel
-         * explaining that nothing happened.
-         *
-         * It exists because the figure alone could not answer the question
-         * somebody actually has on seeing "v2": is this the whole amount, or
-         * what is left? Until the balance was corrected it was neither - the
-         * screen offered the full new figure to a model who had already been
-         * paid most of it.
-         */}
-        {(balance.versions?.length ?? 0) > 1 && (
-          <section className="panel pay__versions">
-            <div className="panel__head">
-              <h2 className="panel__title">How this month changed</h2>
-            </div>
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Version</th>
-                  <th className="numeric">Agreed</th>
-                  <th className="numeric">Paid against it</th>
-                </tr>
-              </thead>
-              <tbody>
-                {balance.versions!.map((entry) => (
-                  <tr
-                    key={entry.version}
-                    className={entry.is_current ? undefined : "pay__version--old"}
-                  >
-                    <td>
-                      {entry.version}
-                      {!entry.is_current && (
-                        <span className="detail__note"> superseded</span>
-                      )}
-                    </td>
-                    <td className="numeric">
-                      <Money
-                        piastres={entry.obligation_piastres}
-                        kind={entry.is_current ? "agreed" : "blocked"}
-                      />
-                    </td>
-                    <td className="numeric">
-                      <Money
-                        piastres={entry.paid_piastres}
-                        kind={entry.is_current ? "agreed" : "blocked"}
-                        tone={entry.paid_piastres > 0 ? "settled" : "neutral"}
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <p className="pay__versions-note">
-              Money stays attached to the version it settled. What is still
-              owed is the difference between the current figure and everything
-              already sent for this month.
-            </p>
-          </section>
+        {balance.destination_changed_at && (
+          <p className="pay-record__warn" role="alert">
+            Where {balance.name} is paid changed{" "}
+            <strong>{describeWhen(balance.destination_changed_at)}</strong>. If you
+            were not expecting that, check with them before sending anything.
+          </p>
         )}
 
-        <section className="panel">
-          <div className="panel__head">
-            <h2 className="panel__title">Where to send it</h2>
-          </div>
+        <label className="pay-record__field">
+          <span>Amount transferred, E£</span>
+          <input
+            className="input pay-record__input"
+            inputMode="decimal"
+            value={amount}
+            onChange={(event) => setAmount(event.target.value)}
+          />
+        </label>
 
-          {revealed === null ? (
-            <>
-              <p className="pay__lead">
-                These details are shortened everywhere else on purpose. Showing
-                them is recorded — who looked, and when.
-              </p>
-              <button
-                type="button"
-                className="button"
-                onClick={reveal}
-                disabled={revealing}
-              >
-                {revealing ? "Reading…" : "Show where to send it"}
-              </button>
-            </>
-          ) : (
-            <PaymentDestination
-              revealed={revealed}
-              copied={copied}
-              copyMessage={copyMessage}
-              onCopy={copy}
-            />
-          )}
-        </section>
-      </div>
+        <label className="pay-record__field">
+          <span>Transfer date</span>
+          <input
+            className="input pay-record__input"
+            type="date"
+            required
+            value={transferDate}
+            onChange={(event) => setTransferDate(event.target.value)}
+          />
+        </label>
 
-      <form onSubmit={submit} className="pay__form">
-        <section className="panel">
-          <div className="panel__head">
-            <h2 className="panel__title">Record what you sent</h2>
-          </div>
+        <label className="pay-record__field">
+          <span>Destination used</span>
+          <select className="input pay-record__input" value="current" disabled>
+            <option value="current">{describeDestination(balance.destination ?? null)}</option>
+          </select>
+        </label>
 
-          <label className="field pay__field">
-            <span className="field__label">Amount sent</span>
+        <label className="pay-record__field">
+          <span>Reference</span>
+          <input
+            className="input pay-record__input"
+            maxLength={120}
+            value={reference}
+            onChange={(event) => setReference(event.target.value)}
+            placeholder="From the transfer confirmation"
+          />
+        </label>
+
+        <div className="pay-record__field">
+          <span>Receipt</span>
+          <label className={proof ? "pay-record__drop pay-record__drop--on" : "pay-record__drop"}>
             <input
-              className="input"
-              inputMode="decimal"
-              value={amount}
-              onChange={(event) => setAmount(event.target.value)}
-              aria-describedby="amount-help"
-            />
-            {/*
-             * **Louder when it is more, quiet when it is less.**
-             *
-             * Both were the same grey note, and paying under is ordinary -
-             * a part payment, recorded on purpose. Paying *over* is the one
-             * that has to be reconciled afterwards, and on staging somebody
-             * typed the full agreed figure over a correctly pre-filled
-             * remainder and sent E£760 twice. The note said so. Nobody read
-             * a grey line.
-             */}
-            <span
-              className={
-                piastres !== null && piastres > owed
-                  ? "detail__note pay__over"
-                  : "detail__note"
-              }
-              id="amount-help"
-            >
-              {piastres === null
-                ? "Type a figure, for example 5512.35"
-                : piastres > owed
-                  ? `${formatEgp(piastres)} — ${formatEgp(piastres - owed)} more than is owed. This month will be overpaid, and you will have to credit or write off the difference.`
-                  : differs
-                    ? `${formatEgp(piastres)} — ${formatEgp(owed - piastres)} less than what is owed`
-                    : `${formatEgp(piastres)} — exactly what is owed`}
-            </span>
-          </label>
-
-          {/*
-           * §14. The note is what separates a deliberate partial payment from a
-           * typo, and only the person recording it knows which. The server
-           * refuses the difference without one; asking here means the reason is
-           * written while it is still in mind.
-           */}
-          {differs && (
-            <label className="field pay__field">
-              <span className="field__label">
-                Why is it different from what is owed?
-              </span>
-              <textarea
-                className="input reopen__textarea"
-                rows={2}
-                maxLength={500}
-                required
-                value={note}
-                onChange={(event) => setNote(event.target.value)}
-                placeholder="InstaPay would not send the whole amount in one transfer."
-              />
-            </label>
-          )}
-
-          <label className="field pay__field">
-            <span className="field__label">Transfer date</span>
-            <input
-              className="input"
-              type="date"
-              required
-              value={transferDate}
-              onChange={(event) => setTransferDate(event.target.value)}
-            />
-            <span className="detail__note">
-              The day the money moved, which may differ from the day you record it.
-            </span>
-          </label>
-
-          <label className="field pay__field">
-            <span className="field__label">Reference (optional)</span>
-            <input
-              className="input"
-              maxLength={120}
-              value={reference}
-              onChange={(event) => setReference(event.target.value)}
-              placeholder="The transaction number from the confirmation"
-            />
-          </label>
-
-          <label className="field pay__field">
-            <span className="field__label">Confirmation screenshot</span>
-            <input
-              className="input"
               type="file"
               accept="image/*"
+              className="pay-record__file"
               onChange={(event) => {
                 setProof(event.target.files?.[0] ?? null);
                 setProofFileId(null);
               }}
             />
-            <span className="detail__note">
-              {balance.name} sees this, which is what stops the “did you send it?”
-              messages. Location data is stripped and the image is compressed
-              before it is stored.
-            </span>
+            {proof
+              ? `${proof.name} attached · choose another to replace it`
+              : "Attach the transfer receipt"}
           </label>
+        </div>
 
-          <div className="payroll__actions">
-            <button
-              type="button"
-              className="button"
-              onClick={() => navigate("/payments")}
-              disabled={working}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="button button--primary"
-              disabled={
-                working || piastres === null || piastres <= 0 || noteMissing
-              }
-            >
-              {working
-                ? "Recording…"
-                : piastres === null || piastres <= 0
-                  ? "Enter an amount"
-                  : noteMissing
-                    ? "Say why it differs"
-                    : `Record ${formatEgp(piastres)} as sent`}
-            </button>
-          </div>
-        </section>
+        {differs && (
+          <label className="pay-record__field">
+            <span>Why is it different from what is outstanding?</span>
+            <textarea
+              className="input pay-record__input"
+              rows={2}
+              maxLength={500}
+              required
+              value={note}
+              onChange={(event) => setNote(event.target.value)}
+              placeholder="InstaPay would not send the whole amount in one transfer."
+            />
+          </label>
+        )}
+
+        {amount.trim() !== "" && (piastres === null || piastres <= 0) && (
+          <p className="pay-record__error" role="alert">
+            Enter the amount that was actually transferred.
+          </p>
+        )}
+        {over && (
+          <p className="pay-record__warn">
+            That is more than the outstanding <Money piastres={owed} kind="agreed" />.
+            It will be recorded as transferred and the difference stays visible on
+            the payment.
+          </p>
+        )}
+        {error && (
+          <p className="pay-record__error" role="alert">
+            {error}
+          </p>
+        )}
+
+        <div className="pay-record__acts">
+          <button
+            type="submit"
+            className="button button--primary pay-record__big"
+            disabled={working || piastres === null || piastres <= 0 || noteMissing}
+          >
+            {working ? "Recording…" : "Record payment"}
+          </button>
+          <Link className="button pay-record__big" to={back}>
+            Cancel
+          </Link>
+        </div>
+
+        <p className="pay-record__note">
+          Saving records a transfer that finance already made outside this
+          dashboard. {balance.name} sees the receipt.
+        </p>
       </form>
     </>
   );
 }
 
-/**
- * The authorized destination values the payer must act on.
- *
- * Kept as one method-aware component so InstaPay, bank/card and every wallet
- * provider cannot drift into three partial versions. The exact submitted URL
- * is both visible/copyable and the Open target; opening it is deliberately
- * followed by no success state because leaving HBA never proves money moved.
- */
 export function PaymentDestination({
   revealed,
   copied,
@@ -688,16 +462,6 @@ export function PaymentDestination({
   );
 }
 
-function Line({ label, piastres }: { label: string; piastres: number }) {
-  return (
-    <div className="detail__row">
-      <dt className="detail__label">{label}</dt>
-      <dd className="detail__value">
-        <Money piastres={piastres} kind="agreed" />
-      </dd>
-    </div>
-  );
-}
 
 function Detail({ label, value }: { label: string; value: string }) {
   return (

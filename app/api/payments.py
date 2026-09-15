@@ -52,7 +52,7 @@ from app.services.payroll import blockers_for, is_historical
 from app.services.payouts import (
     changed_recently,
     current_destination,
-    payable_destination,
+    mask_destination,
 )
 from app.services.proof import ProofRejected, readable_by, store_proof
 
@@ -147,13 +147,13 @@ def _render_balance(
         # one of them in. Making them open a profile for it is how a transfer
         # goes to the previous destination.
         #
-        # The destination is sent **in full**, which is the one place that is
-        # true - see `payable_destination`. The column ellipsises it at the
-        # export's 210px and the copy button puts the whole value on the
-        # clipboard, because the next thing that happens to it is being typed
-        # into a banking app.
+        # The destination is **masked** by the same function the profile uses
+        # (ADR 0028): enough to recognise on a list of twenty. The copy button
+        # beside it asks for the real value through the audited reveal, gated
+        # on `payments.record`, so every number that reaches a clipboard is
+        # one somebody is recorded as having looked at.
         "terms": _terms_label(db, affiliate, month),
-        "destination": payable_destination(current_destination(db, affiliate)),
+        "destination": mask_destination(current_destination(db, affiliate)),
     }
 
     # F14. An approved obligation is a debt; a forecast is still moving. The

@@ -285,7 +285,7 @@ reached. Nothing else is a legitimate difference.
 | Targets | *Whole year* checkbox beside Save | Owner, 11 September 2026: targets are fixed across a year |
 | Targets | A second, quieter pace line under Recorded | D08, asked for after the export was drawn |
 | Payments | *Settle difference* action | Overpaid months exist; the export never drew one |
-| Payments | Destination shown in full on the desk only | Finance types it into a banking app; masked everywhere else |
+| Payments | The list shows the masked destination; *Copy* and the payment view's *Show where to send it* fetch the real value | ADR 0028: the full number is gated on recording payments and every reveal is audited. The export prints it outright |
 | Home | Chart axis label inside the plot | Real totals are wider than the export's gutter |
 | Models | Table/Cards switch, *Add a house code* | §12.3 asked for the toggle; house codes are a real account kind |
 | Models | Resend/Withdraw under an invitation's date | No invitation view exists yet to hold them |

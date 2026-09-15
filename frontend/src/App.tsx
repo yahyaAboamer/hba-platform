@@ -18,6 +18,7 @@ import { OrderDetail, Orders } from "./screens/Orders";
 import { Overview } from "./screens/Overview";
 import { ProductDetail, Products } from "./screens/Products";
 import { PaymentReconcile } from "./screens/PaymentReconcile";
+import { PaymentDetail, PaymentReceipt } from "./screens/PaymentDetail";
 import { PaymentRecord } from "./screens/PaymentRecord";
 import { Payments } from "./screens/Payments";
 import { Payroll } from "./screens/Payroll";
@@ -146,9 +147,19 @@ export default function App() {
             <Route path="/payroll/:month/approve" element={<PayrollApprove />} />
             <Route path="/payroll/:month/reopen" element={<PayrollReopen />} />
             <Route path="/payments" element={<Payments session={session} />} />
+            {/* One model's month, as the approved export opens it: the
+             *  figure, where to send it, the approval and the transfers. */}
             <Route
               path="/payments/:month/:affiliateId"
+              element={<PaymentDetail session={session} />}
+            />
+            <Route
+              path="/payments/:month/:affiliateId/record"
               element={<PaymentRecord />}
+            />
+            <Route
+              path="/payments/:month/:affiliateId/receipts/:paymentId"
+              element={<PaymentReceipt />}
             />
             <Route
               path="/payments/:month/:affiliateId/reconcile"

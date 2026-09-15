@@ -852,19 +852,15 @@ def test_a_recorded_destination_is_masked_in_their_history(client):
     assert "nour-abdelrahman" not in str(body)
 
 
-def test_the_month_end_desk_shows_the_whole_destination(client):
-    """The one screen where the full value is the point.
+def test_the_month_end_desk_masks_the_destination(client):
+    """ADR 0028, held on the busiest screen that shows a destination.
 
-    §6.4.4 masks a destination everywhere it is *mentioned* - an audit row, a
-    log line, a message, the model's own screen. The month-end desk is not a
-    mention: somebody is holding a banking app open and typing what this
-    screen says, and the approved design prints it in full for that reason. A
-    masked number makes the copy button useless and sends them into the
-    profile to find the real one, which is how a transfer goes to the previous
-    destination.
-
-    Reached only through `payments.view`, which is finance and the owner - and
-    the test below this one is what keeps it that way.
+    The desk lists twenty of them, so it shows enough to recognise and no
+    more. The real value - what somebody is about to type into a banking app -
+    comes through the reveal, which is gated on `payments.record` and writes
+    an audit row, so every number that reaches a clipboard is one somebody is
+    recorded as having looked at. An earlier change sent the whole value to
+    the list and lost that record; this is what keeps it from happening again.
     """
     affiliate = _affiliate(client)
     client.put(
@@ -878,11 +874,12 @@ def test_the_month_end_desk_shows_the_whole_destination(client):
 
     rows = client.get(f"/api/payments/{AUGUST}").json()["affiliates"]
     row = next(r for r in rows if r["affiliate_id"] == affiliate["id"])
+    revealed = client.post(
+        f"/api/affiliates/{affiliate['id']}/payout-destination/reveal"
+    ).json()
 
-    assert (
-        row["destination"]["instapay_address_url"]
-        == "https://ipn.eg/nour-abdelrahman-2291"
-    )
+    assert "nour-abdelrahman-2291" not in str(row["destination"])
+    assert "nour-abdelrahman-2291" in str(revealed)
 
 
 def test_a_model_may_not_read_the_month_end_desk(client):
@@ -1001,3 +998,81 @@ def test_the_pay_screen_carries_every_version_of_a_reopened_month(client):
     assert after["paid_piastres"] == already
     assert after["paid_earlier_versions_piastres"] == already
     assert after["balance_piastres"] == after["obligation_piastres"] - already
+
+
+# -- The month's payment view (the approved export's vPayment) ---------------
+
+
+def test_an_unagreed_month_is_an_estimate_with_a_fingerprint(client):
+    """Worked out live, labelled an estimate, and carrying what an approval
+    from this view has to hand back (05B)."""
+    affiliate = _affiliate(client)
+    _order(affiliate["id"], "st-1", 2_000_000)
+
+    body = client.get(f"/api/payroll/{AUGUST}/statement/{affiliate['id']}").json()
+
+    assert body["basis"] == "estimate"
+    assert body["source_version"]
+    assert body["version"] is None
+
+
+def test_an_agreed_month_is_read_from_its_snapshot(client):
+    """Once approved, the figure under *Approved amount* is the frozen one."""
+    affiliate = _affiliate(client)
+    _owed(client, affiliate)
+
+    body = client.get(f"/api/payroll/{AUGUST}/statement/{affiliate['id']}").json()
+
+    assert body["basis"] == "approved"
+    assert body["total_piastres"] == 200_000
+    assert body["version"] == 1
+    assert body["source_version"] is None
+    assert body["blockers"] == []
+
+
+def test_the_lines_add_up_to_the_total(client):
+    """A breakdown that does not sum to the figure beside it is the one thing
+    a breakdown must never be."""
+    affiliate = _affiliate(client)
+    _owed(client, affiliate)
+
+    body = client.get(f"/api/payroll/{AUGUST}/statement/{affiliate['id']}").json()
+
+    assert (
+        body["commission_piastres"]
+        + body["fixed_piastres"]
+        + body["guarantee_top_up_piastres"]
+        == body["total_piastres"]
+    )
+
+
+def test_approving_from_the_payment_view_refuses_a_moved_month(client):
+    """The fingerprint from the statement is what the commit is checked
+    against: an order arriving after the page loaded refuses the approval."""
+    affiliate = _affiliate(client)
+    _order(affiliate["id"], "st-2", 2_000_000)
+    seen = client.get(f"/api/payroll/{AUGUST}/statement/{affiliate['id']}").json()
+    _order(affiliate["id"], "st-3", 500_000)
+
+    response = client.post(
+        f"/api/payroll/{AUGUST}/approve",
+        json={
+            "affiliate_ids": [affiliate["id"]],
+            "preview": False,
+            "source_versions": {str(affiliate["id"]): seen["source_version"]},
+        },
+    ).json()
+
+    assert response["results"][0]["approved"] is False
+    assert response["results"][0]["stale"] is True
+
+
+def test_a_model_may_not_read_a_payment_statement(client):
+    affiliate = _affiliate(client)
+    with engine.begin() as connection:
+        connection.execute(text("UPDATE role_assignment SET role = 'affiliate'"))
+
+    assert (
+        client.get(f"/api/payroll/{AUGUST}/statement/{affiliate['id']}").status_code
+        == 403
+    )
