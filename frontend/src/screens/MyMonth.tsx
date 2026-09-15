@@ -21,10 +21,16 @@ import "./MyMonth.css";
  * not payment**, and a month agreed this morning says *approved*, not *paid*,
  * however certain the transfer is.
  */
-type HomeState = "open" | "approved" | "paid" | "settled";
+export type HomeState = "open" | "approved" | "paid" | "settled";
 
-/** Lower case, as the export writes them. */
-const STATE_LABEL: Record<HomeState, string> = {
+/**
+ * Lower case, as the export writes them.
+ *
+ * Exported because *How this adds up* is the same month under a different
+ * heading, and two screens that disagreed about where one month had got to
+ * would be the reason for the next support message.
+ */
+export const STATE_LABEL: Record<HomeState, string> = {
   open: "in progress",
   approved: "approved",
   paid: "payment recorded",
@@ -38,7 +44,15 @@ const HERO_LABEL: Record<HomeState, string> = {
   settled: "Settled earnings",
 };
 
-function homeState(body: MyEarnings, settlement?: PaymentMonth): HomeState {
+/** What the sum at the foot of the breakdown is called. */
+export const TOTAL_LABEL: Record<HomeState, string> = {
+  open: "Earnings so far",
+  approved: "Approved for payment",
+  paid: "Recorded payment",
+  settled: "Settled",
+};
+
+export function homeState(body: MyEarnings, settlement?: PaymentMonth): HomeState {
   // A month from before the platform is closed and has no figure to move
   // (ADR 0036), which is the export's *settled*.
   if (body.state === "historical") return "settled";

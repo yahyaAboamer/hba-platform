@@ -391,6 +391,20 @@
 .portal-chart__point,.portal-chart__bar { fill:var(--accent); }
 .portal-chart__pick { display:block; max-width:100%; margin:2px auto 0; padding:5px; font-size:12px; border:0; background:var(--surface); color:var(--quiet); }
 .portal-calculation { margin:0; border-radius:8px; background:var(--surface); overflow:hidden; }
-.portal-calculation > div { display:flex; justify-content:space-between; gap:15px; padding:14px 15px; border-bottom:1px solid var(--rule); font-size:14px; }
-.portal-calculation dd { margin:0; flex:none; }
-.portal-calculation small { display:block; margin-top:5px; font-size:12.5px; color:var(--quiet); }
+.portal-calculation > div { display:flex; align-items:baseline; justify-content:space-between; gap:12px; padding:14px 15px; border-bottom:1px solid var(--rule); font-size:14px; }
+.portal-calculation dd { margin:0; flex:none; font-variant-numeric:tabular-nums; }
+.portal-calculation small { display:block; margin-top:4px; font-size:12.5px; line-height:1.5; color:var(--faint); }
+/* The sum, in the same card and a size larger. Nothing under it, because
+   there is nothing after the answer. */
+.portal-calculation__total { border-bottom:0 !important; padding:15px !important; font-size:16px !important; }
+
+/* Why the month reads differently from what was agreed. Amber and outlined:
+   nothing is wrong, and a filled red card would say otherwise to somebody
+   whose pay went up. */
+.portal-calc__changed { padding:15px; border:1px solid var(--owed); border-radius:8px; }
+.portal-calc__changed h2 { margin:0 0 8px; font-size:13px; font-weight:400; color:var(--owed); }
+.portal-calc__changed p { margin:0; font-size:13.5px; line-height:1.6; }
+
+/* The rule the month was worked out under. */
+.portal-calc__rule { margin:0; padding:14px 15px; border-radius:8px; background:var(--surface); font-size:12.5px; line-height:1.6; color:var(--faint); }
+.portal-calc__rules-link { font-size:13px; color:var(--accent); text-decoration:none; }
