@@ -282,9 +282,6 @@ export function Affiliates() {
   const live = invited.filter((row) => !row.expired);
   const dead = invited.filter((row) => row.expired);
 
-  const waiting = rows?.filter((row) => row.status === "pending") ?? [];
-  const stuck = rows?.filter((row) => missingSetup(row).length > 0) ?? [];
-
   return (
     <>
       <div className="page__head">
@@ -301,28 +298,38 @@ export function Affiliates() {
             </span>
           )}
         </div>
+      </div>
 
-        <div className="affiliates__controls">
-          {/*
-           * The primary action on this screen, and it used to have no home at
-           * all: inviting a model was neither here nor in Settings, whose role
-           * list offers only staff. Phase 8 built the whole onboarding flow
-           * and nothing could start it.
-           */}
-          <InviteModel onInvited={reload} />
+      {/*
+       * **One row, as the export draws it.** The filters take the left, the
+       * search and the primary act take the right. This screen had the acts
+       * up in the page heading and the filters on a line of their own
+       * underneath, which is two toolbars for one table.
+       */}
+      <div className="affiliates__bar">
+        <div className="affiliates__segments" role="group" aria-label="Segments">
+          {SEGMENTS.map((option) => (
+            <button
+              key={option.key}
+              type="button"
+              className={segment === option.key ? "chip chip--on" : "chip"}
+              onClick={() => narrow({ segment: option.key })}
+              aria-pressed={segment === option.key}
+            >
+              {option.label}
+              {rows && (
+                <span className="affiliates__segment-count">
+                  {rosterMatches(rows, option.key, "").length}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
 
-          {/*
-           * Deliberately its own button, not a second option folded into
-           * inviting a model. The two create opposite things - a person who
-           * signs in and gets paid, versus a code that never does either -
-           * and one control offering both invites exactly the mistake this
-           * exists to prevent.
-           */}
-          <AddHouseCode onCreated={reload} />
-
+        <div className="affiliates__acts">
           <input
             type="search"
-            className="affiliates__search"
+            className="input input--search"
             value={query}
             onChange={(event) => narrow({ q: event.target.value })}
             placeholder="Search name or code"
@@ -332,107 +339,53 @@ export function Affiliates() {
           {/*
            * §12.3 keeps this toggle even though width alone already chooses a
            * table on a laptop and cards on a phone — it was asked for after
-           * reviewing mockups, and that is a good enough reason.
+           * reviewing mockups, and that is a good enough reason. It is drawn
+           * as the export's segmented switch because that is the export's
+           * word for *one of these two*.
            *
            * It disappears on a phone, where it could only be ignored: a table
            * does not fit there however firmly somebody asked for one, and a
            * control that does nothing teaches people the tool is unreliable.
            */}
           {!isNarrow && (
-            <div className="affiliates__view" role="group" aria-label="Layout">
-              <button
-                type="button"
-                className={
-                  view === "table"
-                    ? "affiliates__view-button affiliates__view-button--on"
-                    : "affiliates__view-button"
-                }
-                onClick={() => setView("table")}
-                aria-pressed={view === "table"}
-              >
-                Table
-              </button>
-              <button
-                type="button"
-                className={
-                  view === "cards"
-                    ? "affiliates__view-button affiliates__view-button--on"
-                    : "affiliates__view-button"
-                }
-                onClick={() => setView("cards")}
-                aria-pressed={view === "cards"}
-              >
-                Cards
-              </button>
+            <div className="seg" role="group" aria-label="Layout">
+              <label className="seg-opt">
+                <input type="radio" name="roster-view" checked={view === "table"}
+                  onChange={() => setView("table")} />
+                <span>Table</span>
+              </label>
+              <label className="seg-opt">
+                <input type="radio" name="roster-view" checked={view === "cards"}
+                  onChange={() => setView("cards")} />
+                <span>Cards</span>
+              </label>
             </div>
           )}
-        </div>
-      </div>
 
-      {/*
-       * The approved roster's segments, left of the search. They replace a
-       * *Show archived* checkbox: archived is one of the states a model can be
-       * in, and a separate control for it let the two disagree about what the
-       * list was showing.
-       */}
-      <div className="affiliates__segments" role="group" aria-label="Segments">
-        {SEGMENTS.map((option) => (
-          <button
-            key={option.key}
-            type="button"
-            className={
-              segment === option.key
-                ? "affiliates__segment affiliates__segment--on"
-                : "affiliates__segment"
-            }
-            onClick={() => narrow({ segment: option.key })}
-            aria-pressed={segment === option.key}
-          >
-            {option.label}
-            {rows && (
-              <span className="affiliates__segment-count">
-                {rosterMatches(rows, option.key, "").length}
-              </span>
-            )}
-          </button>
-        ))}
+          {/*
+           * Deliberately its own button, not a second option folded into
+           * inviting a model. The two create opposite things - a person who
+           * signs in and gets paid, versus a code that never does either -
+           * and one control offering both invites exactly the mistake this
+           * exists to prevent. It is the quieter of the two, because it is
+           * the rarer of the two.
+           */}
+          <AddHouseCode onCreated={reload} />
+
+          {/*
+           * The primary action on this screen, and it used to have no home at
+           * all: inviting a model was neither here nor in Settings, whose role
+           * list offers only staff. Phase 8 built the whole onboarding flow
+           * and nothing could start it.
+           */}
+          <InviteModel onInvited={reload} />
+        </div>
       </div>
 
       {error && (
         <p className="notice notice--refused" role="alert">
           {error}
         </p>
-      )}
-
-      {/*
-       * Two counts that overlap, and the business read them as the same thing:
-       * *I don't understand what is needs attention and what is the difference
-       * between it and waiting to be approved.*
-       *
-       * They are different and only one of them is about a decision. Waiting
-       * to be approved is somebody who has applied. Needs attention is
-       * somebody - approved or not - who is missing a verified code or pay
-       * terms, and therefore earns nothing while looking fine. Saying what
-       * each means costs a clause and removes the question.
-       */}
-      {rows && rows.length > 0 && (
-        <div className="affiliates__figures">
-          <span>
-            <strong>{waiting.length}</strong> waiting for you to approve
-          </span>
-          {/*
-           * One counter, not two. It read as two separate facts sharing a
-           * line, and the dash looked like it joined them - so "0 cannot earn
-           * yet — no code confirmed, or no pay terms" was read as a second
-           * count of something. The reason moves behind the count, where the
-           * per-model detail already lives in Needs attention.
-           */}
-          <span className={stuck.length > 0 ? "affiliates__stuck" : undefined}>
-            <strong>{stuck.length}</strong>{" "}
-            {stuck.length === 1 ? "model cannot" : "models cannot"} earn yet
-            {stuck.length > 0 && " — see Needs attention"}
-          </span>
-        </div>
       )}
 
       {/*
@@ -593,10 +546,10 @@ export function Affiliates() {
                * rather than in a column of its own.
                */}
               <th>Model</th>
-              <th>Status</th>
+              <th className="affiliates__status-cell">Status</th>
               <th className="affiliates__figure">{monthLabel} sales</th>
               <th className="affiliates__figure">Content</th>
-              <th>Needs attention</th>
+              <th className="affiliates__attention">Needs attention</th>
               <th aria-hidden="true" />
             </tr>
           </thead>
@@ -620,7 +573,7 @@ export function Affiliates() {
                       </span>
                     </Link>
                   </td>
-                  <td>
+                  <td className="affiliates__status-cell">
                     <span className={`affiliates__status affiliates__status--${row.status}`}>
                       {STATUS_LABEL[row.status]}
                     </span>
@@ -637,7 +590,7 @@ export function Affiliates() {
                    * too would spend the one signal the page has on the rows
                    * that need nothing (ADR 0027).
                    */}
-                  <td>
+                  <td className="affiliates__attention">
                     {missing.length > 0 && (
                       <span className="blocker">{missing.join(", ")}</span>
                     )}
