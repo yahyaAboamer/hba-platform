@@ -578,3 +578,10 @@ td.profile__muted,
   color: var(--ink);
   text-decoration: none;
 }
+
+/* A figure's colour is the card's meaning, not the value's: a zero month on
+   these cards reads in the ink colour, as the export draws it, rather than
+   fading into the quiet tier the way a zero in a table row does. */
+.profile__stat-value .money {
+  color: inherit;
+}
