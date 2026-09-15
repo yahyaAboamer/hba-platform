@@ -93,6 +93,19 @@ def me(
         "shipping": {field: getattr(affiliate, field) for field in SHIPPING_FIELDS},
         "status": affiliate.status,
         "state": application_state(db, affiliate),
+        #: Which of the three arrangements she is on **this month**, raw, with
+        #: her own screen putting the words on it - as Targets and Payments do,
+        #: so there is one vocabulary and not three.
+        #:
+        #: `None` where nobody has set terms for her yet, which is not the same
+        #: as commission: one is an arrangement and the other is a gap, and a
+        #: screen that showed the gap as commission would be quoting her a rate
+        #: nobody agreed.
+        "arrangement": _arrangement_now(db, affiliate),
+        #: When she started with HBA, where somebody recorded it. `None` is
+        #: ordinary - it is filled in for models brought over from before the
+        #: platform, and the screen simply says less without it.
+        "since": affiliate.collaboration_start_month,
         "codes": codes_with_status(db, affiliate, affiliate.created_at.strftime("%Y-%m"))
         if affiliate.created_at
         else [],
@@ -101,6 +114,21 @@ def me(
             method: list(fields) for method, fields in REQUIRED_PAYOUT_FIELDS.items()
         },
     }
+
+
+def _arrangement_now(db: Session, affiliate: AffiliateProfile) -> str | None:
+    """Her compensation type in the working month, or `None` if none is set.
+
+    Asked about a month rather than "current terms", because terms are dated
+    (`terms_for`): a model can be on commission in one month and a guaranteed
+    minimum in the next, and the working month is the one her screens are
+    about.
+    """
+    from app.services.compensation import terms_for
+    from app.services.portal import working_month
+
+    terms = terms_for(db, affiliate, working_month())
+    return terms.compensation_type if terms else None
 
 
 class NotificationPreferenceBody(BaseModel):

@@ -2164,6 +2164,31 @@ def test_her_targets_are_only_ever_hers(admin):
 # -- Her best sellers (the approved Wardrobe's first section) ------------------
 
 
+def test_her_own_record_names_the_arrangement_she_is_on(admin):
+    """*Your arrangement*, on her account screen.
+
+    The payload carries the raw type and her screen puts the words on it, the
+    way the roster's *Terms* column does - one vocabulary, written once.
+
+    **A model with no terms is `None`, not commission.** A gap is not an
+    arrangement, and answering the gap with the commonest of the three would
+    quote her a basis nobody has agreed with her.
+    """
+    affiliate = _affiliate(admin)
+
+    before = _sign_in().get("/api/me")
+    assert before.status_code == 200, before.text
+    assert before.json()["arrangement"] is None
+    # Present whether or not anybody recorded it; the screen says less without
+    # it rather than guessing a date.
+    assert "since" in before.json()
+
+    _terms(admin, affiliate["id"])
+
+    after = _sign_in().get("/api/me")
+    assert after.json()["arrangement"] == "commission"
+
+
 def _line(order_id, product_id, total, quantity=1):
     with engine.begin() as connection:
         connection.execute(

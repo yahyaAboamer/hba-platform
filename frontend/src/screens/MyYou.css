@@ -1,0 +1,178 @@
+/* Her account. `vYou` in `Affiliate Portal v3.dc.html`, lines 418–465. */
+
+.affiliate .you {
+  padding-bottom: var(--tab-clearance);
+}
+
+.affiliate .you__hero {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+
+.affiliate .you__avatar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border: 1px solid var(--rule);
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 20px;
+}
+
+.affiliate .you__who {
+  min-width: 0;
+}
+
+.affiliate .you__name {
+  display: block;
+  font-size: 18px;
+  /* A long name truncates rather than wrapping under the avatar, which is
+     what pushed the arrangement card down the screen on a 375px phone. */
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.affiliate .you__since {
+  display: block;
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--quiet);
+}
+
+.affiliate .you__card {
+  margin-top: 14px;
+  padding: 14px 15px;
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.affiliate .you__hero + .you__card {
+  margin-top: 16px;
+}
+
+.affiliate .you__card-label {
+  font-size: 13px;
+  color: var(--quiet);
+}
+
+.affiliate .you__card-line {
+  margin-top: 6px;
+  font-size: 14px;
+}
+
+.affiliate .you__card-note {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--faint);
+}
+
+.affiliate .you__appearance {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 15px;
+  font-size: 14px;
+}
+
+/* ── The rows ───────────────────────────────────────────────────────────
+ *
+ * One list, each row opening the one thing it names. The hint is what the
+ * setting says *now*, so the common case — checking where her money goes —
+ * is answered without opening anything.
+ */
+.affiliate .you__rows {
+  margin-top: 14px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.affiliate .you__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 52px;
+  padding: 14px 15px;
+  border-bottom: 1px solid var(--rule);
+  color: var(--ink);
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.affiliate .you__row:last-child {
+  border-bottom: 0;
+}
+
+.affiliate .you__hint {
+  display: block;
+  margin-top: 3px;
+  font-size: 12.5px;
+  color: var(--faint);
+}
+
+.affiliate .you__go {
+  flex: none;
+  color: var(--accent);
+}
+
+/* ── The way out ────────────────────────────────────────────────────────── */
+
+.affiliate .you__signout {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 14px;
+  padding: 13px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--quiet);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.affiliate .you__confirm {
+  margin-top: 14px;
+  padding: 15px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+}
+
+.affiliate .you__confirm-question {
+  font-size: 14px;
+}
+
+.affiliate .you__confirm-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.affiliate .you__stay,
+.affiliate .you__leave {
+  flex: 1;
+  min-height: 46px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+/* The only red button in the portal, and it ends the session rather than
+   destroying anything — outlined, never filled. */
+.affiliate .you__leave {
+  border-color: var(--refused);
+  color: var(--refused);
+}

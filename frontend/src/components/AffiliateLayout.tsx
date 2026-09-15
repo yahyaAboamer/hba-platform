@@ -76,7 +76,17 @@ export function PortalHeader({
   const navigate = useNavigate();
   const [copied, setCopied] = useState(false);
 
-  const secondaryTitles: Record<string,string> = {"/you":"You", "/earnings":"How this adds up", "/payments":"Payment history", "/you/payout":"Payment details", "/glossary":"Help", "/best":"All products sold"};
+  const secondaryTitles: Record<string,string> = {
+    "/you": "You",
+    "/earnings": "How this adds up",
+    "/payments": "Payment history",
+    "/you/payout": "Payment details",
+    "/you/details": "Personal details",
+    "/you/sizes": "Height and weight",
+    "/you/notifications": "Notifications",
+    "/glossary": "Help",
+    "/best": "All products sold",
+  };
   const isPrimary = TABS.some(tab => tab.to === pathname);
   if (!isPrimary) {
     return (

@@ -38,6 +38,14 @@ export type Me = {
   };
   status: string;
   state: string;
+  /**
+   * Which of the three arrangements she is on this month, raw, labelled by
+   * the screen through `PAY_TYPE`. `null` means nobody has set her terms —
+   * not commission, which is an arrangement somebody would have had to agree.
+   */
+  arrangement: string | null;
+  /** `YYYY-MM` she started with HBA, where anybody recorded it. */
+  since: string | null;
   codes: { code: string; verified: boolean }[];
   payout_destination: Record<string, string | null> | null;
   required_fields: Record<string, string[]>;
@@ -362,7 +370,7 @@ type Preference = { kind: string; label: string; enabled: boolean };
  * is worth knowing: it is the number a parcel is matched back to her by, so a
  * number that cannot be read is a delivery that never reaches her wardrobe.
  */
-function ShippingAddress({ me, onChanged }: { me: Me; onChanged: () => void }) {
+export function ShippingAddress({ me, onChanged }: { me: Me; onChanged: () => void }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(me.shipping);
   const [saving, setSaving] = useState(false);
@@ -482,7 +490,7 @@ function ShippingAddress({ me, onChanged }: { me: Me; onChanged: () => void }) {
  * goes; a height is not that, and asking for a password every time she
  * corrects a number she volunteered teaches her to type it into anything.
  */
-function Measurements({ me, onChanged }: { me: Me; onChanged: () => void }) {
+export function Measurements({ me, onChanged }: { me: Me; onChanged: () => void }) {
   const [open, setOpen] = useState(false);
   const [height, setHeight] = useState("");
   const [weight, setWeight] = useState("");
@@ -604,7 +612,7 @@ function Measurements({ me, onChanged }: { me: Me; onChanged: () => void }) {
 }
 
 
-function Notifications() {
+export function Notifications() {
   const [preferences, setPreferences] = useState<Preference[] | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
 

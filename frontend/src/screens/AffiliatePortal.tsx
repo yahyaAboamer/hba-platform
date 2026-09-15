@@ -18,6 +18,13 @@ import { MyPayments } from "./MyPayments";
 import { MyPolicy } from "./MyPolicy";
 import { MyRanking } from "./MyRanking";
 import { MyTargets } from "./MyTargets";
+import {
+  MyYou,
+  YouDetails,
+  YouNotifications,
+  YouPayout,
+  YouSizes,
+} from "./MyYou";
 import "./Apply.css";
 import "./AffiliateHome.css";
 
@@ -215,17 +222,17 @@ export function AffiliatePortal({ session }: { session: Session }) {
           <Route path="payments" element={<MyPayments />} />
           <Route path="year" element={<Navigate to="/" replace />} />
           <Route path="grow" element={<Navigate to="/" replace />} />
-          <Route
-            path="you"
-            element={
-              <MyDetails
-                me={me}
-                onChanged={load}
-                theme={theme}
-                onTheme={setTheme}
-              />
-            }
-          />
+          {/*
+           * You is a page of rows now, each opening the one thing it names -
+           * `vYou` in the approved portal. The panels behind them are the
+           * ones that were already here; what changed is that she no longer
+           * scrolls past four forms to reach the fifth.
+           */}
+          <Route path="you" element={<MyYou me={me} theme={theme} onTheme={setTheme} />} />
+          <Route path="you/payout" element={<YouPayout me={me} onChanged={load} />} />
+          <Route path="you/details" element={<YouDetails me={me} onChanged={load} />} />
+          <Route path="you/sizes" element={<YouSizes me={me} onChanged={load} />} />
+          <Route path="you/notifications" element={<YouNotifications />} />
           <Route path="policy/:id" element={<MyPolicy />} />
           <Route path="glossary" element={<Glossary />} />
           <Route path="*" element={<Navigate to="/" replace />} />
