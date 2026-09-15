@@ -90,24 +90,24 @@ Each needs a decision: fold into the nearest approved pattern, or remove.
 
 | # | Export flag | Lines | Route / component | Status |
 |---|---|---|---|---|
-| D1 | `onHome` | 102–212 | `/` `MyMonth.tsx` | Unreviewed |
-| D2 | `onOrders` | 213–256 | `/orders` `MyOrders.tsx` | Unreviewed |
-| D3 | `onWardrobe` | 257–327 | `/wardrobe` `MyWardrobe.tsx` | *Your best sellers* added; rest unreviewed. Needs a model sign-in to see |
-| D4 | `onTargets` | 328–377 | `/targets` `MyTargets.tsx` | Unreviewed |
-| D5 | `onRanking` | 378–417 | `/ranking` `MyRanking.tsx` | Unreviewed |
+| D1 | `onHome` | 102–212 | `/` `MyMonth.tsx` | Implemented · **visual check blocked** (needs a model session). Export's four states (*in progress / approved / payment recorded / settled*), hero label following them, chart readout of month, figure and what the figure is, and the payment card. Only the ledger may say *payment recorded*; the export's "usually recorded in N days" is not promised on HBA's behalf |
+| D2 | `onOrders` | 213–256 | `/orders` `MyOrders.tsx` | Implemented · **visual check blocked**. Commission leads, sale underneath; wrapping filter chips with counts; state pill per row; expansion keeps our contents list and the sentence. Third filter is *Not counted*, not *Failed* — ours folds cancelled and refunded in |
+| D3 | `onWardrobe` | 257–327 | `/wardrobe` `MyWardrobe.tsx` | Implemented · **visual check blocked**. Best sellers, feature requests, wardrobe, *Not received yet* in the export's order; the three states now carry their own tone. Subtitle says delivered only (05A) |
+| D4 | `onTargets` | 328–377 | `/targets` `MyTargets.tsx` | Implemented · **visual check blocked**. *Content record*, who keeps it and when, the live month on a raised card, history as a list with a state pill. Keeps a third word the export lacks: *not recorded* is not *not met* (§11.3) |
+| D5 | `onRanking` | 378–417 | `/ranking` `MyRanking.tsx` | Implemented · **visual check blocked**. Position card and board to the export, without the names, codes and avatars it prints for other models |
 
 ## E. Portal — secondary views
 
 | # | Export view | Lines | Route / component | Status |
 |---|---|---|---|---|
-| E1 | `vYou` | 418–467 | `/you` | Unreviewed |
+| E1 | `vYou` | 418–467 | `/you` `MyYou.tsx` | Implemented · **visual check blocked**. Hero, *Your arrangement*, Appearance seg, rows that each open one thing, sign-out behind a question. `GET /api/me` now carries `arrangement` and `since` |
 | E2 | `vEarnings` | 468–512 | `/earnings` `MyCalculation.tsx` | Unreviewed |
 | E3 | `vPayments` | 513–554 | `/payments` `MyPayments.tsx` | Unreviewed |
 | E4 | `vReceipt` | 555–571 | inside `MyPayments` | Unreviewed |
-| E5 | `vPayout` | 572–660 | `MyPayout.tsx` | Unreviewed |
-| E6 | `vDetails` | 661–673 | `MyDetails.tsx` | Unreviewed |
-| E7 | `vSizes` | 674–689 | part of `MyDetails`? | Unreviewed |
-| E8 | `vNotify` | 690–705 | **none** | Unreviewed |
+| E5 | `vPayout` | 572–660 | `/you/payout` `MyPayout.tsx` | On its own route now, reached from You. Panel itself unreviewed — it keeps §6.4's two steps and the password at the point of committing, which the export does not draw |
+| E6 | `vDetails` | 661–673 | `/you/details` `ShippingAddress` in `MyDetails.tsx` | On its own route now. Fields and wording unreviewed |
+| E7 | `vSizes` | 674–689 | `/you/sizes` `Measurements` in `MyDetails.tsx` | On its own route now. Fields and wording unreviewed |
+| E8 | `vNotify` | 690–705 | `/you/notifications` `Notifications` in `MyDetails.tsx` | On its own route now. Two switches, not the export's three — an alert per counted order is an email an order |
 | E9 | `vBest` | 706–724 | `/best` `MyBestSellers` in `MyWardrobe.tsx` | Implemented, needs a model sign-in to see | New `GET /api/me/best-sellers`: her own delivered sales by product, never programme totals. The export counts pending orders too; that is 05A's preview, not the live rule |
 | E10 | `vHelp` | 725–738 | **none** | Unreviewed |
 
@@ -124,9 +124,9 @@ Each needs a decision: fold into the nearest approved pattern, or remove.
 | Payments: empty | `payEmpty` | Mapped |
 | Home: hidden notices | `hasHidden` / `unhide` | Unreviewed |
 | Portal: month picker open | `showPicker` / `pickerOpen` | Unreviewed |
-| Portal: order expanded | `o.open` | Unreviewed |
-| Portal: guarantee explainer | `showGuaranteeInfo` / `guaranteeOpen` | Unreviewed |
-| Portal: sign-out confirm | `confirmSignOut` | Unreviewed |
+| Portal: order expanded | `o.open` | Implemented — contents, then the sentence saying what happened to the order |
+| Portal: guarantee explainer | `showGuaranteeInfo` / `guaranteeOpen` | Difference kept: the sentence stays in the open on Targets rather than behind an ⓘ |
+| Portal: sign-out confirm | `confirmSignOut` | Implemented on You |
 | Portal: payout method | `mInsta` / `mWallet` / `mBank`, `instaHelp` | Unreviewed |
 | Every list | loading, empty, retry | Unreviewed |
 
@@ -293,10 +293,27 @@ reached. Nothing else is a legitimate difference.
 | Products | Size count under the name instead of a SKU | A SKU belongs to a size, not a product; search still finds SKUs |
 | Products | Top sellers panel, below the catalogue | Built later from the owner's question; **open: confirm it stays** |
 | Everywhere | `E£`, not `EGP` | Owner decision |
+| Portal Home | The order chips are links into a filtered Orders list | The question a chip raises is *which ones*, and the answer is one screen away |
+| Portal Home | No "payment usually recorded in N days" | The export's schedule is its demo's; HBA has promised no date, and a portal that invents one is a support message |
+| Portal Orders | Third filter is *Not counted*, not *Failed* | Ours folds cancelled and refunded in with failed delivery; calling a cancelled order a failed delivery describes something that never happened |
+| Portal Targets | The sentence about her pay stays in the open, not behind an ⓘ | On a guaranteed minimum it says whether these two numbers are about to decide her pay |
+| Portal Targets | A third word for a month: *not recorded* | §11.3. A month nobody has counted is not a month she missed, and it is the state that holds a guarantee up |
+| Portal Ranking | Other models are unnamed — no name, code or avatar | The export prints all three for everybody; a leaderboard that names twenty colleagues is a public table none of them agreed to |
+| Portal Wardrobe, Best sellers | Delivered orders only, and the subtitle says so | 05A's pending-inclusive counting is a read-only preview, not what she is paid on |
+| Portal You | *Payment details* keeps its two steps and the password | §6.4, the highest-risk change she can make. The export saves it in one press |
+| Portal shell | Back returns where she came from, not to Home | Always-Home threw away her place coming out of All products sold and the payment detail |
 
 ## Blockers
 
-None open. The docker-compose test database that stopped on 15 September was restarted the same day and the full suite has run since.
+**Every portal row is built and none has been seen on screen.** Checking one
+means signing in as a model, and doing that in this browser signs the admin
+out of the session the maintainer screens were verified in. What is needed is
+a second browser profile signed in as a test model, or word that signing the
+admin out here is fine. Until then the D and E rows say *visual check
+blocked*, and they are not claimed as verified.
+
+The docker-compose test database that stopped on 15 September was restarted
+the same day; the full suite has run since.
 
 ## Evidence
 
