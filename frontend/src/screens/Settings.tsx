@@ -36,6 +36,7 @@ type InvitationRow = {
   role: string;
   expires_at: string;
   expired: boolean;
+  created_at: string | null;
 };
 
 type Roster = {
@@ -89,10 +90,9 @@ export function Settings({ session }: { session: Session }) {
           onClick={() => setQuery({section:id})}>{label}</button>)}
       </nav>
       <div className="settings__sections">
-        {section === "team" && <>
-          {can(session, "settings.manage") && <RosterPanel />}
-          {can(session, "invitations.send") && <InvitePanel />}
-        </>}
+        {section === "team" && (can(session, "settings.manage")
+          ? <RosterPanel invite={can(session, "invitations.send")} />
+          : can(session, "invitations.send") && <InvitePanel />)}
         {section === "shopify" && <><PlatformPanel session={session} />{can(session, "settings.manage") && <DataPanel />}</>}
         {section === "historical" && (can(session, "compensation.manage") ? <SetupRoster kind="model" /> : <p className="empty">Your account cannot manage payment terms.</p>)}
         {section === "codes" && <>
@@ -199,7 +199,7 @@ function PlatformPanel({ session }: { session: Session }) {
   );
 }
 
-function InvitePanel() {
+function InvitePanel({ onInvited }: { onInvited?: () => void }) {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("content_manager");
   const [link, setLink] = useState<string | null>(null);
@@ -220,6 +220,7 @@ function InvitePanel() {
       setEmailed(result.emailed);
       setLink(`${window.location.origin}/accept-invitation?token=${result.token}`);
       setEmail("");
+      onInvited?.();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not invite them.");
     } finally {
@@ -261,52 +262,45 @@ function InvitePanel() {
       )}
 
       {/*
-       * Staff only, and it says so. Inviting a model is a different act - they
-       * hold no permission at all (§6.1) - and it lives on Affiliates, where
-       * models live. Offering both from one list said they were variations of
-       * one decision.
+       * One row: the address, the access, and the act - the export's form.
+       * It used to be two labelled fields stacked over a button with a
+       * paragraph above them pointing models elsewhere; the Models screen's
+       * own *Invite a model* already says that, where somebody inviting a
+       * model actually is.
        */}
-      <p className="settings__note">
-        For models, use <strong>Invite a model</strong> on the Models
-        screen.
-      </p>
-
-      <form onSubmit={submit} className="settings__form">
-        <label className="field settings__field">
-          <span className="field__label">Email</span>
-          <input
-            className="input"
-            type="email"
-            required
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-          />
-        </label>
-        <label className="field settings__field">
-          <span className="field__label">Role</span>
-          <select
-            className="input"
-            value={role}
-            onChange={(event) => setRole(event.target.value)}
-          >
-            <option value="content_manager">Content manager</option>
-            <option value="affiliate_manager">Affiliate manager</option>
-            <option value="admin">Admin</option>
-          </select>
-        </label>
+      <form onSubmit={submit} className="settings__invite-row">
+        <input
+          className="input settings__invite-email"
+          type="email"
+          required
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+          placeholder="name@hbawear.store"
+          aria-label="Email"
+        />
+        <select
+          className="input settings__invite-role"
+          value={role}
+          onChange={(event) => setRole(event.target.value)}
+          aria-label="Access"
+        >
+          <option value="content_manager">Content manager</option>
+          <option value="affiliate_manager">Affiliate manager</option>
+          <option value="admin">Admin</option>
+        </select>
         <button
           type="submit"
-          className="button button--primary"
+          className="button button--primary settings__invite-send"
           disabled={working || !email.trim()}
         >
-          {working ? "Inviting…" : "Invite"}
+          {working ? "Sending…" : "Send invitation"}
         </button>
       </form>
     </section>
   );
 }
 
-function RosterPanel() {
+function RosterPanel({ invite = false }: { invite?: boolean }) {
   const [roster, setRoster] = useState<Roster | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
@@ -364,6 +358,19 @@ function RosterPanel() {
     }
   }
 
+  async function resendInvitation(id: number) {
+    setBusyId(id);
+    setError(null);
+    try {
+      await api.post(`/api/staff/invitations/${id}/resend`);
+      load();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not send it again.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   async function revokeInvitation(id: number) {
     setBusyId(id);
     setError(null);
@@ -377,12 +384,15 @@ function RosterPanel() {
     }
   }
 
+  /*
+   * The export's Team section, in its order: the staff list on a surface of
+   * its own with no title above it - its column header already says *Staff*
+   * - then the invite form, then *Pending staff invitations* as a third
+   * surface. Pending invitations used to be a sub-table inside the staff
+   * panel with no way to send one again.
+   */
   return (
-    <section className="panel settings__panel">
-      <div className="panel__head">
-        <h2 className="panel__title">Staff</h2>
-      </div>
-
+    <>
       {error && (
         <p className="notice notice--refused" role="alert">
           {error}
@@ -392,132 +402,158 @@ function RosterPanel() {
       {roster === null && !error && <p className="empty">Loading…</p>}
 
       {roster && (
-        <table className="table settings__table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Role</th>
-              <th>Status</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {roster.staff.map((row) => (
-              <tr key={row.id}>
-                <td>
-                  {row.display_name || row.email}
-                  <span className="settings__email">{row.email}</span>
-                </td>
-                <td>
-                  <select
-                    className="input settings__role-select"
-                    value={row.role}
-                    disabled={busyId === row.id || !roster.assignable_roles.includes(row.role)}
-                    onChange={(event) => changeRole(row.id, event.target.value)}
-                  >
-                    {!roster.assignable_roles.includes(row.role) && (
-                      <option value={row.role}>{row.role}</option>
-                    )}
-                    {roster.assignable_roles.map((role) => (
-                      <option key={role} value={role}>
-                        {ROLE_LABEL[role] ?? role}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td className={`settings__status settings__status--${row.status}`}>
-                  {row.status}
-                </td>
-                <td className="settings__action">
-                  {row.status === "suspended" ? (
-                    <button
-                      type="button"
-                      className="button"
-                      disabled={busyId === row.id}
-                      onClick={() => reactivate(row.id)}
-                    >
-                      Reactivate
-                    </button>
-                  ) : suspending === row.id ? (
-                    <div className="settings__suspend-form">
-                      <input
-                        className="input settings__reason"
-                        placeholder="Why?"
-                        value={reason}
-                        onChange={(event) => setReason(event.target.value)}
-                      />
-                      <button
-                        type="button"
-                        className="button button--danger"
-                        disabled={busyId === row.id || !reason.trim()}
-                        onClick={() => suspend(row.id)}
-                      >
-                        Confirm
-                      </button>
-                      <button
-                        type="button"
-                        className="button"
-                        onClick={() => {
-                          setSuspending(null);
-                          setReason("");
-                        }}
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      className="button button--danger"
-                      onClick={() => setSuspending(row.id)}
-                    >
-                      Suspend
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-
-      {roster && roster.invitations.length > 0 && (
-        <>
-          <h3 className="settings__subhead">Pending staff invitations</h3>
+        <section className="panel" aria-label="Staff">
           <table className="table settings__table">
             <thead>
               <tr>
-                <th>Email</th>
-                <th>Role</th>
-                <th>State</th>
-                <th />
+                <th>Staff</th>
+                <th className="settings__access">Access</th>
+                <th className="settings__state">State</th>
+                <th className="settings__action" aria-label="Actions" />
               </tr>
             </thead>
             <tbody>
-              {roster.invitations.map((row) => (
+              {roster.staff.map((row) => (
                 <tr key={row.id}>
-                  <td>{row.email}</td>
-                  <td>{ROLE_LABEL[row.role] ?? row.role}</td>
-                  <td className="settings__quiet">
-                    {row.expired ? "Expired — never accepted" : "Waiting"}
+                  <td>
+                    {row.display_name || row.email}
+                    <span className="settings__email">{row.email}</span>
                   </td>
-                  <td className="settings__action">
-                    <button
-                      type="button"
-                      className="button"
-                      disabled={busyId === row.id}
-                      onClick={() => revokeInvitation(row.id)}
+                  <td className="settings__access">
+                    <select
+                      className="input settings__role-select"
+                      value={row.role}
+                      aria-label={`Access for ${row.display_name || row.email}`}
+                      disabled={busyId === row.id || !roster.assignable_roles.includes(row.role)}
+                      onChange={(event) => changeRole(row.id, event.target.value)}
                     >
-                      Withdraw
-                    </button>
+                      {!roster.assignable_roles.includes(row.role) && (
+                        <option value={row.role}>{ROLE_LABEL[row.role] ?? row.role}</option>
+                      )}
+                      {roster.assignable_roles.map((role) => (
+                        <option key={role} value={role}>
+                          {ROLE_LABEL[role] ?? role}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className={`settings__state settings__status--${row.status}`}>
+                    {row.status.charAt(0).toUpperCase() + row.status.slice(1)}
+                  </td>
+                  {/*
+                   * Suspend and reactivate are not in the export, and they
+                   * are not optional: a departed member of staff has to be
+                   * locked out today. They sit at the end of the row, the
+                   * quietest place that still reaches them.
+                   */}
+                  <td className="settings__action">
+                    {row.status === "suspended" ? (
+                      <button
+                        type="button"
+                        className="button button--row"
+                        disabled={busyId === row.id}
+                        onClick={() => reactivate(row.id)}
+                      >
+                        Reactivate
+                      </button>
+                    ) : suspending === row.id ? (
+                      <div className="settings__suspend-form">
+                        <input
+                          className="input settings__reason"
+                          placeholder="Why?"
+                          value={reason}
+                          onChange={(event) => setReason(event.target.value)}
+                        />
+                        <button
+                          type="button"
+                          className="button button--row button--danger"
+                          disabled={busyId === row.id || !reason.trim()}
+                          onClick={() => suspend(row.id)}
+                        >
+                          Confirm
+                        </button>
+                        <button
+                          type="button"
+                          className="button button--row"
+                          onClick={() => {
+                            setSuspending(null);
+                            setReason("");
+                          }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        className="button button--row button--danger"
+                        onClick={() => setSuspending(row.id)}
+                      >
+                        Suspend
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </>
+        </section>
       )}
-    </section>
+
+      {invite && <InvitePanel onInvited={load} />}
+
+      {roster && (
+        <section className="panel">
+          <div className="panel__head">
+            <h2 className="panel__title">Pending staff invitations</h2>
+          </div>
+          {roster.invitations.length === 0 ? (
+            <p className="settings__none">No staff invitation is outstanding.</p>
+          ) : (
+            <ul className="settings__pending">
+              {roster.invitations.map((row) => (
+                <li key={row.id}>
+                  <span className="settings__pending-who">
+                    {row.email}
+                    <span className="settings__email">
+                      {ROLE_LABEL[row.role] ?? row.role}
+                      {" · "}
+                      {row.expired
+                        ? "Link expired"
+                        : row.created_at
+                          ? `Sent ${new Date(row.created_at).toLocaleDateString("en-GB", {
+                              day: "numeric",
+                              month: "long",
+                              year: "numeric",
+                            })}`
+                          : "Sent"}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    className="button button--row"
+                    disabled={busyId === row.id}
+                    onClick={() => resendInvitation(row.id)}
+                  >
+                    Resend
+                  </button>
+                  {!row.expired && (
+                    <button
+                      type="button"
+                      className="button button--row settings__withdraw"
+                      disabled={busyId === row.id}
+                      onClick={() => revokeInvitation(row.id)}
+                    >
+                      Withdraw
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
+    </>
   );
 }
 

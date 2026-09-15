@@ -290,3 +290,76 @@
 .settings__appearance { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:14px 18px; }
 .settings__appearance > span { font-size:14px; }
 @media(max-width:800px) { .settings__workspace { flex-direction:column; } .settings__navigation { flex-direction:row; overflow-x:auto; width:100%; } .settings__navigation button { white-space:nowrap; } .settings__workspace > .settings__sections { width:100%; } }
+
+/* ── Team, measured off the export's Settings (lines 606–647) ──────────── */
+
+.settings__access { width: 170px; }
+.settings__state { width: 90px; font-size: 12.5px; }
+.settings__table .settings__action { width: 1%; white-space: nowrap; }
+
+.settings__email {
+  display: block;
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--faint);
+}
+
+.settings__status--active { color: var(--accent-lift); }
+.settings__status--invited { color: var(--owed); }
+.settings__status--suspended { color: var(--refused); }
+
+/* The invite form is one row: address, access, act - 42px tall, on the
+   page ground rather than the card's. */
+.settings__invite-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 12px 18px 16px;
+}
+
+.settings__invite-row .input {
+  min-height: 42px;
+  padding: 11px 13px;
+  background: var(--paper);
+  font-size: 14px;
+}
+
+.settings__invite-email { flex: 1; min-width: 220px; width: auto; }
+.settings__invite-role { width: auto; }
+
+.settings__invite-send {
+  min-height: 42px;
+  padding: 11px 16px;
+  font-size: 14px;
+}
+
+.settings__pending {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.settings__pending li {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.settings__pending li:last-child { border-bottom: 0; }
+
+.settings__pending-who {
+  flex: 1;
+  min-width: 0;
+  font-size: 13.5px;
+}
+
+.settings__withdraw { color: var(--refused); }
+
+.settings__none {
+  margin: 0;
+  padding: 22px 16px;
+  font-size: 13px;
+  color: var(--quiet);
+}

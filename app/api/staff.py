@@ -88,6 +88,10 @@ def roster(
                 "role": invitation.role,
                 "expires_at": _isoformat(invitation.expires_at),
                 "expired": invitation.expires_at <= now,
+                # When it went out - the approved panel writes *Finance - Sent
+                # 3 November 2026* under each address, and two invitations to
+                # one address are otherwise indistinguishable.
+                "created_at": _isoformat(invitation.created_at),
             }
             for invitation in list_pending_invitations(db, exclude_roles=("affiliate",))
         ],

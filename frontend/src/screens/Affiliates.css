@@ -378,9 +378,14 @@
   font-variant-numeric: tabular-nums;
 }
 
-.affiliates__terms,
-.affiliates__table th.affiliates__terms {
+/* Width for both; the cell's type only for the cell. Written on the pair, the
+   header row picked up 12.5px body text and stood out from the other four. */
+.affiliates__table th.affiliates__terms,
+td.affiliates__terms {
   width: 150px;
+}
+
+td.affiliates__terms {
   font-size: 12.5px;
   color: var(--quiet);
 }
@@ -430,3 +435,10 @@ td.affiliates__content {
   display: flex;
   gap: 8px;
 }
+
+/* A tone on a content cell has to out-rank the cell's own quiet colour, or
+   *No update yet* - the one amber word the export puts in this column -
+   comes out grey. */
+td.affiliates__content.affiliates__tone--owed { color: var(--owed); }
+td.affiliates__content.affiliates__tone--quiet,
+td.affiliates__figure.affiliates__tone--quiet { color: var(--faint); }

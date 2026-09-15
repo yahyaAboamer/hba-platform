@@ -4,7 +4,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { Money } from "../components/Money";
 import { api } from "../lib/api";
 import { PAY_TYPE } from "../lib/payouts";
-import { formatMonth } from "../lib/money";
+import { shortMonth } from "../lib/money";
 import { AddHouseCode } from "./AddHouseCode";
 import { InviteModel } from "./InviteModel";
 import "./Affiliates.css";
@@ -301,7 +301,9 @@ export function Affiliates() {
   }, [segment]);
   // The column header names the month it is showing, so a figure can never be
   // read as "this month" when the list is answering for another one.
-  const monthLabel = rows?.[0]?.month ? formatMonth(rows[0].month) : "Month";
+  // *Sept sales*, as the export's `monthShort` writes it. The full month
+  // name does not fit a 130px uppercase header and ran into the next column.
+  const monthShort = rows?.[0]?.month ? shortMonth(rows[0].month) : "Month";
 
   const reload = useCallback(() => {
     setError(null);
@@ -449,7 +451,7 @@ export function Affiliates() {
                 <tr>
                   <th>Model</th>
                   <th className="affiliates__status-cell">Status</th>
-                  <th className="affiliates__figure">{monthLabel} sales</th>
+                  <th className="affiliates__figure">{monthShort} sales</th>
                   <th className="affiliates__figure">Content</th>
                   <th className="affiliates__terms">Sent</th>
                   <th aria-hidden="true" />
@@ -554,7 +556,7 @@ export function Affiliates() {
                  */}
                 <th>Model</th>
                 <th className="affiliates__status-cell">Status</th>
-                <th className="affiliates__figure">{monthLabel} sales</th>
+                <th className="affiliates__figure">{monthShort} sales</th>
                 <th className="affiliates__figure">Content</th>
                 <th className="affiliates__terms">
                   {segment === "applications" ? "Applied" : "Terms"}
