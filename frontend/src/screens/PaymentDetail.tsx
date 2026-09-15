@@ -369,7 +369,7 @@ export function PaymentDetail({ session }: { session: Session }) {
             <Link
               key={index}
               className="pay-detail__correction"
-              to={`/payments/${month}/${affiliateId}/reconcile`}
+              to={`/payments/${month}/${affiliateId}/correction`}
             >
               A difference was found after {formatMonth(month)} was agreed. A
               decision is needed.

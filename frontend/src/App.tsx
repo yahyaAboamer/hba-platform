@@ -18,6 +18,7 @@ import { OrderDetail, Orders } from "./screens/Orders";
 import { Overview } from "./screens/Overview";
 import { ProductDetail, Products } from "./screens/Products";
 import { PaymentReconcile } from "./screens/PaymentReconcile";
+import { PaymentCorrection } from "./screens/PaymentCorrection";
 import { PaymentDetail, PaymentReceipt } from "./screens/PaymentDetail";
 import { PaymentRecord } from "./screens/PaymentRecord";
 import { Payments } from "./screens/Payments";
@@ -164,6 +165,10 @@ export default function App() {
             <Route
               path="/payments/:month/:affiliateId/reconcile"
               element={<PaymentReconcile />}
+            />
+            <Route
+              path="/payments/:month/:affiliateId/correction"
+              element={<PaymentCorrection session={session} />}
             />
             <Route path="/targets" element={<Targets session={session} />} />
             <Route path="/settings" element={<Settings session={session} />} />

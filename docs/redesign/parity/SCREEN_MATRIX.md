@@ -67,10 +67,10 @@ had the wrong filter names.
 | B4 | `vPromo` | 1157–1231 | inside product detail? | Unreviewed | Promotion / feature-request editor |
 | B5 | `vShipment` | 1135–1156 | **none** | Unreviewed | No route exists |
 | B6 | `vOrder` | 1092–1134 | `/orders/:orderId` `OrderDetail` in `Orders.tsx` | Implemented, not deployed | Route and `GET /api/orders/detail/{id}` are new |
-| B7 | `vPayment` | 1280–1402 | `/payments/:month/:affiliateId` `PaymentRecord.tsx` | Unreviewed | Largest secondary view |
-| B8 | `vRecord` | 1403–1445 | same file | Unreviewed | Record-a-payment form |
-| B9 | `vReceipt` | 1446–1461 | **none** | Unreviewed | Admin-side receipt |
-| B10 | `vCorrection` | 1462–1513 | `/payments/:month/:affiliateId/reconcile` `PaymentReconcile.tsx` | Unreviewed | |
+| B7 | `vPayment` | 1280–1402 + script 3171 | `/payments/:month/:affiliateId` `PaymentDetail.tsx` | Implemented · dark checked on staging | New `GET /api/payroll/{month}/statement/{id}`; approval from the page with the 05B fingerprint. Blocked month checked on staging; an approved month with transfers not yet seen on staging data |
+| B8 | `vRecord` | 1403–1445 + script 3270 | `/payments/:month/:affiliateId/record` `PaymentRecord.tsx` | Implemented | Returns to B7. Not exercised on staging (no approved month with money owed there) |
+| B9 | `vReceipt` | 1446–1461 + script 3314 | `/payments/:month/:affiliateId/receipts/:paymentId` `PaymentReceipt` | Implemented | *Recorded by* left out: the ledger payload does not carry it |
+| B10 | `vCorrection` | 1462–1513 | `/payments/:month/:affiliateId/correction` `PaymentCorrection.tsx` | Implemented, not deployed | Order reference and failure date are not in the corrections payload, so the lead line names the month instead. `/reconcile` stays for overpaid months |
 | B11 | `vTerms` | 1514–1604 | `/affiliates/:id/compensation` `Compensation.tsx` | Unreviewed | Compensation history and month selection |
 
 ## C. Admin — routes we ship that the export does not draw
