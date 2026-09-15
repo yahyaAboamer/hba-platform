@@ -295,7 +295,12 @@ function OrderTableRow({ row }: { row: OrderRow }) {
         ) : row.outcome === "held" ? (
           <span className="orders__held">Held — two codes claim it</span>
         ) : (
-          <span className="orders__nobody">No affiliate code</span>
+          /* *No affiliate code* over a row that visibly carries HBA10 read as
+           * a contradiction on staging. Where there is a code it simply
+           * belongs to no model - a brand code, or one nobody registered. */
+          <span className="orders__nobody">
+            {row.discount_codes.length > 0 ? "No model" : "No affiliate code"}
+          </span>
         )}
         {/* The code under the model, as the export stacks them. An unmatched
          *  code still shows — it is the reason the row belongs to nobody. */}
