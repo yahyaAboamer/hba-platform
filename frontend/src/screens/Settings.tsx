@@ -113,9 +113,15 @@ export function Settings({ session }: { session: Session }) {
 
 function AppearancePanel() {
   const [theme, setTheme] = useState(() => storedTheme("maintainer"));
+  // The export's segmented switch - two radios that read as one control -
+  // rather than two buttons that could both look pressed.
   return <section className="panel settings__appearance"><span>Theme</span>
-    <div role="group" aria-label="Theme">{(["dark", "light"] as const).map(value => <button key={value} className="button"
-      aria-pressed={theme === value} onClick={() => { setTheme(value); storeTheme(value,"maintainer"); applyMaintainerTheme(value); }}>{value === "dark" ? "Dark" : "Light"}</button>)}</div>
+    <div className="seg" role="radiogroup" aria-label="Theme">{(["dark", "light"] as const).map(value =>
+      <label key={value} className="seg-opt">
+        <input type="radio" name="admin-theme" checked={theme === value}
+          onChange={() => { setTheme(value); storeTheme(value,"maintainer"); applyMaintainerTheme(value); }} />
+        <span>{value === "dark" ? "Dark" : "Light"}</span>
+      </label>)}</div>
   </section>;
 }
 

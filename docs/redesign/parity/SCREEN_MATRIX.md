@@ -42,15 +42,20 @@ implementation to correct, never a competing design.
 
 ## A. Admin — primary views
 
-| # | Export view | Lines | Route / component | Status | Differences found |
+The export's wording and tones are bound from its data script (line 1646
+onward: `rosterVals`, `catalogueVals`, `ordersVals`, `orderVals` …). Read the
+script as well as the markup — three screens were matched on markup alone and
+had the wrong filter names.
+
+| # | Export view | Lines | Route / component | Status | Evidence and remaining differences |
 |---|---|---|---|---|---|
-| A1 | `vHome` | 121–254 | `/` `Overview.tsx` | Mapped | *pending re-read under the corrected method* |
-| A2 | `vModels` | 255–312 | `/affiliates` `Affiliates.tsx` | Mapped | *pending re-read* |
-| A3 | `vProducts` | 313–373 | `/products` `Products.tsx` | Mapped | *pending re-read* |
-| A4 | `vTargets` | 465–525 | `/targets` `Targets.tsx` | Mapped | See §T below — large |
-| A5 | `vPayments` | 526–597 | `/payments` `Payments.tsx` | Mapped | See §P below — large |
-| A6 | `vSettings` | 598–786 | `/settings` `Settings.tsx` | Mapped | *pending re-read* |
-| A7 | `vOrders` | 1060–1091 | `/orders` `Orders.tsx` | Mapped | *pending re-read* |
+| A1 | `vHome` | 121–254 | `/` `Overview.tsx` | Implemented · dark checked on staging | Chart added (was missing). Checked at 1536 CSS px, dark. Pending: 1280/1440, light theme |
+| A2 | `vModels` | 255–312 + script 2485 | `/affiliates` `Affiliates.tsx` | Implemented, not deployed | Filters corrected to Active/Applications/Invitations/Inactive; invitations as rows. Backend test run blocked (see Blockers) |
+| A3 | `vProducts` | 313–373 + script 2580 | `/products` `Products.tsx` | Implemented, not deployed | Three filters, coverage bar, Active pill, pager. Backend test run blocked |
+| A4 | `vTargets` | 465–525 | `/targets` `Targets.tsx` | Implemented · dark checked on staging | §T. Checked at 1536 CSS px, dark; element sizes measured. Pending: 1280/1440, light, a save and a confirm exercised |
+| A5 | `vPayments` | 526–597 | `/payments` `Payments.tsx` | Implemented · dark checked on staging | §P. Card 101 vs export 101px, row 82 vs 84px. Pending: 1280/1440, light, Record/Open actions exercised |
+| A6 | `vSettings` | 598–786 | `/settings` `Settings.tsx` | Mapped | Not yet re-read under the script-reading method |
+| A7 | `vOrders` | 1060–1091 + script 3010 | `/orders` `Orders.tsx` | Implemented, not deployed | Five columns, counted line, load-more. Backend test run blocked |
 
 ## B. Admin — secondary views
 
@@ -61,7 +66,7 @@ implementation to correct, never a competing design.
 | B3 | `vProduct` | 374–464 | `/products/:id` `ProductDetail.tsx` | Unreviewed | |
 | B4 | `vPromo` | 1157–1231 | inside product detail? | Unreviewed | Promotion / feature-request editor |
 | B5 | `vShipment` | 1135–1156 | **none** | Unreviewed | No route exists |
-| B6 | `vOrder` | 1092–1134 | **none** | Unreviewed | No route exists — order detail |
+| B6 | `vOrder` | 1092–1134 | `/orders/:orderId` `OrderDetail` in `Orders.tsx` | Implemented, not deployed | Route and `GET /api/orders/detail/{id}` are new |
 | B7 | `vPayment` | 1280–1402 | `/payments/:month/:affiliateId` `PaymentRecord.tsx` | Unreviewed | Largest secondary view |
 | B8 | `vRecord` | 1403–1445 | same file | Unreviewed | Record-a-payment form |
 | B9 | `vReceipt` | 1446–1461 | **none** | Unreviewed | Admin-side receipt |
@@ -268,6 +273,33 @@ Table surface — `margin-top:14px`, radius 8, `background:var(--surf)`.
 7. Terms line and recorded line are present but their sizes and tones differ.
 
 ---
+
+## Differences kept on purpose
+
+Each one is a later decision or a real state the export's sample data never
+reached. Nothing else is a legitimate difference.
+
+| Screen | Kept | Why |
+|---|---|---|
+| Targets | *Confirm* button and a tick in the Model column | Target confirmation is an approved later capability |
+| Targets | *Whole year* checkbox beside Save | Owner, 11 September 2026: targets are fixed across a year |
+| Targets | A second, quieter pace line under Recorded | D08, asked for after the export was drawn |
+| Payments | *Settle difference* action | Overpaid months exist; the export never drew one |
+| Payments | Destination shown in full on the desk only | Finance types it into a banking app; masked everywhere else |
+| Home | Chart axis label inside the plot | Real totals are wider than the export's gutter |
+| Models | Table/Cards switch, *Add a house code* | §12.3 asked for the toggle; house codes are a real account kind |
+| Models | Resend/Withdraw under an invitation's date | No invitation view exists yet to hold them |
+| Orders | *Cancelled* status; Enter looks an order up in any month | Shopify cancels orders; support asks by number |
+| Products | Size count under the name instead of a SKU | A SKU belongs to a size, not a product; search still finds SKUs |
+| Products | Top sellers panel, below the catalogue | Built later from the owner's question; **open: confirm it stays** |
+| Everywhere | `E£`, not `EGP` | Owner decision |
+
+## Blockers
+
+- **The backend test suite can't run.** The test database is the
+  docker-compose PostgreSQL on port 5433, and Docker Desktop stopped during a
+  low-memory kill on 15 September. Commit `da243ff` (Models, Orders, Products)
+  is committed locally and not pushed until the suite passes.
 
 ## Evidence
 
