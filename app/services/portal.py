@@ -944,6 +944,10 @@ def my_orders(db: Session, affiliate: AffiliateProfile, month: str) -> list[dict
         detail.append(
         {
             "order_number": index.order_number,
+            # The index's own key, so a staff view of these rows can open the
+            # order. It identifies an order, not a customer, and her own
+            # screen simply does not use it.
+            "shopify_order_id": index.shopify_order_id,
             "placed_at": index.placed_at.isoformat(),
             # What was in it. Empty where nothing has been read - which is an
             # older order, not an empty one, and the screen says so.

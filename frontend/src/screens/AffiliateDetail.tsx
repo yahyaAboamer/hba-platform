@@ -2,16 +2,16 @@ import { useEffect, useState, useRef } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import { MonthPicker } from "../components/MonthPicker";
-import { Targets } from "./Targets";
 import { Money } from "../components/Money";
 import { Corrections } from "../components/Corrections";
 import { FinancialRulesPreview } from "../components/FinancialRulesPreview";
 import { api, can } from "../lib/api";
-import { PAYOUT_FIELD_LABEL, PAY_TYPE } from "../lib/payouts";
+import { describeDestination, PAY_TYPE } from "../lib/payouts";
 import type { Session } from "../lib/api";
-import { describeBlocker, formatMonth } from "../lib/money";
-import { STATUS_LABEL } from "./Affiliates";
+import { formatEgp, formatMonth } from "../lib/money";
+import { ROSTER_STATUS } from "./Affiliates";
 import type { Affiliate } from "./Affiliates";
+import "./PaymentDetail.css";
 import "./AffiliateDetail.css";
 
 type Compensation = {
@@ -84,11 +84,6 @@ type Earnings = {
   is_payable: boolean;
 };
 
-const METHOD: Record<string, string> = {
-  instapay: "InstaPay",
-  bank: "Bank transfer",
-  wallet: "Mobile wallet",
-};
 
 /**
  * One model, and everything true about them this month.
@@ -98,6 +93,72 @@ const METHOD: Record<string, string> = {
  * this changes" preview, and those are the next screens after this one (§12.2
  * calls them Pattern C: money decisions never happen in a small dialog).
  */
+/** One of her orders, as her own orders screen reads it (`my_orders`). */
+type ProfileOrder = {
+  shopify_order_id: string;
+  order_number: string;
+  placed_at: string;
+  base_piastres: number;
+  placed_piastres: number | null;
+  state: "earned" | "pending" | "void";
+  commission_piastres: number | null;
+};
+
+/** One month of her content record (`my_targets`). */
+type TargetMonth = {
+  month: string;
+  required_videos: number | null;
+  required_stories: number | null;
+  actual_videos: number | null;
+  actual_stories: number | null;
+  achieved: boolean | null;
+  recorded_at: string | null;
+};
+
+/** One agreed month and what was paid against it (`my_payments`). */
+type StatementMonth = {
+  month: string;
+  state: string;
+  obligation_piastres: number;
+  paid_piastres: number;
+};
+
+type ProfileRecord = { targets: TargetMonth[]; statements: StatementMonth[] };
+
+type Tone = { label: string; tone: string };
+
+/** The export's three order states, by what they mean for money. */
+const ORDER_STATE: Record<string, Tone> = {
+  earned: { label: "Delivered", tone: "approved" },
+  pending: { label: "Pending", tone: "owed" },
+  void: { label: "Failed delivery", tone: "refused" },
+};
+
+/** An agreed month's state, in the words the Payments list uses. */
+const STATEMENT_STATE: Record<string, Tone> = {
+  unpaid: { label: "Approved", tone: "approved" },
+  partially_paid: { label: "Partly paid", tone: "owed" },
+  settled: { label: "Fully paid", tone: "lift" },
+  overpaid: { label: "More sent than due", tone: "refused" },
+  settled_externally: { label: "Paid outside the platform", tone: "quiet" },
+};
+
+function dateDay(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "long" });
+}
+
+/**
+ * How a month's content record ended, in the export's words. *No record yet*
+ * is the one that holds a month up, so it is the one coloured; a month that
+ * was recorded and fell short is an ordinary outcome and is not.
+ */
+function targetState(row: TargetMonth): Tone {
+  if (row.achieved === null && row.actual_videos === null) return { label: "No record yet", tone: "owed" };
+  if (row.achieved) return { label: "Target met", tone: "lift" };
+  if (row.actual_videos === 0 && row.actual_stories === 0) return { label: "Recorded zero", tone: "quiet" };
+  return { label: "Below target", tone: "quiet" };
+}
+
 export function AffiliateDetail({ session }: { session: Session }) {
   const { id } = useParams();
   const [query, setQuery] = useSearchParams();
@@ -107,6 +168,10 @@ export function AffiliateDetail({ session }: { session: Session }) {
   const [wardrobeReload, setWardrobeReload] = useState(0);
   const [detail, setDetail] = useState<Detail | null>(null);
   const [earnings, setEarnings] = useState<Earnings | null>(null);
+  /** Her content record and agreed months, and her orders for the month -
+   *  the same records her own screens read. */
+  const [record, setRecord] = useState<ProfileRecord | null>(null);
+  const [orders, setOrders] = useState<ProfileOrder[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   // A message and whether it is good news. The two used to be separate, and
   // the news was always rendered green - so "Shopify has never heard of this
@@ -140,6 +205,7 @@ export function AffiliateDetail({ session }: { session: Session }) {
   function load() {
     const version = ++loadVersion.current;
     setEarnings(null);
+    setOrders(null);
     setError(null);
     api
       // The selected month goes with the request: terms are dated, and a
@@ -150,11 +216,18 @@ export function AffiliateDetail({ session }: { session: Session }) {
         if (version !== loadVersion.current) return;
         setDetail(body);
         setCorrection("");
-        return api.get<Earnings>(
-          `/api/affiliates/${id}/earnings/${month}`,
-        );
+        return Promise.all([
+          api.get<Earnings>(`/api/affiliates/${id}/earnings/${month}`),
+          api.get<ProfileRecord>(`/api/affiliates/${id}/record`),
+          api.get<{ orders: ProfileOrder[] }>(`/api/affiliates/${id}/orders/${month}`),
+        ]);
       })
-      .then(value => { if (version === loadVersion.current && value) setEarnings(value); })
+      .then(value => {
+        if (version !== loadVersion.current || !value) return;
+        setEarnings(value[0]);
+        setRecord(value[1]);
+        setOrders(value[2].orders);
+      })
       .catch((caught) => { if (version === loadVersion.current) setError(caught.message); });
   }
 
@@ -310,14 +383,32 @@ export function AffiliateDetail({ session }: { session: Session }) {
         year: "numeric",
       })
     : null;
+  const status = ROSTER_STATUS[detail.status] ?? ROSTER_STATUS.inactive;
+  const terms = detail.compensation;
+  const termLine = terms
+    ? [
+        PAY_TYPE[terms.compensation_type] ?? terms.compensation_type,
+        `${terms.commission_rate_bp / 100}% commission`,
+        terms.fixed_amount_piastres !== null ? `${formatEgp(terms.fixed_amount_piastres)} salary` : null,
+        terms.base_amount_piastres !== null ? `${formatEgp(terms.base_amount_piastres)} minimum` : null,
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : "No terms set";
+  const contentRow = record?.targets.find((row) => row.month === month) ?? null;
+  const statement = record?.statements.find((row) => row.month === month) ?? null;
+  const statementState = statement
+    ? STATEMENT_STATE[statement.state] ?? { label: statement.state, tone: "quiet" }
+    : null;
 
   return (
     <>
       <div className="page__head">
+        <Link className="button profile__back" to="/affiliates">
+          ← Models
+        </Link>
         <div className="page__title">
-          <Link to="/affiliates" className="detail__back">
-            ← Models
-          </Link>
+          <h1>{detail.name}</h1>
         </div>
       </div>
 
@@ -327,28 +418,22 @@ export function AffiliateDetail({ session }: { session: Session }) {
        * an order knows her by — the same four things the roster row carries,
        * so arriving from that row does not feel like arriving somewhere else.
        */}
-      <header className="detail__hero">
-        <span className="detail__hero-avatar" aria-hidden="true">
+      {/*
+       * The approved profile's hero: her initial, the state she is in and the
+       * code an order knows her by - the same things her roster row carries,
+       * in the export's words and tones. Her name is the page title above.
+       */}
+      <header className="profile__hero">
+        <span className="profile__avatar" aria-hidden="true">
           {detail.name.charAt(0).toUpperCase()}
         </span>
-        <div className="detail__hero-who">
-          <h1>{detail.name}</h1>
-          <div className="detail__hero-facts">
-            <span className={`state state--${detail.status}`}>
-              {STATUS_LABEL[detail.status]}
-            </span>
-            {/* The code she sells under now. A profile that showed every code
-             *  she has ever held would bury the one that matters today. */}
-            {current ? (
-              <span className="code">{current.code}</span>
-            ) : (
-              <span className="detail__hero-nocode">No code yet</span>
-            )}
-            {detail.status === "pending" && appliedOn && (
-              <span className="detail__hero-applied">Applied {appliedOn}</span>
-            )}
-          </div>
-        </div>
+        <span className="profile__facts">
+          <span className={`pill profile__tone--${status.tone}`}>{status.label}</span>
+          <span className="profile__code">{current ? current.code : "No code yet"}</span>
+        </span>
+        {detail.status === "pending" && appliedOn && (
+          <span className="profile__applied">Applied {appliedOn}</span>
+        )}
       </header>
 
       {/*
@@ -523,15 +608,57 @@ export function AffiliateDetail({ session }: { session: Session }) {
 
       <div className="profile__navigation">
         <nav className="profile__tabs" aria-label="Model sections">
-          {["Overview", "Wardrobe", "Performance", "Targets", "Payments"].map(label => <button key={label} type="button"
-            className={section === label.toLowerCase() ? "profile__tab profile__tab--active" : "profile__tab"}
-            aria-current={section === label.toLowerCase() ? "page" : undefined}
-            onClick={() => setQuery(previous => { const next = new URLSearchParams(previous); next.set("section", label.toLowerCase()); next.set("month", month); return next; })}>{label}</button>)}
+          {["Overview", "Wardrobe", "Performance", "Targets", "Payments"].map(label => {
+            const key = label.toLowerCase();
+            return <button key={label} type="button"
+              className={section === key ? "profile__tab profile__tab--active" : "profile__tab"}
+              aria-current={section === key ? "page" : undefined}
+              onClick={() => setQuery(previous => { const next = new URLSearchParams(previous); next.set("section", key); next.set("month", month); return next; })}>
+              {key === "overview" && detail.status === "pending" ? "Application" : label}
+            </button>;
+          })}
         </nav>
-        {["performance", "targets", "payments"].includes(section) && <MonthPicker value={month} onChange={setMonth} />}
+        {/* The export keeps the month beside the sections on every one of
+         *  them: the figures on Overview are that month's too. */}
+        <span className="profile__month"><MonthPicker value={month} onChange={setMonth} /></span>
       </div>
       <div className="detail__grid">
         {section === "overview" && <>
+        <div className="profile__stats profile__full">
+          <section className="pay-detail__card profile__stat">
+            <span className="profile__stat-label">{formatMonth(month)} sales</span>
+            <span className="profile__stat-value">
+              {earnings ? <Money piastres={earnings.sales.earned_piastres} kind="agreed" /> : "—"}
+            </span>
+          </section>
+          <section className="pay-detail__card profile__stat">
+            <span className="profile__stat-label">Content recorded</span>
+            <span className="profile__stat-text">
+              {!contentRow || contentRow.actual_videos === null
+                ? "No update yet"
+                : `${contentRow.actual_videos}/${contentRow.required_videos ?? 0} videos · ${contentRow.actual_stories ?? 0}/${contentRow.required_stories ?? 0} stories`}
+            </span>
+          </section>
+          <section className="pay-detail__card profile__stat">
+            <span className="profile__stat-label">{formatMonth(month)} payment</span>
+            {/* An agreed month shows what was agreed; an open one shows the
+             *  estimate and says it is one, never under a paid-sounding word. */}
+            <span className="profile__stat-value">
+              {statement ? (
+                <Money piastres={statement.obligation_piastres} kind="agreed" />
+              ) : earnings ? (
+                <Money piastres={earnings.payout.piastres} kind="agreed" />
+              ) : "—"}
+            </span>
+            <span className={`profile__stat-state profile__tone--${statementState ? statementState.tone : earnings && earnings.blockers.length > 0 ? "refused" : "owed"}`}>
+              {statementState
+                ? statementState.label
+                : earnings && earnings.blockers.length > 0
+                  ? "Not payable yet"
+                  : "Estimated"}
+            </span>
+          </section>
+        </div>
         <section className="panel">
           <div className="panel__head">
             <h2 className="panel__title">Contact and shipping</h2>
@@ -754,6 +881,15 @@ export function AffiliateDetail({ session }: { session: Session }) {
             Only the model can change these.
           </p>
         </section>
+        <section className="pay-detail__card profile__card">
+          <h2 className="pay-detail__card-title">Current terms</h2>
+          <p className="profile__card-line">{termLine}</p>
+          {can(session, "compensation.manage") && (
+            <Link className="pay-detail__link profile__card-link" to={`/affiliates/${id}/compensation`}>
+              Compensation history →
+            </Link>
+          )}
+        </section>
         <section className="panel">
           <div className="panel__head">
             <h2 className="panel__title">Discount codes</h2>
@@ -784,240 +920,229 @@ export function AffiliateDetail({ session }: { session: Session }) {
           )}
         </section>
         </>}
-        {section === "wardrobe" && <div className="profile__wardrobe">
+        {section === "wardrobe" && <div className="profile__wardrobe profile__full">
           {wardrobeError && <p className="notice notice--refused" role="alert">{wardrobeError} <button className="button" onClick={() => setWardrobeReload(n => n + 1)}>Retry</button></p>}
           {!wardrobe && !wardrobeError && <p className="empty">Loading wardrobe…</p>}
-          {wardrobe && [["Received", wardrobe.received], ["Processing", wardrobe.processing], ["Needs checking", wardrobe.failed]].map(([label, list]) => <section key={label as string} className="profile__wardrobe-group">
-            <h2>{label as string} <span className="page__subtitle">{(list as WardrobeItem[]).length}</span></h2>
-            {(list as WardrobeItem[]).length === 0 ? <p className="empty">No products.</p> : <div className="profile__products">
-              {(list as WardrobeItem[]).map((item, index) => <article className="profile__product" key={`${item.shopify_order_id}-${item.shopify_product_id}-${index}`}>
-                {item.image_thumb_url || item.image_url ? <img src={item.image_thumb_url || item.image_url!} alt={item.title} loading="lazy" /> : <div className="profile__product-image">Image unavailable</div>}
-                {item.shopify_product_id ? <Link to={`/products/${item.shopify_product_id}`}>{item.title}</Link> : <span>{item.title}</span>}
-                <small>Size {item.size || "not recorded"}</small>
-              </article>)}
-            </div>}
-          </section>)}
-        </div>}
-        {section === "performance" && <>
-        <section className="panel">
-          <div className="panel__head">
-            <h2 className="panel__title">How the month is going</h2>
-            <span className="page__subtitle">
-              {formatMonth(month)}
-            </span>
-          </div>
-          <dl className="detail__list">
-            <Row label="Sales that count">
-              {earnings ? (
-                <Money piastres={earnings.sales.earned_piastres} />
-              ) : (
-                "—"
-              )}
-            </Row>
-            <Row label="Still travelling">
-              {earnings ? (
-                <Money piastres={earnings.sales.pending_piastres} />
-              ) : (
-                "—"
-              )}
-              {earnings && earnings.orders.pending > 0 && (
-                <span className="detail__note">
-                  {earnings.orders.pending} order
-                  {earnings.orders.pending === 1 ? "" : "s"} on the way
-                </span>
-              )}
-            </Row>
-            <Row label="Would be paid">
-              {/*
-               * A blocked figure is **not** owed, and must not be coloured as
-               * if it were. Somebody scanning for what to pay should be able
-               * to trust that orange means payable; the reason it is blocked
-               * sits in the row directly below (ADR 0027).
-               */}
-              {earnings ? (
-                <Money
-                  piastres={earnings.payout.piastres}
-                  kind={earnings.blockers.length > 0 ? "blocked" : "provisional"}
-                  tone={
-                    earnings.blockers.length === 0 && earnings.payout.piastres > 0
-                      ? "owed"
-                      : "neutral"
-                  }
-                />
-              ) : (
-                "—"
-              )}
-            </Row>
-            {earnings && earnings.blockers.length > 0 && (
-              <Row label="Waiting on">
-                <ul className="detail__blockers">
-                  {earnings.blockers.map((key) => (
-                    <li key={key} className="blocker">
-                      {describeBlocker(key)}
+          {wardrobe && <>
+            <div className="profile__subhead">
+              <h2>Received</h2>
+              <span>{wardrobe.received.length} {wardrobe.received.length === 1 ? "piece" : "pieces"}</span>
+            </div>
+            {wardrobe.received.length === 0 ? (
+              <div className="surface"><p className="empty">Nothing received yet.</p></div>
+            ) : (
+              <div className="profile__pieces">
+                {wardrobe.received.map((item, index) => {
+                  const body = <>
+                    {item.image_thumb_url || item.image_url
+                      ? <img className="profile__piece-image" src={item.image_thumb_url || item.image_url!} alt="" loading="lazy" />
+                      : <span className="profile__piece-image profile__piece-image--none">image</span>}
+                    <span className="profile__piece-text">
+                      <span className="profile__piece-name">{item.title}</span>
+                      <span className="profile__piece-size">Size {item.size || "not recorded"}</span>
+                    </span>
+                  </>;
+                  return item.shopify_product_id
+                    ? <Link key={`${item.shopify_order_id}-${index}`} className="profile__piece" to={`/products/${item.shopify_product_id}`}>{body}</Link>
+                    : <div key={`${item.shopify_order_id}-${index}`} className="profile__piece">{body}</div>;
+                })}
+              </div>
+            )}
+            {wardrobe.processing.length + wardrobe.failed.length > 0 && <>
+              <div className="profile__subhead profile__subhead--gap">
+                <h2>Not received yet</h2>
+                <span>{wardrobe.processing.length + wardrobe.failed.length} not yet owned</span>
+              </div>
+              <div className="surface">
+                <ul className="profile__pending">
+                  {wardrobe.processing.map((item, index) => (
+                    <li key={`p-${item.shopify_order_id}-${index}`}>
+                      <span>{item.title}<span className="profile__piece-size">Size {item.size || "not recorded"}</span></span>
+                      <span className="profile__tone--owed">Processing</span>
+                    </li>
+                  ))}
+                  {wardrobe.failed.map((item, index) => (
+                    <li key={`f-${item.shopify_order_id}-${index}`}>
+                      <span>{item.title}<span className="profile__piece-size">Size {item.size || "not recorded"}</span></span>
+                      <span className="profile__tone--refused">Needs checking</span>
                     </li>
                   ))}
                 </ul>
-              </Row>
+              </div>
+            </>}
+            <div className="profile__catalogue">
+              <span>What HBA has not sent {detail.name} yet is in the catalogue.</span>
+              <Link className="pay-detail__link" to="/products">Open the catalogue →</Link>
+            </div>
+          </>}
+        </div>}
+        {section === "performance" && <div className="profile__full">
+          <div className="surface">
+            {orders === null ? (
+              <p className="empty">Loading…</p>
+            ) : orders.length === 0 ? (
+              <p className="empty">
+                {current
+                  ? `No orders were placed with ${current.code} in ${formatMonth(month)}.`
+                  : `No orders in ${formatMonth(month)}.`}
+              </p>
+            ) : (
+              <table className="table profile__orders">
+                <thead>
+                  <tr>
+                    <th className="profile__ref">Order</th>
+                    <th>Date</th>
+                    <th className="profile__state">Status</th>
+                    <th className="profile__money">Net sales</th>
+                    <th className="profile__money">Commission</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {orders.map((order) => {
+                    const state = ORDER_STATE[order.state] ?? ORDER_STATE.pending;
+                    return (
+                      <tr key={order.shopify_order_id}>
+                        <td className="profile__ref">
+                          <Link to={`/orders/${encodeURIComponent(order.shopify_order_id)}`}>{order.order_number}</Link>
+                        </td>
+                        <td className="profile__muted">{dateDay(order.placed_at)}</td>
+                        <td className={`profile__state profile__tone--${state.tone}`}>{state.label}</td>
+                        <td className="profile__money">
+                          <Money piastres={order.placed_piastres ?? order.base_piastres} kind="agreed" />
+                        </td>
+                        <td className="profile__money">
+                          {order.commission_piastres === null
+                            ? "—"
+                            : <Money piastres={order.commission_piastres} kind="agreed" />}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             )}
-          </dl>
-        </section>
-          <Link className="button" to={`/orders?month=${month}&affiliate=${id}`}>View attributed orders →</Link>
-        </>}
-        {section === "targets" && <div className="profile__full"><Targets key={`${id}-${month}`} session={session} affiliateId={Number(id)} initialMonth={month} embedded /></div>}
+          </div>
+        </div>}
+        {section === "targets" && <div className="profile__full">
+          <div className="profile__subhead">
+            <h2>Recorded content</h2>
+            <Link className="pay-detail__link" to={`/targets?month=${month}`}>Open Targets →</Link>
+          </div>
+          <div className="surface">
+            {!record ? (
+              <p className="empty">Loading…</p>
+            ) : record.targets.length === 0 ? (
+              <p className="empty">Nothing has been asked of {detail.name} yet.</p>
+            ) : (
+              <table className="table profile__history">
+                <thead>
+                  <tr>
+                    <th>Month</th>
+                    <th className="profile__count">Videos</th>
+                    <th className="profile__count">Stories</th>
+                    <th className="profile__state">Recorded</th>
+                    <th className="profile__state">Updated</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {record.targets.map((row) => {
+                    const state = targetState(row);
+                    return (
+                      <tr key={row.month}>
+                        <td>{formatMonth(row.month)}</td>
+                        <td className="profile__count">
+                          {row.actual_videos === null ? "—" : `${row.actual_videos} / ${row.required_videos ?? 0}`}
+                        </td>
+                        <td className="profile__count">
+                          {row.actual_stories === null ? "—" : `${row.actual_stories} / ${row.required_stories ?? 0}`}
+                        </td>
+                        <td className={`profile__state profile__tone--${state.tone}`}>{state.label}</td>
+                        <td className="profile__state profile__muted">
+                          {row.recorded_at ? dateDay(row.recorded_at) : "—"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>}
         {section === "payments" && <>
-        <section className="panel">
-          <div className="panel__head">
-            <h2 className="panel__title">
-              Current terms
-              {detail.terms_month !== detail.current_month && (
-                <span className="page__subtitle"> {formatMonth(detail.terms_month)}</span>
-              )}
-            </h2>
-            {can(session, "compensation.manage") && <Link className="button" to={`/affiliates/${id}/compensation`}>Compensation history →</Link>}
-          </div>
-          {detail.compensation === null ? (
-            <p className="empty">
-              No pay terms for {formatMonth(detail.terms_month)}, so nothing
-              can be calculated. Sales are still recorded.
-            </p>
-          ) : (
-            <dl className="detail__list">
-              <Row label="Arrangement">
-                {PAY_TYPE[detail.compensation.compensation_type]}
-              </Row>
-              <Row label="Commission">
-                <span className="code">
-                  {detail.compensation.commission_rate_bp / 100}%
-                </span>
-              </Row>
-              {detail.compensation.fixed_amount_piastres !== null && (
-                <Row label="Salary">
-                  <Money piastres={detail.compensation.fixed_amount_piastres} />
-                </Row>
-              )}
-              {detail.compensation.base_amount_piastres !== null && (
-                <Row label="Guaranteed minimum">
-                  <Money piastres={detail.compensation.base_amount_piastres} />
-                  <span className="detail__note">
-                    Applies only when targets are met and confirmed
-                  </span>
-                </Row>
-              )}
-              <Row label="In force from">
-                <span className="code">
-                  {formatMonth(detail.compensation.start_month)}
-                </span>
-                {detail.compensation.end_month && (
-                  <span className="detail__note">
-                    to {formatMonth(detail.compensation.end_month)}
-                  </span>
-                )}
-              </Row>
-            </dl>
-          )}
-        </section>
-        <section className="panel">
-          <div className="panel__head">
-            <h2 className="panel__title">What has been paid</h2>
-            <Link className="button" to={`/affiliates/${detail.id}/payments`}>
-              Open the history
-            </Link>
-          </div>
-          {/*
-           * Deliberately a link and not a summary. "What has this person ever
-           * been sent" is asked rarely and answered at length - every payment,
-           * its reference, where it went and the screenshot - and putting the
-           * first two rows here would answer it wrongly more often than it
-           * answered it at all.
-           */}
-          <p className="empty">
-            Every payment and adjustment, with the screenshots.
-          </p>
-        </section>
-        <section className="panel">
-          <div className="panel__head">
-            <h2 className="panel__title">Where the money goes</h2>
-            {can(session, "affiliates.manage") && (
-              <Link
-                className="button"
-                to={`/affiliates/${detail.id}/payout-destination`}
-              >
-                {detail.payout_destination ? "Correct it" : "Set it"}
+        <div className="profile__cards profile__full">
+          <section className="pay-detail__card profile__card">
+            <h2 className="pay-detail__card-title">Terms</h2>
+            <p className="profile__card-line">{termLine}</p>
+            {detail.terms_month !== detail.current_month && (
+              <p className="pay-detail__faint">For {formatMonth(detail.terms_month)}</p>
+            )}
+            {can(session, "compensation.manage") && (
+              <Link className="pay-detail__link profile__card-link" to={`/affiliates/${id}/compensation`}>
+                Edit terms →
               </Link>
             )}
-          </div>
-          {detail.payout_destination === null ? (
-            <p className="empty">
-              Nothing on file. {detail.name} cannot be paid yet.
-            </p>
-          ) : (
-            <dl className="detail__list">
-              <Row label="Method">
-                {METHOD[detail.payout_destination.method] ??
-                  detail.payout_destination.method}
-              </Row>
-              {detail.payout_destination.bank_name && (
-                <Row label="Bank">{detail.payout_destination.bank_name}</Row>
-              )}
-              {detail.payout_destination.bank_account_holder && (
-                <Row label="Account holder">
-                  {detail.payout_destination.bank_account_holder}
-                </Row>
-              )}
-              {detail.payout_destination.instapay_address_url && (
-                <Row label="Address">
-                  <span className="code">
-                    {detail.payout_destination.instapay_address_url}
-                  </span>
-                </Row>
-              )}
-              {detail.payout_destination.bank_account_number && (
-                /* Card number, from the one map that names these (D06). She
-                   is asked for the digits on the front of her card; showing
-                   them back as an "account number" is how a payer types the
-                   wrong thing into a banking app. */
-                <Row label={PAYOUT_FIELD_LABEL.bank_account_number}>
-                  <span className="code">
-                    {detail.payout_destination.bank_account_number}
-                  </span>
-                </Row>
-              )}
-              {detail.payout_destination.instapay_phone && (
-                <Row label="InstaPay number">
-                  <span className="code">
-                    {detail.payout_destination.instapay_phone}
-                  </span>
-                  <span className="detail__note">
-                    Used when the app does not open
-                  </span>
-                </Row>
-              )}
-              {detail.payout_destination.wallet_phone && (
-                <Row label="Wallet number">
-                  <span className="code">
-                    {detail.payout_destination.wallet_phone}
-                  </span>
-                </Row>
-              )}
-              {/*
-               * §6.4.4 and ADR 0028. Shortened here on purpose — this is the
-               * screen somebody leaves open while doing something else, and a
-               * page of full account numbers is a different object from a page
-               * of masked ones. The number needed to actually send money is
-               * revealed on the payment screen, one at a time and recorded.
-               */}
-              <p className="detail__masked">
-                {detail.payout_destination.method === "instapay"
-                  ? "Shortened on purpose. Pay from Payments, which opens InstaPay with the address filled in."
-                  : "Shortened on purpose. Pay from Payments, where the full number is shown."}
+          </section>
+          <section className="pay-detail__card profile__card">
+            <h2 className="pay-detail__card-title">Where to send it</h2>
+            {detail.payout_destination === null ? (
+              <p className="pay-detail__missing">
+                {detail.name} has not submitted payment details, so nothing can be sent yet.
               </p>
-            </dl>
+            ) : (
+              <p className="profile__card-line">{describeDestination(detail.payout_destination)}</p>
+            )}
+            {can(session, "affiliates.manage") && (
+              <Link className="pay-detail__link profile__card-link" to={`/affiliates/${detail.id}/payout-destination`}>
+                {detail.payout_destination ? "Correct it →" : "Set it →"}
+              </Link>
+            )}
+            {/* Shortened here as everywhere else (ADR 0028). The full details
+             *  are on each month's payment, behind a reveal that is recorded. */}
+            <p className="pay-detail__faint">Earlier transfers keep the destination they were sent to.</p>
+          </section>
+        </div>
+        <div className="surface profile__full">
+          {!record ? (
+            <p className="empty">Loading…</p>
+          ) : record.statements.length === 0 ? (
+            <p className="empty">No month has been agreed for {detail.name} yet.</p>
+          ) : (
+            <table className="table profile__history">
+              <thead>
+                <tr>
+                  <th>Month</th>
+                  <th className="profile__money">Amount</th>
+                  <th className="profile__state">State</th>
+                  <th className="profile__recorded">Recorded</th>
+                </tr>
+              </thead>
+              <tbody>
+                {record.statements.map((row) => {
+                  const state = STATEMENT_STATE[row.state] ?? { label: row.state, tone: "quiet" };
+                  return (
+                    <tr key={row.month}>
+                      <td>
+                        <Link to={`/payments/${row.month}/${detail.id}`}>{formatMonth(row.month)}</Link>
+                      </td>
+                      <td className="profile__money">
+                        <Money piastres={row.obligation_piastres} kind="agreed" />
+                      </td>
+                      <td className={`profile__state profile__tone--${state.tone}`}>{state.label}</td>
+                      <td className="profile__recorded profile__muted">
+                        {row.paid_piastres > 0
+                          ? <><Money piastres={row.paid_piastres} kind="agreed" /> recorded</>
+                          : "Nothing recorded yet"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           )}
-        </section>
+        </div>
           {id && <Corrections key={`fix-${id}`} affiliateId={id} session={session} />}
           {id && <FinancialRulesPreview key={`${id}-${month}`} affiliateId={id} currentMonth={detail.current_month}
             firstMonth={detail.collaboration_start_month && detail.collaboration_start_month > detail.platform_start_month ? detail.collaboration_start_month : detail.platform_start_month} />}
-          <Link className="button" to={`/payments?month=${month}&affiliate=${id}`}>Open this model in Payments →</Link>
         </>}
       </div>
     </>

@@ -61,7 +61,7 @@ had the wrong filter names.
 
 | # | Export view | Lines | Route / component | Status | Note |
 |---|---|---|---|---|---|
-| B1 | `vModel` | 787–1059 | `/affiliates/:id` `AffiliateDetail.tsx` | Unreviewed | Five sections: Overview, Wardrobe, Performance, Targets, Payments |
+| B1 | `vModel` | 787–1059 + script 2870 | `/affiliates/:id` `AffiliateDetail.tsx` | Implemented, not yet seen on staging | Hero, section tabs with the month always beside them, Overview's three figures and *Current terms*; Wardrobe as received pieces and a not-yet list; Performance as her orders (new `GET /api/affiliates/{id}/orders/{month}`); Targets and Payments as month-by-month tables (new `GET /api/affiliates/{id}/record`). Kept: code verification, start month, shipping edit, codes form, corrections panel, rules preview. The embedded Targets editing grid is replaced by the export's read-only table and a link to Targets |
 | B2 | `vInvite` | 1232–1279 | `InviteModel.tsx` | Unreviewed | Not on a route of its own — check entry |
 | B3 | `vProduct` | 374–464 | `/products/:id` `ProductDetail.tsx` | Unreviewed | |
 | B4 | `vPromo` | 1157–1231 | inside product detail? | Unreviewed | Promotion / feature-request editor |
@@ -71,7 +71,7 @@ had the wrong filter names.
 | B8 | `vRecord` | 1403–1445 + script 3270 | `/payments/:month/:affiliateId/record` `PaymentRecord.tsx` | Implemented | Returns to B7. Not exercised on staging (no approved month with money owed there) |
 | B9 | `vReceipt` | 1446–1461 + script 3314 | `/payments/:month/:affiliateId/receipts/:paymentId` `PaymentReceipt` | Implemented | *Recorded by* left out: the ledger payload does not carry it |
 | B10 | `vCorrection` | 1462–1513 | `/payments/:month/:affiliateId/correction` `PaymentCorrection.tsx` | Implemented, not deployed | Order reference and failure date are not in the corrections payload, so the lead line names the month instead. `/reconcile` stays for overpaid months |
-| B11 | `vTerms` | 1514–1604 | `/affiliates/:id/compensation` `Compensation.tsx` | Unreviewed | Compensation history and month selection |
+| B11 | `vTerms` | 1514–1604 + script | `/affiliates/:id/compensation` `Compensation.tsx` | Implemented · dark checked on staging | Two surfaces, a year of twelve tiles, *Apply to N months* is the save. Kept: met/missed for a guarantee month before go-live (ADR 0036), the list of months still missing something. An apply not yet exercised on staging |
 
 ## C. Admin — routes we ship that the export does not draw
 

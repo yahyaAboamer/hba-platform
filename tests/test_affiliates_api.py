@@ -1897,3 +1897,44 @@ def test_a_nonsense_month_is_refused_rather_than_guessed(client):
     assert client.get(
         f"/api/affiliates/{affiliate['id']}?month=not-a-month"
     ).status_code in (400, 422)
+
+
+# -- The profile's Performance, Targets and Payments sections -----------------
+
+
+def test_the_profile_lists_her_orders_for_a_month(client):
+    """The same `my_orders` her own screen reads, with the commission worked
+    out on the server."""
+    affiliate = _register(client)
+    _attributed(affiliate["id"], "pr-1", "2026-08")
+
+    response = client.get(f"/api/affiliates/{affiliate['id']}/orders/2026-08")
+
+    assert response.status_code == 200, response.text
+    orders = response.json()["orders"]
+    assert len(orders) == 1
+    assert "commission_piastres" in orders[0]
+    assert "order_number" in orders[0]
+
+
+def test_the_profile_orders_refuse_a_month_that_is_not_one(client):
+    affiliate = _register(client)
+
+    assert client.get(f"/api/affiliates/{affiliate['id']}/orders/2026-13").status_code == 400
+
+
+def test_the_profile_record_carries_targets_and_agreed_months(client):
+    affiliate = _register(client)
+
+    body = client.get(f"/api/affiliates/{affiliate['id']}/record").json()
+
+    assert isinstance(body["targets"], list)
+    assert isinstance(body["statements"], list)
+
+
+def test_a_model_may_not_read_another_profile_record(client):
+    affiliate = _register(client)
+    _demote_to("affiliate")
+
+    assert client.get(f"/api/affiliates/{affiliate['id']}/record").status_code == 403
+    assert client.get(f"/api/affiliates/{affiliate['id']}/orders/2026-08").status_code == 403

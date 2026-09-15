@@ -1119,3 +1119,52 @@ def affiliate_wardrobe_route(
 
     affiliate = _get_affiliate_or_404(db, affiliate_id)
     return wardrobe_for(db, affiliate.id)
+
+
+@router.get("/{affiliate_id}/orders/{month}")
+def affiliate_orders_route(
+    affiliate_id: int,
+    month: str,
+    _actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_VIEW)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Her orders for one month, for the profile's *Performance* section.
+
+    The approved profile lists them - order, date, status, net sales and the
+    commission each was worth - and the commission per order is arithmetic
+    this codebase does on the server only. **The same function the model's own
+    orders screen reads** (`my_orders`), so the two views of one order cannot
+    tell different stories; no customer appears in either, because the index
+    never stored one.
+    """
+    from app.services.portal import my_orders
+
+    affiliate = _get_affiliate_or_404(db, affiliate_id)
+    return {"month": _month_or_400(month), "orders": my_orders(db, affiliate, month)}
+
+
+@router.get("/{affiliate_id}/record")
+def affiliate_record_route(
+    affiliate_id: int,
+    _actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_VIEW)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Her content record and her agreed months, for the profile.
+
+    The approved profile's *Targets* section is a table of every month - what
+    was asked, what was recorded, how it ended - and its *Payments* section a
+    table of every agreed month with what was paid against it. Both are what
+    the model's own screens already read (`my_targets`, `my_payments`), so the
+    profile and her phone are two readings of one record.
+
+    Months nobody has agreed are left out of `statements`, exactly as they are
+    on her screen: a forecast is not a debt, and a table of amounts under a
+    *State* heading would present one as though it were.
+    """
+    from app.services.portal import my_payments, my_targets
+
+    affiliate = _get_affiliate_or_404(db, affiliate_id)
+    return {
+        "targets": my_targets(db, affiliate)["months"],
+        "statements": my_payments(db, affiliate)["months"],
+    }
