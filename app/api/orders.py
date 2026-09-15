@@ -152,6 +152,15 @@ def orders_for_month(
     held = [row for row in rows if row["outcome"] == "held"]
     unattributed = [row for row in rows if row["outcome"] == "unattributed"]
     carried = [row for row in rows if row["is_carried"]]
+    # The approved list heads itself *N orders - E£X counted*. Counted means
+    # what did not fail or get cancelled: a failed parcel was never sales, and
+    # summing it into the line above the list would say otherwise. Added up
+    # here, because nothing about money is added up in a browser.
+    counted = sum(
+        row["total_piastres"]
+        for row in rows
+        if not row["cancelled"] and row["delivery_state"] != "failed"
+    )
 
     return {
         "month": month,
@@ -161,7 +170,73 @@ def orders_for_month(
             "held": len(held),
             "unattributed": len(unattributed),
             "carried": len(carried),
+            "counted_piastres": counted,
+            "counted": format_egp(counted),
         },
+    }
+
+
+@router.get("/detail/{shopify_order_id}")
+def order_detail(
+    shopify_order_id: str,
+    _actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_VIEW)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """One order, opened: whose it is, what it earned, and what was in it.
+
+    The approved dashboard opens an order from the list into its own view -
+    the model and code, when it was placed, its net sales, **the commission
+    it was worth**, which month it counts towards, and its product lines.
+    None of that had a screen here; the list carried a *Base* and a *Paid by*
+    column instead, which answered half of it on every row at once.
+
+    The commission is the same per-order figure a model sees on her own
+    orders (`_order_commission`): the rate of the month the order belongs to,
+    exact to the piastre, and `None` for an order that has not earned - still
+    travelling, void, or on a month with no rate - rather than a zero that
+    would read as a figure.
+    """
+    from app.models.catalogue import OrderLineItem
+    from app.services.compensation import terms_for
+    from app.services.portal import _order_commission
+
+    order = db.get(OrderIndex, shopify_order_id)
+    if order is None:
+        raise HTTPException(404, "No such order")
+
+    names = {a.id: a.name for a in db.scalars(select(AffiliateProfile))}
+    row = _render(db, order, names)
+
+    commission = None
+    if row["outcome"] == "attributed" and row["affiliate_id"] is not None:
+        affiliate = db.get(AffiliateProfile, row["affiliate_id"])
+        terms = terms_for(db, affiliate, order.business_month)
+        commission = _order_commission(
+            row["base_piastres"] or 0,
+            terms.commission_rate_bp if terms else None,
+            row["commission_state"],
+        )
+
+    lines = [
+        {
+            "title": line.title,
+            "variant": line.variant_title,
+            "quantity": line.quantity,
+            "total_piastres": line.discounted_total_piastres,
+            "total": format_egp(line.discounted_total_piastres),
+        }
+        for line in db.scalars(
+            select(OrderLineItem)
+            .where(OrderLineItem.shopify_order_id == order.shopify_order_id)
+            .order_by(OrderLineItem.title)
+        )
+    ]
+
+    return {
+        **row,
+        "commission_piastres": commission,
+        "commission": format_egp(commission) if commission is not None else None,
+        "lines": lines,
     }
 
 

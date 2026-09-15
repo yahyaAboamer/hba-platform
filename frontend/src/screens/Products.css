@@ -1,23 +1,7 @@
 /* The catalogue, and one product's roster. W01, W02. */
 
-.products__controls {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-}
-
 .products__search {
   width: 16rem;
-}
-
-.products__toggle {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: var(--text-sm);
-  color: var(--quiet);
-  white-space: nowrap;
-  cursor: pointer;
 }
 
 .products__grid {
@@ -118,11 +102,6 @@
 .products__models li {
   padding: var(--space-1) 0;
   break-inside: avoid;
-}
-
-.products__more {
-  margin: var(--space-5) auto 0;
-  display: block;
 }
 
 /* W11. What sold through the codes - above the catalogue grid, because it is
@@ -232,10 +211,6 @@
 }
 
 /* Only a product that is no longer sold is worth a colour here. */
-.products__status--archived {
-  color: var(--faint);
-}
-
 .products__figure {
   text-align: right;
   white-space: nowrap;
@@ -257,3 +232,136 @@
 /* The arrow at the end of a row is the export's faint tier at 13.5px, the
  * same as the roster's. */
 .products__go { font-size: 13.5px; }
+
+/* ── The catalogue list, measured off `vProducts` (lines 313–373) ──────── */
+
+.products__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.products__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.products__filter-count {
+  margin-left: 6px;
+}
+
+.products__search {
+  width: 280px;
+  max-width: 100%;
+}
+
+/* Product takes the rest (at least 250), then 110 / 190 / 150 / 16. */
+.products__table {
+  table-layout: fixed;
+  min-width: 46rem;
+}
+
+.products__status-cell {
+  width: 110px;
+}
+
+.products__coverage {
+  width: 190px;
+  font-size: 13px;
+  color: var(--quiet);
+}
+
+.products__feature {
+  width: 150px;
+}
+
+.products__table .products__go {
+  width: 16px;
+  color: var(--faint);
+}
+
+.products__thumb,
+.products__nothumb {
+  flex: none;
+  width: 40px;
+  height: 48px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+}
+
+.products__nothumb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--rule-strong);
+  background: var(--paper);
+  font-size: 9.5px;
+  color: var(--faint);
+}
+
+.products__status--active {
+  color: var(--accent);
+}
+
+.products__status--draft {
+  color: var(--owed);
+}
+
+.products__status--archived {
+  color: var(--quiet);
+}
+
+/* A 4px track under the coverage words, filled in the accent. */
+.products__bar-track {
+  display: block;
+  height: 4px;
+  margin-top: 6px;
+  border-radius: 2px;
+  background: var(--rule-strong);
+  overflow: hidden;
+}
+
+.products__bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+/* The one pill the Feature request column draws: filled, not outlined. */
+.products__active {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  font-size: 11.5px;
+  color: var(--accent-lift);
+}
+
+.products__active-dot {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.products__pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin: 14px 0 20px;
+  font-size: 12.5px;
+  color: var(--faint);
+}
+
+.products__pager-acts {
+  display: flex;
+  gap: 8px;
+}

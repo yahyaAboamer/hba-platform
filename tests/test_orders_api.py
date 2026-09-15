@@ -281,6 +281,10 @@ def test_totals_count_each_outcome(client):
         "held": 1,
         "unattributed": 1,
         "carried": 0,
+        # *N orders - E£X counted*, the line the approved list heads itself
+        # with: every order here was delivered, so all three count.
+        "counted_piastres": body["totals"]["counted_piastres"],
+        "counted": body["totals"]["counted"],
     }
 
 
@@ -322,3 +326,41 @@ def test_finding_an_order_by_number_with_the_hash(client):
 def test_a_number_matching_nothing_is_a_404(client):
     response = client.get("/api/orders/lookup/does-not-exist")
     assert response.status_code == 404
+
+
+# -- One order, opened (the approved export's order view) ---------------------
+
+
+def test_an_order_opens_with_its_model_and_lines(client):
+    """The view the approved list opens into: whose it is and what was in it."""
+    nour = _affiliate(client, "Nour", "nour@example.com")
+    _register_code(client, nour["id"], "NOUR10")
+    _paid_order(nour["id"], "o-9", 100_000)
+
+    body = client.get("/api/orders/detail/o-9").json()
+
+    assert body["affiliate_id"] == nour["id"]
+    assert body["outcome"] == "attributed"
+    assert body["lines"] == []
+    # A figure or an explicit absence, never a missing key the screen would
+    # have to guess about.
+    assert "commission_piastres" in body
+
+
+def test_an_unknown_order_is_a_404_not_an_empty_view(client):
+    assert client.get("/api/orders/detail/nope").status_code == 404
+
+
+def test_the_month_counts_what_did_not_fail(client):
+    """*N orders - E£X counted*: a failed parcel was never sales."""
+    nour = _affiliate(client, "Nour", "nour@example.com")
+    _register_code(client, nour["id"], "NOUR10")
+    _paid_order(nour["id"], "o-10", 100_000)
+
+    body = client.get(f"/api/orders/{MONTH}").json()
+
+    assert body["totals"]["counted_piastres"] == sum(
+        row["total_piastres"]
+        for row in body["orders"]
+        if not row["cancelled"] and row["delivery_state"] != "failed"
+    )

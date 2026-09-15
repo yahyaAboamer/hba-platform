@@ -17,54 +17,58 @@ const model = (over: Partial<Affiliate> = {}): Affiliate => ({
 
 describe("searching the roster", () => {
   it("finds her by name", () => {
-    expect(rosterMatches([model()], "all", "nour")).toHaveLength(1);
+    expect(rosterMatches([model()], "active", "nour")).toHaveLength(1);
   });
 
   it("finds her by the code an order knows her by", () => {
     // The case this exists for: somebody is holding an order with a code on
     // it and wants to know whose it is. A name-only search fails exactly then.
-    expect(rosterMatches([model()], "all", "NOUR10")).toHaveLength(1);
-    expect(rosterMatches([model()], "all", "nour10")).toHaveLength(1);
+    expect(rosterMatches([model()], "active", "NOUR10")).toHaveLength(1);
+    expect(rosterMatches([model()], "active", "nour10")).toHaveLength(1);
   });
 
   it("ignores surrounding space, which a paste brings with it", () => {
-    expect(rosterMatches([model()], "all", "  nour  ")).toHaveLength(1);
+    expect(rosterMatches([model()], "active", "  nour  ")).toHaveLength(1);
   });
 
-  it("returns everybody when nothing is typed", () => {
-    expect(rosterMatches([model(), model({ id: 2 })], "all", "")).toHaveLength(2);
+  it("returns the whole filter when nothing is typed", () => {
+    expect(rosterMatches([model(), model({ id: 2 })], "active", "")).toHaveLength(2);
   });
 
   it("does not fall over on a model with no code yet", () => {
-    expect(rosterMatches([model({ code: null })], "all", "zzz")).toHaveLength(0);
+    expect(rosterMatches([model({ code: null })], "active", "zzz")).toHaveLength(0);
   });
 });
 
-describe("the roster segments", () => {
+describe("the roster filters, as the export names them", () => {
   const roster = [
     model({ id: 1, status: "active" }),
     model({ id: 2, status: "pending" }),
-    model({ id: 3, status: "archived" }),
+    model({ id: 3, status: "inactive" }),
+    model({ id: 4, status: "archived" }),
   ];
 
-  it("shows everybody under All", () => {
-    expect(rosterMatches(roster, "all", "")).toHaveLength(3);
-  });
-
-  it("narrows to the applications waiting to be approved", () => {
-    const waiting = rosterMatches(roster, "waiting", "");
-    expect(waiting.map((row) => row.id)).toEqual([2]);
-  });
-
-  it("keeps archived out of Active", () => {
+  it("keeps everybody who is not working out of Active", () => {
     expect(rosterMatches(roster, "active", "").map((r) => r.id)).toEqual([1]);
   });
 
-  it("combines a segment with a search rather than choosing between them", () => {
+  it("narrows to the applications waiting to be approved", () => {
+    expect(rosterMatches(roster, "applications", "").map((r) => r.id)).toEqual([2]);
+  });
+
+  it("puts paused and archived under one word, Inactive", () => {
+    expect(rosterMatches(roster, "inactive", "").map((r) => r.id)).toEqual([3, 4]);
+  });
+
+  it("lists no models under Invitations, which lists invitations instead", () => {
+    expect(rosterMatches(roster, "invitations", "")).toHaveLength(0);
+  });
+
+  it("combines a filter with a search rather than choosing between them", () => {
     const found = rosterMatches(
       [model({ id: 1, status: "pending", name: "Nour" }),
        model({ id: 2, status: "pending", name: "Salma", code: "SAL10" })],
-      "waiting",
+      "applications",
       "salma",
     );
     expect(found.map((row) => row.id)).toEqual([2]);

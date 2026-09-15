@@ -1,186 +1,238 @@
+/* ── Attributed orders ─────────────────────────────────────────────────────
+ *
+ * `vOrders` and `vOrder` in `Admin Dashboard.dc.html`, lines 1060–1134.
+ */
+
 .orders__note {
   margin-bottom: var(--space-4);
 }
 
-.orders__search {
+/* A count on the left, the search on the right. */
+.orders__bar {
   display: flex;
-  gap: var(--space-3);
-  max-width: 32rem;
-  margin-bottom: var(--space-4);
-}
-
-.orders__search-input {
-  flex: 1;
-}
-
-.orders__found-label {
-  margin: 0 0 var(--space-2);
-  font-size: var(--text-xs);
-  color: var(--quiet);
-}
-
-.orders__figures {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-8);
-  margin-bottom: var(--space-5);
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
   flex-wrap: wrap;
-}
-
-.orders__figure {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-
-.orders__figure-label {
-  font-size: var(--text-xs);
-  color: var(--quiet);
+  margin: 0 0 14px;
 }
 
 .orders__count {
-  font-size: var(--text-lg);
-  font-weight: 400;
-}
-
-.orders__count--refused {
-  color: var(--refused);
-}
-
-.orders__table {
-  table-layout: auto;
-}
-
-.orders__amount,
-.table th.orders__amount {
-  text-align: right;
-  white-space: nowrap;
-}
-
-.orders__placed,
-.orders__delivery,
-.orders__commission {
-  font-size: var(--text-sm);
+  font-size: 13px;
   color: var(--quiet);
-  white-space: nowrap;
 }
 
-.orders__code {
-  margin-right: var(--space-2);
+.orders__search {
+  width: 280px;
+  max-width: 100%;
 }
 
-/* A code on the order that matched nobody registered — usually a typo. Quiet
-   rather than alarmed: it is a fact about the order, not a fault the platform
-   is refusing to handle. */
-.orders__code--unmatched {
-  color: var(--rule-strong);
-  text-decoration: line-through;
+/* Order 110 · Model takes the rest · Date 150 · Status 150 · Net sales 140. */
+.orders__table {
+  table-layout: fixed;
+  min-width: 44rem;
 }
 
-.orders__name {
+.orders__surface {
+  overflow-x: auto;
+}
+
+.orders__ref {
+  width: 110px;
+}
+
+.orders__date,
+.orders__status {
+  width: 150px;
+}
+
+.orders__net {
+  width: 140px;
+  font-variant-numeric: tabular-nums;
+}
+
+.orders__row {
+  cursor: pointer;
+}
+
+.orders__ref a,
+.orders__model {
   color: var(--ink);
   text-decoration: none;
-  font-weight: 400;
+  font-size: 13.5px;
 }
 
-.orders__name:hover {
+.orders__ref a:hover {
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 
-.orders__quiet {
-  font-size: var(--text-sm);
-  color: var(--quiet);
-}
-
-.orders__paid-by {
-  font-size: var(--text-sm);
-  white-space: nowrap;
-}
-
-.orders__carried-note {
+.orders__code {
   display: block;
-  font-size: var(--text-xs);
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--faint);
+}
+
+.orders__date {
+  font-size: 13px;
   color: var(--quiet);
 }
 
-@media (max-width: 640px) {
-  .orders__figures {
-    gap: var(--space-5);
-  }
-
-  .orders__table {
-    display: block;
-    overflow-x: auto;
-  }
+td.orders__status {
+  font-size: 12.5px;
 }
 
-.orders__found {
-  padding-bottom: var(--space-4);
-  margin-bottom: var(--space-5);
-  border-bottom: 1px solid var(--rule-strong);
+/* The export's three tones, by what the state means for money. */
+.orders__status--settled {
+  color: var(--accent);
 }
 
-/* ── What to look at ──────────────────────────────────────────────────────
- *
- * The screen answers two questions and they are not the same one: what
- * happened this month, and what needs me. The second is the reason to open it
- * on a busy day, and it used to mean reading two hundred rows to find three.
- */
-.orders__lenses {
+.orders__status--owed {
+  color: var(--owed);
+}
+
+.orders__status--refused {
+  color: var(--refused);
+}
+
+.orders__status--quiet {
+  color: var(--faint);
+}
+
+.orders__held {
+  color: var(--refused);
+  font-size: 13.5px;
+}
+
+.orders__nobody {
+  color: var(--faint);
+}
+
+.orders__foot {
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  margin-bottom: var(--space-4);
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 14px;
+  font-size: 12.5px;
+  color: var(--faint);
 }
 
-.orders__lens {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--rule);
+/* ── One order ──────────────────────────────────────────────────────────── */
+
+.page__head .orders__back {
+  min-height: 36px;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+.page__head .orders__back + .page__title {
+  flex: 1;
+  margin-left: 14px;
+}
+
+.order {
+  max-width: 620px;
+}
+
+.order__card {
+  padding: 18px 20px;
   border-radius: var(--radius);
   background: var(--surface);
+}
+
+.order__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.order__ref {
+  font-size: 18px;
+}
+
+.order__pill {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.order__facts {
+  margin: 14px 0 0;
+}
+
+.order__facts > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--rule);
+  font-size: 13.5px;
+}
+
+.order__facts > div:last-child {
+  border-bottom: 0;
+}
+
+.order__facts dt {
   color: var(--quiet);
-  font: inherit;
-  font-size: var(--text-sm);
-  cursor: pointer;
 }
 
-.orders__lens:hover {
-  background: var(--hover);
+.order__facts dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
 }
 
-/* A rule and a weight, no colour. ADR 0027 keeps colour for money state, and
-   a filter is not money. */
-.orders__lens--on {
-  border-color: var(--ink);
-  color: var(--ink);
+.order__model {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.order__lines {
+  margin-top: 14px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.order__lines-title {
+  margin: 0;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--rule);
+  font-size: 15px;
   font-weight: 400;
 }
 
-.orders__lens:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
+.order__lines ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.orders__lens-count {
-  font-size: var(--text-xs);
+.order__lines li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--rule);
+  font-size: 13.5px;
+}
+
+.order__lines li:last-child {
+  border-bottom: 0;
+}
+
+.order__note {
+  margin-top: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  font-size: 13px;
+  line-height: 1.6;
   color: var(--quiet);
-}
-
-.orders__lens--on .orders__lens-count {
-  color: var(--ink);
-}
-
-/* The code under the model's name rather than in a column of its own — it
- * identifies the row rather than being another fact about it. */
-.orders__codes {
-  display: block;
-  margin-top: 3px;
-}
-
-.orders__codes .code + .code {
-  margin-left: 6px;
 }

@@ -130,3 +130,31 @@ def test_a_model_may_not_read_the_catalogue(client):
         connection.execute(text("UPDATE role_assignment SET role = 'affiliate'"))
 
     assert client.get("/api/products").status_code == 403
+
+
+def test_the_filters_carry_their_own_counts(client):
+    """*Active 1 - All products 2*, which do not move with the search."""
+    _product(PANTS, "Wide-leg trousers")
+    _product(TOP, "Cropped top", status="archived")
+
+    body = client.get("/api/products?search=zzz").json()
+
+    assert body["counts"]["active"] == 1
+    assert body["counts"]["all"] == 2
+    assert body["counts"]["requests"] == 0
+
+
+def test_scope_all_is_the_older_all_products(client):
+    _product(PANTS, "Wide-leg trousers")
+    _product(TOP, "Cropped top", status="archived")
+
+    assert client.get("/api/products?scope=all").json()["total"] == 2
+    assert client.get("/api/products?scope=active").json()["total"] == 1
+    assert client.get("/api/products?scope=requests").json()["total"] == 0
+
+
+def test_coverage_is_out_of_the_models_working_now(client):
+    """What *3 of 12 received* is out of. Nobody on the programme yet here."""
+    _product(PANTS, "Wide-leg trousers")
+
+    assert client.get("/api/products").json()["active_models"] == 0

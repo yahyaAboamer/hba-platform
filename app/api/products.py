@@ -37,6 +37,7 @@ class FeatureRequestBody(BaseModel):
 @router.get("")
 def list_products(
     all_products: bool = False,
+    scope: str | None = None,
     search: str | None = None,
     limit: int = 60,
     offset: int = 0,
@@ -61,11 +62,39 @@ def list_products(
     `total` comes back so the interface can say *60 of 340* rather than
     implying that sixty is all there is.
     """
+    from sqlalchemy import or_
+
+    from app.models.affiliates import AccountKind, AffiliateProfile
+    from app.models.promotions import FeatureRequest
+
+    # The approved catalogue's three filters: *Active*, *All products* and
+    # *Active requests* - the last being the products a feature request is
+    # currently showing to models. `all_products` is kept as the older
+    # spelling of the second.
+    scope = scope or ("all" if all_products else "active")
+    showing_requests = select(FeatureRequest.shopify_product_id).where(
+        FeatureRequest.visible.is_(True)
+    )
+
     query = select(Product)
-    if not all_products:
+    if scope == "active":
         query = query.where(Product.status == ProductStatus.ACTIVE)
+    elif scope == "requests":
+        query = query.where(Product.shopify_product_id.in_(showing_requests))
     if search and search.strip():
-        query = query.where(Product.title.ilike(f"%{search.strip()}%"))
+        needle = f"%{search.strip()}%"
+        # Name **or SKU**, as the approved search says. A SKU belongs to a
+        # size, so a product matches when any of its sizes does.
+        query = query.where(
+            or_(
+                Product.title.ilike(needle),
+                Product.shopify_product_id.in_(
+                    select(ProductVariant.shopify_product_id).where(
+                        ProductVariant.sku.ilike(needle)
+                    )
+                ),
+            )
+        )
 
     total = db.scalar(
         select(func.count()).select_from(query.subquery())
@@ -138,9 +167,33 @@ def list_products(
             }
             for row in rows
         ],
-        "showing": "all" if all_products else "active",
+        "showing": scope,
         "total": total,
         "offset": max(0, offset),
+        # The counts inside the three filter labels - *Active 42* - which do
+        # not move with the search, as the export's do not.
+        "counts": {
+            "active": db.scalar(
+                select(func.count())
+                .select_from(Product)
+                .where(Product.status == ProductStatus.ACTIVE)
+            )
+            or 0,
+            "all": db.scalar(select(func.count()).select_from(Product)) or 0,
+            "requests": db.scalar(
+                select(func.count()).select_from(showing_requests.subquery())
+            )
+            or 0,
+        },
+        # What *3 of 12 received* is out of: the models currently working
+        # with HBA. A house code receives nothing and is not in it.
+        "active_models": db.scalar(
+            select(func.count())
+            .select_from(AffiliateProfile)
+            .where(AffiliateProfile.status == "active")
+            .where(AffiliateProfile.account_kind != AccountKind.HOUSE)
+        )
+        or 0,
     }
 
 

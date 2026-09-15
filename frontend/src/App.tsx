@@ -14,7 +14,7 @@ import { Affiliates } from "./screens/Affiliates";
 import { Compensation } from "./screens/Compensation";
 import { FirstRun } from "./screens/FirstRun";
 import { Glossary } from "./screens/Glossary";
-import { Orders } from "./screens/Orders";
+import { OrderDetail, Orders } from "./screens/Orders";
 import { Overview } from "./screens/Overview";
 import { ProductDetail, Products } from "./screens/Products";
 import { PaymentReconcile } from "./screens/PaymentReconcile";
@@ -140,6 +140,8 @@ export default function App() {
              * screen was rebuilt in this batch, only moved.
              */}
             <Route path="/orders" element={<Orders session={session} />} />
+            {/* The approved export opens an order into its own view. */}
+            <Route path="/orders/:orderId" element={<OrderDetail />} />
             <Route path="/payroll" element={<Payroll session={session} />} />
             <Route path="/payroll/:month/approve" element={<PayrollApprove />} />
             <Route path="/payroll/:month/reopen" element={<PayrollReopen />} />

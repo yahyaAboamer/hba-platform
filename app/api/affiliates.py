@@ -327,6 +327,15 @@ def list_affiliates_route(
         affiliate_id: code
         for code, affiliate_id in registered_codes(db, month).items()
     }
+    # The raw arrangement that month, for the approved roster's *Terms*
+    # column. Raw, and labelled by the screen, as Targets and Payments do -
+    # one table of words, not three.
+    from app.services.compensation import terms_for
+
+    arrangements = {}
+    for a in affiliates:
+        terms = terms_for(db, a, month)
+        arrangements[a.id] = terms.compensation_type if terms else None
     return {
         "affiliates": [
             {
@@ -339,6 +348,7 @@ def list_affiliates_route(
                 ),
                 "uses": sales[a.id].uses if a.id in sales else 0,
                 "content": content.get(a.id),
+                "arrangement": arrangements.get(a.id),
             }
             for a in affiliates
         ],

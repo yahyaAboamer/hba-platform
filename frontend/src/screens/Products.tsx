@@ -38,21 +38,31 @@ type RosterEntry = { affiliate_id: number; name: string; status: string };
  * of counts reads as a measurement that came back empty. **No model has one**
  * is the thing HBA would act on.
  */
-export function coverageLabel(count: number): string {
-  if (count === 0) return "Nobody yet";
-  return `${count} model${count === 1 ? "" : "s"}`;
+/**
+ * *3 of 12 received* — the export's words for model coverage.
+ *
+ * Out of the models working with HBA now, which the server counts, so a
+ * product nobody has reads *0 of 12 received* rather than a bare nought: the
+ * denominator is what makes the number something HBA can act on.
+ */
+export function coverageLabel(count: number, of: number): string {
+  return `${count} of ${of} received`;
+}
+
+/** How full the coverage bar is, as a CSS width. Geometry, not money. */
+export function coverageWidth(count: number, of: number): string {
+  if (of <= 0) return "0%";
+  return `${Math.min(100, Math.round((count / of) * 100))}%`;
 }
 
 /**
- * Whether HBA has asked for this product to be posted about (W09).
- *
- * Three states, not two. **A hidden request is not the absence of one** —
- * somebody wrote it and then took it down, and the wording is still there to
- * put back. Collapsing hidden into none is how a paragraph gets retyped.
+ * The feature-request column: *Active* while a request is showing to models,
+ * and nothing otherwise — the export draws one pill and leaves the rest of
+ * the column empty. A hidden request is still kept (W09); it is simply not
+ * something this list needs to say.
  */
-export function featureLabel(featured: boolean | null): string {
-  if (featured === null) return "—";
-  return featured ? "Showing to models" : "Hidden";
+export function featureLabel(featured: boolean | null): string | null {
+  return featured === true ? "Active" : null;
 }
 
 export type FeatureRequest = { message: string | null; visible: boolean };
@@ -83,7 +93,6 @@ type Detail = {
  * Search is on the name, because W01 puts colour in the product name and there
  * is no separate colour taxonomy to filter by.
  */
-const PAGE = 60;
 
 type TopSeller = {
   shopify_product_id: string | null;
@@ -161,20 +170,39 @@ function TopSellers({ month }: { month: string }) {
   );
 }
 
+type Scope = "active" | "all" | "requests";
+
+type Listing = {
+  products: Row[];
+  total: number;
+  counts: { active: number; all: number; requests: number };
+  active_models: number;
+};
+
+/** The export's page is ten rows, with Previous and Next under it. */
+const CATALOGUE_PAGE = 10;
+
+/**
+ * *Products* — `vProducts` in the approved export.
+ *
+ * Three filters and a search on one row; a table of Product, Status, Model
+ * coverage and Feature request; and *1–10 of 340* with Previous and Next
+ * under it.
+ *
+ * It had an *All products* checkbox where the export has three filters, a
+ * *Show 60 more* button where the export pages, and the top-sellers panel
+ * above the table. The panel is kept — it was built later, from the owner's
+ * own question about what sells through the codes — but it sits under the
+ * catalogue now, so the screen opens on what the export opens on.
+ */
 export function Products({ session }: { session: Session }) {
-  const [rows, setRows] = useState<Row[] | null>(null);
-  const [total, setTotal] = useState(0);
-  /**
-   * The scope and the search live in the URL, like the roster's.
-   *
-   * Opening a garment and pressing back used to land on the unfiltered
-   * catalogue at page one — with sixty images between somebody and the row
-   * they were looking at. What is being *typed* stays local: a URL rewritten
-   * per keystroke would fill the history with half-words.
-   */
+  const [listing, setListing] = useState<Listing | null>(null);
   const [params, setParams] = useSearchParams();
-  const all = params.get("scope") === "all";
+  const asked_scope = params.get("scope");
+  const scope: Scope =
+    asked_scope === "all" || asked_scope === "requests" ? asked_scope : "active";
   const [search, setSearch] = useState(() => params.get("q") ?? "");
+  const [page, setPage] = useState(0);
 
   const remember = useCallback(
     (next: { scope?: string; q?: string }) => {
@@ -182,7 +210,8 @@ export function Products({ session }: { session: Session }) {
         (previous) => {
           const updated = new URLSearchParams(previous);
           for (const [key, value] of Object.entries(next)) {
-            if (!value) updated.delete(key);
+            // The default filter and an empty search leave no trace.
+            if (!value || value === "active") updated.delete(key);
             else updated.set(key, value);
           }
           return updated;
@@ -192,80 +221,54 @@ export function Products({ session }: { session: Session }) {
     },
     [setParams],
   );
-  /**
-   * What was actually asked for, as opposed to what is being typed.
-   *
-   * The first version fetched on every keystroke: typing "dress" was five
-   * requests, four of them already stale before they returned, and on a real
-   * catalogue each one is a query and a page of images. A third of a second is
-   * long enough to finish a word and short enough not to feel laggy.
-   */
-  const [asked, setAsked] = useState("");
+  const [asked, setAsked] = useState(search);
   const [error, setError] = useState<string | null>(null);
 
+  /*
+   * A third of a second after the last keystroke, not on every one: typing
+   * "dress" was five requests, four of them stale before they returned.
+   */
   useEffect(() => {
     const timer = setTimeout(() => {
       setAsked(search);
-      // The settled search, not every keystroke.
       remember({ q: search.trim() });
     }, 300);
     return () => clearTimeout(timer);
   }, [search, remember]);
 
-  const load = useCallback(
-    (offset = 0) => {
-      const query = new URLSearchParams();
-      if (all) query.set("all_products", "true");
-      if (asked.trim()) query.set("search", asked.trim());
-      query.set("limit", String(PAGE));
-      query.set("offset", String(offset));
-      api
-        .get<{ products: Row[]; total: number }>(`/api/products?${query}`)
-        .then((body) => {
-          // Appended when paging, replaced when the filter changed. Replacing
-          // on a "show more" would scroll somebody back to the top of a list
-          // they were reading.
-          setRows((was) =>
-            offset === 0 ? body.products : [...(was ?? []), ...body.products],
-          );
-          setTotal(body.total);
-        })
-        .catch((caught) => setError(caught.message));
-    },
-    [all, asked],
-  );
+  useEffect(() => setPage(0), [scope, asked]);
 
-  useEffect(() => load(0), [load]);
+  useEffect(() => {
+    const query = new URLSearchParams();
+    query.set("scope", scope);
+    if (asked.trim()) query.set("search", asked.trim());
+    query.set("limit", String(CATALOGUE_PAGE));
+    query.set("offset", String(page * CATALOGUE_PAGE));
+    let live = true;
+    api
+      .get<Listing>(`/api/products?${query}`)
+      .then((body) => {
+        if (live) setListing(body);
+      })
+      .catch((caught) => setError(caught.message));
+    return () => {
+      live = false;
+    };
+  }, [scope, asked, page]);
+
+  const rows = listing?.products ?? null;
+  const total = listing?.total ?? 0;
+  const filters: { key: Scope; label: string; count: number }[] = [
+    { key: "active", label: "Active", count: listing?.counts.active ?? 0 },
+    { key: "all", label: "All products", count: listing?.counts.all ?? 0 },
+    { key: "requests", label: "Active requests", count: listing?.counts.requests ?? 0 },
+  ];
 
   return (
     <>
       <div className="page__head">
         <div className="page__title">
           <h1>Products</h1>
-          <span className="page__subtitle">
-            {rows === null
-              ? "…"
-              : rows.length < total
-                ? `${rows.length} of ${total}`
-                : `${total} ${all ? "in the catalogue" : "active"}`}
-          </span>
-        </div>
-        <div className="products__controls">
-          <input
-            className="input products__search"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search by name"
-            aria-label="Search products by name"
-          />
-          <label className="products__toggle">
-            <input
-              type="checkbox"
-              checked={all}
-              onChange={(event) => remember({ scope: event.target.checked ? "all" : "" })}
-            />
-            All products
-          </label>
         </div>
       </div>
 
@@ -275,95 +278,148 @@ export function Products({ session }: { session: Session }) {
         </p>
       )}
 
-      {/*
-       * **Three different facts, three different messages** (§S06). Loading is
-       * not empty; a search with no hits is not an empty catalogue; and an
-       * empty catalogue is a thing to fix in Settings rather than a shrug.
-       */}
+      <div className="products__bar">
+        <div className="products__filters" role="group" aria-label="Filter the catalogue">
+          {filters.map((option) => (
+            <button
+              key={option.key}
+              type="button"
+              className={scope === option.key ? "chip chip--on" : "chip"}
+              aria-pressed={scope === option.key}
+              onClick={() => remember({ scope: option.key })}
+            >
+              {option.label}
+              {listing && <span className="products__filter-count">{option.count}</span>}
+            </button>
+          ))}
+        </div>
+        <input
+          type="search"
+          className="input products__search"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Search name or SKU"
+          aria-label="Search products by name or SKU"
+        />
+      </div>
+
       {rows === null && !error && <p className="empty">Loading…</p>}
-      {rows !== null && rows.length === 0 && search.trim() && (
-        <p className="empty">Nothing matches “{search.trim()}”.</p>
+
+      {rows !== null && (
+        <div className="surface">
+          {rows.length === 0 ? (
+            /*
+             * **Three different facts, three different messages** (S06). A
+             * search with no hits is not an empty catalogue, and an empty
+             * catalogue is a thing to fix in Settings rather than a shrug.
+             */
+            <p className="empty">
+              {asked.trim()
+                ? `No product matches “${asked.trim()}”.`
+                : scope === "requests"
+                  ? "No feature request is visible to models right now."
+                  : "The catalogue has not been read yet. Settings → Connection → Read the catalogue."}
+            </p>
+          ) : (
+            <table className="table products__table">
+              <thead>
+                <tr>
+                  <th>Product</th>
+                  <th className="products__status-cell">Status</th>
+                  <th className="products__coverage">Model coverage</th>
+                  <th className="products__feature">Feature request</th>
+                  <th className="products__go" aria-hidden="true" />
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => {
+                  const feature = featureLabel(row.featured);
+                  const of = listing?.active_models ?? 0;
+                  return (
+                    <tr key={row.shopify_product_id}>
+                      <td>
+                        <Link
+                          className="products__who"
+                          to={`/products/${row.shopify_product_id}`}
+                        >
+                          {row.image_url ? (
+                            <img className="products__thumb" src={row.image_url} alt="" loading="lazy" />
+                          ) : (
+                            <span className="products__nothumb" aria-hidden="true">image</span>
+                          )}
+                          <span className="products__who-text">
+                            <span className="products__name">{row.title}</span>
+                            {/* The export stacks a SKU under the name. **This
+                             *  platform has no product-level SKU** — a SKU
+                             *  belongs to a size, and a garment has one per
+                             *  size — so the size count is what is true at
+                             *  this level. The search still finds a SKU. */}
+                            <span className="products__meta">
+                              {row.sizes} size{row.sizes === 1 ? "" : "s"}
+                            </span>
+                          </span>
+                        </Link>
+                      </td>
+                      <td className="products__status-cell">
+                        <span className={`pill products__status--${row.status}`}>
+                          {row.status.charAt(0).toUpperCase() + row.status.slice(1)}
+                        </span>
+                      </td>
+                      <td className="products__coverage">
+                        {coverageLabel(row.models_with_it, of)}
+                        <span className="products__bar-track" aria-hidden="true">
+                          <span
+                            className="products__bar-fill"
+                            style={{ width: coverageWidth(row.models_with_it, of) }}
+                          />
+                        </span>
+                      </td>
+                      <td className="products__feature">
+                        {feature && (
+                          <span className="products__active">
+                            <span className="products__active-dot" aria-hidden="true" />
+                            {feature}
+                          </span>
+                        )}
+                      </td>
+                      <td className="products__go" aria-hidden="true">→</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
       )}
-      {rows !== null && rows.length === 0 && !search.trim() && (
-        <p className="empty">
-          The catalogue has not been read yet. Settings → Shopify &amp; data →
-          Read the catalogue.
-        </p>
+
+      {rows !== null && total > 0 && (
+        <div className="products__pager">
+          <span>
+            {page * CATALOGUE_PAGE + 1}–{page * CATALOGUE_PAGE + rows.length} of {total}
+            {asked.trim() ? " matching" : ""}
+          </span>
+          <span className="products__pager-acts">
+            <button
+              type="button"
+              className="button button--row"
+              disabled={page === 0}
+              onClick={() => setPage(page - 1)}
+            >
+              Previous
+            </button>
+            <button
+              type="button"
+              className="button button--row"
+              disabled={(page + 1) * CATALOGUE_PAGE >= total}
+              onClick={() => setPage(page + 1)}
+            >
+              Next
+            </button>
+          </span>
+        </div>
       )}
 
       <TopSellers month={currentMonth()} />
-
-      {rows !== null && rows.length > 0 && (
-        <table className="table products__table">
-          <thead>
-            <tr>
-              <th>Product</th>
-              <th>Status</th>
-              <th className="products__figure">Model coverage</th>
-              <th>Feature request</th>
-              <th aria-hidden="true" />
-            </tr>
-          </thead>
-          <tbody>
-          {rows.map((row) => (
-            <tr key={row.shopify_product_id}>
-              <td>
-                <Link
-                  className="products__who"
-                  to={`/products/${row.shopify_product_id}`}
-                >
-                  {row.image_url ? (
-                    <img
-                      className="products__thumb"
-                      src={row.image_url}
-                      alt=""
-                      loading="lazy"
-                    />
-                  ) : (
-                    <span className="products__nothumb" aria-hidden="true" />
-                  )}
-                  <span className="products__who-text">
-                    <span className="products__name">{row.title}</span>
-                    {/* The export stacks a SKU under the name. **This
-                     *  platform has no product-level SKU** — a SKU belongs to
-                     *  a variant, and a garment has one per size, so printing
-                     *  any single one of them would label the product with a
-                     *  fact about one of its sizes. The size count is what is
-                     *  true at this level. */}
-                    <span className="products__meta">
-                      {row.sizes} size{row.sizes === 1 ? "" : "s"}
-                    </span>
-                  </span>
-                </Link>
-              </td>
-              <td>
-                <span className={`products__status products__status--${row.status}`}>
-                  {row.status === "active" ? "Active" : row.status}
-                </span>
-              </td>
-              <td className="products__figure">{coverageLabel(row.models_with_it)}</td>
-              <td>{featureLabel(row.featured)}</td>
-              <td className="products__go" aria-hidden="true">→</td>
-            </tr>
-          ))}
-          </tbody>
-        </table>
-      )}
-
-      {/*
-       * **More, rather than every page as a number.** Nobody navigating a
-       * catalogue knows which page a garment is on, and a page count invites
-       * clicking through six of them to find out.
-       */}
-      {rows !== null && rows.length < total && (
-        <button
-          type="button"
-          className="button products__more"
-          onClick={() => load(rows.length)}
-        >
-          Show {Math.min(PAGE, total - rows.length)} more
-        </button>
-      )}
       {session && null}
     </>
   );

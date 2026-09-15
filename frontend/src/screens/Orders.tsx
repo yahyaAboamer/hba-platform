@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import { Money } from "../components/Money";
 import { MonthPicker } from "../components/MonthPicker";
@@ -34,90 +34,91 @@ type OrderRow = {
 type Grid = {
   month: string;
   orders: OrderRow[];
-  totals: { orders: number; held: number; unattributed: number; carried: number };
+  totals: {
+    orders: number;
+    held: number;
+    unattributed: number;
+    carried: number;
+    /** What did not fail or get cancelled, added up by the server. */
+    counted: string;
+  };
 };
+
+type OrderDetailBody = OrderRow & {
+  commission_piastres: number | null;
+  lines: {
+    title: string;
+    variant: string | null;
+    quantity: number;
+    total_piastres: number;
+  }[];
+};
+
+/** The export loads twenty-five at a time and says how many are left. */
+const STEP = 25;
 
 /**
- * What to look at. The screen answers two questions and they are not the same
- * one: *what happened this month*, and *what needs me*.
+ * An order's state in the export's three words, and a fourth it never drew.
  *
- * The second is the reason to open it at all on a busy day, and until now it
- * meant reading two hundred rows to find three. Each filter here is a real
- * state with a real consequence, not a category:
- *
- * - `held` blocks every month it touches until somebody decides (§9.2)
- * - `unowned` is sales going to nobody — the model whose code it is will
- *   notice long before anybody here does
- * - `void` did not arrive, so it pays nothing, and it is the row a model asks
- *   about
- * - `carried` was sold here and paid by another month (§11.4)
+ * *Delivered*, *Pending* and *Failed delivery* are the export's own; the tone
+ * is too - accent, amber, red. *Cancelled* is ours, because Shopify cancels
+ * orders and the export's sample shop never did, and it takes the red of a
+ * failed delivery because it means the same thing for money: nothing earned.
  */
-type Lens = "all" | "attention" | "held" | "unowned" | "void" | "carried";
-
-const LENS_LABEL: Record<Lens, string> = {
-  all: "Everything",
-  attention: "Needs a decision",
-  held: "Two codes claim it",
-  unowned: "Belongs to nobody",
-  void: "Did not arrive",
-  carried: "Carried in",
-};
-
-function matches(row: OrderRow, lens: Lens): boolean {
-  switch (lens) {
-    case "held":
-      return row.outcome === "held";
-    case "unowned":
-      return row.outcome === "unattributed";
-    case "void":
-      return row.commission_state === "void" || row.cancelled;
-    case "carried":
-      return row.is_carried;
-    case "attention":
-      // The two that actually stop something. A void order is settled and a
-      // carried one is correct; neither needs anybody.
-      return row.outcome === "held" || row.outcome === "unattributed";
-    default:
-      return true;
-  }
+export function orderStatus(row: Pick<OrderRow, "cancelled" | "delivery_state">): {
+  label: string;
+  tone: "settled" | "owed" | "refused";
+} {
+  if (row.cancelled) return { label: "Cancelled", tone: "refused" };
+  if (row.delivery_state === "delivered") return { label: "Delivered", tone: "settled" };
+  if (row.delivery_state === "failed") return { label: "Failed delivery", tone: "refused" };
+  return { label: "Pending", tone: "owed" };
 }
 
-const DELIVERY_LABEL: Record<string, string> = {
-  delivered: "Delivered",
-  failed: "Failed delivery",
-  in_flight: "On its way",
-};
-
-const COMMISSION_LABEL: Record<string, string> = {
-  earned: "Counts",
-  pending: "Still travelling",
-  void: "Does not count",
-};
+function placedOn(iso: string, withYear = false): string {
+  return new Date(iso).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "long",
+    ...(withYear ? { year: "numeric" } : {}),
+  });
+}
 
 /**
- * Why one order reads the way it does.
+ * *Attributed orders* — `vOrders` in the approved export.
  *
- * Affiliates, Payroll and Payments each answer "what does they earn" for a
- * model or a month. This answers the question that actually arrives one order
- * at a time — whose code it carried, whether Shopify has said it arrived,
- * which payroll paid it — so the order is the unit here, not the person.
+ * A count and a search above one table of five columns: Order, Model with
+ * the code under it, Date, Status, Net sales. Each row opens the order.
+ *
+ * This screen used to carry a strip of four counts, a row of filters, a
+ * separate *Find* form and eight columns — *Commission*, *Base* and *Paid
+ * by* among them. Those three are facts about one order rather than about
+ * the month, and the export puts them where they are read one at a time: in
+ * the order itself (`OrderDetail`, below). Held and code-less orders are
+ * still here, said in the Model column where the reason they belong to
+ * nobody is visible.
  *
  * Nothing on this page can be changed. It reads decisions `attributed_order`
  * and `payroll_snapshot` already made.
  */
 export function Orders({ session }: { session: Session }) {
   const [query] = useSearchParams();
-  const [month, setMonth] = useState(query.get("month")?.match(/^\d{4}-(0[1-9]|1[0-2])$/) ? query.get("month")! : session.platform.working_month);
+  const navigate = useNavigate();
+  const [month, setMonth] = useState(
+    query.get("month")?.match(/^\d{4}-(0[1-9]|1[0-2])$/)
+      ? query.get("month")!
+      : session.platform.working_month,
+  );
   const [grid, setGrid] = useState<Grid | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [lockNote, setLockNote] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [found, setFound] = useState<OrderRow | null | undefined>(undefined);
-  const [searching, setSearching] = useState(false);
-  const [lens, setLens] = useState<Lens>("all");
+  const [limit, setLimit] = useState(STEP);
+  const [lookedUp, setLookedUp] = useState<"missing" | null>(null);
 
   useEffect(() => {
     setError(null);
+    setGrid(null);
+    setLimit(STEP);
     api
       .get<Grid>(`/api/orders/${month}`)
       .then(setGrid)
@@ -135,24 +136,38 @@ export function Orders({ session }: { session: Session }) {
     return null;
   }
 
+  const needle = search.trim().toLowerCase().replace(/^#/, "");
+  const month_rows = (grid?.orders ?? []).filter(
+    (row) => !query.get("affiliate") || String(row.affiliate_id) === query.get("affiliate"),
+  );
+  const rows = month_rows.filter(
+    (row) =>
+      !needle ||
+      [row.order_number, row.affiliate_name ?? "", ...row.discount_codes]
+        .join(" ")
+        .toLowerCase()
+        .includes(needle),
+  );
+
+  /*
+   * **The support question arrives as an order number, never as a month.**
+   * The export's search narrows the month on screen, and so does this one;
+   * pressing Enter on a number that is not in this month then looks it up
+   * across every month and opens it, which is what the separate *Find* form
+   * used to do from a second box.
+   */
   async function lookUp(event: React.FormEvent) {
     event.preventDefault();
-    const needle = search.trim();
-    if (!needle) return;
-    setSearching(true);
-    setFound(undefined);
+    if (!needle || rows.length > 0) return;
     try {
-      setFound(await api.get<OrderRow>(`/api/orders/lookup/${encodeURIComponent(needle)}`));
+      const found = await api.get<OrderRow>(
+        `/api/orders/lookup/${encodeURIComponent(search.trim())}`,
+      );
+      navigate(`/orders/${encodeURIComponent(found.shopify_order_id)}`);
     } catch {
-      setFound(null);
-    } finally {
-      setSearching(false);
+      setLookedUp("missing");
     }
   }
-
-  const all = (grid?.orders ?? []).filter(row => !query.get("affiliate") || String(row.affiliate_id) === query.get("affiliate"));
-  const rows = all.filter((row) => matches(row, lens));
-  const count = (of: Lens) => all.filter((row) => matches(row, of)).length;
 
   return (
     <>
@@ -175,237 +190,293 @@ export function Orders({ session }: { session: Session }) {
         />
       </div>
 
-      {/*
-       * The support question arrives as an order number, never as a month.
-       * Looking one up is therefore its own action, separate from browsing.
-       */}
-      <form className="orders__search" onSubmit={lookUp}>
+      {error && (
+        <p className="notice notice--refused" role="alert">
+          {error}
+        </p>
+      )}
+      {lockNote && <p className="notice orders__note">{lockNote}</p>}
+
+      <form className="orders__bar" onSubmit={lookUp}>
+        <span className="orders__count">
+          {grid === null
+            ? "…"
+            : needle
+              ? /* A search narrows the list; the counted figure is the
+                 * server's for the whole month, and re-adding the visible
+                 * rows here would be a second implementation of a money
+                 * figure. So a narrowed list says how many, not how much. */
+                `${rows.length} of ${month_rows.length} ${month_rows.length === 1 ? "order" : "orders"}`
+              : `${month_rows.length} ${month_rows.length === 1 ? "order" : "orders"} · ${grid.totals.counted} counted`}
+        </span>
         <input
-          className="input orders__search-input"
-          placeholder="Search orders"
+          type="search"
+          className="input orders__search"
           value={search}
           onChange={(event) => {
             setSearch(event.target.value);
-            setFound(undefined);
+            setLookedUp(null);
+            setLimit(STEP);
           }}
+          placeholder="Search model, code or order"
+          aria-label="Search model, code or order"
         />
-        <button type="submit" className="button" disabled={searching || !search.trim()}>
-          {searching ? "Looking…" : "Find"}
-        </button>
       </form>
+
+      {grid === null && !error && <p className="empty">Loading…</p>}
+
+      {grid && (
+        <div className="surface orders__surface">
+          {month_rows.length === 0 ? (
+            <p className="empty">No orders placed in {formatMonth(month)} yet.</p>
+          ) : rows.length === 0 ? (
+            <p className="empty">
+              {lookedUp === "missing" || !/^\d+$/.test(needle)
+                ? "No order matches that search."
+                : "Not in this month. Press Enter to look for it in any month."}
+            </p>
+          ) : (
+            <table className="table orders__table">
+              <thead>
+                <tr>
+                  <th className="orders__ref">Order</th>
+                  <th>Model</th>
+                  <th className="orders__date">Date</th>
+                  <th className="orders__status">Status</th>
+                  <th className="orders__net">Net sales</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.slice(0, limit).map((row) => (
+                  <OrderTableRow key={row.shopify_order_id} row={row} />
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+
+      {grid && rows.length > 0 && (
+        <div className="orders__foot">
+          <span>
+            Showing {Math.min(limit, rows.length)} of {rows.length}
+          </span>
+          {rows.length > limit && (
+            <button type="button" className="button button--row" onClick={() => setLimit(limit + STEP)}>
+              Load {Math.min(STEP, rows.length - limit)} more of {rows.length}
+            </button>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
+
+function OrderTableRow({ row }: { row: OrderRow }) {
+  const navigate = useNavigate();
+  const status = orderStatus(row);
+  const open = `/orders/${encodeURIComponent(row.shopify_order_id)}`;
+
+  return (
+    /*
+     * The export makes the whole row the way in. The order number is also a
+     * real link, so the row is reachable by keyboard and a middle-click opens
+     * it in a tab, which a row with only an `onClick` never is.
+     */
+    <tr className="orders__row" onClick={() => navigate(open)}>
+      <td className="orders__ref">
+        <Link to={open} onClick={(event) => event.stopPropagation()}>
+          {row.order_number}
+        </Link>
+      </td>
+      <td>
+        {row.outcome === "attributed" ? (
+          <span className="orders__model">{row.affiliate_name}</span>
+        ) : row.outcome === "held" ? (
+          <span className="orders__held">Held — two codes claim it</span>
+        ) : (
+          <span className="orders__nobody">No affiliate code</span>
+        )}
+        {/* The code under the model, as the export stacks them. An unmatched
+         *  code still shows — it is the reason the row belongs to nobody. */}
+        {row.discount_codes.length > 0 && (
+          <span className="orders__code">{row.discount_codes.join(" · ")}</span>
+        )}
+      </td>
+      <td className="orders__date">{placedOn(row.placed_at)}</td>
+      <td className={`orders__status orders__status--${status.tone}`}>{status.label}</td>
+      <td className="orders__net">
+        {/* Shopify zeroes a cancelled order's totals, so the zero is not what
+         *  it sold for — the export writes *not available* for exactly this. */}
+        {row.cancelled ? (
+          <span className="orders__nobody">not available</span>
+        ) : (
+          <Money piastres={row.total_piastres} kind="agreed" />
+        )}
+      </td>
+    </tr>
+  );
+}
+
+/**
+ * One order, opened — `vOrder` in the approved export.
+ *
+ * A card with the order's number and state, then five facts on hairlines:
+ * the model and code, when it was placed, its net sales, the commission it
+ * was worth, and which month it counts towards. Its product lines follow on
+ * a surface of their own.
+ *
+ * Every figure is the server's. The commission is the same per-order
+ * arithmetic a model sees on her own orders, at the rate of the month the
+ * order belongs to.
+ */
+export function OrderDetail() {
+  const { orderId = "" } = useParams();
+  const [order, setOrder] = useState<OrderDetailBody | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setOrder(null);
+    setError(null);
+    api
+      .get<OrderDetailBody>(`/api/orders/detail/${encodeURIComponent(orderId)}`)
+      .then(setOrder)
+      .catch((caught) => setError(caught.message));
+  }, [orderId]);
+
+  const status = order ? orderStatus(order) : null;
+  const counts = order ? countsTowards(order) : null;
+
+  return (
+    <>
+      <div className="page__head">
+        <Link
+          className="button orders__back"
+          to={order ? `/orders?month=${order.business_month}` : "/orders"}
+        >
+          ← Attributed orders
+        </Link>
+        <div className="page__title">
+          <h1>{order ? `Order ${order.order_number}` : "Order"}</h1>
+          {order && (
+            <span className="page__subtitle">{formatMonth(order.business_month)}</span>
+          )}
+        </div>
+      </div>
 
       {error && (
         <p className="notice notice--refused" role="alert">
           {error}
         </p>
       )}
+      {!order && !error && <p className="empty">Loading…</p>}
 
-      {found === null && (
-        <p className="notice notice--refused orders__note" role="alert">
-          No order matches that search.
-        </p>
-      )}
-
-      {found && (
-        <div className="orders__found">
-          <p className="orders__found-label">Found, regardless of month:</p>
-          <table className="table orders__table">
-            <thead>
-              <OrderHead />
-            </thead>
-            <tbody>
-              <OrderTableRow row={found} />
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {lockNote && <p className="notice orders__note">{lockNote}</p>}
-
-      {grid === null && !error && <p className="empty">Loading…</p>}
-
-      {grid && (
-        <div className="orders__figures">
-          <div className="orders__figure">
-            <strong className="orders__count">{grid.totals.orders}</strong>
-            <span className="orders__figure-label">orders this month</span>
-          </div>
-          {grid.totals.held > 0 && (
-            <div className="orders__figure">
-              <strong className="orders__count orders__count--refused">
-                {grid.totals.held}
-              </strong>
-              <span className="orders__figure-label">
-                held — two codes both claim {grid.totals.held === 1 ? "it" : "them"}
+      {order && status && counts && (
+        <div className="order">
+          <section className="order__card">
+            <div className="order__head">
+              <span className="order__ref">{order.order_number}</span>
+              <span className={`pill order__pill orders__status--${status.tone}`}>
+                {status.label}
               </span>
             </div>
+            <dl className="order__facts">
+              <div>
+                <dt>Model</dt>
+                <dd>
+                  {order.outcome === "attributed" && order.affiliate_id !== null ? (
+                    <Link
+                      className="order__model"
+                      to={`/affiliates/${order.affiliate_id}?section=performance&month=${order.business_month}`}
+                    >
+                      {order.affiliate_name}
+                      {order.matched_codes.length > 0 && ` · ${order.matched_codes.join(" · ")}`}
+                    </Link>
+                  ) : order.outcome === "held" ? (
+                    <span className="orders__held">Held — two codes claim it</span>
+                  ) : (
+                    <span className="orders__nobody">No affiliate code</span>
+                  )}
+                </dd>
+              </div>
+              <div>
+                <dt>Placed</dt>
+                <dd>{placedOn(order.placed_at, true)}</dd>
+              </div>
+              <div>
+                <dt>Net sales</dt>
+                <dd>
+                  {order.cancelled ? (
+                    <span className="orders__nobody">not available</span>
+                  ) : (
+                    <Money piastres={order.total_piastres} kind="agreed" />
+                  )}
+                </dd>
+              </div>
+              <div>
+                <dt>Commission</dt>
+                <dd>
+                  {order.commission_piastres === null ? (
+                    <span className="orders__nobody">Nothing earned</span>
+                  ) : (
+                    <Money piastres={order.commission_piastres} kind="agreed" />
+                  )}
+                </dd>
+              </div>
+              <div>
+                <dt>Counts towards</dt>
+                <dd className={`orders__status--${counts.tone}`}>{counts.label}</dd>
+              </div>
+            </dl>
+          </section>
+
+          {order.lines.length > 0 && (
+            <section className="order__lines">
+              <h2 className="order__lines-title">Products</h2>
+              <ul>
+                {order.lines.map((line, index) => (
+                  <li key={`${line.title}-${index}`}>
+                    <span>
+                      {line.title}
+                      {line.variant && <span className="orders__nobody"> · {line.variant}</span>}
+                      {line.quantity > 1 && <span className="orders__nobody"> × {line.quantity}</span>}
+                    </span>
+                    <Money piastres={line.total_piastres} kind="agreed" />
+                  </li>
+                ))}
+              </ul>
+            </section>
           )}
-          {grid.totals.unattributed > 0 && (
-            <div className="orders__figure">
-              <strong className="orders__count">{grid.totals.unattributed}</strong>
-              <span className="orders__figure-label">no affiliate code used</span>
-            </div>
-          )}
-          {grid.totals.carried > 0 && (
-            <div className="orders__figure">
-              <strong className="orders__count">{grid.totals.carried}</strong>
-              <span className="orders__figure-label">
-                carried in from an earlier month
-              </span>
-            </div>
+
+          {order.lines.length === 0 && order.cancelled && (
+            <p className="order__note">
+              This order was cancelled in Shopify, so its original amount and
+              product lines are not available.
+            </p>
           )}
         </div>
-      )}
-
-      {/*
-       * Only the lenses that have something behind them. A row of filters
-       * that all read zero is a row of things somebody has to rule out.
-       */}
-      {grid && all.length > 0 && (
-        <div className="orders__lenses" role="group" aria-label="What to look at">
-          {(Object.keys(LENS_LABEL) as Lens[])
-            .filter((option) => option === "all" || count(option) > 0)
-            .map((option) => (
-              <button
-                key={option}
-                type="button"
-                className={
-                  lens === option
-                    ? "orders__lens orders__lens--on"
-                    : "orders__lens"
-                }
-                onClick={() => setLens(option)}
-                aria-pressed={lens === option}
-              >
-                {LENS_LABEL[option]}
-                <span className="orders__lens-count">{count(option)}</span>
-              </button>
-            ))}
-        </div>
-      )}
-
-      {grid && all.length === 0 && !found && (
-        <p className="empty">No orders placed in {formatMonth(month)} yet.</p>
-      )}
-
-      {grid && all.length > 0 && rows.length === 0 && (
-        <p className="empty">
-          Nothing in {formatMonth(month)} matches that — which is the good
-          answer.
-        </p>
-      )}
-
-      {grid && rows.length > 0 && (
-        <table className="table orders__table">
-          <thead>
-            <OrderHead />
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <OrderTableRow key={row.shopify_order_id} row={row} />
-            ))}
-          </tbody>
-        </table>
       )}
     </>
   );
 }
 
-function OrderHead() {
-  return (
-    <tr>
-      {/* The export's five columns, in its words. Ours said Placed, Belongs
-       *  to and Delivery for the same three facts, and split the code into a
-       *  column of its own where the export stacks it under the model — the
-       *  code identifies the row rather than being a fact about it. */}
-      <th>Order</th>
-      <th>Model</th>
-      <th>Date</th>
-      <th>Status</th>
-      <th>Commission</th>
-      <th className="orders__amount">Net sales</th>
-      <th className="orders__amount">Base</th>
-      <th>
-        <Link to="/glossary#carried-forward" className="glossary-link">
-          Paid by
-        </Link>
-      </th>
-    </tr>
-  );
-}
-
-function OrderTableRow({ row }: { row: OrderRow }) {
-  return (
-    <tr>
-      <td className="code">{row.order_number}</td>
-      <td>
-        {row.outcome === "attributed" && row.affiliate_id !== null ? (
-          <Link className="orders__name" to={`/affiliates/${row.affiliate_id}`}>
-            {row.affiliate_name}
-          </Link>
-        ) : row.outcome === "held" ? (
-          <span className="blocker">Held — two codes claim it</span>
-        ) : (
-          <span className="orders__quiet">No affiliate code</span>
-        )}
-        {/* The code under the model, as the export stacks them. An unmatched
-         *  code still shows — it is the reason the row belongs to nobody. */}
-        {row.discount_codes.length > 0 && (
-          <span className="orders__codes">
-            {row.discount_codes.map((code) => (
-              <span
-                key={code}
-                className={
-                  row.matched_codes.includes(code)
-                    ? "code"
-                    : "code orders__code--unmatched"
-                }
-              >
-                {code}
-              </span>
-            ))}
-          </span>
-        )}
-      </td>
-      <td className="orders__placed">
-        {new Date(row.placed_at).toLocaleDateString("en-GB", {
-          day: "numeric",
-          month: "short",
-        })}
-      </td>
-      <td className="orders__delivery">
-        {row.cancelled
-          ? "Cancelled"
-          : row.delivery_state
-            ? DELIVERY_LABEL[row.delivery_state] ?? row.delivery_state
-            : "Not yet known"}
-      </td>
-      <td className="orders__commission">
-        {row.commission_state ? COMMISSION_LABEL[row.commission_state] : "—"}
-      </td>
-      <td className="orders__amount">
-        <Money piastres={row.total_piastres} />
-      </td>
-      <td className="orders__amount">
-        {row.base_piastres === null ? (
-          "—"
-        ) : (
-          <Money
-            piastres={row.base_piastres}
-            kind={row.commission_state === "earned" ? "agreed" : "provisional"}
-          />
-        )}
-      </td>
-      <td className="orders__paid-by">
-        {row.paid_in_month && (
-          <>
-            {formatMonth(row.paid_in_month)}
-            {row.is_carried && (
-              <span className="orders__carried-note">carried from {formatMonth(row.business_month)}</span>
-            )}
-          </>
-        )}
-      </td>
-    </tr>
-  );
+/**
+ * *Counted in September 2026*, or *Excluded from it* — the export's line.
+ *
+ * Counted takes the month that actually paid it where that is a different
+ * one (§11.4), because that is the month a model will find it in. A pending
+ * order has not been decided either way, and says so rather than borrowing
+ * one of the two answers.
+ */
+export function countsTowards(order: Pick<
+  OrderRow,
+  "outcome" | "commission_state" | "cancelled" | "delivery_state" | "business_month" | "paid_in_month"
+>): { label: string; tone: "settled" | "owed" | "refused" | "quiet" } {
+  if (order.outcome !== "attributed") return { label: "No model's month", tone: "quiet" };
+  const month = formatMonth(order.paid_in_month ?? order.business_month);
+  if (order.commission_state === "earned") return { label: `Counted in ${month}`, tone: "settled" };
+  if (order.commission_state === "void" || order.cancelled || order.delivery_state === "failed") {
+    return { label: `Excluded from ${formatMonth(order.business_month)}`, tone: "refused" };
+  }
+  return { label: "Waiting for delivery", tone: "owed" };
 }

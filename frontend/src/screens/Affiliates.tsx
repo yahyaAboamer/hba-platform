@@ -3,20 +3,44 @@ import { Link, useSearchParams } from "react-router-dom";
 
 import { Money } from "../components/Money";
 import { api } from "../lib/api";
+import { PAY_TYPE } from "../lib/payouts";
 import { formatMonth } from "../lib/money";
 import { AddHouseCode } from "./AddHouseCode";
 import { InviteModel } from "./InviteModel";
 import "./Affiliates.css";
 
 /** The approved roster's segments. */
-export type Segment = "all" | "waiting" | "active" | "archived";
+export type Segment = "active" | "applications" | "invitations" | "inactive";
 
+/**
+ * The approved roster's four filters, in its words and its order.
+ *
+ * *Invitations* is a filter rather than a panel above the table: the export
+ * turns the same table into one row per invitation, so an invitation nobody
+ * has opened sits exactly where the model it would become will sit. It used
+ * to be a collapsible block over the list, and seven of them once buried the
+ * four models this screen exists to show.
+ *
+ * *Inactive* covers paused and archived alike - both are somebody no longer
+ * earning, and the export has one word for them.
+ */
 export const SEGMENTS: { key: Segment; label: string }[] = [
-  { key: "all", label: "All" },
-  { key: "waiting", label: "Waiting to be approved" },
   { key: "active", label: "Active" },
-  { key: "archived", label: "Archived" },
+  { key: "applications", label: "Applications" },
+  { key: "invitations", label: "Invitations" },
+  { key: "inactive", label: "Inactive" },
 ];
+
+/** The export's status words for a roster row, and their tone. */
+export const ROSTER_STATUS: Record<string, { label: string; tone: string }> = {
+  pending: { label: "Application", tone: "owed" },
+  active: { label: "Active", tone: "approved" },
+  inactive: { label: "Inactive", tone: "quiet" },
+  archived: { label: "Inactive", tone: "quiet" },
+};
+
+/** The export lists twelve to a page. */
+const ROSTER_PAGE = 12;
 
 export type Affiliate = {
   id: number;
@@ -29,6 +53,8 @@ export type Affiliate = {
   archived_at: string | null;
   has_verified_code?: boolean;
   has_terms?: boolean;
+  /** The raw arrangement she is on that month, labelled by `PAY_TYPE`. */
+  arrangement?: string | null;
   /** The code they sell under this month, if they have one registered. */
   code?: string | null;
   /** The month the sales and content figures below belong to. */
@@ -177,9 +203,17 @@ export function rosterMatches(
 ): Affiliate[] {
   const needle = query.trim().toLowerCase();
   return rows.filter((row) => {
-    if (segment === "waiting" && row.status !== "pending") return false;
+    // Invitations are not models; that filter lists them instead.
+    if (segment === "invitations") return false;
+    if (segment === "applications" && row.status !== "pending") return false;
     if (segment === "active" && row.status !== "active") return false;
-    if (segment === "archived" && row.status !== "archived") return false;
+    if (
+      segment === "inactive" &&
+      row.status !== "inactive" &&
+      row.status !== "archived"
+    ) {
+      return false;
+    }
     if (!needle) return true;
     return (
       row.name.toLowerCase().includes(needle) ||
@@ -227,7 +261,13 @@ export function Affiliates() {
    * link now, rather than four words of instruction.
    */
   const [params, setParams] = useSearchParams();
-  const segment = (params.get("segment") as Segment) ?? "all";
+  // An address from before the filters were renamed (*all*, *waiting*)
+  // lands on Active rather than on an empty table.
+  const asked = params.get("segment");
+  const segment: Segment = SEGMENTS.some((option) => option.key === asked)
+    ? (asked as Segment)
+    : "active";
+  const [page, setPage] = useState(0);
   const query = params.get("q") ?? "";
 
   const narrow = useCallback(
@@ -238,7 +278,7 @@ export function Affiliates() {
           for (const [key, value] of Object.entries(next)) {
             // An empty search or the default segment leaves no trace: a URL
             // carrying `?q=` says a search happened and found everything.
-            if (!value || value === "all") updated.delete(key);
+            if (!value || value === "active") updated.delete(key);
             else updated.set(key, value);
           }
           return updated;
@@ -256,7 +296,8 @@ export function Affiliates() {
   // Archived is a segment now rather than a checkbox, so asking for it is what
   // fetches it. Keeping both controls would let them contradict each other.
   useEffect(() => {
-    setIncludeArchived(segment === "archived");
+    setIncludeArchived(segment === "inactive");
+    setPage(0);
   }, [segment]);
   // The column header names the month it is showing, so a figure can never be
   // read as "this month" when the list is answering for another one.
@@ -279,8 +320,14 @@ export function Affiliates() {
 
   // Live is what somebody is still waiting on; dead is history that should
   // not be in the way of it.
-  const live = invited.filter((row) => !row.expired);
-  const dead = invited.filter((row) => row.expired);
+  // Live first, then lapsed and withdrawn - the export lists expired links in
+  // the same table, and the ones somebody is still waiting on belong on top.
+  const needle = query.trim().toLowerCase();
+  const invitations = [
+    ...invited.filter((row) => !row.expired),
+    ...invited.filter((row) => row.expired),
+  ].filter((row) => !needle || row.email.toLowerCase().includes(needle));
+  const paged = visible.slice(page * ROSTER_PAGE, (page + 1) * ROSTER_PAGE);
 
   return (
     <>
@@ -319,7 +366,9 @@ export function Affiliates() {
               {option.label}
               {rows && (
                 <span className="affiliates__segment-count">
-                  {rosterMatches(rows, option.key, "").length}
+                  {option.key === "invitations"
+                    ? invited.length
+                    : rosterMatches(rows, option.key, "").length}
                 </span>
               )}
             </button>
@@ -388,222 +437,241 @@ export function Affiliates() {
         </p>
       )}
 
-      {/*
-       * Invitations nobody has opened. They belong here rather than on the
-       * staff panel - a model is not staff - and they have to be somewhere, or
-       * an invitation sent to the wrong address could never be withdrawn.
-       */}
-      {invited.length > 0 && (
-        <details className="panel affiliates__invited">
-          {/*
-           * Collapsed to one line. An invitation waiting on somebody is worth
-           * seeing, so it stays at the top rather than moving to the bottom -
-           * but seven of them once buried the four models this screen exists
-           * to show. Closing an address when its owner accepts (server side)
-           * keeps this short; collapsing keeps it short even when it is not.
-           */}
-          {/*
-           * **The count is of live ones only.** Dead invitations are not
-           * outstanding - nobody is waiting on them - and counting them made
-           * the number grow for ever while meaning less each time.
-           */}
-          <summary className="affiliates__invited-summary">
-            {live.length > 0 ? (
-              <>
-                <strong>{live.length}</strong>{" "}
-                {live.length === 1 ? "invitation" : "invitations"} outstanding
-              </>
-            ) : (
-              <>No invitations outstanding</>
-            )}
-          </summary>
-          <ul className="affiliates__invited-list">
-            {live.map((row) => (
-              <li key={row.id}>
-                <span className="affiliates__invited-who">
-                  <span>{row.email}</span>
-                  {/*
-                   * Sent-when, because two rows for one address were otherwise
-                   * identical and there was no way to tell which was which.
-                   */}
-                  <span className="affiliates__invited-when">
-                    sent {formatSentAt(row.created_at)}
-                  </span>
-                </span>
-                <span className="affiliates__invited-state">
-                  Still waiting
-                </span>
-                {/*
-                 * Resend always; withdraw only where it can actually work.
-                 * Withdrawing backdates the expiry and the server refuses an
-                 * invitation that has already lapsed - so offering Withdraw on
-                 * a row marked "Link expired" was offering an action that
-                 * could only fail, which is exactly what it did.
-                 */}
-                <button
-                  type="button"
-                  className="button"
-                  onClick={() =>
-                    api
-                      .post(`/api/staff/invitations/${row.id}/resend`)
-                      .then(reload)
-                      .catch((caught) => setError(caught.message))
-                  }
-                >
-                  Resend
-                </button>
-                {/*
-                 * No guard needed: this list holds live invitations only, and
-                 * withdrawing is refused on anything already lapsed. The
-                 * condition that used to be here described a row that can no
-                 * longer appear.
-                 */}
-                <button
-                  type="button"
-                  className="button"
-                  onClick={() =>
-                    api
-                      .post(`/api/staff/invitations/${row.id}/revoke`)
-                      .then(reload)
-                      .catch((caught) => setError(caught.message))
-                  }
-                >
-                  Withdraw
-                </button>
-              </li>
-            ))}
-          </ul>
-
-          {/*
-           * **Kept, not deleted, and not in the way.** Twenty models onboarded
-           * means a long tail of typos and lapsed links, and every one of them
-           * was sitting above the list of people who actually matter. They are
-           * still here when somebody wants to know whether a link expired -
-           * which is the only question they answer.
-           */}
-          {dead.length > 0 && (
-            <details className="affiliates__invited-dead">
-              <summary>
-                {dead.length} {dead.length === 1 ? "link" : "links"} no longer
-                usable
-              </summary>
-              <ul className="affiliates__invited-list">
-                {dead.map((row) => (
-                  <li key={row.id}>
-                    <span className="affiliates__invited-who">
-                      <span>{row.email}</span>
-                      <span className="affiliates__invited-when">
-                        sent {formatSentAt(row.created_at)}
-                      </span>
-                    </span>
-                    <span className="affiliates__invited-state">
-                      {row.withdrawn ? "Withdrawn" : "Link expired"}
-                    </span>
-                    <button
-                      type="button"
-                      className="button"
-                      onClick={() =>
-                        api
-                          .post(`/api/staff/invitations/${row.id}/resend`)
-                          .then(reload)
-                          .catch((caught) => setError(caught.message))
-                      }
-                    >
-                      Resend
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </details>
-          )}
-        </details>
-      )}
-
       {rows === null && <p className="empty">Loading…</p>}
 
-      {rows?.length === 0 && (
-        <p className="empty">
-          Nobody yet. An affiliate appears here once they have applied and you
-          have created their record.
-        </p>
-      )}
-
-      {rows && rows.length > 0 && visible.length === 0 && (
-        <p className="empty">
-          Nobody here matches. Clear the search, or try another segment.
-        </p>
-      )}
-
-      {visible.length > 0 && shown === "table" && (
-        <table className="table affiliates__table">
-          <thead>
-            <tr>
-              {/*
-               * Her name over her code, the way the approved roster stacks
-               * them. The code is how an order is recognised as somebody's,
-               * so it is how a person is recognised on this list — asked for
-               * by name during the walkthrough, and kept beside the name
-               * rather than in a column of its own.
-               */}
-              <th>Model</th>
-              <th className="affiliates__status-cell">Status</th>
-              <th className="affiliates__figure">{monthLabel} sales</th>
-              <th className="affiliates__figure">Content</th>
-              <th className="affiliates__attention">Needs attention</th>
-              <th aria-hidden="true" />
-            </tr>
-          </thead>
-          <tbody>
-            {visible.map((row) => {
-              const missing = missingSetup(row);
-              return (
-                <tr key={row.id}>
-                  <td>
-                    <Link className="affiliates__who" to={`/affiliates/${row.id}`}>
-                      <span className="affiliates__avatar" aria-hidden="true">
-                        {row.name.charAt(0).toUpperCase()}
+      {rows !== null && segment === "invitations" && (
+        <div className="surface">
+          {invitations.length === 0 ? (
+            <p className="empty">No outstanding invitations.</p>
+          ) : (
+            <table className="table affiliates__table">
+              <thead>
+                <tr>
+                  <th>Model</th>
+                  <th className="affiliates__status-cell">Status</th>
+                  <th className="affiliates__figure">{monthLabel} sales</th>
+                  <th className="affiliates__figure">Content</th>
+                  <th className="affiliates__terms">Sent</th>
+                  <th aria-hidden="true" />
+                </tr>
+              </thead>
+              <tbody>
+                {invitations.map((row) => (
+                  <tr key={row.id}>
+                    <td>
+                      <span className="affiliates__who">
+                        <span className="affiliates__avatar" aria-hidden="true">
+                          {row.email.charAt(0).toUpperCase()}
+                        </span>
+                        <span className="affiliates__who-text">
+                          <span className="affiliates__name">{row.email}</span>
+                          <span className="affiliates__sub">
+                            {row.withdrawn
+                              ? "Withdrawn"
+                              : row.expired
+                                ? "Link expired"
+                                : "Awaiting application"}
+                          </span>
+                        </span>
                       </span>
-                      <span className="affiliates__who-text">
-                        <span className="affiliates__name">{row.name}</span>
-                        {row.code ? (
-                          <span className="code">{row.code}</span>
-                        ) : (
-                          <span className="affiliates__no-code">no code yet</span>
+                    </td>
+                    <td className="affiliates__status-cell">
+                      <span
+                        className={`pill affiliates__tone--${
+                          row.expired ? "refused" : "owed"
+                        }`}
+                      >
+                        {row.withdrawn ? "Withdrawn" : row.expired ? "Expired" : "Invited"}
+                      </span>
+                    </td>
+                    <td className="affiliates__figure affiliates__tone--quiet">—</td>
+                    <td className="affiliates__figure affiliates__tone--quiet">—</td>
+                    <td className="affiliates__terms">
+                      {formatSentAt(row.created_at)}
+                      {/*
+                       * Resend always; withdraw only where it can work. The
+                       * export opens the invitation to act on it, and there is
+                       * no invitation view here yet, so the two acts ride under
+                       * the date rather than disappearing.
+                       */}
+                      <span className="affiliates__row-acts">
+                        <button
+                          type="button"
+                          className="button button--quiet"
+                          onClick={() =>
+                            api
+                              .post(`/api/staff/invitations/${row.id}/resend`)
+                              .then(reload)
+                              .catch((caught) => setError(caught.message))
+                          }
+                        >
+                          Resend
+                        </button>
+                        {!row.expired && (
+                          <button
+                            type="button"
+                            className="button button--quiet"
+                            onClick={() =>
+                              api
+                                .post(`/api/staff/invitations/${row.id}/revoke`)
+                                .then(reload)
+                                .catch((caught) => setError(caught.message))
+                            }
+                          >
+                            Withdraw
+                          </button>
                         )}
                       </span>
-                    </Link>
-                  </td>
-                  <td className="affiliates__status-cell">
-                    <span className={`affiliates__status affiliates__status--${row.status}`}>
-                      {STATUS_LABEL[row.status]}
-                    </span>
-                    {row.account_kind === "house" && (
-                      <span className="affiliates__kind">House</span>
-                    )}
-                  </td>
-                  <td className="affiliates__figure">
-                    <Money piastres={row.sales_piastres ?? 0} />
-                  </td>
-                  <td className="affiliates__figure">{contentSummary(row)}</td>
-                  {/*
-                   * Empty when there is nothing wrong. Marking the healthy rows
-                   * too would spend the one signal the page has on the rows
-                   * that need nothing (ADR 0027).
-                   */}
-                  <td className="affiliates__attention">
-                    {missing.length > 0 && (
-                      <span className="blocker">{missing.join(", ")}</span>
-                    )}
-                  </td>
-                  <td className="affiliates__go" aria-hidden="true">→</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                    </td>
+                    <td aria-hidden="true" />
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       )}
 
-      {visible.length > 0 && shown === "cards" && (
+      {rows !== null && segment !== "invitations" && visible.length === 0 && (
+        <div className="surface">
+          <p className="empty">
+            {query.trim()
+              ? `No model matches “${query.trim()}”.`
+              : "Nothing in this view."}
+          </p>
+        </div>
+      )}
+
+      {segment !== "invitations" && visible.length > 0 && shown === "table" && (
+        <div className="surface">
+          <table className="table affiliates__table">
+            <thead>
+              <tr>
+                {/*
+                 * Her name over her code, the way the approved roster stacks
+                 * them. The code is how an order is recognised as somebody's,
+                 * so it is how a person is recognised on this list.
+                 */}
+                <th>Model</th>
+                <th className="affiliates__status-cell">Status</th>
+                <th className="affiliates__figure">{monthLabel} sales</th>
+                <th className="affiliates__figure">Content</th>
+                <th className="affiliates__terms">
+                  {segment === "applications" ? "Applied" : "Terms"}
+                </th>
+                <th aria-hidden="true" />
+              </tr>
+            </thead>
+            <tbody>
+              {paged.map((row) => {
+                const status = ROSTER_STATUS[row.status] ?? ROSTER_STATUS.inactive;
+                const applying = row.status === "pending";
+                const nothingYet =
+                  row.content?.required_videos != null &&
+                  row.content?.last_update == null;
+                return (
+                  <tr key={row.id}>
+                    <td>
+                      <Link className="affiliates__who" to={`/affiliates/${row.id}`}>
+                        <span className="affiliates__avatar" aria-hidden="true">
+                          {row.name.charAt(0).toUpperCase()}
+                        </span>
+                        <span className="affiliates__who-text">
+                          <span className="affiliates__name">{row.name}</span>
+                          <span className="affiliates__sub">
+                            {row.code ?? "no code yet"}
+                            {/* Shopify has never agreed this code exists. It
+                             *  stops nothing, and the first symptom of a typo
+                             *  is silence - so it is said, quietly. */}
+                            {row.code && row.has_verified_code === false && " · not confirmed"}
+                            {row.account_kind === "house" && " · house"}
+                          </span>
+                        </span>
+                      </Link>
+                    </td>
+                    <td className="affiliates__status-cell">
+                      <span className={`pill affiliates__tone--${status.tone}`}>
+                        {status.label}
+                      </span>
+                    </td>
+                    <td className="affiliates__figure">
+                      {applying ? (
+                        <span className="affiliates__tone--quiet">—</span>
+                      ) : (
+                        <Money piastres={row.sales_piastres ?? 0} kind="agreed" />
+                      )}
+                    </td>
+                    <td
+                      className={`affiliates__figure affiliates__content ${
+                        applying
+                          ? "affiliates__tone--quiet"
+                          : nothingYet
+                            ? "affiliates__tone--owed"
+                            : ""
+                      }`}
+                    >
+                      {applying ? "—" : nothingYet ? "No update yet" : contentSummary(row)}
+                    </td>
+                    {/*
+                     * *Terms* for a working model, *Applied* for somebody
+                     * waiting - the export's last column. No terms is the one
+                     * thing on this row that actually stops payroll, so it is
+                     * the one thing coloured.
+                     */}
+                    <td className="affiliates__terms">
+                      {applying ? (
+                        row.created_at ? (
+                          new Date(row.created_at).toLocaleDateString("en-GB", {
+                            day: "numeric",
+                            month: "long",
+                          })
+                        ) : (
+                          "—"
+                        )
+                      ) : row.arrangement ? (
+                        PAY_TYPE[row.arrangement] ?? row.arrangement
+                      ) : row.account_kind === "house" ? (
+                        <span className="affiliates__tone--quiet">Never paid</span>
+                      ) : (
+                        <span className="affiliates__tone--refused">Not set</span>
+                      )}
+                    </td>
+                    <td className="affiliates__go" aria-hidden="true">→</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {segment !== "invitations" && visible.length > ROSTER_PAGE && shown === "table" && (
+        <div className="affiliates__pager">
+          <span>
+            {page * ROSTER_PAGE + 1}–{page * ROSTER_PAGE + paged.length} of {visible.length}
+          </span>
+          <span className="affiliates__pager-acts">
+            <button
+              type="button"
+              className="button button--row"
+              disabled={page === 0}
+              onClick={() => setPage(page - 1)}
+            >
+              Previous
+            </button>
+            <button
+              type="button"
+              className="button button--row"
+              disabled={(page + 1) * ROSTER_PAGE >= visible.length}
+              onClick={() => setPage(page + 1)}
+            >
+              Next
+            </button>
+          </span>
+        </div>
+      )}
+
+      {segment !== "invitations" && visible.length > 0 && shown === "cards" && (
         <ul className="affiliates__cards">
           {visible.map((row) => {
             const missing = missingSetup(row);
@@ -613,7 +681,7 @@ export function Affiliates() {
                   {row.name}
                 </Link>
                 <span className="affiliates__card-note">
-                  {STATUS_LABEL[row.status]}
+                  {(ROSTER_STATUS[row.status] ?? ROSTER_STATUS.inactive).label}
                   {row.account_kind === "house" && " · house account"}
                 </span>
                 {missing.length > 0 && (

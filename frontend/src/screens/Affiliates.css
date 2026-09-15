@@ -378,8 +378,8 @@
   font-variant-numeric: tabular-nums;
 }
 
-.affiliates__attention,
-.affiliates__table th.affiliates__attention {
+.affiliates__terms,
+.affiliates__table th.affiliates__terms {
   width: 150px;
   font-size: 12.5px;
   color: var(--quiet);
@@ -389,4 +389,44 @@
 .affiliates__table td:last-child {
   width: 16px;
   color: var(--faint);
+}
+
+/* The line under a name: her code, or what an invitation is waiting on. */
+.affiliates__sub {
+  display: block;
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--faint);
+}
+
+/* A status is coloured by what it means, measured off the export. */
+.affiliates__tone--approved { color: var(--accent); }
+.affiliates__tone--owed { color: var(--owed); }
+.affiliates__tone--refused { color: var(--refused); }
+.affiliates__tone--quiet { color: var(--faint); }
+
+td.affiliates__content {
+  font-size: 12.5px;
+  color: var(--quiet);
+}
+
+.affiliates__row-acts {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.affiliates__pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 14px;
+  font-size: 12.5px;
+  color: var(--faint);
+}
+
+.affiliates__pager-acts {
+  display: flex;
+  gap: 8px;
 }
