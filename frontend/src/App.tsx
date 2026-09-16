@@ -14,6 +14,7 @@ import { Affiliates } from "./screens/Affiliates";
 import { Compensation } from "./screens/Compensation";
 import { FirstRun } from "./screens/FirstRun";
 import { Glossary } from "./screens/Glossary";
+import { InvitePage } from "./screens/InvitePage";
 import { OrderDetail, Orders } from "./screens/Orders";
 import { Overview } from "./screens/Overview";
 import { ProductDetail, Products } from "./screens/Products";
@@ -114,6 +115,8 @@ export default function App() {
           <Route element={<Layout session={session} />}>
             <Route path="/" element={<Overview session={session} />} />
             <Route path="/affiliates" element={<Affiliates />} />
+            {/* Before the profile route so `invite` is never read as an id. */}
+            <Route path="/affiliates/invite" element={<InvitePage />} />
             <Route
               path="/affiliates/:id"
               element={<AffiliateDetail session={session} />}

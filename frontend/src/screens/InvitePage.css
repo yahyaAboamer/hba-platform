@@ -1,0 +1,147 @@
+/* Inviting a model. `vInvite` in `Admin Dashboard.dc.html`, lines 1232–1277. */
+
+.invite-page {
+  max-width: 720px;
+}
+
+.invite-page__back {
+  display: inline-block;
+  margin-bottom: 14px;
+  color: var(--accent);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.invite-page__card {
+  padding: 16px 18px;
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.invite-page__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.invite-page__form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+/* The field takes the room and the act sits beside it, rather than under it
+   on a laptop where there is width to spare. */
+.invite-page__form .input {
+  flex: 1;
+  min-width: 240px;
+}
+
+.invite-page__hint {
+  margin: 10px 0 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--faint);
+}
+
+.invite-page__problem {
+  margin: 10px 0 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--refused);
+}
+
+/* A working credential until it is used, so it is shown once and marked as
+   worth acting on now. */
+.invite-page__link {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 13px;
+  padding: 11px 13px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+}
+
+.invite-page__link-value {
+  flex: 1;
+  min-width: 180px;
+  font-size: 13px;
+  color: var(--accent-lift);
+  overflow-wrap: anywhere;
+}
+
+.invite-page__list {
+  margin-top: 16px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.invite-page__list-title {
+  margin: 0;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--rule);
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.invite-page__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--rule);
+  color: var(--ink);
+  font-size: 13.5px;
+  text-decoration: none;
+}
+
+.invite-page__row:last-child {
+  border-bottom: 0;
+}
+
+.invite-page__row > span:first-child {
+  flex: 1;
+  min-width: 180px;
+}
+
+.invite-page__sub {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--faint);
+}
+
+.invite-page__state {
+  flex: none;
+  font-size: 12.5px;
+  color: var(--owed);
+}
+
+/* Expired or withdrawn: nothing is waiting on anybody, so it stops being
+   amber and stops asking for attention. */
+.invite-page__state--gone {
+  color: var(--faint);
+}
+
+.invite-page__withdraw {
+  color: var(--refused);
+}
+
+.invite-page__go {
+  flex: none;
+  color: var(--accent);
+  font-size: 12.5px;
+}
+
+.invite-page__empty {
+  margin: 0;
+  padding: 24px 16px;
+  font-size: 13px;
+  color: var(--quiet);
+}

@@ -6,7 +6,6 @@ import { api } from "../lib/api";
 import { PAY_TYPE } from "../lib/payouts";
 import { shortMonth } from "../lib/money";
 import { AddHouseCode } from "./AddHouseCode";
-import { InviteModel } from "./InviteModel";
 import "./Affiliates.css";
 
 /** The approved roster's segments. */
@@ -109,7 +108,7 @@ type Invited = {
  * these two identical rows is the recent one - where a full date makes the
  * reader do the arithmetic themselves.
  */
-function formatSentAt(iso: string): string {
+export function formatSentAt(iso: string): string {
   const sent = new Date(iso);
   const time = sent.toLocaleTimeString("en-GB", {
     hour: "2-digit",
@@ -428,8 +427,14 @@ export function Affiliates() {
            * all: inviting a model was neither here nor in Settings, whose role
            * list offers only staff. Phase 8 built the whole onboarding flow
            * and nothing could start it.
+           *
+           * It opens a screen now rather than a modal, because the export
+           * gives the act one — and because the applications waiting to be
+           * reviewed and the links already out belong beside it.
            */}
-          <InviteModel onInvited={reload} />
+          <Link className="button button--primary" to="/affiliates/invite">
+            Invite a model
+          </Link>
         </div>
       </div>
 
