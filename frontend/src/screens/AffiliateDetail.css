@@ -585,3 +585,61 @@ td.profile__muted,
 .profile__stat-value .money {
   color: inherit;
 }
+
+/* ── An application waiting to be reviewed ──────────────────────────────
+ *
+ * `mIsApp` in `Admin Dashboard.dc.html`, lines 805–833: what she sent on the
+ * left, what somebody here still has to do on the right, and the approval
+ * under the second — never under the first, because approving is the end of
+ * the right-hand column and not a comment on her answers.
+ */
+.detail__application {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.detail__submitted,
+.detail__setup {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.detail__facts {
+  margin: 4px 0 0;
+}
+
+.detail__facts > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--rule);
+  font-size: 13.5px;
+}
+
+.detail__facts > div:last-child {
+  border-bottom: 0;
+}
+
+.detail__facts dt {
+  color: var(--quiet);
+}
+
+/* Her answers, right-aligned against their labels and capped so a long
+   address wraps inside its own column rather than pushing the label away. */
+.detail__facts dd {
+  flex: none;
+  max-width: 60%;
+  margin: 0;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.detail__approve {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 14px;
+}

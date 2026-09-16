@@ -499,10 +499,53 @@ export function AffiliateDetail({ session }: { session: Session }) {
        * lands on from there.
        */}
       {detail.status === "pending" && can(session, "affiliates.manage") && (
-        <section className="panel detail__review">
-          <div className="panel__head">
-            <h2 className="panel__title">Before {detail.name} can earn</h2>
-          </div>
+        <div className="detail__application">
+          {/*
+           * **What she sent us**, beside what somebody here still has to do —
+           * the export's two columns, and the reason for them: approving an
+           * application means reading her answers, and they were nowhere on
+           * this panel. They were two taps away under Overview.
+           *
+           * Read-only. Her details are hers to correct (A05, D11); this card
+           * is for checking them, not editing them.
+           */}
+          <section className="pay-detail__card detail__submitted">
+            <h2 className="pay-detail__card-title">Submitted information</h2>
+            <dl className="detail__facts">
+              <div><dt>Signs in with</dt><dd>{detail.email ?? "—"}</dd></div>
+              <div><dt>Phone</dt><dd>{detail.phone ?? "Not given"}</dd></div>
+              <div>
+                <dt>Discount code</dt>
+                <dd>{detail.codes[0]?.code ?? "None yet"}</dd>
+              </div>
+              <div>
+                <dt>Where to send things</dt>
+                <dd>
+                  {[detail.shipping.shipping_line1, detail.shipping.shipping_city, detail.shipping.shipping_governorate]
+                    .filter(Boolean)
+                    .join(", ") || "Not given"}
+                </dd>
+              </div>
+              <div>
+                <dt>Height and weight</dt>
+                <dd>
+                  {detail.height_cm || detail.weight_kg
+                    ? `${detail.height_cm ? `${detail.height_cm} cm` : "no height"} · ${detail.weight_kg ? `${detail.weight_kg} kg` : "no weight"}`
+                    : "Not given — they are optional"}
+                </dd>
+              </div>
+              {/* Masked, as it is everywhere else (ADR 0028). Recognising the
+                  account is all this row has to do. */}
+              <div>
+                <dt>Paid to</dt>
+                <dd>{describeDestination(detail.payout_destination)}</dd>
+              </div>
+            </dl>
+          </section>
+
+          <div className="detail__setup">
+          <section className="pay-detail__card">
+          <h2 className="pay-detail__card-title">Setup before approval</h2>
 
           <ol className="detail__steps">
             <li className={verified ? "detail__step--done" : undefined}>
@@ -583,27 +626,27 @@ export function AffiliateDetail({ session }: { session: Session }) {
               </Link>
             </li>
           </ol>
+          </section>
 
           {/*
            * The gate is `set_status`, server-side, and it raises on an
-           * unverified code. Showing it here means the maintainer sees why
-           * before pressing rather than meeting a refusal after.
+           * unverified code. Saying so on the button means the maintainer sees
+           * why before pressing rather than meeting a refusal after.
            */}
-          <div className="payroll__actions">
-            <button
-              type="button"
-              className="button button--primary"
-              onClick={approve}
-              disabled={working !== null || !verified}
-            >
-              {working === "approve"
-                ? "Approving…"
-                : verified
-                  ? `Approve ${detail.name}`
-                  : "Check the code first"}
-            </button>
+          <button
+            type="button"
+            className="button button--primary detail__approve"
+            onClick={approve}
+            disabled={working !== null || !verified}
+          >
+            {working === "approve"
+              ? "Approving…"
+              : verified
+                ? "Approve this application"
+                : "Check the code first"}
+          </button>
           </div>
-        </section>
+        </div>
       )}
 
       <div className="profile__navigation">
