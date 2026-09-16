@@ -109,6 +109,27 @@ export function MyPayments() {
         </Link>
       </section>
 
+      {/*
+       * Agreed and not yet sent, at the top — the export leads with it, and it
+       * is the question somebody opens this screen to ask. One card per month,
+       * because two unpaid months are two separate answers.
+       *
+       * The figure is the month's own balance, not the total above it: the
+       * total answers *how much am I owed altogether* and this answers *for
+       * which month*.
+       */}
+      {body.months
+        .filter((row) => row.balance_piastres > 0)
+        .map((row) => (
+          <section className="pay-await" key={row.month}>
+            <div className="pay-await__label">Approved, payment not yet recorded</div>
+            <div className="pay-await__row">
+              <span>{formatMonth(row.month)}</span>
+              <Money piastres={row.balance_piastres} kind="agreed" />
+            </div>
+          </section>
+        ))}
+
       <section className="panel settle">
         <div className="panel__head">
           <h2 className="panel__title">Month by month</h2>
@@ -182,7 +203,7 @@ export function MyPayments() {
       {body.payments.length > 0 && (
         <section className="panel settle">
           <div className="panel__head">
-            <h2 className="panel__title">Every transfer</h2>
+            <h2 className="panel__title">Recorded payments</h2>
           </div>
           <ul className="settle__list">
             {body.payments.map((payment) => (
@@ -231,19 +252,28 @@ export function PaymentRow({ payment }: { payment: Payment }) {
 
   return (
     <li className="settle__row">
+      {/*
+       * The month it paid is the title and the date is underneath it, which is
+       * the export's order and the way somebody looks a transfer up: they know
+       * which month they are asking about, not which day it was sent.
+       *
+       * A transfer that has not been put against a month says so in the same
+       * place rather than going untitled — money can arrive before anybody
+       * decides what it settles.
+       */}
       <div className="settle__head">
-        <span className="settle__when">{onlyTheDate(payment.occurred_at)}</span>
+        <span className="settle__month">
+          {payment.settles.length === 0
+            ? "Not yet put against a month"
+            : payment.settles.map((line) => formatMonth(line.month)).join(", ")}
+        </span>
         <Money piastres={payment.amount_piastres} kind="agreed" tone="settled" />
       </div>
       <div className="settle__foot">
-        <span className="settle__for">
-          {payment.settles.length === 0
-            ? "Not yet put against a month"
-            : `For ${payment.settles.map((line) => formatMonth(line.month)).join(", ")}`}
+        <span className="settle__when">
+          Recorded {onlyTheDate(payment.occurred_at)}
+          {payment.reference && ` · ${payment.reference}`}
         </span>
-        {payment.reference && (
-          <span className="code settle__reference">{payment.reference}</span>
-        )}
       </div>
 
       {/*

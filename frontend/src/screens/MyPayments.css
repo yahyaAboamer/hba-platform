@@ -14,7 +14,7 @@
 }
 
 .settle__row {
-  padding: var(--space-4) var(--space-5);
+  padding: 14px 15px;
   border-bottom: 1px solid var(--rule);
 }
 
@@ -48,7 +48,34 @@
 }
 
 .settle__month {
-  font-size: var(--text-sm);
+  font-size: 14px;
+}
+
+/* ── Agreed, and not yet sent ───────────────────────────────────────────
+ *
+ * Outlined in the accent rather than filled: it is money she is owed, which
+ * is good news and not an alarm, and the one filled surface on this screen is
+ * the figure at the top.
+ */
+.affiliate .pay-await {
+  margin-bottom: var(--space-4);
+  padding: 15px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+}
+
+.affiliate .pay-await__label {
+  font-size: 13px;
+  color: var(--accent);
+}
+
+.affiliate .pay-await__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 9px;
+  font-size: 14px;
 }
 
 .settle__kind {
@@ -58,8 +85,8 @@
 .settle__for,
 .settle__when,
 .settle__balance {
-  font-size: var(--text-xs);
-  color: var(--quiet);
+  font-size: 12.5px;
+  color: var(--faint);
 }
 
 .settle__reference {

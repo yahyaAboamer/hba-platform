@@ -101,9 +101,9 @@ Each needs a decision: fold into the nearest approved pattern, or remove.
 | # | Export view | Lines | Route / component | Status |
 |---|---|---|---|---|
 | E1 | `vYou` | 418–467 | `/you` `MyYou.tsx` | Implemented · **visual check blocked**. Hero, *Your arrangement*, Appearance seg, rows that each open one thing, sign-out behind a question. `GET /api/me` now carries `arrangement` and `since` |
-| E2 | `vEarnings` | 468–512 | `/earnings` `MyCalculation.tsx` | Unreviewed |
-| E3 | `vPayments` | 513–554 | `/payments` `MyPayments.tsx` | Unreviewed |
-| E4 | `vReceipt` | 555–571 | inside `MyPayments` | Unreviewed |
+| E2 | `vEarnings` | 468–512 | `/earnings` `MyCalculation.tsx` | Implemented · **visual check blocked**. Month and state pill shared with Home, lines and their total in one card, the amber *why this differs* card, and the rule at the foot — delivered only, with the rate from the server |
+| E3 | `vPayments` | 513–554 | `/payments` `MyPayments.tsx` | Implemented · **visual check blocked**. *Approved, payment not yet recorded* card per unpaid month, *Recorded payments* rows titled by the month they paid. Keeps the outstanding figure, the month-by-month reconciliation and *Changes without a transfer*, which the export has no equivalent of |
+| E4 | `vReceipt` | 555–571 | the expanded transfer row in `MyPayments` | Difference kept: the receipt opens in place rather than on its own view — every field the export's receipt shows is already on the row, and the screenshot is one press away |
 | E5 | `vPayout` | 572–660 | `/you/payout` `MyPayout.tsx` | On its own route now, reached from You. Panel itself unreviewed — it keeps §6.4's two steps and the password at the point of committing, which the export does not draw |
 | E6 | `vDetails` | 661–673 | `/you/details` `ShippingAddress` in `MyDetails.tsx` | On its own route now. Fields and wording unreviewed |
 | E7 | `vSizes` | 674–689 | `/you/sizes` `Measurements` in `MyDetails.tsx` | On its own route now. Fields and wording unreviewed |
@@ -302,6 +302,8 @@ reached. Nothing else is a legitimate difference.
 | Portal Wardrobe, Best sellers | Delivered orders only, and the subtitle says so | 05A's pending-inclusive counting is a read-only preview, not what she is paid on |
 | Portal You | *Payment details* keeps its two steps and the password | §6.4, the highest-risk change she can make. The export saves it in one press |
 | Portal shell | Back returns where she came from, not to Home | Always-Home threw away her place coming out of All products sold and the payment detail |
+| Portal Payments | The receipt expands in the row instead of opening its own view | Every field the export's receipt view shows is on the row already; a second screen would be a navigation step to see the same four lines |
+| Portal Payments | *Month by month* and *Changes without a transfer* kept | §11.5 and 05C: a write-off or a carried correction is where a month settles without a transfer, and a model who cannot see it cannot close her own arithmetic. The export's sample data has neither |
 
 ## Blockers
 
