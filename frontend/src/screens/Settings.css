@@ -364,6 +364,12 @@
   color: var(--quiet);
 }
 
+/* Months nobody can pay for. Amber rather than red: nothing is broken, but
+   somebody has to write the terms before those months can be worked out. */
+.settings__gap {
+  color: var(--owed);
+}
+
 /* ── Shopify and sync, measured off the export's Settings (lines 650–690) ── */
 
 .sync__card + .sync__card {

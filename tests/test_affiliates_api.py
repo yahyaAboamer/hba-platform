@@ -1410,6 +1410,41 @@ def test_the_editor_opens_on_every_month_from_the_horizon_to_now(client, _go_liv
     ]
 
 
+def test_the_roster_says_the_first_month_anybody_wrote_terms_for(client, _go_live):
+    """Settings' *Historical setup* column, and the gap it exists to find.
+
+    A month before her earliest terms **cannot be calculated at all**, so a
+    model who started in January whose terms begin in April has three months
+    nobody can pay her for. The roster carries the earliest month and the
+    screen compares it with when she started.
+
+    `None` is not "commission by default": it says nothing was ever written,
+    which is that same problem for every month she has worked.
+    """
+    affiliate = _register(client)
+
+    before = client.get("/api/affiliates")
+    assert before.status_code == 200, before.text
+    assert [
+        row["earliest_terms_month"]
+        for row in before.json()["affiliates"]
+        if row["id"] == affiliate["id"]
+    ] == [None]
+
+    _history(
+        client,
+        affiliate["id"],
+        [{"start_month": "2026-04", "end_month": None, **COMMISSION}],
+    )
+
+    after = client.get("/api/affiliates")
+    assert [
+        row["earliest_terms_month"]
+        for row in after.json()["affiliates"]
+        if row["id"] == affiliate["id"]
+    ] == ["2026-04"]
+
+
 def test_a_whole_history_is_written_in_one_act(client, _go_live):
     """Three arrangements over seven months, one Save. Applied as three
     separate `set_terms` calls this left a one-month remnant of whatever was

@@ -127,8 +127,37 @@ function AppearancePanel() {
   </section>;
 }
 
+type SetupRow = {
+  id: number;
+  name: string;
+  account_kind: string;
+  code?: string;
+  status: string;
+  collaboration_start_month?: string | null;
+  /** The first month her terms cover. `null` means none were ever written. */
+  earliest_terms_month?: string | null;
+};
+
+/**
+ * Whether her terms reach back to when she started.
+ *
+ * **A month before her earliest terms cannot be calculated**, so this is not
+ * a tidiness column: it is the list of months nobody can pay, and the state
+ * word is what turns a date somebody has to compare into an answer.
+ */
+function historicalState(row: SetupRow) {
+  if (!row.earliest_terms_month) {
+    return <span className="settings__gap">No month can be worked out</span>;
+  }
+  if (!row.collaboration_start_month) return "Start month not recorded";
+  if (row.earliest_terms_month > row.collaboration_start_month) {
+    return <span className="settings__gap">Months before her terms</span>;
+  }
+  return "Covered from the start";
+}
+
 function SetupRoster({kind}: {kind: "model" | "house"}) {
-  const [rows,setRows] = useState<{id:number;name:string;account_kind:string;code?:string;status:string;collaboration_start_month?:string|null}[] | null>(null);
+  const [rows,setRows] = useState<SetupRow[] | null>(null);
   const [error,setError] = useState<string | null>(null);
   useEffect(() => { let live = true; api.get<{affiliates:NonNullable<typeof rows>}>("/api/affiliates?include_archived=true")
     .then(body => { if(live) setRows(body.affiliates.filter(row => row.account_kind === kind)); })
@@ -137,11 +166,31 @@ function SetupRoster({kind}: {kind: "model" | "house"}) {
   if(!rows) return <p className="empty">Loading…</p>;
   return <section className="panel">
     <div className="panel__head"><h2 className="panel__title">{kind === "house" ? "Brand codes" : "Historical setup"}</h2></div>
-    <table className="table"><thead><tr><th>{kind === "house" ? "Code" : "Model"}</th><th>{kind === "house" ? "Purpose" : "Started"}</th><th>{kind === "house" ? "State" : "Months and terms"}</th></tr></thead>
+    {/* The export's four columns for models — Model, Started, Earliest terms,
+        State — and its three for brand codes, which have no terms at all. */}
+    <table className="table"><thead><tr>
+      <th>{kind === "house" ? "Code" : "Model"}</th>
+      <th>{kind === "house" ? "Purpose" : "Started"}</th>
+      <th>{kind === "house" ? "State" : "Earliest terms"}</th>
+      {kind === "model" && <th>State</th>}
+    </tr></thead>
       <tbody>{rows.map(row => <tr key={row.id}>
         <td><Link to={`/affiliates/${row.id}`}>{kind === "house" ? row.code || "No code" : row.name}</Link></td>
         <td>{kind === "house" ? row.name : row.collaboration_start_month ? formatMonth(row.collaboration_start_month) : "Not recorded"}</td>
-        <td>{kind === "house" ? row.status : <Link to={`/affiliates/${row.id}/compensation`}>Review months →</Link>}</td>
+        <td>{kind === "house"
+          ? row.status
+          : row.earliest_terms_month
+            ? formatMonth(row.earliest_terms_month)
+            : <span className="settings__gap">None written</span>}</td>
+        {kind === "model" && <td>
+          {historicalState(row)}
+          {/* The way to fix it, where there is something to fix. */}
+          {(!row.earliest_terms_month
+            || (row.collaboration_start_month
+              && row.earliest_terms_month > row.collaboration_start_month)) && <>
+            {" · "}<Link to={`/affiliates/${row.id}/compensation`}>Set the months →</Link>
+          </>}
+        </td>}
       </tr>)}</tbody></table>
     {rows.length === 0 && <p className="empty">No {kind === "house" ? "brand codes" : "models"}.</p>}
   </section>;

@@ -336,6 +336,20 @@ def list_affiliates_route(
     for a in affiliates:
         terms = terms_for(db, a, month)
         arrangements[a.id] = terms.compensation_type if terms else None
+
+    # The first month anybody ever wrote terms for, for Settings' *Historical
+    # setup*. One query for everybody rather than a history read per model:
+    # a loop here is the shape that made the products screen slow (03D).
+    #
+    # Months are `YYYY-MM`, so the earliest is simply the smallest string.
+    from app.models.compensation import CompensationPeriod
+
+    earliest: dict[int, str] = {}
+    for affiliate_id, start_month in db.execute(
+        select(CompensationPeriod.affiliate_id, CompensationPeriod.start_month)
+    ).all():
+        if affiliate_id not in earliest or start_month < earliest[affiliate_id]:
+            earliest[affiliate_id] = start_month
     return {
         "affiliates": [
             {
@@ -349,6 +363,15 @@ def list_affiliates_route(
                 "uses": sales[a.id].uses if a.id in sales else 0,
                 "content": content.get(a.id),
                 "arrangement": arrangements.get(a.id),
+                #: The first month her terms cover, for *Historical setup*.
+                #:
+                #: **The gap is the thing to find.** A month before her
+                #: earliest terms cannot be calculated at all, so a model who
+                #: started in January whose terms begin in June has five
+                #: months nobody can pay her for — and that is what the column
+                #: exists to show. `None` means no terms were ever written,
+                #: which is the same problem for every month she has worked.
+                "earliest_terms_month": earliest.get(a.id),
             }
             for a in affiliates
         ],
