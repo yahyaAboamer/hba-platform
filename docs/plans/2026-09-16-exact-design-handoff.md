@@ -55,7 +55,12 @@ New backend: `arrangement` and `since` on `GET /api/me`;
    only an un-maximized window resized (to 931). Needed: the window restored
    (not maximized) before the next session's width checks. Everything verified
    so far was dark at 1536–1707 CSS px.
-3. **Light theme** is verified on the invite page only.
+3. **Light theme** is verified on **Targets** and the **invite page** only.
+   Home and Payments were attempted twice and were still showing *Loading…*
+   after five seconds against staging — worth timing on its own before
+   concluding anything about them — and the Models capture died in a
+   `Page.captureScreenshot` timeout. Screenshot capture on this tab fails
+   roughly one time in five; retry once, then move on rather than looping.
 
 ## What is left, in order
 
