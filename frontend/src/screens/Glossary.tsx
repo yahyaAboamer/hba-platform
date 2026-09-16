@@ -31,7 +31,12 @@ export function Glossary() {
   }, [target]);
 
   return (
-    <>
+    /*
+     * Wrapped, so the portal can style it as the export's stack of cards and
+     * drop the heading below: the phone shell already writes *Help* across the
+     * top of the screen, and the page head printed it a second time.
+     */
+    <div className="glossary">
       <div className="page__head">
         <div className="page__title">
           <h1>What these words mean</h1>
@@ -56,6 +61,6 @@ export function Glossary() {
           ))}
         </dl>
       </section>
-    </>
+    </div>
   );
 }

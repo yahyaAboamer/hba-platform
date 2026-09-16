@@ -23,3 +23,45 @@
 .glossary__entry--target dt {
   color: var(--focus);
 }
+
+/* ── On a phone ─────────────────────────────────────────────────────────
+ *
+ * `vHelp` in `Affiliate Portal v3.dc.html`, lines 725–735: one card per
+ * entry, question over answer. The definitions are the same ones the
+ * maintainer reads — §16 keeps a single glossary — and only the shape
+ * changes.
+ */
+.affiliate .glossary .page__head {
+  display: none;
+}
+
+/* The cards are the surfaces here, so the panel around them is not one. */
+.affiliate .glossary .panel {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.affiliate .glossary__list {
+  gap: 12px;
+  max-width: none;
+}
+
+.affiliate .glossary__entry {
+  padding: 14px 15px;
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.affiliate .glossary__entry dt {
+  margin-bottom: 7px;
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.affiliate .glossary__entry dd {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--quiet);
+}
