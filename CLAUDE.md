@@ -5,7 +5,7 @@ The admin serves the owner, marketing team and finance team; the model portal
 shows each model their own performance, wardrobe and payment records.
 FastAPI + SQLAlchemy + Postgres, React + Vite, on Railway.
 
-**Read `docs/plans/2026-09-15-exact-design-handoff.md` first** — it says where
+**Read `docs/plans/2026-09-16-exact-design-handoff.md` first** — it says where
 the work is right now, and `docs/redesign/parity/SCREEN_MATRIX.md` records
 each screen's state. Everything below is the part that does not change.
 
@@ -92,7 +92,7 @@ payroll without touching a maintainer screen.
   the background. Two against the same database deadlock and leak committed
   rows into each other, and the failures look exactly like a real regression
   in whatever you just changed. Also on 10 September, and it cost an hour.
-- Backend: `.venv/Scripts/python.exe -m pytest -q` — **1935 passing**, and no
+- Backend: `.venv/Scripts/python.exe -m pytest -q` — **1936 passing**, and no
   change merges below that. It takes 5–15 minutes; run it in the background.
 - **If the suite is killed for low memory, run it in groups of five files**
   rather than giving up on it. One pytest process grows as it goes and this
