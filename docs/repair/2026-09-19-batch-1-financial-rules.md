@@ -383,6 +383,20 @@ Tests (`tests/test_corrections.py`): absorb before payment, with the payable
 unchanged; the transfer recorded afterwards, settling to zero and raising no
 new notice; a second failure afterwards offering only the new difference.
 
+### Result
+
+**1,976 collected, 1,976 passed, 0 failed, across all 77 files**, recorded per
+file in `docs/repair/batch-1/test-log-followup.txt`, where the total
+reconciles exactly with `--collect-only`. Frontend: `tsc` clean, **321**
+tests, build green.
+
+Seven files first reported *errors* rather than failures. Five were the
+stale-backend deadlock a memory kill leaves behind; two were mine — a second
+pytest process against the same database while a chunk was still running,
+which is the failure `CLAUDE.md` warns reads exactly like a regression in
+whatever you last touched. Each passed alone after clearing the connection,
+and the log names them.
+
 ### Documentation and release-gate corrections
 
 - **D09 is decided, not open.** Corrected in ADR 0040 and above; the scope is
