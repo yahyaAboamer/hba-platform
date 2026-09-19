@@ -32,15 +32,17 @@ from app.services.codes import register_code
 from app.services.compensation import set_terms
 from app.models.payments import AdjustmentType
 from app.services.corrections import (
+    NOTHING_TO_CORRECT,
     OVERPAID,
     UNDERPAID,
+    CorrectionMoved,
     capacity_of,
     correction_for,
     open_corrections,
     outstanding_piastres,
     resolve,
 )
-from app.services.payments import record_payment
+from app.services.payments import balance_for, record_payment
 from app.services.payroll import approve_month
 from app.services.targets import record_actuals, set_requirements, verify
 
@@ -201,6 +203,11 @@ def test_an_order_failing_after_approval_is_an_overpayment(db):
 def test_nothing_is_recoverable_from_a_month_that_was_never_paid(db):
     """A debt is money that moved. A month agreed and not yet paid simply pays
     less when it is paid - there is nothing to take back.
+
+    **It is still reviewed** (F09). This used to leave the queue empty, so an
+    order failing between approval and payment was a change nobody was told
+    about. Not inventing a debt is right; hiding the difference is not, and
+    they are separate figures now.
     """
     affiliate = _model(db)
     _order(db, affiliate, "1", 2_000_000)
@@ -212,7 +219,37 @@ def test_nothing_is_recoverable_from_a_month_that_was_never_paid(db):
     assert found.outcome == OVERPAID
     assert found.paid_piastres == 0
     assert found.recoverable_piastres == 0
-    assert open_corrections(db, affiliate) == []
+    # The difference is real, and somebody has to look at it.
+    assert found.outstanding_piastres == 200_000
+    assert found.needs_review
+    assert not found.resolved
+    assert [row.month for row in open_corrections(db, affiliate)] == [AUGUST]
+    # ...and it adds nothing to what she owes, because she was sent nothing.
+    assert outstanding_piastres(db, affiliate) == 0
+
+
+def test_a_month_awaiting_its_transfer_cannot_be_recovered_from(db):
+    """F09/A05. The honest refusal, and it names what to do instead.
+
+    An external transfer that really was made is recorded, and the recovery
+    becomes available; one that was never made leaves the agreed figure to be
+    paid in full. Neither is a deduction against money that never moved.
+    """
+    affiliate = _model(db)
+    _order(db, affiliate, "1", 2_000_000)
+    approve_month(db, affiliate, AUGUST)
+    _september(db, affiliate, base=5_000_000)
+    _fail(db, "1")
+
+    with pytest.raises(ValueError, match="No transfer is recorded"):
+        resolve(
+            db,
+            affiliate,
+            AUGUST,
+            choice=AdjustmentType.CREDIT,
+            reason="nothing was sent",
+            destination_month=SEPTEMBER,
+        )
 
 
 def test_recovery_is_capped_at_what_actually_moved(db):
@@ -227,13 +264,17 @@ def test_recovery_is_capped_at_what_actually_moved(db):
     assert correction_for(db, affiliate, AUGUST).recoverable_piastres == 50_000
 
 
-def test_a_month_worth_more_than_agreed_is_not_a_correction_against_her(db):
-    """HBA owes her, and that is settled by agreeing the higher figure - not by
-    an adjustment taking money back.
+def test_delivery_after_approval_changes_nothing(db):
+    """F02, and the reason counting a pending order is safe.
+
+    The month counted it while it was travelling. The courier confirming it is
+    evidence about the same sale, not a second one - so there is nothing to
+    correct in either direction, and nothing to pay again.
     """
     affiliate = _model(db)
     _order(db, affiliate, "1", 2_000_000, state=CommissionState.PENDING)
-    approve_month(db, affiliate, AUGUST)
+    snapshot = approve_month(db, affiliate, AUGUST)
+    assert snapshot.approved_obligation_piastres == 200_000
 
     db.scalar(
         select(AttributedOrder).where(AttributedOrder.shopify_order_id == "1")
@@ -241,9 +282,27 @@ def test_a_month_worth_more_than_agreed_is_not_a_correction_against_her(db):
     db.flush()
 
     found = correction_for(db, affiliate, AUGUST)
+    assert found is None or found.outcome == NOTHING_TO_CORRECT
+    assert open_corrections(db, affiliate) == []
+
+
+def test_a_month_worth_more_than_agreed_is_not_a_correction_against_her(db):
+    """HBA owes her, and that is settled by agreeing the higher figure - not by
+    an adjustment taking money back.
+    """
+    affiliate = _model(db)
+    _order(db, affiliate, "1", 2_000_000)
+    approve_month(db, affiliate, AUGUST)
+
+    # An order attributed to August after August was agreed. Its sales are
+    # real and the agreed figure did not include them.
+    _order(db, affiliate, "2", 1_000_000)
+
+    found = correction_for(db, affiliate, AUGUST)
 
     assert found.outcome == UNDERPAID
     assert found.recoverable_piastres == 0
+    assert found.outstanding_piastres == 0
     assert open_corrections(db, affiliate) == []
 
 
@@ -456,9 +515,15 @@ def test_two_corrections_cannot_both_spend_one_month(db):
     assert capacity_of(db, affiliate, SEPTEMBER) == 50_000
 
 
-def test_a_carry_bigger_than_the_month_is_refused_rather_than_part_applied(db):
-    """A partial recovery leaves a remainder nothing is tracking, and not
-    forgetting a difference is the whole point of this service.
+def test_a_carry_bigger_than_the_month_applies_what_fits_and_keeps_the_rest(db):
+    """F12, and the case this service was built for.
+
+    Earning E£500 against a E£2,000 deduction applies E£500, sends nothing,
+    and leaves E£1,500 outstanding for a later month - this year or any other.
+    It used to be refused outright, on the reasoning that a remainder nothing
+    is tracking is worse than a refusal. The remainder is tracked now: the
+    month's whole difference is compared with everything already carried or
+    absorbed, so it cannot be forgotten and cannot be taken twice.
     """
     affiliate = _model(db)
     _order(db, affiliate, "1", 2_000_000)
@@ -467,17 +532,289 @@ def test_a_carry_bigger_than_the_month_is_refused_rather_than_part_applied(db):
     _september(db, affiliate, base=500_000)
     _fail(db, "1")
 
-    with pytest.raises(ValueError, match="can take"):
+    adjustment = resolve(
+        db,
+        affiliate,
+        AUGUST,
+        choice=AdjustmentType.CREDIT,
+        reason="as much as September can take",
+        destination_month=SEPTEMBER,
+    )
+
+    # September was worth E£500 and is consumed entirely; nothing is sent, and
+    # no zero-value transfer stands in for the settlement.
+    assert adjustment.amount_piastres == 50_000
+    assert balance_for(db, affiliate, SEPTEMBER)["balance_piastres"] == 0
+
+    remaining = correction_for(db, affiliate, AUGUST)
+    assert remaining.resolved_piastres == 50_000
+    assert remaining.outstanding_piastres == 150_000
+    assert not remaining.resolved
+    assert [row.month for row in open_corrections(db, affiliate)] == [AUGUST]
+
+
+def test_a_remainder_waits_for_a_month_with_room_in_a_later_year(db):
+    """F12: remainders persist across years, with no four-month limit."""
+    affiliate = _model(db)
+    _order(db, affiliate, "1", 2_000_000)
+    august = approve_month(db, affiliate, AUGUST)
+    _paid(db, affiliate, august, 200_000)
+    _september(db, affiliate, base=500_000)
+    _fail(db, "1")
+
+    resolve(
+        db,
+        affiliate,
+        AUGUST,
+        choice=AdjustmentType.CREDIT,
+        reason="September takes what it can",
+        destination_month=SEPTEMBER,
+    )
+
+    # The following February, with room for the rest of it.
+    _order(db, affiliate, "9", 9_000_000, month="2027-02")
+    approve_month(db, affiliate, "2027-02")
+
+    second = resolve(
+        db,
+        affiliate,
+        AUGUST,
+        choice=AdjustmentType.CREDIT,
+        reason="the remainder, the following year",
+        destination_month="2027-02",
+    )
+
+    assert second.amount_piastres == 150_000
+    settled = correction_for(db, affiliate, AUGUST)
+    assert settled.resolved_piastres == 200_000
+    assert settled.outstanding_piastres == 0
+    assert settled.resolved
+    assert open_corrections(db, affiliate) == []
+
+
+def test_a_second_failure_reopens_only_the_new_difference(db):
+    """F11, and the defect this repair was written for.
+
+    One agreed month, two failed orders and a credit in between. Treating any
+    earlier resolution as *this month is dealt with* hid the second failure
+    completely: the queue reported nothing, whatever the new difference was.
+    """
+    affiliate = _model(db)
+    _order(db, affiliate, "1", 1_000_000)
+    _order(db, affiliate, "2", 1_000_000)
+    august = approve_month(db, affiliate, AUGUST)
+    _paid(db, affiliate, august, 200_000)
+    _september(db, affiliate, base=9_000_000)
+
+    _fail(db, "1")
+    resolve(
+        db,
+        affiliate,
+        AUGUST,
+        choice=AdjustmentType.CREDIT,
+        reason="the first parcel came back",
+        destination_month=SEPTEMBER,
+    )
+    assert correction_for(db, affiliate, AUGUST).resolved
+    assert open_corrections(db, affiliate) == []
+
+    # Weeks later, the second parcel fails too.
+    _fail(db, "2")
+
+    again = correction_for(db, affiliate, AUGUST)
+    assert again.shortfall_piastres == 200_000
+    assert again.resolved_piastres == 100_000
+    # Only the new difference, never the whole month a second time.
+    assert again.outstanding_piastres == 100_000
+    assert again.recoverable_piastres == 100_000
+    assert not again.resolved
+    assert [row.month for row in open_corrections(db, affiliate)] == [AUGUST]
+
+
+def test_the_same_correction_cannot_be_recovered_twice_by_a_retry(db):
+    """A repeated submission is refused, not applied again.
+
+    Partial settlement is legitimate now, so a second identical request is no
+    longer harmlessly idempotent - it would carry the same money into the same
+    month twice. The figure the screen showed is sent back with the choice,
+    and a request that no longer matches it is answered *look again*.
+    """
+    affiliate = _model(db)
+    _order(db, affiliate, "1", 2_000_000)
+    august = approve_month(db, affiliate, AUGUST)
+    _paid(db, affiliate, august, 200_000)
+    _september(db, affiliate, base=9_000_000)
+    _fail(db, "1")
+
+    shown = correction_for(db, affiliate, AUGUST).outstanding_piastres
+    resolve(
+        db,
+        affiliate,
+        AUGUST,
+        choice=AdjustmentType.CREDIT,
+        reason="carried",
+        destination_month=SEPTEMBER,
+        expected_outstanding_piastres=shown,
+    )
+
+    with pytest.raises(CorrectionMoved):
         resolve(
             db,
             affiliate,
             AUGUST,
             choice=AdjustmentType.CREDIT,
-            reason="too big",
+            reason="carried",
+            destination_month=SEPTEMBER,
+            expected_outstanding_piastres=shown,
+        )
+
+    assert correction_for(db, affiliate, AUGUST).resolved_piastres == 200_000
+
+
+def test_resolving_a_correction_leaves_the_agreement_and_the_transfer_alone(db):
+    """05B/F07, asserted rather than assumed.
+
+    The whole design rests on this: an agreed month is not unmade and a
+    transfer that happened does not un-happen. A correction is recorded
+    *against* them. So the snapshot's figure, its frozen payload, its content
+    hash and the payment row are all read before and after, and none of them
+    may move.
+    """
+    from app.models.payments import PaymentTransaction
+
+    affiliate = _model(db)
+    _order(db, affiliate, "1", 2_000_000)
+    august = approve_month(db, affiliate, AUGUST)
+    _paid(db, affiliate, august, 200_000)
+    _september(db, affiliate, base=9_000_000)
+
+    before = (
+        august.approved_obligation_piastres,
+        august.content_hash,
+        dict(august.payload_json),
+        august.version,
+    )
+    transfer = db.scalars(select(PaymentTransaction)).one()
+    sent = (transfer.id, transfer.amount_piastres, transfer.occurred_at)
+
+    _fail(db, "1")
+    resolve(
+        db,
+        affiliate,
+        AUGUST,
+        choice=AdjustmentType.CREDIT,
+        reason="the parcel came back",
+        destination_month=SEPTEMBER,
+    )
+    db.flush()
+    db.expire_all()
+
+    after = db.get(type(august), august.id)
+    assert (
+        after.approved_obligation_piastres,
+        after.content_hash,
+        dict(after.payload_json),
+        after.version,
+    ) == before
+    still = db.scalars(select(PaymentTransaction)).one()
+    assert (still.id, still.amount_piastres, still.occurred_at) == sent
+
+
+def test_a_difference_larger_than_the_transfer_stays_open_and_says_why(db):
+    """The other way nothing can be recovered, and it is not the same thing.
+
+    Agreed E£2,000, E£100 sent, the order then failed: E£100 is recoverable
+    and E£1,900 of the difference is against money that has not been
+    transferred at all. Taking that back would be recovering what never
+    moved; hiding it would lose the difference. It waits, and becomes
+    recoverable the moment the rest is sent.
+    """
+    affiliate = _model(db)
+    _order(db, affiliate, "1", 2_000_000)
+    august = approve_month(db, affiliate, AUGUST)
+    _paid(db, affiliate, august, 10_000)
+    _fail(db, "1")
+
+    resolve(
+        db,
+        affiliate,
+        AUGUST,
+        choice=AdjustmentType.WRITEOFF,
+        reason="HBA absorbs what was sent",
+    )
+
+    left = correction_for(db, affiliate, AUGUST)
+    assert left.resolved_piastres == 10_000
+    assert left.outstanding_piastres == 190_000
+    assert left.recoverable_piastres == 0
+    assert left.review_reason == "difference_exceeds_what_was_sent"
+    assert [row.month for row in open_corrections(db, affiliate)] == [AUGUST]
+
+    with pytest.raises(ValueError, match="already been recovered"):
+        resolve(
+            db,
+            affiliate,
+            AUGUST,
+            choice=AdjustmentType.WRITEOFF,
+            reason="again",
+        )
+
+
+def test_a_month_with_no_room_is_refused_rather_than_settled_for_nothing(db):
+    """F12: never a zero-value adjustment standing in for a settlement."""
+    affiliate = _model(db)
+    _order(db, affiliate, "1", 2_000_000)
+    august = approve_month(db, affiliate, AUGUST)
+    _paid(db, affiliate, august, 200_000)
+    _fail(db, "1")
+
+    # September has no sales at all, so there is nothing for a deduction to
+    # come out of.
+    with pytest.raises(ValueError, match="no room"):
+        resolve(
+            db,
+            affiliate,
+            AUGUST,
+            choice=AdjustmentType.CREDIT,
+            reason="nothing to take it from",
             destination_month=SEPTEMBER,
         )
 
-    assert open_corrections(db, affiliate) != []
+    assert correction_for(db, affiliate, AUGUST).resolved_piastres == 0
+
+
+def test_a_deduction_can_be_accepted_against_a_month_not_yet_approved(db):
+    """F07/F12. The timing the old rule had backwards.
+
+    An overpayment is found in early October; October is not agreed until
+    November. Capacity that waited for approval left two choices - write off
+    money that should have carried, or remember to come back - and §11.5
+    exists to stop anybody relying on the second.
+    """
+    affiliate = _model(db)
+    _order(db, affiliate, "1", 2_000_000)
+    august = approve_month(db, affiliate, AUGUST)
+    _paid(db, affiliate, august, 200_000)
+    # September's sales exist; nobody has agreed the month.
+    _order(db, affiliate, "2", 5_000_000, month=SEPTEMBER)
+    _fail(db, "1")
+
+    assert capacity_of(db, affiliate, SEPTEMBER) == 500_000
+
+    adjustment = resolve(
+        db,
+        affiliate,
+        AUGUST,
+        choice=AdjustmentType.CREDIT,
+        reason="carried into the open month",
+        destination_month=SEPTEMBER,
+    )
+    assert adjustment.amount_piastres == 200_000
+
+    # And it is part of what September's approval agrees: the month is worth
+    # E£500 and E£200 of it is already spoken for.
+    approve_month(db, affiliate, SEPTEMBER)
+    assert balance_for(db, affiliate, SEPTEMBER)["balance_piastres"] == 300_000
 
 
 def test_everything_outstanding_is_added_up_across_her_months(db):

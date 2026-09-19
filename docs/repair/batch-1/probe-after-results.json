@@ -1,0 +1,37 @@
+{
+  "pending_order": {
+    "sales_egp": 10000,
+    "rate": "10%",
+    "live_payout_egp": 1000.0,
+    "preview_payout_egp": 1000.0,
+    "required_payout_egp": 1000,
+    "recalculated_under_a_delivered_only_agreement_egp": 0.0
+  },
+  "second_failure_after_resolution": {
+    "approved_egp": 2000,
+    "revised_egp": 1700,
+    "already_resolved_egp": 100.0,
+    "cumulative_shortfall_egp": 300.0,
+    "still_outstanding_egp": 200.0,
+    "marked_resolved": false,
+    "open_correction_count": 1,
+    "note": "The cumulative difference is compared with what has already been carried or absorbed, so only the new EGP 200 is offered again."
+  },
+  "failure_after_approval_before_payment": {
+    "difference_egp": -200.0,
+    "paid_egp": 0,
+    "recoverable_egp": 0.0,
+    "needs_review": true,
+    "review_reason": "no_transfer_recorded",
+    "open_correction_count": 1,
+    "note": "No recoverable debt is invented for money that never moved, and the change is no longer hidden by the fact that it did not."
+  },
+  "insufficient_earnings": {
+    "deduction_egp": 200,
+    "available_egp": 100,
+    "applied_egp": 100.0,
+    "retained_for_a_later_month_egp": 100.0,
+    "zero_value_transfer_recorded": false,
+    "note": "The remainder stays against the source month and is offered again for any later month, this year or another."
+  }
+}

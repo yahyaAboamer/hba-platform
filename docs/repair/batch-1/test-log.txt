@@ -1,0 +1,2 @@
+RESULT tests/test_financial_transition.py ............                                                             [100%] 12 passed in 31.14s 
+RESULT tests/test_corrections.py ..............................                                           [100%] 30 passed in 58.54s 

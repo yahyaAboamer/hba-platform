@@ -586,6 +586,11 @@ class CorrectionBody(BaseModel):
     choice: str
     reason: str = Field(min_length=1, max_length=500)
     destination_month: str | None = None
+    #: What the screen showed as outstanding. Optional, and its absence is not
+    #: agreement: a caller that sends nothing is one that has not been taught
+    #: to check. Sent, it turns a retried or duplicated request into a refusal
+    #: rather than a second recovery of the same money.
+    expected_outstanding_piastres: int | None = None
 
 
 def _render_correction(row) -> dict:
@@ -601,9 +606,22 @@ def _render_correction(row) -> dict:
         "paid": format_egp(row.paid_piastres),
         "recoverable_piastres": row.recoverable_piastres,
         "recoverable": format_egp(row.recoverable_piastres),
+        # F11. The whole difference this month has come to, how much of it has
+        # already been carried or absorbed, and what is left - separate
+        # figures, because a month can be corrected twice and settled in
+        # parts, and one boolean could not say which.
+        "shortfall_piastres": row.shortfall_piastres,
+        "shortfall": format_egp(row.shortfall_piastres),
+        "resolved_piastres": row.resolved_piastres,
+        "resolved_amount": format_egp(row.resolved_piastres),
+        "outstanding_piastres": row.outstanding_piastres,
+        "outstanding": format_egp(row.outstanding_piastres),
         "snapshot_version": row.snapshot_version,
         "resolved": row.resolved,
         "resolution": row.resolution,
+        # F09. Something to look at, even where there is no money to move.
+        "needs_review": row.needs_review,
+        "review_reason": row.review_reason,
     }
 
 
@@ -655,7 +673,7 @@ def resolve_correction(
     than was ever paid, or recover twice, and the ledger would afterwards
     record only that somebody chose that.
     """
-    from app.services.corrections import resolve
+    from app.services.corrections import CorrectionMoved, resolve
 
     affiliate = _affiliate_or_404(db, body.affiliate_id)
     _month_or_400(body.month)
@@ -670,9 +688,16 @@ def resolve_correction(
             choice=body.choice,
             reason=body.reason,
             destination_month=body.destination_month,
+            expected_outstanding_piastres=body.expected_outstanding_piastres,
             actor_id=actor.id,
             actor_email=actor.email,
         )
+    # Before the plain refusal below: a correction that moved is a different
+    # answer from one that cannot be acted on, and 409 is what tells a browser
+    # to look again rather than to correct its request.
+    except CorrectionMoved as exc:
+        db.rollback()
+        raise HTTPException(409, str(exc)) from exc
     except ValueError as exc:
         db.rollback()
         raise HTTPException(400, str(exc)) from exc

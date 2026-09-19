@@ -16,6 +16,17 @@ errors, and the result is not the same figure. Both numbers come back —
 `exact_unrounded_piastres` and the rounded one — because the audit has to show
 what was calculated as well as what will be paid.
 
+## Which orders count — F02
+
+**Pending and delivered both count. A failed delivery does not.** An order on
+its way is a sale that has happened; the courier's confirmation is evidence
+about the same sale, not a second event that creates it.
+
+Two things keep that from paying anybody twice. Approval settles every order
+it counted, so a later month cannot pay the same one again; and
+`carried_forward` now pays only what an **earlier, delivered-only** approval
+left out, which is a finite backlog that empties and is never added to.
+
 ## Three ways to be paid
 
 | Type | Payout |
@@ -78,6 +89,48 @@ NO_TARGET = "no_target_recorded_for_this_month"
 #: They hit their targets and nobody has confirmed the numbers. Verification is
 #: what unlocks the guarantee (§11.3), so this is not a formality.
 TARGETS_UNVERIFIED = "targets_achieved_but_not_verified"
+
+#: F02. The live counting rule, written into every snapshot it agrees.
+PENDING_INCLUSIVE = "pending_inclusive"
+
+#: The rule before it. **A snapshot carries no policy at all if it was agreed
+#: under this one**, which is what identifies the months the transition has to
+#: reconcile.
+DELIVERED_ONLY = "delivered_only"
+
+#: F02. The order states the live policy pays for, defined once beside the
+#: arithmetic that sums them. Approval settles exactly these, so what a month
+#: paid for and what it recorded paying for cannot drift apart.
+COUNTED_STATES = (CommissionState.EARNED, CommissionState.PENDING)
+
+
+def counted_sales_from(figures: dict, policy: str = PENDING_INCLUSIVE) -> int:
+    """The sales a figure was computed on, out of a stored or live calculation.
+
+    **The commission line has to name the money it is a percentage of**, and
+    that is not always the delivered total: since F02 it is delivered and
+    pending together. A statement saying *10% of E£2,000* above a commission
+    worked out on E£3,000 is a breakdown that does not add up, and the one
+    person guaranteed to check is the person being paid.
+
+    `policy` is the rule the figures were produced under - a snapshot's own,
+    for an agreed month - so an old statement keeps saying what it always
+    said.
+    """
+    earned = int(figures.get("earned_base_piastres") or 0)
+    pending = int(figures.get("pending_base_piastres") or 0)
+    return earned + (
+        pending if CommissionState.PENDING in counted_states_for(policy) else 0
+    )
+
+
+def counted_states_for(policy: str) -> tuple[str, ...]:
+    """Which order states a given policy pays for.
+
+    Anything that is not the live rule is the old one: the absence of a policy
+    means a month agreed before the transition, and there are no others.
+    """
+    return COUNTED_STATES if policy == PENDING_INCLUSIVE else (CommissionState.EARNED,)
 
 #: §11.4. An order carried from a month that has no compensation terms. Its
 #: sales are real; what it is worth is not calculable, and guessing at a rate
@@ -253,16 +306,38 @@ def carried_forward(db: Session, affiliate: AffiliateProfile, month: str) -> dic
 
 
 def calculate_month(
-    db: Session, affiliate: AffiliateProfile, month: str
+    db: Session,
+    affiliate: AffiliateProfile,
+    month: str,
+    *,
+    policy: str = PENDING_INCLUSIVE,
 ) -> MonthCalculation:
-    """The delivered-only calculation used by existing approval and payments.
+    """What this month is worth under the live policy. F02.
 
-    No preview argument, deliberately. Approval calls this name: accepting
-    source_orders here would let a routine caller include pending and discard
-    legacy carry without deliberately choosing the new policy. 05A must not
-    make that switch. Both public entry points share _calculate's arithmetic.
+    **Pending and delivered both count; a failed delivery does not.** This was
+    delivered-only until the transition, and the two words in this docstring
+    are the whole of the change: an order that has left the warehouse is a
+    sale, and waiting for the courier to confirm it is not a reason to leave a
+    model's own month looking smaller than it is.
+
+    The reason it is safe to count a pending order is not that it always
+    arrives — it is that the same order can never be counted twice. Approval
+    settles every order it counted against its snapshot, `carried_forward`
+    only pays orders an *earlier policy* left out, and a delivery that fails
+    afterwards becomes a correction against the agreed figure rather than a
+    silent rewrite of it (05C).
+
+    ## `policy`, and the one caller that supplies it
+
+    A month agreed before the transition must be *re-*calculated the way it
+    was calculated: comparing a delivered-only agreement with a
+    pending-inclusive recalculation reports the policy change itself as a
+    difference, and would tell somebody a closed month is suddenly worth more.
+    `corrections.correction_for` passes the snapshot's own recorded rule so
+    that a comparison answers *has the evidence moved*, which is the only
+    question it is asked.
     """
-    return _calculate(db, affiliate, month, source_orders=None)
+    return _calculate(db, affiliate, month, source_orders=None, policy=policy)
 
 
 def preview_calculation(
@@ -272,11 +347,16 @@ def preview_calculation(
     *,
     source_orders: list[SourceOrder],
 ) -> MonthCalculation:
-    """Read-only pending-inclusive entitlement, never an approval instruction.
+    """The same policy, computed from supplied source facts rather than rows.
 
-    Source facts include pending and legacy carry-paid source sales, but never
-    incoming delivery carry. The distinct name keeps this policy choice out of
-    accidental calls to calculate_month; 05B/05C and D01 still own activation.
+    It exists for the reconciliation screen, which reads delivery state
+    directly (`source_order`) so it can distinguish *failed* from *we have not
+    been told*, and reports per-order issues no ledger column carries.
+
+    Since the transition the **policy** is identical to `calculate_month` —
+    pending and delivered count. What still differs is the source of the facts
+    and the fact that this one never touches carry: it answers *what do this
+    month's own orders come to*, which is the question a reconciliation asks.
     """
     return _calculate(db, affiliate, month, source_orders=source_orders)
 
@@ -287,6 +367,7 @@ def _calculate(
     month: str,
     *,
     source_orders: list[SourceOrder] | None,
+    policy: str = PENDING_INCLUSIVE,
 ) -> MonthCalculation:
     """Shared monthly terms, target qualification and aggregate-once arithmetic.
 
@@ -380,9 +461,17 @@ def _calculate(
             blockers=blockers,
         )
 
-    # One numerator for the whole month, divided once. Summing per-order
-    # commissions instead would round each of them first.
-    counted_base = earned_base + (pending_base if is_preview else 0)
+    # **F02: pending and delivered both count.** One numerator for the whole
+    # month, divided once; summing per-order commissions would round each of
+    # them first.
+    #
+    # Both entry points count the same way. The preview's numbers used to be
+    # the only pending-inclusive ones in the platform, and the gap between
+    # them was the defect: a model could be shown an entitlement on one screen
+    # and paid a different figure from another.
+    counted_base = earned_base + (
+        pending_base if CommissionState.PENDING in counted_states_for(policy) else 0
+    )
     numerator = (
         commission_numerator(counted_base, terms.commission_rate_bp)
         if counted_base

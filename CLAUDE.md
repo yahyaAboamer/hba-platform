@@ -32,8 +32,17 @@ payroll without touching a maintainer screen.
 - **Nothing about money is calculated in the browser.** The server sends the
   figure; a second implementation is a second answer waiting to disagree in
   front of the one person guaranteed to check.
-- **An agreed month is read from its snapshot**, never recalculated. A live
-  recalculation under the word "paid" presents a working number as a debt.
+- **An agreed month's *money* is read from its snapshot**, never recalculated.
+  A live recalculation under the word "paid" presents a working number as a
+  debt. **Her sales and order counts are the opposite** (F13, ADR 0040): they
+  describe what happened in the month, so a parcel refused in November
+  corrects September's sales and chart while September's agreed total does not
+  move. A difference after approval is settled as a correction (05C), never by
+  restating the agreement.
+- **A pending order counts** (F02, ADR 0040). Pending and delivered are paid;
+  a failed delivery is not. Approval settles every order it counted, and
+  `carried_into` now pays only what a *delivered-only* approval left out — a
+  backlog that shrinks and is never added to.
 - **No component names a colour directly.** The accent lives in
   `frontend/src/styles/accent.css` — eight declarations, now covering both
   halves (ADR 0039) — and `styles/__tests__/accent-isolation.test.ts` fails the
@@ -94,17 +103,26 @@ payroll without touching a maintainer screen.
   in whatever you just changed. Also on 10 September, and it cost an hour.
 - Backend: `.venv/Scripts/python.exe -m pytest -q` — **1936 passing**, and no
   change merges below that. It takes 5–15 minutes; run it in the background.
-- **If the suite is killed for low memory, run it in groups of five files**
-  rather than giving up on it. One pytest process grows as it goes and this
-  machine has 7.9 GB with under 1 GB free on a bad day; short processes each
-  stay small enough to finish. Groups of ten worked in early September and were
-  killed again on the 14th with Docker running, so the size came down to five —
-  fifteen groups, about twenty minutes in total:
+- **If the suite is killed for low memory, make the groups smaller — and keep
+  a record so a kill costs one group, not the run.** One pytest process grows
+  as it goes and this machine has 7.9 GB, most of it spoken for: Docker alone
+  holds about 1.2 GB, and on 19 September there was **0.23 GB free**, where
+  groups of five *and then three* were both killed. Ten worked in early
+  September, five on the 14th. There is no safe fixed number; check
+  `Get-CimInstance Win32_OperatingSystem` and go smaller than the last size
+  that failed.
+
+  One file per process is the floor, and resumable, which is what makes it
+  the one to fall back to:
 
   ```
-  ls tests/test_*.py > /tmp/all.txt && split -l 5 -d /tmp/all.txt /tmp/sm
-  for g in /tmp/sm*; do DATABASE_URL='...' .venv/Scripts/python.exe -m pytest     -q --color=no -p no:cacheprovider $(cat $g | tr '
-' ' '); done
+  ls tests/test_*.py > todo.txt; : > log.txt
+  while read -r f; do
+    grep -q "^RESULT $f " log.txt && continue
+    out=$(DATABASE_URL='...' .venv/Scripts/python.exe -m pytest -q --color=no       -p no:cacheprovider "$f" 2>&1 | tail -3 | tr '
+' ' ')
+    echo "RESULT $f $out" >> log.txt
+  done < todo.txt
   ```
 
   Clear the leftover backends first — a killed run leaves one holding locks.

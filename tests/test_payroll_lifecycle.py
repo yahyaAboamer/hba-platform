@@ -47,6 +47,8 @@ BOOTSTRAP = {
     "display_name": "Owner",
     "password": "quiet-harbour-lantern",
 }
+from tests.support_policy import approved_before_the_switch
+
 AUGUST = "2026-08"
 SEPTEMBER = "2026-09"
 
@@ -119,6 +121,23 @@ def _order(db, affiliate, order_id, base, *, month=AUGUST,
     return row
 
 
+
+def _approved_delivered_only(db, affiliate, month):
+    """Agree a month the way the platform agreed one before ADR 0040.
+
+    Carry-forward is the **backlog** that rule left behind: an order still
+    travelling when its month closed was not counted, so a later payroll paid
+    it. Under the live rule the month counts it and nothing is carried, which
+    is why these tests - all of them about what carry does - agree their
+    source month the old way.
+
+    They are not legacy tests. The backlog is real, it is still paid, and
+    everything below is what paying it correctly means.
+    """
+    with approved_before_the_switch():
+        return approve_month(db, affiliate, month)
+
+
 # ── Carry-forward (§11.4) ──────────────────────────────────────────────────────
 
 
@@ -130,7 +149,7 @@ def test_an_order_still_travelling_at_approval_carries_into_the_next_month(db):
     affiliate = _affiliate(db)
     _order(db, affiliate, "paid", 200_000)
     late = _order(db, affiliate, "late", 84_000, state=CommissionState.PENDING)
-    approve_month(db, affiliate, AUGUST)
+    _approved_delivered_only(db, affiliate, AUGUST)
 
     # It arrives in September.
     late.commission_state = CommissionState.EARNED
@@ -150,7 +169,7 @@ def test_a_carried_order_keeps_its_own_month(db):
     affiliate = _affiliate(db)
     _order(db, affiliate, "paid", 200_000)
     late = _order(db, affiliate, "late", 84_000, state=CommissionState.PENDING)
-    approve_month(db, affiliate, AUGUST)
+    _approved_delivered_only(db, affiliate, AUGUST)
     late.commission_state = CommissionState.EARNED
     db.flush()
 
@@ -165,7 +184,7 @@ def test_the_carried_line_says_where_it_came_from(db):
     _order(db, affiliate, "paid", 200_000)
     _order(db, affiliate, "late-1", 50_000, state=CommissionState.PENDING)
     _order(db, affiliate, "late-2", 34_000, state=CommissionState.PENDING)
-    approve_month(db, affiliate, AUGUST)
+    _approved_delivered_only(db, affiliate, AUGUST)
     db.execute(
         text(
             "UPDATE attributed_order SET commission_state = 'earned' "
@@ -203,7 +222,7 @@ def test_a_pending_order_does_not_carry_until_it_arrives(db):
     affiliate = _affiliate(db)
     _order(db, affiliate, "paid", 200_000)
     _order(db, affiliate, "still-travelling", 50_000, state=CommissionState.PENDING)
-    approve_month(db, affiliate, AUGUST)
+    _approved_delivered_only(db, affiliate, AUGUST)
 
     assert carried_into(db, affiliate, SEPTEMBER) == []
 
@@ -287,7 +306,7 @@ def test_reopening_does_not_touch_a_month_settled_elsewhere(db):
     affiliate = _affiliate(db)
     _order(db, affiliate, "august", 200_000)
     late = _order(db, affiliate, "late", 84_000, state=CommissionState.PENDING)
-    approve_month(db, affiliate, AUGUST)
+    _approved_delivered_only(db, affiliate, AUGUST)
     late.commission_state = CommissionState.EARNED
     late.business_month = AUGUST
     db.flush()
@@ -780,7 +799,7 @@ def test_a_carried_order_is_paid_by_the_month_that_carries_it(db):
     affiliate = _affiliate(db)
     _order(db, affiliate, "paid", 200_000)
     late = _order(db, affiliate, "late", 100_000, state=CommissionState.PENDING)
-    approve_month(db, affiliate, AUGUST)
+    _approved_delivered_only(db, affiliate, AUGUST)
     late.commission_state = CommissionState.EARNED
     _order(db, affiliate, "own", 300_000, month=SEPTEMBER)
     db.flush()
@@ -811,7 +830,7 @@ def test_a_carried_order_is_paid_at_its_own_months_rate(db):
     )
     _order(db, affiliate, "paid", 200_000)
     late = _order(db, affiliate, "late", 100_000, state=CommissionState.PENDING)
-    approve_month(db, affiliate, AUGUST)
+    _approved_delivered_only(db, affiliate, AUGUST)
     late.commission_state = CommissionState.EARNED
     _order(db, affiliate, "own", 100_000, month=SEPTEMBER)
     db.flush()
@@ -834,7 +853,7 @@ def test_a_carried_order_is_not_paid_twice(db):
     affiliate = _affiliate(db)
     _order(db, affiliate, "paid", 200_000)
     late = _order(db, affiliate, "late", 100_000, state=CommissionState.PENDING)
-    approve_month(db, affiliate, AUGUST)
+    _approved_delivered_only(db, affiliate, AUGUST)
     late.commission_state = CommissionState.EARNED
     db.flush()
 
@@ -877,7 +896,7 @@ def test_carried_money_sits_on_top_of_a_guarantee_not_inside_it(db):
 
     _order(db, affiliate, "paid", 200_000)
     late = _order(db, affiliate, "late", 100_000, state=CommissionState.PENDING)
-    approve_month(db, affiliate, AUGUST)
+    _approved_delivered_only(db, affiliate, AUGUST)
     late.commission_state = CommissionState.EARNED
     _order(db, affiliate, "own", 100_000, month=SEPTEMBER)
     db.flush()
@@ -910,7 +929,7 @@ def test_a_carried_month_with_no_terms_blocks_rather_than_guesses(db):
     affiliate = _affiliate(db)
     _order(db, affiliate, "paid", 200_000)
     late = _order(db, affiliate, "late", 100_000, state=CommissionState.PENDING)
-    approve_month(db, affiliate, AUGUST)
+    _approved_delivered_only(db, affiliate, AUGUST)
     late.commission_state = CommissionState.EARNED
     db.flush()
 
@@ -939,7 +958,7 @@ def test_reopening_a_month_reclaims_an_order_the_next_month_has_not_paid(db):
     affiliate = _affiliate(db)
     _order(db, affiliate, "paid", 200_000)
     late = _order(db, affiliate, "late", 100_000, state=CommissionState.PENDING)
-    approve_month(db, affiliate, AUGUST)
+    _approved_delivered_only(db, affiliate, AUGUST)
     late.commission_state = CommissionState.EARNED
     db.flush()
     assert len(carried_into(db, affiliate, SEPTEMBER)) == 1
@@ -965,7 +984,7 @@ def test_reopening_a_month_leaves_an_order_the_next_month_has_paid(db):
     affiliate = _affiliate(db)
     _order(db, affiliate, "paid", 200_000)
     late = _order(db, affiliate, "late", 100_000, state=CommissionState.PENDING)
-    august = approve_month(db, affiliate, AUGUST)
+    august = _approved_delivered_only(db, affiliate, AUGUST)
     late.commission_state = CommissionState.EARNED
     _order(db, affiliate, "own", 300_000, month=SEPTEMBER)
     db.flush()

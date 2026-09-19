@@ -8,11 +8,11 @@ decisions. A second implementation of what they are owed would be a second answe
 waiting to disagree with the first, and the one it disagreed with would be the
 one they were paid.
 
-## An agreed month is read from the snapshot, never recalculated
+## An agreed month's money is read from the snapshot, never recalculated
 
-The whole month - the total, the commission line, the salary, every carried
-line - comes out of `payload_json`, not out of `calculate_month`. Two reasons,
-and the first has already caught us once.
+The money - the total, the commission line, the salary, every carried line -
+comes out of `payload_json`, not out of `calculate_month`. Two reasons, and
+the first has already caught us once.
 
 `calculate_month` keeps moving after approval: an order settling in October
 changes what September *would* come to and never what September *is*. A screen
@@ -24,6 +24,13 @@ The second reason is subtler, and is why the whole breakdown comes from the
 payload rather than only the total: lines drawn from a live recalculation
 underneath a frozen total would not add up. They are the one person guaranteed
 to check.
+
+**Her sales and order counts are the opposite case** (F13). Those describe
+what happened in the month, not what she is owed for it, and a parcel refused
+in November did happen - to September. So the counts, the sales figure and the
+chart come from the month as it is now, while the agreed total beside them
+does not move. A failure after approval is settled as a correction against the
+agreement (05C), never by quietly restating what the agreement said.
 
 ## Blockers are translated, and none of them is their fault
 
@@ -78,7 +85,11 @@ from app.models.payments import (
 from app.models.targets import MonthlyTarget
 from app.models.payroll import CalculationState, PayrollMonth, PayrollSnapshot
 from app.services.commission.base import commission_base
-from app.services.commission.calculate import MonthCalculation
+from app.services.commission.calculate import (
+    PENDING_INCLUSIVE,
+    MonthCalculation,
+    counted_sales_from,
+)
 from app.services.compensation import all_terms, terms_for
 from app.services.payments import adjustments_for, balance_for, payments_for
 from app.services.performance import uses_for
@@ -87,6 +98,7 @@ from app.services.payroll import (
     blockers_for,
     get_month,
     is_historical,
+    policy_of,
     snapshots_for,
     working_month,
 )
@@ -409,7 +421,7 @@ def _plural(count: int, noun: str) -> str:
     return f"{count} {noun}" if count == 1 else f"{count} {noun}s"
 
 
-def _makeup(figures: dict, total_piastres: int) -> list[dict]:
+def _makeup(figures: dict, total_piastres: int, policy: str = PENDING_INCLUSIVE) -> list[dict]:
     """What the total is made of, in lines that add up to it.
 
     The lines are display-rounded and the total is not assembled from them
@@ -422,7 +434,12 @@ def _makeup(figures: dict, total_piastres: int) -> list[dict]:
 
     commission = _display_piastres(figures.get("commission_piastres") or 0)
     rate_bp = figures.get("commission_rate_bp")
-    earned = figures.get("earned_base_piastres") or 0
+    # The sales this commission is a percentage **of**, under the rule that
+    # produced it - delivered and pending since F02, and delivered only on a
+    # month agreed before the switch. Naming the delivered total beside a
+    # commission worked out on more than that is a breakdown that does not add
+    # up.
+    earned = counted_sales_from(figures, policy)
 
     if figures.get("guarantee_applied"):
         # §9.5. Never both, and never one on top of the other. Naming what it
@@ -612,14 +629,28 @@ def my_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
 
     blockers, calculation = blockers_for(db, affiliate, month)
 
-    # An agreed month comes out of the snapshot in full - total *and* lines.
-    # See the module docstring: a live recalculation underneath a frozen total
-    # is a breakdown that does not add up.
+    # An agreed month's **money** comes out of the snapshot in full - total
+    # *and* lines. See the module docstring: a live recalculation underneath a
+    # frozen total is a breakdown that does not add up.
     figures = snapshot.payload_json if agreed else _as_payload(calculation)
     total = (
         snapshot.approved_obligation_piastres if agreed else calculation.payout_piastres
     )
-    average_order = _average_order(figures)
+
+    # **Her performance is not frozen, and never was** (F13).
+    #
+    # What she earned in September is settled: it was agreed, it is owed, and
+    # an order failing in November does not reach back and change it. What she
+    # *sold* in September is a fact about September that the November delivery
+    # failure corrects — the parcel did not arrive, so the sale did not stand,
+    # and her sales figure and her chart say so.
+    #
+    # Reading both out of the snapshot conflated the two: a failed order left
+    # no trace anywhere she could see, and the month's own graph went on
+    # showing a sale that had been reversed. The money stays where it is; the
+    # counts come from the month as it is now.
+    performance = _as_payload(calculation)
+    average_order = _average_order(performance)
 
     return {
         "month": month,
@@ -630,13 +661,13 @@ def my_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
         # sentence.
         "not_started": _not_started(month),
         "sales": {
-            "earned_piastres": figures["earned_base_piastres"],
-            "earned": format_egp(figures["earned_base_piastres"]),
+            "earned_piastres": performance["earned_base_piastres"],
+            "earned": format_egp(performance["earned_base_piastres"]),
             # Shown, never hidden. Hiding an order still in transit makes their
             # month look smaller than it is, and produces exactly the question
             # this platform exists to stop their having to ask.
-            "pending_piastres": figures["pending_base_piastres"],
-            "pending": format_egp(figures["pending_base_piastres"]),
+            "pending_piastres": performance["pending_base_piastres"],
+            "pending": format_egp(performance["pending_base_piastres"]),
             # **What a typical order under their code is worth.** Their own
             # figure, and one they cannot work out from anything else on the
             # screen without dividing two numbers in their head.
@@ -651,9 +682,9 @@ def my_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
         },
         "window": _window(month, agreed),
         "orders": {
-            "earned": figures["earned_orders"],
-            "pending": figures["pending_orders"],
-            "void": figures["void_orders"],
+            "earned": performance["earned_orders"],
+            "pending": performance["pending_orders"],
+            "void": performance["void_orders"],
             # **How often her code was used** (M01, and D03 for what counts).
             #
             # Not derivable from the three counts beside it, which is why it is
@@ -666,7 +697,9 @@ def my_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
         },
         "amount_piastres": total,
         "amount": format_egp(total),
-        "makeup": _makeup(figures, total),
+        "makeup": _makeup(
+            figures, total, policy_of(snapshot) if agreed else PENDING_INCLUSIVE
+        ),
         "carried_in": [
             {
                 "from_month": line["from_month"],

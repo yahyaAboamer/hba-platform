@@ -24,6 +24,7 @@ from app.services.compensation import set_terms
 from app.services.payroll import approve_month, content_hash
 from app.services.payments import record_payment
 from app.services.targets import record_actuals, set_requirements, verify
+from tests.support_policy import approved_before_the_switch
 
 MONTH = "2026-04"
 EXAMPLES = {
@@ -67,42 +68,72 @@ def pending(db, order_id="pending", **extra):
     return index
 
 
-def test_approval_calculation_cannot_opt_into_preview_source_orders(db, model):
+def test_the_two_entry_points_stay_separate_and_agree(db, model):
+    """ADR 0040. One policy, still two functions.
+
+    The approval path does not take supplied source facts - it reads the
+    ledger - and that separation is kept: the reconciliation view reports
+    per-order issues no ledger column carries, and handing those to approval
+    would make a screen's diagnostics into an obligation.
+
+    What is no longer true is that they produce different money. A pending
+    order is worth the same to both, which is the whole of the repair.
+    """
     pending(db)
     facts = [source_order(db.get(AttributedOrder, "pending"))]
 
-    # Accidentally passing preview facts to the approval entry point must fail
-    # before it can turn a pending order into an approved obligation.
     with pytest.raises(TypeError, match="source_orders"):
         calculate_month(db, model, MONTH, source_orders=facts)
 
-    assert calculate_month(db, model, MONTH).payout_piastres == 0
-    assert approve_month(db, model, MONTH).approved_obligation_piastres == 0
+    live = calculate_month(db, model, MONTH).payout_piastres
+    assert live > 0
+    assert preview_month(db, model, MONTH)["current_entitlement"]["payout"]["piastres"] == live
+    assert approve_month(db, model, MONTH).approved_obligation_piastres == live
 
 
 def test_pending_once_example_delivery_adds_nothing_in_either_month(db, model):
+    """F02's worked example: counted once, in the month it belongs to.
+
+    The name held through the transition and the figures moved under it. The
+    order used to be worth nothing until it was delivered and then worth
+    something to a *later* month; now it is worth the same to its own month
+    throughout, and the delivery adds nothing anywhere - which is what the
+    example was always asserting.
+    """
     example = EXAMPLES["pending_once"]
     index = pending(db, total_piastres=example["source_sales_piastres"], shipping_piastres=0)
     before = preview_month(db, model, MONTH)
     assert before["current_entitlement"]["payout"]["piastres"] == example["commission_piastres"]
     assert before["performance"]["pending_orders"] == 1
-    assert calculate_month(db, model, MONTH).payout_piastres == 0
-    # Old approval deliberately still pays delivered-only. The preview never
-    # inherits that old late-delivery carry into the destination's entitlement.
+    assert calculate_month(db, model, MONTH).payout_piastres == example["commission_piastres"]
+
     snapshot = approve_month(db, model, MONTH)
+    assert snapshot.approved_obligation_piastres == example["commission_piastres"]
+
     index.delivery_state = "delivered"
     index.delivered_at = datetime(2026, 5, 2, tzinfo=timezone.utc)
     attribute_order(db, index)
+
     after = preview_month(db, model, MONTH)
-    assert after["current_entitlement"] == before["current_entitlement"]
+    assert after["current_entitlement"]["payout"] == before["current_entitlement"]["payout"]
     assert after["performance"]["delivered_orders"] == 1
+    # May pays nothing for it: April counted it, and the settlement link says
+    # so whatever the courier does afterwards.
     assert preview_month(db, model, "2026-05")["current_entitlement"]["payout"]["piastres"] == 0
-    assert snapshot.approved_obligation_piastres == 0
+    assert calculate_month(db, model, "2026-05").payout_piastres == 0
 
 
 def test_legacy_carry_allocation_keeps_source_sales_and_both_snapshot_links(db, model):
+    """The backlog ADR 0040 inherited, and the view that reconciles it.
+
+    April is agreed **before the transition**, so the order still travelling
+    is left out of it and a later payroll pays it - exactly as it happened for
+    every month approved under the old rule. That link is what the transition
+    has to be able to see, and it is still reported at both ends.
+    """
     index = pending(db, total_piastres=2_000_000, shipping_piastres=0)
-    source = approve_month(db, model, MONTH)
+    with approved_before_the_switch():
+        source = approve_month(db, model, MONTH)
     index.delivery_state = "delivered"
     index.delivered_at = datetime(2026, 5, 2, tzinfo=timezone.utc)
     attribute_order(db, index)
@@ -121,6 +152,8 @@ def test_legacy_carry_allocation_keeps_source_sales_and_both_snapshot_links(db, 
         assert original["legacy_allocations"] == later["legacy_allocations"] == expected_link
         assert original["requires_transition_reconciliation"] is True
         assert later["approval"]["approved_obligation_piastres"] == 200_000
+    # April's own recalculation excludes it, because May settled it. The
+    # backlog order is paid once, by the month that actually paid it.
     assert calculate_month(db, model, MONTH).payout_piastres == 0
     assert db.get(AttributedOrder, "pending").settled_in_snapshot_id == destination.id
     assert (content_hash(source.payload_json), content_hash(destination.payload_json)) == before_hashes

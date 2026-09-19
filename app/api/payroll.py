@@ -39,6 +39,7 @@ from app.models.affiliates import AffiliateProfile
 from app.models.attributed_orders import AttributedOrder
 from app.models.identity import UserAccount
 from app.services.affiliates import list_affiliates
+from app.services.commission.calculate import counted_sales_from
 from app.services.payroll import (
     SOURCE_MOVED,
     SourceMoved,
@@ -49,6 +50,7 @@ from app.services.payroll import (
     get_month,
     is_historical,
     months_left_reopened,
+    policy_of,
     reconciliation_for,
     snapshots_for,
     source_version,
@@ -291,7 +293,11 @@ def statement(
             guarantee_applied=bool(frozen.get("guarantee_applied")),
             commission_piastres=Decimal(str(frozen.get("commission_piastres") or "0")),
         )
-        counted = int(frozen.get("earned_base_piastres") or 0)
+        # The sales the approved commission was worked out on, under the rule
+        # that approved it: delivered and pending since F02, delivered only on
+        # a month agreed before the switch. Reading the delivered total alone
+        # would print a line that does not add up to the figure above it.
+        counted = counted_sales_from(frozen, policy_of(snapshot))
         rate = frozen.get("commission_rate_bp")
         base_amount = int(frozen.get("base_amount_piastres") or 0)
         carried = _display_piastres(str(frozen.get("carried_piastres") or "0"))
@@ -301,7 +307,8 @@ def statement(
         fingerprint = None
     else:
         source = calculation
-        counted = calculation.earned_base_piastres
+        # Live, so the live rule by construction.
+        counted = calculation.earned_base_piastres + calculation.pending_base_piastres
         rate = calculation.commission_rate_bp
         base_amount = calculation.base_amount_piastres
         carried = _display_piastres(calculation.carried_piastres)

@@ -72,6 +72,10 @@ type OpenCorrection = {
   status: Balance["status"];
   month: string;
   recoverable_piastres: number;
+  /** What is left of the month's whole difference, money or not. */
+  outstanding_piastres: number;
+  /** `no_transfer_recorded` where the difference is real and nothing moved. */
+  review_reason: string | null;
 };
 
 type Outstanding = {
@@ -362,10 +366,18 @@ export function Payments({ session }: { session: Session }) {
             <section className="panel payments__corrections">
               <div className="panel__head payments__correction-head">
                 <div>
-                  <h2 className="panel__title">Unresolved earlier payments</h2>
+                  <h2 className="panel__title">Agreed months that have changed</h2>
                   <p className="payments__correction-lead">
-                    Decide whether each amount is carried forward or absorbed
-                    before it is forgotten at month end.
+                    {/*
+                     * F09. Not every row here is money: a month whose transfer
+                     * has not been recorded has a real difference and nothing
+                     * to take back, and it belongs in the queue as much as the
+                     * others. The figure beside the heading is only the part
+                     * that was advanced.
+                     */}
+                    Look at each one before another transfer is made. Where
+                    money was sent, decide whether it is carried forward or
+                    absorbed; the total is what has been advanced.
                   </p>
                 </div>
                 <Money
@@ -387,10 +399,12 @@ export function Payments({ session }: { session: Session }) {
                       )}
                       <span className="payments__correction-month">
                         {formatMonth(row.month)}
+                        {row.review_reason === "no_transfer_recorded" &&
+                          " · nothing sent yet"}
                       </span>
                     </span>
                     <Money
-                      piastres={row.recoverable_piastres}
+                      piastres={row.outstanding_piastres}
                       kind="agreed"
                       tone="owed"
                     />

@@ -1,7 +1,15 @@
-"""Pending-inclusive financial rules rehearsal. No approval or ledger writes.
+"""The pending-inclusive rules, read against one month. No ledger writes.
 
-D01 still owns transition. Legacy settlement links are shown for reconciliation,
-never subtracted from source sales or automatically turned into new debt.
+This was a rehearsal of a policy that had not been adopted. It is now a
+**reconciliation view of the live one**: the same counting rule as
+`calculate_month`, computed from delivery facts rather than ledger rows, so it
+can report what no ledger column carries — orders whose delivery state we have
+not been told, an attribution that needs review, an original basis that cannot
+be established.
+
+Legacy settlement links are still shown, and still for reconciliation: they say
+which earlier payroll paid an order left out of its own month under the old
+rule. They are never subtracted from source sales or turned into new debt.
 """
 
 from dataclasses import asdict
@@ -15,7 +23,7 @@ from app.models.payroll import PayrollMonth, PayrollSnapshot
 from app.services.commission.calculate import preview_calculation
 from app.services.commission.source import source_order
 from app.services.payments import allocated_to_month, balance_for
-from app.services.payroll import get_month, is_historical
+from app.services.payroll import PENDING_INCLUSIVE, get_month, is_historical
 
 
 def preview_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
@@ -60,10 +68,18 @@ def preview_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
         for order, settled, destination in links
     ]
     return {
-        "policy": "pending_inclusive_preview",
+        "policy": PENDING_INCLUSIVE,
         "month": month,
+        # **The policy is live; this view still approves nothing.** Approval
+        # has one route and one set of refusals, and a second way in would be
+        # a second set to keep in step.
+        "is_live_policy": True,
         "can_approve": False,
-        "activation_blockers": ["live_transition_not_enabled"],
+        # Empty since the transition. It carried
+        # `live_transition_not_enabled`, which is no longer true of anything -
+        # and a blocker that outlives its cause is worse than none, because
+        # somebody acts on it.
+        "activation_blockers": [],
         "source_complete": not any(fact.issues for fact in facts),
         "performance": {
             "counted_sales_piastres": calculation.earned_base_piastres + calculation.pending_base_piastres,

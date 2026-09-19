@@ -52,14 +52,21 @@ from sqlalchemy.orm import Session
 
 from app.core.businesstime import business_month, parse_month, utcnow
 from app.models.affiliates import AccountKind, AffiliateProfile
-from app.models.attributed_orders import AttributedOrder
+from app.models.attributed_orders import AttributedOrder, CommissionState
 from app.models.payroll import CalculationState, PayrollMonth, PayrollSnapshot
 from app.services.attribution import AttributionOutcome, resolve_order
 from app.services.audit import record_audit
 from app.services.policy import active_policy_for
+# F02. The policy names live beside the arithmetic that applies them and are
+# re-exported here, because a snapshot is where one is recorded: every caller
+# asking *which rule agreed this month* asks this module.
 from app.services.commission.calculate import (
+    COUNTED_STATES,
+    DELIVERED_ONLY,
+    PENDING_INCLUSIVE,
     MonthCalculation,
     calculate_month,
+    counted_states_for,
     not_settled_by_another_month,
 )
 
@@ -74,6 +81,8 @@ HOUSE_ACCOUNT = "house_accounts_are_never_owed"
 
 #: Approving twice would create a second obligation for one month.
 ALREADY_APPROVED = "month_is_already_approved"
+
+
 
 
 def get_month(
@@ -212,6 +221,12 @@ def _payload(
         {**_order_line(order), "business_month": order.business_month}
         for order in (carried or [])
     ]
+    # F02. Which rule agreed this figure, frozen with the figure itself. A
+    # month must be able to say what it counted long after the policy moved
+    # on, and every later question about it - was this order paid, is that
+    # difference a correction - is answered from this rather than from
+    # whatever the calculator does today.
+    body["policy"] = PENDING_INCLUSIVE
     # 05B. What this figure was computed from, in one short string. Frozen
     # here so a later question - *has anything moved since we agreed this?* -
     # is one comparison rather than a re-derivation of a month that is closed.
@@ -269,6 +284,37 @@ def source_version(
         ],
     }
     return content_hash(facts)[:16]
+
+
+def policy_of(snapshot: PayrollSnapshot) -> str:
+    """Which counting rule a snapshot was agreed under. F02.
+
+    Absent means `DELIVERED_ONLY`: every month approved before the transition
+    was agreed under the old rule, and none of them carries the flag.
+    """
+    return (snapshot.payload_json or {}).get("policy") or DELIVERED_ONLY
+
+
+def counted_in_snapshot(snapshot: PayrollSnapshot, shopify_order_id: str) -> bool:
+    """Did this agreed month already pay for this order?
+
+    **The one question the transition turns on.** An order left out of its own
+    month because it had not been delivered yet is still owed, and a later
+    payroll pays it (§11.4). An order its own month counted is paid, and
+    nothing may pay it again - however it is delivered afterwards.
+
+    Answered from the snapshot's frozen order list and the policy recorded
+    beside it, never from the order's state today: today's state is exactly
+    what changed, and reading it would answer a question about September using
+    facts from November.
+    """
+    counted = counted_states_for(policy_of(snapshot))
+    for line in (snapshot.payload_json or {}).get("orders") or []:
+        if line.get("shopify_order_id") == shopify_order_id:
+            return line.get("state") in counted
+    # Not in the snapshot at all. It reached us after the month was agreed, so
+    # that month cannot have paid for it.
+    return False
 
 
 def content_hash(payload: dict) -> str:
@@ -390,8 +436,14 @@ def approve_month(
     # until snapshots existed, and what lets a model's dashboard say "paid in
     # your September payment" rather than leaving them to work out the
     # difference.
+    #
+    # **Every order this figure counted, not only the delivered ones** (F02).
+    # A pending order the month paid for is paid, and the link saying so is
+    # what stops a later payroll offering it again when the courier confirms
+    # it. Leaving it unmarked would make the guarantee depend on nobody ever
+    # reading the order's state instead of the snapshot's.
     for order in [*orders, *carried]:
-        if order.counts_toward_payout and order.settled_in_snapshot_id is None:
+        if order.commission_state in COUNTED_STATES and order.settled_in_snapshot_id is None:
             order.settled_in_snapshot_id = snapshot.id
             order.settled_at = snapshot.approved_at
 
@@ -537,17 +589,31 @@ def carried_into(
     payroll pays an order, never about which month it belongs to - and
     conflating the two is what would make a model's own arithmetic disagree
     with their payment.
+
+    ## Since F02 this is a backlog, not a mechanism
+
+    The new policy counts a pending order in its own month, so no month
+    approved under it can leave one behind: there is nothing for a later
+    payroll to carry. What remains are the orders **delivered-only approvals
+    left out** — real sales, agreed under the old rule, still owed — and this
+    keeps paying exactly those.
+
+    That is what makes the transition reconcilable rather than a write-off of
+    other people's money. The set is finite, it is identified from each
+    snapshot's own frozen evidence (`counted_in_snapshot`), and it can only
+    shrink. Nothing is added to it again.
     """
     parse_month(month)
-    approved_months = {
-        row.month
+    approved = {
+        row.month: row.active_snapshot
         for row in db.scalars(
             select(PayrollMonth)
             .where(PayrollMonth.affiliate_id == affiliate.id)
             .where(PayrollMonth.calculation_state == CalculationState.APPROVED)
         )
+        if row.active_snapshot is not None
     }
-    if not approved_months:
+    if not approved:
         return []
 
     rows = db.scalars(
@@ -560,7 +626,12 @@ def carried_into(
     return [
         row
         for row in rows
-        if row.counts_toward_payout and row.business_month in approved_months
+        if row.counts_toward_payout
+        and row.business_month in approved
+        # **Only what its own month did not pay for.** Under the old rule that
+        # is every order still travelling at approval; under the new one it is
+        # nothing, because they were all counted where they belong.
+        and not counted_in_snapshot(approved[row.business_month], row.shopify_order_id)
     ]
 
 

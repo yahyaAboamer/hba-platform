@@ -26,6 +26,7 @@ from app.core.passwords import hash_password
 from app.db import engine
 from app.main import app
 from app.models.payouts import PayoutMethod
+from tests.support_policy import approved_before_the_switch
 
 #: Where their money goes, so a payment can freeze a masked copy of it.
 ADDRESS = 'https://ipn.eg/S/nour.mahmoud/instapay/8Xk2Qp' 
@@ -710,7 +711,11 @@ def test_a_carried_order_names_the_month_that_paid_it(admin):
     _terms(admin, affiliate["id"])
     _order(affiliate["id"], "1", 100_000)
     _order(affiliate["id"], "2", 200_000, state="pending")
-    _approve(admin, affiliate["id"], AUGUST)
+    # Agreed before ADR 0040, which is what leaves an order behind at all:
+    # the live rule counts a travelling order in its own month, so nothing
+    # new is ever carried. The backlog is still paid, and still explained.
+    with approved_before_the_switch():
+        _approve(admin, affiliate["id"], AUGUST)
 
     _deliver("2")
     _approve(admin, affiliate["id"], SEPTEMBER)
@@ -761,7 +766,10 @@ def test_the_month_that_paid_it_says_where_it_came_from(admin):
     )
     _order(affiliate["id"], "1", 100_000)
     _order(affiliate["id"], "2", 200_000, state="pending")
-    _approve(admin, affiliate["id"], AUGUST)
+    # As above: only a delivered-only agreement leaves an order for a later
+    # payroll to pay, and paying it at August's rate is what this checks.
+    with approved_before_the_switch():
+        _approve(admin, affiliate["id"], AUGUST)
 
     _deliver("2")
 

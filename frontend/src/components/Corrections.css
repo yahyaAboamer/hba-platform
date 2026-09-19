@@ -42,6 +42,16 @@
   white-space: nowrap;
 }
 
+/* F09. A difference with no money behind it yet. Amber rather than red:
+   nothing has gone wrong, and nobody is owed anything - somebody simply has
+   to look at it before the transfer is made. */
+.corrections__review {
+  max-width: 52ch;
+  font-size: var(--text-xs);
+  line-height: 1.55;
+  color: var(--owed);
+}
+
 .corrections__decide {
   padding: var(--space-4);
   border-top: 1px solid var(--rule);

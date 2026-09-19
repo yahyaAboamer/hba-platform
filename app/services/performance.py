@@ -35,6 +35,7 @@ from sqlalchemy.orm import Session
 from app.core.businesstime import parse_month
 from app.models.affiliates import AccountKind, AffiliateProfile
 from app.models.attributed_orders import AttributedOrder, CommissionState
+from app.services.commission.calculate import COUNTED_STATES
 from app.models.orders import OrderIndex
 from app.services.shopify.fulfilment import FAILED
 
@@ -77,12 +78,14 @@ def month_performance(db: Session, month: str) -> list[Standing]:
         select(
             AffiliateProfile.id,
             AffiliateProfile.name,
-            # Sales are what pays: delivered orders only, which is the live
-            # rule. 05A's pending-inclusive policy is a preview and is not
-            # what a rank is decided on.
+            # **Sales are what pays** - and since ADR 0040 that is delivered
+            # and pending together, never a failed delivery. It was
+            # delivered-only while the payroll engine was; a board ordered on
+            # one definition of sales while her month is paid on another is
+            # two answers to *how am I doing*.
             func.coalesce(
                 func.sum(AttributedOrder.commission_base_piastres).filter(
-                    AttributedOrder.commission_state == CommissionState.EARNED
+                    AttributedOrder.commission_state.in_(COUNTED_STATES)
                 ),
                 0,
             ),
@@ -233,10 +236,9 @@ def top_products(db: Session, month: str, *, limit: int = 10) -> dict:
             AttributedOrder.shopify_order_id == OrderLineItem.shopify_order_id,
         )
         .where(AttributedOrder.business_month == month)
-        # Counted sales only, matching the figure every other screen calls
-        # sales. A pending order has not sold anything yet and a failed one
-        # never will.
-        .where(AttributedOrder.commission_state == CommissionState.EARNED)
+        # Counted sales, matching the figure every other screen calls sales:
+        # delivered and pending, never a failed delivery (F02, ADR 0040).
+        .where(AttributedOrder.commission_state.in_(COUNTED_STATES))
         .group_by(OrderLineItem.shopify_product_id)
     ).all()
 
@@ -275,11 +277,12 @@ def best_sellers_for(db: Session, affiliate_id: int) -> list[ProductSales]:
     affiliate and every month, and it reads the same lines the same way:
     what the customer paid after her discount.
 
-    **Delivered orders only**, which is the live rule. The export counts
-    pending orders too; that is 05A's pending-inclusive policy, which is still
-    a preview and is not what anything shown to a model is decided on. A
-    product whose Shopify record was deleted has no id to group by and is left
-    out of the ranking, as it is on the admin list.
+    **Counted orders**, which is the live rule since ADR 0040: delivered and
+    pending, never a failed delivery. This read delivered-only while payroll
+    did, and the approved portal counts pending here too - so the change
+    closes a gap with the design as well as with the money. A product whose
+    Shopify record was deleted has no id to group by and is left out of the
+    ranking, as it is on the admin list.
     """
     from app.models.catalogue import OrderLineItem
 
@@ -296,7 +299,7 @@ def best_sellers_for(db: Session, affiliate_id: int) -> list[ProductSales]:
             AttributedOrder.shopify_order_id == OrderLineItem.shopify_order_id,
         )
         .where(AttributedOrder.affiliate_id == affiliate_id)
-        .where(AttributedOrder.commission_state == CommissionState.EARNED)
+        .where(AttributedOrder.commission_state.in_(COUNTED_STATES))
         .where(OrderLineItem.shopify_product_id.is_not(None))
         .group_by(OrderLineItem.shopify_product_id)
     ).all()

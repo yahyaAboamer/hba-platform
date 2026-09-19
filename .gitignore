@@ -10,6 +10,13 @@ frontend/dist/
 *.egg-info/
 design-preview/
 
+# The readiness audit, as supplied. Kept on disk as evidence and deliberately
+# not committed: its screenshots are authenticated staging captures carrying
+# real model names and real figures, and the repair brief is explicit about
+# not committing copies of data. The repair's own evidence - what changed,
+# what was run, what it produced - is in `docs/repair/`, which is committed.
+HBA_Readiness_Audit/
+
 # The design-parity handoff package: its two commits are in the history
 # (imported from its bundle) and its two documents are in docs/. What is left
 # in it is a duplicate bundle and patch of commits this repository already has.

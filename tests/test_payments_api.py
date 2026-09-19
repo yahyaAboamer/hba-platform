@@ -787,6 +787,110 @@ def test_a_carried_correction_can_leave_no_transfer_due(client):
     assert row["state"] == "settled"
 
 
+def test_a_month_awaiting_its_transfer_is_in_the_desk_queue(client):
+    """F09/A05, over HTTP.
+
+    An order failing between approval and payment used to leave the queue
+    empty: the row was dropped because nothing was recoverable, so the one
+    screen finance reads at month end said nothing had changed. Not inventing
+    a debt is right; hiding the change is not.
+    """
+    affiliate = _affiliate(client)
+    _owed(client, affiliate, AUGUST)
+
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "UPDATE attributed_order SET commission_state = 'void' "
+                "WHERE affiliate_id = :affiliate AND business_month = :month"
+            ),
+            {"affiliate": affiliate["id"], "month": AUGUST},
+        )
+
+    body = client.get(f"/api/payments/{SEPTEMBER}").json()
+    row = next(
+        row for row in body["open_corrections"] if row["affiliate_id"] == affiliate["id"]
+    )
+
+    assert row["outstanding_piastres"] == 200_000
+    assert row["recoverable_piastres"] == 0
+    assert row["needs_review"] is True
+    assert row["review_reason"] == "no_transfer_recorded"
+    # Nothing was advanced, so nothing is added to what she owes.
+    assert body["totals"]["open_corrections_piastres"] == 0
+
+    refused = client.post(
+        "/api/corrections",
+        json={
+            "affiliate_id": affiliate["id"],
+            "month": AUGUST,
+            "choice": "credit",
+            "reason": "nothing was sent",
+            "destination_month": SEPTEMBER,
+        },
+    )
+    assert refused.status_code == 400
+    assert "No transfer is recorded" in refused.json()["detail"]
+
+
+def test_a_repeated_correction_is_refused_rather_than_applied_twice(client):
+    """Duplicate and concurrent submissions, over HTTP.
+
+    A settlement can be partial now, so a second identical request is no
+    longer harmlessly idempotent - it would carry the same money into the same
+    month again. The screen sends the figure it displayed, and a request that
+    no longer matches it is answered 409: look again.
+    """
+    affiliate = _affiliate(client)
+    august = _owed(client, affiliate, AUGUST)
+    _owed(client, affiliate, SEPTEMBER)
+    client.post(
+        "/api/payments",
+        json={
+            "affiliate_id": affiliate["id"],
+            "amount_piastres": 200_000,
+            "allocations": [{"payroll_snapshot_id": august, "piastres": 200_000}],
+        },
+    )
+
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "UPDATE attributed_order SET commission_state = 'void' "
+                "WHERE affiliate_id = :affiliate AND business_month = :month"
+            ),
+            {"affiliate": affiliate["id"], "month": AUGUST},
+        )
+
+    shown = next(
+        row
+        for row in client.get(f"/api/payments/{SEPTEMBER}").json()["open_corrections"]
+        if row["affiliate_id"] == affiliate["id"]
+    )["outstanding_piastres"]
+
+    request = {
+        "affiliate_id": affiliate["id"],
+        "month": AUGUST,
+        "choice": "credit",
+        "reason": "Recover the transfer after the order failed",
+        "destination_month": SEPTEMBER,
+        "expected_outstanding_piastres": shown,
+    }
+
+    first = client.post("/api/corrections", json=request)
+    assert first.status_code == 201, first.text
+
+    # The retry a browser makes when it never learned the first one landed.
+    second = client.post("/api/corrections", json=request)
+    assert second.status_code == 409, second.text
+
+    # And exactly one recovery stands.
+    adjustments = client.get(
+        f"/api/affiliates/{affiliate['id']}/payments"
+    ).json()["adjustments"]
+    assert [row["amount_piastres"] for row in adjustments] == [200_000]
+
+
 def test_their_history_shows_payments_and_adjustments(client):
     """§11.5 requires adjustments to be visible to them - a credit they cannot
     see is a credit they cannot check.

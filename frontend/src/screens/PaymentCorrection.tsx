@@ -15,6 +15,11 @@ type Correction = {
   paid_piastres: number;
   recoverable_piastres: number;
   snapshot_version: number;
+  /** The month's whole difference, and how much of it is still open. */
+  shortfall_piastres: number;
+  resolved_piastres: number;
+  outstanding_piastres: number;
+  review_reason: string | null;
 };
 
 type Body = { name: string; corrections: Correction[] };
@@ -68,6 +73,9 @@ export function PaymentCorrection({ session }: { session: Session }) {
         month: row.month,
         choice,
         reason: reason.trim(),
+        // What this screen was showing. A settlement can be partial now, so a
+        // repeated submission is refused rather than recovering twice.
+        expected_outstanding_piastres: row.outstanding_piastres,
         ...(choice === "credit" ? { destination_month: destination } : {}),
       });
       setDecided({ choice, destination, reason: reason.trim() });
@@ -78,7 +86,12 @@ export function PaymentCorrection({ session }: { session: Session }) {
     }
   }
 
-  const ready = reason.trim() !== "" && (choice === "writeoff" || destination !== "");
+  // F09. Nothing was sent, so neither choice is about money and both would be
+  // refused by the server. The card above says what to do instead; the
+  // buttons stay out of the way rather than standing there to be pressed.
+  const recoverable = (row?.recoverable_piastres ?? 0) > 0;
+  const ready =
+    recoverable && reason.trim() !== "" && (choice === "writeoff" || destination !== "");
 
   return (
     <>
@@ -125,11 +138,36 @@ export function PaymentCorrection({ session }: { session: Session }) {
                     <dt>What the month is worth now</dt>
                     <dd><Money piastres={row.now_piastres} kind="agreed" /></dd>
                   </div>
+                  {/* Only where part of it has already been dealt with - a
+                      second failure against a month that was carried once. */}
+                  {row.resolved_piastres > 0 && (
+                    <div>
+                      <dt>Already carried or absorbed</dt>
+                      <dd><Money piastres={row.resolved_piastres} kind="agreed" /></dd>
+                    </div>
+                  )}
                   <div>
-                    <dt>Recoverable difference</dt>
+                    <dt>Difference still open</dt>
+                    <dd><Money piastres={row.outstanding_piastres} kind="agreed" tone="owed" /></dd>
+                  </div>
+                  <div>
+                    <dt>Recoverable</dt>
                     <dd><Money piastres={row.recoverable_piastres} kind="agreed" tone="owed" /></dd>
                   </div>
                 </dl>
+                {/*
+                 * F09. The difference is real and nothing was sent, so there
+                 * is nothing to take back - said here rather than left to be
+                 * read off a recoverable zero.
+                 */}
+                {row.review_reason === "no_transfer_recorded" && (
+                  <p className="pay-detail__faint">
+                    No transfer is recorded against {formatMonth(month)}, so
+                    there is nothing to recover from it. Record the transfer
+                    that was made, or leave the agreed figure to be paid in
+                    full.
+                  </p>
+                )}
                 <p className="pay-detail__faint">
                   {formatMonth(month)} keeps its approved calculation and its
                   recorded payment. Only its sales performance reflects the change.

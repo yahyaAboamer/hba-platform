@@ -125,7 +125,14 @@ def test_a_month_reports_what_it_is_worth(client):
     assert body["is_payable"] is True
 
 
-def test_pending_rules_preview_counts_pending_without_switching_payroll(client):
+def test_reading_the_rules_view_agrees_with_payroll_and_writes_nothing(client):
+    """ADR 0040. Two screens, one figure, and nothing recorded by looking.
+
+    The name used to end *without switching payroll*, which was the defect:
+    the view counted a pending order and payroll did not. They agree now. What
+    has not changed is that reading either one writes no snapshot, no payment
+    and no settlement link.
+    """
     affiliate = _affiliate(client)
     _terms(client, affiliate["id"])
     _paid_order(affiliate["id"], "pending-preview", 2_000_000, state="pending")
@@ -142,9 +149,16 @@ def test_pending_rules_preview_counts_pending_without_switching_payroll(client):
     assert preview is not None, "05A must expose a read-only pending-inclusive preview"
     assert preview["current_entitlement"]["payout"]["piastres"] == 200_000
     assert preview["performance"]["counted_sales_piastres"] == 2_000_000
+    # The view still approves nothing - approval has one route and one set of
+    # refusals - but it no longer reports a policy waiting to be switched on.
     assert preview["can_approve"] is False
-    assert body["payout"]["piastres"] == 0
-    assert client.get(url).json()["payout"]["piastres"] == 0
+    assert preview["is_live_policy"] is True
+    assert preview["activation_blockers"] == []
+    # ADR 0040. The ordinary earnings figure counts the pending order too, so
+    # the two screens agree; reading one figure here and another there was the
+    # defect the repair was written for.
+    assert body["payout"]["piastres"] == 200_000
+    assert client.get(url).json()["payout"]["piastres"] == 200_000
     with engine.connect() as connection:
         assert connection.scalar(text("SELECT count(*) FROM payroll_snapshot")) == 0
         assert connection.scalar(text("SELECT count(*) FROM payment_transaction")) == 0

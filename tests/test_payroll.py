@@ -447,14 +447,35 @@ def test_approving_records_which_payroll_paid_each_order(db):
     assert order.settled_at is not None
 
 
-def test_an_order_that_did_not_pay_is_not_marked_settled(db):
-    """A pending order was not paid by this payroll, and saying it was would
-    make the label lie.
+def test_every_order_the_month_paid_for_is_marked_settled(db):
+    """F02, and the structural half of *never twice*.
+
+    A pending order **is** paid by this payroll now - the month counted it -
+    so the link saying which payroll paid it has to say so. It used to be left
+    unmarked, correctly, under a rule that did not pay for it.
+
+    The mark is what stops a later month offering the same order again when
+    the courier confirms it. Leaving it off would make that guarantee depend
+    on nobody reading the order's state instead of the snapshot's.
     """
     affiliate = _affiliate(db)
     _terms(db, affiliate)
     _order(db, affiliate, "1", 200_000)
     _order(db, affiliate, "2", 50_000, state=CommissionState.PENDING)
+
+    snapshot = approve_month(db, affiliate, MONTH)
+
+    assert db.get(AttributedOrder, "1").settled_in_snapshot_id == snapshot.id
+    assert db.get(AttributedOrder, "2").settled_in_snapshot_id == snapshot.id
+
+
+def test_a_failed_order_is_not_marked_settled(db):
+    """Nothing was paid for it, in either policy, and the label must not say
+    otherwise."""
+    affiliate = _affiliate(db)
+    _terms(db, affiliate)
+    _order(db, affiliate, "1", 200_000)
+    _order(db, affiliate, "2", 50_000, state=CommissionState.VOID)
 
     approve_month(db, affiliate, MONTH)
 

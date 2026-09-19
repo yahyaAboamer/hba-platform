@@ -15,6 +15,18 @@ type Correction = {
   paid_piastres: number;
   recoverable_piastres: number;
   snapshot_version: number;
+  /** The whole difference this month has come to, however many orders made it. */
+  shortfall_piastres: number;
+  /** How much of that has already been carried or absorbed. */
+  resolved_piastres: number;
+  /** What is left of it — what this row is still about. */
+  outstanding_piastres: number;
+  /**
+   * Why it still needs somebody, when no money can move. Today the only
+   * value is `no_transfer_recorded`: the difference is real and nothing was
+   * ever sent, so there is nothing to take back.
+   */
+  review_reason: string | null;
 };
 
 type Body = {
@@ -81,6 +93,11 @@ export function Corrections({
         month: deciding.month,
         choice,
         reason,
+        // What this screen was showing when the choice was made. A settlement
+        // can be partial now, so a retried request is no longer harmlessly
+        // repeated - sending the figure turns a duplicate into a refusal
+        // rather than a second recovery of the same money.
+        expected_outstanding_piastres: deciding.outstanding_piastres,
         ...(choice === "credit" ? { destination_month: destination } : {}),
       });
       setDeciding(null);
@@ -134,20 +151,55 @@ export function Corrections({
                 Agreed <Money piastres={row.agreed_piastres} kind="agreed" />,
                 now worth <Money piastres={row.now_piastres} />, sent{" "}
                 <Money piastres={row.paid_piastres} />
+                {/*
+                 * Only where part of it has been dealt with. A month can be
+                 * corrected twice - a second parcel fails weeks after the
+                 * first was carried - and the row has to say which part of
+                 * the difference is still open, or the figure beside it reads
+                 * as the whole month a second time.
+                 */}
+                {row.resolved_piastres > 0 && (
+                  <>
+                    {" · "}
+                    <Money piastres={row.resolved_piastres} /> of{" "}
+                    <Money piastres={row.shortfall_piastres} /> already settled
+                  </>
+                )}
               </span>
+              {/*
+               * F09. The difference is real and none of it is recoverable,
+               * because nothing was ever sent. Said here rather than shown as
+               * a recoverable E£0.00 beside a button that refuses.
+               */}
+              {row.review_reason === "no_transfer_recorded" && (
+                <span className="corrections__review">
+                  No transfer recorded yet, so there is nothing to take back.
+                  Record the transfer that was made, or leave the agreed
+                  figure to be paid in full.
+                </span>
+              )}
+              {row.review_reason === "difference_exceeds_what_was_sent" && (
+                <span className="corrections__review">
+                  Everything sent has already been recovered. The rest is a
+                  difference against money not yet transferred, and can be
+                  recovered once it is.
+                </span>
+              )}
             </div>
             <span className="corrections__amount">
-              <Money piastres={row.recoverable_piastres} tone="owed" />
+              <Money piastres={row.outstanding_piastres} tone="owed" />
             </span>
-            {can(session, "payments.record") && deciding?.month !== row.month && (
-              <button
-                type="button"
-                className="button"
-                onClick={() => setDeciding(row)}
-              >
-                Decide
-              </button>
-            )}
+            {can(session, "payments.record") &&
+              row.recoverable_piastres > 0 &&
+              deciding?.month !== row.month && (
+                <button
+                  type="button"
+                  className="button"
+                  onClick={() => setDeciding(row)}
+                >
+                  Decide
+                </button>
+              )}
           </li>
         ))}
       </ul>
@@ -158,6 +210,14 @@ export function Corrections({
             {formatMonth(deciding.month)} —{" "}
             <Money piastres={deciding.recoverable_piastres} tone="owed" />
           </h3>
+          {/* What can be recovered is capped by what was actually sent, so it
+              is not always the whole outstanding difference. */}
+          {deciding.recoverable_piastres < deciding.outstanding_piastres && (
+            <p className="detail__note">
+              <Money piastres={deciding.outstanding_piastres} /> is outstanding;
+              this is what was sent and can be taken back.
+            </p>
+          )}
 
           <label className="field">
             <span className="field__label">Why?</span>
@@ -194,6 +254,14 @@ export function Corrections({
             <span className="detail__note">
               A carried correction takes as much of that month as it needs,
               including a guaranteed minimum. That month can come to nothing.
+              {/*
+               * F12, and the part somebody choosing needs to know before they
+               * press: a month with less in it than the correction takes what
+               * it can, and the rest waits for a later one rather than being
+               * refused or forgotten.
+               */}
+              {" "}If it cannot take all of it, what is left stays against{" "}
+              {formatMonth(deciding.month)} for a later month.
             </span>
           </label>
 
