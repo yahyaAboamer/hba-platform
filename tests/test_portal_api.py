@@ -1370,9 +1370,14 @@ def test_a_historical_month_counts_its_orders_the_same_way(admin, monkeypatch):
     body = _sign_in().get("/api/me/earnings/2025-11").json()
 
     assert body["state"] == "historical"
-    assert body["orders"] == {"earned": 1, "pending": 1, "void": 1}
+    # R3. The same shape as any other month, counted the same way: what she
+    # sold is not a question the platform answers differently either side of
+    # go-live.
+    assert body["orders"] == {"earned": 1, "pending": 1, "void": 1, "counted": 2}
+    assert body["sales"]["counted_piastres"] == 140_000
     assert body["sales"]["earned_piastres"] == 100_000
     assert body["sales"]["pending_piastres"] == 40_000
+    assert body["sales"]["failed_piastres"] == 25_000
     # And every order is listed, exactly as in any other month.
     assert len(body["orders_detail"]) == 3
     # The one thing still withheld: March's rates live in the old system, and
@@ -1595,18 +1600,28 @@ def test_the_average_order_is_absent_rather_than_zero(admin):
     assert counted["sales"]["average_order"] == _egp(75_000)
 
 
-def test_an_order_still_travelling_is_left_out_of_the_average(admin):
-    """It has no settled base to average, and including it would describe no
-    order they actually made."""
+def test_a_travelling_order_is_part_of_the_average(admin):
+    """R3, F02. The average is of the orders the month is paid on.
+
+    It left a travelling order out, on the reasoning that it had no settled
+    base - true while the month did not count it, and false since. An average
+    over the delivered half, printed beside a figure earned on both, describes
+    no month she had.
+
+    A failed delivery is still excluded: it earned nothing and never will.
+    """
     affiliate = _affiliate(admin)
     _terms(admin, affiliate["id"])
     _order(affiliate["id"], "9105", 100_000, month=SEPTEMBER)
     _deliver("9105")
     _order(affiliate["id"], "9106", 900_000, month=SEPTEMBER, state="pending")
+    _order(affiliate["id"], "9107", 800_000, month=SEPTEMBER, state="void")
 
     body = _sign_in().get(f"/api/me/earnings/{SEPTEMBER}").json()
 
-    assert body["sales"]["average_order_piastres"] == 100_000
+    # E£10,000 over two counted orders.
+    assert body["sales"]["average_order_piastres"] == 500_000
+    assert body["sales"]["counted_piastres"] == 1_000_000
 
 
 # ── Phase 3: what one order was worth ────────────────────────────────────────

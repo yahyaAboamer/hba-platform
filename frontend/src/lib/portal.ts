@@ -130,10 +130,23 @@ export type MyEarnings = {
    */
   not_started: boolean;
   sales: {
+    /**
+     * **What the month is paid on** (F02): delivered and pending together,
+     * never a failed delivery. This is *net sales counted* on her Home card,
+     * and the figure the year chart plots.
+     */
+    counted_piastres: number;
+    counted: string;
+    counted_orders: number;
+    /** The delivered half of that. */
     earned_piastres: number;
     earned: string;
+    /** The half still travelling. */
     pending_piastres: number;
     pending: string;
+    /** What did not arrive. Counted for nothing, and still worth saying. */
+    failed_piastres: number;
+    failed: string;
     /**
      * What a counted order was worth, on average. `null` at zero counted
      * orders - the difference between *your average order is worth nothing*
@@ -160,6 +173,8 @@ export type MyEarnings = {
     earned: number;
     pending: number;
     void: number;
+    /** Delivered plus pending: the orders the month is paid on. */
+    counted: number;
     /**
      * How often her code was used (M01, D03). **Not the sum of the three
      * above**: those are commission states and this is a delivery outcome, so

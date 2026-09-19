@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { Money } from "../components/Money";
@@ -52,6 +52,9 @@ export function PaymentCorrection({ session }: { session: Session }) {
   const [reason, setReason] = useState("");
   const [working, setWorking] = useState(false);
   const [decided, setDecided] = useState<{ choice: Choice; destination: string; reason: string } | null>(null);
+  // R2. One name for one decision, kept across retries rather than minted per
+  // render - a new value on every attempt would be a new decision each time.
+  const operation = useRef(`correction:${affiliateId}:${month}:${crypto.randomUUID()}`);
 
   useEffect(() => {
     api
@@ -74,8 +77,11 @@ export function PaymentCorrection({ session }: { session: Session }) {
         choice,
         reason: reason.trim(),
         // What this screen was showing. A settlement can be partial now, so a
-        // repeated submission is refused rather than recovering twice.
+        // repeated submission must not recover twice.
         expected_outstanding_piastres: row.outstanding_piastres,
+        // R2. One name for one decision, held across retries: a request that
+        // arrives again is answered with the recovery the first one made.
+        operation_key: operation.current,
         ...(choice === "credit" ? { destination_month: destination } : {}),
       });
       setDecided({ choice, destination, reason: reason.trim() });
@@ -86,12 +92,14 @@ export function PaymentCorrection({ session }: { session: Session }) {
     }
   }
 
-  // F09. Nothing was sent, so neither choice is about money and both would be
-  // refused by the server. The card above says what to do instead; the
-  // buttons stay out of the way rather than standing there to be pressed.
+  // R4. Nothing was sent, so there is nothing to carry into a later month -
+  // but HBA can still absorb the difference and pay the agreed figure in
+  // full, which is a decision and is recorded as one. Only the carry is out
+  // of reach here.
   const recoverable = (row?.recoverable_piastres ?? 0) > 0;
   const ready =
-    recoverable && reason.trim() !== "" && (choice === "writeoff" || destination !== "");
+    reason.trim() !== "" &&
+    (choice === "writeoff" ? true : recoverable && destination !== "");
 
   return (
     <>

@@ -187,21 +187,37 @@ the preview/live split (`test_financial_rules_preview.py`,
 
 Frontend: `npx tsc --noEmit` clean, `npm test` **321 passed**, build passes.
 
-### Migration: none, and that is deliberate
+### Migration and rollback
 
-**No schema change and no data rewritten.** The policy a month was agreed
-under is recorded inside the snapshot payload that already exists, and its
-*absence* is the marker for every month agreed before the switch — so nothing
-has to be backfilled, and no approved month is touched to make the new code
-work. Rolling back is redeploying the previous build: months approved in
-between carry a `policy` key the old code ignores, and the old code's
-delivered-only carry would resume from the same frozen evidence.
+**Batch 1 itself changed no schema.** The policy a month was agreed under
+lives inside the snapshot payload that already exists, and its *absence* is
+the marker for every month agreed before the switch, so nothing was
+backfilled and no approved month was touched.
 
-The one visible consequence of a rollback is that months approved under the
-new rule would have counted pending orders the old rule would then try to
-carry again — which `settled_in_snapshot_id` already prevents, because
-approval marked them. That is the reason the marking was made structural
-rather than left to the payload.
+**The follow-up does change schema**, deliberately and additively —
+`b1f0a40c0001`, in response to R1 and R2. It adds two adjustment kinds
+(`release`, `accepted`) and a nullable unique `operation_key`. No row is
+rewritten. The downgrade **refuses** rather than deleting: if any adjustment
+of the two new kinds exists, it raises, because each is a decision somebody
+made about real money and a migration that silently dropped them would lose
+the record of it.
+
+**Rolling the application back** to the pre-Batch-1 build leaves months
+approved under the new rule carrying a `policy` key the old code ignores.
+What protects those months is not the key but `settled_in_snapshot_id`: the
+new approval marks every order it counted, including pending ones, so the old
+delivered-only carry cannot offer them to a later payroll. That is why the
+marking was made structural rather than left to payload archaeology, and
+`test_a_legacy_carried_order_is_not_paid_twice_after_it_is_carried` is the
+test that holds it.
+
+**What is still unproven, and is a release gate rather than a claim.** The old
+code's `correction_for` would compare a snapshot agreed pending-inclusive
+against a delivered-only recalculation and report a difference that is a
+policy change rather than an event. On a rollback, corrections for months
+approved in between should therefore be treated as suspect until re-derived.
+Exercising that against a restored copy is Batch 4's release evidence; it has
+not been done, and nothing here should be read as saying it has.
 
 ### Reconciliation dry run
 
@@ -251,14 +267,150 @@ retry is refused. No layout or design work was done on them; that is Batch 3.
   month's balance then reads as overpaid, which is accurate and easy to
   misread. Binding those figures deliberately is A02, in Batch 2; noting it
   here so it is not discovered there as a surprise.
-- **D09 is untouched** — a delivery failure later found to be wrong, after a
-  deduction has been used. Still open, as it was.
+- **D09 is decided, not open.** An earlier version of this report and of ADR
+  0040 called it outstanding. It is not: the owner settled it on 12 September
+  — a delivery outcome is final, so a recovery made on a failure that later
+  proves to have been a delivery cannot arise. Corrected in both places, and
+  the scope is not reopened.
 - **No integration run against real data.** The reconciliation dry run has
   been written and not pointed at anything but the test database.
 - **A02, A06, A08, A09, A11, A12 are Batch 2** and unchanged here. A01's fix
   changes the figures A02 mis-binds; the mis-binding itself remains.
 - **Nothing here is visually verified.** No screenshots were taken and no
   parity claim is made for the three screens touched.
+
+## Follow-up review, 19 September — R1 to R4
+
+Reviewed at `f46971e`. Four required repairs, all on this branch.
+
+### R1 — a draft destination could consume more than its final earnings
+
+A carry is accepted against a month before that month is agreed, on what it
+is worth then (F07, F12). The month can be agreed lower, and E£200 of
+deduction would sit on a month with E£100 in it: the balance read **−E£100,
+"overpaid"**, on a month nothing had been transferred for, while the source
+correction read as fully resolved. What the month could not take was tracked
+nowhere.
+
+**Fixed at approval.** `_release_deductions_the_month_cannot_take` compares
+what is landing with what the month is actually worth and hands back the
+excess as an append-only `release`, carrying the same source and destination
+as the credit it un-applies. Both ends net it: `credited_into` drops to what
+the month could take, and the source correction opens again by exactly the
+remainder, for any later month or year. **The credit is never edited** — what
+was chosen and what could be applied are different facts and the ledger keeps
+both. Where two corrections share a destination, the later claim gives way
+first; the earlier one was accepted when the month had room.
+
+**Approval now also freezes and fingerprints the deductions.**
+`deductions_landing_on` feeds both `_payload` and `source_version`, so a
+deduction added, changed or released between the preview and the commit
+refuses the approval instead of quietly changing the settlement the reviewer
+agreed. The key is added to the fingerprint only when there is a deduction,
+so every snapshot agreed before this compares equal exactly as it did.
+
+Tests (`tests/test_corrections.py`): destination falls 200 → 100, applies 100
+and returns 100; falls to zero, returns all of it; two sources sharing one
+destination; a deduction accepted after the preview raising `SourceMoved`; a
+remainder released in one year and carried the next.
+
+### R2 — duplicate and concurrent protection was not atomic
+
+`resolve` read the correction, checked the expected figure, read capacity and
+then wrote — with nothing serialising the three. Two sessions could both
+read the same outstanding amount and both pass. The sequential retry test
+could never reach that.
+
+**Fixed with a lock and an identity.** The source month's row is locked
+`FOR UPDATE` before the correction is computed, and the destination's before
+its capacity is read; the order is always source then destination, which is
+why two of these cannot deadlock. `operation_key` is now required at the API,
+unique in the database, and checked first — so a retry after a lost response
+is answered with the row the first attempt wrote rather than a 409 it cannot
+interpret. `expected_outstanding_piastres` is required too; its absence used
+to mean *proceed anyway*, which made the protection optional for exactly the
+callers most likely to need it. A destination earlier than its source is
+refused by the server.
+
+Tests (`tests/test_correction_concurrency.py`, **real separate PostgreSQL
+sessions on threads, committing**): two sessions resolving one correction;
+two corrections aiming at one destination; a retry with the same key.
+
+**They were verified to fail without the fix.** With `_lock_month` neutered,
+two of the three fail — the double recovery and the shared destination — and
+all three pass with it. The third passes either way, because the unique key
+alone settles a true retry; that is the division of labour between the two
+guards, and it is worth knowing which one is carrying which case.
+
+### R3 — Model Home and the sales chart still excluded pending sales
+
+The calculator was switched and her screen was not: *Net sales counted* read
+`sales.earned_piastres`, the delivered half, while the figure above it was
+earned on both. E£10,000 travelling showed **E£1,000 earned on E£0 of sales**.
+
+**Fixed at the contract.** `source_month_sales` reads the month's own orders
+and returns counted, delivered, pending and failed separately; `my_month`
+exposes all four, `my_year` plots counted, and `MyMonth.tsx` renders
+`counted_piastres`. The statement path keeps reading the snapshot under its
+own frozen policy, so an approved month still says what it always said.
+
+**And performance no longer comes from the payment calculator.** That
+calculation excludes an order a different month's payroll settled — it must,
+or the transition would pay one twice — which made an August sale vanish from
+August because September settled it. Her sales are now the month's own
+orders, whoever paid the commission.
+
+Tests (`tests/test_financial_transition.py`): pending-only; a mixed month;
+delivery adding nothing and failure subtracting; an order settled elsewhere
+still counting as its own month's sales. Plus `tests/test_portal_api.py`,
+where the average order is now over counted orders and a failed delivery is
+still excluded.
+
+### R4 — an unpaid correction could be seen but not finished
+
+The queue showed it and refused every way of ending it: the same
+`recoverable_piastres <= 0` guard blocked absorbing as well as recovering.
+
+**Fixed with a decision that is not a write-off.** Choosing *HBA absorbs it*
+on a month nothing was sent for records an `accepted` — the agreed figure
+stands, HBA takes the difference, no money moves. It is deliberately not the
+generic write-off path, whose source-balance arithmetic reduces what is still
+owed and would pay her less than was agreed. `adjusted_against` excludes it
+for that reason; `_resolved_so_far` counts it, so the review closes and a
+*later* failure still surfaces only its own additional difference.
+
+Tests (`tests/test_corrections.py`): absorb before payment, with the payable
+unchanged; the transfer recorded afterwards, settling to zero and raising no
+new notice; a second failure afterwards offering only the new difference.
+
+### Documentation and release-gate corrections
+
+- **D09 is decided, not open.** Corrected in ADR 0040 and above; the scope is
+  not reopened.
+- **The resumable test loop** recorded every outcome as `RESULT`, read its
+  result from `tail` rather than pytest's exit status, and truncated its own
+  log on rerun — so a failure could be skipped as done. `CLAUDE.md` now keeps
+  the exit code, records `PASS`/`FAIL` distinctly, stamps the revision, and
+  never truncates.
+- **`reconcile.py` now opens the read-only transaction it claimed.** `SET
+  TRANSACTION READ ONLY` is issued before it reads, and a write from inside it
+  is refused by PostgreSQL — verified: `cannot execute CREATE TABLE in a
+  read-only transaction`. It has been run against the disposable database; it
+  has **not** been run against a restored copy of real data, which remains a
+  release gate.
+- **Rollback**: see the migration section above, including what is still
+  unproven.
+
+### Noted, not fixed: a write-off still reduces what a month is owed
+
+Absorbing money that *was* advanced (a genuine `writeoff`) is counted by
+`adjusted_against`, so it lowers the balance still to transfer for that
+month. On a month agreed at E£2,000, paid E£100 and now worth nothing,
+absorbing the E£100 leaves E£1,800 to send rather than E£1,900 — the model
+ends up E£100 short of the agreement. That is ADR 0035's existing arithmetic,
+not something R1–R4 changed, and the R4 test asserts only that an `accepted`
+leaves the balance *unchanged* rather than endorsing the figure beside it.
+Worth a decision in Batch 2 alongside A02.
 
 ## Exact next task
 

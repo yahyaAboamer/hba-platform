@@ -68,6 +68,34 @@ class AdjustmentType:
     #: A bookkeeping correction that is neither of the above.
     CORRECTION = "correction"
 
+    #: **Part of a credit that its destination month could not take** (R1).
+    #:
+    #: A carry is accepted against a month before that month is agreed, on
+    #: what it is worth at the time. The month can be agreed lower, and the
+    #: difference has to go somewhere: it goes back to the source correction,
+    #: as an append-only row that un-applies exactly that much at both ends.
+    #:
+    #: It carries the same source and destination as the credit it releases,
+    #: so both `_resolved_so_far` and `credited_into` net it out. **The credit
+    #: itself is never edited** - what was chosen and what could be applied
+    #: are different facts, and the ledger keeps both.
+    RELEASE = "release"
+
+    #: **HBA absorbs a difference on a month nothing was sent for** (R4).
+    #:
+    #: A month agreed at E£2,000 that now calculates to E£1,800, with no
+    #: transfer recorded, has a real difference and nothing to recover: no
+    #: money moved, so none can come back. §11.5 still needs somebody to
+    #: decide, and this records that they did - *the agreed figure stands and
+    #: HBA takes the difference*.
+    #:
+    #: **It is not a write-off**, and the distinction is the whole reason it
+    #: exists. A write-off against a month still owed reduces what is owed,
+    #: which is the opposite of absorbing a loss: it would quietly pay her
+    #: less. This closes the review and leaves the payable exactly where the
+    #: agreement put it, which is why `adjusted_against` does not count it.
+    ACCEPTED = "accepted"
+
 
 VALID_ADJUSTMENT_TYPES = frozenset(
     value
@@ -257,13 +285,21 @@ class PayrollAdjustment(Base):
     __tablename__ = "payroll_adjustment"
     __table_args__ = (
         CheckConstraint(
-            "type IN ('credit', 'writeoff', 'correction')",
+            "type IN ('credit', 'writeoff', 'correction', 'release', 'accepted')",
             name="payroll_adjustment_type_valid",
         ),
         CheckConstraint(
             "amount_piastres > 0", name="payroll_adjustment_amount_positive"
         ),
+        # R2. One decision, one row, however many times the request arrives.
+        # The same guarantee `payment_transaction` already has, and for the
+        # same reason: a retry the browser makes because it never learned the
+        # first attempt landed must not recover the money twice.
+        UniqueConstraint(
+            "operation_key", name="payroll_adjustment_operation_key_unique"
+        ),
         Index("payroll_adjustment_source_idx", "source_payroll_month_id"),
+        Index("payroll_adjustment_destination_idx", "destination_payroll_month_id"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -285,6 +321,13 @@ class PayrollAdjustment(Base):
     #: **Required.** An adjustment is money moving without a transfer, and the
     #: only thing that makes it auditable is why.
     reason: Mapped[str] = mapped_column(Text, nullable=False)
+
+    #: R2. What one decision is called, so the same decision arriving twice is
+    #: one row. `NULL` for the rows written before this existed and for the
+    #: internal releases approval writes, which are keyed by the month they
+    #: belong to instead; Postgres treats NULLs as distinct, so the unique
+    #: constraint costs those nothing.
+    operation_key: Mapped[str | None] = mapped_column(String(80))
 
     created_by: Mapped[int | None] = mapped_column(
         ForeignKey("user_account.id", ondelete="SET NULL")

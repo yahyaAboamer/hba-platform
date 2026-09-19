@@ -61,7 +61,7 @@ sales as belonging to nobody, which is a different and wrong answer.
 from dataclasses import dataclass, field
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.businesstime import parse_month
@@ -102,6 +102,69 @@ DELIVERED_ONLY = "delivered_only"
 #: arithmetic that sums them. Approval settles exactly these, so what a month
 #: paid for and what it recorded paying for cannot drift apart.
 COUNTED_STATES = (CommissionState.EARNED, CommissionState.PENDING)
+
+
+@dataclass(frozen=True)
+class SourceMonthSales:
+    """What a month sold, whoever ended up paying the commission on it. R3.
+
+    **Every order attributed to the month**, with no settlement filter. The
+    payment calculation excludes an order a *different* month's payroll
+    settled, and it has to: paying it twice is the one thing the transition
+    guards against. But that is a fact about which payroll paid, not about
+    when the sale happened — and a model's own screen answers the second
+    question.
+
+    Reading her performance out of the payment calculator made a legacy
+    carried order vanish from the month she actually sold it in. Her August
+    sales fell because September's payroll paid one of them, which is not
+    something that happened to August.
+    """
+
+    counted_piastres: int = 0
+    delivered_piastres: int = 0
+    pending_piastres: int = 0
+    failed_piastres: int = 0
+    counted_orders: int = 0
+    delivered_orders: int = 0
+    pending_orders: int = 0
+    failed_orders: int = 0
+
+
+def source_month_sales(
+    db: Session, affiliate: AffiliateProfile, month: str
+) -> SourceMonthSales:
+    """Her sales for one month, by delivery outcome. F02, F13, R3."""
+    parse_month(month)
+    rows = db.execute(
+        select(
+            AttributedOrder.commission_state,
+            func.count(AttributedOrder.shopify_order_id),
+            func.coalesce(func.sum(AttributedOrder.commission_base_piastres), 0),
+        )
+        .where(AttributedOrder.affiliate_id == affiliate.id)
+        .where(AttributedOrder.business_month == month)
+        .group_by(AttributedOrder.commission_state)
+    ).all()
+
+    by_state = {state: (int(count or 0), int(base or 0)) for state, count, base in rows}
+    delivered_orders, delivered = by_state.get(CommissionState.EARNED, (0, 0))
+    pending_orders, pending = by_state.get(CommissionState.PENDING, (0, 0))
+    failed_orders, failed = by_state.get(CommissionState.VOID, (0, 0))
+
+    return SourceMonthSales(
+        # F02: what the month is paid on. The two are kept beside it rather
+        # than folded away - *counted* is the money and *delivered/pending* is
+        # how far along it is, and her screen says both.
+        counted_piastres=delivered + pending,
+        delivered_piastres=delivered,
+        pending_piastres=pending,
+        failed_piastres=failed,
+        counted_orders=delivered_orders + pending_orders,
+        delivered_orders=delivered_orders,
+        pending_orders=pending_orders,
+        failed_orders=failed_orders,
+    )
 
 
 def counted_sales_from(figures: dict, policy: str = PENDING_INCLUSIVE) -> int:

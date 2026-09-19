@@ -101,7 +101,10 @@ export function MyMonth() {
       <div className="portal-home__amount">{body.amount_piastres === null ? "—" : <Money piastres={body.amount_piastres} />}</div>
       {body.amount_piastres === null && <p className="portal-home__note">Earnings are not available for this month yet.</p>}
       <div className="portal-home__metrics">
-        <div><span>Net sales counted</span><strong><Money piastres={body.sales.earned_piastres} /></strong></div>
+        {/* F02. What the month is paid on - delivered and pending together.
+            It showed the delivered part while the figure above it was worked
+            out on both, so the card disagreed with itself. */}
+        <div><span>Net sales counted</span><strong><Money piastres={body.sales.counted_piastres} /></strong></div>
         <div><span>Code uses</span><strong>{body.orders.uses ?? "—"}</strong></div>
       </div>
       {/*
@@ -114,8 +117,8 @@ export function MyMonth() {
        * did not happen.
        */}
       <div className="portal-home__states">
-        <Link to="/orders?status=earned">{body.orders.earned} counted</Link>
-        <Link to="/orders?status=pending">{body.orders.pending} pending</Link>
+        <Link to="/orders?status=earned">{body.orders.earned} delivered</Link>
+        <Link to="/orders?status=pending">{body.orders.pending} on the way</Link>
         <Link to="/orders?status=void">{body.orders.void} not counted</Link>
       </div>
     </section>

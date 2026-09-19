@@ -40,9 +40,11 @@ from app.core.businesstime import parse_month
 from app.models.affiliates import AffiliateProfile
 from app.models.attributed_orders import AttributedOrder
 from app.models.payments import AdjustmentType, PayrollAdjustment
+from app.models.payroll import PayrollMonth
 from app.services.commission.calculate import calculate_month
 from app.services.payroll import (
     carried_into,
+    deductions_landing_on,
     get_month,
     is_historical,
     policy_of,
@@ -199,7 +201,15 @@ def correction_for(
     # The question here is only ever *has the evidence moved*, so both sides
     # of the comparison have to be the same rule.
     now = calculate_month(db, affiliate, month, policy=policy_of(snapshot))
-    if source_version(now, orders, carried_into(db, affiliate, month)) == frozen:
+    if (
+        source_version(
+            now,
+            orders,
+            carried_into(db, affiliate, month),
+            deductions_landing_on(db, affiliate, month),
+        )
+        == frozen
+    ):
         return None
 
     agreed = snapshot.approved_obligation_piastres
@@ -283,7 +293,16 @@ def _resolved_so_far(
             .where(PayrollAdjustment.source_payroll_month_id == payroll_month.id)
             .where(
                 PayrollAdjustment.type.in_(
-                    [AdjustmentType.CREDIT, AdjustmentType.WRITEOFF]
+                    [
+                        AdjustmentType.CREDIT,
+                        AdjustmentType.WRITEOFF,
+                        # R4. HBA absorbed a difference on a month nothing was
+                        # sent for. No money moved and the decision is real,
+                        # so it settles the review exactly as the other two do.
+                        AdjustmentType.ACCEPTED,
+                        # R1. What a destination could not take, handed back.
+                        AdjustmentType.RELEASE,
+                    ]
                 )
             )
             .order_by(PayrollAdjustment.created_at, PayrollAdjustment.id)
@@ -291,7 +310,16 @@ def _resolved_so_far(
     )
     if not rows:
         return 0, None
-    return sum(int(amount or 0) for _, amount in rows), rows[-1][0]
+
+    # A release is negative here: it is the part of a carry that never
+    # landed, so it stops counting as settled and the correction opens again
+    # by exactly that much.
+    settled = sum(
+        -int(amount or 0) if kind == AdjustmentType.RELEASE else int(amount or 0)
+        for kind, amount in rows
+    )
+    decisions = [kind for kind, _ in rows if kind != AdjustmentType.RELEASE]
+    return max(settled, 0), decisions[-1] if decisions else None
 
 
 def open_corrections(db: Session, affiliate: AffiliateProfile) -> list[Correction]:
@@ -416,6 +444,27 @@ def capacity_of(db: Session, affiliate: AffiliateProfile, month: str) -> int:
     return max(calculation.payout_piastres - already, 0)
 
 
+def _lock_month(db: Session, affiliate: AffiliateProfile, month: str) -> None:
+    """Hold this month's row until the transaction ends. R2.
+
+    `SELECT ... FOR UPDATE` on the `payroll_month` row, which every figure in
+    this file is ultimately about: its snapshot, its allocations, its
+    adjustments. Locking the row rather than a table keeps two models'
+    corrections independent, which matters on the one screen that resolves
+    several at month end.
+
+    Silent when the month has no row yet. A month nobody has opened has no
+    correction and no capacity, and both callers below create it first where
+    they need one.
+    """
+    db.execute(
+        select(PayrollMonth.id)
+        .where(PayrollMonth.affiliate_id == affiliate.id)
+        .where(PayrollMonth.month == month)
+        .with_for_update()
+    ).first()
+
+
 def resolve(
     db: Session,
     affiliate: AffiliateProfile,
@@ -425,6 +474,7 @@ def resolve(
     reason: str,
     destination_month: str | None = None,
     expected_outstanding_piastres: int | None = None,
+    operation_key: str | None = None,
     actor_id: int | None = None,
     actor_email: str | None = None,
 ) -> PayrollAdjustment:
@@ -432,6 +482,24 @@ def resolve(
 
     `choice` is `credit` (carry) or `writeoff` (absorb) — the two words the
     ledger already uses, rather than a third vocabulary for the same two acts.
+
+    ## The decision is taken under a lock, not merely checked before one (R2)
+
+    Reading the outstanding amount, asking the destination what it has room
+    for and writing the adjustment are three steps, and between them another
+    session can do all three itself. Both would read the same figure, both
+    would pass every check, and the money would be recovered twice — a race no
+    sequential retry test can reach.
+
+    So the source month's row is locked before the correction is computed, and
+    the destination's before its capacity is read. Two resolutions of one
+    correction queue; two corrections aiming at one destination queue on the
+    destination. The order is always source then destination, which is why
+    they cannot deadlock against each other.
+
+    **The lock is not the only guard.** `operation_key` gives one decision one
+    identity, so a request that arrives twice — the browser's retry after a
+    response it never saw — is answered with the row the first one wrote.
 
     ## What this adds over calling `adjust` directly
 
@@ -462,12 +530,48 @@ def resolve(
     recovering the same money again.
     """
     from app.services.payments import adjust
+    from app.services.payroll import open_month
 
     if choice not in (AdjustmentType.CREDIT, AdjustmentType.WRITEOFF):
         raise ValueError(
             "A correction is either carried into a later month ('credit') or "
             "absorbed by HBA ('writeoff')."
         )
+
+    # R2. **A replay is answered before anything else is judged.**
+    #
+    # A request that already succeeded is not stale and is not a conflict: the
+    # decision was made once and this is the same decision arriving again,
+    # because the browser never saw the answer. Checked here rather than left
+    # to the freshness test below, which would call it a conflict and leave
+    # the caller unable to tell a lost response from somebody else's edit.
+    if operation_key:
+        already = db.scalar(
+            select(PayrollAdjustment).where(
+                PayrollAdjustment.operation_key == operation_key.strip()
+            )
+        )
+        if already is not None:
+            return already
+
+    # R2. A destination earlier than its source is not a carry forward, and
+    # the server says so rather than trusting the screen to have offered only
+    # later months.
+    if choice == AdjustmentType.CREDIT and destination_month:
+        parse_month(destination_month)
+        if destination_month <= month:
+            raise ValueError(
+                f"A correction from {month} cannot land on {destination_month}. "
+                "It carries into a later month, never an earlier one."
+            )
+
+    # R2. Everything below reads and then writes, so the reading happens
+    # inside the lock. The source row first, always - see the docstring on
+    # why the order is what stops two of these deadlocking.
+    _lock_month(db, affiliate, month)
+    if choice == AdjustmentType.CREDIT and destination_month:
+        open_month(db, affiliate, destination_month)
+        _lock_month(db, affiliate, destination_month)
 
     correction = correction_for(db, affiliate, month)
     if correction is None or correction.outcome != OVERPAID:
@@ -495,17 +599,36 @@ def resolve(
             f"{'carried' if correction.resolution == AdjustmentType.CREDIT else 'absorbed'}."
         )
     if correction.recoverable_piastres <= 0:
-        if correction.review_reason == MORE_THAN_WAS_SENT:
-            raise ValueError(
-                f"Everything sent against {affiliate.name}'s {month} has "
-                "already been recovered. What is left is a difference against "
-                "money not yet transferred, and it can be recovered once it "
-                "is."
+        # **R4. Nothing can be recovered, and something can still be decided.**
+        #
+        # A month agreed at E£2,000 that now calculates to E£1,800 with no
+        # transfer recorded has a real difference and no money to take back.
+        # Visibility alone left it there for ever: the queue said *look at
+        # this* and refused every way of finishing with it.
+        #
+        # Absorbing is a real answer - *the agreed figure stands and HBA takes
+        # the difference* - and it is recorded as its own kind. **Not as a
+        # write-off**, which reduces what a month still owes and would pay her
+        # less than was agreed, which is the opposite of HBA absorbing a loss.
+        if choice == AdjustmentType.WRITEOFF:
+            return adjust(
+                db,
+                affiliate,
+                kind=AdjustmentType.ACCEPTED,
+                source_month=month,
+                amount_piastres=correction.outstanding_piastres,
+                reason=reason,
+                # The difference it closes is the review, not the balance.
+                open_difference_piastres=correction.outstanding_piastres,
+                operation_key=operation_key,
+                actor_id=actor_id,
+                actor_email=actor_email,
             )
         raise ValueError(
             f"No transfer is recorded against {affiliate.name}'s {month}, so "
-            "there is nothing to recover from it. Record the transfer that "
-            "was made, or leave the agreed figure to be paid in full."
+            "there is nothing to carry into another month. Record the transfer "
+            "that was made, or absorb the difference and pay the agreed figure "
+            "in full."
         )
 
     applied = correction.recoverable_piastres
@@ -540,6 +663,7 @@ def resolve(
         # it the full shortfall while applying a part of it would let the cap
         # pass a second, overlapping recovery it exists to refuse.
         open_difference_piastres=applied,
+        operation_key=operation_key,
         actor_id=actor_id,
         actor_email=actor_email,
     )

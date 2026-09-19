@@ -25,17 +25,21 @@ Run it against a disposable copy of the data you care about:
     DATABASE_URL='postgresql+psycopg://…' .venv/Scripts/python.exe \\
         docs/repair/batch-1/reconcile.py
 
-**It opens a read-only transaction and rolls it back.** It does not import
-pytest or any fixture, so it cannot truncate anything. Even so, prefer a
-restored copy over a live database: this is a report, and a report is worth
-nothing that a restore cannot repeat.
+**The transaction is read-only, enforced by the database.** It issues `SET
+TRANSACTION READ ONLY` before it reads anything, so a write attempted from
+here — by this script or by anything it calls — is refused by PostgreSQL
+rather than by good intentions. It also imports no pytest fixture, so it
+cannot truncate anything.
+
+Even so, prefer a restored copy over a live database: this is a report, and a
+report is worth nothing that a restore cannot repeat.
 """
 
 import json
 import os
 import sys
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..")))
 
@@ -152,9 +156,11 @@ def report(db) -> dict:
 if __name__ == "__main__":
     db = SessionLocal()
     try:
+        # Enforced by the database, not by this file's good intentions: any
+        # write from here on is refused with `read-only transaction`. It is
+        # what makes the promise at the top of this file checkable.
+        db.execute(text("SET TRANSACTION READ ONLY"))
         print(json.dumps(report(db), indent=2))
     finally:
-        # Nothing here writes; the rollback is belt and braces, and it is what
-        # lets this be pointed at a restored copy without a second thought.
         db.rollback()
         db.close()

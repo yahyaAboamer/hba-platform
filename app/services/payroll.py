@@ -46,7 +46,7 @@ import hashlib
 import json
 from dataclasses import asdict
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -199,6 +199,7 @@ def _payload(
     calculation: MonthCalculation,
     orders: list[AttributedOrder],
     carried: list[AttributedOrder] | None = None,
+    deductions: list[dict] | None = None,
 ) -> dict:
     """The whole calculation, in a form that survives the data changing.
 
@@ -230,14 +231,66 @@ def _payload(
     # 05B. What this figure was computed from, in one short string. Frozen
     # here so a later question - *has anything moved since we agreed this?* -
     # is one comparison rather than a re-derivation of a month that is closed.
-    body["source_version"] = source_version(calculation, orders, carried)
+    body["source_version"] = source_version(calculation, orders, carried, deductions)
+    # F07 names accepted deduction allocations among what approval freezes, so
+    # they are written into the snapshot rather than only hashed into its
+    # fingerprint: a statement has to be able to say what was deducted without
+    # re-deriving it from a ledger that has moved on.
+    body["deductions"] = deductions or []
     return body
+
+
+def deductions_landing_on(db: Session, affiliate: AffiliateProfile, month: str) -> list[dict]:
+    """Corrections accepted against this month, oldest first. R1, F07.
+
+    What the reviewer is agreeing to, beside the figure itself: approval
+    freezes *accepted deduction allocations* as well as the earnings, and a
+    deduction is the difference between a month that pays E£500 and one that
+    pays nothing.
+
+    Each row is identified by the adjustment that created it, so a deduction
+    added, changed or released between the preview and the commit shows up as
+    a different fingerprint rather than as the same month quietly settling
+    for less.
+    """
+    from app.models.payments import AdjustmentType, PayrollAdjustment
+
+    payroll_month = get_month(db, affiliate, month)
+    if payroll_month is None:
+        return []
+
+    rows = db.execute(
+        select(
+            PayrollAdjustment.id,
+            PayrollAdjustment.type,
+            PayrollAdjustment.amount_piastres,
+            PayrollMonth.month,
+        )
+        .join(PayrollMonth, PayrollMonth.id == PayrollAdjustment.source_payroll_month_id)
+        .where(PayrollAdjustment.destination_payroll_month_id == payroll_month.id)
+        .where(
+            PayrollAdjustment.type.in_(
+                [AdjustmentType.CREDIT, AdjustmentType.RELEASE]
+            )
+        )
+        .order_by(PayrollAdjustment.id)
+    ).all()
+    return [
+        {
+            "adjustment_id": row_id,
+            "type": kind,
+            "amount_piastres": int(amount or 0),
+            "from_month": from_month,
+        }
+        for row_id, kind, amount, from_month in rows
+    ]
 
 
 def source_version(
     calculation: MonthCalculation,
     orders: list[AttributedOrder],
     carried: list[AttributedOrder] | None = None,
+    deductions: list[dict] | None = None,
 ) -> str:
     """A short fingerprint of everything this month's figure was computed from.
 
@@ -283,6 +336,18 @@ def source_version(
             for order in (carried or [])
         ],
     }
+    # R1, F07. A deduction accepted against this month decides what is
+    # actually transferred for it, so it is part of what the reviewer agrees.
+    # One added, changed or released between the preview and the commit has to
+    # move this fingerprint, or the settlement they approve is not the
+    # settlement they were shown.
+    #
+    # **Added only when there is one**, so the fingerprint of a month with no
+    # deductions is the same string it has always been. Every snapshot agreed
+    # before this existed keeps comparing equal, and the cheap *nothing has
+    # moved* answer keeps working for them.
+    if deductions:
+        facts["deductions"] = deductions
     return content_hash(facts)[:16]
 
 
@@ -372,6 +437,9 @@ def approve_month(
     # offered to next month as well - the calculation would happily pay them
     # again, because nothing about the order says it has been paid except this.
     carried = carried_into(db, affiliate, month)
+    # R1, F07. What is already accepted against this month, frozen with the
+    # figure and checked for freshness beside it.
+    deductions = deductions_landing_on(db, affiliate, month)
 
     # 05B. Agree the figure that was shown, or agree nothing.
     #
@@ -380,14 +448,14 @@ def approve_month(
     # check. It is optional here because approval is also driven from tests,
     # backfills and the shell, where there is no screen to be stale.
     if expected_source_version is not None:
-        current = source_version(calculation, orders, carried)
+        current = source_version(calculation, orders, carried, deductions)
         if current != expected_source_version:
             raise SourceMoved(
                 f"{affiliate.name}'s {month} changed while you were looking at "
                 "it. Reload the month and check the figure before agreeing it."
             )
 
-    payload = _payload(calculation, orders, carried)
+    payload = _payload(calculation, orders, carried, deductions)
     previous = latest_version(db, payroll_month)
 
     # §16, Phase 10 Batch C. Which plain-language rules this was calculated
@@ -447,6 +515,10 @@ def approve_month(
             order.settled_in_snapshot_id = snapshot.id
             order.settled_at = snapshot.approved_at
 
+    _release_deductions_the_month_cannot_take(
+        db, affiliate, payroll_month, snapshot, actor_id=actor_id
+    )
+
     db.flush()
     record_audit(
         db,
@@ -484,6 +556,118 @@ def approve_month(
 
         month_approved(db, affiliate, snapshot, month)
     return snapshot
+
+
+def _release_deductions_the_month_cannot_take(
+    db: Session,
+    affiliate: AffiliateProfile,
+    payroll_month: PayrollMonth,
+    snapshot: PayrollSnapshot,
+    *,
+    actor_id: int | None = None,
+) -> int:
+    """Hand back the part of a carried correction this month cannot absorb. R1.
+
+    ## Why a carry can be too big by the time the month is agreed
+
+    A correction is carried into a month **before** that month is approved, on
+    what it is worth at the time — which is the whole point of accepting it
+    then (F07, F12): finding an overpayment in early October and being told to
+    come back in November is how one gets forgotten.
+
+    What it is worth can fall. E£200 is carried into October when October is
+    earning E£200; an order fails, October is agreed at E£100, and E£200 of
+    deduction is now sitting on a month with E£100 in it.
+
+    ## What was wrong with leaving it
+
+    The month's balance simply went to **minus E£100 — "overpaid"** — on a
+    month nothing had ever been transferred for. Worse, the source correction
+    read as fully resolved, so the E£100 that could not be taken was tracked
+    nowhere at all. A request to recover money and an amount a month could
+    actually absorb are different facts, and the ledger was recording only the
+    first.
+
+    ## What happens instead
+
+    The excess is returned to the correction it came from, as an append-only
+    `release` carrying the same source and destination as the credit it
+    un-applies. Both ends net it out: the destination's `credited_into` drops
+    to what it could take, and the source's correction opens again by exactly
+    the remainder, for any later month.
+
+    **Nothing is edited.** The credit stands as the decision somebody made;
+    the release stands as what the month could do about it. Returns the
+    piastres released, which is zero on almost every approval.
+    """
+    from app.models.payments import AdjustmentType, PayrollAdjustment
+    from app.services.payments import adjust, credited_into
+
+    payable = snapshot.approved_obligation_piastres
+    landing = credited_into(db, payroll_month)
+    excess = landing - payable
+    if excess <= 0:
+        return 0
+
+    # Newest first: the last carry accepted is the one that over-committed the
+    # month, so it is the one to unwind. An older credit was accepted when the
+    # month had more room and has the better claim to it.
+    credits = list(
+        db.scalars(
+            select(PayrollAdjustment)
+            .where(PayrollAdjustment.destination_payroll_month_id == payroll_month.id)
+            .where(PayrollAdjustment.type == AdjustmentType.CREDIT)
+            .order_by(PayrollAdjustment.created_at.desc(), PayrollAdjustment.id.desc())
+        )
+    )
+
+    released = 0
+    for credit in credits:
+        if excess <= 0:
+            break
+        # What is still applied from *this* credit, after anything already
+        # released against it, so a second approval cannot release it twice.
+        already = int(
+            db.scalar(
+                select(func.coalesce(func.sum(PayrollAdjustment.amount_piastres), 0))
+                .where(
+                    PayrollAdjustment.source_payroll_month_id
+                    == credit.source_payroll_month_id
+                )
+                .where(
+                    PayrollAdjustment.destination_payroll_month_id
+                    == payroll_month.id
+                )
+                .where(PayrollAdjustment.type == AdjustmentType.RELEASE)
+            )
+            or 0
+        )
+        applied = credit.amount_piastres - already
+        if applied <= 0:
+            continue
+
+        give_back = min(applied, excess)
+        source = db.get(PayrollMonth, credit.source_payroll_month_id)
+        adjust(
+            db,
+            affiliate,
+            kind=AdjustmentType.RELEASE,
+            source_month=source.month,
+            destination_month=payroll_month.month,
+            amount_piastres=give_back,
+            reason=(
+                f"{payroll_month.month} was agreed at "
+                f"{payable} piastres, which cannot take the whole deduction "
+                f"carried from {source.month}. This much returns to "
+                f"{source.month} and can be carried into a later month."
+            ),
+            open_difference_piastres=give_back,
+            actor_id=actor_id,
+        )
+        released += give_back
+        excess -= give_back
+
+    return released
 
 
 def latest_version(db: Session, payroll_month: PayrollMonth) -> int:

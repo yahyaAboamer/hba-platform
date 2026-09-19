@@ -774,6 +774,8 @@ def test_a_carried_correction_can_leave_no_transfer_due(client):
             "choice": "credit",
             "reason": "Recover the transfer after the order failed",
             "destination_month": SEPTEMBER,
+            "expected_outstanding_piastres": 200_000,
+            "operation_key": "carry-august-into-september",
         },
     )
     assert resolved.status_code == 201, resolved.text
@@ -827,10 +829,62 @@ def test_a_month_awaiting_its_transfer_is_in_the_desk_queue(client):
             "choice": "credit",
             "reason": "nothing was sent",
             "destination_month": SEPTEMBER,
+            "expected_outstanding_piastres": 200_000,
+            "operation_key": "carry-what-was-never-sent",
         },
     )
     assert refused.status_code == 400
-    assert "No transfer is recorded" in refused.json()["detail"]
+    assert "nothing to carry" in refused.json()["detail"]
+
+    # R4. Absorbing it is the answer that finishes the review, and it leaves
+    # the agreed figure to be paid in full.
+    absorbed = client.post(
+        "/api/corrections",
+        json={
+            "affiliate_id": affiliate["id"],
+            "month": AUGUST,
+            "choice": "writeoff",
+            "reason": "HBA absorbs the difference and pays what was agreed",
+            "expected_outstanding_piastres": 200_000,
+            "operation_key": "absorb-august",
+        },
+    )
+    assert absorbed.status_code == 201, absorbed.text
+    assert absorbed.json()["type"] == "accepted"
+
+    after = client.get(f"/api/payments/{SEPTEMBER}").json()
+    assert not [
+        row
+        for row in after["open_corrections"]
+        if row["affiliate_id"] == affiliate["id"]
+    ]
+    august = client.get(f"/api/payments/{AUGUST}").json()["affiliates"][0]
+    assert august["obligation_piastres"] == 200_000
+    assert august["balance_piastres"] == 200_000
+
+
+def test_the_desk_refuses_a_correction_that_cannot_say_what_it_was_shown(client):
+    """R2. Freshness and identity are required, not optional.
+
+    Their absence used to mean *proceed anyway*, which made the protection
+    optional for exactly the callers most likely to need it: a script, a
+    retry, a second tab.
+    """
+    affiliate = _affiliate(client)
+    _owed(client, affiliate, AUGUST)
+
+    for missing in ("expected_outstanding_piastres", "operation_key"):
+        body = {
+            "affiliate_id": affiliate["id"],
+            "month": AUGUST,
+            "choice": "writeoff",
+            "reason": "no freshness, no identity",
+            "expected_outstanding_piastres": 0,
+            "operation_key": "a-key-long-enough",
+        }
+        body.pop(missing)
+        refused = client.post("/api/corrections", json=body)
+        assert refused.status_code == 422, (missing, refused.text)
 
 
 def test_a_repeated_correction_is_refused_rather_than_applied_twice(client):
@@ -875,14 +929,26 @@ def test_a_repeated_correction_is_refused_rather_than_applied_twice(client):
         "reason": "Recover the transfer after the order failed",
         "destination_month": SEPTEMBER,
         "expected_outstanding_piastres": shown,
+        "operation_key": "recover-august-once",
     }
 
     first = client.post("/api/corrections", json=request)
     assert first.status_code == 201, first.text
 
-    # The retry a browser makes when it never learned the first one landed.
+    # **The retry a browser makes when it never learned the first one landed**
+    # (R2). Same decision, same key: it is answered with the recovery the
+    # first attempt made, not refused as a conflict it cannot interpret.
     second = client.post("/api/corrections", json=request)
-    assert second.status_code == 409, second.text
+    assert second.status_code == 201, second.text
+    assert second.json()["id"] == first.json()["id"]
+
+    # A *different* decision on a figure that has since moved is a conflict,
+    # and says so.
+    stale = client.post(
+        "/api/corrections",
+        json={**request, "operation_key": "somebody-elses-decision"},
+    )
+    assert stale.status_code == 409, stale.text
 
     # And exactly one recovery stands.
     adjustments = client.get(

@@ -26,6 +26,7 @@ nothing, and neither does anything in this file until somebody says it happened.
 from datetime import datetime
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.businesstime import parse_month, utcnow
@@ -134,19 +135,48 @@ def adjusted_against(db: Session, payroll_month: PayrollMonth) -> int:
     A **credit** moves the excess to a later month, where the model already
     holds it and that month therefore needs less sent. A **write-off** goes
     nowhere - HBA absorbs it.
+
+    ## Two kinds are deliberately not counted here (R1, R4)
+
+    An `accepted` records that HBA absorbed a difference on a month **nothing
+    was sent for**. It closes the review and must not close the debt: this
+    month is still owed exactly what was agreed, and counting it here would
+    quietly pay her less - the opposite of HBA taking the loss.
+
+    A `release` un-applies part of a credit that its destination could not
+    take. It belongs to the destination's arithmetic and to the source
+    *correction*, not to the source month's balance, which the credit it
+    releases never entered either.
     """
     return int(
         db.scalar(
             select(func.coalesce(func.sum(PayrollAdjustment.amount_piastres), 0))
             .where(PayrollAdjustment.source_payroll_month_id == payroll_month.id)
+            .where(
+                PayrollAdjustment.type.in_(
+                    [
+                        AdjustmentType.CREDIT,
+                        AdjustmentType.WRITEOFF,
+                        AdjustmentType.CORRECTION,
+                    ]
+                )
+            )
         )
         or 0
     )
 
 
 def credited_into(db: Session, payroll_month: PayrollMonth) -> int:
-    """Credits landing on this month from an earlier overpayment."""
-    return int(
+    """Credits landing on this month, less anything it could not take.
+
+    R1. A carry is accepted against a month **before** that month is agreed,
+    on what it is worth at the time, and the month can be agreed lower. What
+    it could not take is released back to the source correction, and this nets
+    those releases out - otherwise a month agreed at E£100 carrying a E£200
+    credit would report itself E£100 overpaid on a transfer that never
+    happened.
+    """
+    applied = int(
         db.scalar(
             select(func.coalesce(func.sum(PayrollAdjustment.amount_piastres), 0))
             .where(PayrollAdjustment.destination_payroll_month_id == payroll_month.id)
@@ -154,6 +184,15 @@ def credited_into(db: Session, payroll_month: PayrollMonth) -> int:
         )
         or 0
     )
+    released = int(
+        db.scalar(
+            select(func.coalesce(func.sum(PayrollAdjustment.amount_piastres), 0))
+            .where(PayrollAdjustment.destination_payroll_month_id == payroll_month.id)
+            .where(PayrollAdjustment.type == AdjustmentType.RELEASE)
+        )
+        or 0
+    )
+    return max(applied - released, 0)
 
 
 def balance_for(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
@@ -584,6 +623,7 @@ def adjust(
     reason: str,
     destination_month: str | None = None,
     open_difference_piastres: int | None = None,
+    operation_key: str | None = None,
     actor_id: int | None = None,
     actor_email: str | None = None,
 ) -> PayrollAdjustment:
@@ -605,6 +645,21 @@ def adjust(
         raise ValueError(f"Unknown adjustment type: {kind!r}")
     if amount_piastres <= 0:
         raise ValueError("An adjustment must be for more than nothing")
+
+    # R2. One decision, one row. A request that arrives twice - a browser
+    # retrying because it never learned the first one landed - gets the row
+    # the first one wrote rather than a second recovery of the same money.
+    # Checked before anything is computed, so a replay is cheap and cannot
+    # take a different path from the original.
+    operation_key = (operation_key or "").strip() or None
+    if operation_key:
+        already = db.scalar(
+            select(PayrollAdjustment).where(
+                PayrollAdjustment.operation_key == operation_key
+            )
+        )
+        if already is not None:
+            return already
     # ADR 0036. An adjustment closes a difference, and a month settled outside
     # the platform has none: its balance is zero by construction. A credit out
     # of one would conjure money the platform never owed, and a credit *into*
@@ -630,7 +685,10 @@ def adjust(
         raise ValueError(f"{affiliate.name} has no {source_month} to adjust")
 
     destination = None
-    if kind == AdjustmentType.CREDIT:
+    # A release carries the same destination as the credit it un-applies, so
+    # both ends of that credit net out (R1). Everything else that lands
+    # somewhere is a credit.
+    if kind in (AdjustmentType.CREDIT, AdjustmentType.RELEASE):
         if destination_month is None:
             raise ValueError(
                 "A credit needs a month to land on. To absorb it instead, "
@@ -718,6 +776,12 @@ def adjust(
     # source would drop by the amount and the destination would drop by it
     # again, and the model would end up short by exactly the credit. Refusing
     # is not a restriction on a legitimate act; there is no such act.
+    #
+    # A **release** is the reverse of a credit and inherits none of this: it
+    # returns what a destination could not take, and the source it returns to
+    # is by definition a month whose difference is still open. An **accepted**
+    # closes a review rather than a balance, and never reaches this at all -
+    # it is the one kind that leaves what is owed exactly where it was.
     if kind == AdjustmentType.CREDIT and open_difference > 0:
         raise ValueError(
             f"{source_month} is still owed money, so there is no excess to "
@@ -730,10 +794,29 @@ def adjust(
         destination_payroll_month_id=destination.id if destination else None,
         amount_piastres=int(amount_piastres),
         reason=reason.strip(),
+        operation_key=operation_key,
         created_by=actor_id,
     )
     db.add(adjustment)
-    db.flush()
+    # R2. The unique key is the guard that actually holds: two sessions can
+    # both find nothing above and both arrive here, and only one insert can
+    # win. The loser is handed the winner's row, so a race ends the way a
+    # retry does - one decision, one recovery - rather than in an error the
+    # caller has to interpret.
+    try:
+        with db.begin_nested():
+            db.flush()
+    except IntegrityError:
+        if not operation_key:
+            raise
+        settled = db.scalar(
+            select(PayrollAdjustment).where(
+                PayrollAdjustment.operation_key == operation_key
+            )
+        )
+        if settled is None:
+            raise
+        return settled
 
     record_audit(
         db,

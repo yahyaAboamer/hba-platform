@@ -349,6 +349,84 @@ def test_an_old_statement_keeps_saying_what_it_always_said(db):
     assert month["amount_piastres"] == 100_000
 
 
+def test_her_home_counts_a_travelling_order_in_net_sales_counted(db):
+    """R3. The field Home actually renders, not the commission above it.
+
+    The calculator was switched and her screen was not: *Net sales counted*
+    read the delivered half while the figure above it was worked out on both,
+    so a month with E£10,000 travelling showed E£1,000 earned on E£0 of
+    sales. The audit's own numbers.
+    """
+    affiliate = _model(db)
+    _order(db, affiliate, "1", 1_000_000, state=CommissionState.PENDING)
+
+    month = my_month(db, affiliate, AUGUST)
+
+    assert month["sales"]["counted_piastres"] == 1_000_000
+    assert month["orders"]["counted"] == 1
+    assert month["amount_piastres"] == 100_000
+    # The halves are kept beside it: what arrived, what is on its way.
+    assert month["sales"]["earned_piastres"] == 0
+    assert month["sales"]["pending_piastres"] == 1_000_000
+
+
+def test_her_home_breaks_a_mixed_month_into_its_three_states(db):
+    """R3. Delivered, travelling and failed, each separately."""
+    affiliate = _model(db)
+    _order(db, affiliate, "1", 1_000_000)
+    _order(db, affiliate, "2", 500_000, state=CommissionState.PENDING)
+    _order(db, affiliate, "3", 300_000, state=CommissionState.VOID)
+
+    month = my_month(db, affiliate, AUGUST)
+
+    assert month["sales"]["counted_piastres"] == 1_500_000
+    assert month["sales"]["earned_piastres"] == 1_000_000
+    assert month["sales"]["pending_piastres"] == 500_000
+    assert month["sales"]["failed_piastres"] == 300_000
+    assert (month["orders"]["earned"], month["orders"]["pending"], month["orders"]["void"]) == (1, 1, 1)
+
+
+def test_delivery_does_not_grow_her_sales_and_failure_shrinks_them(db):
+    """R3. A pending order is already counted, so arriving adds nothing.
+
+    Failing removes it, which is the only way the figure moves - and it moves
+    on the month she sold in, whatever the courier did and whenever.
+    """
+    affiliate = _model(db)
+    _order(db, affiliate, "1", 1_000_000, state=CommissionState.PENDING)
+    _order(db, affiliate, "2", 1_000_000, state=CommissionState.PENDING)
+    before = my_month(db, affiliate, AUGUST)["sales"]["counted_piastres"]
+
+    _deliver(db, "1")
+    assert my_month(db, affiliate, AUGUST)["sales"]["counted_piastres"] == before
+
+    _fail(db, "2")
+    assert my_month(db, affiliate, AUGUST)["sales"]["counted_piastres"] == 1_000_000
+
+
+def test_an_order_another_month_settled_still_counts_as_that_months_sales(db):
+    """R3. Which payroll paid it is not when she sold it.
+
+    A legacy carried order is excluded from the payment calculation - it must
+    be, or the transition would pay it twice - and reading her performance out
+    of that calculation made an August sale disappear from August because
+    September's payroll settled it.
+    """
+    affiliate = _model(db)
+    _order(db, affiliate, "old", 1_000_000, state=CommissionState.PENDING)
+    with _approved_before_the_switch():
+        approve_month(db, affiliate, AUGUST)
+    _deliver(db, "old")
+    approve_month(db, affiliate, SEPTEMBER)
+
+    august = my_month(db, affiliate, AUGUST)
+    # September's payroll paid for it; August is still the month she sold it.
+    assert august["sales"]["counted_piastres"] == 1_000_000
+    assert august["orders"]["counted"] == 1
+    # And what August was agreed at has not moved.
+    assert august["amount_piastres"] == 0
+
+
 def test_the_year_chart_follows_the_month_it_draws(db):
     """A07. `my_year` builds its sales series from `my_month`, so the chart
     was frozen for exactly as long as the month was."""

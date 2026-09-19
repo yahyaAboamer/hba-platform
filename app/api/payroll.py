@@ -49,6 +49,7 @@ from app.services.payroll import (
     carry_forward_summary,
     get_month,
     is_historical,
+    deductions_landing_on,
     months_left_reopened,
     policy_of,
     reconciliation_for,
@@ -96,7 +97,15 @@ def _source_version_for(
             .order_by(AttributedOrder.shopify_order_id)
         )
     )
-    return source_version(calculation, orders, carried_into(db, affiliate, month))
+    return source_version(
+        calculation,
+        orders,
+        carried_into(db, affiliate, month),
+        # R1. The same facts approval will check against, deductions included -
+        # a preview that omitted them would hand out a fingerprint the commit
+        # could never match.
+        deductions_landing_on(db, affiliate, month),
+    )
 
 
 def _month_or_400(month: str) -> str:

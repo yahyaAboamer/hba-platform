@@ -586,11 +586,18 @@ class CorrectionBody(BaseModel):
     choice: str
     reason: str = Field(min_length=1, max_length=500)
     destination_month: str | None = None
-    #: What the screen showed as outstanding. Optional, and its absence is not
-    #: agreement: a caller that sends nothing is one that has not been taught
-    #: to check. Sent, it turns a retried or duplicated request into a refusal
-    #: rather than a second recovery of the same money.
-    expected_outstanding_piastres: int | None = None
+    #: What the screen showed as outstanding. **Required** (R2): this decides
+    #: real money, and a caller that cannot say what it was looking at cannot
+    #: be given permission to act on it. Its omission used to be treated as
+    #: *proceed anyway*, which made the protection optional for exactly the
+    #: callers most likely to need it.
+    expected_outstanding_piastres: int = Field(ge=0)
+
+    #: What this decision is called, so the same one arriving twice is one
+    #: recovery. **Required**, and the browser sends a value it keeps across
+    #: retries - a figure alone is not an identity, because two people
+    #: recovering the same correction produce identical figures.
+    operation_key: str = Field(min_length=8, max_length=80)
 
 
 def _render_correction(row) -> dict:
@@ -689,6 +696,7 @@ def resolve_correction(
             reason=body.reason,
             destination_month=body.destination_month,
             expected_outstanding_piastres=body.expected_outstanding_piastres,
+            operation_key=body.operation_key,
             actor_id=actor.id,
             actor_email=actor.email,
         )

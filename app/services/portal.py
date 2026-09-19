@@ -89,6 +89,7 @@ from app.services.commission.calculate import (
     PENDING_INCLUSIVE,
     MonthCalculation,
     counted_sales_from,
+    source_month_sales,
 )
 from app.services.compensation import all_terms, terms_for
 from app.services.payments import adjustments_for, balance_for, payments_for
@@ -304,17 +305,23 @@ def _not_started(month: str) -> bool:
 def _average_order(figures: dict) -> int | None:
     """What a counted order under their code was worth, on average.
 
-    Counted orders only. An order still in transit has no settled base to
-    average, and a void one earned nothing - including either would drag the
-    figure toward a number that describes no order they actually made.
+    Counted orders only - delivered and pending since F02, never a failed
+    delivery, which earned nothing and would drag the figure toward a number
+    describing no order she actually made.
 
     `None` at zero counted orders, never zero: the difference between *your
     average order is worth nothing* and *there is nothing to average yet*.
+
+    Kept for the statement path, which reads a snapshot's frozen figures.
+    `my_month` averages her live source-month sales instead (R3).
     """
-    orders = figures.get("earned_orders") or 0
+    orders = (figures.get("earned_orders") or 0) + (figures.get("pending_orders") or 0)
     if not orders:
         return None
-    return round((figures.get("earned_base_piastres") or 0) / orders)
+    base = (figures.get("earned_base_piastres") or 0) + (
+        figures.get("pending_base_piastres") or 0
+    )
+    return round(base / orders)
 
 
 def _window(month: str, agreed: bool) -> dict:
@@ -591,6 +598,7 @@ def my_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
         gone = [r for r in rows if r.commission_state == CommissionState.VOID]
         earned_base = sum(r.commission_base_piastres for r in counted)
         pending_base = sum(r.commission_base_piastres for r in travelling)
+        failed_base = sum(r.commission_base_piastres for r in gone)
 
         return {
             "month": month,
@@ -598,15 +606,25 @@ def my_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
             "is_working_month": month == working,
             "not_started": False,
             "sales": {
+                # R3. The same shape as any other month, counted the same way
+                # (F02): what she sold is not a question the platform answers
+                # differently either side of go-live. Only the commission is
+                # withheld, because those rates live in the old system.
+                "counted_piastres": earned_base + pending_base,
+                "counted": format_egp(earned_base + pending_base),
+                "counted_orders": len(counted) + len(travelling),
                 "earned_piastres": earned_base,
                 "earned": format_egp(earned_base),
                 "pending_piastres": pending_base,
                 "pending": format_egp(pending_base),
+                "failed_piastres": failed_base,
+                "failed": format_egp(failed_base),
             },
             "orders": {
                 "earned": len(counted),
                 "pending": len(travelling),
                 "void": len(gone),
+                "counted": len(counted) + len(travelling),
             },
             "amount_piastres": None,
             "amount": None,
@@ -649,8 +667,19 @@ def my_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
     # no trace anywhere she could see, and the month's own graph went on
     # showing a sale that had been reversed. The money stays where it is; the
     # counts come from the month as it is now.
-    performance = _as_payload(calculation)
-    average_order = _average_order(performance)
+    #
+    # **Read from the month's own orders, not from the payment calculation**
+    # (R3). That calculation leaves out an order a different month's payroll
+    # settled - it must, or the transition would pay one twice - and that is a
+    # fact about which payroll paid rather than about when she sold. Reading
+    # her performance out of it made an August sale disappear from August
+    # because September's payroll happened to settle it.
+    performance = source_month_sales(db, affiliate, month)
+    average_order = (
+        round(performance.counted_piastres / performance.counted_orders)
+        if performance.counted_orders
+        else None
+    )
 
     return {
         "month": month,
@@ -661,13 +690,26 @@ def my_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
         # sentence.
         "not_started": _not_started(month),
         "sales": {
-            "earned_piastres": performance["earned_base_piastres"],
-            "earned": format_egp(performance["earned_base_piastres"]),
+            # **What the month is paid on** (F02, R3): delivered and pending
+            # together. Her Home screen says *net sales counted*, and it said
+            # the delivered part of it while the money was worked out on both
+            # - a card that disagreed with the figure above it.
+            "counted_piastres": performance.counted_piastres,
+            "counted": format_egp(performance.counted_piastres),
+            "counted_orders": performance.counted_orders,
+            # The two halves of that, kept separate. *Counted* is the money;
+            # these say how far along it is, and her screen shows both.
+            "earned_piastres": performance.delivered_piastres,
+            "earned": format_egp(performance.delivered_piastres),
             # Shown, never hidden. Hiding an order still in transit makes their
             # month look smaller than it is, and produces exactly the question
             # this platform exists to stop their having to ask.
-            "pending_piastres": performance["pending_base_piastres"],
-            "pending": format_egp(performance["pending_base_piastres"]),
+            "pending_piastres": performance.pending_piastres,
+            "pending": format_egp(performance.pending_piastres),
+            # A failed delivery counts for nothing and is still worth saying:
+            # it is the difference she will otherwise try to reconcile.
+            "failed_piastres": performance.failed_piastres,
+            "failed": format_egp(performance.failed_piastres),
             # **What a typical order under their code is worth.** Their own
             # figure, and one they cannot work out from anything else on the
             # screen without dividing two numbers in their head.
@@ -682,9 +724,10 @@ def my_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
         },
         "window": _window(month, agreed),
         "orders": {
-            "earned": performance["earned_orders"],
-            "pending": performance["pending_orders"],
-            "void": performance["void_orders"],
+            "earned": performance.delivered_orders,
+            "pending": performance.pending_orders,
+            "void": performance.failed_orders,
+            "counted": performance.counted_orders,
             # **How often her code was used** (M01, and D03 for what counts).
             #
             # Not derivable from the three counts beside it, which is why it is
@@ -1350,9 +1393,12 @@ def my_year(db: Session, affiliate: AffiliateProfile) -> dict:
                 # `None` on a month the platform did not pay for.
                 "earned_piastres": figures["amount_piastres"],
                 "earned": figures["amount"],
-                "sales_piastres": figures["sales"]["earned_piastres"],
-                "sales": figures["sales"]["earned"],
-                "orders": figures["orders"]["earned"],
+                # F02, R3. The same *counted sales* her month card shows -
+                # delivered and pending. The chart plotted the delivered part
+                # while the card beside it was about to say something else.
+                "sales_piastres": figures["sales"]["counted_piastres"],
+                "sales": figures["sales"]["counted"],
+                "orders": figures["orders"]["counted"],
             }
         )
 

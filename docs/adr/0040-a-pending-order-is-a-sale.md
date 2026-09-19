@@ -71,8 +71,13 @@ and the orders they left unpaid are still paid the way they always were.
 is still settled by a correction against the agreement (05C), never by
 restating it.
 
-**It does not decide D09** — a delivery failure later found to be wrong, after
-a deduction has been used. Still open.
+**D09 was already decided and is not reopened here.** A delivery outcome is
+final: Shopify does not move an order from *failed* to *delivered* or back, so
+a recovery made on a failure that later turns out to have been a delivery
+cannot arise, and the platform carries no machinery for it
+(`decisions/D09-a-delivery-outcome-is-final.md`). An earlier draft of this ADR
+and of the batch report described it as open; that was wrong about a decision
+the owner had made, and is corrected here rather than acted on.
 
 ## The cost, stated plainly
 

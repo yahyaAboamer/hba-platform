@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { api, can } from "../lib/api";
 import type { Session } from "../lib/api";
@@ -73,6 +73,9 @@ export function Corrections({
   const [deciding, setDeciding] = useState<Correction | null>(null);
   const [reason, setReason] = useState("");
   const [destination, setDestination] = useState("");
+  // Held in a ref rather than state: it must survive a retry without
+  // re-rendering, and a new value on every render would defeat the point.
+  const operation = useRef<string | null>(null);
 
   const load = useCallback(() => {
     api
@@ -87,6 +90,12 @@ export function Corrections({
     if (!deciding) return;
     setBusy(choice);
     setError(null);
+    // R2. One name for one decision, kept across retries. A browser that
+    // never saw the answer sends this again and is handed the recovery the
+    // first attempt made, rather than making a second one.
+    const key =
+      operation.current ??
+      (operation.current = `correction:${deciding.affiliate_id}:${deciding.month}:${crypto.randomUUID()}`);
     try {
       await api.post("/api/corrections", {
         affiliate_id: deciding.affiliate_id,
@@ -98,11 +107,13 @@ export function Corrections({
         // repeated - sending the figure turns a duplicate into a refusal
         // rather than a second recovery of the same money.
         expected_outstanding_piastres: deciding.outstanding_piastres,
+        operation_key: key,
         ...(choice === "credit" ? { destination_month: destination } : {}),
       });
       setDeciding(null);
       setReason("");
       setDestination("");
+      operation.current = null;
       load();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Nothing changed.");
@@ -174,8 +185,8 @@ export function Corrections({
               {row.review_reason === "no_transfer_recorded" && (
                 <span className="corrections__review">
                   No transfer recorded yet, so there is nothing to take back.
-                  Record the transfer that was made, or leave the agreed
-                  figure to be paid in full.
+                  Record the transfer that was made, or absorb the difference
+                  and pay the agreed figure in full.
                 </span>
               )}
               {row.review_reason === "difference_exceeds_what_was_sent" && (
@@ -189,8 +200,11 @@ export function Corrections({
             <span className="corrections__amount">
               <Money piastres={row.outstanding_piastres} tone="owed" />
             </span>
+            {/* R4. A month nothing was sent for can still be decided: HBA
+                absorbs the difference and pays the agreed figure in full.
+                The panel below offers only that, because there is no money
+                to carry anywhere. */}
             {can(session, "payments.record") &&
-              row.recoverable_piastres > 0 &&
               deciding?.month !== row.month && (
                 <button
                   type="button"
@@ -242,6 +256,10 @@ export function Corrections({
               className="input"
               type="month"
               value={destination}
+              // R4. Nothing was sent, so there is nothing to take out of a
+              // later month. Absorbing is the only act, and the field says so
+              // rather than offering a choice the server will refuse.
+              disabled={deciding.recoverable_piastres <= 0}
               onChange={(event) => setDestination(event.target.value)}
             />
             {/*
@@ -269,7 +287,12 @@ export function Corrections({
             <button
               type="button"
               className="button button--primary"
-              disabled={!!busy || !reason.trim() || !destination}
+              disabled={
+                !!busy ||
+                !reason.trim() ||
+                !destination ||
+                deciding.recoverable_piastres <= 0
+              }
               onClick={() => decide("credit")}
             >
               {busy === "credit" ? "Saving…" : "Take it out of that month"}

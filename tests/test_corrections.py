@@ -43,7 +43,14 @@ from app.services.corrections import (
     resolve,
 )
 from app.services.payments import balance_for, record_payment
-from app.services.payroll import approve_month
+from app.services.payroll import (
+    SourceMoved,
+    approve_month,
+    blockers_for,
+    carried_into,
+    deductions_landing_on,
+    source_version,
+)
 from app.services.targets import record_actuals, set_requirements, verify
 
 AUGUST = "2026-08"
@@ -125,6 +132,24 @@ def _fail(db, order_id):
     )
     row.commission_state = CommissionState.VOID
     db.flush()
+
+
+def _source_version(db, affiliate, month):
+    """The fingerprint a reviewer would be shown for this month."""
+    _, calculation = blockers_for(db, affiliate, month)
+    return source_version(
+        calculation,
+        list(
+            db.scalars(
+                select(AttributedOrder)
+                .where(AttributedOrder.affiliate_id == affiliate.id)
+                .where(AttributedOrder.business_month == month)
+                .order_by(AttributedOrder.shopify_order_id)
+            )
+        ),
+        carried_into(db, affiliate, month),
+        deductions_landing_on(db, affiliate, month),
+    )
 
 
 def _paid(db, affiliate, snapshot, piastres):
@@ -750,14 +775,304 @@ def test_a_difference_larger_than_the_transfer_stays_open_and_says_why(db):
     assert left.review_reason == "difference_exceeds_what_was_sent"
     assert [row.month for row in open_corrections(db, affiliate)] == [AUGUST]
 
-    with pytest.raises(ValueError, match="already been recovered"):
+    # **R4.** Carrying it is still impossible - there is nothing left that
+    # moved - but absorbing it is a real answer, and it is the one that
+    # finishes the review: the agreed figure stands and HBA takes the rest.
+    with pytest.raises(ValueError, match="nothing to carry"):
         resolve(
             db,
             affiliate,
             AUGUST,
-            choice=AdjustmentType.WRITEOFF,
-            reason="again",
+            choice=AdjustmentType.CREDIT,
+            reason="nowhere to carry it",
+            destination_month=SEPTEMBER,
         )
+
+    before = balance_for(db, affiliate, AUGUST)["balance_piastres"]
+    absorbed = resolve(
+        db,
+        affiliate,
+        AUGUST,
+        choice=AdjustmentType.WRITEOFF,
+        reason="HBA absorbs what was never sent",
+    )
+    assert absorbed.type == AdjustmentType.ACCEPTED
+    assert absorbed.amount_piastres == 190_000
+    assert correction_for(db, affiliate, AUGUST).outstanding_piastres == 0
+    # **The property R4 owns**: absorbing a difference against money that was
+    # never sent moves nothing. Asserted as *unchanged* rather than against a
+    # figure, because what August still owes is decided by the earlier
+    # write-off's own arithmetic (ADR 0035) and is not this decision's to
+    # change either way.
+    assert balance_for(db, affiliate, AUGUST)["balance_piastres"] == before
+
+
+def test_a_destination_that_falls_before_approval_hands_back_what_it_cannot_take(db):
+    """R1, and the defect the follow-up review reproduced.
+
+    E£200 is carried into September while September is earning E£200. An
+    order then fails and September is agreed at E£100. The month cannot take
+    the whole deduction, and what it cannot take must go back to the
+    correction it came from - not sit on September as a E£100 *overpayment*
+    on a month nothing was ever transferred for.
+    """
+    affiliate = _model(db)
+    _order(db, affiliate, "1", 2_000_000)
+    august = approve_month(db, affiliate, AUGUST)
+    _paid(db, affiliate, august, 200_000)
+    # September is worth E£200 when the carry is accepted.
+    _order(db, affiliate, "sep-big", 1_000_000, month=SEPTEMBER)
+    _order(db, affiliate, "sep-small", 1_000_000, month=SEPTEMBER)
+    _fail(db, "1")
+
+    resolve(
+        db,
+        affiliate,
+        AUGUST,
+        choice=AdjustmentType.CREDIT,
+        reason="carried into September",
+        destination_month=SEPTEMBER,
+    )
+    assert correction_for(db, affiliate, AUGUST).outstanding_piastres == 0
+
+    # One of September's orders fails before the month is agreed.
+    _fail(db, "sep-small")
+    approve_month(db, affiliate, SEPTEMBER)
+
+    balance = balance_for(db, affiliate, SEPTEMBER)
+    assert balance["obligation_piastres"] == 100_000
+    # It took what it could, and no more.
+    assert balance["credited_piastres"] == 100_000
+    assert balance["balance_piastres"] == 0
+    assert balance["state"] != "overpaid"
+
+    # The rest is open again, against the month it came from.
+    again = correction_for(db, affiliate, AUGUST)
+    assert again.resolved_piastres == 100_000
+    assert again.outstanding_piastres == 100_000
+    assert again.recoverable_piastres == 100_000
+    assert [row.month for row in open_corrections(db, affiliate)] == [AUGUST]
+
+
+def test_a_destination_that_falls_to_nothing_hands_all_of_it_back(db):
+    """R1. The same, with no room left at all."""
+    affiliate = _model(db)
+    _order(db, affiliate, "1", 2_000_000)
+    august = approve_month(db, affiliate, AUGUST)
+    _paid(db, affiliate, august, 200_000)
+    _order(db, affiliate, "sep-1", 2_000_000, month=SEPTEMBER)
+    _fail(db, "1")
+
+    resolve(
+        db,
+        affiliate,
+        AUGUST,
+        choice=AdjustmentType.CREDIT,
+        reason="carried into September",
+        destination_month=SEPTEMBER,
+    )
+
+    _fail(db, "sep-1")
+    approve_month(db, affiliate, SEPTEMBER)
+
+    assert balance_for(db, affiliate, SEPTEMBER)["credited_piastres"] == 0
+    assert correction_for(db, affiliate, AUGUST).outstanding_piastres == 200_000
+
+
+def test_two_corrections_sharing_a_destination_are_released_in_turn(db):
+    """R1. The month pays what it has, oldest claim first.
+
+    Two months are corrected and both carried into October. October is then
+    agreed at less than the two together, so the later claim gives way: the
+    earlier one was accepted when the month had room for it.
+    """
+    affiliate = _model(db)
+    _order(db, affiliate, "jun", 1_000_000, month="2026-06")
+    june = approve_month(db, affiliate, "2026-06")
+    _paid(db, affiliate, june, 100_000)
+    _order(db, affiliate, "jul", 1_000_000, month="2026-07")
+    july = approve_month(db, affiliate, "2026-07")
+    _paid(db, affiliate, july, 100_000)
+    _order(db, affiliate, "oct", 3_000_000, month="2026-10")
+    _fail(db, "jun")
+    _fail(db, "jul")
+
+    for source in ("2026-06", "2026-07"):
+        resolve(
+            db,
+            affiliate,
+            source,
+            choice=AdjustmentType.CREDIT,
+            reason=f"carried from {source}",
+            destination_month="2026-10",
+        )
+
+    # October is agreed at E£150 against E£200 of accepted deductions.
+    _order(db, affiliate, "oct-lost", 1_500_000, month="2026-10")
+    _fail(db, "oct-lost")
+    db.get(AttributedOrder, "oct").commission_base_piastres = 1_500_000
+    db.flush()
+    approve_month(db, affiliate, "2026-10")
+
+    assert balance_for(db, affiliate, "2026-10")["credited_piastres"] == 150_000
+    # June keeps what it claimed first; July gives back the shortfall.
+    assert correction_for(db, affiliate, "2026-06").outstanding_piastres == 0
+    assert correction_for(db, affiliate, "2026-07").outstanding_piastres == 50_000
+
+
+def test_a_deduction_accepted_after_the_preview_invalidates_the_approval(db):
+    """R1, F07. Approval freezes accepted deductions, so it checks them.
+
+    A reviewer opens September, sees what it will pay, and somebody carries a
+    correction into it before they commit. The settlement they were shown is
+    not the settlement they would be agreeing, and the fingerprint says so.
+    """
+    affiliate = _model(db)
+    _order(db, affiliate, "1", 2_000_000)
+    august = approve_month(db, affiliate, AUGUST)
+    _paid(db, affiliate, august, 200_000)
+    _order(db, affiliate, "sep-1", 5_000_000, month=SEPTEMBER)
+
+    shown = _source_version(db, affiliate, SEPTEMBER)
+    _fail(db, "1")
+    resolve(
+        db,
+        affiliate,
+        AUGUST,
+        choice=AdjustmentType.CREDIT,
+        reason="carried while the reviewer was looking",
+        destination_month=SEPTEMBER,
+    )
+
+    with pytest.raises(SourceMoved):
+        approve_month(db, affiliate, SEPTEMBER, expected_source_version=shown)
+
+
+def test_a_remainder_released_in_one_year_is_carried_in_the_next(db):
+    """R1, F12. What a month could not take waits as long as it needs to."""
+    affiliate = _model(db)
+    _order(db, affiliate, "1", 2_000_000)
+    august = approve_month(db, affiliate, AUGUST)
+    _paid(db, affiliate, august, 200_000)
+    _order(db, affiliate, "sep-1", 2_000_000, month=SEPTEMBER)
+    _fail(db, "1")
+    resolve(
+        db,
+        affiliate,
+        AUGUST,
+        choice=AdjustmentType.CREDIT,
+        reason="carried into September",
+        destination_month=SEPTEMBER,
+    )
+    _fail(db, "sep-1")
+    approve_month(db, affiliate, SEPTEMBER)
+    assert correction_for(db, affiliate, AUGUST).outstanding_piastres == 200_000
+
+    _order(db, affiliate, "feb", 9_000_000, month="2027-02")
+    approve_month(db, affiliate, "2027-02")
+    resolve(
+        db,
+        affiliate,
+        AUGUST,
+        choice=AdjustmentType.CREDIT,
+        reason="the remainder, the following year",
+        destination_month="2027-02",
+    )
+
+    assert correction_for(db, affiliate, AUGUST).outstanding_piastres == 0
+    assert balance_for(db, affiliate, "2027-02")["credited_piastres"] == 200_000
+
+
+# -- R4: a decision on a month nothing was sent for ---------------------------
+
+
+def test_hba_can_absorb_a_difference_on_a_month_nothing_was_sent_for(db):
+    """R4. Visibility was not the whole workflow.
+
+    Approved E£2,000, revised to E£1,800, no transfer recorded. The queue
+    showed it and refused every way of finishing with it. Absorbing is a real
+    answer - the agreed figure stands and HBA takes the difference - and it
+    is recorded without pretending money moved.
+    """
+    affiliate = _model(db)
+    _order(db, affiliate, "1", 1_800_000)
+    _order(db, affiliate, "2", 200_000)
+    approve_month(db, affiliate, AUGUST)
+    _fail(db, "2")
+
+    found = correction_for(db, affiliate, AUGUST)
+    assert found.recoverable_piastres == 0
+    assert found.review_reason == "no_transfer_recorded"
+
+    decision = resolve(
+        db,
+        affiliate,
+        AUGUST,
+        choice=AdjustmentType.WRITEOFF,
+        reason="HBA keeps its promise and absorbs the difference",
+    )
+
+    assert decision.type == AdjustmentType.ACCEPTED
+    assert decision.amount_piastres == 20_000
+    # The review is finished...
+    settled = correction_for(db, affiliate, AUGUST)
+    assert settled.outstanding_piastres == 0
+    assert settled.resolved
+    assert open_corrections(db, affiliate) == []
+    # ...and the agreed payable is exactly where the agreement put it.
+    balance = balance_for(db, affiliate, AUGUST)
+    assert balance["obligation_piastres"] == 200_000
+    assert balance["balance_piastres"] == 200_000
+    assert balance["paid_piastres"] == 0
+
+
+def test_absorbing_before_payment_leaves_the_transfer_still_to_make(db):
+    """R4. No fabricated transfer, and no fabricated debt either."""
+    affiliate = _model(db)
+    _order(db, affiliate, "1", 1_800_000)
+    _order(db, affiliate, "2", 200_000)
+    august = approve_month(db, affiliate, AUGUST)
+    _fail(db, "2")
+    resolve(
+        db,
+        affiliate,
+        AUGUST,
+        choice=AdjustmentType.WRITEOFF,
+        reason="absorbed",
+    )
+
+    # The transfer is made afterwards, for the figure that was agreed.
+    _paid(db, affiliate, august, 200_000)
+
+    assert balance_for(db, affiliate, AUGUST)["balance_piastres"] == 0
+    # Recording it does not reopen a difference that was already decided.
+    assert open_corrections(db, affiliate) == []
+
+
+def test_a_later_failure_after_an_absorption_offers_only_the_new_difference(db):
+    """R4 with F11: the cumulative rule still governs."""
+    affiliate = _model(db)
+    _order(db, affiliate, "1", 1_600_000)
+    _order(db, affiliate, "2", 200_000)
+    _order(db, affiliate, "3", 200_000)
+    august = approve_month(db, affiliate, AUGUST)
+    _fail(db, "2")
+    resolve(
+        db,
+        affiliate,
+        AUGUST,
+        choice=AdjustmentType.WRITEOFF,
+        reason="absorbed the first",
+    )
+    _paid(db, affiliate, august, 200_000)
+
+    _fail(db, "3")
+
+    again = correction_for(db, affiliate, AUGUST)
+    assert again.shortfall_piastres == 40_000
+    assert again.resolved_piastres == 20_000
+    assert again.outstanding_piastres == 20_000
+    assert again.recoverable_piastres == 20_000
 
 
 def test_a_month_with_no_room_is_refused_rather_than_settled_for_nothing(db):

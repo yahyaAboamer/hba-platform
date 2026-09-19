@@ -113,17 +113,31 @@ payroll without touching a maintainer screen.
   that failed.
 
   One file per process is the floor, and resumable, which is what makes it
-  the one to fall back to:
+  the one to fall back to. **Record pytest's exit status, not a tail of its
+  output**, and skip only what passed:
 
   ```
-  ls tests/test_*.py > todo.txt; : > log.txt
+  ls tests/test_*.py > todo.txt; touch log.txt      # never truncate: that is the progress
+  rev=$(git rev-parse HEAD)
   while read -r f; do
-    grep -q "^RESULT $f " log.txt && continue
-    out=$(DATABASE_URL='...' .venv/Scripts/python.exe -m pytest -q --color=no       -p no:cacheprovider "$f" 2>&1 | tail -3 | tr '
-' ' ')
-    echo "RESULT $f $out" >> log.txt
+    grep -q "^PASS $rev $f " log.txt && continue    # only a pass, only this revision
+    out=$(DATABASE_URL='...' .venv/Scripts/python.exe -m pytest -q --color=no       -p no:cacheprovider "$f" > one.txt 2>&1; echo $?)
+    [ "$out" = 0 ] && state=PASS || state=FAIL
+    echo "$state $rev $f $(tail -1 one.txt)" >> log.txt
   done < todo.txt
+  grep -c '^PASS ' log.txt; grep '^FAIL ' log.txt
   ```
+
+  Three things that version gets right and the obvious one does not. **The
+  exit code is the result**: `pytest | tail` reports *tail's* status, so a
+  file with a hundred failures reads as a pass. **A failure is recorded as a
+  failure**, so a resume re-runs it instead of skipping it as done. **The
+  revision is in the line**, so yesterday's pass is not mistaken for today's.
+
+  Errors are worth a second look before believing them. A killed run leaves a
+  backend holding locks, and every file after it reports *errors* that look
+  exactly like a regression in whatever you last changed — clear the
+  connection (below) and re-run the file alone before concluding anything.
 
   Clear the leftover backends first — a killed run leaves one holding locks.
 - **A killed pytest run leaves a connection behind that deadlocks the next
