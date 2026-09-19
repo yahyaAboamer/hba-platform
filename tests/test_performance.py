@@ -143,14 +143,21 @@ def test_a_refund_is_a_financial_event_and_does_not_remove_a_use(db):
 
 
 def test_uses_and_sales_do_not_move_together(db):
-    """Correct rather than a fault, and the reason her card explains itself: a
-    parcel going out raises her uses and not her sales.
+    """Correct rather than a fault, and the reason her card explains itself.
+
+    D03: a use is a **delivery** outcome and sales is a money one, so they are
+    never the same count. A parcel going out used to be the clearest example -
+    a use, and not yet a sale - and since ADR 0040 it is both, because a
+    travelling order now counts.
+
+    The divergence is still there and it runs the other way: an order
+    delivered and later refunded arrived, so it is a use, and HBA's policy
+    pays nothing on it, so it is not a sale. One fixture, same rule, and the
+    example moved with the policy.
     """
     affiliate = _model(db, "Nour")
     _order(db, affiliate, "1", 100_000, delivery=DELIVERED, state=CommissionState.EARNED)
-    _order(
-        db, affiliate, "2", 900_000, delivery=IN_FLIGHT, state=CommissionState.PENDING
-    )
+    _order(db, affiliate, "2", 900_000, delivery=DELIVERED, state=CommissionState.VOID)
 
     board = month_performance(db, AUGUST)
 

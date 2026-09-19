@@ -2231,13 +2231,23 @@ def test_her_best_sellers_are_her_own_sales_and_nobody_elses(admin):
     assert [row["shopify_product_id"] for row in body["products"]] == ["P1"]
 
 
-def test_an_order_still_travelling_is_not_a_best_seller_yet(admin):
-    """Delivered only - the live rule, not 05A's pending-inclusive preview."""
+def test_a_travelling_order_sells_and_a_failed_one_does_not(admin):
+    """ADR 0040, and the same basis as the money beside it.
+
+    This read delivered-only, which was the live rule when it was written and
+    stopped being it: her best sellers are the sales she is paid on, so a
+    list that left out a travelling order would disagree with her own month.
+    A failed delivery still sells nothing, and always did.
+    """
     nour = _affiliate(admin)
     _order(nour["id"], "bs-3", 100_000, state="pending")
     _line("bs-3", "P3", 100_000)
+    _order(nour["id"], "bs-9", 400_000, state="void")
+    _line("bs-9", "P9", 400_000)
 
-    assert _sign_in().get("/api/me/best-sellers").json()["products"] == []
+    rows = _sign_in().get("/api/me/best-sellers").json()["products"]
+
+    assert [row["shopify_product_id"] for row in rows] == ["P3"]
 
 
 def test_best_sellers_rank_by_what_the_customer_paid(admin):

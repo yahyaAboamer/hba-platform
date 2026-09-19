@@ -364,8 +364,13 @@ def test_a_renamed_product_is_still_one_product(db):
 
 
 def test_only_counted_orders_sell_anything(db):
-    """A pending order has not sold yet and a failed one never will. The same
-    basis every other screen calls sales.
+    """The same basis every other screen calls sales.
+
+    Which is delivered **and pending** since ADR 0040, and never a failed
+    delivery. A travelling order used to sell nothing here while the payroll
+    engine paid nothing for it either; now the engine pays for it, and a
+    product list that still left it out would disagree with the money on the
+    screen beside it.
     """
     from app.services.performance import top_products
 
@@ -402,7 +407,8 @@ def test_only_counted_orders_sell_anything(db):
 
     found = top_products(db, AUGUST)["products"]
 
-    assert [row.title for row in found] == ["Counted"]
+    # Best first, and the travelling order is the bigger of the two.
+    assert [row.title for row in found] == ["Still travelling", "Counted"]
 
 
 def test_a_product_deleted_from_shopify_is_reported_not_dropped(db):
