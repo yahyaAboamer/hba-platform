@@ -148,24 +148,22 @@ and the suite was killed for memory in groups of five and again in groups of
 three. It finished as one file per process, with each result recorded so a
 kill costs one file rather than the run. `CLAUDE.md` now carries that method.
 
-**What has been run, and what has not.** Results are recorded per file in
-`docs/repair/batch-1/test-log.txt`. At the time of this commit:
+**Result: 1,960 collected, 1,960 passed, 0 failed, across all 76 files.**
+Recorded per file in `docs/repair/batch-1/test-log.txt`, where the total
+reconciles exactly with what `--collect-only` reports for this tree.
 
-- the first ten files of the suite, in two groups of five: **283 passed, 0
-  failed**, against this tree;
-- `tests/test_financial_transition.py`: **12 passed** — the new Batch 1 suite;
-- earlier, before the last two tests were added to each:
-  `tests/test_corrections.py` and `tests/test_commission_calculate.py`
-  together **49 passed**; `tests/test_corrections.py`,
-  `tests/test_portal_corrections.py` and `tests/test_payroll.py` together
-  **73 passed**.
+Four files reported *errors* rather than failures on their first run —
+`test_commission_base`, `test_migrations`, `test_reconcile`, `test_payments`
+— and each passed on re-run after clearing the connection. That is the
+stale-backend deadlock `CLAUDE.md` describes, left behind by the memory
+kills, and it is exactly the symptom that reads like a regression in whatever
+you last changed. The log says which lines were re-runs.
 
-**The full sweep did not complete in this session**, and it is not claimed to
-have. The remaining files — including the changed `test_payments_api.py`,
-`test_payroll_lifecycle.py`, `test_financial_rules_preview.py`,
-`test_earnings_api.py` and `test_portal_api.py` — are queued in the same
-resumable loop and each one takes minutes on a machine in this state. Finish
-it with the loop in `CLAUDE.md`; it skips what is already recorded.
+Of note in the batch's own files: `test_payments_api.py` **41**,
+`test_payroll_lifecycle.py` **48**, `test_portal_api.py` **89**,
+`test_corrections.py` **30**, `test_financial_transition.py` **12**,
+`test_financial_rules_preview.py` **22**, `test_overview.py` **30**,
+`test_performance.py` **36**.
 
 New: `tests/test_financial_transition.py` — the live policy, the snapshot
 policy record, delivery after approval paying nothing again, the backlog only

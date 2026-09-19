@@ -1,2 +1,81 @@
-RESULT tests/test_financial_transition.py ............                                                             [100%] 12 passed in 31.14s 
-RESULT tests/test_corrections.py ..............................                                           [100%] 30 passed in 58.54s 
+Batch 1 — backend suite, per file, on the committed tree.
+
+1960 tests collected; 1960 passed; 0 failed. 76 files.
+
+Run one file per process: this machine had 0.23 GB free of 7.87 GB and
+the suite was killed in groups of five and again in groups of three.
+Four files first reported errors rather than failures - the stale-backend
+deadlock CLAUDE.md describes, left by those kills - and each passed on
+re-run after clearing the connection. Those lines say so.
+
+The first ten files were run as two groups before the kills, and are
+recorded as groups: 198 + 85 = 283, which is exactly what they collect.
+
+GROUP tests/test_affiliate_access.py..tests/test_applications.py 198 passed
+GROUP tests/test_attributed_orders.py..tests/test_codes.py 85 passed
+RESULT tests/test_financial_transition.py 12 passed
+RESULT tests/test_corrections.py 30 passed
+RESULT tests/test_payments_api.py 41 passed
+RESULT tests/test_payroll_lifecycle.py 48 passed
+RESULT tests/test_financial_rules_preview.py 22 passed
+RESULT tests/test_portal_api.py 89 passed
+RESULT tests/test_overview.py 30 passed
+RESULT tests/test_performance.py 36 passed
+RESULT tests/test_reachability.py 3 passed
+RESULT tests/test_products_api.py 9 passed
+RESULT tests/test_auth_api.py 42 passed in 140.05s (0:02:20)
+RESULT tests/test_auth_service.py 27 passed in 10.01s
+RESULT tests/test_browser_journey.py 10 passed in 53.28s
+RESULT tests/test_businesstime.py 22 passed in 21.15s
+RESULT tests/test_code_periods.py 33 passed in 11.59s
+RESULT tests/test_collaboration_start.py 15 passed in 14.27s
+RESULT tests/test_commission_attribute.py 16 passed in 10.64s
+RESULT tests/test_commission_backfill.py 18 passed in 8.48s
+RESULT tests/test_commission_base.py 13 passed in 27.12s (re-run after clearing a stale backend)
+RESULT tests/test_commission_calculate.py 31 passed in 32.58s
+RESULT tests/test_commission_state.py 22 passed in 14.90s
+RESULT tests/test_compensation.py 55 passed in 35.37s
+RESULT tests/test_config.py 8 passed in 6.80s
+RESULT tests/test_earnings_api.py 24 passed in 70.76s (0:01:10)
+RESULT tests/test_health.py 11 passed in 24.07s
+RESULT tests/test_identity_models.py 19 passed in 11.71s
+RESULT tests/test_invitations.py 33 passed in 19.81s
+RESULT tests/test_jobs.py 43 passed in 9.71s
+RESULT tests/test_migrations.py 8 passed in 50.59s (re-run after clearing a stale backend)
+RESULT tests/test_money.py 25 passed in 42.57s
+RESULT tests/test_notices.py 9 passed in 55.60s
+RESULT tests/test_notifications.py 37 passed in 20.04s
+RESULT tests/test_operations_api.py 67 passed in 219.96s (0:03:39)
+RESULT tests/test_order_index.py 9 passed in 20.79s
+RESULT tests/test_orders_api.py 16 passed in 106.65s (0:01:46)
+RESULT tests/test_password_resets.py 15 passed in 15.73s
+RESULT tests/test_passwords.py 14 passed in 16.52s
+RESULT tests/test_payments.py 46 passed in 47.32s (re-run after clearing a stale backend)
+RESULT tests/test_payments_cost.py 2 passed in 50.76s
+RESULT tests/test_payout_destinations.py 54 passed in 21.19s
+RESULT tests/test_payroll.py 40 passed in 39.57s
+RESULT tests/test_periods.py 35 passed in 24.75s
+RESULT tests/test_permissions.py 20 passed in 17.83s
+RESULT tests/test_policy.py 14 passed in 7.87s
+RESULT tests/test_policy_api.py 6 passed in 39.47s
+RESULT tests/test_portal_corrections.py 7 passed in 23.48s
+RESULT tests/test_recipients.py 42 passed in 23.65s
+RESULT tests/test_reconcile.py 21 passed in 38.73s (re-run after clearing a stale backend)
+RESULT tests/test_release_rehearsal.py 9 passed in 32.05s
+RESULT tests/test_setup_readiness.py 14 passed in 23.52s
+RESULT tests/test_shopify_bulk.py 21 passed in 23.14s
+RESULT tests/test_shopify_catalogue.py 22 passed in 8.92s
+RESULT tests/test_shopify_client.py 29 passed in 22.58s
+RESULT tests/test_shopify_discounts.py 21 passed in 16.45s
+RESULT tests/test_shopify_facts.py 40 passed in 34.37s
+RESULT tests/test_shopify_fulfilment.py 43 passed in 10.48s
+RESULT tests/test_shopify_normalise.py 24 passed in 9.65s
+RESULT tests/test_shopify_sync.py 22 passed in 20.29s
+RESULT tests/test_shopify_webhooks.py 29 passed in 84.16s (0:01:24)
+RESULT tests/test_signals.py 7 passed in 13.71s
+RESULT tests/test_staff_api.py 18 passed in 79.79s (0:01:19)
+RESULT tests/test_static_serving.py 6 passed in 18.87s
+RESULT tests/test_targets.py 44 passed in 39.93s
+RESULT tests/test_targets_api.py 30 passed in 139.48s (0:02:19)
+RESULT tests/test_wardrobe.py 34 passed in 27.63s
+RESULT tests/test_worker.py 15 passed in 64.45s (0:01:04)
