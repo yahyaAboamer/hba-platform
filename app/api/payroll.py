@@ -585,3 +585,81 @@ def month_summary_view(
             for row in found.year
         ],
     }
+
+
+# ── A09: finishing the months that happened before the platform ───────────────
+
+
+def _render_historical(result: dict) -> dict:
+    """One shape for both the dry run and the run, plus the sentence.
+
+    The result line is written here rather than in the browser for the reason
+    every figure is: it states what was done to somebody's money, and a second
+    copy of it in TypeScript is a second thing to get wrong when the rule
+    changes.
+    """
+    from app.core.money import format_egp
+
+    totals = result["totals"]
+    done = totals.get("approved")
+    if done is None:
+        line = (
+            f"{totals['ready']} month{'' if totals['ready'] == 1 else 's'} "
+            "can be finalised now."
+        )
+    else:
+        line = (
+            f"{done} month{'' if done == 1 else 's'} finalised from "
+            f"{result['from_month'] or 'the start'} using each model's "
+            "recorded terms. No payments or receipts were created; a month "
+            "with no imported transfer still has none."
+        )
+    if totals["blocked"]:
+        line += (
+            f" {totals['blocked']} still need information HBA has not "
+            "recorded yet."
+        )
+    return {
+        **result,
+        "summary": line,
+        "approved_total": format_egp(
+            sum(row.get("obligation_piastres", 0) for row in result.get("approved", []))
+        ),
+    }
+
+
+@router.get("/historical/review")
+def review_historical_route(
+    _actor: UserAccount = Depends(require_permission(Permission.PAYROLL_APPROVE)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """What finalising the pre-platform months would do. Reads only.
+
+    Separated from the act deliberately: A09 is as much about *what is still
+    missing* as about what can be finished, and a screen that could only find
+    that out by doing something is a screen nobody presses.
+    """
+    from app.services.historical import historical_review
+
+    return _render_historical(historical_review(db))
+
+
+@router.post("/historical/finalise")
+def finalise_historical_route(
+    actor: UserAccount = Depends(require_permission(Permission.PAYROLL_APPROVE)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Approve every pre-platform month that can be calculated. Idempotent.
+
+    Gated on `payroll.approve` because that is exactly what it does, twenty
+    times over. Nothing else about it is new: each month goes through the same
+    `approve_month` as any other, and ADR 0036 already makes the result
+    unpayable.
+    """
+    from app.services.historical import finalise_historical
+
+    result = finalise_historical(
+        db, actor_id=actor.id, actor_email=actor.email
+    )
+    db.commit()
+    return _render_historical(result)

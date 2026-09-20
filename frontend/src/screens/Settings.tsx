@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { AddHouseCode } from "./AddHouseCode";
+import { HistoricalReview } from "./HistoricalReview";
 import { applyMaintainerTheme, storedTheme, storeTheme } from "../lib/theme";
 
 import { MonthPicker } from "../components/MonthPicker";
@@ -96,7 +97,9 @@ export function Settings({ session }: { session: Session }) {
         {section === "shopify" && (can(session, "settings.manage")
           ? <DataPanel goLiveMonth={session.platform.go_live_month} />
           : <PlatformPanel session={session} />)}
-        {section === "historical" && (can(session, "compensation.manage") ? <SetupRoster kind="model" /> : <p className="empty">Your account cannot manage payment terms.</p>)}
+        {section === "historical" && (can(session, "compensation.manage")
+          ? <><SetupRoster kind="model" /><HistoricalReview session={session} /></>
+          : <p className="empty">Your account cannot manage payment terms.</p>)}
         {section === "codes" && <>
           <SetupRoster kind="house" />
           {can(session, "affiliates.manage") && <AddHouseCode onCreated={() => undefined} />}

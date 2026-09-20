@@ -470,3 +470,18 @@
   font-size: 13px;
   cursor: pointer;
 }
+
+/* A09. The bulk historical review, under the per-model table it summarises. */
+.settings__subtitle {
+  margin: 20px 0 8px;
+  font-family: var(--font-heading);
+  font-size: 14px;
+}
+
+.settings__gaps {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--quiet);
+}
