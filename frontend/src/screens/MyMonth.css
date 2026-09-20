@@ -353,6 +353,9 @@
 .portal-home__state--approved,
 .portal-home__state--paid { color:var(--accent); }
 .portal-home__state--settled { color:var(--quiet); }
+/* A12. Not the accent and not the owed colour: neither is true, because the
+   ledger did not answer. It reads as the aside it is. */
+.portal-home__state--unknown { color:var(--quiet); }
 
 /* Something moved after the month was agreed. Amber and pressable, because
    the sentence is a summary and the detail is on another screen. */

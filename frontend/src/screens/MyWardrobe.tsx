@@ -45,6 +45,7 @@ export function MyWardrobe() {
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [best, setBest] = useState<BestSeller[] | null>(null);
+  const [bestError, setBestError] = useState<string | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -53,11 +54,18 @@ export function MyWardrobe() {
     api.get<Wardrobe>("/api/me/wardrobe")
       .then((found) => { if (live) setBody(found); })
       .catch((caught) => { if (live) setError(caught.message); });
-    // Her own best sellers. A failure here hides the section rather than the
+    // Her own best sellers. A failure here costs the section rather than the
     // wardrobe: it is a second question on the same screen.
+    //
+    // **It no longer costs it silently** (A12). `setBest([])` turned a failed
+    // request into "she has sold nothing", and the section then vanished
+    // exactly as it does for a model who genuinely has no sales - so a broken
+    // read was indistinguishable from an empty one, on the screen least able
+    // to tell the difference.
+    setBestError(null);
     api.get<{ products: BestSeller[] }>("/api/me/best-sellers")
-      .then((found) => { if (live) setBest(found.products); })
-      .catch(() => { if (live) setBest([]); });
+      .then((found) => { if (live) { setBest(found.products); setBestError(null); } })
+      .catch((caught) => { if (live) { setBest(null); setBestError(caught.message); } });
     return () => { live = false; };
   }, [attempt]);
 
@@ -68,10 +76,28 @@ export function MyWardrobe() {
     </div>
   );
   if (body === null) return <p className="empty" role="status">Loading wardrobe…</p>;
-  return <WardrobeContents body={body} best={best} />;
+  return (
+    <WardrobeContents
+      body={body}
+      best={best}
+      bestError={bestError}
+      onRetryBest={() => setAttempt((n) => n + 1)}
+    />
+  );
 }
 
-export function WardrobeContents({ body, best = null }: { body: Wardrobe; best?: BestSeller[] | null }) {
+export function WardrobeContents({
+  body,
+  best = null,
+  bestError = null,
+  onRetryBest,
+}: {
+  body: Wardrobe;
+  best?: BestSeller[] | null;
+  /** A12. Set when the best-sellers read failed, which is not "no sales". */
+  bestError?: string | null;
+  onRetryBest?: () => void;
+}) {
   const waiting = [...body.processing, ...body.failed];
   return (
     <div className="wardrobe">
@@ -80,6 +106,22 @@ export function WardrobeContents({ body, best = null }: { body: Wardrobe; best?:
        * her own code, delivered orders only, from `/api/me/best-sellers`;
        * never the programme's totals with her name above them.
        */}
+      {/* A12. The read failed, so this says so and offers another go. It is
+       *  deliberately the only extra line: a section that cannot load is one
+       *  short sentence, not a paragraph explaining itself. */}
+      {bestError && (
+        <section className="wardrobe__block">
+          <h2 className="wardrobe__title">Your best sellers</h2>
+          <p className="wardrobe__subtitle" role="status">
+            Could not load your best sellers.{" "}
+            {onRetryBest && (
+              <button type="button" className="button" onClick={onRetryBest}>
+                Try again
+              </button>
+            )}
+          </p>
+        </section>
+      )}
       {best && best.length > 0 && (
         <section className="wardrobe__block">
           <h2 className="wardrobe__title">Your best sellers</h2>

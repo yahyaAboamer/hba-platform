@@ -57,9 +57,15 @@ export function MyPayments() {
   if (body === null) return <p className="empty">Loading…</p>;
 
   if (body.months.length === 0 && body.payments.length === 0) {
+    // A12. **"Nothing has been paid yet" was a claim this screen cannot
+    // make.** It reads the platform's ledger, which begins at go-live - and
+    // HBA paid models before it existed (ADR 0036). An empty ledger therefore
+    // means there is no record *here*, which is a fact, rather than that she
+    // has never been paid, which is not one and which is a worse thing to
+    // read on your own payments page.
     return (
       <p className="empty">
-        Nothing has been paid yet. A month appears here once HBA closes it.
+        No payment is recorded here yet. A month appears once HBA closes it.
       </p>
     );
   }

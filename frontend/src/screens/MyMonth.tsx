@@ -21,7 +21,16 @@ import "./MyMonth.css";
  * not payment**, and a month agreed this morning says *approved*, not *paid*,
  * however certain the transfer is.
  */
-export type HomeState = "open" | "approved" | "paid" | "settled";
+/**
+ * Where a month has got to — including *we could not find out*. A12.
+ *
+ * `unknown` exists because the settlement comes from a second request, and a
+ * screen that could not read it used to show **approved**: the badge that
+ * means *agreed and not yet paid*. That is a claim about her money inferred
+ * from a failed network call, and it is the one reading nobody should take
+ * from an error.
+ */
+export type HomeState = "open" | "approved" | "paid" | "settled" | "unknown";
 
 /**
  * Lower case, as the export writes them.
@@ -35,6 +44,7 @@ export const STATE_LABEL: Record<HomeState, string> = {
   approved: "approved",
   paid: "payment recorded",
   settled: "settled",
+  unknown: "payment status unavailable",
 };
 
 const HERO_LABEL: Record<HomeState, string> = {
@@ -42,6 +52,9 @@ const HERO_LABEL: Record<HomeState, string> = {
   approved: "Approved for payment",
   paid: "Recorded payment",
   settled: "Settled earnings",
+  // The earnings read succeeded, so the figure is real and is still shown.
+  // What could not be read is whether anything has been sent against it.
+  unknown: "Approved earnings",
 };
 
 /** What the sum at the foot of the breakdown is called. */
@@ -50,13 +63,30 @@ export const TOTAL_LABEL: Record<HomeState, string> = {
   approved: "Approved for payment",
   paid: "Recorded payment",
   settled: "Settled",
+  unknown: "Approved earnings",
 };
 
-export function homeState(body: MyEarnings, settlement?: PaymentMonth): HomeState {
+export function homeState(
+  body: MyEarnings,
+  settlement?: PaymentMonth,
+  /**
+   * Whether the settlement read actually answered. A12.
+   *
+   * `settlement` being absent has two completely different causes - *the
+   * ledger has nothing for this month* and *the request failed* - and the
+   * second one used to be silently read as the first, producing **approved**
+   * on a screen that had no idea. Defaulted to `true` so every existing
+   * caller keeps its meaning, and passed explicitly by the screens that can
+   * tell the difference.
+   */
+  settlementKnown = true,
+): HomeState {
   // A month from before the platform is closed and has no figure to move
-  // (ADR 0036), which is the export's *settled*.
+  // (ADR 0036), which is the export's *settled*. Neither it nor an open month
+  // depends on the ledger, so a failed settlement read costs them nothing.
   if (body.state === "historical") return "settled";
   if (body.state === "open") return "open";
+  if (!settlementKnown) return "unknown";
   // Agreed. Only the ledger may promote it to *payment recorded*, and only
   // once nothing is outstanding: a part payment is still money owed.
   const paid = settlement?.state === "settled" || settlement?.state === "overpaid";
@@ -87,7 +117,7 @@ export function MyMonth() {
   if (!body) return <p className="empty">Loading…</p>;
 
   const settlement = payments?.months.find(row => row.month === month);
-  const state = homeState(body, settlement);
+  const state = homeState(body, settlement, paymentError === null);
   const transfer = payments?.payments.find(row => row.settles.some(part => part.month === month));
 
   return <div className="portal-home">

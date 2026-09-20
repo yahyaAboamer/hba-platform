@@ -31,6 +31,7 @@ export function MyCalculation() {
   const eligible = months.includes(month);
   const [body, setBody] = useState<MyEarnings | null>(null);
   const [payments, setPayments] = useState<MyPayments | null>(null);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [retry, setRetry] = useState(0);
 
@@ -42,21 +43,31 @@ export function MyCalculation() {
       setError("This month is not available in your history.");
       return;
     }
+    setPaymentError(null);
     api.get<MyEarnings>(`/api/me/earnings/${month}`)
       .then(value => { if (live) setBody(value); })
       .catch(e => { if (live) setError(e.message); });
     // Quietly: the breakdown is the screen, and a failure here costs it one
     // word at the top rather than its contents.
+    //
+    // **But the word has to be the truthful one** (A12). Swallowing the error
+    // into `null` left the settlement indistinguishable from *the ledger has
+    // nothing for this month*, and the screen then said **approved** - agreed
+    // and not yet paid - on the strength of a request that never answered.
     api.get<MyPayments>("/api/me/payments")
-      .then(value => { if (live) setPayments(value); })
-      .catch(() => { if (live) setPayments(null); });
+      .then(value => { if (live) { setPayments(value); setPaymentError(null); } })
+      .catch(e => { if (live) { setPayments(null); setPaymentError(e.message); } });
     return () => { live = false; };
   }, [month, retry, eligible]);
 
   if (error) return <p role="alert">{error} <button className="button" onClick={() => setRetry(n => n + 1)}>Retry</button></p>;
   if (!body) return <p className="empty">Loading…</p>;
 
-  const state = homeState(body, payments?.months.find(row => row.month === month));
+  const state = homeState(
+    body,
+    payments?.months.find(row => row.month === month),
+    paymentError === null,
+  );
 
   return <div className="portal-home">
     <div className="portal-home__month">

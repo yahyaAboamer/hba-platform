@@ -293,6 +293,77 @@ either. Same gap as the sections above.
 
 ---
 
-## A09, A12
+## A12 — wording that stated things the screen could not know
 
-Not started.
+Three places turned a request that never answered into a fact about her money.
+
+### The calculation said "approved" when it could not reach the ledger
+
+`MyCalculation` fetched the settlement separately and swallowed a failure into
+`setPayments(null)`. `homeState` then saw no settlement and returned
+**approved** — *agreed and not yet paid* — which is a statement about her
+money produced by a network error.
+
+`homeState` now takes whether the settlement was actually read.
+`settlement === undefined` had two completely different causes — *the ledger
+has nothing for this month* and *the request failed* — and the second was
+silently read as the first. The parameter defaults to `true`, so every
+existing caller keeps its meaning.
+
+A month that never needed the ledger is untouched: an open month and a
+pre-platform month are decided by the earnings read alone, so a broken
+settlement request costs them nothing.
+
+### The wardrobe turned a failed read into "no sales"
+
+`.catch(() => setBest([]))`. An empty list hides the section — exactly as it
+does for a model who genuinely has sold nothing. The two were indistinguishable
+on the screen least able to tell them apart.
+
+Now three states: `null` with no error is *still loading*, `[]` is *genuinely
+none*, and an error says so and offers another go. One short sentence, not a
+paragraph.
+
+### "Nothing has been paid yet" was not this screen's to say
+
+`MyPayments` reads the platform's ledger, which **begins at go-live** — and
+HBA paid models before it existed (ADR 0036). An empty ledger means there is
+no record *here*. It now says that.
+
+### Evidence
+
+Seven tests in `frontend/src/screens/__tests__/UnknownStates.test.tsx`: the
+unknown settlement against the genuine empty one, a recorded payment still
+reported, open and historical months unaffected by a failed ledger read, and
+the wardrobe's three states rendered apart — failed, genuinely empty, and
+still loading.
+
+**Honest limit.** The audit asked for these to be driven by *actual rejected
+API requests*. This project has no DOM test environment — no `jsdom`, no
+`@testing-library/react` — so a component's effect cannot be run in a test at
+all, and adding both was scope this batch did not have. What is tested instead
+is the seam the defect lived in: the decision functions and the render props,
+with the failure and the emptiness passed in as the distinct values they now
+are. The swallow itself is gone from the source, but nothing yet re-runs a
+rejected fetch through the component.
+
+**Results:** frontend **347** tests, build green; backend `test_portal_api.py`
+93, `test_wardrobe.py` 34.
+
+### One thing this turned up about the checks themselves
+
+`npx tsc --noEmit` **checks nothing**. The root `tsconfig.json` is a solution
+file containing only `references`, so bare `tsc` compiles no files and exits 0
+whatever is broken — it passed a JSX syntax error and an import of a type that
+does not exist, both of which `npm run build` (`tsc -b`) caught immediately.
+Recorded in CLAUDE.md, because a green typecheck has been quoted as evidence
+in this repair more than once.
+
+---
+
+## A09
+
+Not started — and the largest of the six. Most of what it asks for is data
+rather than code: verified start dates, terms and guarantee outcomes
+populated, order completeness verified, then an idempotent historical
+finalisation. A06 was its stated prerequisite and is done.

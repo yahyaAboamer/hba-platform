@@ -197,8 +197,15 @@ payroll without touching a maintainer screen.
 
   Then empty the database and re-run the file alone. Happened 10 September and
   cost the best part of an hour.
-- Frontend: `cd frontend && npm test` (319), `npx tsc --noEmit` and
+- Frontend: `cd frontend && npm test` (347), `npx tsc --noEmit` and
   `npm run build`.
+- **`npm run build` is the typecheck; `npx tsc --noEmit` is not.** The root
+  `tsconfig.json` is a solution file — nothing but `references` — so bare
+  `tsc --noEmit` checks *no files at all* and exits 0 whatever is broken. The
+  build runs `tsc -b`, which follows the references and actually compiles. On
+  20 September `tsc --noEmit` passed a JSX syntax error and an import of a type
+  that does not exist; `npm run build` caught both. Run the build before
+  believing a green typecheck.
 - **A browser session is now possible.** Yahya signs in himself at
   `https://hba-platform-staging-staging.up.railway.app/sign-in` and the session
   is then usable for the rest of the conversation - ask for it rather than
