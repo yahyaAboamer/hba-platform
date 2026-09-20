@@ -525,7 +525,60 @@ function PaymentFigure({
   );
 }
 
-function PaymentRow({
+/**
+ * What this row's headline figure is. A02.
+ *
+ * **It is the month's transfer, and it used to be `balance_piastres`.** That
+ * is what is *left* to send, which is zero on an unapproved month by
+ * construction and zero again once a month is fully paid - so the list showed
+ * Boda E£0.00 for September while her own detail screen showed an estimated
+ * E£14,224, and a settled row showed nothing where the export shows what was
+ * sent.
+ *
+ * `required_piastres` is the figure the export's rows carry
+ * (`egp(pay.total)`): the month's entitlement less any deduction landing on
+ * it, before payments. The server computes it the same way on both sides of
+ * the approved/forecast line, which is what stops one column meaning two
+ * things depending on a state the reader cannot see. It is also what the
+ * page's own "Funds required" total already adds up, so the row and the
+ * header finally agree.
+ *
+ * Not "replace every zero with a forecast": a genuine zero - a model with no
+ * sales, a month settled outside the platform - still reads zero, and the
+ * *remaining* figure keeps its own place on the second line below.
+ */
+export function amountShown(row: Balance): number {
+  return row.required_piastres;
+}
+
+/**
+ * The one line under the figure, and only where it adds something.
+ *
+ * The export allows exactly one, and chooses the deduction over the receipt
+ * when there is one: a month paying less than it earned because an earlier
+ * overpayment is being recovered needs that said, or the headline looks like
+ * a mistake. Otherwise it is what has already been sent, and where neither
+ * applies there is no line at all.
+ */
+export function secondLine(row: Balance) {
+  if (row.credited_piastres > 0) {
+    return (
+      <span className="payments__part">
+        <Money piastres={row.credited_piastres} /> deducted
+      </span>
+    );
+  }
+  if (row.paid_piastres > 0) {
+    return (
+      <span className="payments__part">
+        <Money piastres={row.paid_piastres} /> recorded
+      </span>
+    );
+  }
+  return null;
+}
+
+export function PaymentRow({
   row,
   month,
   canRecord,
@@ -563,7 +616,7 @@ function PaymentRow({
         ) : (
           <>
             <Money
-              piastres={row.balance_piastres}
+              piastres={amountShown(row)}
               kind={isForecast ? "provisional" : "agreed"}
             />
             {/* One figure, and a second line only where it is not the whole
@@ -572,12 +625,7 @@ function PaymentRow({
              *  unapproved figure, which is the third place on this screen
              *  saying the same thing: the total already wears an `Estimated`
              *  badge and the row already wears an `Awaiting approval` pill. */}
-            {row.paid_piastres > 0 && (
-              <span className="payments__part">
-                <Money piastres={row.paid_piastres} /> already sent
-              </span>
-            )}
-
+            {secondLine(row)}
           </>
         )}
       </td>

@@ -1246,3 +1246,67 @@ def test_a_model_may_not_read_a_payment_statement(client):
         client.get(f"/api/payroll/{AUGUST}/statement/{affiliate['id']}").status_code
         == 403
     )
+
+
+def test_a_forecast_month_reports_the_transfer_not_the_gross_earnings(client):
+    """A02. One column, one meaning, on both sides of the approval line.
+
+    A carry is accepted against a month **before** it is agreed (F07, F12), so
+    a draft month can already be carrying a deduction. September is on course
+    to earn E£3,000 and E£2,000 of August's overpayment is landing on it, so
+    the bank movement is E£1,000 — and *funds required* is the question that
+    column asks.
+
+    The approved branch has always netted the deduction out. The forecast
+    branch reported the gross earnings, so the same column meant two different
+    things depending on a state the reader cannot see, which is the half of
+    A02 that lives on the server.
+
+    `forecast_piastres` keeps answering the other question — what the month is
+    worth — because the detail screen and the header's estimate both ask it.
+    """
+    affiliate = _affiliate(client, "Nour", "nour-forecast@example.com")
+    snapshot = _owed(client, affiliate)
+    client.post(
+        "/api/payments",
+        json={
+            "affiliate_id": affiliate["id"],
+            "amount_piastres": 200_000,
+            "allocations": [
+                {"payroll_snapshot_id": snapshot, "piastres": 200_000}
+            ],
+        },
+    )
+    # September earns E£3,000 and is deliberately left unapproved.
+    _order(affiliate["id"], "sep-big", 3_000_000, month=SEPTEMBER)
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "UPDATE attributed_order SET commission_state = 'void' "
+                "WHERE affiliate_id = :affiliate AND business_month = :month"
+            ),
+            {"affiliate": affiliate["id"], "month": AUGUST},
+        )
+    carried = client.post(
+        "/api/corrections",
+        json={
+            "affiliate_id": affiliate["id"],
+            "month": AUGUST,
+            "choice": "credit",
+            "reason": "Recover the transfer after the order failed",
+            "destination_month": SEPTEMBER,
+            "expected_outstanding_piastres": 200_000,
+            "operation_key": "carry-into-a-draft-september",
+        },
+    )
+    assert carried.status_code == 201, carried.text
+
+    row = client.get(f"/api/payments/{SEPTEMBER}").json()["affiliates"][0]
+    assert row["required_kind"] == "forecast"
+    # What the month is worth, and what would leave the bank.
+    assert row["forecast_piastres"] == 300_000
+    assert row["credited_piastres"] == 200_000
+    assert row["required_piastres"] == 100_000
+    # And the agreed figures stay where an unapproved month puts them.
+    assert row["obligation_piastres"] == 0
+    assert row["balance_piastres"] == 0

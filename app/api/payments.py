@@ -44,11 +44,12 @@ from app.services.payments import (
     adjustments_for,
     assert_same_payment,
     balance_for,
+    credited_into,
     payment_for_operation_key,
     payments_for,
     record_payment,
 )
-from app.services.payroll import blockers_for, is_historical
+from app.services.payroll import blockers_for, get_month, is_historical
 from app.services.payouts import (
     changed_recently,
     current_destination,
@@ -162,11 +163,31 @@ def _render_balance(
     if balance["state"] == "not_approved" and not is_historical(month):
         blockers, calculation = blockers_for(db, affiliate, month)
         forecast = calculation.payout_piastres if not blockers else None
+        # A02. **What she is on course to earn and what would leave the bank
+        # are two figures, and the second one is the column's own question.**
+        #
+        # A carry is accepted against a month before it is agreed (F07, F12),
+        # so a draft month can already be carrying a deduction. Reporting the
+        # gross forecast as *funds required* asks for money a deduction is
+        # about to take back, and it made the forecast branch mean something
+        # different from the approved branch directly below - which is the
+        # whole of A02: one column, two meanings, depending on a state the
+        # reader cannot see.
+        #
+        # `forecast_piastres` stays gross. It answers *what is this month
+        # worth*, which is the question the detail screen and the header's
+        # estimate ask.
+        landing = (
+            credited_into(db, payroll_month)
+            if (payroll_month := get_month(db, affiliate, month)) is not None
+            else 0
+        )
         row.update(
             forecast_piastres=forecast,
             forecast_blockers=blockers,
             required_kind="forecast" if forecast is not None else "unavailable",
-            required_piastres=forecast or 0,
+            required_piastres=max((forecast or 0) - landing, 0),
+            credited_piastres=landing,
         )
     elif balance["state"] == "settled_externally":
         row.update(

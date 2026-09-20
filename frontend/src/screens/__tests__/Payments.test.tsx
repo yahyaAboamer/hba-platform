@@ -1,7 +1,9 @@
 import { renderToStaticMarkup } from "react-dom/server";
+import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 
 import {
+  PaymentRow,
   paymentRowPresentation,
   type Balance,
 } from "../Payments";
@@ -154,5 +156,172 @@ describe("recording the external transfer", () => {
     );
 
     for (const fact of facts) expect(html).toContain(fact);
+  });
+});
+
+/**
+ * A02. The amount column, rendered, from the shape the API actually sends.
+ *
+ * The defect the audit confirmed in the browser: the row always rendered
+ * `balance_piastres`. That is what is *left to send*, which the server sets to
+ * zero on any month nobody has approved - so the list showed E£0.00 beside a
+ * model whose own detail screen showed an estimated E£14,224. The same zero
+ * appeared once a month was fully paid, where the export shows what was sent.
+ *
+ * These are fixtures in the server's own response shape rather than hand-made
+ * numbers, and they are rendered through the real row, because the bug was
+ * never in the arithmetic. Every figure involved was correct and on the wire;
+ * the column was bound to the wrong one.
+ */
+describe("the amount column, rendered", () => {
+  const rowHtml = (over: Partial<Balance>) =>
+    renderToStaticMarkup(
+      <MemoryRouter>
+        <table>
+          <tbody>
+            <PaymentRow
+              row={{ ...approved, ...over }}
+              month="2026-09"
+              canRecord
+              canApprove
+            />
+          </tbody>
+        </table>
+      </MemoryRouter>,
+    );
+
+  /**
+   * The headline figure alone, and the line under it alone.
+   *
+   * Asserting against the whole cell is how a broken binding passes: a
+   * settled row rendering `balance_piastres` shows E£0.00 as its figure and
+   * E£2,000.00 on its second line, and a test that only asks whether
+   * E£2,000.00 is *somewhere* in the markup is satisfied by the bug.
+   */
+  const figure = (html: string) => html.split('class="payments__part"')[0];
+  const under = (html: string) => html.split('class="payments__part"').slice(1).join("");
+
+  it("shows the forecast on a month nobody has approved", () => {
+    const html = rowHtml({
+      state: "not_approved",
+      payroll_snapshot_id: undefined,
+      obligation_piastres: 0,
+      paid_piastres: 0,
+      credited_piastres: 0,
+      balance_piastres: 0,
+      forecast_piastres: 1_422_400,
+      required_kind: "forecast",
+      required_piastres: 1_422_400,
+    });
+
+    // The figure her detail screen shows, on the row that used to say nothing.
+    expect(figure(html)).toContain("E£14,224.00");
+    expect(html).not.toContain("E£0.00");
+  });
+
+  it("says nothing rather than guessing when the month cannot be calculated", () => {
+    const html = rowHtml({
+      state: "not_approved",
+      payroll_snapshot_id: undefined,
+      obligation_piastres: 0,
+      paid_piastres: 0,
+      credited_piastres: 0,
+      balance_piastres: 0,
+      forecast_piastres: null,
+      forecast_blockers: ["no_terms_for_this_month"],
+      required_kind: "unavailable",
+      required_piastres: 0,
+    });
+
+    expect(html).toContain("Unavailable");
+    expect(html).not.toContain("E£");
+  });
+
+  it("shows the approved total on a month nothing has been sent for", () => {
+    const html = rowHtml({
+      state: "unpaid",
+      obligation_piastres: 200_000,
+      paid_piastres: 0,
+      credited_piastres: 0,
+      balance_piastres: 200_000,
+      forecast_piastres: null,
+      required_kind: "approved",
+      required_piastres: 200_000,
+    });
+
+    expect(figure(html)).toContain("E£2,000.00");
+    // Nothing sent and nothing deducted, so there is no second line to draw.
+    expect(html).not.toContain("payments__part");
+  });
+
+  it("keeps the whole month in the figure when part of it has been sent", () => {
+    const html = rowHtml({
+      state: "partially_paid",
+      obligation_piastres: 200_000,
+      paid_piastres: 50_000,
+      credited_piastres: 0,
+      balance_piastres: 150_000,
+      forecast_piastres: null,
+      required_kind: "approved",
+      required_piastres: 200_000,
+    });
+
+    // The month, then what has gone - not the remainder on its own, which is
+    // what made a part-paid row read as a smaller month than it is.
+    expect(figure(html)).toContain("E£2,000.00");
+    expect(under(html)).toContain("E£500.00");
+    expect(under(html)).toContain("recorded");
+  });
+
+  it("still shows what a fully paid month came to", () => {
+    const html = rowHtml({
+      state: "settled",
+      obligation_piastres: 200_000,
+      paid_piastres: 200_000,
+      credited_piastres: 0,
+      balance_piastres: 0,
+      forecast_piastres: null,
+      required_kind: "approved",
+      required_piastres: 200_000,
+    });
+
+    expect(figure(html)).toContain("E£2,000.00");
+    expect(under(html)).toContain("E£2,000.00");
+    expect(under(html)).toContain("recorded");
+  });
+
+  it("explains a correction-covered month rather than showing a bare zero", () => {
+    // D04: the deduction takes the whole month, so nothing is transferred.
+    // The row has to say why, or a valid zero looks like a broken one.
+    const html = rowHtml({
+      state: "settled",
+      obligation_piastres: 200_000,
+      paid_piastres: 0,
+      credited_piastres: 200_000,
+      balance_piastres: 0,
+      forecast_piastres: null,
+      required_kind: "approved",
+      required_piastres: 0,
+    });
+
+    expect(figure(html)).toContain("E£0.00");
+    expect(under(html)).toContain("E£2,000.00");
+    expect(under(html)).toContain("deducted");
+  });
+
+  it("shows a month settled outside the platform as owing nothing", () => {
+    const html = rowHtml({
+      state: "settled_externally",
+      obligation_piastres: 0,
+      paid_piastres: 0,
+      credited_piastres: 0,
+      balance_piastres: 0,
+      forecast_piastres: null,
+      required_kind: "settled_externally",
+      required_piastres: 0,
+    });
+
+    expect(figure(html)).toContain("E£0.00");
+    expect(html).not.toContain("payments__part");
   });
 });
