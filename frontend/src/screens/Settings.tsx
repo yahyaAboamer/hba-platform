@@ -136,6 +136,23 @@ type SetupRow = {
   collaboration_start_month?: string | null;
   /** The first month her terms cover. `null` means none were ever written. */
   earliest_terms_month?: string | null;
+  /**
+   * A09. How many of her eligible months can actually be calculated.
+   *
+   * Counts, from the server's per-month rule — the same one the profile
+   * screen uses. **Not two dates**, which is what this column compared
+   * before: her earliest terms against her start month, an answer that cannot
+   * see a gap in the middle of a year or a guaranteed month with no recorded
+   * outcome.
+   */
+  historical_setup?: {
+    eligible: number;
+    ready: number;
+    blocking: number;
+    /** The earliest month that cannot be calculated, to link straight to. */
+    first_gap: string | null;
+    start_is_recorded: boolean;
+  } | null;
 };
 
 /**
@@ -145,15 +162,27 @@ type SetupRow = {
  * a tidiness column: it is the list of months nobody can pay, and the state
  * word is what turns a date somebody has to compare into an answer.
  */
-function historicalState(row: SetupRow) {
-  if (!row.earliest_terms_month) {
+export function historicalState(row: SetupRow) {
+  const setup = row.historical_setup;
+  // The server did not send a verdict. Say that, rather than working one out
+  // here from whatever else is on the row - which is how this column came to
+  // have its own rule in the first place (A09).
+  if (!setup) return <span className="settings__gap">Not known</span>;
+  if (setup.eligible === 0) {
     return <span className="settings__gap">No month can be worked out</span>;
   }
-  if (!row.collaboration_start_month) return "Start month not recorded";
-  if (row.earliest_terms_month > row.collaboration_start_month) {
-    return <span className="settings__gap">Months before her terms</span>;
+  if (setup.blocking === 0) {
+    // **Every eligible month, not the earliest one.** "Covered from the
+    // start" used to mean only that her terms began early enough.
+    return setup.start_is_recorded
+      ? `All ${setup.eligible} months ready`
+      : `All ${setup.eligible} months ready · start not recorded`;
   }
-  return "Covered from the start";
+  return (
+    <span className="settings__gap">
+      {setup.blocking} of {setup.eligible} months cannot be calculated
+    </span>
+  );
 }
 
 function SetupRoster({kind}: {kind: "model" | "house"}) {
@@ -184,11 +213,15 @@ function SetupRoster({kind}: {kind: "model" | "house"}) {
             : <span className="settings__gap">None written</span>}</td>
         {kind === "model" && <td>
           {historicalState(row)}
-          {/* The way to fix it, where there is something to fix. */}
-          {(!row.earliest_terms_month
-            || (row.collaboration_start_month
-              && row.earliest_terms_month > row.collaboration_start_month)) && <>
-            {" · "}<Link to={`/affiliates/${row.id}/compensation`}>Set the months →</Link>
+          {/* The way to fix it, where there is something to fix - and it goes
+              to the first month that cannot be calculated rather than to the
+              top of the grid. */}
+          {row.historical_setup && row.historical_setup.blocking > 0 && <>
+            {" · "}<Link to={`/affiliates/${row.id}/compensation`}>
+              {row.historical_setup.first_gap
+                ? `Fix from ${formatMonth(row.historical_setup.first_gap)} →`
+                : "Set the months →"}
+            </Link>
           </>}
         </td>}
       </tr>)}</tbody></table>

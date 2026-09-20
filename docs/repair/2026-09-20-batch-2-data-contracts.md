@@ -361,9 +361,76 @@ in this repair more than once.
 
 ---
 
-## A09
+## A09 — historical readiness compared two dates
 
-Not started — and the largest of the six. Most of what it asks for is data
-rather than code: verified start dates, terms and guarantee outcomes
-populated, order completeness verified, then an idempotent historical
-finalisation. A06 was its stated prerequisite and is done.
+A09 asks for several things, and they are not all code. This section does the
+code half and says plainly what the other half still needs.
+
+### The code defect: "Covered from the start" proved nothing of the kind
+
+Settings' *Historical setup* column decided readiness like this:
+
+```tsx
+if (row.earliest_terms_month > row.collaboration_start_month) return "Months before her terms";
+return "Covered from the start";
+```
+
+Two dates. That answers *do her terms begin early enough* and nothing else:
+
+- **A gap in the middle passes.** Terms from January to March and from June
+  onwards, starting in January, reads *Covered from the start* while April and
+  May cannot be calculated at all.
+- **A guaranteed month with no recorded outcome passes.** It blocks the figure
+  exactly as completely as missing terms (F06), and this column could not see
+  it.
+- **"Start month not recorded" was reported as a verdict.** It is a real fact
+  and worth showing (H01), but a model whose start nobody wrote down still has
+  eligible months derived from her orders and can be perfectly ready across
+  every one of them.
+
+H06 is explicit that a first terms record does not prove readiness. Neither
+does an early one.
+
+### What it does now
+
+The roster carries `historical_setup`: how many of her eligible months are
+ready, how many are blocking, and the first month that cannot be calculated.
+The column says *"All 9 months ready"* or *"2 of 9 months cannot be
+calculated"*, and the fix link goes to the first gap rather than the top of
+the grid.
+
+**One rule, in one place.** The per-month decision was pulled out of
+`setup_readiness` into `month_gaps`, and both the profile screen's payload and
+the new roster summary call it. The column having its own rule is how A09
+happened.
+
+`roster_readiness` answers for the whole roster in four queries rather than
+three per model — the loop this file already warns about (03D).
+
+### Evidence
+
+Five tests in `tests/test_setup_readiness.py`: the gap in the middle that the
+two-date comparison called covered, a guaranteed month with no outcome, the
+fully covered case, a model with no recorded start judged on her orders, and
+the whole roster answered in one pass.
+
+### What A09 still needs, and it is not code
+
+The audit asks for verified start dates, terms and guarantee outcomes to be
+**populated**, order completeness **verified**, and historical reconstruction
+**finalised idempotently**. None of that is a code change and none of it has
+been done:
+
+- No real or restored data has been touched. The staging gaps the audit found
+  — Jana starting January with terms from August, other profiles with no
+  recorded start — are still there.
+- Order completeness has not been verified against Shopify.
+- There is no historical finalisation step, idempotent or otherwise. The
+  column now measures readiness honestly, which is what makes the remaining
+  work visible rather than what completes it.
+- The approved bulk historical review entry is still absent.
+
+A06 was its stated prerequisite and is done.
+
+**Results:** frontend **347** tests, build green; backend
+`test_setup_readiness.py` 19, `test_affiliates_api.py` 113.

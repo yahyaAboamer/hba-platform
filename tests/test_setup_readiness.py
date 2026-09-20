@@ -47,6 +47,53 @@ def _affiliate(db, name="Nour", email="nour@example.com") -> AffiliateProfile:
     return affiliate
 
 
+def _model(db, *, start=None, name="Nour", email="nour@example.com"):
+    """An affiliate with a recorded collaboration start, or deliberately none.
+
+    A09 turns on the difference: a model whose start nobody wrote down still
+    has eligible months, derived from her orders.
+    """
+    affiliate = _affiliate(db, name=name, email=email)
+    if start:
+        set_collaboration_start(db, affiliate, start)
+        db.flush()
+    return affiliate
+
+
+def _order(db, affiliate, order_id, *, month):
+    """One attributed order, which is what a derived start month reads."""
+    from datetime import datetime, timezone
+
+    from app.models.attributed_orders import AttributedOrder
+    from app.models.orders import OrderIndex
+
+    db.add(
+        OrderIndex(
+            shopify_order_id=order_id,
+            order_number=f"#{order_id}",
+            placed_at=datetime(2026, 8, 1, 12, tzinfo=timezone.utc),
+            business_month=month,
+            discount_codes=["NOUR10"],
+            subtotal_piastres=100_000,
+            total_piastres=100_000,
+            shipping_piastres=0,
+            tax_piastres=0,
+            currency="EGP",
+        )
+    )
+    db.flush()
+    db.add(
+        AttributedOrder(
+            shopify_order_id=order_id,
+            affiliate_id=affiliate.id,
+            business_month=month,
+            commission_base_piastres=100_000,
+            commission_state="earned",
+        )
+    )
+    db.flush()
+
+
 def _readiness(db, affiliate):
     return setup_readiness(
         db, affiliate, working=WORKING, is_historical=_historical
@@ -379,3 +426,142 @@ def test_readiness_reflects_a_later_edit_immediately(db):
     result = _readiness(db, affiliate)
     assert result["eligible"] == 3
     assert _months(result)["2026-04"]["missing"] == [NO_TERMS]
+
+
+# ── A09: readiness across every eligible month, not two dates ─────────────────
+
+
+def test_a_gap_in_the_middle_is_not_covered_from_the_start(db):
+    """A09. The case the two-date comparison could not see.
+
+    Terms from January to March and from June onwards. The earliest terms
+    month is January, her start is January, and the old column said *Covered
+    from the start* - while April and May could not be calculated at all.
+    """
+    from app.services.setup import roster_readiness
+
+    affiliate = _model(db, start="2026-01")
+    set_terms(
+        db,
+        affiliate,
+        start_month="2026-01",
+        end_month="2026-03",
+        compensation_type=CompensationType.COMMISSION,
+        commission_rate_bp=1000,
+    )
+    set_terms(
+        db,
+        affiliate,
+        start_month="2026-06",
+        compensation_type=CompensationType.COMMISSION,
+        commission_rate_bp=1000,
+    )
+
+    summary = roster_readiness(
+        db, [affiliate], working="2026-09", is_historical=_historical
+    )[affiliate.id]
+
+    assert summary["eligible"] == 9
+    assert summary["blocking"] == 2, "April and May have no terms"
+    assert summary["ready"] == 7
+    assert summary["first_gap"] == "2026-04"
+
+
+def test_a_guaranteed_month_without_an_outcome_blocks_it_too(db):
+    """A09, F06. Missing terms is not the only thing that stops a figure."""
+    from app.services.setup import roster_readiness
+
+    affiliate = _model(db, start="2026-09")
+    set_terms(
+        db,
+        affiliate,
+        start_month="2026-09",
+        compensation_type=CompensationType.BASE_GUARANTEE,
+        commission_rate_bp=1000,
+        base_amount_piastres=300_000,
+    )
+
+    summary = roster_readiness(
+        db, [affiliate], working="2026-09", is_historical=_historical
+    )[affiliate.id]
+
+    assert summary["eligible"] == 1
+    assert summary["blocking"] == 1, "the guarantee has no verified target"
+    assert summary["first_gap"] == "2026-09"
+
+
+def test_every_month_covered_is_reported_ready(db):
+    """A09. And the happy case still reads as one."""
+    from app.services.setup import roster_readiness
+
+    affiliate = _model(db, start="2026-07")
+    set_terms(
+        db,
+        affiliate,
+        start_month="2026-07",
+        compensation_type=CompensationType.COMMISSION,
+        commission_rate_bp=1000,
+    )
+
+    summary = roster_readiness(
+        db, [affiliate], working="2026-09", is_historical=_historical
+    )[affiliate.id]
+
+    assert summary == {
+        "eligible": 3,
+        "ready": 3,
+        "blocking": 0,
+        "first_gap": None,
+        "start_is_recorded": True,
+    }
+
+
+def test_a_model_with_no_recorded_start_is_judged_on_her_orders(db):
+    """A09. "Start month not recorded" was reported as a state of its own.
+
+    It is a real fact and the payload still carries it — but it is not a
+    readiness verdict. A model whose start nobody wrote down still has
+    eligible months derived from her orders, and she can be perfectly ready
+    across all of them.
+    """
+    from app.services.setup import roster_readiness
+
+    affiliate = _model(db, start=None)
+    _order(db, affiliate, "aug", month="2026-08")
+    set_terms(
+        db,
+        affiliate,
+        start_month="2026-08",
+        compensation_type=CompensationType.COMMISSION,
+        commission_rate_bp=1000,
+    )
+
+    summary = roster_readiness(
+        db, [affiliate], working="2026-09", is_historical=_historical
+    )[affiliate.id]
+
+    assert summary["start_is_recorded"] is False
+    assert summary["eligible"] == 2
+    assert summary["blocking"] == 0, "derived months, and every one of them covered"
+
+
+def test_the_roster_answers_for_everybody_in_one_pass(db):
+    """A09. Set-wise, because this is the screen with all of them on it."""
+    from app.services.setup import roster_readiness
+
+    ready = _model(db, start="2026-09", name="Ready", email="ready@example.com")
+    set_terms(
+        db,
+        ready,
+        start_month="2026-09",
+        compensation_type=CompensationType.COMMISSION,
+        commission_rate_bp=1000,
+    )
+    blocked = _model(db, start="2026-09", name="Blocked", email="blocked@example.com")
+
+    summary = roster_readiness(
+        db, [ready, blocked], working="2026-09", is_historical=_historical
+    )
+
+    assert summary[ready.id]["blocking"] == 0
+    assert summary[blocked.id]["blocking"] == 1

@@ -344,6 +344,19 @@ def list_affiliates_route(
     # Months are `YYYY-MM`, so the earliest is simply the smallest string.
     from app.models.compensation import CompensationPeriod
 
+    # A09. **Whether she is actually set up, across every month she has.**
+    #
+    # The column used to compare her earliest terms month with her start
+    # month, which sees neither a gap in the middle nor a guaranteed month
+    # with no recorded outcome. This is the same per-month rule the profile
+    # screen uses, asked for the whole roster in four queries.
+    from app.services.payroll import is_historical as _is_historical
+    from app.services.setup import roster_readiness
+
+    historical_setup = roster_readiness(
+        db, affiliates, working=month, is_historical=_is_historical
+    )
+
     earliest: dict[int, str] = {}
     for affiliate_id, start_month in db.execute(
         select(CompensationPeriod.affiliate_id, CompensationPeriod.start_month)
@@ -372,6 +385,11 @@ def list_affiliates_route(
                 #: exists to show. `None` means no terms were ever written,
                 #: which is the same problem for every month she has worked.
                 "earliest_terms_month": earliest.get(a.id),
+                #: A09. How many of her eligible months can actually be
+                #: calculated, and the first one that cannot. Counts rather
+                #: than a boolean, because *nearly ready* is the state this
+                #: screen exists to show and a yes/no hides it.
+                "historical_setup": historical_setup.get(a.id),
             }
             for a in affiliates
         ],

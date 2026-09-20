@@ -103,6 +103,37 @@ def eligible_months(db: Session, affiliate: AffiliateProfile, working: str) -> l
     return months
 
 
+def month_gaps(terms, target, *, historical: bool) -> list[str]:
+    """What one month is still missing, or nothing. H06, F06.
+
+    Extracted so the per-model payload and the whole-roster summary decide a
+    month **the same way** (A09). The roster used to answer this question by
+    comparing two dates instead, and two implementations of a readiness rule
+    is two answers to *can she be paid*.
+    """
+    if terms is None:
+        return [NO_TERMS]
+    if terms.compensation_type != CompensationType.BASE_GUARANTEE:
+        # **Only guarantee depends on targets** (F06). A commission or salary
+        # month is complete with terms alone, and asking for an outcome would
+        # block payroll on evidence that decides nothing.
+        return []
+    if historical:
+        # ADR 0036: the counts were never kept, so the outcome *is* the
+        # evidence. Absent, the guarantee cannot be decided - and F06 is
+        # explicit that unknown qualifying information blocks a decision
+        # rather than being read as a failure.
+        if target is None or target.recorded_outcome is None:
+            return [NO_TARGET_OUTCOME]
+        return []
+    # Live months keep the existing gate. Verification is what releases a
+    # guarantee today, and adding a second approval would be a duplicate
+    # process for one fact.
+    if target is None or target.verified_at is None:
+        return [TARGET_NOT_VERIFIED]
+    return []
+
+
 def setup_readiness(
     db: Session,
     affiliate: AffiliateProfile,
@@ -158,28 +189,7 @@ def setup_readiness(
     for month in months:
         terms = covers.get(month)
         historical = is_historical(month)
-        missing: list[str] = []
-
-        if terms is None:
-            missing.append(NO_TERMS)
-        elif terms.compensation_type == CompensationType.BASE_GUARANTEE:
-            # **Only guarantee depends on targets** (F06). A commission or
-            # salary month is complete with terms alone, and asking for an
-            # outcome would block payroll on evidence that decides nothing.
-            target = targets.get(month)
-            if historical:
-                # ADR 0036: the counts were never kept, so the outcome *is* the
-                # evidence. Absent, the guarantee cannot be decided - and
-                # F06 is explicit that unknown qualifying information blocks a
-                # decision rather than being read as a failure.
-                if target is None or target.recorded_outcome is None:
-                    missing.append(NO_TARGET_OUTCOME)
-            else:
-                # Live months keep the existing gate. Verification is what
-                # releases a guarantee today, and adding a second approval
-                # would be a duplicate process for one fact.
-                if target is None or target.verified_at is None:
-                    missing.append(TARGET_NOT_VERIFIED)
+        missing = month_gaps(terms, targets.get(month), historical=historical)
 
         rows.append(
             {
@@ -207,3 +217,137 @@ def setup_readiness(
         "ready": ready,
         "blocking": len(rows) - ready,
     }
+
+
+def roster_readiness(
+    db: Session,
+    affiliates: list[AffiliateProfile],
+    *,
+    working: str,
+    is_historical,
+) -> dict[int, dict]:
+    """The same verdict as `setup_readiness`, for a whole roster at once. A09.
+
+    ## What this replaces, and why it is not the same question
+
+    Settings' *Historical setup* column decided "Covered from the start" by
+    comparing **two dates**: her earliest terms month against her collaboration
+    start. That answers *do her terms begin early enough* and nothing else.
+
+    It cannot see a gap in the middle - terms from January to March and from
+    June onwards passes, with April and May uncalculable. It cannot see a
+    guaranteed month with no recorded outcome, which blocks the figure just as
+    completely as missing terms. And "Start month not recorded" was reported as
+    a state of its own, when a model with no recorded start still has eligible
+    months derived from her orders and can be perfectly ready across all of
+    them.
+
+    So the column now says how many of her eligible months are actually ready,
+    from the same per-month rule the profile screen uses (`month_gaps`). H06 is
+    explicit that a first terms record does not prove readiness; neither does
+    an early one.
+
+    ## Set-wise, because this is the screen with everybody on it
+
+    Four queries for the whole roster rather than three per model. The loop
+    this avoids is the shape that made the products screen slow (03D), and
+    `setup_readiness` says the same thing about its own months.
+    """
+    from sqlalchemy import func
+
+    from app.models.compensation import CompensationPeriod
+
+    ids = [a.id for a in affiliates]
+    if not ids:
+        return {}
+
+    first_order = dict(
+        db.execute(
+            select(
+                AttributedOrder.affiliate_id,
+                func.min(AttributedOrder.business_month),
+            )
+            .where(AttributedOrder.affiliate_id.in_(ids))
+            .group_by(AttributedOrder.affiliate_id)
+        ).all()
+    )
+
+    periods: dict[int, list] = {}
+    for period in db.scalars(
+        select(CompensationPeriod).where(CompensationPeriod.affiliate_id.in_(ids))
+    ):
+        periods.setdefault(period.affiliate_id, []).append(period)
+
+    targets: dict[int, dict[str, object]] = {}
+    for target in db.scalars(
+        select(MonthlyTarget).where(MonthlyTarget.affiliate_id.in_(ids))
+    ):
+        targets.setdefault(target.affiliate_id, {})[target.month] = target
+
+    approved: dict[int, set[str]] = {}
+    for affiliate_id, month in db.execute(
+        select(PayrollMonth.affiliate_id, PayrollMonth.month)
+        .where(PayrollMonth.affiliate_id.in_(ids))
+        .where(PayrollMonth.calculation_state == CalculationState.APPROVED)
+    ).all():
+        approved.setdefault(affiliate_id, set()).add(month)
+
+    out: dict[int, dict] = {}
+    for affiliate in affiliates:
+        start = affiliate.collaboration_start_month
+        first = (
+            max(start, PLATFORM_START_MONTH)
+            if start
+            else first_order.get(affiliate.id)
+        )
+        if not first or first > working:
+            out[affiliate.id] = {
+                "eligible": 0,
+                "ready": 0,
+                "blocking": 0,
+                "first_gap": None,
+                "start_is_recorded": start is not None,
+            }
+            continue
+
+        covers: dict[str, object] = {}
+        for period in periods.get(affiliate.id, []):
+            cursor = period.start_month
+            while cursor <= (period.end_month or working):
+                covers[cursor] = period
+                cursor = month_add(cursor, 1)
+
+        settled = approved.get(affiliate.id, set())
+        mine = targets.get(affiliate.id, {})
+        eligible = 0
+        blocking = 0
+        first_gap = None
+        cursor = first
+        while cursor <= working:
+            eligible += 1
+            # An approved month is finished whatever else is true of it: its
+            # terms are frozen in the snapshot and nothing here can or should
+            # ask it to change.
+            if cursor not in settled and month_gaps(
+                covers.get(cursor), mine.get(cursor), historical=is_historical(cursor)
+            ):
+                blocking += 1
+                if first_gap is None:
+                    first_gap = cursor
+            cursor = month_add(cursor, 1)
+
+        out[affiliate.id] = {
+            "eligible": eligible,
+            "ready": eligible - blocking,
+            "blocking": blocking,
+            #: The earliest month that cannot be calculated, so the screen can
+            #: send somebody to it rather than to the top of a year.
+            "first_gap": first_gap,
+            #: H01. "She started in June" and "we are guessing from her
+            #: earliest order" are different facts and a screen should be able
+            #: to tell them apart - but neither of them is a readiness verdict,
+            #: which is why this sits beside the counts rather than replacing
+            #: them.
+            "start_is_recorded": start is not None,
+        }
+    return out
