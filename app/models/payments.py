@@ -81,19 +81,23 @@ class AdjustmentType:
     #: are different facts, and the ledger keeps both.
     RELEASE = "release"
 
-    #: **HBA absorbs a difference on a month nothing was sent for** (R4).
+    #: **HBA absorbs a difference on an agreed month** (R4, widened by F2).
     #:
-    #: A month agreed at E£2,000 that now calculates to E£1,800, with no
-    #: transfer recorded, has a real difference and nothing to recover: no
-    #: money moved, so none can come back. §11.5 still needs somebody to
-    #: decide, and this records that they did - *the agreed figure stands and
-    #: HBA takes the difference*.
+    #: A month agreed at E£2,000 that now calculates to E£1,800 has a real
+    #: difference, and one of the answers to it is *the agreed figure stands
+    #: and HBA takes the difference*. This records that answer. It is what
+    #: choosing **absorb** on a correction writes, in every case.
     #:
     #: **It is not a write-off**, and the distinction is the whole reason it
-    #: exists. A write-off against a month still owed reduces what is owed,
-    #: which is the opposite of absorbing a loss: it would quietly pay her
-    #: less. This closes the review and leaves the payable exactly where the
-    #: agreement put it, which is why `adjusted_against` does not count it.
+    #: exists. A write-off says *we are not sending the rest* and reduces what
+    #: the month still owes - which is the opposite of HBA absorbing a loss:
+    #: it would quietly pay her less. This closes the review and leaves the
+    #: payable exactly where the agreement put it, which is why
+    #: `adjusted_against` counts it on neither of its lists.
+    #:
+    #: R4 introduced it for the one case it had noticed - a month with no
+    #: transfer recorded, where there is nothing to recover. F2 found the same
+    #: sentence is true whenever anything is still owed, which is most months.
     ACCEPTED = "accepted"
 
 

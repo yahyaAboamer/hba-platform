@@ -42,6 +42,7 @@ from app.services.payroll import approve_month
 
 AUGUST = "2026-08"
 SEPTEMBER = "2026-09"
+OCTOBER = "2026-10"
 
 
 @pytest.fixture(autouse=True)
@@ -116,11 +117,14 @@ def _fail(db, order_id):
     db.flush()
 
 
-def _in_parallel(work, count=2):
+def _in_parallel(work, count=2, names=None):
     """Run `work(index)` in `count` threads, each holding its own session.
 
     Started together on a barrier so they are genuinely in flight at the same
     time. Returns each thread's result or the exception it raised, in order.
+
+    `names` labels the threads, which is how the deterministic tests below tell
+    one participant from the other from inside the service code.
     """
     ready = threading.Barrier(count)
     results: list = [None] * count
@@ -137,13 +141,51 @@ def _in_parallel(work, count=2):
         finally:
             session.close()
 
-    threads = [threading.Thread(target=run, args=(index,)) for index in range(count)]
+    threads = [
+        threading.Thread(
+            target=run,
+            args=(index,),
+            name=(names[index] if names else f"worker-{index}"),
+        )
+        for index in range(count)
+    ]
     for thread in threads:
         thread.start()
     for thread in threads:
-        thread.join(timeout=60)
+        # Generous, because the gate is doing its job: three writers against
+        # one model queue behind each other and each runs a whole month's
+        # calculation. A tighter bound here measures the machine, not the code.
+        thread.join(timeout=180)
     assert not any(thread.is_alive() for thread in threads), "a session never finished"
     return results
+
+
+def _hold_one_thread_at_the_gate(monkeypatch, *, thread_name, until):
+    """Make one named thread arrive at the money gate *after* `until` is set.
+
+    F3. The race approval used to lose is not about who starts first — it is
+    about a session that read the world, waited, and then wrote what it read.
+    This puts one thread in exactly that position on purpose: it reaches the
+    gate, the other session commits in full, and only then does it continue.
+
+    Everything approval decides on is read **after** the gate (that is the
+    fix), so the thread held here must come out of the wait seeing the other
+    session's work. A version that read first and locked second would freeze
+    evidence that was already false, and the assertions below say so.
+
+    An event, not a sleep: nothing here is timing-dependent, and the other
+    session has genuinely committed before this one moves.
+    """
+    from app.services import money_gate
+
+    real = money_gate.hold_money_gate
+
+    def wait_then_hold(db, affiliate):
+        if threading.current_thread().name == thread_name:
+            assert until.wait(timeout=30), "the other session never finished"
+        return real(db, affiliate)
+
+    monkeypatch.setattr(money_gate, "hold_money_gate", wait_then_hold)
 
 
 @pytest.fixture()
@@ -250,9 +292,137 @@ def test_a_retry_with_the_same_key_returns_the_first_recovery(committed):
         ).id
 
     outcomes = _in_parallel(work)
-    landed = [row for row in outcomes if isinstance(row, int)]
-    assert landed, outcomes
-    assert len(set(landed)) == 1, "one decision produced two rows"
+
+    # F4. **Both**, not "at least one and no contradictions."
+    #
+    # The first version of this collected the successes, checked that one
+    # existed and checked they agreed with each other. One success and one
+    # exception satisfies every word of that, which is the outcome the test was
+    # written to rule out: a retry answered with a 409 it cannot interpret,
+    # about a decision its own first attempt had already made.
+    assert all(isinstance(row, int) for row in outcomes), outcomes
+    assert len(set(outcomes)) == 1, f"one decision produced two rows: {outcomes}"
+    assert _adjustments(AdjustmentType.CREDIT) == [(AdjustmentType.CREDIT, 200_000)]
+
+
+def test_a_key_reused_for_a_different_decision_is_refused(committed):
+    """F4. The other half of an idempotency key: it has to identify something.
+
+    Handing back whatever row carries the key, whatever that row says, turns a
+    client's key-reuse bug into a silent wrong answer — a carry into September
+    reported for a request that asked for an absorb, or for a different month
+    entirely.
+    """
+    from app.models.affiliates import AffiliateProfile
+    from app.services.payments import OperationKeyReused
+
+    key = f"reused-{uuid.uuid4()}"
+    session = SessionLocal()
+    try:
+        affiliate = session.get(AffiliateProfile, committed)
+        first = resolve(
+            session,
+            affiliate,
+            AUGUST,
+            choice=AdjustmentType.CREDIT,
+            reason="carried",
+            destination_month=SEPTEMBER,
+            operation_key=key,
+        )
+        session.commit()
+        first_id = first.id
+    finally:
+        session.close()
+
+    session = SessionLocal()
+    try:
+        affiliate = session.get(AffiliateProfile, committed)
+        # Same key, different decision. Not the same request arriving twice.
+        with pytest.raises(OperationKeyReused):
+            resolve(
+                session,
+                affiliate,
+                AUGUST,
+                choice=AdjustmentType.WRITEOFF,
+                reason="absorbed instead",
+                operation_key=key,
+            )
+        session.rollback()
+        # And the same key with the same decision is still a retry.
+        affiliate = session.get(AffiliateProfile, committed)
+        again = resolve(
+            session,
+            affiliate,
+            AUGUST,
+            choice=AdjustmentType.CREDIT,
+            reason="carried",
+            destination_month=SEPTEMBER,
+            operation_key=key,
+        )
+        assert again.id == first_id
+    finally:
+        session.rollback()
+        session.close()
+
+    assert _adjustments(AdjustmentType.CREDIT) == [(AdjustmentType.CREDIT, 200_000)]
+
+
+def test_a_colliding_key_leaves_the_session_able_to_answer(committed):
+    """F4. The savepoint has to contain the collision, insert included.
+
+    Two sessions both find the key free and both insert. The loser's statement
+    fails on the unique constraint, and what happens next is the whole point:
+    the recovery query has to be able to run. If the insert escaped the
+    savepoint the whole transaction would be aborted, and a retry that should
+    have been answered with the winner's row would raise instead.
+
+    Driven through `adjust` directly with the replay check stubbed out, because
+    the only way to reach the collision is for both sessions to get past a
+    check that is designed to stop them.
+    """
+    from app.models.affiliates import AffiliateProfile
+    from app.services import payments
+
+    key = f"collide-{uuid.uuid4()}"
+    passed_the_check = threading.Barrier(2, timeout=30)
+    real = payments._replay_of
+
+    def blind_first_time(db, operation_key, **rest):
+        found = real(db, operation_key, **rest)
+        if found is None:
+            # Both sessions leave here together, so both insert.
+            passed_the_check.wait()
+        return found
+
+    def work(index, worker):
+        profile = worker.get(AffiliateProfile, committed)
+        row = payments.adjust(
+            worker,
+            profile,
+            kind=AdjustmentType.CREDIT,
+            source_month=AUGUST,
+            destination_month=SEPTEMBER,
+            amount_piastres=200_000,
+            reason="carried",
+            open_difference_piastres=200_000,
+            operation_key=key,
+        )
+        # The session survived the collision and can still be used.
+        assert worker.scalar(
+            __import__("sqlalchemy")
+            .select(PayrollAdjustment.id)
+            .where(PayrollAdjustment.id == row.id)
+        )
+        return row.id
+
+    payments._replay_of = blind_first_time
+    try:
+        outcomes = _in_parallel(work)
+    finally:
+        payments._replay_of = real
+
+    assert all(isinstance(row, int) for row in outcomes), outcomes
+    assert len(set(outcomes)) == 1, f"one key produced two rows: {outcomes}"
     assert _adjustments(AdjustmentType.CREDIT) == [(AdjustmentType.CREDIT, 200_000)]
 
 
@@ -318,5 +488,322 @@ def test_two_corrections_cannot_both_spend_one_destination(fresh_database):
             for month in sources
         )
         assert applied + outstanding == 200_000
+    finally:
+        session.close()
+
+
+# -- F3. Approval and allocation, which used to run past each other -----------
+
+
+@pytest.fixture()
+def carried_into_october(fresh_database):
+    """August overpaid by E£2,000, and an October worth E£2,000 to take it.
+
+    October is deliberately left in draft: a carry is accepted against a month
+    before it is agreed (F07, F12), which is the window approval and the
+    corrections service both write into.
+    """
+    session = SessionLocal()
+    try:
+        affiliate = _model(session, "Hana")
+        _order(session, affiliate, "aug-1", 2_000_000)
+        august = approve_month(session, affiliate, AUGUST)
+        record_payment(
+            session,
+            affiliate,
+            amount_piastres=200_000,
+            allocations={august.id: 200_000},
+        )
+        _order(session, affiliate, "oct-1", 2_000_000, month=OCTOBER)
+        _fail(session, "aug-1")
+        session.commit()
+        return affiliate.id
+    finally:
+        session.close()
+
+
+def _october(affiliate_id):
+    """What October ended up at: its snapshot's evidence and its ledger."""
+    from app.models.affiliates import AffiliateProfile
+    from app.services.payments import credited_into
+    from app.services.payroll import get_month
+
+    session = SessionLocal()
+    try:
+        affiliate = session.get(AffiliateProfile, affiliate_id)
+        month = get_month(session, affiliate, OCTOBER)
+        snapshot = month.active_snapshot if month is not None else None
+        return {
+            "approved": snapshot.approved_obligation_piastres if snapshot else None,
+            "frozen_applied": (
+                snapshot.payload_json["deductions_applied_piastres"]
+                if snapshot
+                else None
+            ),
+            "frozen_released": (
+                snapshot.payload_json["deductions_released_piastres"]
+                if snapshot
+                else None
+            ),
+            "credited": credited_into(session, month) if month else 0,
+            "balance": balance_for(session, affiliate, OCTOBER)["balance_piastres"],
+            "outstanding": correction_for(
+                session, affiliate, AUGUST
+            ).outstanding_piastres,
+        }
+    finally:
+        session.close()
+
+
+def test_a_carry_landing_during_an_approval_is_part_of_what_is_agreed(
+    carried_into_october, monkeypatch
+):
+    """F3. The deterministic one: approval waits, the carry lands, approval runs.
+
+    The approving session reaches the gate and is held there until the other
+    has committed a E£2,000 carry onto the very month it is about to agree.
+    Everything approval decides on is read after that gate, so the snapshot it
+    writes has to account for the carry.
+
+    What must not happen is the shape the old order produced: a snapshot whose
+    frozen deduction evidence says nothing landed on this month, beside a
+    ledger in which E£2,000 did. Two records of one month, disagreeing, with
+    the statement rendered from the one that is wrong.
+    """
+    from app.models.affiliates import AffiliateProfile
+
+    carried = threading.Event()
+    _hold_one_thread_at_the_gate(monkeypatch, thread_name="approver", until=carried)
+
+    def work(index, session):
+        affiliate = session.get(AffiliateProfile, carried_into_october)
+        if threading.current_thread().name == "approver":
+            return approve_month(session, affiliate, OCTOBER).id
+        try:
+            return resolve(
+                session,
+                affiliate,
+                AUGUST,
+                choice=AdjustmentType.CREDIT,
+                reason="carried into October",
+                destination_month=OCTOBER,
+                operation_key=f"carry-{uuid.uuid4()}",
+            ).id
+        finally:
+            session.commit()
+            carried.set()
+
+    outcomes = _in_parallel(work, names=["approver", "carrier"])
+    assert all(isinstance(row, int) for row in outcomes), outcomes
+
+    after = _october(carried_into_october)
+    assert after["approved"] == 200_000
+    assert after["credited"] == 200_000
+    assert after["frozen_applied"] == 200_000, (
+        "the snapshot froze a deduction figure the ledger disagrees with"
+    )
+    assert after["frozen_released"] == 0
+    assert after["balance"] == 0
+    assert after["outstanding"] == 0
+
+
+def test_an_approval_and_a_carry_racing_leave_one_consistent_month(
+    carried_into_october,
+):
+    """F3. The same two writers, with nobody held anywhere.
+
+    Whichever order they land in, one set of facts has to come out: the month
+    absorbs no more than it is worth, its frozen evidence agrees with its
+    ledger, and every piastre of the correction is either applied or still
+    open. Nothing may be applied twice and nothing may go missing.
+    """
+    from app.models.affiliates import AffiliateProfile
+
+    def work(index, session):
+        affiliate = session.get(AffiliateProfile, carried_into_october)
+        if index == 0:
+            return approve_month(session, affiliate, OCTOBER).id
+        return resolve(
+            session,
+            affiliate,
+            AUGUST,
+            choice=AdjustmentType.CREDIT,
+            reason="carried into October",
+            destination_month=OCTOBER,
+            operation_key=f"carry-{uuid.uuid4()}",
+        ).id
+
+    _in_parallel(work)
+
+    after = _october(carried_into_october)
+    if after["approved"] is None:
+        pytest.fail("October was never agreed")
+    assert after["credited"] <= after["approved"], "more was deducted than was agreed"
+    # `frozen_applied` is already net of anything released, so subtracting the
+    # released figure from it again would only make this easier to satisfy -
+    # which is the F4 mistake in a different costume.
+    assert after["frozen_applied"] <= after["approved"]
+    assert after["frozen_applied"] >= 0
+    assert after["balance"] >= 0
+    # Applied plus still-open is the whole difference, once.
+    assert after["credited"] + after["outstanding"] == 200_000
+
+
+def test_two_carries_and_an_approval_cannot_overdraw_the_month(fresh_database):
+    """F3. Three writers, one destination worth less than the two claims.
+
+    June and July are each owed E£1,000 back; September is worth E£1,500 and is
+    being agreed at the same moment. The two carries together are more than it
+    has. However the three interleave, September may absorb at most what it is
+    worth, and what it cannot take stays open against the month it came from.
+    """
+    from app.models.affiliates import AffiliateProfile
+    from app.services.payments import credited_into
+    from app.services.payroll import get_month
+
+    session = SessionLocal()
+    try:
+        affiliate = _model(session, "Dina")
+        for month, order in (("2026-06", "jun"), ("2026-07", "jul")):
+            _order(session, affiliate, order, 1_000_000, month=month)
+            snapshot = approve_month(session, affiliate, month)
+            record_payment(
+                session,
+                affiliate,
+                amount_piastres=100_000,
+                allocations={snapshot.id: 100_000},
+            )
+            _fail(session, order)
+        _order(session, affiliate, "sep", 1_500_000, month=SEPTEMBER)
+        session.commit()
+        affiliate_id = affiliate.id
+    finally:
+        session.close()
+
+    sources = ["2026-06", "2026-07"]
+
+    def work(index, session):
+        affiliate = session.get(AffiliateProfile, affiliate_id)
+        if index == 2:
+            return approve_month(session, affiliate, SEPTEMBER).id
+        return resolve(
+            session,
+            affiliate,
+            sources[index],
+            choice=AdjustmentType.CREDIT,
+            reason=f"carried from {sources[index]}",
+            destination_month=SEPTEMBER,
+            operation_key=f"three-{index}-{uuid.uuid4()}",
+        ).id
+
+    _in_parallel(work, count=3)
+
+    session = SessionLocal()
+    try:
+        affiliate = session.get(AffiliateProfile, affiliate_id)
+        month = get_month(session, affiliate, SEPTEMBER)
+        applied = credited_into(session, month)
+        assert applied <= 150_000, f"{applied} piastres applied to a 150000 month"
+        assert balance_for(session, affiliate, SEPTEMBER)["balance_piastres"] >= 0
+        outstanding = sum(
+            correction_for(session, affiliate, source).outstanding_piastres
+            for source in sources
+        )
+        assert applied + outstanding == 200_000, "a remainder was lost"
+        if month.active_snapshot is not None:
+            body = month.active_snapshot.payload_json
+            agreed = month.active_snapshot.approved_obligation_piastres
+            # **Not equality with the ledger**, and the reason is a real rule
+            # rather than a concession to the race. A carry may be accepted
+            # against a month that is already agreed — `capacity_of` offers an
+            # approved month its remaining balance — so a credit recorded after
+            # this snapshot was written is legitimate and is not in it. What
+            # the snapshot froze is what was landing *when it was agreed*, and
+            # that can never have been more than the month was worth.
+            assert body["deductions_applied_piastres"] <= agreed, (
+                "the snapshot agreed to more deduction than the month was worth"
+            )
+            assert body["deductions_applied_piastres"] >= 0
+    finally:
+        session.close()
+
+
+def test_a_release_and_a_decision_on_the_same_source_settle_it_once(fresh_database):
+    """F3. Approval handing money back while somebody decides about it.
+
+    August carries its whole E£2,000 into an October that then loses the sale
+    it was going to pay with. Agreeing October at nothing releases the E£2,000
+    back to August — at the same moment as somebody absorbing August's
+    correction on the screen in front of them.
+
+    The release reopens the difference and the absorb closes it. Both are real
+    decisions and both may stand; what must not happen is August ending up
+    settled for more or less than the one E£2,000 it was ever short.
+    """
+    from app.models.affiliates import AffiliateProfile
+    from app.services.corrections import _resolved_so_far
+    from app.services.payments import credited_into
+    from app.services.payroll import get_month
+
+    session = SessionLocal()
+    try:
+        affiliate = _model(session, "Rana")
+        _order(session, affiliate, "aug-1", 2_000_000)
+        august = approve_month(session, affiliate, AUGUST)
+        record_payment(
+            session,
+            affiliate,
+            amount_piastres=200_000,
+            allocations={august.id: 200_000},
+        )
+        _order(session, affiliate, "oct-1", 2_000_000, month=OCTOBER)
+        _fail(session, "aug-1")
+        resolve(
+            session,
+            affiliate,
+            AUGUST,
+            choice=AdjustmentType.CREDIT,
+            reason="carried into October",
+            destination_month=OCTOBER,
+        )
+        # And now October loses the sale it was going to pay the deduction with.
+        _fail(session, "oct-1")
+        session.commit()
+        affiliate_id = affiliate.id
+    finally:
+        session.close()
+
+    def work(index, session):
+        affiliate = session.get(AffiliateProfile, affiliate_id)
+        if index == 0:
+            return approve_month(session, affiliate, OCTOBER).id
+        return resolve(
+            session,
+            affiliate,
+            AUGUST,
+            choice=AdjustmentType.WRITEOFF,
+            reason="HBA absorbs it",
+            operation_key=f"absorb-{uuid.uuid4()}",
+        ).id
+
+    _in_parallel(work)
+
+    session = SessionLocal()
+    try:
+        affiliate = session.get(AffiliateProfile, affiliate_id)
+        month = get_month(session, affiliate, OCTOBER)
+        # October took nothing, because it is worth nothing.
+        assert credited_into(session, month) == 0
+        assert balance_for(session, affiliate, OCTOBER)["balance_piastres"] == 0
+
+        settled, _ = _resolved_so_far(session, affiliate, AUGUST)
+        outstanding = correction_for(session, affiliate, AUGUST).outstanding_piastres
+        assert settled + outstanding == 200_000, (
+            f"August was short E£2,000 and is recorded as {settled} settled "
+            f"with {outstanding} open"
+        )
+        assert outstanding >= 0
+        # And August is still owed nothing extra: it was paid in full.
+        assert balance_for(session, affiliate, AUGUST)["balance_piastres"] == 0
     finally:
         session.close()

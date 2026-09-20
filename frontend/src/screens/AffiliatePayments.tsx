@@ -46,7 +46,12 @@ type History = {
 
 const ADJUSTMENT_WORD: Record<string, string> = {
   credit: "Carried to a later month",
-  writeoff: "Absorbed by HBA",
+  writeoff: "Written off by HBA",
+  // R4, F2. HBA took the difference and the agreed total did not move, which
+  // is a different sentence from a write-off and has to read as one.
+  accepted: "HBA covered the difference",
+  // R1. A deduction the destination month could not take, sent back.
+  release: "Returned to an earlier month",
 };
 
 /**

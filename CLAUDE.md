@@ -49,6 +49,20 @@ payroll without touching a maintainer screen.
   build if those values appear anywhere else.
 - **No customer data.** `order_index` and `attributed_order` hold no name,
   address, phone or email, and a test keeps it structural.
+- **A correction settles money that moved; a balance is money that has not**
+  (ADR 0041, amending 0035). Carrying a difference into a later month recovers
+  it **there** — taking it off the source month as well recovers it twice, and
+  reported E£800 still to send on a month agreed at E£2,000 with E£1,000 sent.
+  Absorbing records an **`accepted`**, always: a `writeoff` means *we are not
+  sending the rest* and still reduces a balance, which is the opposite of HBA
+  taking a loss. Absorbing takes the whole remaining difference, so carry what
+  is recoverable first.
+- **One gate in front of every writer of a model's money**
+  (`app/services/money_gate.py`). `approve_month`, `corrections.resolve` and
+  `record_payment` all take it **before reading anything they decide on**, not
+  before writing. It locks the *affiliate* row rather than a month because
+  approval and `resolve` need the same two month rows in opposite orders, and
+  one lock has no order to get wrong. It re-reads on the way in.
 - **Append-only tables stay append-only**: `payroll_snapshot`,
   `payment_transaction`, `payment_allocation`, `payroll_adjustment`,
   `payout_destination`, `policy_version`. Guarded by triggers.
@@ -59,8 +73,9 @@ payroll without touching a maintainer screen.
 
 ## Where the reasoning lives
 
-- **`docs/adr/`** — 38 ADRs. The index is generated from the files. 0014 is
-  superseded by 0036; 0027 is amended by 0038.
+- **`docs/adr/`** — 41 ADRs. The index is generated from the files. 0014 is
+  superseded by 0036; 0027 is amended by 0038; **0035 is amended by 0041**, in
+  one clause — a *write-off* closes a debt and a *credit* does not.
 - **`docs/limits.md`** — every failure met, what it looked like from outside,
   and the fix. **Read this before debugging anything.**
 - **`docs/plans/`** — what is being built and why.
@@ -101,7 +116,7 @@ payroll without touching a maintainer screen.
   the background. Two against the same database deadlock and leak committed
   rows into each other, and the failures look exactly like a real regression
   in whatever you just changed. Also on 10 September, and it cost an hour.
-- Backend: `.venv/Scripts/python.exe -m pytest -q` — **1976 passing**, and no
+- Backend: `.venv/Scripts/python.exe -m pytest -q` — **1997 passing**, and no
   change merges below that. It takes 5–15 minutes; run it in the background.
 - **If the suite is killed for low memory, make the groups smaller — and keep
   a record so a kill costs one group, not the run.** One pytest process grows
@@ -111,6 +126,23 @@ payroll without touching a maintainer screen.
   September, five on the 14th. There is no safe fixed number; check
   `Get-CimInstance Win32_OperatingSystem` and go smaller than the last size
   that failed.
+
+  **On 20 September it was 0.16 GB, and one file per process was killed too** —
+  twice, and both times as a *background* job while foreground runs of the same
+  thing survived. The watchdog reaches for background tasks first. At that much
+  pressure, run the loop in the **foreground** and re-invoke it until it reports
+  nothing remaining; the log is what makes that cost nothing, because each call
+  skips everything already recorded as passing at this revision. The runner used
+  that day is kept at `docs/repair/batch-1/run-suite.sh`.
+
+  **Clear the backends and empty the database at the start of every slice, not
+  only after a kill.** A killed run skips its teardown and leaves committed rows
+  behind, so the *next* slice opens on a dirty database and its first file or
+  two fail on unique violations — `test_affiliate_self_api.py` reported "3
+  failed, 4 errors" twice on 20 September and passed alone both times, which
+  cost two re-runs before the cause was the obvious one. The runner does this
+  itself now; a slice that starts clean is the difference between a phantom
+  failure and a real one.
 
   One file per process is the floor, and resumable, which is what makes it
   the one to fall back to. **Record pytest's exit status, not a tail of its

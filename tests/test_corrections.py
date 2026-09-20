@@ -377,8 +377,20 @@ def _september(db, affiliate, base=900_000):
     return approve_month(db, affiliate, SEPTEMBER)
 
 
-def test_absorbing_an_overpayment_records_a_write_off_and_recovers_nothing(db):
-    """§11.5's other half. HBA takes the loss; she owes nothing."""
+def test_absorbing_an_overpayment_records_an_acceptance_and_recovers_nothing(db):
+    """§11.5's other half. HBA takes the loss; she owes nothing.
+
+    **This used to assert a `writeoff`, and F2 is why it does not now.** Both
+    words were right about the intention and only one of them is right about
+    the arithmetic: a write-off reduces what a month still owes - *we are not
+    sending the rest* - and absorbing a correction must not, or HBA's loss
+    comes out of her money. The row type is what carries that difference, so
+    absorbing records an `accepted`.
+
+    Nothing about a write-off changed. It is still what closes an overpayment
+    and still what forgives a remainder nobody will chase; it is simply not
+    what this act is.
+    """
     affiliate = _model(db)
     _order(db, affiliate, "1", 2_000_000)
     snapshot = approve_month(db, affiliate, AUGUST)
@@ -393,11 +405,14 @@ def test_absorbing_an_overpayment_records_a_write_off_and_recovers_nothing(db):
         reason="Parcel refused; not worth chasing",
     )
 
-    assert written.type == AdjustmentType.WRITEOFF
+    assert written.type == AdjustmentType.ACCEPTED
     assert written.amount_piastres == 200_000
     assert written.destination_payroll_month_id is None
     assert correction_for(db, affiliate, AUGUST).resolved is True
     assert open_corrections(db, affiliate) == []
+    # Paid in full and agreed at that figure, so nothing is outstanding - and
+    # the acceptance did not make it so, which is the point of the type.
+    assert balance_for(db, affiliate, AUGUST)["balance_piastres"] == 0
 
 
 def test_carrying_an_overpayment_lands_it_in_a_later_month(db):
@@ -758,26 +773,48 @@ def test_a_difference_larger_than_the_transfer_stays_open_and_says_why(db):
     _order(db, affiliate, "1", 2_000_000)
     august = approve_month(db, affiliate, AUGUST)
     _paid(db, affiliate, august, 10_000)
+    _september(db, affiliate, base=3_000_000)
     _fail(db, "1")
 
-    resolve(
+    # The queue says so before anybody decides anything: E£100 recoverable,
+    # E£2,000 of difference, and a reason naming which is which.
+    left = correction_for(db, affiliate, AUGUST)
+    assert left.resolved_piastres == 0
+    assert left.outstanding_piastres == 200_000
+    assert left.recoverable_piastres == 10_000
+    # No reason yet: something *can* be recovered, so there is an ordinary
+    # decision to make and nothing to explain.
+    assert left.review_reason is None
+    assert [row.month for row in open_corrections(db, affiliate)] == [AUGUST]
+
+    # Carrying takes what actually moved, and only that. The rest stays open.
+    carried = resolve(
         db,
         affiliate,
         AUGUST,
-        choice=AdjustmentType.WRITEOFF,
-        reason="HBA absorbs what was sent",
+        choice=AdjustmentType.CREDIT,
+        reason="recover what was sent",
+        destination_month=SEPTEMBER,
     )
+    assert carried.amount_piastres == 10_000
+    still = correction_for(db, affiliate, AUGUST)
+    assert still.outstanding_piastres == 190_000
+    assert still.recoverable_piastres == 0
+    # And now the reason: what is left is difference against money that was
+    # never sent, which is why the next paragraph cannot carry it anywhere.
+    assert still.review_reason == "difference_exceeds_what_was_sent"
 
-    left = correction_for(db, affiliate, AUGUST)
-    assert left.resolved_piastres == 10_000
-    assert left.outstanding_piastres == 190_000
-    assert left.recoverable_piastres == 0
-    assert left.review_reason == "difference_exceeds_what_was_sent"
-    assert [row.month for row in open_corrections(db, affiliate)] == [AUGUST]
-
-    # **R4.** Carrying it is still impossible - there is nothing left that
-    # moved - but absorbing it is a real answer, and it is the one that
-    # finishes the review: the agreed figure stands and HBA takes the rest.
+    # **R4, and F2's correction to it.** What is left is difference against
+    # money that was never sent: nothing to carry, and absorbing is the answer
+    # that finishes the review. It takes the whole remaining difference rather
+    # than a part of it - absorbing recovers nothing either way, so there is
+    # no partial version of it to want.
+    #
+    # **This test used to absorb first and carry second**, and the order is
+    # what changed. Absorbing now closes the review completely, so anything
+    # recoverable has to be recovered before it rather than after. That is the
+    # order somebody would choose anyway: take back what moved, then decide
+    # about what did not.
     with pytest.raises(ValueError, match="nothing to carry"):
         resolve(
             db,
@@ -799,12 +836,11 @@ def test_a_difference_larger_than_the_transfer_stays_open_and_says_why(db):
     assert absorbed.type == AdjustmentType.ACCEPTED
     assert absorbed.amount_piastres == 190_000
     assert correction_for(db, affiliate, AUGUST).outstanding_piastres == 0
-    # **The property R4 owns**: absorbing a difference against money that was
-    # never sent moves nothing. Asserted as *unchanged* rather than against a
-    # figure, because what August still owes is decided by the earlier
-    # write-off's own arithmetic (ADR 0035) and is not this decision's to
-    # change either way.
+    # **The property R4 owns, which F2 widened**: absorbing moves nothing. Not
+    # the difference against money that never left, and - since F2 - not the
+    # money still to send either.
     assert balance_for(db, affiliate, AUGUST)["balance_piastres"] == before
+    assert before == 190_000
 
 
 def test_a_destination_that_falls_before_approval_hands_back_what_it_cannot_take(db):

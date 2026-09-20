@@ -426,6 +426,225 @@ not something R1–R4 changed, and the R4 test asserts only that an `accepted`
 leaves the balance *unchanged* rather than endorsing the figure beside it.
 Worth a decision in Batch 2 alongside A02.
 
+## Second follow-up review, 20 September — F1 to F4
+
+The reviewer took the R1–R4 commit (`ea46413`), read the diff, and ran the
+platform's own service functions against mocked database reads. Two of the
+four findings came back with arithmetic attached, and both reproduced exactly
+as described.
+
+### F1 — only one of two credits from a source was released
+
+**Reproduced first, in `tests/test_correction_accounting.py`.** Two carries of
+E£1,000 from August land on October; October is agreed at nothing. Before the
+fix, `credited_into(October)` returned **100000** where it should return 0, and
+`test_two_equal_credits_from_one_source_are_both_released` failed on exactly
+that number. Half of the deduction stayed applied to a month with no money in
+it, and August's correction read as settled for money nothing could take.
+
+The cause was one query in the wrong place.
+`_release_deductions_the_month_cannot_take` walked the individual credit rows
+and, for each one, subtracted the releases recorded against its whole
+source-and-destination **pair**. With one credit those are the same number.
+With two, the release written for the first was subtracted from the second as
+well, the second looked fully released already, and the loop moved on.
+
+A release carries no link to an individual credit, deliberately: *how much of
+August's correction is applied to October* is a fact about the pair and not
+about which of two rows somebody clicked first. So the arithmetic now happens
+where the fact lives. `_deduction_outcome` nets credits against releases **per
+source month**, returns what the destination can absorb and what goes back, and
+writes nothing. The release loop just executes that plan.
+
+Six regression tests cover it: two equal credits, unequal credits, a second
+release pass over an already-released month, two sources released newest-first,
+a month that can take the whole deduction and releases nothing, and the frozen
+evidence below.
+
+**The snapshot's frozen evidence was the second half of F1**, and the reviewer
+was right that it was wrong. Approval builds its payload before it works out
+what the month can absorb, so a month agreed at nothing froze a deduction list
+reading E£2,000 — the amount *requested*, none of which was taken. The outcome
+is now computed **before** the payload, and the snapshot carries three separate
+facts: `deductions` unchanged, which is the allocation somebody reviewed and
+the thing the fingerprint is over; `deductions_applied_piastres`, what it came
+to; and `deductions_released`, what went back and to which month.
+
+### F2 — an outgoing correction reduced the month it came from
+
+**Reproduced.** August agreed at E£2,000, E£1,000 sent, E£200 carried into
+September: `balance_for` returned **80000** where E£1,000 is still owed, and
+`test_carrying_a_correction_does_not_reduce_what_the_source_still_owes` failed
+on that figure. The E£200 is then recovered again in September, so HBA keeps it
+twice and she is paid E£1,800 against an agreement of E£2,000.
+
+The reasoning and the decision are in
+**[ADR 0041](../adr/0041-a-correction-settles-money-that-moved.md)**, which
+amends 0035 in one clause. In short: a correction settles money that **already
+moved**; a balance is money that has **not moved yet**; subtracting the first
+from the second charges one difference twice.
+
+`balance_for` now asks two different questions. An overpaid month is closed by
+`SETTLES_AN_EXCESS` exactly as 0035 decided and nothing there moves. A month
+still owed money is reduced only by `FORGIVES_A_DEBT` — `writeoff` and
+`correction` — and a `credit` is on that list nowhere.
+
+**The reviewer's warning about redefining historical adjustments caught a
+mistake of mine before it shipped.** My first attempt made `writeoff` stop
+forgiving a debt, which broke `test_a_write_off_clears_the_rest`: a write-off
+recorded against a balance has meant *the remainder is not worth chasing* since
+§11.5, and that test was right. The separation belongs one level up. A
+write-off still means what it always meant; what changed is that **absorbing a
+correction now records an `accepted` in every case**, not only when nothing had
+been paid. The two acts were sharing one row type and therefore one arithmetic,
+and the arithmetic belonged to the other one.
+
+Nine regression tests, including the salary and qualified-guarantee
+arrangements the review asked for, a carry and an absorb against unpaid, partly
+paid and fully paid months, the overpaid case that must keep working, and the
+combined source-plus-destination cash obligation rather than correction status
+alone.
+
+**One gap I opened and then found**, recorded because it was mine: netting
+releases out of the correction but not out of the *balance* would have left an
+overpaid month reading as settled after its carry bounced back.
+`adjusted_against` now nets a release out of any total that counts credits, and
+`test_a_released_carry_reopens_an_overpaid_month_too` holds it.
+
+### F3 — one gate in front of every writer
+
+`corrections.resolve` locked the months it was about; `approve_month` read the
+calculation, the carried orders, the deductions and the fingerprint before it
+locked anything.
+
+Giving approval the same row locks would have introduced a worse bug than it
+fixed. `resolve` takes the **source** month then the **destination**; approval
+takes the month it is approving — which *is* a destination — and then reaches
+back to the earlier months its releases return money to. Two writers taking two
+rows in opposite orders is the textbook deadlock, and it would have appeared at
+month end on the one operation nobody can safely retry blind.
+
+So the gate is the **model**, not the month:
+`app/services/money_gate.py`, one `SELECT … FOR UPDATE` on the affiliate row,
+taken by `approve_month`, `corrections.resolve` and `record_payment` before any
+of them reads anything. One lock has no order to get wrong. It flushes and then
+`expire_all`s, so a session that waited on it comes out seeing the world as it
+is rather than as it loaded it. The month-row locks stay inside it. Two models'
+payrolls never contend; what serialises is two decisions about one model's
+money, which is what should.
+
+**Four deterministic and racing PostgreSQL tests**, barrier- and
+event-driven with no sleeps: a carry landing while an approval is held at the
+gate, the same two writers racing freely, three writers against one destination
+worth less than the claims against it, and an approval's automatic release
+racing a decision about the same source. Each asserts the ledger **and** the
+snapshot evidence: no over-allocation, no lost remainder, and the frozen
+deduction figure never larger than the month was agreed at.
+
+**Said plainly: these four tests pass with the gate neutered.** I checked, the
+way I checked the R2 locks — `hold_money_gate` stubbed to a no-op, the two
+races repeated four times each, all green. So they are invariant tests, not
+proof that the gate is load-bearing, and I am not going to present them as the
+second thing.
+
+Why the invariants survive without it: `capacity_of` and `_deduction_outcome`
+are each recomputed from live state at the moment they are used, and the
+resolver already holds the destination month's row, so every interleaving I
+could construct is self-correcting — the later writer reads the earlier
+writer's work and caps itself. The gate makes that a property of the design
+instead of a property of three functions all happening to re-read, which is
+worth having and is what the review asked for. It is not, on this evidence, a
+bug fix. **The review's own note applies unchanged: this race is from code
+inspection, and nobody has executed a failure of it against PostgreSQL.**
+
+### F4 — retry evidence, key binding, and the savepoint
+
+All four parts, and three of them are demonstrated by a test that fails without
+the fix.
+
+**The retry test asserted too little.** It collected the successes, checked one
+existed and checked they agreed — which one success and one exception satisfies
+entirely. It now requires **both** callers to succeed with one identity.
+
+**The key is rechecked after the locking wait.** It was read before the gate, so
+two identical requests in flight both found nothing, both queued, and the one
+that waited woke in a world where its own twin had already recorded the
+decision — then failed the freshness check and was told to reload a correction
+its own retry had settled. *Evidence:* with the recheck removed, the
+strengthened test fails with `ValueError("Nour's 2026-08 has already been
+carried.")` in place of the first row.
+
+**A key reused for a different decision is refused**, not silently satisfied
+with an unrelated row. `_replay_of` compares affiliate, source month,
+destination and type, raises `OperationKeyReused`, and the route answers 409.
+An absorb's retry still finds its own `accepted` row.
+
+**The insert moved inside the savepoint.** *Evidence:* with `db.add` back
+outside `begin_nested`, `test_a_colliding_key_leaves_the_session_able_to_answer`
+fails with `PendingRollbackError` — exactly the failure the review predicted,
+on the recovery query that is supposed to hand the loser the winner's row.
+
+### What this cost elsewhere, stated rather than buried
+
+Four existing tests changed, each with the reasoning written into it rather
+than deleted:
+
+* `test_absorbing_an_overpayment_records_a_write_off_and_recovers_nothing` →
+  `…records_an_acceptance_and_recovers_nothing`. The row type changed; what
+  the act means did not.
+* `test_a_difference_larger_than_the_transfer_stays_open_and_says_why` now
+  carries the recoverable part first and absorbs the remainder, because
+  absorbing closes the whole review. That is the order somebody would choose
+  anyway.
+* `test_a_write_off_clears_the_rest` and `test_writing_off_a_debt_still_settles_it`
+  were **restored, not changed** — they caught my first attempt at F2 and were
+  right.
+
+`ADJUSTMENT_TEXT` and the maintainer's adjustment list gained wording for
+`accepted` and `release`, which had no label at all. The correction screen now
+says what each choice does — absorbing takes the whole remaining difference and
+moves nothing payable; carrying recovers the recoverable part from the month
+you pick — beside the buttons rather than leaving it to be inferred from a
+balance afterwards.
+
+### Results
+
+**Backend: 1,997 collected, 1,997 passed, 0 failed, all 78 files** — 21 more
+than the R1–R4 commit's 1,976, which is the fifteen new accounting tests and
+the six new concurrency ones. It reconciles exactly with `--collect-only`.
+
+Run one file per pytest process, resumably, with the log kept at
+`docs/repair/batch-1/test-log-f1-f4.txt` and the runner at
+`docs/repair/batch-1/run-suite.sh`. **Frontend:** `tsc --noEmit` clean, 321
+tests passing, build green.
+
+**Three runs were lost and are recorded here rather than quietly re-run.** Two
+were my own error: I edited source files while a suite was in flight, and I
+started a slice against a database a watchdog-killed run had left dirty, which
+produced three phantom failures in `test_affiliate_self_api.py` and
+`test_affiliates.py` — both files passed alone, twice. The runner now clears
+the backends and empties the database before every slice, which is the actual
+fix and is now in CLAUDE.md.
+
+The third was the machine: free memory reached **0.16 GB of 7.87 GB**, the
+watchdog killed every background job, and eventually the Docker engine itself
+stopped responding. Sixteen files then reported `psycopg.errors.ConnectionTimeout`
+as "errors" — nothing to do with the code. Docker Desktop was restarted, the
+`hba_pgdata` volume was intact, and `test_operations_api.py` went from *1
+failed, 55 passed, 20 errors in 1830s* to **67 passed in 26s**. Every file in
+the final log is a genuine pass at this revision.
+
+### Still open after F1–F4
+
+Unchanged from the first review, and neither is claimed as done:
+
+* **Reconciliation against an authorised restored copy of real data.**
+  `docs/repair/batch-1/reconcile.py` has not been run against anything but the
+  test database.
+* **A migration and rollback rehearsal.** `b1f0a40c0001` is additive and its
+  downgrade refuses rather than deleting a record of money; nobody has
+  rehearsed either direction on a restored copy.
+
 ## Exact next task
 
 Batch 2, beginning with **A02**: bind forecast, approved total, recorded money

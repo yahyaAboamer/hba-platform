@@ -237,6 +237,36 @@ export function PaymentCorrection({ session }: { session: Session }) {
                       </button>
                     </div>
 
+                    {/*
+                      * F2. Two sentences the operator has to be able to tell
+                      * apart before pressing either button, because they used
+                      * to be the same row type and therefore looked alike.
+                      *
+                      * Absorbing takes the **whole** remaining difference —
+                      * there is no partial version, since absorbing recovers
+                      * nothing either way — and leaves what she is still owed
+                      * exactly where the agreement put it. Carrying recovers
+                      * only what actually moved, and only from the month it is
+                      * carried to.
+                      */}
+                    <p className="pay-fix__note">
+                      {choice === "writeoff" ? (
+                        <>
+                          HBA takes the whole remaining difference of{" "}
+                          <Money piastres={row.outstanding_piastres} kind="agreed" />. The
+                          agreed total for {formatMonth(month)} does not change,
+                          and neither does anything still to be sent for it.
+                        </>
+                      ) : (
+                        <>
+                          <Money piastres={row.recoverable_piastres} kind="agreed" /> is
+                          recovered from the month you choose, which is paid that
+                          much less. What {formatMonth(month)} is still owed does
+                          not change.
+                        </>
+                      )}
+                    </p>
+
                     {choice === "credit" && (
                       <label className="pay-fix__field">
                         <span>Destination month</span>

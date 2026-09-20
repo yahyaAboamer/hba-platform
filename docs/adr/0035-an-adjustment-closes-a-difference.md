@@ -1,6 +1,7 @@
 # 0035 — An adjustment closes a difference; it never opens a larger one
 
-**Status:** accepted
+**Status:** accepted, amended by
+[0041](0041-a-correction-settles-money-that-moved.md)
 **Date:** 2026-09-04
 **Implements:** spec §11.5 (reconciliation)
 **Related:** [0004](0004-round-once-at-the-end.md), [0030](0030-a-reopened-month-emails-once-on-reapproval.md)
@@ -54,6 +55,13 @@ Concretely:
    whichever direction that difference runs. An overpaid month becomes settled;
    an underpaid month written off becomes settled. The sign follows the
    balance, it is not fixed in the formula.
+
+   > **Amended by [0041](0041-a-correction-settles-money-that-moved.md), and
+   > this clause is the half that was wrong.** It is true of a write-off and
+   > false of a **credit**. Carrying recovers the money from the month it is
+   > carried *to*; reducing the source month as well recovers it twice, and a
+   > month agreed at E£2,000 with E£1,000 sent and E£200 carried reported
+   > E£800 still to send. Everything else here stands.
 2. On the **destination** month, a credit means the model **already holds that
    money**, so the later month needs that much less in transfers.
 3. The amount is **capped at the true difference** — `paid − obligation` — and

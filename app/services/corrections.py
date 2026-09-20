@@ -529,13 +529,57 @@ def resolve(
     after somebody else's, is answered with `CorrectionMoved` instead of
     recovering the same money again.
     """
-    from app.services.payments import adjust
+    from app.services.money_gate import hold_money_gate
+    from app.services.payments import _replay_of, adjust
     from app.services.payroll import open_month
 
     if choice not in (AdjustmentType.CREDIT, AdjustmentType.WRITEOFF):
         raise ValueError(
             "A correction is either carried into a later month ('credit') or "
             "absorbed by HBA ('writeoff')."
+        )
+
+    operation_key = (operation_key or "").strip() or None
+
+    def replay() -> PayrollAdjustment | None:
+        """The row this key already wrote, refusing a key reused for another.
+
+        Two kinds are looked for, because `resolve` can write either: the
+        decision as asked, or the `accepted` that R4 substitutes when there is
+        nothing to recover. A retry of an absorb must find its own row rather
+        than be told the key belongs to some other decision.
+        """
+        if not operation_key:
+            return None
+        for kind in (
+            (choice, AdjustmentType.ACCEPTED)
+            if choice == AdjustmentType.WRITEOFF
+            else (choice,)
+        ):
+            try:
+                found = _replay_of(
+                    db,
+                    operation_key,
+                    affiliate=affiliate,
+                    kind=kind,
+                    source_month=month,
+                    destination_month=(
+                        destination_month if kind == AdjustmentType.CREDIT else None
+                    ),
+                )
+            except ValueError:
+                continue
+            if found is not None:
+                return found
+        # Nothing matched. Let `_replay_of` raise its own message about the
+        # decision this key really belongs to, rather than inventing one.
+        return _replay_of(
+            db,
+            operation_key,
+            affiliate=affiliate,
+            kind=choice,
+            source_month=month,
+            destination_month=destination_month,
         )
 
     # R2. **A replay is answered before anything else is judged.**
@@ -545,14 +589,9 @@ def resolve(
     # because the browser never saw the answer. Checked here rather than left
     # to the freshness test below, which would call it a conflict and leave
     # the caller unable to tell a lost response from somebody else's edit.
-    if operation_key:
-        already = db.scalar(
-            select(PayrollAdjustment).where(
-                PayrollAdjustment.operation_key == operation_key.strip()
-            )
-        )
-        if already is not None:
-            return already
+    already = replay()
+    if already is not None:
+        return already
 
     # R2. A destination earlier than its source is not a carry forward, and
     # the server says so rather than trusting the screen to have offered only
@@ -565,13 +604,32 @@ def resolve(
                 "It carries into a later month, never an earlier one."
             )
 
-    # R2. Everything below reads and then writes, so the reading happens
-    # inside the lock. The source row first, always - see the docstring on
-    # why the order is what stops two of these deadlocking.
+    # F3. One gate for every writer of this model's money, taken before the
+    # reading rather than before the writing, and shared with `approve_month`
+    # so a carry and an approval cannot interleave. See `money_gate.py`.
+    hold_money_gate(db, affiliate)
+
+    # R2. The month rows too, inside the gate. They are redundant while every
+    # writer takes the gate first and they are cheap, so they stay: a future
+    # path that forgets the gate still cannot resolve two corrections against
+    # one month at once. Source first, always.
     _lock_month(db, affiliate, month)
     if choice == AdjustmentType.CREDIT and destination_month:
         open_month(db, affiliate, destination_month)
         _lock_month(db, affiliate, destination_month)
+
+    # F4. **The key is looked for again, now that the waiting is over.**
+    #
+    # The check above ran before the gate. Two identical requests in flight at
+    # once both find nothing there, both queue, and the one that waits wakes
+    # up in a world where its own decision has already been recorded - by its
+    # twin. Judged on freshness it is a conflict, and the caller is told to
+    # reload a correction that its own retry settled. Asked again here, it is
+    # what it actually is: the same decision, already made, and the row is
+    # handed back.
+    already = replay()
+    if already is not None:
+        return already
 
     correction = correction_for(db, affiliate, month)
     if correction is None or correction.outcome != OVERPAID:
@@ -598,32 +656,42 @@ def resolve(
             f"{affiliate.name}'s {month} has already been "
             f"{'carried' if correction.resolution == AdjustmentType.CREDIT else 'absorbed'}."
         )
+    # **R4, widened by F2. Absorbing is always recorded as `accepted`.**
+    #
+    # R4 introduced this type for the one case it had noticed: a month with no
+    # transfer recorded, where there is a real difference and nothing to take
+    # back. Absorbing was a real answer nobody could give, because the only
+    # word for it was *write-off* — and a write-off reduces what a month still
+    # owes, which would have paid her less than was agreed.
+    #
+    # F2 found that the same sentence is true whenever anything is still owed,
+    # which is most months: agreed E£2,000, sent E£1,000, E£200 absorbed, and
+    # the write-off took the E£200 out of the E£1,000 still to send. HBA
+    # "taking the loss" came out of her money.
+    #
+    # The two acts were sharing one row type and therefore one arithmetic.
+    # They are separated here rather than by redefining what a write-off
+    # means: a write-off recorded against a balance still forgives it, exactly
+    # as §11.5 always said, and remains the way to say *the remainder is not
+    # worth chasing*. Absorbing a correction is a different sentence — *the
+    # agreed figure stands and HBA takes the difference* — and now has its own
+    # row to say it in.
+    if choice == AdjustmentType.WRITEOFF:
+        return adjust(
+            db,
+            affiliate,
+            kind=AdjustmentType.ACCEPTED,
+            source_month=month,
+            amount_piastres=correction.outstanding_piastres,
+            reason=reason,
+            # The difference it closes is the review, not the balance.
+            open_difference_piastres=correction.outstanding_piastres,
+            operation_key=operation_key,
+            actor_id=actor_id,
+            actor_email=actor_email,
+        )
+
     if correction.recoverable_piastres <= 0:
-        # **R4. Nothing can be recovered, and something can still be decided.**
-        #
-        # A month agreed at E£2,000 that now calculates to E£1,800 with no
-        # transfer recorded has a real difference and no money to take back.
-        # Visibility alone left it there for ever: the queue said *look at
-        # this* and refused every way of finishing with it.
-        #
-        # Absorbing is a real answer - *the agreed figure stands and HBA takes
-        # the difference* - and it is recorded as its own kind. **Not as a
-        # write-off**, which reduces what a month still owes and would pay her
-        # less than was agreed, which is the opposite of HBA absorbing a loss.
-        if choice == AdjustmentType.WRITEOFF:
-            return adjust(
-                db,
-                affiliate,
-                kind=AdjustmentType.ACCEPTED,
-                source_month=month,
-                amount_piastres=correction.outstanding_piastres,
-                reason=reason,
-                # The difference it closes is the review, not the balance.
-                open_difference_piastres=correction.outstanding_piastres,
-                operation_key=operation_key,
-                actor_id=actor_id,
-                actor_email=actor_email,
-            )
         raise ValueError(
             f"No transfer is recorded against {affiliate.name}'s {month}, so "
             "there is nothing to carry into another month. Record the transfer "

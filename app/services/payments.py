@@ -124,46 +124,101 @@ def version_history(db: Session, payroll_month: PayrollMonth) -> list[dict]:
     ]
 
 
-def adjusted_against(db: Session, payroll_month: PayrollMonth) -> int:
-    """Credits and write-offs closing this month's difference.
+#: Adjustments that settle an **overpayment** — money that went out and is
+#: coming back, one way or another. A `credit` recovers it from a later month;
+#: a `writeoff` gives up on recovering it; a `correction` is the manual
+#: bookkeeping entry that predates both.
+SETTLES_AN_EXCESS = (
+    AdjustmentType.CREDIT,
+    AdjustmentType.WRITEOFF,
+    AdjustmentType.CORRECTION,
+)
 
-    ADR 0035. Both kinds **close a difference, whichever way it runs**: a
-    write-off against an underpaid month discharges the debt, and either kind
-    against an overpaid month absorbs the excess. Neither ever opens a larger
-    difference than the one it was created to settle.
+#: Adjustments that reduce what a month **still owes**. F2.
+#:
+#: A `writeoff` is HBA giving up on a balance — *the remainder is not worth
+#: chasing* — and has meant that since §11.5. A `correction` is the manual
+#: bookkeeping entry. Both are left behaving exactly as they always have.
+#:
+#: **A `credit` is not here**, and that is the fix. Carrying a difference into
+#: a later month recovers it *there*; taking it off the source month as well
+#: recovers it twice. Nor is `accepted`, which closes a review and never a
+#: balance — and which is now what absorbing a correction records, precisely
+#: so that absorbing cannot be confused with forgiving.
+FORGIVES_A_DEBT = (AdjustmentType.WRITEOFF, AdjustmentType.CORRECTION)
 
-    A **credit** moves the excess to a later month, where the model already
-    holds it and that month therefore needs less sent. A **write-off** goes
-    nowhere - HBA absorbs it.
 
-    ## Two kinds are deliberately not counted here (R1, R4)
+def adjusted_against(
+    db: Session, payroll_month: PayrollMonth, kinds: tuple[str, ...] = SETTLES_AN_EXCESS
+) -> int:
+    """Adjustments recorded against this month, of the kinds asked for.
+
+    ADR 0035. An adjustment **closes a difference and never opens a larger
+    one**. What F2 found is that there are two differences here and the code
+    had them confused.
+
+    ## The difference a correction closes is not the one a balance shows
+
+    A **correction** compares an agreed month against a fresh calculation of
+    it, and what it settles is money that *already moved*: a sale was counted,
+    a transfer went out, the parcel came back. It decides where that money is
+    recovered from, or that it is not recovered at all.
+
+    A **balance** is what has not moved yet — the rest of what was agreed,
+    still to send.
+
+    Subtracting the first from the second charged one difference twice. August
+    agreed at E£2,000 with E£1,000 sent and E£200 carried into September
+    reported E£800 left to send; September then paid E£200 less as well, so HBA
+    kept the E£200 twice and she was paid E£1,800 against an agreement of
+    E£2,000. Absorbing had the mirror fault: HBA "taking the loss" came
+    straight out of what HBA still owed her, which is not a loss being taken.
+
+    So the caller says which question it is asking. `SETTLES_AN_EXCESS` closes
+    an overpayment — a month that had **more** sent than it was agreed at, the
+    case ADR 0035 was written for and which is unchanged. `FORGIVES_A_DEBT`
+    reduces what is still to send: a `writeoff` recorded against a balance,
+    which has always meant *the remainder is not worth chasing*, and the
+    manual `correction` entry. Neither meaning moves.
+
+    What changed is which of these the corrections service writes. Absorbing a
+    correction now records an `accepted` in every case rather than a write-off
+    when something had been paid — because absorbing means *the agreed figure
+    stands and HBA takes the difference*, and a write-off means *we are not
+    sending the rest*. They were sharing one row type and therefore one
+    arithmetic, and the arithmetic belonged to the other one.
+
+    ## Two kinds are on neither list (R1, R4)
 
     An `accepted` records that HBA absorbed a difference on a month **nothing
-    was sent for**. It closes the review and must not close the debt: this
-    month is still owed exactly what was agreed, and counting it here would
-    quietly pay her less - the opposite of HBA taking the loss.
+    was sent for**. It closes the review and must not close the debt.
 
-    A `release` un-applies part of a credit that its destination could not
-    take. It belongs to the destination's arithmetic and to the source
-    *correction*, not to the source month's balance, which the credit it
-    releases never entered either.
+    A `release` is not a settlement of its own: it **un-applies** a credit its
+    destination could not take. So it is netted out of any total that counts
+    credits, and appears in no total that does not. Without that, an overpaid
+    August that carried E£500 into an October agreed at nothing would read as
+    settled - the credit counted, the release that undid it ignored, and a
+    recovery that bounced reported as complete.
     """
-    return int(
+    settled = int(
         db.scalar(
             select(func.coalesce(func.sum(PayrollAdjustment.amount_piastres), 0))
             .where(PayrollAdjustment.source_payroll_month_id == payroll_month.id)
-            .where(
-                PayrollAdjustment.type.in_(
-                    [
-                        AdjustmentType.CREDIT,
-                        AdjustmentType.WRITEOFF,
-                        AdjustmentType.CORRECTION,
-                    ]
-                )
-            )
+            .where(PayrollAdjustment.type.in_(list(kinds)))
         )
         or 0
     )
+    if AdjustmentType.CREDIT not in kinds:
+        return settled
+    returned = int(
+        db.scalar(
+            select(func.coalesce(func.sum(PayrollAdjustment.amount_piastres), 0))
+            .where(PayrollAdjustment.source_payroll_month_id == payroll_month.id)
+            .where(PayrollAdjustment.type == AdjustmentType.RELEASE)
+        )
+        or 0
+    )
+    return max(settled - returned, 0)
 
 
 def credited_into(db: Session, payroll_month: PayrollMonth) -> int:
@@ -226,6 +281,7 @@ def balance_for(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
             "obligation_piastres": 0,
             "paid_piastres": 0,
             "adjusted_piastres": 0,
+            "forgiven_piastres": 0,
             "credited_piastres": 0,
             "balance_piastres": 0,
         }
@@ -239,6 +295,7 @@ def balance_for(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
             "obligation_piastres": 0,
             "paid_piastres": 0,
             "adjusted_piastres": 0,
+            "forgiven_piastres": 0,
             "credited_piastres": 0,
             "balance_piastres": 0,
         }
@@ -255,6 +312,7 @@ def balance_for(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
             "obligation_piastres": 0,
             "paid_piastres": 0,
             "adjusted_piastres": 0,
+            "forgiven_piastres": 0,
             "credited_piastres": 0,
             "balance_piastres": 0,
             "reopened": bool(
@@ -273,6 +331,7 @@ def balance_for(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
     paid = allocated_to_month(db, payroll_month)
     paid_this_version = allocated_to(db, snapshot)
     adjusted = adjusted_against(db, payroll_month)
+    forgiven = adjusted_against(db, payroll_month, FORGIVES_A_DEBT)
     credited = credited_into(db, payroll_month)
 
     # **A credit landing here is money the model already holds** (§11.5, ADR
@@ -284,17 +343,25 @@ def balance_for(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
     # **An adjustment closes a difference; it never opens a larger one.**
     #
     # Which way it closes depends on which way the difference runs, and that
-    # is the whole of ADR 0035. Writing off a *debt* reduces what is owed;
-    # settling an *excess* reduces the overpayment. Subtracting in both cases
-    # - which is what this did - pushes an already-overpaid month further
-    # into overpayment, so every press of "settle the difference" doubled it:
-    # a real overpayment of E£257 was reported as E£5,074.
+    # is the whole of ADR 0035. Settling an *excess* reduces the overpayment;
+    # forgiving a *debt* reduces what is owed. Subtracting in both cases -
+    # which is what this did - pushes an already-overpaid month further into
+    # overpayment, so every press of "settle the difference" doubled it: a
+    # real overpayment of E£257 was reported as E£5,074.
+    #
+    # **And the two sides do not take the same adjustments** (F2). A month
+    # that is still owed money is reduced only by `FORGIVES_A_DEBT` - the
+    # manual entry that says *we are not sending the rest*. A correction
+    # carried or absorbed is about money that already left, is recovered where
+    # it was carried to or nowhere at all, and reaches this side of the
+    # arithmetic not at all. Counting it here recovered it a second time; see
+    # `adjusted_against`.
     #
     # The clamp is the second guard. Even if an adjustment is larger than the
     # difference it closes - and one was, four times over, before the cap
     # below existed - the balance stops at zero rather than crossing it.
     balance = (
-        max(difference - adjusted, 0)
+        max(difference - forgiven, 0)
         if difference > 0
         else min(difference + adjusted, 0)
     )
@@ -316,6 +383,12 @@ def balance_for(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
         "paid_this_version_piastres": paid_this_version,
         "paid_earlier_versions_piastres": paid - paid_this_version,
         "adjusted_piastres": adjusted,
+        # F2. Of everything adjusted against this month, the part that reduces
+        # what is still to send. On an underpaid month these differ, and the
+        # difference is the money a correction moved to another month rather
+        # than out of this one - which is exactly what nobody could see when
+        # the balance quietly netted them together.
+        "forgiven_piastres": forgiven,
         "credited_piastres": credited,
         "balance_piastres": balance,
         # Every figure this month has had. Nothing showed them, and a lone
@@ -393,6 +466,13 @@ def record_payment(
 
     if amount_piastres <= 0:
         raise ValueError("A payment must be for more than nothing")
+
+    # F3. Recording a transfer changes what a correction may recover - the cap
+    # is what was actually paid - so it belongs behind the same gate as the
+    # approvals and the corrections. See `money_gate.py`.
+    from app.services.money_gate import hold_money_gate
+
+    hold_money_gate(db, affiliate)
 
     # **Nothing is paid while one of this model's months is mid-correction.**
     #
@@ -613,6 +693,86 @@ def payments_for(
 # -- Adjustments (Section 11.5) -----------------------------------------------
 
 
+class OperationKeyReused(ValueError):
+    """One key, two different decisions. F4.
+
+    An operation key promises *this is the same request arriving again*, and
+    the whole of its value is that the second arrival can be answered with the
+    first one's row instead of recovering the same money twice.
+
+    That answer is only true if it **is** the same request. A key reused for a
+    different month, a different destination or a different decision — a
+    client that derives keys from something too coarse, a copied cURL line, a
+    retry rebuilt from a stale form — would otherwise be handed a row about
+    something else entirely and told it succeeded. The caller then reports a
+    carry into September that never happened.
+
+    So a mismatched key is refused, loudly, rather than silently satisfied.
+    """
+
+
+def _replay_of(
+    db: Session,
+    operation_key: str,
+    *,
+    affiliate: AffiliateProfile,
+    kind: str,
+    source_month: str,
+    destination_month: str | None,
+) -> PayrollAdjustment | None:
+    """The adjustment this key already wrote, if the request is the same one.
+
+    Returns `None` when the key is new. Raises `OperationKeyReused` when a row
+    exists and describes a different decision — see that exception for why
+    that is worth an error rather than a shrug.
+    """
+    already = db.scalar(
+        select(PayrollAdjustment).where(
+            PayrollAdjustment.operation_key == operation_key
+        )
+    )
+    if already is None:
+        return None
+
+    months = {
+        row.id: (row.affiliate_id, row.month)
+        for row in db.scalars(
+            select(PayrollMonth).where(
+                PayrollMonth.id.in_(
+                    [
+                        row_id
+                        for row_id in (
+                            already.source_payroll_month_id,
+                            already.destination_payroll_month_id,
+                        )
+                        if row_id is not None
+                    ]
+                )
+            )
+        )
+    }
+    source = months.get(already.source_payroll_month_id)
+    destination = months.get(already.destination_payroll_month_id)
+
+    asked = (affiliate.id, source_month, destination_month, kind)
+    wrote = (
+        source[0] if source else None,
+        source[1] if source else None,
+        destination[1] if destination else None,
+        already.type,
+    )
+    if asked != wrote:
+        raise OperationKeyReused(
+            f"Operation key {operation_key!r} was already used to record a "
+            f"{wrote[3]} against {wrote[1]}"
+            + (f" into {wrote[2]}" if wrote[2] else "")
+            + f", not a {kind} against {source_month}"
+            + (f" into {destination_month}" if destination_month else "")
+            + ". Use a new key for a new decision."
+        )
+    return already
+
+
 def adjust(
     db: Session,
     affiliate: AffiliateProfile,
@@ -651,12 +811,19 @@ def adjust(
     # the first one wrote rather than a second recovery of the same money.
     # Checked before anything is computed, so a replay is cheap and cannot
     # take a different path from the original.
+    #
+    # **And the row has to be about the same decision** (F4). Handing back
+    # whatever carries that key, whatever it says, turns a client's key-reuse
+    # bug into a silent wrong answer.
     operation_key = (operation_key or "").strip() or None
     if operation_key:
-        already = db.scalar(
-            select(PayrollAdjustment).where(
-                PayrollAdjustment.operation_key == operation_key
-            )
+        already = _replay_of(
+            db,
+            operation_key,
+            affiliate=affiliate,
+            kind=kind,
+            source_month=source_month,
+            destination_month=destination_month,
         )
         if already is not None:
             return already
@@ -797,14 +964,24 @@ def adjust(
         operation_key=operation_key,
         created_by=actor_id,
     )
-    db.add(adjustment)
     # R2. The unique key is the guard that actually holds: two sessions can
     # both find nothing above and both arrive here, and only one insert can
     # win. The loser is handed the winner's row, so a race ends the way a
     # retry does - one decision, one recovery - rather than in an error the
     # caller has to interpret.
+    #
+    # **The row is added inside the savepoint, not before it** (F4). Outside
+    # it, the pending insert belongs to the enclosing transaction: anything
+    # that triggers an autoflush between the `add` and the `begin_nested` -
+    # today nothing does, tomorrow one added query would - flushes it where
+    # the rollback below cannot reach, and the collision aborts the whole
+    # transaction instead of one statement. Then the recovery query runs on a
+    # session that can no longer execute anything, and a retry that should
+    # have been answered with the first row raises `PendingRollbackError`
+    # instead.
     try:
         with db.begin_nested():
+            db.add(adjustment)
             db.flush()
     except IntegrityError:
         if not operation_key:

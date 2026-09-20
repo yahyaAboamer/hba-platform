@@ -681,6 +681,7 @@ def resolve_correction(
     record only that somebody chose that.
     """
     from app.services.corrections import CorrectionMoved, resolve
+    from app.services.payments import OperationKeyReused
 
     affiliate = _affiliate_or_404(db, body.affiliate_id)
     _month_or_400(body.month)
@@ -704,6 +705,12 @@ def resolve_correction(
     # answer from one that cannot be acted on, and 409 is what tells a browser
     # to look again rather than to correct its request.
     except CorrectionMoved as exc:
+        db.rollback()
+        raise HTTPException(409, str(exc)) from exc
+    # F4. A key already spent on a different decision. 409 rather than 400:
+    # nothing about the request is malformed, and the thing to do about it is
+    # look at what that key already recorded.
+    except OperationKeyReused as exc:
         db.rollback()
         raise HTTPException(409, str(exc)) from exc
     except ValueError as exc:

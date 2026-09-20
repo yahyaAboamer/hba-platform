@@ -74,17 +74,23 @@ what was chosen.
 | [0032](0032-backups-run-in-their-own-container-not-the-apps.md) | Backups run in their own container, not the app's | Accepted |
 | [0033](0033-a-house-account-gets-a-user-account-it-can-never-sign-into.md) | A house account gets a user_account it can never sign into | Accepted |
 | [0034](0034-a-second-service-splits-staging-from-production.md) | A second service splits staging from production | Accepted |
-| [0035](0035-an-adjustment-closes-a-difference.md) | An adjustment closes a difference; it never opens a larger one | Accepted |
+| [0035](0035-an-adjustment-closes-a-difference.md) | An adjustment closes a difference; it never opens a larger one | Accepted; amended by 0041 |
 | [0036](0036-pre-go-live-months-are-ordinary-months.md) | Months before go-live are ordinary months, settled outside | Accepted |
 | [0037](0037-what-you-were-paid-is-not-how-you-sold.md) | What a model was paid and how their sales performed are two numbers | Accepted |
 | [0038](0038-the-portal-wears-the-brand-the-tool-does-not.md) | The portal wears the brand; the maintainer's tool does not | Superseded by 0039 |
 | [0039](0039-one-palette-across-both-halves.md) | One palette and one typeface across both halves | Accepted |
+| [0040](0040-a-pending-order-is-a-sale.md) | A pending order is a sale, and the carry becomes a backlog | Accepted |
+| [0041](0041-a-correction-settles-money-that-moved.md) | A correction settles money that moved; a balance is money that has not | Accepted; amends 0035 |
 
 **0014 is superseded by 0036** and **0038 by 0039**. **0027 keeps its
 principle and loses its mechanism to 0039**: an agreed figure is still set
 apart from a working one, but by weight and colour rather than by a second
-typeface. Each carries the reasoning at the top of the superseded file rather
-than only in the one that replaced it.
+typeface. **0035 is amended by 0041 in a single clause**: an adjustment still
+closes a difference and never opens a larger one, but a *credit* closes only an
+overpayment — carrying a difference forward recovers it in the month it is
+carried to, and reducing the source month as well recovers it twice. Each
+carries the reasoning at the top of the superseded or amended file rather than
+only in the one that replaced it.
 
 See also [`../limits.md`](../limits.md) — the register of known limits and
 foreseeable failures, which records what will eventually break rather than what

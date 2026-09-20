@@ -503,6 +503,15 @@
   background: var(--accent-soft);
 }
 
+/* F2. What the chosen decision actually does, beside the buttons rather than
+   after the fact. The two used to share a row type and read alike. */
+.pay-fix__note {
+  margin: 13px 0 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--quiet);
+}
+
 .pay-fix__field {
   display: block;
   margin-top: 13px;

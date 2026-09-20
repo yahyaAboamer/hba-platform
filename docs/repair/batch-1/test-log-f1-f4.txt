@@ -1,0 +1,78 @@
+PASS worktree-f1-f4 tests/test_affiliate_access.py 8 passed in 31.34s
+PASS worktree-f1-f4 tests/test_affiliates_api.py 107 passed in 377.03s (0:06:17)
+PASS worktree-f1-f4 tests/test_applications.py 19 passed in 7.41s
+PASS worktree-f1-f4 tests/test_applications_api.py 13 passed in 53.06s
+PASS worktree-f1-f4 tests/test_attributed_orders.py 18 passed in 14.87s
+PASS worktree-f1-f4 tests/test_attribution.py 27 passed in 8.01s
+PASS worktree-f1-f4 tests/test_audit.py 21 passed in 8.15s
+PASS worktree-f1-f4 tests/test_audit_api.py 6 passed in 24.36s
+PASS worktree-f1-f4 tests/test_auth_api.py 42 passed in 132.84s (0:02:12)
+PASS worktree-f1-f4 tests/test_auth_service.py 27 passed in 5.95s
+PASS worktree-f1-f4 tests/test_browser_journey.py 10 passed in 32.60s
+PASS worktree-f1-f4 tests/test_affiliates.py 36 passed in 36.00s (alone, after clearing a dirty database)
+PASS worktree-f1-f4 tests/test_affiliate_self_api.py 28 passed in 191.11s (alone, after clearing a dirty database)
+PASS worktree-f1-f4 tests/test_businesstime.py 22 passed in 9.47s
+PASS worktree-f1-f4 tests/test_code_periods.py 33 passed in 41.56s
+PASS worktree-f1-f4 tests/test_collaboration_start.py 15 passed in 8.51s
+PASS worktree-f1-f4 tests/test_commission_attribute.py 16 passed in 22.82s
+PASS worktree-f1-f4 tests/test_commission_backfill.py 18 passed in 15.08s
+PASS worktree-f1-f4 tests/test_commission_base.py 13 passed in 6.78s
+PASS worktree-f1-f4 tests/test_commission_calculate.py 31 passed in 15.61s
+PASS worktree-f1-f4 tests/test_commission_state.py 22 passed in 7.56s
+PASS worktree-f1-f4 tests/test_compensation.py 55 passed in 11.69s
+PASS worktree-f1-f4 tests/test_config.py 8 passed in 4.48s
+PASS worktree-f1-f4 tests/test_correction_accounting.py 15 passed in 23.82s
+PASS worktree-f1-f4 tests/test_correction_concurrency.py 9 passed in 68.09s (0:01:08)
+PASS worktree-f1-f4 tests/test_corrections.py 38 passed in 62.03s (0:01:02)
+PASS worktree-f1-f4 tests/test_earnings_api.py 24 passed in 71.62s (0:01:11)
+PASS worktree-f1-f4 tests/test_financial_rules_preview.py 22 passed in 23.02s
+PASS worktree-f1-f4 tests/test_financial_transition.py 16 passed in 33.21s
+PASS worktree-f1-f4 tests/test_health.py 11 passed in 12.79s
+PASS worktree-f1-f4 tests/test_identity_models.py 19 passed in 9.71s
+PASS worktree-f1-f4 tests/test_invitations.py 33 passed in 7.75s
+PASS worktree-f1-f4 tests/test_jobs.py 43 passed in 6.89s
+PASS worktree-f1-f4 tests/test_migrations.py 8 passed in 13.18s
+PASS worktree-f1-f4 tests/test_money.py 25 passed in 10.56s
+PASS worktree-f1-f4 tests/test_notices.py 9 passed in 58.52s
+PASS worktree-f1-f4 tests/test_notifications.py 37 passed in 14.91s
+PASS worktree-f1-f4 tests/test_order_index.py 9 passed in 3.84s
+PASS worktree-f1-f4 tests/test_orders_api.py 16 passed in 9.15s
+PASS worktree-f1-f4 tests/test_overview.py 30 passed in 7.27s
+PASS worktree-f1-f4 tests/test_password_resets.py 15 passed in 2.93s
+PASS worktree-f1-f4 tests/test_passwords.py 14 passed in 2.16s
+PASS worktree-f1-f4 tests/test_payments.py 46 passed in 12.44s
+PASS worktree-f1-f4 tests/test_payments_api.py 42 passed in 31.20s
+PASS worktree-f1-f4 tests/test_payments_cost.py 2 passed in 3.34s
+PASS worktree-f1-f4 tests/test_payout_destinations.py 54 passed in 3.55s
+PASS worktree-f1-f4 tests/test_payroll.py 40 passed in 7.34s
+PASS worktree-f1-f4 tests/test_payroll_lifecycle.py 48 passed in 14.36s
+PASS worktree-f1-f4 tests/test_performance.py 36 passed in 4.31s
+PASS worktree-f1-f4 tests/test_periods.py 35 passed in 2.39s
+PASS worktree-f1-f4 tests/test_permissions.py 20 passed in 1.73s
+PASS worktree-f1-f4 tests/test_policy.py 14 passed in 3.34s
+PASS worktree-f1-f4 tests/test_policy_api.py 6 passed in 4.18s
+PASS worktree-f1-f4 tests/test_portal_api.py 89 passed in 47.39s
+PASS worktree-f1-f4 tests/test_portal_corrections.py 7 passed in 4.25s
+PASS worktree-f1-f4 tests/test_products_api.py 9 passed in 4.76s
+PASS worktree-f1-f4 tests/test_reachability.py 3 passed in 2.98s
+PASS worktree-f1-f4 tests/test_recipients.py 42 passed in 2.55s
+PASS worktree-f1-f4 tests/test_reconcile.py 21 passed in 5.88s
+PASS worktree-f1-f4 tests/test_release_rehearsal.py 9 passed in 3.04s
+PASS worktree-f1-f4 tests/test_setup_readiness.py 14 passed in 2.44s
+PASS worktree-f1-f4 tests/test_shopify_bulk.py 21 passed in 2.50s
+PASS worktree-f1-f4 tests/test_shopify_catalogue.py 22 passed in 2.21s
+PASS worktree-f1-f4 tests/test_shopify_client.py 29 passed in 1.83s
+PASS worktree-f1-f4 tests/test_shopify_discounts.py 21 passed in 1.92s
+PASS worktree-f1-f4 tests/test_shopify_facts.py 40 passed in 2.18s
+PASS worktree-f1-f4 tests/test_shopify_fulfilment.py 43 passed in 2.05s
+PASS worktree-f1-f4 tests/test_shopify_normalise.py 24 passed in 1.74s
+PASS worktree-f1-f4 tests/test_shopify_sync.py 22 passed in 5.15s
+PASS worktree-f1-f4 tests/test_shopify_webhooks.py 29 passed in 6.60s
+PASS worktree-f1-f4 tests/test_signals.py 7 passed in 1.91s
+PASS worktree-f1-f4 tests/test_staff_api.py 18 passed in 6.77s
+PASS worktree-f1-f4 tests/test_static_serving.py 6 passed in 3.39s
+PASS worktree-f1-f4 tests/test_targets.py 44 passed in 4.05s
+PASS worktree-f1-f4 tests/test_targets_api.py 30 passed in 12.71s
+PASS worktree-f1-f4 tests/test_wardrobe.py 34 passed in 3.89s
+PASS worktree-f1-f4 tests/test_worker.py 15 passed in 9.64s
+PASS worktree-f1-f4 tests/test_operations_api.py 67 passed in 26.11s (alone, after the Docker engine was restarted)

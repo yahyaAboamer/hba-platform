@@ -297,7 +297,7 @@ export type Payment = {
 
 /** §11.5. A credit they cannot see is a credit they cannot check. */
 export type Adjustment = {
-  kind: "credit" | "writeoff" | "correction";
+  kind: "credit" | "writeoff" | "correction" | "accepted" | "release";
   kind_text: string;
   amount_piastres: number;
   amount: string;

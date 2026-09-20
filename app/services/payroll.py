@@ -200,6 +200,8 @@ def _payload(
     orders: list[AttributedOrder],
     carried: list[AttributedOrder] | None = None,
     deductions: list[dict] | None = None,
+    applied_piastres: int | None = None,
+    released: list[dict] | None = None,
 ) -> dict:
     """The whole calculation, in a form that survives the data changing.
 
@@ -237,6 +239,34 @@ def _payload(
     # fingerprint: a statement has to be able to say what was deducted without
     # re-deriving it from a ledger that has moved on.
     body["deductions"] = deductions or []
+    # F1, and the reason the two lines below are not one. **What was asked of
+    # this month and what it could do about it are different facts**, and the
+    # snapshot used to record only the first.
+    #
+    # A month agreed at nothing with E£2,000 of deduction landing on it froze a
+    # deduction list reading E£2,000, because the payload is built before
+    # approval works out what can actually be absorbed. Rendered onto a
+    # statement that says *E£2,000 was deducted* - which is false twice: that
+    # much was requested, none of it was taken, and all of it went back to the
+    # month it came from and is still open there.
+    #
+    # `deductions` stays exactly as it was: the allocation somebody reviewed
+    # and agreed, and the thing the fingerprint is over. These say what it came
+    # to.
+    body["deductions_applied_piastres"] = (
+        int(applied_piastres)
+        if applied_piastres is not None
+        else sum(
+            row["amount_piastres"]
+            if row["type"] != "release"
+            else -row["amount_piastres"]
+            for row in (deductions or [])
+        )
+    )
+    body["deductions_released"] = released or []
+    body["deductions_released_piastres"] = sum(
+        row["amount_piastres"] for row in (released or [])
+    )
     return body
 
 
@@ -415,7 +445,29 @@ def approve_month(
     Refuses on any blocker. §11.3 makes these refusals rather than warnings,
     because a warning that can be clicked past is not a control.
     """
+    from app.services.money_gate import hold_money_gate
+
     parse_month(month)
+
+    # F3. **The lock comes before the reading, not before the writing.**
+    #
+    # Everything below decides a figure and then freezes it: the blockers, the
+    # calculation, the carried orders, the deductions landing on the month and
+    # the fingerprint they are checked against. All of it was read outside any
+    # lock, and a carry committing in that window was agreed to by a snapshot
+    # that had never seen it — the freshness check passed because the figure it
+    # compared had been read before the change, which is precisely the check
+    # failing to do its job.
+    #
+    # The gate is taken on the model rather than the month, and
+    # `app/services/money_gate.py` says why at length: approval and
+    # `corrections.resolve` need the same two month rows in opposite orders,
+    # and one lock has no order to get wrong. It re-reads on the way in, so
+    # what follows is the world as it is now rather than as this session last
+    # loaded it.
+    hold_money_gate(db, affiliate)
+    payroll_month = open_month(db, affiliate, month)
+
     blockers, calculation = blockers_for(db, affiliate, month)
     if blockers:
         raise ValueError(
@@ -423,7 +475,6 @@ def approve_month(
             + ", ".join(blockers)
         )
 
-    payroll_month = open_month(db, affiliate, month)
     orders = list(
         db.scalars(
             select(AttributedOrder)
@@ -455,7 +506,23 @@ def approve_month(
                 "it. Reload the month and check the figure before agreeing it."
             )
 
-    payload = _payload(calculation, orders, carried, deductions)
+    # F1. What this month can actually take of what is landing on it, worked
+    # out *before* the payload so the snapshot can freeze both the allocation
+    # that was reviewed and the amount it came to. The releases themselves are
+    # written below, once there is a snapshot to have been agreed at this
+    # figure.
+    applied_piastres, giving_back = _deduction_outcome(
+        db, payroll_month, calculation.payout_piastres
+    )
+
+    payload = _payload(
+        calculation,
+        orders,
+        carried,
+        deductions,
+        applied_piastres=applied_piastres,
+        released=giving_back,
+    )
     previous = latest_version(db, payroll_month)
 
     # §16, Phase 10 Batch C. Which plain-language rules this was calculated
@@ -516,7 +583,7 @@ def approve_month(
             order.settled_at = snapshot.approved_at
 
     _release_deductions_the_month_cannot_take(
-        db, affiliate, payroll_month, snapshot, actor_id=actor_id
+        db, affiliate, payroll_month, snapshot, giving_back=giving_back, actor_id=actor_id
     )
 
     db.flush()
@@ -558,12 +625,100 @@ def approve_month(
     return snapshot
 
 
+def _deduction_outcome(
+    db: Session, payroll_month: PayrollMonth, payable: int
+) -> tuple[int, list[dict]]:
+    """What a month's incoming deductions come to, and what goes back. R1, F1.
+
+    Answers both halves of one question — *this month is worth `payable`, and
+    this much is being deducted from it: how much of that can it take?* — so
+    that approval can freeze the answer and then act on it, rather than acting
+    first and freezing the request.
+
+    Returns the piastres the month absorbs and, per source month, the piastres
+    it hands back. Writes nothing.
+
+    ## Netted per source month, which is the fix F1 asked for
+
+    The first version of this walked the individual credit rows and, for each
+    one, subtracted the releases recorded against its whole source-and-
+    destination *pair*. With one credit those are the same number and it was
+    right. With two credits from one source it counted the first release again
+    while judging the second, decided the second was already fully released,
+    and left half the deduction applied to a month that could not pay it.
+
+    A release carries no link to an individual credit — deliberately, because
+    "how much of August's correction is applied to October" is a fact about the
+    pair and not about which of two rows somebody clicked first. So the
+    arithmetic is done where the fact lives: credits less releases, per source,
+    and whatever that nets to is what there is to hand back.
+    """
+    from app.models.payments import AdjustmentType, PayrollAdjustment
+
+    rows = db.execute(
+        select(
+            PayrollAdjustment.source_payroll_month_id,
+            PayrollAdjustment.type,
+            func.sum(PayrollAdjustment.amount_piastres),
+            func.max(PayrollAdjustment.id),
+        )
+        .where(PayrollAdjustment.destination_payroll_month_id == payroll_month.id)
+        .where(
+            PayrollAdjustment.type.in_(
+                [AdjustmentType.CREDIT, AdjustmentType.RELEASE]
+            )
+        )
+        .group_by(
+            PayrollAdjustment.source_payroll_month_id, PayrollAdjustment.type
+        )
+    ).all()
+
+    applied: dict[int, int] = {}
+    newest: dict[int, int] = {}
+    for source_id, kind, total, last_id in rows:
+        sign = -1 if kind == AdjustmentType.RELEASE else 1
+        applied[source_id] = applied.get(source_id, 0) + sign * int(total or 0)
+        if kind == AdjustmentType.CREDIT:
+            newest[source_id] = max(newest.get(source_id, 0), int(last_id or 0))
+
+    landing = sum(amount for amount in applied.values() if amount > 0)
+    excess = landing - payable
+    if excess <= 0:
+        return landing, []
+
+    # Newest first: the last carry accepted is the one that over-committed the
+    # month, so it is the one to unwind. An older credit was accepted when the
+    # month had more room and has the better claim to it.
+    order = sorted(
+        (source_id for source_id, amount in applied.items() if amount > 0),
+        key=lambda source_id: newest.get(source_id, 0),
+        reverse=True,
+    )
+
+    giving_back = []
+    for source_id in order:
+        if excess <= 0:
+            break
+        give_back = min(applied[source_id], excess)
+        source = db.get(PayrollMonth, source_id)
+        giving_back.append(
+            {
+                "from_month": source.month if source else None,
+                "amount_piastres": give_back,
+            }
+        )
+        excess -= give_back
+
+    return landing - sum(row["amount_piastres"] for row in giving_back), giving_back
+
+
 def _release_deductions_the_month_cannot_take(
     db: Session,
     affiliate: AffiliateProfile,
     payroll_month: PayrollMonth,
     snapshot: PayrollSnapshot,
     *,
+    giving_back: list[dict] | None = None,
     actor_id: int | None = None,
 ) -> int:
     """Hand back the part of a carried correction this month cannot absorb. R1.
@@ -600,72 +755,36 @@ def _release_deductions_the_month_cannot_take(
     the release stands as what the month could do about it. Returns the
     piastres released, which is zero on almost every approval.
     """
-    from app.models.payments import AdjustmentType, PayrollAdjustment
-    from app.services.payments import adjust, credited_into
+    from app.models.payments import AdjustmentType
+    from app.services.payments import adjust
 
     payable = snapshot.approved_obligation_piastres
-    landing = credited_into(db, payroll_month)
-    excess = landing - payable
-    if excess <= 0:
-        return 0
-
-    # Newest first: the last carry accepted is the one that over-committed the
-    # month, so it is the one to unwind. An older credit was accepted when the
-    # month had more room and has the better claim to it.
-    credits = list(
-        db.scalars(
-            select(PayrollAdjustment)
-            .where(PayrollAdjustment.destination_payroll_month_id == payroll_month.id)
-            .where(PayrollAdjustment.type == AdjustmentType.CREDIT)
-            .order_by(PayrollAdjustment.created_at.desc(), PayrollAdjustment.id.desc())
-        )
-    )
+    if giving_back is None:
+        _, giving_back = _deduction_outcome(db, payroll_month, payable)
 
     released = 0
-    for credit in credits:
-        if excess <= 0:
-            break
-        # What is still applied from *this* credit, after anything already
-        # released against it, so a second approval cannot release it twice.
-        already = int(
-            db.scalar(
-                select(func.coalesce(func.sum(PayrollAdjustment.amount_piastres), 0))
-                .where(
-                    PayrollAdjustment.source_payroll_month_id
-                    == credit.source_payroll_month_id
-                )
-                .where(
-                    PayrollAdjustment.destination_payroll_month_id
-                    == payroll_month.id
-                )
-                .where(PayrollAdjustment.type == AdjustmentType.RELEASE)
-            )
-            or 0
-        )
-        applied = credit.amount_piastres - already
-        if applied <= 0:
+    for row in giving_back:
+        give_back = row["amount_piastres"]
+        if give_back <= 0:
             continue
-
-        give_back = min(applied, excess)
-        source = db.get(PayrollMonth, credit.source_payroll_month_id)
+        source_month = row["from_month"]
         adjust(
             db,
             affiliate,
             kind=AdjustmentType.RELEASE,
-            source_month=source.month,
+            source_month=source_month,
             destination_month=payroll_month.month,
             amount_piastres=give_back,
             reason=(
                 f"{payroll_month.month} was agreed at "
                 f"{payable} piastres, which cannot take the whole deduction "
-                f"carried from {source.month}. This much returns to "
-                f"{source.month} and can be carried into a later month."
+                f"carried from {source_month}. This much returns to "
+                f"{source_month} and can be carried into a later month."
             ),
             open_difference_piastres=give_back,
             actor_id=actor_id,
         )
         released += give_back
-        excess -= give_back
 
     return released
 

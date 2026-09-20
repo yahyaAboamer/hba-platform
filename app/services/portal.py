@@ -1150,6 +1150,12 @@ ADJUSTMENT_TEXT = {
     AdjustmentType.CREDIT: "Carried into a later month",
     AdjustmentType.WRITEOFF: "Written off by HBA",
     AdjustmentType.CORRECTION: "A correction",
+    # R4, F2. HBA took the difference and the agreed figure stands, so what she
+    # is owed has not moved. Worded to say that rather than to say "absorbed",
+    # which reads from her side as money going somewhere.
+    AdjustmentType.ACCEPTED: "HBA covered the difference; your agreed total is unchanged",
+    # R1. A deduction a month could not take, gone back to where it came from.
+    AdjustmentType.RELEASE: "Returned to an earlier month",
 }
 
 
