@@ -212,17 +212,61 @@ is a delivery outcome (D03): every attributed order except one whose delivery
 failed, including an order the courier has not answered for yet. The three
 counts beside it are **commission** states.
 
-So they part company in both directions. An order delivered and later refunded
-is a use and pays nothing. A parcel refused at the door is neither. Aliasing
-one to the other would have drawn a chart that disagreed with the card above
-it.
+Where they part company is **before** delivery. An order refunded or cancelled
+while still in transit voids the commission, and the courier never reported a
+failure — so her code was used and no sale completed. A parcel refused at the
+door is neither a use nor a sale. Aliasing one figure to the other would have
+drawn a chart that disagreed with the card above it.
+
+**After** delivery they agree, and stay agreed. See the correction below.
+
+### Correction: this section had the refund rule backwards
+
+The first version of this claimed *"an order delivered and later refunded is a
+use and pays nothing"*, and shipped a test built to match — an order written
+directly into the database as `void` **and** `delivered`, described as a
+delivered order that was later refunded.
+
+Both halves were wrong, and the second one is the serious one.
+
+**ADR 0025: delivery is final.** Once the parcel arrives the sale is hers, and
+a later refund, return, exchange or cancellation changes nothing — her counted
+sales and her commission both stand. `commission_state` checks delivery first
+precisely so that a refund processed as a cancellation cannot reverse a
+delivered order. So the row that test built **cannot arise from the normal
+path at all**: `attribute_order` would never produce it, and `is_final` means
+a delivered order is never recalculated afterwards.
+
+It passed because it asserted against fabricated rows rather than running the
+sequence, and nothing else contradicted a docstring.
+
+Corrected two ways:
+
+- `tests/test_commission_attribute.py` now drives the **real sequence** through
+  `attribute_order`: the parcel arrives and is attributed, then Shopify
+  restates the order as `refunded` and it is attributed again. The state stays
+  `earned`, the commission basis does not move, and `counts_toward_payout`
+  stays true. Partial refund and exchange variants alongside it, plus the
+  other side of the line — a refund **before** delivery, which does void the
+  sale — so the rule is not mistaken for *refunds never matter*.
+- The portal test that misstated it now tests the divergence that actually
+  arises (refunded in transit), and a second test asserts a
+  delivered-then-refunded order counts as **both** a use and a sale, with her
+  sales figure unmoved.
+
+No fabricated-state test was kept. Nothing in this repair needs one.
 
 ### Evidence
 
-Four route tests in `tests/test_portal_api.py`: the year and the card
+Five route tests in `tests/test_portal_api.py`: the year and the card
 reporting the same figure, pending-and-delivered counting while a refused
-parcel does not, the delivered-and-refunded order that is a use and not a
-counted order, and a quiet month reporting zero rather than nothing.
+parcel does not, an order refunded in transit that is a use and not a sale, a
+delivered-then-refunded order that is both, and a quiet month reporting zero
+rather than nothing.
+
+Four service tests in `tests/test_commission_attribute.py` driving the real
+delivered → refunded, partial-refund and exchange sequences, and the
+before-delivery refund that does void it.
 
 One existing test was corrected rather than deleted:
 `test_a_historical_month_counts_its_orders_the_same_way` now expects `uses` in

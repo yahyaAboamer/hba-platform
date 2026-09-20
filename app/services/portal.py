@@ -1416,13 +1416,21 @@ def my_year(db: Session, affiliate: AffiliateProfile) -> dict:
                 # is not available yet*, because `my_year` returned `orders`
                 # and the chart reads `uses`.
                 #
-                # It is the month card's own figure, not a second count: a use
-                # is a **delivery** outcome (D03) and the order counts beside
-                # it are *commission* states, so an order delivered and later
-                # refunded is a use and pays nothing, while a parcel refused at
-                # the door is neither. Renaming `orders` would have drawn a
-                # chart that disagreed with the card above it in both
-                # directions at once.
+                # It is the month card's own figure, not a second count: a
+                # use is a **delivery** outcome (D03) and the order counts
+                # beside it are *commission* states.
+                #
+                # Where they part company is **before** delivery. An order
+                # refunded or cancelled while still in transit voids the
+                # commission, and the courier never reported a failure - so
+                # her code was used and no sale completed. A parcel refused at
+                # the door is neither a use nor a sale.
+                #
+                # **After** delivery they agree and stay agreed: ADR 0025 is
+                # that delivery is final, so a refund, a return or an exchange
+                # leaves a delivered order earning exactly what it earned. An
+                # earlier draft of this comment said such an order "pays
+                # nothing", which is the opposite of the rule HBA runs.
                 "uses": figures["orders"].get("uses"),
             }
         )

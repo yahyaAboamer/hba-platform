@@ -324,3 +324,111 @@ def test_a_house_account_is_attributed_but_not_payable(db):
 
     assert row.affiliate_id == house.id
     assert row.commission_state == CommissionState.EARNED
+
+
+def test_a_refund_after_delivery_keeps_the_sale_and_the_commission(db):
+    """ADR 0025, driven through the real sequence rather than asserted at rest.
+
+    The parcel arrives and is attributed. Then the refund happens: Shopify
+    sends the order again with `financial_status: refunded` and a refunded
+    amount on it, and `attribute_order` runs a second time on the same order -
+    which is exactly what happens in production, because the indexer reprocesses
+    whatever Shopify last said about an order.
+
+    **The sale and the commission both stay.** Her counted sales do not drop,
+    her commission basis does not drop, and the state does not move off
+    `earned`. The refund is recorded beside them as the fact it is.
+
+    Written because a Batch 2 test docstring said the opposite - that a
+    delivered order which was later refunded "pays nothing" - and no test
+    contradicted it, because none of them ran the sequence.
+    """
+    _affiliate(db)
+    order = _order(db)
+    first = attribute_order(db, order)
+    assert first.commission_state == CommissionState.EARNED
+    earned_base = first.commission_base_piastres
+    assert earned_base == EXPECTED_BASE
+
+    # The refund arrives. Same order row, restated by Shopify.
+    order.financial_status = "refunded"
+    order.refunded_merchandise_piastres = EXPECTED_BASE
+    order.return_status = "RETURNED"
+    order.return_activity = True
+    db.flush()
+
+    again = attribute_order(db, order)
+
+    assert again.shopify_order_id == first.shopify_order_id, (
+        "the same order, not a second one"
+    )
+    assert again.commission_state == CommissionState.EARNED
+    assert again.commission_base_piastres == earned_base, (
+        "a delivered sale keeps its commission basis through a refund"
+    )
+    assert again.counts_toward_payout is True
+
+
+def test_a_partial_refund_after_delivery_keeps_the_whole_sale(db):
+    """ADR 0025. Half the money back is still not the sale coming back.
+
+    Shopify's refund figures are not what HBA actually refunds (ADR 0025 again),
+    which is the reason none of them reduce anything here.
+    """
+    _affiliate(db)
+    order = _order(db)
+    attribute_order(db, order)
+
+    order.financial_status = "partially_refunded"
+    order.refunded_merchandise_piastres = EXPECTED_BASE // 2
+    db.flush()
+
+    row = attribute_order(db, order)
+
+    assert row.commission_state == CommissionState.EARNED
+    assert row.commission_base_piastres == EXPECTED_BASE
+
+
+def test_an_exchange_after_delivery_keeps_the_sale_and_the_commission(db):
+    """ADR 0025. An exchange is a return and a new order, and only the second
+    of those is a new sale. The delivered one is untouched.
+    """
+    _affiliate(db)
+    order = _order(db)
+    attribute_order(db, order)
+
+    order.return_status = "RETURNED"
+    order.return_activity = True
+    order.financial_status = "refunded"
+    # An exchange edits the order on Shopify, so the subtotal moves too.
+    order.subtotal_piastres = 1
+    order.total_piastres = 1
+    db.flush()
+
+    row = attribute_order(db, order)
+
+    assert row.commission_state == CommissionState.EARNED
+    assert row.commission_base_piastres == EXPECTED_BASE, (
+        "the basis was frozen at delivery; a later edit does not reach it"
+    )
+
+
+def test_a_refund_before_delivery_does_take_the_sale_back(db):
+    """The other side of the line, so the rule above is not mistaken for
+    *refunds never matter*.
+
+    Money back **before** the parcel arrives means the sale never completed.
+    That is `void`, and it is where the two halves of ADR 0025 meet.
+    """
+    _affiliate(db)
+    order = _order(
+        db,
+        delivery_state=IN_FLIGHT,
+        delivered_at=None,
+        financial_status="refunded",
+    )
+
+    row = attribute_order(db, order)
+
+    assert row.commission_state == CommissionState.VOID
+    assert row.counts_toward_payout is False

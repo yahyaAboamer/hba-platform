@@ -2360,12 +2360,29 @@ def test_a_use_is_a_delivery_outcome_not_a_commission_state(admin):
     assert august["orders"] == 2
 
 
-def test_an_order_that_arrived_and_earned_nothing_is_still_a_use(admin):
-    """A08. The case that proves `uses` cannot be `orders` under a new name."""
+def test_an_order_refunded_in_transit_is_a_use_and_not_a_sale(admin):
+    """A08. The case that proves `uses` cannot be `orders` under a new name.
+
+    **This test replaced one that had the business rule backwards.** The
+    earlier version built an order marked `void` *and* delivered, called it
+    "delivered and later refunded", and concluded such an order "pays
+    nothing". Both halves were wrong. ADR 0025 is that **delivery is final**:
+    once the parcel arrives the sale is hers and a later refund, return or
+    exchange changes nothing - so that combination cannot arise from the
+    normal path at all, and `test_a_refund_after_delivery_keeps_the_sale_and_
+    the_commission` now drives the real sequence.
+
+    The divergence is real; it just lives on the other side of delivery. Money
+    back **before** the parcel arrives voids the commission, and the courier
+    never reported a failure - so her code was still used, and no sale
+    completed. A use is a delivery outcome; a counted order is a commission
+    state. Here they differ, and neither is the other renamed.
+    """
     affiliate = _affiliate(admin)
     _terms(admin, affiliate["id"])
-    _order(affiliate["id"], "refunded", 400_000, month=AUGUST, state="void")
-    _delivery("refunded", "delivered")
+    _order(affiliate["id"], "refunded-in-transit", 400_000, month=AUGUST, state="void")
+    # Never delivered and never failed: Shopify said nothing about the courier.
+    _delivery("refunded-in-transit", None)
 
     august = next(
         m
@@ -2373,8 +2390,38 @@ def test_an_order_that_arrived_and_earned_nothing_is_still_a_use(admin):
         if m["month"] == AUGUST
     )
 
-    assert august["uses"] == 1, "it arrived, so her code was used"
-    assert august["orders"] == 0, "and it pays nothing, so it counts for nothing"
+    assert august["uses"] == 1, "her code was used; the courier reported nothing"
+    assert august["orders"] == 0, "the money went back before it arrived"
+
+
+def test_an_order_refunded_after_delivery_counts_for_both(admin):
+    """A08 and ADR 0025 together, on the screens rather than in the service.
+
+    The rule HBA actually runs: a delivered order keeps its counted sales and
+    its commission through a refund. So this one is a use **and** a counted
+    sale, and her sales figure does not drop when the refund lands.
+    """
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"])
+    _order(affiliate["id"], "kept", 400_000, month=AUGUST, state="earned")
+    _delivery("kept", "delivered")
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "UPDATE order_index SET financial_status = 'refunded' "
+                "WHERE shopify_order_id = 'kept'"
+            ),
+        )
+
+    august = next(
+        m
+        for m in _sign_in().get("/api/me/year").json()["months"]
+        if m["month"] == AUGUST
+    )
+
+    assert august["uses"] == 1
+    assert august["orders"] == 1
+    assert august["sales_piastres"] == 400_000, "the sale is hers and stays hers"
 
 
 def test_a_month_with_no_orders_reports_no_uses_rather_than_nothing(admin):
