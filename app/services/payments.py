@@ -986,10 +986,25 @@ def adjust(
     except IntegrityError:
         if not operation_key:
             raise
-        settled = db.scalar(
-            select(PayrollAdjustment).where(
-                PayrollAdjustment.operation_key == operation_key
-            )
+        # **The same identity check as the pre-check above, and for the same
+        # reason.** This branch is the pre-check's race: both sessions looked,
+        # both found the key free, and only one insert won. If the two requests
+        # were not actually the same decision, handing the loser the winner's
+        # row is the silent wrong answer `_replay_of` exists to refuse - a
+        # carry into September reported to a caller that asked for an absorb.
+        #
+        # Checking in only one of the two places made the guarantee depend on
+        # the timing: sequential reuse was refused, concurrent reuse was
+        # satisfied. A mismatch raises `OperationKeyReused` from here exactly
+        # as it does from there, and an absent row re-raises the collision
+        # rather than inventing an answer for it.
+        settled = _replay_of(
+            db,
+            operation_key,
+            affiliate=affiliate,
+            kind=kind,
+            source_month=source_month,
+            destination_month=destination_month,
         )
         if settled is None:
             raise

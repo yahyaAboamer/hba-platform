@@ -426,6 +426,96 @@ def test_a_colliding_key_leaves_the_session_able_to_answer(committed):
     assert _adjustments(AdjustmentType.CREDIT) == [(AdjustmentType.CREDIT, 200_000)]
 
 
+def test_a_colliding_key_for_a_different_decision_is_refused(committed):
+    """F4. Key binding has to hold on the collision path as well.
+
+    `adjust` checks the key twice: once before it computes anything, and once
+    when the unique constraint refuses its insert. The second place is the
+    first place's race — both sessions looked, both found the key free, and
+    only one insert won.
+
+    The pre-check compares the whole request and refuses a key reused for
+    another decision. The recovery path used to compare nothing: it looked the
+    key up and handed back whatever row held it. So a mismatch was refused when
+    it arrived second and *satisfied* when it arrived at the same moment, and
+    the caller that asked to absorb August was told its carry into September
+    had succeeded.
+
+    Here the two sessions ask for genuinely different things under one key: a
+    carry and an absorb. One writes; the other must be refused and must still
+    have a session it can use.
+    """
+    from sqlalchemy import select as sa_select
+
+    from app.models.affiliates import AffiliateProfile
+    from app.services import payments
+    from app.services.payments import OperationKeyReused
+
+    key = f"mismatch-{uuid.uuid4()}"
+    passed_the_check = threading.Barrier(2, timeout=30)
+    real = payments._replay_of
+
+    def blind_first_time(db, operation_key, **rest):
+        # Raises on a mismatch, exactly as it does in production - which is the
+        # behaviour under test, so it is never stubbed away. The barrier only
+        # opens when the key is genuinely free, which is how both sessions get
+        # past the pre-check and reach the insert together.
+        found = real(db, operation_key, **rest)
+        if found is None:
+            passed_the_check.wait()
+        return found
+
+    def work(index, worker):
+        profile = worker.get(AffiliateProfile, committed)
+        shared = dict(
+            source_month=AUGUST,
+            amount_piastres=200_000,
+            open_difference_piastres=200_000,
+            operation_key=key,
+        )
+        try:
+            if index == 0:
+                row = payments.adjust(
+                    worker,
+                    profile,
+                    kind=AdjustmentType.CREDIT,
+                    destination_month=SEPTEMBER,
+                    reason="carried into September",
+                    **shared,
+                )
+            else:
+                row = payments.adjust(
+                    worker,
+                    profile,
+                    kind=AdjustmentType.ACCEPTED,
+                    reason="HBA absorbs it",
+                    **shared,
+                )
+        except OperationKeyReused:
+            # **The session has to survive the refusal.** The savepoint
+            # contained the collision, so this query runs; if the insert had
+            # escaped it, the transaction would be aborted and this would raise
+            # `PendingRollbackError` instead of answering.
+            rows = worker.scalars(sa_select(PayrollAdjustment)).all()
+            return ("refused", len(rows))
+        return ("wrote", row.type)
+
+    payments._replay_of = blind_first_time
+    try:
+        outcomes = _in_parallel(work)
+    finally:
+        payments._replay_of = real
+
+    assert not any(isinstance(row, Exception) for row in outcomes), outcomes
+    kinds = sorted(row[0] for row in outcomes)
+    assert kinds == ["refused", "wrote"], (
+        f"one key, two different decisions, and {kinds} came back"
+    )
+    refused = next(row for row in outcomes if row[0] == "refused")
+    assert refused[1] == 1, "the refused session could not read the ledger"
+    assert len(_adjustments()) == 1, "a mismatched key wrote a second row"
+
+
 def test_two_corrections_cannot_both_spend_one_destination(fresh_database):
     """R2. The other race: one month, two claims on it.
 
