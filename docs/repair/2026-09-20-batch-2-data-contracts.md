@@ -506,3 +506,124 @@ as evidence — see A12 for why it never was.
   real data, and a migration rollback rehearsal.
 
 `main` and `production` remain at `6a13958`. Nothing merged, nothing deployed.
+
+
+---
+
+# Follow-up: browser verification and the A09 application work
+
+## 1. The refund rule, corrected
+
+Batch 2's A08 work claimed *"an order delivered and later refunded is a use and
+pays nothing"* — in a test docstring, a source comment and this report. **The
+rule is the opposite.** ADR 0025: delivery is final. Once the parcel arrives
+the sale is hers, and a later refund, return, exchange or cancellation changes
+nothing; her counted sales and her commission both stand.
+
+The test built to match it was worse than the sentence: it wrote an order
+directly into the database as `void` **and** `delivered`, which
+`attribute_order` cannot produce and which `is_final` guarantees can never be
+reached by reprocessing. It passed because it asserted against fabricated rows
+instead of running the sequence.
+
+`tests/test_commission_attribute.py` now drives the real sequence — the parcel
+arrives and is attributed, then Shopify restates the order as refunded and it
+is attributed again, which is what the indexer does. State stays `earned`, the
+basis does not move, `counts_toward_payout` stays true. Partial-refund and
+exchange variants beside it (the exchange edits the subtotal, so the frozen
+basis is the thing under test), plus the other side of the line: a refund
+**before** delivery, which does void the sale.
+
+**No fabricated-state test was kept**, so there is nothing here labelled as an
+inconsistent old record. If one is ever needed it will say so in its name.
+
+## 2. A09's application work
+
+### The bulk review entry
+
+`app/services/historical.py` plus `GET /api/payroll/historical/review` and
+`POST /api/payroll/historical/finalise`, entered from the **Review months from
+January 2026** button the approved export puts under the Historical setup
+table. The reachability ratchet refused the routes until that entry existed.
+
+### Safe and repeatable
+
+Every step is *approve this month if it is not approved and can be calculated*.
+A second run finds them approved and does nothing, so an interrupted run is
+finished by running it again. Verified in the browser: first run **3
+finalised**, second run **0 approved, 3 already finalised**, and
+`payment_transaction`, `payment_allocation` and `payroll_adjustment` all still
+empty.
+
+### Missing software, versus information only HBA holds
+
+| | |
+|---|---|
+| **Software — now done** | The bulk entry, the dry run, the idempotent finalisation, the per-model gap list |
+| **Waiting on Yahya** | Collaboration start months; compensation terms for every eligible month; met/missed outcomes for guaranteed months before go-live; confirmation that the order import is complete for those months |
+
+The screen names the second column per model — *"Sara — 1 month from August
+2026: guaranteed minimum with no met/missed recorded"* — and links to her
+terms grid. **Nothing is invented**: no default rate, no assumed outcome, no
+nearest arrangement. A month missing information is reported and skipped.
+
+**No live record was touched.** All of this was exercised against a disposable
+seeded database created for the purpose and dropped afterwards.
+
+## 3. A12 verified in a running browser
+
+Against a local build of this branch, with `window.fetch` made to reject the
+two endpoints — a real rejected request, taking the component's own catch
+branch.
+
+| Check | Result |
+|---|---|
+| Best sellers, request rejected | *"Could not load your best sellers. Try again"* |
+| Retry after recovery | Section loads; error clears |
+| Payment status, request rejected, approved month | Badge reads **payment status unavailable**, not "approved" |
+| Retry after recovery | Badge returns to **approved**, "Not yet recorded" |
+| Breakdown during the failure | Still rendered — that read succeeded |
+
+Six component tests now drive the same rejections in `jsdom`
+(`FailedRequests.test.tsx`). Restoring the two original swallows, three fail.
+
+## 4. Design comparison
+
+**A02** — our Payments and the export's Payments, both at 1280: same three
+totals, same filter chips with the count after the label, same five columns
+(MODEL / TO RECEIVE / DESTINATION / STATE / NEXT ACTION), same name-over-
+arrangement row, same second line under the amount. Layla's unapproved month
+renders **E£5,512.00** where the old binding gives E£0.00 — the audit's Boda
+symptom, fixed, on live data.
+
+**A09** — four differences from the export found and fixed: the state word,
+the panel placement, the result box, and the pluralisation. See the commit.
+
+**A08 / A12** — model pages at the export's default **390**: Code uses on the
+card, the **Uses** chart drawing *2 uses* across July–September where it used
+to say *this history is not available yet*.
+
+### Remaining differences, and one limitation
+
+- **The viewport could not be set.** The browser tool renders every tab at a
+  fixed 1920×879 and ignores `resize_window`; the app sends
+  `X-Frame-Options: DENY`, so an iframe harness cannot host it either. The
+  1280 and 1440 captures were produced by constraining the app's root element,
+  which is faithful here because **no media query in this codebase sits between
+  1280 and 1920** — the largest breakpoint is `max-width: 1050px`. It is not
+  the same as a real viewport and is not claimed to be.
+- **Destination masking is shorter than the export's.** The export shows
+  `InstaPay · 010 7014 2033`; ours shows `InstaPay · …291`. Ours is the more
+  conservative reading of ADR 0028 and is deliberate.
+- **The roster table has no pagination.** The export has *Show all 20 models*;
+  ours lists every model. Not yet addressed.
+- **1440 was not captured separately.** Nothing in the layout changes between
+  1280 and 1920, so the 1280 capture stands for both; a real 1440 viewport
+  capture is still outstanding.
+
+## Results
+
+**Backend 2,030 collected, 2,030 passed, 0 failed, all 79 files**, reconciling
+exactly with `--collect-only`; the runner exited **0**. **Frontend 357 tests
+across 16 files, `npm run build` green** — the build is the typecheck here, for
+the reason recorded in CLAUDE.md.
