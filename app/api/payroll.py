@@ -600,23 +600,36 @@ def _render_historical(result: dict) -> dict:
     """
     from app.core.money import format_egp
 
+    from app.services.payroll import go_live_month
+    from app.services.portal import _month_words
+
+    def months(count: int) -> str:
+        return f"{count} month" if count == 1 else f"{count} months"
+
     totals = result["totals"]
     done = totals.get("approved")
+    # **The boundary, named.** Everything here stops at go-live, and the
+    # readiness column above it counts *every* eligible month - so the two
+    # legitimately disagree about a model whose live month is also unready,
+    # and a reader who is not told where the line falls reads that as a bug.
+    live = go_live_month()
+    before = f" before {_month_words(live)}" if live else ""
     if done is None:
-        line = (
-            f"{totals['ready']} month{'' if totals['ready'] == 1 else 's'} "
-            "can be finalised now."
-        )
+        line = f"{months(totals['ready'])}{before} can be finalised now."
+        if not totals["ready"] and not totals["blocked"]:
+            line = f"No month{before} is waiting to be finalised."
     else:
         line = (
-            f"{done} month{'' if done == 1 else 's'} finalised from "
-            f"{result['from_month'] or 'the start'} using each model's "
+            f"{months(done)}{before} finalised from "
+            f"{_month_words(result['from_month']) if result['from_month'] else 'the start'}"
+            " using each model's "
             "recorded terms. No payments or receipts were created; a month "
             "with no imported transfer still has none."
         )
     if totals["blocked"]:
+        verb = "needs" if totals["blocked"] == 1 else "need"
         line += (
-            f" {totals['blocked']} still need information HBA has not "
+            f" {totals['blocked']} still {verb} information HBA has not "
             "recorded yet."
         )
     return {

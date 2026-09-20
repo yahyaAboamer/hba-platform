@@ -98,7 +98,7 @@ export function Settings({ session }: { session: Session }) {
           ? <DataPanel goLiveMonth={session.platform.go_live_month} />
           : <PlatformPanel session={session} />)}
         {section === "historical" && (can(session, "compensation.manage")
-          ? <><SetupRoster kind="model" /><HistoricalReview session={session} /></>
+          ? <SetupRoster kind="model" session={session} />
           : <p className="empty">Your account cannot manage payment terms.</p>)}
         {section === "codes" && <>
           <SetupRoster kind="house" />
@@ -174,21 +174,23 @@ export function historicalState(row: SetupRow) {
   if (setup.eligible === 0) {
     return <span className="settings__gap">No month can be worked out</span>;
   }
-  if (setup.blocking === 0) {
-    // **Every eligible month, not the earliest one.** "Covered from the
-    // start" used to mean only that her terms began early enough.
-    return setup.start_is_recorded
-      ? `All ${setup.eligible} months ready`
-      : `All ${setup.eligible} months ready · start not recorded`;
-  }
+  // **Ready**, exactly as the approved export words it - and it now means
+  // every eligible month rather than only that her terms began early enough.
+  // Whether her start was recorded is the STARTED column's fact, not this
+  // one's, and saying it twice made the cell read like a second verdict.
+  if (setup.blocking === 0) return "Ready";
+  // The state the export never has to draw, because everything in it is
+  // ready. Counts rather than a word, because *nearly ready* is what this
+  // column exists to show and how near is the whole of the question.
   return (
     <span className="settings__gap">
-      {setup.blocking} of {setup.eligible} months cannot be calculated
+      {setup.blocking} of {setup.eligible}{" "}
+      {setup.eligible === 1 ? "month" : "months"} cannot be calculated
     </span>
   );
 }
 
-function SetupRoster({kind}: {kind: "model" | "house"}) {
+function SetupRoster({kind, session}: {kind: "model" | "house"; session?: Session}) {
   const [rows,setRows] = useState<SetupRow[] | null>(null);
   const [error,setError] = useState<string | null>(null);
   useEffect(() => { let live = true; api.get<{affiliates:NonNullable<typeof rows>}>("/api/affiliates?include_archived=true")
@@ -229,6 +231,9 @@ function SetupRoster({kind}: {kind: "model" | "house"}) {
         </td>}
       </tr>)}</tbody></table>
     {rows.length === 0 && <p className="empty">No {kind === "house" ? "brand codes" : "models"}.</p>}
+    {/* A09. The approved export puts the bulk review directly under this
+        table - one panel, the list and the thing you do about it. */}
+    {kind === "model" && session && <HistoricalReview session={session} />}
   </section>;
 }
 

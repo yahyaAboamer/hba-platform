@@ -104,31 +104,27 @@ export function HistoricalReview({ session }: { session: Session }) {
 
   if (error) {
     return (
-      <section className="panel">
-        <div className="panel__head"><h2 className="panel__title">Historical months</h2></div>
+      <div className="settings__historical">
         <p className="notice notice--refused" role="alert">
           {error}{" "}
           <button type="button" className="button" onClick={() => setAttempt((n) => n + 1)}>
             Try again
           </button>
         </p>
-      </section>
+      </div>
     );
   }
-  if (!body) return <p className="empty">Loading…</p>;
+  if (!body) return null;
 
   const ready = body.totals.ready ?? 0;
   const done = body.totals.approved;
   const blocked = blockedByModel(body.blocked);
 
   return (
-    <section className="panel">
-      <div className="panel__head"><h2 className="panel__title">Historical months</h2></div>
-
-      {/* The result line, written by the server. It says what was done to
-          somebody's money, so it is not restated here. */}
-      <p className="settings__note" role="status">{body.summary}</p>
-
+    <div className="settings__historical">
+      {/* The button the approved export puts here, in its words. It is only
+          drawn when there is something to do: an entry that does nothing is
+          worse than no entry, because somebody presses it. */}
       {done === undefined && ready > 0 && allowed && (
         <button
           type="button"
@@ -141,26 +137,30 @@ export function HistoricalReview({ session }: { session: Session }) {
             : `Review months from ${formatMonth(body.from_month ?? body.working_month)}`}
         </button>
       )}
-      {done === undefined && ready === 0 && (
-        <p className="settings__note">
-          Nothing is waiting to be finalised.
-          {body.totals.already_finalised > 0 &&
-            ` ${body.totals.already_finalised} already agreed.`}
-        </p>
-      )}
+      {/* The result line, written by the server - it says what was done to
+          somebody's money, so it is not restated here. The export shows it in
+          a bordered accent box once the review has run; before that it is the
+          quiet sentence explaining why the button is or is not there. */}
+      <p
+        className={done === undefined ? "settings__note" : "settings__result"}
+        role="status"
+      >
+        {body.summary}
+      </p>
+
       {done !== undefined && (
-        <p className="settings__note">
-          {/* Running it again is the repair for a run that stopped halfway,
-              so the way to do that stays on the screen. */}
-          <button type="button" className="button" onClick={() => setAttempt((n) => n + 1)}>
-            Check again
-          </button>
-        </p>
+        // Running it again is the repair for a run that stopped halfway, so
+        // the way to do that stays on the screen.
+        <button type="button" className="button" onClick={() => setAttempt((n) => n + 1)}>
+          Check again
+        </button>
       )}
 
       {blocked.length > 0 && (
         <>
-          <h3 className="settings__subtitle">Waiting on information HBA holds</h3>
+          <h3 className="settings__subtitle">
+            Waiting on information HBA holds
+          </h3>
           {/* Named per model rather than per month, because that is how one
               person fixes them: one profile, all of her gaps. Nothing here can
               be filled in by the software — that is the whole point of the
@@ -193,9 +193,9 @@ export function HistoricalReview({ session }: { session: Session }) {
         </>
       )}
 
-      {!allowed && (
+      {!allowed && ready > 0 && (
         <p className="settings__note">Only somebody who approves payroll can finalise these.</p>
       )}
-    </section>
+    </div>
   );
 }
