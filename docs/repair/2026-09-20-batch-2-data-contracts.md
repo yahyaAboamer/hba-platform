@@ -434,3 +434,31 @@ A06 was its stated prerequisite and is done.
 
 **Results:** frontend **347** tests, build green; backend
 `test_setup_readiness.py` 19, `test_affiliates_api.py` 113.
+
+---
+
+## Batch 2 results
+
+**Backend: 2,014 collected, 2,014 passed, 0 failed, all 78 files**, reconciling
+exactly with `--collect-only` — 17 more than Batch 1's 1,997. Log at
+`docs/repair/batch-2-test-log.txt`.
+
+The runner exited **0** for the first time, which is itself new: "incomplete"
+used to look identical to success, and now does not.
+
+**Frontend:** 347 tests, build green. `npx tsc --noEmit` is *not* quoted here
+as evidence — see A12 for why it never was.
+
+## What Batch 2 did not do
+
+- **No browser verification.** Four of the six were confirmed by the auditor
+  in a browser or on staging, and none of the repairs has been rendered
+  against the approved export at 1280 and 1440. That is the check CLAUDE.md
+  asks for and it has not been run.
+- **No rejected-request tests** for A12, for want of a DOM test environment.
+- **A09's data half is untouched** — start dates, terms, outcomes, order
+  completeness, historical finalisation.
+- Batch 1's two release gates still stand: reconciliation against restored
+  real data, and a migration rollback rehearsal.
+
+`main` and `production` remain at `6a13958`. Nothing merged, nothing deployed.
