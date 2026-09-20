@@ -237,6 +237,62 @@ that divergence is the distinction working.
 
 ---
 
-## A09, A11, A12
+## A11 — a receipt could be labelled with a month it did not pay
+
+### What it was
+
+`PaymentReceipt` finds the transfer by id, looks for an allocation matching
+the month in the URL, and fell back to the transfer's **whole amount** when
+that allocation was missing — while still titling the page with the month from
+the URL:
+
+```tsx
+<Money piastres={here?.allocated_piastres ?? transfer.amount_piastres} />
+```
+
+So a stale bookmark, a mistyped month or a link copied from the wrong row
+produced a page that looked exactly like a genuine receipt and said this
+transfer paid for a month it had nothing to do with. Nothing on it disagreed,
+because every fact on it was true except the one the heading implied.
+
+§14 allows one transfer to cover two months, so *which part of this settled
+this month* is a real question with a real answer — and the answer is
+sometimes **none of it**.
+
+### What it does now
+
+`receiptFor` returns which of three situations this is, because there are
+three and the old code had one answer for all of them:
+
+- **settled** — there is an allocation for this month, and the receipt shows
+  that part, not the transfer's total.
+- **unassigned** — the transfer has no allocations at all. An ordinary state,
+  not an error: §14 lets money be recorded before anybody decides which months
+  it covers. It is shown, and it is not claimed for this month.
+- **elsewhere** — the transfer is allocated, to other months. The page says
+  so, names them, and links to one, so a wrong link is a wrong turning rather
+  than a dead end.
+
+### Evidence
+
+Five tests in `frontend/src/screens/__tests__/PaymentReceipt.test.tsx`,
+including the multi-allocation history the audit asked for: one transfer
+covering August and September shows the August part for August and refuses
+July outright.
+
+One of them is there for a trap rather than a symptom — a recorded allocation
+of **zero** is a decision somebody made, and must not be read as a missing
+one. `??` on a number is how that goes wrong, and it is what this replaced.
+
+No new multi-month payment-creation workflow was added, as the audit asked.
+
+**Results:** frontend `tsc` clean, **338** tests, build green.
+
+**Not verified in a browser**, and the audit did not reproduce it by URL
+either. Same gap as the sections above.
+
+---
+
+## A09, A12
 
 Not started.

@@ -56,6 +56,47 @@ type Transfer = {
 
 type History = { name: string; payments: Transfer[] };
 
+/**
+ * Whether a transfer is this month's receipt, and for how much. A11.
+ *
+ * **The fallback this replaces was `here?.allocated_piastres ??
+ * transfer.amount_piastres`.** When the route's month had no allocation on
+ * that transfer, the page showed the transfer's *whole* amount — under a
+ * heading naming the route's month. A stale or mistyped deep link therefore
+ * produced a plausible receipt associating a genuine transfer with a month it
+ * never paid for, and nothing on the page said otherwise.
+ *
+ * Three outcomes, because there are three situations and the old code had one
+ * answer for all of them:
+ *
+ * - `settled` — the transfer has an allocation for this month. Its amount is
+ *   the allocated part, which is not the transfer's total when one transfer
+ *   covered two months (§14 allows exactly that).
+ * - `unassigned` — the transfer has no allocations at all. That is an
+ *   ordinary state, not an error: §14 lets a transfer be recorded before
+ *   anybody has decided which months it covers. It is shown, and it is not
+ *   claimed for this month.
+ * - `elsewhere` — the transfer is allocated, but to other months. This month
+ *   is not what it paid for, and the page says so instead of drawing a
+ *   receipt for it.
+ */
+export type ReceiptMatch =
+  | { kind: "settled"; piastres: number }
+  | { kind: "unassigned"; piastres: number }
+  | { kind: "elsewhere"; months: string[] };
+
+export function receiptFor(transfer: Transfer, month: string): ReceiptMatch {
+  const here = transfer.allocations.find((allocation) => allocation.month === month);
+  if (here) return { kind: "settled", piastres: here.allocated_piastres };
+  if (transfer.allocations.length === 0) {
+    return { kind: "unassigned", piastres: transfer.amount_piastres };
+  }
+  return {
+    kind: "elsewhere",
+    months: transfer.allocations.map((allocation) => allocation.month).sort(),
+  };
+}
+
 type Correction = { month: string; resolved: boolean };
 
 function dateLong(iso: string): string {
@@ -613,7 +654,7 @@ export function PaymentReceipt() {
   }, [affiliateId]);
 
   const transfer = history?.payments.find((payment) => String(payment.id) === paymentId);
-  const here = transfer?.allocations.find((allocation) => allocation.month === month);
+  const match = transfer ? receiptFor(transfer, month) : null;
   const back = `/payments/${month}/${affiliateId}`;
 
   return (
@@ -636,12 +677,32 @@ export function PaymentReceipt() {
       {!history && !error && <p className="empty">Loading…</p>}
       {history && !transfer && <p className="empty">That transfer is not on record.</p>}
 
-      {transfer && (
+      {/* A11. The transfer is real and it did not pay for this month. Naming
+       *  the months it did pay for is what makes this a wrong turning rather
+       *  than a dead end - the link that was wanted is one click away. */}
+      {transfer && match?.kind === "elsewhere" && (
+        <p className="empty">
+          This transfer did not pay for {formatMonth(month)}. It settled{" "}
+          {match.months.map(formatMonth).join(" and ")}.{" "}
+          <Link className="pay-detail__link" to={`/payments/${match.months[0]}/${affiliateId}`}>
+            Open {formatMonth(match.months[0])} →
+          </Link>
+        </p>
+      )}
+
+      {transfer && match && match.kind !== "elsewhere" && (
         <div className="pay-receipt">
           <section className="pay-receipt__card">
-            <div className="pay-detail__muted">{formatMonth(month)}</div>
+            <div className="pay-detail__muted">
+              {/* An unallocated transfer is an ordinary state (§14): money can
+               *  arrive before anybody has decided which months it covers. It
+               *  is shown, and it is not claimed for this one. */}
+              {match.kind === "unassigned"
+                ? "Not yet assigned to a month"
+                : formatMonth(month)}
+            </div>
             <div className="pay-receipt__amount">
-              <Money piastres={here?.allocated_piastres ?? transfer.amount_piastres} kind="agreed" />
+              <Money piastres={match.piastres} kind="agreed" />
             </div>
             <dl className="pay-receipt__rows">
               <div>
