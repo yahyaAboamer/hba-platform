@@ -1973,3 +1973,189 @@ def test_a_model_may_not_read_another_profile_record(client):
 
     assert client.get(f"/api/affiliates/{affiliate['id']}/record").status_code == 403
     assert client.get(f"/api/affiliates/{affiliate['id']}/orders/2026-08").status_code == 403
+
+
+# ── A06: the months that are hers to arrange ──────────────────────────────────
+#
+# The editor drew its first selectable month from `joined_month`, which is the
+# first month she **sold** in. For every model signed before she made a sale
+# those are different months, and the ones in between are precisely the months
+# that need a salary recorded - there are no commissions in them to stand in
+# for one.
+
+
+def _joined(client, affiliate, month: str) -> None:
+    """Record when she actually started, which is not when she first sold."""
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "UPDATE affiliate_profile SET collaboration_start_month = :m "
+                "WHERE id = :id"
+            ),
+            {"m": month, "id": affiliate["id"]},
+        )
+
+
+def _sold(affiliate, order_id: str, month: str, base: int = 1_000_000) -> None:
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO order_index (shopify_order_id, order_number, placed_at, "
+                "business_month, discount_codes, subtotal_piastres, total_piastres, "
+                "shipping_piastres, tax_piastres, currency) "
+                "VALUES (:i, :n, now(), :m, ARRAY['NOUR10'], :b, :b, 0, 0, 'EGP')"
+            ),
+            {"i": order_id, "n": f"#{order_id}", "m": month, "b": base},
+        )
+        connection.execute(
+            text(
+                "INSERT INTO attributed_order (shopify_order_id, affiliate_id, "
+                "business_month, commission_base_piastres, commission_state) "
+                "VALUES (:i, :a, :m, :b, 'earned')"
+            ),
+            {"i": order_id, "a": affiliate["id"], "m": month, "b": base},
+        )
+
+
+def test_the_grid_starts_when_she_joined_not_when_she_first_sold(client):
+    """A06. January and February are hers to arrange, and used to be missing."""
+    affiliate = _register(client)
+    _joined(client, affiliate, "2026-01")
+    _sold(affiliate, "first-sale", "2026-03")
+
+    body = client.get(f"/api/affiliates/{affiliate['id']}/pay-history").json()
+
+    assert body["joined_month"] == "2026-03", "she did first sell in March"
+    assert body["arrangeable_from"] == "2026-01", (
+        "and she has been with HBA since January, which is what may be arranged"
+    )
+
+
+def test_a_model_who_has_never_sold_still_has_months_to_arrange(client):
+    """A06. No sales is not the same as no arrangement."""
+    affiliate = _register(client)
+    _joined(client, affiliate, "2026-02")
+
+    body = client.get(f"/api/affiliates/{affiliate['id']}/pay-history").json()
+
+    assert body["joined_month"] is None
+    assert body["arrangeable_from"] == "2026-02"
+
+
+def test_the_grid_never_starts_before_the_platform_does(client):
+    """A06. Bounded below, whatever a record says."""
+    affiliate = _register(client)
+    _joined(client, affiliate, "2025-06")
+
+    body = client.get(f"/api/affiliates/{affiliate['id']}/pay-history").json()
+
+    assert body["arrangeable_from"] == "2026-01"
+
+
+def test_without_a_recorded_start_the_first_sale_still_answers(client):
+    """A06. The old behaviour is the fallback, not the rule."""
+    affiliate = _register(client)
+    _sold(affiliate, "only-sale", "2026-04")
+
+    body = client.get(f"/api/affiliates/{affiliate['id']}/pay-history").json()
+
+    assert body["arrangeable_from"] == "2026-04"
+
+
+def test_a_salary_can_be_recorded_for_months_before_the_first_sale(client):
+    """A06, end to end. The case the editor could not express at all.
+
+    January and February on commission, March and April on a salary, and a
+    zero-sales month in between that still belongs to a run.
+    """
+    affiliate = _register(client)
+    _joined(client, affiliate, "2026-01")
+    _sold(affiliate, "march-sale", "2026-03")
+
+    written = client.put(
+        f"/api/affiliates/{affiliate['id']}/pay-history",
+        json={
+            "periods": [
+                {
+                    "start_month": "2026-01",
+                    "end_month": "2026-02",
+                    "compensation_type": "commission",
+                    "commission_rate_bp": 1000,
+                },
+                {
+                    "start_month": "2026-03",
+                    "end_month": "2026-04",
+                    "compensation_type": "fixed_plus_commission",
+                    "commission_rate_bp": 1000,
+                    "fixed_amount_piastres": 500_000,
+                },
+            ],
+            "outcomes": {},
+        },
+    )
+    assert written.status_code == 200, written.text
+
+    months = {row["month"]: row for row in written.json()["months"]}
+    assert months["2026-01"]["terms"]["compensation_type"] == "commission"
+    assert months["2026-02"]["terms"]["compensation_type"] == "commission"
+    # February has no orders and still carries the arrangement it was given.
+    assert months["2026-02"]["has_orders"] is False
+    assert months["2026-04"]["terms"]["fixed_amount_piastres"] == 500_000
+
+
+def test_writing_one_period_keeps_the_others(client):
+    """A06's preservation risk, as a route-level guarantee.
+
+    The route **replaces the whole history**, so whatever is sent is the
+    history. The screen used to send only the months at or after its start
+    month, which silently deleted anything before them while the success
+    message said unselected months were unchanged.
+
+    Sending the whole history keeps it. Sending half of it does not, and this
+    says so in both directions so the difference cannot be mistaken for a
+    route that merges.
+    """
+    affiliate = _register(client)
+    _joined(client, affiliate, "2026-01")
+    both = [
+        {
+            "start_month": "2026-01",
+            "end_month": "2026-02",
+            "compensation_type": "commission",
+            "commission_rate_bp": 1000,
+        },
+        {
+            "start_month": "2026-03",
+            "end_month": "2026-04",
+            "compensation_type": "fixed_plus_commission",
+            "commission_rate_bp": 1000,
+            "fixed_amount_piastres": 500_000,
+        },
+    ]
+    client.put(
+        f"/api/affiliates/{affiliate['id']}/pay-history",
+        json={"periods": both, "outcomes": {}},
+    )
+
+    # The whole history, with one period edited: everything survives.
+    edited = [dict(both[0]), {**both[1], "fixed_amount_piastres": 600_000}]
+    kept = client.put(
+        f"/api/affiliates/{affiliate['id']}/pay-history",
+        json={"periods": edited, "outcomes": {}},
+    )
+    assert kept.status_code == 200, kept.text
+    months = {row["month"]: row for row in kept.json()["months"]}
+    assert months["2026-01"]["terms"]["compensation_type"] == "commission"
+    assert months["2026-04"]["terms"]["fixed_amount_piastres"] == 600_000
+
+    # And the shape the screen used to send: the earlier period left out.
+    dropped = client.put(
+        f"/api/affiliates/{affiliate['id']}/pay-history",
+        json={"periods": [edited[1]], "outcomes": {}},
+    )
+    assert dropped.status_code == 200, dropped.text
+    months = {row["month"]: row for row in dropped.json()["months"]}
+    assert months["2026-01"]["terms"] is None, (
+        "the route replaces rather than merges, which is why the screen has to "
+        "send everything"
+    )

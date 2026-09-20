@@ -118,6 +118,69 @@ CLAUDE.md asks for. That check is outstanding for this batch.
 
 ---
 
-## A06, A08, A09, A11, A12
+## A06 — the terms editor started at the first sale, not the start
+
+### What it was
+
+Two defects behind one field.
+
+`_pay_history_payload` returned `joined_month` as `min(sold_in)` — the first
+month she **sold** in — and the editor used it as the first selectable month,
+falling back to the working month for a model who had never sold.
+
+For every model signed before she made a sale those are different months, and
+the gap between them is exactly where a salary belongs: there are no
+commissions in those months to stand in for one. A model who joined in January
+and first sold in March could not be given January or February pay at all. The
+grid did not offer them.
+
+Underneath that, a preservation risk the success message denied. `PUT
+/pay-history` **replaces** a model's whole history, so a period left out of the
+request is a period deleted — and the screen built its request from the months
+at or after its start month. Anything recorded before them was dropped, while
+the message afterwards read *unselected months are unchanged*. True of
+unselected months inside the slice; false of everything before it.
+
+### What it does now
+
+The server answers **which months are hers to arrange**, as
+`arrangeable_from`: her recorded collaboration start, floored at the
+platform's first month, falling back to the first sale and then to the working
+month so a model with neither still gets a grid rather than an empty one.
+
+Decided on the server rather than in the browser for the reason the money
+rules already are: a rule with two implementations is a rule with two answers.
+`joined_month` stays exactly as it was and keeps meaning what it says.
+
+The editor sends its **whole month list** to the replacement route, not the
+arrangeable slice. `fromServer` already reads every month the server sent, so
+the months before the start month are re-stated exactly as they were and
+survive the replace.
+
+### Evidence
+
+Six route tests in `tests/test_affiliates_api.py`: joined-January
+first-sold-March, a model who has never sold, a recorded start before the
+platform existed, no recorded start at all, the January/February commission
+into March/April salary case with a zero-sales month inside a run, and the
+preservation case.
+
+The last one asserts in **both** directions — sending the whole history keeps
+it, sending half of it does not — so the route's replace-don't-merge behaviour
+is written down rather than left as something the screen has to remember.
+
+Three library tests in `frontend/src/lib/__tests__/payHistory.test.ts` hold the
+reason the screen passes its whole list, including that a zero-sales month
+stays inside a run rather than splitting it.
+
+**Results:** frontend `tsc` clean, **331** tests, build green; backend
+`test_affiliates_api.py` 113, `test_compensation.py` 55,
+`test_browser_journey.py` 10.
+
+**Not verified in a browser.** Same gap as A02.
+
+---
+
+## A08, A09, A11, A12
 
 Not started.

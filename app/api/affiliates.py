@@ -1064,6 +1064,31 @@ def _pay_history_payload(db: Session, affiliate: AffiliateProfile) -> dict:
         # never sold, where there is no history to backfill and the screen
         # offers the one-arrangement form instead.
         "joined_month": min(sold_in) if sold_in else None,
+        # **The first month that is hers to arrange** (A06, H01/H04/H05).
+        #
+        # The editor used `joined_month` for this, which is the first month she
+        # *sold* in - and the two are different for every model who was signed
+        # before she made a sale. Somebody who joined in January and first sold
+        # in March could not be given January or February pay at all: the grid
+        # would not offer them, and a fixed salary for those months is exactly
+        # the arrangement that needs recording, because there are no
+        # commissions to stand in for it.
+        #
+        # Her collaboration start is the recorded answer to *when did she start
+        # with us*, so it is the one used. Floored at the platform's own first
+        # month because nothing before that is representable, and falling back
+        # to the first sale and then to the working month, so a model with
+        # neither still gets an arrangeable month rather than an empty grid.
+        #
+        # Decided here rather than in the browser: which months a person may
+        # arrange is a rule, and a rule with two implementations is a rule with
+        # two answers.
+        "arrangeable_from": max(
+            affiliate.collaboration_start_month
+            or (min(sold_in) if sold_in else None)
+            or working,
+            PLATFORM_START_MONTH,
+        ),
         "months": months,
         "periods": [_compensation_payload(row) for row in periods],
     }

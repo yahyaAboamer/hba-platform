@@ -33,6 +33,15 @@ function commission(rateBp = 1000): Arrangement {
   return { kind: "commission", rateBp, amountPiastres: 0, met: null };
 }
 
+function salary(fixed: number): Arrangement {
+  return {
+    kind: "fixed_plus_commission",
+    rateBp: 1000,
+    amountPiastres: fixed,
+    met: null,
+  };
+}
+
 function guarantee(met: boolean | null, base = 300_000): Arrangement {
   return {
     kind: "base_guarantee",
@@ -187,6 +196,7 @@ describe("fromServer", () => {
       working_month: "2026-09",
       go_live_month: "2026-08",
       joined_month: "2026-02",
+      arrangeable_from: "2026-02",
       periods: [],
       // `fromServer` reads the strip, not the verdict. Present because the
       // payload carries it, and deliberately empty: this test is about
@@ -242,5 +252,58 @@ describe("toBasisPoints", () => {
     expect(toBasisPoints("ten")).toBeNull();
     expect(toBasisPoints("10.005")).toBeNull();
     expect(toBasisPoints("-5")).toBeNull();
+  });
+});
+
+/**
+ * A06. What the pay-history route is handed is the history.
+ *
+ * `PUT /pay-history` **replaces** every arrangement a model has, so a period
+ * left out of the request is a period deleted. The editor built its request
+ * from the months at or after its own start month, which quietly dropped
+ * anything recorded before them — while the message it showed afterwards said
+ * *unselected months are unchanged*.
+ *
+ * This is the arithmetic of that, on its own, so the reason the screen now
+ * passes its whole month list cannot be edited away by somebody who reads the
+ * call and thinks the filter looks tidier.
+ */
+describe("what gets written when the route replaces everything", () => {
+  const january = month("2026-01");
+  const february = month("2026-02", { has_orders: false });
+  const march = month("2026-03");
+  const all = [january, february, march];
+  const set = {
+    "2026-01": commission(1000),
+    "2026-02": commission(1000),
+    "2026-03": salary(500_000),
+  };
+
+  it("keeps every arrangement when the whole history is sent", () => {
+    const written = periodsToWrite(all, set);
+
+    expect(written).toHaveLength(2);
+    expect(written[0]).toMatchObject({ from: "2026-01", to: "2026-02" });
+    expect(written[1]).toMatchObject({ from: "2026-03", to: "2026-03" });
+  });
+
+  it("loses the earlier arrangement when only part of it is sent", () => {
+    // The shape the screen used to send: months from its start month on.
+    const written = periodsToWrite(all.filter((row) => row.month >= "2026-03"), set);
+
+    expect(written).toHaveLength(1);
+    expect(written[0]).toMatchObject({ from: "2026-03", to: "2026-03" });
+    // January and February are simply absent, and the route deletes what is
+    // absent. That is the defect, stated as the reason for the line above it.
+  });
+
+  it("carries a zero-sales month inside a run rather than breaking it", () => {
+    // February has no orders and is still February's arrangement. A run that
+    // split around it would write two periods where somebody chose one.
+    expect(february.has_orders).toBe(false);
+    expect(periodsToWrite(all, set)[0]).toMatchObject({
+      from: "2026-01",
+      to: "2026-02",
+    });
   });
 });

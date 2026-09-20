@@ -76,7 +76,18 @@ export type PayHistory = {
   working_month: string;
   go_live_month: string | null;
   /** Her first month with an order. `null` for a model who has never sold. */
+  /** The first month she sold in — `null` for a model who never has. */
   joined_month: string | null;
+  /**
+   * The first month that is hers to arrange, decided by the server. A06.
+   *
+   * Her collaboration start, floored at the platform's first month, falling
+   * back to the first sale and then to the working month. **Not
+   * `joined_month`**, which is when she first sold: a model signed in January
+   * whose first sale was in March still has January and February to arrange,
+   * and a salary is exactly what those months need.
+   */
+  arrangeable_from: string;
   months: MonthRow[];
   periods: Terms[];
   readiness: Readiness;

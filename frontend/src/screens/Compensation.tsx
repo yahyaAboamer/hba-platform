@@ -108,9 +108,12 @@ export function Compensation() {
       .catch((caught) => setError(caught.message));
   }, [id]);
 
-  /** Her first month: the first she sold in, or the working month for a model
-   *  who never has. Nothing before it is hers to arrange. */
-  const startMonth = data ? data.joined_month ?? data.working_month : "";
+  /** Her first month, decided by the server: when she started with HBA, not
+   *  when she first sold (A06). A model signed in January whose first sale was
+   *  in March still has January and February to arrange — and a salary is
+   *  exactly what those months need, because there are no commissions in them
+   *  to stand in for one. */
+  const startMonth = data ? data.arrangeable_from : "";
   const arrangeable = useMemo(
     () => (data?.months ?? []).filter((row) => row.month >= startMonth),
     [data, startMonth],
@@ -213,8 +216,20 @@ export function Compensation() {
     setSaving(true);
     setError(null);
     try {
+      // **Every month she has, not the ones this screen lets you edit** (A06).
+      //
+      // The route replaces her whole pay history in one act, so what is sent
+      // is the history — anything left out of it is deleted. Sending only the
+      // arrangeable slice therefore quietly dropped terms recorded before the
+      // start month, while the message below promised the opposite: *unselected
+      // months are unchanged*. It was true of unselected months inside the
+      // slice and false of everything before it.
+      //
+      // `set` already holds every month the server sent, including those, so
+      // handing the whole list to `periodsToWrite` re-states them exactly as
+      // they were and the replacement keeps them.
       await api.put(`/api/affiliates/${id}/pay-history`, {
-        periods: periodsToWrite(arrangeable, next).map((run) => ({
+        periods: periodsToWrite(data.months, next).map((run) => ({
           start_month: run.from,
           end_month: run.to === data.working_month ? null : run.to,
           compensation_type: run.kind,
@@ -222,7 +237,7 @@ export function Compensation() {
           fixed_amount_piastres: run.kind === "fixed_plus_commission" ? run.amountPiastres : null,
           base_amount_piastres: run.kind === "base_guarantee" ? run.amountPiastres : null,
         })),
-        outcomes: outcomesFrom(arrangeable, next),
+        outcomes: outcomesFrom(data.months, next),
       });
       setSet(next);
       setSaved(
