@@ -52,6 +52,22 @@ def _go_live(monkeypatch):
     monkeypatch.setattr(settings, "go_live_month", GO_LIVE, raising=False)
 
 
+@pytest.fixture()
+def unlocked(monkeypatch):
+    """A09. Finalising is locked by default; these tests are about what it
+    does once somebody has checked the history and unlocked it.
+
+    Not autouse, deliberately - `test_finalising_is_locked_until_the_history_
+    is_checked` is the one that asserts the default, and an autouse fixture
+    would have quietly disabled the guard for the whole file.
+    """
+    from app.config import settings
+
+    monkeypatch.setattr(
+        settings, "historical_finalisation_unlocked", True, raising=False
+    )
+
+
 def _model(db, name="Nour", *, start="2026-03", terms=True, kind=CompensationType.COMMISSION, base=None):
     account = UserAccount(
         email=f"{name.lower()}@example.com",
@@ -110,7 +126,7 @@ def _order(db, affiliate, order_id, base, *, month):
 # -- What it finishes ---------------------------------------------------------
 
 
-def test_it_finalises_every_historical_month_that_can_be_calculated(db):
+def test_it_finalises_every_historical_month_that_can_be_calculated(db, unlocked):
     """March and April are hers, arranged, and before go-live."""
     affiliate = _model(db)
     _order(db, affiliate, "mar", 1_000_000, month="2026-03")
@@ -126,7 +142,7 @@ def test_it_finalises_every_historical_month_that_can_be_calculated(db):
     assert result["approved"][0]["obligation_piastres"] == 100_000
 
 
-def test_a_live_month_is_never_touched(db):
+def test_a_live_month_is_never_touched(db, unlocked):
     """The cut is go-live. May is the platform's own, and somebody agrees it
     by looking at it."""
     affiliate = _model(db)
@@ -142,7 +158,7 @@ def test_a_live_month_is_never_touched(db):
 # -- What it refuses to invent ------------------------------------------------
 
 
-def test_a_month_with_no_terms_is_reported_and_skipped(db):
+def test_a_month_with_no_terms_is_reported_and_skipped(db, unlocked):
     """The information does not exist, so no amount of code produces it.
 
     There is no default rate here and no nearest-arrangement guess. H02: never
@@ -161,7 +177,7 @@ def test_a_month_with_no_terms_is_reported_and_skipped(db):
     assert get_month(db, affiliate, "2026-03") is None
 
 
-def test_a_guarantee_with_no_recorded_outcome_is_reported_and_skipped(db):
+def test_a_guarantee_with_no_recorded_outcome_is_reported_and_skipped(db, unlocked):
     """F06. Unknown qualifying information blocks the decision; it does not
     read as a failure, and it is certainly not assumed to be a pass."""
     affiliate = _model(db, kind=CompensationType.BASE_GUARANTEE, base=300_000)
@@ -173,7 +189,7 @@ def test_a_guarantee_with_no_recorded_outcome_is_reported_and_skipped(db):
     assert {row["missing"][0] for row in result["blocked"]} == {"no_target_outcome"}
 
 
-def test_once_the_outcome_is_recorded_the_same_month_finalises(db):
+def test_once_the_outcome_is_recorded_the_same_month_finalises(db, unlocked):
     """The other half of the sentence above: the software was never the thing
     missing, and the moment a person supplies the fact it finishes."""
     affiliate = _model(db, kind=CompensationType.BASE_GUARANTEE, base=300_000)
@@ -193,7 +209,7 @@ def test_once_the_outcome_is_recorded_the_same_month_finalises(db):
 # -- What it never creates ----------------------------------------------------
 
 
-def test_no_payment_receipt_or_adjustment_is_created(db):
+def test_no_payment_receipt_or_adjustment_is_created(db, unlocked):
     """The approved result line promises this in as many words: *no receipts
     were created; months without an imported transfer stay marked as having
     none*.
@@ -213,7 +229,7 @@ def test_no_payment_receipt_or_adjustment_is_created(db):
     assert balance_for(db, affiliate, "2026-03")["balance_piastres"] == 0
 
 
-def test_it_sends_no_month_closed_notice(db):
+def test_it_sends_no_month_closed_notice(db, unlocked):
     """ADR 0036. Twenty-one models times eight months is a hundred and seventy
     mails announcing that a month closed - months that closed and were paid
     before the platform existed. `approve_month` suppresses them, and running
@@ -234,7 +250,7 @@ def test_it_sends_no_month_closed_notice(db):
 # -- Running it twice ---------------------------------------------------------
 
 
-def test_running_it_again_changes_nothing(db):
+def test_running_it_again_changes_nothing(db, unlocked):
     """Idempotent, which is what makes an interrupted run safe to finish.
 
     A timeout, a closed browser, a deploy mid-run: the repair is to press it
@@ -260,7 +276,7 @@ def test_running_it_again_changes_nothing(db):
     } == versions, "05B: an agreed month is never unmade, or restated"
 
 
-def test_a_half_finished_run_is_finished_by_running_it_again(db):
+def test_a_half_finished_run_is_finished_by_running_it_again(db, unlocked):
     """The interruption case, built rather than described.
 
     One model is arranged and one is not. The first run finalises what it can
@@ -318,3 +334,39 @@ def test_the_review_separates_what_is_ready_from_what_needs_a_person(db):
     assert plan["totals"]["ready"] == 2, "Nour's March and April"
     assert plan["totals"]["blocked"] == 2, "Sara's, waiting on her terms"
     assert plan["totals"]["models"] == 2
+
+
+# -- The operational lock -----------------------------------------------------
+
+
+def test_finalising_is_locked_until_the_history_is_checked(db):
+    """A09. The code is ready and the act is not, and those are different.
+
+    Approving on top of a partial order import freezes a figure that is simply
+    wrong, and 05B means an agreed month is never unmade - the mistake would
+    be permanent. So the act waits on two things the software cannot check
+    about itself: that the recorded starts, terms and outcomes match what HBA
+    agreed, and that the import for those months is complete.
+    """
+    from app.services.historical import FinalisationLocked
+
+    affiliate = _model(db)
+    _order(db, affiliate, "mar", 1_000_000, month="2026-03")
+
+    with pytest.raises(FinalisationLocked) as refused:
+        finalise_historical(db, working=WORKING)
+
+    assert "order import" in str(refused.value)
+    assert get_month(db, affiliate, "2026-03") is None, "nothing was approved"
+
+
+def test_the_review_is_never_locked(db):
+    """Finding out what is missing is how the first of those conditions gets
+    met. A check that needed permission to perform is a check nobody performs.
+    """
+    affiliate = _model(db)
+    _order(db, affiliate, "mar", 1_000_000, month="2026-03")
+
+    plan = historical_review(db, working=WORKING)
+
+    assert plan["totals"]["ready"] == 2

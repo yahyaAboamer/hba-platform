@@ -499,3 +499,16 @@
   font-size: 13px;
   line-height: 1.6;
 }
+
+/* The export puts this beside the review button, same height, plain border. */
+.settings__expand { margin: 14px 10px 0 0; }
+
+/* A09. The act is locked; the review is not. Amber, because it is a state
+   somebody has to resolve rather than a refusal or a success. */
+.settings__locked {
+  margin-top: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--owed);
+  border-radius: var(--radius-md);
+  color: var(--text);
+}

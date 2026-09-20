@@ -81,11 +81,12 @@ what was chosen.
 | [0039](0039-one-palette-across-both-halves.md) | One palette and one typeface across both halves | Accepted |
 | [0040](0040-a-pending-order-is-a-sale.md) | A pending order is a sale, and the carry becomes a backlog | Accepted |
 | [0041](0041-a-correction-settles-money-that-moved.md) | A correction settles money that moved; a balance is money that has not | Accepted; amends 0035 |
+| [0042](0042-the-payer-sees-the-whole-destination.md) | The payer sees the whole destination, without asking twice | Accepted; amends 0028 |
 
 **0014 is superseded by 0036** and **0038 by 0039**. **0027 keeps its
 principle and loses its mechanism to 0039**: an agreed figure is still set
 apart from a working one, but by weight and colour rather than by a second
-typeface. **0035 is amended by 0041 in a single clause**: an adjustment still
+typeface. **0028 is amended by 0042**: masking still governs every record, and the payer's own screen shows the whole destination, which is what the approved design always drew. **0035 is amended by 0041 in a single clause**: an adjustment still
 closes a difference and never opens a larger one, but a *credit* closes only an
 overpayment — carrying a difference forward recovers it in the month it is
 carried to, and reducing the source month as well recovers it twice. Each

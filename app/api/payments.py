@@ -53,6 +53,8 @@ from app.services.payroll import blockers_for, get_month, is_historical
 from app.services.payouts import (
     changed_recently,
     current_destination,
+    destination_card,
+    destination_line,
     mask_destination,
 )
 from app.services.proof import ProofRejected, readable_by, store_proof
@@ -124,7 +126,9 @@ def _render_balance(
     month: str,
     balance: dict,
     destination_changed_at=None,
+    may_pay: bool = False,
 ) -> dict:
+    here = current_destination(db, affiliate)
     row = {
         **balance,
         "affiliate_id": affiliate.id,
@@ -148,13 +152,23 @@ def _render_balance(
         # one of them in. Making them open a profile for it is how a transfer
         # goes to the previous destination.
         #
-        # The destination is **masked** by the same function the profile uses
-        # (ADR 0028): enough to recognise on a list of twenty. The copy button
-        # beside it asks for the real value through the audited reveal, gated
-        # on `payments.record`, so every number that reaches a clipboard is
-        # one somebody is recorded as having looked at.
+        # `destination` stays masked and stays on the row: it is what a
+        # marketing account sees, and it is the only form that may travel into
+        # a log or a notice (ADR 0028, which is unchanged about that).
         "terms": _terms_label(db, affiliate, month),
-        "destination": mask_destination(current_destination(db, affiliate)),
+        "destination": mask_destination(here),
+        # **The whole destination, for the person about to send the money.**
+        #
+        # The owner's approved design puts the real number on the row and the
+        # full details plus the submitted InstaPay link in the detail card,
+        # with no reveal step. ADR 0028 had put them behind an audited click;
+        # ADR 0042 records why that is overruled and what is kept.
+        #
+        # Only for `payments.record` - the permission ADR 0028 already chose
+        # for the reveal - so a marketing account reading the same screen
+        # still sees the masked form beside it.
+        "destination_line": destination_line(here) if may_pay else None,
+        "destination_card": destination_card(here) if may_pay else None,
     }
 
     # F14. An approved obligation is a debt; a forecast is still moving. The
@@ -244,7 +258,7 @@ def _all_open_corrections(db: Session) -> list[dict]:
 def outstanding(
     month: str,
     include_archived: bool = False,
-    _actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_VIEW)),
+    actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_VIEW)),
     db: Session = Depends(get_session),
 ) -> dict:
     """What is still owed for one month, per model.
@@ -261,6 +275,13 @@ def outstanding(
         for affiliate in list_affiliates(db, include_archived=include_archived)
         if affiliate.is_payable
     ]
+    # The same check the route guards make, through the same two functions -
+    # a second reading of "may this person pay" is a second answer waiting to
+    # disagree with the first.
+    from app.api.deps import active_role
+    from app.core.permissions import has_permission
+
+    may_pay = has_permission(active_role(db, actor), Permission.PAYMENTS_RECORD)
     rows = [
         _render_balance(
             db,
@@ -268,6 +289,7 @@ def outstanding(
             month,
             balance_for(db, affiliate, month),
             changed_recently(db, affiliate),
+            may_pay=may_pay,
         )
         for affiliate in affiliates
     ]

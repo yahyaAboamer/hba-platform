@@ -58,6 +58,24 @@ class Settings(BaseSettings):
     # point (§21, open question 1).
     go_live_month: str = ""
 
+    # **Historical finalisation is locked until somebody says the history is
+    # right.** A09.
+    #
+    # `finalise_historical` approves every pre-go-live month it can calculate.
+    # That is safe code and it is not a safe *act* until two things outside
+    # the platform are true: the recorded collaboration starts, terms and
+    # guarantee outcomes have been checked against what HBA actually agreed,
+    # and the order import for those months is known to be complete. Neither
+    # is a thing the software can verify about itself - approving on top of a
+    # partial import freezes a figure that is simply wrong, and 05B means an
+    # agreed month is never unmade.
+    #
+    # So the dry run stays open - it is how the gaps are found - and the act
+    # is refused until this is set deliberately, per environment. Blank blocks
+    # it, the same way a blank `go_live_month` blocks every approval, and for
+    # the same reason.
+    historical_finalisation_unlocked: bool = False
+
     # Shopify. Blank by default so the platform runs without it: health checks
     # and authentication must keep working on a machine with no credentials.
     shopify_shop_domain: str = ""

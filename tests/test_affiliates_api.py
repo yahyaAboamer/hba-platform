@@ -153,7 +153,6 @@ def test_writing_requires_authentication(anonymous):
         ("POST", "/api/affiliates/1/codes"),
         ("PUT", "/api/affiliates/1/pay-history"),
         ("PUT", "/api/affiliates/1/payout-destination"),
-        ("POST", "/api/affiliates/1/payout-destination/reveal"),
     ]:
         response = anonymous.request(method, path, json={})
         assert response.status_code == 401, path
@@ -1252,48 +1251,6 @@ def test_the_profile_shows_a_bank_account_masked(client):
     assert body["payout_destination"]["bank_account_holder"] == "Nour Abdelrahman"
 
 
-def test_revealing_gives_the_payer_the_real_number(client):
-    affiliate = _register(client)
-    _bank_destination(client, affiliate["id"])
-
-    response = client.post(
-        f"/api/affiliates/{affiliate['id']}/payout-destination/reveal"
-    )
-
-    assert response.status_code == 200, response.text
-    assert response.json() == {
-        "method": "bank",
-        "bank_name": "CIB",
-        "bank_account_holder": "Nour Abdelrahman",
-        "bank_account_number": "1000293847561234",
-    }
-
-
-def test_revealing_needs_the_permission_for_moving_money(client):
-    """`payments.record`, not `affiliates.view`. Reading a profile and sending
-    money are different acts, and only the second needs the number.
-    """
-    affiliate = _register(client)
-    _bank_destination(client, affiliate["id"])
-    _demote_to("affiliate")
-
-    response = client.post(
-        f"/api/affiliates/{affiliate['id']}/payout-destination/reveal"
-    )
-
-    assert response.status_code == 403
-
-
-def test_revealing_with_nothing_on_file_is_a_404(client):
-    affiliate = _register(client)
-
-    response = client.post(
-        f"/api/affiliates/{affiliate['id']}/payout-destination/reveal"
-    )
-
-    assert response.status_code == 404
-
-
 def test_changing_a_rate_is_one_call_that_either_happens_or_does_not(client):
     """What the pay screen has always claimed to do.
 
@@ -2159,3 +2116,30 @@ def test_writing_one_period_keeps_the_others(client):
         "the route replaces rather than merges, which is why the screen has to "
         "send everything"
     )
+
+
+def test_the_admin_reveal_route_is_gone(client):
+    """ADR 0042. The payer gets the whole destination on the screen, so the
+    route that used to hand it over on request has nothing left to do.
+
+    Removed rather than left in place: `test_reachability` refuses a
+    capability with no way in from the interface, and it refused this one the
+    moment the *Copy* button stopped calling it. A dead authenticated route is
+    exactly what that ratchet exists to catch.
+
+    **The model's own reveal is untouched.** `/api/me/payout-destination` is a
+    different route, for the person the number belongs to, and she still asks
+    for it deliberately.
+    """
+    affiliate = _register(client)
+
+    response = client.post(
+        f"/api/affiliates/{affiliate['id']}/payout-destination/reveal"
+    )
+
+    # 405 rather than 404: the router still owns the path prefix for the PUT
+    # that sets a destination, so FastAPI answers "not that method" rather
+    # than "no such path". Either way there is no POST behind it, which is
+    # the thing being asserted.
+    assert response.status_code in (404, 405)
+    assert response.status_code != 200

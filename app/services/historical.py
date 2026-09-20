@@ -82,9 +82,30 @@ __all__ = [
     "NO_TARGET_OUTCOME",
     "NO_TERMS",
     "TARGET_NOT_VERIFIED",
+    "FinalisationLocked",
     "finalise_historical",
     "historical_review",
 ]
+
+
+class FinalisationLocked(RuntimeError):
+    """The act is refused until the history itself has been checked. A09.
+
+    Two things have to be true before finalising is safe, and neither is
+    something the software can establish about itself:
+
+    1. The recorded collaboration starts, terms and guarantee outcomes match
+       what HBA actually agreed with each model.
+    2. The order import for those months is complete.
+
+    Approving on top of a partial import freezes a figure that is simply
+    wrong, and 05B means an agreed month is never unmade - so the mistake
+    would be permanent and would have to be corrected rather than fixed.
+
+    The **review** is not gated: finding out what is missing is how the first
+    of those gets done, and a check that required permission to perform would
+    be a check nobody performs.
+    """
 
 
 def _historical_months(
@@ -194,6 +215,17 @@ def finalise_historical(
     outcome comes back in `blocked` exactly as the review reported it, and no
     ledger row is written here at all.
     """
+    from app.config import settings
+
+    if not settings.historical_finalisation_unlocked:
+        raise FinalisationLocked(
+            "Historical finalisation is locked. Verify each model's recorded "
+            "start, terms and guarantee outcomes against what HBA agreed, and "
+            "confirm the order import for those months is complete, then set "
+            "HISTORICAL_FINALISATION_UNLOCKED on the environment being "
+            "finalised. The review below is open and needs no unlock."
+        )
+
     working = working or working_month()
     plan = historical_review(db, working=working)
 

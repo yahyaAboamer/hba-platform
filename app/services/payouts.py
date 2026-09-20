@@ -467,3 +467,119 @@ def reveal_destination(
         "method": destination.method,
         **{field: getattr(destination, field) for field in fields},
     }
+
+
+def destination_card(destination: PayoutDestination | None) -> dict | None:
+    """Where the money goes, in full, in the shape the approved design draws.
+
+    ## Why this exists beside `mask_destination`
+
+    ADR 0028 put the real values behind an audited reveal: a click, a POST, an
+    audit row, then the number. The reasoning was sound and the owner has
+    overruled it, explicitly and in writing - *follow my approved
+    payment-details design, including accessible full payment details and the
+    supplied InstaPay link.*
+
+    The approved export agrees with him in every particular. Its payments
+    table renders `"InstaPay · " + p.phone` - the whole number, on the row. Its
+    detail card carries **InstaPay number** and **Payment link, as submitted**
+    side by side, each with its own copy button, and an *Open InstaPay* link
+    under them. There is no reveal step anywhere in it.
+
+    The act this serves is somebody with a banking app open, working down a
+    list of twenty transfers. A number rendered `…291` cannot be typed, and
+    a click-to-reveal on every row is a click per transfer at the one moment
+    the screen exists to be fast.
+
+    ## What still holds
+
+    `mask_destination` is unchanged and is still the only thing that goes into
+    an audit row, a log, a notification or a change confirmation. This is for
+    the screen of the person sending the money and nothing else: the routes
+    that return it are gated on `payments.record`, which is the permission
+    ADR 0028 already chose for the reveal.
+
+    See ADR 0042, which records the decision and what was traded for it.
+    """
+    if destination is None:
+        return None
+
+    method = destination.method
+    if method == "instapay":
+        rows = [
+            {
+                "label": "InstaPay number",
+                "value": destination.instapay_phone,
+                "copy": "number",
+            },
+            {
+                "label": "Payment link, as submitted",
+                "value": destination.instapay_address_url,
+                "copy": "link",
+            },
+        ]
+        return {
+            "kind": "instapay",
+            "title": "InstaPay",
+            "rows": [row for row in rows if row["value"]],
+            # §13.1 collects a link rather than a number precisely because a
+            # phone hands it straight to the InstaPay app. This is that link,
+            # as she submitted it - never rebuilt from the number.
+            "link": destination.instapay_address_url,
+        }
+
+    if method == "wallet":
+        return {
+            "kind": "wallet",
+            "title": destination.wallet_provider or "Wallet",
+            "rows": [
+                {
+                    "label": "Wallet provider",
+                    "value": destination.wallet_provider,
+                    "copy": None,
+                },
+                {
+                    "label": "Wallet number",
+                    "value": destination.wallet_phone,
+                    "copy": "number",
+                },
+            ],
+            "link": None,
+        }
+
+    return {
+        "kind": "bank",
+        "title": destination.bank_name or "Bank transfer",
+        "rows": [
+            {"label": "Bank", "value": destination.bank_name, "copy": None},
+            {
+                "label": "Account holder",
+                "value": destination.bank_account_holder,
+                "copy": None,
+            },
+            {
+                "label": "Account number, as provided",
+                "value": destination.bank_account_number,
+                "copy": "account",
+            },
+        ],
+        "link": None,
+    }
+
+
+def destination_line(destination: PayoutDestination | None) -> str | None:
+    """One line naming where the money goes, as the approved table writes it.
+
+    `InstaPay · 010 7014 2033`, `Vodafone Cash · 010 …`, `Banque Misr · …` -
+    the export's `destinationLabel`, with the real value in it rather than a
+    mask. The person reading this row is the person about to send the money.
+    """
+    if destination is None:
+        return None
+    if destination.method == "instapay":
+        return f"InstaPay · {destination.instapay_phone or 'link only'}"
+    if destination.method == "wallet":
+        provider = destination.wallet_provider or "Wallet"
+        return f"{provider} · {destination.wallet_phone or ''}".strip(" ·")
+    bank = destination.bank_name or "Bank"
+    return f"{bank} · {destination.bank_account_number or ''}".strip(" ·")

@@ -12,8 +12,7 @@ import {
   formatEgp,
   formatMonth,
 } from "../lib/money";
-import { copyableDestination, describeDestination, PAY_TYPE } from "../lib/payouts";
-import type { Revealed } from "./PaymentRecord";
+import { describeDestination, PAY_TYPE } from "../lib/payouts";
 import "./Payments.css";
 
 export type SettlementState =
@@ -23,6 +22,21 @@ export type SettlementState =
   | "overpaid"
   | "not_approved"
   | "settled_externally";
+
+/**
+ * Where the money goes, in full, in the shape the approved design draws it.
+ *
+ * `rows` are label/value pairs in the order the design lists them; `copy`
+ * marks the one a banking app needs. `link` is the InstaPay payment address
+ * **as she submitted it** (§13.1) — a phone hands it straight to the app,
+ * which is the whole reason that field is collected as a link.
+ */
+export type DestinationCard = {
+  kind: "instapay" | "wallet" | "bank";
+  title: string;
+  rows: { label: string; value: string | null; copy: string | null }[];
+  link: string | null;
+};
 
 export type RequiredKind =
   | "approved"
@@ -38,6 +52,14 @@ export type Balance = {
   terms?: string | null;
   /** Masked on the server. Enough to recognise, never the full number. */
   destination?: Record<string, string | null> | null;
+  /**
+   * The destination as the approved table writes it — `InstaPay · 010 7014
+   * 2033`, in full. Present only for an account that may record payments;
+   * `null` otherwise, and the masked sentence is used instead. ADR 0042.
+   */
+  destination_line?: string | null;
+  /** The full details the approved payment card draws. ADR 0042. */
+  destination_card?: DestinationCard | null;
   month: string;
   state: SettlementState;
   payroll_snapshot_id?: number;
@@ -630,13 +652,18 @@ export function PaymentRow({
         )}
       </td>
       <td className="payments__destination">
-        {/* The same sentence her profile shows, from the same function — a
-         *  second way of writing a destination is a second way of writing it
-         *  wrong. Masked on the server before it ever reaches this list. */}
+        {/* **The real destination, on the row.** The approved export writes
+         *  `InstaPay · 010 7014 2033` here and the owner asked for exactly
+         *  that: the person reading this list is about to type it into a
+         *  banking app, and `…291` cannot be typed. The server sends it only
+         *  to somebody who may record payments; anybody else still gets the
+         *  masked sentence. ADR 0042. */}
         <span className="payments__where">
-          <span>{describeDestination(row.destination ?? null)}</span>
-          {row.destination && canRecord && (
-            <CopyDestination affiliateId={row.affiliate_id} />
+          <span>
+            {row.destination_line ?? describeDestination(row.destination ?? null)}
+          </span>
+          {row.destination_card && canRecord && (
+            <CopyDestination card={row.destination_card} />
           )}
         </span>
       </td>
@@ -674,25 +701,22 @@ export function PaymentRow({
  * being typed into a banking app. Retyping an account number off a screen is
  * the step where a digit goes missing.
  */
-function CopyDestination({ affiliateId }: { affiliateId: number }) {
+export function CopyDestination({ card }: { card: DestinationCard }) {
   const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
+  // The number itself, not the sentence around it: what gets pasted into a
+  // banking app has to be the value and nothing else. The row the design
+  // marks `copy` is the one that carries it.
+  const value =
+    card.rows.find((entry) => entry.copy === "number" || entry.copy === "account")
+      ?.value ?? card.rows[0]?.value ?? "";
   return (
     <button
       type="button"
       className="button button--quiet payments__copy"
       aria-label="Copy destination"
       onClick={async () => {
-        /*
-         * The list holds the masked form (ADR 0028), so *Copy* asks for the
-         * real value through the reveal - gated on recording payments, and
-         * written to the audit log - and copies only the number, not the
-         * sentence around it.
-         */
         try {
-          const revealed = await api.post<Revealed>(
-            `/api/affiliates/${affiliateId}/payout-destination/reveal`,
-          );
-          await navigator.clipboard.writeText(copyableDestination(revealed));
+          await navigator.clipboard.writeText(value);
           setState("copied");
         } catch {
           setState("failed");

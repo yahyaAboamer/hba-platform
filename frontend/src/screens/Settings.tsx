@@ -190,14 +190,20 @@ export function historicalState(row: SetupRow) {
   );
 }
 
+/** The export's Historical setup opens on eight and expands to the whole list. */
+const HISTORICAL_PREVIEW = 8;
+
 function SetupRoster({kind, session}: {kind: "model" | "house"; session?: Session}) {
   const [rows,setRows] = useState<SetupRow[] | null>(null);
   const [error,setError] = useState<string | null>(null);
+  const [expanded,setExpanded] = useState(false);
   useEffect(() => { let live = true; api.get<{affiliates:NonNullable<typeof rows>}>("/api/affiliates?include_archived=true")
     .then(body => { if(live) setRows(body.affiliates.filter(row => row.account_kind === kind)); })
     .catch(caught => { if(live) setError(caught.message); }); return () => {live=false;}; },[kind]);
   if(error) return <p className="notice notice--refused" role="alert">{error}</p>;
   if(!rows) return <p className="empty">Loading…</p>;
+  const shownRows =
+    kind === "model" && !expanded ? rows.slice(0, HISTORICAL_PREVIEW) : rows;
   return <section className="panel">
     <div className="panel__head"><h2 className="panel__title">{kind === "house" ? "Brand codes" : "Historical setup"}</h2></div>
     {/* The export's four columns for models — Model, Started, Earliest terms,
@@ -208,7 +214,7 @@ function SetupRoster({kind, session}: {kind: "model" | "house"; session?: Sessio
       <th>{kind === "house" ? "State" : "Earliest terms"}</th>
       {kind === "model" && <th>State</th>}
     </tr></thead>
-      <tbody>{rows.map(row => <tr key={row.id}>
+      <tbody>{shownRows.map(row => <tr key={row.id}>
         <td><Link to={`/affiliates/${row.id}`}>{kind === "house" ? row.code || "No code" : row.name}</Link></td>
         <td>{kind === "house" ? row.name : row.collaboration_start_month ? formatMonth(row.collaboration_start_month) : "Not recorded"}</td>
         <td>{kind === "house"
@@ -231,6 +237,14 @@ function SetupRoster({kind, session}: {kind: "model" | "house"; session?: Sessio
         </td>}
       </tr>)}</tbody></table>
     {rows.length === 0 && <p className="empty">No {kind === "house" ? "brand codes" : "models"}.</p>}
+    {/* The export opens this list on eight and offers the rest behind one
+        button — twenty models is a scroll past the thing you came here to
+        press. Only for models: brand codes are a handful. */}
+    {kind === "model" && !expanded && rows.length > HISTORICAL_PREVIEW && (
+      <button type="button" className="button settings__expand" onClick={() => setExpanded(true)}>
+        Show all {rows.length} models
+      </button>
+    )}
     {/* A09. The approved export puts the bulk review directly under this
         table - one panel, the list and the thing you do about it. */}
     {kind === "model" && session && <HistoricalReview session={session} />}

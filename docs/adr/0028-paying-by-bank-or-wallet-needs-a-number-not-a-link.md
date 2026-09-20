@@ -1,6 +1,9 @@
 # 0028 — Paying by bank or wallet needs a number, not a link
 
-**Status:** accepted, amended 2026-08-27, deep link verified 2026-08-27
+**Status:** accepted, amended 2026-08-27, deep link verified 2026-08-27;
+**the reveal step is superseded by
+[0042](0042-the-payer-sees-the-whole-destination.md)** — masking still governs
+every record, and the payer's own screen now shows the whole destination
 **Date:** 2026-08-26
 **Amends:** spec §13.1 (InstaPay details), §14 (Payments and proof)
 **Related:** [0017](0017-proof-is-shown-to-the-affiliate.md), §6.4 (payout destination changes)

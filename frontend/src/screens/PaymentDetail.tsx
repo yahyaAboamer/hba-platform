@@ -9,11 +9,9 @@ import {
   describeDestination,
   destinationHolder,
   PAY_TYPE,
-  PAYOUT_FIELD_LABEL,
 } from "../lib/payouts";
 import type { Balance } from "./Payments";
 import { paymentRowPresentation, STATE_PILL } from "./Payments";
-import type { Revealed } from "./PaymentRecord";
 import "./PaymentDetail.css";
 
 type Statement = {
@@ -133,8 +131,6 @@ export function PaymentDetail({ session }: { session: Session }) {
   const [error, setError] = useState<string | null>(null);
   const [approving, setApproving] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
-  const [revealed, setRevealed] = useState<Revealed | null>(null);
-  const [revealing, setRevealing] = useState(false);
 
   const load = useCallback(() => {
     setError(null);
@@ -207,19 +203,6 @@ export function PaymentDetail({ session }: { session: Session }) {
    * when - and a record made every time the page opens would record
    * browsing rather than intent.
    */
-  async function reveal() {
-    setRevealing(true);
-    setError(null);
-    try {
-      setRevealed(
-        await api.post<Revealed>(`/api/affiliates/${affiliateId}/payout-destination/reveal`),
-      );
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not read it.");
-    } finally {
-      setRevealing(false);
-    }
-  }
 
   function copy(label: string, value: string) {
     navigator.clipboard?.writeText(value).then(
@@ -281,17 +264,8 @@ export function PaymentDetail({ session }: { session: Session }) {
         ? "Settled amount"
         : "Estimated amount";
   const destination = balance.destination ?? null;
-  const destinationRows: [string, string | null | undefined, boolean][] = revealed
-    ? [
-        ["InstaPay payment address", revealed.instapay_address_url, true],
-        ["InstaPay number", revealed.instapay_phone, true],
-        ["Bank", revealed.bank_name, false],
-        [PAYOUT_FIELD_LABEL.bank_account_holder, revealed.bank_account_holder, false],
-        [PAYOUT_FIELD_LABEL.bank_account_number, revealed.bank_account_number, true],
-        ["Wallet provider", revealed.wallet_provider, false],
-        ["Wallet number", revealed.wallet_phone, true],
-      ]
-    : [];
+  // Present only for an account that may record payments. ADR 0042.
+  const card = balance.destination_card ?? null;
 
   return (
     <>
@@ -446,61 +420,55 @@ export function PaymentDetail({ session }: { session: Session }) {
                     {balance.name} before sending anything.
                   </p>
                 )}
-                {revealed === null ? (
+                {/* **The full details, without a reveal step** (ADR 0042).
+                 *
+                 *  The owner's approved design draws this card with the real
+                 *  values in it - InstaPay number, the payment link as she
+                 *  submitted it, and an *Open InstaPay* button - and asked for
+                 *  exactly that. The server sends the card only to an account
+                 *  that may record payments; anybody else sees the shortened
+                 *  sentence and is told why. */}
+                {card ? (
                   <>
-                    <p className="pay-detail__dest-summary">{describeDestination(destination)}</p>
-                    {can(session, "payments.record") ? (
-                      <>
-                        <button
-                          type="button"
-                          className="button button--row pay-detail__reveal"
-                          disabled={revealing}
-                          onClick={reveal}
-                        >
-                          {revealing ? "Reading…" : "Show where to send it"}
-                        </button>
-                        <p className="pay-detail__faint">
-                          Shortened everywhere else on purpose. Showing it is
-                          recorded — who looked, and when.
-                        </p>
-                      </>
-                    ) : (
-                      <p className="pay-detail__faint">
-                        Only somebody who records payments can see the full details.
-                      </p>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    {destinationRows
-                      .filter(([, value]) => value)
-                      .map(([label, value, copyable]) => (
-                        <div key={label} className="pay-detail__dest">
+                    {card.rows
+                      .filter((entry) => entry.value)
+                      .map((entry) => (
+                        <div key={entry.label} className="pay-detail__dest">
                           <span className="pay-detail__dest-text">
-                            <span className="pay-detail__dest-label">{label}</span>
-                            <span className="pay-detail__dest-value">{value}</span>
+                            <span className="pay-detail__dest-label">{entry.label}</span>
+                            <span className="pay-detail__dest-value">{entry.value}</span>
                           </span>
-                          {copyable && (
+                          {entry.copy && (
                             <button
                               type="button"
                               className="button button--quiet"
-                              onClick={() => copy(label, value ?? "")}
+                              onClick={() => copy(entry.label, entry.value ?? "")}
                             >
-                              {copied === label ? "Copied" : "Copy"}
+                              {copied === entry.label ? "Copied" : "Copy"}
                             </button>
                           )}
                         </div>
                       ))}
-                    {revealed.instapay_address_url && (
+                    {card.link && (
+                      /* §13.1 collects a link rather than a number because a
+                         phone hands it straight to the InstaPay app. This is
+                         that link, as submitted - never rebuilt. */
                       <a
                         className="button pay-detail__instapay"
-                        href={revealed.instapay_address_url}
+                        href={card.link}
                         target="_blank"
                         rel="noreferrer noopener"
                       >
                         Open InstaPay
                       </a>
                     )}
+                  </>
+                ) : (
+                  <>
+                    <p className="pay-detail__dest-summary">{describeDestination(destination)}</p>
+                    <p className="pay-detail__faint">
+                      Only somebody who records payments can see the full details.
+                    </p>
                   </>
                 )}
               </>

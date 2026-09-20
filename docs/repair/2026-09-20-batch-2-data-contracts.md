@@ -627,3 +627,124 @@ to say *this history is not available yet*.
 exactly with `--collect-only`; the runner exited **0**. **Frontend 357 tests
 across 16 files, `npm run build` green** — the build is the typecheck here, for
 the reason recorded in CLAUDE.md.
+
+---
+
+# Third pass: the payment details, the roster, and a visual review
+
+## Your payment-details design, followed
+
+> Follow my approved payment-details design, including accessible full payment
+> details and the supplied InstaPay link. Earlier internal decisions do not
+> override my explicit requirements.
+
+Done, and **[ADR 0042](../adr/0042-the-payer-sees-the-whole-destination.md)**
+records that the earlier decision was overruled and what it cost.
+
+The payments row now reads `InstaPay · 010 1234 5678` — the whole number, as
+the export's `destinationLabel` writes it. The payment detail draws the
+export's `destinationCard`: **InstaPay number** and **Payment link, as
+submitted**, each with its own copy button, and an **Open InstaPay** button
+under them. No reveal step anywhere.
+
+The link is the payment address **as she submitted it** (§13.1) and is never
+rebuilt from the number — a phone hands that link straight to the InstaPay
+app, which is the whole reason the field is collected as a link.
+
+**What is kept from the old rule.** `mask_destination` is untouched and is
+still the only form allowed in an audit row, a log, a notice or a change
+confirmation. The full values are served only where `payments.record` holds —
+the same permission the reveal used — so marketing reads the same screen and
+still sees the masked sentence.
+
+**What it costs**, stated in the ADR rather than buried: the audit no longer
+records who looked at a destination. That trail is gone; the permission and
+the audit of recording a payment remain.
+
+**Two follow-ons the change forced.** The destination column truncated
+`InstaPay · 010 7014 2033` at 210px where the export shows it whole — widened
+to 262px, because since ADR 0042 that string is the thing somebody types into
+a banking app and an ellipsis in the middle of it is the one place it must not
+appear. And `test_reachability` failed the moment *Copy* stopped calling the
+admin reveal route: a capability with no way in from the interface is exactly
+what that ratchet catches, so the route is **removed**. The model's own
+reveal, which she asks for deliberately, is untouched.
+
+## Roster expansion
+
+The **Models** roster already paginated to the export's rule — twelve a page,
+`1–12 of 20`, Previous/Next, pager hidden below thirteen. That one was not
+missing.
+
+**Settings → Historical setup** was: the export opens it on eight with a
+*Show all 20 models* button, and ours listed everybody. Added.
+
+## Historical finalisation is now blocked operationally
+
+> Keep real historical finalisation blocked operationally until we have
+> verified that information and order completeness.
+
+`finalise_historical` refuses unless `HISTORICAL_FINALISATION_UNLOCKED` is set
+on the environment being finalised, and the route answers **409** with the
+checklist. Verified against the running app: review `200`, finalise `409`.
+
+The **review is never locked** — finding out what is missing is how the first
+condition gets met, and a check that needed permission to run is a check
+nobody runs. The screen carries the lock in an amber panel above the review.
+
+The list of what is needed from you is its own file:
+**[`docs/repair/HISTORICAL-INFORMATION-NEEDED.md`](../HISTORICAL-INFORMATION-NEEDED.md)**.
+
+## The visual review, and what it actually covered
+
+### Viewport control, solved
+
+The browser tool's own `resize_window` reports success and changes nothing: it
+never restores a maximised window first. `docs/repair/batch-2/set-viewport.ps1`
+does that through Win32 and then converges on the width, and **1280 and 1440
+were both achieved and verified** by reading `innerWidth` in the page.
+
+### What was compared, at a verified 1280
+
+| Screen | Result |
+|---|---|
+| Admin Home | Matches: three notices, three business cards, *Top three* and *Content progress* below |
+| Payments | Matches: three totals, filter chips with the count after the label, five columns, name-over-arrangement rows, second line under the amount |
+| Payment detail | Matches the export's `destinationCard` exactly, including *Open InstaPay* |
+
+### What still differs
+
+- **Destination masking on long values.** A 16-digit bank number still
+  truncates — but so does the export's (`Orange Money · 010 516…`). Matching
+  behaviour; nothing to fix.
+- **The seeded InstaPay number differs between our capture and the export's**
+  (`010 1234 5678` vs `010 7014 2033`). Fixture data, not a difference.
+
+### What was not done, and why
+
+**A complete sweep of every page, subtab and popup at 1280, 1440 and 390 was
+not completed.** The automation drives the Chrome window that is also in use
+on this machine, and the window is restored to its previous size between
+operations — so a verified 1280 capture is followed by a 1600 one a moment
+later, and every capture needs the window re-set and the tab re-created.
+Interactive clicks reset it immediately, and their coordinate frame does not
+match the page's, so popups could not be driven reliably at a known width.
+
+Specifically missing:
+
+- **1440 was verified as achievable but nothing was captured at it.**
+- **390 is not reachable at all this way**: Chrome's minimum window width is
+  about 500px. The portal was therefore not captured at its approved phone
+  width. An iframe harness behind a header-stripping local proxy would do it
+  and was not built.
+- Products, Targets, the remaining Settings subtabs, and every popup —
+  record-payment, correction, invite, approval — are uncaptured.
+
+`set-viewport.ps1` is the working tool for finishing this on a machine where
+the browser is not in use.
+
+## Results
+
+**Backend 2,032 collected, 2,032 passed, 0 failed, all 79 files**, reconciling
+exactly with `--collect-only`; runner exit 0. **Frontend 357 tests, build
+green.**

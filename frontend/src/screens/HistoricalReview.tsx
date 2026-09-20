@@ -37,6 +37,13 @@ export type HistoricalReviewBody = {
   refused?: (HistoricalMonth & { reason: string })[];
   summary: string;
   approved_total: string;
+  /**
+   * A09. Whether this environment may finalise at all. The review is always
+   * available — it is how the gaps get found — and the **act** waits until
+   * somebody has checked the recorded history against what HBA agreed and
+   * confirmed the order import for those months is complete.
+   */
+  finalisation_unlocked?: boolean;
   totals: {
     models?: number;
     ready?: number;
@@ -125,7 +132,19 @@ export function HistoricalReview({ session }: { session: Session }) {
       {/* The button the approved export puts here, in its words. It is only
           drawn when there is something to do: an entry that does nothing is
           worse than no entry, because somebody presses it. */}
-      {done === undefined && ready > 0 && allowed && (
+      {/* Locked, and the checklist is the message: what has to be true
+          before the act is safe, not merely that it is switched off. */}
+      {done === undefined && ready > 0 && body.finalisation_unlocked === false && (
+        <p className="settings__note settings__locked" role="status">
+          <strong>Finalising is locked on this environment.</strong> Before it
+          is unlocked, each model's recorded start, terms and guarantee
+          outcomes need checking against what HBA agreed, and the order import
+          for these months needs confirming as complete. Until then this list
+          is a review only.
+        </p>
+      )}
+
+      {done === undefined && ready > 0 && allowed && body.finalisation_unlocked !== false && (
         <button
           type="button"
           className="button button--primary"

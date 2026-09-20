@@ -63,6 +63,16 @@ payroll without touching a maintainer screen.
   before writing. It locks the *affiliate* row rather than a month because
   approval and `resolve` need the same two month rows in opposite orders, and
   one lock has no order to get wrong. It re-reads on the way in.
+- **The payer sees the whole destination** (ADR 0042, amending 0028). The
+  approved design puts the real number on the payments row and the full
+  details plus the submitted InstaPay link on the detail card, with no reveal
+  step - the owner asked for that explicitly. `mask_destination` still governs
+  every *record*: audit rows, logs, notices, change confirmations. The full
+  values go only where `payments.record` holds.
+- **Historical finalisation is locked** until `HISTORICAL_FINALISATION_UNLOCKED`
+  is set on that environment. The *review* is never locked - it is how the
+  gaps are found. What HBA must supply first is listed in
+  `docs/repair/HISTORICAL-INFORMATION-NEEDED.md`.
 - **Append-only tables stay append-only**: `payroll_snapshot`,
   `payment_transaction`, `payment_allocation`, `payroll_adjustment`,
   `payout_destination`, `policy_version`. Guarded by triggers.
@@ -73,7 +83,7 @@ payroll without touching a maintainer screen.
 
 ## Where the reasoning lives
 
-- **`docs/adr/`** — 41 ADRs. The index is generated from the files. 0014 is
+- **`docs/adr/`** — 42 ADRs. The index is generated from the files. 0014 is
   superseded by 0036; 0027 is amended by 0038; **0035 is amended by 0041**, in
   one clause — a *write-off* closes a debt and a *credit* does not.
 - **`docs/limits.md`** — every failure met, what it looked like from outside,
@@ -116,7 +126,7 @@ payroll without touching a maintainer screen.
   the background. Two against the same database deadlock and leak committed
   rows into each other, and the failures look exactly like a real regression
   in whatever you just changed. Also on 10 September, and it cost an hour.
-- Backend: `.venv/Scripts/python.exe -m pytest -q` — **1997 passing**, and no
+- Backend: `.venv/Scripts/python.exe -m pytest -q` — **2032 passing**, and no
   change merges below that. It takes 5–15 minutes; run it in the background.
 - **If the suite is killed for low memory, make the groups smaller — and keep
   a record so a kill costs one group, not the run.** One pytest process grows
@@ -197,7 +207,7 @@ payroll without touching a maintainer screen.
 
   Then empty the database and re-run the file alone. Happened 10 September and
   cost the best part of an hour.
-- Frontend: `cd frontend && npm test` (347), `npx tsc --noEmit` and
+- Frontend: `cd frontend && npm test` (357), `npx tsc --noEmit` and
   `npm run build`.
 - **`npm run build` is the typecheck; `npx tsc --noEmit` is not.** The root
   `tsconfig.json` is a solution file — nothing but `references` — so bare
@@ -206,6 +216,16 @@ payroll without touching a maintainer screen.
   20 September `tsc --noEmit` passed a JSX syntax error and an import of a type
   that does not exist; `npm run build` caught both. Run the build before
   believing a green typecheck.
+- **Real viewport widths need `docs/repair/batch-2/set-viewport.ps1`.** The
+  browser tool's `resize_window` reports success and changes nothing: Chrome
+  keeps a maximised window maximised and the extension never restores it
+  first. That script does the restore through Win32 and converges on the
+  width; 1280 and 1440 both work, verified by reading `innerWidth` in the
+  page. **Chrome's minimum window width is about 500px**, so a 390 phone
+  viewport cannot be had this way at all. And when the automation shares a
+  Chrome window that somebody is using, the window is restored between
+  operations - verify `innerWidth` in the same batch as every screenshot, and
+  name the file for the width you actually got.
 - **A browser session is now possible.** Yahya signs in himself at
   `https://hba-platform-staging-staging.up.railway.app/sign-in` and the session
   is then usable for the rest of the conversation - ask for it rather than

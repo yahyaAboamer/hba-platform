@@ -157,7 +157,12 @@
 
 .payments__destination,
 .table th.payments__destination {
-  width: 210px;
+  /* The export's own destination cell is 210px and its text 148px, leaving
+     room for Copy. Ours is a table cell with padding on both sides, so 210
+     truncated `InstaPay · 010 7014 2033` where the export shows it whole -
+     and since ADR 0042 that string is the thing somebody is about to type,
+     an ellipsis in the middle of it is the one place it must not appear. */
+  width: 262px;
 }
 
 .payments__state,

@@ -1022,36 +1022,6 @@ def test_a_recorded_destination_is_masked_in_their_history(client):
     assert "nour-abdelrahman" not in str(body)
 
 
-def test_the_month_end_desk_masks_the_destination(client):
-    """ADR 0028, held on the busiest screen that shows a destination.
-
-    The desk lists twenty of them, so it shows enough to recognise and no
-    more. The real value - what somebody is about to type into a banking app -
-    comes through the reveal, which is gated on `payments.record` and writes
-    an audit row, so every number that reaches a clipboard is one somebody is
-    recorded as having looked at. An earlier change sent the whole value to
-    the list and lost that record; this is what keeps it from happening again.
-    """
-    affiliate = _affiliate(client)
-    client.put(
-        f"/api/affiliates/{affiliate['id']}/payout-destination",
-        json={
-            "method": "instapay",
-            "instapay_address_url": "https://ipn.eg/nour-abdelrahman-2291",
-        },
-    )
-    _owed(client, affiliate)
-
-    rows = client.get(f"/api/payments/{AUGUST}").json()["affiliates"]
-    row = next(r for r in rows if r["affiliate_id"] == affiliate["id"])
-    revealed = client.post(
-        f"/api/affiliates/{affiliate['id']}/payout-destination/reveal"
-    ).json()
-
-    assert "nour-abdelrahman-2291" not in str(row["destination"])
-    assert "nour-abdelrahman-2291" in str(revealed)
-
-
 def test_a_model_may_not_read_the_month_end_desk(client):
     """Which is what makes the line above it safe."""
     _affiliate(client)
@@ -1310,3 +1280,90 @@ def test_a_forecast_month_reports_the_transfer_not_the_gross_earnings(client):
     # And the agreed figures stay where an unapproved month puts them.
     assert row["obligation_piastres"] == 0
     assert row["balance_piastres"] == 0
+
+
+# ── ADR 0042: the payer sees the whole destination ────────────────────────────
+
+
+def _instapay(affiliate_id: int) -> None:
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO payout_destination (affiliate_id, method, "
+                "instapay_address_url, instapay_phone, created_at) "
+                "VALUES (:a, 'instapay', :u, :p, now())"
+            ),
+            {
+                "a": affiliate_id,
+                "u": "https://ipn.eg/S/nour/instapay/1111",
+                "p": "01001234567",
+            },
+        )
+
+
+def test_the_payments_row_carries_the_whole_destination(client):
+    """ADR 0042. The owner's approved design puts the real number on the row.
+
+    `InstaPay · 010 7014 2033` is what the export writes, and `…4567` is what
+    the old masking wrote. A number rendered with dots cannot be typed into a
+    banking app, which is what this screen exists to precede.
+    """
+    affiliate = _affiliate(client, "Nour", "nour-dest@example.com")
+    _instapay(affiliate["id"])
+
+    row = client.get(f"/api/payments/{AUGUST}").json()["affiliates"][0]
+
+    assert row["destination_line"] == "InstaPay · 01001234567"
+    # The masked form is still on the row beside it - it is what a log or a
+    # notice may carry, and ADR 0028 is unchanged about that.
+    assert row["destination"]["instapay_phone"] != "01001234567"
+
+
+def test_the_detail_card_carries_the_link_she_submitted(client):
+    """ADR 0042 and §13.1. The link, not a number turned into one.
+
+    A phone hands an InstaPay payment address straight to the app, which is
+    the entire reason that field is collected as a link rather than rebuilt
+    from the number.
+    """
+    affiliate = _affiliate(client, "Nour", "nour-card@example.com")
+    _instapay(affiliate["id"])
+
+    card = client.get(f"/api/payments/{AUGUST}").json()["affiliates"][0][
+        "destination_card"
+    ]
+
+    assert card["kind"] == "instapay"
+    assert card["title"] == "InstaPay"
+    assert [row["label"] for row in card["rows"]] == [
+        "InstaPay number",
+        "Payment link, as submitted",
+    ]
+    assert card["rows"][0]["value"] == "01001234567"
+    assert card["rows"][1]["value"] == "https://ipn.eg/S/nour/instapay/1111"
+    assert card["link"] == "https://ipn.eg/S/nour/instapay/1111"
+
+
+def test_an_account_that_cannot_pay_sees_neither(client):
+    """ADR 0042 keeps ADR 0028's gate: `payments.record`, and nothing wider.
+
+    Marketing reads the same screen. It gets the masked sentence and no card,
+    which is the whole of what changed - who sees it did not.
+    """
+    affiliate = _affiliate(client, "Nour", "nour-gate@example.com")
+    _instapay(affiliate["id"])
+
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "UPDATE role_assignment SET role = 'content_manager' "
+                "WHERE user_account_id = 1 AND revoked_at IS NULL"
+            )
+        )
+
+    row = client.get(f"/api/payments/{AUGUST}").json()["affiliates"][0]
+
+    assert row["destination_line"] is None
+    assert row["destination_card"] is None
+    # And the masked form is still there, so the screen still says where it goes.
+    assert row["destination"]["method"] == "instapay"

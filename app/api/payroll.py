@@ -632,8 +632,13 @@ def _render_historical(result: dict) -> dict:
             f" {totals['blocked']} still {verb} information HBA has not "
             "recorded yet."
         )
+    from app.config import settings
+
     return {
         **result,
+        #: A09. Whether finalising is permitted on this environment at all.
+        #: The review is always available - it is how the gaps are found.
+        "finalisation_unlocked": settings.historical_finalisation_unlocked,
         "summary": line,
         "approved_total": format_egp(
             sum(row.get("obligation_piastres", 0) for row in result.get("approved", []))
@@ -669,10 +674,17 @@ def finalise_historical_route(
     `approve_month` as any other, and ADR 0036 already makes the result
     unpayable.
     """
-    from app.services.historical import finalise_historical
+    from app.services.historical import FinalisationLocked, finalise_historical
 
-    result = finalise_historical(
-        db, actor_id=actor.id, actor_email=actor.email
-    )
+    try:
+        result = finalise_historical(
+            db, actor_id=actor.id, actor_email=actor.email
+        )
+    except FinalisationLocked as locked:
+        # 409, not 403: the account is allowed, the platform is not ready.
+        # A09 - the history itself has to be checked first, and no permission
+        # substitutes for that.
+        db.rollback()
+        raise HTTPException(409, str(locked)) from locked
     db.commit()
     return _render_historical(result)
