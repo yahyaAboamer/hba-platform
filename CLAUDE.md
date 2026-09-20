@@ -144,6 +144,18 @@ payroll without touching a maintainer screen.
   itself now; a slice that starts clean is the difference between a phantom
   failure and a real one.
 
+  **A disposable database says so inside itself, and the runner refuses any
+  that does not.** It terminates every connection and truncates every table, so
+  an exported `DATABASE_URL` cannot be the only thing between here and staging
+  — an environment variable is exactly what goes wrong, which is what emptied
+  the dev data on 10 September. The designation is a row in
+  `hba_test_guard.designation`, written once by hand into a database somebody
+  has decided is throwaway; it survives both `empty_the_database` (truncates
+  only `public`) and `_rebuild_schema` (drops only `public`). Nothing creates it
+  automatically. The refusal message carries the SQL. Exit codes: `0` green and
+  finished, `1` a file failed, `2` refused and nothing touched, `3` cleanup
+  failed and nothing ran, `4` budget exhausted with files left — call it again.
+
   One file per process is the floor, and resumable, which is what makes it
   the one to fall back to. **Record pytest's exit status, not a tail of its
   output**, and skip only what passed:
