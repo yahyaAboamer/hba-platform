@@ -1373,7 +1373,19 @@ def test_a_historical_month_counts_its_orders_the_same_way(admin, monkeypatch):
     # R3. The same shape as any other month, counted the same way: what she
     # sold is not a question the platform answers differently either side of
     # go-live.
-    assert body["orders"] == {"earned": 1, "pending": 1, "void": 1, "counted": 2}
+    # A08 added `uses` to this shape, and all three orders are uses: the
+    # helper leaves `delivery_state` unresolved, and D03 counts an order the
+    # courier has not answered for. A use is a delivery outcome and the three
+    # counts beside it are commission states, so the void order appearing in
+    # one and not the other is the distinction working rather than a
+    # miscount.
+    assert body["orders"] == {
+        "earned": 1,
+        "pending": 1,
+        "void": 1,
+        "counted": 2,
+        "uses": 3,
+    }
     assert body["sales"]["counted_piastres"] == 140_000
     assert body["sales"]["earned_piastres"] == 100_000
     assert body["sales"]["pending_piastres"] == 40_000
@@ -2275,3 +2287,110 @@ def test_best_sellers_rank_by_what_the_customer_paid(admin):
 
     assert [row["shopify_product_id"] for row in rows] == ["BIG", "SMALL"]
     assert rows[1]["quantity"] == 5
+
+
+# ── A08: the Uses chart had no field to read ──────────────────────────────────
+
+
+def _delivery(order_id: str, state: str | None) -> None:
+    """What the courier did, which is not what the commission did."""
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "UPDATE order_index SET delivery_state = :s "
+                "WHERE shopify_order_id = :i"
+            ),
+            {"s": state, "i": order_id},
+        )
+
+
+def test_the_year_carries_the_code_uses_its_chart_asks_for(admin):
+    """A08. Home said 37 uses; the Uses tab said the history was unavailable.
+
+    `PortalYearChart` reads `row.uses` and `my_year` returned `orders` and
+    nothing else, so the chart had a metric with no field behind it. Both
+    figures are hers and they must be the same figure.
+    """
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"])
+    _order(affiliate["id"], "delivered", 400_000, month=AUGUST)
+    _order(affiliate["id"], "travelling", 600_000, month=AUGUST, state="pending")
+    _delivery("delivered", "delivered")
+    _delivery("travelling", None)
+
+    portal = _sign_in()
+    august = next(
+        m for m in portal.get("/api/me/year").json()["months"] if m["month"] == AUGUST
+    )
+    card = portal.get(f"/api/me/earnings/{AUGUST}").json()
+
+    assert august["uses"] == 2
+    assert august["uses"] == card["orders"]["uses"], (
+        "the chart and the card above it are the same fact"
+    )
+
+
+def test_a_use_is_a_delivery_outcome_not_a_commission_state(admin):
+    """A08, D03. Pending and delivered count; a refused parcel does not.
+
+    And it is **not** the order count renamed. An order that was delivered and
+    then failed to earn anything is still a use, so the two figures diverge on
+    purpose — which is why the repair had to be its own field rather than an
+    alias.
+    """
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"])
+    _order(affiliate["id"], "delivered", 400_000, month=AUGUST)
+    _order(affiliate["id"], "travelling", 600_000, month=AUGUST, state="pending")
+    _order(affiliate["id"], "refused", 500_000, month=AUGUST, state="void")
+    _delivery("delivered", "delivered")
+    _delivery("travelling", None)
+    _delivery("refused", "failed")
+
+    august = next(
+        m
+        for m in _sign_in().get("/api/me/year").json()["months"]
+        if m["month"] == AUGUST
+    )
+
+    # Two uses: the parcel that arrived and the one still travelling.
+    assert august["uses"] == 2
+    # Two counted orders as well here - but not for the same reason, and the
+    # next test is the one where they part company.
+    assert august["orders"] == 2
+
+
+def test_an_order_that_arrived_and_earned_nothing_is_still_a_use(admin):
+    """A08. The case that proves `uses` cannot be `orders` under a new name."""
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"])
+    _order(affiliate["id"], "refunded", 400_000, month=AUGUST, state="void")
+    _delivery("refunded", "delivered")
+
+    august = next(
+        m
+        for m in _sign_in().get("/api/me/year").json()["months"]
+        if m["month"] == AUGUST
+    )
+
+    assert august["uses"] == 1, "it arrived, so her code was used"
+    assert august["orders"] == 0, "and it pays nothing, so it counts for nothing"
+
+
+def test_a_month_with_no_orders_reports_no_uses_rather_than_nothing(admin):
+    """A08. Zero is an answer; absent is not.
+
+    The chart draws `null` as *Not available*, which is right for something it
+    cannot know and wrong for a quiet month. A month she has is a month it can
+    count.
+    """
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"])
+    _order(affiliate["id"], "july", 100_000, month="2026-07")
+
+    months = _sign_in().get("/api/me/year").json()["months"]
+
+    for row in months:
+        assert row["uses"] is not None, f"{row['month']} could be counted"
+    july = next(m for m in months if m["month"] == "2026-07")
+    assert july["uses"] == 1

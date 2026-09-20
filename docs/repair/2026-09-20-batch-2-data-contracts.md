@@ -181,6 +181,62 @@ stays inside a run rather than splitting it.
 
 ---
 
-## A08, A09, A11, A12
+## A08 — the Uses chart had no field to read
+
+### What it was
+
+Model Home showed **37 uses**. Selecting *Uses* on the chart beside it showed
+*Not available · this history is not available yet*.
+
+Neither was broken. `PortalYearChart` reads `row.uses`; `my_year` returned
+`orders` and no `uses` at all, and `ChartMonth` declared the field
+**optional** — so nothing in the type system, the tests or the build had
+anything to object to. The chart had a metric with no field behind it.
+
+### What it does now
+
+`my_year` carries `uses`, taken from the month card's own figure rather than
+computed a second way. The historical branch of `my_month` carries it too: her
+code uses are a fact about her orders, and her orders are in the index either
+side of go-live — only the commission was agreed elsewhere (ADR 0014). That
+branch was returning "—" for a month it could answer perfectly well.
+
+`ChartMonth.uses` is now **required**. `null` still means genuinely unknown
+and still draws *Not available*; what it can no longer mean is that nobody
+wired it up.
+
+### Not the order count renamed
+
+The audit was explicit about this and it is the part worth stating. A **use**
+is a delivery outcome (D03): every attributed order except one whose delivery
+failed, including an order the courier has not answered for yet. The three
+counts beside it are **commission** states.
+
+So they part company in both directions. An order delivered and later refunded
+is a use and pays nothing. A parcel refused at the door is neither. Aliasing
+one to the other would have drawn a chart that disagreed with the card above
+it.
+
+### Evidence
+
+Four route tests in `tests/test_portal_api.py`: the year and the card
+reporting the same figure, pending-and-delivered counting while a refused
+parcel does not, the delivered-and-refunded order that is a use and not a
+counted order, and a quiet month reporting zero rather than nothing.
+
+One existing test was corrected rather than deleted:
+`test_a_historical_month_counts_its_orders_the_same_way` now expects `uses` in
+that shape, with the reasoning written in — all three of its orders are uses
+because their delivery is unresolved, while only two are counted orders, and
+that divergence is the distinction working.
+
+**Results:** frontend `tsc` clean, **331** tests, build green; backend
+`test_portal_api.py` 93, `test_earnings_api.py` 24, `test_performance.py` 36.
+
+**Not verified in a browser.** Same gap as A02 and A06.
+
+---
+
+## A09, A11, A12
 
 Not started.

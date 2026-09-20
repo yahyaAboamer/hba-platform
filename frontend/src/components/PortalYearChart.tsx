@@ -2,7 +2,18 @@ import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { formatEgp, formatMonth } from "../lib/money";
 
-export type ChartMonth = { month: string; sales_piastres: number | null; uses?: number | null; in_progress: boolean };
+/**
+ * A08. `uses` is **required**, and that is the point of writing it this way.
+ *
+ * It used to be optional, so `my_year` not sending it was not a mistake any
+ * tool could see: Home read *37 uses* from the month card while the Uses tab
+ * beside it said *this history is not available yet*, and both were behaving
+ * exactly as written.
+ *
+ * `null` still means genuinely unknown and still draws "Not available". What
+ * it can no longer mean is *nobody wired it up*.
+ */
+export type ChartMonth = { month: string; sales_piastres: number | null; uses: number | null; in_progress: boolean };
 export function chartPoints(values: (number | null)[]) {
   const max = Math.max(1, ...values.filter((v): v is number => v !== null && Number.isFinite(v)));
   return values.map((value, index) => value === null || !Number.isFinite(value) ? null : {

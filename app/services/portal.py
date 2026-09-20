@@ -625,6 +625,12 @@ def my_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
                 "pending": len(travelling),
                 "void": len(gone),
                 "counted": len(counted) + len(travelling),
+                # A08. **The same figure a month after go-live gets.** Her code
+                # uses are a fact about her orders, and her orders are in the
+                # index either side of the line - only the commission was
+                # agreed elsewhere (ADR 0014). Leaving it out here made the
+                # card say "—" for a month it could answer perfectly well.
+                "uses": uses_for(db, affiliate, month),
             },
             "amount_piastres": None,
             "amount": None,
@@ -1405,6 +1411,19 @@ def my_year(db: Session, affiliate: AffiliateProfile) -> dict:
                 "sales_piastres": figures["sales"]["counted_piastres"],
                 "sales": figures["sales"]["counted"],
                 "orders": figures["orders"]["counted"],
+                # A08. **The chart asked for this and nothing sent it.** Home
+                # said *37 uses* and the Uses tab beside it said *this history
+                # is not available yet*, because `my_year` returned `orders`
+                # and the chart reads `uses`.
+                #
+                # It is the month card's own figure, not a second count: a use
+                # is a **delivery** outcome (D03) and the order counts beside
+                # it are *commission* states, so an order delivered and later
+                # refunded is a use and pays nothing, while a parcel refused at
+                # the door is neither. Renaming `orders` would have drawn a
+                # chart that disagreed with the card above it in both
+                # directions at once.
+                "uses": figures["orders"].get("uses"),
             }
         )
 
