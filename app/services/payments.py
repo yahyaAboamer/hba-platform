@@ -30,7 +30,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.businesstime import parse_month, utcnow
-from app.models.affiliates import AffiliateProfile
+from app.models.affiliates import AffiliateProfile, AffiliateStatus
 from app.models.payments import (
     AdjustmentType,
     PaymentAllocation,
@@ -43,6 +43,52 @@ from app.services.audit import record_audit
 from app.services.payments_state import SettlementState
 from app.services.payouts import current_destination, mask_destination
 from app.services.payroll import get_month, is_historical, open_month
+
+
+def on_the_desk(
+    db: Session, month: str, *, include_archived: bool = False
+) -> list[AffiliateProfile]:
+    """Who the payments desk is about, for one month.
+
+    **One rule, used by the screen and by the badge above it.** The badge
+    counts *awaiting approval*; the screen lists it. They were computed
+    separately, and the moment the screen's rule changed the sidebar said 22
+    where the desk showed 19 - the "second answer waiting to disagree" that
+    the counts route's own docstring warns about, arriving by exactly the
+    route it predicted.
+
+    Three exclusions, and the approved export has all three:
+
+    - **A house code** has real sales and no payee (`is_payable`).
+    - **An application** is not on the programme yet. The export lists
+      `participants(month)`, and `rosterModels()` is `status !== "application"`.
+      Somebody who applied and has not been taken on is owed nothing by
+      construction, and listing her as *Terms missing* puts her in the
+      awaiting-approval count for a month she was not part of.
+    - **A month before she started.** The export's `started(m, month)`. A
+      model taken on in November has no September, and a September row reading
+      *Terms missing* asks somebody to fix something that is not broken.
+
+    An **unknown** start is not a no. `collaboration_from` returns `None` when
+    nobody has recorded one and no order has arrived, and a model in that
+    state is precisely the one somebody needs to see and set up.
+
+    Inactive models stay. An old obligation does not leave with them.
+    """
+    from app.services.affiliates import list_affiliates
+    from app.services.setup import collaboration_from
+
+    kept = []
+    for affiliate in list_affiliates(db, include_archived=include_archived):
+        if not affiliate.is_payable:
+            continue
+        if affiliate.status == AffiliateStatus.PENDING:
+            continue
+        first = collaboration_from(db, affiliate)
+        if first is not None and first > month:
+            continue
+        kept.append(affiliate)
+    return kept
 
 
 def allocated_to(db: Session, snapshot: PayrollSnapshot) -> int:
@@ -73,13 +119,13 @@ def allocated_to_month(db: Session, payroll_month: PayrollMonth) -> int:
     the right question for a version and the wrong one for a bank account.
 
     After a reopen the two diverge, and the platform reported the wrong one.
-    August was agreed at E£760 and paid in full; more orders arrived; it was
-    reopened and agreed again at E£1,060. The payment screen then said **still
-    owed E£1,060** - because nothing had been allocated to version 2 - when they
-    had already received E£760 and was genuinely owed E£300.
+    August was agreed at EGP 760 and paid in full; more orders arrived; it was
+    reopened and agreed again at EGP 1,060. The payment screen then said **still
+    owed EGP 1,060** - because nothing had been allocated to version 2 - when they
+    had already received EGP 760 and was genuinely owed EGP 300.
 
-    Paying what that screen said would have sent E£1,820 for a month worth
-    E£1,060.
+    Paying what that screen said would have sent EGP 1,820 for a month worth
+    EGP 1,060.
 
     Both facts still exist and are still separate: a payment stays attached to
     the version it settled (§11.5), and this sums what actually left the bank
@@ -168,10 +214,10 @@ def adjusted_against(
     still to send.
 
     Subtracting the first from the second charged one difference twice. August
-    agreed at E£2,000 with E£1,000 sent and E£200 carried into September
-    reported E£800 left to send; September then paid E£200 less as well, so HBA
-    kept the E£200 twice and she was paid E£1,800 against an agreement of
-    E£2,000. Absorbing had the mirror fault: HBA "taking the loss" came
+    agreed at EGP 2,000 with EGP 1,000 sent and EGP 200 carried into September
+    reported EGP 800 left to send; September then paid EGP 200 less as well, so HBA
+    kept the EGP 200 twice and she was paid EGP 1,800 against an agreement of
+    EGP 2,000. Absorbing had the mirror fault: HBA "taking the loss" came
     straight out of what HBA still owed her, which is not a loss being taken.
 
     So the caller says which question it is asking. `SETTLES_AN_EXCESS` closes
@@ -196,7 +242,7 @@ def adjusted_against(
     A `release` is not a settlement of its own: it **un-applies** a credit its
     destination could not take. So it is netted out of any total that counts
     credits, and appears in no total that does not. Without that, an overpaid
-    August that carried E£500 into an October agreed at nothing would read as
+    August that carried EGP 500 into an October agreed at nothing would read as
     settled - the credit counted, the release that undid it ignored, and a
     recovery that bounced reported as complete.
     """
@@ -227,8 +273,8 @@ def credited_into(db: Session, payroll_month: PayrollMonth) -> int:
     R1. A carry is accepted against a month **before** that month is agreed,
     on what it is worth at the time, and the month can be agreed lower. What
     it could not take is released back to the source correction, and this nets
-    those releases out - otherwise a month agreed at E£100 carrying a E£200
-    credit would report itself E£100 overpaid on a transfer that never
+    those releases out - otherwise a month agreed at EGP 100 carrying a EGP 200
+    credit would report itself EGP 100 overpaid on a transfer that never
     happened.
     """
     applied = int(
@@ -347,7 +393,7 @@ def balance_for(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
     # forgiving a *debt* reduces what is owed. Subtracting in both cases -
     # which is what this did - pushes an already-overpaid month further into
     # overpayment, so every press of "settle the difference" doubled it: a
-    # real overpayment of E£257 was reported as E£5,074.
+    # real overpayment of EGP 257 was reported as EGP 5,074.
     #
     # **And the two sides do not take the same adjustments** (F2). A month
     # that is still owed money is reduced only by `FORGIVES_A_DEBT` - the
@@ -643,7 +689,7 @@ def allocate(
     """Apply part of an existing transfer to an agreed figure.
 
     The database refuses an allocation that would take the total past the
-    transfer, because *"we allocated E£12,000 of a E£10,000 transfer"* has to be
+    transfer, because *"we allocated EGP 12,000 of a EGP 10,000 transfer"* has to be
     impossible rather than caught in review.
     """
     if piastres <= 0:

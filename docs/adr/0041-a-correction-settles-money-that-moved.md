@@ -14,17 +14,17 @@ mocked ledger totals and got an answer nobody had intended:
 
 | | |
 |---|---|
-| August, agreed and frozen | E£2,000 |
-| Transferred | E£1,000 |
-| Correction carried into September | E£200 |
-| **What August still owed** | **E£800** |
+| August, agreed and frozen | EGP 2,000 |
+| Transferred | EGP 1,000 |
+| Correction carried into September | EGP 200 |
+| **What August still owed** | **EGP 800** |
 
-August was agreed at E£2,000 and E£1,000 had been sent, so E£1,000 was still
-to send. The screen said E£800.
+August was agreed at EGP 2,000 and EGP 1,000 had been sent, so EGP 1,000 was still
+to send. The screen said EGP 800.
 
-The E£200 is then recovered a second time, in September, where the credit
-lands and that month is paid E£200 less. HBA keeps it twice and she is paid
-E£1,800 against an agreement of E£2,000 — without anybody reopening the month,
+The EGP 200 is then recovered a second time, in September, where the credit
+lands and that month is paid EGP 200 less. HBA keeps it twice and she is paid
+EGP 1,800 against an agreement of EGP 2,000 — without anybody reopening the month,
 which 05B retired precisely so that an agreed figure could not quietly move.
 
 Absorbing had the mirror-image fault. *HBA takes the loss* reduced the money

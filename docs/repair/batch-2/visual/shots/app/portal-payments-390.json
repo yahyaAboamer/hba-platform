@@ -1,0 +1,52 @@
+{
+ "runs": [
+  "← Back",
+  "Payments",
+  "NOTHING OUTSTANDING",
+  "EGP 0.00",
+  "Every month HBA has closed has been paid in full.",
+  "Going to",
+  "InstaPay · …291",
+  "Change where I am paid",
+  "Month by month",
+  "HBA paid you for the months up to January 2026 before this page existed, so those payments are not listed here. What you earned in them is on your Earnings and Year screens.",
+  "August 2026",
+  "EGP 13,010.00",
+  "paid",
+  "Recorded payments",
+  "August 2026",
+  "EGP 13,010.00",
+  "Recorded 23 September 2026 · INSTA-0001",
+  "Sent to InstaPay · …291",
+  "Why August 2026 came to EGP 13,010.00"
+ ],
+ "headings": [
+  "Month by month",
+  "Recorded payments"
+ ],
+ "buttons": [
+  "← Back",
+  "Change where I am paid",
+  "Why August 2026 came to EGP 13,010.00"
+ ],
+ "labels": [],
+ "money": [
+  "EGP 0.00",
+  "EGP 13,010.00"
+ ],
+ "heading": {
+  "family": "Inter",
+  "size": "13px",
+  "weight": "600",
+  "colour": "rgb(236, 239, 234)"
+ },
+ "body": {
+  "family": "Inter",
+  "size": "15px",
+  "weight": "400",
+  "colour": "rgb(236, 239, 234)"
+ },
+ "background": "rgb(8, 9, 10)",
+ "scrollHeight": 844,
+ "clientHeight": 844
+}

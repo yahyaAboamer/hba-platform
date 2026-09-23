@@ -69,7 +69,7 @@ export function SalesByMonth({
       {/*
        * The axis labels sit **inside** the plot rather than in a gutter to
        * its left. The export can put them outside because its sample figures
-       * are three characters wide; ours are the server's full `E£63,235.70`,
+       * are three characters wide; ours are the server's full `EGP 63,235.70`,
        * which at this scale is wider than the whole gutter and spilled off
        * the card's left edge. Inside, anchored to the start, it fits at any
        * length and still reads as the top of the scale.

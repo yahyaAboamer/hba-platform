@@ -32,7 +32,7 @@ one, so the audit trail shows both what was calculated and what was paid.
 
 HBA absorbs a sub-pound difference on every payout. Half-up pays fractionally
 more about as often as fractionally less, so it averages to approximately zero -
-on the order of E£90 a year across the whole programme, which is not worth the
+on the order of EGP 90 a year across the whole programme, which is not worth the
 complexity of carrying remainders between months.
 
 `round()` must never be reintroduced. A test asserts both of the built-in's

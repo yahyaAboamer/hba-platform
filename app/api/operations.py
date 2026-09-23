@@ -638,15 +638,16 @@ def counts(
     it is the screen's.
     """
     from app.models.affiliates import AffiliateProfile
-    from app.services.affiliates import list_affiliates
-    from app.services.payments import balance_for
+    from app.services.payments import balance_for, on_the_desk
 
     month = business_month(utcnow())
+    # **The same people the desk lists**, through the same function. Counting
+    # every payable affiliate here instead put 22 on the badge above a screen
+    # showing 19, which is the disagreement the paragraph above predicted.
     awaiting = sum(
         1
-        for affiliate in list_affiliates(db)
-        if affiliate.is_payable
-        and balance_for(db, affiliate, month)["state"] == "not_approved"
+        for affiliate in on_the_desk(db, month)
+        if balance_for(db, affiliate, month)["state"] == "not_approved"
     )
 
     return {
@@ -744,6 +745,32 @@ def attention(
             "/settings",
             "Open settings",
             "Until it is set, no month can be agreed and no model can be paid.",
+        )
+
+    # -- People waiting to be let in -----------------------------------------
+    #
+    # **The export's first notice, and the app had no such notice at all.**
+    # `2 applications awaiting review / Submitted through the invitation link.
+    # / Open applications`. Somebody who applied through an invitation link is
+    # waiting on a person, and nothing else on Home said so: the roster's
+    # *Applications 2* chip is only seen by somebody who already went looking.
+    #
+    # ATTENTION rather than BLOCKING. Nobody is owed money and no month is
+    # held up; a person is waiting, which is a different kind of urgent.
+    waiting = db.execute(
+        text(
+            "SELECT count(*) FROM affiliate_profile "
+            "WHERE status = 'pending' AND account_kind <> 'house'"
+        )
+    ).scalar()
+    if waiting:
+        add(
+            "applications_waiting",
+            ATTENTION,
+            f"{waiting} application{_s(waiting)} awaiting review.",
+            "/affiliates?segment=applications",
+            "Open applications",
+            "Submitted through the invitation link.",
         )
 
     # -- Mail ----------------------------------------------------------------

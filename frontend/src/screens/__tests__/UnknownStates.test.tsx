@@ -24,7 +24,7 @@ const earnings = (over: Partial<MyEarnings> = {}): MyEarnings =>
     month: "2026-08",
     state: "approved",
     amount_piastres: 200_000,
-    amount: "E£2,000.00",
+    amount: "EGP 2,000.00",
     makeup: [],
     ...over,
   }) as MyEarnings;

@@ -180,7 +180,7 @@ export function Corrections({
               {/*
                * F09. The difference is real and none of it is recoverable,
                * because nothing was ever sent. Said here rather than shown as
-               * a recoverable E£0.00 beside a button that refuses.
+               * a recoverable EGP 0.00 beside a button that refuses.
                */}
               {row.review_reason === "no_transfer_recorded" && (
                 <span className="corrections__review">

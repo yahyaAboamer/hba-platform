@@ -118,7 +118,7 @@ class AttributedOrder(Base):
 
     #: Total the customer pays, minus shipping, minus tax (§9.3, ADR 0011).
     #: BigInteger because piastres are 100x the pound figure and a 32-bit
-    #: column overflows at about E£21 million.
+    #: column overflows at about EGP 21 million.
     commission_base_piastres: Mapped[int] = mapped_column(
         BigInteger, nullable=False, server_default="0"
     )

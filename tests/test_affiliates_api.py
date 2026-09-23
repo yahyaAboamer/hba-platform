@@ -572,6 +572,16 @@ def test_an_instapay_destination_without_an_address_is_refused(client):
 
 
 def test_the_current_destination_shows_up_masked_on_the_affiliate(client):
+    """`payout_destination` is masked. ADR 0028, and 0042 did not touch it.
+
+    This asserted that the real address appeared **nowhere** in the payload,
+    which was right under 0028 and is wrong under 0042: the profile now also
+    carries `payout_destination_card`, with the whole destination in it, for a
+    reader who may send money. The masked field is still the masked field -
+    it is what a log, a notice or a change confirmation may carry - and that
+    is what this test is about. Who may see the card is
+    `test_a_profile_reader_who_cannot_pay_sees_no_card`.
+    """
     affiliate = _register(client)
     client.put(
         f"/api/affiliates/{affiliate['id']}/payout-destination",
@@ -583,7 +593,7 @@ def test_the_current_destination_shows_up_masked_on_the_affiliate(client):
     body = client.get(f"/api/affiliates/{affiliate['id']}").json()
     assert body["payout_destination"] is not None
     assert body["payout_destination"]["method"] == "instapay"
-    assert "nour.mahmoud" not in str(body)
+    assert "nour.mahmoud" not in str(body["payout_destination"])
 
 
 def test_setting_a_destination_for_an_unknown_affiliate_is_404(client):

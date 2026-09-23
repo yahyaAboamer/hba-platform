@@ -307,12 +307,18 @@ reached. Nothing else is a legitimate difference.
 
 ## Blockers
 
-**Every portal row is built and none has been seen on screen.** Checking one
-means signing in as a model, and doing that in this browser signs the admin
-out of the session the maintainer screens were verified in. What is needed is
-a second browser profile signed in as a test model, or word that signing the
-admin out here is fine. Until then the D and E rows say *visual check
-blocked*, and they are not claimed as verified.
+**~~Every portal row is built and none has been seen on screen.~~ Cleared,
+23 September 2026.** The blocker was that signing in as a model signs the
+admin out of the same browser. `docs/repair/batch-2/visual/` drives a headless
+Chromium with a **browser context per role**, so the two sessions coexist and
+neither disturbs the other - and it reaches 390, which window sizing could
+not, because Chrome will not make a window narrower than about 500px.
+
+Nine portal screens and thirty admin screens now have matched pairs in
+`docs/repair/batch-2/visual/shots/`. **What that sweep did not do is both
+themes**: every capture is in the default one - dark for the portal, light for
+the maintainer. A row wanting `Visually verified` by this file's own
+definition still needs the second theme.
 
 The docker-compose test database that stopped on 15 September was restarted
 the same day; the full suite has run since.
@@ -322,3 +328,10 @@ the same day; the full suite has run since.
 Screenshots live in `docs/redesign/parity/shots/`, named
 `<view>-<width>-<theme>-{ref,app}.png`. A row may not reach
 `Visually verified` without a matched pair in that directory.
+
+**And in `docs/repair/batch-2/visual/shots/`**, named `<screen>-<width>.png`
+under `app/` and `export/`, with a JSON digest beside each - every visible
+line, every control label, every money string, the typeface and the colour.
+`compare.mjs` diffs the digests, which is what finds a renamed tab or a
+heading that lost its unit; a screenshot pair on its own finds neither.
+`CHECKLIST.md` beside them is the reading of that diff, one row per screen.

@@ -1,0 +1,71 @@
+{
+ "runs": [
+  "9:41",
+  "Y",
+  "Yahya Aboamer",
+  "HBA ambassador · HBA15",
+  "Nov",
+  "▼",
+  "November 2026",
+  "in progress",
+  "Your earnings so far",
+  "EGP 680.00",
+  "Net sales counted",
+  "EGP 6,800.00",
+  "Code uses",
+  "2",
+  "1 delivered",
+  "1 pending",
+  "0 failed delivery",
+  "Your year",
+  "2026",
+  "Sales",
+  "Uses",
+  "November 2026",
+  "EGP 6,800.00",
+  "net sales counted",
+  "How this adds up",
+  "→",
+  "Expected payment",
+  "After the month closes",
+  "Usually recorded around 3 December 2026.",
+  "Payment history →",
+  "Home",
+  "Orders",
+  "Wardrobe",
+  "Targets",
+  "Ranking"
+ ],
+ "headings": [],
+ "buttons": [
+  "Y",
+  "Nov▼",
+  "Sales",
+  "Uses",
+  "How this adds up→",
+  "Payment history →",
+  "Home",
+  "Orders",
+  "Wardrobe",
+  "Targets",
+  "Ranking"
+ ],
+ "labels": [
+  "Sales",
+  "Uses"
+ ],
+ "money": [
+  "EGP 6,800.00",
+  "EGP 680.00"
+ ],
+ "heading": null,
+ "body": {
+  "family": "Inter",
+  "size": "15px",
+  "weight": "400",
+  "colour": "rgb(236, 239, 234)"
+ },
+ "background": "rgb(8, 9, 10)",
+ "scrollHeight": 844,
+ "clientHeight": 844
+}

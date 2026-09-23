@@ -39,7 +39,7 @@ const transfer = (allocations: { month: string; piastres: number }[]) => ({
 describe("which month a receipt belongs to", () => {
   it("shows the part of the transfer that settled this month", () => {
     // One transfer covering two months, which §14 explicitly allows. The
-    // receipt for August is the August part, not the whole E£3,000.
+    // receipt for August is the August part, not the whole EGP 3,000.
     const match = receiptFor(
       transfer([
         { month: "2026-08", piastres: 100_000 },
@@ -52,7 +52,7 @@ describe("which month a receipt belongs to", () => {
   });
 
   it("refuses to claim a transfer for a month it never settled", () => {
-    // The defect: this used to return the transfer's full E£3,000 and the
+    // The defect: this used to return the transfer's full EGP 3,000 and the
     // page titled it July.
     const match = receiptFor(
       transfer([

@@ -748,3 +748,151 @@ the browser is not in use.
 **Backend 2,032 collected, 2,032 passed, 0 failed, all 79 files**, reconciling
 exactly with `--collect-only`; runner exit 0. **Frontend 357 tests, build
 green.**
+
+---
+
+# A03 — the complete visual and interaction review, 23 September 2026
+
+The sweep the last report said was not done. It is done now, in a browser of
+its own: **69 paired screenshots**, every admin screen at 1280 *and* 1440 and
+every model screen at 390, plus eight interaction checks that change something
+and read it back.
+
+## Why it works now and did not before
+
+The previous attempt drove the Chrome window somebody was using. It produced
+real captures and said so honestly, and it could not be made into a sweep:
+the window is restored between operations, clicking resets it, and **Chrome
+will not make a window narrower than about 500px**, so 390 — the width the
+whole model-facing half is designed for — was unreachable.
+
+Playwright launches its own headless Chromium. No window is opened, restored
+or resized, the user's browser is never touched, and the viewport is exactly
+the number in the config. 390 is a number.
+
+`playwright-core@1.58.0` **exactly**, installed outside the repository and
+pointed at by `PLAYWRIGHT=`: it is the version whose Chromium revision 1208 is
+already in this machine's cache, so the review needed no download, and it is
+not a dependency of a frontend that does not ship it.
+
+## What the comparison actually compares
+
+The export draws its app inside a fixed frame — `.ad` at 1280×900 or 1440×900,
+`.pt` at 390×844 — with its **review toolbar outside that frame**.
+Screenshotting the frame element excludes the toolbar by construction rather
+than by cropping, and gives the app the same content area to fill. The frame's
+width is asserted before the shutter.
+
+Each capture also writes a digest: every visible line via `innerText`, every
+control label, every money string, the typeface and colour. `compare.mjs`
+diffs those. **That is what found nearly everything below** — a renamed tab or
+a heading that lost its unit is invisible at a glance and obvious in a set
+difference.
+
+Two false findings from the first version of the digest are worth recording,
+because both would have been reported as differences: it joined an element's
+own text children with a space, so the app's `{a}–{b} of {c}` came back as
+`1 – 12 of 19` against the export's single string `1–12 of 19`, and `Open
+{{ monthLabel }} in Payments →` came back as `Open in Payments →`. `innerText`
+renders what the browser renders; neither survived the change.
+
+## The data
+
+`docs/repair/batch-2/visual/seed_browser.py` seeds the export's own cast —
+the twenty-two people in its `MODELS`, with their names, codes, arrangements
+and requirement counts — into a database that refuses to be anything but
+`hba_browser*`. Five models was the right size for building a screen and the
+wrong size for reviewing one: the roster's pager only appears above twelve.
+
+**One thing cannot match.** The export is set in November 2026 and the platform
+runs on the real clock. Every start month is shifted so each model stands the
+same distance from the working month as her counterpart, but the month
+*labels* differ by two.
+
+## What was wrong, and is now fixed
+
+**Currency, on every screen.** `E£1,062.00` where the approved design writes
+`EGP 1,062.00` — with the space and a U+2212 minus, which is the export's
+`egp()` character for character. Both formatters changed, and a test now holds
+them to the same examples so they cannot drift apart again.
+
+**Home had no *applications awaiting review* notice** — the export's first
+one. Two people who applied through an invitation link were waiting and
+nothing on Home said so.
+
+**The payments desk listed applications.** The export lists
+`participants(month)`; ours listed every non-house affiliate, so applicants
+appeared as *Terms missing* and **the sidebar badge read 22 over a list of
+19**. That is the "second answer waiting to disagree" the counts route's own
+docstring warns about, arriving by exactly the route it predicted. Both now
+call `payments.on_the_desk`.
+
+**The model's profile masked her destination** while the payments desk one
+click away showed it in full — the same fact, to the same person, on the same
+permission. ADR 0042 is about a screen being usable by somebody with a banking
+app open; a profile that sends them back to the desk to read a number is the
+same problem in a different place. One component draws the card now
+(`components/DestinationDetails.tsx`), one permission gates it, and ADR 0042
+records the addition.
+
+**An empty filter claimed a search had failed.** *No transfer due* with
+nothing in it said *"No model matches that search."* to somebody who had not
+searched.
+
+**Eleven wording differences**, each the export's words restored: the roster
+subtitle and its pager suffix, *No terms set*, *No destination recorded* in
+both places it belongs, the brand-codes note's missing clause and its button,
+the invitations screen's title and subtitle, the portal's order filter and row
+chip, *products* rather than *pieces*, the *You* sheet's order and labels, and
+her payments screen's title.
+
+## What still differs
+
+Thirteen items, each needing a decision rather than a fix, listed one sentence
+each in `docs/repair/batch-2/visual/CHECKLIST.md`. The three that matter most:
+**Settings → Appearance is missing the export's two switches** (the app has
+finer machinery underneath and no control for it); **the Reference tab writes
+audit rows as event names** where the export writes sentences; and **the
+portal's Ranking anonymises the other models**, which was a deliberate privacy
+choice and is not in the approved design.
+
+## The actions, exercised
+
+Eight checks, all passing, each changing something and reading it back from
+the server on a fresh page load — because a toast is not evidence.
+Navigation through all six sidebar destinations by clicking; saving a target
+requirement and finding it after a reload; editing terms and finding the month
+changed; copying a payment destination and reading the clipboard; opening the
+supplied InstaPay link (aborted at the browser edge, so nothing is fetched
+from a third party) and confirming it is **the address she submitted, not one
+rebuilt from her number**; the same card on her profile; and opening a receipt.
+
+## Results — A03
+
+**Backend: 2,039 collected, 2,039 passed, 0 failed, all 79 files**, reconciling
+exactly with `--collect-only`, through `docs/repair/batch-1/run-suite.sh` over
+three calls. Seven tests are new: the profile's destination card and its
+permission gate, the desk's three exclusions and the badge that must agree
+with it, and the Home notice with the export's exact words.
+
+**Frontend: 363 tests across 16 files, `npm run build` green.** Three are new:
+the desk's destination column has three cases — a line to print, a reader who
+may not see it, and nothing on file — and the first version of the fix
+collapsed the middle one into the last, which would have told marketing that a
+model with perfectly good details had none.
+
+**Evidence: 69 matched pairs** in `docs/repair/batch-2/visual/shots/`, every
+one taken against this build, plus a JSON digest beside each and
+`CHECKLIST.md` reading the diff row by row. **Eight interaction checks pass**,
+recorded in `actions.json`.
+
+Two things ran and are recorded honestly as not having run: **reconciliation
+against an authorised restored copy of real data**, and the
+**migration/rollback rehearsal for `b1f0a40c0001`**. Both are release gates
+carried forward from Batch 1 and neither is satisfied by anything in this
+report.
+
+Nothing was merged, deployed, or finalised against real records. Historical
+finalisation is still locked behind `HISTORICAL_FINALISATION_UNLOCKED`, and
+the five things HBA must supply are unchanged in
+`docs/repair/HISTORICAL-INFORMATION-NEEDED.md`.

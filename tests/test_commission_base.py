@@ -1,9 +1,9 @@
 """What is this order worth? §9.3, ADR 0011, ADR 0025.
 
 Order `#29115` is the acceptance test, not an illustration. The customer paid
-**E£1,157**, of which E£95 was shipping, so the base is **E£1,062**. Mid-exchange
-Shopify reported three items totalling E£1,675 and the old dashboard calculated
-on roughly E£1,557 — about **47% too much on a single order**.
+**EGP 1,157**, of which EGP 95 was shipping, so the base is **EGP 1,062**. Mid-exchange
+Shopify reported three items totalling EGP 1,675 and the old dashboard calculated
+on roughly EGP 1,557 — about **47% too much on a single order**.
 
 The base moves until delivery and then stops. An exchange can only happen to a
 parcel the customer already has, so freezing on delivery is strictly earlier than
@@ -15,14 +15,14 @@ import pytest
 
 from app.services.commission.base import base_for_order, commission_base
 
-#: #29115, in piastres. E£1,157 paid, E£95 of it shipping, no tax.
+#: #29115, in piastres. EGP 1,157 paid, EGP 95 of it shipping, no tax.
 PAID = 115_700
 SHIPPING = 9_500
 TAX = 0
 EXPECTED_BASE = 106_200
 
 #: What Shopify reports once E-stebdal has added the replacement without
-#: removing the returned item: 3 items, E£1,675.
+#: removing the returned item: 3 items, EGP 1,675.
 INFLATED_PAID = 167_500 + SHIPPING
 
 
@@ -39,7 +39,7 @@ def test_shipping_and_tax_belong_to_hba_not_the_model():
 
 
 def test_the_discount_is_already_in_the_figure():
-    """A E£1,000 jacket on a 10% code arrives inside a total of E£900. Nothing
+    """A EGP 1,000 jacket on a 10% code arrives inside a total of EGP 900. Nothing
     here needs the code's percentage, and using one would be a bug - it records
     what HBA expects, not what the customer paid.
     """
@@ -84,8 +84,8 @@ def test_delivery_fixes_the_figure():
 
 
 def test_the_exchange_inflation_cannot_reach_a_delivered_order():
-    """The defect this module exists to prevent. Shopify now says E£1,675 of
-    goods; the base still says E£1,062. Reading the live figure would calculate
+    """The defect this module exists to prevent. Shopify now says EGP 1,675 of
+    goods; the base still says EGP 1,062. Reading the live figure would calculate
     47% too much.
     """
     decision = base_for_order(

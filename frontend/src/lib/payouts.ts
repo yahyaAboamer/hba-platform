@@ -105,6 +105,32 @@ const METHOD_LABEL: Record<string, string> = {
  * they do not know, and a screen printing a full account number is one worth
  * photographing over their shoulder on a bus.
  */
+/**
+ * Where the money goes, in full, in the shape the approved design draws it.
+ *
+ * `rows` are label/value pairs in the order the design lists them; `copy`
+ * marks the one a banking app needs. `link` is the InstaPay payment address
+ * **as she submitted it** (§13.1) — a phone hands it straight to the app,
+ * which is the whole reason that field is collected as a link.
+ */
+export type DestinationCard = {
+  kind: "instapay" | "wallet" | "bank";
+  title: string;
+  rows: { label: string; value: string | null; copy: string | null }[];
+  link: string | null;
+};
+
+/**
+ * What the admin desk writes where a model has given no destination.
+ *
+ * The export's words, in two places: the payments row's `destinationLabel`
+ * (`if (!p) return "No destination recorded"`) and the detail card's
+ * `destTitle`. The portal says *Nothing on file yet* to the model herself,
+ * which is the same fact addressed to the person who can fix it - so the two
+ * sentences stay different on purpose rather than by drift.
+ */
+export const NO_DESTINATION_RECORDED = "No destination recorded";
+
 export function describeDestination(
   destination: Record<string, string | null> | null,
 ): string {

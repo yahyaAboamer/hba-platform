@@ -17,17 +17,17 @@ const view: RulesPreview = {
 describe("financial rules review", () => {
   it("keeps candidate earnings, approved amount and actual transfers separate", () => {
     const html = renderToStaticMarkup(<RulesPreviewResult view={view} />);
-    expect(html).toContain("E£2,000.00");
-    expect(html).toContain("E£2,100.00");
-    expect(html).toContain("E£1,500.00");
+    expect(html).toContain("EGP 2,000.00");
+    expect(html).toContain("EGP 2,100.00");
+    expect(html).toContain("EGP 1,500.00");
     expect(html).not.toContain("<button");
   });
   it("does not present an incomplete candidate as money to pay", () => {
     const html = renderToStaticMarkup(<RulesPreviewResult view={{ ...view, source_complete: false,
       current_entitlement: { ...view.current_entitlement, blockers: ["delivery_status_unavailable"] } }} />);
-    expect(html).not.toContain("E£2,000.00");
-    expect(html).not.toContain("E£20,000.00");
-    expect(html).toContain("E£2,100.00");
+    expect(html).not.toContain("EGP 2,000.00");
+    expect(html).not.toContain("EGP 20,000.00");
+    expect(html).toContain("EGP 2,100.00");
     expect(html).toContain("Delivery status is unavailable");
   });
   it("shows legacy carry as an allocation requiring review, not another transfer", () => {

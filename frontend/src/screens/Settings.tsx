@@ -102,8 +102,15 @@ export function Settings({ session }: { session: Session }) {
           : <p className="empty">Your account cannot manage payment terms.</p>)}
         {section === "codes" && <>
           <SetupRoster kind="house" />
-          {can(session, "affiliates.manage") && <AddHouseCode onCreated={() => undefined} />}
-          <p className="settings__note">Brand codes have no model payments and are excluded from model rankings.</p>
+          {can(session, "affiliates.manage") && <AddHouseCode onCreated={() => undefined} label="Add code" />}
+          <p className="settings__note">
+            {/* The export's sentence, whole. Ours dropped "and active
+             *  counts", which is the half somebody reads this note to
+             *  find out: it is why the roster says 19 and the codes
+             *  list has more than 19 codes in it. */}
+            HBA's own codes. They do not belong to a model, carry no pay
+            and are excluded from model rankings and active counts.
+          </p>
         </>}
         {section === "appearance" && <AppearancePanel />}
         {section === "advanced" && <>

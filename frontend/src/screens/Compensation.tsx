@@ -156,9 +156,9 @@ export function Compensation() {
       : [];
   const amountLabel =
     draft?.kind === "fixed_plus_commission"
-      ? "Fixed monthly salary, E£"
+      ? "Fixed monthly salary, EGP"
       : draft?.kind === "base_guarantee"
-        ? "Guaranteed minimum, E£"
+        ? "Guaranteed minimum, EGP"
         : null;
 
   function toggle(row: MonthRow) {

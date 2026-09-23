@@ -17,7 +17,7 @@ import type { Payment } from "../../lib/portal";
 const payment: Payment = {
   id: 7,
   amount_piastres: 240_000,
-  amount: "E£2,400.00",
+  amount: "EGP 2,400.00",
   occurred_at: "2026-08-03T09:00:00+00:00",
   reference: "TRX-88",
   destination: {
@@ -25,7 +25,7 @@ const payment: Payment = {
     instapay_address_url: "https://ipn.eg/S/old.address/instapay/1111",
   },
   has_proof: false,
-  settles: [{ month: "2026-07", piastres: 240_000, amount: "E£2,400.00" }],
+  settles: [{ month: "2026-07", piastres: 240_000, amount: "EGP 2,400.00" }],
 };
 
 function render(row: Payment) {

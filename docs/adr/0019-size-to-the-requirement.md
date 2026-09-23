@@ -6,7 +6,7 @@
 ## Context
 
 The money columns were made `bigint` with this reasoning: a 32-bit column
-overflows at E£21,474,836.47, and `bigint` puts the ceiling somewhere
+overflows at EGP 21,474,836.47, and `bigint` puts the ceiling somewhere
 unreachable.
 
 The business rejected the reasoning, correctly:
@@ -60,9 +60,9 @@ record.
 **Decision: `bigint` stays**, for one reason that is not "safer":
 
 `order_index` holds *per-order* values, where `integer` is genuinely
-sufficient — no single order approaches E£21 million. But the money columns
+sufficient — no single order approaches EGP 21 million. But the money columns
 still to come in Phase 3 are **aggregates**: monthly and annual totals across
-the whole programme. Even at a conservative E£2 million a month, an annual total
+the whole programme. Even at a conservative EGP 2 million a month, an annual total
 passes the 32-bit ceiling in the first year. Those columns must be `bigint`
 regardless.
 

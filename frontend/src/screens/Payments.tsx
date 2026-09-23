@@ -12,7 +12,12 @@ import {
   formatEgp,
   formatMonth,
 } from "../lib/money";
-import { describeDestination, PAY_TYPE } from "../lib/payouts";
+import { NO_DESTINATION_RECORDED, PAY_TYPE, describeDestination } from "../lib/payouts";
+import type { DestinationCard } from "../lib/payouts";
+
+// Re-exported where it has always been imported from, so this move is not a
+// change to anybody else's imports.
+export type { DestinationCard };
 import "./Payments.css";
 
 export type SettlementState =
@@ -22,21 +27,6 @@ export type SettlementState =
   | "overpaid"
   | "not_approved"
   | "settled_externally";
-
-/**
- * Where the money goes, in full, in the shape the approved design draws it.
- *
- * `rows` are label/value pairs in the order the design lists them; `copy`
- * marks the one a banking app needs. `link` is the InstaPay payment address
- * **as she submitted it** (§13.1) — a phone hands it straight to the app,
- * which is the whole reason that field is collected as a link.
- */
-export type DestinationCard = {
-  kind: "instapay" | "wallet" | "bank";
-  title: string;
-  rows: { label: string; value: string | null; copy: string | null }[];
-  link: string | null;
-};
 
 export type RequiredKind =
   | "approved"
@@ -482,7 +472,18 @@ export function Payments({ session }: { session: Session }) {
             {rows.length === 0 ? (
               <div className="surface"><p className="empty">No models in this month-end run.</p></div>
             ) : visibleRows.length === 0 ? (
-              <div className="surface"><p className="empty">No model matches that search.</p></div>
+              /* **Two empty lists, two sentences.** An empty *filter* is
+               *  often good news - nobody is in *No transfer due* means every
+               *  month owes something - and telling somebody their search
+               *  found nothing when they have not searched sends them looking
+               *  for a search box they never used. */
+              <div className="surface">
+                <p className="empty">
+                  {search.trim()
+                    ? "No model matches that search."
+                    : `Nothing in ${FILTERS.find((f) => f.value === filter)?.label.toLowerCase() ?? "this filter"} for this month.`}
+                </p>
+              </div>
             ) : (
               <div className="surface payments__table-wrap">
                 <table className="table payments__table">
@@ -553,8 +554,8 @@ function PaymentFigure({
  * **It is the month's transfer, and it used to be `balance_piastres`.** That
  * is what is *left* to send, which is zero on an unapproved month by
  * construction and zero again once a month is fully paid - so the list showed
- * Boda E£0.00 for September while her own detail screen showed an estimated
- * E£14,224, and a settled row showed nothing where the export shows what was
+ * Boda EGP 0.00 for September while her own detail screen showed an estimated
+ * EGP 14,224, and a settled row showed nothing where the export shows what was
  * sent.
  *
  * `required_piastres` is the figure the export's rows carry
@@ -660,7 +661,17 @@ export function PaymentRow({
          *  masked sentence. ADR 0042. */}
         <span className="payments__where">
           <span>
-            {row.destination_line ?? describeDestination(row.destination ?? null)}
+            {/* **Three cases, not two.** `destination_line` is null both
+                when there is no destination *and* when the reader may not
+                send money (ADR 0042 gates it on `payments.record`), and
+                collapsing those printed *No destination recorded* to
+                marketing about a model who had submitted her details
+                perfectly well. The masked sentence is what they saw before
+                and what they see now. */}
+            {row.destination_line ??
+              (row.destination
+                ? describeDestination(row.destination)
+                : NO_DESTINATION_RECORDED)}
           </span>
           {row.destination_card && canRecord && (
             <CopyDestination card={row.destination_card} />

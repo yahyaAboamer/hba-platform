@@ -17,10 +17,10 @@ month that had nothing to pay it with.
 ## F2 — a correction reduced the month it came from, twice over
 
 `balance_for` subtracted every outgoing credit and write-off from whatever the
-month still owed. A month agreed at E£2,000 with E£1,000 sent and E£200
-carried forward reported E£800 left to send. The E£200 was then recovered
+month still owed. A month agreed at EGP 2,000 with EGP 1,000 sent and EGP 200
+carried forward reported EGP 800 left to send. The EGP 200 was then recovered
 *again* out of the destination month, so HBA kept it twice and the model was
-paid E£1,800 against an agreement of E£2,000.
+paid EGP 1,800 against an agreement of EGP 2,000.
 
 Absorbing had the mirror-image fault: HBA "taking the loss" reduced the money
 HBA still owed her, which is the opposite of taking a loss.
@@ -158,7 +158,7 @@ def _adjustments(db, affiliate, kind):
 
 
 def _source_overpaid_twice(db, affiliate, *, first, second, destination_worth):
-    """August agreed at E£2,000, paid in full, and failing in two instalments.
+    """August agreed at EGP 2,000, paid in full, and failing in two instalments.
 
     Each failure is carried separately into the destination month, which is why
     two credits share one source-and-destination pair — the shape the release
@@ -210,9 +210,9 @@ def _source_overpaid_twice(db, affiliate, *, first, second, destination_worth):
 def test_two_equal_credits_from_one_source_are_both_released(db):
     """F1. The reproduction, at its plainest.
 
-    Two carries of E£1,000 land on October; October is agreed at nothing. Both
+    Two carries of EGP 1,000 land on October; October is agreed at nothing. Both
     have to come back. Releasing one of them and calling the other applied
-    leaves E£1,000 of deduction sitting on a month with no money in it, and
+    leaves EGP 1,000 of deduction sitting on a month with no money in it, and
     tells August its difference is settled when half of it is not.
     """
     affiliate = _model(db)
@@ -231,8 +231,8 @@ def test_two_equal_credits_from_one_source_are_both_released(db):
 def test_unequal_credits_release_only_what_the_month_cannot_take(db):
     """F1. A partial release, which is the ordinary case.
 
-    E£1,200 and E£800 land on October; October is agreed at E£500. It keeps
-    E£500 and hands back E£1,500 — not "the newest credit and then nothing".
+    EGP 1,200 and EGP 800 land on October; October is agreed at EGP 500. It keeps
+    EGP 500 and hands back EGP 1,500 — not "the newest credit and then nothing".
     """
     affiliate = _model(db)
     _source_overpaid_twice(
@@ -244,7 +244,7 @@ def test_unequal_credits_release_only_what_the_month_cannot_take(db):
         (AUGUST, OCTOBER, 150_000)
     ]
     assert correction_for(db, affiliate, AUGUST).outstanding_piastres == 150_000
-    # The month is square: it was agreed at E£500 and E£500 of deduction is on
+    # The month is square: it was agreed at EGP 500 and EGP 500 of deduction is on
     # it, so nothing is sent and nothing is owed.
     assert balance_for(db, affiliate, OCTOBER)["balance_piastres"] == 0
 
@@ -275,8 +275,8 @@ def test_a_second_release_pass_gives_nothing_back_twice(db):
 def test_two_sources_are_released_newest_first(db):
     """F1. Two months carried into one, and only some room to share.
 
-    June and July are each owed E£1,000 back out of September, which is agreed
-    at E£500. The newest carry is the one that over-committed the month, so
+    June and July are each owed EGP 1,000 back out of September, which is agreed
+    at EGP 500. The newest carry is the one that over-committed the month, so
     July gives back everything and June gives back half — and each release goes
     home to its own source, not to whichever one the loop reached first.
     """
@@ -320,7 +320,7 @@ def test_two_sources_are_released_newest_first(db):
 def test_a_month_that_can_take_the_whole_deduction_releases_nothing(db):
     """F1. The ordinary approval, which must stay silent.
 
-    October is agreed at E£2,000 and E£2,000 of deduction lands on it. It takes
+    October is agreed at EGP 2,000 and EGP 2,000 of deduction lands on it. It takes
     all of it, sends nothing, and writes no release.
     """
     affiliate = _model(db)
@@ -337,9 +337,9 @@ def test_the_snapshot_says_what_the_deduction_actually_came_to(db):
     """F1, F07. Frozen evidence of the allocation *and* of what it could do.
 
     Approval builds its payload before it works out what the month can absorb,
-    so the deduction list on its own is the gross request — E£2,000 against a
+    so the deduction list on its own is the gross request — EGP 2,000 against a
     month worth nothing. A statement rendered from that would tell somebody
-    E£2,000 was deducted, when E£2,000 was asked for and nothing was taken.
+    EGP 2,000 was deducted, when EGP 2,000 was asked for and nothing was taken.
 
     Both figures are frozen: the allocation that was reviewed, and the amount
     it actually came to.
@@ -365,7 +365,7 @@ def test_the_snapshot_says_what_the_deduction_actually_came_to(db):
 
 
 def _partly_paid_august(db, affiliate, *, paid):
-    """August agreed at E£2,000, `paid` sent, and E£200 of it failing later."""
+    """August agreed at EGP 2,000, `paid` sent, and EGP 200 of it failing later."""
     _order(db, affiliate, "aug-most", 1_800_000, month=AUGUST)
     _order(db, affiliate, "aug-lost", 200_000, month=AUGUST)
     august = approve_month(db, affiliate, AUGUST)
@@ -380,11 +380,11 @@ def _partly_paid_august(db, affiliate, *, paid):
 
 
 def test_carrying_a_correction_does_not_reduce_what_the_source_still_owes(db):
-    """F2. The reproduction. E£1,000 sent of E£2,000, E£200 carried forward.
+    """F2. The reproduction. EGP 1,000 sent of EGP 2,000, EGP 200 carried forward.
 
-    August is still owed E£1,000. The E£200 is recovered out of September,
+    August is still owed EGP 1,000. The EGP 200 is recovered out of September,
     where the credit lands. Taking it off August as well recovers it twice and
-    pays her E£1,800 against an agreement of E£2,000.
+    pays her EGP 1,800 against an agreement of EGP 2,000.
     """
     affiliate = _model(db)
     _partly_paid_august(db, affiliate, paid=100_000)
@@ -419,8 +419,8 @@ def test_carrying_a_correction_does_not_reduce_what_the_source_still_owes(db):
 def test_absorbing_a_correction_does_not_forgive_what_is_still_owed(db):
     """F2. HBA taking the loss cannot mean paying her less.
 
-    Same month, absorbed instead of carried. HBA eats the E£200 over-agreement;
-    the E£1,000 it has not yet sent is untouched by that decision.
+    Same month, absorbed instead of carried. HBA eats the EGP 200 over-agreement;
+    the EGP 1,000 it has not yet sent is untouched by that decision.
     """
     affiliate = _model(db)
     _partly_paid_august(db, affiliate, paid=100_000)
@@ -440,7 +440,7 @@ def test_absorbing_a_correction_does_not_forgive_what_is_still_owed(db):
 def test_a_fully_paid_month_is_square_after_the_carry(db):
     """F2. The case the old arithmetic happened to get right, held in place.
 
-    Everything agreed was sent, so nothing is outstanding, and the E£200 comes
+    Everything agreed was sent, so nothing is outstanding, and the EGP 200 comes
     back out of September rather than out of a balance that is already zero.
     """
     affiliate = _model(db)
@@ -464,7 +464,7 @@ def test_an_unpaid_month_keeps_its_whole_obligation_when_absorbed(db):
     """F2, R4. Nothing was sent, so nothing can come back.
 
     The difference is real and somebody decides about it. What they decide
-    cannot be *she is owed E£200 less*.
+    cannot be *she is owed EGP 200 less*.
     """
     affiliate = _model(db)
     _partly_paid_august(db, affiliate, paid=0)
@@ -527,8 +527,8 @@ def _arrangement(db, name, **terms):
 def test_a_salary_month_still_owes_its_fixed_part_after_a_correction(db):
     """F2. Both halves of `fixed_plus_commission` are paid, and stay payable.
 
-    E£1,000 salary and E£2,000 commission agreed, half of it sent, and E£200 of
-    the commission lost to a refused parcel. Carrying that E£200 forward
+    EGP 1,000 salary and EGP 2,000 commission agreed, half of it sent, and EGP 200 of
+    the commission lost to a refused parcel. Carrying that EGP 200 forward
     recovers it from September. What August has not yet sent — salary included
     — is not a second place to recover it from.
     """
@@ -606,11 +606,11 @@ def test_a_qualified_guarantee_month_still_owes_what_it_was_agreed_at(db):
 def test_a_released_carry_reopens_an_overpaid_month_too(db):
     """F1 and ADR 0035 together, and a gap the first F2 fix opened.
 
-    August was **overpaid**: E£2,500 sent against an agreed E£2,000. The E£500
+    August was **overpaid**: EGP 2,500 sent against an agreed EGP 2,000. The EGP 500
     is carried into October, and October turns out to be worth nothing, so the
     carry comes straight back.
 
-    The recovery bounced, so August is overpaid again by exactly E£500. A
+    The recovery bounced, so August is overpaid again by exactly EGP 500. A
     release that nets out of the correction but not out of the balance would
     leave the credit counted and the release ignored, and August would read as
     settled on a recovery that never happened.
@@ -650,9 +650,9 @@ def test_a_released_carry_reopens_an_overpaid_month_too(db):
 def test_a_released_carry_leaves_the_source_owed_exactly_what_it_was(db):
     """F1 and F2 together, which is where a double count would hide.
 
-    August is owed E£1,000 and carries E£2,000 into an October that turns out
+    August is owed EGP 1,000 and carries EGP 2,000 into an October that turns out
     to be worth nothing. The release reopens the correction; neither the credit
-    nor the release may move what August is still owed, and the E£2,000 must
+    nor the release may move what August is still owed, and the EGP 2,000 must
     end up applied nowhere at all.
     """
     affiliate = _model(db)

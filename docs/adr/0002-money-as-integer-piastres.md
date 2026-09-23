@@ -32,8 +32,8 @@ divide by 100. Shopify's decimal strings are parsed with `Decimal`, never
 `float`.
 
 `bigint` costs four extra bytes per value and removes any practical ceiling: the
-limit becomes roughly E£92 quadrillion per field rather than E£21 million. A
-test stores a E£20 million order specifically so that narrowing the column later
+limit becomes roughly EGP 92 quadrillion per field rather than EGP 21 million. A
+test stores a EGP 20 million order specifically so that narrowing the column later
 fails loudly.
 
 ## Alternatives considered

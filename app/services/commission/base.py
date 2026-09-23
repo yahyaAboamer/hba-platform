@@ -4,10 +4,10 @@
 > discounts.
 
 Order `#29115` is the worked example and the acceptance test. The customer paid
-**E£1,157**, of which E£95 was shipping, so the base is **E£1,062**. Mid-exchange
-Shopify reported three items totalling E£1,675 — E-stebdal had added the
+**EGP 1,157**, of which EGP 95 was shipping, so the base is **EGP 1,062**. Mid-exchange
+Shopify reported three items totalling EGP 1,675 — E-stebdal had added the
 replacement without removing the returned one — and the old dashboard calculated
-on roughly E£1,557. **About 47% too much, on one order.**
+on roughly EGP 1,557. **About 47% too much, on one order.**
 
 ## The base moves until delivery, and then it stops
 
@@ -53,7 +53,7 @@ def commission_base(
 
     Shipping and tax are HBA's, not the model's. Both are already net of every
     discount the customer received, so no percentage is needed anywhere - a
-    E£1,000 jacket on a 10% code arrives here inside a total of E£900.
+    EGP 1,000 jacket on a 10% code arrives here inside a total of EGP 900.
 
     Never negative. A refund larger than the order would otherwise produce one,
     and a negative base would quietly subtract from everything else they earned

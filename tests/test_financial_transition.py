@@ -6,8 +6,8 @@ Batch 1 of the readiness repair: F02, F07, F13 and the audit's A01 and A07.
 
 Until this, `calculate_month` counted **delivered orders only** and the
 pending-inclusive rules lived in a preview that advertised
-`live_transition_not_enabled`. A model with E£10,000 of pending sales at 10%
-was shown an entitlement of E£1,000 on one screen and paid E£0 by another.
+`live_transition_not_enabled`. A model with EGP 10,000 of pending sales at 10%
+was shown an entitlement of EGP 1,000 on one screen and paid EGP 0 by another.
 
 Now one rule counts for both: pending and delivered count, a failed delivery
 does not.
@@ -150,9 +150,9 @@ _approved_before_the_switch = approved_before_the_switch
 
 
 def test_a_pending_order_is_paid_by_the_month_it_belongs_to(db):
-    """A01/F02. The audit probe's own figures: E£10,000 pending at 10%.
+    """A01/F02. The audit probe's own figures: EGP 10,000 pending at 10%.
 
-    It reproduced E£0 live against E£1,000 in the preview. One rule now, and
+    It reproduced EGP 0 live against EGP 1,000 in the preview. One rule now, and
     it is the agreed one.
     """
     affiliate = _model(db)
@@ -323,8 +323,8 @@ def test_the_statement_names_the_sales_its_commission_came_from(db):
     month = my_month(db, affiliate, AUGUST)
     line = next(row for row in month["makeup"] if "Commission" in row["label"])
 
-    # E£20,000 of sales, E£2,000 of commission.
-    assert "E£20,000.00" in line["detail"]
+    # EGP 20,000 of sales, EGP 2,000 of commission.
+    assert "EGP 20,000.00" in line["detail"]
     assert line["piastres"] == 200_000
     assert month["amount_piastres"] == 200_000
 
@@ -344,7 +344,7 @@ def test_an_old_statement_keeps_saying_what_it_always_said(db):
     month = my_month(db, affiliate, AUGUST)
     line = next(row for row in month["makeup"] if "Commission" in row["label"])
 
-    assert "E£10,000.00" in line["detail"]
+    assert "EGP 10,000.00" in line["detail"]
     assert line["piastres"] == 100_000
     assert month["amount_piastres"] == 100_000
 
@@ -354,7 +354,7 @@ def test_her_home_counts_a_travelling_order_in_net_sales_counted(db):
 
     The calculator was switched and her screen was not: *Net sales counted*
     read the delivered half while the figure above it was worked out on both,
-    so a month with E£10,000 travelling showed E£1,000 earned on E£0 of
+    so a month with EGP 10,000 travelling showed EGP 1,000 earned on EGP 0 of
     sales. The audit's own numbers.
     """
     affiliate = _model(db)

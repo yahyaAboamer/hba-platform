@@ -979,7 +979,7 @@ def test_the_counts_still_say_nothing_about_money(client):
     assert body["payments_awaiting_approval"] == 0
     assert not any("piastres" in key for key in body)
     assert not any(
-        isinstance(value, str) and "E£" in value for value in body.values()
+        isinstance(value, str) and "EGP " in value for value in body.values()
     )
 
 
@@ -987,3 +987,49 @@ def test_a_model_may_not_read_the_maintainer_counts(client):
     _demote_to("affiliate")
 
     assert client.get("/api/operations/counts").status_code == 403
+
+
+def test_home_says_when_applications_are_waiting(client):
+    """The approved export's first notice, which the app did not have. A03.
+
+    `2 applications awaiting review / Submitted through the invitation link. /
+    Open applications`. Somebody who applied through an invitation link is
+    waiting on a person, and nothing on Home said so - the roster's
+    *Applications 2* chip is only seen by somebody who already went looking.
+
+    ATTENTION rather than BLOCKING on purpose: nobody is owed money and no
+    month is held up. A person is waiting, which is a different kind of urgent
+    and reads differently on the panel.
+    """
+    from app.core.passwords import hash_password
+    from app.db import SessionLocal
+    from app.models.identity import UserAccount
+    from app.services.affiliates import create_affiliate
+
+    with SessionLocal() as session:
+        for name in ("Habiba", "Karim"):
+            account = UserAccount(
+                email=f"{name.lower()}-applied@example.com",
+                password_hash=hash_password("quiet-harbour-lantern"),
+                status="active",
+                display_name=name,
+            )
+            session.add(account)
+            session.flush()
+            create_affiliate(session, user_account_id=account.id, name=name)
+        session.commit()
+
+    items = client.get("/api/operations/attention").json()["items"]
+    notice = next(row for row in items if row["key"] == "applications_waiting")
+
+    assert notice["text"] == "2 applications awaiting review."
+    assert notice["detail"] == "Submitted through the invitation link."
+    assert notice["action"] == "Open applications"
+    assert notice["where"] == "/affiliates?segment=applications"
+    assert notice["severity"] != "blocking"
+
+
+def test_no_applications_means_no_notice(client):
+    """A notice that is always there is furniture, not a notice."""
+    keys = {row["key"] for row in client.get("/api/operations/attention").json()["items"]}
+    assert "applications_waiting" not in keys

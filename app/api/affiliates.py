@@ -23,10 +23,10 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_permission
+from app.api.deps import active_role, require_permission
 from app.core.businesstime import business_month, month_add, parse_month, utcnow
 from app.core.periods import OPEN_ENDED, PLATFORM_START_MONTH
-from app.core.permissions import Permission
+from app.core.permissions import Permission, has_permission
 from app.db import get_session
 from app.models.affiliates import AffiliateProfile, AffiliateStatus
 from app.models.identity import UserAccount
@@ -62,6 +62,7 @@ from app.services.compensation import (
     terms_for,
 )
 from app.services.payouts import (
+    destination_card,
     current_destination,
     mask_destination,
     set_destination,
@@ -221,16 +222,24 @@ def _month_or_400(month: str) -> str:
 
 
 def _affiliate_detail(
-    db: Session, affiliate: AffiliateProfile, month: str | None = None
+    db: Session,
+    affiliate: AffiliateProfile,
+    month: str | None = None,
+    *,
+    may_pay: bool = False,
 ) -> dict:
     """The profile plus what is true about it *this month*.
 
     Codes and compensation are dated; "current" means the business month right
     now, derived the same way order attribution derives it (ADR 0005).
 
-    The payout destination is masked. This is a maintainer's screen, not the
-    affiliate's own - the raw value is never returned here, only enough to
-    recognise it (app/services/payouts.py).
+    The payout destination is masked **unless the reader may send money**
+    (ADR 0042). The approved export draws this card with the real values in
+    it - *InstaPay number*, *Payment link, as submitted*, and an *Open
+    InstaPay* button - and it is the same card the payments desk shows,
+    because it is the same question asked from a different screen. Marketing,
+    who can read this profile and cannot pay anybody, still sees the
+    shortened sentence and nothing else.
 
     "Current" is the **working** month, not necessarily this one: before
     go-live the useful question is what will apply when the platform starts,
@@ -263,6 +272,11 @@ def _affiliate_detail(
         "codes": codes_with_status(db, affiliate, month),
         "compensation": _compensation_payload(terms_for(db, affiliate, month)),
         "payout_destination": mask_destination(current_destination(db, affiliate)),
+        #: The full card, or `None`. Served on exactly the permission the
+        #: desk uses, so one rule decides who sees a real account number.
+        "payout_destination_card": (
+            destination_card(current_destination(db, affiliate)) if may_pay else None
+        ),
         # Which fields each method needs, from the one place that decides it.
         # The model's own screen already reads this; the maintainer's screen
         # correcting a destination on their behalf must agree with it, and two
@@ -545,11 +559,16 @@ def create_house_account_route(
 def get_affiliate_route(
     affiliate_id: int,
     month: str | None = None,
-    _actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_VIEW)),
+    actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_VIEW)),
     db: Session = Depends(get_session),
 ) -> dict:
     affiliate = _get_affiliate_or_404(db, affiliate_id)
-    return _affiliate_detail(db, affiliate, month)
+    return _affiliate_detail(
+        db,
+        affiliate,
+        month,
+        may_pay=has_permission(active_role(db, actor), Permission.PAYMENTS_RECORD),
+    )
 
 
 @router.patch("/{affiliate_id}")

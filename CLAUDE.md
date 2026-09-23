@@ -64,11 +64,25 @@ payroll without touching a maintainer screen.
   approval and `resolve` need the same two month rows in opposite orders, and
   one lock has no order to get wrong. It re-reads on the way in.
 - **The payer sees the whole destination** (ADR 0042, amending 0028). The
-  approved design puts the real number on the payments row and the full
-  details plus the submitted InstaPay link on the detail card, with no reveal
-  step - the owner asked for that explicitly. `mask_destination` still governs
-  every *record*: audit rows, logs, notices, change confirmations. The full
-  values go only where `payments.record` holds.
+  approved design puts the real number on the payments row, and the full
+  details plus the submitted InstaPay link on the detail card **and on the
+  model's profile**, with no reveal step - the owner asked for that
+  explicitly. One component draws it (`components/DestinationDetails.tsx`) and
+  one permission gates it (`payments.record`), because the screen that drifted
+  was the second copy. `mask_destination` still governs every *record*: audit
+  rows, logs, notices, change confirmations.
+- **Money reads `EGP 1,062.00`**, with the space and a U+2212 minus - the
+  approved export's `egp()`, character for character. It said `E£` on every
+  screen until 23 September; that was ours, not the design's. Two formatters
+  render it, `app/core/money.py` and `frontend/src/lib/money.ts`, and
+  `money.test.ts` holds them to the same examples. Two implementations of a
+  *format* are safe in a way two implementations of an *amount* are not - but
+  they still have to agree.
+- **The payments desk is a list of people on the programme** - not
+  applications, and not months somebody had not started yet
+  (`payments.on_the_desk`, the export's `participants(month)`). The sidebar
+  badge counts through the same function: they were computed separately once,
+  and the sidebar said 22 over a list of 19.
 - **Historical finalisation is locked** until `HISTORICAL_FINALISATION_UNLOCKED`
   is set on that environment. The *review* is never locked - it is how the
   gaps are found. What HBA must supply first is listed in

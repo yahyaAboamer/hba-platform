@@ -70,15 +70,15 @@ def test_many_small_orders_stay_exact():
 
 
 def test_rounds_half_up_not_bankers():
-    # E£10,608.50 must round UP to E£10,609.
+    # EGP 10,608.50 must round UP to EGP 10,609.
     assert round_half_up_to_pounds(Decimal("1060850")) == 1_060_900
 
 
 def test_python_round_would_get_it_wrong():
     """Proof, in the suite, of why the built-in round() is never used here.
 
-    Python rounds half to even. E£10,608.50 becomes E£10,608 and E£10,609.50
-    becomes E£10,610 — the affiliate is underpaid half the time, and the
+    Python rounds half to even. EGP 10,608.50 becomes EGP 10,608 and EGP 10,609.50
+    becomes EGP 10,610 — the affiliate is underpaid half the time, and the
     behaviour looks arbitrary to anyone reading a payslip.
     """
     assert round(Decimal("10608.50")) == 10608   # rounds down to even
@@ -88,12 +88,12 @@ def test_python_round_would_get_it_wrong():
 
 
 def test_rounds_down_below_half():
-    # E£10,608.37 rounds down to E£10,608
+    # EGP 10,608.37 rounds down to EGP 10,608
     assert round_half_up_to_pounds(Decimal("1060837")) == 1_060_800
 
 
 def test_rounds_up_above_half():
-    # E£10,608.61 rounds up to E£10,609
+    # EGP 10,608.61 rounds up to EGP 10,609
     assert round_half_up_to_pounds(Decimal("1060861")) == 1_060_900
 
 
@@ -104,8 +104,8 @@ def test_rounded_result_is_always_whole_pounds():
 
 def test_fractional_piastres_round_correctly():
     # The exact value carries a fraction; rounding still lands on whole pounds.
-    assert round_half_up_to_pounds(Decimal("10623.7")) == 10_600   # E£106.237 -> E£106
-    assert round_half_up_to_pounds(Decimal("10650.0")) == 10_700   # E£106.50  -> E£107
+    assert round_half_up_to_pounds(Decimal("10623.7")) == 10_600   # EGP 106.237 -> EGP 106
+    assert round_half_up_to_pounds(Decimal("10650.0")) == 10_700   # EGP 106.50  -> EGP 107
 
 
 def test_zero_and_negative_are_handled():
@@ -167,14 +167,14 @@ def test_booleans_are_refused():
 
 
 def test_format_egp_uses_thousands_and_two_decimals():
-    assert format_egp(1_060_837) == "E£10,608.37"
-    assert format_egp(0) == "E£0.00"
-    assert format_egp(5) == "E£0.05"
-    assert format_egp(100) == "E£1.00"
+    assert format_egp(1_060_837) == "EGP 10,608.37"
+    assert format_egp(0) == "EGP 0.00"
+    assert format_egp(5) == "EGP 0.05"
+    assert format_egp(100) == "EGP 1.00"
 
 
 def test_format_egp_handles_negatives():
-    assert format_egp(-1_060_837) == "-E£10,608.37"
+    assert format_egp(-1_060_837) == "−EGP 10,608.37"
 
 
 # ── The real order from the specification ──────────────────────────────────────
@@ -183,9 +183,9 @@ def test_format_egp_handles_negatives():
 def test_order_29115_from_the_spec():
     """Spec section 9.1: the exchange-inflation example, computed correctly.
 
-    The customer paid E£1,157.00, of which E£95.00 was shipping. The commission
-    base is therefore E£1,062.00. Shopify's subtotal during the in-flight
-    exchange showed E£1,675.00, which is what the old dashboard read.
+    The customer paid EGP 1,157.00, of which EGP 95.00 was shipping. The commission
+    base is therefore EGP 1,062.00. Shopify's subtotal during the in-flight
+    exchange showed EGP 1,675.00, which is what the old dashboard read.
     """
     paid_piastres = 115_700
     shipping_piastres = 9_500
@@ -193,8 +193,8 @@ def test_order_29115_from_the_spec():
     assert base == 106_200
 
     exact = exact_commission_piastres(commission_numerator(base, 1000))
-    assert exact == Decimal("10620")                 # E£106.20
-    assert round_half_up_to_pounds(exact) == 10_600  # E£106.00
+    assert exact == Decimal("10620")                 # EGP 106.20
+    assert round_half_up_to_pounds(exact) == 10_600  # EGP 106.00
 
 
 def test_order_29115_shows_what_the_old_system_would_have_paid():
@@ -203,8 +203,8 @@ def test_order_29115_shows_what_the_old_system_would_have_paid():
     inflated = exact_commission_piastres(commission_numerator(inflated_base, 1000))
     correct = exact_commission_piastres(commission_numerator(106_200, 1000))
 
-    assert inflated == Decimal("15570")  # E£155.70
-    assert correct == Decimal("10620")   # E£106.20
+    assert inflated == Decimal("15570")  # EGP 155.70
+    assert correct == Decimal("10620")   # EGP 106.20
     # Roughly 47% too much on a single order.
     assert (inflated - correct) / correct > Decimal("0.46")
 

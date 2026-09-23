@@ -23,9 +23,17 @@ The approved export renders its app inside a container with its own
 toggle is set to regardless of the browser window. That is the designer's own
 control and is the right reference.
 
-## What is not here
+## Superseded, and kept anyway
 
-A complete sweep of every page, subtab and popup at 1280, 1440 and 390 was not
-completed — see the batch report's *What was not done* for exactly what is
-missing and why. `docs/repair/batch-2/set-viewport.ps1` is the working tool for
-a later run on a machine where the browser is not in use.
+**The complete sweep is in [`../visual/`](../visual/), captured 23 September in
+a browser of its own.** Playwright launches its own headless Chromium, which
+Chrome's window manager never hears about: nothing is opened, restored or
+resized, the user's window is untouched, and the viewport is exactly the number
+in the config - including 390, which window sizing could not reach at all
+because Chrome will not make a window narrower than about 500px.
+
+These six files are kept because they are honest evidence of what the
+window-driven approach produced, and because the note above about filenames
+carrying the *actual* width is the kind of thing worth being able to point at.
+`../set-viewport.ps1` still works and is still the right tool if somebody needs
+a real window at a real width; it is no longer the tool for a sweep.

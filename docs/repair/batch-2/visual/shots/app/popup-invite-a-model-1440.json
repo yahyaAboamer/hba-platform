@@ -1,0 +1,69 @@
+{
+ "runs": [
+  "HBA",
+  "Admin",
+  "hbawear.store",
+  "Home",
+  "Models",
+  "2",
+  "Products",
+  "Targets",
+  "Payments",
+  "20",
+  "Settings",
+  "Y",
+  "Yahya",
+  "admin",
+  "▾",
+  "← Models",
+  "Invitations",
+  "Invite a model and manage outstanding links",
+  "Send invitation",
+  "The link opens a form: a password, their own details, and where they want to be paid. You approve the application and set the pay after that — nothing about pay is decided here.",
+  "Applications awaiting review",
+  "Habiba Sami",
+  "Applied today at 14:37",
+  "Review →",
+  "Karim Diab",
+  "Applied today at 14:37",
+  "Review →",
+  "Outstanding invitations",
+  "No invitation is outstanding."
+ ],
+ "headings": [
+  "Invitations",
+  "Applications awaiting review",
+  "Outstanding invitations"
+ ],
+ "buttons": [
+  "HBAAdminhbawear.store",
+  "Home",
+  "Models2",
+  "Products",
+  "Targets",
+  "Payments20",
+  "Settings",
+  "YYahyaadmin▾",
+  "← Models",
+  "Send invitation",
+  "Habiba SamiApplied today at 14:37Review →",
+  "Karim DiabApplied today at 14:37Review →"
+ ],
+ "labels": [],
+ "money": [],
+ "heading": {
+  "family": "Inter",
+  "size": "15px",
+  "weight": "500",
+  "colour": "rgb(236, 239, 234)"
+ },
+ "body": {
+  "family": "Inter",
+  "size": "15px",
+  "weight": "400",
+  "colour": "rgb(236, 239, 234)"
+ },
+ "background": "rgb(8, 9, 10)",
+ "scrollHeight": 900,
+ "clientHeight": 900
+}

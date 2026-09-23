@@ -172,8 +172,8 @@ def counted_sales_from(figures: dict, policy: str = PENDING_INCLUSIVE) -> int:
 
     **The commission line has to name the money it is a percentage of**, and
     that is not always the delivered total: since F02 it is delivered and
-    pending together. A statement saying *10% of E£2,000* above a commission
-    worked out on E£3,000 is a breakdown that does not add up, and the one
+    pending together. A statement saying *10% of EGP 2,000* above a commission
+    worked out on EGP 3,000 is a breakdown that does not add up, and the one
     person guaranteed to check is the person being paid.
 
     `policy` is the rule the figures were produced under - a snapshot's own,

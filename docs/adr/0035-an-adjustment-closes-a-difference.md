@@ -15,15 +15,15 @@ Reconstructed from the database, not from the screen:
 
 | | |
 |---|---|
-| August obligation, active snapshot (v3) | E£4,332.00 |
-| Transferred (two payments, 28 August) | E£4,589.00 |
-| **True overpayment** | **E£257.00** |
-| Adjustments recorded against August | E£4,817.00 |
-| What the payments screen reported | overpaid by **E£5,074.00** |
+| August obligation, active snapshot (v3) | EGP 4,332.00 |
+| Transferred (two payments, 28 August) | EGP 4,589.00 |
+| **True overpayment** | **EGP 257.00** |
+| Adjustments recorded against August | EGP 4,817.00 |
+| What the payments screen reported | overpaid by **EGP 5,074.00** |
 
 The overpayment displayed was twenty times the real one, and each press of
-*Settle the difference* doubled it: E£2,537 became E£5,074, and would have
-become E£10,148.
+*Settle the difference* doubled it: EGP 2,537 became EGP 5,074, and would have
+become EGP 10,148.
 
 The cause is one sign in `balance_for`:
 
@@ -60,13 +60,13 @@ Concretely:
    > this clause is the half that was wrong.** It is true of a write-off and
    > false of a **credit**. Carrying recovers the money from the month it is
    > carried *to*; reducing the source month as well recovers it twice, and a
-   > month agreed at E£2,000 with E£1,000 sent and E£200 carried reported
-   > E£800 still to send. Everything else here stands.
+   > month agreed at EGP 2,000 with EGP 1,000 sent and EGP 200 carried reported
+   > EGP 800 still to send. Everything else here stands.
 2. On the **destination** month, a credit means the model **already holds that
    money**, so the later month needs that much less in transfers.
 3. The amount is **capped at the true difference** — `paid − obligation` — and
    never at a balance that already has adjustments folded into it. The cap
-   alone would have stopped this defect at E£257 even with the sign wrong.
+   alone would have stopped this defect at EGP 257 even with the sign wrong.
 
 The reconcile screen's existing wording is correct and does not change. The
 code changes to match it.
@@ -78,7 +78,7 @@ its scenario — moving an unpaid obligation to a later month — is a **differe
 feature** that nothing asks for today. If it is ever wanted it gets its own
 name and its own control, because calling it a "credit" is what produced this.
 
-Three adjustments on staging (E£4,817 against a real E£257) are junk generated
+Three adjustments on staging (EGP 4,817 against a real EGP 257) are junk generated
 by the defect. `payroll_adjustment` is append-only by design, so they are
 deleted directly at the database rather than reversed. **Production has never
 had an adjustment recorded**, so nothing there is affected.

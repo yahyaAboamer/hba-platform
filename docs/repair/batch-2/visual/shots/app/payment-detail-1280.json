@@ -1,0 +1,54 @@
+{
+ "runs": [
+  "HBA",
+  "Admin",
+  "hbawear.store",
+  "Home",
+  "Models",
+  "2",
+  "Products",
+  "Targets",
+  "Payments",
+  "20",
+  "Settings",
+  "Y",
+  "Yahya",
+  "admin",
+  "▾",
+  "← Payments",
+  "Payment",
+  "August 2026",
+  "Loading…"
+ ],
+ "headings": [
+  "Payment"
+ ],
+ "buttons": [
+  "HBAAdminhbawear.store",
+  "Home",
+  "Models2",
+  "Products",
+  "Targets",
+  "Payments20",
+  "Settings",
+  "YYahyaadmin▾",
+  "← Payments"
+ ],
+ "labels": [],
+ "money": [],
+ "heading": {
+  "family": "Inter",
+  "size": "18px",
+  "weight": "500",
+  "colour": "rgb(236, 239, 234)"
+ },
+ "body": {
+  "family": "Inter",
+  "size": "15px",
+  "weight": "400",
+  "colour": "rgb(236, 239, 234)"
+ },
+ "background": "rgb(8, 9, 10)",
+ "scrollHeight": 900,
+ "clientHeight": 900
+}

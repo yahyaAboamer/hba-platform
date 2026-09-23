@@ -478,7 +478,7 @@
  * The card's colour is the card's meaning, so a zero does not take the quiet
  * tier here the way a zero in a table row does. *Recorded so far* is the
  * accent whether or not anything has been recorded yet - which is the whole
- * point of reading it - and a grey E£0.00 beside a white E£22,347.00 is the
+ * point of reading it - and a grey EGP 0.00 beside a white EGP 22,347.00 is the
  * greyness the owner kept pointing at.
  */
 .money--zero.payments__total {

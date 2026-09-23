@@ -13,7 +13,7 @@ in Shopify, because E-stebdal opens the same return object for both.
 
 Three attempts to close that gap each failed on the data:
 
-**Refund amounts do not say what HBA refunded.** Return shipping is deducted (E£120
+**Refund amounts do not say what HBA refunded.** Return shipping is deducted (EGP 120
 today, and it moves), exchanges are sometimes settled outside E-stebdal leaving the
 order still claiming a refund is owed, and sometimes nothing is recorded on Shopify
 at all.
@@ -61,7 +61,7 @@ delivery* — a difference of a few weeks, on the same reasoning.
 **The exposure is small and measured.** Across the 537 orders indexed on
 26 August 2026, **six show money having gone back**: one `refunded` and five
 `partially_refunded`. That is **1.1% of orders**, and only a fraction of any one
-of them is commission. It is larger than the ~E£90/year of rounding accepted in
+of them is commission. It is larger than the ~EGP 90/year of rounding accepted in
 ADR 0004 and the same kind of decision.
 
 **It is reversible.** `order_index` still stores `return_status`, `return_activity`,
@@ -79,7 +79,7 @@ question.
 
 **`read_returns` stops being needed.** It was the last thing blocking Phase 4.
 
-**A wholly returned order still pays.** A customer who receives E£5,000 of goods and
+**A wholly returned order still pays.** A customer who receives EGP 5,000 of goods and
 sends all of it back leaves the model paid on a sale that reversed. This is the case
 that will eventually be noticed, and it is accepted knowingly — HBA was asked
 specifically about it and chose to keep the rule whole rather than carve out an

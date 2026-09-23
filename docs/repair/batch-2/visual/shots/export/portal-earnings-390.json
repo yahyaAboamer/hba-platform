@@ -1,0 +1,41 @@
+{
+ "runs": [
+  "9:41",
+  "← Back",
+  "How this adds up",
+  "November 2026",
+  "in progress",
+  "Net sales counted",
+  "1 delivered · 1 pending · 0 failed",
+  "EGP 6,800.00",
+  "Commission at 10%",
+  "Of net sales counted",
+  "EGP 680.00",
+  "Guaranteed minimum not applied",
+  "Content targets for this month were not recorded as met. Your commission is unaffected.",
+  "EGP 0.00",
+  "Earnings so far",
+  "EGP 680.00",
+  "Commission is 10% of net sales on delivered and pending orders. Failed deliveries are excluded."
+ ],
+ "headings": [],
+ "buttons": [
+  "← Back"
+ ],
+ "labels": [],
+ "money": [
+  "EGP 0.00",
+  "EGP 6,800.00",
+  "EGP 680.00"
+ ],
+ "heading": null,
+ "body": {
+  "family": "Inter",
+  "size": "15px",
+  "weight": "400",
+  "colour": "rgb(236, 239, 234)"
+ },
+ "background": "rgb(8, 9, 10)",
+ "scrollHeight": 844,
+ "clientHeight": 844
+}

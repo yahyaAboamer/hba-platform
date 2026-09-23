@@ -202,7 +202,7 @@ def test_once_the_outcome_is_recorded_the_same_month_finalises(db, unlocked):
     result = finalise_historical(db, working=WORKING)
 
     assert [row["month"] for row in result["approved"]] == ["2026-03", "2026-04"]
-    # max(commission, base): E£1,000 of commission against a E£3,000 floor.
+    # max(commission, base): EGP 1,000 of commission against a EGP 3,000 floor.
     assert result["approved"][0]["obligation_piastres"] == 300_000
 
 

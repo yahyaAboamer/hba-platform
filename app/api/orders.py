@@ -152,7 +152,7 @@ def orders_for_month(
     held = [row for row in rows if row["outcome"] == "held"]
     unattributed = [row for row in rows if row["outcome"] == "unattributed"]
     carried = [row for row in rows if row["is_carried"]]
-    # The approved list heads itself *N orders - E£X counted*. Counted means
+    # The approved list heads itself *N orders - EGP X counted*. Counted means
     # what did not fail or get cancelled: a failed parcel was never sales, and
     # summing it into the line above the list would say otherwise. Added up
     # here, because nothing about money is added up in a browser.

@@ -105,6 +105,14 @@ def _affiliate(admin, name="Nour", email="nour@example.com", code="NOUR10") -> d
             ),
             {"a": affiliate["id"], "c": code},
         )
+        # **Active**, because these tests pay her. `create_affiliate` makes an
+        # application, and `payments.on_the_desk` no longer lists one - the
+        # approved export's desk is `participants(month)`. A model who is paid
+        # and is still an application is not a state the product produces.
+        connection.execute(
+            text("UPDATE affiliate_profile SET status = 'active' WHERE id = :id"),
+            {"id": affiliate["id"]},
+        )
     return affiliate
 
 
@@ -590,7 +598,7 @@ def test_the_breakdown_adds_up_to_the_total(admin):
     """
     affiliate = _affiliate(admin)
     _terms(admin, affiliate["id"], rate_bp=1000)
-    # 106,237 x 10% = 10,623.7 piastres, rounded to E£106.00.
+    # 106,237 x 10% = 10,623.7 piastres, rounded to EGP 106.00.
     _order(affiliate["id"], "1", 106_237)
 
     body = _sign_in().get(f"/api/me/earnings/{AUGUST}").json()
@@ -640,10 +648,10 @@ def test_a_guarantee_says_what_it_replaced(admin):
 def test_a_guarantee_that_did_not_apply_is_still_named(admin):
     """The bug the browser found, and the screen it came from.
 
-    Sara is on a guaranteed minimum of E£8,000. Their targets have not been
+    Sara is on a guaranteed minimum of EGP 8,000. Their targets have not been
     recorded, so §9.5's comparison has no answer and they are paid their commission
-    of E£1,100. Nothing about that figure is wrong - but the first version of
-    this screen showed E£1,100 and never mentioned the guarantee at all, and
+    of EGP 1,100. Nothing about that figure is wrong - but the first version of
+    this screen showed EGP 1,100 and never mentioned the guarantee at all, and
     the honest reading of that is *they have forgotten my minimum*.
     """
     affiliate = _affiliate(admin)
@@ -660,7 +668,7 @@ def test_a_guarantee_that_did_not_apply_is_still_named(admin):
     assert body["amount_piastres"] == 110_000
     assert body["guarantee"] == {
         "piastres": 800_000,
-        "amount": "E£8,000.00",
+        "amount": "EGP 8,000.00",
         "applied": False,
         # §15. `null` is a third answer, and the one that decides which
         # sentence they read: nobody has recorded their month, rather than they
@@ -727,7 +735,7 @@ def test_a_carried_order_names_the_month_that_paid_it(admin):
             "to_month": SEPTEMBER,
             "orders": 1,
             "base_piastres": 200_000,
-            "base": "E£2,000.00",
+            "base": "EGP 2,000.00",
         }
     ]
     late = next(row for row in august["orders_detail"] if row["order_number"] == "#2")
@@ -780,10 +788,10 @@ def test_the_month_that_paid_it_says_where_it_came_from(admin):
             "from_month": AUGUST,
             "orders": 1,
             "base_piastres": 200_000,
-            "base": "E£2,000.00",
+            "base": "EGP 2,000.00",
             "commission_rate_bp": 1000,
             "piastres": 20_000,
-            "amount": "E£200.00",
+            "amount": "EGP 200.00",
         }
     ]
     carried = next(
@@ -808,7 +816,7 @@ def test_every_order_state_is_shown_in_their_words(admin):
     body = _sign_in().get(f"/api/me/earnings/{AUGUST}").json()
 
     states = {row["order_number"]: row["state_text"] for row in body["orders_detail"]}
-    assert states == {"#1": "Counted", "#2": "On its way", "#3": "Did not arrive"}
+    assert states == {"#1": "Delivered", "#2": "Pending", "#3": "Did not arrive"}
     assert body["sales"]["pending_piastres"] == 200_000
 
 
@@ -1507,7 +1515,7 @@ def test_a_salary_model_is_paid_the_salary_and_the_commission(admin):
 
     assert "Commission on this month's sales" in labels
     assert "Your monthly salary" in labels
-    # 10% of E£1,000 is E£100, and the salary is E£9,000 on top - never instead.
+    # 10% of EGP 1,000 is EGP 100, and the salary is EGP 9,000 on top - never instead.
     assert body["amount_piastres"] == 910_000
     assert sum(line["piastres"] for line in body["makeup"]) == body["amount_piastres"]
 
@@ -1631,7 +1639,7 @@ def test_a_travelling_order_is_part_of_the_average(admin):
 
     body = _sign_in().get(f"/api/me/earnings/{SEPTEMBER}").json()
 
-    # E£10,000 over two counted orders.
+    # EGP 10,000 over two counted orders.
     assert body["sales"]["average_order_piastres"] == 500_000
     assert body["sales"]["counted_piastres"] == 1_000_000
 
@@ -1654,7 +1662,7 @@ def test_an_order_row_carries_the_commission_it_earned(admin):
     body = _sign_in().get(f"/api/me/earnings/{SEPTEMBER}").json()
     (row,) = [o for o in body["orders_detail"] if o["order_number"] == "#9201"]
 
-    # 15% of E£849.15 is E£127.3725, exact to the piastre before any rounding.
+    # 15% of EGP 849.15 is EGP 127.3725, exact to the piastre before any rounding.
     assert row["commission_piastres"] == 12_737
     assert row["commission"] == _egp(12_737)
 
@@ -1692,7 +1700,7 @@ def test_no_figure_is_put_beside_an_order_that_earned_nothing(admin):
     """A zero would read as an amount. These are absences.
 
     An order still travelling has earned nothing *yet* and a void one never
-    will - two different sentences, neither of them "E£0.00".
+    will - two different sentences, neither of them "EGP 0.00".
     """
     affiliate = _affiliate(admin)
     _terms(admin, affiliate["id"])
@@ -1736,7 +1744,7 @@ def test_an_order_is_worth_the_rate_of_its_own_month(admin):
 #
 # Shopify zeroes the current totals on a cancelled order, and the platform
 # stores those because §9.3 pays on what the customer actually paid. The
-# consequence reached a model's screen: a struck-through E£0.00, which claims
+# consequence reached a model's screen: a struck-through EGP 0.00, which claims
 # the order was worth nothing *and* was cancelled. `original_total_piastres`
 # keeps the placed-at figure so the row can say what it was.
 
@@ -1744,7 +1752,7 @@ def test_an_order_is_worth_the_rate_of_its_own_month(admin):
 def test_a_cancelled_order_still_says_what_it_came_to(admin):
     affiliate = _affiliate(admin)
     _terms(admin, affiliate["id"])
-    # Cancelled: Shopify reports it worth nothing now, and E£1,200 when placed.
+    # Cancelled: Shopify reports it worth nothing now, and EGP 1,200 when placed.
     _order(affiliate["id"], "9601", 0, month=SEPTEMBER, state="void", placed=120_000)
 
     body = _sign_in().get(f"/api/me/earnings/{SEPTEMBER}").json()
@@ -1773,7 +1781,7 @@ def test_an_order_indexed_before_the_column_existed_offers_no_figure(admin):
     """`NULL` is *we never asked Shopify*, and must not become a zero.
 
     A zero would be indistinguishable from an order that was genuinely free,
-    and would put "E£0.00" back on the screen this whole change removed it
+    and would put "EGP 0.00" back on the screen this whole change removed it
     from.
     """
     affiliate = _affiliate(admin)
@@ -1826,7 +1834,7 @@ def test_a_void_order_says_what_it_would_have_earned(admin):
     (row,) = [o for o in body["orders_detail"] if o["order_number"] == "#9701"]
 
     assert row["placed_piastres"] == 120_000
-    # 15% of E£1,200 is E£180.
+    # 15% of EGP 1,200 is EGP 180.
     assert row["forgone_piastres"] == 18_000
     assert row["forgone"] == _egp(18_000)
 
@@ -1993,7 +2001,7 @@ def test_a_backfilled_month_is_never_owed_and_never_listed_as_unpaid(
 ):
     """The protection ADR 0014 gave, kept where approving cannot bypass it.
 
-    March is agreed at E£500 and nothing about it is outstanding. A row here
+    March is agreed at EGP 500 and nothing about it is outstanding. A row here
     reading "not paid yet" would be a debt that never existed.
     """
     _backfilled(admin, monkeypatch)

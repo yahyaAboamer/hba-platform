@@ -12,8 +12,8 @@ commission arrangement that label is exact — what they earned and what their
 sales produced are the same number.
 
 On a **guaranteed minimum** they are not, and the gap is the point of the
-arrangement. A model with a E£5,000 floor whose code sold E£12,000 that month
-earns E£1,200 in commission and is paid **E£5,000**, provided she met her
+arrangement. A model with a EGP 5,000 floor whose code sold EGP 12,000 that month
+earns EGP 1,200 in commission and is paid **EGP 5,000**, provided she met her
 targets. The business put it plainly:
 
 > *"This does not tell the models what was their performance on sales. It tells
@@ -33,7 +33,7 @@ is the same every month and says nothing about how she sold.
 other.**
 
 - **The headline is what she was paid.** Total for the year, with a second line
-  splitting it: *"E£12,400 of it from your sales."* On a commission
+  splitting it: *"EGP 12,400 of it from your sales."* On a commission
   arrangement the two figures are equal and the second line is absent, so
   nothing changes for most models.
 - **The line chart is her sales, always.** It plots commission and nothing

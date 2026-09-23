@@ -32,7 +32,7 @@ separates calculation state from settlement so a single column cannot conflate t
 defect that produced *"Approved · Partially paid"*. Phase 6 makes approval the moment one
 becomes the other.
 
-An interface that renders both as *"E£2,000"* in the same grey throws that away at the last
+An interface that renders both as *"EGP 2,000"* in the same grey throws that away at the last
 step.
 
 ## Decision

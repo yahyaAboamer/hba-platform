@@ -16,7 +16,7 @@ platform, and it must stay that way.
 
 ## Three entities, because one transfer is not one month
 
-A single E£10,000 transfer allocates E£7,000 to August and E£3,000 to September
+A single EGP 10,000 transfer allocates EGP 7,000 to August and EGP 3,000 to September
 **without pretending two transfers occurred**. InstaPay limits make the reverse
 just as ordinary - two transfers settling one month. The old system could
 represent neither.
@@ -83,7 +83,7 @@ class AdjustmentType:
 
     #: **HBA absorbs a difference on an agreed month** (R4, widened by F2).
     #:
-    #: A month agreed at E£2,000 that now calculates to E£1,800 has a real
+    #: A month agreed at EGP 2,000 that now calculates to EGP 1,800 has a real
     #: difference, and one of the answers to it is *the agreed figure stands
     #: and HBA takes the difference*. This records that answer. It is what
     #: choosing **absorb** on a correction writes, in every case.

@@ -106,18 +106,21 @@ export function MyYou({
         </span>
       </section>
 
+      {/*
+       * **The export's order, and the export's words.** Hers reads
+       * *Personal and contact details*, *Height and weight*, *Payment
+       * details*, *Payment history*, *Notifications*, *Help*. Ours led with
+       * *What you have been paid* and called the next two *Payment details*
+       * and *Personal details*.
+       *
+       * The hints stay ours where ours say more: *What these words mean*
+       * under Help rather than the prototype's *Sample answers for review*,
+       * which is a note to a reviewer and not to her.
+       */}
       <nav className="you__rows" aria-label="About your account">
-        {active && (
-          <Row to="/payments" label="What you have been paid" hint="Every transfer HBA has recorded" />
-        )}
-        <Row
-          to="/you/payout"
-          label="Payment details"
-          hint={describeDestination(me.payout_destination)}
-        />
         <Row
           to="/you/details"
-          label="Personal details"
+          label="Personal and contact details"
           hint={
             me.shipping.shipping_line1
               ? [me.shipping.shipping_line1, me.shipping.shipping_city].filter(Boolean).join(", ")
@@ -134,6 +137,14 @@ export function MyYou({
                 : "Not given — they are optional"
             }
           />
+        )}
+        <Row
+          to="/you/payout"
+          label="Payment details"
+          hint={describeDestination(me.payout_destination)}
+        />
+        {active && (
+          <Row to="/payments" label="Payment history" hint="Every transfer HBA has recorded" />
         )}
         {active && (
           <Row to="/you/notifications" label="Notifications" hint="What HBA writes to you about" />

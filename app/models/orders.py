@@ -102,12 +102,12 @@ class OrderIndex(Base):
         ARRAY(String(120)), nullable=False, server_default="{}"
     )
     # BigInteger throughout: piastres are 100x the pound figure, so a 32-bit
-    # column would overflow at roughly E£21 million.
+    # column would overflow at roughly EGP 21 million.
     #: **The order as it was placed.** Display only, and never paid on.
     #:
     #: Shopify zeroes the `current*` totals when an order is cancelled. That is
     #: right for commission - §9.3 pays on what the customer actually paid -
-    #: and it left a model's Orders screen printing a struck-through E£0.00 for
+    #: and it left a model's Orders screen printing a struck-through EGP 0.00 for
     #: a cancelled order, because the figure it wanted no longer existed
     #: anywhere. These keep it.
     #:

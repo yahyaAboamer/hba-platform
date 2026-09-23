@@ -29,7 +29,7 @@ ORDER_FIELDS = """
     #
     # Shopify zeroes the `current*` sets when an order is cancelled, which is
     # correct for commission - §9.3 pays on what the customer actually paid -
-    # and left a model's Orders screen printing a struck-through E£0.00 for a
+    # and left a model's Orders screen printing a struck-through EGP 0.00 for a
     # cancelled order, because the value it wanted no longer existed anywhere.
     #
     # These two must never reach `calculate.py`. Paying on them would pay for

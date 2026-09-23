@@ -19,11 +19,11 @@ Delivery lives one level down, on the fulfilments.
 
 ## A refund is not always a refund
 
-One order in the sample carried refund line items worth **E£998** and a total
+One order in the sample carried refund line items worth **EGP 998** and a total
 refunded of **zero**. That is an exchange: E-stebdal records the returned goods,
 and no money goes back because the customer swapped for something else.
 
-Subtracting the line items would have cut E£998 from a base where the customer
+Subtracting the line items would have cut EGP 998 from a base where the customer
 paid in full and kept goods of equal value - underpaying the model on the exact
 case ADR 0011's freeze exists to protect. So both numbers are stored, and Task 3
 decides. **`refunded_merchandise` alone is not a reduction.**

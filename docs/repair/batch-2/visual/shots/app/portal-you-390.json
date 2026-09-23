@@ -1,0 +1,62 @@
+{
+ "runs": [
+  "← Back",
+  "You",
+  "S",
+  "Sara Edrees",
+  "HBA ambassador since November 2025",
+  "Your arrangement",
+  "Salary + commission",
+  "You are paid a fixed amount every month and a share of what your code sells — both, not whichever is larger. Set by HBA.",
+  "Appearance",
+  "Dark",
+  "Light",
+  "Personal and contact details",
+  "No address yet",
+  "→",
+  "Height and weight",
+  "Not given — they are optional",
+  "→",
+  "Payment details",
+  "InstaPay · …291",
+  "→",
+  "Payment history",
+  "Every transfer HBA has recorded",
+  "→",
+  "Notifications",
+  "What HBA writes to you about",
+  "→",
+  "Help",
+  "What these words mean",
+  "→",
+  "Sign out"
+ ],
+ "headings": [],
+ "buttons": [
+  "← Back",
+  "Dark",
+  "Light",
+  "Personal and contact detailsNo address yet→",
+  "Height and weightNot given — they are optional→",
+  "Payment detailsInstaPay · …291→",
+  "Payment historyEvery transfer HBA has recorded→",
+  "NotificationsWhat HBA writes to you about→",
+  "HelpWhat these words mean→",
+  "Sign out"
+ ],
+ "labels": [
+  "Dark",
+  "Light"
+ ],
+ "money": [],
+ "heading": null,
+ "body": {
+  "family": "Inter",
+  "size": "15px",
+  "weight": "400",
+  "colour": "rgb(236, 239, 234)"
+ },
+ "background": "rgb(8, 9, 10)",
+ "scrollHeight": 1060,
+ "clientHeight": 1060
+}

@@ -1,0 +1,68 @@
+{
+ "runs": [
+  "S",
+  "Sara Edrees",
+  "HBA ambassador · SARAED",
+  "Your best sellers",
+  "Sales through your code · all time · delivered orders",
+  "1",
+  "No image",
+  "Cargo Tailored Trouser",
+  "5 units sold",
+  "EGP 20,065.00",
+  "2",
+  "No image",
+  "Panel Track Jacket",
+  "6 units sold",
+  "EGP 19,206.66",
+  "3",
+  "No image",
+  "Ribbed Knit Top",
+  "5 units sold",
+  "EGP 18,235.00",
+  "Show all 6 products",
+  "Your wardrobe",
+  "0 pieces received",
+  "No products yet.",
+  "Home",
+  "Orders",
+  "Wardrobe",
+  "Targets",
+  "Ranking"
+ ],
+ "headings": [
+  "Your best sellers",
+  "Your wardrobe"
+ ],
+ "buttons": [
+  "S",
+  "SARAED",
+  "Show all 6 products",
+  "Home",
+  "Orders",
+  "Wardrobe",
+  "Targets",
+  "Ranking"
+ ],
+ "labels": [],
+ "money": [
+  "EGP 18,235.00",
+  "EGP 19,206.66",
+  "EGP 20,065.00"
+ ],
+ "heading": {
+  "family": "Inter",
+  "size": "15px",
+  "weight": "500",
+  "colour": "rgb(236, 239, 234)"
+ },
+ "body": {
+  "family": "Inter",
+  "size": "15px",
+  "weight": "400",
+  "colour": "rgb(236, 239, 234)"
+ },
+ "background": "rgb(8, 9, 10)",
+ "scrollHeight": 844,
+ "clientHeight": 844
+}

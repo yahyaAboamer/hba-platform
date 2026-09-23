@@ -164,8 +164,8 @@ describe("recording the external transfer", () => {
  *
  * The defect the audit confirmed in the browser: the row always rendered
  * `balance_piastres`. That is what is *left to send*, which the server sets to
- * zero on any month nobody has approved - so the list showed E£0.00 beside a
- * model whose own detail screen showed an estimated E£14,224. The same zero
+ * zero on any month nobody has approved - so the list showed EGP 0.00 beside a
+ * model whose own detail screen showed an estimated EGP 14,224. The same zero
  * appeared once a month was fully paid, where the export shows what was sent.
  *
  * These are fixtures in the server's own response shape rather than hand-made
@@ -194,9 +194,9 @@ describe("the amount column, rendered", () => {
    * The headline figure alone, and the line under it alone.
    *
    * Asserting against the whole cell is how a broken binding passes: a
-   * settled row rendering `balance_piastres` shows E£0.00 as its figure and
-   * E£2,000.00 on its second line, and a test that only asks whether
-   * E£2,000.00 is *somewhere* in the markup is satisfied by the bug.
+   * settled row rendering `balance_piastres` shows EGP 0.00 as its figure and
+   * EGP 2,000.00 on its second line, and a test that only asks whether
+   * EGP 2,000.00 is *somewhere* in the markup is satisfied by the bug.
    */
   const figure = (html: string) => html.split('class="payments__part"')[0];
   const under = (html: string) => html.split('class="payments__part"').slice(1).join("");
@@ -215,8 +215,8 @@ describe("the amount column, rendered", () => {
     });
 
     // The figure her detail screen shows, on the row that used to say nothing.
-    expect(figure(html)).toContain("E£14,224.00");
-    expect(html).not.toContain("E£0.00");
+    expect(figure(html)).toContain("EGP 14,224.00");
+    expect(html).not.toContain("EGP 0.00");
   });
 
   it("says nothing rather than guessing when the month cannot be calculated", () => {
@@ -234,7 +234,7 @@ describe("the amount column, rendered", () => {
     });
 
     expect(html).toContain("Unavailable");
-    expect(html).not.toContain("E£");
+    expect(html).not.toContain("EGP ");
   });
 
   it("shows the approved total on a month nothing has been sent for", () => {
@@ -249,7 +249,7 @@ describe("the amount column, rendered", () => {
       required_piastres: 200_000,
     });
 
-    expect(figure(html)).toContain("E£2,000.00");
+    expect(figure(html)).toContain("EGP 2,000.00");
     // Nothing sent and nothing deducted, so there is no second line to draw.
     expect(html).not.toContain("payments__part");
   });
@@ -268,8 +268,8 @@ describe("the amount column, rendered", () => {
 
     // The month, then what has gone - not the remainder on its own, which is
     // what made a part-paid row read as a smaller month than it is.
-    expect(figure(html)).toContain("E£2,000.00");
-    expect(under(html)).toContain("E£500.00");
+    expect(figure(html)).toContain("EGP 2,000.00");
+    expect(under(html)).toContain("EGP 500.00");
     expect(under(html)).toContain("recorded");
   });
 
@@ -285,8 +285,8 @@ describe("the amount column, rendered", () => {
       required_piastres: 200_000,
     });
 
-    expect(figure(html)).toContain("E£2,000.00");
-    expect(under(html)).toContain("E£2,000.00");
+    expect(figure(html)).toContain("EGP 2,000.00");
+    expect(under(html)).toContain("EGP 2,000.00");
     expect(under(html)).toContain("recorded");
   });
 
@@ -304,8 +304,8 @@ describe("the amount column, rendered", () => {
       required_piastres: 0,
     });
 
-    expect(figure(html)).toContain("E£0.00");
-    expect(under(html)).toContain("E£2,000.00");
+    expect(figure(html)).toContain("EGP 0.00");
+    expect(under(html)).toContain("EGP 2,000.00");
     expect(under(html)).toContain("deducted");
   });
 
@@ -321,7 +321,39 @@ describe("the amount column, rendered", () => {
       required_piastres: 0,
     });
 
-    expect(figure(html)).toContain("E£0.00");
+    expect(figure(html)).toContain("EGP 0.00");
     expect(html).not.toContain("payments__part");
+  });
+
+  /**
+   * ADR 0042 gates `destination_line` on `payments.record`, so it is null in
+   * two quite different situations: **nobody has submitted a destination**,
+   * and **this reader may not be shown it**. Collapsing them printed
+   * *No destination recorded* to marketing about a model whose details were
+   * on file and correct.
+   */
+  describe("the destination column", () => {
+    const withDestination = {
+      method: "instapay",
+      instapay_phone: "…01234",
+      instapay_address_url: null,
+    };
+
+    it("prints the whole line where the server sent one", () => {
+      const html = rowHtml({ destination_line: "InstaPay · 010 1000 2000" });
+      expect(html).toContain("InstaPay · 010 1000 2000");
+      expect(html).not.toContain("No destination recorded");
+    });
+
+    it("falls back to the masked sentence for a reader who may not pay", () => {
+      const html = rowHtml({ destination_line: null, destination: withDestination });
+      expect(html).not.toContain("No destination recorded");
+      expect(html).toContain("InstaPay");
+    });
+
+    it("says so only when there is genuinely nothing on file", () => {
+      const html = rowHtml({ destination_line: null, destination: null });
+      expect(html).toContain("No destination recorded");
+    });
   });
 });

@@ -13,8 +13,8 @@ got them wrong:
    carried undivided and summed, and the single division happens at the end.
 
 2. **Round half-up, once, on the final total.** Python's built-in round()
-   rounds half to *even*, so E£10,608.50 becomes E£10,608 while E£10,609.50
-   becomes E£10,610. That underpays half the time and looks arbitrary on a
+   rounds half to *even*, so EGP 10,608.50 becomes EGP 10,608 while EGP 10,609.50
+   becomes EGP 10,610. That underpays half the time and looks arbitrary on a
    payslip. Decimal with ROUND_HALF_UP is used instead, and only at the moment
    a payout is approved.
 """
@@ -62,8 +62,8 @@ def round_half_up_to_pounds(exact_piastres: Decimal | int) -> int:
     """Round to whole pounds, half-up, and return the result in piastres.
 
     Half-up rather than banker's rounding, and away from zero for negatives so
-    that a credit of E£0.50 is treated the same magnitude as a payment of
-    E£0.50. The result is always a multiple of 100 piastres.
+    that a credit of EGP 0.50 is treated the same magnitude as a payment of
+    EGP 0.50. The result is always a multiple of 100 piastres.
 
     Floats are refused. Decimal(1060850.7) is 1060850.69999999995343..., and a
     value sitting near a .5 boundary would round the wrong way. Accepting a
@@ -85,7 +85,17 @@ def round_half_up_to_pounds(exact_piastres: Decimal | int) -> int:
 
 
 def format_egp(piastres: int) -> str:
-    """Render piastres as a display string. Never used for calculation."""
-    sign = "-" if piastres < 0 else ""
+    """Render piastres as a display string. Never used for calculation.
+
+    `EGP 1,062.00` - the approved export's `egp()`, character for character,
+    including the space and the U+2212 minus. It said `E£` until 20
+    September, which was ours rather than the design's.
+
+    The frontend's `formatEgp` renders the same string from the same piastres.
+    Two implementations of a *format* are safe in a way two implementations of
+    an *amount* are not - but they still have to agree, so a test holds them
+    to the same examples.
+    """
+    sign = "−" if piastres < 0 else ""
     whole, fraction = divmod(abs(int(piastres)), PIASTRES_PER_POUND)
-    return f"{sign}E£{whole:,}.{fraction:02d}"
+    return f"{sign}EGP {whole:,}.{fraction:02d}"

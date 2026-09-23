@@ -71,24 +71,32 @@ NO_TARGET_OUTCOME = "no_target_outcome"
 TARGET_NOT_VERIFIED = "target_not_verified"
 
 
-def eligible_months(db: Session, affiliate: AffiliateProfile, working: str) -> list[str]:
-    """Every month this model can be arranged for, oldest first.
+def collaboration_from(db: Session, affiliate: AffiliateProfile) -> str | None:
+    """The first month this model has anything to do with, or `None`.
 
     Her recorded collaboration start where there is one, floored at the
     platform's horizon; otherwise the earliest month she has an order in. See
     the module docstring - the two are different facts and this prefers the one
     somebody actually knows.
+
+    `None` means nobody has said and nothing has arrived, which is not the same
+    as "she has not started". A caller deciding whether to *hide* something
+    must treat it as unknown rather than as a no.
     """
     first = affiliate.collaboration_start_month
     if first:
-        first = max(first, PLATFORM_START_MONTH)
-    else:
-        first = db.scalar(
-            select(AttributedOrder.business_month)
-            .where(AttributedOrder.affiliate_id == affiliate.id)
-            .order_by(AttributedOrder.business_month)
-            .limit(1)
-        )
+        return max(first, PLATFORM_START_MONTH)
+    return db.scalar(
+        select(AttributedOrder.business_month)
+        .where(AttributedOrder.affiliate_id == affiliate.id)
+        .order_by(AttributedOrder.business_month)
+        .limit(1)
+    )
+
+
+def eligible_months(db: Session, affiliate: AffiliateProfile, working: str) -> list[str]:
+    """Every month this model can be arranged for, oldest first."""
+    first = collaboration_from(db, affiliate)
 
     if not first or first > working:
         return []

@@ -1,0 +1,74 @@
+{
+ "runs": [
+  "HBA",
+  "Admin",
+  "hbawear.store",
+  "Home",
+  "Models",
+  "2",
+  "Products",
+  "Targets",
+  "Payments",
+  "4",
+  "Settings",
+  "N",
+  "Nour Hassan",
+  "Marketing",
+  "▾",
+  "Settings",
+  "Team Shopify and sync Historical setup Brand codes Appearance Reference",
+  "Policy in force",
+  "Commission policy",
+  "v3 · in force since 1 July 2026",
+  "Returns policy",
+  "A return after delivery does not reduce the counted sale",
+  "Payment timing",
+  "Recorded early in the following month",
+  "Recent activity",
+  "Made a feature request visible on Forest green short sleeve",
+  "Nour Hassan · 6 November 2026, 11:04",
+  "Recorded a payment of EGP 1,900.00 to Yahya Aboamer for September 2026",
+  "Yasmine Adel · 3 October 2026, 14:22",
+  "Changed Sara Edrees to fixed salary plus commission from June 2026",
+  "Hazem Fouad · 28 May 2026, 09:15",
+  "Recorded achieved content for October 2026",
+  "Nour Hassan · 1 November 2026, 10:40"
+ ],
+ "headings": [
+  "Settings"
+ ],
+ "buttons": [
+  "Home",
+  "Models 2",
+  "Products",
+  "Targets",
+  "Payments 4",
+  "Settings",
+  "N Nour Hassan Marketing ▾",
+  "Team",
+  "Shopify and sync",
+  "Historical setup",
+  "Brand codes",
+  "Appearance",
+  "Reference"
+ ],
+ "labels": [],
+ "money": [
+  "EGP 1,900.00"
+ ],
+ "heading": {
+  "family": "Inter",
+  "size": "18px",
+  "weight": "500",
+  "colour": "rgb(236, 239, 234)"
+ },
+ "body": {
+  "family": "Inter",
+  "size": "15px",
+  "weight": "400",
+  "colour": "rgb(236, 239, 234)"
+ },
+ "background": "rgb(8, 9, 10)",
+ "scrollHeight": 898,
+ "clientHeight": 898
+}

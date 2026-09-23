@@ -106,7 +106,7 @@ class Correction:
 
     `recoverable_piastres` is what HBA could actually take back, **capped at
     money that moved and has not already been recovered**: a month agreed at
-    E£2,000 and paid E£500 cannot give back E£2,000 however far the
+    EGP 2,000 and paid EGP 500 cannot give back EGP 2,000 however far the
     calculation has fallen. Recovering money that never left would invent a
     debt.
 
@@ -232,7 +232,7 @@ def correction_for(
     outstanding = max(shortfall - already, 0)
 
     # Capped at what actually moved, less whatever has already been taken
-    # back. A month agreed at E£2,000 and paid E£500 cannot give back E£2,000
+    # back. A month agreed at EGP 2,000 and paid EGP 500 cannot give back EGP 2,000
     # however far the calculation has fallen - recovering money that never
     # left would invent a debt.
     recoverable = max(min(outstanding, paid - already), 0)
@@ -272,13 +272,13 @@ def _resolved_so_far(
 
     **The amount, not merely whether one exists** — and that distinction is
     the whole of F11. Treating any earlier credit as *this is dealt with*
-    hid every later failure behind the first one: a month corrected by E£300,
+    hid every later failure behind the first one: a month corrected by EGP 300,
     carried, and then hit by a second failed order reported nothing at all,
     because something had been carried once.
 
     Summed from the adjustments themselves rather than stored, which keeps it
-    true across partial recoveries: three carries of E£100 against one month
-    leave the same trace as one of E£300, and neither can be counted twice.
+    true across partial recoveries: three carries of EGP 100 against one month
+    leave the same trace as one of EGP 300, and neither can be counted twice.
 
     Returns the total and the most recent choice, which is what the screens
     label a partly-settled month with.
@@ -338,8 +338,8 @@ def open_corrections(db: Session, affiliate: AffiliateProfile) -> list[Correctio
     ## Keyed on the difference, not on what can be recovered (F09)
 
     A month whose transfer has not been recorded yet has a real difference and
-    nothing recoverable, and this used to drop it: with an approved E£2,000,
-    a revised E£1,800 and no payment recorded, the queue was empty and nobody
+    nothing recoverable, and this used to drop it: with an approved EGP 2,000,
+    a revised EGP 1,800 and no payment recorded, the queue was empty and nobody
     was told anything had changed.
 
     That was the wrong half to filter on. It is right not to invent
@@ -390,8 +390,8 @@ def capacity_of(db: Session, affiliate: AffiliateProfile, month: str) -> int:
     """How much of a later month a deduction may consume.
 
     **All of it** (D04, 10 September 2026). The owner was asked directly - a
-    model on an E£8,000 guarantee, an overpayment to recover, and E£9,000
-    earned in October - and answered *the whole E£9,000 if needed*. A month can
+    model on an EGP 8,000 guarantee, an overpayment to recover, and EGP 9,000
+    earned in October - and answered *the whole EGP 9,000 if needed*. A month can
     settle at zero while a debt clears, including a month she qualified for her
     guaranteed minimum in.
 
@@ -510,8 +510,8 @@ def resolve(
     simply say somebody chose that.
 
     **A carry takes what the destination has room for, and the rest waits**
-    (F12). A deduction of E£200 against a month worth E£100 applies E£100,
-    sends nothing, and leaves E£100 outstanding against the source month —
+    (F12). A deduction of EGP 200 against a month worth EGP 100 applies EGP 100,
+    sends nothing, and leaves EGP 100 outstanding against the source month —
     which the next month can take, this year or any later one. It used to be
     refused outright, on the reasoning that a partial recovery leaves a
     remainder nothing is tracking; the remainder is tracked now, by comparing
@@ -665,8 +665,8 @@ def resolve(
     # owes, which would have paid her less than was agreed.
     #
     # F2 found that the same sentence is true whenever anything is still owed,
-    # which is most months: agreed E£2,000, sent E£1,000, E£200 absorbed, and
-    # the write-off took the E£200 out of the E£1,000 still to send. HBA
+    # which is most months: agreed EGP 2,000, sent EGP 1,000, EGP 200 absorbed, and
+    # the write-off took the EGP 200 out of the EGP 1,000 still to send. HBA
     # "taking the loss" came out of her money.
     #
     # The two acts were sharing one row type and therefore one arithmetic.

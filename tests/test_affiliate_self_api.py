@@ -354,6 +354,21 @@ def test_they_can_see_that_their_destination_moved_lately(admin):
     assert body["changed_at"] is not None
 
 
+def _taken_on(name: str) -> None:
+    """Approve the application, which is what puts her on the payments desk.
+
+    `_model` walks the real flow - invited, accepted, applied - and stops
+    where the product stops: an **application**. The desk lists people on the
+    programme (`payments.on_the_desk`, the export's `participants(month)`), so
+    a test that reads a row off it has to do the next thing a person does.
+    """
+    with engine.begin() as connection:
+        connection.execute(
+            text("UPDATE affiliate_profile SET status = 'active' WHERE name = :n"),
+            {"n": name},
+        )
+
+
 def test_the_payment_screen_is_told_a_destination_moved_lately(admin):
     """§6.4.5. `changed_recently` has existed since Phase 3 and reached no
     screen until now - it had nothing to warn about while only the maintainer
@@ -369,6 +384,7 @@ def test_the_payment_screen_is_told_a_destination_moved_lately(admin):
             "instapay_phone": "01009999999",
         },
     )
+    _taken_on("Nour Hassan")
 
     rows = admin.get("/api/payments/2026-08").json()["affiliates"]
     nour = next(row for row in rows if row["name"] == "Nour Hassan")
@@ -379,6 +395,7 @@ def test_the_payment_screen_is_told_a_destination_moved_lately(admin):
 def test_an_untouched_destination_raises_no_warning(admin):
     """A warning that is always on is one nobody reads."""
     _model(admin, "nour@example.com", "Nour Hassan", "NOUR10")
+    _taken_on("Nour Hassan")
 
     rows = admin.get("/api/payments/2026-08").json()["affiliates"]
     nour = next(row for row in rows if row["name"] == "Nour Hassan")

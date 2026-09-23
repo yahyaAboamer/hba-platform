@@ -1,0 +1,45 @@
+{
+ "runs": [
+  "9:41",
+  "← Back",
+  "Payment details",
+  "Where HBA should send your payment",
+  "Method",
+  "InstaPay",
+  "Wallet",
+  "Bank",
+  "Account number",
+  "Payment link",
+  "i",
+  "Cancel",
+  "Save details"
+ ],
+ "headings": [],
+ "buttons": [
+  "← Back",
+  "InstaPay",
+  "Wallet",
+  "Bank",
+  "i",
+  "Cancel",
+  "Save details"
+ ],
+ "labels": [
+  "InstaPay",
+  "Wallet",
+  "Bank",
+  "Account number",
+  "Payment link"
+ ],
+ "money": [],
+ "heading": null,
+ "body": {
+  "family": "Inter",
+  "size": "15px",
+  "weight": "400",
+  "colour": "rgb(236, 239, 234)"
+ },
+ "background": "rgb(8, 9, 10)",
+ "scrollHeight": 844,
+ "clientHeight": 844
+}

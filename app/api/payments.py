@@ -45,6 +45,7 @@ from app.services.payments import (
     assert_same_payment,
     balance_for,
     credited_into,
+    on_the_desk,
     payment_for_operation_key,
     payments_for,
     record_payment,
@@ -267,14 +268,11 @@ def outstanding(
     settlement state, because there isn't one (§11.1).
     """
     month = _month_or_400(month)
-    # A house code has real sales and no payee. Filtering it before any
-    # calculation prevents it entering model counts as well as money totals;
-    # inactive models stay because an old obligation does not leave with them.
-    affiliates = [
-        affiliate
-        for affiliate in list_affiliates(db, include_archived=include_archived)
-        if affiliate.is_payable
-    ]
+    # **Who this desk is about** lives in one function beside `balance_for`,
+    # because the sidebar's badge counts the same people and the two drifting
+    # apart is what put 22 above a list of 19. See `on_the_desk`.
+    affiliates = on_the_desk(db, month, include_archived=include_archived)
+
     # The same check the route guards make, through the same two functions -
     # a second reading of "may this person pay" is a second answer waiting to
     # disagree with the first.

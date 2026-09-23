@@ -1,0 +1,48 @@
+{
+ "runs": [
+  "← Back",
+  "How this adds up",
+  "September 2026",
+  "in progress",
+  "Commission on this month's sales",
+  "10% of EGP 10,710.00",
+  "EGP 1,071.00",
+  "Your monthly salary",
+  "EGP 12,000.00",
+  "Earnings so far",
+  "EGP 13,071.00",
+  "Commission is 10% of net sales on delivered orders. An order on its way counts the day it arrives; one that fails is excluded."
+ ],
+ "headings": [
+  "September 2026"
+ ],
+ "buttons": [
+  "← Back"
+ ],
+ "labels": [
+  "Commission on this month's sales10% of EGP 10,710.00",
+  "Your monthly salary",
+  "Earnings so far"
+ ],
+ "money": [
+  "EGP 1,071.00",
+  "EGP 10,710.00",
+  "EGP 12,000.00",
+  "EGP 13,071.00"
+ ],
+ "heading": {
+  "family": "Inter",
+  "size": "15px",
+  "weight": "500",
+  "colour": "rgb(236, 239, 234)"
+ },
+ "body": {
+  "family": "Inter",
+  "size": "15px",
+  "weight": "400",
+  "colour": "rgb(236, 239, 234)"
+ },
+ "background": "rgb(8, 9, 10)",
+ "scrollHeight": 844,
+ "clientHeight": 844
+}

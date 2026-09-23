@@ -585,7 +585,7 @@ def test_the_kept_quantity_is_what_the_customer_still_has(db):
 
 
 def test_the_prices_are_what_they_paid_not_the_shelf_price(db):
-    """A E£1,000 jacket with a 10% code costs E£900, and E£900 is what the
+    """A EGP 1,000 jacket with a 10% code costs EGP 900, and EGP 900 is what the
     model earns on. `discountedUnitPriceSet` already carries the discount, so
     nothing has to know the code's percentage.
     """

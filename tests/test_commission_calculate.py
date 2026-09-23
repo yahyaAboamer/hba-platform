@@ -116,7 +116,7 @@ def test_one_order_at_ten_percent(db):
 
     assert result.earned_base_piastres == 106_200
     assert result.commission_piastres == Decimal("10620")
-    assert result.payout_piastres == 10_600, "E£106.20 → E£106"
+    assert result.payout_piastres == 10_600, "EGP 106.20 → EGP 106"
 
 
 def test_the_fractional_piastre_survives_to_the_end(db):
@@ -168,8 +168,8 @@ def test_rounding_per_order_would_give_a_different_answer(db):
 @pytest.mark.parametrize(
     "exact_piastres,expected",
     [
-        (1_060_837, 1_060_800),  # E£10,608.37 → E£10,608
-        (1_060_850, 1_060_900),  # E£10,608.50 → E£10,609, half-up
+        (1_060_837, 1_060_800),  # EGP 10,608.37 → EGP 10,608
+        (1_060_850, 1_060_900),  # EGP 10,608.50 → EGP 10,609, half-up
         (1_060_849, 1_060_800),
     ],
 )
@@ -209,7 +209,7 @@ def test_both_figures_come_back(db):
 
     assert result.exact_unrounded_piastres == Decimal("10623.7")
     assert result.payout_piastres == 10_600
-    assert format_egp(result.payout_piastres) == "E£106.00"
+    assert format_egp(result.payout_piastres) == "EGP 106.00"
 
 
 # ── Which orders count ─────────────────────────────────────────────────────────

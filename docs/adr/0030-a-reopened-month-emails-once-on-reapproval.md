@@ -39,7 +39,7 @@ timeline; it settles what the email says once it is built.
 
 ## Decision: the email states the reason, not just the new figure
 
-*"Your August is now E£2,650"* answers what changed. It does not answer the
+*"Your August is now EGP 2,650"* answers what changed. It does not answer the
 question they will actually have: *did you make a mistake, or did I?* Silence
 on that point is what turns a correction into a support message.
 
@@ -62,7 +62,7 @@ So a downward re-approval emails **immediately**, at approval, and says which
 of the two resolutions applies (§11.5 leaves that choice to the maintainer,
 never to the platform):
 
-- **Credited**: *"E£300 will come off next month's payment."*
+- **Credited**: *"EGP 300 will come off next month's payment."*
 - **Written off**: *"Nothing further is needed from you."*
 
 ## What this settles for Phase 10

@@ -134,7 +134,14 @@ export function InvitePage() {
       </Link>
 
       <section className="invite-page__card">
-        <h1 className="invite-page__title">Invite a model</h1>
+        {/* The export's own title and subtitle: *Invitations*, because the
+         *  screen is both halves - sending one and managing the ones still
+         *  outstanding - and a page headed *Invite a model* above a list of
+         *  three unanswered links is describing one of the two. */}
+        <h1 className="invite-page__title">Invitations</h1>
+        <p className="invite-page__subtitle">
+          Invite a model and manage outstanding links
+        </p>
 
         <form className="invite-page__form" onSubmit={send}>
           <input

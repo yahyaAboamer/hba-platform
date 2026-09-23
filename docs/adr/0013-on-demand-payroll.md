@@ -18,7 +18,7 @@ Payroll is an action the maintainer takes, not a scheduled job. Running it for
 August freezes whatever is `earned` **at that instant** and pays it.
 
 Anything still `pending` rolls into the next run automatically, appearing as a
-labelled line - *"Carried forward from August - 2 orders, E£840"*. Nothing is
+labelled line - *"Carried forward from August - 2 orders, EGP 840"*. Nothing is
 lost and nothing is paid early.
 
 An order's **attribution month is the month it was placed** and never changes,

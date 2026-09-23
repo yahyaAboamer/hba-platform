@@ -21,7 +21,21 @@ import { api } from "../lib/api";
  * behind one control invites exactly the mistake this exists to prevent:
  * approving a real customer's discount code as though it were a colleague.
  */
-export function AddHouseCode({ onCreated }: { onCreated: () => void }) {
+export function AddHouseCode({
+  onCreated,
+  /**
+   * The word on the button, because where it sits changes what it needs to
+   * say. Under Settings → **Brand codes** the export writes *Add code*:
+   * everything around it already says which kind. On the roster, among
+   * twenty models and an *Invite a model* button beside it, the same word
+   * would read as "add a model's code" - which is the one mistake that
+   * control exists to prevent.
+   */
+  label = "Add a house code",
+}: {
+  onCreated: () => void;
+  label?: string;
+}) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
@@ -53,7 +67,7 @@ export function AddHouseCode({ onCreated }: { onCreated: () => void }) {
   if (!open) {
     return (
       <button type="button" className="button" onClick={() => setOpen(true)}>
-        Add a house code
+        {label}
       </button>
     );
   }

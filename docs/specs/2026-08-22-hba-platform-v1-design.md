@@ -352,7 +352,7 @@ payroll_adjustment      — credits, write-offs, corrections
   amount_piastres, reason, created_by
 ```
 
-A single E£10,000 InstaPay transfer allocates E£7,000 to August and E£3,000 to September
+A single EGP 10,000 InstaPay transfer allocates EGP 7,000 to August and EGP 3,000 to September
 without pretending two transfers occurred. All three tables are append-only.
 
 **`commission_policy_version`** — the rules themselves, versioned (§16).
@@ -378,9 +378,9 @@ automation that auto-cancels them — protection living outside the codebase tha
 silently disappear if that automation were disabled.
 
 **In-flight exchanges inflate the commission base.** Order `#29115` is the worked example.
-The customer paid **E£1,157** (E£1,062 of products plus E£95 shipping). E-stebdal then began
-an exchange, and Shopify's subtotal now counts **both** the returned item (E£550) and its
-replacement (E£495) — showing 3 items totalling E£1,675 against E£1,157 actually collected.
+The customer paid **EGP 1,157** (EGP 1,062 of products plus EGP 95 shipping). E-stebdal then began
+an exchange, and Shopify's subtotal now counts **both** the returned item (EGP 550) and its
+replacement (EGP 495) — showing 3 items totalling EGP 1,675 against EGP 1,157 actually collected.
 Furthermore `partially_paid` is handled nowhere in `shopify_client.py`'s status logic, so a
 mid-exchange order passes through as normal at up to **~47% inflated value**.
 
@@ -402,7 +402,7 @@ mid-exchange order passes through as normal at up to **~47% inflated value**.
 
 > **Commission base = total the customer pays − shipping − tax**, after all discounts.
 
-Verified against `#29115`: `1,157 − 95 = E£1,062`.
+Verified against `#29115`: `1,157 − 95 = EGP 1,062`.
 
 **Freezing rule.** The base updates while the order is `pending` with no return or exchange
 activity — so genuine pre-shipment edits are reflected — and **freezes the moment any return
@@ -421,8 +421,8 @@ inflation in §9.1 cannot reach the calculation.
 *Why this rule exists — recorded so it is not mistaken for an oversight later:* freezing the
 base defeats a specific Shopify artefact where an in-flight exchange inflates the order
 subtotal. It was never intended to pay commission on merchandise the customer actually
-returned and was refunded for. Buying a jacket at E£1,000 and pants at E£600, then genuinely
-returning the pants, leaves a commission base of **E£1,000** — not E£1,600 — provided the
+returned and was refunded for. Buying a jacket at EGP 1,000 and pants at EGP 600, then genuinely
+returning the pants, leaves a commission base of **EGP 1,000** — not EGP 1,600 — provided the
 month has not yet been approved. After approval, the absorb rule (§9.4) governs.
 
 ### 9.4 Commission state and return exposure
@@ -471,12 +471,12 @@ impossible.
 
 **Rounding happens exactly once**, on the **final payout total**, at approval:
 
-- **Half-up to whole Egyptian pounds:** `E£10,608.37 → E£10,608` · `E£10,608.50 → E£10,609`
+- **Half-up to whole Egyptian pounds:** `EGP 10,608.37 → EGP 10,608` · `EGP 10,608.50 → EGP 10,609`
 - **The total only, never per order.** Rounding each order before summing compounds error
   across dozens of orders.
 - **The fraction is absorbed, not carried.** Half-up pays fractionally more about as often
   as fractionally less, averaging to roughly zero. Carrying sub-pound remainders would add
-  real complexity for an error on the order of E£90/year across the whole programme.
+  real complexity for an error on the order of EGP 90/year across the whole programme.
 - **Both figures are stored** on the snapshot — `exact_unrounded_piastres` and
   `approved_obligation_piastres` — so the audit shows what was calculated *and* what was
   approved.
@@ -634,7 +634,7 @@ The block is on *missing information*, never on poor performance, and applies on
 ### 11.4 Carry-forward
 
 Orders settling after approval never alter the approved month. They appear in the next
-`draft` month as a labelled line: *"Carried forward from August — 2 orders, E£840."*
+`draft` month as a labelled line: *"Carried forward from August — 2 orders, EGP 840."*
 
 This is the **common** path, not an edge case: Egyptian COD delivery routinely straddles
 month end, so an order placed 29 August may still be `pending` when payroll runs on
@@ -833,7 +833,7 @@ just not the first one — with two additions for `version > 1`:
 - If the new figure is **lower** than what was already paid, the email is sent **immediately
   on re-approval, before any correction is applied** — there is no transfer to attach the news
   to, and the model will notice nothing in their bank account otherwise. It states which §11.5
-  resolution was chosen: *"E£300 will come off next month's payment"* (credit) or *"nothing
+  resolution was chosen: *"EGP 300 will come off next month's payment"* (credit) or *"nothing
   further is needed from you"* (write-off).
 
 **Every model gets email only.** There is no in-platform inbox for them — that channel belongs

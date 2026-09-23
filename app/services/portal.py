@@ -167,9 +167,23 @@ NOT_HER_PROBLEM = frozenset(
 
 #: What each order state means to them. `void` matters most: §9.4 pays on
 #: delivery, and an order that vanishes without a word looks like a mistake.
+#: The words on an order's chip, in her own Orders list.
+#:
+#: **The approved export's two, and one of ours.** *Delivered* and *Pending*
+#: are the design's and they are also the accurate ones: *Counted* was ours,
+#: and it said something false by omission, because a pending order counts too
+#: (F02, ADR 0040) - a chip reading *Counted* on one row and not the other
+#: describes the opposite of the rule this platform is built on.
+#:
+#: **`VOID` keeps our word.** The export writes *Failed*, which is right for a
+#: parcel that did not arrive and wrong for the rest of what lands in this
+#: bucket: a cancelled order and a refunded one are here too, and neither
+#: failed. *Did not arrive* is what a model needs to read, and it is the only
+#: place this list departs from the design - recorded here rather than left to
+#: be rediscovered.
 ORDER_STATE_TEXT = {
-    CommissionState.EARNED: "Counted",
-    CommissionState.PENDING: "On its way",
+    CommissionState.EARNED: "Delivered",
+    CommissionState.PENDING: "Pending",
     CommissionState.VOID: "Did not arrive",
 }
 
@@ -516,7 +530,7 @@ def _guarantee(figures: dict) -> dict | None:
     applied** - which is the whole point. A month where their targets have not
     been recorded pays their commission, because §9.5's comparison has no answer
     without them. Sara's September looked like this: a guaranteed minimum of
-    E£8,000, a commission of E£1,100, and a screen showing E£1,100 with no
+    EGP 8,000, a commission of EGP 1,100, and a screen showing EGP 1,100 with no
     mention of the guarantee at all.
 
     Nothing was wrong with the figure. What was wrong was that the one number
@@ -851,7 +865,7 @@ def _credited_from(
     targets in, in which she is owed nothing at all, and the only thing
     standing between that and a support message is this sentence.
 
-    It also used to be the wrong sentence. The screen said *includes E£9,000
+    It also used to be the wrong sentence. The screen said *includes EGP 9,000
     from August*, which reads as money **added** to the month - the exact
     opposite of what is happening. She already received it; that is why nothing
     is being sent now.
@@ -1390,7 +1404,7 @@ def my_year(db: Session, affiliate: AffiliateProfile) -> dict:
                 # **The month in progress is marked, not hidden here.**
                 #
                 # A part-month plotted beside finished ones reads as a
-                # collapse: September at E£503 next to August at E£3,829
+                # collapse: September at EGP 503 next to August at EGP 3,829
                 # drew a line falling off a cliff, when September was three
                 # days old. The charts drop it; this screen still returns it,
                 # because the Month tab is where a live figure belongs and one

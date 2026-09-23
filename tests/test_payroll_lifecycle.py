@@ -179,7 +179,7 @@ def test_a_carried_order_keeps_its_own_month(db):
 
 
 def test_the_carried_line_says_where_it_came_from(db):
-    """§11.4's own wording: "Carried forward from August - 2 orders, E£840"."""
+    """§11.4's own wording: "Carried forward from August - 2 orders, EGP 840"."""
     affiliate = _affiliate(db)
     _order(db, affiliate, "paid", 200_000)
     _order(db, affiliate, "late-1", 50_000, state=CommissionState.PENDING)
@@ -806,7 +806,7 @@ def test_a_carried_order_is_paid_by_the_month_that_carries_it(db):
 
     september = calculate_month(db, affiliate, SEPTEMBER)
 
-    # E£3,000 of its own at 10%, plus E£1,000 carried at 10%.
+    # EGP 3,000 of its own at 10%, plus EGP 1,000 carried at 10%.
     assert september.carried_orders == 1
     assert september.carried_piastres == 10_000
     assert september.payout_piastres == 40_000
@@ -837,8 +837,8 @@ def test_a_carried_order_is_paid_at_its_own_months_rate(db):
 
     september = calculate_month(db, affiliate, SEPTEMBER)
 
-    # September's own E£1,000 at 20% = E£200. August's late E£1,000 at **10%**
-    # = E£100. Paying it at September's rate would have made it E£400.
+    # September's own EGP 1,000 at 20% = EGP 200. August's late EGP 1,000 at **10%**
+    # = EGP 100. Paying it at September's rate would have made it EGP 400.
     assert september.carried_piastres == 10_000
     assert september.payout_piastres == 30_000
 
@@ -903,7 +903,7 @@ def test_carried_money_sits_on_top_of_a_guarantee_not_inside_it(db):
 
     september = calculate_month(db, affiliate, SEPTEMBER)
 
-    # Own commission E£100, floor E£8,000, carried E£100.
+    # Own commission EGP 100, floor EGP 8,000, carried EGP 100.
     assert september.guarantee_applied is True
     assert september.payout_piastres == 810_000
 
@@ -967,7 +967,7 @@ def test_reopening_a_month_reclaims_an_order_the_next_month_has_not_paid(db):
     db.flush()
 
     assert carried_into(db, affiliate, SEPTEMBER) == []
-    # E£2,000 + E£1,000 at 10%.
+    # EGP 2,000 + EGP 1,000 at 10%.
     assert calculate_month(db, affiliate, AUGUST).payout_piastres == 30_000
 
 

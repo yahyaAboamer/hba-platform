@@ -15,8 +15,8 @@ counted delivered orders only, and the pending-inclusive rule lived in
 `live_transition_not_enabled`.
 
 So there were two answers to *what is this month worth*. The readiness audit
-reproduced the gap with the platform's own service functions: E£10,000 of
-pending sales at ten percent produced **E£0 live and E£1,000 in the preview**.
+reproduced the gap with the platform's own service functions: EGP 10,000 of
+pending sales at ten percent produced **EGP 0 live and EGP 1,000 in the preview**.
 A model could be shown one figure and paid the other.
 
 Under the delivered-only rule, an order still travelling when its month closed

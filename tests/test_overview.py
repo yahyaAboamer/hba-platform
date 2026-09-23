@@ -143,8 +143,8 @@ def test_a_salary_and_commission_month_reports_both(db):
 
 
 def test_a_guarantee_that_applied_shows_what_the_floor_added(db):
-    """She sold E£1,000 of commission against an E£3,000 floor. The owner needs
-    to see that E£2,000 of the payout is the guarantee rather than sales - it
+    """She sold EGP 1,000 of commission against an EGP 3,000 floor. The owner needs
+    to see that EGP 2,000 of the payout is the guarantee rather than sales - it
     is the figure that answers *what is this costing us beyond what they sold*.
     """
     affiliate = _model(

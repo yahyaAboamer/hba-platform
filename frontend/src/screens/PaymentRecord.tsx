@@ -3,7 +3,11 @@ import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 
 import { Money } from "../components/Money";
 import { api } from "../lib/api";
-import { describeDestination, PAYOUT_FIELD_LABEL } from "../lib/payouts";
+import {
+  NO_DESTINATION_RECORDED,
+  PAYOUT_FIELD_LABEL,
+  describeDestination,
+} from "../lib/payouts";
 import { egpPlain, formatMonth, parseEgp } from "../lib/money";
 import type { Balance } from "./Payments";
 import "./Payments.css";
@@ -246,7 +250,7 @@ export function PaymentRecord() {
         )}
 
         <label className="pay-record__field">
-          <span>Amount transferred, E£</span>
+          <span>Amount transferred, EGP</span>
           <input
             className="input pay-record__input"
             inputMode="decimal"
@@ -269,7 +273,14 @@ export function PaymentRecord() {
         <label className="pay-record__field">
           <span>Destination used</span>
           <select className="input pay-record__input" value="current" disabled>
-            <option value="current">{describeDestination(balance.destination ?? null)}</option>
+            {/* *No destination recorded* is what the admin says; *Nothing on
+             *  file yet* is what the portal says to the model herself. This
+             *  is an admin screen and it was borrowing her sentence. */}
+            <option value="current">
+              {balance.destination
+                ? describeDestination(balance.destination)
+                : NO_DESTINATION_RECORDED}
+            </option>
           </select>
         </label>
 

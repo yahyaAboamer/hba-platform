@@ -10,7 +10,7 @@ a sample of 50 it called *fulfilled*, only 35 had actually been delivered - ten
 mid-attempt, three out for delivery, one in transit, one failed outright.
 
 **A refund is not always a refund.** One order carried refund line items worth
-E£998 against a total refunded of zero: an exchange, where the goods come back
+EGP 998 against a total refunded of zero: an exchange, where the goods come back
 and no money does.
 """
 
@@ -233,7 +233,7 @@ def test_a_completed_return_stops_blocking_the_order():
 
 def test_the_base_stays_frozen_after_the_return_finishes():
     """Unfreezing on completion would let the post-exchange subtotal back in -
-    the E£1,675-instead-of-E£1,062 reading on #29115.
+    the EGP 1,675-instead-of-EGP 1,062 reading on #29115.
     """
     assert derive_return("RETURNED")[2] is True
     assert derive_return("RETURN_FAILED")[2] is True
@@ -289,10 +289,10 @@ def test_what_separates_them_is_whether_money_moved():
 
 
 def test_an_exchange_returns_goods_and_no_money():
-    """The live finding. E£998 of merchandise came back against a total
+    """The live finding. EGP 998 of merchandise came back against a total
     refunded of zero, because the customer swapped rather than got paid.
 
-    Subtracting the merchandise would cut E£998 from a base where the customer
+    Subtracting the merchandise would cut EGP 998 from a base where the customer
     paid in full and kept goods of equal value - underpaying the model on
     precisely the case ADR 0011's freeze exists to protect.
     """

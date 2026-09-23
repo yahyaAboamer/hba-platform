@@ -182,7 +182,7 @@ def test_a_month_carrying_a_credit_names_the_month_it_came_from(db):
 
     **The sentence arrived in 05C**, and it is the part that matters now. D04
     lets a carried correction take a whole month, so July can come to nothing -
-    and the wording used to say *includes E£600 from May*, which reads as money
+    and the wording used to say *includes EGP 600 from May*, which reads as money
     added rather than an advance being repaid. It is written by the service so
     a test can hold it to account.
     """
@@ -191,8 +191,8 @@ def test_a_month_carrying_a_credit_names_the_month_it_came_from(db):
     may = approve_month(db, affiliate, MAY)
     _order(db, affiliate, "2", 3_000_000, JULY)
     approve_month(db, affiliate, JULY)
-    # A credit carries an excess (ADR 0035): May agreed E£2,000 and was sent
-    # E£2,600.
+    # A credit carries an excess (ADR 0035): May agreed EGP 2,000 and was sent
+    # EGP 2,600.
     record_payment(
         db, affiliate, amount_piastres=260_000, allocations={may.id: 260_000}
     )
@@ -214,7 +214,7 @@ def test_a_month_carrying_a_credit_names_the_month_it_came_from(db):
     assert [(row["month"], row["piastres"]) for row in credits] == [(MAY, 60_000)]
     said = credits[0]["text"]
     assert "May 2026" in said
-    assert "E£600.00" in said
+    assert "EGP 600.00" in said
     assert "includes" not in said.lower()
 
 
@@ -227,8 +227,8 @@ def test_the_month_the_credit_came_from_does_not_claim_to_carry_it(db):
     may = approve_month(db, affiliate, MAY)
     _order(db, affiliate, "2", 3_000_000, JULY)
     approve_month(db, affiliate, JULY)
-    # A credit carries an excess (ADR 0035): May agreed E£2,000 and was sent
-    # E£2,600.
+    # A credit carries an excess (ADR 0035): May agreed EGP 2,000 and was sent
+    # EGP 2,600.
     record_payment(
         db, affiliate, amount_piastres=260_000, allocations={may.id: 260_000}
     )

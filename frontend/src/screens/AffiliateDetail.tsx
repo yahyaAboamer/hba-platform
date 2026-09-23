@@ -6,6 +6,8 @@ import { Money } from "../components/Money";
 import { Corrections } from "../components/Corrections";
 import { FinancialRulesPreview } from "../components/FinancialRulesPreview";
 import { api, can } from "../lib/api";
+import { DestinationDetails } from "../components/DestinationDetails";
+import type { DestinationCard } from "../lib/payouts";
 import { describeDestination, PAY_TYPE } from "../lib/payouts";
 import type { Session } from "../lib/api";
 import { formatEgp, formatMonth } from "../lib/money";
@@ -73,6 +75,12 @@ type Detail = Affiliate & {
   codes: Code[];
   compensation: Compensation | null;
   payout_destination: Destination | null;
+  /**
+   * The full destination, or `null` where the reader may not send money.
+   * ADR 0042: the server decides, on `payments.record`, and this screen only
+   * draws what it is given.
+   */
+  payout_destination_card?: DestinationCard | null;
 };
 
 type Earnings = {
@@ -1131,6 +1139,15 @@ export function AffiliateDetail({ session }: { session: Session }) {
               <p className="pay-detail__missing">
                 {detail.name} has not submitted payment details, so nothing can be sent yet.
               </p>
+            ) : detail.payout_destination_card ? (
+              /* **The whole destination, here too** (ADR 0042). The export
+               *  draws the same card on this tab as on the payments desk,
+               *  and it is the same question asked from a different screen:
+               *  somebody looking at her profile with a banking app open
+               *  cannot type `…291` any more than somebody on the desk can.
+               *  The server sends the card only where `payments.record`
+               *  holds; marketing still gets the shortened sentence. */
+              <DestinationDetails card={detail.payout_destination_card} />
             ) : (
               <p className="profile__card-line">{describeDestination(detail.payout_destination)}</p>
             )}
@@ -1139,8 +1156,10 @@ export function AffiliateDetail({ session }: { session: Session }) {
                 {detail.payout_destination ? "Correct it →" : "Set it →"}
               </Link>
             )}
-            {/* Shortened here as everywhere else (ADR 0028). The full details
-             *  are on each month's payment, behind a reveal that is recorded. */}
+            {/* Masking still governs every *record* (ADR 0028, as amended by
+             *  0042): audit rows, logs, notices and the confirmation shown
+             *  when a destination changes. This line is about neither - it
+             *  says an old transfer is not rewritten by a new destination. */}
             <p className="pay-detail__faint">Earlier transfers keep the destination they were sent to.</p>
           </section>
         </div>

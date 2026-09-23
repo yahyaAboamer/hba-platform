@@ -278,7 +278,7 @@ def test_a_month_awaiting_its_transfer_cannot_be_recovered_from(db):
 
 
 def test_recovery_is_capped_at_what_actually_moved(db):
-    """Agreed E£2,000, paid E£500, now worth nothing. E£500 is the debt."""
+    """Agreed EGP 2,000, paid EGP 500, now worth nothing. EGP 500 is the debt."""
     affiliate = _model(db)
     _order(db, affiliate, "1", 2_000_000)
     snapshot = approve_month(db, affiliate, AUGUST)
@@ -337,8 +337,8 @@ def test_a_month_worth_more_than_agreed_is_not_a_correction_against_her(db):
 def test_a_failed_sale_above_a_guarantee_costs_nothing(db):
     """§15, and the case that would manufacture a debt if it were got wrong.
 
-    She is on an E£8,000 floor and sold E£100,000 at 10%. One E£20,000 order
-    fails. Her commission falls from E£10,000 to E£8,000 - and her *pay* does
+    She is on an EGP 8,000 floor and sold EGP 100,000 at 10%. One EGP 20,000 order
+    fails. Her commission falls from EGP 10,000 to EGP 8,000 - and her *pay* does
     not move at all, because the floor was already carrying it.
     """
     affiliate = _model(
@@ -476,8 +476,8 @@ def test_a_correction_can_only_be_resolved_once(db):
 def test_a_whole_month_can_be_consumed_including_below_a_guarantee(db):
     """**D04, answered 10 September 2026: the whole month, floor included.**
 
-    She is on an E£8,000 guaranteed minimum. September's commission comes to
-    E£9,000, so that is what September is worth. An E£9,000 debt from August
+    She is on an EGP 8,000 guaranteed minimum. September's commission comes to
+    EGP 9,000, so that is what September is worth. An EGP 9,000 debt from August
     takes all of it and September settles at zero - **in a month she met and
     verified her targets in**, which is the month the guarantee was a promise
     about.
@@ -551,15 +551,15 @@ def test_two_corrections_cannot_both_spend_one_month(db):
         destination_month=SEPTEMBER,
     )
 
-    # September was worth E£250 and E£200 of it is spoken for.
+    # September was worth EGP 250 and EGP 200 of it is spoken for.
     assert capacity_of(db, affiliate, SEPTEMBER) == 50_000
 
 
 def test_a_carry_bigger_than_the_month_applies_what_fits_and_keeps_the_rest(db):
     """F12, and the case this service was built for.
 
-    Earning E£500 against a E£2,000 deduction applies E£500, sends nothing,
-    and leaves E£1,500 outstanding for a later month - this year or any other.
+    Earning EGP 500 against a EGP 2,000 deduction applies EGP 500, sends nothing,
+    and leaves EGP 1,500 outstanding for a later month - this year or any other.
     It used to be refused outright, on the reasoning that a remainder nothing
     is tracking is worse than a refusal. The remainder is tracked now: the
     month's whole difference is compared with everything already carried or
@@ -581,7 +581,7 @@ def test_a_carry_bigger_than_the_month_applies_what_fits_and_keeps_the_rest(db):
         destination_month=SEPTEMBER,
     )
 
-    # September was worth E£500 and is consumed entirely; nothing is sent, and
+    # September was worth EGP 500 and is consumed entirely; nothing is sent, and
     # no zero-value transfer stands in for the settlement.
     assert adjustment.amount_piastres == 50_000
     assert balance_for(db, affiliate, SEPTEMBER)["balance_piastres"] == 0
@@ -763,8 +763,8 @@ def test_resolving_a_correction_leaves_the_agreement_and_the_transfer_alone(db):
 def test_a_difference_larger_than_the_transfer_stays_open_and_says_why(db):
     """The other way nothing can be recovered, and it is not the same thing.
 
-    Agreed E£2,000, E£100 sent, the order then failed: E£100 is recoverable
-    and E£1,900 of the difference is against money that has not been
+    Agreed EGP 2,000, EGP 100 sent, the order then failed: EGP 100 is recoverable
+    and EGP 1,900 of the difference is against money that has not been
     transferred at all. Taking that back would be recovering what never
     moved; hiding it would lose the difference. It waits, and becomes
     recoverable the moment the rest is sent.
@@ -776,8 +776,8 @@ def test_a_difference_larger_than_the_transfer_stays_open_and_says_why(db):
     _september(db, affiliate, base=3_000_000)
     _fail(db, "1")
 
-    # The queue says so before anybody decides anything: E£100 recoverable,
-    # E£2,000 of difference, and a reason naming which is which.
+    # The queue says so before anybody decides anything: EGP 100 recoverable,
+    # EGP 2,000 of difference, and a reason naming which is which.
     left = correction_for(db, affiliate, AUGUST)
     assert left.resolved_piastres == 0
     assert left.outstanding_piastres == 200_000
@@ -846,17 +846,17 @@ def test_a_difference_larger_than_the_transfer_stays_open_and_says_why(db):
 def test_a_destination_that_falls_before_approval_hands_back_what_it_cannot_take(db):
     """R1, and the defect the follow-up review reproduced.
 
-    E£200 is carried into September while September is earning E£200. An
-    order then fails and September is agreed at E£100. The month cannot take
+    EGP 200 is carried into September while September is earning EGP 200. An
+    order then fails and September is agreed at EGP 100. The month cannot take
     the whole deduction, and what it cannot take must go back to the
-    correction it came from - not sit on September as a E£100 *overpayment*
+    correction it came from - not sit on September as a EGP 100 *overpayment*
     on a month nothing was ever transferred for.
     """
     affiliate = _model(db)
     _order(db, affiliate, "1", 2_000_000)
     august = approve_month(db, affiliate, AUGUST)
     _paid(db, affiliate, august, 200_000)
-    # September is worth E£200 when the carry is accepted.
+    # September is worth EGP 200 when the carry is accepted.
     _order(db, affiliate, "sep-big", 1_000_000, month=SEPTEMBER)
     _order(db, affiliate, "sep-small", 1_000_000, month=SEPTEMBER)
     _fail(db, "1")
@@ -943,7 +943,7 @@ def test_two_corrections_sharing_a_destination_are_released_in_turn(db):
             destination_month="2026-10",
         )
 
-    # October is agreed at E£150 against E£200 of accepted deductions.
+    # October is agreed at EGP 150 against EGP 200 of accepted deductions.
     _order(db, affiliate, "oct-lost", 1_500_000, month="2026-10")
     _fail(db, "oct-lost")
     db.get(AttributedOrder, "oct").commission_base_piastres = 1_500_000
@@ -1025,7 +1025,7 @@ def test_a_remainder_released_in_one_year_is_carried_in_the_next(db):
 def test_hba_can_absorb_a_difference_on_a_month_nothing_was_sent_for(db):
     """R4. Visibility was not the whole workflow.
 
-    Approved E£2,000, revised to E£1,800, no transfer recorded. The queue
+    Approved EGP 2,000, revised to EGP 1,800, no transfer recorded. The queue
     showed it and refused every way of finishing with it. Absorbing is a real
     answer - the agreed figure stands and HBA takes the difference - and it
     is recorded without pretending money moved.
@@ -1163,7 +1163,7 @@ def test_a_deduction_can_be_accepted_against_a_month_not_yet_approved(db):
     assert adjustment.amount_piastres == 200_000
 
     # And it is part of what September's approval agrees: the month is worth
-    # E£500 and E£200 of it is already spoken for.
+    # EGP 500 and EGP 200 of it is already spoken for.
     approve_month(db, affiliate, SEPTEMBER)
     assert balance_for(db, affiliate, SEPTEMBER)["balance_piastres"] == 300_000
 
@@ -1222,7 +1222,7 @@ def test_a_month_swallowed_by_a_correction_explains_itself_to_her(db):
     said = my_month(db, affiliate, SEPTEMBER)["credited_from"][0]["text"]
 
     assert "August 2026" in said
-    assert "E£2,000.00" in said
+    assert "EGP 2,000.00" in said
     # **Never "includes".** The old wording read as money added to the month,
     # which is the opposite of what a credit does.
     assert "includes" not in said.lower()
@@ -1272,13 +1272,13 @@ def test_a_guarantee_month_recovers_exactly_what_the_acceptance_check_says(
 ):
     """AC43, asserted in the figures the check is written in.
 
-    Commission of E£2,100 falls to E£1,900 against a guaranteed minimum of
-    E£2,000.
+    Commission of EGP 2,100 falls to EGP 1,900 against a guaranteed minimum of
+    EGP 2,000.
 
-    * **Targets met**: she was paid E£2,100 and the month is now worth E£2,000,
-      because the floor catches it. **E£100.**
+    * **Targets met**: she was paid EGP 2,100 and the month is now worth EGP 2,000,
+      because the floor catches it. **EGP 100.**
     * **Targets missed**: the guarantee never applied, so the month is worth
-      its commission both times. **E£200.**
+      its commission both times. **EGP 200.**
 
     The same failed order, and the recovery differs by a factor of two
     depending on a target. Nothing in `corrections` knows that - it runs the
@@ -1294,8 +1294,8 @@ def test_a_guarantee_month_recovers_exactly_what_the_acceptance_check_says(
     verify(db, target)
     db.flush()
 
-    # E£2,100 of commission at 10% is E£21,000 of sales: E£19,000 that stays
-    # and E£2,000 that fails. In piastres throughout, which is the whole
+    # EGP 2,100 of commission at 10% is EGP 21,000 of sales: EGP 19,000 that stays
+    # and EGP 2,000 that fails. In piastres throughout, which is the whole
     # currency of the engine - the acceptance check is written in pounds and
     # the two are a factor of a hundred apart.
     _order(db, affiliate, "keeps", 1_900_000)

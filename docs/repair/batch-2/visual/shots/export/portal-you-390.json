@@ -1,0 +1,65 @@
+{
+ "runs": [
+  "9:41",
+  "← Back",
+  "You",
+  "Y",
+  "Yahya Aboamer",
+  "HBA ambassador since January 2026",
+  "Your arrangement",
+  "Guaranteed minimum with commission",
+  "10% commission, brought up to EGP 2,000.00 when the month's content targets are recorded as met. Set by HBA.",
+  "Appearance",
+  "Dark",
+  "Light",
+  "Personal and contact details",
+  "Cairo · 0100 441 8827",
+  "→",
+  "Height and weight",
+  "182 cm · 76 kg",
+  "→",
+  "Payment details",
+  "ipn.eg/yahya.hba",
+  "→",
+  "Payment history",
+  "7 recorded payments",
+  "→",
+  "Notifications",
+  "What HBA tells you about",
+  "→",
+  "Help",
+  "Sample answers for review",
+  "→",
+  "Sign out"
+ ],
+ "headings": [],
+ "buttons": [
+  "← Back",
+  "Dark",
+  "Light",
+  "Personal and contact detailsCairo · 0100 441 8827 →",
+  "Height and weight182 cm · 76 kg →",
+  "Payment detailsipn.eg/yahya.hba →",
+  "Payment history7 recorded payments →",
+  "NotificationsWhat HBA tells you about →",
+  "HelpSample answers for review →",
+  "Sign out"
+ ],
+ "labels": [
+  "Dark",
+  "Light"
+ ],
+ "money": [
+  "EGP 2,000.00"
+ ],
+ "heading": null,
+ "body": {
+  "family": "Inter",
+  "size": "15px",
+  "weight": "400",
+  "colour": "rgb(236, 239, 234)"
+ },
+ "background": "rgb(8, 9, 10)",
+ "scrollHeight": 844,
+ "clientHeight": 844
+}

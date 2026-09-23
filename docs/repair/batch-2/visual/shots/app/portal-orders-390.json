@@ -1,0 +1,70 @@
+{
+ "runs": [
+  "S",
+  "Sara Edrees",
+  "HBA ambassador · SARAED",
+  "September 2026",
+  "August 2026",
+  "July 2026",
+  "June 2026",
+  "May 2026",
+  "April 2026",
+  "March 2026",
+  "February 2026",
+  "January 2026",
+  "Orders",
+  "September 2026",
+  "All 1",
+  "Delivered 1",
+  "Pending 0",
+  "Not counted 0",
+  "#1014",
+  "8 September · 2 products",
+  "Delivered",
+  "EGP 1,071.00",
+  "EGP 10,710.00 net sales",
+  "Customer details aren’t shown here.",
+  "Home",
+  "Orders",
+  "Wardrobe",
+  "Targets",
+  "Ranking"
+ ],
+ "headings": [
+  "Orders"
+ ],
+ "buttons": [
+  "S",
+  "SARAED",
+  "All 1",
+  "Delivered 1",
+  "Pending 0",
+  "Not counted 0",
+  "#10148 September · 2 productsDeliveredEGP 1,071.00EGP 10,710.00 net sales",
+  "Home",
+  "Orders",
+  "Wardrobe",
+  "Targets",
+  "Ranking"
+ ],
+ "labels": [],
+ "money": [
+  "EGP 1,071.00",
+  "EGP 10,710.00"
+ ],
+ "heading": {
+  "family": "Inter",
+  "size": "15px",
+  "weight": "500",
+  "colour": "rgb(236, 239, 234)"
+ },
+ "body": {
+  "family": "Inter",
+  "size": "15px",
+  "weight": "400",
+  "colour": "rgb(236, 239, 234)"
+ },
+ "background": "rgb(8, 9, 10)",
+ "scrollHeight": 844,
+ "clientHeight": 844
+}

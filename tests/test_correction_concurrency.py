@@ -228,7 +228,7 @@ def _adjustments(kind=None):
 def test_two_sessions_resolving_one_correction_recover_it_once(committed):
     """R2. The race the sequential retry test cannot reach.
 
-    Both sessions read the same E£2,000 outstanding, and both are entitled to
+    Both sessions read the same EGP 2,000 outstanding, and both are entitled to
     act on it as far as any check can tell. Exactly one recovery may exist
     afterwards, and September must be reduced once.
     """
@@ -261,7 +261,7 @@ def test_two_sessions_resolving_one_correction_recover_it_once(committed):
 
         affiliate = session.get(Profile, committed)
         assert correction_for(session, affiliate, AUGUST).outstanding_piastres == 0
-        # September needed E£900 and E£200 of it is already in her hands.
+        # September needed EGP 900 and EGP 200 of it is already in her hands.
         assert balance_for(session, affiliate, SEPTEMBER)["credited_piastres"] == 200_000
         assert balance_for(session, affiliate, SEPTEMBER)["balance_piastres"] == 700_000
     finally:
@@ -519,9 +519,9 @@ def test_a_colliding_key_for_a_different_decision_is_refused(committed):
 def test_two_corrections_cannot_both_spend_one_destination(fresh_database):
     """R2. The other race: one month, two claims on it.
 
-    June and July are both overpaid by E£100 and both carried into September,
-    which is worth E£150. The two together are more than it has, and the
-    ledger must not end up recording E£200 applied to a E£150 month.
+    June and July are both overpaid by EGP 100 and both carried into September,
+    which is worth EGP 150. The two together are more than it has, and the
+    ledger must not end up recording EGP 200 applied to a EGP 150 month.
     """
     from app.models.affiliates import AffiliateProfile
 
@@ -568,7 +568,7 @@ def test_two_corrections_cannot_both_spend_one_destination(fresh_database):
             amount for kind, amount in _adjustments(AdjustmentType.CREDIT)
         )
         # Whatever order they arrived in, the month cannot give more than it
-        # has: E£150, not the E£200 the two corrections asked for together.
+        # has: EGP 150, not the EGP 200 the two corrections asked for together.
         assert applied <= 150_000, f"{applied} piastres applied to a 150000 month"
         assert balance_for(session, affiliate, SEPTEMBER)["balance_piastres"] >= 0
         # And nothing was lost: what the month could not take is still open
@@ -587,7 +587,7 @@ def test_two_corrections_cannot_both_spend_one_destination(fresh_database):
 
 @pytest.fixture()
 def carried_into_october(fresh_database):
-    """August overpaid by E£2,000, and an October worth E£2,000 to take it.
+    """August overpaid by EGP 2,000, and an October worth EGP 2,000 to take it.
 
     October is deliberately left in draft: a carry is accepted against a month
     before it is agreed (F07, F12), which is the window approval and the
@@ -651,13 +651,13 @@ def test_a_carry_landing_during_an_approval_is_part_of_what_is_agreed(
     """F3. The deterministic one: approval waits, the carry lands, approval runs.
 
     The approving session reaches the gate and is held there until the other
-    has committed a E£2,000 carry onto the very month it is about to agree.
+    has committed a EGP 2,000 carry onto the very month it is about to agree.
     Everything approval decides on is read after that gate, so the snapshot it
     writes has to account for the carry.
 
     What must not happen is the shape the old order produced: a snapshot whose
     frozen deduction evidence says nothing landed on this month, beside a
-    ledger in which E£2,000 did. Two records of one month, disagreeing, with
+    ledger in which EGP 2,000 did. Two records of one month, disagreeing, with
     the statement rendered from the one that is wrong.
     """
     from app.models.affiliates import AffiliateProfile
@@ -742,7 +742,7 @@ def test_an_approval_and_a_carry_racing_leave_one_consistent_month(
 def test_two_carries_and_an_approval_cannot_overdraw_the_month(fresh_database):
     """F3. Three writers, one destination worth less than the two claims.
 
-    June and July are each owed E£1,000 back; September is worth E£1,500 and is
+    June and July are each owed EGP 1,000 back; September is worth EGP 1,500 and is
     being agreed at the same moment. The two carries together are more than it
     has. However the three interleave, September may absorb at most what it is
     worth, and what it cannot take stays open against the month it came from.
@@ -821,14 +821,14 @@ def test_two_carries_and_an_approval_cannot_overdraw_the_month(fresh_database):
 def test_a_release_and_a_decision_on_the_same_source_settle_it_once(fresh_database):
     """F3. Approval handing money back while somebody decides about it.
 
-    August carries its whole E£2,000 into an October that then loses the sale
-    it was going to pay with. Agreeing October at nothing releases the E£2,000
+    August carries its whole EGP 2,000 into an October that then loses the sale
+    it was going to pay with. Agreeing October at nothing releases the EGP 2,000
     back to August — at the same moment as somebody absorbing August's
     correction on the screen in front of them.
 
     The release reopens the difference and the absorb closes it. Both are real
     decisions and both may stand; what must not happen is August ending up
-    settled for more or less than the one E£2,000 it was ever short.
+    settled for more or less than the one EGP 2,000 it was ever short.
     """
     from app.models.affiliates import AffiliateProfile
     from app.services.corrections import _resolved_so_far
@@ -889,7 +889,7 @@ def test_a_release_and_a_decision_on_the_same_source_settle_it_once(fresh_databa
         settled, _ = _resolved_so_far(session, affiliate, AUGUST)
         outstanding = correction_for(session, affiliate, AUGUST).outstanding_piastres
         assert settled + outstanding == 200_000, (
-            f"August was short E£2,000 and is recorded as {settled} settled "
+            f"August was short EGP 2,000 and is recorded as {settled} settled "
             f"with {outstanding} open"
         )
         assert outstanding >= 0

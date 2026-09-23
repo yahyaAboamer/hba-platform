@@ -55,6 +55,14 @@ row and on the card, with no intermediate step.**
 3. Both are served **only** where `payments.record` holds — the permission
    ADR 0028 already chose for the reveal. Marketing reads the same screen and
    still sees the masked sentence.
+3. **And on the model's own profile**, which is the same card drawn by the
+   same component. Added 23 September 2026, after a browser sweep found the
+   payments desk showing a model's whole InstaPay number while her profile one
+   click away still printed `InstaPay · …291` — the same fact, to the same
+   person, on the same permission, written two ways. The export draws the card
+   on both. `frontend/src/components/DestinationDetails.tsx` is now the only
+   place it is drawn, and `payout_destination_card` is served on the same
+   `payments.record` check, so the gate cannot widen by being reimplemented.
 4. **The admin reveal route is removed.** It was kept in a first draft of
    this ADR on the grounds that deleting a working route is churn;
    `test_reachability` disagreed, and it was right. A capability with no way
@@ -66,10 +74,16 @@ row and on the card, with no intermediate step.**
 ## What does not change
 
 **`mask_destination` is untouched, and it is still the only representation
-allowed outside the payer's screen.** Audit rows, logs, notifications, the
-confirmation shown when a destination changes, the roster, a model's own
-profile summary: all masked, exactly as 0028 requires. Nothing in this ADR
-puts a value anywhere it is written down.
+allowed outside the payer's screens.** Audit rows, logs, notifications, the
+confirmation shown when a destination changes, the roster, and the model's own
+portal summary: all masked, exactly as 0028 requires. Nothing in this ADR puts
+a value anywhere it is written down.
+
+*"The payer's screens"* is now two - the payments desk and the model's profile
+- and the amendment above says why. The `payout_destination` field on that
+profile is still masked and still what anything writing a record reads; what
+was added beside it is a second field, served on `payments.record`, carrying
+the card.
 
 ## The cost, stated plainly
 

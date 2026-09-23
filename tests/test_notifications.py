@@ -169,11 +169,11 @@ def test_a_month_email_states_a_figure_and_links_to_the_screen(monkeypatch):
         },
     )
 
-    assert "E£2,400.00" in message.body
+    assert "EGP 2,400.00" in message.body
     assert "https://pay.example.com/" in message.body
     # One figure, not a breakdown. Restating the lines in an email is a second
     # place for them to disagree with the screen, and they read both.
-    assert message.body.count("E£") == 1
+    assert message.body.count("EGP ") == 1
 
 
 def test_no_link_is_better_than_a_broken_one(monkeypatch):
@@ -751,10 +751,10 @@ def test_the_message_reaches_the_provider_intact(monkeypatch):
 def test_the_html_carries_the_same_words_as_the_text(monkeypatch):
     from app.services.mail_branding import wrap
 
-    body = "Hi Nour,\n\nSeptember is closed and agreed at E£280.00."
+    body = "Hi Nour,\n\nSeptember is closed and agreed at EGP 280.00."
     rendered = wrap(body)
 
-    assert "September is closed and agreed at E£280.00." in rendered
+    assert "September is closed and agreed at EGP 280.00." in rendered
     assert "Hi Nour," in rendered
 
 

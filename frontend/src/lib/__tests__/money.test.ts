@@ -21,7 +21,7 @@ describe("parseEgp", () => {
   });
 
   it("accepts what a person actually types", () => {
-    expect(parseEgp("E£5,512.35")).toBe(551_235);
+    expect(parseEgp("EGP 5,512.35")).toBe(551_235);
     expect(parseEgp(" 5 512.35 ")).toBe(551_235);
     expect(parseEgp("0.05")).toBe(5);
     expect(parseEgp(".5")).toBe(50);
@@ -66,7 +66,32 @@ describe("egpPlain", () => {
 
 describe("formatEgp", () => {
   it("always shows two decimals, so a column can be scanned", () => {
-    expect(formatEgp(551_200)).toBe("E£5,512.00");
-    expect(formatEgp(5)).toBe("E£0.05");
+    expect(formatEgp(551_200)).toBe("EGP 5,512.00");
+    expect(formatEgp(5)).toBe("EGP 0.05");
+  });
+
+  /**
+   * **The same examples `tests/test_money.py` asserts of `format_egp`.**
+   *
+   * Two implementations render money here: the server sends most figures
+   * already formatted, and this one formats what the browser is given as
+   * piastres. Two implementations of a *format* are safe in a way two
+   * implementations of an *amount* are not - but only while they agree, and
+   * nothing but this would notice them drifting. If you change one, this
+   * fails; change both, and update the Python test with the same rows.
+   */
+  it("renders exactly what the server's format_egp renders", () => {
+    const shared: [number, string][] = [
+      [1_060_837, "EGP 10,608.37"],
+      [0, "EGP 0.00"],
+      [5, "EGP 0.05"],
+      [100, "EGP 1.00"],
+      // U+2212, not a hyphen: it is the width of a digit, so a column of
+      // negatives stays in line.
+      [-1_060_837, "−EGP 10,608.37"],
+    ];
+    for (const [piastres, rendered] of shared) {
+      expect(formatEgp(piastres)).toBe(rendered);
+    }
   });
 });

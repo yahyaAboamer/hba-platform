@@ -281,7 +281,7 @@ def test_totals_count_each_outcome(client):
         "held": 1,
         "unattributed": 1,
         "carried": 0,
-        # *N orders - E£X counted*, the line the approved list heads itself
+        # *N orders - EGP X counted*, the line the approved list heads itself
         # with: every order here was delivered, so all three count.
         "counted_piastres": body["totals"]["counted_piastres"],
         "counted": body["totals"]["counted"],
@@ -352,7 +352,7 @@ def test_an_unknown_order_is_a_404_not_an_empty_view(client):
 
 
 def test_the_month_counts_what_did_not_fail(client):
-    """*N orders - E£X counted*: a failed parcel was never sales."""
+    """*N orders - EGP X counted*: a failed parcel was never sales."""
     nour = _affiliate(client, "Nour", "nour@example.com")
     _register_code(client, nour["id"], "NOUR10")
     _paid_order(nour["id"], "o-10", 100_000)

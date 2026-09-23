@@ -105,7 +105,7 @@ def _order(db, affiliate, order_id, base, *, month=AUGUST):
 
 
 def _owed(db, affiliate, month=AUGUST, base=2_000_000):
-    """An approved month with a round obligation. 10% of E£20,000 = E£2,000."""
+    """An approved month with a round obligation. 10% of EGP 20,000 = EGP 2,000."""
     _order(db, affiliate, f"{affiliate.id}-{month}", base, month=month)
     return approve_month(db, affiliate, month)
 
@@ -172,7 +172,7 @@ def test_two_transfers_can_settle_one_month(db):
 
 
 def test_one_transfer_can_cover_two_months(db):
-    """§8's worked example: a single E£10,000 transfer applied to August and
+    """§8's worked example: a single EGP 10,000 transfer applied to August and
     September **without pretending two transfers occurred**.
     """
     affiliate = _affiliate(db)
@@ -303,7 +303,7 @@ def test_money_already_sent_still_counts_after_a_reopen(db):
     # Nothing has been allocated to version 2 - the fact the old test was
     # protecting, kept and named for what it is.
     assert balance["paid_this_version_piastres"] == 0
-    # And E£2,000 has left the bank for this month, so it is not still owed.
+    # And EGP 2,000 has left the bank for this month, so it is not still owed.
     assert balance["paid_piastres"] == 200_000
     assert balance["paid_earlier_versions_piastres"] == 200_000
     assert balance["balance_piastres"] == (
@@ -352,8 +352,8 @@ def test_a_month_agreed_once_has_one_version(db):
 
 
 def test_allocating_more_than_was_sent_is_impossible(db):
-    """§17, and a trigger rather than a review comment. "We allocated E£12,000
-    of a E£10,000 transfer" has to be impossible.
+    """§17, and a trigger rather than a review comment. "We allocated EGP 12,000
+    of a EGP 10,000 transfer" has to be impossible.
     """
     affiliate = _affiliate(db)
     snapshot = _owed(db, affiliate)
@@ -537,12 +537,12 @@ def test_a_credit_leaves_the_overpaid_month_settled(db):
     the arithmetic said "debt", and both passed for a month.
     """
     affiliate = _affiliate(db)
-    _owed(db, affiliate, AUGUST)  # E£2,000 agreed
-    _owed(db, affiliate, SEPTEMBER, base=1_000_000)  # E£1,000 agreed
+    _owed(db, affiliate, AUGUST)  # EGP 2,000 agreed
+    _owed(db, affiliate, SEPTEMBER, base=1_000_000)  # EGP 1,000 agreed
     august = get_month(db, affiliate, AUGUST)
     september = get_month(db, affiliate, SEPTEMBER)
 
-    # Overpaid by E£200: sent E£2,200 against E£2,000.
+    # Overpaid by EGP 200: sent EGP 2,200 against EGP 2,000.
     _pay(db, affiliate, AUGUST, 220_000)
     assert balance_for(db, affiliate, AUGUST)["balance_piastres"] == -20_000
 
@@ -561,7 +561,7 @@ def test_a_credit_leaves_the_overpaid_month_settled(db):
     assert august_now["balance_piastres"] == 0
     assert august_now["state"] == SettlementState.SETTLED
 
-    # And September needs E£200 less sent, because she is already holding it —
+    # And September needs EGP 200 less sent, because she is already holding it —
     # which is exactly what the reconcile screen promises in words.
     assert balance_for(db, affiliate, SEPTEMBER)["balance_piastres"] == 80_000
 
@@ -647,8 +647,8 @@ def test_a_credit_waits_on_a_draft_month_and_applies_when_it_is_approved(db):
 
     affiliate = _affiliate(db)
     _owed(db, affiliate, AUGUST)
-    # A credit carries an excess, so there has to be one: E£2,200 sent
-    # against E£2,000 agreed.
+    # A credit carries an excess, so there has to be one: EGP 2,200 sent
+    # against EGP 2,000 agreed.
     _pay(db, affiliate, AUGUST, 220_000)
     adjust(
         db,
@@ -668,7 +668,7 @@ def test_a_credit_waits_on_a_draft_month_and_applies_when_it_is_approved(db):
     _owed(db, affiliate, SEPTEMBER, base=1_000_000)
     db.flush()
 
-    # E£1,000 agreed, less the E£200 she is already holding.
+    # EGP 1,000 agreed, less the EGP 200 she is already holding.
     settled = balance_for(db, affiliate, SEPTEMBER)
     assert settled["credited_piastres"] == 20_000
     assert settled["balance_piastres"] == 80_000
@@ -771,14 +771,14 @@ def test_one_models_correction_never_blocks_another(db):
 
 # ── ADR 0035: an adjustment closes a difference ─────────────────────────────
 #
-# Reproduced from staging, where a real overpayment of E£257 was reported as
-# E£5,074 and doubled on every press of "Settle the difference".
+# Reproduced from staging, where a real overpayment of EGP 257 was reported as
+# EGP 5,074 and doubled on every press of "Settle the difference".
 
 
 def test_settling_an_overpayment_does_not_make_it_larger(db):
     """The defect, in the shape it actually took.
 
-    August agreed at E£2,000 and paid E£2,200. The excess is E£200. Settling
+    August agreed at EGP 2,000 and paid EGP 2,200. The excess is EGP 200. Settling
     it must leave the month at zero — and settling it again must be refused
     rather than doubling it, which is what happened four times on staging
     before anybody noticed the figure was growing.
@@ -804,7 +804,7 @@ def test_settling_an_overpayment_does_not_make_it_larger(db):
     assert settled["state"] == SettlementState.SETTLED
 
     # And there is nothing left to settle. Before ADR 0035 this call would
-    # have been offered a difference of E£400 and accepted it.
+    # have been offered a difference of EGP 400 and accepted it.
     with pytest.raises(ValueError, match="nothing left to settle"):
         adjust(
             db,
@@ -824,7 +824,7 @@ def test_an_adjustment_cannot_exceed_the_difference_it_closes(db):
     """
     affiliate = _affiliate(db)
     _owed(db, affiliate, AUGUST)
-    _pay(db, affiliate, AUGUST, 220_000)  # E£200 over
+    _pay(db, affiliate, AUGUST, 220_000)  # EGP 200 over
 
     with pytest.raises(ValueError, match="more than the difference"):
         adjust(
@@ -843,7 +843,7 @@ def test_two_half_settlements_are_allowed_and_a_third_is_not(db):
     refused halfway through."""
     affiliate = _affiliate(db)
     _owed(db, affiliate, AUGUST)
-    _pay(db, affiliate, AUGUST, 220_000)  # E£200 over
+    _pay(db, affiliate, AUGUST, 220_000)  # EGP 200 over
 
     for _ in range(2):
         adjust(
@@ -874,7 +874,7 @@ def test_writing_off_a_debt_still_settles_it(db):
     what it owed."""
     affiliate = _affiliate(db)
     _owed(db, affiliate, AUGUST)
-    _pay(db, affiliate, AUGUST, 150_000)  # E£500 short
+    _pay(db, affiliate, AUGUST, 150_000)  # EGP 500 short
 
     assert balance_for(db, affiliate, AUGUST)["balance_piastres"] == 50_000
 
@@ -934,7 +934,7 @@ def test_a_month_before_go_live_owes_nothing_however_it_was_approved(
 ):
     """ADR 0036, and the whole of what replaced ADR 0014's blocker.
 
-    August is worth E£2,000 and that figure is real - her dashboard shows it.
+    August is worth EGP 2,000 and that figure is real - her dashboard shows it.
     What is **outstanding** is nothing, because the money moved outside the
     platform months ago.
     """

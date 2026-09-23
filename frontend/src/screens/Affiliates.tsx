@@ -337,12 +337,14 @@ export function Affiliates() {
           <h1>Models</h1>
           {rows && (
             <span className="page__subtitle">
-              {/* While a search or segment is narrowing the list, the count
-               *  says what is on screen as well as what exists — a bare
-               *  "6 on file" above one visible row reads as a bug. */}
-              {visible.length === rows.length
-                ? `${rows.length} on file`
-                : `${visible.length} of ${rows.length}`}
+              {/* The export's own subtitle, which is the *active* count and
+               *  nothing else: `this.activeModels().length + " active"`. It
+               *  said "19 of 22" here until 23 September - a count of what a
+               *  filter was showing - and that is a different fact. How many
+               *  models are collaborating does not change when somebody types
+               *  in the search box, and the pager below already says what is
+               *  on screen, in the export's words and with its suffix. */}
+              {`${rosterMatches(rows, "active", "").length} active`}
             </span>
           )}
         </div>
@@ -640,7 +642,7 @@ export function Affiliates() {
                       ) : row.account_kind === "house" ? (
                         <span className="affiliates__tone--quiet">Never paid</span>
                       ) : (
-                        <span className="affiliates__tone--refused">Not set</span>
+                        <span className="affiliates__tone--refused">No terms set</span>
                       )}
                     </td>
                     <td className="affiliates__go" aria-hidden="true">→</td>
@@ -655,7 +657,11 @@ export function Affiliates() {
       {segment !== "invitations" && visible.length > ROSTER_PAGE && shown === "table" && (
         <div className="affiliates__pager">
           <span>
-            {page * ROSTER_PAGE + 1}–{page * ROSTER_PAGE + paged.length} of {visible.length}
+            {/* `1–12 of 19`, and `of 19 matching` while a search is on -
+             *  the export's exact sentence. The suffix is what stops the
+             *  total reading as the whole roster when it is a result count. */}
+            {`${page * ROSTER_PAGE + 1}–${page * ROSTER_PAGE + paged.length}`}
+            {` of ${visible.length}${query.trim() ? " matching" : ""}`}
           </span>
           <span className="affiliates__pager-acts">
             <button

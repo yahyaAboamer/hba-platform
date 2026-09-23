@@ -32,7 +32,12 @@ type Filter = "all" | "earned" | "pending" | "void";
 
 const FILTERS: { key: Filter; label: string }[] = [
   { key: "all", label: "All" },
-  { key: "earned", label: "Counted" },
+  // The export's word, and the accurate one. *Counted* was ours and it said
+  // something false by omission: a **pending** order counts too (F02, ADR
+  // 0040), so a filter called *Counted* that hides pending describes the
+  // opposite of the rule this platform is built on. *Delivered* is a fact
+  // about the parcel, which is what the bucket actually holds.
+  { key: "earned", label: "Delivered" },
   { key: "pending", label: "Pending" },
   // Not the export's *Failed*: this one holds cancelled and refunded orders
   // too, and calling a cancelled order a failed delivery would describe
@@ -192,7 +197,12 @@ function Row({
         <span className="orders__left">
           <span className="code orders__number">{order.order_number}</span>
           <span className="orders__meta">
-            {onlyTheDate(order.placed_at)} · {pieces > 0 ? `${pieces} ${pieces === 1 ? "piece" : "pieces"}` : "contents not recorded"}
+            {/* *product* / *products*, the export's word. Ours said *pieces*,
+                which is warehouse language for the same thing. */}
+            {onlyTheDate(order.placed_at)} ·{" "}
+            {pieces > 0
+              ? `${pieces} ${pieces === 1 ? "product" : "products"}`
+              : "contents not recorded"}
           </span>
           {/* Her words for the state, from the server, in the tone that
               matches it: counted is money, on its way is not yet, and did

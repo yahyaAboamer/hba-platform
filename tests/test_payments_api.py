@@ -77,6 +77,17 @@ def _affiliate(client, name="Nour", email="nour@example.com") -> dict:
     response = client.post("/api/affiliates", json=body)
     assert response.status_code == 201, response.text
     affiliate = response.json()
+    # **Active, because the desk is a list of people on the programme.**
+    # `create_affiliate` makes an application; approving it is what puts
+    # somebody on the payroll, and `on_the_desk` now models that - the
+    # approved export lists `participants(month)`, which excludes an
+    # application. A fixture that left her pending and then gave her pay terms
+    # and orders was describing a state the product does not produce.
+    with engine.begin() as connection:
+        connection.execute(
+            text("UPDATE affiliate_profile SET status = 'active' WHERE id = :id"),
+            {"id": affiliate["id"]},
+        )
     client.put(
         f"/api/affiliates/{affiliate['id']}/pay-history",
         json={
@@ -131,7 +142,7 @@ def _commit(client, month, affiliate_id):
 
 
 def _owed(client, affiliate, month=AUGUST, base=2_000_000) -> int:
-    """An approved month owing E£2,000. Returns the snapshot id."""
+    """An approved month owing EGP 2,000. Returns the snapshot id."""
     _order(affiliate["id"], f"{affiliate['id']}-{month}", base, month=month)
     _commit(client, month, affiliate["id"])
     with engine.begin() as connection:
@@ -545,8 +556,8 @@ def test_a_credit_moves_the_money_forward(client):
     august = _owed(client, affiliate, AUGUST)
     _owed(client, affiliate, SEPTEMBER, base=1_000_000)
 
-    # A credit carries an excess, so there has to be one: E£2,200 against
-    # E£2,000 agreed.
+    # A credit carries an excess, so there has to be one: EGP 2,200 against
+    # EGP 2,000 agreed.
     # Pay it in full, correctly.
     paid = client.post(
         "/api/payments",
@@ -1223,8 +1234,8 @@ def test_a_forecast_month_reports_the_transfer_not_the_gross_earnings(client):
 
     A carry is accepted against a month **before** it is agreed (F07, F12), so
     a draft month can already be carrying a deduction. September is on course
-    to earn E£3,000 and E£2,000 of August's overpayment is landing on it, so
-    the bank movement is E£1,000 — and *funds required* is the question that
+    to earn EGP 3,000 and EGP 2,000 of August's overpayment is landing on it, so
+    the bank movement is EGP 1,000 — and *funds required* is the question that
     column asks.
 
     The approved branch has always netted the deduction out. The forecast
@@ -1247,7 +1258,7 @@ def test_a_forecast_month_reports_the_transfer_not_the_gross_earnings(client):
             ],
         },
     )
-    # September earns E£3,000 and is deliberately left unapproved.
+    # September earns EGP 3,000 and is deliberately left unapproved.
     _order(affiliate["id"], "sep-big", 3_000_000, month=SEPTEMBER)
     with engine.begin() as connection:
         connection.execute(
@@ -1367,3 +1378,121 @@ def test_an_account_that_cannot_pay_sees_neither(client):
     assert row["destination_card"] is None
     # And the masked form is still there, so the screen still says where it goes.
     assert row["destination"]["method"] == "instapay"
+
+
+def test_the_profile_carries_the_same_card_as_the_desk(client):
+    """ADR 0042, on the model's own profile. A03.
+
+    The card was on the payments desk and the profile one click away still
+    printed `InstaPay · …4567` - the same fact, to the same person, with the
+    same permission, written two different ways. The approved export draws the
+    same card in both places, and it is the same job in both: somebody with a
+    banking app open cannot type a number made of dots.
+    """
+    affiliate = _affiliate(client, "Nour", "nour-profile-card@example.com")
+    _instapay(affiliate["id"])
+
+    profile = client.get(f"/api/affiliates/{affiliate['id']}").json()
+    desk = client.get(f"/api/payments/{AUGUST}").json()["affiliates"][0]
+
+    assert profile["payout_destination_card"] == desk["destination_card"]
+    assert profile["payout_destination_card"]["rows"][0]["value"] == "01001234567"
+    # Masked beside it, still, for everything that writes a record down.
+    assert profile["payout_destination"]["instapay_phone"] != "01001234567"
+
+
+def test_a_profile_reader_who_cannot_pay_sees_no_card(client):
+    """The same gate, on the same permission, from the other screen.
+
+    Marketing may read a profile - that is what `affiliates.view` is for - and
+    may not send money. Widening the card to everybody who can open a profile
+    would have quietly undone ADR 0028's gate while claiming to obey 0042.
+    """
+    affiliate = _affiliate(client, "Nour", "nour-profile-gate@example.com")
+    _instapay(affiliate["id"])
+
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "UPDATE role_assignment SET role = 'content_manager' "
+                "WHERE user_account_id = 1 AND revoked_at IS NULL"
+            )
+        )
+
+    profile = client.get(f"/api/affiliates/{affiliate['id']}").json()
+
+    assert profile["payout_destination_card"] is None
+    assert profile["payout_destination"]["method"] == "instapay"
+
+
+def test_an_application_is_not_on_the_payments_desk(client):
+    """The export lists `participants(month)`, which excludes an application.
+
+    Somebody who applied and has not been taken on is owed nothing by
+    construction: no terms, no code, no month. Listing her as *Terms missing*
+    put her in the awaiting-approval count and on the sidebar badge, which
+    read 22 over a list of 19. Her application is handled on Models, where the
+    design puts it.
+    """
+    taken_on = _affiliate(client, "Nour", "nour-participant@example.com")
+    applied = _affiliate(client, "Habiba", "habiba-applied@example.com")
+    with engine.begin() as connection:
+        connection.execute(
+            text("UPDATE affiliate_profile SET status = 'pending' WHERE id = :id"),
+            {"id": applied["id"]},
+        )
+
+    listed = {
+        row["affiliate_id"] for row in client.get(f"/api/payments/{AUGUST}").json()["affiliates"]
+    }
+
+    assert taken_on["id"] in listed
+    assert applied["id"] not in listed
+
+
+def test_a_month_before_she_started_is_not_on_the_desk(client):
+    """The export's `started(m, month)`, in the one direction the desk needs.
+
+    A model taken on in a later month has no August, and an August row reading
+    *Terms missing* asks somebody to fix something that is not broken.
+    """
+    later = _affiliate(client, "Zeina", "zeina-later@example.com")
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "UPDATE affiliate_profile SET collaboration_start_month = '2026-12' "
+                "WHERE id = :id"
+            ),
+            {"id": later["id"]},
+        )
+
+    listed = {
+        row["affiliate_id"] for row in client.get(f"/api/payments/{AUGUST}").json()["affiliates"]
+    }
+
+    assert later["id"] not in listed
+
+
+def test_the_sidebar_badge_counts_the_people_the_desk_lists(client):
+    """One rule, two readers. The disagreement this prevents was live.
+
+    The badge counted every payable affiliate and the desk listed
+    participants, so the sidebar said 22 above a screen showing 19 - the
+    "second answer waiting to disagree" that the counts route's own docstring
+    warns about, arriving by exactly the route it predicted.
+    """
+    _affiliate(client, "Nour", "nour-badge@example.com")
+    applied = _affiliate(client, "Habiba", "habiba-badge@example.com")
+    with engine.begin() as connection:
+        connection.execute(
+            text("UPDATE affiliate_profile SET status = 'pending' WHERE id = :id"),
+            {"id": applied["id"]},
+        )
+
+    from app.services.payroll import working_month
+
+    desk = client.get(f"/api/payments/{working_month()}").json()["affiliates"]
+    awaiting = sum(1 for row in desk if row["state"] == "not_approved")
+    badge = client.get("/api/operations/counts").json()["payments_awaiting_approval"]
+
+    assert badge == awaiting

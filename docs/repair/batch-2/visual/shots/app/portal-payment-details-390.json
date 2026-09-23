@@ -1,0 +1,51 @@
+{
+ "runs": [
+  "← Back",
+  "Payment details",
+  "Change where you are paid",
+  "This changes where your money is sent. HBA is told whenever it moves.",
+  "How should we pay you?",
+  "InstaPay",
+  "Bank transfer",
+  "Mobile wallet",
+  "InstaPay payment address",
+  "InstaPay number",
+  "Cancel",
+  "Continue"
+ ],
+ "headings": [
+  "Change where you are paid"
+ ],
+ "buttons": [
+  "← Back",
+  "InstaPay",
+  "Bank transfer",
+  "Mobile wallet",
+  "Cancel",
+  "Continue"
+ ],
+ "labels": [
+  "How should we pay you?",
+  "InstaPay",
+  "Bank transfer",
+  "Mobile wallet",
+  "InstaPay payment address",
+  "InstaPay number"
+ ],
+ "money": [],
+ "heading": {
+  "family": "Inter",
+  "size": "13px",
+  "weight": "600",
+  "colour": "rgb(236, 239, 234)"
+ },
+ "body": {
+  "family": "Inter",
+  "size": "15px",
+  "weight": "400",
+  "colour": "rgb(236, 239, 234)"
+ },
+ "background": "rgb(8, 9, 10)",
+ "scrollHeight": 844,
+ "clientHeight": 844
+}

@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
+import { DestinationDetails } from "../components/DestinationDetails";
 import { Money } from "../components/Money";
 import { api, can } from "../lib/api";
 import type { Session } from "../lib/api";
 import { describeBlocker, formatEgp, formatMonth } from "../lib/money";
 import {
+  NO_DESTINATION_RECORDED,
   describeDestination,
   destinationHolder,
   PAY_TYPE,
@@ -130,7 +132,6 @@ export function PaymentDetail({ session }: { session: Session }) {
   const [corrections, setCorrections] = useState<Correction[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [approving, setApproving] = useState(false);
-  const [copied, setCopied] = useState<string | null>(null);
 
   const load = useCallback(() => {
     setError(null);
@@ -194,24 +195,6 @@ export function PaymentDetail({ session }: { session: Session }) {
     } finally {
       setApproving(false);
     }
-  }
-
-  /*
-   * **The real destination, on request** (ADR 0028). The export prints it on
-   * this card outright; here it takes one press, because showing it is
-   * gated on recording payments and writes an audit row - who looked, and
-   * when - and a record made every time the page opens would record
-   * browsing rather than intent.
-   */
-
-  function copy(label: string, value: string) {
-    navigator.clipboard?.writeText(value).then(
-      () => {
-        setCopied(label);
-        window.setTimeout(() => setCopied(null), 2000);
-      },
-      () => setCopied(null),
-    );
   }
 
   const head = (
@@ -397,14 +380,20 @@ export function PaymentDetail({ session }: { session: Session }) {
           <section className="pay-detail__card">
             <div className="pay-detail__card-head">
               <h2 className="pay-detail__card-title">Where to send it</h2>
-              {destination && (
-                <span className="pay-detail__muted">{destinationHolder(destination)}</span>
-              )}
+              {/* The export puts a quiet word beside the heading either way:
+               *  the method when there is one, and *No destination recorded*
+               *  when there is not. Showing nothing there left the card
+               *  looking like it had failed to load rather than like a model
+               *  who has not sent her details in. */}
+              <span className="pay-detail__muted">
+                {destination ? destinationHolder(destination) : NO_DESTINATION_RECORDED}
+              </span>
             </div>
             {!destination ? (
               <>
                 <p className="pay-detail__missing">
-                  No payout destination is on file for {balance.name}.
+                  {balance.name} has not submitted payment details, so nothing
+                  can be sent yet.
                 </p>
                 <Link className="button button--row" to={`/affiliates/${affiliateId}`}>
                   Open the profile
@@ -429,40 +418,7 @@ export function PaymentDetail({ session }: { session: Session }) {
                  *  that may record payments; anybody else sees the shortened
                  *  sentence and is told why. */}
                 {card ? (
-                  <>
-                    {card.rows
-                      .filter((entry) => entry.value)
-                      .map((entry) => (
-                        <div key={entry.label} className="pay-detail__dest">
-                          <span className="pay-detail__dest-text">
-                            <span className="pay-detail__dest-label">{entry.label}</span>
-                            <span className="pay-detail__dest-value">{entry.value}</span>
-                          </span>
-                          {entry.copy && (
-                            <button
-                              type="button"
-                              className="button button--quiet"
-                              onClick={() => copy(entry.label, entry.value ?? "")}
-                            >
-                              {copied === entry.label ? "Copied" : "Copy"}
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                    {card.link && (
-                      /* §13.1 collects a link rather than a number because a
-                         phone hands it straight to the InstaPay app. This is
-                         that link, as submitted - never rebuilt. */
-                      <a
-                        className="button pay-detail__instapay"
-                        href={card.link}
-                        target="_blank"
-                        rel="noreferrer noopener"
-                      >
-                        Open InstaPay
-                      </a>
-                    )}
-                  </>
+                  <DestinationDetails card={card} />
                 ) : (
                   <>
                     <p className="pay-detail__dest-summary">{describeDestination(destination)}</p>

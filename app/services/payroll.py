@@ -243,10 +243,10 @@ def _payload(
     # this month and what it could do about it are different facts**, and the
     # snapshot used to record only the first.
     #
-    # A month agreed at nothing with E£2,000 of deduction landing on it froze a
-    # deduction list reading E£2,000, because the payload is built before
+    # A month agreed at nothing with EGP 2,000 of deduction landing on it froze a
+    # deduction list reading EGP 2,000, because the payload is built before
     # approval works out what can actually be absorbed. Rendered onto a
-    # statement that says *E£2,000 was deducted* - which is false twice: that
+    # statement that says *EGP 2,000 was deducted* - which is false twice: that
     # much was requested, none of it was taken, and all of it went back to the
     # month it came from and is still open there.
     #
@@ -275,7 +275,7 @@ def deductions_landing_on(db: Session, affiliate: AffiliateProfile, month: str) 
 
     What the reviewer is agreeing to, beside the figure itself: approval
     freezes *accepted deduction allocations* as well as the earnings, and a
-    deduction is the difference between a month that pays E£500 and one that
+    deduction is the difference between a month that pays EGP 500 and one that
     pays nothing.
 
     Each row is identified by the adjustment that created it, so a deduction
@@ -730,15 +730,15 @@ def _release_deductions_the_month_cannot_take(
     then (F07, F12): finding an overpayment in early October and being told to
     come back in November is how one gets forgotten.
 
-    What it is worth can fall. E£200 is carried into October when October is
-    earning E£200; an order fails, October is agreed at E£100, and E£200 of
-    deduction is now sitting on a month with E£100 in it.
+    What it is worth can fall. EGP 200 is carried into October when October is
+    earning EGP 200; an order fails, October is agreed at EGP 100, and EGP 200 of
+    deduction is now sitting on a month with EGP 100 in it.
 
     ## What was wrong with leaving it
 
-    The month's balance simply went to **minus E£100 — "overpaid"** — on a
+    The month's balance simply went to **minus EGP 100 — "overpaid"** — on a
     month nothing had ever been transferred for. Worse, the source correction
-    read as fully resolved, so the E£100 that could not be taken was tracked
+    read as fully resolved, so the EGP 100 that could not be taken was tracked
     nowhere at all. A request to recover money and an amount a month could
     actually absorb are different facts, and the ledger was recording only the
     first.

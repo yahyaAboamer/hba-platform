@@ -16,18 +16,26 @@
 const PIASTRES_PER_POUND = 100;
 
 /**
- * `E£1,062.00`.
+ * `EGP 1,062.00` — the approved export's `egp()`, character for character.
+ *
+ * **`EGP `, with the space, not `E£`.** That is what the approved design
+ * writes, everywhere, and every screen went out with `E£` until 20
+ * September - which was ours, not the design's. No cleverness is needed
+ * beyond matching it.
  *
  * Always two decimals, even on a whole figure. A column where some rows show
  * pounds and others show pounds-and-piastres is a column nobody can scan, and
  * scanning is what this screen is for.
+ *
+ * The minus is U+2212, not a hyphen: it is the width of a digit, so a column
+ * of negatives stays in line.
  */
 export function formatEgp(piastres: number): string {
   const negative = piastres < 0;
   const whole = Math.trunc(Math.abs(piastres) / PIASTRES_PER_POUND);
   const fraction = Math.abs(piastres) % PIASTRES_PER_POUND;
   const grouped = whole.toLocaleString("en-GB");
-  return `${negative ? "−" : ""}E£${grouped}.${String(fraction).padStart(2, "0")}`;
+  return `${negative ? "−" : ""}EGP ${grouped}.${String(fraction).padStart(2, "0")}`;
 }
 
 /** What a figure is, which decides how it is set. */
@@ -173,7 +181,7 @@ export function currentMonth(): string {
 export function parseEgp(text: string): number | null {
   // The currency is stripped only where a currency goes — at the front.
   // Removing every "e" in the string turned "1e5" into "15", quietly reading a
-  // figure nobody meant to type as E£15.00 rather than refusing it.
+  // figure nobody meant to type as EGP 15.00 rather than refusing it.
   const cleaned = text
     .trim()
     .replace(/^\+/, "")

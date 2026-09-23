@@ -1,0 +1,42 @@
+[
+ {
+  "name": "navigation",
+  "ok": true,
+  "evidence": "Home→/ (Home)  Models→/affiliates (Models)  Products→/products (Products)  Targets→/targets (Targets)  Payments→/payments (Payments)  Settings→/settings (Settings)"
+ },
+ {
+  "name": "saving targets",
+  "ok": true,
+  "evidence": "Aya Sherif videos required: 4 → 7, reloaded as 7"
+ },
+ {
+  "name": "editing terms",
+  "ok": true,
+  "evidence": "Sara Edrees: \"SepSalary\" now reads \"Sep17%\" (saved with \"Apply to 1 month\")"
+ },
+ {
+  "name": "copying payment details",
+  "ok": true,
+  "evidence": "row reads \"InstaPay · 010 1000 2000 Copy\", clipboard \"010 1000 2000\""
+ },
+ {
+  "name": "opening the InstaPay link",
+  "ok": true,
+  "evidence": "href https://ipn.eg/saraed-2291; opened https://ipn.eg/saraed-2291; card shows \"https://ipn.eg/saraed-2291\""
+ },
+ {
+  "name": "the link is the one she submitted",
+  "ok": true,
+  "evidence": "button href \"https://ipn.eg/saraed-2291\" vs card value \"https://ipn.eg/saraed-2291\""
+ },
+ {
+  "name": "the profile shows the same destination",
+  "ok": true,
+  "evidence": "profile card reads \"010 1000 2000\""
+ },
+ {
+  "name": "viewing receipts",
+  "ok": true,
+  "evidence": "/payments/2026-08/1/receipts/1 shows EGP 13,010.00"
+ }
+]

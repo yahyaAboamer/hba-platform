@@ -121,7 +121,7 @@ def test_a_month_reports_what_it_is_worth(client):
 
     assert body["sales"]["earned_piastres"] == 106_200
     assert body["payout"]["piastres"] == 10_600
-    assert body["payout"]["display"] == "E£106.00"
+    assert body["payout"]["display"] == "EGP 106.00"
     assert body["is_payable"] is True
 
 
