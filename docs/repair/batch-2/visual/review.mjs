@@ -644,13 +644,11 @@ const portal = [
       await p.locator(".pt button", { hasText: "Payment details" }).first().click();
     },
   },
-  // **No `portal-month-picker` step, and that is the finding.** The export
-  // opens a sheet from a `Nov ▼` button and draws the month list inside the
-  // phone frame. The app uses a native `<select class="phead__month">`, so
-  // the list is drawn by the operating system, outside the page, and there is
-  // nothing on the page to screenshot. The control is in both; its list
-  // cannot be captured from one of them. Recorded in CHECKLIST.md rather than
-  // left as a step that fails forever.
+  // **No `portal-month-picker` step here.** When this sweep was written the
+  // app's control was a native `<select>`, whose list the operating system
+  // draws outside the page. Batch E replaced it with the export's `Sep ▼`
+  // button and in-page list; `shared-controls.mjs` captures both sides of it
+  // open (`portal-month-open-390`) and a month chosen from it.
   {
     id: "portal-earnings",
     app: async (p) => { await p.goto(`${APP}/earnings`, { waitUntil: "networkidle" }); },

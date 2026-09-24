@@ -155,6 +155,26 @@ export function monthAdd(month: string, delta: number): string {
   return `${Math.floor(zeroBased / 12)}-${String((zeroBased % 12) + 1).padStart(2, "0")}`;
 }
 
+/** Every month from `first` to `last` inclusive, newest first. */
+export function monthsBetween(first: string, last: string): string[] {
+  const out: string[] = [];
+  for (let month = last; month >= first; month = monthAdd(month, -1)) out.push(month);
+  return out;
+}
+
+/**
+ * The months an admin month control offers, newest first.
+ *
+ * The export's `<select>` lists its calendar year; ours starts at the
+ * platform's first month, so a month settled before the platform can still be
+ * looked at, and runs to the end of the year the platform is working in -
+ * the months the grid it replaces could reach, without the years past it.
+ */
+export function platformMonths(platform: { start_month: string; working_month: string }): string[] {
+  const year = [platform.working_month, currentMonth()].sort().at(-1)!.slice(0, 4);
+  return monthsBetween(platform.start_month, `${year}-12`);
+}
+
 /** Today's business month, in Cairo. The month decides which payroll an order belongs to. */
 export function currentMonth(): string {
   const cairo = new Intl.DateTimeFormat("en-CA", {

@@ -16,6 +16,7 @@ from app.api.deps import (
 from app.config import settings
 from app.core.password_quality import password_problem, password_strength
 from app.core.passwords import MINIMUM_PASSWORD_LENGTH, hash_password
+from app.core.periods import PLATFORM_START_MONTH
 from app.core.permissions import VALID_ROLES, Permission
 from app.db import get_session
 from app.models.identity import RoleAssignment, UserAccount
@@ -317,6 +318,10 @@ def me(
         "platform": {
             "working_month": working_month(),
             "go_live_month": go_live_month() or None,
+            # The first month anything can be known in. The admin's month
+            # control offers every month from here, so the browser is told
+            # rather than keeping a second copy of the constant.
+            "start_month": PLATFORM_START_MONTH,
         },
     }
 

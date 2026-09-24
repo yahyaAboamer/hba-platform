@@ -307,9 +307,11 @@
   font-size: 13px;
 }
 
+/* Beside the back button at the top bar's own 14px gap, as the export's
+   `gap:14px` puts it - a margin on top of that gap made it 26px. */
 .page__head .profile__back + .page__title {
   flex: 1;
-  margin-left: 14px;
+  min-width: 0;
 }
 
 .profile__hero {

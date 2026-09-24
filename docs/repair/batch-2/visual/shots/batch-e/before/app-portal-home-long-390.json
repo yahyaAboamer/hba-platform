@@ -1,0 +1,64 @@
+{
+ "header": {
+  "name": {
+   "text": "Mariam Abdelrahman El-Sayed Mostafa",
+   "x": 62,
+   "y": 33.3,
+   "w": 161,
+   "h": 18.8,
+   "truncated": true,
+   "size": "15px",
+   "weight": "400",
+   "lh": "18.75px",
+   "num": "tabular-nums"
+  },
+  "identity": {
+   "text": "HBA ambassador · MARIAMELSAYED2026",
+   "x": 62,
+   "y": 52,
+   "w": 161,
+   "h": 18.8,
+   "truncated": true,
+   "size": "12.5px",
+   "weight": "400",
+   "lh": "18.75px",
+   "num": "tabular-nums"
+  },
+  "month": {
+   "text": "September 2026 August 2026 July 2026 June 2026 May 2026 Apri",
+   "x": 233,
+   "y": 33,
+   "w": 145,
+   "h": 38,
+   "truncated": false,
+   "size": "13px",
+   "weight": "400",
+   "lh": "normal",
+   "num": "tabular-nums"
+  },
+  "avatar": {
+   "text": "M",
+   "x": 12,
+   "y": 32,
+   "w": 40,
+   "h": 40,
+   "truncated": false,
+   "size": "16px",
+   "weight": "400",
+   "lh": "24px",
+   "num": "tabular-nums"
+  },
+  "header": {
+   "text": "M Mariam Abdelrahman El-Sayed Mostafa HBA ambassador · MARIA",
+   "x": 12,
+   "y": 20,
+   "w": 366,
+   "h": 66,
+   "truncated": false,
+   "size": "15px",
+   "weight": "400",
+   "lh": "22.5px",
+   "num": "tabular-nums"
+  }
+ }
+}

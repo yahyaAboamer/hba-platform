@@ -11,7 +11,7 @@ import type { DestinationCard } from "../lib/payouts";
 import type { NetSales } from "../lib/portal";
 import { describeDestination, PAY_TYPE } from "../lib/payouts";
 import type { Session } from "../lib/api";
-import { formatEgp, formatMonth } from "../lib/money";
+import { formatEgp, formatMonth, monthsBetween } from "../lib/money";
 import { ROSTER_STATUS } from "./Affiliates";
 import type { Affiliate } from "./Affiliates";
 import "./PaymentDetail.css";
@@ -434,8 +434,11 @@ export function AffiliateDetail({ session }: { session: Session }) {
         <Link className="button profile__back" to="/affiliates">
           ← Models
         </Link>
+        {/* Her name, and under it the code an order knows her by: the
+         *  export's title and subtitle for a model (`titleVals`, `m.code`). */}
         <div className="page__title">
           <h1>{detail.name}</h1>
+          {current && <span className="page__subtitle">{current.code}</span>}
         </div>
       </div>
 
@@ -690,7 +693,27 @@ export function AffiliateDetail({ session }: { session: Session }) {
         </nav>
         {/* The export keeps the month beside the sections on every one of
          *  them: the figures on Overview are that month's too. */}
-        <span className="profile__month"><MonthPicker value={month} onChange={setMonth} /></span>
+        <span className="profile__month">
+          {/* The export's in-page select (`mMonth`). Every month from the
+           *  platform's first to the working month, as the grid offered her
+           *  profile before: the export narrows it to her own months, and a
+           *  month before her recorded start can still hold orders somebody
+           *  needs to look at (see the kept divergence in the checklist). */}
+          <MonthPicker value={month} size="section"
+            months={monthsBetween(detail.platform_start_month, detail.current_month)}
+            onChange={(next) => {
+              setMonth(next);
+              // Into the address as well, replacing rather than adding a
+              // history entry: an order opened from here comes Back to the
+              // address it left, and that should be the month on screen,
+              // not the one the section was first opened on.
+              setQuery((previous) => {
+                const address = new URLSearchParams(previous);
+                address.set("month", next);
+                return address;
+              }, { replace: true });
+            }} />
+        </span>
       </div>
       <div className="detail__grid">
         {section === "overview" && <>

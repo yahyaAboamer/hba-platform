@@ -7,7 +7,7 @@ import type { MonthLock } from "../components/MonthPicker";
 import type { CountsTowards, NetSales } from "../lib/portal";
 import { api } from "../lib/api";
 import type { Session } from "../lib/api";
-import { currentMonth, formatMonth } from "../lib/money";
+import { currentMonth, formatMonth, platformMonths } from "../lib/money";
 import "./Orders.css";
 
 type Outcome = "attributed" | "unattributed" | "held";
@@ -196,6 +196,7 @@ export function Orders({ session }: { session: Session }) {
         <MonthPicker
           value={month}
           onChange={setMonth}
+          months={platformMonths(session.platform)}
           lockFor={lockFor}
           onLockedClick={(candidate, lock) =>
             setLockNote(

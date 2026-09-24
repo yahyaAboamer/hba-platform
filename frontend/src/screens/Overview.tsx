@@ -7,7 +7,7 @@ import { MonthPicker } from "../components/MonthPicker";
 import type { MonthLock } from "../components/MonthPicker";
 import { api } from "../lib/api";
 import type { Session } from "../lib/api";
-import { currentMonth, formatMonth } from "../lib/money";
+import { currentMonth, formatMonth, platformMonths } from "../lib/money";
 
 type PayrollRow = {
   affiliate_id: number;
@@ -281,7 +281,7 @@ export function Overview({ session }: { session: Session }) {
     <>
       <div className="page__head">
         <div className="page__title"><h1>Home</h1><span className="page__subtitle">{formatMonth(month)}</span></div>
-        <MonthPicker value={month} onChange={setMonth} lockFor={lockFor}
+        <MonthPicker value={month} onChange={setMonth} months={platformMonths(session.platform)} lockFor={lockFor}
           onLockedClick={(candidate, lock) => setLockNote(lock === "historical"
             ? `${formatMonth(candidate)} was settled outside this dashboard.`
             : `${formatMonth(candidate)} is still in progress.`)} />

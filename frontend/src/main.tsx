@@ -3,7 +3,9 @@ import { createRoot } from "react-dom/client";
 
 // Self-hosted, so a month-end tool does not depend on a font CDN being up,
 // and so a phone opening this over Egyptian mobile data makes no third-party
-// request. Latin only, three weights.
+// request. Latin only, and the four weights the approved references load
+// (`Inter:wght@400;500;600;700`): without 700 a `<strong>` - which the admin
+// export does use in prose - was drawn from the 600 face instead.
 //
 // **Inter, and only Inter** (ADR 0039). It is the face the redesign was drawn
 // in, and the approved references declare it for body and heading alike.
@@ -15,6 +17,7 @@ import { createRoot } from "react-dom/client";
 import "@fontsource/inter/latin-400.css";
 import "@fontsource/inter/latin-500.css";
 import "@fontsource/inter/latin-600.css";
+import "@fontsource/inter/latin-700.css";
 
 import "./styles/tokens.css";
 import "./styles/base.css";

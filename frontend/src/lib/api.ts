@@ -208,6 +208,8 @@ export type Platform = {
   working_month: string;
   /** The first month the platform is responsible for. Null until chosen. */
   go_live_month: string | null;
+  /** The first month anything can be known in (`PLATFORM_START_MONTH`). */
+  start_month: string;
 };
 
 export type Session = {

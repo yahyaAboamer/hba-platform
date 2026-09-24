@@ -278,5 +278,5 @@
 .filters__option[aria-pressed="true"] {
   background: var(--accent-soft);
   color: var(--accent-text);
-  font-weight: 600;
+  font-weight: 400;
 }

@@ -18,12 +18,30 @@
  * links now live on the You screen, which is where somebody goes looking for
  * them rather than somewhere they get in the way.
  */
+/*
+ * Measured off the export's header (`inApp`): edge to edge, 16px inside,
+ * 12px above and 13px below, a rule across the whole width, and **held at
+ * the top while the screen scrolls under it** - the export's header is
+ * outside its scrolling area, so the name and the month control never leave.
+ *
+ * `.phead-bar` carries the stickiness and the bleed so the month list can sit
+ * inside it, under the header, as the export's does.
+ */
+.phead-bar {
+  position: sticky;
+  top: 0;
+  z-index: 9;
+  /* Out through the portal's own padding: up to the top of the window and
+     out to both edges. */
+  margin: calc(-1 * var(--space-6)) calc(-1 * var(--space-5)) var(--space-5);
+  background: var(--paper);
+}
+
 .phead {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 12px 0 13px;
-  margin-bottom: 14px;
+  padding: 12px 16px 13px;
   /* The export rules the header off from the screen under it, which is what
      stops a scrolled list from appearing to start inside her name. */
   border-bottom: 1px solid var(--rule);
@@ -52,26 +70,22 @@
   min-width: 0;
 }
 
+/* **Wrapped, not truncated**, as the export's lines are: neither sets
+   `nowrap`. Beside the compact month control an ordinary name and code fit on
+   one line each; a long one takes a second line rather than losing its end,
+   and the code is the part of that line she is most likely to need. */
 .phead__name {
   display: block;
   font-size: 15px;
   line-height: 1.25;
-  /* Truncated rather than wrapped. Wrapping a long name pushes the code
-     button off the bottom of a 3.25rem header; an ellipsis keeps the row one
-     line tall whatever is in it, and the full name is the heading on the You
-     screen one tap away. */
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 
 .phead__since {
   display: block;
-  overflow: hidden;
   color: var(--quiet);
   font-size: 12.5px;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 
 /* Outlined, never filled. The accent is a line in this system, and a solid
@@ -139,11 +153,11 @@
    state on the maintainer's screens and that still holds there; here the
    accent is the brand, and the active tab is the single mark that says which
    of five screens you are on — a weight change alone was not enough to find
-   at a glance on a phone. */
+   at a glance on a phone. The export changes no weight at all: the rule and
+   the colour are the whole mark. */
 .tabs__tab--on {
   border-top-color: var(--accent);
   color: var(--accent-text);
-  font-weight: 600;
 }
 
 .tabs__tab:focus-visible {
@@ -151,8 +165,25 @@
   outline-offset: -2px;
 }
 
-.phead__inline-code { padding:0; border:0; color:var(--accent-text); background:none; font:inherit; cursor:pointer; }
-.phead__month { max-width:145px; min-height:38px; padding:9px 11px; border:1px solid var(--rule); border-radius:8px; color:var(--ink); background:transparent; font-size:13px; }
+/* The code reads as the rest of the line does, as the export draws it; a tap
+   still copies it (and says *Copied*), which the export has no word on. */
+.phead__inline-code { padding:0; border:0; color:inherit; background:none; font:inherit; overflow-wrap:anywhere; text-align:left; cursor:pointer; }
+
+/* The export's month button: short month and a small muted caret. */
+.phead__month { flex:none; display:flex; align-items:center; gap:6px; padding:9px 11px; border:1px solid var(--rule); border-radius:8px; background:transparent; color:var(--ink); font-size:13px; cursor:pointer; }
+.phead__caret { color:var(--quiet); font-size:9px; }
+
+/* The list it opens, under the header: every month she can see, the one on
+   screen tinted, each with where it has got to. Scrolls inside itself past
+   five months, as the export's `max-height:250px` does. */
+.pmonths { max-height:250px; overflow-y:auto; margin:10px 16px 0; border:1px solid var(--rule); border-radius:8px; background:var(--raise); }
+.pmonths__month { width:100%; display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 13px; border:0; border-bottom:1px solid var(--rule); background:transparent; color:var(--ink); text-align:left; font-size:14px; cursor:pointer; }
+.pmonths__month:last-child { border-bottom:0; }
+.pmonths__month--on { background:var(--accent-soft); }
+.pmonths__state { font-size:12.5px; }
+.pmonths__state--open { color:var(--owed); }
+.pmonths__state--agreed { color:var(--accent-text); }
+.pmonths__state--settled { color:var(--quiet); }
 
 /* ── A view that is not one of the five ─────────────────────────────────
  *
@@ -160,7 +191,7 @@
  * whole header and given the width of the back button on its right, so it
  * reads as centred on the screen rather than on the space left over.
  */
-.phead--back { gap:10px; }
+.phead--back { gap:10px; padding:12px 14px 13px; }
 .phead__back { flex:none; padding:9px 11px; border:1px solid var(--rule); border-radius:8px; background:transparent; color:var(--ink); font:inherit; font-size:13px; cursor:pointer; }
 .phead__back:hover { border-color:var(--accent); }
 .phead__title { flex:1; min-width:0; padding-right:60px; font-size:15px; text-align:center; }

@@ -6,7 +6,7 @@ import { MonthPicker } from "../components/MonthPicker";
 import type { MonthLock } from "../components/MonthPicker";
 import { api, can } from "../lib/api";
 import type { Session } from "../lib/api";
-import { currentMonth, describeBlocker, formatMonth } from "../lib/money";
+import { currentMonth, describeBlocker, formatMonth, platformMonths } from "../lib/money";
 import "./Payroll.css";
 
 export type PayrollRow = {
@@ -195,6 +195,7 @@ export function Payroll({ session }: { session: Session }) {
         <MonthPicker
           value={month}
           onChange={setMonth}
+          months={platformMonths(session.platform)}
           lockFor={lockFor}
           onLockedClick={(candidate, lock) =>
             setLockNote(

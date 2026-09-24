@@ -115,8 +115,9 @@
    *
    * What carries it instead is what the exports use and what a reader can
    * actually act on: the words on the screen — "still adding up", "open",
-   * "closed" — plus weight and colour. `tabular-nums` is set on `body`, so
-   * figures still line up in a column without a second family.
+   * "closed". Figures that stand in a column - money, counts, ranks - set
+   * `tabular-nums` themselves, where the exports do, so they still line up
+   * without a second family (ADR 0043; it was on `body` before).
    */
   --sans: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
 

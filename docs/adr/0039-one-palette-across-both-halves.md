@@ -1,6 +1,8 @@
 # 0039 — One palette, and one typeface, across both halves
 
-**Status:** accepted
+**Status:** accepted; **its type mechanism is amended by
+[0043](0043-type-as-the-exports-set-it.md)** — figures are tabular only where
+the exports set them, and an agreed figure is no longer heavier
 **Date:** 2026-09-09
 **Supersedes:** [0038](0038-the-portal-wears-the-brand-the-tool-does-not.md) entirely, and
 [0027](0027-numerals-change-face-when-a-figure-becomes-an-obligation.md)'s

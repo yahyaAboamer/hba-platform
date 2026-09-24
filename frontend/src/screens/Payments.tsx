@@ -11,6 +11,7 @@ import {
   describeBlocker,
   formatEgp,
   formatMonth,
+  platformMonths,
 } from "../lib/money";
 import { NO_DESTINATION_RECORDED, PAY_TYPE, describeDestination } from "../lib/payouts";
 import type { DestinationCard } from "../lib/payouts";
@@ -314,6 +315,7 @@ export function Payments({ session }: { session: Session }) {
         <MonthPicker
           value={month}
           onChange={setMonth}
+          months={platformMonths(session.platform)}
           lockFor={lockFor}
           onLockedClick={(candidate, lock) =>
             setLockNote(

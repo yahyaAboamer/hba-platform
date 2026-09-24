@@ -8,7 +8,7 @@ import { MonthPicker } from "../components/MonthPicker";
 import { PolicyText } from "../components/PolicyText";
 import { api, can } from "../lib/api";
 import type { Session } from "../lib/api";
-import { currentMonth, formatMonth } from "../lib/money";
+import { currentMonth, formatMonth, monthsBetween } from "../lib/money";
 import { DataPanel } from "./DataPanel";
 import "./Settings.css";
 
@@ -781,7 +781,15 @@ function PolicyPanel() {
         <form onSubmit={submit} className="comp__form">
           <label className="field comp__field">
             <span className="field__label">Effective from</span>
-            <MonthPicker value={effectiveMonth} onChange={setEffectiveMonth} />
+            {/* A select, as every month control outside terms editing is. It
+             *  offers from this month (or the current version's, if later
+             *  than that is still ahead) to the end of next year; the server
+             *  still decides what may be saved. */}
+            <MonthPicker value={effectiveMonth} onChange={setEffectiveMonth} size="section" label={false}
+              months={monthsBetween(
+                [currentMonth(), newest?.effective_month ?? currentMonth()].sort()[0],
+                `${Number(currentMonth().slice(0, 4)) + 1}-12`,
+              )} />
             <span className="field__hint">
               {newest
                 ? `Must be later than ${formatMonth(newest.effective_month)}, the current version.`

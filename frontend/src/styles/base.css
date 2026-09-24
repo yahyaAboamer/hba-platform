@@ -17,12 +17,16 @@ html {
 body {
   font-family: var(--sans);
   font-size: var(--text-base);
-  line-height: 1.5;
+  /* The design system's body rhythm (`body{line-height:1.55}`), which every
+     line in both exports inherits. 1.5 made each 15px line 0.75px shorter
+     than the approved one, and a screen of rows a few pixels shorter each. */
+  line-height: 1.55;
   color: var(--ink);
   background: var(--paper);
-  /* Tabular figures everywhere, not only in the money column. A count of
-     orders that shifts width as it changes is a count that is hard to scan. */
-  font-variant-numeric: tabular-nums;
+  /* **Proportional figures, as the exports set them.** Tabular figures are
+     opted into where the export opts in - money (`.money`), counts and ranks
+     in a column - not set on the whole page (ADR 0043). On every line they
+     widened, a code like HBA15 or a date grew by the width of each 1. */
   /* **Not `antialiased`.** The approved export leaves smoothing at `auto`,
    * and on a dark ground the difference is not subtle: `antialiased` thins
    * every glyph, so the same #ECEFEA that reads as white in the reference
@@ -32,12 +36,21 @@ body {
   -webkit-font-smoothing: auto;
 }
 
+/*
+ * **A heading element is not a heavier line.** Inside the applications the
+ * exports use one heading element - the admin page title, an `h4` with the
+ * design system's heading rule - and draw every other title and figure as
+ * plain text in `var(--font-heading)`, which is only the family: it renders
+ * at 400, on the body's 1.55, untracked. Ours are `h1`-`h3` for structure,
+ * so they take the text's weight and rhythm, and the one real heading takes
+ * the heading rule (`.page__head h1`, `Layout.css`). ADR 0043.
+ */
 h1,
 h2,
 h3 {
-  font-weight: 600;
-  line-height: 1.25;
-  letter-spacing: -0.01em;
+  font-weight: 400;
+  line-height: inherit;
+  letter-spacing: normal;
 }
 
 h1 {
@@ -55,6 +68,21 @@ input,
 select {
   font: inherit;
   color: inherit;
+}
+
+/*
+ * **Controls keep the browser's line height**, as every button and select in
+ * both exports does: the prototype never resets them, so they sit at
+ * `line-height: normal` while the text around them is on 1.55. Inheriting
+ * 1.55 made every padded button taller than its approved counterpart - a
+ * month list row 47px against 41px. The *family* is not copied: the same
+ * missing reset draws those buttons in the browser's control font (Arial on
+ * the reviewing machine, San Francisco on an iPhone), which is no one face
+ * and not the one the design system declares. Ours stay in Inter. ADR 0043.
+ */
+button,
+select {
+  line-height: normal;
 }
 
 /*
@@ -93,10 +121,10 @@ a {
 
 /* ── Money ────────────────────────────────────────────────────────────────
  *
- * ADR 0027, as amended by 0039.
+ * ADR 0027, as amended by 0039 and 0043.
  *
- *   .money            provisional — a working number, quiet
- *   .money--agreed    frozen in an approved snapshot — full weight and ink
+ *   .money            provisional — a working number
+ *   .money--agreed    frozen in an approved snapshot — ink
  *   .money--blocked   cannot be approved; the reason sits beside it
  *
  * **The typeface no longer carries this.** It used to: an agreed figure was
@@ -111,11 +139,12 @@ a {
  * on Home it made the two headline numbers — the ones the screen exists for —
  * the dimmest text on the card.
  *
- * The distinction is not lost. It is **weight**, still, and more importantly
- * it is said in words: the payout card wears an *Estimated* pill and the
- * screens name what they are showing. That is ADR 0027's own argument applied
- * one step further — a colour is only a signal to somebody who has been told
- * what it means, and nobody has been told.
+ * **Nor weight, from 24 September** (ADR 0043): the export draws every figure
+ * at 400. The distinction is not lost - it is said in words: the payout card
+ * wears an *Estimated* pill and the screens name what they are showing. That
+ * is ADR 0027's own argument applied one step further — a colour or a weight
+ * is only a signal to somebody who has been told what it means, and nobody
+ * has been told.
  *
  * §12.5: money never wraps or truncates at any width. If a figure does not
  * fit, the layout changes — never the number.
@@ -127,10 +156,12 @@ a {
   white-space: nowrap;
 }
 
+/* At the text's weight and tracking, as every figure in both exports is.
+ * The weight was the last thing still separating an agreed figure from a
+ * working one, and the export does not draw it: the words beside a figure -
+ * *Estimated*, *Approved*, *still adding up* - are what say it (ADR 0043). */
 .money--agreed {
-  font-weight: 500;
   color: var(--ink);
-  letter-spacing: -0.02em;
 }
 
 .money--owed {

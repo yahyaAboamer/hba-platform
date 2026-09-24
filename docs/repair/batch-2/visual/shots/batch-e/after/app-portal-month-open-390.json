@@ -1,0 +1,58 @@
+{
+ "options": [
+  {
+   "text": "September 2026 in progress",
+   "h": 42,
+   "size": "14px",
+   "bg": "rgba(35, 169, 92, 0.14)"
+  },
+  {
+   "text": "August 2026 paid",
+   "h": 42,
+   "size": "14px",
+   "bg": "rgba(0, 0, 0, 0)"
+  },
+  {
+   "text": "July 2026 in progress",
+   "h": 42,
+   "size": "14px",
+   "bg": "rgba(0, 0, 0, 0)"
+  },
+  {
+   "text": "June 2026 in progress",
+   "h": 42,
+   "size": "14px",
+   "bg": "rgba(0, 0, 0, 0)"
+  },
+  {
+   "text": "May 2026 settled",
+   "h": 42,
+   "size": "14px",
+   "bg": "rgba(0, 0, 0, 0)"
+  },
+  {
+   "text": "April 2026 settled",
+   "h": 42,
+   "size": "14px",
+   "bg": "rgba(0, 0, 0, 0)"
+  },
+  {
+   "text": "March 2026 settled",
+   "h": 42,
+   "size": "14px",
+   "bg": "rgba(0, 0, 0, 0)"
+  },
+  {
+   "text": "February 2026 settled",
+   "h": 42,
+   "size": "14px",
+   "bg": "rgba(0, 0, 0, 0)"
+  },
+  {
+   "text": "January 2026 settled",
+   "h": 41,
+   "size": "14px",
+   "bg": "rgba(0, 0, 0, 0)"
+  }
+ ]
+}

@@ -192,6 +192,7 @@ def test_me_says_which_month_the_platform_is_working_in(client, monkeypatch):
     assert body["platform"] == {
         "working_month": "2099-06",
         "go_live_month": "2099-06",
+        "start_month": "2026-01",
     }
 
 

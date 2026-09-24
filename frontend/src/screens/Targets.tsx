@@ -5,7 +5,7 @@ import { MonthPicker } from "../components/MonthPicker";
 import type { MonthLock } from "../components/MonthPicker";
 import { api, can } from "../lib/api";
 import type { Session } from "../lib/api";
-import { currentMonth, formatMonth } from "../lib/money";
+import { currentMonth, formatMonth, platformMonths } from "../lib/money";
 import { PAY_TYPE } from "../lib/payouts";
 import "./Targets.css";
 
@@ -346,7 +346,7 @@ export function Targets({ session, affiliateId, initialMonth, embedded = false }
           <h1>Targets</h1>
           <span className="page__subtitle">{formatMonth(month)} · recorded weekly</span>
         </div>
-        <MonthPicker value={month} onChange={setMonth} lockFor={lockFor} />
+        <MonthPicker value={month} onChange={setMonth} months={platformMonths(session.platform)} lockFor={lockFor} />
       </div>}
 
       {error && (

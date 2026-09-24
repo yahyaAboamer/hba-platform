@@ -209,7 +209,7 @@ not enough evidence yet, and what is missing.
 | 6 | Portal Targets: *met* / *not met* / *in progress* | The export's words |
 | 9 | Portal payment details: *Where HBA should send your payment*, *Method*, *Save details* | The export's words |
 | 11 | Recording a payment stays **on** the payment detail | The export keeps it there |
-| 12 | **The month grid belongs to terms editing only** — below | Your request, read against the export |
+| 12 | **The month grid belongs to terms editing only** — below. **Corrected in batch E** (see the end of this file) | Your request, read against the export |
 | — | Expired invitation → *Send a new link*; absolute sent date; featured card shows the size | The export |
 
 **I had these filed as open questions. They were not.** The design already
@@ -503,3 +503,108 @@ server on a fresh page load, because a toast is not evidence.
   operating system, outside the page, so there is nothing to screenshot.
 - **Printing, and anything behind a Shopify call.** Neither is reachable in a
   throwaway environment with no shop attached.
+
+---
+
+## Batch E — shared typography, identity headers and month controls (24 September)
+
+Captured with `shared-controls.mjs` (headless Chromium, the throwaway
+`hba_browser` database, fonts awaited before every shot, the export's frame
+clipped below its simulated status bar). Pictures and digests in
+`shots/batch-e/before/` and `shots/batch-e/after/`; side by side, before ·
+after · export, in `shots/batch-e/compare/`.
+
+### Reference to app
+
+| Reference | Where in the export | App |
+|---|---|---|
+| Body type: Inter, 15px, `line-height:1.55`, 400 | `_ds/…/styles.css` | `base.css` `body` |
+| The one heading element: `h4`, 18px, 500, 1.12, −0.015em | Admin `pageTitle` | `.layout__main > .page__head h1` |
+| Every other title and figure: `var(--font-heading)` (family only), 400 | both | `h1`–`h3` base, and the screen rules listed in ADR 0043 |
+| Tabular figures on money, counts and ranks only | 30 + 19 inline uses | `.money` and the column classes; no longer on `body` |
+| Controls at the browser's `line-height: normal` | every `<button>`, `<select>` | `base.css` `button, select` |
+| Admin top-bar month: *Month* 12px + `<select>` 38px, 13.5px | `monthly`, `onMonth` | `MonthPicker` (default size) on Home, Orders, Payments, Payroll, Targets |
+| Profile month: *Month* + `<select>` 36px, 13px | `mMonth`, `onMMonth` | `MonthPicker size="section"` on the model profile |
+| Profile title: name, code under it at 12.5px, 4px apart; 14px after Back | `titleVals` (`m.name`, `m.code`) | `AffiliateDetail` `page__title` + `page__subtitle` |
+| Portal header: edge to edge, 16px inside, fixed while the screen scrolls | `inApp` block | `.phead-bar` (sticky) + `.phead` |
+| Identity line: *HBA ambassador · CODE*, 12.5px muted, not truncated | `inApp` | `.phead__since` (wraps) |
+| Portal month: *Nov ▼* button, 13px, list under the header with each month's state | `showPicker`, `monthOptions` | `button.phead__month` + `.pmonths` |
+| Multi-month grid | terms editing only | `Compensation.tsx`, unchanged |
+
+### What the type difference actually was
+
+**Not the font.** The app's self-hosted Inter and the export's Google Fonts
+Inter (v20) measure identically in the same Chromium: a test line at 438.49px
+(400), 443.12px (500), 447.7px (600). Nothing fell back. The differences were
+line height (1.5 vs 1.55), tabular figures on every digit, headings at
+600/1.25/−0.01em, a dozen rules that read `var(--font-heading)` as weight 500,
+the agreed figure at 500, controls inheriting 1.55, and no 700 face for
+`<strong>`. ADR 0043 records the change and its cost. One Home defect found on
+the way: the metric label rule also matched the figure's `<span>`, printing
+*Net sales counted* at 12.5px grey instead of 17px ink.
+
+### Checked, and how
+
+| Screen | Widths | Result |
+|---|---|---|
+| Portal Home (header, month control closed / open / month chosen, scrolled to the end) | 390 | Corrected |
+| Portal Orders (September, and July chosen through the new list) | 390 | Corrected; row height below |
+| Portal Ranking header | 390 | Corrected |
+| Portal header with a long name and code (`/api/me` answered with them) | 390 | Wraps, nothing cut |
+| Admin model profile (header, code, month select, month chosen, Back from an order) | 1280, 1440 | Corrected |
+| Admin profile with a long name and code | 1280 | Wraps, nothing cut |
+| Admin Home, Payments, Targets top bar | 1280, 1440 | Month control identical: 38 × 152px, 13.5px |
+| Admin Orders and Payroll top bar | 1280, 1440 | Month control as above; no export pair |
+
+Measured, after: header 66px on both; list rows 42px vs 41px; the portal
+header stays at 0–66px while Home scrolls under it and the last line ends at
+744px against the tab bar at 788px; no horizontal overflow at 390; choosing
+a month closes the list, changing tab closes it, a secondary view and Back
+keep the month; the profile's chosen month survives opening an order and
+Back (`?section=performance&month=2026-07`); the chart's month columns work
+by tap and by keyboard.
+
+### Kept divergences, with the reason
+
+- **Controls stay in Inter.** The export never resets form-control fonts, so
+  any button without an inline family - the month button, list rows, order
+  rows, filters, *How this adds up* - is drawn in the browser's control font:
+  Arial on the reviewing machine, San Francisco on an iPhone. Its `<select>`
+  and nav buttons, which do set a family, are Inter. That is a missing reset,
+  not a face; the design system declares Inter.
+- **So portal Orders rows are 95px against 92px**, and list rows 42px against
+  41px. Measured: at `line-height: normal` Arial is 1.15em and Inter 1.21em,
+  across three lines of a row. Batch D's "font metrics; accepted" is this.
+- **The admin profile offers every platform month** (from 2026-01 to the
+  working month); the export lists only her own. A month before her recorded
+  start can still hold orders somebody needs to see.
+- **The admin top bar lists the platform's months** from its first month to
+  December of the working year; the export lists its calendar year.
+- **The code on the portal header still copies on tap**, and says *Copied*;
+  it looks like the export's plain text.
+- **Settings' *Effective from* and the rules preview** are not in the export.
+  They use the same select: the preview over its server-given window,
+  Settings from this month to the end of next year.
+
+### Still differs, not in this batch
+
+- **Admin Attributed orders list (`vOrders`) — still not reviewed.** Only its
+  top-bar month control was checked. Nothing here says that screen matches.
+- Portal Home: chips read *0 on the way* / *0 not counted* where the export
+  says *1 pending* / *0 failed delivery*; the year chart draws numbered ticks
+  and a scale where the export draws month names; *How this adds up* is a
+  link at 1.55 where the export's is a button at `normal`.
+- Admin profile body (Overview): labels at 13px vs 12.5px, *Only the model can
+  change these.* at 12px vs 12.5px, the *Active* chip at 12px vs 11.5px, and
+  the Contact panel's structure.
+- Admin Home: notice ⋯ and × are unbordered where the export's are 34px
+  bordered squares; *Estimated* tracked +0.02em and *19* −0.02em where the
+  export tracks neither.
+- Payments desk rows: the model's name at 15px/700 against 13.5px/400; the
+  state chips at 13px against 11.5px.
+- Admin Overview's historical-month note (`onLockedClick`) never shows: the
+  month effect clears it in the same render. It did not show with the grid
+  either, and the export shows no note, so the visible behaviour matches.
+- The prototype's status bar (*9:41*, battery) is its phone and is not
+  reproduced.
+

@@ -9,13 +9,13 @@ true. Nothing was deleted.
 | | |
 |---|---|
 | **Branch** | `repair/batch-2` |
-| **Revision reviewed** | The sweep describes `f83b4fc` — *Every screen at both widths, and 390 at last*. **One code change since**: the best-sellers commit on top of `ffde978` (*Best sellers say what they count*), which touches `app/api/affiliate_self.py`, `frontend/src/screens/MyWardrobe.tsx` and tests, and recaptures `portal-wardrobe-390` plus a new `portal-best-390`. **Then** batch C (`1b1bb21`, earnings explanations and per-order commission) and batch D on top of it (Orders against the approved HTML), both below. |
+| **Revision reviewed** | The sweep describes `f83b4fc` — *Every screen at both widths, and 390 at last*. **One code change since**: the best-sellers commit on top of `ffde978` (*Best sellers say what they count*), which touches `app/api/affiliate_self.py`, `frontend/src/screens/MyWardrobe.tsx` and tests, and recaptures `portal-wardrobe-390` plus a new `portal-best-390`. **Then** batch C (`1b1bb21`, earnings explanations and per-order commission) and batch D on top of it (Orders against the approved HTML), both below. **Batch D closed at `7bd9650`; batch E** (shared typography, identity headers, month controls) on top of it, in its own section below. |
 | **Current head** | run `git rev-parse --short HEAD`. Not written here: a document cannot contain the hash of the commit that adds it, and the last attempt was stale one commit later. |
 | **Tree** | clean apart from `.claude/settings.json`, the owner's plugin config, deliberately not committed |
 | **`origin/main`** | `6a13958` |
 | **`origin/production`** | `6a13958` — **level with `main`**, gap of 0 commits, read from `git ls-remote` on 24 September |
-| **Backend** | 2,069 tests, 80 files, all passing through `run-suite.sh` on 24 September, after batch D's corrections; matches `--collect-only` |
-| **Frontend** | 391 tests, 18 files; `npm run build` green (24 September, after batch D's corrections) |
+| **Backend** | 2,069 tests, 80 files, all passing through `run-suite.sh` on 24 September, after batch D's corrections; matches `--collect-only`. Batch E changed one backend line (an added `start_month` in `/api/auth/me`); the three files that read that payload pass (158 tests); the full runner was not re-run for it |
+| **Frontend** | 403 tests, 19 files; `npm run build` green (24 September, after batch E) |
 | **Migration head** | `b1f0a40c0001` |
 
 > **Correction, 24 September 2026.** An earlier version of this table said
@@ -260,22 +260,54 @@ Current pictures in `shots/app/`: `portal-orders-july-all-390`,
 - [x] *Counts towards* decided on the server; amount and words agree
 - [x] Late failure: neutral review wording; approved amount and payments stand
 - [x] Admin profile table and order detail; navigation; mobile scrolling
-- [ ] Portal header identity, portal month control, admin header code —
-      **the next shared-controls batch**
+- [x] Portal header identity, portal month control, admin header code —
+      done in batch E
 - [ ] The export's admin order view cannot be captured (prototype defect)
 - [ ] The admin **Attributed orders** list (`vOrders`) was not compared
+
+## Batch E — shared typography, identity headers and month controls (24 September)
+
+Owner's scope, 24 September: typography, the model identity header at 390,
+the admin profile header's code, and each screen's own month control.
+**Implemented without stopping for approval, as instructed.** Full record,
+mapping and evidence: the *Batch E* section at the end of
+`docs/repair/batch-2/visual/CHECKLIST.md`; pictures in
+`docs/repair/batch-2/visual/shots/batch-e/` (`compare/` is before · after ·
+export); the capture script is `shared-controls.mjs` beside `review.mjs`.
+
+- **Type.** The font was not the cause (identical Inter metrics, measured).
+  The cause was our CSS: line height 1.5, tabular figures on every digit,
+  headings at 600, `var(--font-heading)` misread as weight 500, the agreed
+  figure at 500, controls inheriting 1.55, and no 700 face. ADR 0043 amends
+  0039 and says what it costs.
+- **Portal header.** Edge to edge, held at the top while the screen scrolls,
+  the identity line wraps instead of truncating, the code in the line's own
+  colour (tap still copies), and the export's *Sep ▼* control opening a list of
+  her months with *in progress* / *approved* / *paid* / *settled* - derived
+  from `/api/me/payments`, no new endpoint; no words if that read fails.
+- **Admin.** `MonthPicker` is the export's *Month* + `<select>` (38px top bar,
+  36px profile) over the platform's months (`start_month`, new in the session
+  payload, to December of the working year). The profile shows the code under
+  the name, 14px after Back, and writes its chosen month to the address so an
+  order's Back returns to it (it did not before, grid or select).
+- **Chart.** The *Inspect chart month* select under the portal chart, which
+  the export does not have, is replaced by tap/keyboard columns, as the
+  export's `hits`.
+- **Kept, with reasons in the checklist:** controls stay in Inter where the
+  prototype falls back to the browser's control font (Arial here, SF on an
+  iPhone) - which is also the whole of the 95px vs 92px Orders row; the
+  profile offers every platform month rather than only hers.
+- **Not claimed:** the admin *Attributed orders* list is still unreviewed,
+  and matching these controls says nothing about the rest of any screen.
 
 ## Not scheduled — a backlog, not an instruction
 
 Each batch is named by the owner. These are known, decided by the export, and
 **not** queued; nothing here is the next batch until he says so.
 
-- **The shared-controls batch, next when the owner names it** - assigned by
-  him on 24 September: the portal header's identity line (truncated beside
-  the month control), the portal month control (the export's compact
-  *Nov ▾*), the admin model header's missing code, and the admin month grid
-  back to the export's `<select>` everywhere except `Compensation.tsx`'s
-  terms editing. Batch D's table above has the measured detail.
+- The differences batch E found and left, listed with their locations at
+  the end of `docs/repair/batch-2/visual/CHECKLIST.md` (*Still differs, not
+  in this batch*), and the admin **Attributed orders** list, still unreviewed.
 - The comment in `app/services/portal.py` saying a delivered-then-refunded
   order *"pays nothing"*; the code and tests already have it right.
 - The small wordings: *Send a new link*, the absolute sent date, the size on
@@ -303,9 +335,13 @@ Each batch is named by the owner. These are known, decided by the export, and
 - **An agreed month is never unmade** (05B); a difference after approval is a
   correction (05C).
 - **The month grid is for editing terms only** (`Compensation.tsx`). That is
-  what the owner asked for, and the export agrees. Every other month control
-  follows the export's `<select>` — item A above. An earlier version of this
-  line said the grid was approved everywhere; it was not.
+  what the owner asked for, and the export agrees. Every other admin month
+  control is the export's `<select>` (done in batch E), and the portal's is the
+  export's *Nov ▼* button and list. An earlier version of this line said the
+  grid was approved everywhere; it was not.
+- **Type follows the exports, ADR 0043**: body 1.55, proportional figures
+  except money/counts/ranks, one heading weight (the admin page title), no
+  heavier agreed figure. It is not the font file - that was measured.
 - **The reviewing browser is Playwright**, headless, in its own process. Not
   the Chrome extension, and not the window-resizing script.
 

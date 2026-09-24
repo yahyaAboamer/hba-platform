@@ -19,8 +19,10 @@
 .layout__account-menu a, .layout__account-menu button { padding:9px 11px; min-height:36px; color:var(--quiet); background:none; border:0; text-align:left; font-size:13px; text-decoration:none; cursor:pointer; }
 .layout__account-menu a:hover, .layout__account-menu button:hover { background:var(--hover); color:var(--ink); border-radius:8px; }
 .layout__main { min-width:0; overflow:auto; padding:0 22px 30px; }
-.layout__main > .page__head { position:sticky; top:0; z-index:10; margin:0 -22px 20px; padding:14px 22px; min-height:68px; border-bottom:1px solid var(--rule); background:var(--paper); }
-.layout__main > .page__head h1 { font-size:18px; font-weight:500; }
+.layout__main > .page__head { position:sticky; top:0; z-index:10; gap:14px; margin:0 -22px 20px; padding:14px 22px; min-height:68px; border-bottom:1px solid var(--rule); background:var(--paper); }
+/* The one heading element the export draws: an `h4` under the design
+   system's heading rule - 500, 1.12, -0.015em - at 18px (ADR 0043). */
+.layout__main > .page__head h1 { font-size:18px; font-weight:500; line-height:1.12; letter-spacing:-0.015em; }
 @media (max-width:800px) {
   .layout { grid-template-columns:1fr; height:auto; min-height:100dvh; }
   .layout__sidebar { border-right:0; }
@@ -50,7 +52,8 @@
 .page__title {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  /* The export's subtitle sits `margin-top:4px` under the title. */
+  gap: 4px;
 }
 
 .page__subtitle {

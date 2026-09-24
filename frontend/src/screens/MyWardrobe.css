@@ -1,6 +1,6 @@
 .affiliate .wardrobe { padding-bottom: var(--tab-clearance); }
 .affiliate .wardrobe__block { margin-bottom: 24px; }
-.affiliate .wardrobe__title { margin: 0; font-size: 15px; font-weight: 500; }
+.affiliate .wardrobe__title { margin: 0; font-size: 15px; font-weight: 400; }
 /* Inside the bordered box, where it labels a short list rather than opening
    a section of the screen. */
 .affiliate .wardrobe__title--inset { font-size: 13.5px; }

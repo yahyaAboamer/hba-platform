@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 
 import { api } from "../lib/api";
-import { describeBlocker, formatMonth } from "../lib/money";
+import { describeBlocker, formatMonth, monthsBetween } from "../lib/money";
 import { Money } from "./Money";
 import { MonthPicker } from "./MonthPicker";
 import "./FinancialRulesPreview.css";
@@ -58,9 +58,9 @@ export function FinancialRulesPreview({ affiliateId, currentMonth, firstMonth }:
   const eligible = month >= firstMonth && month <= currentMonth;
 
   function chooseMonth(next: string) {
-    // MonthPicker marks months but deliberately permits every choice. This
-    // endpoint has a narrower history window: the server's platform floor
-    // and this model's collaboration start, never a browser-owned date.
+    // The select offers only this window - the server's platform floor and
+    // this model's collaboration start, never a browser-owned date - so this
+    // guard answers a month that arrived some other way.
     if (next < firstMonth || next > currentMonth) {
       setSelectionNotice(
         `Choose a month from ${formatMonth(firstMonth)} to ${formatMonth(currentMonth)}.`,
@@ -80,11 +80,11 @@ export function FinancialRulesPreview({ affiliateId, currentMonth, firstMonth }:
       {open && (
         <div className="rules-preview__body">
           <div className="rules-preview__month">
-            <span>Month</span>
             <MonthPicker
               value={month}
               onChange={chooseMonth}
-              lockFor={(candidate) => candidate > currentMonth ? "future" : null}
+              months={monthsBetween(firstMonth, currentMonth)}
+              size="section"
             />
           </div>
           {selectionNotice && (

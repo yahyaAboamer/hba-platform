@@ -1,0 +1,64 @@
+{
+ "header": {
+  "name": {
+   "text": "Sara Edrees",
+   "x": 66,
+   "y": 12.9,
+   "w": 235.6,
+   "h": 18.8,
+   "truncated": false,
+   "size": "15px",
+   "weight": "400",
+   "lh": "18.75px",
+   "num": "normal"
+  },
+  "identity": {
+   "text": "HBA ambassador · SARAED",
+   "x": 66,
+   "y": 31.7,
+   "w": 235.6,
+   "h": 19.4,
+   "truncated": false,
+   "size": "12.5px",
+   "weight": "400",
+   "lh": "19.375px",
+   "num": "normal"
+  },
+  "month": {
+   "text": "Aug ▼",
+   "x": 311.6,
+   "y": 14,
+   "w": 62.4,
+   "h": 36,
+   "truncated": false,
+   "size": "13px",
+   "weight": "400",
+   "lh": "normal",
+   "num": "normal"
+  },
+  "avatar": {
+   "text": "S",
+   "x": 16,
+   "y": 12,
+   "w": 40,
+   "h": 40,
+   "truncated": false,
+   "size": "16px",
+   "weight": "400",
+   "lh": "24.8px",
+   "num": "normal"
+  },
+  "header": {
+   "text": "S Sara Edrees HBA ambassador · SARAED Aug ▼",
+   "x": 0,
+   "y": 0,
+   "w": 390,
+   "h": 66,
+   "truncated": false,
+   "size": "15px",
+   "weight": "400",
+   "lh": "23.25px",
+   "num": "normal"
+  }
+ }
+}

@@ -374,3 +374,35 @@ export type MyPayments = {
    */
   settled_outside: { months: string[]; since: string; text: string } | null;
 };
+
+/**
+ * Where each month in her month list has got to, in the export's words
+ * (`monthOptions`: *in progress*, *approved*, *paid*, *settled*).
+ *
+ * From her payments, which already hold every answer the list needs: a month
+ * settled before the platform is in `settled_outside`; an agreed month is in
+ * `months` with its balance, paid once nothing is outstanding - the same
+ * reading `homeState` gives the month on screen; and a month in neither has
+ * no agreed figure, so it is still in progress.
+ *
+ * `null` when the payments could not be read. The list then names the months
+ * and says nothing about them, rather than guessing (A12).
+ */
+export type MonthListState = "open" | "approved" | "paid" | "settled";
+
+export function monthListStates(
+  months: string[],
+  payments: MyPayments | null,
+): Record<string, MonthListState> | null {
+  if (!payments) return null;
+  const outside = new Set(payments.settled_outside?.months ?? []);
+  return Object.fromEntries(
+    months.map((month) => {
+      if (outside.has(month)) return [month, "settled"];
+      const row = payments.months.find((entry) => entry.month === month);
+      if (!row) return [month, "open"];
+      const paid = row.state === "settled" || row.state === "overpaid";
+      return [month, paid ? "paid" : "approved"];
+    }),
+  );
+}

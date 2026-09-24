@@ -332,14 +332,16 @@
 /* Approved v3 hierarchy; these classes do not restyle legacy screens. */
 .portal-home { display:flex; flex-direction:column; gap:14px; }
 .portal-home__month { display:flex; justify-content:space-between; align-items:center; gap:10px; }
-.portal-home__month h1 { font-size:15px; font-weight:500; }
+.portal-home__month h1 { font-size:15px; font-weight:400; }
 .portal-home__hero { background:var(--surface); border-radius:12px; padding:18px 16px; }
 .portal-home h2 { font-size:13px; font-weight:400; margin:0; color:var(--quiet); }
-.portal-home__amount { font-size:36px; line-height:1.1; letter-spacing:-.02em; margin-top:8px; font-weight:500; }
+.portal-home__amount { font-size:36px; line-height:1.1; letter-spacing:-.02em; margin-top:8px; font-weight:400; }
 .portal-home__metrics { display:flex; gap:12px; margin-top:16px; padding-top:14px; border-top:1px solid var(--rule); }
 .portal-home__metrics > div { flex:1; min-width:0; }
-.portal-home__metrics span { font-size:12.5px; color:var(--quiet); }
-.portal-home__metrics strong { display:block; font-size:17px; font-weight:500; margin-top:5px; }
+/* The label only: the figure under it is a `<span>` too (`Money`), and this
+   rule used to shrink it to the label's 12.5px grey. */
+.portal-home__metrics > div > span { font-size:12.5px; color:var(--quiet); }
+.portal-home__metrics strong { display:block; font-size:17px; font-weight:400; margin-top:5px; font-variant-numeric:tabular-nums; }
 .portal-home__states { display:flex; flex-wrap:wrap; gap:6px; margin-top:11px; }
 .portal-home__states a { text-decoration:none; padding:3px 9px; border-radius:99px; background:var(--accent-soft); color:var(--accent-text); font-size:12px; }
 .portal-home__states a:nth-child(2) { background:transparent; border:1px solid var(--owed); color:var(--owed); }
@@ -375,7 +377,7 @@
 .portal-home__pay-more { display:inline-block; margin-top:11px; color:var(--accent); text-decoration:none; font-size:13px; }
 .portal-chart { padding:15px 13px 12px; background:var(--surface); border-radius:8px; }
 .portal-chart__heading { display:flex; justify-content:space-between; margin-bottom:12px; font-size:12px; color:var(--quiet); }
-.portal-chart__heading h2 { font-size:15px; color:var(--ink); font-weight:500; }
+.portal-chart__heading h2 { font-size:15px; color:var(--ink); font-weight:400; }
 .portal-chart__switch { display:flex; border:1px solid var(--rule); border-radius:8px; overflow:hidden; }
 .portal-chart__switch button { flex:1; padding:9px; border:0; background:none; color:var(--quiet); font-size:13px; cursor:pointer; }
 .portal-chart__switch [aria-pressed="true"] { color:var(--accent-text); background:var(--accent-soft); }
@@ -383,7 +385,7 @@
    month, figure, and what the figure is. Held at a fixed height so tapping
    from one month to another does not move the chart under the finger. */
 .portal-chart__readout { min-height:52px; padding:12px 3px 8px; font-size:12.5px; color:var(--quiet); }
-.portal-chart__readout strong { display:block; margin-top:4px; font-size:18px; color:var(--ink); font-weight:500; }
+.portal-chart__readout strong { display:block; margin-top:4px; font-size:18px; color:var(--ink); font-weight:400; }
 .portal-chart__readout em { display:block; margin-top:3px; font-style:normal; color:var(--faint); }
 .portal-chart svg { display:block; width:100%; overflow:visible; margin-top:8px; }
 .portal-chart text { fill:var(--faint); font-size:9px; }
@@ -392,7 +394,8 @@
 .portal-chart__tick--on { fill:var(--accent); }
 .portal-chart__line { fill:none; stroke:var(--accent); stroke-width:2; }
 .portal-chart__point,.portal-chart__bar { fill:var(--accent); }
-.portal-chart__pick { display:block; max-width:100%; margin:2px auto 0; padding:5px; font-size:12px; border:0; background:var(--surface); color:var(--quiet); }
+.portal-chart__hit { fill:transparent; cursor:pointer; }
+.portal-chart__hit:focus-visible { outline:none; stroke:var(--accent); stroke-width:1.5; }
 .portal-calculation { margin:0; border-radius:8px; background:var(--surface); overflow:hidden; }
 .portal-calculation > div { display:flex; align-items:baseline; justify-content:space-between; gap:12px; padding:14px 15px; border-bottom:1px solid var(--rule); font-size:14px; }
 .portal-calculation dd { margin:0; flex:none; font-variant-numeric:tabular-nums; }

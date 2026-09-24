@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Link,
   NavLink,
@@ -8,7 +8,10 @@ import {
   useOutletContext,
 } from "react-router-dom";
 
-import { formatMonth } from "../lib/money";
+import { api } from "../lib/api";
+import { formatMonth, shortMonth } from "../lib/money";
+import { monthListStates } from "../lib/portal";
+import type { MonthListState, MyPayments } from "../lib/portal";
 import type { Me } from "../screens/MyDetails";
 import "./AffiliateLayout.css";
 
@@ -50,16 +53,30 @@ export function usePortal(): PortalContext {
   return useOutletContext<PortalContext>();
 }
 
+/** The export's words and tones for each state in her month list. */
+const LIST_WORD: Record<MonthListState, { word: string; tone: string }> = {
+  open: { word: "in progress", tone: "pmonths__state--open" },
+  approved: { word: "approved", tone: "pmonths__state--agreed" },
+  paid: { word: "paid", tone: "pmonths__state--agreed" },
+  settled: { word: "settled", tone: "pmonths__state--settled" },
+};
+
 /**
- * Their name, their code, and the way in to their own details.
+ * Their name, their code, and the way in to their own details - and on Home,
+ * Orders and Ranking, the month.
  *
  * **The code is here rather than on one screen**, because it is the thing
  * they give out, the thing customers type, and the reason every figure in
  * this portal exists. It used to live three taps away.
  *
- * On the You screen the whole thing collapses to a way back: their name is
- * already the heading there, and an avatar linking to the page you are on is
- * a control that does nothing.
+ * **The month is the export's compact control**: the short month and a caret
+ * (*Nov ▼*), opening a list under the header of every month she can see, each
+ * with where it has got to. It was a native select reading *September 2026*,
+ * wide enough to cut her own code off the line beside it.
+ *
+ * On a view that is not one of the five, the whole thing collapses to a way
+ * back: their name is already the heading there, and an avatar linking to the
+ * page you are on is a control that does nothing.
  */
 export function PortalHeader({
   name,
@@ -75,6 +92,23 @@ export function PortalHeader({
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const [copied, setCopied] = useState(false);
+  const [listOpen, setListOpen] = useState(false);
+  const [states, setStates] = useState<Record<string, MonthListState> | null>(null);
+
+  // The list belongs to the screen it was opened on. Moving to another tab
+  // or view closes it, as the export's tab and view changes do.
+  useEffect(() => setListOpen(false), [pathname]);
+
+  // Read each time it opens, so a month approved or paid since she last
+  // looked says so. A failed read leaves the months without words.
+  useEffect(() => {
+    if (!listOpen || !months) return;
+    let live = true;
+    api.get<MyPayments>("/api/me/payments")
+      .then((body) => { if (live) setStates(monthListStates(months, body)); })
+      .catch(() => { if (live) setStates(null); });
+    return () => { live = false; };
+  }, [listOpen, months]);
 
   const secondaryTitles: Record<string,string> = {
     "/you": "You",
@@ -93,22 +127,24 @@ export function PortalHeader({
   const isPrimary = TABS.some(tab => tab.to === pathname);
   if (!isPrimary) {
     return (
-      <header className="phead phead--back">
-        {/*
-         * Back to wherever she came from, not to Home. *All products sold* is
-         * reached from the wardrobe and the payment detail from the payment
-         * list, and a Back that always went Home would throw away her place
-         * both times. Home is the fallback for somebody who arrived on a link.
-         */}
-        <button
-          type="button"
-          className="phead__back"
-          onClick={() => (window.history.length > 1 ? navigate(-1) : navigate("/"))}
-        >
-          ← Back
-        </button>
-        <span className="phead__title">{secondaryTitles[pathname] ?? "Details"}</span>
-      </header>
+      <div className="phead-bar">
+        <header className="phead phead--back">
+          {/*
+           * Back to wherever she came from, not to Home. *All products sold* is
+           * reached from the wardrobe and the payment detail from the payment
+           * list, and a Back that always went Home would throw away her place
+           * both times. Home is the fallback for somebody who arrived on a link.
+           */}
+          <button
+            type="button"
+            className="phead__back"
+            onClick={() => (window.history.length > 1 ? navigate(-1) : navigate("/"))}
+          >
+            ← Back
+          </button>
+          <span className="phead__title">{secondaryTitles[pathname] ?? "Details"}</span>
+        </header>
+      </div>
     );
   }
 
@@ -125,25 +161,56 @@ export function PortalHeader({
     }
   }
 
-  return (
-    <header className="phead">
-      <Link to="/you" className="phead__avatar" aria-label="Your details">
-        {/* Their initial. `name` is never empty - the application requires it -
-            but a fallback costs nothing and avoids an empty circle. */}
-        {name.trim().charAt(0).toUpperCase() || "·"}
-      </Link>
-      <div className="phead__who">
-        <span className="phead__name">{name}</span>
-        <span className="phead__since">
-          {codePending ? "Code being checked" : "HBA ambassador"}{code && <> · <button type="button" className="phead__inline-code" onClick={copy}>{copied ? "Copied" : code}</button></>}
-        </span>
-      </div>
-      {month && months && onMonth && ["/", "/orders", "/ranking"].includes(pathname) &&
-        <select className="phead__month" aria-label="Month" value={month} onChange={event => onMonth(event.target.value)}>
-          {months.map(value => <option key={value} value={value}>{formatMonth(value)}</option>)}
-        </select>}
+  const monthly = Boolean(month && months && onMonth && ["/", "/orders", "/ranking"].includes(pathname));
 
-    </header>
+  return (
+    <div className="phead-bar">
+      <header className="phead">
+        <Link to="/you" className="phead__avatar" aria-label="Your details">
+          {/* Their initial. `name` is never empty - the application requires it -
+              but a fallback costs nothing and avoids an empty circle. */}
+          {name.trim().charAt(0).toUpperCase() || "·"}
+        </Link>
+        <div className="phead__who">
+          <span className="phead__name">{name}</span>
+          <span className="phead__since">
+            {codePending ? "Code being checked" : "HBA ambassador"}{code && <> · <button type="button" className="phead__inline-code" onClick={copy}>{copied ? "Copied" : code}</button></>}
+          </span>
+        </div>
+        {monthly && (
+          <button
+            type="button"
+            className="phead__month"
+            aria-expanded={listOpen}
+            aria-controls="portal-months"
+            aria-label={`Month: ${formatMonth(month!)}`}
+            onClick={() => setListOpen((was) => !was)}
+          >
+            <span>{shortMonth(month!)}</span>
+            <span className="phead__caret" aria-hidden="true">▼</span>
+          </button>
+        )}
+      </header>
+      {monthly && listOpen && (
+        <div className="pmonths" id="portal-months">
+          {months!.map((value) => {
+            const state = states?.[value];
+            return (
+              <button
+                key={value}
+                type="button"
+                className={value === month ? "pmonths__month pmonths__month--on" : "pmonths__month"}
+                aria-current={value === month ? "true" : undefined}
+                onClick={() => { onMonth!(value); setListOpen(false); }}
+              >
+                <span>{formatMonth(value)}</span>
+                {state && <span className={`pmonths__state ${LIST_WORD[state].tone}`}>{LIST_WORD[state].word}</span>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 
