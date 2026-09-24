@@ -223,6 +223,9 @@ export type MyEarnings = {
     earned: number;
     pending: number;
     void: number;
+    /** The void orders the courier failed to deliver - not the cancelled or
+     *  refunded ones. Home's *failed delivery* chip. */
+    failed_delivery: number;
     /** Delivered plus pending: the orders the month is paid on. */
     counted: number;
     /**

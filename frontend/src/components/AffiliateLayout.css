@@ -192,6 +192,6 @@
  * reads as centred on the screen rather than on the space left over.
  */
 .phead--back { gap:10px; padding:12px 14px 13px; }
-.phead__back { flex:none; padding:9px 11px; border:1px solid var(--rule); border-radius:8px; background:transparent; color:var(--ink); font:inherit; font-size:13px; cursor:pointer; }
+.phead__back { flex:none; padding:9px 11px; border:1px solid var(--rule); border-radius:8px; background:transparent; color:var(--ink); font-size:13px; cursor:pointer; }
 .phead__back:hover { border-color:var(--accent); }
 .phead__title { flex:1; min-width:0; padding-right:60px; font-size:15px; text-align:center; }

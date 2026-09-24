@@ -1419,10 +1419,13 @@ def test_a_historical_month_counts_its_orders_the_same_way(admin, monkeypatch):
     # counts beside it are commission states, so the void order appearing in
     # one and not the other is the distinction working rather than a
     # miscount.
+    # `failed_delivery` is 0: the void order has no courier answer, so it is
+    # void for another reason, and Home's *failed delivery* does not claim it.
     assert body["orders"] == {
         "earned": 1,
         "pending": 1,
         "void": 1,
+        "failed_delivery": 0,
         "counted": 2,
         "uses": 3,
     }
@@ -2764,3 +2767,22 @@ def test_a_month_with_no_orders_reports_no_uses_rather_than_nothing(admin):
         assert row["uses"] is not None, f"{row['month']} could be counted"
     july = next(m for m in months if m["month"] == "2026-07")
     assert july["uses"] == 1
+
+
+def test_home_counts_a_failed_delivery_and_not_a_cancellation(admin):
+    """Home's chip says *failed delivery*, the export's words. The void bucket
+    behind the old *not counted* chip also holds cancellations and refunds in
+    transit; only an order the courier failed is a failed delivery."""
+    affiliate = _affiliate(admin)
+    _order(affiliate["id"], "fd1", 30_000, state="void")
+    _order(affiliate["id"], "fd2", 20_000, state="void")
+    _order(affiliate["id"], "fd3", 10_000, state="void")
+    with engine.begin() as connection:
+        connection.execute(text("UPDATE order_index SET delivery_state = 'failed' WHERE shopify_order_id = 'fd1'"))
+        connection.execute(text("UPDATE order_index SET cancelled_at = now() WHERE shopify_order_id = 'fd2'"))
+
+    body = _sign_in().get(f"/api/me/earnings/{AUGUST}").json()
+
+    assert body["orders"]["void"] == 3
+    assert body["orders"]["failed_delivery"] == 1
+

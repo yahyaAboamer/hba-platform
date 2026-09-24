@@ -14,8 +14,8 @@ true. Nothing was deleted.
 | **Tree** | clean apart from `.claude/settings.json`, the owner's plugin config, deliberately not committed |
 | **`origin/main`** | `6a13958` |
 | **`origin/production`** | `6a13958` — **level with `main`**, gap of 0 commits, read from `git ls-remote` on 24 September |
-| **Backend** | 2,069 tests, 80 files, all passing through `run-suite.sh` on 24 September, after batch D's corrections; matches `--collect-only`. Batch E changed one backend line (an added `start_month` in `/api/auth/me`); the three files that read that payload pass (158 tests); the full runner was not re-run for it |
-| **Frontend** | 403 tests, 19 files; `npm run build` green (24 September, after batch E) |
+| **Backend** | 2,069 tests, 80 files, all passing through `run-suite.sh` on 24 September, after batch D's corrections; matches `--collect-only`. Batch E changed one backend line (an added `start_month` in `/api/auth/me`); the three files that read that payload pass (158 tests). The follow-up added `months` to the profile payload and `failed_delivery` to earnings; the three files that read them pass (235 tests). The full runner was not re-run for either |
+| **Frontend** | 406 tests, 19 files; `npm run build` green (24 September, after the batch E follow-up) |
 | **Migration head** | `b1f0a40c0001` |
 
 > **Correction, 24 September 2026.** An earlier version of this table said
@@ -293,21 +293,49 @@ export); the capture script is `shared-controls.mjs` beside `review.mjs`.
 - **Chart.** The *Inspect chart month* select under the portal chart, which
   the export does not have, is replaced by tap/keyboard columns, as the
   export's `hits`.
-- **Kept, with reasons in the checklist:** controls stay in Inter where the
-  prototype falls back to the browser's control font (Arial here, SF on an
-  iPhone) - which is also the whole of the 95px vs 92px Orders row; the
-  profile offers every platform month rather than only hers.
+- **Kept in Batch E, then withdrawn by the owner the same day** (*an
+  explanation for a difference does not approve that difference*): controls
+  in Inter, and the profile offering every platform month. Both done in the
+  follow-up below.
 - **Not claimed:** the admin *Attributed orders* list is still unreviewed,
   and matching these controls says nothing about the rest of any screen.
+
+## Batch E follow-up (24 September)
+
+Owner's scope: finish the two shared-control differences, and five named
+presentation differences. Record and measurements: *Batch E follow-up* in
+`docs/repair/batch-2/visual/CHECKLIST.md`; pictures in
+`shots/batch-e/follow-up/` and `shots/batch-e/compare-follow-up/`.
+
+- **Buttons in the browser's control font**, as the approved page renders
+  them (ADR 0044): `button { font: revert }`; inputs and selects stay Inter as
+  the export sets them; links the export draws as buttons take the same font
+  through `.control-font`. Orders rows 92 vs 92, month list rows 41 vs 41.
+- **The profile offers her months** (`months` in the profile payload, from
+  `months_for` - the rule her portal already used). Admin reporting keeps the
+  platform's months. `outside_months.py` (read-only) found no record hidden by
+  a recorded start inside the platform's range on the disposable database;
+  real data not yet checked.
+- **Portal Home chips** read *pending* and *failed delivery*; the third
+  counts only courier failures (`failed_delivery`, server-side, by
+  `order_status`), never cancellations.
+- **Portal Home chart** redrawn to the export's plot as it renders - no axis
+  text, because the export's labels never render (question 13 in the list).
+- **Admin**: profile labels and *Active* pill, Home notice controls and
+  letter-spacing, Payments name and pill - all measured equal to the export.
+- **Checks**: frontend 406 tests, 19 files, and `npm run build`; backend: the
+  three files reading the changed payloads, 235 tests. Full runner not re-run.
 
 ## Not scheduled — a backlog, not an instruction
 
 Each batch is named by the owner. These are known, decided by the export, and
 **not** queued; nothing here is the next batch until he says so.
 
-- The differences batch E found and left, listed with their locations at
-  the end of `docs/repair/batch-2/visual/CHECKLIST.md` (*Still differs, not
-  in this batch*), and the admin **Attributed orders** list, still unreviewed.
+- **The one remaining-work list** is at the end of
+  `docs/repair/batch-2/visual/CHECKLIST.md` (*Remaining work - the one
+  list*): approved differences still to implement, defects, missing
+  verification, and three questions for the owner. It is the only such list;
+  it includes the unreviewed admin **Attributed orders** list.
 - The comment in `app/services/portal.py` saying a delivered-then-refunded
   order *"pays nothing"*; the code and tests already have it right.
 - The small wordings: *Send a new link*, the absolute sent date, the size on

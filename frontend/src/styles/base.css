@@ -63,26 +63,35 @@ h3 {
   font-size: var(--text-base);
 }
 
-button,
+/*
+ * **Controls are typed as the approved reference types them** (ADR 0044).
+ *
+ * The admin export sets `.ad input, .ad select, .ad textarea
+ * {font-family: var(--font-body)}` - fields and selects are Inter - and
+ * leaves `button` to the browser. So every button in both exports that does
+ * not name a family inline (146 of 150) is drawn in the browser's own control
+ * font, at its own line height, at 400, at 13.33px unless the button gives a
+ * size: Arial in the reviewing Chromium, the system face on a phone. The
+ * four that do name one - the portal's avatar and tabs, the admin sidebar,
+ * one product sheet - are links or say `font: inherit` here.
+ *
+ * `revert` hands the button back to the browser's stylesheet, so it renders
+ * exactly as the reference's does on the same device; a class that sets a
+ * size or weight still sets it.
+ */
 input,
 select {
   font: inherit;
   color: inherit;
 }
 
-/*
- * **Controls keep the browser's line height**, as every button and select in
- * both exports does: the prototype never resets them, so they sit at
- * `line-height: normal` while the text around them is on 1.55. Inheriting
- * 1.55 made every padded button taller than its approved counterpart - a
- * month list row 47px against 41px. The *family* is not copied: the same
- * missing reset draws those buttons in the browser's control font (Arial on
- * the reviewing machine, San Francisco on an iPhone), which is no one face
- * and not the one the design system declares. Ours stay in Inter. ADR 0043.
- */
-button,
 select {
   line-height: normal;
+}
+
+button {
+  font: revert;
+  color: inherit;
 }
 
 /*
@@ -496,6 +505,21 @@ a {
  * One shape. The weight of an action is carried by what it says, not by how
  * loud it looks — "Approve August" is already the strongest thing on a page.
  */
+/*
+ * **Text the export draws inside a `<button>`, where ours is a link** - the
+ * app's `.button` links, a payments row's name, the → links under a card. It
+ * takes the same browser control font a button does (ADR 0044): the
+ * `-webkit-small-control` keyword is exactly what a button's own stylesheet
+ * uses, measured identical in Chromium; where a browser lacks the keyword the
+ * line is dropped and the system face stands in. `:where` keeps it at zero
+ * specificity, so a screen's own size or weight still applies, as it would to
+ * a button.
+ */
+:where(.control-font, a.button) {
+  font-family: system-ui;
+  font: -webkit-small-control;
+}
+
 .button {
   display: inline-flex;
   text-decoration: none;
@@ -513,7 +537,9 @@ a {
   background: transparent;
   font-size: 13.5px;
   font-weight: 400;
-  line-height: 1.15;
+  /* The browser's own, as the export's buttons have. 1.15 was an earlier
+     stand-in for it, from before these were in the control font. */
+  line-height: normal;
   cursor: pointer;
 }
 

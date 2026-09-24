@@ -348,6 +348,8 @@
 .portal-home__states a:nth-child(3) { background:transparent; border:1px solid var(--refused); color:var(--refused); }
 .portal-home__note { font-size:12.5px; color:var(--quiet); }
 .portal-home__open { display:flex; justify-content:space-between; padding:14px 15px; border:1px solid var(--rule); border-radius:8px; color:var(--ink); text-decoration:none; font-size:14px; }
+/* The export's arrow is accent (`<span style="color:var(--acc)">→</span>`). */
+.portal-home__open span { color:var(--accent); }
 /* Where the month has got to, in one word. Amber while it can still move,
    accent once it is agreed or sent, quiet once it is closed. */
 .portal-home__state { padding:4px 10px; border:1px solid currentColor; border-radius:999px; font-size:12px; }
@@ -379,7 +381,7 @@
 .portal-chart__heading { display:flex; justify-content:space-between; margin-bottom:12px; font-size:12px; color:var(--quiet); }
 .portal-chart__heading h2 { font-size:15px; color:var(--ink); font-weight:400; }
 .portal-chart__switch { display:flex; border:1px solid var(--rule); border-radius:8px; overflow:hidden; }
-.portal-chart__switch button { flex:1; padding:9px; border:0; background:none; color:var(--quiet); font-size:13px; cursor:pointer; }
+.portal-chart__switch button { flex:1; padding:9px; border:0; background:none; color:var(--quiet); font:inherit; font-size:13px; cursor:pointer; }
 .portal-chart__switch [aria-pressed="true"] { color:var(--accent-text); background:var(--accent-soft); }
 /* The reading for whichever month is picked, above the plot it belongs to:
    month, figure, and what the figure is. Held at a fixed height so tapping
@@ -387,13 +389,17 @@
 .portal-chart__readout { min-height:52px; padding:12px 3px 8px; font-size:12.5px; color:var(--quiet); }
 .portal-chart__readout strong { display:block; margin-top:4px; font-size:18px; color:var(--ink); font-weight:400; }
 .portal-chart__readout em { display:block; margin-top:3px; font-style:normal; color:var(--faint); }
-.portal-chart svg { display:block; width:100%; overflow:visible; margin-top:8px; }
-.portal-chart text { fill:var(--faint); font-size:9px; }
-.portal-chart__grid { stroke:var(--rule); stroke-width:.6; }
+.portal-chart svg { display:block; width:100%; overflow:visible; }
+/* The export's plot as it renders: rules in the stronger line colour, a 2.25
+   line with open points, the month being read filled in accent. */
+.portal-chart__grid { stroke:var(--rule-strong); stroke-width:1; }
 /* The month being read, named under its own point. */
-.portal-chart__tick--on { fill:var(--accent); }
-.portal-chart__line { fill:none; stroke:var(--accent); stroke-width:2; }
-.portal-chart__point,.portal-chart__bar { fill:var(--accent); }
+.portal-chart__line { fill:none; stroke:var(--accent); stroke-width:2.25; stroke-linejoin:round; stroke-linecap:round; }
+.portal-chart__point { fill:var(--surface); stroke:var(--accent); stroke-width:2; }
+.portal-chart__point--on { fill:var(--accent); }
+.portal-chart__bar { fill:var(--bar); }
+.portal-chart__bar--on { fill:var(--accent); }
+
 .portal-chart__hit { fill:transparent; cursor:pointer; }
 .portal-chart__hit:focus-visible { outline:none; stroke:var(--accent); stroke-width:1.5; }
 .portal-calculation { margin:0; border-radius:8px; background:var(--surface); overflow:hidden; }

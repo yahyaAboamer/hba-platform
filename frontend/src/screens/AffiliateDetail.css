@@ -222,7 +222,7 @@
 
 .profile__navigation { display:flex; justify-content:space-between; align-items:center; gap:14px; margin:18px 0; flex-wrap:wrap; }
 .profile__tabs { display:flex; gap:7px; flex-wrap:wrap; }
-.profile__tab { min-height:36px; padding:8px 13px; border:0; border-radius:8px; background:none; color:var(--quiet); font:inherit; font-size:13px; cursor:pointer; }
+.profile__tab { min-height:36px; padding:8px 13px; border:0; border-radius:8px; background:none; color:var(--quiet); font-size:13px; cursor:pointer; }
 .profile__tab--active { color:var(--accent-text); background:var(--accent-soft); }
 .profile__wardrobe,.profile__full { grid-column:1 / -1; min-width:0; }
 .profile__wardrobe-group { margin-bottom:22px; }
@@ -650,4 +650,22 @@ td.profile__muted,
   width: 100%;
   min-height: 44px;
   margin-top: 14px;
+}
+
+/* ── Batch E follow-up: the profile's sizes, as `vModel` sets them ─────────
+ *
+ * The state pill at the export's 3px 9px / 11.5px. `.pill` is defined twice
+ * in the bundle, and `Compensation.css`'s version (12px, no vertical padding)
+ * loads later and was winning here; scoped to the hero so terms editing keeps
+ * its own. The panels' labels and notes at the export's 12.5px (`Height`,
+ * `Phone`, *Only the model can change these.*).
+ */
+.profile__facts .pill {
+  padding: 3px 9px;
+  font-size: 11.5px;
+}
+
+.detail__grid .detail__label,
+.detail__grid .detail__note {
+  font-size: 12.5px;
 }

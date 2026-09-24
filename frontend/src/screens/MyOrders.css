@@ -55,7 +55,8 @@
   border-radius: var(--radius);
   background: transparent;
   color: var(--quiet);
-  font: inherit;
+  /* No `font: inherit`: the export's filters and rows are buttons in the
+     browser's control font (ADR 0044). */
   font-size: 12.5px;
   /* The export's chips and rows set no line height of their own, so they
      sit at the browser's normal - the page's 1.5 made each row 14px taller
@@ -106,7 +107,6 @@
   border: 0;
   background: transparent;
   color: var(--ink);
-  font: inherit;
   line-height: normal;
   text-align: left;
   cursor: pointer;

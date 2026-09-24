@@ -622,7 +622,7 @@ export function PaymentRow({
       <td className="payments__who">
         {/* The export opens the model's payment for this month from her name,
          *  not her profile - the profile is one link further, from there. */}
-        <Link className="payments__name" to={`/payments/${month}/${row.affiliate_id}`}>
+        <Link className="payments__name control-font" to={`/payments/${month}/${row.affiliate_id}`}>
           {row.name}
         </Link>
         {/* Her arrangement under her name, as the export writes it: the

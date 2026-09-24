@@ -198,7 +198,7 @@ async function exportPortal(browser) {
   save("export-portal-month-open-390", {
     options: await frame.evaluate((pt) => [...pt.querySelectorAll(":scope > div:nth-child(3) button")].map((b) => {
       const cs = getComputedStyle(b); const r = b.getBoundingClientRect();
-      return { text: b.innerText.replace(/\s+/g, " "), h: r.height, size: cs.fontSize, bg: cs.backgroundColor };
+      return { text: b.innerText.replace(/\s+/g, " "), h: r.height, size: cs.fontSize, fam: cs.fontFamily, bg: cs.backgroundColor };
     })),
   });
   await page.locator(".pt > div:nth-child(3) button").nth(2).click(); await settle(page, 300);
@@ -239,7 +239,7 @@ async function appPortal(browser) {
     save("app-portal-month-open-390", {
       options: await page.$$eval(".pmonths button", (bs) => bs.map((b) => {
         const cs = getComputedStyle(b); const r = b.getBoundingClientRect();
-        return { text: b.innerText.replace(/\s+/g, " "), h: r.height, size: cs.fontSize, bg: cs.backgroundColor };
+        return { text: b.innerText.replace(/\s+/g, " "), h: r.height, size: cs.fontSize, fam: cs.fontFamily, bg: cs.backgroundColor };
       })),
     });
     await page.locator(".pmonths button").nth(1).click(); await settle(page, 900);
@@ -335,6 +335,16 @@ async function exportAdmin(browser, width) {
     save(`export-${id}-${width}`, {
       topbar: await typography(page, topbar, 12),
       body: await typography(page, ".ad > div:nth-child(2) > div:nth-child(2)", 40),
+      rowName: await frame.evaluate((ad) => {
+        const b = [...ad.querySelectorAll("button")].find((x) => x.style.textAlign === "left" && x.style.fontSize === "13.5px" && x.querySelector("span"));
+        if (!b) return null; const c = getComputedStyle(b);
+        return { text: b.firstChild.textContent.trim(), fam: c.fontFamily, size: c.fontSize, weight: c.fontWeight };
+      }),
+      rowPill: await frame.evaluate((ad) => {
+        const e = [...ad.querySelectorAll("span")].find((x) => x.style.borderRadius === "999px" && /^(Awaiting approval|Approved|Partly paid|Fully paid)$/.test(x.textContent.trim()));
+        if (!e) return null; const c = getComputedStyle(e); const r = e.getBoundingClientRect();
+        return { text: e.textContent.trim(), size: c.fontSize, pad: c.padding, h: r.height, fam: c.fontFamily };
+      }),
       selects: await frame.evaluate((ad) => [...ad.querySelectorAll("select")].map((s) => {
         const r = s.getBoundingClientRect(); const cs = getComputedStyle(s);
         return { value: s.value, label: s.selectedOptions[0]?.textContent, options: s.options.length, h: r.height, w: r.width, size: cs.fontSize, x: r.left, y: r.top };
@@ -373,6 +383,8 @@ async function appAdmin(browser, width) {
       topbar: await typography(page, ".page__head", 12),
       body: await typography(page, ".layout__main", 40),
       selects: await measureSelects(),
+      rowName: await page.evaluate(() => { const e = document.querySelector(".payments__name"); if (!e) return null; const c = getComputedStyle(e); return { text: e.textContent.trim(), fam: c.fontFamily, size: c.fontSize, weight: c.fontWeight }; }),
+      rowPill: await page.evaluate(() => { const e = document.querySelector(".payments__state .pill"); if (!e) return null; const c = getComputedStyle(e); const r = e.getBoundingClientRect(); return { text: e.textContent.trim(), size: c.fontSize, pad: c.padding, h: r.height, fam: c.fontFamily }; }),
     });
   }
 
@@ -381,6 +393,7 @@ async function appAdmin(browser, width) {
   const control = page.locator(".profile__month select");
   if (await control.count()) {
     const values = await control.evaluate((s) => [...s.options].map((o) => o.value));
+    save(`app-admin-profile-months-${width}`, { options: values });
     const pick = values[1];
     await page.locator(".profile__tab", { hasText: "Performance" }).click(); await settle(page, 600);
     await control.selectOption(pick); await settle(page, 900);

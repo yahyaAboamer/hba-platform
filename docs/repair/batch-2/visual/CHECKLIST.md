@@ -564,47 +564,130 @@ keep the month; the profile's chosen month survives opening an order and
 Back (`?section=performance&month=2026-07`); the chart's month columns work
 by tap and by keyboard.
 
-### Kept divergences, with the reason
+### Batch E's divergences - withdrawn by the follow-up below
 
-- **Controls stay in Inter.** The export never resets form-control fonts, so
-  any button without an inline family - the month button, list rows, order
-  rows, filters, *How this adds up* - is drawn in the browser's control font:
-  Arial on the reviewing machine, San Francisco on an iPhone. Its `<select>`
-  and nav buttons, which do set a family, are Inter. That is a missing reset,
-  not a face; the design system declares Inter.
-- **So portal Orders rows are 95px against 92px**, and list rows 42px against
-  41px. Measured: at `line-height: normal` Arial is 1.15em and Inter 1.21em,
-  across three lines of a row. Batch D's "font metrics; accepted" is this.
-- **The admin profile offers every platform month** (from 2026-01 to the
-  working month); the export lists only her own. A month before her recorded
-  start can still hold orders somebody needs to see.
-- **The admin top bar lists the platform's months** from its first month to
-  December of the working year; the export lists its calendar year.
-- **The code on the portal header still copies on tap**, and says *Copied*;
-  it looks like the export's plain text.
-- **Settings' *Effective from* and the rules preview** are not in the export.
-  They use the same select: the preview over its server-given window,
-  Settings from this month to the end of next year.
+Batch E kept two differences with reasons (controls in Inter; the profile
+offering every platform month). The owner's answer: *an explanation for a
+difference does not approve that difference.* Both are implemented below.
+Batch E also listed *Payments: the model's name at 15px/700*. That was a
+mis-pairing: the 15px/700 name is our corrections panel's, which the export
+does not have; the desk row's name was already 13.5px/400.
 
-### Still differs, not in this batch
+---
 
-- **Admin Attributed orders list (`vOrders`) — still not reviewed.** Only its
-  top-bar month control was checked. Nothing here says that screen matches.
-- Portal Home: chips read *0 on the way* / *0 not counted* where the export
-  says *1 pending* / *0 failed delivery*; the year chart draws numbered ticks
-  and a scale where the export draws month names; *How this adds up* is a
-  link at 1.55 where the export's is a button at `normal`.
-- Admin profile body (Overview): labels at 13px vs 12.5px, *Only the model can
-  change these.* at 12px vs 12.5px, the *Active* chip at 12px vs 11.5px, and
-  the Contact panel's structure.
-- Admin Home: notice ⋯ and × are unbordered where the export's are 34px
-  bordered squares; *Estimated* tracked +0.02em and *19* −0.02em where the
-  export tracks neither.
-- Payments desk rows: the model's name at 15px/700 against 13.5px/400; the
-  state chips at 13px against 11.5px.
-- Admin Overview's historical-month note (`onLockedClick`) never shows: the
-  month effect clears it in the same render. It did not show with the grid
-  either, and the export shows no note, so the visible behaviour matches.
-- The prototype's status bar (*9:41*, battery) is its phone and is not
-  reproduced.
+## Batch E follow-up (24 September)
 
+Pictures and digests in `shots/batch-e/follow-up/`; Batch E · follow-up ·
+export side by side in `shots/batch-e/compare-follow-up/`.
+
+| What | Before | Now | Export |
+|---|---|---|---|
+| Buttons | Inter, inherited | the browser's control font (`font: revert`), ADR 0044 | control font on 146 of 150 buttons |
+| Portal Orders row | 95px | **92px** | 92px |
+| Portal month list row | 42px | **41px** | 41px |
+| Portal header | name 236, month 62×35, 390×66 | same | same |
+| Payments row name | Inter 13.5px/400 | Arial 13.5px/400 (control font) | Arial 13.5px/400 |
+| Payments state pill | 12px, no vertical padding (leaked `.pill`) | 11.5px, 3px 9px, inline, 22px box | same |
+| Profile *Active* pill | 12px (leaked `.pill`) | 11.5px, 3px 9px, 25.8px box | same |
+| Profile labels, sizing note | 13px / 12px | 12.5px | 12.5px |
+| Admin Home ⋯ and ✕ | bare glyphs | 34px bordered squares, 13px | same |
+| Admin Home *Estimated*, *19* | tracked | untracked | untracked |
+| Portal Home chips | *0 on the way*, *0 not counted* (all void) | *0 pending*, *0 failed delivery* (courier failures only: `failed_delivery`, decided on the server by the order's own status) | *1 pending*, *0 failed delivery* |
+| Portal Home chart | 4 labelled rules, no headroom | the export's plot: 3 rules, 15% / 35% headroom, open points, `viewBox -24 0 324 130`, no axis text | as rendered |
+| Profile month control | platform months, 2026-01 to working month | **her months** (`months_for`, in the profile payload) | her months (`started`) |
+
+**The profile's months, and the records outside them.** The rule is the one
+her portal already used: her recorded collaboration start, else her earliest
+order or payroll record, floored at 2026-01, up to the working month. Admin
+reporting screens keep the platform's months. `outside_months.py`
+(read-only) lists any model whose orders or payroll records fall outside her
+months. On the disposable database: 7 models, each with one or two orders in
+2025-11 / 2025-12 - before the platform's first month, put there by the
+seed's date shifting, and offered by no control before Batch E either. **No
+model has records hidden by a recorded start inside the platform's range.**
+Staging and production were not queried (item 9 below).
+
+**Checked.** Portal at 390: Home, Orders (September; July chosen through the
+new list), month list open and a month chosen, Home scrolled to the end
+(header held at 0-66px, last line at 744px above the tab bar at 788px), a
+long name and code, no horizontal overflow. Admin at 1280 and 1440: profile
+(her months, *Performance* kept, `month=` written, Back from an order returns
+to *Performance · July*), Home, Payments, Targets, Orders and Payroll top
+bars, a long name and code at 1280. Fonts awaited before every capture.
+
+---
+
+## Remaining work - the one list
+
+Each item is one of: **approved difference still to implement**,
+**functional defect**, **missing verification**, **information required from
+the owner**. Nothing below reopens an approved design choice.
+
+### Approved differences still to implement
+
+1. **Portal Home chart switch** - the export's `.seg` control (accent outline
+   on *Sales*, *Uses* in ink); ours fills the selected half.
+   `PortalYearChart.tsx`, `MyMonth.css` `.portal-chart__switch`.
+2. **Portal Home chart reading** - ours adds *· So far* after the month; the
+   export prints the month alone. `PortalYearChart.tsx`, the readout.
+3. **Admin Home notice titles** end with a full stop (*2 applications awaiting
+   review.*); the export's do not. The text comes from the server's
+   `attention` items.
+4. **Admin profile body (Overview)** - the export's Contact panel is editable
+   fields (*Full name, Email, Phone, Shipping address, City, Save details*);
+   ours is rows (*Started with HBA, Phone, Signs in with, Parcels go to*).
+   Sizing values at the export's 15px (ours 12px `.code`), and the
+   *November 2025* start value at 12.5px (ours 12px). The *Discount codes*
+   panel is not in the export. *Signs in with* stays: the owner's D07 of
+   9 September is a later explicit instruction. `AffiliateDetail.tsx`,
+   roughly lines 760-1000.
+5. **Buttons still re-set to Inter outside this batch's screens** - the
+   portal's You screens (`MyYou.css` two rules; `AffiliateHome.css`
+   `.pref--row`, `.affiliate__reveal` and the rule near line 173;
+   `portal.css` near line 334) and terms editing (`Compensation.css`
+   `.fork`, `.mo`, `.kinds`, `.seg`, `.comp__clear`). Each is removed when
+   its screen is reviewed against the export.
+6. **`.pill` is defined twice.** `Compensation.css` redefines it (12px, no
+   vertical padding) and, bundled globally, overrides the base pill on every
+   screen - Compensation itself does not use it. Fixed locally on the
+   profile and Payments; the roster, Products, admin order detail and payment
+   detail pills still draw the leaked version.
+
+### Functional defects
+
+7. **Admin Home's earlier-month note never shows.** `Overview.tsx` sets it
+   from `onLockedClick` and the month effect clears it in the same render
+   (true before Batch E as well). Deliberately not fixed: the export shows no
+   such note - item 12.
+
+### Missing verification
+
+8. **Admin *Attributed orders* list (`vOrders`) - layout not reviewed.** Only
+   its month control was checked. Nothing here says it matches.
+9. **Records outside a model's months, on real data.** Run
+   `outside_months.py` (read-only) against staging and, with authorisation, a
+   restored production copy. Only the disposable database has been checked.
+10. **The control font on real devices.** Buttons now take the device's face,
+    as the export's do; verified in Chromium on Windows only - not on an
+    iPhone, not on Android, not in Firefox (where `.control-font` links fall
+    back to `system-ui`).
+11. **Backend.** The follow-up added two payload fields (`months` on the
+    profile, `failed_delivery` on earnings). The three files that read them
+    pass (235 tests); the full runner was not re-run. Run `run-suite.sh`
+    before any merge. The two release gates in `CLAUDE.md` remain open.
+
+### Information required from the owner
+
+12. **The earlier-month note on admin Home.** Old code intended a sentence
+    (*"… was settled outside this dashboard."*) when a month before go-live
+    is chosen; the approved export shows none, and today none shows. Keep it
+    absent, or should it appear?
+13. **Chart axis text.** The export's markup has rule labels (*0 / 11k / 22k*)
+    and month numbers, but its runtime puts each in an HTML `<span>` inside
+    SVG `<text>`, which no browser draws - so the rendered chart that was
+    approved has none, and ours now matches it. Should the labels the markup
+    intends be shown?
+14. **The Payments *Agreed months that have changed* panel** is ours; the
+    export shows this kind of item only as a Home notice (*Late failed order
+    needs a decision → Open correction*). Keep the panel on Payments, or only
+    the Home notice?

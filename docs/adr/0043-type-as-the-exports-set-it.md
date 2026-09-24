@@ -1,6 +1,8 @@
 # 0043 — Type as the exports set it: proportional figures, one weight
 
-**Status:** accepted
+**Status:** accepted; **controls amended by
+[0044](0044-controls-in-the-browsers-control-font.md)** — buttons draw in the
+browser's control font, as the approved page does
 **Date:** 2026-09-24
 **Amends:** [0039](0039-one-palette-across-both-halves.md) (its type mechanism),
 and with it what remained of [0027](0027-numerals-change-face-when-a-figure-becomes-an-obligation.md)

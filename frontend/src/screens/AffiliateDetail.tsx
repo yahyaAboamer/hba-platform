@@ -11,7 +11,7 @@ import type { DestinationCard } from "../lib/payouts";
 import type { NetSales } from "../lib/portal";
 import { describeDestination, PAY_TYPE } from "../lib/payouts";
 import type { Session } from "../lib/api";
-import { formatEgp, formatMonth, monthsBetween } from "../lib/money";
+import { formatEgp, formatMonth } from "../lib/money";
 import { ROSTER_STATUS } from "./Affiliates";
 import type { Affiliate } from "./Affiliates";
 import "./PaymentDetail.css";
@@ -73,6 +73,8 @@ type Detail = Affiliate & {
   /** Which month `compensation` and `codes` below actually describe. */
   terms_month: string;
   platform_start_month: string;
+  /** Her months, newest first (`months_for`): the profile's month control. */
+  months: string[];
   codes: Code[];
   compensation: Compensation | null;
   payout_destination: Destination | null;
@@ -694,13 +696,14 @@ export function AffiliateDetail({ session }: { session: Session }) {
         {/* The export keeps the month beside the sections on every one of
          *  them: the figures on Overview are that month's too. */}
         <span className="profile__month">
-          {/* The export's in-page select (`mMonth`). Every month from the
-           *  platform's first to the working month, as the grid offered her
-           *  profile before: the export narrows it to her own months, and a
-           *  month before her recorded start can still hold orders somebody
-           *  needs to look at (see the kept divergence in the checklist). */}
+          {/* The export's in-page select (`mMonth`), over **her** months
+           *  (`mMonthOptions`: from when she started to the current month) -
+           *  decided on the server by the rule her own portal uses. Admin
+           *  reporting screens keep the platform's months; this control is
+           *  about one model. A month reached from a link outside them still
+           *  shows, because the control never hides the month on screen. */}
           <MonthPicker value={month} size="section"
-            months={monthsBetween(detail.platform_start_month, detail.current_month)}
+            months={detail.months}
             onChange={(next) => {
               setMonth(next);
               // Into the address as well, replacing rather than adding a
@@ -978,7 +981,7 @@ export function AffiliateDetail({ session }: { session: Session }) {
           <h2 className="pay-detail__card-title">Current terms</h2>
           <p className="profile__card-line">{termLine}</p>
           {can(session, "compensation.manage") && (
-            <Link className="pay-detail__link profile__card-link" to={`/affiliates/${id}/compensation`}>
+            <Link className="pay-detail__link profile__card-link control-font" to={`/affiliates/${id}/compensation`}>
               Compensation history →
             </Link>
           )}
@@ -1186,7 +1189,7 @@ export function AffiliateDetail({ session }: { session: Session }) {
               <p className="pay-detail__faint">For {formatMonth(detail.terms_month)}</p>
             )}
             {can(session, "compensation.manage") && (
-              <Link className="pay-detail__link profile__card-link" to={`/affiliates/${id}/compensation`}>
+              <Link className="pay-detail__link profile__card-link control-font" to={`/affiliates/${id}/compensation`}>
                 Edit terms →
               </Link>
             )}

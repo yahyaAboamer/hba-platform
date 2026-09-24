@@ -301,9 +301,9 @@ export function Overview({ session }: { session: Session }) {
             {item.detail && <small>{item.detail}</small>}
           </div>
           <Link className="button" to={item.where}>{item.action}</Link>
-          <button className="button" aria-label={`Options for ${item.text}`} aria-expanded={noticeMenu === item.key}
+          <button className="button overview__notice-icon" aria-label={`Options for ${item.text}`} aria-expanded={noticeMenu === item.key}
             onClick={() => setNoticeMenu(noticeMenu === item.key ? null : item.key)}>⋯</button>
-          <button className="button" aria-label={`Dismiss ${item.text}`} onClick={() => hide(item.key)}>×</button>
+          <button className="button overview__notice-icon" aria-label={`Dismiss ${item.text}`} onClick={() => hide(item.key)}>✕</button>
           {noticeMenu === item.key && <div className="overview__notice-menu">
             <button className="button" onClick={() => hide(item.key)}>Hide for now</button>
             {item.severity !== "blocking" && <button className="button" onClick={() => mute(item.key)}>Don't remind me about this item</button>}
@@ -328,7 +328,7 @@ export function Overview({ session }: { session: Session }) {
               {summary.selling_models} {summary.selling_models === 1 ? "model" : "models"} with
               {" "}attributed orders in {formatMonth(month)}
             </p>
-            <Link to={`/orders?month=${month}`}>All attributed orders →</Link>
+            <Link className="control-font" to={`/orders?month=${month}`}>All attributed orders →</Link>
           </section>
           <section className="overview__card overview__card--payout">
             <h2>{payroll?.is_historical
@@ -343,14 +343,14 @@ export function Overview({ session }: { session: Session }) {
                 {summary.expected.guarantee_top_up_piastres > 0 && <div className="overview__parts--lift"><dt>Guarantee top-ups</dt><dd><Money piastres={summary.expected.guarantee_top_up_piastres} /></dd></div>}
               </dl>
             </>}
-            <Link to={`/payments?month=${month}`}>Open {formatMonth(month)} in Payments →</Link>
+            <Link className="control-font" to={`/payments?month=${month}`}>Open {formatMonth(month)} in Payments →</Link>
           </section>
           <section className="overview__card overview__card--count">
-            <h2>Active models</h2><div className="overview__hero-value">{summary.active_models}</div>
+            <h2>Active models</h2><div className="overview__hero-value overview__hero-value--count">{summary.active_models}</div>
             <p className="overview__card-note">
               {summary.active_models} collaborating in {shortMonth(month)}
             </p>
-            <Link to="/affiliates">Open roster →</Link>
+            <Link className="control-font" to="/affiliates">Open roster →</Link>
           </section>
         </div>
         <div className="overview__lower">
@@ -370,7 +370,7 @@ export function Overview({ session }: { session: Session }) {
           <section className="panel">
             <div className="panel__head">
               <h2 className="panel__title">Content progress to review</h2>
-              <Link to={`/targets?month=${month}`}>Targets →</Link>
+              <Link className="control-font" to={`/targets?month=${month}`}>Targets →</Link>
             </div>
             {toReview(summary.content).length === 0 ? <p className="empty">Every model's record is up to date for {formatMonth(month)}.</p> : <>
               <table className="table overview__content">

@@ -68,6 +68,7 @@ from app.services.payouts import (
     set_destination,
 )
 from app.services.payroll import working_month
+from app.services.portal import months_for
 from app.services.targets import record_outcome
 from app.services.shopify.client import (
     ShopifyError,
@@ -269,6 +270,11 @@ def _affiliate_detail(
         # The preview's history floor is a server fact, not a second calendar
         # hard-coded into the browser. Collaboration can start later than it.
         "platform_start_month": PLATFORM_START_MONTH,
+        #: Her months, newest first, for the profile's month control: the
+        #: export offers a model only the months she was with HBA
+        #: (`started`). The same rule her own portal uses (`months_for`), so
+        #: the owner and the model are offered the same months for her.
+        "months": months_for(db, affiliate),
         "codes": codes_with_status(db, affiliate, month),
         "compensation": _compensation_payload(terms_for(db, affiliate, month)),
         "payout_destination": mask_destination(current_destination(db, affiliate)),

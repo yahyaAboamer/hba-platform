@@ -280,6 +280,34 @@ def months_for(db: Session, affiliate: AffiliateProfile) -> list[str]:
     return _months_between(first, working)
 
 
+def failed_deliveries(db: Session, affiliate: AffiliateProfile, month: str) -> int:
+    """How many of her orders in this month the courier failed to deliver.
+
+    **Not the void count.** Void also holds a cancellation and a refund while
+    travelling, and Home's chip says *failed delivery*, the export's words -
+    so it counts only what `order_status` calls *failed*, the same decision
+    the order's own row shows.
+    """
+    rows = db.execute(
+        select(AttributedOrder, OrderIndex)
+        .join(OrderIndex, OrderIndex.shopify_order_id == AttributedOrder.shopify_order_id)
+        .where(AttributedOrder.affiliate_id == affiliate.id)
+        .where(AttributedOrder.business_month == month)
+        .where(AttributedOrder.commission_state == CommissionState.VOID)
+    ).all()
+    return sum(
+        1
+        for order, index in rows
+        if order_status(
+            state=order.commission_state,
+            delivery_state=index.delivery_state,
+            cancelled_at=index.cancelled_at,
+            financial_status=index.financial_status,
+        )
+        == "failed"
+    )
+
+
 def _not_started(month: str) -> bool:
     """Whether this month has not begun yet.
 
@@ -621,6 +649,7 @@ def my_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
                 "earned": len(counted),
                 "pending": len(travelling),
                 "void": len(gone),
+                "failed_delivery": failed_deliveries(db, affiliate, month),
                 "counted": len(counted) + len(travelling),
                 # A08. **The same figure a month after go-live gets.** Her code
                 # uses are a fact about her orders, and her orders are in the
@@ -734,6 +763,7 @@ def my_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
             "earned": performance.delivered_orders,
             "pending": performance.pending_orders,
             "void": performance.failed_orders,
+            "failed_delivery": failed_deliveries(db, affiliate, month),
             "counted": performance.counted_orders,
             # **How often her code was used** (M01, and D03 for what counts).
             #

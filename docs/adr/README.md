@@ -82,7 +82,8 @@ what was chosen.
 | [0040](0040-a-pending-order-is-a-sale.md) | A pending order is a sale, and the carry becomes a backlog | Accepted |
 | [0041](0041-a-correction-settles-money-that-moved.md) | A correction settles money that moved; a balance is money that has not | Accepted; amends 0035 |
 | [0042](0042-the-payer-sees-the-whole-destination.md) | The payer sees the whole destination, without asking twice | Accepted; amends 0028 |
-| [0043](0043-type-as-the-exports-set-it.md) | Type as the exports set it: proportional figures, one weight | Accepted; amends 0039 |
+| [0043](0043-type-as-the-exports-set-it.md) | Type as the exports set it: proportional figures, one weight | Accepted; amends 0039; controls amended by 0044 |
+| [0044](0044-controls-in-the-browsers-control-font.md) | Buttons in the browser's control font, as the approved page draws them | Accepted; amends 0043 |
 
 **0014 is superseded by 0036** and **0038 by 0039**. **0027 keeps its
 principle and loses its mechanism to 0039**: an agreed figure is still set

@@ -212,3 +212,25 @@
   color: var(--accent);
   text-decoration: none;
 }
+
+/* The export's notice controls (`n.onMenu`, `n.onDismiss`): 34px squares with
+   the divider's border, muted, 13px - not bare glyphs. */
+.overview__notice button.overview__notice-icon {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  min-height: 34px;
+  padding: 0;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--quiet);
+  font-size: 13px;
+}
+
+/* Untracked where the export leaves them: the count of active models (its
+   `activeCount` has no letter-spacing, unlike the two money figures beside
+   it) and the *Estimated* pill. */
+.overview__hero-value--count { letter-spacing: normal; }
+.overview__card .state { letter-spacing: normal; }
+

@@ -2153,3 +2153,20 @@ def test_the_admin_reveal_route_is_gone(client):
     # the thing being asserted.
     assert response.status_code in (404, 405)
     assert response.status_code != 200
+
+
+def test_the_profile_offers_her_months_not_the_platforms(client):
+    """The export's profile month control lists only the months the model was
+    with HBA (`mMonthOptions` / `started`). The server says which, by the rule
+    her own portal uses, so the owner and the model see the same months."""
+    from app.services.payroll import working_month
+
+    affiliate = _register(client)
+    _joined(client, affiliate, "2026-03")
+
+    months = client.get(f"/api/affiliates/{affiliate['id']}").json()["months"]
+
+    assert months[0] == working_month()
+    assert months[-1] == "2026-03"
+    assert "2026-02" not in months
+    assert months == sorted(months, reverse=True)

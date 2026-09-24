@@ -138,24 +138,22 @@ export function MyMonth() {
         <div><span>Code uses</span><strong>{body.orders.uses ?? "—"}</strong></div>
       </div>
       {/*
-       * The export's three chips, and ours are links: the question a chip
-       * raises is *which ones*, and the answer is one screen away.
-       *
-       * **Not the export's words for the third.** It says *failed delivery*;
-       * ours folds cancelled, refunded and failed together, and calling a
-       * cancelled order a failed delivery would be telling her something that
-       * did not happen.
+       * The export's three chips, in its words, and ours are links: the
+       * question a chip raises is *which ones*, and the answer is one screen
+       * away. The third counts only what the courier failed to deliver
+       * (`failed_delivery`, decided by the order's own status on the server):
+       * a cancelled order is void too, and is not a failed delivery.
        */}
       <div className="portal-home__states">
         <Link to="/orders?status=earned">{body.orders.earned} delivered</Link>
-        <Link to="/orders?status=pending">{body.orders.pending} on the way</Link>
-        <Link to="/orders?status=void">{body.orders.void} not counted</Link>
+        <Link to="/orders?status=pending">{body.orders.pending} pending</Link>
+        <Link to="/orders?status=void">{body.orders.failed_delivery} failed delivery</Link>
       </div>
     </section>
 
     <PortalYearChart month={month} eligible={months} />
 
-    <Link className="portal-home__open" to={`/earnings?month=${month}`}>How this adds up <span>→</span></Link>
+    <Link className="portal-home__open control-font" to={`/earnings?month=${month}`}>How this adds up <span>→</span></Link>
 
     {/*
      * A month that moved after it was agreed, and the money carried out of an
@@ -227,6 +225,6 @@ function PaymentCard({ state, settlement, transfer, loading, error, onRetry }: {
                   : "Your performance history for this month is unchanged."}
           </div>
         </>}
-    <Link className="portal-home__pay-more" to="/payments">Payment history →</Link>
+    <Link className="portal-home__pay-more control-font" to="/payments">Payment history →</Link>
   </section>;
 }

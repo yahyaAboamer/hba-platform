@@ -38,7 +38,7 @@ const earnings = {
   amount: "EGP 2,000.00",
   makeup: [{ label: "Commission", detail: "10% of EGP 20,000.00", piastres: 200_000 }],
   sales: { counted_piastres: 2_000_000, counted: "EGP 20,000.00" },
-  orders: { earned: 1, pending: 0, void: 0, counted: 1, uses: 1 },
+  orders: { earned: 1, pending: 0, void: 0, failed_delivery: 0, counted: 1, uses: 1 },
   orders_detail: [],
   carried_in: [],
   carried_out: [],
