@@ -9,8 +9,9 @@ true. Nothing was deleted.
 | | |
 |---|---|
 | **Branch** | `repair/batch-2` |
-| **Commit** | `f83b4fc` — *Every screen at both widths, and 390 at last* |
-| **Pushed** | yes, `origin/repair/batch-2` at the same commit |
+| **Head** | `9202c72` — *One set of instructions, one set of rules, one handoff* (this reset; documents only) |
+| **Last product commit** | `f83b4fc` — *Every screen at both widths, and 390 at last*. Nothing under `app/`, `frontend/src/` or `tests/` has changed since it. |
+| **Pushed** | yes, `origin/repair/batch-2` at `9202c72` |
 | **Tree** | clean apart from `.claude/settings.json`, which is the owner's plugin config and deliberately not committed |
 | **`main`** | `6a13958`, untouched by the repair |
 | **`production`** | `025d8a8`, 122 commits behind `main` — expected while the deployment rule is paused |
