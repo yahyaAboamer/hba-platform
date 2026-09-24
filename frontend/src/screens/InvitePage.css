@@ -137,6 +137,11 @@
   color: var(--faint);
 }
 
+/* The export draws a lapsed link in red (`var(--red)`). */
+.invite-page__state--expired {
+  color: var(--refused);
+}
+
 .invite-page__withdraw {
   color: var(--refused);
 }

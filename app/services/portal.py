@@ -806,10 +806,12 @@ def my_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
             #
             # Not derivable from the three counts beside it, which is why it is
             # its own figure rather than a sum. Those are *commission* states,
-            # and a use is a **delivery** outcome: an order delivered and later
-            # refunded pays nothing and is still a use, while a parcel refused
-            # at the door is neither. Adding earned and pending would be wrong
-            # in both directions at once.
+            # and a use is a **delivery** outcome (D03). They are counted by
+            # different rules, so a sum of the counts is not the uses. (An
+            # order delivered and later refunded keeps its commission - ADR
+            # 0025, delivery is final - and is a use; a parcel refused at the
+            # door is neither. An earlier version of this comment said the
+            # refunded order "pays nothing", which is the opposite of the rule.)
             "uses": uses_for(db, affiliate, month),
         },
         "amount_piastres": total,

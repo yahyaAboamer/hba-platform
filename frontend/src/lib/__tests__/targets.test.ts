@@ -56,7 +56,7 @@ describe("targetChip", () => {
     expect(targetChip(target({ verified: false }))!.text).toBe(
       "Waiting to be confirmed",
     );
-    expect(targetChip(target())!.text).toBe("Met");
+    expect(targetChip(target())!.text).toBe("targets met");
   });
 
   it("does not raise confirmation where it decides nothing", () => {
@@ -64,7 +64,7 @@ describe("targetChip", () => {
     // paperwork. Telling her it is outstanding invents a worry.
     expect(
       targetChip(target({ verified: false, determines_pay: false }))!.text,
-    ).toBe("Met");
+    ).toBe("targets met");
   });
 });
 
@@ -104,9 +104,9 @@ describe("targetCounts", () => {
 });
 
 describe("targetOutcome", () => {
-  it("separates the three states", () => {
+  it("separates the three states, in the export's words where it has them", () => {
     expect(targetOutcome(target({ achieved: null }))).toBe("not recorded");
-    expect(targetOutcome(target({ achieved: false }))).toBe("short");
+    expect(targetOutcome(target({ achieved: false }))).toBe("not met");
     expect(targetOutcome(target())).toBe("met");
   });
 

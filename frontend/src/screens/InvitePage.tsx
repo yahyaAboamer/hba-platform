@@ -249,19 +249,25 @@ export function InvitePage() {
                   {row.email}
                   <span className="invite-page__sub">Sent {formatSentAt(row.created_at)}</span>
                 </span>
+                {/* The export's words (`inviteRows`): *Awaiting application*
+                    in amber, *Link expired* in red. *Withdrawn* is ours and
+                    waits on the owner (checklist, exception a). */}
                 <span
                   className={
-                    row.expired || row.withdrawn
+                    row.withdrawn
                       ? "invite-page__state invite-page__state--gone"
-                      : "invite-page__state"
+                      : row.expired
+                        ? "invite-page__state invite-page__state--expired"
+                        : "invite-page__state"
                   }
                 >
-                  {row.withdrawn ? "Withdrawn" : row.expired ? "Expired" : "Invited"}
+                  {row.withdrawn ? "Withdrawn" : row.expired ? "Link expired" : "Awaiting application"}
                 </span>
-                {/* Resend always; withdraw only where it can still do
-                    anything. */}
+                {/* Resend always - *Send a new link* where the old one no
+                    longer works, as the export says; withdraw only where it
+                    can still do anything. */}
                 <button type="button" className="button button--row" onClick={() => act(row.id, "resend")}>
-                  Resend
+                  {row.expired || row.withdrawn ? "Send a new link" : "Resend"}
                 </button>
                 {!row.expired && !row.withdrawn && (
                   <button

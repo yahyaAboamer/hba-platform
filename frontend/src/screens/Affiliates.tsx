@@ -102,25 +102,16 @@ type Invited = {
 };
 
 /**
- * When an invitation went out, said the way somebody actually reads it.
- *
- * "today at 14:20" and "yesterday" answer the question being asked - which of
- * these two identical rows is the recent one - where a full date makes the
- * reader do the arithmetic themselves.
+ * When an invitation went out, as the export writes it: the date in full,
+ * *2 November 2026* (`i.sent`). It used to say *today at 14:20*, which the
+ * export does not, and which is wrong the moment the screen is left open.
  */
 export function formatSentAt(iso: string): string {
-  const sent = new Date(iso);
-  const time = sent.toLocaleTimeString("en-GB", {
-    hour: "2-digit",
-    minute: "2-digit",
+  return new Date(iso).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
   });
-  const days = Math.floor(
-    (new Date().setHours(0, 0, 0, 0) - new Date(sent).setHours(0, 0, 0, 0)) /
-      86_400_000,
-  );
-  if (days === 0) return `today at ${time}`;
-  if (days === 1) return `yesterday at ${time}`;
-  return sent.toLocaleDateString("en-GB", { day: "numeric", month: "long" });
 }
 
 type View = "table" | "cards";

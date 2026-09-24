@@ -28,13 +28,16 @@ export function targetChip(
   if (target.achieved === null) {
     return { text: "Not recorded yet", className: "chip chip--quiet" };
   }
+  // The export's live-month words: *in progress* until the targets are met,
+  // then *targets met*. The month is not over, so a shortfall so far is
+  // progress, not a miss.
   if (!target.achieved) {
-    return { text: "Short this month", className: "chip chip--quiet" };
+    return { text: "in progress", className: "chip chip--quiet" };
   }
   if (target.determines_pay && !target.verified) {
     return { text: "Waiting to be confirmed", className: "chip" };
   }
-  return { text: "Met", className: "chip chip--ok" };
+  return { text: "targets met", className: "chip chip--ok" };
 }
 
 /**
@@ -74,7 +77,7 @@ export function targetOutcome(
   row: Pick<MonthTargets, "achieved" | "verified" | "determines_pay">,
 ): string {
   if (row.achieved === null) return "not recorded";
-  if (!row.achieved) return "short";
+  if (!row.achieved) return "not met";
   if (row.determines_pay && !row.verified) return "met — to confirm";
   return "met";
 }

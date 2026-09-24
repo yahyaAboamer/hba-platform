@@ -1,0 +1,10 @@
+wardrobe featured: ["On the way · size M"]
+targets live chip: ["in progress"]
+targets history: ["not met","not met","not met","not recorded","not recorded","not recorded","not recorded","not recorded"]
+payout form: lead="Where HBA should send your payment" legend="Method"
+you rows: []; sign out: ["Sign out [Arial 14px]"]
+notification rows: ["A month closes and my figure i [Arial 13px]","A payment is sent [Arial 13px]"]
+[1280] invitations: ["Habiba Sami Applied 24 September 2026 Review →","Karim Diab Applied 24 September 2026 Review →","rowan.khalil@example.com Sent 24 September 2026 Awaiting application Resend Withdraw","lina.saad@example.com Sent 24 September 2026 Withdrawn Send a new link","mo.gaber@example.com Sent 24 September 2026 Link expired Send a new link"]
+[1280] roster invitations: ["Sent","24 September 2026ResendWithdraw","24 September 2026Resend"]
+[1440] invitations: ["Habiba Sami Applied 24 September 2026 Review →","Karim Diab Applied 24 September 2026 Review →","rowan.khalil@example.com Sent 24 September 2026 Awaiting application Resend Withdraw","lina.saad@example.com Sent 24 September 2026 Withdrawn Send a new link","mo.gaber@example.com Sent 24 September 2026 Link expired Send a new link"]
+[1440] roster invitations: ["Sent","24 September 2026ResendWithdraw","24 September 2026Resend"]

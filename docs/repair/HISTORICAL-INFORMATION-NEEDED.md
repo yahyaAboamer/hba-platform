@@ -3,6 +3,11 @@
 One list, for Yahya. Nothing here can be worked out from the data — each item
 is a fact only HBA holds, and the platform refuses to guess any of them.
 
+**What is asked for is each month's terms, not its payments.** The agreed
+approach did not import old payment records, and none are needed: a month
+before go-live is calculated from its orders and its terms, and what HBA
+actually transferred then stays outside the platform (ADR 0036).
+
 **Finalising is locked until these are supplied and checked.** The *review* is
 open and needs no unlock: Settings → Historical setup names every gap, per
 model, and links to the screen that fills it.
@@ -19,21 +24,22 @@ where a salary belongs.
 - What happens without it: her month list is derived from her earliest order,
   so months before that are invisible and cannot be arranged.
 
-## 2. What each model was paid on, for every month since she started
+## 2. Her terms for every month since she started
 
-The **arrangement per month**, with no gaps:
+The **terms in force each month** - not what was transferred - with no gaps:
 
-- `commission` — and the rate,
-- `fixed_plus_commission` — the salary *and* the rate, both,
-- `base_guarantee` — the floor *and* the rate.
+- **commission**: the commission rate;
+- **salary plus commission**: the fixed salary *and* the commission rate;
+- **guaranteed minimum**: the guaranteed amount *and* the commission rate.
 
 - Where it goes: the model's pay-history grid.
 - What happens without it: the month cannot be calculated at all. This is the
   single most common gap in the current data.
 
-## 3. Whether each guaranteed month's targets were met
+## 3. The target outcome, where one applies
 
-For **guaranteed-minimum months before go-live only**: met or missed.
+For **guaranteed-minimum months before go-live only** - the only months where
+a target outcome changes the figure: met or missed.
 
 The counts were never kept for those months, so the recorded outcome *is* the
 evidence. The platform will not assume a pass, and will not read a missing
@@ -47,6 +53,12 @@ answer as a failure.
 
 A statement from you that the orders imported for every pre-go-live month are
 **all** of them — no missing range, no code that was live and never imported.
+
+**You review evidence first.** `docs/repair/order_import_report.py` prints a
+read-only report for an environment: how many orders are indexed per month,
+days with none, every gap in Shopify's order numbers (an order never imported,
+or one deleted in Shopify), and every discount code on an order that no model
+owned. It is checked against the shop, then confirmed - not before.
 
 This one is not a screen. It is a judgement, and it is the most consequential
 item on the list: finalising approves a figure calculated from whatever orders
@@ -65,9 +77,10 @@ true for that environment's data.
 
 ## What you do **not** need to supply
 
-- **Transfers for historical months.** Nothing here creates a payment, a
-  receipt or an opening debt. A month with no imported transfer keeps having
-  none — ADR 0036 makes a pre-go-live month unpayable by construction.
+- **Transfers or payment records for historical months.** They were not
+  imported, by agreement, and nothing here needs them. Nothing here creates a
+  payment, a receipt or an opening debt; ADR 0036 makes a pre-go-live month
+  unpayable by construction.
 - **Anything about live months.** Finalisation stops at go-live. September
   onwards is approved the way it always has been, by somebody looking at it.
 - **Re-entering anything already recorded.** A month already agreed is skipped,

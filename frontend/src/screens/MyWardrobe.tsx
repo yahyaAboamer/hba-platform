@@ -170,8 +170,10 @@ export function WardrobeContents({
                     <span className="wardrobe__name">{request.title ?? received?.title ?? incoming?.title ?? "Product"}</span>
                     {/* Whether she has it decides whether the request is one
                         she can act on today, so it carries the tone. */}
-                    {received && <span className="wardrobe__state wardrobe__state--have">In your wardrobe</span>}
-                    {!received && incoming && <span className="wardrobe__state wardrobe__state--coming">On its way</span>}
+                    {/* The export's words, and the size she has or is getting:
+                        *In your wardrobe · size M*, *On the way · size M*. */}
+                    {received && <span className="wardrobe__state wardrobe__state--have">In your wardrobe{received.size ? ` · size ${received.size}` : ""}</span>}
+                    {!received && incoming && <span className="wardrobe__state wardrobe__state--coming">On the way{incoming.size ? ` · size ${incoming.size}` : ""}</span>}
                     <p className="wardrobe__ask">{request.message}</p>
                   </div>
                 </li>

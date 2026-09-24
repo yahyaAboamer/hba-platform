@@ -677,25 +677,34 @@ from those is dropped: each is below, or in *Closed, with evidence*.
 
 Portal (390)
 
-1. **Wardrobe featured card** shows the size (*On the way · size M*). Populated pass #2.
-2. **Targets words**: *met* / *not met* / *in progress*. Thirteen #6.
+1. ~~**Wardrobe featured card** shows the size~~ - **done, batch G**.
+2. ~~**Targets words**: *met* / *not met* / *in progress*~~ - **done, batch G**
+   (live month *in progress* / *targets met*; past *met* / *not met*).
+   *not recorded* waits on exception (f); the pay sentence is item 6.
 3. **Ranking** names the other models, with code and avatar, as the export
    does (F; ours writes *Another model*).
-4. **Payment details form** in the export's words: *Where HBA should send
-   your payment*, *Method*, *Save details*. Thirteen #9.
+4. ~~**Payment details form** in the export's words~~ - **done, batch G**:
+   *Where HBA should send your payment*, *Method*, *Save details*; our extra
+   lead sentence removed. Still different: the export chooses the method with
+   a `.seg` and saves in one step with *Back* / *Save details*; ours uses
+   option cards (implementation) and asks for the password before saving
+   (§6.4.1 - exception h).
 5. **Home order chips** are links in ours, plain pills in the export
    (matrix, kept for a preference only).
 6. **Targets guarantee sentence** stands in the open; the export puts it
    behind an ⓘ (matrix, preference only).
-7. **You screens: buttons still set to Inter** (`MyYou.css` two rules,
-   `AffiliateHome.css` `.pref--row`, `.affiliate__reveal` and the rule near
-   line 173, `portal.css` near line 334), where the export's are in the
-   control font (ADR 0044).
+7. ~~**You screens: buttons still set to Inter**~~ - **done, batch G**:
+   sign-out, leave, the detail rows, notification rows and the reveal
+   button take the control font. `portal.css`'s `.affiliate .block` still
+   resets it, and no screen was found rendering it - to confirm and remove.
 
 Admin (1280 / 1440)
 
-8. **Invitations**: an expired link offers *Send a new link*; the sent date is
-   absolute (*2 November 2026*). Populated pass #5, #6.
+8. ~~**Invitations**~~ - **done, batch G**: *Awaiting application*,
+   *Link expired* (red), *Send a new link*, and the date in full on the
+   invitations page and the roster. Still different: the roster's invitation
+   row keeps its own *Resend* / *Withdraw*, where the export's row opens the
+   invitation instead.
 9. **Targets state words**: the export's *In progress / Below target /
    Recorded zero* for the outcome, keeping *confirmed* separately (E), plus
    matrix §T's layout list (Save top right, one grid with a mode switch,
@@ -723,15 +732,19 @@ Admin (1280 / 1440)
 16. **Products**: the per-model order reference the export prints on a
     product (not in the roster payload); the feature request's message
     presets (matrix B3, B4).
-17. **Held by the owner's instruction of 24 September**: *Refresh now* and
-    *last successful refresh* on Settings → Shopify. Not to be built until he
-    releases it.
+17. **Settings → Shopify: *Refresh now* and *last successful refresh***
+    (Admin lines 659, 662; script 3560). **Not on hold.** An earlier version
+    of this list said *"held by the owner's instruction of 24 September"*.
+    No such instruction is recorded anywhere: the phrase first appears in
+    `4077b88` as an uncited paraphrase, and the only recorded words on it
+    are a question put to you on 16 September (`2026-09-16-exact-design-
+    handoff.md`, *Open questions*) and a proposal to build it (`ffde978`).
+    It is approved implementation like the rest of this list.
 
 Code hygiene (no behaviour)
 
-18. `app/services/portal.py` near line 810: a comment says a
-    delivered-then-refunded order *"pays nothing"*; the rule (ADR 0025) and
-    the tests say it keeps its commission.
+18. ~~The *"pays nothing"* comment in `app/services/portal.py`~~ - **done,
+    batch G**; it now states ADR 0025's rule.
 19. `/payroll/:month/reopen` (`PayrollReopen.tsx`): reopening is retired
     (05B); the route is a candidate for removal, with `test_reachability`.
 
@@ -762,28 +775,50 @@ Code hygiene (no behaviour)
     database), and a migration/rollback rehearsal for `b1f0a40c0001`. Neither
     has run; the repair is not releasable while they are open.
 
+31a. **The order-import completeness report, on real data.**
+    `docs/repair/order_import_report.py` is written and proven on the
+    disposable database (read-only transaction; orders per month, days with
+    none, gaps and duplicates in Shopify's order numbers, codes no model
+    owns). It has **not** run on staging or production: `railway ssh` from
+    this machine now reaches Railway's account endpoint rather than the
+    service, and production needs your go-ahead even for a read. Once it
+    runs, the report goes to you before item 32's confirmation is asked for.
+
 ### Information needed from the owner
 
-32. **Five historical facts** (`HISTORICAL-INFORMATION-NEEDED.md`): each
-    model's start, what she was paid on each month, whether guaranteed
-    months' targets were met, confirmation the order import is complete, and
-    which environment to unlock and when. Historical finalisation stays
-    locked until then.
+32. **Historical terms** (`HISTORICAL-INFORMATION-NEEDED.md`): each model's
+    start month; her terms each month - commission rate, fixed salary,
+    guaranteed amount - **not** what was transferred (old payment records
+    were not imported, by agreement, and are not needed); the target outcome
+    for guaranteed months; confirmation the order import is complete - **after
+    you have reviewed the import report** (item 31a); and which environment
+    to unlock and when. The rest of this list does not wait on these.
+    Historical finalisation stays locked until they are in.
 33. **Kept today for a rule, accuracy or security reason** - each needs your
-    yes to stay, or it becomes implementation:
-    - *Withdrawn* shown apart from *Link expired* (the export writes *Link
-      expired* for both; a withdrawn link did not expire).
-    - The Shopify connection read-only rather than editable in the page (B):
-      an API key field means a secret the server can read back (ADR 0015).
-    - *Help* and *Appearance* in the account menu (C): removing them leaves
-      Help with no way in, which `test_reachability` fails.
-    - Products: a size count instead of a SKU (a SKU belongs to a size), and
-      the *Top sellers* panel and *Selling best through codes*, built from
-      your own question and not in the export.
-    - Portal Targets' third word, *not recorded* (§11.3: a month nobody has
-      counted is not a month she missed).
-    - Portal Home without the export's *usually recorded in N days*: HBA has
-      promised no date.
+    yes to stay, or it becomes implementation. Export line numbers are in
+    `docs/redesign/designs/`; *Admin* is `Admin Dashboard.dc.html`, *Portal*
+    is `Affiliate Portal v3.dc.html`.
+
+    | # | Our screen, and where | What ours shows | Your approved reference | What it shows |
+    |---|---|---|---|---|
+    | a | Models → Invitations (`/affiliates/invite`), each outstanding link's state - `InvitePage.tsx:259` | *Withdrawn* for a link HBA cancelled, *Expired* for one that lapsed | Admin `vInvite`, the row's state at line 1268; words at line 3152 | *Link expired* for both (and *Awaiting application* where ours says *Invited* - that part is plain implementation, item 8) |
+    | b | Settings → Shopify and sync (`/settings?section=shopify`) - `DataPanel.tsx:260` | A read-only list ending *"Set on the server. Changing the connection is a deploy, not a form."* | Admin `setShopify`, lines 650-690: *Store domain* and *Admin API key* fields (script 3569-3570) and an *Update connection* button (line 677) | The connection edited in the page |
+    | c | The account menu, bottom of the admin sidebar - `Layout.tsx:103-104` | *Help*, *Appearance* as well as the export's two | Admin lines 86-90 | *Team and access*, *Sign out* only |
+    | d | Products → the catalogue list (`/products`), the line under each product's name - `Products.tsx:356-359` | *4 sizes* | Admin `vProducts`, line 338 (`{{ r.sku }}`) | The product's SKU, e.g. *HBA-JRS-06-BLK* |
+    | e | Products (`/products`), a panel below the catalogue on every tab - `Products.tsx:117-146`, rendered at `:423` | *Selling best through codes*, this month's top five | Admin `vProducts`, lines 313-373 | No such panel |
+    | f | Portal → Targets (`/targets`), a month nobody has counted - `lib/targets.ts:69-77` | *not recorded* / *Not recorded yet* (a shortfall now reads *not met* / *in progress*, the export's words) | Portal `onTargets`, lines 328-377; the history pill `{{ h.state }}` at line 370, words at script 1377; the live month at 1365 | *met* / *not met*, and *targets met* / *in progress* for the live month - no word for *not counted* |
+    | g | Portal → Home, the payment card (`/`) - `MyMonth.tsx:186-214` | *After the month closes*, and no date | Portal lines 202-203 (`paymentLine`, `paymentNote`), script 1310-1318 | *Usually recorded around 3 December 2026.* / *Approved. HBA usually records the transfer around …* - a date HBA would be promising |
+    | h | Portal → You → Payment details (`/you/payout`), after *Continue* - `MyPayout.tsx` | *Enter your password to confirm*, then *Save details* | Portal `vPayout`, lines 572-660 | One step: *Save details* saves |
+
+    Why each is held today: (a) a withdrawn link did not expire; (b) an API
+    key field means a secret the server can read back (ADR 0015);
+    (c) without them Help has no way in, which `test_reachability` fails;
+    (d) a SKU belongs to a size, not a product; (e) built later in answer to a question of
+    yours (`SCREEN_MATRIX.md`), not drawn in the export; (f) §11.3 - a month
+    nobody counted is not a month she missed, and it is the state that holds
+    a guarantee up; (g) HBA has not promised a transfer date; (h) §6.4.1 -
+    changing where money goes needs the password, not only a session.
+
 34. **Permissions**: merging to `main` and promoting to `production` are two
     separate decisions; neither is given.
 
@@ -807,7 +842,8 @@ never drew).
 | Profile offers her months | Batch E kept divergence | `a8eaab9` |
 | Home chips *pending* / *failed delivery* | Batch E list | `a8eaab9` |
 | Profile labels and *Active* pill; Home ⋯ ✕ and spacing; Payments name and pill | Batch E list | `a8eaab9`; pills finished here |
-| Chart axes, switch, *· So far*, Home titles, `.pill` leak, corrections panel, Home note | Follow-up list, owner's answers | this batch (the commit that adds this section); `shots/batch-f/checks.txt` |
+| Chart axes, switch, *· So far*, Home titles, `.pill` leak, corrections panel, Home note | Follow-up list, owner's answers | `900aa21`; `shots/batch-f/checks.txt` |
+| Wardrobe size, Targets words, payment-details words, Invitations words and dates, You buttons' font, the refund comment | Items 1, 2, 4, 7, 8, 18 | batch G (the commit that adds this row); `shots/batch-g/checks.txt` |
 | Portal order filter *Failed*, chips naming the case (G, #13) | Thirteen | `6131d0c` |
 | Net sales and *Counts towards* from facts | Batch D | `7bd9650` |
 | Earnings explanations, per-order commission | Batch C | `1b1bb21` |

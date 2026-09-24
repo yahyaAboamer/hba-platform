@@ -106,7 +106,9 @@ export function MyPayout({
 
   return (
     <section className="panel apply__panel">
-      <h2 className="panel__title">Change where you are paid</h2>
+      {/* The export's words: a lead line, *Method*, *Save details*. The
+          password step before saving is §6.4.1's and stays (checklist). */}
+      <p className="apply__lead">Where HBA should send your payment</p>
 
       {error && (
         <p className="notice notice--refused apply__error" role="alert">
@@ -114,14 +116,10 @@ export function MyPayout({
         </p>
       )}
 
-      <p className="apply__lead">
-        This changes where your money is sent. HBA is told whenever it moves.
-      </p>
-
       {!confirming ? (
         <>
           <fieldset className="apply__choice">
-            <legend className="field__label">How should we pay you?</legend>
+            <legend className="field__label">Method</legend>
             {(Object.keys(METHOD_LABEL) as Method[]).map((option) => (
               <label
                 key={option}
@@ -278,7 +276,7 @@ export function MyPayout({
               className="button button--primary"
               disabled={working || !password}
             >
-              {working ? "Changing…" : "Change where I am paid"}
+              {working ? "Saving…" : "Save details"}
             </button>
           </div>
         </form>

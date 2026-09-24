@@ -60,10 +60,11 @@ row by row, is `docs/repair/batch-2/visual/CHECKLIST.md`.
 Current and complete: *Information needed from the owner* in the one list
 (`docs/repair/batch-2/visual/CHECKLIST.md`, items 32-34). In short:
 
-1. **Five historical facts**, unchanged:
-   `docs/repair/HISTORICAL-INFORMATION-NEEDED.md`. Finalisation cannot be
-   unlocked without them, and confirming the order import is complete is the
-   one that cannot be worked out from the data.
+1. **Historical terms** (`docs/repair/HISTORICAL-INFORMATION-NEEDED.md`,
+   clarified 25 September): start months, each month's terms and the target
+   outcome for guaranteed months - not transfers. Order-import completeness
+   is confirmed only after he reviews the import report, which has not yet
+   run on real data. Finalisation stays locked; nothing else waits on this.
 2. **Nothing from the sweep, by default.** An earlier version of this line
    said all thirteen differences needed his decision. That was wrong. **The
    approved HTML decides**, so an ordinary difference from it is
@@ -351,6 +352,31 @@ in `docs/repair/batch-2/visual/CHECKLIST.md`; `shots/batch-f/checks.txt`.
   four files that touch attention and corrections, 170 tests. Browser at
   1280, 1440 and 390. Full runner not re-run.
 
+## Batch G - what does not wait on the owner's answers (25 September)
+
+He asked for the approved work that does not depend on his answers to
+continue, and for four documents. Evidence: `shots/batch-g/checks.txt`.
+
+- **Historical checklist clarified** (`HISTORICAL-INFORMATION-NEEDED.md`):
+  it asks for each month's *terms* - commission rate, fixed salary,
+  guaranteed amount - and the target outcome for guaranteed months, not what
+  was transferred; old payment records were not imported, by agreement.
+- **Order-import completeness report**: `docs/repair/order_import_report.py`,
+  read-only, proven on the disposable database. **Not yet run on real
+  data** - `railway ssh` here reaches Railway's account endpoint, not the
+  service, and production needs his go-ahead even to read. Confirmation of
+  completeness is asked for only after he has reviewed its output.
+- **The exceptions**, now eight with SKU and top sellers split and the
+  password step added, each with our screen and the export's exact element:
+  item 33 in the one list.
+- ***Refresh now* was never on hold.** The phrase "held back by the owner's
+  instruction of 24 September" first appears in `4077b88` with nothing
+  behind it; it is withdrawn and the item is approved implementation (17).
+- Built: the wardrobe card's size, Portal Targets' words, the payment-details
+  words, Invitations' words and full dates, the You screens' button font,
+  and the refund comment. Frontend 410 tests and `npm run build`; browser at
+  390, 1280 and 1440.
+
 ## Not scheduled — a backlog, not an instruction
 
 Each batch is named by the owner. Nothing here is the next batch until he
@@ -397,6 +423,12 @@ conflicts B-G) are all in it.
   the Chrome extension, and not the window-resizing script.
 
 ## What I got wrong, so the next session does not repeat it
+
+- **Recorded a hold as the owner's instruction without his words.** *Refresh
+  now* was written up as "held back by the owner's instruction of 24
+  September" in `4077b88`, and no such instruction exists. A hold, a
+  decision or a quote attributed to him needs his words beside it, or it is
+  not written down as his.
 
 - **Kept a difference because I could explain it** (batch E: controls in
   Inter, every platform month on the profile). The owner: *an explanation
