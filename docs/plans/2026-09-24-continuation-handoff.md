@@ -9,19 +9,29 @@ true. Nothing was deleted.
 | | |
 |---|---|
 | **Branch** | `repair/batch-2` |
-| **Head** | `9202c72` — *One set of instructions, one set of rules, one handoff* (this reset; documents only) |
-| **Last product commit** | `f83b4fc` — *Every screen at both widths, and 390 at last*. Nothing under `app/`, `frontend/src/` or `tests/` has changed since it. |
-| **Pushed** | yes, `origin/repair/batch-2` at `9202c72` |
-| **Tree** | clean apart from `.claude/settings.json`, which is the owner's plugin config and deliberately not committed |
-| **`main`** | `6a13958`, untouched by the repair |
-| **`production`** | `025d8a8`, 122 commits behind `main` — expected while the deployment rule is paused |
+| **Revision reviewed** | `f83b4fc` — *Every screen at both widths, and 390 at last*. Every test count, screenshot and finding below describes **this** revision. Commits after it change documents and evidence only; nothing under `app/`, `frontend/src/` or `tests/` has moved since. |
+| **Current head** | run `git rev-parse --short HEAD`. Not written here: a document cannot contain the hash of the commit that adds it, and the last attempt was stale one commit later. |
+| **Tree** | clean apart from `.claude/settings.json`, the owner's plugin config, deliberately not committed |
+| **`origin/main`** | `6a13958` |
+| **`origin/production`** | `6a13958` — **level with `main`**, gap of 0 commits, read from `git ls-remote` on 24 September |
 | **Backend** | 2,039 tests, 79 files, all passing; reconciles with `--collect-only` |
 | **Frontend** | 363 tests, 16 files; `npm run build` green |
 | **Migration head** | `b1f0a40c0001` |
 
+> **Correction, 24 September 2026.** An earlier version of this table said
+> production was *"122 commits behind `main`"*. That was wrong. It came from
+> the **local** `production` ref, which nobody had updated and was sitting at
+> `025d8a8`; `git ls-remote` shows `origin/production` and `origin/main` both
+> at `6a13958`, a gap of **zero**. The memory that records this instruction
+> even says to check `origin/production..origin/main` — with the `origin/`
+> — and the check was run without it. Read the remote before describing it.
+
 ## Standing restrictions, still in force
 
-- **No merge, no deployment.**
+- **No merge.** And separately: **no deployment.** These are two permissions,
+  not one. Being told the repair may merge to `main` does **not** authorise
+  promoting to `production` — `main` deploys staging, `production` deploys to
+  the people who use it, and the second needs its own yes.
 - **Historical finalisation locked** behind `HISTORICAL_FINALISATION_UNLOCKED`.
   The *review* is open and is how the gaps get found.
 - **No destructive fixture against staging or production.**
@@ -55,26 +65,49 @@ row by row, is `docs/repair/batch-2/visual/CHECKLIST.md`.
    of `CHECKLIST.md`. None of them is a bug; each is a place where the app and
    the approved export differ and somebody has to say which wins.
 
-## The next bounded task, proposed
+## The bounded task that was proposed, and is now done
 
-**Finish the three screens the sweep could not exercise, by growing the seed —
-and nothing else.**
+*Finish the three screens the sweep could not exercise, by growing the seed.*
+Done on 24 September, and widened to five: the two wardrobes and the
+invitations list were in the same condition. The seed carries invitations in
+three states, a visible and a hidden feature request, three gifts across the
+three delivery states, and the evidence of a simulated Shopify sync. All five
+screens were **re-captured**, at 1280, 1440 and 390, and inspected as pictures
+as well as diffed as text. No application behaviour changed.
 
-`Model · Wardrobe`, `Products · Active requests` and `Settings · Shopify and
-sync` each render their empty state correctly, and the export's version of each
-is full of fixture rows. Comparing them today compares seed data, so the
-checklist says *not exercised* rather than claiming a match.
+What it found is in `docs/repair/batch-2/visual/CHECKLIST.md`: two screens
+settled as matching, seven new differences that only became visible once the
+data was there, and three things still not verifiable with what the seed has.
 
-The task: add shipments, one feature request and a recorded Shopify connection
-to `docs/repair/batch-2/visual/seed_browser.py`; re-capture those three screens
-at both widths; update the three checklist rows to matched, corrected or still
-differs. **No application behaviour changes.** It is bounded, it closes the
-only gap in the sweep that is ours to close, and it can be reviewed in one
-sitting.
+## The next small implementation batch, proposed
 
-Not proposed yet, and why: the thirteen decisions need Yahya first; the two
-release gates need a restored copy of real data and a rehearsal window; and
-`vShipment` (the one export view never built) is a feature, not a repair.
+Everything below is already decided — by the approved export or by an explicit
+instruction from you — so it is work, not a question. Nothing here changes a
+business rule and nothing needs a new ADR. It is deliberately small.
+
+**A. Take the month grid back off the seven screens it was never asked for.**
+`MonthPicker` returns to the export's `<select>`; `Compensation.tsx`'s terms
+grid is not touched. Home, Orders, Overview, Payments, Payroll, Settings,
+Targets and the model profile all follow from the one component.
+
+**B. Fix the comment that contradicts the refund rule.**
+`app/services/portal.py:756` says a delivered-then-refunded order *"pays
+nothing"*. It is a comment; the code and four tests already have it right.
+
+**C. The five small wordings the export decides.** Expired invitation reads
+*Send a new link*; the sent date is absolute; the featured card carries the
+size; the portal targets use *met* / *not met* / *in progress*; the portal
+payment-details form uses the export's three labels.
+
+**D. Build *Refresh now* on Settings → Shopify and sync**, and report *last
+successful refresh* rather than *last order arrived*. The read-only connection
+card stays — see conflict B in the checklist.
+
+Held back deliberately, and why: the Appearance switches and the audit
+sentences (items 1 and 2) are each a day's work with persistence behind them
+and belong in their own batch; recording a payment moving onto the detail
+(item 11) is a route change; and everything in the conflicts list waits on
+your answer.
 
 ## Decisions not to reopen
 

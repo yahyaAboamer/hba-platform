@@ -23,14 +23,14 @@
   "Appearance",
   "Reference",
   "hbawear.store",
-  "Not connected",
-  "· last order arrived 23 Sept, 14:37",
+  "Connected",
+  "· last order arrived 24 Sept, 13:10",
   "Read the catalogue",
   "Connection",
   "Store domain",
   "hbawear.store",
   "Shopify access",
-  "Not configured",
+  "Configured on the server",
   "Order webhooks",
   "Not registered",
   "Go-live month",
@@ -82,5 +82,11 @@
  },
  "background": "rgb(8, 9, 10)",
  "scrollHeight": 900,
- "clientHeight": 900
+ "clientHeight": 900,
+ "viewport": {
+  "innerWidth": 1280,
+  "innerHeight": 900,
+  "devicePixelRatio": 1,
+  "frame": null
+ }
 }

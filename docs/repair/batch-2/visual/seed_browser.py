@@ -232,6 +232,154 @@ def order(db, affiliate, code: str, month: str, piastres: int, *, state: str,
     return key
 
 
+def populated_states(db, owner_id: int, made: dict, now) -> None:
+    """The five screens the first sweep could only photograph empty.
+
+    Each one renders its empty state correctly and the approved export's
+    version of it is full of fixture rows, so comparing them compared seed
+    data and the checklist said *not exercised* rather than claiming a match.
+    This fills them, and nothing here changes what the application does.
+
+    **The Shopify connection is simulated and stays that way.** The panel reads
+    `settings.shopify_configured`, which is environment, not database - so the
+    review runs the app with an obviously fake domain and token **and
+    `WORKER_ENABLED=false`**, which is the part that matters: with the worker
+    off nothing leases a sync job, so nothing can reach a real store even by
+    accident. The rows below are the *evidence* of a sync having happened, not
+    a sync.
+    """
+    from datetime import timedelta
+
+    from app.models.identity import Invitation
+    from app.models.integration import IntegrationEvent
+    from app.models.promotions import FeatureRequest
+    from app.models.shipments import Classification, ModelShipment
+
+    # ── Models → Invitations: the export's three states ──────────────────────
+    #
+    # Outstanding, lapsed, and withdrawn. The last two both read *Link expired*
+    # on the roster unless `withdrawn_at` distinguishes them, which is the
+    # distinction the column exists to make.
+    invitations = [
+        ("rowan.khalil@example.com", now + timedelta(days=5), None),
+        ("mo.gaber@example.com", now - timedelta(days=3), None),
+        ("lina.saad@example.com", now - timedelta(days=1), now - timedelta(days=1)),
+    ]
+    for index, (email, expires, withdrawn) in enumerate(invitations):
+        db.add(
+            Invitation(
+                email=email,
+                role="affiliate",
+                token_hash=f"seed-invitation-{index:02d}-not-a-real-token-hash",
+                expires_at=expires,
+                withdrawn_at=withdrawn,
+                invited_by=owner_id,
+            )
+        )
+
+    # ── Products → Active requests ───────────────────────────────────────────
+    #
+    # One visible request, which is what makes the tab non-empty, and one
+    # hidden - W09 keeps *hidden* and *removed* apart, and a screen that only
+    # ever shows visible ones cannot demonstrate that it does.
+    db.add(
+        FeatureRequest(
+            shopify_product_id="track-jacket",
+            message="Wear this with the wide-leg denim for the autumn set.",
+            visible=True,
+            updated_by=owner_id,
+        )
+    )
+    db.add(
+        FeatureRequest(
+            shopify_product_id="logo-cap",
+            message="Holding this one until the restock lands.",
+            visible=False,
+            updated_by=owner_id,
+        )
+    )
+
+    # ── Wardrobe, admin and portal: gifts in all three states ────────────────
+    #
+    # W04 classifies from the order's **original** net: zero means HBA sent it.
+    # The three delivery states are the three the wardrobe draws - received,
+    # processing, and the failed one W08 insists is shown rather than hidden.
+    wardrobe = [
+        ("delivered", DELIVERED, [PRODUCTS[0], PRODUCTS[2]]),
+        ("in-flight", IN_FLIGHT, [PRODUCTS[3]]),
+        ("failed", "failed", [PRODUCTS[5]]),
+    ]
+    sara = made["SARAED"]
+    for index, (label, state, items) in enumerate(wardrobe):
+        key = f"gift-{index:02d}"
+        placed = now - timedelta(days=20 - index * 6)
+        db.add(
+            OrderIndex(
+                shopify_order_id=key,
+                order_number=f"#G{2000 + index}",
+                placed_at=placed,
+                business_month=f"{placed.year}-{placed.month:02d}",
+                discount_codes=[],
+                # **Zero, and that is the whole classification.** A later
+                # cancellation zeroes Shopify's *current* totals, so the
+                # wardrobe reads the original - and a gift is an order whose
+                # original net was nothing.
+                subtotal_piastres=0,
+                total_piastres=0,
+                shipping_piastres=0,
+                tax_piastres=0,
+                currency="EGP",
+                delivery_state=state,
+                delivery_status=label.upper(),
+                delivered_at=placed + timedelta(days=3) if state == DELIVERED else None,
+                last_synced_at=now,
+            )
+        )
+        db.flush()
+        for slot, (title, handle, _price) in enumerate(items):
+            db.add(
+                OrderLineItem(
+                    shopify_line_item_id=f"{key}-{slot}",
+                    shopify_order_id=key,
+                    shopify_product_id=handle,
+                    shopify_variant_id=f"{handle}-m",
+                    title=title,
+                    variant_title="M",
+                    sku=f"{handle.upper()}-M",
+                    quantity=1,
+                    discounted_total_piastres=0,
+                    original_total_piastres=0,
+                )
+            )
+        db.add(
+            ModelShipment(
+                shopify_order_id=key,
+                affiliate_id=sara.id,
+                recipient_token="seed-token",
+                match_reason="seeded",
+                matched_at=now,
+                classification=Classification.GIFT,
+                original_net_piastres=0,
+            )
+        )
+    db.flush()
+
+    # ── Settings → Shopify and sync: the evidence of a sync ──────────────────
+    #
+    # `last_event_received_at` reads the newest `integration_event`, and
+    # `last_order_synced_at` the newest `order_index.last_synced_at`, which the
+    # gift orders above already carry.
+    db.add(
+        IntegrationEvent(
+            source="shopify",
+            topic="orders/updated",
+            external_id="seed-webhook-0001",
+            received_at=now,
+            payload_digest="0" * 64,
+        )
+    )
+
+
 def main() -> None:
     refuse_anything_but_a_scratch_database()
     empty_everything()
@@ -398,6 +546,7 @@ def main() -> None:
             actor_id=owner.id,
             actor_email=OWNER_EMAIL,
         )
+    populated_states(db, owner.id, made, now)
     db.commit()
     db.close()
 

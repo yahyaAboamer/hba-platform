@@ -24,16 +24,16 @@ shifted to stand the same distance from the working month as her counterpart.
 | Home | Corrected | Corrected | Currency; the missing *applications awaiting review* notice |
 | Models · Active | Corrected | Corrected | Subtitle, terms cell, pager suffix |
 | Models · Applications | Matched | Matched | |
-| Models · Invitations | Matched | Matched | Empty in this data; the export's fixture has three |
+| Models · Invitations | **Still differs** | **Still differs** | Populated 24 Sept with all three states. Two small wording items below; *Withdrawn* as its own state is ours and is better |
 | Models · Inactive | Matched | Matched | |
 | Model · Overview | Matched | Matched | Same five tabs, same three summary cards |
-| Model · Wardrobe | Not exercised | Not exercised | Nothing shipped in the seed; the panel says so correctly |
+| Model · Wardrobe | **Matched** | **Matched** | Populated 24 Sept: *Received · 2 pieces · image · title · Size M*, the export's structure and words exactly |
 | Model · Performance | Matched | Matched | Same columns in the same order |
 | Model · Targets | Matched | Matched | Same columns; state words differ, below |
 | Model · Payments | Corrected | Corrected | **Was masking the destination**; now the full card |
 | Products · Active | Matched | Matched | |
 | Products · All products | Matched | Matched | |
-| Products · Active requests | Not exercised | Not exercised | No feature request seeded |
+| Products · Active requests | **Still differs** | **Still differs** | Populated 24 Sept. Columns and pager match; *Selling best through codes* is on this tab and is not in the export |
 | Targets | Still differs | Still differs | State vocabulary, below |
 | Payments (working month) | Corrected | Corrected | Applications and not-yet-started models removed |
 | Payments · previous month | Corrected | Corrected | |
@@ -44,7 +44,7 @@ shifted to stand the same distance from the working month as her counterpart.
 | Payment detail | Corrected | Corrected | Missing-destination title and sentence |
 | Record payment | Still differs | Still differs | A screen of its own, not a panel on the detail — below |
 | Settings · Team | Matched | Matched | |
-| Settings · Shopify and sync | Not exercised | Not exercised | Nothing connected in this environment |
+| Settings · Shopify and sync | **Still differs** | **Still differs** | Simulated connection, 24 Sept. The export edits the connection in the page; ours is read-only by choice. Below |
 | Settings · Historical setup | Matched | Matched | Plus the lock panel, which the export has no state for |
 | Settings · Brand codes | Corrected | Corrected | Button word and the note's missing clause |
 | Settings · Appearance | Still differs | Still differs | Two switches missing, below |
@@ -58,7 +58,7 @@ shifted to stand the same distance from the working month as her counterpart.
 |---|---|---|
 | Home | Matched | |
 | Orders | Corrected | Filter and chip words; *products* not *pieces* |
-| Wardrobe | Not exercised | No featured products seeded |
+| Wardrobe | **Still differs** | Populated 24 Sept including a featured product. Best-sellers counting rule and a missing size, below |
 | Targets | Still differs | State vocabulary, below |
 | Ranking | Still differs | Other models are anonymised, below |
 | You | Corrected | The export's row order and its words |
@@ -132,7 +132,248 @@ before the change was made.
 
 ---
 
-## Still differs — each needs a decision
+## What the populated pass found, 24 September
+
+Five screens could only be photographed empty on 23 September. The seed now
+carries invitations in three states, a visible and a hidden feature request,
+three gifts in the three delivery states the wardrobe draws, and the evidence
+of a Shopify sync. All five were **re-captured, not reused**, at 1280, 1440
+and 390, and looked at as pictures as well as diffed as text.
+
+**The Shopify connection is simulated and cannot reach a store.** The panel
+reads an environment setting, so the review app runs with a plainly fake
+domain and token **and `WORKER_ENABLED=false`** — with the worker off nothing
+leases a sync job, so nothing calls out even by accident. The rows in the
+database are the evidence of a sync, not a sync.
+
+### Newly settled
+
+- **Admin model profile → Wardrobe: matches.** *Received · 2 pieces*, then
+  `image · title · Size M` per garment, and *Not received yet* below — the
+  export's structure and its words.
+- **Model portal → Wardrobe: the frame matches**, including *HBA would like
+  you to feature · Chosen by the HBA team* with the request's own message.
+
+### Newly found, because the data arrived
+
+1. **Best sellers count a different set on each side.** Ours: *"Sales through
+   your code · all time · **delivered orders**"*, and the server agrees —
+   `best_sellers_for` is delivered-only. The export: *"Sales through HBA15 ·
+   all time · **delivered and pending**"*. See the conflicts below; this one
+   touches ADR 0040.
+2. **The featured card drops the size.** Export: *On the way · size M*. Ours:
+   *On its way*. The export also shows a second card in a different state —
+   *In your wardrobe · size one size* — which our single seeded request cannot
+   demonstrate.
+3. **Shopify panel: two actions the app does not have.** *Refresh now* in the
+   header, and *Update connection* under editable Store domain and Admin API
+   key fields. Ours is a read-only list that says *"Set on the server.
+   Changing the connection is a deploy, not a form."*
+4. **The connection header reports a different fact.** Export: *last
+   successful refresh 6 November 2026, 08:15*. Ours: *last order arrived
+   24 Sept, 13:10*. Somebody checking a connection wants the first.
+5. **An expired invitation offers *Resend*** where the export offers *Send a
+   new link*.
+6. **The sent date is relative.** Ours: *today at 13:10*. Export:
+   *2 November 2026*.
+7. **Ours distinguishes *Withdrawn* from *Expired*;** the export writes *Link
+   expired* for both. Ours is better and deliberate — `withdrawn_at` exists to
+   tell a cancelled link from a lapsed one — and it stays unless you say
+   otherwise.
+
+### Still not verifiable, and why
+
+- **Product images.** Both sides draw a placeholder: the export a dashed box
+  reading *image*, ours a grey box reading *No image*. Nothing is being
+  compared there until real product images are in the seed.
+- **The portal wardrobe below the fold.** The export's 844px frame ends
+  mid-list, so our *Ordered 4 Sept 2026* line has nothing to be compared to.
+
+---
+
+## The thirteen, re-sorted
+
+Sorted as asked: **(1)** already decided, so it is implementation work and not
+a question; **(2)** a genuine conflict between two requirements, quoted; **(3)**
+not enough evidence yet, and what is missing.
+
+### 1 — Already decided. Implementation work, not questions.
+
+| # | What | Decided by |
+|---|---|---|
+| 1 | Settings → Appearance: *Show pop-up notices on Home*, *Weekly reminder to record achieved content* | The export draws both switches |
+| 2 | Reference: audit rows as sentences, not `payment.recorded` | The export writes sentences |
+| 6 | Portal Targets: *met* / *not met* / *in progress* | The export's words |
+| 9 | Portal payment details: *Where HBA should send your payment*, *Method*, *Save details* | The export's words |
+| 11 | Recording a payment stays **on** the payment detail | The export keeps it there |
+| 12 | **The month grid belongs to terms editing only** — below | Your request, read against the export |
+| — | Expired invitation → *Send a new link*; absolute sent date; featured card shows the size | The export |
+
+**I had these filed as open questions. They were not.** The design already
+answered each one, and asking again was the wrong move.
+
+#### 12, in detail: the month grid was over-applied
+
+You asked for a grid **for editing terms**, and the approved export agrees
+with you there — it carries `"Select all editable months in " + year`, which
+is the terms grid's own control. That screen is right and stays.
+
+What happened next is the problem. `MonthPicker` — the ordinary *Month*
+control — was rebuilt as a grid too, and its source comment justifies that
+with *"the owner asked for that and it stays"*. It is now on **eight**
+screens: Home, Orders, Overview, Payments, Payroll, Settings, Targets and the
+model profile. **The export uses a plain `<select>` for every one of them**
+(its `{{ month }}` and `{{ mMonth }}` controls; the file contains five
+`<select>` elements in total).
+
+So one instruction about one screen was read as permission to replace every
+month picker in the product. Reverting `MonthPicker` to the export's
+`<select>` — and leaving `Compensation.tsx`'s terms grid exactly as it is — is
+implementation work, and it is in the batch proposed below.
+
+### 2 — Genuine conflicts. Both requirements, and what I would do.
+
+**A. Best sellers: delivered, or delivered and pending?**
+
+> **The approved export:** *"Sales through HBA15 · all time · delivered and
+> pending"*.
+> **The platform's own rule, F02 / ADR 0040:** *"A pending order counts.
+> Pending and delivered are paid."* `PENDING_INCLUSIVE` is the live policy and
+> every approval writes it into its snapshot.
+
+Against both: `best_sellers_for` is delivered-only, and our subtitle says so
+honestly. **Recommendation: follow the export and the rule — count pending.**
+They agree with each other; only this panel disagrees with both. It is the one
+place still applying the retired rule, and a model who reads *delivered
+orders* on one screen and is paid for a pending order on another has found a
+contradiction we put there.
+
+**B. The Shopify connection: editable in the page, or set on the server?**
+
+> **The approved export:** a Store domain field, a masked Admin API key field,
+> and an *Update connection* button.
+> **ADR 0015 and the deployment model:** Shopify authenticates by client
+> credentials held as server configuration; the app is one deployable and a
+> credential change is a deploy.
+
+**Recommendation: keep the read-only card, and build *Refresh now*.** An API
+key field in a browser form means storing a secret the server can read back,
+which is a different security posture from the one the platform was built on —
+and the screen already explains itself. *Refresh now* is a different matter:
+the export draws it, it has no backend act, and it is the one thing somebody
+actually wants from this panel.
+
+**C. The account menu: two items, or four?**
+
+> **The approved export:** *Team and access*, *Sign out*.
+> **`test_reachability`:** a route with no way in from the interface fails the
+> build.
+
+*Help* and *Appearance* are real destinations and this menu is where they are
+reached from. **Recommendation: keep them**, and if you want the export's two,
+say where Help and Appearance should live instead — Settings already has an
+Appearance tab, so only Help genuinely needs a home.
+
+**D. The roster's Table / Cards toggle.**
+
+> **The approved export:** no such control.
+> **Ours:** a preference, and narrow screens force cards regardless of it.
+
+**Recommendation: remove it.** The responsive rule already does the job it was
+added for, which makes it a control the design does not have and the product
+does not need.
+
+**E. Targets state words, where verification exists.**
+
+> **The approved export:** *In progress*, *Below target*, *Recorded zero*.
+> **§15, built after the export was drawn:** a second person confirms the
+> recorded numbers, and that is what unlocks a guarantee — so a month can be
+> *met* and *not confirmed*, and those are different facts.
+
+**Recommendation: take the export's three words for the states it drew, and
+keep *confirmed* / *not confirmed* as the separate thing it is.** They are not
+competing vocabularies: one is the outcome, the other is whether anybody has
+checked it.
+
+**F. Portal Ranking names the other models, or does not.**
+
+> **The approved export:** every model by name, with code and avatar.
+> **Ours:** *Another model* for everybody but her.
+
+This was our privacy choice and it was never put to you — it was also asked in
+the 16 September handoff and never answered. **Recommendation: follow the
+export.** They are colleagues on one programme and a board is the point of a
+ranking. If you disagree, the anonymised version is one line away — but it
+should be your call rather than a default we chose quietly.
+
+**G. The fourth order filter: *Not counted* or *Failed*?**
+
+> **The approved export:** *Failed*.
+> **The bucket's contents:** cancelled and refunded orders land here too, and
+> neither failed.
+
+**Recommendation: keep *Not counted*.** The other three filters now match the
+export exactly; this one would be inaccurate if it did.
+
+### 3 — Not enough evidence yet, and what is missing.
+
+| # | What | The comparison that is missing |
+|---|---|---|
+| 8 | Her payment history has no separate *Receipt →* screen; ours puts the same facts inline | **The export's receipt screen has never been captured.** Until it is, I cannot say whether our inline block is a superset or is missing something. One step, one pair. |
+| 10 | Portal earnings line names — *Net sales counted* against *Commission on this month's sales* | **Like for like needs a model on a guaranteed minimum.** The seeded model is salary-plus-commission and the export's is on a guarantee, so part of the difference is the arrangement, not the wording. |
+| — | Product images, in both wardrobes and the requests table | Real product images in the seed; both sides currently draw a placeholder. |
+
+---
+
+## The two things you asked me to check specifically
+
+### The month grid — over-applied, and here is the evidence
+
+Covered as item 12 above. In one line: **the terms grid is right and the other
+eight are not.** The export has a grid for editing terms and a plain
+`<select>` everywhere else; we have a grid everywhere, justified by a source
+comment that reads *"the owner asked for that and it stays"*.
+
+### The refunded order — the rule is right; one comment still says the opposite
+
+**The behaviour is correct and tested.** ADR 0025 makes delivery final, and
+four tests in `tests/test_commission_attribute.py` hold it:
+
+- `test_a_refund_after_delivery_keeps_the_sale_and_the_commission`
+- `test_a_partial_refund_after_delivery_keeps_the_whole_sale`
+- `test_an_exchange_after_delivery_keeps_the_sale_and_the_commission`
+- `test_a_refund_before_delivery_does_take_the_sale_back`
+
+All four passed in the full run at `f83b4fc`, and nothing under `app/` has
+changed since — so they are not re-run for a documentation and screenshot
+pass.
+
+**But one comment was missed when this was corrected.**
+`app/services/portal.py:756` still reads:
+
+> an order delivered and later refunded **pays nothing** and is still a use
+
+That is the opposite of the agreed rule. Seven hundred lines further down, the
+comment that *was* corrected says so in as many words:
+
+> ADR 0025 is that delivery is final, so a refund, a return or an exchange
+> leaves a delivered order earning exactly what it earned. An earlier draft of
+> this comment said such an order "pays nothing", which is the opposite of the
+> rule HBA runs.
+
+Two comments about one rule, contradicting each other, in one file. **Nothing
+computes from either** — `commission_state` checks delivery before anything
+else — so this is a documentation defect, not a money defect. It is in the
+next batch and is deliberately not changed here.
+
+---
+
+## The original thirteen, kept for the record
+
+The list as first written on 23 September, before the populated pass and
+before they were sorted. Kept because five of them turned out to be questions
+that the approved design had already answered, and that is worth being able
+to see. **Read the sorted version above; this one is history.**
 
 **1. Settings → Appearance is missing two switches.** The export has
 *Show pop-up notices on Home* and *Weekly reminder to record achieved
@@ -228,10 +469,10 @@ server on a fresh page load, because a toast is not evidence.
 
 ## Not covered, and why
 
-- **Model · Wardrobe, Products · Active requests, Settings · Shopify and
-  sync.** Each renders its empty state correctly and the export's version is
-  full of fixture rows. Comparing them would be comparing seed data. Say the
-  word and the seed grows shipments, a feature request and a fake connection.
+- ~~**Model · Wardrobe, Products · Active requests, Settings · Shopify and
+  sync.**~~ **Done, 24 September.** The seed grew shipments, a feature request
+  and a simulated connection, and all five affected screens were re-captured
+  rather than reused. See *What the populated pass found* above.
 - **The portal's month list.** A native `<select>`; its list is drawn by the
   operating system, outside the page, so there is nothing to screenshot.
 - **Printing, and anything behind a Shopify call.** Neither is reachable in a

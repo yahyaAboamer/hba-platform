@@ -30,8 +30,11 @@ sizes, tones, interactions — and a passing test is not evidence of it.
 The work is an **audit repair** on `repair/batch-2`. Three standing
 instructions from the owner override the build-phase habits below:
 
-- **Do not merge. Do not deploy.** Nothing reaches `main`, staging or
-  production until the owner says so.
+- **Do not merge, and separately, do not deploy.** These are **two
+  permissions, not one.** Being told the repair may merge to `main` does not
+  authorise promoting to `production`: `main` deploys staging, `production`
+  deploys to the people who use it, and the second needs its own yes. Never
+  read one as implying the other.
 - **Historical finalisation stays locked.**
 - **No destructive fixture ever touches staging or production.**
 
@@ -44,12 +47,18 @@ without asking.* It came from
 phase, when no real model was onboarded and there was nothing to lose.
 
 **It is suspended for the duration of the repair**, by the owner's explicit
-and repeated instruction, and it resumes only when he says the repair branch
-may merge. Today `production` is 122 commits behind `main`, which is the
-expected consequence and not a fault to go and fix.
+and repeated instruction. It resumes when he says so — and *"you may merge"*
+is not that sentence. Promotion is its own decision and needs its own yes.
 
 If a memory or an older document tells you to promote automatically, it is
 describing the build phase. This paragraph is the current one.
+
+**Read the remote before describing the remote.** `origin/main` and
+`origin/production` are both at `6a13958` — level, a gap of zero. A document
+in this repository claimed production was *122 commits behind* for a day;
+that number came from the **local** `production` ref, which nobody had
+updated. `git ls-remote --heads origin main production` is the check, and a
+local `git rev-list --count production..main` is not.
 
 ---
 

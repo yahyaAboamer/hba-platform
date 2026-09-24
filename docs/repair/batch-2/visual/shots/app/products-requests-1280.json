@@ -21,8 +21,16 @@
   "All products",
   "8",
   "Active requests",
-  "0",
-  "No feature request is visible to models right now.",
+  "1",
+  "PRODUCT STATUS MODEL COVERAGE FEATURE REQUEST",
+  "image",
+  "Panel Track Jacket",
+  "3 sizes",
+  "Active 1 of 19 received",
+  "Active →",
+  "1–1 of 1",
+  "Previous",
+  "Next",
   "Selling best through codes",
   "September 2026",
   "Cargo Tailored Trouser",
@@ -51,14 +59,22 @@
   "YYahyaadmin▾",
   "Active8",
   "All products8",
-  "Active requests0",
+  "Active requests1",
+  "imagePanel Track Jacket3 sizes",
+  "Previous",
+  "Next",
   "Cargo Tailored Trouser",
   "Panel Track Jacket",
   "Ribbed Knit Top",
   "Heavy Cotton Tee",
   "Wide Leg Denim"
  ],
- "labels": [],
+ "labels": [
+  "Product",
+  "Status",
+  "Model coverage",
+  "Feature request"
+ ],
  "money": [
   "EGP 33,030.00",
   "EGP 39,935.00",
@@ -80,5 +96,11 @@
  },
  "background": "rgb(8, 9, 10)",
  "scrollHeight": 900,
- "clientHeight": 900
+ "clientHeight": 900,
+ "viewport": {
+  "innerWidth": 1280,
+  "innerHeight": 900,
+  "devicePixelRatio": 1,
+  "frame": null
+ }
 }

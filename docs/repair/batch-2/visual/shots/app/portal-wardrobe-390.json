@@ -21,9 +21,29 @@
   "5 units sold",
   "EGP 18,235.00",
   "Show all 6 products",
+  "HBA would like you to feature",
+  "Chosen by the HBA team",
+  "No image",
+  "Panel Track Jacket",
+  "On its way",
+  "Wear this with the wide-leg denim for the autumn set.",
   "Your wardrobe",
-  "0 pieces received",
-  "No products yet.",
+  "2 pieces received",
+  "No image",
+  "Oversized Wash Hoodie",
+  "Size M",
+  "Ordered 4 Sept 2026",
+  "No image",
+  "Ribbed Knit Top",
+  "Size M",
+  "Ordered 4 Sept 2026",
+  "Not received yet",
+  "Panel Track Jacket",
+  "Size M",
+  "Processing",
+  "Wide Leg Denim",
+  "Size M",
+  "Failed delivery",
   "Home",
   "Orders",
   "Wardrobe",
@@ -32,7 +52,9 @@
  ],
  "headings": [
   "Your best sellers",
-  "Your wardrobe"
+  "HBA would like you to feature",
+  "Your wardrobe",
+  "Not received yet"
  ],
  "buttons": [
   "S",
@@ -63,6 +85,12 @@
   "colour": "rgb(236, 239, 234)"
  },
  "background": "rgb(8, 9, 10)",
- "scrollHeight": 844,
- "clientHeight": 844
+ "scrollHeight": 1262,
+ "clientHeight": 1262,
+ "viewport": {
+  "innerWidth": 390,
+  "innerHeight": 844,
+  "devicePixelRatio": 1,
+  "frame": 390
+ }
 }

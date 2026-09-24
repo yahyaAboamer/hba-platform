@@ -29,14 +29,28 @@
   "September 2026",
   "▾",
   "Received",
-  "0 pieces",
-  "Nothing received yet.",
+  "2 pieces",
+  "image",
+  "Oversized Wash Hoodie",
+  "Size M",
+  "image",
+  "Ribbed Knit Top",
+  "Size M",
+  "Not received yet",
+  "2 not yet owned",
+  "Panel Track Jacket",
+  "Size M",
+  "Processing",
+  "Wide Leg Denim",
+  "Size M",
+  "Needs checking",
   "What HBA has not sent Sara Edrees yet is in the catalogue.",
   "Open the catalogue →"
  ],
  "headings": [
   "Sara Edrees",
-  "Received"
+  "Received",
+  "Not received yet"
  ],
  "buttons": [
   "HBAAdminhbawear.store",
@@ -54,6 +68,8 @@
   "Targets",
   "Payments",
   "September 2026▾",
+  "imageOversized Wash HoodieSize M",
+  "imageRibbed Knit TopSize M",
   "Open the catalogue →"
  ],
  "labels": [],
@@ -72,5 +88,11 @@
  },
  "background": "rgb(8, 9, 10)",
  "scrollHeight": 900,
- "clientHeight": 900
+ "clientHeight": 900,
+ "viewport": {
+  "innerWidth": 1280,
+  "innerHeight": 900,
+  "devicePixelRatio": 1,
+  "frame": null
+ }
 }

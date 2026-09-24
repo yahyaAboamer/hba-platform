@@ -22,14 +22,30 @@
   "Applications",
   "2",
   "Invitations",
-  "0",
+  "3",
   "Inactive",
   "1",
   "Table",
   "Cards",
   "Add a house code",
   "Invite a model",
-  "No outstanding invitations."
+  "MODEL STATUS SEP SALES CONTENT SENT",
+  "R",
+  "rowan.khalil@example.com",
+  "Awaiting application",
+  "Invited — — today at 13:10",
+  "Resend",
+  "Withdraw",
+  "L",
+  "lina.saad@example.com",
+  "Withdrawn",
+  "Withdrawn — — today at 13:10",
+  "Resend",
+  "M",
+  "mo.gaber@example.com",
+  "Link expired",
+  "Expired — — today at 13:10",
+  "Resend"
  ],
  "headings": [
   "Models"
@@ -45,16 +61,25 @@
   "YYahyaadmin▾",
   "Active19",
   "Applications2",
-  "Invitations0",
+  "Invitations3",
   "Inactive1",
   "Table",
   "Cards",
   "Add a house code",
-  "Invite a model"
+  "Invite a model",
+  "Resend",
+  "Withdraw",
+  "Resend",
+  "Resend"
  ],
  "labels": [
   "Table",
-  "Cards"
+  "Cards",
+  "Model",
+  "Status",
+  "Sep sales",
+  "Content",
+  "Sent"
  ],
  "money": [],
  "heading": {
@@ -71,5 +96,11 @@
  },
  "background": "rgb(8, 9, 10)",
  "scrollHeight": 900,
- "clientHeight": 900
+ "clientHeight": 900,
+ "viewport": {
+  "innerWidth": 1440,
+  "innerHeight": 900,
+  "devicePixelRatio": 1,
+  "frame": null
+ }
 }
