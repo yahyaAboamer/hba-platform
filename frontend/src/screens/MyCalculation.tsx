@@ -118,9 +118,10 @@ export function MyCalculation() {
     {/*
      * The rule the month was worked out under, at the foot of the screen.
      *
-     * **Delivered only.** The export's line counts pending orders too; that is
-     * 05A's preview and not what she is paid on, and a sentence promising it
-     * would be promising money that is not owed yet.
+     * **The rule the month is on** (F02, ADR 0040): delivered and pending,
+     * in the export's own words. A month agreed before the switch was agreed
+     * on delivered orders only, and says that instead - its figures are that
+     * agreement's, and describing them under today's rule would be untrue.
      *
      * The rate is the server's own field, shown as a percentage. That is the
      * one arithmetic the browser does here, and it is a rate rather than an
@@ -128,8 +129,7 @@ export function MyCalculation() {
      */}
     {body.commission_rate_bp !== null && (
       <p className="portal-calc__rule">
-        Commission is {percent(body.commission_rate_bp)} of net sales on delivered orders.
-        An order on its way counts the day it arrives; one that fails is excluded.
+        {commissionRule(body.policy, body.commission_rate_bp, month)}
       </p>
     )}
 
@@ -142,6 +142,17 @@ export function MyCalculation() {
 }
 
 /** Basis points as somebody reads them: 1000 → "10%", 1250 → "12.5%". */
+/** The rule line, in the export's words under the live rule (F02). */
+export function commissionRule(
+  policy: MyEarnings["policy"],
+  rateBp: number,
+  month: string,
+): string {
+  return policy === "delivered_only"
+    ? `${formatMonth(month)} was agreed counting delivered orders only: commission is ${percent(rateBp)} of net sales on delivered orders. Failed deliveries are excluded.`
+    : `Commission is ${percent(rateBp)} of net sales on delivered and pending orders. Failed deliveries are excluded.`;
+}
+
 function percent(bp: number): string {
   const whole = bp / 100;
   return `${Number.isInteger(whole) ? whole : whole.toFixed(2).replace(/0$/, "")}%`;

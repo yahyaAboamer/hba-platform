@@ -170,7 +170,7 @@ function saleLine(order: MyOrder): string {
   return "amount not available";
 }
 
-function Row({
+export function Row({
   order,
   month,
   open,
@@ -213,13 +213,14 @@ function Row({
           {/*
            * **What it was worth to her**, and only where there is an answer.
            *
-           * A void order keeps what it would have earned, struck through, so
-           * she can still match the row against her own record — the business
-           * asked for the figure rather than the words. Where there is no
-           * figure at all the row prints a dash, never a zero: an order still
-           * travelling has earned nothing *yet*.
+           * Delivered and pending both carry their figure (ADR 0040; the
+           * owner asked for it), `EGP 0.00` included - a zero is an answer. A
+           * void order keeps what it would have earned, struck through, so
+           * she can still match the row against her own record. Where there
+           * is no figure at all - no rate set, or an order its month did not
+           * count - the row prints a dash, never a zero.
            */}
-          <span className={order.commission ? "orders__fee" : order.forgone ? "orders__fee money--void" : "orders__fee orders__fee--none"}>
+          <span className={order.commission !== null ? "orders__fee" : order.forgone ? "orders__fee money--void" : "orders__fee orders__fee--none"}>
             {order.commission ?? order.forgone ?? "—"}
           </span>
           <span className="orders__net">{saleLine(order)}</span>
@@ -293,14 +294,23 @@ function Row({
  * about a second implementation applies to one order as much as to a month.
  * Where there is no figure the sentence says why rather than showing a zero.
  */
-function explain(order: MyOrder, month: string): string {
+export function explain(order: MyOrder, month: string): string {
+  const noRate = order.rate_missing
+    ? ` No commission rate is set for ${formatMonth(month)}, so what it earns is not available yet.`
+    : "";
   if (order.state === "earned") {
-    return order.commission
+    return order.commission !== null
       ? `Delivered, so it counts in ${formatMonth(month)}. Of ${order.base}, ${order.commission} is yours.`
-      : `Delivered, so it counts in ${formatMonth(month)}.`;
+      : `Delivered, so it counts in ${formatMonth(month)}.${noRate}`;
   }
   if (order.state === "pending") {
-    return `It counts the day it reaches the customer. If that is after HBA closes ${formatMonth(month)}, it is paid with the next month — still at this month's rate.`;
+    // A month agreed before ADR 0040 counted delivered orders only, so an
+    // order still on its way was left for the payroll after it arrives.
+    if (!order.counted) {
+      return `${formatMonth(month)} was agreed counting delivered orders only, so this order is paid with the month after it arrives — still at ${formatMonth(month)}'s rate.`;
+    }
+    // The export's sentence, word for word; the figure is on the row above.
+    return `Counted in ${formatMonth(month)} while it is on its way. If it fails, it is removed and the difference is settled in a later month.${noRate}`;
   }
   // Two different void rows. Where the amount survived, it is on screen and
   // they can match it; where the order was cancelled outright, Shopify clears

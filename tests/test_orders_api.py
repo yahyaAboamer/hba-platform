@@ -364,3 +364,28 @@ def test_the_month_counts_what_did_not_fail(client):
         for row in body["orders"]
         if not row["cancelled"] and row["delivery_state"] != "failed"
     )
+
+
+def test_a_pending_order_opens_with_the_commission_it_counts_for(client):
+    """The staff view of one order tells the story her own row does
+    (`month_rule`): EGP 2,000 on its way at 10% is EGP 200 (ADR 0040)."""
+    nour = _affiliate(client, "Nour", "nour@example.com")
+    _register_code(client, nour["id"], "NOUR10")
+    response = client.put(
+        f"/api/affiliates/{nour['id']}/pay-history",
+        json={
+            "periods": [
+                {
+                    "start_month": "2026-01",
+                    "compensation_type": "commission",
+                    "commission_rate_bp": 1000,
+                }
+            ]
+        },
+    )
+    assert response.status_code == 200, response.text
+    _paid_order(nour["id"], "o-11", 200_000, state="pending")
+
+    body = client.get("/api/orders/detail/o-11").json()
+
+    assert body["commission_piastres"] == 20_000

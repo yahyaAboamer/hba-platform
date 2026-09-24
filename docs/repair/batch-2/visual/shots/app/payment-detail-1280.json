@@ -16,12 +16,43 @@
   "admin",
   "▾",
   "← Payments",
-  "Payment",
+  "Sara Edrees",
   "August 2026",
-  "Loading…"
+  "Fully paid",
+  "Salary + commission",
+  "Open profile →",
+  "Counted sales",
+  "As approved. Failed deliveries excluded.",
+  "EGP 10,100.00",
+  "Commission at 10%",
+  "EGP 1,010.00",
+  "Fixed salary",
+  "EGP 12,000.00",
+  "Approved amount",
+  "EGP 13,010.00",
+  "Where to send it",
+  "InstaPay",
+  "InstaPay number",
+  "010 1000 2000",
+  "Copy",
+  "Payment link, as submitted",
+  "https://ipn.eg/saraed-2291",
+  "Copy",
+  "Open InstaPay",
+  "Approval",
+  "Approved 24 September 2026 · EGP 13,010.00",
+  "Transfers",
+  "EGP 13,010.00 recorded · EGP 0.00 remaining",
+  "EGP 13,010.00",
+  "Receipt →",
+  "24 September 2026 · INSTA-0001",
+  "No receipt attached"
  ],
  "headings": [
-  "Payment"
+  "Sara Edrees",
+  "Where to send it",
+  "Approval",
+  "Transfers"
  ],
  "buttons": [
   "HBAAdminhbawear.store",
@@ -32,10 +63,21 @@
   "Payments20",
   "Settings",
   "YYahyaadmin▾",
-  "← Payments"
+  "← Payments",
+  "Open profile →",
+  "Copy",
+  "Copy",
+  "Open InstaPay",
+  "EGP 13,010.00Receipt →24 September 2026 · INSTA-0001No receipt attached"
  ],
  "labels": [],
- "money": [],
+ "money": [
+  "EGP 0.00",
+  "EGP 1,010.00",
+  "EGP 10,100.00",
+  "EGP 12,000.00",
+  "EGP 13,010.00"
+ ],
  "heading": {
   "family": "Inter",
   "size": "18px",
@@ -50,5 +92,11 @@
  },
  "background": "rgb(8, 9, 10)",
  "scrollHeight": 900,
- "clientHeight": 900
+ "clientHeight": 900,
+ "viewport": {
+  "innerWidth": 1280,
+  "innerHeight": 900,
+  "devicePixelRatio": 1,
+  "frame": null
+ }
 }

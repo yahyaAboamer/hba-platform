@@ -89,6 +89,7 @@ from app.services.commission.calculate import (
     PENDING_INCLUSIVE,
     MonthCalculation,
     counted_sales_from,
+    counted_states_for,
     source_month_sales,
 )
 from app.services.compensation import all_terms, terms_for
@@ -617,6 +618,8 @@ def my_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
         return {
             "month": month,
             "state": "historical",
+            #: R3: the historical shape counts delivered and pending too.
+            "policy": PENDING_INCLUSIVE,
             "is_working_month": month == working,
             "not_started": False,
             "sales": {
@@ -704,6 +707,10 @@ def my_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
     return {
         "month": month,
         "state": "agreed" if agreed else "open",
+        #: The counting rule behind the figure: the snapshot's own on an
+        #: agreed month, so a month agreed delivered-only (before ADR 0040)
+        #: is described as it was agreed, and the live rule otherwise.
+        "policy": policy_of(snapshot) if agreed else PENDING_INCLUSIVE,
         "is_working_month": month == working,
         # A month the calendar has not reached. Distinct from "open with no
         # sales yet", which is the same figures and a completely different
@@ -926,33 +933,74 @@ def _placed_value(order: AttributedOrder, index: OrderIndex) -> int | None:
 
 
 def _forgone_commission(
-    placed: int | None, rate_bp: int | None, state: str
+    value: int | None, rate_bp: int | None, state: str
 ) -> int | None:
     """What a void order would have earned, had it arrived.
 
-    Only on a void row, and only where the placed-at value survived. A model
-    matching a cancelled order against her own record wants the figure she
-    *would* have had - the business asked for it explicitly, struck through
-    rather than replaced by the words "nothing earned".
+    Only on a void row, and only where a value survived: the base a failed
+    delivery keeps (F03), or the placed-at figure of a cancelled order whose
+    base Shopify zeroed. A model matching a void order against her own record
+    wants the figure she *would* have had - the business asked for it
+    explicitly, struck through rather than replaced by the words "nothing
+    earned", which is how the approved portal draws a failed delivery.
 
     **Never paid, never summed.** It is the same arithmetic as a counted
     order applied to a sale that did not complete, and no total on any screen
     includes it. `None` on an order that is still travelling: that one has not
     lost anything yet.
     """
-    if state != CommissionState.VOID or not rate_bp or not placed:
+    if state != CommissionState.VOID or not rate_bp or not value:
         return None
-    exact = exact_commission_piastres(commission_numerator(placed, rate_bp))
+    exact = exact_commission_piastres(commission_numerator(value, rate_bp))
     return int(exact.quantize(Decimal("1"), rounding=ROUND_HALF_UP)) or None
 
 
-def _order_commission(base: int, rate_bp: int | None, state: str) -> int | None:
-    """What one counted order was worth in commission, exact to the piastre.
+def month_rule(
+    db: Session, affiliate: AffiliateProfile, month: str
+) -> tuple[int | None, tuple[str, ...]]:
+    """The rate one month's orders are worth, and which states it counts.
 
-    `None` where there is no answer rather than zero: an order still in
-    transit has earned nothing *yet*, a void one never will, and a month
-    nobody has set a rate for cannot be answered at all. A zero beside any of
-    the three would read as a figure rather than an absence.
+    **An agreed month answers from its snapshot** - the rate it was approved at
+    and the counting rule it was approved under (`policy_of`) - so nothing
+    about a frozen month is read from anything that can still be edited. Any
+    other month is on its own terms and the live rule. Shared by her orders
+    and the staff order view, so one order cannot tell two stories.
+    """
+    payroll_month = get_month(db, affiliate, month)
+    snapshot = (
+        payroll_month.active_snapshot
+        if payroll_month is not None
+        and payroll_month.calculation_state == CalculationState.APPROVED
+        else None
+    )
+    if snapshot is not None:
+        return (
+            (snapshot.payload_json or {}).get("commission_rate_bp"),
+            counted_states_for(policy_of(snapshot)),
+        )
+    terms = terms_for(db, affiliate, month)
+    return (
+        terms.commission_rate_bp if terms else None,
+        counted_states_for(PENDING_INCLUSIVE),
+    )
+
+
+def _order_commission(
+    base: int, rate_bp: int | None, state: str, counted: tuple[str, ...]
+) -> int | None:
+    """What one counted order was worth in commission, to the whole piastre.
+
+    **Counted is the month's own rule** (F02, ADR 0040): delivered and pending
+    under the live policy, delivered only on a month agreed before it. An
+    order on its way is paid with its month, so its row says what it is
+    worth - the owner asked for exactly that.
+
+    `None` where there is no answer: a void order never earned anything (its
+    struck-through figure is `_forgone_commission`), a pending order on a
+    delivered-only agreement was not counted there, and a month nobody has set
+    a rate for cannot be answered at all. **Zero is an answer**, not an
+    absence: a counted order the customer paid nothing for earned exactly
+    nothing, and says `EGP 0.00` rather than a dash.
 
     **A worked example, not a ledger line.** The month's commission is one
     numerator divided once (ADR 0004); these are the same arithmetic applied
@@ -961,9 +1009,9 @@ def _order_commission(base: int, rate_bp: int | None, state: str) -> int | None:
     which is why the screen showing them says what the total is, rather than
     inviting an addition.
     """
-    if state != CommissionState.EARNED or not rate_bp or base <= 0:
+    if state not in counted or not rate_bp:
         return None
-    exact = exact_commission_piastres(commission_numerator(base, rate_bp))
+    exact = exact_commission_piastres(commission_numerator(max(base, 0), rate_bp))
     return int(exact.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
 
@@ -985,8 +1033,11 @@ def my_orders(db: Session, affiliate: AffiliateProfile, month: str) -> list[dict
     # **The rate that month was on, not the rate they are on now.** An order
     # sold in July is worth July's percentage even when it is read in
     # September, which is the same rule §11.4 applies to a carried order.
-    terms = terms_for(db, affiliate, month)
-    rate_bp = terms.commission_rate_bp if terms else None
+    #
+    # An agreed month answers from its snapshot - the rate it was approved at
+    # and the counting rule it was approved under - so nothing about a frozen
+    # month is read from anything that can still be edited.
+    rate_bp, counted = month_rule(db, affiliate, month)
 
     rows = db.execute(
         select(AttributedOrder, OrderIndex)
@@ -1033,10 +1084,14 @@ def my_orders(db: Session, affiliate: AffiliateProfile, month: str) -> list[dict
     detail = []
     for order, index in rows:
         commission = _order_commission(
-            order.commission_base_piastres, rate_bp, order.commission_state
+            order.commission_base_piastres, rate_bp, order.commission_state, counted
         )
         placed = _placed_value(order, index)
-        forgone = _forgone_commission(placed, rate_bp, order.commission_state)
+        forgone = _forgone_commission(
+            placed or order.commission_base_piastres,
+            rate_bp,
+            order.commission_state,
+        )
         detail.append(
         {
             "order_number": index.order_number,
@@ -1062,16 +1117,24 @@ def my_orders(db: Session, affiliate: AffiliateProfile, month: str) -> list[dict
             # implementation would be a second answer waiting to disagree in
             # front of the one person guaranteed to check.
             #
-            # Counted orders only. An order still travelling has earned
-            # nothing yet and a void one never will, and putting a figure
-            # beside either would be describing money that does not exist.
+            # Counted orders, under the month's own rule: delivered and
+            # pending since ADR 0040. A void one never earns, and shows what
+            # it would have been instead (`forgone`, struck through).
             #
-            # Exact to the piastre, and **deliberately not rounded**: ADR 0004
-            # rounds once, on the month's total. Rounding here as well would
-            # produce rows that do not sum to the figure above them, which is
-            # the one thing a breakdown must never do.
+            # **A worked example, not a ledger line**: ADR 0004 rounds once,
+            # on the month's total, so these rows can miss it by up to half a
+            # pound when summed, and the screen says what the total is.
             "commission_piastres": commission,
             "commission": format_egp(commission) if commission is not None else None,
+            # Whether this order counts in this month's figure under the rule
+            # the month is on. False for a void order, and for one still on
+            # its way in a month agreed delivered-only - that one is paid by
+            # the payroll after it arrives, at this month's rate (§11.4).
+            "counted": order.commission_state in counted,
+            # **No rate, so no answer** - not zero. Nobody has set terms for
+            # the month, so a screen says *not available* rather than
+            # inventing an amount.
+            "rate_missing": rate_bp is None,
             # **What the order was placed at**, where the base no longer says.
             #
             # Shopify zeroes a cancelled order's totals, so `base_piastres` is

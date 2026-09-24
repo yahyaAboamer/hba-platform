@@ -1696,22 +1696,200 @@ def test_the_rows_agree_with_the_month_they_are_part_of(admin):
     assert abs(rows - line["piastres"]) <= counted
 
 
-def test_no_figure_is_put_beside_an_order_that_earned_nothing(admin):
-    """A zero would read as an amount. These are absences.
+def _row(month, number):
+    body = _sign_in().get(f"/api/me/earnings/{month}").json()
+    (row,) = [o for o in body["orders_detail"] if o["order_number"] == number]
+    return body, row
 
-    An order still travelling has earned nothing *yet* and a void one never
-    will - two different sentences, neither of them "EGP 0.00".
+
+def _set(order_id: str, **columns) -> None:
+    """Change an attributed order the way a later Shopify fact would."""
+    assignments = ", ".join(f"{name} = :{name}" for name in columns)
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                f"UPDATE attributed_order SET {assignments} "
+                "WHERE shopify_order_id = :i"
+            ),
+            {"i": order_id, **columns},
+        )
+
+
+def test_a_pending_order_shows_the_commission_it_counts_for(admin):
+    """The owner asked for it, and ADR 0040 is why it is true.
+
+    EGP 2,000 on its way at 10% is EGP 200: the month is paid on it, so its
+    row says what it is worth rather than a dash.
     """
     affiliate = _affiliate(admin)
-    _terms(admin, affiliate["id"])
-    _order(affiliate["id"], "9401", 100_000, month=SEPTEMBER, state="pending")
-    _order(affiliate["id"], "9402", 100_000, month=SEPTEMBER, state="void")
+    _terms(admin, affiliate["id"], rate_bp=1000)
+    _order(affiliate["id"], "9801", 200_000, month=SEPTEMBER, state="pending")
 
-    body = _sign_in().get(f"/api/me/earnings/{SEPTEMBER}").json()
+    body, row = _row(SEPTEMBER, "#9801")
 
-    for row in body["orders_detail"]:
-        assert row["commission_piastres"] is None, row["order_number"]
-        assert row["commission"] is None, row["order_number"]
+    assert row["commission_piastres"] == 20_000
+    assert row["commission"] == _egp(20_000)
+    assert row["counted"] is True
+    assert row["rate_missing"] is False
+    assert row["forgone_piastres"] is None
+    assert body["amount_piastres"] == 20_000, "the month counts it too"
+    assert body["policy"] == "pending_inclusive"
+
+
+def test_delivery_leaves_the_commission_where_it_was(admin):
+    """Pending to delivered is the same order arriving: EGP 200 before and
+    after, one row, and the month does not count it twice."""
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"], rate_bp=1000)
+    _order(affiliate["id"], "9802", 200_000, month=SEPTEMBER, state="pending")
+
+    _deliver("9802")
+    body, row = _row(SEPTEMBER, "#9802")
+
+    assert row["state"] == "earned"
+    assert row["commission_piastres"] == 20_000
+    assert len(body["orders_detail"]) == 1
+    assert body["amount_piastres"] == 20_000
+
+
+def test_a_failed_delivery_leaves_the_count_and_is_struck_through(admin):
+    """What it would have earned stays on the row, struck through - the
+    approved portal's failed-delivery presentation - and no total includes it.
+
+    The base survives the failure (F03, `attribute_order`), so the figure is
+    worked out on that rather than on a placed-at value it does not need.
+    """
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"], rate_bp=1000)
+    _order(affiliate["id"], "9803", 200_000, month=SEPTEMBER, state="pending")
+
+    _set("9803", commission_state="void")
+    body, row = _row(SEPTEMBER, "#9803")
+
+    assert row["commission_piastres"] is None
+    assert row["counted"] is False
+    assert row["forgone_piastres"] == 20_000
+    assert row["forgone"] == _egp(20_000)
+    assert body["amount_piastres"] == 0
+    assert body["sales"]["counted_piastres"] == 0
+
+
+def test_a_refund_after_delivery_keeps_the_commission(admin):
+    """F04: delivery is the end of the story. The order stays earned (the
+    ingestion path is pinned in `test_best_sellers`), and its row keeps its
+    EGP 200 with the refund recorded beside it."""
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"], rate_bp=1000)
+    _order(affiliate["id"], "9804", 200_000, month=SEPTEMBER, state="pending")
+    _deliver("9804")
+
+    _set(
+        "9804",
+        financial_status="refunded",
+        return_status="returned",
+        refunded_merchandise_piastres=200_000,
+    )
+    body, row = _row(SEPTEMBER, "#9804")
+
+    assert row["commission_piastres"] == 20_000
+    assert body["amount_piastres"] == 20_000
+
+
+def test_a_pending_order_keeps_its_own_months_rate(admin):
+    """Today's raise does not reach back: August's pending EGP 1,000 is worth
+    August's 10%, EGP 100, not September's 20%."""
+    affiliate = _affiliate(admin)
+    _rate_change(
+        admin,
+        affiliate["id"],
+        until=AUGUST,
+        before_bp=1000,
+        after_bp=2000,
+        from_month=SEPTEMBER,
+    )
+    _order(affiliate["id"], "9805", 100_000, month=AUGUST, state="pending")
+    _order(affiliate["id"], "9806", 100_000, month=SEPTEMBER, state="pending")
+
+    _, august = _row(AUGUST, "#9805")
+    _, september = _row(SEPTEMBER, "#9806")
+
+    assert august["commission_piastres"] == 10_000
+    assert september["commission_piastres"] == 20_000
+
+
+def test_no_rate_is_not_available_rather_than_zero(admin):
+    """A month nobody set terms for cannot be answered, and says so."""
+    affiliate = _affiliate(admin)
+    _order(affiliate["id"], "9807", 200_000, month=SEPTEMBER, state="pending")
+
+    _, row = _row(SEPTEMBER, "#9807")
+
+    assert row["commission_piastres"] is None
+    assert row["commission"] is None
+    assert row["rate_missing"] is True
+    assert row["counted"] is True
+
+
+def test_a_valid_zero_is_a_figure_not_an_absence(admin):
+    """An order the customer paid nothing for earned exactly nothing, at a
+    rate that exists - `EGP 0.00`, distinguishable from *not available*."""
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"], rate_bp=1000)
+    _order(affiliate["id"], "9808", 0, month=SEPTEMBER, state="pending")
+
+    _, row = _row(SEPTEMBER, "#9808")
+
+    assert row["commission_piastres"] == 0
+    assert row["commission"] == _egp(0)
+    assert row["rate_missing"] is False
+
+
+def test_an_agreed_month_reports_the_rule_it_was_agreed_under(admin):
+    """A pending-inclusive approval says so, and so does the statement."""
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"], rate_bp=1000)
+    _order(affiliate["id"], "9809", 200_000, month=AUGUST, state="pending")
+    _approve(admin, affiliate["id"], AUGUST)
+
+    body, row = _row(AUGUST, "#9809")
+    statement = admin.get(f"/api/payroll/{AUGUST}/statement/{affiliate['id']}").json()
+
+    assert body["state"] == "agreed"
+    assert body["policy"] == "pending_inclusive"
+    assert row["commission_piastres"] == 20_000
+    assert statement["policy"] == "pending_inclusive"
+    assert statement["counted_sales_piastres"] == 200_000
+
+
+def test_a_month_agreed_delivered_only_is_described_as_it_was_agreed(admin):
+    """An older snapshot carries no policy, which means delivered-only.
+
+    Its figures do not move, it is not described as counting pending, and a
+    pending order in it shows no commission there - it was left for the
+    payroll after it arrives (§11.4). The live rule is not applied backwards.
+    """
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"], rate_bp=1000)
+    _order(affiliate["id"], "9810", 100_000, month=AUGUST)
+    _deliver("9810")
+    _order(affiliate["id"], "9811", 200_000, month=AUGUST, state="pending")
+    # Approved through the ordinary path with the old rule restored around it:
+    # the snapshot is append-only, so a legacy month is born, not edited.
+    with approved_before_the_switch():
+        _approve(admin, affiliate["id"], AUGUST)
+
+    body = _sign_in().get(f"/api/me/earnings/{AUGUST}").json()
+    delivered = next(o for o in body["orders_detail"] if o["order_number"] == "#9810")
+    pending = next(o for o in body["orders_detail"] if o["order_number"] == "#9811")
+    statement = admin.get(f"/api/payroll/{AUGUST}/statement/{affiliate['id']}").json()
+
+    assert body["policy"] == "delivered_only"
+    assert body["amount_piastres"] == 10_000, "10% of the delivered EGP 1,000 only"
+    assert delivered["commission_piastres"] == 10_000
+    assert pending["counted"] is False
+    assert pending["commission_piastres"] is None
+    assert statement["policy"] == "delivered_only"
+    assert statement["counted_sales_piastres"] == 100_000
 
 
 def test_an_order_is_worth_the_rate_of_its_own_month(admin):

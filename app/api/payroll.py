@@ -335,6 +335,10 @@ def statement(
         "name": affiliate.name,
         "month": month,
         "basis": basis,
+        # The rule the counted sales were counted under: the snapshot's own,
+        # so a month agreed delivered-only says so; `None` on a live estimate,
+        # which is the live rule by construction.
+        "policy": policy_of(snapshot) if snapshot is not None else None,
         "version": snapshot.version if snapshot else None,
         "approved_at": snapshot.approved_at.isoformat() if snapshot else None,
         "compensation_type": source.compensation_type,

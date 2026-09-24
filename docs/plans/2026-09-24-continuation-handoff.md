@@ -9,13 +9,13 @@ true. Nothing was deleted.
 | | |
 |---|---|
 | **Branch** | `repair/batch-2` |
-| **Revision reviewed** | The sweep describes `f83b4fc` — *Every screen at both widths, and 390 at last*. **One code change since**: the best-sellers commit on top of `ffde978` (*Best sellers say what they count*), which touches `app/api/affiliate_self.py`, `frontend/src/screens/MyWardrobe.tsx` and tests, and recaptures `portal-wardrobe-390` plus a new `portal-best-390`. |
+| **Revision reviewed** | The sweep describes `f83b4fc` — *Every screen at both widths, and 390 at last*. **One code change since**: the best-sellers commit on top of `ffde978` (*Best sellers say what they count*), which touches `app/api/affiliate_self.py`, `frontend/src/screens/MyWardrobe.tsx` and tests, and recaptures `portal-wardrobe-390` plus a new `portal-best-390`. **And a second**, batch C on top of `4077b88` — earnings explanations and per-order commission, below. |
 | **Current head** | run `git rev-parse --short HEAD`. Not written here: a document cannot contain the hash of the commit that adds it, and the last attempt was stale one commit later. |
 | **Tree** | clean apart from `.claude/settings.json`, the owner's plugin config, deliberately not committed |
 | **`origin/main`** | `6a13958` |
 | **`origin/production`** | `6a13958` — **level with `main`**, gap of 0 commits, read from `git ls-remote` on 24 September |
-| **Backend** | 2,045 tests, 80 files, all passing through `run-suite.sh` on 24 September, after the best-sellers change (was 2,039 / 79) |
-| **Frontend** | 365 tests, 16 files; `npm run build` green (24 September, after the best-sellers change) |
+| **Backend** | 2,054 tests, 80 files, all passing through `run-suite.sh` on 24 September, after batch C; matches `--collect-only` |
+| **Frontend** | 378 tests, 17 files; `npm run build` green (24 September, after batch C) |
 | **Migration head** | `b1f0a40c0001` |
 
 > **Correction, 24 September 2026.** An earlier version of this table said
@@ -108,57 +108,76 @@ corrected there.
   Four of the six fail if the filter is set back to delivered-only — checked.
 - No payroll, snapshot, payment or ledger code was touched.
 
-### Still delivered-only, found while checking — not fixed in that batch
+## The current batch: earnings explanations and per-order commission (24 September)
 
-1. **My Calculation's rule line** (`frontend/src/screens/MyCalculation.tsx`,
-   the `portal-calc__rule` paragraph): *"… of net sales on delivered orders.
-   An order on its way counts the day it arrives"*. The export (line 509 of
-   the portal): *"Commission is 10% of net sales on delivered and pending
-   orders. Failed deliveries are excluded."* Its source comment still calls
-   pending *05A's preview*.
-2. **Payment detail's counted-sales line** (`PaymentDetail.tsx`, the
-   *Counted sales* `StatementLine`): *"Delivered orders. Failed deliveries
-   excluded."* for a month not yet approved, whose figure includes pending.
-3. **Her orders list gives a pending order no commission**:
-   `app/services/portal.py`, the per-order worked example returns `None`
-   unless the state is `EARNED`, so the row prints *—* for an order the month
-   is paying on. Needs checking against the export's orders rows before it
-   is changed; it is a money display.
+**Batch C — the counting rule in the words and the order rows.** The three
+delivered-only displays found during the best-sellers batch, fixed together.
+The owner explicitly asked for a pending order's commission on its row.
 
-## The next small implementation batch, proposed
+1. **My Calculation.** The rule line is the export's sentence: *"Commission is
+   10% of net sales on delivered and pending orders. Failed deliveries are
+   excluded."* The comment calling pending *05A's preview* is gone. A month
+   agreed before ADR 0040 says instead *"{Month} was agreed counting
+   delivered orders only: …"* — the earnings payload now carries `policy`
+   (the snapshot's own on an agreed month).
+2. **Payment detail, *Counted sales*.** Unapproved: *"Delivered and pending
+   orders. Failed deliveries excluded."* (the export). Approved under the live
+   rule: *"As approved. Failed deliveries excluded."* — the export's, and
+   what it already said. Approved delivered-only: *"As approved, on delivered
+   orders only — the rule before pending orders counted. …"*. The statement
+   now carries `policy`; no figure on it moved.
+3. **My Orders.** `_order_commission` in `app/services/portal.py` counts by the
+   month's own rule (`counted_states_for(policy)`): delivered and pending
+   under the live rule, delivered only on a delivered-only agreement. The rate
+   is the month's own — the snapshot's on an agreed month, the terms in force
+   for that month otherwise. A valid zero is `EGP 0.00`; no terms for the
+   month is `null` with `rate_missing: true`, and the row says *not available*.
+   A failed delivery that keeps its base now gets the struck-through
+   would-have-been figure the export draws (it printed a dash). Each row also
+   carries `counted`. The pending explanation is the export's sentence word
+   for word.
+4. **The staff order view** (`app/api/orders.py`, order detail) reads the
+   same helper, `month_rule`, so an order opened by staff shows the figure
+   her row shows. It was the second caller of `_order_commission`, and the
+   full suite is what found it.
 
-Everything below is already decided — by the approved export or by an explicit
-instruction from you — so it is work, not a question. Nothing here changes a
-business rule and nothing needs a new ADR. It is deliberately small.
+Nothing in `calculate.py`, payroll, snapshots, payments or the ledger
+changed; the month's figure is still one numerator rounded once.
 
-**A. Take the month grid back off the seven screens it was never asked for.**
-`MonthPicker` returns to the export's `<select>`; `Compensation.tsx`'s terms
-grid is not touched. Home, Orders, Overview, Payments, Payroll, Settings,
-Targets and the model profile all follow from the one component.
+**Checks run.** Nine API tests in `tests/test_portal_api.py` with explicit
+amounts (EGP 2,000 pending at 10% → EGP 200; delivered, unchanged, once;
+failed → out of the month, EGP 200 struck through; refunded after delivery →
+kept; July at 10% unchanged by September's 20%; no rate → not available;
+zero base → `EGP 0.00`; pending-inclusive and delivered-only agreements,
+the latter born through `approved_before_the_switch`). Four fail against the
+old `EARNED`-only rule — checked. They replace
+`test_no_figure_is_put_beside_an_order_that_earned_nothing`, which asserted the
+retired rule. `test_reading_a_month_of_contents_costs_one_query` allows five
+fixed queries, not four: the month's agreement is one more, once. Eleven
+frontend tests in `CountingRule.test.tsx`. One API test in
+`tests/test_orders_api.py` for the staff view of a pending order. Screens: `portal-orders-390`,
+`portal-earnings-390` and `payment-detail` at 1280/1440 recaptured; new
+`portal-orders-pending-390` pair, `portal-orders-failed-390` and
+`payment-detail-estimate-1280`, from July with one failed order added to the
+throwaway database.
 
-**B. Fix the comment that contradicts the refund rule.**
-`app/services/portal.py:756` says a delivered-then-refunded order *"pays
-nothing"*. It is a comment; the code and four tests already have it right.
+## Not scheduled — a backlog, not an instruction
 
-**C. The five small wordings the export decides.** Expired invitation reads
-*Send a new link*; the sent date is absolute; the featured card carries the
-size; the portal targets use *met* / *not met* / *in progress*; the portal
-payment-details form uses the export's three labels.
+Each batch is named by the owner. These are known, decided by the export, and
+**not** queued; nothing here is the next batch until he says so.
 
-**D. Build *Refresh now* on Settings → Shopify and sync**, and report *last
-successful refresh* rather than *last order arrived*. The read-only connection
-card stays — see conflict B in the checklist.
-
-**E. The three delivered-only sites above.** Wording for the first two; the
-third after comparing with the export.
-
-Held back deliberately, and why: the Appearance switches and the audit
-sentences (items 1 and 2) are each a day's work with persistence behind them
-and belong in their own batch; recording a payment moving onto the detail
-(item 11) is a route change. The checklist's "conflicts" B–G are
-**implementation work toward the export** under the rule above, not
-questions; *Refresh now* and connection editing (B) are held back by the
-owner's instruction of 24 September, not by a pending decision.
+- The month grid back to the export's `<select>` everywhere except
+  `Compensation.tsx`'s terms editing.
+- The comment in `app/services/portal.py` saying a delivered-then-refunded
+  order *"pays nothing"*; the code and tests already have it right.
+- The small wordings: *Send a new link*, the absolute sent date, the size on
+  the featured card, *met* / *not met* / *in progress*, the payment-details
+  labels.
+- *Refresh now* and *last successful refresh* on Settings → Shopify — held
+  back by the owner's instruction of 24 September.
+- The Appearance switches, the audit sentences, and recording a payment on
+  its detail — each its own batch. The checklist's "conflicts" B–G are
+  implementation work toward the export, not questions.
 
 ## Decisions not to reopen
 
@@ -183,6 +202,11 @@ owner's instruction of 24 September, not by a pending decision.
   the Chrome extension, and not the window-resizing script.
 
 ## What I got wrong, so the next session does not repeat it
+
+- **Changed a helper's signature and ran only the files I expected to use
+  it.** `_order_commission` had a second caller in `app/api/orders.py`; the
+  focused run missed it and the full runner caught it. Grep for callers
+  before choosing the focused set.
 
 - **Described code from its label.** The checklist said `best_sellers_for`
   was delivered-only because the subtitle said so; the function had counted

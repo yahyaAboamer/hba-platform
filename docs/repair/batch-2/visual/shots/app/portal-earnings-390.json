@@ -11,7 +11,7 @@
   "EGP 12,000.00",
   "Earnings so far",
   "EGP 13,071.00",
-  "Commission is 10% of net sales on delivered orders. An order on its way counts the day it arrives; one that fails is excluded."
+  "Commission is 10% of net sales on delivered and pending orders. Failed deliveries are excluded."
  ],
  "headings": [
   "September 2026"
@@ -44,5 +44,11 @@
  },
  "background": "rgb(8, 9, 10)",
  "scrollHeight": 844,
- "clientHeight": 844
+ "clientHeight": 844,
+ "viewport": {
+  "innerWidth": 390,
+  "innerHeight": 844,
+  "devicePixelRatio": 1,
+  "frame": 390
+ }
 }

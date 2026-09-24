@@ -73,11 +73,13 @@ export type MyOrder = {
   /** §11.4. Set only where a **different** month's payroll paid it. */
   paid_in_month: string | null;
   /**
-   * What this one order was worth in commission, exact to the piastre.
+   * What this one order was worth in commission, to the whole piastre.
    *
-   * `null` where there is no answer rather than zero: an order still in
-   * transit has earned nothing *yet*, a void one never will, and a month with
-   * no rate set cannot be answered at all.
+   * Every **counted** order has one - delivered and pending under the live
+   * rule (ADR 0040), delivered only on a month agreed before it. `0` is a real
+   * figure (an order the customer paid nothing for). `null` is no answer: a
+   * void order (see `forgone`), an order its month did not count, or a month
+   * with no rate set (`rate_missing`).
    *
    * **A worked example, not a ledger line.** ADR 0004 divides one numerator
    * once for the whole month, so these can miss the month's rounded total by
@@ -86,6 +88,10 @@ export type MyOrder = {
    */
   commission_piastres: number | null;
   commission: string | null;
+  /** Whether it counts in this month's figure, under the month's own rule. */
+  counted: boolean;
+  /** Nobody set a rate for the month: *not available*, never a zero. */
+  rate_missing: boolean;
   /**
    * What the order came to when it was placed, where the base no longer says.
    *
@@ -122,6 +128,11 @@ export type MyEarnings = {
    * (ADR 0014).
    */
   state: "historical" | "open" | "agreed";
+  /**
+   * The counting rule behind the figure. `delivered_only` only on a month
+   * agreed before ADR 0040, and described as it was agreed.
+   */
+  policy: "pending_inclusive" | "delivered_only";
   is_working_month: boolean;
   /**
    * The calendar has not reached this month yet. Distinct from "open with no

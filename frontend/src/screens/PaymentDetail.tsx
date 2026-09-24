@@ -16,6 +16,20 @@ import type { Balance } from "./Payments";
 import { paymentRowPresentation, STATE_PILL } from "./Payments";
 import "./PaymentDetail.css";
 
+/**
+ * What *Counted sales* counted, in the export's words where the export has
+ * them. An agreed month is described by the rule **its snapshot** recorded:
+ * *As approved* under the live rule, and delivered-only, said plainly, for a
+ * month agreed before ADR 0040. A live figure is the live rule.
+ */
+export function countedSalesDetail(policy: Statement["policy"]): string {
+  if (policy === "delivered_only") {
+    return "As approved, on delivered orders only — the rule before pending orders counted. Failed deliveries excluded.";
+  }
+  if (policy === "pending_inclusive") return "As approved. Failed deliveries excluded.";
+  return "Delivered and pending orders. Failed deliveries excluded.";
+}
+
 type Statement = {
   affiliate_id: number;
   name: string;
@@ -23,6 +37,8 @@ type Statement = {
   /** Approved from its snapshot, an estimate worked out live, or a month
    *  paid before the platform. Decides every label on the page. */
   basis: "approved" | "estimate" | "settled_outside";
+  /** The rule its snapshot was agreed under; `null` on a live estimate. */
+  policy: "pending_inclusive" | "delivered_only" | null;
   version: number | null;
   approved_at: string | null;
   compensation_type: string | null;
@@ -294,11 +310,7 @@ export function PaymentDetail({ session }: { session: Session }) {
           <section className="pay-detail__lines" aria-label="How the figure is made up">
             <StatementLine
               label="Counted sales"
-              detail={
-                statement.basis === "approved"
-                  ? "As approved. Failed deliveries excluded."
-                  : "Delivered orders. Failed deliveries excluded."
-              }
+              detail={countedSalesDetail(statement.policy)}
               piastres={statement.counted_sales_piastres}
               tone="quiet"
             />

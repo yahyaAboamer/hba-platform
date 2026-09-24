@@ -574,4 +574,7 @@ def test_reading_a_month_of_contents_costs_one_query(db):
     finally:
         event.remove(db.get_bind(), "before_cursor_execute", watch)
 
-    assert len(seen) <= 4, "\n".join(seen)
+    # Five, whatever the month holds: settlements, the month itself (its
+    # agreement decides the rate and the counting rule), its terms or its
+    # snapshot, the orders, and their lines. A sixth per order is the bug.
+    assert len(seen) <= 5, "\n".join(seen)

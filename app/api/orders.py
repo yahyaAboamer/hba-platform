@@ -191,14 +191,13 @@ def order_detail(
     column instead, which answered half of it on every row at once.
 
     The commission is the same per-order figure a model sees on her own
-    orders (`_order_commission`): the rate of the month the order belongs to,
-    exact to the piastre, and `None` for an order that has not earned - still
-    travelling, void, or on a month with no rate - rather than a zero that
-    would read as a figure.
+    orders (`_order_commission`, `month_rule`): the rate of the month the
+    order belongs to - its snapshot's, once agreed - counted delivered and
+    pending under the live rule (ADR 0040), and `None` for a void order, one
+    its month's agreement did not count, or a month with no rate.
     """
     from app.models.catalogue import OrderLineItem
-    from app.services.compensation import terms_for
-    from app.services.portal import _order_commission
+    from app.services.portal import _order_commission, month_rule
 
     order = db.get(OrderIndex, shopify_order_id)
     if order is None:
@@ -210,11 +209,9 @@ def order_detail(
     commission = None
     if row["outcome"] == "attributed" and row["affiliate_id"] is not None:
         affiliate = db.get(AffiliateProfile, row["affiliate_id"])
-        terms = terms_for(db, affiliate, order.business_month)
+        rate_bp, counted = month_rule(db, affiliate, order.business_month)
         commission = _order_commission(
-            row["base_piastres"] or 0,
-            terms.commission_rate_bp if terms else None,
-            row["commission_state"],
+            row["base_piastres"] or 0, rate_bp, row["commission_state"], counted
         )
 
     lines = [
