@@ -24,7 +24,8 @@
 .affiliate .orders__head h1 {
   margin: 0;
   font-size: 15px;
-  font-weight: 500;
+  font-weight: 400;
+  line-height: 1.55;
 }
 
 .affiliate .orders__head span {
@@ -56,6 +57,10 @@
   color: var(--quiet);
   font: inherit;
   font-size: 12.5px;
+  /* The export's chips and rows set no line height of their own, so they
+     sit at the browser's normal - the page's 1.5 made each row 14px taller
+     than the approved one. */
+  line-height: normal;
   cursor: pointer;
 }
 
@@ -102,12 +107,17 @@
   background: transparent;
   color: var(--ink);
   font: inherit;
+  line-height: normal;
   text-align: left;
   cursor: pointer;
 }
 
-.affiliate .orders__button:hover {
-  background: var(--hover);
+/* Only where a pointer really hovers. On a phone the state sticks after a
+   tap and tinted the opened row, which the approved design never does. */
+@media (hover: hover) {
+  .affiliate .orders__button:hover {
+    background: var(--hover);
+  }
 }
 
 .affiliate .orders__button:focus-visible {
@@ -230,6 +240,7 @@
 .affiliate .orders__note {
   margin: 14px 0 0;
   font-size: 12.5px;
+  line-height: 1.55;
   color: var(--faint);
 }
 

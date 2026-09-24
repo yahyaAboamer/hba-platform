@@ -23,6 +23,8 @@ const order = (patch: Partial<MyOrder>): MyOrder =>
     state_text: "Delivered",
     rate_bp: 1000,
     failed_after_approval: false,
+    net_sales: { kind: "known", piastres: 949_000, amount: "EGP 9,490.00" },
+    counts_towards: { decision: "counted", month: "2026-07" },
     delivered_at: null,
     paid_in_month: null,
     commission_piastres: 94_900,
@@ -66,18 +68,30 @@ describe("the model's order rows", () => {
     expect(explain(order(failed), "2026-07")).toBe(
       "Delivery failed, so this order is excluded from July 2026.",
     );
-    expect(explain(order({ ...failed, failed_after_approval: true }), "2026-07")).toBe(
-      "Delivery failed, so this order is excluded from July 2026. It failed after the month was approved, so the difference is settled in a later month.",
+    // Neutral: nothing on record says a deduction was chosen, applied or
+    // settled for this one order, so the sentence names no amount or month.
+    const late = explain(order({ ...failed, failed_after_approval: true }), "2026-07");
+    expect(late).toBe(
+      "Delivery failed, so this order is excluded from July 2026. It failed after July 2026 was approved. The approved amount and any payment stay as recorded, and HBA reviews the difference.",
     );
+    expect(late).not.toMatch(/settled in|recovered|EGP/);
   });
 
   it("never calls a cancelled or refunded order a failed delivery", () => {
-    const cancelled = { state: "void" as const, status: "cancelled" as const, state_text: "Cancelled", base_piastres: 0, commission_piastres: null, commission: null };
+    const cancelled = {
+      state: "void" as const,
+      status: "cancelled" as const,
+      state_text: "Cancelled",
+      base_piastres: 0,
+      commission_piastres: null,
+      commission: null,
+      net_sales: { kind: "unavailable" as const, piastres: null, amount: null },
+    };
     expect(html(cancelled)).not.toContain("Failed delivery");
     expect(explain(order(cancelled), "2026-07")).toBe(
       "This order was cancelled, so the original sales amount is not available and nothing is counted.",
     );
-    expect(explain(order({ ...cancelled, placed_piastres: 150_000, placed: "EGP 1,500.00" }), "2026-07")).toBe(
+    expect(explain(order({ ...cancelled, net_sales: { kind: "placed", piastres: 150_000, amount: "EGP 1,500.00" } }), "2026-07")).toBe(
       "This order was cancelled, so nothing is counted. The amount shown is what it came to when it was placed.",
     );
     const refunded = { ...cancelled, status: "refunded" as const, state_text: "Refunded" };
@@ -101,6 +115,24 @@ describe("the model's order rows", () => {
   });
 });
 
+describe("net sales, and how it is known", () => {
+  it("prints a real zero as EGP 0.00, not as missing", () => {
+    const row = html({ base_piastres: 0, base: "EGP 0.00", net_sales: { kind: "known", piastres: 0, amount: "EGP 0.00" } });
+    expect(row).toContain("EGP 0.00 net sales");
+    expect(row).not.toContain("amount not available");
+  });
+
+  it("prints a cancelled order's recorded placed-at total as such", () => {
+    const row = html({ state: "void", status: "cancelled", base_piastres: 0, net_sales: { kind: "placed", piastres: 120_000, amount: "EGP 1,200.00" } });
+    expect(row).toContain("EGP 1,200.00 when it was placed");
+  });
+
+  it("says not available only when nothing was recorded", () => {
+    const row = html({ state: "void", status: "cancelled", base_piastres: 0, net_sales: { kind: "unavailable", piastres: null, amount: null } });
+    expect(row).toContain("amount not available");
+  });
+});
+
 describe("the staff order view", () => {
   it("takes its status from the server, never from raw facts", () => {
     expect(orderStatus({ status: "failed" }).label).toBe("Failed delivery");
@@ -108,27 +140,15 @@ describe("the staff order view", () => {
     expect(orderStatus({ status: "delivered" }).label).toBe("Delivered");
   });
 
-  it("counts a pending order in its month, as the export does", () => {
-    const counts = countsTowards({
-      outcome: "attributed",
-      commission_state: "pending",
-      cancelled: false,
-      delivery_state: null,
-      business_month: "2026-07",
-      paid_in_month: null,
-    });
-    expect(counts.label).toBe("Counted in July 2026");
-  });
-
-  it("excludes a void order from its month", () => {
-    const counts = countsTowards({
-      outcome: "attributed",
-      commission_state: "void",
-      cancelled: false,
-      delivery_state: "failed",
-      business_month: "2026-07",
-      paid_in_month: null,
-    });
-    expect(counts.label).toBe("Excluded from July 2026");
+  it("words the server's decision and never decides it", () => {
+    expect(countsTowards({ decision: "counted", month: "2026-07" }).label).toBe("Counted in July 2026");
+    expect(countsTowards({ decision: "excluded", month: "2026-07" }).label).toBe("Excluded from July 2026");
+    expect(countsTowards({ decision: "after_delivery", month: "2026-08" }).label).toBe(
+      "Paid after delivery — August 2026 was agreed on delivered orders only",
+    );
+    expect(countsTowards({ decision: "failed_after_approval", month: "2026-08" }).label).toBe(
+      "Failed after August 2026 was approved — for review",
+    );
+    expect(countsTowards(null).label).toBe("No model's month");
   });
 });

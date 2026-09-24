@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate, useParams, useSearchParams } from "reac
 import { Money } from "../components/Money";
 import { MonthPicker } from "../components/MonthPicker";
 import type { MonthLock } from "../components/MonthPicker";
+import type { CountsTowards, NetSales } from "../lib/portal";
 import { api } from "../lib/api";
 import type { Session } from "../lib/api";
 import { currentMonth, formatMonth } from "../lib/money";
@@ -52,6 +53,11 @@ type Grid = {
 
 type OrderDetailBody = OrderRow & {
   commission_piastres: number | null;
+  /** No rate for the month: *not available*, not a figure it did not earn. */
+  rate_missing: boolean;
+  /** Attributed orders only; `null` on an order that is nobody's. */
+  net_sales: NetSales | null;
+  counts_towards: CountsTowards | null;
   lines: {
     title: string;
     variant: string | null;
@@ -364,7 +370,7 @@ export function OrderDetail() {
   }, [orderId]);
 
   const status = order ? orderStatus(order) : null;
-  const counts = order ? countsTowards(order) : null;
+  const counts = order ? countsTowards(order.counts_towards) : null;
 
   return (
     <>
@@ -427,12 +433,12 @@ export function OrderDetail() {
                 <dd>
                   {/* Net sales is the base the commission is worked on - the
                       same figure her own row and the profile print. */}
-                  {order.base_piastres !== null && order.base_piastres > 0 ? (
-                    <Money piastres={order.base_piastres} kind="agreed" />
-                  ) : order.cancelled ? (
+                  {order.net_sales === null ? (
+                    <Money piastres={order.total_piastres} kind="agreed" />
+                  ) : order.net_sales.kind === "unavailable" || order.net_sales.piastres === null ? (
                     <span className="orders__nobody">not available</span>
                   ) : (
-                    <Money piastres={order.base_piastres ?? order.total_piastres} kind="agreed" />
+                    <Money piastres={order.net_sales.piastres} kind="agreed" />
                   )}
                 </dd>
               </div>
@@ -440,10 +446,11 @@ export function OrderDetail() {
                 <dt>Commission</dt>
                 <dd>
                   {/* A void order is EGP 0.00 from the server - it earned
-                      nothing, which is a figure. Null is no answer: no rate
-                      set for the month, or nobody's order. */}
+                      nothing, which is a figure. Null is either no rate for
+                      the month (*not available*) or an order its month's
+                      agreement did not count, which *Counts towards* says. */}
                   {order.commission_piastres === null ? (
-                    <span className="orders__nobody">not available</span>
+                    <span className="orders__nobody">{order.rate_missing ? "not available" : "—"}</span>
                   ) : (
                     <Money piastres={order.commission_piastres} kind="agreed" />
                   )}
@@ -473,10 +480,14 @@ export function OrderDetail() {
             </section>
           )}
 
+          {/* The export's sentence where nothing was recorded; where the
+              placed-at total was, *Net sales* above shows it, and saying it
+              is not available would contradict the line it sits under. */}
           {order.lines.length === 0 && order.cancelled && (
             <p className="order__note">
-              This order was cancelled in Shopify, so its original amount and
-              product lines are not available.
+              {order.net_sales?.kind === "placed"
+                ? "This order was cancelled in Shopify. Net sales is what it came to when it was placed; its product lines are not available."
+                : "This order was cancelled in Shopify, so its original amount and product lines are not available."}
             </p>
           )}
         </div>
@@ -486,24 +497,25 @@ export function OrderDetail() {
 }
 
 /**
- * *Counted in September 2026*, or *Excluded from it* — the export's line.
- *
- * Counted takes the month that actually paid it where that is a different
- * one (§11.4), because that is the month a model will find it in. **A pending
- * order is counted** (F02, ADR 0040): its month is paid on it, and the export
- * says *Counted in* for it as it does for a delivered one.
+ * *Counted in September 2026*, or *Excluded from it* — the export's line,
+ * worded here and **decided on the server** (`counts_towards`), under the
+ * month's own rule: a pending order counts under the live rule and waits for
+ * delivery in a month agreed delivered-only. `null` is nobody's order.
  */
-export function countsTowards(order: Pick<
-  OrderRow,
-  "outcome" | "commission_state" | "cancelled" | "delivery_state" | "business_month" | "paid_in_month"
->): { label: string; tone: "settled" | "owed" | "refused" | "quiet" } {
-  if (order.outcome !== "attributed") return { label: "No model's month", tone: "quiet" };
-  const month = formatMonth(order.paid_in_month ?? order.business_month);
-  if (order.commission_state === "earned" || order.commission_state === "pending") {
-    return { label: `Counted in ${month}`, tone: "settled" };
+export function countsTowards(towards: CountsTowards | null): {
+  label: string;
+  tone: "settled" | "owed" | "refused" | "quiet";
+} {
+  if (towards === null) return { label: "No model's month", tone: "quiet" };
+  const month = formatMonth(towards.month);
+  switch (towards.decision) {
+    case "counted":
+      return { label: `Counted in ${month}`, tone: "settled" };
+    case "after_delivery":
+      return { label: `Paid after delivery — ${month} was agreed on delivered orders only`, tone: "owed" };
+    case "failed_after_approval":
+      return { label: `Failed after ${month} was approved — for review`, tone: "refused" };
+    default:
+      return { label: `Excluded from ${month}`, tone: "refused" };
   }
-  if (order.commission_state === "void" || order.cancelled || order.delivery_state === "failed") {
-    return { label: `Excluded from ${formatMonth(order.business_month)}`, tone: "refused" };
-  }
-  return { label: `Counted in ${month}`, tone: "settled" };
 }

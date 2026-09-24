@@ -165,8 +165,8 @@ export function MyOrders() {
  * says so rather than printing a zero that reads as *it was worth nothing*.
  */
 function saleLine(order: MyOrder): string {
-  if (order.base_piastres > 0) return `${order.base} net sales`;
-  if (order.placed !== null) return `${order.placed} when it was placed`;
+  if (order.net_sales.kind === "known") return `${order.net_sales.amount} net sales`;
+  if (order.net_sales.kind === "placed") return `${order.net_sales.amount} when it was placed`;
   return "amount not available";
 }
 
@@ -315,17 +315,22 @@ export function explain(order: MyOrder, month: string): string {
   // and for a cancelled order with nothing left to show; our own, in the same
   // voice, for the two cases the design has no words for.
   if (order.status === "failed") {
+    // After approval, the approved amount and any payment stand as recorded,
+    // and what happens next is a review (05C). Nothing here says a deduction
+    // was chosen, applied or settled anywhere - no record says that of one
+    // order.
     return `Delivery failed, so this order is excluded from ${formatMonth(month)}.` +
       (order.failed_after_approval
-        ? " It failed after the month was approved, so the difference is settled in a later month."
+        ? ` It failed after ${formatMonth(month)} was approved. The approved amount and any payment stay as recorded, and HBA reviews the difference.`
         : "");
   }
   if (order.status === "refunded") {
     return `The payment was refunded before this order arrived, so it is excluded from ${formatMonth(month)}.`;
   }
-  if (order.base_piastres > 0 || order.placed_piastres !== null) {
+  if (order.net_sales.kind === "placed") {
     return "This order was cancelled, so nothing is counted. The amount shown is what it came to when it was placed.";
   }
+  if (order.net_sales.kind === "known") return "This order was cancelled, so nothing is counted.";
   return "This order was cancelled, so the original sales amount is not available and nothing is counted.";
 }
 

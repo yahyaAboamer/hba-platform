@@ -56,6 +56,24 @@ export type MakeupLine = {
 
 export type OrderStatus = "delivered" | "pending" | "failed" | "cancelled" | "refunded";
 
+/**
+ * Net sales **and how it is known** (`net_sales_of`). `known` includes a real
+ * `EGP 0.00`; `placed` is a cancelled order's recorded placed-at total;
+ * `unavailable` is a zeroed void order with nothing recorded. Never inferred
+ * from a value being zero.
+ */
+export type NetSales = {
+  kind: "known" | "placed" | "unavailable";
+  piastres: number | null;
+  amount: string | null;
+};
+
+/** Which month an order counts in, decided by the server (`counts_towards`). */
+export type CountsTowards = {
+  decision: "counted" | "excluded" | "failed_after_approval" | "after_delivery";
+  month: string;
+};
+
 export type MyOrder = {
   /**
    * What was in the order. **Empty means not recorded, not empty**: contents
@@ -88,6 +106,8 @@ export type MyOrder = {
   rate_bp: number | null;
   /** Void, but counted by the month's agreement: it failed after approval. */
   failed_after_approval: boolean;
+  net_sales: NetSales;
+  counts_towards: CountsTowards;
   delivered_at: string | null;
   /** §11.4. Set only where a **different** month's payroll paid it. */
   paid_in_month: string | null;

@@ -25,6 +25,8 @@ const order = (patch: Partial<MyOrder>): MyOrder =>
     state_text: "Pending",
     rate_bp: 1000,
     failed_after_approval: false,
+    net_sales: { kind: "known", piastres: 200_000, amount: "EGP 2,000.00" },
+    counts_towards: { decision: "counted", month: "2026-09" },
     delivered_at: null,
     paid_in_month: null,
     commission_piastres: 20_000,

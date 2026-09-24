@@ -30,7 +30,7 @@ shifted to stand the same distance from the working month as her counterpart.
 | Models · Inactive | Matched | Matched | |
 | Model · Overview | Matched | Matched | Same five tabs, same three summary cards |
 | Model · Wardrobe | **Matched** | **Matched** | Populated 24 Sept: *Received · 2 pieces · image · title · Size M*, the export's structure and words exactly |
-| Model · Performance | Matched | Matched | Same columns in the same order |
+| Model · Performance | Corrected (batch D) | Corrected (batch D) | Table and the order it opens; the header lacks the export's code under the name — **shared-controls batch** |
 | Model · Targets | Matched | Matched | Same columns; state words differ, below |
 | Model · Payments | Corrected | Corrected | **Was masking the destination**; now the full card |
 | Products · Active | Matched | Matched | |
@@ -59,7 +59,7 @@ shifted to stand the same distance from the working month as her counterpart.
 | Screen | 390 | Notes |
 |---|---|---|
 | Home | Matched | |
-| Orders | Corrected | Filter and chip words; *products* not *pieces* |
+| Orders | Corrected (batch D) | Filters, chips, rows, sentences and row metrics match; header identity is truncated and the month control is a `<select>` — both **shared-controls batch** |
 | Wardrobe | **Still differs** | Populated 24 Sept including a featured product. Best-sellers counting rule and a missing size, below |
 | Targets | Still differs | State vocabulary, below |
 | Ranking | Still differs | Other models are anonymised, below |

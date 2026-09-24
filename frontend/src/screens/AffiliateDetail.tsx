@@ -8,6 +8,7 @@ import { FinancialRulesPreview } from "../components/FinancialRulesPreview";
 import { api, can } from "../lib/api";
 import { DestinationDetails } from "../components/DestinationDetails";
 import type { DestinationCard } from "../lib/payouts";
+import type { NetSales } from "../lib/portal";
 import { describeDestination, PAY_TYPE } from "../lib/payouts";
 import type { Session } from "../lib/api";
 import { formatEgp, formatMonth } from "../lib/money";
@@ -111,6 +112,8 @@ type ProfileOrder = {
   state: "earned" | "pending" | "void";
   /** What happened to it; only a courier's failure is `failed`. */
   status: "delivered" | "pending" | "failed" | "cancelled" | "refunded";
+  /** Net sales and how it is known - never inferred from a zero. */
+  net_sales: NetSales;
   commission_piastres: number | null;
 };
 
@@ -1085,14 +1088,13 @@ export function AffiliateDetail({ session }: { session: Session }) {
                         <td className="profile__muted">{dateWithYear(order.placed_at)}</td>
                         <td className={`profile__state profile__tone--${state.tone}`}>{state.label}</td>
                         <td className="profile__money">
-                          {/* Net sales, or the placed-at figure a cancelled
-                              order keeps; *amount not available* where the
-                              shop holds neither, never a zero. */}
-                          {order.base_piastres > 0
-                            ? <Money piastres={order.base_piastres} kind="agreed" />
-                            : order.placed_piastres !== null
-                              ? <Money piastres={order.placed_piastres} kind="agreed" />
-                              : <span className="profile__muted">amount not available</span>}
+                          {/* The server says how it knows: a real zero
+                              prints EGP 0.00, a cancelled order's recorded
+                              placed-at total prints as such, and only a
+                              figure nobody recorded is *amount not available*. */}
+                          {order.net_sales.kind === "unavailable" || order.net_sales.piastres === null
+                            ? <span className="profile__muted">amount not available</span>
+                            : <Money piastres={order.net_sales.piastres} kind="agreed" />}
                         </td>
                         <td className="profile__money">
                           {order.commission_piastres === null

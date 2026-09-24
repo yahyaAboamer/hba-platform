@@ -208,7 +208,12 @@ def order_detail(
     its month's agreement did not count, or a month with no rate.
     """
     from app.models.catalogue import OrderLineItem
-    from app.services.portal import _order_commission, month_rule
+    from app.services.portal import (
+        _order_commission,
+        counts_towards,
+        month_rule,
+        net_sales_of,
+    )
 
     order = db.get(OrderIndex, shopify_order_id)
     if order is None:
@@ -218,9 +223,23 @@ def order_detail(
     row = _render(db, order, names)
 
     commission = None
+    rate_missing = False
+    net_sales = None
+    towards = None
     if row["outcome"] == "attributed" and row["affiliate_id"] is not None:
         affiliate = db.get(AffiliateProfile, row["affiliate_id"])
-        rate_bp, counted, _ = month_rule(db, affiliate, order.business_month)
+        attributed = db.get(AttributedOrder, order.shopify_order_id)
+        rate_bp, counted, snapshot = month_rule(db, affiliate, order.business_month)
+        rate_missing = rate_bp is None
+        # The same two decisions her own row carries, so the two views of
+        # one order cannot disagree (`net_sales_of`, `counts_towards`).
+        net_sales = net_sales_of(attributed, order)
+        towards = counts_towards(
+            attributed,
+            counted,
+            snapshot,
+            row["paid_in_month"] if row["is_carried"] else None,
+        )
         commission = (
             # The approved order view prints EGP 0.00 for an order that did
             # not count: it earned nothing, which is a figure, not a gap.
@@ -250,6 +269,11 @@ def order_detail(
         **row,
         "commission_piastres": commission,
         "commission": format_egp(commission) if commission is not None else None,
+        # No rate for the month: *not available*, which is not the same as a
+        # figure it did not earn.
+        "rate_missing": rate_missing,
+        "net_sales": net_sales,
+        "counts_towards": towards,
         "lines": lines,
     }
 

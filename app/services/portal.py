@@ -885,6 +885,66 @@ def _credited_from(
 
 
 
+def net_sales_of(order: AttributedOrder, index: OrderIndex) -> dict:
+    """What the order's net sales are, and **how we know** - never inferred
+    from a value being zero.
+
+    Three answers, each from an explicit fact:
+
+    - `known` - the commission base. A counted order's base is Shopify's live
+      figure, so a zero there is a real zero (an order paid for in full by a
+      discount) and prints `EGP 0.00`. A void order whose base survived (a
+      failed delivery keeps it, F03) is known too.
+    - `placed` - a void order whose base Shopify zeroed, and whose
+      placed-at total we recorded (`original_total_piastres`): the amount it
+      came to before it was cancelled.
+    - `unavailable` - a void order with a zero base and no recorded placed-at
+      total. Zero there is Shopify clearing a cancelled order, not a price,
+      and the row says *amount not available* rather than repeating it.
+    """
+    base = order.commission_base_piastres
+    if order.commission_state != CommissionState.VOID or base > 0:
+        return {"kind": "known", "piastres": base, "amount": format_egp(base)}
+    if index.original_total_piastres is None:
+        return {"kind": "unavailable", "piastres": None, "amount": None}
+    placed = commission_base(
+        index.original_total_piastres, index.shipping_piastres, index.tax_piastres
+    )
+    if placed > 0:
+        return {"kind": "placed", "piastres": placed, "amount": format_egp(placed)}
+    # Recorded, and genuinely nothing when it was placed.
+    return {"kind": "known", "piastres": 0, "amount": format_egp(0)}
+
+
+def counts_towards(
+    order: AttributedOrder,
+    counted: tuple[str, ...],
+    snapshot: PayrollSnapshot | None,
+    paid_in_month: str | None,
+) -> dict:
+    """Which month this order counts in, decided here under the month's own
+    rule - the browser only puts the words on it.
+
+    - `counted` - it counts; `month` is the payroll that paid it where a
+      different one did (§11.4), else its own.
+    - `after_delivery` - a pending order in a month agreed delivered-only
+      (before ADR 0040): that agreement left it out, and it is paid after it
+      arrives (§11.4), not in its own month.
+    - `failed_after_approval` - void, but counted by the month's agreement.
+      The approved amount and any payment stand as recorded; what follows is
+      a review (05C), and nothing here claims it has been decided.
+    - `excluded` - void, and not counted by anything.
+    """
+    month = order.business_month
+    if order.commission_state in counted:
+        return {"decision": "counted", "month": paid_in_month or month}
+    if order.commission_state != CommissionState.VOID:
+        return {"decision": "after_delivery", "month": month}
+    if snapshot is not None and counted_in_snapshot(snapshot, order.shopify_order_id):
+        return {"decision": "failed_after_approval", "month": month}
+    return {"decision": "excluded", "month": month}
+
+
 def _placed_value(order: AttributedOrder, index: OrderIndex) -> int | None:
     """What the customer's order came to when it was placed, if that differs.
 
@@ -1098,6 +1158,18 @@ def my_orders(db: Session, affiliate: AffiliateProfile, month: str) -> list[dict
             "contents": contents.get(order.shopify_order_id, []),
             "base_piastres": order.commission_base_piastres,
             "base": format_egp(order.commission_base_piastres),
+            # Net sales and how it is known - read this, not whether a value
+            # happens to be zero (`net_sales_of`).
+            "net_sales": net_sales_of(order, index),
+            # Which month it counts in, decided under the month's own rule.
+            "counts_towards": counts_towards(
+                order,
+                counted,
+                snapshot,
+                settled.get(order.shopify_order_id)
+                if settled.get(order.shopify_order_id) != month
+                else None,
+            ),
             "state": order.commission_state,
             # What happened to it, in the approved words - and a void order
             # split by why: only a courier's failure reads *Failed delivery*.

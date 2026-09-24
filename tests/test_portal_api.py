@@ -1945,10 +1945,84 @@ def test_a_delivery_that_fails_after_approval_says_so(admin):
     assert failed["state_text"] == "Failed delivery"
     assert failed["failed_after_approval"] is True
     assert failed["forgone_piastres"] == 20_000
+    # For review, not decided: nothing records a deduction for this one order.
+    assert failed["counts_towards"] == {
+        "decision": "failed_after_approval",
+        "month": AUGUST,
+    }
     assert delivered["failed_after_approval"] is False
     # *Commission is 10% of EGP 1,000.00* - August's own rate, from its snapshot.
     assert delivered["rate_bp"] == 1000
     assert delivered["commission_piastres"] == 10_000
+
+
+def _profile_row(admin, affiliate_id, month, number):
+    body = admin.get(f"/api/affiliates/{affiliate_id}/orders/{month}").json()
+    (row,) = [o for o in body["orders"] if o["order_number"] == number]
+    return row
+
+
+def test_net_sales_says_how_it_is_known_never_from_a_zero(admin):
+    """The admin profile's *Net sales*, from explicit facts.
+
+    A counted order paid for in full by a discount is a real EGP 0.00. A
+    cancelled order Shopify zeroed shows its recorded placed-at total. Only a
+    zeroed void order with nothing recorded is *not available*. A failed
+    delivery keeps its base, which is known.
+    """
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"])
+    _order(affiliate["id"], "9820", 0, month=SEPTEMBER, state="pending")
+    _order(affiliate["id"], "9821", 0, month=SEPTEMBER, state="void", placed=150_000)
+    _order(affiliate["id"], "9822", 0, month=SEPTEMBER, state="void", placed=None)
+    _order(affiliate["id"], "9823", 180_000, month=SEPTEMBER, state="void")
+    _delivery("9823", "failed")
+
+    zero = _profile_row(admin, affiliate["id"], SEPTEMBER, "#9820")["net_sales"]
+    placed = _profile_row(admin, affiliate["id"], SEPTEMBER, "#9821")["net_sales"]
+    missing = _profile_row(admin, affiliate["id"], SEPTEMBER, "#9822")["net_sales"]
+    failed = _profile_row(admin, affiliate["id"], SEPTEMBER, "#9823")["net_sales"]
+
+    assert zero == {"kind": "known", "piastres": 0, "amount": _egp(0)}
+    assert placed == {"kind": "placed", "piastres": 150_000, "amount": _egp(150_000)}
+    assert missing == {"kind": "unavailable", "piastres": None, "amount": None}
+    assert failed == {"kind": "known", "piastres": 180_000, "amount": _egp(180_000)}
+
+
+def test_a_pending_order_counts_in_its_month_under_the_live_rule(admin):
+    """The staff order view's *Counts towards*, decided on the server, and
+    agreeing with the amount beside it: EGP 200 at 10%, counted in August."""
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"], rate_bp=1000)
+    _order(affiliate["id"], "9824", 200_000, month=AUGUST, state="pending")
+
+    detail = admin.get("/api/orders/detail/9824").json()
+
+    assert detail["counts_towards"] == {"decision": "counted", "month": AUGUST}
+    assert detail["commission_piastres"] == 20_000
+    assert detail["rate_missing"] is False
+
+
+def test_a_pending_order_waits_for_delivery_under_a_delivered_only_agreement(admin):
+    """The same pending order, in a month agreed before ADR 0040: that
+    agreement did not count it, so it is not *Counted in August*, and it has
+    no commission there - while its rate is known, so it is not *missing*."""
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"], rate_bp=1000)
+    _order(affiliate["id"], "9825", 100_000, month=AUGUST)
+    _deliver("9825")
+    _order(affiliate["id"], "9826", 200_000, month=AUGUST, state="pending")
+    with approved_before_the_switch():
+        _approve(admin, affiliate["id"], AUGUST)
+
+    detail = admin.get("/api/orders/detail/9826").json()
+    row = _profile_row(admin, affiliate["id"], AUGUST, "#9826")
+
+    assert detail["counts_towards"] == {"decision": "after_delivery", "month": AUGUST}
+    assert detail["commission_piastres"] is None
+    assert detail["rate_missing"] is False
+    assert row["counts_towards"] == detail["counts_towards"]
+    assert row["commission_piastres"] is None
 
 
 def test_an_order_is_worth_the_rate_of_its_own_month(admin):
