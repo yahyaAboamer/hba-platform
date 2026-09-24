@@ -590,13 +590,18 @@ def my_best_sellers(
 ) -> dict:
     """*Your best sellers* and *All products sold* - her own sales, by product.
 
-    Computed from her attributed, delivered orders only (`best_sellers_for`),
-    so no other model's sales can reach this payload however it is asked for:
-    the route takes no affiliate id, as nothing under `/api/me` does.
+    Computed from her attributed orders, counted as her money counts them -
+    delivered and pending, never a failed delivery (`best_sellers_for`, F02,
+    ADR 0040) - so no other model's sales can reach this payload however it is
+    asked for: the route takes no affiliate id, as nothing under `/api/me` does.
+
+    `codes` is every code she has held, for the export's *Sales through
+    HBA15*: the list is all time, so a code she has since given up sold on it.
     """
     from sqlalchemy import select
 
     from app.models.catalogue import Product
+    from app.models.codes import DiscountCodePeriod
     from app.services.performance import best_sellers_for
     from app.services.wardrobe import thumbnail
 
@@ -626,7 +631,16 @@ def my_best_sellers(
                 "image_url": thumbnail(images.get(row.shopify_product_id)),
             }
             for row in rows
-        ]
+        ],
+        "codes": sorted(
+            set(
+                db.scalars(
+                    select(DiscountCodePeriod.code).where(
+                        DiscountCodePeriod.affiliate_id == affiliate.id
+                    )
+                )
+            )
+        ),
     }
 
 

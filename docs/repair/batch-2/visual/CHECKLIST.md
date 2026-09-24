@@ -6,7 +6,9 @@ under `export/`, and a `.json` digest beside each.
 
 **Matched** — nothing differs but the data.
 **Corrected** — differed, and the difference is fixed on this branch.
-**Still differs** — real, described below, waiting on a decision.
+**Still differs** — real, described below. Implementation work toward the
+approved HTML unless a later explicit instruction from the owner conflicts
+with it (24 September; see *The thirteen, re-sorted*).
 **Not exercised** — the screen renders but the seeded data does not put it in
 the state the export shows, so the comparison would be about the fixture.
 
@@ -156,11 +158,12 @@ database are the evidence of a sync, not a sync.
 
 ### Newly found, because the data arrived
 
-1. **Best sellers count a different set on each side.** Ours: *"Sales through
-   your code · all time · **delivered orders**"*, and the server agrees —
-   `best_sellers_for` is delivered-only. The export: *"Sales through HBA15 ·
-   all time · **delivered and pending**"*. See the conflicts below; this one
-   touches ADR 0040.
+1. **Best sellers said a different set on each side.** Ours: *"Sales through
+   your code · all time · **delivered orders**"*. The export: *"Sales through
+   HBA15 · all time · **delivered and pending**"*. **Fixed on 24 September** —
+   see A below. *Correction:* this line first said the server agreed with our
+   subtitle. It did not: `best_sellers_for` has counted delivered and pending
+   since batch 1 (`0a2ba69`). Only the words were delivered-only.
 2. **The featured card drops the size.** Export: *On the way · size M*. Ours:
    *On its way*. The export also shows a second card in a different state —
    *In your wardrobe · size one size* — which our single seeded request cannot
@@ -233,7 +236,23 @@ implementation work, and it is in the batch proposed below.
 
 ### 2 — Genuine conflicts. Both requirements, and what I would do.
 
-**A. Best sellers: delivered, or delivered and pending?**
+> **How to read this section now (24 September).** The approved HTML decides
+> by default, and an ordinary difference from it is implementation work, not
+> a question. It is a question only where a **later, explicit** instruction
+> from the owner conflicts with the HTML — the month grid for terms editing
+> is the one such case recorded. An internal ADR or a privacy choice we made
+> ourselves does not make it a question; it makes it a recorded divergence at
+> most. The recommendations below stand as the work to do.
+
+**A. Best sellers: delivered, or delivered and pending? — done, 24 September.**
+
+*Not a conflict: the export and ADR 0040 agree.* The panel and *All products
+sold* now read *"Sales through SARAED · all time · delivered and pending"* and
+*"… Delivered and pending orders; failed deliveries excluded."*, her own code
+in the export's HBA15 place. Six tests in `tests/test_best_sellers.py` drive
+the rule through ingestion with explicit amounts; the recaptured
+`portal-wardrobe-390` and new `portal-best-390` pairs show pending sales
+moving *Panel Track Jacket* from fourth to second.
 
 > **The approved export:** *"Sales through HBA15 · all time · delivered and
 > pending"*.
@@ -241,7 +260,8 @@ implementation work, and it is in the batch proposed below.
 > Pending and delivered are paid."* `PENDING_INCLUSIVE` is the live policy and
 > every approval writes it into its snapshot.
 
-Against both: `best_sellers_for` is delivered-only, and our subtitle says so
+*As first written, kept for the record:* Against both: `best_sellers_for` is
+delivered-only *(wrong — see the correction above)*, and our subtitle says so
 honestly. **Recommendation: follow the export and the rule — count pending.**
 They agree with each other; only this panel disagrees with both. It is the one
 place still applying the retired rule, and a model who reads *delivered

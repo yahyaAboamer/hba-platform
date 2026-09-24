@@ -9,13 +9,13 @@ true. Nothing was deleted.
 | | |
 |---|---|
 | **Branch** | `repair/batch-2` |
-| **Revision reviewed** | `f83b4fc` — *Every screen at both widths, and 390 at last*. Every test count, screenshot and finding below describes **this** revision. Commits after it change documents and evidence only; nothing under `app/`, `frontend/src/` or `tests/` has moved since. |
+| **Revision reviewed** | The sweep describes `f83b4fc` — *Every screen at both widths, and 390 at last*. **One code change since**: the best-sellers commit on top of `ffde978` (*Best sellers say what they count*), which touches `app/api/affiliate_self.py`, `frontend/src/screens/MyWardrobe.tsx` and tests, and recaptures `portal-wardrobe-390` plus a new `portal-best-390`. |
 | **Current head** | run `git rev-parse --short HEAD`. Not written here: a document cannot contain the hash of the commit that adds it, and the last attempt was stale one commit later. |
 | **Tree** | clean apart from `.claude/settings.json`, the owner's plugin config, deliberately not committed |
 | **`origin/main`** | `6a13958` |
 | **`origin/production`** | `6a13958` — **level with `main`**, gap of 0 commits, read from `git ls-remote` on 24 September |
-| **Backend** | 2,039 tests, 79 files, all passing; reconciles with `--collect-only` |
-| **Frontend** | 363 tests, 16 files; `npm run build` green |
+| **Backend** | 2,045 tests, 80 files, all passing through `run-suite.sh` on 24 September, after the best-sellers change (was 2,039 / 79) |
+| **Frontend** | 365 tests, 16 files; `npm run build` green (24 September, after the best-sellers change) |
 | **Migration head** | `b1f0a40c0001` |
 
 > **Correction, 24 September 2026.** An earlier version of this table said
@@ -61,9 +61,16 @@ row by row, is `docs/repair/batch-2/visual/CHECKLIST.md`.
    `docs/repair/HISTORICAL-INFORMATION-NEEDED.md`. Finalisation cannot be
    unlocked without them, and confirming the order import is complete is the
    one that cannot be worked out from the data.
-2. **Thirteen design decisions** from the sweep, one sentence each at the end
-   of `CHECKLIST.md`. None of them is a bug; each is a place where the app and
-   the approved export differ and somebody has to say which wins.
+2. **Nothing from the sweep, by default.** An earlier version of this line
+   said all thirteen differences needed his decision. That was wrong. **The
+   approved HTML decides**, so an ordinary difference from it is
+   implementation work, not a question. It becomes a question only where a
+   **later, explicit** instruction from him conflicts with the HTML — and the
+   one such case recorded is the month grid, which he asked for **for terms
+   editing** and nowhere else. An internal ADR or a privacy choice we made
+   ourselves is not such an instruction; where we keep one, it is written
+   down as a divergence with its reason (see the memory *the approved design
+   wins over internal decisions*).
 
 ## The bounded task that was proposed, and is now done
 
@@ -78,6 +85,45 @@ as well as diffed as text. No application behaviour changed.
 What it found is in `docs/repair/batch-2/visual/CHECKLIST.md`: two screens
 settled as matching, seven new differences that only became visible once the
 data was there, and three things still not verifiable with what the seed has.
+
+## Done since: best sellers follow the counting rule (24 September)
+
+The export and ADR 0040 agreed; only the words disagreed. **The server was
+already right** — `best_sellers_for` has filtered on `COUNTED_STATES`
+(delivered and pending, never a failed delivery) since batch 1, `0a2ba69`.
+The checklist's claim that it was delivered-only was mistaken, and is
+corrected there.
+
+- *Your best sellers* reads *"Sales through {her code} · all time · delivered
+  and pending"*; *All products sold* reads *"Every product sold through {her
+  code}, all time. Delivered and pending orders; failed deliveries
+  excluded."* — the export's words, her code where it says HBA15.
+  `/api/me/best-sellers` now carries `codes` for that; nothing else in the
+  payload moved.
+- `tests/test_best_sellers.py`, six tests through `upsert_order_index` and
+  `upsert_line_items`: a pending EGP 4,500 coat outranking a delivered EGP
+  3,000 dress with a failed EGP 9,000 bag excluded; a never-answered order
+  counting; pending→delivered staying one sale; pending→failed leaving;
+  refunded, cancelled and returned after delivery keeping its full EGP 3,000.
+  Four of the six fail if the filter is set back to delivered-only — checked.
+- No payroll, snapshot, payment or ledger code was touched.
+
+### Still delivered-only, found while checking — not fixed in that batch
+
+1. **My Calculation's rule line** (`frontend/src/screens/MyCalculation.tsx`,
+   the `portal-calc__rule` paragraph): *"… of net sales on delivered orders.
+   An order on its way counts the day it arrives"*. The export (line 509 of
+   the portal): *"Commission is 10% of net sales on delivered and pending
+   orders. Failed deliveries are excluded."* Its source comment still calls
+   pending *05A's preview*.
+2. **Payment detail's counted-sales line** (`PaymentDetail.tsx`, the
+   *Counted sales* `StatementLine`): *"Delivered orders. Failed deliveries
+   excluded."* for a month not yet approved, whose figure includes pending.
+3. **Her orders list gives a pending order no commission**:
+   `app/services/portal.py`, the per-order worked example returns `None`
+   unless the state is `EARNED`, so the row prints *—* for an order the month
+   is paying on. Needs checking against the export's orders rows before it
+   is changed; it is a money display.
 
 ## The next small implementation batch, proposed
 
@@ -103,11 +149,16 @@ payment-details form uses the export's three labels.
 successful refresh* rather than *last order arrived*. The read-only connection
 card stays — see conflict B in the checklist.
 
+**E. The three delivered-only sites above.** Wording for the first two; the
+third after comparing with the export.
+
 Held back deliberately, and why: the Appearance switches and the audit
 sentences (items 1 and 2) are each a day's work with persistence behind them
 and belong in their own batch; recording a payment moving onto the detail
-(item 11) is a route change; and everything in the conflicts list waits on
-your answer.
+(item 11) is a route change. The checklist's "conflicts" B–G are
+**implementation work toward the export** under the rule above, not
+questions; *Refresh now* and connection editing (B) are held back by the
+owner's instruction of 24 September, not by a pending decision.
 
 ## Decisions not to reopen
 
@@ -124,12 +175,20 @@ your answer.
   owner's explicit instruction. Masking still governs every *record*.
 - **An agreed month is never unmade** (05B); a difference after approval is a
   correction (05C).
-- **The month control is a grid**, not the export's dropdown. The owner asked
-  for the grid.
+- **The month grid is for editing terms only** (`Compensation.tsx`). That is
+  what the owner asked for, and the export agrees. Every other month control
+  follows the export's `<select>` — item A above. An earlier version of this
+  line said the grid was approved everywhere; it was not.
 - **The reviewing browser is Playwright**, headless, in its own process. Not
   the Chrome extension, and not the window-resizing script.
 
 ## What I got wrong, so the next session does not repeat it
+
+- **Described code from its label.** The checklist said `best_sellers_for`
+  was delivered-only because the subtitle said so; the function had counted
+  pending for five days. Read the query before describing it.
+- **Filed ordinary design differences as owner decisions.** The HTML decides
+  unless a later explicit instruction conflicts with it.
 
 - **Ran a second pytest against the test database while the suite was
   running**, twice. Both times it produced failures that looked exactly like

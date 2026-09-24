@@ -32,6 +32,17 @@ export type BestSeller = {
   image_url: string | null;
 };
 
+type BestSellers = { products: BestSeller[]; codes: string[] };
+
+/**
+ * *Sales through HBA15* - the export names her code where it could have said
+ * "your code". Every code she has held, because the list is all time; "your
+ * code" only for a model the server has no code on record for.
+ */
+export function throughCodes(codes: string[] | undefined): string {
+  return codes && codes.length ? codes.join(", ") : "your code";
+}
+
 type Wardrobe = {
   received: Item[];
   processing: Item[];
@@ -46,6 +57,7 @@ export function MyWardrobe() {
   const [attempt, setAttempt] = useState(0);
   const [best, setBest] = useState<BestSeller[] | null>(null);
   const [bestError, setBestError] = useState<string | null>(null);
+  const [codes, setCodes] = useState<string[]>([]);
 
   useEffect(() => {
     let live = true;
@@ -63,8 +75,10 @@ export function MyWardrobe() {
     // read was indistinguishable from an empty one, on the screen least able
     // to tell the difference.
     setBestError(null);
-    api.get<{ products: BestSeller[] }>("/api/me/best-sellers")
-      .then((found) => { if (live) { setBest(found.products); setBestError(null); } })
+    api.get<BestSellers>("/api/me/best-sellers")
+      .then((found) => {
+        if (live) { setBest(found.products); setCodes(found.codes ?? []); setBestError(null); }
+      })
       .catch((caught) => { if (live) { setBest(null); setBestError(caught.message); } });
     return () => { live = false; };
   }, [attempt]);
@@ -80,6 +94,7 @@ export function MyWardrobe() {
     <WardrobeContents
       body={body}
       best={best}
+      codes={codes}
       bestError={bestError}
       onRetryBest={() => setAttempt((n) => n + 1)}
     />
@@ -89,11 +104,14 @@ export function MyWardrobe() {
 export function WardrobeContents({
   body,
   best = null,
+  codes = [],
   bestError = null,
   onRetryBest,
 }: {
   body: Wardrobe;
   best?: BestSeller[] | null;
+  /** Her codes, for *Sales through HBA15*. */
+  codes?: string[];
   /** A12. Set when the best-sellers read failed, which is not "no sales". */
   bestError?: string | null;
   onRetryBest?: () => void;
@@ -103,7 +121,8 @@ export function WardrobeContents({
     <div className="wardrobe">
       {/*
        * *Your best sellers* - the export's first section. What sold through
-       * her own code, delivered orders only, from `/api/me/best-sellers`;
+       * her own code, delivered and pending as her money counts them (F02,
+       * ADR 0040), from `/api/me/best-sellers`;
        * never the programme's totals with her name above them.
        */}
       {/* A12. The read failed, so this says so and offers another go. It is
@@ -125,7 +144,9 @@ export function WardrobeContents({
       {best && best.length > 0 && (
         <section className="wardrobe__block">
           <h2 className="wardrobe__title">Your best sellers</h2>
-          <p className="wardrobe__subtitle">Sales through your code · all time · delivered orders</p>
+          <p className="wardrobe__subtitle">
+            Sales through {throughCodes(codes)} · all time · delivered and pending
+          </p>
           <BestSellerList rows={best.slice(0, 3)} />
           {best.length > 3 && (
             <Link className="wardrobe__all" to="/best">
@@ -230,20 +251,21 @@ function BestSellerList({ rows, offset = 0 }: { rows: BestSeller[]; offset?: num
 /**
  * *All products sold* - `vBest` in the approved portal.
  *
- * Every product sold through her code, all time, best first. Delivered orders
- * only, as the live rule counts them; the export's line says delivered and
- * pending, which is 05A's preview and not what she is paid on.
+ * Every product sold through her code, all time, best first. Delivered and
+ * pending orders, failed deliveries excluded - the export's line, and the rule
+ * she is paid on since ADR 0040.
  */
 export function MyBestSellers() {
   const [rows, setRows] = useState<BestSeller[] | null>(null);
+  const [codes, setCodes] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let live = true;
     setError(null);
-    api.get<{ products: BestSeller[] }>("/api/me/best-sellers")
-      .then((found) => { if (live) setRows(found.products); })
+    api.get<BestSellers>("/api/me/best-sellers")
+      .then((found) => { if (live) { setRows(found.products); setCodes(found.codes ?? []); } })
       .catch((caught) => { if (live) setError(caught.message); });
     return () => { live = false; };
   }, [attempt]);
@@ -259,8 +281,8 @@ export function MyBestSellers() {
   return (
     <div className="wardrobe">
       <p className="wardrobe__lead">
-        Every product sold through your code, all time. Delivered orders; failed
-        deliveries and orders still on their way are not included.
+        Every product sold through {throughCodes(codes)}, all time. Delivered and
+        pending orders; failed deliveries excluded.
       </p>
       {rows.length === 0
         ? <p className="empty">Nothing has sold through your code yet.</p>

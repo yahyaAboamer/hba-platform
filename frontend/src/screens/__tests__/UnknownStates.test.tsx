@@ -3,7 +3,7 @@ import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 
 import { homeState, STATE_LABEL } from "../MyMonth";
-import { WardrobeContents } from "../MyWardrobe";
+import { throughCodes, WardrobeContents } from "../MyWardrobe";
 import type { MyEarnings, PaymentMonth } from "../../lib/portal";
 
 /**
@@ -95,5 +95,37 @@ describe("best sellers that could not be loaded", () => {
 
     expect(html).not.toContain("Could not load");
     expect(html).not.toContain("Your best sellers");
+  });
+});
+
+describe("best sellers say what they count, in the export's words", () => {
+  const sold = [
+    {
+      shopify_product_id: "coat",
+      title: "Coat",
+      quantity: 1,
+      sales_piastres: 450_000,
+      sales: "EGP 4,500.00",
+      image_url: null,
+    },
+  ];
+  const render = (codes?: string[]) =>
+    renderToStaticMarkup(
+      <MemoryRouter>
+        <WardrobeContents body={wardrobe} best={sold} codes={codes} />
+      </MemoryRouter>,
+    );
+
+  it("names her code, and counts delivered and pending", () => {
+    const html = render(["HBA15"]);
+
+    expect(html).toContain("Sales through HBA15 · all time · delivered and pending");
+    expect(html).toContain("EGP 4,500.00");
+    expect(html).not.toContain("delivered orders");
+  });
+
+  it("falls back to 'your code' only where no code is on record", () => {
+    expect(render([])).toContain("Sales through your code · all time · delivered and pending");
+    expect(throughCodes(["HBA15", "NOUR10"])).toBe("HBA15, NOUR10");
   });
 });

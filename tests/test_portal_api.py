@@ -2264,6 +2264,8 @@ def test_her_best_sellers_are_her_own_sales_and_nobody_elses(admin):
     body = _sign_in().get("/api/me/best-sellers").json()
 
     assert [row["shopify_product_id"] for row in body["products"]] == ["P1"]
+    # *Sales through NOUR10*, as the export names HBA15 - her code, never Sara's.
+    assert body["codes"] == ["NOUR10"]
 
 
 def test_a_travelling_order_sells_and_a_failed_one_does_not(admin):
@@ -2283,6 +2285,8 @@ def test_a_travelling_order_sells_and_a_failed_one_does_not(admin):
     rows = _sign_in().get("/api/me/best-sellers").json()["products"]
 
     assert [row["shopify_product_id"] for row in rows] == ["P3"]
+    assert rows[0]["sales_piastres"] == 100_000
+    assert rows[0]["sales"] == "EGP 1,000.00"
 
 
 def test_best_sellers_rank_by_what_the_customer_paid(admin):
