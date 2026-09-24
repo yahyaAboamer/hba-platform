@@ -4,10 +4,9 @@ import { Link } from "react-router-dom";
 import { Money } from "../components/Money";
 import { SalesByMonth } from "../components/SalesByMonth";
 import { MonthPicker } from "../components/MonthPicker";
-import type { MonthLock } from "../components/MonthPicker";
 import { api } from "../lib/api";
 import type { Session } from "../lib/api";
-import { currentMonth, formatMonth, platformMonths } from "../lib/money";
+import { formatMonth, platformMonths } from "../lib/money";
 
 type PayrollRow = {
   affiliate_id: number;
@@ -53,13 +52,6 @@ type Attention = {
     text: string;
     where: string;
   }[];
-};
-
-type SyncStatus = {
-  orders_indexed: number;
-  go_live_month: string | null;
-  payroll_can_be_approved: boolean;
-  jobs: { failed: number };
 };
 
 /**
@@ -191,7 +183,6 @@ export function Overview({ session }: { session: Session }) {
   const [noticeMenu, setNoticeMenu] = useState<string | null>(null);
   const [month, setMonth] = useState(session.platform.working_month);
   const [payroll, setPayroll] = useState<PayrollMonth | null>(null);
-  const [sync, setSync] = useState<SyncStatus | null>(null);
   const [attention, setAttention] = useState<Attention | null>(null);
   const [summary, setSummary] = useState<Summary | null>(null);
   /**
@@ -244,7 +235,6 @@ export function Overview({ session }: { session: Session }) {
       .catch((caught) => setError(caught.message));
   }
   const [error, setError] = useState<string | null>(null);
-  const [lockNote, setLockNote] = useState<string | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -253,27 +243,18 @@ export function Overview({ session }: { session: Session }) {
     setPayroll(null);
     Promise.all([
       api.get<PayrollMonth>(`/api/payroll/${month}`),
-      api.get<SyncStatus>("/api/operations/sync"),
       api.get<Attention>("/api/operations/attention"),
       api.get<Summary>(`/api/payroll/${month}/summary`),
     ])
-      .then(([months, status, needing, month_summary]) => {
+      .then(([months, needing, month_summary]) => {
         if (!live) return;
         setPayroll(months);
-        setSync(status);
         setAttention(needing);
         setSummary(month_summary);
       })
       .catch((caught) => { if (live) setError(caught.message); });
-    setLockNote(null);
     return () => { live = false; };
   }, [month]);
-
-  function lockFor(candidate: string): MonthLock {
-    if (sync?.go_live_month && candidate < sync.go_live_month) return "historical";
-    if (candidate > currentMonth()) return "future";
-    return null;
-  }
 
 
 
@@ -281,12 +262,11 @@ export function Overview({ session }: { session: Session }) {
     <>
       <div className="page__head">
         <div className="page__title"><h1>Home</h1><span className="page__subtitle">{formatMonth(month)}</span></div>
-        <MonthPicker value={month} onChange={setMonth} months={platformMonths(session.platform)} lockFor={lockFor}
-          onLockedClick={(candidate, lock) => setLockNote(lock === "historical"
-            ? `${formatMonth(candidate)} was settled outside this dashboard.`
-            : `${formatMonth(candidate)} is still in progress.`)} />
+        {/* The export's select and nothing beside it. An earlier month says
+         *  what it is on its own figures and payment views; Home adds no
+         *  sentence about it (owner, 24 September). */}
+        <MonthPicker value={month} onChange={setMonth} months={platformMonths(session.platform)} />
       </div>
-      {lockNote && <p className="notice">{lockNote}</p>}
       {error && <p className="notice notice--refused" role="alert">{error}</p>}
       {hidden.length > 0 && <div className="overview__hidden">
         <span>{hidden.length} notices hidden for now</span>
@@ -300,7 +280,8 @@ export function Overview({ session }: { session: Session }) {
             <span>{item.text}</span>
             {item.detail && <small>{item.detail}</small>}
           </div>
-          <Link className="button" to={item.where}>{item.action}</Link>
+          <Link className="button" to={item.where}
+            state={item.key.startsWith("correction:") ? { back: { label: "Home", to: "/" } } : undefined}>{item.action}</Link>
           <button className="button overview__notice-icon" aria-label={`Options for ${item.text}`} aria-expanded={noticeMenu === item.key}
             onClick={() => setNoticeMenu(noticeMenu === item.key ? null : item.key)}>⋯</button>
           <button className="button overview__notice-icon" aria-label={`Dismiss ${item.text}`} onClick={() => hide(item.key)}>✕</button>

@@ -25,12 +25,11 @@ export type ChartMonth = { month: string; sales_piastres: number | null; uses: n
  * no sales (its `max * 1.15` is zero), drawn flat on the axis. A month with
  * no figure stays a gap, never a zero.
  *
- * **No axis text, because the approved page shows none.** The export's
- * markup has rule labels (*0 / 11k / 22k*) and month numbers, but its
- * runtime puts each one in an HTML `<span>` inside the SVG `<text>`, which no
- * browser draws: every label measures 0px wide and the rendered chart - the
- * one approved on a phone - is rules, line, points and bars only. Whether to
- * show what the markup intended is a question for the owner (checklist).
+ * **Axis text as the export's markup draws it** - rule labels at x 2, month
+ * numbers at y 122, Inter 10 in the faint tier, the month being read in
+ * accent. Its runtime never actually rendered them (each sat in an HTML
+ * `<span>` inside SVG `<text>`); the owner asked for them back, 24 September,
+ * from the real figures, never the prototype's.
  */
 const LEFT = 8;
 const WIDTH = 284;
@@ -39,10 +38,36 @@ const HEIGHT = 88;
 
 const known = (v: number | null): v is number => v !== null && Number.isFinite(v);
 
-/** The top of the scale: the highest month plus the export's headroom. */
-export function chartScale(values: (number | null)[], headroom: number): number {
+/**
+ * The top of the scale: the highest month plus the export's headroom.
+ *
+ * Uses are counts, so their top is rounded up to a whole, even number: the
+ * middle rule then falls on a whole count too, and every label is exactly
+ * the value its rule stands at.
+ */
+export function chartScale(values: (number | null)[], headroom: number, whole = false): number {
   const max = Math.max(0, ...values.filter(known));
-  return max > 0 ? max * headroom : 0;
+  if (max <= 0) return 0;
+  const top = max * headroom;
+  return whole ? Math.max(2, Math.ceil(top / 2) * 2) : top;
+}
+
+/** A sales figure, in piastres, as a rule label: whole pounds below
+ *  EGP 1,000, thousands as *K* to one place from there (*7.3K*, *15K*). */
+export function salesLabel(piastres: number): string {
+  const pounds = piastres / 100;
+  if (pounds < 1000) return String(Math.round(pounds));
+  const thousands = pounds / 1000;
+  const shown = thousands >= 100 ? Math.round(thousands) : Math.round(thousands * 10) / 10;
+  return `${shown}K`;
+}
+
+/** The three rules' labels, bottom up. A year of nothing labels only the axis. */
+export function axisLabels(scale: number, metric: "sales" | "uses"): string[] {
+  if (!scale) return ["0", "", ""];
+  return [0, 0.5, 1].map((f) =>
+    metric === "uses" ? String(Math.round(scale * f)) : salesLabel(scale * f),
+  );
 }
 
 export function chartPoints(values: (number | null)[], headroom = 1.15) {
@@ -69,7 +94,8 @@ export function PortalYearChart({ month, eligible }: { month: string; eligible: 
   const values = rows.map(row => metric === "sales" ? row.sales_piastres : row.uses ?? null);
   const headroom = metric === "sales" ? 1.15 : 1.35;
   const points = chartPoints(values, headroom);
-  const scale = chartScale(values, headroom);
+  const scale = chartScale(values, headroom, metric === "uses");
+  const labels = axisLabels(scale, metric);
   const step = WIDTH / Math.max(1, rows.length);
   const segments: string[] = []; let segment: string[] = [];
   points.forEach(point => { if(point) segment.push(`${point.x},${point.y}`); else if(segment.length) {segments.push(segment.join(" ")); segment=[];} });
@@ -82,11 +108,14 @@ export function PortalYearChart({ month, eligible }: { month: string; eligible: 
     {error ? <p role="alert">Could not load your chart. <button className="button" onClick={() => setRetry(n=>n+1)}>Retry</button></p> : !data ? <p className="empty">Loading chart…</p> : !rows.length ? <p className="empty">No months to show yet.</p> : <>
       {/* Month, figure, and what the figure is — the export's three lines,
           above the plot they read from. */}
-      <div className="portal-chart__readout"><span>{formatMonth(selected.month)}{selected.in_progress ? " · So far" : ""}</span>
+      <div className="portal-chart__readout"><span>{formatMonth(selected.month)}</span>
         <strong>{values[index] === null ? "Not available" : metric === "sales" ? formatEgp(values[index]!) : `${values[index]} ${values[index] === 1 ? "use" : "uses"}`}</strong>
         <em>{metric === "sales" ? "net sales counted" : "orders placed with your code"}</em></div>
       <svg viewBox="-24 0 324 130" role="img" aria-label={`${metric === "sales" ? "Sales" : "Code uses"} by month`}>
-        {[0, 1, 2].map((i) => <line key={i} x1={LEFT} x2={LEFT + WIDTH} y1={AXIS - HEIGHT * i / 2} y2={AXIS - HEIGHT * i / 2} className="portal-chart__grid" />)}
+        {labels.map((label, i) => <g key={i}>
+          <line x1={LEFT} x2={LEFT + WIDTH} y1={AXIS - HEIGHT * i / 2} y2={AXIS - HEIGHT * i / 2} className="portal-chart__grid" />
+          {label && <text x="2" y={AXIS - HEIGHT * i / 2 + 3.5} textAnchor="end">{label}</text>}
+        </g>)}
         {metric === "sales"
           ? <>
             {segments.map((path, i) => <polyline key={i} points={path} className="portal-chart__line" />)}
@@ -99,6 +128,9 @@ export function PortalYearChart({ month, eligible }: { month: string; eligible: 
             return <rect key={rows[i].month} x={LEFT + step * i + step * 0.22} y={AXIS - h} width={step * 0.56} height={h} rx="3"
               className={index === i ? "portal-chart__bar portal-chart__bar--on" : "portal-chart__bar"} />;
           })}
+        {rows.map((row, i) => <text key={`tick-${row.month}`} y="122" textAnchor="middle"
+          x={metric === "sales" ? (points[i]?.x ?? LEFT + step * i + step / 2) : LEFT + step * i + step / 2}
+          className={index === i ? "portal-chart__tick--on" : undefined}>{Number(row.month.slice(5))}</text>)}
         {/* The month is chosen on the chart itself, as the export's is: a
             transparent column over each month (`hits`), the height of the
             plot, so a thumb need not find a small point. A keyboard reaches

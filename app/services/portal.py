@@ -308,6 +308,43 @@ def failed_deliveries(db: Session, affiliate: AffiliateProfile, month: str) -> i
     )
 
 
+def changed_after_approval(
+    db: Session, affiliate: AffiliateProfile, month: str
+) -> list[tuple[str, str]]:
+    """The orders an agreed month counted that are void now: `(number, status)`.
+
+    What a correction's Home notice names. Read from the month's own approval
+    (`counted_in_snapshot`, never from today's rule) and worded by
+    `order_status`, so a notice can say *failed* only of a courier's failure
+    and never of a cancellation. Empty for a month with no approval, or whose
+    difference came from something other than an order going void.
+    """
+    _, _, snapshot = month_rule(db, affiliate, month)
+    if snapshot is None:
+        return []
+    rows = db.execute(
+        select(AttributedOrder, OrderIndex)
+        .join(OrderIndex, OrderIndex.shopify_order_id == AttributedOrder.shopify_order_id)
+        .where(AttributedOrder.affiliate_id == affiliate.id)
+        .where(AttributedOrder.business_month == month)
+        .where(AttributedOrder.commission_state == CommissionState.VOID)
+        .order_by(OrderIndex.placed_at)
+    ).all()
+    return [
+        (
+            index.order_number,
+            order_status(
+                state=order.commission_state,
+                delivery_state=index.delivery_state,
+                cancelled_at=index.cancelled_at,
+                financial_status=index.financial_status,
+            ),
+        )
+        for order, index in rows
+        if counted_in_snapshot(snapshot, order.shopify_order_id)
+    ]
+
+
 def _not_started(month: str) -> bool:
     """Whether this month has not begun yet.
 

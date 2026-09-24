@@ -421,8 +421,11 @@ a {
  * an outlined chip. Both take their colour from what they mean, so both are
  * written here without one.
  */
+/* Inline, as every status pill in the exports is (`r.status`, `pStatus`,
+   `r.state`): the box is its text plus padding, not a line box plus padding.
+   In a flex row it is blockified, as the export's own are. */
 .pill {
-  display: inline-block;
+  display: inline;
   padding: 3px 9px;
   border: 1px solid currentColor;
   border-radius: 999px;

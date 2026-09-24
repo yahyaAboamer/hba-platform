@@ -49,44 +49,6 @@
   margin-top: 8px;
 }
 
-/* An unresolved correction is already-sent money, so it precedes the list of
-   proposed transfers rather than becoming one more state inside that list. */
-.payments__corrections {
-  margin-bottom: var(--space-4);
-  border-left: 2px solid var(--owed);
-}
-
-.payments__correction-head {
-  align-items: flex-start;
-}
-
-.payments__correction-lead {
-  max-width: 68ch;
-  margin: var(--space-1) 0 0;
-  font-size: var(--text-xs);
-  color: var(--quiet);
-}
-
-.payments__correction-list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.payments__correction {
-  display: grid;
-  grid-template-columns: minmax(12rem, 1fr) auto auto;
-  align-items: center;
-  gap: var(--space-4);
-  padding: var(--space-3) var(--space-4);
-  border-top: 1px solid var(--rule);
-}
-
-.payments__correction:first-child {
-  border-top: none;
-}
-
-.payments__correction-month,
 /*
  * *Pending*, *archived* - a fact about the person rather than about her
  * month. It follows the arrangement on the same quiet line the export gives
@@ -370,14 +332,6 @@
     flex-direction: column;
   }
 
-    .payments__correction {
-    grid-template-columns: 1fr auto;
-  }
-
-  .payments__correction .button {
-    grid-column: 1 / -1;
-    justify-self: start;
-  }
 }
 
 /* §6.4.5. Above the fold, before the amount and before the destination is
@@ -491,15 +445,4 @@
 
 .money--owed.payments__total {
   color: var(--owed);
-}
-
-/* The row's state pill at the export's 3px 9px / 11.5px (`r.stateTone`).
-   Scoped: a second `.pill` in `Compensation.css` loads later and was drawing
-   it at 12px with no vertical padding. */
-.payments__state .pill {
-  /* Inline, as the export's span is: its box is the text plus padding
-     (22px), not a line box plus padding (25.8px). */
-  display: inline;
-  padding: 3px 9px;
-  font-size: 11.5px;
 }

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 
 import { Money } from "../components/Money";
 import { api, can } from "../lib/api";
@@ -65,6 +65,9 @@ export function PaymentCorrection({ session }: { session: Session }) {
 
   const row = body?.corrections.find((candidate) => candidate.month === month) ?? null;
   const back = `/payments/${month}/${affiliateId}`;
+  // Opened from Home's notice, Back returns to Home, as the export's
+  // correction view does (`backLabel: "Home"`); otherwise to the payment.
+  const from = (useLocation().state as { back?: { label: string; to: string } } | null)?.back;
 
   async function save() {
     if (!row) return;
@@ -104,8 +107,8 @@ export function PaymentCorrection({ session }: { session: Session }) {
   return (
     <>
       <div className="page__head">
-        <Link className="button pay__back" to={back}>
-          ← {body?.name ?? "Payment"}
+        <Link className="button pay__back" to={from?.to ?? back}>
+          ← {from?.label ?? body?.name ?? "Payment"}
         </Link>
         <div className="page__title">
           <h1>Correction</h1>

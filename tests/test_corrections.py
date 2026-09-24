@@ -1325,3 +1325,53 @@ def test_the_outstanding_total_can_reuse_a_list_it_is_given(db):
     assert outstanding_piastres(db, affiliate, rows) == outstanding_piastres(
         db, affiliate
     )
+
+
+def _home_corrections(db):
+    """The correction notices on Home, as the API returns them."""
+    from app.api.operations import attention
+
+    return [row for row in attention(_actor=None, db=db)["items"] if row["key"].startswith("correction:")]
+
+
+def test_home_names_a_late_courier_failure_in_the_exports_words(db):
+    """The export's second Home notice. It replaces the payments desk's
+    *Agreed months that have changed* panel as the way in, so it must be there
+    for as long as the correction is open, and open the correction."""
+    affiliate = _model(db)
+    _order(db, affiliate, "1", 2_000_000)
+    approve_month(db, affiliate, AUGUST)
+    db.scalar(select(OrderIndex).where(OrderIndex.shopify_order_id == "1")).delivery_state = "failed"
+    _fail(db, "1")
+
+    [notice] = _home_corrections(db)
+
+    assert notice["text"] == "Late failed order needs a decision"
+    assert notice["detail"] == "Nour · order #1 failed after August was approved."
+    assert notice["action"] == "Open correction"
+    assert notice["where"] == f"/payments/{AUGUST}/{affiliate.id}/correction"
+    assert notice["severity"] == "blocking"
+
+
+def test_home_never_calls_a_late_cancellation_a_failed_delivery(db):
+    affiliate = _model(db)
+    _order(db, affiliate, "1", 2_000_000)
+    approve_month(db, affiliate, AUGUST)
+    db.scalar(select(OrderIndex).where(OrderIndex.shopify_order_id == "1")).cancelled_at = datetime(
+        2026, 9, 2, tzinfo=timezone.utc
+    )
+    _fail(db, "1")
+
+    [notice] = _home_corrections(db)
+
+    assert "failed" not in notice["text"].lower() + notice["detail"].lower()
+    assert notice["text"] == "Agreed month changed and needs a decision"
+    assert notice["detail"] == "Nour · August changed after it was approved."
+
+
+def test_home_has_no_correction_notice_when_nothing_changed(db):
+    affiliate = _model(db)
+    _order(db, affiliate, "1", 2_000_000)
+    approve_month(db, affiliate, AUGUST)
+
+    assert _home_corrections(db) == []

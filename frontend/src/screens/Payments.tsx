@@ -79,22 +79,9 @@ export type Balance = {
   destination_changed_at?: string | null;
 };
 
-type OpenCorrection = {
-  affiliate_id: number;
-  name: string;
-  status: Balance["status"];
-  month: string;
-  recoverable_piastres: number;
-  /** What is left of the month's whole difference, money or not. */
-  outstanding_piastres: number;
-  /** `no_transfer_recorded` where the difference is real and nothing moved. */
-  review_reason: string | null;
-};
-
 type Outstanding = {
   month: string;
   affiliates: Balance[];
-  open_corrections: OpenCorrection[];
   totals: {
     affiliates: number;
     required_piastres: number;
@@ -103,8 +90,6 @@ type Outstanding = {
     recorded_piastres: number;
     still_owed_affiliates: number;
     still_owed_piastres: number;
-    open_corrections: number;
-    open_corrections_piastres: number;
   };
 };
 
@@ -371,69 +356,11 @@ export function Payments({ session }: { session: Session }) {
           </section>
 
           {/*
-           * 05C made each correction visible on one model. That is not enough
-           * at month end: nobody can remember to open every profile. This one
-           * cross-model queue is deliberately above the payment table so
-           * already-advanced money is considered before another transfer.
+           * No corrections panel here. The export puts an open correction on
+           * Home, as a notice with *Open correction* (built from the same
+           * `open_corrections` on the server), and on the model's own
+           * payment review; the desk is the month's transfers only.
            */}
-          {data.open_corrections.length > 0 && (
-            <section className="panel payments__corrections">
-              <div className="panel__head payments__correction-head">
-                <div>
-                  <h2 className="panel__title">Agreed months that have changed</h2>
-                  <p className="payments__correction-lead">
-                    {/*
-                     * F09. Not every row here is money: a month whose transfer
-                     * has not been recorded has a real difference and nothing
-                     * to take back, and it belongs in the queue as much as the
-                     * others. The figure beside the heading is only the part
-                     * that was advanced.
-                     */}
-                    Look at each one before another transfer is made. Where
-                    money was sent, decide whether it is carried forward or
-                    absorbed; the total is what has been advanced.
-                  </p>
-                </div>
-                <Money
-                  piastres={data.totals.open_corrections_piastres}
-                  kind="agreed"
-                  tone="owed"
-                />
-              </div>
-              <ul className="payments__correction-list">
-                {data.open_corrections.map((row) => (
-                  <li
-                    key={`${row.affiliate_id}-${row.month}`}
-                    className="payments__correction"
-                  >
-                    <span>
-                      <strong>{row.name}</strong>
-                      {row.status !== "active" && (
-                        <span className="payments__person-state">{row.status}</span>
-                      )}
-                      <span className="payments__correction-month">
-                        {formatMonth(row.month)}
-                        {row.review_reason === "no_transfer_recorded" &&
-                          " · nothing sent yet"}
-                      </span>
-                    </span>
-                    <Money
-                      piastres={row.outstanding_piastres}
-                      kind="agreed"
-                      tone="owed"
-                    />
-                    <Link
-                      className="button"
-                      to={`/affiliates/${row.affiliate_id}#corrections`}
-                    >
-                      Review correction
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-
           <section className="payments__desk" aria-label="Month-end payments">
             <div className="payments__tools">
               <div

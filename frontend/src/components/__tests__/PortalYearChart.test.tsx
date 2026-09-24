@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chartPoints, chartScale } from "../PortalYearChart";
+import { axisLabels, chartPoints, chartScale, salesLabel } from "../PortalYearChart";
 
 describe("approved Home chart boundary cases", () => {
   it("has no coordinates when no months exist", () => {
@@ -15,6 +15,7 @@ describe("approved Home chart boundary cases", () => {
     const points = chartPoints([0, 0, 0]);
     expect(points.every((point) => point !== null && Number.isFinite(point.x) && point.y === 102)).toBe(true);
     expect(chartScale([0, 0, 0], 1.15)).toBe(0);
+    expect(axisLabels(0, "sales")).toEqual(["0", "", ""]);
   });
   it("leaves missing and invalid values as gaps, rather than zero earnings", () => {
     const points = chartPoints([100000, null, Number.NaN, 200000]);
@@ -36,3 +37,27 @@ describe("the chart's scale, from real values", () => {
     expect(chartScale([2, 4], 1.35)).toBeCloseTo(5.4, 5);
   });
 });
+
+describe("the chart's axis labels, from real figures", () => {
+  it("labels sales in EGP, with K from 1,000", () => {
+    expect(salesLabel(0)).toBe("0");
+    expect(salesLabel(69000)).toBe("690");
+    expect(salesLabel(730825)).toBe("7.3K");
+    expect(salesLabel(1500000)).toBe("15K");
+    expect(salesLabel(14616500)).toBe("146K");
+  });
+  it("labels the three rules from the month's own scale", () => {
+    // Highest month EGP 12,710.00: the top rule stands at 1.15x that.
+    expect(axisLabels(chartScale([1271000, 500000], 1.15), "sales")).toEqual(["0", "7.3K", "14.6K"]);
+  });
+  it("labels uses in whole counts that sit exactly on their rules", () => {
+    expect(chartScale([2, 4], 1.35, true)).toBe(6);
+    expect(axisLabels(chartScale([2, 4], 1.35, true), "uses")).toEqual(["0", "3", "6"]);
+    // A single use still gets a whole middle rule.
+    expect(axisLabels(chartScale([1], 1.35, true), "uses")).toEqual(["0", "1", "2"]);
+  });
+  it("labels a single month's chart from that month", () => {
+    expect(axisLabels(chartScale([60000], 1.15), "sales")).toEqual(["0", "345", "690"]);
+  });
+});
+

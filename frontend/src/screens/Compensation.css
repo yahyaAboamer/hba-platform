@@ -424,32 +424,6 @@
   overflow-x: auto;
 }
 
-.pill {
-  display: inline-block;
-  padding: 0 var(--space-2);
-  font-size: var(--text-xs);
-  border: 1px solid;
-  border-radius: 999px;
-}
-
-.pill--commission {
-  color: var(--commission);
-  background: var(--commission-bg);
-  border-color: var(--commission);
-}
-
-.pill--fixed_plus_commission {
-  color: var(--salary);
-  background: var(--salary-bg);
-  border-color: var(--salary);
-}
-
-.pill--base_guarantee {
-  color: var(--guarantee);
-  background: var(--guarantee-bg);
-  border-color: var(--guarantee);
-}
-
 .comp__clear {
   padding: 0;
   font: inherit;

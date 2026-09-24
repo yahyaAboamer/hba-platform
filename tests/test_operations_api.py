@@ -1022,7 +1022,7 @@ def test_home_says_when_applications_are_waiting(client):
     items = client.get("/api/operations/attention").json()["items"]
     notice = next(row for row in items if row["key"] == "applications_waiting")
 
-    assert notice["text"] == "2 applications awaiting review."
+    assert notice["text"] == "2 applications awaiting review"
     assert notice["detail"] == "Submitted through the invitation link."
     assert notice["action"] == "Open applications"
     assert notice["where"] == "/affiliates?segment=applications"

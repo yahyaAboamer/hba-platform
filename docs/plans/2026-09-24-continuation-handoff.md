@@ -14,8 +14,8 @@ true. Nothing was deleted.
 | **Tree** | clean apart from `.claude/settings.json`, the owner's plugin config, deliberately not committed |
 | **`origin/main`** | `6a13958` |
 | **`origin/production`** | `6a13958` — **level with `main`**, gap of 0 commits, read from `git ls-remote` on 24 September |
-| **Backend** | 2,069 tests, 80 files, all passing through `run-suite.sh` on 24 September, after batch D's corrections; matches `--collect-only`. Batch E changed one backend line (an added `start_month` in `/api/auth/me`); the three files that read that payload pass (158 tests). The follow-up added `months` to the profile payload and `failed_delivery` to earnings; the three files that read them pass (235 tests). The full runner was not re-run for either |
-| **Frontend** | 406 tests, 19 files; `npm run build` green (24 September, after the batch E follow-up) |
+| **Backend** | 2,069 tests, 80 files, all passing through `run-suite.sh` on 24 September, after batch D's corrections; matches `--collect-only`. Batch E changed one backend line (an added `start_month` in `/api/auth/me`); the three files that read that payload pass (158 tests). The follow-up added `months` to the profile payload and `failed_delivery` to earnings; the three files that read them pass (235 tests). Batch F changed the Home notices; the four files that touch attention and corrections pass (170 tests). The full runner was not re-run for any of these, and must be before a merge |
+| **Frontend** | 410 tests, 19 files; `npm run build` green (24 September, after batch F) |
 | **Migration head** | `b1f0a40c0001` |
 
 > **Correction, 24 September 2026.** An earlier version of this table said
@@ -56,6 +56,9 @@ digest beside each, and eight interaction checks passing. The reading of it,
 row by row, is `docs/repair/batch-2/visual/CHECKLIST.md`.
 
 ## What is waiting on Yahya
+
+Current and complete: *Information needed from the owner* in the one list
+(`docs/repair/batch-2/visual/CHECKLIST.md`, items 32-34). In short:
 
 1. **Five historical facts**, unchanged:
    `docs/repair/HISTORICAL-INFORMATION-NEEDED.md`. Finalisation cannot be
@@ -161,7 +164,7 @@ frontend tests in `CountingRule.test.tsx`. One API test in
 (its `portal-orders-failed-390` is superseded by batch D's captures), from July with one failed order added to the
 throwaway database.
 
-## The current batch: D — Orders against the approved HTML (24 September)
+## Done: batch D — Orders against the approved HTML (24 September)
 
 The model's Orders, the admin profile's orders table and the order it opens,
 compared with `Affiliate Portal v3.dc.html` (`onOrders`, `orderRows`) and
@@ -326,26 +329,43 @@ presentation differences. Record and measurements: *Batch E follow-up* in
 - **Checks**: frontend 406 tests, 19 files, and `npm run build`; backend: the
   three files reading the changed payloads, 235 tests. Full runner not re-run.
 
+## Batch F - the owner's three answers (24 September)
+
+He answered the follow-up's questions: no earlier-month note on Home;
+readable chart axes from real figures; the Payments corrections panel
+removed, with the correction kept reachable. Record and evidence: *Batch F*
+in `docs/repair/batch-2/visual/CHECKLIST.md`; `shots/batch-f/checks.txt`.
+
+- **Home now has the export's correction notice**, which the app never had:
+  one per open correction (`open_corrections`, every payable model), worded
+  from the real orders (`changed_after_approval` + `order_status`) - *Late
+  failed order needs a decision* only for courier failures - opening the
+  month's correction, whose Back reads *← Home*. This replaced the Payments
+  panel as the way in. Nothing about correction records, routes or
+  safeguards changed.
+- Chart axes (EGP with *K*; whole uses on an even scale; month numbers), the
+  export's `.seg` switch, no *· So far*, notice titles without full stops.
+- `Compensation.css`'s unused global `.pill` removed; the base pill is inline,
+  as every export pill is; the local overrides it had needed are gone.
+- **Checks**: frontend 410 tests, 19 files, and `npm run build`; backend: the
+  four files that touch attention and corrections, 170 tests. Browser at
+  1280, 1440 and 390. Full runner not re-run.
+
 ## Not scheduled — a backlog, not an instruction
 
-Each batch is named by the owner. These are known, decided by the export, and
-**not** queued; nothing here is the next batch until he says so.
+Each batch is named by the owner. Nothing here is the next batch until he
+says so.
 
-- **The one remaining-work list** is at the end of
-  `docs/repair/batch-2/visual/CHECKLIST.md` (*Remaining work - the one
-  list*): approved differences still to implement, defects, missing
-  verification, and three questions for the owner. It is the only such list;
-  it includes the unreviewed admin **Attributed orders** list.
-- The comment in `app/services/portal.py` saying a delivered-then-refunded
-  order *"pays nothing"*; the code and tests already have it right.
-- The small wordings: *Send a new link*, the absolute sent date, the size on
-  the featured card, *met* / *not met* / *in progress*, the payment-details
-  labels.
-- *Refresh now* and *last successful refresh* on Settings → Shopify — held
-  back by the owner's instruction of 24 September.
-- The Appearance switches, the audit sentences, and recording a payment on
-  its detail — each its own batch. The checklist's "conflicts" B–G are
-  implementation work toward the export, not questions.
+**The one remaining-work list** is at the end of
+`docs/repair/batch-2/visual/CHECKLIST.md` - *Remaining work - the one list
+(reconciled 24 September)*. It carries every unfinished item from this
+handoff, the sweep checklist, `SCREEN_MATRIX.md`, the release gates and the
+historical-information list, grouped as implementation, verification and
+information needed, with a *Closed, with evidence* table naming the commit
+for each finished one. It is the only such list; the items that used to be
+repeated here (the refund comment, the small wordings, *Refresh now*, the
+Appearance switches, audit sentences, recording a payment on its detail,
+conflicts B-G) are all in it.
 
 ## Decisions not to reopen
 
@@ -367,6 +387,9 @@ Each batch is named by the owner. These are known, decided by the export, and
   control is the export's `<select>` (done in batch E), and the portal's is the
   export's *Nov ▼* button and list. An earlier version of this line said the
   grid was approved everywhere; it was not.
+- **No earlier-month note on admin Home; chart axes from real figures;
+  corrections reached from Home's notice, not a Payments panel** - the
+  owner's answers of 24 September (batch F).
 - **Type follows the exports, ADR 0043**: body 1.55, proportional figures
   except money/counts/ranks, one heading weight (the admin page title), no
   heavier agreed figure. It is not the font file - that was measured.
@@ -374,6 +397,21 @@ Each batch is named by the owner. These are known, decided by the export, and
   the Chrome extension, and not the window-resizing script.
 
 ## What I got wrong, so the next session does not repeat it
+
+- **Kept a difference because I could explain it** (batch E: controls in
+  Inter, every platform month on the profile). The owner: *an explanation
+  for a difference does not approve that difference.* Measure the rendered
+  reference and match it; a reason is for the checklist, not for keeping.
+- **Described a chart from memory**: batch E's report said the export's axis
+  used month names. It uses numbers, and its labels never render at all.
+  Inspect the DOM before describing it.
+- **Paired two elements by their text** and reported a difference between a
+  corrections-panel name and a table-row name. Match the element, not the
+  words.
+- **A link I did not open**: the old Payments panel's *Review correction*
+  went to `/affiliates/{id}#corrections`, which opens the profile's
+  *Overview*, where the corrections are not. Follow a link before relying on
+  it as the way in.
 
 - **Changed a helper's signature and ran only the files I expected to use
   it.** `_order_commission` had a second caller in `app/api/orders.py`; the

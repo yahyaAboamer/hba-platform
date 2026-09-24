@@ -30,7 +30,7 @@ shifted to stand the same distance from the working month as her counterpart.
 | Models · Inactive | Matched | Matched | |
 | Model · Overview | Matched | Matched | Same five tabs, same three summary cards |
 | Model · Wardrobe | **Matched** | **Matched** | Populated 24 Sept: *Received · 2 pieces · image · title · Size M*, the export's structure and words exactly |
-| Model · Performance | Corrected (batch D) | Corrected (batch D) | Table and the order it opens; the header lacks the export's code under the name — **shared-controls batch** |
+| Model · Performance | Corrected (batch D) | Corrected (batch D) | Table and the order it opens; the code under the name restored in batch E (`9514fd1`) |
 | Model · Targets | Matched | Matched | Same columns; state words differ, below |
 | Model · Payments | Corrected | Corrected | **Was masking the destination**; now the full card |
 | Products · Active | Matched | Matched | |
@@ -59,7 +59,7 @@ shifted to stand the same distance from the working month as her counterpart.
 | Screen | 390 | Notes |
 |---|---|---|
 | Home | Matched | |
-| Orders | Corrected (batch D) | Filters, chips, rows, sentences and row metrics match; header identity is truncated and the month control is a `<select>` — both **shared-controls batch** |
+| Orders | Corrected (batch D, E) | Filters, chips, rows, sentences and row metrics match; header identity and month control corrected in batch E (`9514fd1`, `a8eaab9`) |
 | Wardrobe | **Still differs** | Populated 24 Sept including a featured product. Best-sellers counting rule and a missing size, below |
 | Targets | Still differs | State vocabulary, below |
 | Ranking | Still differs | Other models are anonymised, below |
@@ -67,7 +67,7 @@ shifted to stand the same distance from the working month as her counterpart.
 | Payments | Corrected | Screen title; receipts differ, below |
 | Payment details | Still differs | Form wording, below |
 | Earnings | Still differs | Line names, below |
-| Month picker | Cannot be captured | Native `<select>`; the list is drawn by the OS |
+| Month picker | Corrected (batch E) | The export's *Nov ▼* and in-page list, captured open (`shots/batch-e/`) |
 
 ---
 
@@ -499,8 +499,8 @@ server on a fresh page load, because a toast is not evidence.
   sync.**~~ **Done, 24 September.** The seed grew shipments, a feature request
   and a simulated connection, and all five affected screens were re-captured
   rather than reused. See *What the populated pass found* above.
-- **The portal's month list.** A native `<select>`; its list is drawn by the
-  operating system, outside the page, so there is nothing to screenshot.
+- ~~**The portal's month list.**~~ **Done in batch E**: now the export's
+  in-page list, captured open.
 - **Printing, and anything behind a Shopify call.** Neither is reachable in a
   throwaway environment with no shop attached.
 
@@ -617,77 +617,201 @@ bars, a long name and code at 1280. Fonts awaited before every capture.
 
 ---
 
-## Remaining work - the one list
+## Batch F - the owner's three answers, and five presentation items (24 September)
 
-Each item is one of: **approved difference still to implement**,
-**functional defect**, **missing verification**, **information required from
-the owner**. Nothing below reopens an approved design choice.
+The owner answered the three questions the follow-up asked. Evidence:
+`shots/batch-f/` (`checks.txt` is the browser run, at 1280, 1440 and 390;
+`compare-chart-390.png` is ours, sales and uses, beside the export).
 
-### Approved differences still to implement
+- **No earlier-month notice on admin Home.** The unused logic is removed
+  (`Overview.tsx`: the note, its `lockFor`, and the sync read that existed only
+  for it). Payment views keep their own historical explanations; no data moved.
+- **Chart axes restored**, from her real figures: three rules labelled in EGP
+  with *K* from 1,000 (*0 / 7.3K / 14.6K* for Sara's year), uses in whole
+  counts on a whole, even scale (*0 / 3 / 6*), month numbers under each month
+  with the month being read in accent. Gaps, an all-zero year (one label,
+  flat on the axis) and a single month (centred) are tested
+  (`PortalYearChart.test.tsx`); tap and keyboard selection re-checked; the
+  widest label fits the 390 frame; no horizontal overflow.
+- **The *Agreed months that have changed* panel is gone from Payments.** Its
+  way in is now the export's Home notice, which the app never had: one per
+  open correction, from the same `open_corrections` the panel used, across
+  every payable model. *Late failed order needs a decision · Sara Edrees ·
+  order #1013 failed after August was approved.* - the export's words, and
+  only where every order the agreement counted and has lost was a courier's
+  failure; otherwise *Agreed month changed and needs a decision*.
+  *Open correction* opens the month's correction; its Back reads *← Home*.
+  Checked: after going to Payments and back the notice is still there and
+  still opens it; the model's payment review still links *Open the
+  correction*; correction records, resolution routes and their safeguards are
+  untouched. Three tests in `tests/test_corrections.py`.
+- **Sales/Uses switch** as the export's `.seg`: measured equal (accent and a
+  1px inset accent outline on the chosen half, ink on the other, 34.1px,
+  Inter).
+- ***· So far*** removed from the chart reading.
+- **Home notice titles** without a full stop, as the export's; details keep
+  theirs.
+- **The global `.pill` override in `Compensation.css` is removed** - it was
+  unused by Compensation and was restyling every other screen's pills. The
+  base `.pill` is now `inline`, as every status pill in the exports is;
+  checked against each reference: Payments 11.5px 3px 9px inline 22px =
+  export; profile 25.8px block (a flex row) = export; roster and Products
+  inline 11.5px 3px 9px (22px against the export's 20px - its row is a
+  `<button>`, so its pill is in the control font; row structure, item 12
+  below); payment and order views 12px 4px 10px = the export's own style.
+  The two local overrides added earlier are gone.
 
-1. **Portal Home chart switch** - the export's `.seg` control (accent outline
-   on *Sales*, *Uses* in ink); ours fills the selected half.
-   `PortalYearChart.tsx`, `MyMonth.css` `.portal-chart__switch`.
-2. **Portal Home chart reading** - ours adds *· So far* after the month; the
-   export prints the month alone. `PortalYearChart.tsx`, the readout.
-3. **Admin Home notice titles** end with a full stop (*2 applications awaiting
-   review.*); the export's do not. The text comes from the server's
-   `attention` items.
-4. **Admin profile body (Overview)** - the export's Contact panel is editable
-   fields (*Full name, Email, Phone, Shipping address, City, Save details*);
-   ours is rows (*Started with HBA, Phone, Signs in with, Parcels go to*).
-   Sizing values at the export's 15px (ours 12px `.code`), and the
-   *November 2025* start value at 12.5px (ours 12px). The *Discount codes*
-   panel is not in the export. *Signs in with* stays: the owner's D07 of
-   9 September is a later explicit instruction. `AffiliateDetail.tsx`,
-   roughly lines 760-1000.
-5. **Buttons still re-set to Inter outside this batch's screens** - the
-   portal's You screens (`MyYou.css` two rules; `AffiliateHome.css`
-   `.pref--row`, `.affiliate__reveal` and the rule near line 173;
-   `portal.css` near line 334) and terms editing (`Compensation.css`
-   `.fork`, `.mo`, `.kinds`, `.seg`, `.comp__clear`). Each is removed when
-   its screen is reviewed against the export.
-6. **`.pill` is defined twice.** `Compensation.css` redefines it (12px, no
-   vertical padding) and, bundled globally, overrides the base pill on every
-   screen - Compensation itself does not use it. Fixed locally on the
-   profile and Payments; the roster, Products, admin order detail and payment
-   detail pills still draw the leaked version.
+---
 
-### Functional defects
+## Remaining work - the one list (reconciled 24 September)
 
-7. **Admin Home's earlier-month note never shows.** `Overview.tsx` sets it
-   from `onLockedClick` and the month effect clears it in the same render
-   (true before Batch E as well). Deliberately not fixed: the export shows no
-   such note - item 12.
+Reconciled against: the 24 September handoff (*What is waiting on Yahya*,
+the backlog, batch D's table), this checklist (the sweep tables, the
+populated pass, *The thirteen, re-sorted*, *Not covered*),
+`docs/redesign/parity/SCREEN_MATRIX.md` (its kept differences, §T, §P and
+route list, written 12 September and partly superseded), `CLAUDE.md`'s
+release gates, and `docs/repair/HISTORICAL-INFORMATION-NEEDED.md`. Nothing
+from those is dropped: each is below, or in *Closed, with evidence*.
 
-### Missing verification
+### Implementation - approved differences still to build
 
-8. **Admin *Attributed orders* list (`vOrders`) - layout not reviewed.** Only
-   its month control was checked. Nothing here says it matches.
-9. **Records outside a model's months, on real data.** Run
-   `outside_months.py` (read-only) against staging and, with authorisation, a
-   restored production copy. Only the disposable database has been checked.
-10. **The control font on real devices.** Buttons now take the device's face,
-    as the export's do; verified in Chromium on Windows only - not on an
-    iPhone, not on Android, not in Firefox (where `.control-font` links fall
-    back to `system-ui`).
-11. **Backend.** The follow-up added two payload fields (`months` on the
-    profile, `failed_delivery` on earnings). The three files that read them
-    pass (235 tests); the full runner was not re-run. Run `run-suite.sh`
-    before any merge. The two release gates in `CLAUDE.md` remain open.
+Portal (390)
 
-### Information required from the owner
+1. **Wardrobe featured card** shows the size (*On the way · size M*). Populated pass #2.
+2. **Targets words**: *met* / *not met* / *in progress*. Thirteen #6.
+3. **Ranking** names the other models, with code and avatar, as the export
+   does (F; ours writes *Another model*).
+4. **Payment details form** in the export's words: *Where HBA should send
+   your payment*, *Method*, *Save details*. Thirteen #9.
+5. **Home order chips** are links in ours, plain pills in the export
+   (matrix, kept for a preference only).
+6. **Targets guarantee sentence** stands in the open; the export puts it
+   behind an ⓘ (matrix, preference only).
+7. **You screens: buttons still set to Inter** (`MyYou.css` two rules,
+   `AffiliateHome.css` `.pref--row`, `.affiliate__reveal` and the rule near
+   line 173, `portal.css` near line 334), where the export's are in the
+   control font (ADR 0044).
 
-12. **The earlier-month note on admin Home.** Old code intended a sentence
-    (*"… was settled outside this dashboard."*) when a month before go-live
-    is chosen; the approved export shows none, and today none shows. Keep it
-    absent, or should it appear?
-13. **Chart axis text.** The export's markup has rule labels (*0 / 11k / 22k*)
-    and month numbers, but its runtime puts each in an HTML `<span>` inside
-    SVG `<text>`, which no browser draws - so the rendered chart that was
-    approved has none, and ours now matches it. Should the labels the markup
-    intends be shown?
-14. **The Payments *Agreed months that have changed* panel** is ours; the
-    export shows this kind of item only as a Home notice (*Late failed order
-    needs a decision → Open correction*). Keep the panel on Payments, or only
-    the Home notice?
+Admin (1280 / 1440)
+
+8. **Invitations**: an expired link offers *Send a new link*; the sent date is
+   absolute (*2 November 2026*). Populated pass #5, #6.
+9. **Targets state words**: the export's *In progress / Below target /
+   Recorded zero* for the outcome, keeping *confirmed* separately (E), plus
+   matrix §T's layout list (Save top right, one grid with a mode switch,
+   inputs with *of N* beside, one-line Recorded, arrangement beside the name,
+   search / dirty count / Discard) - **re-check §T against the sweep's
+   `targets-*` pairs first**: the sweep recorded only the vocabulary, so some
+   of §T may already be done.
+10. **Record payment on the payment detail**, not a screen of its own. Thirteen #11.
+11. **Settings**: Appearance's two switches (*Show pop-up notices on Home*,
+    *Weekly reminder to record achieved content*) (#1); Reference's audit rows
+    as sentences, about forty event types (#2).
+12. **Roster and Products rows as buttons** (control font, so their pills
+    measure 20px as the export's); the roster's **Table / Cards** toggle
+    removed (D).
+13. **Admin Home chart**: axis label outside the plot, as the export (matrix,
+    kept for a preference only).
+14. **Admin profile body** (Overview): the Contact panel as the export's
+    editable form - **a separate task, as the owner set out on 24 September**:
+    field permissions, validation, saving, and contact email against sign-in
+    identity (D07's *Signs in with* is his later instruction). Also in that
+    body: Sizing values at 15px (ours 12px), the start value at 12.5px, and
+    the *Discount codes* panel, which the export does not have.
+15. **Terms editing: buttons still set to Inter** (`Compensation.css` `.fork`,
+    `.mo`, `.kinds`, `.seg`, `.comp__clear`), with its screen's review.
+16. **Products**: the per-model order reference the export prints on a
+    product (not in the roster payload); the feature request's message
+    presets (matrix B3, B4).
+17. **Held by the owner's instruction of 24 September**: *Refresh now* and
+    *last successful refresh* on Settings → Shopify. Not to be built until he
+    releases it.
+
+Code hygiene (no behaviour)
+
+18. `app/services/portal.py` near line 810: a comment says a
+    delivered-then-refunded order *"pays nothing"*; the rule (ADR 0025) and
+    the tests say it keeps its commission.
+19. `/payroll/:month/reopen` (`PayrollReopen.tsx`): reopening is retired
+    (05B); the route is a candidate for removal, with `test_reachability`.
+
+### Verification - still to run
+
+20. **Admin *Attributed orders* list (`vOrders`) - layout not reviewed.**
+    Only its month control has been checked.
+21. **The export's admin order view renders blank** in the served prototype;
+    our order detail was compared against its markup only.
+22. **The export's receipt screen was never captured**, so whether our inline
+    receipt is a superset is unknown (#8).
+23. **Earnings line names** need a seeded model on a guaranteed minimum to
+    compare like for like (#10).
+24. **Product images** and **the portal wardrobe below the fold**: nothing to
+    compare yet (placeholders; the export's frame ends mid-list).
+25. **Printing, and anything behind a Shopify call**: unreachable without a shop.
+26. **Staging**: an approved month with transfers (matrix B7) and a terms
+    apply (B11) have not been exercised on staging data.
+27. **Real data**: `outside_months.py` (read-only) against staging and an
+    authorised restored copy; only the disposable database has been checked.
+28. **Devices**: the control font on an iPhone, on Android and in Firefox.
+29. **`payment-record-*` screenshots** predate the *No destination recorded*
+    wording.
+30. **Before merge**: the full backend runner (`run-suite.sh`), the frontend
+    suite and build. Not re-run for this batch; the focused files are.
+31. **Release gates** (`CLAUDE.md`): reconciliation against an authorised
+    restored copy of real data (`reconcile.py` has only run on the test
+    database), and a migration/rollback rehearsal for `b1f0a40c0001`. Neither
+    has run; the repair is not releasable while they are open.
+
+### Information needed from the owner
+
+32. **Five historical facts** (`HISTORICAL-INFORMATION-NEEDED.md`): each
+    model's start, what she was paid on each month, whether guaranteed
+    months' targets were met, confirmation the order import is complete, and
+    which environment to unlock and when. Historical finalisation stays
+    locked until then.
+33. **Kept today for a rule, accuracy or security reason** - each needs your
+    yes to stay, or it becomes implementation:
+    - *Withdrawn* shown apart from *Link expired* (the export writes *Link
+      expired* for both; a withdrawn link did not expire).
+    - The Shopify connection read-only rather than editable in the page (B):
+      an API key field means a secret the server can read back (ADR 0015).
+    - *Help* and *Appearance* in the account menu (C): removing them leaves
+      Help with no way in, which `test_reachability` fails.
+    - Products: a size count instead of a SKU (a SKU belongs to a size), and
+      the *Top sellers* panel and *Selling best through codes*, built from
+      your own question and not in the export.
+    - Portal Targets' third word, *not recorded* (§11.3: a month nobody has
+      counted is not a month she missed).
+    - Portal Home without the export's *usually recorded in N days*: HBA has
+      promised no date.
+34. **Permissions**: merging to `main` and promoting to `production` are two
+    separate decisions; neither is given.
+
+### Owner decisions standing (not open)
+
+The month grid for terms editing only; Targets' *Confirm*, *Whole year* and
+the D08 pace line; the payer sees the whole destination (ADR 0042); pending
+orders count (ADR 0040); *Signs in with* (D07); no earlier-month note on Home;
+chart axes from real figures; corrections reached from Home, not Payments;
+Payments' *Settle difference* for an overpaid month (a real state the export
+never drew).
+
+### Closed, with evidence
+
+| Item | Where it came from | Closed by |
+|---|---|---|
+| Month grid only in terms editing (#12) | Thirteen, handoff | `9514fd1` |
+| Portal header identity, portal month control, admin header code | Batch D table, matrix *month picker open* | `9514fd1`, `a8eaab9`; `shots/batch-e/` |
+| Type: line height, figures, weights | Batch E | `9514fd1`, ADR 0043 |
+| Buttons in the control font; Orders rows 92 = 92; month rows 41 = 41 | Batch E kept divergence | `a8eaab9`, ADR 0044 |
+| Profile offers her months | Batch E kept divergence | `a8eaab9` |
+| Home chips *pending* / *failed delivery* | Batch E list | `a8eaab9` |
+| Profile labels and *Active* pill; Home ⋯ ✕ and spacing; Payments name and pill | Batch E list | `a8eaab9`; pills finished here |
+| Chart axes, switch, *· So far*, Home titles, `.pill` leak, corrections panel, Home note | Follow-up list, owner's answers | this batch (the commit that adds this section); `shots/batch-f/checks.txt` |
+| Portal order filter *Failed*, chips naming the case (G, #13) | Thirteen | `6131d0c` |
+| Net sales and *Counts towards* from facts | Batch D | `7bd9650` |
+| Earnings explanations, per-order commission | Batch C | `1b1bb21` |
+| Best sellers count delivered and pending (A) | Populated pass #1 | `4077b88` (server right since `0a2ba69`) |
+| Five empty screens populated and recaptured | *Not covered* | `ffde978` |
+| Currency `EGP`, the Home applications notice, desk applications removed, profile destination unmasked, words | Sweep *Corrected on this branch* | `f83b4fc`, `8456045` (ADR 0042) |
+| Matrix *E£ not EGP*, *masked destination*, *Not counted*, *Resend/Withdraw with no invitation view* | Matrix kept list | superseded by the rows above and by `vInvite` |

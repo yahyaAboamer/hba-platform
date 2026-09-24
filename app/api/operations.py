@@ -741,7 +741,7 @@ def attention(
         add(
             "go_live_month_unset",
             BLOCKING,
-            "No go-live month is set, so nothing can be approved.",
+            "No go-live month is set, so nothing can be approved",
             "/settings",
             "Open settings",
             "Until it is set, no month can be agreed and no model can be paid.",
@@ -767,11 +767,62 @@ def attention(
         add(
             "applications_waiting",
             ATTENTION,
-            f"{waiting} application{_s(waiting)} awaiting review.",
+            f"{waiting} application{_s(waiting)} awaiting review",
             "/affiliates?segment=applications",
             "Open applications",
             "Submitted through the invitation link.",
         )
+
+    # -- Agreed months that have changed -----------------------------------
+    #
+    # **The export's second notice**: *Late failed order needs a decision /
+    # Yahya Aboamer · order #29741 failed after September was approved. /
+    # Open correction*. One per open correction (05C), from the same
+    # `open_corrections` the payments desk used to list, across every payable
+    # model including departed ones - so a correction is on the screen
+    # everybody lands on until somebody carries or absorbs it.
+    #
+    # Worded from what actually happened: *failed* only where every order the
+    # agreement counted and has lost was a courier's failure (`order_status`);
+    # a cancellation or a refund is never called a failed delivery.
+    #
+    # BLOCKING, for the export's red: money may already have been advanced.
+    from app.services.affiliates import list_affiliates
+    from app.services.corrections import open_corrections
+    from app.services.portal import changed_after_approval
+
+    this_year = working_month()[:4]
+    for affiliate in list_affiliates(db, include_archived=True):
+        if not affiliate.is_payable:
+            continue
+        for correction in open_corrections(db, affiliate):
+            month = correction.month
+            when = (
+                _month_words(month).split(" ")[0]
+                if month[:4] == this_year
+                else _month_words(month)
+            )
+            lost = changed_after_approval(db, affiliate, month)
+            if lost and all(status == "failed" for _, status in lost):
+                numbers = ", ".join(number for number, _ in lost)
+                one = len(lost) == 1
+                title = f"Late failed order{'' if one else 's'} need{'s' if one else ''} a decision"
+                detail = (
+                    f"{affiliate.name} · order{'' if one else 's'} {numbers} "
+                    f"failed after {when} was approved."
+                )
+            else:
+                title = "Agreed month changed and needs a decision"
+                detail = f"{affiliate.name} · {when} changed after it was approved."
+            add(
+                f"correction:{affiliate.id}:{month}",
+                BLOCKING,
+                title,
+                # The month's own correction, where it is carried or absorbed.
+                f"/payments/{month}/{affiliate.id}/correction",
+                "Open correction",
+                detail,
+            )
 
     # -- Mail ----------------------------------------------------------------
     #
@@ -781,7 +832,7 @@ def attention(
         add(
             "mail_not_configured",
             ATTENTION,
-            "No email is being sent.",
+            "No email is being sent",
             "/settings",
             "Open settings",
             "Invitations and receipts are written and never delivered.",
@@ -796,7 +847,7 @@ def attention(
         add(
             "notifications_failed",
             ATTENTION,
-            f"{failed_mail} email{_s(failed_mail)} did not arrive.",
+            f"{failed_mail} email{_s(failed_mail)} did not arrive",
             "/settings",
             "Open settings",
             "They can be sent again without writing them a second time.",
@@ -812,7 +863,7 @@ def attention(
         add(
             "failed_jobs",
             ATTENTION,
-            f"{failed_jobs} piece{_s(failed_jobs)} of order syncing failed.",
+            f"{failed_jobs} piece{_s(failed_jobs)} of order syncing failed",
             "/settings",
             "Open sync",
             "Sales in those orders are not attributed to anybody yet.",
@@ -837,7 +888,7 @@ def attention(
         add(
             "unregistered_codes",
             ATTENTION,
-            f"{unowned} discount code{_s(unowned)} on orders belong{'s' if unowned == 1 else ''} to no model.",
+            f"{unowned} discount code{_s(unowned)} on orders belong{'s' if unowned == 1 else ''} to no model",
             "/settings",
             "Open codes",
             "Whoever earned on them is not being credited.",
@@ -863,7 +914,7 @@ def attention(
         add(
             "orders_held",
             BLOCKING,
-            f"{held} order{_s(held)} carry two models' codes and need a decision.",
+            f"{held} order{_s(held)} carry two models' codes and need a decision",
             "/orders",
             "Open orders",
             "Nobody is credited until somebody says which model it belongs to.",
@@ -878,9 +929,9 @@ def attention(
         add(
             "months_left_reopened",
             BLOCKING,
-            f"{_month_words(months[0])} was reopened and never agreed again."
+            f"{_month_words(months[0])} was reopened and never agreed again"
             if len(months) == 1
-            else f"{len(months)} months were reopened and never agreed again.",
+            else f"{len(months)} months were reopened and never agreed again",
             "/payroll",
             "Open payroll",
             "A month left open is a month nobody is being paid for.",
@@ -905,7 +956,7 @@ def attention(
                 "payroll_due",
                 ATTENTION,
                 f"{unapproved} model{_s(unapproved)} still unapproved for "
-                f"{_month_words(previous)}.",
+                f"{_month_words(previous)}",
                 "/payroll",
                 "Open payroll",
                 "The month cannot close while any model is still unapproved.",

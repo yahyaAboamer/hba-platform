@@ -1,0 +1,52 @@
+[1280] Home notices:
+  2 applications awaiting review Submitted through the invitation link.
+  Late failed order needs a decision Sara Edrees · order #1013 failed after August was approved.
+  No email is being sent Invitations and receipts are written and never delivered.
+  7 pieces of order syncing failed Sales in those orders are not attributed to anybody yet.
+  14 models still unapproved for August 2026 The month cannot close while any model is still unapproved.
+[1280] Open correction -> /payments/2026-08/1/correction; back button "← Home"; screen has ""
+[1280] Back -> /
+[1280] Payments desk: corrections panel present = false
+[1280] Payments pills: ["Estimated | 11px pad 2px 8px block h23.0","Terms missing | 11.5px pad 3px 9px inline h22.0","Awaiting approval | 11.5px pad 3px 9px inline h22.0"]
+[1280] Home again: correction notice present = true
+[1280] reopened -> /payments/2026-08/1/correction
+[1280] payment review 2026-08/1: "Open the correction" link = 1
+[1280] payment review pills: ["Fully paid | 12px pad 4px 10px block h28.6"]
+[1280] roster pills: ["Active | 11.5px pad 3px 9px inline h22.0","Active | 11.5px pad 3px 9px inline h22.0","Active | 11.5px pad 3px 9px inline h22.0"]
+[1280] products pills: ["Active | 11.5px pad 3px 9px inline h22.0","Active | 11.5px pad 3px 9px inline h22.0","Active | 11.5px pad 3px 9px inline h22.0"]
+[1280] order detail pills: ["Failed delivery | 12px pad 4px 10px block h28.6"]
+[1280] profile pills: ["Active | 11.5px pad 3px 9px block h25.8"]
+[1280] EXPORT home notices: ["2 applications awaiting review","Late failed order needs a decision","Shopify sync last succeeded 6 November, 08:15","Content progress to review"]
+[1280] EXPORT payments pills: ["2 | 11px pad 1px 6px block h16.0","4 | 11px pad 1px 6px block h16.0","Fully paid | 11.5px pad 3px 9px inline h22.0"]
+[1280] EXPORT roster pills: ["2 | 11px pad 1px 6px block h16.0","4 | 11px pad 1px 6px block h16.0","Active | 11.5px pad 3px 9px inline h20.0"]
+[1280] EXPORT products pills: ["2 | 11px pad 1px 6px block h16.0","4 | 11px pad 1px 6px block h16.0","Active | 11.5px pad 3px 9px inline h20.0"]
+[1280] EXPORT profile pills: ["2 | 11px pad 1px 6px block h16.0","4 | 11px pad 1px 6px block h16.0","Active | 11.5px pad 3px 9px block h25.8"]
+[1440] Home notices:
+  2 applications awaiting review Submitted through the invitation link.
+  Late failed order needs a decision Sara Edrees · order #1013 failed after August was approved.
+  No email is being sent Invitations and receipts are written and never delivered.
+  7 pieces of order syncing failed Sales in those orders are not attributed to anybody yet.
+  14 models still unapproved for August 2026 The month cannot close while any model is still unapproved.
+[1440] Open correction -> /payments/2026-08/1/correction; back button "← Home"; screen has ""
+[1440] Back -> /
+[1440] Payments desk: corrections panel present = false
+[1440] Payments pills: ["Estimated | 11px pad 2px 8px block h23.0","Terms missing | 11.5px pad 3px 9px inline h22.0","Awaiting approval | 11.5px pad 3px 9px inline h22.0"]
+[1440] Home again: correction notice present = true
+[1440] reopened -> /payments/2026-08/1/correction
+[1440] payment review 2026-08/1: "Open the correction" link = 1
+[1440] payment review pills: ["Fully paid | 12px pad 4px 10px block h28.6"]
+[1440] roster pills: ["Active | 11.5px pad 3px 9px inline h22.0","Active | 11.5px pad 3px 9px inline h22.0","Active | 11.5px pad 3px 9px inline h22.0"]
+[1440] products pills: ["Active | 11.5px pad 3px 9px inline h22.0","Active | 11.5px pad 3px 9px inline h22.0","Active | 11.5px pad 3px 9px inline h22.0"]
+[1440] order detail pills: ["Failed delivery | 12px pad 4px 10px block h28.6"]
+[1440] profile pills: ["Active | 11.5px pad 3px 9px block h25.8"]
+[1440] EXPORT home notices: ["2 applications awaiting review","Late failed order needs a decision","Shopify sync last succeeded 6 November, 08:15","Content progress to review"]
+[1440] EXPORT payments pills: ["2 | 11px pad 1px 6px block h16.0","4 | 11px pad 1px 6px block h16.0","Fully paid | 11.5px pad 3px 9px inline h22.0"]
+[1440] EXPORT roster pills: ["2 | 11px pad 1px 6px block h16.0","4 | 11px pad 1px 6px block h16.0","Active | 11.5px pad 3px 9px inline h20.0"]
+[1440] EXPORT products pills: ["2 | 11px pad 1px 6px block h16.0","4 | 11px pad 1px 6px block h16.0","Active | 11.5px pad 3px 9px inline h20.0"]
+[1440] EXPORT profile pills: ["2 | 11px pad 1px 6px block h16.0","4 | 11px pad 1px 6px block h16.0","Active | 11.5px pad 3px 9px block h25.8"]
+[390] chart sales: {"readout":"September 2026","texts":[{"t":"0","left":20,"w":7,"h":12,"size":"10px"},{"t":"7.3K","left":6,"w":21,"h":12,"size":"10px"},{"t":"14.6K","left":0,"w":26,"h":12,"size":"10px"},{"t":"1","left":31,"w":4,"h":12,"size":"10px"},{"t":"2","left":66,"w":6,"h":12,"size":"10px"},{"t":"3","left":102,"w":6,"h":12,"size":"10px"},{"t":"4","left":139,"w":7,"h":12,"size":"10px"},{"t":"5","left":175,"w":6,"h":12,"size":"10px"},{"t":"6","left":211,"w":6,"h":12,"size":"10px"},{"t":"7","left":248,"w":6,"h":12,"size":"10px"},{"t":"8","left":284,"w":6,"h":12,"size":"10px"},{"t":"9","left":321,"w":6,"h":12,"size":"10px"}],"switch":["Sales rgb(35, 169, 92) rgb(35, 169, 92) 0px 0px 0px 1 h34.1 Inter","Uses rgb(236, 239, 234) none h34.1 Inter"],"svgLeft":29}
+[390] chart uses: {"readout":"September 2026","texts":[{"t":"0","left":20,"w":7,"h":12,"size":"10px"},{"t":"3","left":20,"w":6,"h":12,"size":"10px"},{"t":"6","left":20,"w":6,"h":12,"size":"10px"},{"t":"1","left":47,"w":4,"h":12,"size":"10px"},{"t":"2","left":78,"w":6,"h":12,"size":"10px"},{"t":"3","left":110,"w":6,"h":12,"size":"10px"},{"t":"4","left":143,"w":7,"h":12,"size":"10px"},{"t":"5","left":175,"w":6,"h":12,"size":"10px"},{"t":"6","left":207,"w":6,"h":12,"size":"10px"},{"t":"7","left":240,"w":6,"h":12,"size":"10px"},{"t":"8","left":272,"w":6,"h":12,"size":"10px"},{"t":"9","left":304,"w":6,"h":12,"size":"10px"}],"switch":["Sales rgb(236, 239, 234) none h34.1 Inter","Uses rgb(35, 169, 92) rgb(35, 169, 92) 0px 0px 0px 1 h34.1 Inter"],"svgLeft":29}
+[390] tap month 3: March 2026
+[390] keyboard month 6: June 2026
+[390] overflow-x: 0
+[390] EXPORT switch: ["Sales rgb(35, 169, 92) rgb(35, 169, 92) 0px 0px 0px 1 h34.1 Inter","Uses rgb(236, 239, 234) none h34.1 Inter"]
