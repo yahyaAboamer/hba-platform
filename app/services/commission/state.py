@@ -90,6 +90,53 @@ def commission_state(
     return CommissionState.PENDING
 
 
+#: What happened to an order, in the words a screen shows. The approved design
+#: draws three - *Delivered*, *Pending*, *Failed delivery* - and a void order is
+#: not always a failed delivery: it can have been cancelled, or refunded while
+#: it was still travelling. Calling those *Failed delivery* would describe a
+#: courier outcome that never happened, so they keep their own two words.
+ORDER_STATUS_TEXT = {
+    "delivered": "Delivered",
+    "pending": "Pending",
+    "failed": "Failed delivery",
+    "cancelled": "Cancelled",
+    "refunded": "Refunded",
+}
+
+
+def order_status(
+    *,
+    state: str | None = None,
+    delivery_state: str | None = None,
+    cancelled_at: datetime | None = None,
+    financial_status: str | None = None,
+) -> str:
+    """Which of `ORDER_STATUS_TEXT` this order is. Derived from the counting
+    state, never beside it, so a label cannot disagree with what is counted.
+
+    **Earned is delivered, whatever came after** (F04, ADR 0025): a delivered
+    order later refunded or cancelled still counts and still reads
+    *Delivered*. Only a void order is split by why it is void, in the order
+    `commission_state` itself checks. `state` is the stored one where there is
+    an attributed row; without one it is worked out from the same facts.
+    """
+    if state is None:
+        state = commission_state(
+            delivery_state=delivery_state,
+            cancelled_at=cancelled_at,
+            financial_status=financial_status,
+        )
+    if state == CommissionState.EARNED:
+        return "delivered"
+    if state == CommissionState.PENDING:
+        return "pending"
+    if delivery_state == FAILED:
+        return "failed"
+    if cancelled_at is not None:
+        return "cancelled"
+    return "refunded"
+
+
 def is_final(state: str) -> bool:
     """ADR 0025. Can this order still change?
 

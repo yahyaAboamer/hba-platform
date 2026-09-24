@@ -9,13 +9,13 @@ true. Nothing was deleted.
 | | |
 |---|---|
 | **Branch** | `repair/batch-2` |
-| **Revision reviewed** | The sweep describes `f83b4fc` — *Every screen at both widths, and 390 at last*. **One code change since**: the best-sellers commit on top of `ffde978` (*Best sellers say what they count*), which touches `app/api/affiliate_self.py`, `frontend/src/screens/MyWardrobe.tsx` and tests, and recaptures `portal-wardrobe-390` plus a new `portal-best-390`. **And a second**, batch C on top of `4077b88` — earnings explanations and per-order commission, below. |
+| **Revision reviewed** | The sweep describes `f83b4fc` — *Every screen at both widths, and 390 at last*. **One code change since**: the best-sellers commit on top of `ffde978` (*Best sellers say what they count*), which touches `app/api/affiliate_self.py`, `frontend/src/screens/MyWardrobe.tsx` and tests, and recaptures `portal-wardrobe-390` plus a new `portal-best-390`. **Then** batch C (`1b1bb21`, earnings explanations and per-order commission) and batch D on top of it (Orders against the approved HTML), both below. |
 | **Current head** | run `git rev-parse --short HEAD`. Not written here: a document cannot contain the hash of the commit that adds it, and the last attempt was stale one commit later. |
 | **Tree** | clean apart from `.claude/settings.json`, the owner's plugin config, deliberately not committed |
 | **`origin/main`** | `6a13958` |
 | **`origin/production`** | `6a13958` — **level with `main`**, gap of 0 commits, read from `git ls-remote` on 24 September |
-| **Backend** | 2,054 tests, 80 files, all passing through `run-suite.sh` on 24 September, after batch C; matches `--collect-only` |
-| **Frontend** | 378 tests, 17 files; `npm run build` green (24 September, after batch C) |
+| **Backend** | 2,066 tests, 80 files, all passing through `run-suite.sh` on 24 September, after batch D; matches `--collect-only` |
+| **Frontend** | 389 tests, 18 files; `npm run build` green (24 September, after batch D) |
 | **Migration head** | `b1f0a40c0001` |
 
 > **Correction, 24 September 2026.** An earlier version of this table said
@@ -108,7 +108,7 @@ corrected there.
   Four of the six fail if the filter is set back to delivered-only — checked.
 - No payroll, snapshot, payment or ledger code was touched.
 
-## The current batch: earnings explanations and per-order commission (24 September)
+## Done: batch C — earnings explanations and per-order commission (24 September)
 
 **Batch C — the counting rule in the words and the order rows.** The three
 delivered-only displays found during the best-sellers batch, fixed together.
@@ -157,9 +157,98 @@ fixed queries, not four: the month's agreement is one more, once. Eleven
 frontend tests in `CountingRule.test.tsx`. One API test in
 `tests/test_orders_api.py` for the staff view of a pending order. Screens: `portal-orders-390`,
 `portal-earnings-390` and `payment-detail` at 1280/1440 recaptured; new
-`portal-orders-pending-390` pair, `portal-orders-failed-390` and
-`payment-detail-estimate-1280`, from July with one failed order added to the
+`portal-orders-pending-390` pair and `payment-detail-estimate-1280`
+(its `portal-orders-failed-390` is superseded by batch D's captures), from July with one failed order added to the
 throwaway database.
+
+## The current batch: D — Orders against the approved HTML (24 September)
+
+The model's Orders, the admin profile's orders table and the order it opens,
+compared with `Affiliate Portal v3.dc.html` (`onOrders`, `orderRows`) and
+`Admin Dashboard.dc.html` (`mOrders`, `orderVals`). Batch C's commission
+rules and snapshot handling are unchanged.
+
+**What differed, and is fixed**
+
+- *Model Orders.* The fourth filter is the export's *Failed*. Chips read
+  *Delivered* / *Pending* / *Failed delivery* (was *Did not arrive*). An
+  empty row says *no product lines available*, and the expansion no longer
+  repeats it. Open rows list each product with *Size M* and its price. The
+  delivered sentence is the export's — *"Delivered and counted in {Month}.
+  Commission is 10% of EGP X."* — with the month's own rate (`rate_bp`, the
+  snapshot's once agreed) and the server's base. The failed sentence is the
+  export's; a late failure adds *"It failed after the month was approved, so
+  the difference is settled in a later month."* The cancelled sentence with
+  no amount is the export's. The note uses the straight apostrophe, and the
+  order number is no longer greyed as code.
+- *Admin profile table.* Status from the server; *amount not available*
+  instead of a zero; dates with the year; the whole row opens the order;
+  amounts at the row's weight.
+- *Admin order detail.* Status from the server, not raw facts — a delivered
+  order later cancelled or refunded read *Cancelled* beside *Counted in*.
+  Net sales is the commission base, as on her row. A void order's commission
+  is *EGP 0.00* (the export's); no rate is *not available*. A pending order
+  *Counts towards* *Counted in {Month}* (was *Waiting for delivery*).
+  Products are name and price. Opened from a profile, the back button names
+  the model and returns to her Performance month.
+
+**One status, derived once.** `order_status` in
+`app/services/commission/state.py` classifies from the counting state: earned
+is *delivered* whatever came after (F04); pending is *pending*; a void order
+is *failed* only if the courier failed, else *cancelled*, else *refunded*
+(money returned while travelling). Her rows and every staff order row use it.
+
+**Failed versus Not counted — decided, and why.** The void bucket holds three
+real cases: a failed delivery, a cancellation, and a refund while travelling.
+A refund *after* delivery is not in it — that order stays delivered and
+counted. The export's own sample files a cancelled order under *Failed*, so
+the filter follows the export. The **one divergence kept**: a cancelled or
+refunded order's chip says *Cancelled* or *Refunded*, where the export's
+sample chip says *Failed delivery* — no courier failed, and the owner asked
+that only actual failed deliveries use those words. Same red tone, same
+struck-through figure. The admin table and detail use the same two words.
+
+**Also kept, with the reason**
+
+- The late-failure sentence names no amount or month: corrections are
+  per month (05C), not per order, so *"EGP X is recovered in {Month}"*
+  cannot be said honestly of one order.
+- A cancelled order whose placed-at value survives keeps it, struck through,
+  with *"This order was cancelled, so nothing is counted. The amount shown is
+  what it came to when it was placed."* — the export's sentence says the
+  amount is not available, which is untrue when we have it.
+- The export's own admin order view renders blank when opened in the served
+  prototype (its script stops; the console shows only its template
+  placeholders). The admin detail was compared against the export's markup
+  and `orderVals` instead, field by field.
+
+**Checks run.** Backend: `run-suite.sh`, 80 files, 2,066 tests, all passing
+(matches `--collect-only`). New: `order_status` unit cases (seven facts,
+including refunded-after-delivery), three staff order-detail tests, a
+late-failure-after-approval test, and the state-words test extended to
+cancelled, refunded and delivered-then-refunded. Frontend: 389 tests, 18
+files, and `npm run build`. Browser, on the throwaway database with July
+holding delivered, pending, failed and cancelled orders and approved August
+holding a late failure: every filter clicked and counted, every row opened
+and read, the whole-row click and the back link followed at 1280 and 1440,
+no customer data on the portal screen. Recaptured: `portal-orders-390`,
+`model-performance` at 1280 and 1440; new: `portal-orders-july-all-390`,
+`portal-orders-july-failed-filter-390`, `portal-orders-delivered-open-390`
+(pair), `portal-orders-august-late-failure-390`,
+`model-performance-july-{1280,1440}` (pair), `order-failed-{1280,1440}`,
+`order-delivered-{1280,1440}`.
+
+**Checklist**
+
+- [x] Model Orders: filters, chips, rows, expansions, amounts, note
+- [x] Actual failed deliveries say *Failed delivery*; nothing else does
+- [x] Delivered explanation with the real month, rate and amounts
+- [x] Pending commission, valid zero, missing rate, struck-through void — kept
+- [x] Admin profile table and order detail against the export
+- [x] Navigation: whole row, back to the profile month
+- [ ] The export's admin order view cannot be captured (prototype defect)
+- [ ] The admin **Attributed orders** list (`vOrders`) was not compared in
+      this batch; it shares the status words but not its layout review
 
 ## Not scheduled — a backlog, not an instruction
 

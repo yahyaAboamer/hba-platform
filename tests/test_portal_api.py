@@ -804,19 +804,51 @@ def test_the_month_that_paid_it_says_where_it_came_from(admin):
 
 
 def test_every_order_state_is_shown_in_their_words(admin):
-    """A void order stays visible. §9.4 pays on delivery, and an order that
-    vanishes without a word looks like a mistake somebody made.
+    """A void order stays visible, and says **why** it is void.
+
+    The approved chips are *Delivered*, *Pending* and *Failed delivery*. A
+    courier's failure is the only void order that reads *Failed delivery*: a
+    cancelled order and one refunded while travelling did not fail, and each
+    keeps its own word. A delivered order later cancelled and refunded is
+    still delivered, and still counted (F04).
     """
     affiliate = _affiliate(admin)
     _terms(admin, affiliate["id"])
     _order(affiliate["id"], "1", 100_000, state="earned")
     _order(affiliate["id"], "2", 200_000, state="pending")
     _order(affiliate["id"], "3", 300_000, state="void")
+    _delivery("3", "failed")
+    _order(affiliate["id"], "4", 0, state="void", placed=150_000)
+    _order(affiliate["id"], "5", 80_000, state="void")
+    _order(affiliate["id"], "6", 90_000, state="earned")
+    _delivery("6", "delivered")
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "UPDATE order_index SET cancelled_at = now() "
+                "WHERE shopify_order_id IN ('4', '6')"
+            )
+        )
+        connection.execute(
+            text(
+                "UPDATE order_index SET financial_status = 'refunded' "
+                "WHERE shopify_order_id IN ('5', '6')"
+            )
+        )
 
     body = _sign_in().get(f"/api/me/earnings/{AUGUST}").json()
 
     states = {row["order_number"]: row["state_text"] for row in body["orders_detail"]}
-    assert states == {"#1": "Delivered", "#2": "Pending", "#3": "Did not arrive"}
+    assert states == {
+        "#1": "Delivered",
+        "#2": "Pending",
+        "#3": "Failed delivery",
+        "#4": "Cancelled",
+        "#5": "Refunded",
+        "#6": "Delivered",
+    }
+    statuses = {row["order_number"]: row["status"] for row in body["orders_detail"]}
+    assert statuses["#6"] == "delivered", "refunded after delivery still counts"
     assert body["sales"]["pending_piastres"] == 200_000
 
 
@@ -1890,6 +1922,33 @@ def test_a_month_agreed_delivered_only_is_described_as_it_was_agreed(admin):
     assert pending["commission_piastres"] is None
     assert statement["policy"] == "delivered_only"
     assert statement["counted_sales_piastres"] == 100_000
+
+
+def test_a_delivery_that_fails_after_approval_says_so(admin):
+    """The approved sentence for a late failure: counted by August's
+    agreement, then failed - the difference is settled later (05C), and the
+    row says that rather than pretending August never counted it."""
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"], rate_bp=1000)
+    _order(affiliate["id"], "9812", 200_000, month=AUGUST, state="pending")
+    _order(affiliate["id"], "9813", 100_000, month=AUGUST, state="pending")
+    _approve(admin, affiliate["id"], AUGUST)
+    _set("9812", commission_state="void")
+    _delivery("9812", "failed")
+    _deliver("9813")
+
+    body = _sign_in().get(f"/api/me/earnings/{AUGUST}").json()
+    failed = next(o for o in body["orders_detail"] if o["order_number"] == "#9812")
+    delivered = next(o for o in body["orders_detail"] if o["order_number"] == "#9813")
+
+    assert failed["status"] == "failed"
+    assert failed["state_text"] == "Failed delivery"
+    assert failed["failed_after_approval"] is True
+    assert failed["forgone_piastres"] == 20_000
+    assert delivered["failed_after_approval"] is False
+    # *Commission is 10% of EGP 1,000.00* - August's own rate, from its snapshot.
+    assert delivered["rate_bp"] == 1000
+    assert delivered["commission_piastres"] == 10_000
 
 
 def test_an_order_is_worth_the_rate_of_its_own_month(admin):

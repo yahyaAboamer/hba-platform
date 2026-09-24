@@ -54,21 +54,40 @@ export type MakeupLine = {
   amount: string;
 };
 
+export type OrderStatus = "delivered" | "pending" | "failed" | "cancelled" | "refunded";
+
 export type MyOrder = {
   /**
    * What was in the order. **Empty means not recorded, not empty**: contents
    * are read only for orders that earned commission, and only from 07A
    * onwards, so an older order legitimately has none.
    */
-  contents: { title: string; variant: string | null; quantity: number }[];
+  contents: {
+    title: string;
+    variant: string | null;
+    quantity: number;
+    /** What the customer paid for the line, after the discount. */
+    price_piastres: number;
+    price: string;
+  }[];
   order_number: string;
   placed_at: string;
   base_piastres: number;
   base: string;
-  /** §9.4. Only `earned` counts toward a payout. */
+  /** §9.4. The counting state: `earned` and `pending` count (ADR 0040). */
   state: "earned" | "pending" | "void";
-  /** The same thing in their words: counted, on its way, did not arrive. */
+  /**
+   * What happened to it. A void order is split by why - only a courier's
+   * failure is `failed`; `cancelled` and `refunded` (while travelling) are not
+   * failed deliveries and never read as one.
+   */
+  status: OrderStatus;
+  /** `status` in the approved words: *Delivered*, *Pending*, *Failed delivery*. */
   state_text: string;
+  /** The month's own rate, for *Commission is 10% of EGP X*. */
+  rate_bp: number | null;
+  /** Void, but counted by the month's agreement: it failed after approval. */
+  failed_after_approval: boolean;
   delivered_at: string | null;
   /** §11.4. Set only where a **different** month's payroll paid it. */
   paid_in_month: string | null;

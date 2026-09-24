@@ -100,5 +100,11 @@
  },
  "background": "rgb(8, 9, 10)",
  "scrollHeight": 898,
- "clientHeight": 898
+ "clientHeight": 898,
+ "viewport": {
+  "innerWidth": 1660,
+  "innerHeight": 1160,
+  "devicePixelRatio": 1,
+  "frame": 1440
+ }
 }

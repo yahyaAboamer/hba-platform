@@ -20,6 +20,7 @@ from app.services.commission.state import (
     commission_state,
     counts_toward_payout,
     is_final,
+    order_status,
 )
 from app.services.shopify.fulfilment import DELIVERED, FAILED, IN_FLIGHT
 
@@ -168,3 +169,44 @@ def test_partly_paid_needs_no_rule_of_its_own():
     )
     plain = commission_state(delivery_state=DELIVERED, financial_status="paid")
     assert partly == plain == CommissionState.EARNED
+
+
+# ── What a screen calls it ─────────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    "facts, expected",
+    [
+        pytest.param({"delivery_state": DELIVERED}, "delivered", id="delivered"),
+        pytest.param({"delivery_state": IN_FLIGHT}, "pending", id="travelling"),
+        pytest.param({}, "pending", id="shopify_has_said_nothing"),
+        pytest.param({"delivery_state": FAILED}, "failed", id="a_courier_failed"),
+        pytest.param(
+            {"cancelled_at": datetime(2026, 8, 3, tzinfo=timezone.utc)},
+            "cancelled",
+            id="cancelled_before_it_arrived",
+        ),
+        pytest.param(
+            {"financial_status": "refunded"}, "refunded", id="refunded_in_transit"
+        ),
+        pytest.param(
+            {
+                "delivery_state": DELIVERED,
+                "cancelled_at": datetime(2026, 8, 9, tzinfo=timezone.utc),
+                "financial_status": "refunded",
+            },
+            "delivered",
+            id="refunded_after_delivery_still_delivered",
+        ),
+    ],
+)
+def test_only_a_couriers_failure_is_a_failed_delivery(facts, expected):
+    """F04: delivery is the end of the story, and a void order says why."""
+    assert order_status(**facts) == expected
+
+
+def test_the_stored_state_decides_and_the_facts_only_explain_it():
+    """An earned order stays delivered whatever arrives later (ADR 0025)."""
+    assert order_status(state="earned", delivery_state=FAILED) == "delivered"
+    assert order_status(state="pending", delivery_state=None) == "pending"
+    assert order_status(state="void", delivery_state=FAILED) == "failed"

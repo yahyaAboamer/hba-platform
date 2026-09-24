@@ -21,7 +21,10 @@ const order = (patch: Partial<MyOrder>): MyOrder =>
     base_piastres: 200_000,
     base: "EGP 2,000.00",
     state: "pending",
+    status: "pending",
     state_text: "Pending",
+    rate_bp: 1000,
+    failed_after_approval: false,
     delivered_at: null,
     paid_in_month: null,
     commission_piastres: 20_000,
@@ -80,7 +83,8 @@ describe("an order's commission on My Orders", () => {
   it("strikes a failed delivery's figure through", () => {
     const html = row({
       state: "void",
-      state_text: "Did not arrive",
+      status: "failed",
+      state_text: "Failed delivery",
       counted: false,
       commission_piastres: null,
       commission: null,

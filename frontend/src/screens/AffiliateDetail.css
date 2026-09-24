@@ -562,6 +562,12 @@
 }
 
 .profile__ref { width: 110px; }
+
+/* The export's row is one button: the whole line opens the order. */
+.profile__order-row { cursor: pointer; }
+.profile__order-row:hover { background: var(--hover); }
+/* The approved table sets its amounts at the row's own weight. */
+.profile__orders .money { font-weight: 400; }
 .profile__state { width: 150px; font-size: 12.5px; }
 .profile__money { width: 140px; font-variant-numeric: tabular-nums; }
 .profile__count { width: 110px; font-variant-numeric: tabular-nums; }

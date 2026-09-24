@@ -30,19 +30,19 @@ import "./MyOrders.css";
 /** The three questions people actually arrive with. */
 type Filter = "all" | "earned" | "pending" | "void";
 
+/**
+ * The approved four: *All*, *Delivered*, *Pending*, *Failed*.
+ *
+ * *Failed* holds every order that did not count - the export files its own
+ * cancelled order there too - and each row's chip and sentence then say which
+ * it was. Only a courier's failure reads *Failed delivery*; a cancelled order
+ * reads *Cancelled*, and one refunded while travelling reads *Refunded*.
+ */
 const FILTERS: { key: Filter; label: string }[] = [
   { key: "all", label: "All" },
-  // The export's word, and the accurate one. *Counted* was ours and it said
-  // something false by omission: a **pending** order counts too (F02, ADR
-  // 0040), so a filter called *Counted* that hides pending describes the
-  // opposite of the rule this platform is built on. *Delivered* is a fact
-  // about the parcel, which is what the bucket actually holds.
   { key: "earned", label: "Delivered" },
   { key: "pending", label: "Pending" },
-  // Not the export's *Failed*: this one holds cancelled and refunded orders
-  // too, and calling a cancelled order a failed delivery would describe
-  // something that never happened.
-  { key: "void", label: "Not counted" },
+  { key: "void", label: "Failed" },
 ];
 
 export function MyOrders() {
@@ -150,7 +150,7 @@ export function MyOrders() {
         </ul>
       )}
 
-      <p className="orders__note">Customer details aren&rsquo;t shown here.</p>
+      <p className="orders__note">Customer details aren't shown here.</p>
     </>
   );
 }
@@ -195,14 +195,14 @@ export function Row({
         onClick={onToggle}
       >
         <span className="orders__left">
-          <span className="code orders__number">{order.order_number}</span>
+          <span className="orders__number">{order.order_number}</span>
           <span className="orders__meta">
             {/* *product* / *products*, the export's word. Ours said *pieces*,
                 which is warehouse language for the same thing. */}
             {onlyTheDate(order.placed_at)} ·{" "}
             {pieces > 0
               ? `${pieces} ${pieces === 1 ? "product" : "products"}`
-              : "contents not recorded"}
+              : "no product lines available"}
           </span>
           {/* Her words for the state, from the server, in the tone that
               matches it: counted is money, on its way is not yet, and did
@@ -243,26 +243,23 @@ export function Row({
            * saying so is the difference between an honest gap and a claim
            * that somebody bought nothing.
            */}
-          {order.contents.length > 0 ? (
+          {/* The row already says *no product lines available* where there
+              are none, so the expansion does not say it twice. */}
+          {order.contents.length > 0 && (
             <ul className="orders__contents">
               {order.contents.map((line, index) => (
                 <li key={`${line.title}-${index}`}>
                   <span className="orders__item">
                     {line.title}
+                    {line.quantity > 1 && ` × ${line.quantity}`}
                     {line.variant && (
-                      <span className="orders__variant">{line.variant}</span>
+                      <span className="orders__variant">Size {line.variant}</span>
                     )}
                   </span>
-                  {line.quantity > 1 && (
-                    <span className="orders__qty">&times;{line.quantity}</span>
-                  )}
+                  <span className="orders__qty">{line.price}</span>
                 </li>
               ))}
             </ul>
-          ) : (
-            <p className="orders__explain">
-              What was in this order was not recorded.
-            </p>
           )}
 
           <p className="orders__explain">{explain(order, month)}</p>
@@ -299,9 +296,11 @@ export function explain(order: MyOrder, month: string): string {
     ? ` No commission rate is set for ${formatMonth(month)}, so what it earns is not available yet.`
     : "";
   if (order.state === "earned") {
-    return order.commission !== null
-      ? `Delivered, so it counts in ${formatMonth(month)}. Of ${order.base}, ${order.commission} is yours.`
-      : `Delivered, so it counts in ${formatMonth(month)}.${noRate}`;
+    // The export's sentence, with this month's own rate and the server's
+    // figures - a delivered order later refunded is still this one (F04).
+    return order.rate_bp !== null && order.commission !== null
+      ? `Delivered and counted in ${formatMonth(month)}. Commission is ${percent(order.rate_bp)} of ${order.base}.`
+      : `Delivered and counted in ${formatMonth(month)}.${noRate}`;
   }
   if (order.state === "pending") {
     // A month agreed before ADR 0040 counted delivered orders only, so an
@@ -312,21 +311,28 @@ export function explain(order: MyOrder, month: string): string {
     // The export's sentence, word for word; the figure is on the row above.
     return `Counted in ${formatMonth(month)} while it is on its way. If it fails, it is removed and the difference is settled in a later month.${noRate}`;
   }
-  // Two different void rows. Where the amount survived, it is on screen and
-  // they can match it; where the order was cancelled outright, Shopify clears
-  // its value and there is nothing to match - so the row says that rather
-  // than leaving somebody to wonder what the missing figure was.
-  if (order.base_piastres > 0) {
-    return "This parcel did not reach the customer, so it earns nothing. The amount stays here so you can match it against your own record.";
+  // Void, and said by why. The approved sentence for a courier's failure,
+  // and for a cancelled order with nothing left to show; our own, in the same
+  // voice, for the two cases the design has no words for.
+  if (order.status === "failed") {
+    return `Delivery failed, so this order is excluded from ${formatMonth(month)}.` +
+      (order.failed_after_approval
+        ? " It failed after the month was approved, so the difference is settled in a later month."
+        : "");
   }
-  if (order.placed_piastres !== null) {
-    return order.forgone
-      ? `This order was cancelled, so it earns nothing. It came to ${order.placed} when it was placed, and would have been worth ${order.forgone} to you had it arrived — both shown struck through so you can match them against your own record.`
-      : `This order was cancelled, so it earns nothing. ${order.placed} is what it came to when it was placed — kept here so you can match it against your own record.`;
+  if (order.status === "refunded") {
+    return `The payment was refunded before this order arrived, so it is excluded from ${formatMonth(month)}.`;
   }
-  // An order indexed before the platform started keeping the placed-at
-  // figure. The order number and the date are still enough to match it.
-  return "This order was cancelled, so it earns nothing, and the shop no longer holds what it came to. The order number and the date are what to match it against.";
+  if (order.base_piastres > 0 || order.placed_piastres !== null) {
+    return "This order was cancelled, so nothing is counted. The amount shown is what it came to when it was placed.";
+  }
+  return "This order was cancelled, so the original sales amount is not available and nothing is counted.";
+}
+
+/** 1000 → `10%`, 1250 → `12.5%`. A rate, never an amount. */
+function percent(bp: number): string {
+  const whole = bp / 100;
+  return `${Number.isInteger(whole) ? whole : whole.toFixed(2).replace(/0$/, "")}%`;
 }
 
 /**

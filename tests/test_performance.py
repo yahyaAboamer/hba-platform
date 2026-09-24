@@ -528,7 +528,14 @@ def test_an_order_carries_what_was_in_it(db):
     contents = my_orders(db, affiliate, AUGUST)[0]["contents"]
 
     assert contents == [
-        {"title": "Wide-leg trousers", "variant": "M", "quantity": 2}
+        {
+            "title": "Wide-leg trousers",
+            "variant": "M",
+            "quantity": 2,
+            # What the customer paid for the line - the price the row prints.
+            "price_piastres": 100_000,
+            "price": "EGP 1,000.00",
+        }
     ]
 
 

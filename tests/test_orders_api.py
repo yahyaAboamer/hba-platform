@@ -7,6 +7,8 @@ those are facts `attributed_order` alone cannot show: an unattributed or held
 order has no row there at all.
 """
 
+from datetime import datetime, timezone
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text
@@ -388,4 +390,73 @@ def test_a_pending_order_opens_with_the_commission_it_counts_for(client):
 
     body = client.get("/api/orders/detail/o-11").json()
 
+    assert body["commission_piastres"] == 20_000
+
+
+def _terms(client, affiliate_id, rate_bp=1000):
+    response = client.put(
+        f"/api/affiliates/{affiliate_id}/pay-history",
+        json={
+            "periods": [
+                {
+                    "start_month": "2026-01",
+                    "compensation_type": "commission",
+                    "commission_rate_bp": rate_bp,
+                }
+            ]
+        },
+    )
+    assert response.status_code == 200, response.text
+
+
+def _facts(order_id, **columns):
+    assignments = ", ".join(f"{name} = :{name}" for name in columns)
+    with engine.begin() as connection:
+        connection.execute(
+            text(f"UPDATE order_index SET {assignments} WHERE shopify_order_id = :i"),
+            {"i": order_id, **columns},
+        )
+
+
+def test_a_failed_delivery_opens_as_failed_and_earned_nothing(client):
+    """The approved order view: *Failed delivery*, commission EGP 0.00."""
+    nour = _affiliate(client, "Nour", "nour@example.com")
+    _register_code(client, nour["id"], "NOUR10")
+    _terms(client, nour["id"])
+    _paid_order(nour["id"], "o-12", 200_000, state="void")
+    _facts("o-12", delivery_state="failed")
+
+    body = client.get("/api/orders/detail/o-12").json()
+
+    assert body["status"] == "failed"
+    assert body["commission_piastres"] == 0
+
+
+def test_a_cancelled_order_is_not_called_a_failed_delivery(client):
+    nour = _affiliate(client, "Nour", "nour@example.com")
+    _register_code(client, nour["id"], "NOUR10")
+    _paid_order(nour["id"], "o-13", 0, state="void")
+    _facts("o-13", cancelled_at=datetime(2026, 8, 3, tzinfo=timezone.utc))
+
+    body = client.get("/api/orders/detail/o-13").json()
+
+    assert body["status"] == "cancelled"
+
+
+def test_delivered_then_cancelled_still_opens_as_delivered(client):
+    """F04: it counts, so it must not read *Cancelled* beside *Counted in*."""
+    nour = _affiliate(client, "Nour", "nour@example.com")
+    _register_code(client, nour["id"], "NOUR10")
+    _terms(client, nour["id"])
+    _paid_order(nour["id"], "o-14", 200_000, state="earned")
+    _facts(
+        "o-14",
+        delivery_state="delivered",
+        cancelled_at=datetime(2026, 8, 20, tzinfo=timezone.utc),
+        financial_status="refunded",
+    )
+
+    body = client.get("/api/orders/detail/o-14").json()
+
+    assert body["status"] == "delivered"
     assert body["commission_piastres"] == 20_000

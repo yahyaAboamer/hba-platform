@@ -96,7 +96,9 @@ from app.services.compensation import all_terms, terms_for
 from app.services.payments import adjustments_for, balance_for, payments_for
 from app.services.performance import uses_for
 from app.services.payments_state import SettlementState
+from app.services.commission.state import ORDER_STATUS_TEXT, order_status
 from app.services.payroll import (
+    counted_in_snapshot,
     blockers_for,
     get_month,
     is_historical,
@@ -165,28 +167,6 @@ NOT_HER_PROBLEM = frozenset(
         "house_accounts_are_never_owed",
     }
 )
-
-#: What each order state means to them. `void` matters most: §9.4 pays on
-#: delivery, and an order that vanishes without a word looks like a mistake.
-#: The words on an order's chip, in her own Orders list.
-#:
-#: **The approved export's two, and one of ours.** *Delivered* and *Pending*
-#: are the design's and they are also the accurate ones: *Counted* was ours,
-#: and it said something false by omission, because a pending order counts too
-#: (F02, ADR 0040) - a chip reading *Counted* on one row and not the other
-#: describes the opposite of the rule this platform is built on.
-#:
-#: **`VOID` keeps our word.** The export writes *Failed*, which is right for a
-#: parcel that did not arrive and wrong for the rest of what lands in this
-#: bucket: a cancelled order and a refunded one are here too, and neither
-#: failed. *Did not arrive* is what a model needs to read, and it is the only
-#: place this list departs from the design - recorded here rather than left to
-#: be rediscovered.
-ORDER_STATE_TEXT = {
-    CommissionState.EARNED: "Delivered",
-    CommissionState.PENDING: "Pending",
-    CommissionState.VOID: "Did not arrive",
-}
 
 
 def _display_piastres(exact: Decimal | str | int) -> int:
@@ -957,8 +937,9 @@ def _forgone_commission(
 
 def month_rule(
     db: Session, affiliate: AffiliateProfile, month: str
-) -> tuple[int | None, tuple[str, ...]]:
-    """The rate one month's orders are worth, and which states it counts.
+) -> tuple[int | None, tuple[str, ...], PayrollSnapshot | None]:
+    """The rate one month's orders are worth, which states it counts, and the
+    agreement they were counted in, if the month has one.
 
     **An agreed month answers from its snapshot** - the rate it was approved at
     and the counting rule it was approved under (`policy_of`) - so nothing
@@ -977,11 +958,13 @@ def month_rule(
         return (
             (snapshot.payload_json or {}).get("commission_rate_bp"),
             counted_states_for(policy_of(snapshot)),
+            snapshot,
         )
     terms = terms_for(db, affiliate, month)
     return (
         terms.commission_rate_bp if terms else None,
         counted_states_for(PENDING_INCLUSIVE),
+        None,
     )
 
 
@@ -1037,7 +1020,7 @@ def my_orders(db: Session, affiliate: AffiliateProfile, month: str) -> list[dict
     # An agreed month answers from its snapshot - the rate it was approved at
     # and the counting rule it was approved under - so nothing about a frozen
     # month is read from anything that can still be edited.
-    rate_bp, counted = month_rule(db, affiliate, month)
+    rate_bp, counted, snapshot = month_rule(db, affiliate, month)
 
     rows = db.execute(
         select(AttributedOrder, OrderIndex)
@@ -1078,6 +1061,10 @@ def my_orders(db: Session, affiliate: AffiliateProfile, month: str) -> list[dict
                     "title": line.title,
                     "variant": line.variant_title,
                     "quantity": line.quantity,
+                    # What the customer paid for the line, after the discount -
+                    # the approved row prints a price beside each product.
+                    "price_piastres": line.discounted_total_piastres,
+                    "price": format_egp(line.discounted_total_piastres),
                 }
             )
 
@@ -1085,6 +1072,12 @@ def my_orders(db: Session, affiliate: AffiliateProfile, month: str) -> list[dict
     for order, index in rows:
         commission = _order_commission(
             order.commission_base_piastres, rate_bp, order.commission_state, counted
+        )
+        status = order_status(
+            state=order.commission_state,
+            delivery_state=index.delivery_state,
+            cancelled_at=index.cancelled_at,
+            financial_status=index.financial_status,
         )
         placed = _placed_value(order, index)
         forgone = _forgone_commission(
@@ -1106,8 +1099,21 @@ def my_orders(db: Session, affiliate: AffiliateProfile, month: str) -> list[dict
             "base_piastres": order.commission_base_piastres,
             "base": format_egp(order.commission_base_piastres),
             "state": order.commission_state,
-            "state_text": ORDER_STATE_TEXT.get(
-                order.commission_state, order.commission_state
+            # What happened to it, in the approved words - and a void order
+            # split by why: only a courier's failure reads *Failed delivery*.
+            "status": status,
+            "state_text": ORDER_STATUS_TEXT[status],
+            # The month's own rate, for the sentence *Commission is 10% of
+            # EGP X* - the percentage the server already used, never a second
+            # calculation.
+            "rate_bp": rate_bp,
+            # A void order its month's agreement had counted: it failed after
+            # approval, and the difference is settled as a correction (05C)
+            # rather than by restating the month.
+            "failed_after_approval": (
+                snapshot is not None
+                and order.commission_state == CommissionState.VOID
+                and counted_in_snapshot(snapshot, order.shopify_order_id)
             ),
             "delivered_at": (
                 order.delivered_at.isoformat() if order.delivered_at else None

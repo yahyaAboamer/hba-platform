@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import { Money } from "../components/Money";
 import { MonthPicker } from "../components/MonthPicker";
@@ -21,6 +21,12 @@ type OrderRow = {
   delivery_state: string | null;
   delivery_status: string | null;
   cancelled: boolean;
+  /**
+   * What happened to it, from the server - derived from the counting state,
+   * so a delivered order later cancelled still reads *Delivered* (F04), and
+   * only a courier's failure reads *Failed delivery*.
+   */
+  status: "delivered" | "pending" | "failed" | "cancelled" | "refunded";
   outcome: Outcome;
   affiliate_id: number | null;
   affiliate_name: string | null;
@@ -65,15 +71,20 @@ const STEP = 25;
  * orders and the export's sample shop never did, and it takes the red of a
  * failed delivery because it means the same thing for money: nothing earned.
  */
-export function orderStatus(row: Pick<OrderRow, "cancelled" | "delivery_state">): {
+export function orderStatus(row: Pick<OrderRow, "status">): {
   label: string;
   tone: "settled" | "owed" | "refused";
 } {
-  if (row.cancelled) return { label: "Cancelled", tone: "refused" };
-  if (row.delivery_state === "delivered") return { label: "Delivered", tone: "settled" };
-  if (row.delivery_state === "failed") return { label: "Failed delivery", tone: "refused" };
-  return { label: "Pending", tone: "owed" };
+  return ORDER_STATUS[row.status] ?? ORDER_STATUS.pending;
 }
+
+const ORDER_STATUS: Record<OrderRow["status"], { label: string; tone: "settled" | "owed" | "refused" }> = {
+  delivered: { label: "Delivered", tone: "settled" },
+  pending: { label: "Pending", tone: "owed" },
+  failed: { label: "Failed delivery", tone: "refused" },
+  cancelled: { label: "Cancelled", tone: "refused" },
+  refunded: { label: "Refunded", tone: "refused" },
+};
 
 function placedOn(iso: string, withYear = false): string {
   return new Date(iso).toLocaleDateString("en-GB", {
@@ -337,6 +348,9 @@ function OrderTableRow({ row }: { row: OrderRow }) {
  */
 export function OrderDetail() {
   const { orderId = "" } = useParams();
+  // Opened from a model's profile, the way back is to her - the export's back
+  // button names the screen it came from. Opened any other way, it is the list.
+  const from = (useLocation().state as { back?: { label: string; to: string } } | null)?.back;
   const [order, setOrder] = useState<OrderDetailBody | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -357,9 +371,9 @@ export function OrderDetail() {
       <div className="page__head">
         <Link
           className="button orders__back"
-          to={order ? `/orders?month=${order.business_month}` : "/orders"}
+          to={from?.to ?? (order ? `/orders?month=${order.business_month}` : "/orders")}
         >
-          ← Attributed orders
+          ← {from?.label ?? "Attributed orders"}
         </Link>
         <div className="page__title">
           <h1>{order ? `Order ${order.order_number}` : "Order"}</h1>
@@ -411,18 +425,25 @@ export function OrderDetail() {
               <div>
                 <dt>Net sales</dt>
                 <dd>
-                  {order.cancelled ? (
+                  {/* Net sales is the base the commission is worked on - the
+                      same figure her own row and the profile print. */}
+                  {order.base_piastres !== null && order.base_piastres > 0 ? (
+                    <Money piastres={order.base_piastres} kind="agreed" />
+                  ) : order.cancelled ? (
                     <span className="orders__nobody">not available</span>
                   ) : (
-                    <Money piastres={order.total_piastres} kind="agreed" />
+                    <Money piastres={order.base_piastres ?? order.total_piastres} kind="agreed" />
                   )}
                 </dd>
               </div>
               <div>
                 <dt>Commission</dt>
                 <dd>
+                  {/* A void order is EGP 0.00 from the server - it earned
+                      nothing, which is a figure. Null is no answer: no rate
+                      set for the month, or nobody's order. */}
                   {order.commission_piastres === null ? (
-                    <span className="orders__nobody">Nothing earned</span>
+                    <span className="orders__nobody">not available</span>
                   ) : (
                     <Money piastres={order.commission_piastres} kind="agreed" />
                   )}
@@ -443,7 +464,6 @@ export function OrderDetail() {
                   <li key={`${line.title}-${index}`}>
                     <span>
                       {line.title}
-                      {line.variant && <span className="orders__nobody"> · {line.variant}</span>}
                       {line.quantity > 1 && <span className="orders__nobody"> × {line.quantity}</span>}
                     </span>
                     <Money piastres={line.total_piastres} kind="agreed" />
@@ -469,9 +489,9 @@ export function OrderDetail() {
  * *Counted in September 2026*, or *Excluded from it* — the export's line.
  *
  * Counted takes the month that actually paid it where that is a different
- * one (§11.4), because that is the month a model will find it in. A pending
- * order has not been decided either way, and says so rather than borrowing
- * one of the two answers.
+ * one (§11.4), because that is the month a model will find it in. **A pending
+ * order is counted** (F02, ADR 0040): its month is paid on it, and the export
+ * says *Counted in* for it as it does for a delivered one.
  */
 export function countsTowards(order: Pick<
   OrderRow,
@@ -479,9 +499,11 @@ export function countsTowards(order: Pick<
 >): { label: string; tone: "settled" | "owed" | "refused" | "quiet" } {
   if (order.outcome !== "attributed") return { label: "No model's month", tone: "quiet" };
   const month = formatMonth(order.paid_in_month ?? order.business_month);
-  if (order.commission_state === "earned") return { label: `Counted in ${month}`, tone: "settled" };
+  if (order.commission_state === "earned" || order.commission_state === "pending") {
+    return { label: `Counted in ${month}`, tone: "settled" };
+  }
   if (order.commission_state === "void" || order.cancelled || order.delivery_state === "failed") {
     return { label: `Excluded from ${formatMonth(order.business_month)}`, tone: "refused" };
   }
-  return { label: "Waiting for delivery", tone: "owed" };
+  return { label: `Counted in ${month}`, tone: "settled" };
 }

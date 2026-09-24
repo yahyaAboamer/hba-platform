@@ -27,6 +27,7 @@ from app.models.attributed_orders import AttributedOrder
 from app.models.identity import UserAccount
 from app.models.orders import OrderIndex
 from app.services.attribution import AttributionOutcome, resolve_order
+from app.services.commission.state import order_status
 
 router = APIRouter(prefix="/api/orders")
 
@@ -66,6 +67,16 @@ def _render(db: Session, order: OrderIndex, names: dict[int, str]) -> dict:
         "delivery_state": order.delivery_state,
         "delivery_status": order.delivery_status,
         "cancelled": order.cancelled_at is not None,
+        # What happened to it, derived from the counting state where there is
+        # one: a delivered order later cancelled or refunded still counts and
+        # still reads *Delivered* (F04), and only a courier's failure reads
+        # *Failed delivery*.
+        "status": order_status(
+            state=attributed.commission_state if attributed is not None else None,
+            delivery_state=order.delivery_state,
+            cancelled_at=order.cancelled_at,
+            financial_status=order.financial_status,
+        ),
     }
 
     if decision.outcome == AttributionOutcome.HELD:
@@ -209,9 +220,15 @@ def order_detail(
     commission = None
     if row["outcome"] == "attributed" and row["affiliate_id"] is not None:
         affiliate = db.get(AffiliateProfile, row["affiliate_id"])
-        rate_bp, counted = month_rule(db, affiliate, order.business_month)
-        commission = _order_commission(
-            row["base_piastres"] or 0, rate_bp, row["commission_state"], counted
+        rate_bp, counted, _ = month_rule(db, affiliate, order.business_month)
+        commission = (
+            # The approved order view prints EGP 0.00 for an order that did
+            # not count: it earned nothing, which is a figure, not a gap.
+            0
+            if row["commission_state"] == "void"
+            else _order_commission(
+                row["base_piastres"] or 0, rate_bp, row["commission_state"], counted
+            )
         )
 
     lines = [

@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import { MonthPicker } from "../components/MonthPicker";
 import { Money } from "../components/Money";
@@ -109,6 +109,8 @@ type ProfileOrder = {
   base_piastres: number;
   placed_piastres: number | null;
   state: "earned" | "pending" | "void";
+  /** What happened to it; only a courier's failure is `failed`. */
+  status: "delivered" | "pending" | "failed" | "cancelled" | "refunded";
   commission_piastres: number | null;
 };
 
@@ -135,11 +137,18 @@ type ProfileRecord = { targets: TargetMonth[]; statements: StatementMonth[] };
 
 type Tone = { label: string; tone: string };
 
-/** The export's three order states, by what they mean for money. */
-const ORDER_STATE: Record<string, Tone> = {
-  earned: { label: "Delivered", tone: "approved" },
+/**
+ * The export's three order states, by what they mean for money - and the two
+ * void orders the export has no word for. A cancelled order, or one refunded
+ * while travelling, did not count either, and is red like a failed delivery;
+ * it is not *called* a failed delivery, because no courier failed.
+ */
+const ORDER_STATE: Record<ProfileOrder["status"], Tone> = {
+  delivered: { label: "Delivered", tone: "approved" },
   pending: { label: "Pending", tone: "owed" },
-  void: { label: "Failed delivery", tone: "refused" },
+  failed: { label: "Failed delivery", tone: "refused" },
+  cancelled: { label: "Cancelled", tone: "refused" },
+  refunded: { label: "Refunded", tone: "refused" },
 };
 
 /** An agreed month's state, in the words the Payments list uses. */
@@ -153,6 +162,11 @@ const STATEMENT_STATE: Record<string, Tone> = {
 
 function dateDay(iso: string): string {
   return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "long" });
+}
+
+/** `25 November 2026` - the approved orders table prints the year. */
+function dateWithYear(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
 }
 
 /**
@@ -169,6 +183,8 @@ function targetState(row: TargetMonth): Tone {
 
 export function AffiliateDetail({ session }: { session: Session }) {
   const { id } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [query, setQuery] = useSearchParams();
   const section = ["overview", "wardrobe", "performance", "targets", "payments"].includes(query.get("section") ?? "") ? query.get("section")! : "overview";
   const [month, setMonth] = useState(query.get("month")?.match(/^\d{4}-(0[1-9]|1[0-2])$/) ? query.get("month")! : session.platform.working_month);
@@ -1050,16 +1066,33 @@ export function AffiliateDetail({ session }: { session: Session }) {
                 </thead>
                 <tbody>
                   {orders.map((order) => {
-                    const state = ORDER_STATE[order.state] ?? ORDER_STATE.pending;
+                    const state = ORDER_STATE[order.status] ?? ORDER_STATE.pending;
+                    const opens = `/orders/${encodeURIComponent(order.shopify_order_id)}`;
+                    // The export's row is one button: the whole line opens
+                    // the order, and the order's back link returns here.
+                    const back = { label: detail.name, to: `${location.pathname}${location.search}` };
                     return (
-                      <tr key={order.shopify_order_id}>
+                      <tr
+                        key={order.shopify_order_id}
+                        className="profile__order-row"
+                        onClick={() => navigate(opens, { state: { back } })}
+                      >
                         <td className="profile__ref">
-                          <Link to={`/orders/${encodeURIComponent(order.shopify_order_id)}`}>{order.order_number}</Link>
+                          <Link to={opens} state={{ back }} onClick={(event) => event.stopPropagation()}>
+                            {order.order_number}
+                          </Link>
                         </td>
-                        <td className="profile__muted">{dateDay(order.placed_at)}</td>
+                        <td className="profile__muted">{dateWithYear(order.placed_at)}</td>
                         <td className={`profile__state profile__tone--${state.tone}`}>{state.label}</td>
                         <td className="profile__money">
-                          <Money piastres={order.placed_piastres ?? order.base_piastres} kind="agreed" />
+                          {/* Net sales, or the placed-at figure a cancelled
+                              order keeps; *amount not available* where the
+                              shop holds neither, never a zero. */}
+                          {order.base_piastres > 0
+                            ? <Money piastres={order.base_piastres} kind="agreed" />
+                            : order.placed_piastres !== null
+                              ? <Money piastres={order.placed_piastres} kind="agreed" />
+                              : <span className="profile__muted">amount not available</span>}
                         </td>
                         <td className="profile__money">
                           {order.commission_piastres === null

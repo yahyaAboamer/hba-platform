@@ -328,6 +328,12 @@ should be your call rather than a default we chose quietly.
 
 **G. The fourth order filter: *Not counted* or *Failed*?**
 
+*Done in batch D, 24 September: the filter is the export's* Failed*, as the
+export files its own cancelled order there; each row's chip names the real
+case - *Failed delivery*, *Cancelled* or *Refunded* - and only a courier's
+failure reads *Failed delivery*. See the handoff. The recommendation below is
+kept for the record.*
+
 > **The approved export:** *Failed*.
 > **The bucket's contents:** cancelled and refunded orders land here too, and
 > neither failed.
@@ -462,7 +468,7 @@ figures it needs and nothing else. Both work; the export keeps more in view.
 and it stays; the export draws a `<select>` on the admin and a sheet on the
 phone. Recorded so nobody "fixes" it back.
 
-**13. The portal's fourth order filter is *Not counted*, not *Failed*.**
+**13. The portal's fourth order filter is *Not counted*, not *Failed*.** *(Superseded by batch D: now* Failed*, with chips that name the case.)*
 Deliberate: that bucket holds cancelled and refunded orders too, and calling a
 cancelled order a failed delivery describes something that never happened. The
 other three now match the export exactly.

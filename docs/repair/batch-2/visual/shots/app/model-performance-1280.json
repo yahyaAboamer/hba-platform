@@ -29,7 +29,7 @@
   "September 2026",
   "▾",
   "ORDER DATE STATUS NET SALES COMMISSION",
-  "#1014 8 September Delivered EGP 10,710.00 EGP 1,071.00"
+  "#1014 8 September 2026 Delivered EGP 10,710.00 EGP 1,071.00"
  ],
  "headings": [
   "Sara Edrees"
@@ -77,5 +77,11 @@
  },
  "background": "rgb(8, 9, 10)",
  "scrollHeight": 900,
- "clientHeight": 900
+ "clientHeight": 900,
+ "viewport": {
+  "innerWidth": 1280,
+  "innerHeight": 900,
+  "devicePixelRatio": 1,
+  "frame": null
+ }
 }
