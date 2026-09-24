@@ -67,7 +67,7 @@ what was chosen.
 | [0025](0025-delivery-is-final.md) | Delivery is final: V1 ignores what happens afterwards | Accepted |
 | [0026](0026-proof-lives-in-postgres.md) | Payment proof is stored in Postgres, in its own table | Accepted |
 | [0027](0027-numerals-change-face-when-a-figure-becomes-an-obligation.md) | Numerals change face when a figure becomes an obligation | Typeface rule superseded by 0039 |
-| [0028](0028-paying-by-bank-or-wallet-needs-a-number-not-a-link.md) | Paying by bank or wallet needs a number, not a link | Accepted, amended 2026-08-27, deep link verified 2026-08-27 |
+| [0028](0028-paying-by-bank-or-wallet-needs-a-number-not-a-link.md) | Paying by bank or wallet needs a number, not a link | Accepted, amended 2026-08-27; **reveal step superseded by 0042** |
 | [0029](0029-a-late-order-is-paid-at-its-own-months-rate.md) | A late order is paid at its own month's rate, on top of any guarantee | Accepted |
 | [0030](0030-a-reopened-month-emails-once-on-reapproval.md) | A reopened month emails once, on re-approval, and says why | Accepted |
 | [0031](0031-the-platform-runs-in-amsterdam-not-california.md) | The platform runs in Amsterdam, not California | Accepted |

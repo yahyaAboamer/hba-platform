@@ -1,5 +1,16 @@
 # Implementation status — correction in progress
 
+> **SUPERSEDED as a statement of position, 24 September 2026.** Where the work
+> is now: [`../plans/2026-09-24-continuation-handoff.md`](../plans/2026-09-24-continuation-handoff.md).
+> Per-screen state: `parity/SCREEN_MATRIX.md`. This file is kept for the
+> paragraph below on how the redesign came to be called complete when it was
+> not — that is worth re-reading and is still true.
+>
+> Two instructions in it are replaced: *"the owner signs in himself"* (the
+> review browser makes its own sessions now — `CLAUDE.md`, *Looking at
+> screens*), and the 12 September promotion rule (**suspended** for the audit
+> repair: no merge, no deployment).
+
 **Current position, 12 September 2026.** The redesign is **not complete**, and
 the phase table further down is historical reporting rather than acceptance.
 Phases 00-09 are merged and their features work; the screens were built onto

@@ -30,6 +30,11 @@
   "Open settings",
   "⋯",
   "×",
+  "1 piece of order syncing failed.",
+  "Sales in those orders are not attributed to anybody yet.",
+  "Open sync",
+  "⋯",
+  "×",
   "14 models still unapproved for August 2026.",
   "The month cannot close while any model is still unapproved.",
   "Open payroll",
@@ -126,6 +131,9 @@
   "Open settings",
   "⋯",
   "×",
+  "Open sync",
+  "⋯",
+  "×",
   "Open payroll",
   "⋯",
   "×",
@@ -193,5 +201,11 @@
  },
  "background": "rgb(8, 9, 10)",
  "scrollHeight": 900,
- "clientHeight": 900
+ "clientHeight": 900,
+ "viewport": {
+  "innerWidth": 1280,
+  "innerHeight": 900,
+  "devicePixelRatio": 1,
+  "frame": null
+ }
 }

@@ -1,5 +1,22 @@
 # Where the work is — 12 September 2026
 
+> **SUPERSEDED, 24 September 2026.** The current handoff is
+> [`2026-09-24-continuation-handoff.md`](2026-09-24-continuation-handoff.md).
+> Kept because the paragraph on how the redesign was mistakenly called
+> complete is worth re-reading. **One thing in it is paused:**
+>
+> - *"`main` and `production` are level and stay that way — the owner asked
+>   for production to match staging automatically, without being asked each
+>   time."* That was right for the build phase. **It is suspended for the
+>   audit repair**, by the owner's explicit and repeated instruction: no merge
+>   and no deployment until he says so. `CLAUDE.md` holds the current version.
+>
+> The browser instructions here — sign in at staging, serve the exports on
+> 8899, compare at 1280 and 1440 — are replaced for sweeps by the Playwright
+> harness in `docs/repair/batch-2/visual/`. Serving the exports on 8899 and
+> excluding the demo toolbar still hold.
+
+
 Replaces `2026-09-11-design-parity-handoff.md`, which was written by the agent
 that produced the correction package and describes a branch that is now merged.
 

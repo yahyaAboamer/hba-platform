@@ -1,5 +1,28 @@
 # Handoff — exact design implementation, 16 September 2026
 
+> **SUPERSEDED, 24 September 2026.** The current handoff is
+> [`2026-09-24-continuation-handoff.md`](2026-09-24-continuation-handoff.md).
+> Kept because it records how the design work was actually done, which still
+> holds. **Four things in it are no longer true:**
+>
+> - *"Pending orders are not counted by the live rule."* They are.
+>   `PENDING_INCLUSIVE` is the live policy and every approval writes it into
+>   its snapshot. ADR 0040.
+> - *"ADR 0028: a full payout destination goes only through the audited
+>   reveal."* Amended by **ADR 0042** on the owner's explicit instruction: the
+>   payer sees the whole destination, on the row, on the detail card and on
+>   the model's profile. Masking still governs every record.
+> - **Blockers 1 and 2 are cleared.** The portal has been seen rendered and
+>   the width pass is done — a headless Playwright browser makes its own
+>   sessions and sets its own viewport, so neither signing the admin out nor
+>   resizing a window is involved. See `CLAUDE.md`, *Looking at screens*.
+> - *"Run the suite in fifteen groups of five files."* Superseded by
+>   `docs/repair/batch-1/run-suite.sh`, one file per process and resumable.
+>
+> The counts quoted below (1936 backend, 321 frontend) are the counts of that
+> day. They are 2,039 and 363 now.
+
+
 The standard is `HBA_Exact_Design_Implementation_Prompt.md` at the repo root:
 every screen must match its **corresponding element** in the approved
 exports — structure, copy, sizes, tones and interactions — not merely use

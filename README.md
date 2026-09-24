@@ -7,6 +7,9 @@ commission and payroll module.
 
 | | |
 |---|---|
+| **How the platform must behave** | [`docs/RULES.md`](docs/RULES.md) — the rules, one shared source for every agent and person |
+| **How to work in this repository** | [`CLAUDE.md`](CLAUDE.md) — verification, branches, the browser harness |
+| **Where the work is right now** | [`docs/plans/2026-09-24-continuation-handoff.md`](docs/plans/2026-09-24-continuation-handoff.md) |
 | **Why it is built this way** | [`docs/adr/`](docs/adr/README.md) — architecture decision records |
 | **What will eventually break** | [`docs/limits.md`](docs/limits.md) — known limits and foreseeable failures |
 | **What it does** | [`docs/specs/2026-08-22-hba-platform-v1-design.md`](docs/specs/2026-08-22-hba-platform-v1-design.md) |
@@ -33,8 +36,9 @@ python -m venv .venv
 # 3. Frontend
 cd frontend && npm ci && npm run build && cd ..
 
-# 4. Tests  (one at a time - see below)
-./.venv/Scripts/python.exe -m pytest -q
+# 4. Tests  (one at a time, and NEVER without DATABASE_URL - see below)
+DATABASE_URL='postgresql+psycopg://hba:hba@127.0.0.1:5433/hba_platform_test' \
+  ./.venv/Scripts/python.exe -m pytest -q
 
 # 5. Run it
 ./.venv/Scripts/python.exe -m uvicorn app.main:app --reload
@@ -84,15 +88,33 @@ the interface is presentation, not protection.
 ## Running the tests
 
 ```
-pytest
+DATABASE_URL='postgresql+psycopg://hba:hba@127.0.0.1:5433/hba_platform_test' \
+  ./.venv/Scripts/python.exe -m pytest -q --color=no
 ```
+
+**`DATABASE_URL` is not optional, and there is no configuration that sets it
+for you.** Unset, pytest falls through to `app/config.py`'s default, which is
+the **dev** database - and the suite truncates every table after each
+committing test. A session ran that way on 10 September and emptied the dev
+data; every test passed, because the suite builds its own rows. This README
+used to print a bare `pytest`, which is that mistake in the one place
+somebody copies from.
+
+For the whole suite, use `docs/repair/batch-1/run-suite.sh`: one file per
+process, resumable, and it refuses any database that has not said inside
+itself that it is disposable. `CLAUDE.md` has the exit codes.
 
 **Do not run two pytest processes at once.** The suite empties the database
 between tests, so a second run pulls the first one's rows out from under it and
-produces failures that look like real bugs. This has cost time more than once.
+produces failures that look like real bugs. This has cost time more than once -
+most recently on 23 September, where it produced six failures in a file that
+passed alone minutes later.
 
-The suite runs in about **90 seconds**. It used to take fifteen minutes, and the
-two reasons are worth knowing because both traps are easy to reintroduce:
+The suite took about **90 seconds** when it was 317 tests on an unloaded
+machine. It is 2,039 tests now and the honest figure depends entirely on what
+else is running: a full pass on the development laptop on 23 September took
+about an hour across three runner calls. The two optimisations below are still
+worth knowing, because both traps are easy to reintroduce:
 
 **Every test that commits used to rebuild the schema** - drop it, then re-run
 every migration - because the append-only guards refuse `TRUNCATE`. That is

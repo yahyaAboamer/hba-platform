@@ -219,6 +219,17 @@ async function digest(page, selector) {
       background: getComputedStyle(root).backgroundColor,
       scrollHeight: root.scrollHeight,
       clientHeight: root.clientHeight,
+      // **The width it was actually taken at, read in the same batch as the
+      // shutter.** The filename says 1280 because the config said 1280; this
+      // says 1280 because the page did. Window-driven captures were renamed
+      // after the fact for exactly this reason, and a digest that cannot
+      // evidence its own width is a digest somebody has to trust.
+      viewport: {
+        innerWidth: window.innerWidth,
+        innerHeight: window.innerHeight,
+        devicePixelRatio: window.devicePixelRatio,
+        frame: sel ? Math.round(root.getBoundingClientRect().width) : null,
+      },
     };
   }, selector);
 }
