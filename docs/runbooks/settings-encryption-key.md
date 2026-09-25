@@ -65,8 +65,10 @@ would make the encryption decoration.
 
 ## 3. Set it on Railway, sealed
 
-For each environment (staging, then production when promotion is authorised),
-on the **hba-platform** service → *Variables*:
+For each environment, on its own service (ADR 0034 - they are separate
+services): **`hba-platform-staging`** in the `staging` environment, and
+**`hba-platform`** in `production` when promotion is authorised. Service →
+*Variables*:
 
 1. *New Variable* → name `SETTINGS_ENCRYPTION_KEY`, value the key.
 2. Open the variable's ⋯ menu → **Seal**. A sealed variable is given to builds

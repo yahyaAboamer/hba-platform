@@ -46,14 +46,52 @@ pictures and measured values in `docs/repair/batch-2/visual/shots/batch-j/`
 | 30a | `SETTINGS_ENCRYPTION_KEY` runbook; a malformed key named as such | `29df94e` |
 | 31a | Import comparison verdict three-way: limited access is **inconclusive** | the commit after `29df94e` |
 
+## Batch J follow-up - items 3, 8, 15a, 19a, and the merge (25-26 September)
+
+| Item | What | Commit |
+|---|---|---|
+| 19a | Worker jobs run in a thread; the API answers during a job (23ms during a 5-second sweep, was: after it) | `4fef951` |
+| 3 | Ranking names every model with her code; *You* on her own row; sales still hers alone (M02) | `95e62d2` |
+| 8 | The roster's invitation row opens the invitation (marked, in view) where Resend / Withdraw are | `96396b5` |
+| 15a | An arrangement can be chosen before a month, as the export's `termsVals` | `880729f` |
+
+**To be merged to `main` (staging) on the owner's instruction of 26 September, once the full runner passes on this head**
+(*merge to staging first*). **Production was not touched** - promotion is its
+own decision. `main` was a strict ancestor of `repair/batch-2`, so it is a
+fast-forward; it also brings `repair/batch-1-financial-rules`' 8 commits,
+which were all already in `repair/batch-2`.
+
+**Staging needs, before its connection form can be used:** a sealed
+`SETTINGS_ENCRYPTION_KEY` on `hba-platform-staging` (runbook). Without it the
+platform runs and the form refuses to save, by design. Migrations
+`c3d51e7a0002` and `d4e7a2c90003` apply on deploy (additive).
+
+**Not verified from here:** this session's network policy blocks the staging
+domain and the Railway connector sees no projects, so the deploy's success
+and a look at staging are the owner's to confirm.
+
+## The other branches (checked with full history, 26 September)
+
+- **11 `phase*` branches** (`phase04b` ... `phase09`): every commit is in
+  `main`. Nothing to merge; they are labels from the build phase. Safe to
+  delete - not deleted, the owner decides.
+- **`repair/batch-1-financial-rules`**: fully in `repair/batch-2`, so in
+  `main` with this merge. Safe to delete afterwards.
+- **`feat/portal-dark-mode`** (5 commits, 31 August): a warm "lamplight"
+  dark theme for the portal with a light/dark/auto pick on My details, and
+  an ADR numbered 0035. **Superseded**: the redesign since made dark the
+  portal's default with its own theme system (`lib/theme.ts`, the export's
+  Appearance switch), and `main`'s ADR 0035 is a different decision. A merge
+  conflicts in `lib/theme.ts` and `MyDetails.tsx` and would bring back a
+  palette the approved exports replaced. Recommendation: do not merge; delete
+  it (or keep it only as a reference). Not deleted - the owner decides.
+
 ## Remaining implementation (the one list, in its order)
 
-- **3** Ranking names the other models (decision F in the list's own words).
-- **8** (remainder) the roster's invitation row opens the invitation.
 - **14** the export's *More actions* card on the profile (ours archives
   elsewhere) - not in item 14's wording; noted, not started.
-- **15a** terms editing: choose an arrangement before a month (found in J).
-- **19a** the worker blocks the web server while a job runs (found in J).
+- **15a** (remainder) future months' terms and the 2027 year button - needs
+  data with terms past this year to compare.
 - Verification items 20-29 unchanged: *Attributed orders* layout, the
   export's blank order view, receipts, earnings line names on a guarantee,
   images, printing, staging exercises, real data, devices, old
