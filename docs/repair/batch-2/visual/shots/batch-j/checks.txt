@@ -215,3 +215,24 @@
 [1280] export vTerms tiles: []
 [1280] terms buttons (after): 21 buttons, 0 in Inter: []
 [1440] terms buttons (after): 21 buttons, 0 in Inter: []
+## product - 2026-09-25T22:20:31.564Z
+[1280] export order reference: {"text":"#28980","font":"13px 400 Arial","color":"rgb(35, 169, 92)","background":"rgba(0, 0, 0, 0)","border":"0px none rgb(35, 169, 92)","radius":"0px","padding":"0px","height":15}
+[1280] export shipment record: ["←","BLACK HBA CLUB 06 JERSEY","Shipment record","BLACK HBA CLUB 06 JERSEY · Aya Sherif","BLACK HBA CLUB 06 JERSEY","Received","Model","Aya Sherif","Size","L","Shopify order","#28980","Delivered and part of the wardrobe."]
+[1280] app order reference: {"text":"#G2001","font":"13px 400 Arial","color":"rgb(236, 239, 234)","background":"rgba(0, 0, 0, 0)","border":"0px none rgb(236, 239, 234)","radius":"0px","padding":"0px","height":15}
+[1280] app rows: ["Sara Edrees | #G2001","Aya Sherif | not sent","Dina Rashad | not sent"]
+[1280] app shipment record: ["← Panel Track Jacket","Shipment record","Panel Track Jacket · Sara Edrees","Panel Track Jacket","Processing","Model","Sara Edrees","Size","M","Shopify order","#G2001","In transit according to Shopify. It becomes part of the wardrobe once it arrives."]
+[1280] after reload: ["← Panel Track Jacket","Shipment record","Panel Track Jacket · Sara Edrees","Panel Track Jacket"]
+[1280] presets: ["Back in stock","Sales push this week","New colourway"]
+[1280] app preset: {"text":"Back in stock","font":"12px 400 Arial","color":"rgb(167, 173, 166)","background":"rgba(0, 0, 0, 0)","border":"1px solid rgb(35, 39, 43)","radius":"999px","padding":"6px 10px","height":28}
+[1280] after preset: message="Sales push this week — include it where it fits." count="48 characters"
+[1280] refused save: alert="Could not save." message kept=true
+[1280] saved and reloaded: "Sales push this week — include it where it fits."
+[1440] export order reference: {"text":"#28980","font":"13px 400 Arial","color":"rgb(35, 169, 92)","background":"rgba(0, 0, 0, 0)","border":"0px none rgb(35, 169, 92)","radius":"0px","padding":"0px","height":15}
+[1440] export shipment record: ["←","BLACK HBA CLUB 06 JERSEY","Shipment record","BLACK HBA CLUB 06 JERSEY · Aya Sherif","BLACK HBA CLUB 06 JERSEY","Received","Model","Aya Sherif","Size","L","Shopify order","#28980","Delivered and part of the wardrobe."]
+[1440] app order reference: {"text":"#G2001","font":"13px 400 Arial","color":"rgb(236, 239, 234)","background":"rgba(0, 0, 0, 0)","border":"0px none rgb(236, 239, 234)","radius":"0px","padding":"0px","height":15}
+[1440] app rows: ["Sara Edrees | #G2001","Aya Sherif | not sent","Dina Rashad | not sent"]
+[1440] app shipment record: ["← Panel Track Jacket","Shipment record","Panel Track Jacket · Sara Edrees","Panel Track Jacket","Processing","Model","Sara Edrees","Size","M","Shopify order","#G2001","In transit according to Shopify. It becomes part of the wardrobe once it arrives."]
+[1440] after reload: ["← Panel Track Jacket","Shipment record","Panel Track Jacket · Sara Edrees","Panel Track Jacket"]
+[1280] export preset: {"text":"Back in stock","font":"12px 400 Arial","color":"rgb(167, 173, 166)","background":"rgba(0, 0, 0, 0)","border":"1px solid rgb(35, 39, 43)","radius":"999px","padding":"6px 10px","height":28}
+[1280] app references after colour fix: ["#G2001 rgb(35, 169, 92) 13px w200","not sent rgb(138, 145, 138) 13px w200"] (export: rgb(35, 169, 92) 13px, 200px; not sent faint)
+[1440] app references after colour fix: ["#G2001 rgb(35, 169, 92) 13px w200","not sent rgb(138, 145, 138) 13px w200"] (export: rgb(35, 169, 92) 13px, 200px; not sent faint)

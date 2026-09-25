@@ -316,6 +316,24 @@ def test_the_roster_groups_every_model_including_those_never_sent_it(db):
     assert never.id
 
 
+def test_each_model_on_a_product_names_the_order_that_carried_it(db):
+    """The export prints the Shopify order beside her name and opens it
+    (`orderRefFor`, `vShipment`): her newest gift of it, with its size. A model
+    never sent it has no order to name."""
+    aya = _model(db, name="Aya", email="aya@example.com")
+    _model(db, name="Dina", email="dina@example.com")
+    _product(db, PANTS, "Wide-leg trousers")
+    _parcel(db, aya, "7001", [(PANTS, "Wide-leg trousers", "S")], placed="2026-07-01")
+    _parcel(db, aya, "7009", [(PANTS, "Wide-leg trousers", "M")], placed="2026-08-20")
+
+    roster = roster_for(db, PANTS)
+
+    row = roster["received"][0]
+    assert (row["shopify_order_id"], row["size"]) == ("7009", "M")
+    assert row["order_number"]
+    assert "shopify_order_id" not in roster["not_sent"][0]
+
+
 def test_the_roster_is_alphabetical_inside_a_group(db):
     """W02: names alphabetical inside groups."""
     for name in ("Zeina", "Aya", "Mona"):

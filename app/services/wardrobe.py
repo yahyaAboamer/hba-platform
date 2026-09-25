@@ -260,11 +260,11 @@ def roster_for(db: Session, shopify_product_id: str) -> dict:
     """
     from app.models.affiliates import AccountKind, AffiliateProfile
 
-    latest: dict[int, str] = {}
-    for shipment, order, _line in _gift_lines(db, product_id=shopify_product_id):
+    latest: dict[int, tuple] = {}
+    for shipment, order, line in _gift_lines(db, product_id=shopify_product_id):
         # Newest first, so the first row seen for a model is the one that
         # counts and later rows are her earlier history.
-        latest.setdefault(shipment.affiliate_id, _state_for(order))
+        latest.setdefault(shipment.affiliate_id, (_state_for(order), order, line))
 
     models = list(
         db.scalars(
@@ -282,7 +282,19 @@ def roster_for(db: Session, shopify_product_id: str) -> dict:
     }
     for model in models:
         row = {"affiliate_id": model.id, "name": model.name, "status": model.status}
-        groups[latest.get(model.id, "not_sent")].append(row)
+        found = latest.get(model.id)
+        if found is None:
+            groups["not_sent"].append(row)
+            continue
+        state, order, line = found
+        # The export prints the order that carried it beside her name, and
+        # opens it (`orderRefFor`, `vShipment`): which parcel, what size.
+        row.update(
+            shopify_order_id=order.shopify_order_id,
+            order_number=order.order_number,
+            size=line.variant_title,
+        )
+        groups[state].append(row)
 
     # Names alphabetical inside groups (W02). The query already ordered by
     # name, so each list arrives sorted and nothing re-sorts it.

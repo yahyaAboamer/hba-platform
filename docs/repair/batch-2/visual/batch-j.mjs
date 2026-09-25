@@ -598,6 +598,72 @@ steps.chart = async (browser) => {
   }
 };
 
+/** Item 16: the order reference on a product, its shipment record, and the presets. */
+steps.product = async (browser) => {
+  for (const width of [1280, 1440]) {
+    const { context: rc, ref } = await openExport(browser, ADMIN_EXPORT, width);
+    await exportNav(ref, NAV.products).click();
+    await settle(ref, 700);
+    await ref.locator(".ad > div:nth-child(2) button").filter({ has: ref.locator("span", { hasText: /^\s*→\s*$/ }) }).first().click();
+    await settle(ref, 700);
+    const refRef = ref.locator(".ad button", { hasText: /^#\d+$/ }).first();
+    log(`[${width}] export order reference: ${JSON.stringify(await style(ref, refRef))}`);
+    await ref.locator(".ad").screenshot({ path: join(OUT, `export-product-${width}.png`) });
+    await refRef.click();
+    await settle(ref, 600);
+    log(`[${width}] export shipment record: ${JSON.stringify(await ref.locator(".ad > div:nth-child(2)").innerText().then((t) => t.split("\n").map((x) => x.trim()).filter(Boolean)))}`);
+    await ref.locator(".ad").screenshot({ path: join(OUT, `export-shipment-${width}.png`) });
+    await rc.close();
+
+    const { context, page } = await signIn(browser, OWNER, { width, height: 900 });
+    await page.goto(`${APP}/products/track-jacket`, { waitUntil: "networkidle" });
+    await settle(page, 800);
+    const mine = page.locator(".product__roster-ref").filter({ hasText: /^#/ }).first();
+    log(`[${width}] app order reference: ${JSON.stringify(await style(page, mine))}`);
+    log(`[${width}] app rows: ${JSON.stringify(await page.locator(".product__roster li").evaluateAll((els) => els.slice(0, 3).map((e) => e.innerText.replace(/\n/g, " | "))))}`);
+    await page.screenshot({ path: join(OUT, `app-product-${width}.png`) });
+    await mine.click();
+    await settle(page, 700);
+    const record = async () => (await page.locator("main").innerText()).split("\n").map((x) => x.trim()).filter(Boolean);
+    log(`[${width}] app shipment record: ${JSON.stringify(await record())}`);
+    await page.reload({ waitUntil: "networkidle" });
+    await settle(page, 700);
+    log(`[${width}] after reload: ${JSON.stringify((await record()).slice(0, 4))}`);
+    await page.screenshot({ path: join(OUT, `app-shipment-${width}.png`) });
+
+    if (width === 1280) {
+      await page.goto(`${APP}/products/track-jacket?view=promotion`, { waitUntil: "networkidle" });
+      await settle(page, 700);
+      const presets = page.locator(".promo__preset");
+      log(`[${width}] presets: ${JSON.stringify(await presets.allInnerTexts())}`);
+      log(`[${width}] app preset: ${JSON.stringify(await style(page, presets))}`);
+      await presets.nth(1).click();
+      log(`[${width}] after preset: message=${JSON.stringify(await page.locator("#promotion-message").inputValue())} count=${JSON.stringify(await page.locator(".promo__count").innerText())}`);
+      await page.route("**/api/products/track-jacket/feature-request", (route) => route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ detail: "Could not save." }) }));
+      await page.getByRole("button", { name: "Save" }).click();
+      await settle(page, 600);
+      log(`[${width}] refused save: alert=${JSON.stringify(await page.getByRole("alert").first().innerText().catch(() => "none"))} message kept=${(await page.locator("#promotion-message").inputValue()).startsWith("Sales push")}`);
+      await page.unroute("**/api/products/track-jacket/feature-request");
+      await page.getByRole("button", { name: "Save" }).click();
+      await settle(page, 900);
+      await page.goto(`${APP}/products/track-jacket`, { waitUntil: "networkidle" });
+      await settle(page, 700);
+      log(`[${width}] saved and reloaded: ${JSON.stringify(await page.locator(".product__message").innerText().catch(() => "none"))}`);
+    }
+    await context.close();
+  }
+  const { context: pc, ref: pref } = await openExport(browser, ADMIN_EXPORT, 1280);
+  await exportNav(pref, NAV.products).click();
+  await settle(pref, 700);
+  await pref.locator(".ad > div:nth-child(2) button").filter({ has: pref.locator("span", { hasText: /^\s*→\s*$/ }) }).first().click();
+  await settle(pref, 700);
+  await pref.locator(".ad button", { hasText: /feature|Feature|Edit/ }).first().click();
+  await settle(pref, 700);
+  log(`[1280] export preset: ${JSON.stringify(await style(pref, pref.locator(".ad button", { hasText: /^Back in stock$/ })))}`);
+  await pref.locator(".ad").screenshot({ path: join(OUT, "export-promo-1280.png") });
+  await pc.close();
+};
+
 function previousMonth() {
   const now = new Date();
   const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);

@@ -1056,6 +1056,41 @@ font (ADR 0044) and its pill is 20px. App: `Affiliates.tsx` / `.css`,
   `checks.txt` (21 buttons, none in Inter, after as before); frontend 457
   tests and the build.
 
+## Batch J - Products: the order on each row, the shipment record, the presets (25 September)
+
+**Reference.** Export `vProduct` coverage rows (Admin lines 445-450;
+`orderRefFor` 2219, rows 2652-2661), `vShipment` (1135-1155; `shipmentVals`
+3060-3074), `vPromo` presets (1180-1190; `prPresets` 3103-3107, `prCount`
+3102). App: `app/services/wardrobe.py` (`roster_for`), `Products.tsx` /
+`.css`.
+
+- **The order on each row.** `roster_for` now carries, for a model who has
+  the product, the order of her newest gift of it and its size
+  (`shopify_order_id`, `order_number`, `size`) - the same query it already
+  ran, no new one. Each coverage row shows the order beside her name (13px,
+  200px, accent; *not sent* in faint for a model never sent it), measured
+  equal to the export at 1280 and 1440. Her name opens her wardrobe, as the
+  export's does.
+- **The shipment record** (`vShipment`): the product (back to it), the state
+  pill, Model, Size, Shopify order and the export's sentence for the state.
+  Opened as `?shipment={order}&model={id}` on the product and read from its
+  own roster, so a reload lands on the same record (checked). The export's
+  *no order reference* case cannot arise here: every row in a received,
+  processing or needs-checking group comes from an order.
+- **Presets**: the export's three pills beside the count - *Back in stock*,
+  *Sales push this week*, *New colourway* - each filling the message with
+  its sentence, which stays editable; the count reads *N characters* as the
+  export (ours said *N/2000*; the 2,000 limit is unchanged). Measured equal:
+  12px, 6px 10px, 999px, 28px high.
+- Checks: `test_wardrobe` (+1: the newest gift's order and size, none for a
+  model never sent it) with `test_products_api`, 44 passing;
+  `ProductShipment.test.tsx` (3); frontend 462 tests, 27 files, and the
+  build. Browser (`shots/batch-j/app-product-*`, `app-shipment-*`,
+  `export-product-*`, `export-shipment-*`, `export-promo-1280`): the order
+  opened its record, which survived a reload; a preset filled the message; a
+  refused save kept it and said so; saved, it was on the product after a
+  reload.
+
 ## Remaining work - the one list (reconciled 24 September)
 
 Reconciled against: the 24 September handoff (*What is waiting on Yahya*,
@@ -1138,9 +1173,9 @@ Admin (1280 / 1440)
     typography, so not folded into 15. Future months beyond the working one
     also read *Not yet* where the export shows their terms and a 2027 button
     - to be compared on data that has terms running past this year.
-16. **Products**: the per-model order reference the export prints on a
-    product (not in the roster payload); the feature request's message
-    presets (matrix B3, B4).
+16. ~~**Products**: the per-model order reference; the feature request's
+    message presets (matrix B3, B4)~~ - **done, batch J**. See *Batch J -
+    Products*.
 17. ~~**Settings → Shopify: *Refresh now* and *last successful refresh***~~
     - **done, batch J** (25 September). The reconciliation sweep brought
     forward; see *Batch J* below.
@@ -1263,6 +1298,7 @@ overpaid month (a real state the export never drew).
 | Wardrobe size, Targets words, payment-details words, Invitations words and dates, You buttons' font, the refund comment | Items 1, 2, 4, 7, 8, 18 | `1b0a240`; `shots/batch-g/checks.txt` |
 | Decisions c, d, e, g, h: account menu, product list line, top-sellers panel, the usual recording date, the password after *Save details* | Owner, 25 September | `52ab988`; `shots/batch-h/checks.txt` |
 | Decision b: the Shopify connection edited in Settings | Owner, 25 September | batch I (the commit that adds this row); ADR 0045; `tests/test_shopify_connection.py` (11), `ShopifyConnection.test.tsx` (4); `shots/batch-i/checks.txt` |
+| Products: order reference per model, shipment record, presets (item 16, B3, B4) | Matrix | batch J; `test_wardrobe` (+1), `ProductShipment.test.tsx` (3) |
 | Terms editing: fonts verified, dead CSS removed, footnote as the export (item 15) | Sweep | batch J; `shots/batch-j/checks.txt` |
 | Admin Home chart: rule labels outside the plot, export geometry (item 13) | Matrix | batch J; `shots/batch-j/app-home-chart-*` |
 | Roster and Products rows as the export's buttons; Table/Cards toggle removed (item 12, D) | Sweep, conflict D | batch J; `shots/batch-j/checks.txt` |

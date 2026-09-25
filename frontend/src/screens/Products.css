@@ -772,3 +772,30 @@
 .products__row { cursor: pointer; }
 /* The export's product name in its row: 14px. */
 .products__row .products__name { font-size: 14px; }
+
+/* A coverage row: the name, then the order that carried it (the export's
+   200px, 13px, accent when there is one). */
+.product__roster li { display: flex; align-items: center; gap: 16px; }
+.product__roster-name { flex: 1; min-width: 0; }
+.product__roster .product__roster-ref { flex: none; width: 200px; font-size: 13px; color: var(--accent); text-decoration: none; }
+.product__roster .product__roster-ref--none { color: var(--faint); }
+
+/* The export's presets beside the character count (`prPresets`). */
+.promo__under { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 9px; flex-wrap: wrap; }
+.promo__under .promo__count { margin-top: 0; }
+.promo__presets { display: flex; gap: 8px; flex-wrap: wrap; }
+.promo__preset { padding: 6px 10px; border: 1px solid var(--rule); border-radius: 999px; background: transparent; color: var(--quiet); font-size: 12px; cursor: pointer; }
+
+/* *Shipment record* (`vShipment`, Admin lines 1135-1155). */
+.shipment { max-width: 560px; padding: 18px 20px; }
+.shipment__head { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+.shipment__product { color: var(--accent); font-size: 16px; text-decoration: none; }
+.shipment__state { padding: 4px 10px; border: 1px solid currentColor; border-radius: 999px; font-size: 12px; }
+.shipment__state--approved { color: var(--accent); }
+.shipment__state--owed { color: var(--owed); }
+.shipment__state--refused { color: var(--refused); }
+.shipment__row { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; padding: 10px 0; border-top: 1px solid var(--rule); font-size: 13.5px; }
+.shipment__head + .shipment__row { margin-top: 8px; padding-top: 12px; }
+.shipment__row > span:first-child { color: var(--quiet); }
+.shipment__row a { color: var(--accent); text-decoration: none; font-size: 13.5px; }
+.shipment__note { margin: 4px 0 0; font-size: 12.5px; color: var(--faint); }

@@ -19,7 +19,16 @@ type Row = {
   featured: boolean | null;
 };
 
-type RosterEntry = { affiliate_id: number; name: string; status: string };
+type RosterEntry = {
+  affiliate_id: number;
+  name: string;
+  status: string;
+  /** Her newest gift of this product, when there is one: the order that
+   *  carried it and the size (the export's `orderRefFor` / `vShipment`). */
+  shopify_order_id?: string;
+  order_number?: string;
+  size?: string | null;
+};
 
 /**
  * What HBA has asked the models to post about this product (W09).
@@ -420,6 +429,23 @@ function ProductDetailPage({ id, session }: { id: string; session: Session }) {
   ];
   const audience = detail.roster.received.length + detail.roster.processing.length;
 
+  const shipmentOrder = query.get("shipment");
+  const shipment = shipmentOrder ? findShipment(detail, shipmentOrder, Number(query.get("model"))) : null;
+  if (shipmentOrder) {
+    return <>
+      <div className="page__head">
+        <Link className="button product__back" to={`/products/${id}`}>← {detail.title}</Link>
+        <div className="page__title">
+          <h1>Shipment record</h1>
+          {shipment && <span className="page__subtitle">{detail.title} · {shipment.entry.name}</span>}
+        </div>
+      </div>
+      {shipment
+        ? <ShipmentRecord productId={id} title={detail.title} shipment={shipment} />
+        : <p className="notice notice--refused" role="alert">That shipment is not on this product any more.</p>}
+    </>;
+  }
+
   return <>
     <div className="page__head">
       {promotion
@@ -508,13 +534,64 @@ function ProductDetailPage({ id, session }: { id: string; session: Session }) {
             {open && (shown.length === 0
               ? <p className="product__group-empty">{search ? "No matching models." : "None."}</p>
               : <ul className="product__roster">
-                  {shown.map((entry) => <li key={entry.affiliate_id}><Link to={`/affiliates/${entry.affiliate_id}`}>{entry.name}</Link></li>)}
+                  {shown.map((entry) => <li key={entry.affiliate_id}>
+                    <Link className="product__roster-name" to={`/affiliates/${entry.affiliate_id}?section=wardrobe`}>{entry.name}</Link>
+                    {/* The export's second column: the order that carried it,
+                     *  opening its shipment record; *not sent* otherwise. */}
+                    {entry.shopify_order_id
+                      ? <Link className="product__roster-ref control-font" to={`/products/${id}?shipment=${entry.shopify_order_id}&model=${entry.affiliate_id}`}>{entry.order_number}</Link>
+                      : <span className="product__roster-ref product__roster-ref--none">not sent</span>}
+                  </li>)}
                 </ul>)}
           </section>;
         })}
       </div>
     </>}
   </>;
+}
+
+/** The export's message presets (`prPresets`, Admin lines 3103-3107). */
+const PRESETS = [
+  "Back in stock — please feature this in your upcoming content.",
+  "Sales push this week — include it where it fits.",
+  "New colourway — we would love to see it styled.",
+];
+
+type Shipment = { entry: RosterEntry; state: "received" | "processing" | "needs_checking" };
+
+function findShipment(detail: Detail, order: string, affiliateId: number): Shipment | null {
+  for (const state of ["received", "processing", "needs_checking"] as const) {
+    const entry = detail.roster[state].find((row) => row.shopify_order_id === order && row.affiliate_id === affiliateId);
+    if (entry) return { entry, state };
+  }
+  return null;
+}
+
+const SHIPMENT_STATE = {
+  received: { label: "Received", tone: "approved", note: "Delivered and part of the wardrobe." },
+  processing: { label: "Processing", tone: "owed", note: "In transit according to Shopify. It becomes part of the wardrobe once it arrives." },
+  needs_checking: { label: "Needs checking", tone: "refused", note: "Shopify reports a delivery problem on this shipment. A replacement updates this shipment state." },
+} as const;
+
+/**
+ * *Shipment record* - the export's `vShipment` (Admin lines 1135-1155): the
+ * product, the state, the model, the size and the Shopify order, with what
+ * the state means. Read from the product's own roster, so a reload lands on
+ * the same record.
+ */
+function ShipmentRecord({ productId, title, shipment }: { productId: string; title: string; shipment: Shipment }) {
+  const state = SHIPMENT_STATE[shipment.state];
+  return <section className="pay-detail__card shipment">
+    <div className="shipment__head">
+      <Link className="shipment__product control-font" to={`/products/${productId}`}>{title}</Link>
+      <span className={`shipment__state shipment__state--${state.tone}`}>{state.label}</span>
+    </div>
+    <div className="shipment__row"><span>Model</span>
+      <Link className="control-font" to={`/affiliates/${shipment.entry.affiliate_id}?section=wardrobe`}>{shipment.entry.name}</Link></div>
+    <div className="shipment__row"><span>Size</span><span>{shipment.entry.size || "not recorded"}</span></div>
+    <div className="shipment__row"><span>Shopify order</span><span>{shipment.entry.order_number}</span></div>
+    <p className="shipment__note">{state.note}</p>
+  </section>;
 }
 
 /**
@@ -564,7 +641,15 @@ function PromotionEditor({ detail, audience, saving, mayEdit, onSave, onRemove, 
         <label htmlFor="promotion-message" className="promo__label">Short message <span className="promo__optional">optional</span></label>
         <textarea id="promotion-message" className="input promo__textarea" value={message} rows={3} maxLength={2000} disabled={saving || !mayEdit}
           onChange={(event) => { setMessage(event.target.value); setSaved(false); }} placeholder="Back in stock — please feature this in your upcoming content." />
-        <span className="promo__count">{message.length}/2000</span>
+        <div className="promo__under">
+          <span className="promo__count">{message.length} characters</span>
+          {/* The export's three presets (`prPresets`): each fills the message
+           *  with its sentence, which can then be edited. */}
+          {mayEdit && <span className="promo__presets">
+            {PRESETS.map((preset) => <button key={preset} type="button" className="promo__preset" disabled={saving}
+              onClick={() => { setMessage(preset); setSaved(false); }}>{preset.split(" —")[0]}</button>)}
+          </span>}
+        </div>
       </section>
       <div className="promo__acts">
         {mayEdit && <button type="button" className="button button--primary promo__big" disabled={saving} onClick={save}>{saving ? "Saving…" : "Save"}</button>}
