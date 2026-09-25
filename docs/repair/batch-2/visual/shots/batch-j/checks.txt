@@ -236,3 +236,5 @@
 [1280] export preset: {"text":"Back in stock","font":"12px 400 Arial","color":"rgb(167, 173, 166)","background":"rgba(0, 0, 0, 0)","border":"1px solid rgb(35, 39, 43)","radius":"999px","padding":"6px 10px","height":28}
 [1280] app references after colour fix: ["#G2001 rgb(35, 169, 92) 13px w200","not sent rgb(138, 145, 138) 13px w200"] (export: rgb(35, 169, 92) 13px, 200px; not sent faint)
 [1440] app references after colour fix: ["#G2001 rgb(35, 169, 92) 13px w200","not sent rgb(138, 145, 138) 13px w200"] (export: rgb(35, 169, 92) 13px, 200px; not sent faint)
+[1280] old reopen bookmark: url=/payroll/2026-08/reopen main="Nothing here\nThere is no screen at this address. Home"
+[1280] POST /api/payroll/2026-08/reopen: 405

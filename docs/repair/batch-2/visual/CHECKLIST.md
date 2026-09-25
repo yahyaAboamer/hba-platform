@@ -1099,8 +1099,11 @@ deleting historical records or disabling supported correction workflows.
 **Removed**
 
 - The screen `PayrollReopen.tsx` and its route `/payroll/:month/reopen`.
-  Nothing linked to it (the Payroll screen's button went in 05B); an old
-  bookmark now lands on the app's ordinary unknown-address handling.
+  Nothing linked to it (the Payroll screen's button went in 05B). An old
+  bookmark first rendered a **blank page** - the staff routes had no
+  catch-all, so any unknown address showed nothing (pre-existing). There is
+  one now, inside the layout: *Nothing here - There is no screen at this
+  address. Home*. Checked in the browser; the API route answers 405.
 - `POST /api/payroll/{month}/reopen`, which since 05B only answered 409, and
   its request body. `test_reachability` no longer lists it as deliberately
   unreached.

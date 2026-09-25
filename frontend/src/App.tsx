@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Link, Navigate, Route, Routes } from "react-router-dom";
 
 import { Layout } from "./components/Layout";
 import { api, currentUser } from "./lib/api";
@@ -174,6 +174,19 @@ export default function App() {
             <Route path="/targets" element={<Targets session={session} />} />
             <Route path="/settings" element={<Settings session={session} />} />
             <Route path="/glossary" element={<Glossary />} />
+            {/*
+             * An address that is not a screen - an old bookmark to the retired
+             * reopening screen, say - says so inside the layout, rather than
+             * rendering a blank page.
+             */}
+            <Route path="*" element={
+              <div className="page__head">
+                <div className="page__title">
+                  <h1>Nothing here</h1>
+                  <span className="page__subtitle">There is no screen at this address. <Link to="/">Home</Link></span>
+                </div>
+              </div>
+            } />
           </Route>
         ) : (
           <Route path="*" element={<Navigate to="/sign-in" replace />} />
