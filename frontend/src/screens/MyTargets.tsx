@@ -46,6 +46,7 @@ type Row = MonthTargets & { month: string };
 export function MyTargets() {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [guaranteeOpen, setGuaranteeOpen] = useState(false);
 
   useEffect(() => {
     let live = true;
@@ -122,12 +123,22 @@ export function MyTargets() {
           <TargetBars target={current} />
         )}
         {/*
-         * The export folds this sentence behind an ⓘ. It stays in the open
-         * here: on a guaranteed minimum it is the sentence that says whether
-         * these two numbers are about to decide her pay, and that is not
-         * something to make somebody press for.
+         * As the export draws it (Portal lines 350-358): only where a
+         * guaranteed minimum rides on these numbers, *Guaranteed minimum*
+         * with an ⓘ that opens the sentence - here, what this month's record
+         * means for it. Other arrangements show nothing: the numbers do not
+         * change their pay.
          */}
-        <p className="mytargets__pay">{describeTargetPay(current)}</p>
+        {current.determines_pay && (
+          <div className="mytargets__guarantee">
+            <div className="mytargets__guarantee-head">
+              <span>Guaranteed minimum</span>
+              <button type="button" className="mytargets__info" aria-label="How the guaranteed minimum works"
+                aria-expanded={guaranteeOpen} onClick={() => setGuaranteeOpen(!guaranteeOpen)}>i</button>
+            </div>
+            {guaranteeOpen && <p className="mytargets__pay">{describeTargetPay(current)}</p>}
+          </div>
+        )}
       </section>
 
       {history.length > 0 && (

@@ -51,10 +51,42 @@
    makes a target informational on every arrangement but a guaranteed minimum,
    and a red shortfall on a commission model says she has lost money she never
    had. The sentence carries it. */
-.affiliate .mytargets__pay {
-  margin: 14px 0 0;
+/* The export's guarantee row (Portal lines 350-358): a rule 14px down, the
+   label 13px muted beside a 22px round *i*, and the sentence in a box on the
+   page ground when opened. */
+.affiliate .mytargets__guarantee {
+  margin-top: 14px;
   padding-top: 12px;
   border-top: 1px solid var(--rule);
+}
+
+.affiliate .mytargets__guarantee-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--quiet);
+}
+
+.affiliate .mytargets__info {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  padding: 1px 6px;
+  border: 1px solid var(--rule);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--quiet);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.affiliate .mytargets__pay {
+  margin: 10px 0 0;
+  padding: 12px 13px;
+  border-radius: var(--radius-sm);
+  background: var(--paper);
   font-size: 13px;
   line-height: 1.6;
   color: var(--quiet);

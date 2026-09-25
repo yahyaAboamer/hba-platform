@@ -139,16 +139,16 @@ export function MyMonth() {
         <div><span>Code uses</span><strong>{body.orders.uses ?? "—"}</strong></div>
       </div>
       {/*
-       * The export's three chips, in its words, and ours are links: the
-       * question a chip raises is *which ones*, and the answer is one screen
-       * away. The third counts only what the courier failed to deliver
-       * (`failed_delivery`, decided by the order's own status on the server):
-       * a cancelled order is void too, and is not a failed delivery.
+       * The export's three chips, in its words and as it draws them: plain
+       * pills, not links (Portal lines 124-128). The third counts only what
+       * the courier failed to deliver (`failed_delivery`, decided by the
+       * order's own status on the server): a cancelled order is void too, and
+       * is not a failed delivery.
        */}
       <div className="portal-home__states">
-        <Link to="/orders?status=earned">{body.orders.earned} delivered</Link>
-        <Link to="/orders?status=pending">{body.orders.pending} pending</Link>
-        <Link to="/orders?status=void">{body.orders.failed_delivery} failed delivery</Link>
+        <span>{body.orders.earned} delivered</span>
+        <span>{body.orders.pending} pending</span>
+        <span>{body.orders.failed_delivery} failed delivery</span>
       </div>
     </section>
 
