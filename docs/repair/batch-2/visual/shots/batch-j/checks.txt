@@ -254,3 +254,7 @@
 [390] app name: {"text":"Nour Eldin","font":"13.5px 400 Inter","color":"rgb(236, 239, 234)","background":"rgba(0, 0, 0, 0)","border":"0px none rgb(236, 239, 234)","radius":"0px","padding":"0px","height":21}
 [390] other rows' sales in the payload: [null]
 [390] app own row: "18 | S | You | SARAED | 1 | uses"
+[1280] roster invitation row: "R | rowan.khalil@example.com | Awaiting application | 	Invited	—	—	25 September 2026	" buttons in row=0 -> /affiliates/invite?email=rowan.khalil%40example.com; opened: "rowan.khalil@example.com | Sent 25 September 2026 | Awaiting application | Resend | Withdraw"
+[1280] Resend on the opened invitation: "rowan.khalil@example.com | Sent 25 September 2026 | Awaiting application | Resend | Withdraw"
+[1280] after reload still opened: true
+[1440] roster invitation row: "R | rowan.khalil@example.com | Awaiting application | 	Invited	—	—	25 September 2026	" buttons in row=0 -> /affiliates/invite?email=rowan.khalil%40example.com; opened: "rowan.khalil@example.com | Sent 25 September 2026 | Awaiting application | Resend | Withdraw"

@@ -1174,9 +1174,12 @@ Admin (1280 / 1440)
 
 8. ~~**Invitations**~~ - **done, batch G**: *Awaiting application*,
    *Link expired* (red), *Send a new link*, and the date in full on the
-   invitations page and the roster. Still different: the roster's invitation
-   row keeps its own *Resend* / *Withdraw*, where the export's row opens the
-   invitation instead.
+   invitations page and the roster. ~~Still different: the roster's invitation
+   row keeps its own *Resend* / *Withdraw*~~ - **done, batch J follow-up**: the
+   row opens the invitation, as the export's (`onOpen` -> `vInvite`), on the
+   Invitations page with that invitation marked and in view; *Resend* and
+   *Withdraw* are there, not on the roster row. After a resend the live
+   invitation is the marked one. Checked at 1280/1440, with a reload.
 9. ~~**Targets state words** and matrix §T~~ - **done, batch J**: the
    export's words, confirmation kept separately, the export's column widths,
    and the guarantee label's rule; §T re-checked (see *Batch J - Admin

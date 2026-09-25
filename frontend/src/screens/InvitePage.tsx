@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 import { api } from "../lib/api";
 import { formatSentAt } from "./Affiliates";
@@ -45,6 +45,8 @@ type Applicant = {
  * setting their rate — stays a separate, deliberate act.
  */
 export function InvitePage() {
+  const [query] = useSearchParams();
+  const opened = query.get("email");
   const [email, setEmail] = useState("");
   const [link, setLink] = useState<string | null>(null);
   const [emailed, setEmailed] = useState(false);
@@ -126,6 +128,11 @@ export function InvitePage() {
         : api.post(`/api/staff/invitations/${id}/revoke`);
     call.then(reload).catch((caught) => setProblem(caught.message));
   }
+
+  // Resending issues a new invitation and lapses the old one, so one address
+  // can have two rows: the live one is the invitation, else the newest.
+  const sameAddress = invited.filter((row) => row.email === opened);
+  const openedId = (sameAddress.find((row) => !row.expired && !row.withdrawn) ?? sameAddress[0])?.id;
 
   return (
     <div className="invite-page">
@@ -244,7 +251,11 @@ export function InvitePage() {
           // waiting on belong on top.
           [...invited.filter((row) => !row.expired), ...invited.filter((row) => row.expired)].map(
             (row) => (
-              <div className="invite-page__row" key={row.id}>
+              <div key={row.id}
+                // Opened from the roster's row: that invitation is the one in
+                // view, marked, with its Resend and Withdraw beside it.
+                className={row.id === openedId ? "invite-page__row invite-page__row--opened" : "invite-page__row"}
+                ref={row.id === openedId ? (el) => el?.scrollIntoView({ block: "center" }) : undefined}>
                 <span>
                   {row.email}
                   <span className="invite-page__sub">Sent {formatSentAt(row.created_at)}</span>

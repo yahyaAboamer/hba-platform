@@ -434,14 +434,18 @@ export function Affiliates() {
               </thead>
               <tbody>
                 {invitations.map((row) => (
-                  <tr key={row.id}>
+                  // The export's roster row opens the invitation (`onOpen` ->
+                  // `vInvite`), where Resend and Withdraw are; the row itself
+                  // carries neither. Whole row, control font, as the model rows.
+                  <tr key={row.id} className="control-font affiliates__row"
+                    onClick={() => navigate(`/affiliates/invite?email=${encodeURIComponent(row.email)}`)}>
                     <td>
                       <span className="affiliates__who">
                         <span className="affiliates__avatar" aria-hidden="true">
                           {row.email.charAt(0).toUpperCase()}
                         </span>
                         <span className="affiliates__who-text">
-                          <span className="affiliates__name">{row.email}</span>
+                          <Link className="affiliates__name" to={`/affiliates/invite?email=${encodeURIComponent(row.email)}`}>{row.email}</Link>
                           <span className="affiliates__sub">
                             {row.withdrawn
                               ? "Withdrawn"
@@ -465,40 +469,6 @@ export function Affiliates() {
                     <td className="affiliates__figure affiliates__tone--quiet">—</td>
                     <td className="affiliates__terms">
                       {formatSentAt(row.created_at)}
-                      {/*
-                       * Resend always; withdraw only where it can work. The
-                       * export opens the invitation to act on it, and there is
-                       * no invitation view here yet, so the two acts ride under
-                       * the date rather than disappearing.
-                       */}
-                      <span className="affiliates__row-acts">
-                        <button
-                          type="button"
-                          className="button button--quiet"
-                          onClick={() =>
-                            api
-                              .post(`/api/staff/invitations/${row.id}/resend`)
-                              .then(reload)
-                              .catch((caught) => setError(caught.message))
-                          }
-                        >
-                          Resend
-                        </button>
-                        {!row.expired && (
-                          <button
-                            type="button"
-                            className="button button--quiet"
-                            onClick={() =>
-                              api
-                                .post(`/api/staff/invitations/${row.id}/revoke`)
-                                .then(reload)
-                                .catch((caught) => setError(caught.message))
-                            }
-                          >
-                            Withdraw
-                          </button>
-                        )}
-                      </span>
                     </td>
                     <td aria-hidden="true" />
                   </tr>

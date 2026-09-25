@@ -158,3 +158,9 @@
   font-size: 13px;
   color: var(--quiet);
 }
+
+/* The invitation opened from the roster's row. */
+.invite-page__row--opened {
+  box-shadow: inset 3px 0 0 var(--accent);
+  background: var(--accent-soft);
+}
