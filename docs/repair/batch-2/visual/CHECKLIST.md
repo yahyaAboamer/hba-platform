@@ -1233,10 +1233,13 @@ Code hygiene (no behaviour)
 19. ~~`/payroll/:month/reopen` (`PayrollReopen.tsx`)~~ - **removed, batch
     J**, with `POST /api/payroll/{month}/reopen`. See *Batch J - reopening
     removed*.
-19a. **The worker blocks the web server while a job runs** (found in batch
-    J): `worker_loop` calls the synchronous `run_one` inside the event loop.
-    Candidate fix: run `run_one` in a thread (`asyncio.to_thread`). Not
-    started - it changes how every job runs and wants its own review.
+19a. ~~**The worker blocks the web server while a job runs**~~ - **fixed,
+    batch J follow-up**: each worker pass (schedule top-up and one job) runs
+    in a thread via `asyncio.to_thread`; still one job at a time, in order.
+    `test_a_slow_job_does_not_stop_the_event_loop` (fails on the old code -
+    checked); in the browser a status request 1.5s into a 5-second simulated
+    sweep answered in 23ms with *running* (before: it waited, then said
+    *succeeded*).
 
 ### Verification - still to run
 

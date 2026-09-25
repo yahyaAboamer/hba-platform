@@ -238,3 +238,4 @@
 [1440] app references after colour fix: ["#G2001 rgb(35, 169, 92) 13px w200","not sent rgb(138, 145, 138) 13px w200"] (export: rgb(35, 169, 92) 13px, 200px; not sent faint)
 [1280] old reopen bookmark: url=/payroll/2026-08/reopen main="Nothing here\nThere is no screen at this address. Home"
 [1280] POST /api/payroll/2026-08/reopen: 405
+[1280] item 19a: status request 1.5s into a 5-second sweep answered in 23ms with state "running" (before: it waited for the sweep and said "succeeded")

@@ -159,11 +159,41 @@ def top_up_schedule(db: Session) -> int:
     return queued
 
 
+def _iteration(worker_id: str, check_schedule: bool) -> bool:
+    """One pass of the loop: top up the schedule if due, then run at most one
+    job. Returns whether there was a job. **Synchronous, and run in a thread.**
+    """
+    if check_schedule:
+        try:
+            with SessionLocal() as db:
+                top_up_schedule(db)
+        except Exception:  # noqa: BLE001 - never stop running jobs over this
+            # Running queued work matters more than topping up the
+            # schedule. Failing here must not cost us both.
+            logger.exception("could not top up the recurring schedule")
+            report(Anomaly.SCHEDULE_TOP_UP_FAILED, worker_id=worker_id)
+
+    with SessionLocal() as db:
+        return run_one(db, worker_id)
+
+
 async def worker_loop() -> None:
     """Poll for work until cancelled.
 
     Sleeps only when idle, so a backlog drains at full speed rather than one
     job per poll interval.
+
+    **The work runs in a thread, not on the event loop.** Handlers are
+    synchronous - database calls and Shopify requests that can take seconds,
+    and a bulk import far longer - and this loop shares its event loop with the
+    API. Run inline, every request waited for the job in hand: with a
+    five-second simulated Shopify, the status request made during a refresh
+    returned only when the refresh had finished (batch J, item 19a). One job
+    at a time still, in order; only *where* it runs changed.
+
+    On shutdown the loop stops at once; a job already in its thread finishes
+    or is abandoned with the process, and its lease expiring hands it to the
+    next worker - the case leases exist for.
     """
     worker_id = worker_identity()
     logger.info("background worker %s started", worker_id)
@@ -173,21 +203,12 @@ async def worker_loop() -> None:
         did_work = False
         try:
             now = time.monotonic()
-            if now >= next_schedule_check:
+            check = now >= next_schedule_check
+            if check:
                 # Set the next check before trying, so a failure waits a minute
                 # rather than retrying on every pass.
                 next_schedule_check = now + SCHEDULE_CHECK_SECONDS
-                try:
-                    with SessionLocal() as db:
-                        top_up_schedule(db)
-                except Exception:  # noqa: BLE001 - never stop running jobs over this
-                    # Running queued work matters more than topping up the
-                    # schedule. Failing here must not cost us both.
-                    logger.exception("could not top up the recurring schedule")
-                    report(Anomaly.SCHEDULE_TOP_UP_FAILED, worker_id=worker_id)
-
-            with SessionLocal() as db:
-                did_work = run_one(db, worker_id)
+            did_work = await asyncio.to_thread(_iteration, worker_id, check)
         except asyncio.CancelledError:
             logger.info("background worker %s stopping", worker_id)
             raise

@@ -345,3 +345,51 @@ def test_a_permanent_failure_still_discards_the_handler_s_writes(session):
         text("SELECT count(*) FROM background_job WHERE kind = 'half'")
     ).scalar()
     assert leftover == 0
+
+
+# ── The API is not held up by a job (item 19a) ────────────────────────────────
+
+
+def test_a_slow_job_does_not_stop_the_event_loop(session, monkeypatch):
+    """The worker shares the API's event loop. A job used to run on it, so no
+    request was answered until the job finished. It runs in a thread now: a
+    ticker on the same loop keeps ticking while a 1.5-second job runs, and the
+    job still finishes."""
+    import asyncio
+    import time as clock
+
+    from app import worker
+
+    monkeypatch.setattr(worker, "SCHEDULE_CHECK_SECONDS", 3600)
+    monkeypatch.setattr("app.config.settings.worker_poll_seconds", 0.05)
+
+    @register_handler("slow")
+    def _slow(db, payload):
+        clock.sleep(1.5)
+
+    job = enqueue(session, "slow", {})
+    session.commit()
+
+    async def scenario():
+        loop_task = asyncio.create_task(worker.worker_loop())
+        ticks = 0
+        started = clock.monotonic()
+        while clock.monotonic() - started < 1.2:
+            await asyncio.sleep(0.05)
+            ticks += 1
+        for _ in range(100):  # let the job finish
+            if _status(session, job.id).status == JobStatus.SUCCEEDED:
+                break
+            await asyncio.sleep(0.05)
+        loop_task.cancel()
+        try:
+            await loop_task
+        except asyncio.CancelledError:
+            pass
+        return ticks
+
+    ticks = asyncio.run(scenario())
+
+    # 1.2 seconds of 50ms sleeps is about 24 ticks; blocked by the job it was 1.
+    assert ticks >= 15
+    assert _status(session, job.id).status == JobStatus.SUCCEEDED
