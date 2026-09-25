@@ -11,7 +11,7 @@ for its record of batches C-I. Nothing was deleted.
 | **Current head** | run `git rev-parse --short HEAD` (a document cannot hold the hash of the commit that adds it) |
 | **`origin/main`, `origin/production`** | not touched by this batch; read them with `git ls-remote --heads origin main production` before describing them |
 | **Migration head** | `d4e7a2c90003` (staff preferences, batch J); before it `c3d51e7a0002` |
-| **Backend** | the full runner at the end of batch J - see *Checks* below for the result |
+| **Backend** | **2,122 tests, 85 files, all passing** through `run-suite.sh` at the end of batch J (one call, exit 0), matching `--collect-only`; run on the files of `71b58a2` (logged under `29df94e`, the head when the run started - the only later change was the import verdict, whose 7 tests are in it) |
 | **Frontend** | 460 tests, 27 files; `npm run build` green |
 | **Where this ran** | a cloud container, Linux, Postgres 16 on 5433 created for the session (`hba_platform_test`, designated disposable inside itself; `hba_browser` for the browser). `.venv/Scripts` is a symlink to `.venv/bin` so the documented commands work unchanged. |
 
@@ -61,7 +61,8 @@ pictures and measured values in `docs/repair/batch-2/visual/shots/batch-j/`
 
 ## Remaining verification
 
-- **Full backend runner** - result in *Checks* below.
+- **Full backend runner**: done - 2,122 passing (see the table). Re-run
+  before any merge if anything changes.
 - **Release gates** (`CLAUDE.md`): reconciliation on an authorised restored
   copy; migration/rollback rehearsal for `b1f0a40c0001`, `c3d51e7a0002`,
   `d4e7a2c90003` with the key cases (`docs/runbooks/settings-encryption-key.md`).
