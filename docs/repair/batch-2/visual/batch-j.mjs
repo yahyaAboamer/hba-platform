@@ -530,6 +530,46 @@ steps.settings = async (browser) => {
   }
 };
 
+/** Item 12: roster and Products rows against the export's button rows. */
+steps.rows = async (browser) => {
+  const PHASE = process.env.PHASE || "after";
+  for (const width of [1280, 1440]) {
+    const { context: rc, ref } = await openExport(browser, ADMIN_EXPORT, width);
+    for (const [nav, label] of [[NAV.models, "roster"], [NAV.products, "products"]]) {
+      await exportNav(ref, nav).click();
+      await settle(ref, 800);
+      const row = ref.locator(".ad > div:nth-child(2) button").filter({ has: ref.locator("span", { hasText: /^\s*→\s*$/ }) }).first();
+      const r = await row.evaluate((el) => {
+        const pill = [...el.querySelectorAll("span")].find((s) => getComputedStyle(s).borderRadius === "999px");
+        const name = el.querySelector("span span span") || el.querySelector("span span");
+        const box = (e) => e ? `${Math.round(e.getBoundingClientRect().height)}px ${getComputedStyle(e).fontSize} ${getComputedStyle(e).fontFamily.split(",")[0]}` : null;
+        return { row: Math.round(el.getBoundingClientRect().height), font: getComputedStyle(el).fontFamily.split(",")[0], pill: box(pill), pillText: pill?.textContent, name: box(name) };
+      });
+      log(`[${width}] export ${label} row: ${JSON.stringify(r)}`);
+      if (PHASE === "after") await ref.locator(".ad").screenshot({ path: join(OUT, `export-${label}-${width}.png`) });
+    }
+    await rc.close();
+
+    const { context, page } = await signIn(browser, OWNER, { width, height: 900 });
+    for (const [path, label, rowSel] of [["/affiliates", "roster", "tbody tr"], ["/products", "products", "tbody tr, .products__row"]]) {
+      await page.goto(`${APP}${path}`, { waitUntil: "networkidle" });
+      await settle(page, 800);
+      const row = page.locator(rowSel).first();
+      if (!(await row.count())) { log(`[${width}] app ${label}: no row found`); continue; }
+      const r = await row.evaluate((el) => {
+        const pill = el.querySelector(".pill, [class*=pill]");
+        const name = el.querySelector("[class*=name]");
+        const box = (e) => e ? `${Math.round(e.getBoundingClientRect().height)}px ${getComputedStyle(e).fontSize} ${getComputedStyle(e).fontFamily.split(",")[0]}` : null;
+        return { row: Math.round(el.getBoundingClientRect().height), font: getComputedStyle(el).fontFamily.split(",")[0], pill: box(pill), pillText: pill?.textContent, name: box(name) };
+      });
+      log(`[${width}] app ${label} row (${PHASE}): ${JSON.stringify(r)}`);
+      if (PHASE === "after") await page.screenshot({ path: join(OUT, `app-${label}-${width}.png`) });
+    }
+    log(`[${width}] roster layout toggle present (${PHASE}): ${await page.goto(`${APP}/affiliates`, { waitUntil: "networkidle" }).then(() => page.locator("input[name=roster-view]").count()) > 0}`);
+    await context.close();
+  }
+};
+
 function previousMonth() {
   const now = new Date();
   const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);

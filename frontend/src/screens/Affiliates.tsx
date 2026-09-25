@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams, useNavigate } from "react-router-dom";
 
 import { Money } from "../components/Money";
 import { api } from "../lib/api";
@@ -231,7 +231,6 @@ export function Affiliates() {
   const [rows, setRows] = useState<Affiliate[] | null>(null);
   const [invited, setInvited] = useState<Invited[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [view, setView] = useState<View>("table");
   const [includeArchived, setIncludeArchived] = useState(false);
   /**
    * The approved roster filters and search.
@@ -257,6 +256,7 @@ export function Affiliates() {
   const segment: Segment = SEGMENTS.some((option) => option.key === asked)
     ? (asked as Segment)
     : "active";
+  const navigate = useNavigate();
   const [page, setPage] = useState(0);
   const query = params.get("q") ?? "";
 
@@ -281,7 +281,9 @@ export function Affiliates() {
   const isNarrow = useIsNarrow();
   // The toggle is a preference, not an override: a table does not fit on a
   // phone however firmly somebody asked for one.
-  const shown: View = isNarrow ? "cards" : view;
+  // The export has one layout, a table; a phone gets cards because a table
+  // does not fit there (§12.3's point), with no switch between them (D).
+  const shown: View = isNarrow ? "cards" : "table";
   const visible = rows ? rosterMatches(rows, segment, query) : [];
   // Archived is a segment now rather than a checkbox, so asking for it is what
   // fetches it. Keeping both controls would let them contradict each other.
@@ -379,31 +381,6 @@ export function Affiliates() {
             aria-label="Search models by name or code"
           />
 
-          {/*
-           * §12.3 keeps this toggle even though width alone already chooses a
-           * table on a laptop and cards on a phone — it was asked for after
-           * reviewing mockups, and that is a good enough reason. It is drawn
-           * as the export's segmented switch because that is the export's
-           * word for *one of these two*.
-           *
-           * It disappears on a phone, where it could only be ignored: a table
-           * does not fit there however firmly somebody asked for one, and a
-           * control that does nothing teaches people the tool is unreliable.
-           */}
-          {!isNarrow && (
-            <div className="seg" role="group" aria-label="Layout">
-              <label className="seg-opt">
-                <input type="radio" name="roster-view" checked={view === "table"}
-                  onChange={() => setView("table")} />
-                <span>Table</span>
-              </label>
-              <label className="seg-opt">
-                <input type="radio" name="roster-view" checked={view === "cards"}
-                  onChange={() => setView("cards")} />
-                <span>Cards</span>
-              </label>
-            </div>
-          )}
 
           {/*
            * Deliberately its own button, not a second option folded into
@@ -570,7 +547,12 @@ export function Affiliates() {
                   row.content?.required_videos != null &&
                   row.content?.last_update == null;
                 return (
-                  <tr key={row.id}>
+                  // The export's row is one button: the whole row opens her,
+                  // and its words are in the control font (ADR 0044) - which
+                  // is what makes its pill 20px. The name stays a link for
+                  // the keyboard and a screen reader.
+                  <tr key={row.id} className="control-font affiliates__row"
+                    onClick={() => navigate(`/affiliates/${row.id}`)}>
                     <td>
                       <Link className="affiliates__who" to={`/affiliates/${row.id}`}>
                         <span className="affiliates__avatar" aria-hidden="true">

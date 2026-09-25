@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import { api, can } from "../lib/api";
 import type { Session } from "../lib/api";
@@ -118,6 +118,7 @@ const CATALOGUE_PAGE = 10;
  * (25 September). A model's own best sellers are hers, in her wardrobe.
  */
 export function Products({ session }: { session: Session }) {
+  const navigate = useNavigate();
   const [listing, setListing] = useState<Listing | null>(null);
   const [params, setParams] = useSearchParams();
   const asked_scope = params.get("scope");
@@ -258,7 +259,11 @@ export function Products({ session }: { session: Session }) {
                   const feature = featureLabel(row.featured);
                   const of = listing?.active_models ?? 0;
                   return (
-                    <tr key={row.shopify_product_id}>
+                    // The export's row is one button: the whole row opens the
+                    // product, in the control font (ADR 0044), so its pill is
+                    // the export's 20px. The name stays a link.
+                    <tr key={row.shopify_product_id} className="control-font products__row"
+                      onClick={() => navigate(`/products/${row.shopify_product_id}`)}>
                       <td>
                         <Link
                           className="products__who"

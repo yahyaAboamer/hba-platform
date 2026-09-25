@@ -766,3 +766,9 @@
   background: var(--accent-soft);
   color: var(--accent);
 }
+
+/* The export's row is a button: it opens on a click. No hover tint - the
+   export's buttons set none. */
+.products__row { cursor: pointer; }
+/* The export's product name in its row: 14px. */
+.products__row .products__name { font-size: 14px; }

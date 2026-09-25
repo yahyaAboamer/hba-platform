@@ -988,6 +988,27 @@ activity lines 13.5px / 12px faint, measured equal to the export; a refused
 save left the switch on; notices off survived a reload; Home showed no cards
 and the hidden line, *Show* brought all three back; switched on again.
 
+## Batch J - roster and Products rows (25 September)
+
+**Reference.** Export roster rows (Admin lines 278-291) and Products rows
+(333-350): each a `<button>`, so its words are in the browser's control
+font (ADR 0044) and its pill is 20px. App: `Affiliates.tsx` / `.css`,
+`Products.tsx` / `.css`.
+
+- The `<table>` stays (it carries rows and columns to a screen reader); each
+  row takes the control font and opens on a click anywhere, the name staying
+  a link for the keyboard. No hover tint, as the export's buttons set none.
+- Measured at 1280 and 1440, before → after: pill 22px Inter → **20px** in the
+  control font (export 20px); every text in the first row equal to the
+  export's own sizes - initial 12.5px, name 14px, code 12px, pill 11.5px,
+  sales 13.5px, content and last column 12.5px; product name 14px.
+- **The Table / Cards toggle is removed** (conflict D). The export has one
+  layout; a phone still gets cards, chosen by width, as §12.3 wanted -
+  without a control that could only be ignored.
+- Checks: `shots/batch-j/app-roster-*`, `app-products-*`, `export-*`,
+  `checks.txt` (a click on a row's status cell opened the profile and the
+  product); frontend 457 tests and the build.
+
 ## Remaining work - the one list (reconciled 24 September)
 
 Reconciled against: the 24 September handoff (*What is waiting on Yahya*,
@@ -1044,9 +1065,12 @@ Admin (1280 / 1440)
 11. ~~**Settings**: Appearance's two switches; Reference's audit rows as
     sentences~~ - **done, batch J** (see *Batch J - Settings*). New migration
     `d4e7a2c90003` (staff preferences) - in the release rehearsal list.
-12. **Roster and Products rows as buttons** (control font, so their pills
-    measure 20px as the export's); the roster's **Table / Cards** toggle
-    removed (D).
+12. ~~**Roster and Products rows as buttons**; the roster's **Table / Cards**
+    toggle removed (D)~~ - **done, batch J**: each row opens on a click
+    anywhere and is in the control font, as the export's row buttons; pills
+    20px and every text size equal to the export's; the toggle gone, cards
+    still automatic on a narrow screen. See *Batch J - roster and Products
+    rows*.
 13. **Admin Home chart**: axis label outside the plot, as the export (matrix,
     kept for a preference only).
 14. ~~**Admin profile body** (Overview): the Contact panel as the export's
@@ -1181,6 +1205,7 @@ overpaid month (a real state the export never drew).
 | Wardrobe size, Targets words, payment-details words, Invitations words and dates, You buttons' font, the refund comment | Items 1, 2, 4, 7, 8, 18 | `1b0a240`; `shots/batch-g/checks.txt` |
 | Decisions c, d, e, g, h: account menu, product list line, top-sellers panel, the usual recording date, the password after *Save details* | Owner, 25 September | `52ab988`; `shots/batch-h/checks.txt` |
 | Decision b: the Shopify connection edited in Settings | Owner, 25 September | batch I (the commit that adds this row); ADR 0045; `tests/test_shopify_connection.py` (11), `ShopifyConnection.test.tsx` (4); `shots/batch-i/checks.txt` |
+| Roster and Products rows as the export's buttons; Table/Cards toggle removed (item 12, D) | Sweep, conflict D | batch J; `shots/batch-j/checks.txt` |
 | Settings switches saved per account and obeyed; audit trail as sentences (item 11) | Thirteen #1, #2 | batch J; `test_staff_preferences` (8), `test_audit_words` (6), `PreferenceSwitches.test.tsx` (2) |
 | Portal Home chips as pills; Targets guarantee behind the ⓘ (items 5, 6) | Matrix | batch J; `shots/batch-j/app-portal-*` |
 | Contact and shipping as the export's form; sign-in kept apart; Sizing 15px; start 12.5px (item 14) | Matrix, owner 24 September | batch J; `ContactForm.test.tsx` (5), `test_affiliates_api` (+3) |

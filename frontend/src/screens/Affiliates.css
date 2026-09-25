@@ -442,3 +442,11 @@ td.affiliates__content {
 td.affiliates__content.affiliates__tone--owed { color: var(--owed); }
 td.affiliates__content.affiliates__tone--quiet,
 td.affiliates__figure.affiliates__tone--quiet { color: var(--faint); }
+
+/* The export's row is a button: it opens on a click. No hover tint - the
+   export's buttons set none. */
+.affiliates__row { cursor: pointer; }
+/* In the control font the row no longer hands its cells a size, so each
+   carries the export's own: name 14px, sales 13.5px. */
+.affiliates__row .affiliates__name { font-size: 14px; }
+.affiliates__row td.affiliates__figure:not(.affiliates__content) { font-size: 13.5px; }

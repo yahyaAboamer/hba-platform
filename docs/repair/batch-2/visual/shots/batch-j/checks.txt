@@ -159,3 +159,41 @@
 [1440] app activity who: {"text":"Yahya · 26 September 2026, 01:03","font":"12px 400 Inter","color":"rgb(138, 145, 138)","background":"rgba(0, 0, 0, 0)","border":"0px none rgb(138, 145, 138)","radius":"0px","padding":"0px","height":19}
 [1440] export switch row: {"text":"Show pop-up notices on Home","font":"14px 400 Arial","color":"rgb(236, 239, 234)","background":"rgba(0, 0, 0, 0)","border":"","radius":"0px","padding":"13px 18px","height":53}
 [1440] export activity what: {"text":"Recorded a payment of EGP 1,900.00 to Yahya Aboamer for September 2026","font":"13.5px 400 Inter","color":"rgb(236, 239, 234)","background":"rgba(0, 0, 0, 0)","border":"0px none rgb(236, 239, 234)","radius":"0px","padding":"0px","height":21}
+## rows - 2026-09-25T22:06:18.076Z
+## rows - 2026-09-25T22:07:00.092Z
+[1280] export roster row: {"row":58,"font":"Arial","pill":"20px 11.5px Arial","pillText":"Active","name":"14px 12.5px Arial"}
+[1280] export products row: {"row":71,"font":"Arial","pill":"20px 11.5px Arial","pillText":"Active","name":"16px 14px Arial"}
+[1280] app roster row (before): {"row":58,"font":"Inter","pill":"22px 11.5px Inter","pillText":"Active","name":"18px 13.5px Inter"}
+[1280] app products row (before): {"row":69,"font":"Inter","pill":"22px 11.5px Inter","pillText":"Active","name":"18px 13px Inter"}
+[1280] roster layout toggle present (before): true
+[1440] export roster row: {"row":58,"font":"Arial","pill":"20px 11.5px Arial","pillText":"Active","name":"14px 12.5px Arial"}
+[1440] export products row: {"row":71,"font":"Arial","pill":"20px 11.5px Arial","pillText":"Active","name":"16px 14px Arial"}
+[1440] app roster row (before): {"row":58,"font":"Inter","pill":"22px 11.5px Inter","pillText":"Active","name":"18px 13.5px Inter"}
+[1440] app products row (before): {"row":69,"font":"Inter","pill":"22px 11.5px Inter","pillText":"Active","name":"18px 13px Inter"}
+[1440] roster layout toggle present (before): true
+## rows - 2026-09-25T22:08:26.653Z
+[1280] export roster row: {"row":58,"font":"Arial","pill":"20px 11.5px Arial","pillText":"Active","name":"14px 12.5px Arial"}
+[1280] export products row: {"row":71,"font":"Arial","pill":"20px 11.5px Arial","pillText":"Active","name":"16px 14px Arial"}
+[1280] app roster row (after): {"row":58,"font":"Arial","pill":"20px 11.5px Arial","pillText":"Active","name":"18px 13.3333px Arial"}
+[1280] app products row (after): {"row":69,"font":"Arial","pill":"20px 11.5px Arial","pillText":"Active","name":"18px 13px Arial"}
+[1280] roster layout toggle present (after): false
+[1440] export roster row: {"row":58,"font":"Arial","pill":"20px 11.5px Arial","pillText":"Active","name":"14px 12.5px Arial"}
+[1440] export products row: {"row":71,"font":"Arial","pill":"20px 11.5px Arial","pillText":"Active","name":"16px 14px Arial"}
+[1440] app roster row (after): {"row":58,"font":"Arial","pill":"20px 11.5px Arial","pillText":"Active","name":"18px 13.3333px Arial"}
+[1440] app products row (after): {"row":69,"font":"Arial","pill":"20px 11.5px Arial","pillText":"Active","name":"18px 13px Arial"}
+[1440] roster layout toggle present (after): false
+[1280] app /affiliates first row text sizes: ["A:12.5px","Aya Sherif:14px","AYASH:12px","Active:11.5px","EGP 14,040.00:13.5px","4/4 · 8/8:12.5px","No terms set:12.5px","→:13.5px"]
+[1280] click on the row's status cell: /affiliates -> /affiliates/10
+[1280] app /products first row text sizes: ["image:9.5px","Cargo Tailored Tro:14px","Active:11.5px","→:13.5px"]
+[1280] click on the row's status cell: /products -> /products/cargo-trouser
+## rows - 2026-09-25T22:09:32.109Z
+[1280] export roster row: {"row":58,"font":"Arial","pill":"20px 11.5px Arial","pillText":"Active","name":"14px 12.5px Arial"}
+[1280] export products row: {"row":71,"font":"Arial","pill":"20px 11.5px Arial","pillText":"Active","name":"16px 14px Arial"}
+[1280] app roster row (after): {"row":59,"font":"Arial","pill":"20px 11.5px Arial","pillText":"Active","name":"19px 14px Arial"}
+[1280] app products row (after): {"row":69,"font":"Arial","pill":"20px 11.5px Arial","pillText":"Active","name":"19px 14px Arial"}
+[1280] roster layout toggle present (after): false
+[1440] export roster row: {"row":58,"font":"Arial","pill":"20px 11.5px Arial","pillText":"Active","name":"14px 12.5px Arial"}
+[1440] export products row: {"row":71,"font":"Arial","pill":"20px 11.5px Arial","pillText":"Active","name":"16px 14px Arial"}
+[1440] app roster row (after): {"row":59,"font":"Arial","pill":"20px 11.5px Arial","pillText":"Active","name":"19px 14px Arial"}
+[1440] app products row (after): {"row":69,"font":"Arial","pill":"20px 11.5px Arial","pillText":"Active","name":"19px 14px Arial"}
+[1440] roster layout toggle present (after): false
