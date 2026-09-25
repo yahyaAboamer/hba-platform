@@ -1,6 +1,8 @@
 # 0015. Shopify authenticates by client credentials
 
-**Status:** Accepted
+**Status:** Accepted; **where the credentials live is amended by
+[0045](0045-the-shopify-connection-is-edited-in-settings.md)** - a connection
+saved (encrypted) from Settings is used before the environment's
 **Date:** 2026-08-23
 
 ## Context

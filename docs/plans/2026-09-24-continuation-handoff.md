@@ -16,7 +16,7 @@ true. Nothing was deleted.
 | **`origin/production`** | `6a13958` — **level with `main`**, gap of 0 commits, read from `git ls-remote` on 24 September |
 | **Backend** | 2,069 tests, 80 files, all passing through `run-suite.sh` on 24 September, after batch D's corrections; matches `--collect-only`. Batch E changed one backend line (an added `start_month` in `/api/auth/me`); the three files that read that payload pass (158 tests). The follow-up added `months` to the profile payload and `failed_delivery` to earnings; the three files that read them pass (235 tests). Batch F changed the Home notices; the four files that touch attention and corrections pass (170 tests). The full runner was not re-run for any of these, and must be before a merge |
 | **Frontend** | 410 tests, 19 files; `npm run build` green (24 September, after batch F) |
-| **Migration head** | `b1f0a40c0001` |
+| **Migration head** | `c3d51e7a0002` (batch I; was `b1f0a40c0001`) |
 
 > **Correction, 24 September 2026.** An earlier version of this table said
 > production was *"122 commits behind `main`"*. That was wrong. It came from
@@ -400,10 +400,22 @@ Checks: frontend 420 tests, 21 files, `npm run build`; backend
 `test_import_completeness` (48); browser at 390, 1280, 1440
 (`shots/batch-h/checks.txt`).
 
-**Batch I - the Shopify connection form (decision b)** is next, and one
-question for the owner comes first: HBA's app authenticates with a client ID
-and secret (ADR 0015 - a Dev Dashboard app has no permanent Admin API key),
-while the export's form has *Store domain* and *Admin API key*.
+## Batch I - the Shopify connection edited in Settings (25 September)
+
+Decision b, with the owner's choice of fields the same day: *Store domain*,
+*Client ID*, *Client secret* (HBA's app has no permanent Admin API key,
+ADR 0015). ADR 0045 records it. `shopify_connection` (migration
+`c3d51e7a0002`) holds one saved connection; `build_client` uses it before the
+environment's. Admin only; the secret is Fernet-encrypted with
+`SETTINGS_ENCRYPTION_KEY`, never returned, logged or audited; new
+credentials are tried against Shopify and must grant every required scope
+before anything is written, so a refusal changes nothing; a blank field
+keeps the saved value. The form is the export's *Connection* card; *Go-live
+month* moved into *Technical detail*. Checks: 11 backend tests, 4 frontend,
+the Shopify-touching backend files (171 passing), a local downgrade/upgrade
+of the migration, and the browser at 1280/1440 (`shots/batch-i/`).
+**Deploying it needs `SETTINGS_ENCRYPTION_KEY` on each environment** - not
+done; no deployment is authorised.
 
 ## Not scheduled — a backlog, not an instruction
 

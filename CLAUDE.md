@@ -129,7 +129,7 @@ prefer the foreground when it is tight.
 ### Frontend
 
 ```
-cd frontend && npm test          # 420 tests, 21 files
+cd frontend && npm test          # 428 tests, 22 files
 cd frontend && npm run build     # this is the typecheck
 ```
 
@@ -148,7 +148,8 @@ Neither has run, and nothing in the repair reports satisfies either:
 1. **Reconciliation against an authorised restored copy of real data.**
    `docs/repair/batch-1/reconcile.py` has only ever run against the test
    database.
-2. **A migration/rollback rehearsal for `b1f0a40c0001`.**
+2. **A migration/rollback rehearsal for `b1f0a40c0001` and `c3d51e7a0002`**
+   (the saved Shopify connection, ADR 0045).
 
 Do not describe the repair as releasable while these are open.
 

@@ -11,7 +11,6 @@ can expire and hand the same job to a second worker.
 
 from sqlalchemy.orm import Session
 
-from app.config import settings
 from app.core.signals import Anomaly, report
 from app.models.orders import OrderIndex
 from app.services.jobs import JobKind, PermanentFailure, enqueue
@@ -33,21 +32,20 @@ PERMANENT = (ShopifyNotConfigured, ShopifyMissingScope)
 
 
 def build_client() -> ShopifyClient:
-    """A client from configuration.
+    """A client for the connection in use.
 
-    Forwards the client id and secret as well as the static token. HBA's app is
-    a Dev Dashboard app with no permanent token (ADR 0015), so a builder that
-    only passed ``access_token`` would work in every test and fail against the
-    real shop.
+    The one saved from Settings if there is one and it can be read, otherwise
+    the environment's (decision b, `connection.effective`). Forwards the client
+    id and secret as well as the static token: HBA's app is a Dev Dashboard app
+    with no permanent token (ADR 0015), so a builder that only passed
+    ``access_token`` would work in every test and fail against the real shop.
     """
-    return ShopifyClient(
-        shop_domain=settings.shopify_shop_domain,
-        client_id=settings.shopify_client_id,
-        client_secret=settings.shopify_client_secret,
-        access_token=settings.shopify_access_token,
-        api_version=settings.shopify_api_version,
-        timeout_seconds=settings.shopify_timeout_seconds,
-    )
+    from app.db import SessionLocal
+    from app.services.shopify.connection import client_for, effective
+
+    with SessionLocal() as db:
+        connection = effective(db)
+    return client_for(connection)
 
 
 def order_gid(order_id: str | int) -> str:

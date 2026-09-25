@@ -86,6 +86,10 @@ class Settings(BaseSettings):
     shopify_client_secret: str = ""
     shopify_access_token: str = ""
     shopify_webhook_secret: str = ""
+    #: A Fernet key (`Fernet.generate_key()`) that encrypts a Shopify client
+    #: secret saved from Settings. Without it the connection form refuses to
+    #: save, rather than storing a secret it cannot protect.
+    settings_encryption_key: str = ""
     # Pinned deliberately. Shopify deprecates versions on a schedule, and an
     # unpinned client would change behaviour without a deploy.
     shopify_api_version: str = "2026-07"

@@ -24,6 +24,11 @@ dependencies = [
     # FastAPI needs this to accept a file upload at all - §14's proof
     # screenshot arrives as multipart form data.
     "python-multipart>=0.0.9,<1",
+    # Encrypts a Shopify client secret saved from Settings (owner, decision b,
+    # 25 September). Fernet: authenticated symmetric encryption, so a stored
+    # value that was tampered with fails to decrypt rather than decrypting
+    # to something else.
+    "cryptography>=43,<46",
 ]
 
 # Without this, setuptools flat-layout discovery sees app/, frontend/ and

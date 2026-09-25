@@ -512,3 +512,35 @@
   border-radius: var(--radius-md);
   color: var(--text);
 }
+
+/* The export's Connection card (`syncCreds`): a label at 12.5px muted above
+   each field, fields 42px on the page ground, and *Update connection* as an
+   outlined button. */
+.shop-conn__field {
+  display: block;
+  margin-top: 12px;
+}
+
+.shop-conn__label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12.5px;
+  color: var(--quiet);
+}
+
+.shop-conn__input {
+  width: 100%;
+  min-height: 42px;
+  padding: 11px 13px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.shop-conn__submit {
+  margin-top: 14px;
+  min-height: 40px;
+  padding: 10px 15px;
+}

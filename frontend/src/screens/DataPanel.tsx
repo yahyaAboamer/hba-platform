@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
+import { ShopifyConnection } from "../components/ShopifyConnection";
+import type { ShopifyConnectionState } from "../components/ShopifyConnection";
 import { api } from "../lib/api";
 import { formatMonth } from "../lib/money";
 import "./PaymentDetail.css";
@@ -128,6 +130,7 @@ export function DataPanel({ goLiveMonth }: { goLiveMonth: string | null }) {
   const [parcelSummary, setParcelSummary] = useState<ParcelSummary | null>(null);
   const [scanning, setScanning] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [connection, setConnection] = useState<ShopifyConnectionState | null>(null);
 
   const load = useCallback(() => {
     Promise.all([
@@ -217,7 +220,7 @@ export function DataPanel({ goLiveMonth }: { goLiveMonth: string | null }) {
       <section className="pay-detail__card sync__card">
         <div className="sync__head">
           <div>
-            <h2 className="sync__store">hbawear.store</h2>
+            <h2 className="sync__store">{connection?.shop_name ?? connection?.shop_domain ?? "Shopify"}</h2>
             <div className="sync__state">
               <span className={`sync__dot sync__dot--${tone}`} aria-hidden="true" />
               <span className={`sync__tone--${tone}`}>
@@ -246,19 +249,8 @@ export function DataPanel({ goLiveMonth }: { goLiveMonth: string | null }) {
         {notice && <p className="sync__notice">{notice}</p>}
       </section>
 
-      <section className="pay-detail__card sync__card">
-        <h2 className="pay-detail__card-title">Connection</h2>
-        <dl className="sync__rows">
-          <div><dt>Store domain</dt><dd>hbawear.store</dd></div>
-          <div><dt>Shopify access</dt><dd>{sync?.shopify_configured ? "Configured on the server" : "Not configured"}</dd></div>
-          <div><dt>Order webhooks</dt><dd>{sync?.webhooks_configured ? "Registered" : "Not registered"}</dd></div>
-          <div><dt>Go-live month</dt><dd>{goLiveMonth ? formatMonth(goLiveMonth) : "Not set"}</dd></div>
-        </dl>
-        {/* The credentials live in the server's environment, not in the
-         *  database, so there is nothing here to type a new key into - and a
-         *  form that looked like one would be a form that did nothing. */}
-        <p className="pay-detail__faint">Set on the server. Changing the connection is a deploy, not a form.</p>
-      </section>
+      {/* The export's Connection card, editable (owner, decision b). */}
+      <ShopifyConnection onChanged={setConnection} />
 
       <button
         type="button"
@@ -280,6 +272,7 @@ export function DataPanel({ goLiveMonth }: { goLiveMonth: string | null }) {
             label="Webhooks"
             value={sync?.webhooks_configured ? "Registered" : "Not registered"}
           />
+          <Fact label="Go-live month" value={goLiveMonth ? formatMonth(goLiveMonth) : "Not set"} />
           <Fact label="Orders indexed" value={sync?.orders_indexed ?? "—"} />
           <Fact
             label="Last order synced"

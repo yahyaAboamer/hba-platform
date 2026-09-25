@@ -127,3 +127,30 @@ class BackgroundJob(Base):
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ShopifyConnection(Base):
+    """The Shopify connection saved from Settings, overriding the environment.
+
+    One row at most (`id = 1`). **The client secret is stored encrypted**
+    (Fernet, keyed by `SETTINGS_ENCRYPTION_KEY`) and is never read back out of
+    the API, a log or the audit trail (owner, decision b, 25 September). A row
+    is written only after its credentials answered Shopify, so the connection
+    in use is always one that worked; a failed update leaves it as it was.
+    """
+
+    __tablename__ = "shopify_connection"
+    __table_args__ = (CheckConstraint("id = 1", name="shopify_connection_single_row"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    shop_domain: Mapped[str] = mapped_column(String(255), nullable=False)
+    client_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    #: Fernet token of the client secret. Never the secret itself.
+    client_secret_encrypted: Mapped[str] = mapped_column(Text, nullable=False)
+    #: When these credentials last answered Shopify, and the shop's name then.
+    verified_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    shop_name: Mapped[str | None] = mapped_column(String(255))
+    updated_by: Mapped[int | None] = mapped_column()
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )

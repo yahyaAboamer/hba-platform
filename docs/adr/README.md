@@ -54,7 +54,7 @@ what was chosen.
 | [0012](0012-earned-on-delivery.md) | Commission is earned on delivery; HBA absorbs late returns | Accepted |
 | [0013](0013-on-demand-payroll.md) | Payroll is an action, not a schedule | Accepted |
 | [0014](0014-historical-months-show-sales-only.md) | Pre-go-live months show sales, never commission | Superseded by 0036 |
-| [0015](0015-shopify-client-credentials.md) | Shopify authenticates by client credentials | Accepted |
+| [0015](0015-shopify-client-credentials.md) | Shopify authenticates by client credentials | Accepted; where the credentials live amended by 0045 |
 | [0016](0016-frontend-toolchain-pinned.md) | The frontend toolchain is pinned to the builder's Node | Accepted |
 | [0017](0017-payment-proof-visible-to-affiliates.md) | Payment screenshots are shown to affiliates | Accepted — risk knowingly accepted by the business |
 | [0018](0018-content-manager-scope.md) | content_manager holds wide, overlapping authority | Accepted — risk knowingly accepted by the business |
@@ -84,6 +84,7 @@ what was chosen.
 | [0042](0042-the-payer-sees-the-whole-destination.md) | The payer sees the whole destination, without asking twice | Accepted; amends 0028 |
 | [0043](0043-type-as-the-exports-set-it.md) | Type as the exports set it: proportional figures, one weight | Accepted; amends 0039; controls amended by 0044 |
 | [0044](0044-controls-in-the-browsers-control-font.md) | Buttons in the browser's control font, as the approved page draws them | Accepted; amends 0043 |
+| [0045](0045-the-shopify-connection-is-edited-in-settings.md) | The Shopify connection is edited in Settings | Accepted; amends 0015 |
 
 **0014 is superseded by 0036** and **0038 by 0039**. **0027 keeps its
 principle and loses its mechanism to 0039**: an agreed figure is still set

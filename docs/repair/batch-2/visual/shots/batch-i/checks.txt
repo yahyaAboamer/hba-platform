@@ -1,0 +1,6 @@
+[1280] form fields: ["Store domain","Client ID","Client secret"]; button "Update connection" disabled=true
+[1280] refused: "Shopify did not accept this connection (SHOPIFY_SHOP_DOMAIN must look like your-store.myshopify.com). The connection in use has not changed."; secret still in field=true
+[1280] secret in any response: false
+[1440] form fields: ["Store domain","Client ID","Client secret"]; button "Update connection" disabled=true
+[1440] refused: "Shopify did not accept this connection (SHOPIFY_SHOP_DOMAIN must look like your-store.myshopify.com). The connection in use has not changed."; secret still in field=true
+[1440] secret in any response: false

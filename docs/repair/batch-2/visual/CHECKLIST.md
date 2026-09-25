@@ -739,10 +739,13 @@ Admin (1280 / 1440)
     are a question put to you on 16 September (`2026-09-16-exact-design-
     handoff.md`, *Open questions*) and a proposal to build it (`ffde978`).
     It is approved implementation like the rest of this list.
-17b. **Settings → Shopify: the editable connection** (decision b) - Store
-    domain and Admin API key, *Update connection*, authorised staff only,
-    credentials never returned, logged or audited, and a failed update
-    leaving the working connection in place. **Batch I**, with 17.
+17b. ~~**Settings → Shopify: the editable connection**~~ - **done, batch I**
+    (ADR 0045): *Store domain*, *Client ID*, *Client secret* (the owner's
+    choice of fields, 25 September), *Update connection*; admin only;
+    secret encrypted, never returned, logged or audited; tried against
+    Shopify before saving; a refusal changes nothing. **Before it can be used
+    on an environment, `SETTINGS_ENCRYPTION_KEY` must be set there** (item
+    30a) - without it the form refuses to save, by design.
 
 Code hygiene (no behaviour)
 
@@ -771,6 +774,10 @@ Code hygiene (no behaviour)
 28. **Devices**: the control font on an iPhone, on Android and in Firefox.
 29. **`payment-record-*` screenshots** predate the *No destination recorded*
     wording.
+30a. **Deploying the connection form** needs `SETTINGS_ENCRYPTION_KEY` (a
+    Fernet key) set on each environment, kept out of the database; and the
+    new migration `c3d51e7a0002` applied. Not done - no deployment is
+    authorised.
 30. **Before merge**: the full backend runner (`run-suite.sh`), the frontend
     suite and build. Not re-run for this batch; the focused files are.
 31. **Release gates** (`CLAUDE.md`): reconciliation against an authorised
@@ -816,7 +823,7 @@ a question in item 33 and is not one any more.
 | | Decision | Where it stands |
 |---|---|---|
 | a | Keep *Withdrawn* separate from *Link expired* | As built (`InvitePage.tsx`); nothing to do |
-| b | Build the export's editable Shopify connection in Settings: authorised staff only; credentials protected and never in responses, logs or audit text; a failed update must not destroy the working connection; no editing of Shopify orders or products | **Batch I** (item 17b) |
+| b | Build the export's editable Shopify connection in Settings: authorised staff only; credentials protected and never in responses, logs or audit text; a failed update must not destroy the working connection; no editing of Shopify orders or products. Fields: *Store domain*, *Client ID*, *Client secret* (his answer, 25 September) | Done, batch I (ADR 0045) |
 | c | Account menu = *Team and access*, *Sign out*; Help and Appearance keep their own places | Done, batch H: Appearance is Settings' tab, Help is Settings → Reference and the glossary links |
 | d | No SKU or size count under the product name; no substitute; sizes stay in wardrobes and product/model details; SKU data stays in storage and integrations | Done, batch H |
 | e | Remove the admin *Selling best through codes* panel; keep the model's *Your best sellers* | Done, batch H: panel and its only route removed; `top_products` and the model's best sellers untouched |
@@ -844,7 +851,8 @@ overpaid month (a real state the export never drew).
 | Profile labels and *Active* pill; Home ⋯ ✕ and spacing; Payments name and pill | Batch E list | `a8eaab9`; pills finished here |
 | Chart axes, switch, *· So far*, Home titles, `.pill` leak, corrections panel, Home note | Follow-up list, owner's answers | `900aa21`; `shots/batch-f/checks.txt` |
 | Wardrobe size, Targets words, payment-details words, Invitations words and dates, You buttons' font, the refund comment | Items 1, 2, 4, 7, 8, 18 | `1b0a240`; `shots/batch-g/checks.txt` |
-| Decisions c, d, e, g, h: account menu, product list line, top-sellers panel, the usual recording date, the password after *Save details* | Owner, 25 September | batch H (the commit that adds this row); `shots/batch-h/checks.txt` |
+| Decisions c, d, e, g, h: account menu, product list line, top-sellers panel, the usual recording date, the password after *Save details* | Owner, 25 September | `52ab988`; `shots/batch-h/checks.txt` |
+| Decision b: the Shopify connection edited in Settings | Owner, 25 September | batch I (the commit that adds this row); ADR 0045; `tests/test_shopify_connection.py` (11), `ShopifyConnection.test.tsx` (4); `shots/batch-i/checks.txt` |
 | Portal order filter *Failed*, chips naming the case (G, #13) | Thirteen | `6131d0c` |
 | Net sales and *Counts towards* from facts | Batch D | `7bd9650` |
 | Earnings explanations, per-order commission | Batch C | `1b1bb21` |

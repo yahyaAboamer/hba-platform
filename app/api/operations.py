@@ -97,7 +97,8 @@ def sync_status(
         }
 
     return {
-        "shopify_configured": settings.shopify_configured,
+        # The connection in use - saved from Settings, or the environment's.
+        "shopify_configured": _shopify_effective(db).source is not None,
         "webhooks_configured": bool(settings.shopify_webhook_secret),
         # §11.2. Blank blocks every approval, deliberately - a default would
         # silently make eight months of already-settled orders approvable.
@@ -1110,3 +1111,62 @@ def unmute_notice(
         db.delete(existing)
         db.commit()
     return {"key": key, "muted": False}
+
+
+class ShopifyConnectionBody(BaseModel):
+    """The export's form, in HBA's credentials (decision b; ADR 0015)."""
+
+    shop_domain: str = Field(max_length=255)
+    #: Blank keeps the saved one, as for the secret.
+    client_id: str | None = Field(default=None, max_length=255)
+    #: Blank keeps the saved secret: it is never sent to the browser, so an
+    #: unchanged form arrives without it.
+    client_secret: str | None = Field(default=None, max_length=512)
+
+
+@router.get("/shopify-connection")
+def shopify_connection(
+    _actor: UserAccount = Depends(require_permission(Permission.SETTINGS_MANAGE)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """The connection in use, for Settings. **No secret, in any form.**"""
+    from app.services.shopify.connection import describe
+
+    return describe(db)
+
+
+@router.put("/shopify-connection")
+def update_shopify_connection(
+    body: ShopifyConnectionBody,
+    actor: UserAccount = Depends(require_permission(Permission.SETTINGS_MANAGE)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Change the connection - only if the new one answers Shopify.
+
+    Owner, decision b (25 September). A refusal leaves the connection in use
+    exactly as it was, and says why in words safe to show; the secret is never
+    echoed back, logged or audited.
+    """
+    from app.services.shopify.connection import ConnectionRefused, save
+
+    try:
+        found = save(
+            db,
+            shop_domain=body.shop_domain,
+            client_id=body.client_id,
+            client_secret=body.client_secret,
+            actor_id=actor.id,
+            actor_email=actor.email,
+        )
+    except ConnectionRefused as exc:
+        db.rollback()
+        raise HTTPException(422, str(exc)) from None
+    db.commit()
+    return found
+
+
+def _shopify_effective(db):
+    """The connection in use (saved from Settings, or the environment's)."""
+    from app.services.shopify.connection import effective
+
+    return effective(db)
