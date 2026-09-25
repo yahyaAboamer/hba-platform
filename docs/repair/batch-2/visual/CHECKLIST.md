@@ -1213,13 +1213,15 @@ Admin (1280 / 1440)
     export's sizes (the rules named here were dead CSS, now removed); the
     screen's review fixed the footnote and found 15a. See *Batch J - terms
     editing*.
-15a. **Terms editing: an arrangement can be chosen before a month** in the
-    export (its options stay enabled, `tmKind`); ours disables them until a
-    month is selected, because the draft is made from the months. Found in
-    batch J's review; an interaction change to the editor's state, not
-    typography, so not folded into 15. Future months beyond the working one
-    also read *Not yet* where the export shows their terms and a 2027 button
-    - to be compared on data that has terms running past this year.
+15a. ~~**Terms editing: an arrangement can be chosen before a month**~~ -
+    **done, batch J follow-up**, as the export's `termsVals`: the three
+    arrangements and the rate are live with no month selected, the choice
+    shows (its amount field too), and *Select months first* stays disabled;
+    selecting a month starts from that month's own terms, as the export's
+    `termsDraft: null` on toggle. Checked at 1280/1440; Commission 12% applied
+    to September and read back after a reload. Still open from 15a's note:
+    future months read *Not yet* where the export shows terms and a 2027
+    button - needs data with terms past this year to compare.
 16. ~~**Products**: the per-model order reference; the feature request's
     message presets (matrix B3, B4)~~ - **done, batch J**. See *Batch J -
     Products*.

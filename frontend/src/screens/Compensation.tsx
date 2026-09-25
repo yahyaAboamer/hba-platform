@@ -379,10 +379,12 @@ export function Compensation() {
                   type="button"
                   className={draft?.kind === kind ? "terms__option terms__option--on" : "terms__option"}
                   aria-pressed={draft?.kind === kind}
-                  disabled={ordered.length === 0}
-                  onClick={() =>
-                    draft && setDraft({ ...draft, kind, met: kind === "base_guarantee" ? draft.met : {} })
-                  }
+                  onClick={() => {
+                    // Available before a month is chosen, as the export's; choosing
+                    // months then starts from their own terms, as there.
+                    const base = draft ?? emptyDraft();
+                    setDraft({ ...base, kind, met: kind === "base_guarantee" ? base.met : {} });
+                  }}
                 >
                   {OPTION_LABEL[kind]}
                 </button>
@@ -396,8 +398,7 @@ export function Compensation() {
                 inputMode="decimal"
                 value={draft?.rate ?? ""}
                 placeholder={mixed ? "Mixed" : "e.g. 12"}
-                disabled={ordered.length === 0}
-                onChange={(event) => draft && setDraft({ ...draft, rate: event.target.value })}
+                onChange={(event) => setDraft({ ...(draft ?? emptyDraft()), rate: event.target.value })}
               />
             </label>
             {amountLabel && draft && (
@@ -508,7 +509,9 @@ function SetupReadiness({ readiness }: { readiness: Readiness }) {
 /* ── the editor panel ──────────────────────────────────────────────────────── */
 
 type Draft = {
-  kind: Kind;
+  /** `null` until an arrangement is picked - possible before any month is
+   *  chosen, as in the export (`termsDraft` over an empty seed). */
+  kind: Kind | null;
   /** Held as typed, so a half-typed "1" is not read as 1%. */
   rate: string;
   amount: string;
@@ -517,6 +520,11 @@ type Draft = {
 
 function blankDraft(): Draft {
   return { kind: "commission", rate: "10", amount: "", met: {} };
+}
+
+/** Nothing chosen yet: the export's empty seed, with no month selected. */
+function emptyDraft(): Draft {
+  return { kind: null, rate: "", amount: "", met: {} };
 }
 
 function draftFor(months: string[], set: Record<string, Arrangement>): Draft {
@@ -537,6 +545,7 @@ function draftFor(months: string[], set: Record<string, Arrangement>): Draft {
 
 /** The draft as numbers, or `null` while it is not yet a valid arrangement. */
 function readDraft(draft: Draft): Omit<Arrangement, "met"> | null {
+  if (draft.kind === null) return null;
   const rateBp = toBasisPoints(draft.rate);
   if (rateBp === null || rateBp <= 0) return null;
   if (draft.kind === "commission") {

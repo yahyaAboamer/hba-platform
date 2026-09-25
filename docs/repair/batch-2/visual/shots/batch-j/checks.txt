@@ -258,3 +258,7 @@
 [1280] Resend on the opened invitation: "rowan.khalil@example.com | Sent 25 September 2026 | Awaiting application | Resend | Withdraw"
 [1280] after reload still opened: true
 [1440] roster invitation row: "R | rowan.khalil@example.com | Awaiting application | 	Invited	—	—	25 September 2026	" buttons in row=0 -> /affiliates/invite?email=rowan.khalil%40example.com; opened: "rowan.khalil@example.com | Sent 25 September 2026 | Awaiting application | Resend | Withdraw"
+[1280] no month: option enabled=true pressed=true amount field=1 apply="Select months first" disabled=true
+[1280] Sep selected: reseeded from its terms, pressed option = ["Fixed salary plus commission"]
+[1280] applied Commission 12% to Sep; after reload Sep tile: "Sep\n12%"
+[1440] no month: option enabled=true pressed=true amount field=1 apply="Select months first" disabled=true
