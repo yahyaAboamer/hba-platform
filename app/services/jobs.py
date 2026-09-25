@@ -72,6 +72,10 @@ class JobKind:
     #: is the wrong trade, and the great majority of orders are customers.
     SYNC_LINE_ITEMS = "shopify_sync_line_items"
 
+    #: Settings → Appearance's *Weekly reminder to record achieved content*:
+    #: an email to staff who record targets and have not turned it off.
+    TARGETS_REMINDER = "targets_weekly_reminder"
+
 
 class PermanentFailure(Exception):
     """A job failure that retrying cannot fix.

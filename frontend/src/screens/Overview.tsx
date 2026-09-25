@@ -235,6 +235,20 @@ export function Overview({ session }: { session: Session }) {
       .catch((caught) => setError(caught.message));
   }
   const [error, setError] = useState<string | null>(null);
+  /**
+   * Settings → Appearance's *Show pop-up notices on Home*, this account's own.
+   * Unread or unreadable means on: a switch that failed to load must not hide
+   * the way into a correction.
+   */
+  const [noticesOn, setNoticesOn] = useState(true);
+  const [showAnyway, setShowAnyway] = useState(false);
+  useEffect(() => {
+    let live = true;
+    api.get<{ preferences: { home_notices: boolean } }>("/api/staff/me/preferences")
+      .then((body) => { if (live) setNoticesOn(body.preferences.home_notices); })
+      .catch(() => undefined);
+    return () => { live = false; };
+  }, []);
 
   useEffect(() => {
     let live = true;
@@ -272,7 +286,13 @@ export function Overview({ session }: { session: Session }) {
         <span>{hidden.length} notices hidden for now</span>
         <button className="button" onClick={() => { setHidden([]); try { sessionStorage.removeItem("hidden-notices"); } catch { /* optional persistence */ } }}>Show again</button>
       </div>}
-      {attention && <section className="overview__notices" aria-label="Notifications">
+      {/* Turned off in Settings → Appearance: the export's own *hidden*
+       *  line in their place, so nothing reached through a notice is lost. */}
+      {attention && !noticesOn && !showAnyway && attention.items.length > 0 && <div className="overview__hidden">
+        <span>{attention.items.length} {attention.items.length === 1 ? "notice" : "notices"} hidden · turned off in Settings → Appearance</span>
+        <button className="button" onClick={() => setShowAnyway(true)}>Show</button>
+      </div>}
+      {attention && (noticesOn || showAnyway) && <section className="overview__notices" aria-label="Notifications">
         {attention.items.filter(item => !hidden.includes(item.key)).map(item => <div key={item.key}
           className={`overview__notice ${item.severity === "blocking" ? "overview__notice--blocking" : ""}`}>
           <span className="overview__notice-dot" aria-hidden="true" />

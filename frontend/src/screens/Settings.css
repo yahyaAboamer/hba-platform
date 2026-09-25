@@ -100,39 +100,38 @@
   flex: 1;
 }
 
+/* The export's *Recent activity* (Admin lines 773-779): rows 12px 16px with
+   a rule under each; what happened 13.5px, who and when 12px faint 4px under. */
 .settings__activity {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
   list-style: none;
   margin: 0;
   padding: 0;
 }
 
 .settings__activity-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--space-3);
-  padding-bottom: var(--space-3);
+  padding: 12px 16px;
   border-bottom: 1px solid var(--rule);
 }
 
 .settings__activity-row:last-child {
   border-bottom: none;
-  padding-bottom: 0;
 }
 
-.settings__activity-action {
-  font-size: var(--text-xs);
+.settings__activity-what {
+  display: block;
+  font-size: 13.5px;
 }
 
-.settings__activity-subject {
-  font-size: var(--text-sm);
+.settings__activity-who {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--faint);
 }
 
 .settings__activity-reason {
-  flex-basis: 100%;
+  display: block;
+  margin-top: 4px;
   font-size: var(--text-sm);
   color: var(--quiet);
   font-style: italic;
@@ -289,6 +288,18 @@
 .settings__workspace > .settings__sections { flex:1; min-width:0; }
 .settings__appearance { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:14px 18px; }
 .settings__appearance > span { font-size:14px; }
+/* The export's switches (Admin lines 749-757): one surface 14px under the
+   theme row, rows 52px high, 13px 18px, 14px, a rule under each; the track
+   44x26 with an 18px knob, accent when on. Buttons in the control font, as
+   every export button (ADR 0044). */
+.settings__switches { margin-top:14px; border-radius:var(--radius); background:var(--surface); overflow:hidden; }
+.settings__switch { width:100%; display:flex; align-items:center; justify-content:space-between; gap:14px; min-height:52px; padding:13px 18px; border:0; border-bottom:1px solid var(--rule); background:transparent; color:var(--ink); text-align:left; font-size:14px; cursor:pointer; }
+.settings__switch:disabled { cursor:default; }
+.settings__track { flex:none; position:relative; width:44px; height:26px; border:1px solid var(--rule); border-radius:13px; background:transparent; }
+.settings__track > span { position:absolute; top:3px; left:3px; width:18px; height:18px; border-radius:50%; background:var(--faint); }
+.settings__track--on { border-color:var(--accent); background:var(--accent); }
+.settings__track--on > span { left:21px; background:var(--paper); }
+.settings__switch-error { margin-top:12px; }
 @media(max-width:800px) { .settings__workspace { flex-direction:column; } .settings__navigation { flex-direction:row; overflow-x:auto; width:100%; } .settings__navigation button { white-space:nowrap; } .settings__workspace > .settings__sections { width:100%; } }
 
 /* ── Team, measured off the export's Settings (lines 606–647) ──────────── */

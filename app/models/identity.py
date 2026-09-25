@@ -18,11 +18,13 @@ of write, whatever the calling code believes.
 from datetime import datetime
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
     Index,
     String,
+    UniqueConstraint,
     text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -194,5 +196,33 @@ class PasswordReset(Base):
     requested_ip: Mapped[str | None] = mapped_column(String(45))
 
     created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+
+
+class StaffPreference(Base):
+    """One of Settings → Appearance's switches, turned off by one staff account.
+
+    **Absence means on**, as the export's defaults (`prefs: { notices: true,
+    weekly: true }`): a row exists only once somebody has changed a switch, so
+    an account nobody has touched gets both.
+    """
+
+    __tablename__ = "staff_preference"
+    __table_args__ = (
+        UniqueConstraint("user_account_id", "key", name="staff_preference_unique"),
+        CheckConstraint(
+            "key IN ('home_notices', 'weekly_targets_reminder')",
+            name="staff_preference_key_valid",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_account_id: Mapped[int] = mapped_column(
+        ForeignKey("user_account.id", ondelete="CASCADE"), nullable=False
+    )
+    key: Mapped[str] = mapped_column(String(40), nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )

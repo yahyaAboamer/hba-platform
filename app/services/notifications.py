@@ -74,6 +74,8 @@ class Event:
     PAYMENT_RECORDED = "payment.recorded"
     DESTINATION_CHANGED = "destination.changed"
     PASSWORD_RESET = "password.reset"
+    #: Settings → Appearance's weekly reminder, to a member of staff.
+    TARGETS_REMINDER = "targets.weekly_reminder"
 
     #: Not in §16's table. Added with the maintainer's own
     #: payout-destination screen, because that screen is the first way one
@@ -438,6 +440,29 @@ def _reopen_reason(db: Session, affiliate_id: int, month: str) -> str | None:
     return None
 
 
+
+def targets_reminder(db: Session, account, month: str, missing: int, total: int):
+    """The weekly reminder to record achieved content (Settings → Appearance).
+
+    To one member of staff who may record it and has the switch on. Says how
+    many models have nothing recorded for the month, because that is the
+    number that holds a guaranteed minimum up.
+    """
+    return queue(
+        db,
+        event=Event.TARGETS_REMINDER,
+        recipient_email=account.email,
+        recipient_name=account.display_name,
+        subject_ref=f"user:{account.id}",
+        payload={
+            "email": account.email,
+            "name": account.display_name or "",
+            "month": month,
+            "missing": missing,
+            "total": total,
+        },
+    )
+
 # -- What each one says -------------------------------------------------------
 
 
@@ -570,6 +595,32 @@ def render(event: str, payload: dict) -> Message | None:
                 "the application can be approved.",
                 "/affiliates",
                 "Review it here:",
+            ),
+        )
+
+    if event == Event.TARGETS_REMINDER:
+        month_words = month_in_words(payload["month"])
+        missing, total = int(payload["missing"]), int(payload["total"])
+        if missing == 0:
+            state = f"Every active model has something recorded for {month_words}."
+        elif missing == total:
+            state = f"No model has anything recorded for {month_words} yet."
+        else:
+            state = (
+                f"{missing} of {total} active models "
+                f"{'has' if missing == 1 else 'have'} nothing recorded for "
+                f"{month_words} yet."
+            )
+        return Message(
+            to_address=payload["email"],
+            to_name=name or None,
+            subject=f"Record achieved content for {month_words}",
+            body=_with_link(
+                f"Hi {first},\n\nYour weekly reminder to record achieved "
+                f"content. {state}\n\nYou can turn this reminder off in "
+                "Settings → Appearance.",
+                "/targets",
+                "Record it here:",
             ),
         )
 

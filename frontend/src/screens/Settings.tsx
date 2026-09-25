@@ -9,7 +9,7 @@ import { PolicyText } from "../components/PolicyText";
 import { api, can } from "../lib/api";
 import type { Session } from "../lib/api";
 import { currentMonth, formatMonth, monthsBetween } from "../lib/money";
-import { DataPanel } from "./DataPanel";
+import { DataPanel, longWhen } from "./DataPanel";
 import "./Settings.css";
 
 type SyncStatus = {
@@ -48,6 +48,10 @@ type Roster = {
 
 type AuditEntry = {
   id: number;
+  /** The entry in words, written on the server from the row. */
+  sentence: string;
+  /** Who did it - their name, not their address. */
+  who: string;
   action: string;
   subject: string;
   actor_email: string | null;
@@ -127,14 +131,63 @@ function AppearancePanel() {
   const [theme, setTheme] = useState(() => storedTheme("maintainer"));
   // The export's segmented switch - two radios that read as one control -
   // rather than two buttons that could both look pressed.
-  return <section className="panel settings__appearance"><span>Theme</span>
-    <div className="seg" role="radiogroup" aria-label="Theme">{(["dark", "light"] as const).map(value =>
-      <label key={value} className="seg-opt">
-        <input type="radio" name="admin-theme" checked={theme === value}
-          onChange={() => { setTheme(value); storeTheme(value,"maintainer"); applyMaintainerTheme(value); }} />
-        <span>{value === "dark" ? "Dark" : "Light"}</span>
-      </label>)}</div>
-  </section>;
+  return <>
+    <section className="panel settings__appearance"><span>Theme</span>
+      <div className="seg" role="radiogroup" aria-label="Theme">{(["dark", "light"] as const).map(value =>
+        <label key={value} className="seg-opt">
+          <input type="radio" name="admin-theme" checked={theme === value}
+            onChange={() => { setTheme(value); storeTheme(value,"maintainer"); applyMaintainerTheme(value); }} />
+          <span>{value === "dark" ? "Dark" : "Light"}</span>
+        </label>)}</div>
+    </section>
+    <PreferenceSwitches />
+  </>;
+}
+
+type Preferences = { preferences: Record<string, boolean>; labels: Record<string, string> };
+
+/**
+ * The export's two switches (`prefRows`, Admin lines 749-757), **saved on the
+ * server for this account**, so they hold after a reload and on another
+ * device. A switch moves when the server has said so, not before; a refusal
+ * leaves it where it was and says why.
+ */
+export function PreferenceSwitches() {
+  const [body, setBody] = useState<Preferences | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.get<Preferences>("/api/staff/me/preferences").then(setBody)
+      .catch((caught) => setError(caught instanceof Error ? caught.message : "Could not load these."));
+  }, []);
+
+  async function toggle(key: string) {
+    if (!body) return;
+    setSaving(key);
+    setError(null);
+    try {
+      setBody(await api.put<Preferences>("/api/staff/me/preferences", { key, enabled: !body.preferences[key] }));
+    } catch (caught) {
+      setError(`${caught instanceof Error ? caught.message : "Could not save that."} Nothing changed.`);
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  return <>
+    {body && <div className="settings__switches">
+      {Object.entries(body.labels).map(([key, label]) => {
+        const on = body.preferences[key];
+        return <button key={key} type="button" role="switch" aria-checked={on} disabled={saving === key}
+          className="settings__switch" onClick={() => toggle(key)}>
+          <span>{label}</span>
+          <span className={`settings__track${on ? " settings__track--on" : ""}`} aria-hidden="true"><span /></span>
+        </button>;
+      })}
+    </div>}
+    {error && <p className="notice notice--refused settings__switch-error" role="alert">{error}</p>}
+  </>;
 }
 
 type SetupRow = {
@@ -890,17 +943,12 @@ function ActivityPanel() {
       {events && events.length > 0 && (
         <ul className="settings__activity">
           {events.map((event) => (
-            <li key={event.id} className="settings__activity-row">
-              <span className="code settings__activity-action">{event.action}</span>
-              <span className="settings__activity-subject">{event.subject}</span>
-              <span className="settings__quiet">
-                {event.actor_email ?? "system"} ·{" "}
-                {new Date(event.created_at).toLocaleString("en-GB", {
-                  day: "numeric",
-                  month: "short",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
+            // The export's entry (Admin lines 774-779): what happened in words,
+            // then who and when. The action code stays in the trail itself.
+            <li key={event.id} className="settings__activity-row" title={`${event.action} · ${event.subject}`}>
+              <span className="settings__activity-what">{event.sentence}</span>
+              <span className="settings__activity-who">
+                {event.who} · {longWhen(event.created_at)}
               </span>
               {event.reason && (
                 <span className="settings__activity-reason">"{event.reason}"</span>

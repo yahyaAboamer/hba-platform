@@ -41,6 +41,9 @@ logger = logging.getLogger(__name__)
 SCHEDULE: dict[str, tuple[timedelta, dict]] = {
     JobKind.RECONCILE: (timedelta(minutes=30), {"since_hours": 48}),
     JobKind.PRUNE_JOBS: (timedelta(days=1), {"older_than_days": 30}),
+    # Settings → Appearance. Roughly weekly; who receives it is decided when
+    # it runs (app.services.staff_prefs).
+    JobKind.TARGETS_REMINDER: (timedelta(days=7), {}),
 }
 
 

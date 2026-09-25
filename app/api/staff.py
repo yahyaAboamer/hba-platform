@@ -224,3 +224,39 @@ def resend(
         "link": invitation_link(token),
         "emailed": queued is not None and settings.mail_configured,
     }
+
+
+# ── Settings → Appearance: this account's own switches ─────────────────────────
+
+
+class PreferenceBody(BaseModel):
+    key: str = Field(min_length=1, max_length=40)
+    enabled: bool
+
+
+@router.get("/me/preferences")
+def my_preferences(
+    actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_VIEW)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """The signed-in member of staff's own switches. Absent means on."""
+    from app.services.staff_prefs import SWITCHES, preferences_for
+
+    return {"preferences": preferences_for(db, actor.id), "labels": SWITCHES}
+
+
+@router.put("/me/preferences")
+def change_my_preference(
+    body: PreferenceBody,
+    actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_VIEW)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Turn one of this account's own switches on or off. Nobody else's."""
+    from app.services.staff_prefs import SWITCHES, set_preference
+
+    try:
+        preferences = set_preference(db, actor, body.key, body.enabled)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from None
+    db.commit()
+    return {"preferences": preferences, "labels": SWITCHES}

@@ -128,3 +128,34 @@
 [1440] app fields: ["Started with HBA","Full name","Signs in with","Phone","Shipping address","City"] / sign-in is an input: false
 [1280] after line-height fix: contact input 42px, Shopify connection input 42px (export 42)
 [1440] after line-height fix: contact input 42px, Shopify connection input 42px (export 42)
+## portal - 2026-09-25T22:03:11.588Z
+[390] export chips: ["SPAN 1 delivered","SPAN 1 pending","SPAN 0 failed delivery"]
+[390] export delivered chip: {"text":"1 delivered","font":"12px 400 Inter","color":"rgb(123, 224, 166)","background":"rgba(35, 169, 92, 0.14)","border":"0px none rgb(123, 224, 166)","radius":"999px","padding":"3px 9px","height":27}
+[390] export info button: {"text":"i","font":"12px 400 Arial","color":"rgb(167, 173, 166)","background":"rgba(0, 0, 0, 0)","border":"1px solid rgb(35, 39, 43)","radius":"50%","padding":"1px 6px","height":22}
+[390] app chips: ["SPAN 1 delivered","SPAN 0 pending","SPAN 0 failed delivery"]
+[390] app delivered chip: {"text":"1 delivered","font":"12px 400 Inter","color":"rgb(123, 224, 166)","background":"rgba(35, 169, 92, 0.14)","border":"0px none rgb(123, 224, 166)","radius":"999px","padding":"3px 9px","height":27}
+[390] Sara (commission) targets: guarantee row shown=false
+[390] Hana (guarantee): sentence shown before tap=false; button {"text":"i","font":"12px 400 Arial","color":"rgb(167, 173, 166)","background":"rgba(0, 0, 0, 0)","border":"1px solid rgb(35, 39, 43)","radius":"50%","padding":"0px","height":22}
+[390] after tap: expanded=true sentence="Met. Your guaranteed minimum applies as soon as HBA confirms the numbers."
+## settings - 2026-09-25T22:03:24.019Z
+[1280] switches: notices=true weekly=true
+[1280] app switch row: {"text":"Show pop-up notices on Home","font":"14px 400 Arial","color":"rgb(236, 239, 234)","background":"rgba(0, 0, 0, 0)","border":"","radius":"0px","padding":"13px 18px","height":53}
+[1280] app track: {"text":"","font":"14px 400 Arial","color":"rgb(236, 239, 234)","background":"rgb(35, 169, 92)","border":"1px solid rgb(35, 169, 92)","radius":"13px","padding":"0px","height":26}
+[1280] refused: alert="The server is having a moment. Nothing changed." weekly still=true
+[1280] notices off, after reload: false
+[1280] Home with notices off: cards=0 line="3 notices hidden · turned off in Settings → Appearance\nShow"
+[1280] after Show: cards=3
+[1280] put back on: true
+[1280] activity: ["Turned on “Show pop-up notices on Home” for themselves | Yahya · 26 September 2026, 01:03","Turned off “Show pop-up notices on Home” for themselves | Yahya · 26 September 2026, 01:03","Yahya signed in | Yahya · 26 September 2026, 01:03","Hana Wagih signed in | Hana Wagih · 26 September 2026, 01:03","Sara Edrees signed in | Sara Edrees · 26 September 2026, 01:03","Yahya signed in | Yahya · 26 September 2026, 00:52","Yahya signed in | Yahya · 26 September 2026, 00:52","Yahya signed in | Yahya · 26 September 2026, 00:51"]
+[1280] app activity what: {"text":"Turned on “Show pop-up notices on Home” for themselves","font":"13.5px 400 Inter","color":"rgb(236, 239, 234)","background":"rgba(0, 0, 0, 0)","border":"0px none rgb(236, 239, 234)","radius":"0px","padding":"0px","height":21}
+[1280] app activity who: {"text":"Yahya · 26 September 2026, 01:03","font":"12px 400 Inter","color":"rgb(138, 145, 138)","background":"rgba(0, 0, 0, 0)","border":"0px none rgb(138, 145, 138)","radius":"0px","padding":"0px","height":19}
+[1280] export switch row: {"text":"Show pop-up notices on Home","font":"14px 400 Arial","color":"rgb(236, 239, 234)","background":"rgba(0, 0, 0, 0)","border":"","radius":"0px","padding":"13px 18px","height":53}
+[1280] export activity what: {"text":"Recorded a payment of EGP 1,900.00 to Yahya Aboamer for September 2026","font":"13.5px 400 Inter","color":"rgb(236, 239, 234)","background":"rgba(0, 0, 0, 0)","border":"0px none rgb(236, 239, 234)","radius":"0px","padding":"0px","height":21}
+[1440] switches: notices=true weekly=true
+[1440] app switch row: {"text":"Show pop-up notices on Home","font":"14px 400 Arial","color":"rgb(236, 239, 234)","background":"rgba(0, 0, 0, 0)","border":"","radius":"0px","padding":"13px 18px","height":53}
+[1440] app track: {"text":"","font":"14px 400 Arial","color":"rgb(236, 239, 234)","background":"rgb(35, 169, 92)","border":"1px solid rgb(35, 169, 92)","radius":"13px","padding":"0px","height":26}
+[1440] activity: ["Yahya signed in | Yahya · 26 September 2026, 01:03","Turned on “Show pop-up notices on Home” for themselves | Yahya · 26 September 2026, 01:03","Turned off “Show pop-up notices on Home” for themselves | Yahya · 26 September 2026, 01:03","Yahya signed in | Yahya · 26 September 2026, 01:03","Hana Wagih signed in | Hana Wagih · 26 September 2026, 01:03","Sara Edrees signed in | Sara Edrees · 26 September 2026, 01:03","Yahya signed in | Yahya · 26 September 2026, 00:52","Yahya signed in | Yahya · 26 September 2026, 00:52"]
+[1440] app activity what: {"text":"Yahya signed in","font":"13.5px 400 Inter","color":"rgb(236, 239, 234)","background":"rgba(0, 0, 0, 0)","border":"0px none rgb(236, 239, 234)","radius":"0px","padding":"0px","height":21}
+[1440] app activity who: {"text":"Yahya · 26 September 2026, 01:03","font":"12px 400 Inter","color":"rgb(138, 145, 138)","background":"rgba(0, 0, 0, 0)","border":"0px none rgb(138, 145, 138)","radius":"0px","padding":"0px","height":19}
+[1440] export switch row: {"text":"Show pop-up notices on Home","font":"14px 400 Arial","color":"rgb(236, 239, 234)","background":"rgba(0, 0, 0, 0)","border":"","radius":"0px","padding":"13px 18px","height":53}
+[1440] export activity what: {"text":"Recorded a payment of EGP 1,900.00 to Yahya Aboamer for September 2026","font":"13.5px 400 Inter","color":"rgb(236, 239, 234)","background":"rgba(0, 0, 0, 0)","border":"0px none rgb(236, 239, 234)","radius":"0px","padding":"0px","height":21}

@@ -905,6 +905,89 @@ City saved, *Saved*, and still there after a reload; a bad parcel phone
 refused with the server's words and *Nothing was saved*, the typed name
 kept, and after a reload the name unchanged; City put back.
 
+## Batch J - portal Home chips and the Targets ⓘ (25 September)
+
+**Reference to code.** Portal export lines 124-128 (the chips) and 350-358,
+1368-1371 (`showGuaranteeInfo`, `onGuaranteeInfo`, `guaranteeLine`). App:
+`MyMonth.tsx` / `.css`, `MyTargets.tsx` / `.css`.
+
+- **Chips** are the export's plain pills (`<span>`), no longer links; the
+  delivered one is the lifted green on the accent tint. Measured at 390:
+  12px, 3px 9px, 999px, 27px high, same colours as the export's.
+- **The guarantee sentence** sits behind the export's round *i* (22px,
+  12px, rule-coloured border, `aria-label` *How the guaranteed minimum
+  works*, `aria-expanded`), under a rule with *Guaranteed minimum* beside
+  it - **only where a guaranteed minimum rides on the numbers**, as the
+  export's `showGuaranteeInfo`. On other arrangements nothing shows (ours
+  used to print *It does not change what you are paid*; the export has no
+  such line). Opened, it is our month-specific sentence (*Met. Your
+  guaranteed minimum applies as soon as HBA confirms the numbers.*), which
+  says more than the export's general one because it reads her record.
+- **Checks** at 390 (`shots/batch-j/app-portal-*`, `export-portal-*`):
+  chips and button measured equal; Sara (commission) shows no guarantee
+  row; Hana (guarantee) shows none of the sentence until the tap, then it.
+
+## Batch J - Settings: the Appearance switches and the audit in words (25 September)
+
+**Reference to code.** Export Appearance (Admin lines 740-758; `prefRows`
+3600-3611; defaults `prefs: { notices: true, weekly: true }`) and Reference's
+*Recent activity* (773-779; `ACTIVITY` 1783-1788). App: `Settings.tsx`
+(`PreferenceSwitches`, `ActivityPanel`), `Overview.tsx`,
+`app/services/staff_prefs.py`, `app/services/audit_words.py`,
+`app/api/staff.py` (`/api/staff/me/preferences`), `app/api/audit.py`,
+migration `d4e7a2c90003`.
+
+**The switches save, survive a reload, and do what they say.** The export's
+are prototype-only (they change nothing), so what each controls is taken
+from its words:
+
+- Stored **per staff account on the server** (`staff_preference`; a row
+  only once a switch is turned off - absent means on, the export's
+  defaults), so a reload or another device shows the same. Any staff role
+  changes their own; a model's account has none (403). A change is audited
+  (*Turned off "Show pop-up notices on Home" for themselves*). A refusal
+  leaves the switch where it was and says *Nothing changed*.
+- ***Show pop-up notices on Home*** off: Home opens without its notice
+  cards and puts the export's own *hidden* line in their place - *3 notices
+  hidden · turned off in Settings → Appearance* with *Show* - so a
+  correction reached only through a notice (batch F) never becomes
+  unreachable. If the switch cannot be read, notices show.
+- ***Weekly reminder to record achieved content***: a real email, roughly
+  weekly (`JobKind.TARGETS_REMINDER` in the schedule; the interval runs from
+  the last send, as every recurring job here), to active staff whose role
+  may record targets and who have it on. It says how many active models
+  have nothing recorded for the month (*2 of 3 active models have nothing
+  recorded for September 2026 yet*), links to Targets, and says where to
+  turn it off. Through the existing outbox, so a failed send is retried and
+  visible like any other.
+
+**The audit trail in words.** Every entry is a sentence written on the
+server from the row, names resolved (the model's name, the member of
+staff's name - not their address), money as *EGP 1,900.00*, months in
+words, the payment's months from its allocations: *Recorded a payment of
+EGP 1,900.00 to Yahya Aboamer for September 2026* - the export's own
+example, reproduced exactly by a test. 49 action types plus the three
+adjustment kinds; a test reads every `action="…"` in `app/` and fails if any
+lacks a sentence. A destination is named by its method only, and nothing
+is read that the masked row does not already hold. Under each: *who ·
+6 November 2026, 11:04*, as the export. The action code stays in the trail
+(and in a tooltip); the filter and a reason, where given, are kept.
+
+**Checks.** Backend: `test_staff_preferences.py` (8: defaults on; saved and
+read back by a new session; one account's switch is not another's; audited
+once per change; unknown switch 422; a model 403; the reminder scheduled and
+handled; sent only to staff who record targets and want it, with the right
+count and words), `test_audit_words.py` (6), `test_audit_api`; the 34 files
+touching the schedule, events, migrations or audit: 967 passing. The
+migration upgraded, downgraded (table gone, accounts intact) and upgraded
+again on a throwaway database. Frontend: `PreferenceSwitches.test.tsx` (2);
+suite 457 tests, 26 files; `npm run build`. Browser at 1280 and 1440
+(`shots/batch-j/app-appearance-*`, `app-home-notices-off-1280`,
+`app-reference-*`, `export-*`): switch rows 53px, 13px 18px, 14px and the
+activity lines 13.5px / 12px faint, measured equal to the export; a refused
+save left the switch on; notices off survived a reload; Home showed no cards
+and the hidden line, *Show* brought all three back; switched on again.
+
 ## Remaining work - the one list (reconciled 24 September)
 
 Reconciled against: the 24 September handoff (*What is waiting on Yahya*,
@@ -930,10 +1013,11 @@ Portal (390)
    lead sentence removed. **Finished in batch H**: the export's *Method*
    segment (*InstaPay · Wallet · Bank*) and *Back* / *Save details*; the
    password is asked after *Save details* (decision h).
-5. **Home order chips** are links in ours, plain pills in the export
-   (matrix, kept for a preference only).
-6. **Targets guarantee sentence** stands in the open; the export puts it
-   behind an ⓘ (matrix, preference only).
+5. ~~**Home order chips** are links in ours, plain pills in the export~~ -
+   **done, batch J**: plain pills, the delivered one in the lifted green.
+6. ~~**Targets guarantee sentence** stands in the open; the export puts it
+   behind an ⓘ~~ - **done, batch J**: behind the export's *i*, and only on a
+   guaranteed minimum, as the export shows it.
 7. ~~**You screens: buttons still set to Inter**~~ - **done, batch G**:
    sign-out, leave, the detail rows, notification rows and the reveal
    button take the control font. `portal.css`'s `.affiliate .block` still
@@ -957,9 +1041,9 @@ Admin (1280 / 1440)
     *detail*, because the sweep's reference step never pressed *Record
     payment*. Against the real `vRecord`, two words differed and are fixed.
     See *Batch J - Record payment*.
-11. **Settings**: Appearance's two switches (*Show pop-up notices on Home*,
-    *Weekly reminder to record achieved content*) (#1); Reference's audit rows
-    as sentences, about forty event types (#2).
+11. ~~**Settings**: Appearance's two switches; Reference's audit rows as
+    sentences~~ - **done, batch J** (see *Batch J - Settings*). New migration
+    `d4e7a2c90003` (staff preferences) - in the release rehearsal list.
 12. **Roster and Products rows as buttons** (control font, so their pills
     measure 20px as the export's); the roster's **Table / Cards** toggle
     removed (D).
@@ -1097,6 +1181,8 @@ overpaid month (a real state the export never drew).
 | Wardrobe size, Targets words, payment-details words, Invitations words and dates, You buttons' font, the refund comment | Items 1, 2, 4, 7, 8, 18 | `1b0a240`; `shots/batch-g/checks.txt` |
 | Decisions c, d, e, g, h: account menu, product list line, top-sellers panel, the usual recording date, the password after *Save details* | Owner, 25 September | `52ab988`; `shots/batch-h/checks.txt` |
 | Decision b: the Shopify connection edited in Settings | Owner, 25 September | batch I (the commit that adds this row); ADR 0045; `tests/test_shopify_connection.py` (11), `ShopifyConnection.test.tsx` (4); `shots/batch-i/checks.txt` |
+| Settings switches saved per account and obeyed; audit trail as sentences (item 11) | Thirteen #1, #2 | batch J; `test_staff_preferences` (8), `test_audit_words` (6), `PreferenceSwitches.test.tsx` (2) |
+| Portal Home chips as pills; Targets guarantee behind the ⓘ (items 5, 6) | Matrix | batch J; `shots/batch-j/app-portal-*` |
 | Contact and shipping as the export's form; sign-in kept apart; Sizing 15px; start 12.5px (item 14) | Matrix, owner 24 September | batch J; `ContactForm.test.tsx` (5), `test_affiliates_api` (+3) |
 | Record payment: premise corrected; subtitle and note as `vRecord` (item 10, #11) | Thirteen | batch J; `shots/batch-j/export-record-*`, `app-record-*` |
 | Admin Targets words, widths, guarantee label; unchanged rows keep their confirmation (item 9) | Thirteen E, matrix §T | batch J; `test_targets_api` (+1), `TargetsWords.test.tsx` (4) |

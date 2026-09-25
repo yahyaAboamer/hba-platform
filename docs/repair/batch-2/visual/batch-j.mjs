@@ -419,6 +419,117 @@ steps.contact = async (browser) => {
   }
 };
 
+const HANA = { email: "hana@example.com", password: "a-long-enough-password" };
+const portalTab = (page, label) => page.locator(".pt").locator("button, a").filter({ hasText: new RegExp(`^${label}$`) }).last();
+
+/** Items 5 and 6 at 390: Home's chips, and the guarantee behind its ⓘ. */
+steps.portal = async (browser) => {
+  const { context: rc, ref } = await openExport(browser, PORTAL_EXPORT, 390, ".pt");
+  const refChips = ref.locator(".pt span", { hasText: /^\d+ (delivered|pending|failed delivery)$/ });
+  log(`[390] export chips: ${JSON.stringify(await refChips.evaluateAll((els) => els.map((e) => `${e.tagName} ${e.textContent}`)))}`);
+  log(`[390] export delivered chip: ${JSON.stringify(await style(ref, refChips))}`);
+  await ref.locator(".pt").screenshot({ path: join(OUT, "export-portal-home-390.png") });
+  await portalTab(ref, "Targets").click();
+  await settle(ref, 700);
+  const info = ref.locator(".pt button[aria-label='How the guaranteed minimum works']");
+  log(`[390] export info button: ${JSON.stringify(await style(ref, info))}`);
+  await info.click();
+  await settle(ref, 400);
+  await ref.locator(".pt").screenshot({ path: join(OUT, "export-portal-targets-open-390.png") });
+  await rc.close();
+
+  const { context, page } = await signIn(browser, MODEL, { width: 390, height: 844 });
+  await page.goto(`${APP}/`, { waitUntil: "networkidle" });
+  await settle(page, 800);
+  const chips = page.locator(".portal-home__states > *");
+  log(`[390] app chips: ${JSON.stringify(await chips.evaluateAll((els) => els.map((e) => `${e.tagName} ${e.textContent}`)))}`);
+  log(`[390] app delivered chip: ${JSON.stringify(await style(page, chips))}`);
+  await page.screenshot({ path: join(OUT, "app-portal-home-390.png") });
+  await page.goto(`${APP}/targets`, { waitUntil: "networkidle" });
+  await settle(page, 700);
+  log(`[390] Sara (commission) targets: guarantee row shown=${await page.locator(".mytargets__guarantee").count() > 0}`);
+  await context.close();
+
+  const { context: hc, page: hana } = await signIn(browser, HANA, { width: 390, height: 844 });
+  await hana.goto(`${APP}/targets`, { waitUntil: "networkidle" });
+  await settle(hana, 700);
+  const button = hana.getByRole("button", { name: "How the guaranteed minimum works" });
+  log(`[390] Hana (guarantee): sentence shown before tap=${await hana.locator(".mytargets__pay").count() > 0}; button ${JSON.stringify(await style(hana, button))}`);
+  await button.click();
+  await settle(hana, 300);
+  log(`[390] after tap: expanded=${await button.getAttribute("aria-expanded")} sentence=${JSON.stringify(await hana.locator(".mytargets__pay").innerText())}`);
+  await hana.screenshot({ path: join(OUT, "app-portal-targets-open-390.png") });
+  await hc.close();
+};
+
+/** Item 11: the switches save and survive a reload; Home obeys; the trail reads as sentences. */
+steps.settings = async (browser) => {
+  for (const width of [1280, 1440]) {
+    const { context, page } = await signIn(browser, OWNER, { width, height: 900 });
+    await page.goto(`${APP}/settings?section=appearance`, { waitUntil: "networkidle" });
+    await settle(page, 700);
+    const notices = page.getByRole("switch", { name: "Show pop-up notices on Home" });
+    const weekly = page.getByRole("switch", { name: "Weekly reminder to record achieved content" });
+    log(`[${width}] switches: notices=${await notices.getAttribute("aria-checked")} weekly=${await weekly.getAttribute("aria-checked")}`);
+    log(`[${width}] app switch row: ${JSON.stringify(await style(page, notices))}`);
+    log(`[${width}] app track: ${JSON.stringify(await style(page, page.locator(".settings__track")))}`);
+    await page.screenshot({ path: join(OUT, `app-appearance-${width}.png`) });
+
+    if (width === 1280) {
+      // Refused by the server: the switch stays where it was.
+      await page.route("**/api/staff/me/preferences", (route) =>
+        route.request().method() === "PUT" ? route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ detail: "The server is having a moment." }) }) : route.continue());
+      await weekly.click();
+      await settle(page, 500);
+      log(`[${width}] refused: alert=${JSON.stringify(await page.getByRole("alert").first().innerText())} weekly still=${await weekly.getAttribute("aria-checked")}`);
+      await page.unroute("**/api/staff/me/preferences");
+
+      await notices.click();
+      await settle(page, 600);
+      await page.reload({ waitUntil: "networkidle" });
+      await settle(page, 700);
+      log(`[${width}] notices off, after reload: ${await page.getByRole("switch", { name: "Show pop-up notices on Home" }).getAttribute("aria-checked")}`);
+      await page.screenshot({ path: join(OUT, `app-appearance-off-${width}.png`) });
+
+      await page.goto(`${APP}/`, { waitUntil: "networkidle" });
+      await settle(page, 800);
+      log(`[${width}] Home with notices off: cards=${await page.locator(".overview__notice").count()} line=${JSON.stringify(await page.locator(".overview__hidden").innerText().catch(() => ""))}`);
+      await page.screenshot({ path: join(OUT, `app-home-notices-off-${width}.png`) });
+      await page.locator(".overview__hidden button", { hasText: "Show" }).click();
+      await settle(page, 400);
+      log(`[${width}] after Show: cards=${await page.locator(".overview__notice").count()}`);
+
+      await page.goto(`${APP}/settings?section=appearance`, { waitUntil: "networkidle" });
+      await settle(page, 600);
+      await page.getByRole("switch", { name: "Show pop-up notices on Home" }).click();
+      await settle(page, 600);
+      log(`[${width}] put back on: ${await page.getByRole("switch", { name: "Show pop-up notices on Home" }).getAttribute("aria-checked")}`);
+    }
+
+    await page.goto(`${APP}/settings?section=advanced`, { waitUntil: "networkidle" });
+    await settle(page, 800);
+    const rows = await page.locator(".settings__activity-row").evaluateAll((els) => els.slice(0, 8).map((e) => e.innerText.replace(/\n/g, " | ")));
+    log(`[${width}] activity: ${JSON.stringify(rows)}`);
+    log(`[${width}] app activity what: ${JSON.stringify(await style(page, page.locator(".settings__activity-what")))}`);
+    log(`[${width}] app activity who: ${JSON.stringify(await style(page, page.locator(".settings__activity-who")))}`);
+    await page.screenshot({ path: join(OUT, `app-reference-${width}.png`) });
+    await context.close();
+
+    const { context: rc, ref } = await openExport(browser, ADMIN_EXPORT, width);
+    await exportNav(ref, NAV.settings).click();
+    await settle(ref);
+    await exportTab(ref, "Appearance");
+    const refRow = ref.locator(".ad button", { hasText: "Show pop-up notices on Home" });
+    log(`[${width}] export switch row: ${JSON.stringify(await style(ref, refRow))}`);
+    await ref.locator(".ad").screenshot({ path: join(OUT, `export-appearance-${width}.png`) });
+    await exportTab(ref, "Reference");
+    const what = ref.locator(".ad div", { hasText: /^Recorded a payment of/ });
+    log(`[${width}] export activity what: ${JSON.stringify(await style(ref, what))}`);
+    await ref.locator(".ad").screenshot({ path: join(OUT, `export-reference-${width}.png`) });
+    await rc.close();
+  }
+};
+
 function previousMonth() {
   const now = new Date();
   const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);

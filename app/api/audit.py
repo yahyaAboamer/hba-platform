@@ -18,6 +18,7 @@ from app.core.permissions import Permission
 from app.db import get_session
 from app.models.identity import UserAccount
 from app.services.audit import recent_events
+from app.services.audit_words import describe
 
 router = APIRouter(prefix="/api/audit")
 
@@ -38,9 +39,12 @@ def recent(
     """
     capped = max(1, min(limit, MAX_LIMIT))
     events = recent_events(db, limit=capped, subject_contains=subject)
+    # The export's *Recent activity*: what happened in words, and who.
+    words = describe(db, events)
     return {
         "events": [
             {
+                **words[index],
                 "id": event.id,
                 "action": event.action,
                 "subject": event.subject,
@@ -50,6 +54,6 @@ def recent(
                 "before": event.before_json,
                 "after": event.after_json,
             }
-            for event in events
+            for index, event in enumerate(events)
         ]
     }
