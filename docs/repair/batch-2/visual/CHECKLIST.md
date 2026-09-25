@@ -1009,6 +1009,30 @@ font (ADR 0044) and its pill is 20px. App: `Affiliates.tsx` / `.css`,
   `checks.txt` (a click on a row's status cell opened the profile and the
   product); frontend 457 tests and the build.
 
+## Batch J - admin Home chart (25 September)
+
+**Reference.** Export Home chart (Admin lines 232-250; `chartGrid`,
+`chartBars` 2471-2482). App: `frontend/src/components/SalesByMonth.tsx`.
+
+- The export's frame: `viewBox="-30 0 620 150"`, rules at 18 / 68 / 118,
+  bars 56% of their slot from 22% in and at least 2 high, month names on
+  140, the chosen month's name in the accent (was the ink colour).
+- **The rule labels sit outside the plot**, in the export's 30-unit gutter,
+  end-anchored 8 units left of it. They were inside because the full
+  *EGP 63,235.70* did not fit there; they now use the portal chart's compact
+  labels (batch F, the owner's *readable axes from real figures*): *0*,
+  *121K*, *243K*. The export's `short()` writes a lower-case *k*; ours keeps
+  batch F's *K* so the two charts agree.
+- Measured: the plot starts 67px (1280) and 75px (1440) into the card in
+  both; our labels end 12px left of it, which is the markup's `x=-8` at this
+  scale. The export's own labels never render in the served prototype (their
+  `{{ }}` attributes fail in SVG, as batch F found for the portal), so their
+  place is taken from the markup.
+- The range reads *January – September 2026*, one year said once, as the
+  export's *January – November 2026*.
+- Checks: `shots/batch-j/app-home-chart-*`, `export-home-chart-*`,
+  `checks.txt`; frontend 457 tests and the build.
+
 ## Remaining work - the one list (reconciled 24 September)
 
 Reconciled against: the 24 September handoff (*What is waiting on Yahya*,
@@ -1071,8 +1095,9 @@ Admin (1280 / 1440)
     20px and every text size equal to the export's; the toggle gone, cards
     still automatic on a narrow screen. See *Batch J - roster and Products
     rows*.
-13. **Admin Home chart**: axis label outside the plot, as the export (matrix,
-    kept for a preference only).
+13. ~~**Admin Home chart**: axis label outside the plot~~ - **done, batch
+    J**: the export's geometry, rule labels in its left gutter. See *Batch J -
+    admin Home chart*.
 14. ~~**Admin profile body** (Overview): the Contact panel as the export's
     editable form~~ - **done, batch J** (see *Batch J - Contact and
     shipping*): the form, contact details kept apart from her sign-in,
@@ -1205,6 +1230,7 @@ overpaid month (a real state the export never drew).
 | Wardrobe size, Targets words, payment-details words, Invitations words and dates, You buttons' font, the refund comment | Items 1, 2, 4, 7, 8, 18 | `1b0a240`; `shots/batch-g/checks.txt` |
 | Decisions c, d, e, g, h: account menu, product list line, top-sellers panel, the usual recording date, the password after *Save details* | Owner, 25 September | `52ab988`; `shots/batch-h/checks.txt` |
 | Decision b: the Shopify connection edited in Settings | Owner, 25 September | batch I (the commit that adds this row); ADR 0045; `tests/test_shopify_connection.py` (11), `ShopifyConnection.test.tsx` (4); `shots/batch-i/checks.txt` |
+| Admin Home chart: rule labels outside the plot, export geometry (item 13) | Matrix | batch J; `shots/batch-j/app-home-chart-*` |
 | Roster and Products rows as the export's buttons; Table/Cards toggle removed (item 12, D) | Sweep, conflict D | batch J; `shots/batch-j/checks.txt` |
 | Settings switches saved per account and obeyed; audit trail as sentences (item 11) | Thirteen #1, #2 | batch J; `test_staff_preferences` (8), `test_audit_words` (6), `PreferenceSwitches.test.tsx` (2) |
 | Portal Home chips as pills; Targets guarantee behind the ⓘ (items 5, 6) | Matrix | batch J; `shots/batch-j/app-portal-*` |

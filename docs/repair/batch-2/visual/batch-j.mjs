@@ -570,6 +570,34 @@ steps.rows = async (browser) => {
   }
 };
 
+/** Item 13: the Home chart's rule labels outside the plot, as the export. */
+steps.chart = async (browser) => {
+  const read = (page, card) => page.locator(card).first().evaluate((el) => {
+    const c = el.getBoundingClientRect();
+    const svg = el.querySelector("svg");
+    const texts = [...svg.querySelectorAll("text")].map((t) => { const r = t.getBoundingClientRect(); return { t: t.textContent, left: Math.round(r.left - c.left), right: Math.round(r.right - c.left), top: Math.round(r.top - c.top) }; });
+    const plot = [...svg.querySelectorAll("line")].map((l) => l.getBoundingClientRect()).sort((a, b) => a.left - b.left)[0];
+    return { card: Math.round(c.width), plotLeft: plot ? Math.round(plot.left - c.left) : null, bars: svg.querySelectorAll("rect").length, rules: texts.filter((x) => !/^[A-Z][a-z]{2}$|^\d{1,2}$/.test(x.t) || x.left < (plot ? plot.left - c.left : 0)).slice(0, 3) };
+  });
+  for (const width of [1280, 1440]) {
+    const { context: rc, ref } = await openExport(browser, ADMIN_EXPORT, width);
+    await exportNav(ref, NAV.home).click();
+    await settle(ref, 800);
+    const refCard = ".ad div:has(> div > span:text-is('Sales generated, EGP per month'))";
+    const r = await read(ref, refCard).catch((e) => ({ error: String(e).slice(0, 120) }));
+    log(`[${width}] export chart: ${JSON.stringify(r)}`);
+    await ref.locator(refCard).first().screenshot({ path: join(OUT, `export-home-chart-${width}.png`) }).catch(() => undefined);
+    await rc.close();
+
+    const { context, page } = await signIn(browser, OWNER, { width, height: 900 });
+    await page.goto(`${APP}/`, { waitUntil: "networkidle" });
+    await settle(page, 900);
+    log(`[${width}] app chart: ${JSON.stringify(await read(page, ".sales-year"))}`);
+    await page.locator(".sales-year").screenshot({ path: join(OUT, `app-home-chart-${width}.png`) });
+    await context.close();
+  }
+};
+
 function previousMonth() {
   const now = new Date();
   const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);

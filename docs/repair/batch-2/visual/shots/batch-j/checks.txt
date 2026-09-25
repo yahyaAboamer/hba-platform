@@ -197,3 +197,13 @@
 [1440] app roster row (after): {"row":59,"font":"Arial","pill":"20px 11.5px Arial","pillText":"Active","name":"19px 14px Arial"}
 [1440] app products row (after): {"row":69,"font":"Arial","pill":"20px 11.5px Arial","pillText":"Active","name":"19px 14px Arial"}
 [1440] roster layout toggle present (after): false
+## chart - 2026-09-25T22:11:42.907Z
+[1280] export chart: {"card":1018,"plotLeft":67,"bars":11,"rules":[{"t":"0","left":67,"right":67,"top":51},{"t":"27k","left":67,"right":67,"top":51},{"t":"54k","left":67,"right":67,"top":51}]}
+[1280] app chart: {"card":1020,"plotLeft":67,"bars":9,"rules":[{"t":"0","left":45,"right":55,"top":228},{"t":"121K","left":22,"right":55,"top":149},{"t":"243K","left":14,"right":55,"top":70}]}
+[1440] export chart: {"card":1178,"plotLeft":75,"bars":11,"rules":[{"t":"0","left":75,"right":75,"top":51},{"t":"27k","left":75,"right":75,"top":51},{"t":"54k","left":75,"right":75,"top":51}]}
+[1440] app chart: {"card":1180,"plotLeft":75,"bars":9,"rules":[{"t":"0","left":48,"right":60,"top":257},{"t":"121K","left":23,"right":60,"top":165},{"t":"243K","left":14,"right":60,"top":73}]}
+## chart - 2026-09-25T22:12:37.083Z
+[1280] export chart: {"card":1018,"plotLeft":67,"bars":11,"rules":[{"t":"0","left":67,"right":67,"top":51},{"t":"27k","left":67,"right":67,"top":51},{"t":"54k","left":67,"right":67,"top":51}]}
+[1280] app chart: {"card":1020,"plotLeft":67,"bars":9,"rules":[{"t":"0","left":45,"right":55,"top":228},{"t":"121K","left":22,"right":55,"top":149},{"t":"243K","left":14,"right":55,"top":70}]}
+[1440] export chart: {"card":1178,"plotLeft":75,"bars":11,"rules":[{"t":"0","left":75,"right":75,"top":51},{"t":"27k","left":75,"right":75,"top":51},{"t":"54k","left":75,"right":75,"top":51}]}
+[1440] app chart: {"card":1180,"plotLeft":75,"bars":9,"rules":[{"t":"0","left":48,"right":60,"top":257},{"t":"121K","left":23,"right":60,"top":165},{"t":"243K","left":14,"right":60,"top":73}]}
