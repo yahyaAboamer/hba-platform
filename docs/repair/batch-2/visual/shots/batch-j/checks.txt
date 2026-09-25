@@ -207,3 +207,11 @@
 [1280] app chart: {"card":1020,"plotLeft":67,"bars":9,"rules":[{"t":"0","left":45,"right":55,"top":228},{"t":"121K","left":22,"right":55,"top":149},{"t":"243K","left":14,"right":55,"top":70}]}
 [1440] export chart: {"card":1178,"plotLeft":75,"bars":11,"rules":[{"t":"0","left":75,"right":75,"top":51},{"t":"27k","left":75,"right":75,"top":51},{"t":"54k","left":75,"right":75,"top":51}]}
 [1440] app chart: {"card":1180,"plotLeft":75,"bars":9,"rules":[{"t":"0","left":48,"right":60,"top":257},{"t":"121K","left":23,"right":60,"top":165},{"t":"243K","left":14,"right":60,"top":73}]}
+[1280] terms (before): {}
+[1440] terms (before): {}
+[1280] terms buttons (before): 21 buttons, 0 in Inter: []
+[1280] all (before): ["← Sara Edrees | 13px Arial h36","2026 | 12.5px Arial h34","Jan / 10% | 13.3333px Arial h56","Feb / 10% | 13.3333px Arial h56","Mar / 10% | 13.3333px Arial h56","Apr / Salary | 13.3333px Arial h56","May / Salary | 13.3333px Arial h56","Jun / Salary | 13.3333px Arial h56","Jul / Salary | 13.3333px Arial h63","Aug / Salary / Approved | 13.3333px Arial h63","Sep / Salary | 13.3333px Arial h63","Oct / Not yet / — | 13.3333px Arial h63","Nov / Not yet / — | 13.3333px Arial h63","Dec / Not yet / — | 13.3333px Arial h63","Select all editable months i | 12.5px Arial h34","Clear | 12.5px Arial h34","Commission only | 13.5px Arial h42","Fixed salary plus commission | 13.5px Arial h42","Guaranteed minimum with comm | 13.5px Arial h42","Select months first | 14px Arial h44","Done | 14px Arial h44"]
+[1440] terms buttons (before): 21 buttons, 0 in Inter: []
+[1280] export vTerms tiles: []
+[1280] terms buttons (after): 21 buttons, 0 in Inter: []
+[1440] terms buttons (after): 21 buttons, 0 in Inter: []

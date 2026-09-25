@@ -471,6 +471,8 @@ export function Compensation() {
               </Link>
             </div>
             <p className="terms__note">
+              {/* The export's `tmNote` and `tmLockedLine`, together. */}
+              Only the months you select change. Approved months are locked.
               Approved months cannot change. There is no reopening action.
             </p>
           </div>

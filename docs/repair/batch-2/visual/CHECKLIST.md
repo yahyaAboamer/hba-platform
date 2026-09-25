@@ -1033,6 +1033,29 @@ font (ADR 0044) and its pill is 20px. App: `Affiliates.tsx` / `.css`,
 - Checks: `shots/batch-j/app-home-chart-*`, `export-home-chart-*`,
   `checks.txt`; frontend 457 tests and the build.
 
+## Batch J - terms editing (25 September)
+
+**Reference.** Export `vTerms` (Admin lines 1514-1601; `tmNote` 3512,
+`tmLockedLine` 3450). App: `Compensation.tsx` / `.css`.
+
+- **Fonts: already right.** All 21 buttons on the screen measured in the
+  control font at the export's sizes before any change - year 12.5px, month
+  tiles, *Select all editable months* and *Clear* 12.5px, the three
+  arrangements 13.5px, *Select months first* and *Done* 14px. The batch E
+  follow-up (`button { font: revert }`) and the later terms rewrite had done
+  it. The selectors this item named (`.fork`, `.mo`, `.kinds`,
+  `.comp__clear`, and `.mo__*`) no longer matched anything: 24 dead rules
+  removed. `.seg button` still said `font: inherit` (global CSS, so it would
+  reach any segmented button): removed, its size kept.
+- **Footnote** is the export's two lines together: *Only the months you
+  select change. Approved months are locked. Approved months cannot change.
+  There is no reopening action.* (ours had only the second).
+- **Found, not changed here** - item 15a: the export lets an arrangement be
+  chosen before a month; ours waits for a month.
+- Checks: `shots/batch-j/app-terms-*`, `export-terms-1280.png`,
+  `checks.txt` (21 buttons, none in Inter, after as before); frontend 457
+  tests and the build.
+
 ## Remaining work - the one list (reconciled 24 September)
 
 Reconciled against: the 24 September handoff (*What is waiting on Yahya*,
@@ -1103,8 +1126,18 @@ Admin (1280 / 1440)
     shipping*): the form, contact details kept apart from her sign-in,
     Sizing at 15px, the start value at 12.5px, the export's two columns.
     *Discount codes* kept, with its reason.
-15. **Terms editing: buttons still set to Inter** (`Compensation.css` `.fork`,
-    `.mo`, `.kinds`, `.seg`, `.comp__clear`), with its screen's review.
+15. ~~**Terms editing: buttons still set to Inter**~~ - **done, batch J**:
+    every button on the screen already rendered in the control font at the
+    export's sizes (the rules named here were dead CSS, now removed); the
+    screen's review fixed the footnote and found 15a. See *Batch J - terms
+    editing*.
+15a. **Terms editing: an arrangement can be chosen before a month** in the
+    export (its options stay enabled, `tmKind`); ours disables them until a
+    month is selected, because the draft is made from the months. Found in
+    batch J's review; an interaction change to the editor's state, not
+    typography, so not folded into 15. Future months beyond the working one
+    also read *Not yet* where the export shows their terms and a 2027 button
+    - to be compared on data that has terms running past this year.
 16. **Products**: the per-model order reference the export prints on a
     product (not in the roster payload); the feature request's message
     presets (matrix B3, B4).
@@ -1230,6 +1263,7 @@ overpaid month (a real state the export never drew).
 | Wardrobe size, Targets words, payment-details words, Invitations words and dates, You buttons' font, the refund comment | Items 1, 2, 4, 7, 8, 18 | `1b0a240`; `shots/batch-g/checks.txt` |
 | Decisions c, d, e, g, h: account menu, product list line, top-sellers panel, the usual recording date, the password after *Save details* | Owner, 25 September | `52ab988`; `shots/batch-h/checks.txt` |
 | Decision b: the Shopify connection edited in Settings | Owner, 25 September | batch I (the commit that adds this row); ADR 0045; `tests/test_shopify_connection.py` (11), `ShopifyConnection.test.tsx` (4); `shots/batch-i/checks.txt` |
+| Terms editing: fonts verified, dead CSS removed, footnote as the export (item 15) | Sweep | batch J; `shots/batch-j/checks.txt` |
 | Admin Home chart: rule labels outside the plot, export geometry (item 13) | Matrix | batch J; `shots/batch-j/app-home-chart-*` |
 | Roster and Products rows as the export's buttons; Table/Cards toggle removed (item 12, D) | Sweep, conflict D | batch J; `shots/batch-j/checks.txt` |
 | Settings switches saved per account and obeyed; audit trail as sentences (item 11) | Thirteen #1, #2 | batch J; `test_staff_preferences` (8), `test_audit_words` (6), `PreferenceSwitches.test.tsx` (2) |

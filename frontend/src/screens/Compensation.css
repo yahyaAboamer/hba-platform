@@ -82,40 +82,10 @@
 
 /* ── the fork ─────────────────────────────────────────────────────────────── */
 
-.fork {
-  display: flex;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
 
-.fork button {
-  flex: 1;
-  min-width: 250px;
-  padding: var(--space-3) var(--space-4);
-  text-align: left;
-  font: inherit;
-  color: var(--ink);
-  background: transparent;
-  border: 1px solid var(--rule-strong);
-  border-radius: var(--radius);
-  cursor: pointer;
-}
 
-.fork button:hover {
-  background: var(--hover);
-}
 
-.fork b {
-  display: block;
-  font-weight: 600;
-}
 
-.fork span {
-  display: block;
-  margin-top: var(--space-1);
-  font-size: var(--text-sm);
-  color: var(--quiet);
-}
 
 /* ── the month strip ──────────────────────────────────────────────────────── */
 
@@ -146,98 +116,22 @@
   }
 }
 
-.mo {
-  position: relative;
-  padding: var(--space-3) var(--space-1);
-  font: inherit;
-  text-align: center;
-  color: var(--ink);
-  background: transparent;
-  border: 1px solid var(--rule-strong);
-  border-radius: var(--radius);
-  cursor: pointer;
-  transition:
-    background 0.1s,
-    border-color 0.1s;
-}
 
-.mo:hover:not(:disabled) {
-  background: var(--hover);
-}
 
-.mo[data-set="commission"] {
-  background: var(--commission-bg);
-  border-color: var(--commission);
-}
 
-.mo[data-set="fixed_plus_commission"] {
-  background: var(--salary-bg);
-  border-color: var(--salary);
-}
 
-.mo[data-set="base_guarantee"] {
-  background: var(--guarantee-bg);
-  border-color: var(--guarantee);
-}
 
-.mo[data-set="none"] .mo__what {
-  color: var(--quiet);
-  font-style: italic;
-}
 
-.mo[aria-pressed="true"] {
-  border-color: var(--focus);
-  box-shadow: inset 0 0 0 2px var(--focus);
-}
 
 /* Hatched, not merely dimmed. A month before she sold anything and a month
    already approved are both *not yours to set*, and a flat grey reads as
    "loading" rather than as a decision the screen has already made. */
-.mo:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-  background: repeating-linear-gradient(
-    135deg,
-    var(--rule) 0 4px,
-    transparent 4px 8px
-  );
-}
 
-.mo__name {
-  display: block;
-  font-size: var(--text-xs);
-  color: var(--quiet);
-}
 
-.mo__what {
-  display: block;
-  margin-top: var(--space-2);
-  min-height: 1.6em;
-  font-size: var(--text-xs);
-  line-height: 1.3;
-}
 
-.mo__amt {
-  display: block;
-  min-height: 1.2em;
-  font-size: var(--text-xs);
-}
 
-.mo__met {
-  display: block;
-  margin-top: var(--space-1);
-  font-size: 0.625rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
 
-.mo__met--yes {
-  color: var(--settled);
-}
 
-.mo__met--no {
-  color: var(--quiet);
-}
 
 .legend {
   display: flex;
@@ -306,34 +200,9 @@
   color: var(--quiet);
 }
 
-.kinds {
-  display: flex;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-  margin-bottom: var(--space-4);
-}
 
-.kinds button {
-  padding: var(--space-2) var(--space-3);
-  font: inherit;
-  font-size: var(--text-sm);
-  color: var(--ink);
-  background: transparent;
-  border: 1px solid var(--rule-strong);
-  border-radius: var(--radius);
-  cursor: pointer;
-}
 
-.kinds button:hover {
-  background: var(--hover);
-}
 
-.kinds button[aria-pressed="true"] {
-  font-weight: 400;
-  background: var(--hover);
-  border-color: var(--focus);
-  box-shadow: inset 0 0 0 1px var(--focus);
-}
 
 .fields {
   display: flex;
@@ -388,7 +257,8 @@
 
 .seg button {
   padding: var(--space-1) var(--space-3);
-  font: inherit;
+  /* The control font, as every export button (ADR 0044); only the size is
+     set here. */
   font-size: var(--text-sm);
   color: var(--quiet);
   background: transparent;
@@ -424,17 +294,6 @@
   overflow-x: auto;
 }
 
-.comp__clear {
-  padding: 0;
-  font: inherit;
-  font-size: var(--text-xs);
-  color: var(--refused);
-  background: none;
-  border: 0;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  cursor: pointer;
-}
 
 /* Sticky, because the strip is long and the thing it says — which months are
    still without an arrangement — is the reason somebody is still on the page. */
