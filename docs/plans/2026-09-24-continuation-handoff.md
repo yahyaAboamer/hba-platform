@@ -377,6 +377,34 @@ continue, and for four documents. Evidence: `shots/batch-g/checks.txt`.
   and the refund comment. Frontend 410 tests and `npm run build`; browser at
   390, 1280 and 1440.
 
+## Batch H - the owner's decisions a-h, presentation (25 September)
+
+His final decisions on the eight exceptions are recorded as confirmed under
+*Owner decisions standing* in the one list; none is a question any more.
+Built: the account menu's two entries (c); no line under a product's name
+(d); the admin top-sellers panel and its only route removed, the model's own
+best sellers kept (e); *Usually recorded around {3rd of next month}* on
+Home's payment card, never for paid or settled-outside months, and kept -
+not moved - once passed, saying it is not recorded yet (g); the payment
+details form's *Method* segment and *Back* / *Save details*, with the
+password asked after *Save details*, and a refused password saving nothing
+and keeping every field (h). (a) and (f) were already as decided.
+
+The order-import work was corrected: a gap in order numbers is a clue, not
+proof. `order_import_compare.py` (with `app/services/shopify/completeness.py`
+and six tests) is the proof - Shopify's IDs against ours, every page
+accounted for, access limits recorded. Neither tool has touched real data.
+
+Checks: frontend 420 tests, 21 files, `npm run build`; backend
+`test_reachability`, `test_products_api`, `test_overview`,
+`test_import_completeness` (48); browser at 390, 1280, 1440
+(`shots/batch-h/checks.txt`).
+
+**Batch I - the Shopify connection form (decision b)** is next, and one
+question for the owner comes first: HBA's app authenticates with a client ID
+and secret (ADR 0015 - a Dev Dashboard app has no permanent Admin API key),
+while the export's form has *Store domain* and *Admin API key*.
+
 ## Not scheduled — a backlog, not an instruction
 
 Each batch is named by the owner. Nothing here is the next batch until he

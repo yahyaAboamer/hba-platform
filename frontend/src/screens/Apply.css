@@ -205,3 +205,45 @@
   font-size: var(--text-xs);
   color: var(--quiet);
 }
+
+/* Payment details: the export's *Method* segment (`.seg` / `.seg-opt`) -
+   an outline, the chosen option in accent with a 1px inset accent edge, the
+   others in ink, divided; Inter labels at 13px on the page's rhythm. */
+.payout__method {
+  margin-top: 16px;
+}
+
+.payout__method .field__label {
+  display: block;
+  margin-bottom: 7px;
+}
+
+.payout__seg {
+  display: flex;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.payout__seg button {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 12px;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.payout__seg button + button {
+  border-left: 1px solid var(--rule);
+}
+
+.payout__seg [aria-checked="true"] {
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}

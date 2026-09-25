@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 
-import { Money } from "../components/Money";
 import { api, can } from "../lib/api";
-import { currentMonth, formatMonth } from "../lib/money";
 import type { Session } from "../lib/api";
 import "./Products.css";
 import "./PaymentDetail.css";
@@ -95,82 +93,6 @@ type Detail = {
  * is no separate colour taxonomy to filter by.
  */
 
-type TopSeller = {
-  shopify_product_id: string | null;
-  title: string;
-  quantity: number;
-  sales_piastres: number;
-};
-
-/**
- * What sold through the models' codes this month. W11.
- *
- * **Three different questions, and this answers one.** Selling through a code,
- * owning something from the wardrobe, and being asked to feature it look alike
- * and are not — *a model can sell products she never received*. This counts
- * what was bought.
- *
- * The figures are what customers actually paid after each model's discount,
- * not list prices. On a ten per cent code, list prices would be a ten per cent
- * overstatement on every row.
- */
-function TopSellers({ month }: { month: string }) {
-  const [body, setBody] = useState<{
-    products: TopSeller[];
-    no_longer_in_shopify_piastres: number;
-  } | null>(null);
-
-  useEffect(() => {
-    let live = true;
-    api
-      .get<{ products: TopSeller[]; no_longer_in_shopify_piastres: number }>(
-        `/api/products/top-sellers/${month}`,
-      )
-      .then((found) => {
-        if (live) setBody(found);
-      })
-      // Silent on failure, deliberately: this is context beside the
-      // catalogue, and a red banner over the whole screen because a side
-      // panel could not load would be out of proportion to what was lost.
-      .catch(() => undefined);
-    return () => {
-      live = false;
-    };
-  }, [month]);
-
-  if (!body || body.products.length === 0) return null;
-
-  return (
-    <section className="panel products__panel">
-      <div className="panel__head">
-        <h2 className="panel__title">Selling best through codes</h2>
-        <span className="page__subtitle">{formatMonth(month)}</span>
-      </div>
-      <ol className="products__top">
-        {body.products.slice(0, 5).map((row) => (
-          <li key={row.shopify_product_id ?? row.title}>
-            {row.shopify_product_id ? (
-              <Link to={`/products/${row.shopify_product_id}`}>{row.title}</Link>
-            ) : (
-              <span>{row.title}</span>
-            )}
-            <span className="products__sold">
-              {row.quantity} sold · <Money piastres={row.sales_piastres} />
-            </span>
-          </li>
-        ))}
-      </ol>
-      {body.no_longer_in_shopify_piastres > 0 && (
-        <p className="detail__note products__gone">
-          A further <Money piastres={body.no_longer_in_shopify_piastres} /> sold
-          products that have since been deleted from Shopify, so they cannot be
-          listed by name.
-        </p>
-      )}
-    </section>
-  );
-}
-
 type Scope = "active" | "all" | "requests";
 
 type Listing = {
@@ -191,10 +113,9 @@ const CATALOGUE_PAGE = 10;
  * under it.
  *
  * It had an *All products* checkbox where the export has three filters, a
- * *Show 60 more* button where the export pages, and the top-sellers panel
- * above the table. The panel is kept — it was built later, from the owner's
- * own question about what sells through the codes — but it sits under the
- * catalogue now, so the screen opens on what the export opens on.
+ * *Show 60 more* button where the export pages, and a *Selling best through
+ * codes* panel the export does not draw - removed by the owner's decision e
+ * (25 September). A model's own best sellers are hers, in her wardrobe.
  */
 export function Products({ session }: { session: Session }) {
   const [listing, setListing] = useState<Listing | null>(null);
@@ -349,15 +270,11 @@ export function Products({ session }: { session: Session }) {
                             <span className="products__nothumb" aria-hidden="true">image</span>
                           )}
                           <span className="products__who-text">
+                            {/* The name alone: no SKU and no size count under
+                             *  it (owner, decision d). Sizes stay where they
+                             *  help - the product's own page and the
+                             *  wardrobes - and the search still finds a SKU. */}
                             <span className="products__name">{row.title}</span>
-                            {/* The export stacks a SKU under the name. **This
-                             *  platform has no product-level SKU** — a SKU
-                             *  belongs to a size, and a garment has one per
-                             *  size — so the size count is what is true at
-                             *  this level. The search still finds a SKU. */}
-                            <span className="products__meta">
-                              {row.sizes} size{row.sizes === 1 ? "" : "s"}
-                            </span>
                           </span>
                         </Link>
                       </td>
@@ -420,7 +337,6 @@ export function Products({ session }: { session: Session }) {
         </div>
       )}
 
-      <TopSellers month={currentMonth()} />
       {session && null}
     </>
   );

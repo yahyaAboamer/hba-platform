@@ -17,6 +17,10 @@ type Masked = Record<string, string | null> | null;
 
 type Method = "instapay" | "bank" | "wallet";
 
+/** The export's segment: its order and its words. */
+const SEG_ORDER: Method[] = ["instapay", "wallet", "bank"];
+const SEG_LABEL: Record<Method, string> = { instapay: "InstaPay", wallet: "Wallet", bank: "Bank" };
+
 const METHOD_LABEL: Record<Method, string> = {
   instapay: "InstaPay",
   bank: "Bank transfer",
@@ -96,8 +100,9 @@ export function MyPayout({
       setError(
         caught instanceof Error ? caught.message : "Could not change that.",
       );
-      // Never left filled after a failure - the next attempt is a fresh,
-      // deliberate act rather than one click on a stale form.
+      // The password is never left filled after a failure - the next attempt
+      // is a fresh, deliberate act. **Only the password**: the method and
+      // every field stay exactly as entered, and nothing was saved.
       setPassword("");
     } finally {
       setWorking(false);
@@ -118,30 +123,27 @@ export function MyPayout({
 
       {!confirming ? (
         <>
-          <fieldset className="apply__choice">
-            <legend className="field__label">Method</legend>
-            {(Object.keys(METHOD_LABEL) as Method[]).map((option) => (
-              <label
-                key={option}
-                className={
-                  method === option
-                    ? "apply__option apply__option--on"
-                    : "apply__option"
-                }
-              >
-                <input
-                  type="radio"
-                  name="new-method"
-                  checked={method === option}
-                  onChange={() => {
+          {/* The export's *Method* segment (`v3-method`): InstaPay, Wallet,
+              Bank, in that order and in those words. */}
+          <div className="payout__method">
+            <span className="field__label" id="payout-method-label">Method</span>
+            <div className="payout__seg" role="radiogroup" aria-labelledby="payout-method-label">
+              {SEG_ORDER.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  role="radio"
+                  aria-checked={method === option}
+                  onClick={() => {
+                    if (method !== option) setFields({});
                     setMethod(option);
-                    setFields({});
                   }}
-                />
-                {METHOD_LABEL[option]}
-              </label>
-            ))}
-          </fieldset>
+                >
+                  {SEG_LABEL[option]}
+                </button>
+              ))}
+            </div>
+          </div>
 
           {needed.map((field, index) => {
             const problem = problems[index];
@@ -205,8 +207,10 @@ export function MyPayout({
           })}
 
           <div className="apply__actions">
+            {/* The export's two: *Back* and *Save details*. Saving asks
+                for the password first (§6.4.1, owner decision h). */}
             <button type="button" className="button" onClick={onCancel}>
-              Cancel
+              Back
             </button>
             <button
               type="button"
@@ -214,7 +218,7 @@ export function MyPayout({
               disabled={incomplete || anyProblem}
               onClick={() => setConfirming(true)}
             >
-              Continue
+              Save details
             </button>
           </div>
         </>
@@ -276,7 +280,7 @@ export function MyPayout({
               className="button button--primary"
               disabled={working || !password}
             >
-              {working ? "Saving…" : "Save details"}
+              {working ? "Saving…" : "Confirm"}
             </button>
           </div>
         </form>

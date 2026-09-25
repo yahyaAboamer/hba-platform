@@ -409,3 +409,37 @@ export function monthListStates(
     }),
   );
 }
+
+/**
+ * When HBA usually records a month's transfer: around the 3rd of the month
+ * after it (owner, decision g, 25 September). **An estimate, never a promise**,
+ * and it is never moved: once the date has passed, the note keeps that date
+ * and says the transfer is not recorded yet, rather than quietly offering a
+ * later one or still reading as something to come.
+ *
+ * `null` where no expectation belongs - a month with money recorded, or one
+ * settled outside the dashboard.
+ */
+export function expectedRecording(
+  month: string,
+  state: "open" | "approved" | "paid" | "settled" | "unknown",
+  today: string,
+): { date: string; label: string; passed: boolean } | null {
+  if (state !== "open" && state !== "approved") return null;
+  const [year, index] = month.split("-").map(Number);
+  const next = index === 12 ? `${year + 1}-01` : `${year}-${String(index + 1).padStart(2, "0")}`;
+  const date = `${next}-03`;
+  const [ny, nm] = next.split("-").map(Number);
+  const names = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  return { date, label: `3 ${names[nm - 1]} ${ny}`, passed: today > date };
+}
+
+/** Today in Cairo, `YYYY-MM-DD` - the business's calendar (ADR 0005), not the browser's. */
+export function cairoToday(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Cairo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}

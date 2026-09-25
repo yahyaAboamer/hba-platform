@@ -7,6 +7,7 @@ import { PortalYearChart } from "../components/PortalYearChart";
 import { api } from "../lib/api";
 import { formatDay, formatMonth } from "../lib/money";
 import type { MyEarnings, MyPayments, Payment, PaymentMonth } from "../lib/portal";
+import { cairoToday, expectedRecording } from "../lib/portal";
 import "./MyMonth.css";
 
 /**
@@ -177,18 +178,20 @@ export function MyMonth() {
     ))}
     {body.waiting_on?.length > 0 && <div className="portal-home__waiting">{body.waiting_on.map(row => <p key={row.text}>{row.text}</p>)}</div>}
 
-    <PaymentCard state={state} settlement={settlement} transfer={transfer} loading={!payments && !paymentError} error={paymentError} onRetry={() => setRetry(n => n + 1)} />
+    <PaymentCard month={month} state={state} settlement={settlement} transfer={transfer} loading={!payments && !paymentError} error={paymentError} onRetry={() => setRetry(n => n + 1)} />
   </div>;
 }
 
 /**
  * What the ledger says about this month, in the export's card.
  *
- * Every line is read from the ledger's own figures. **Nothing here predicts a
- * date**: the export writes "usually recorded" against a demo schedule, and we
- * have no such promise to make on HBA's behalf.
+ * Every figure is read from the ledger. The one date that is not - *usually
+ * recorded around …* - is HBA's usual timing, the 3rd of the next month
+ * (owner, decision g), said as an estimate and never moved once it has
+ * passed (`expectedRecording`).
  */
-function PaymentCard({ state, settlement, transfer, loading, error, onRetry }: {
+function PaymentCard({ month, state, settlement, transfer, loading, error, onRetry }: {
+  month: string;
   state: HomeState;
   settlement?: PaymentMonth;
   transfer?: Payment;
@@ -198,6 +201,7 @@ function PaymentCard({ state, settlement, transfer, loading, error, onRetry }: {
 }) {
   const recorded = settlement && settlement.paid_piastres > 0;
   const part = recorded && settlement.state === "partially_paid";
+  const expected = recorded ? null : expectedRecording(month, state, cairoToday());
 
   return <section className="portal-home__payment">
     <div className="portal-home__pay-title">{state === "open" ? "Expected payment" : "Payment"}</div>
@@ -220,9 +224,14 @@ function PaymentCard({ state, settlement, transfer, loading, error, onRetry }: {
               // Sliced rather than parsed: a timestamp handed to `Date` shows
               // the day before to anybody west of Greenwich (see `formatDay`).
               ? `Recorded ${formatDay(transfer?.occurred_at.slice(0, 10) ?? "")}${transfer?.reference ? ` · ${transfer.reference}` : ""}`
-              : state === "open" ? "Recorded here once the month has closed and been approved."
-                : state === "approved" ? "Approved. The transfer appears here once it has been sent."
-                  : "Your performance history for this month is unchanged."}
+              : expected?.passed
+                // The estimate has gone by: keep its date, and say plainly it
+                // is not recorded yet, rather than moving it or implying it
+                // is still to come.
+                ? `Estimated around ${expected.label}; not recorded yet.`
+                : state === "open" && expected ? `Usually recorded around ${expected.label}.`
+                  : state === "approved" && expected ? `Approved. HBA usually records the transfer around ${expected.label}.`
+                    : "Your performance history for this month is unchanged."}
           </div>
         </>}
     <Link className="portal-home__pay-more control-font" to="/payments">Payment history →</Link>

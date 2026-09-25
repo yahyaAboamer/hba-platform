@@ -11,7 +11,6 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_permission
-from app.core.money import format_egp
 from app.core.permissions import Permission
 from app.db import get_session
 from app.models.catalogue import Product, ProductStatus, ProductVariant
@@ -272,49 +271,3 @@ def delete_feature_request(
     removed = remove_feature_request(db, shopify_product_id)
     db.commit()
     return {"removed": removed}
-
-
-@router.get("/top-sellers/{month}")
-def top_sellers(
-    month: str,
-    _actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_VIEW)),
-    db: Session = Depends(get_session),
-) -> dict:
-    """Which products sold through the models' codes. W11, Phase 07B.
-
-    **Three different questions, and this answers one.** W11 separates selling
-    through a code, owning something from the wardrobe, and being asked to
-    feature it — *a model can sell products she never received*. This counts
-    what was bought, and says nothing about who has what.
-
-    Figures are what the customer actually paid after the model's discount.
-    Summing list prices would credit the shop with money it never took.
-    """
-    from app.core.businesstime import parse_month
-    from app.services.performance import top_products
-
-    try:
-        month = parse_month(month)
-    except ValueError as exc:
-        raise HTTPException(400, str(exc)) from exc
-
-    found = top_products(db, month)
-    return {
-        "month": found["month"],
-        "products": [
-            {
-                "shopify_product_id": row.shopify_product_id,
-                "title": row.title,
-                "quantity": row.quantity,
-                "sales_piastres": row.sales_piastres,
-                "sales": format_egp(row.sales_piastres),
-            }
-            for row in found["products"]
-        ],
-        # Given so the figures on this screen still reconcile with the sales
-        # totals elsewhere, rather than quietly falling short of them.
-        "no_longer_in_shopify_piastres": found["no_longer_in_shopify_piastres"],
-        "no_longer_in_shopify": format_egp(found["no_longer_in_shopify_piastres"]),
-        "total_piastres": found["total_piastres"],
-        "total": format_egp(found["total_piastres"]),
-    }

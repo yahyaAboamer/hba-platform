@@ -685,10 +685,9 @@ Portal (390)
    does (F; ours writes *Another model*).
 4. ~~**Payment details form** in the export's words~~ - **done, batch G**:
    *Where HBA should send your payment*, *Method*, *Save details*; our extra
-   lead sentence removed. Still different: the export chooses the method with
-   a `.seg` and saves in one step with *Back* / *Save details*; ours uses
-   option cards (implementation) and asks for the password before saving
-   (§6.4.1 - exception h).
+   lead sentence removed. **Finished in batch H**: the export's *Method*
+   segment (*InstaPay · Wallet · Bank*) and *Back* / *Save details*; the
+   password is asked after *Save details* (decision h).
 5. **Home order chips** are links in ours, plain pills in the export
    (matrix, kept for a preference only).
 6. **Targets guarantee sentence** stands in the open; the export puts it
@@ -740,6 +739,10 @@ Admin (1280 / 1440)
     are a question put to you on 16 September (`2026-09-16-exact-design-
     handoff.md`, *Open questions*) and a proposal to build it (`ffde978`).
     It is approved implementation like the rest of this list.
+17b. **Settings → Shopify: the editable connection** (decision b) - Store
+    domain and Admin API key, *Update connection*, authorised staff only,
+    credentials never returned, logged or audited, and a failed update
+    leaving the working connection in place. **Batch I**, with 17.
 
 Code hygiene (no behaviour)
 
@@ -775,14 +778,18 @@ Code hygiene (no behaviour)
     database), and a migration/rollback rehearsal for `b1f0a40c0001`. Neither
     has run; the repair is not releasable while they are open.
 
-31a. **The order-import completeness report, on real data.**
-    `docs/repair/order_import_report.py` is written and proven on the
-    disposable database (read-only transaction; orders per month, days with
-    none, gaps and duplicates in Shopify's order numbers, codes no model
-    owns). It has **not** run on staging or production: `railway ssh` from
-    this machine now reaches Railway's account endpoint rather than the
-    service, and production needs your go-ahead even for a read. Once it
-    runs, the report goes to you before item 32's confirmation is asked for.
+31a. **Order-import completeness, on real data.** Two read-only tools, both
+    proven locally and neither run on staging or production:
+    `order_import_compare.py` (Shopify's order IDs for the period against
+    the imported IDs; every page of the listing accounted for; access limits
+    such as a missing `read_all_orders` recorded - six tests in
+    `tests/test_import_completeness.py`) is what can show completeness;
+    `order_import_report.py` gives clues only - **a gap in the order numbers
+    is something to investigate, not proof of a missing import**. Blocked on:
+    the owner's go-ahead for production (not given), and `railway ssh`,
+    which from this machine reaches Railway's account endpoint instead of
+    the service. Item 32's confirmation is asked for only after he has
+    reviewed the comparison.
 
 ### Information needed from the owner
 
@@ -794,42 +801,35 @@ Code hygiene (no behaviour)
     you have reviewed the import report** (item 31a); and which environment
     to unlock and when. The rest of this list does not wait on these.
     Historical finalisation stays locked until they are in.
-33. **Kept today for a rule, accuracy or security reason** - each needs your
-    yes to stay, or it becomes implementation. Export line numbers are in
-    `docs/redesign/designs/`; *Admin* is `Admin Dashboard.dc.html`, *Portal*
-    is `Affiliate Portal v3.dc.html`.
-
-    | # | Our screen, and where | What ours shows | Your approved reference | What it shows |
-    |---|---|---|---|---|
-    | a | Models → Invitations (`/affiliates/invite`), each outstanding link's state - `InvitePage.tsx:259` | *Withdrawn* for a link HBA cancelled, *Expired* for one that lapsed | Admin `vInvite`, the row's state at line 1268; words at line 3152 | *Link expired* for both (and *Awaiting application* where ours says *Invited* - that part is plain implementation, item 8) |
-    | b | Settings → Shopify and sync (`/settings?section=shopify`) - `DataPanel.tsx:260` | A read-only list ending *"Set on the server. Changing the connection is a deploy, not a form."* | Admin `setShopify`, lines 650-690: *Store domain* and *Admin API key* fields (script 3569-3570) and an *Update connection* button (line 677) | The connection edited in the page |
-    | c | The account menu, bottom of the admin sidebar - `Layout.tsx:103-104` | *Help*, *Appearance* as well as the export's two | Admin lines 86-90 | *Team and access*, *Sign out* only |
-    | d | Products → the catalogue list (`/products`), the line under each product's name - `Products.tsx:356-359` | *4 sizes* | Admin `vProducts`, line 338 (`{{ r.sku }}`) | The product's SKU, e.g. *HBA-JRS-06-BLK* |
-    | e | Products (`/products`), a panel below the catalogue on every tab - `Products.tsx:117-146`, rendered at `:423` | *Selling best through codes*, this month's top five | Admin `vProducts`, lines 313-373 | No such panel |
-    | f | Portal → Targets (`/targets`), a month nobody has counted - `lib/targets.ts:69-77` | *not recorded* / *Not recorded yet* (a shortfall now reads *not met* / *in progress*, the export's words) | Portal `onTargets`, lines 328-377; the history pill `{{ h.state }}` at line 370, words at script 1377; the live month at 1365 | *met* / *not met*, and *targets met* / *in progress* for the live month - no word for *not counted* |
-    | g | Portal → Home, the payment card (`/`) - `MyMonth.tsx:186-214` | *After the month closes*, and no date | Portal lines 202-203 (`paymentLine`, `paymentNote`), script 1310-1318 | *Usually recorded around 3 December 2026.* / *Approved. HBA usually records the transfer around …* - a date HBA would be promising |
-    | h | Portal → You → Payment details (`/you/payout`), after *Continue* - `MyPayout.tsx` | *Enter your password to confirm*, then *Save details* | Portal `vPayout`, lines 572-660 | One step: *Save details* saves |
-
-    Why each is held today: (a) a withdrawn link did not expire; (b) an API
-    key field means a secret the server can read back (ADR 0015);
-    (c) without them Help has no way in, which `test_reachability` fails;
-    (d) a SKU belongs to a size, not a product; (e) built later in answer to a question of
-    yours (`SCREEN_MATRIX.md`), not drawn in the export; (f) §11.3 - a month
-    nobody counted is not a month she missed, and it is the state that holds
-    a guarantee up; (g) HBA has not promised a transfer date; (h) §6.4.1 -
-    changing where money goes needs the password, not only a session.
+33. ~~Exceptions a-h~~ - **decided by the owner, 25 September, and
+    confirmed.** No longer questions; each is recorded under *Owner decisions
+    standing* below with where it stands.
 
 34. **Permissions**: merging to `main` and promoting to `production` are two
     separate decisions; neither is given.
 
 ### Owner decisions standing (not open)
 
-The month grid for terms editing only; Targets' *Confirm*, *Whole year* and
-the D08 pace line; the payer sees the whole destination (ADR 0042); pending
-orders count (ADR 0040); *Signs in with* (D07); no earlier-month note on Home;
-chart axes from real figures; corrections reached from Home, not Payments;
-Payments' *Settle difference* for an overpaid month (a real state the export
-never drew).
+**Exceptions a-h, decided 25 September** - his words, summarised; each was
+a question in item 33 and is not one any more.
+
+| | Decision | Where it stands |
+|---|---|---|
+| a | Keep *Withdrawn* separate from *Link expired* | As built (`InvitePage.tsx`); nothing to do |
+| b | Build the export's editable Shopify connection in Settings: authorised staff only; credentials protected and never in responses, logs or audit text; a failed update must not destroy the working connection; no editing of Shopify orders or products | **Batch I** (item 17b) |
+| c | Account menu = *Team and access*, *Sign out*; Help and Appearance keep their own places | Done, batch H: Appearance is Settings' tab, Help is Settings → Reference and the glossary links |
+| d | No SKU or size count under the product name; no substitute; sizes stay in wardrobes and product/model details; SKU data stays in storage and integrations | Done, batch H |
+| e | Remove the admin *Selling best through codes* panel; keep the model's *Your best sellers* | Done, batch H: panel and its only route removed; `top_products` and the model's best sellers untouched |
+| f | *Not recorded* where no achievement record exists; never read a missing record as zero or a miss; *met* / *not met* / *in progress* where records support it | As built (batch G; `lib/targets.ts` keys *not recorded* on no record) |
+| g | *Usually recorded around [date]*: the 3rd of the following month, an estimate not a promise; none for paid months or months settled outside; once passed, never moved forward or shown as upcoming | Done, batch H (`expectedRecording`) |
+| h | Keep the password confirmation, after *Save details*; a failed confirmation saves nothing and discards nothing | Done, batch H; tested |
+
+Also standing: the month grid for terms editing only; Targets' *Confirm*,
+*Whole year* and the D08 pace line; the payer sees the whole destination
+(ADR 0042); pending orders count (ADR 0040); *Signs in with* (D07); no
+earlier-month note on Home; chart axes from real figures; corrections reached
+from Home's notice, not Payments; Payments' *Settle difference* for an
+overpaid month (a real state the export never drew).
 
 ### Closed, with evidence
 
@@ -843,7 +843,8 @@ never drew).
 | Home chips *pending* / *failed delivery* | Batch E list | `a8eaab9` |
 | Profile labels and *Active* pill; Home ⋯ ✕ and spacing; Payments name and pill | Batch E list | `a8eaab9`; pills finished here |
 | Chart axes, switch, *· So far*, Home titles, `.pill` leak, corrections panel, Home note | Follow-up list, owner's answers | `900aa21`; `shots/batch-f/checks.txt` |
-| Wardrobe size, Targets words, payment-details words, Invitations words and dates, You buttons' font, the refund comment | Items 1, 2, 4, 7, 8, 18 | batch G (the commit that adds this row); `shots/batch-g/checks.txt` |
+| Wardrobe size, Targets words, payment-details words, Invitations words and dates, You buttons' font, the refund comment | Items 1, 2, 4, 7, 8, 18 | `1b0a240`; `shots/batch-g/checks.txt` |
+| Decisions c, d, e, g, h: account menu, product list line, top-sellers panel, the usual recording date, the password after *Save details* | Owner, 25 September | batch H (the commit that adds this row); `shots/batch-h/checks.txt` |
 | Portal order filter *Failed*, chips naming the case (G, #13) | Thirteen | `6131d0c` |
 | Net sales and *Counts towards* from facts | Batch D | `7bd9650` |
 | Earnings explanations, per-order commission | Batch C | `1b1bb21` |

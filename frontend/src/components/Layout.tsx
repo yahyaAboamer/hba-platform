@@ -99,9 +99,10 @@ export function Layout({ session }: { session: Session }) {
             </span><span aria-hidden="true">▾</span>
           </button>
           {accountOpen && <div id="admin-account-menu" className="layout__account-menu">
+            {/* The export's two entries (owner, decision c). Appearance is
+                Settings' own tab; Help is Settings → Reference and the
+                glossary links where a term is used. */}
             <Link to="/settings?section=team" onClick={() => setAccountOpen(false)}>Team and access</Link>
-            <Link to="/glossary" onClick={() => setAccountOpen(false)}>Help</Link>
-            <Link to="/settings?section=appearance" onClick={() => setAccountOpen(false)}>Appearance</Link>
             <button type="button" onClick={signOutAndLeave}>Sign out</button>
           </div>}
         </div>

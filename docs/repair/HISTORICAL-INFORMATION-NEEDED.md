@@ -54,11 +54,19 @@ answer as a failure.
 A statement from you that the orders imported for every pre-go-live month are
 **all** of them — no missing range, no code that was live and never imported.
 
-**You review evidence first.** `docs/repair/order_import_report.py` prints a
-read-only report for an environment: how many orders are indexed per month,
-days with none, every gap in Shopify's order numbers (an order never imported,
-or one deleted in Shopify), and every discount code on an order that no model
-owned. It is checked against the shop, then confirmed - not before.
+**You review evidence first**, in two parts:
+
+- **The comparison** - `docs/repair/order_import_compare.py`: every Shopify
+  order ID for the period against the imported IDs, every page of Shopify's
+  listing accounted for, and any access limit recorded (without
+  `read_all_orders`, Shopify silently answers only the last 60 days). This is
+  what can show completeness.
+- **The clues** - `docs/repair/order_import_report.py`: orders per month, days
+  with none, gaps in the order numbers, codes no model owned. A gap in the
+  numbers is something to look up, **not** proof of a missing import: a
+  deleted or test order leaves the same gap.
+
+Neither has run on real data yet; production needs your go-ahead first.
 
 This one is not a screen. It is a judgement, and it is the most consequential
 item on the list: finalising approves a figure calculated from whatever orders

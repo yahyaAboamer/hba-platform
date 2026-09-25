@@ -10,14 +10,20 @@ itself refuses any write this script might attempt.
 
     DATABASE_URL=... .venv/Scripts/python.exe docs/repair/order_import_report.py > report.md
 
-What it can and cannot show:
+**This is investigation, not proof.** Nothing in this report can establish
+that the import is complete, because it only reads what was imported. Proof
+is a comparison with Shopify itself - its order IDs for the same period
+against the imported IDs, with every page of the listing accounted for and
+any access limit recorded - which is `order_import_compare.py`.
+
+What it can show:
 
 - The historical import asks Shopify for **every order created since
-  1 January 2026**, not only discounted ones (`bulk._orders_query`). Shopify
-  numbers a shop's orders in sequence, so a number missing from the index is
-  either an order that was never imported or one deleted in Shopify. The
-  report lists every missing range with the dates either side; only the shop
-  can say which it is.
+  1 January 2026**, not only discounted ones (`bulk._orders_query`). A gap in
+  the order numbers is a **clue to look at**, not a missing import: a number
+  can be skipped by an order deleted in Shopify, a test order, or a number
+  Shopify never issued as an order. The report lists every gap with the dates
+  either side so the right ones can be looked up.
 - Days with no orders are listed, because a quiet day and a day the import
   missed look the same from here.
 - A discount code seen on orders that no model owns, or used outside the
@@ -176,8 +182,9 @@ def main() -> None:
           "is worth asking the shop about.")
     if odd:
         w(f"- {odd} order number{'s' if odd != 1 else ''} not of the form #1234, left out of this check.")
-    w("- A missing number is an order never imported **or** an order deleted in "
-      "Shopify (test orders, duplicates). Only the shop's own list can tell them apart.")
+    w("- A gap is a **clue, not a finding**: an order deleted in Shopify, a test order "
+      "or a number never issued leaves the same gap as an order that was not imported. "
+      "Only a comparison of order IDs with Shopify can tell them apart.")
     w("- Orders before #" + str(lo) + " were created before 1 January 2026 and are not "
       "expected here.\n")
     if missing:
@@ -227,11 +234,14 @@ def main() -> None:
     if not unowned and not outside:
         w("- Every code on an order belongs to a model for the month it was used.\n")
 
-    w("## What to check against the shop\n")
-    w("1. Shopify's order count for 1 January 2026 to go-live against section 1.")
-    w("2. Each missing range in section 4: deleted in Shopify, or never imported?")
-    w("3. Any day in section 3 with no orders that you know had sales.")
-    w("4. Each code in section 5 that no model owns: a code that belonged to someone?")
+    w("## What would prove it\n")
+    w("This report cannot. Completeness is shown by `order_import_compare.py`: every "
+      "Shopify order ID for the period against the imported IDs, every page of "
+      "Shopify's listing accounted for, and any access limit (scopes, date windows, "
+      "rate limits) recorded. Use the clues above to check its result:\n")
+    w("1. Each gap in section 4: deleted in Shopify, a test order, or not imported?")
+    w("2. Any day in section 3 with no orders that you know had sales.")
+    w("3. Each code in section 5 that no model owns: a code that belonged to someone?")
     print("\n".join(out))
 
 

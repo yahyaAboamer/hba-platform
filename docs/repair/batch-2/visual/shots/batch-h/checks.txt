@@ -1,0 +1,11 @@
+[1280] account menu: ["Team and access","Sign out"]
+[1280] Help reachable from Settings → Reference: 1
+[1280] products: first names ["Cargo Tailored Trouser","Crossbody Nylon Bag","Heavy Cotton Tee"]; top-sellers panel = 0
+[1440] account menu: ["Team and access","Sign out"]
+[1440] Help reachable from Settings → Reference: 1
+[1440] products: first names ["Cargo Tailored Trouser","Crossbody Nylon Bag","Heavy Cotton Tee"]; top-sellers panel = 0
+[390] Home 2026-09: state="in progress" card="Expected payment After the month closes Usually recorded around 3 October 2026. Payment history →"
+[390] Home 2026-08: state="payment recorded" card="Payment EGP 13,010.00 recorded Recorded 24 September · INSTA-0001 Payment history →"
+[390] Home 2026-07: state="in progress" card="Expected payment After the month closes Estimated around 3 August 2026; not recorded yet. Payment history →"
+[390] Home 2026-05: state="settled" card="Payment No payments recorded here for this month Your performance history for this month is unchanged. Payment history →"
+[390] payout radios: ["InstaPay:true","Wallet:false","Bank:false"]; buttons ["Back","Save details"]

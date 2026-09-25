@@ -129,7 +129,7 @@ prefer the foreground when it is tight.
 ### Frontend
 
 ```
-cd frontend && npm test          # 410 tests, 19 files
+cd frontend && npm test          # 420 tests, 21 files
 cd frontend && npm run build     # this is the typecheck
 ```
 
