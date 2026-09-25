@@ -11,7 +11,7 @@ for its record of batches C-I. Nothing was deleted.
 | **Current head** | run `git rev-parse --short HEAD` (a document cannot hold the hash of the commit that adds it) |
 | **`origin/main`, `origin/production`** | not touched by this batch; read them with `git ls-remote --heads origin main production` before describing them |
 | **Migration head** | `d4e7a2c90003` (staff preferences, batch J); before it `c3d51e7a0002` |
-| **Backend** | **2,122 tests, 85 files, all passing** through `run-suite.sh` at the end of batch J (one call, exit 0), matching `--collect-only`; run on the files of `71b58a2` (logged under `29df94e`, the head when the run started - the only later change was the import verdict, whose 7 tests are in it) |
+| **Backend** | **2,124 tests, 85 files, all passing** (batch J follow-up; the batch J figure was 2,122) through `run-suite.sh` at the end of batch J (one call, exit 0), matching `--collect-only`; run on the files of `71b58a2` (logged under `29df94e`, the head when the run started - the only later change was the import verdict, whose 7 tests are in it) |
 | **Frontend** | 460 tests, 27 files; `npm run build` green |
 | **Where this ran** | a cloud container, Linux, Postgres 16 on 5433 created for the session (`hba_platform_test`, designated disposable inside itself; `hba_browser` for the browser). `.venv/Scripts` is a symlink to `.venv/bin` so the documented commands work unchanged. |
 
@@ -55,7 +55,7 @@ pictures and measured values in `docs/repair/batch-2/visual/shots/batch-j/`
 | 8 | The roster's invitation row opens the invitation (marked, in view) where Resend / Withdraw are | `96396b5` |
 | 15a | An arrangement can be chosen before a month, as the export's `termsVals` | `880729f` |
 
-**To be merged to `main` (staging) on the owner's instruction of 26 September, once the full runner passes on this head**
+**Merged to `main` (staging) on the owner's instruction of 26 September**, after the full runner passed on this code: 2,124 tests, 85 files, matching `--collect-only`
 (*merge to staging first*). **Production was not touched** - promotion is its
 own decision. `main` was a strict ancestor of `repair/batch-2`, so it is a
 fast-forward; it also brings `repair/batch-1-financial-rules`' 8 commits,
