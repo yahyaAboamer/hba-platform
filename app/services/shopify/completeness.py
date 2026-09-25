@@ -18,7 +18,15 @@ What counts as *complete* here, and only here:
   answers only the last 60 days, silently);
 - every Shopify order ID for the period is in the index.
 
-Anything short of that is reported as *not shown complete*, with the reason.
+The verdict is one of three, never two:
+
+- **shown complete** - all three hold;
+- **incomplete** - Shopify's listing was read in full, with nothing limiting
+  it, and orders it lists are missing from the index;
+- **inconclusive** - the listing could not be read in full or something
+  limited it (an error, a page never reached, a repeated page, a missing or
+  unknown scope). Missing orders found within what *was* read are still
+  listed, but nothing here can say the import is complete - or how incomplete.
 """
 from __future__ import annotations
 
@@ -66,6 +74,22 @@ class Comparison:
     @property
     def not_in_shopify(self) -> list[str]:
         return sorted(set(self.imported) - set(self.shopify), key=_numeric)
+
+    @property
+    def access_complete(self) -> bool:
+        """Shopify's listing for the period was read in full, unlimited."""
+        return (
+            self.error is None
+            and self.last_page_reached
+            and not self.repeated_on_later_page
+            and not self.limits
+        )
+
+    @property
+    def verdict(self) -> str:
+        if not self.access_complete:
+            return "inconclusive"
+        return "incomplete" if self.not_imported else "shown complete"
 
     @property
     def shown_complete(self) -> bool:
@@ -154,7 +178,17 @@ def render(result: Comparison, environment: str) -> str:
         f"Environment: **{environment}**. Orders created from {_iso(result.start)} "
         f"to before {_iso(result.end)}. Read-only.",
         "",
-        f"**Result: {'shown complete' if result.shown_complete else 'not shown complete'}.**",
+        f"**Result: {result.verdict}.**",
+        "",
+        {
+            "shown complete": "Every page of Shopify's listing was read, nothing limited it, "
+            "and every order it lists for the period is imported.",
+            "incomplete": "Every page of Shopify's listing was read and nothing limited it; "
+            "the orders below are in Shopify and not imported.",
+            "inconclusive": "Shopify's listing could not be read in full for this period "
+            "(see *Access limits* and the listing below), so this cannot show the import "
+            "complete. Any order listed as not imported is missing; others may be too.",
+        }[result.verdict],
         "",
         "## Shopify's listing",
         "",

@@ -1,3 +1,8 @@
+> **Superseded on 25 September 2026 by
+> [`2026-09-25-continuation-handoff.md`](2026-09-25-continuation-handoff.md).**
+> Kept for its record of batches C-I; its *exact position* table and
+> *what is next* are no longer current.
+
 # Where the work is — 24 September 2026
 
 **Replaces `2026-09-16-exact-design-handoff.md`** and every handoff before it.

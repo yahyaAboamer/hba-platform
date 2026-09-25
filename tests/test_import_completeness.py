@@ -70,7 +70,8 @@ def test_every_page_read_and_every_id_imported_is_shown_complete(db):
     assert result.pages == 2 and result.last_page_reached
     assert shop.calls[1]["after"] == "c0"  # the second page asked for by cursor
     assert result.not_imported == [] and result.shown_complete
-    assert "shown complete" in render(result, "test")
+    assert result.verdict == "shown complete"
+    assert "**Result: shown complete.**" in render(result, "test")
 
 
 def test_an_order_shopify_has_and_the_index_lacks_is_named(db):
@@ -79,6 +80,8 @@ def test_an_order_shopify_has_and_the_index_lacks_is_named(db):
 
     assert result.not_imported == ["2"]
     assert not result.shown_complete
+    # Read in full and unlimited, so this is a finding, not a doubt.
+    assert result.verdict == "incomplete"
     report = render(result, "test")
     assert "In Shopify, not imported: 1" in report and "| 2 | #2 |" in report
 
@@ -89,6 +92,9 @@ def test_without_read_all_orders_an_old_window_is_a_recorded_limit(db):
 
     assert not result.shown_complete
     assert any("read_all_orders is not granted" in limit for limit in result.limits)
+    # Limited access is inconclusive - never "complete", never a count of what is missing.
+    assert result.verdict == "inconclusive"
+    assert "**Result: inconclusive.**" in render(result, "test")
 
 
 def test_unknown_scopes_are_a_limit_not_an_assumption(db):
@@ -103,6 +109,7 @@ def test_a_failed_page_stops_the_claim(db):
 
     assert result.error == "Shopify returned 503"
     assert not result.last_page_reached and not result.shown_complete
+    assert result.verdict == "inconclusive"
     assert "Stopped by an error" in render(result, "test")
 
 
@@ -112,3 +119,16 @@ def test_an_order_repeated_across_pages_is_reported(db):
 
     assert result.repeated_on_later_page == ["2"]
     assert not result.shown_complete
+    assert result.verdict == "inconclusive"
+
+
+def test_missing_orders_under_limited_access_are_listed_but_the_verdict_stays_inconclusive(db):
+    """What was read and is missing is real; how much else is missing is
+    unknown. So the orders are named and the result is not *incomplete*."""
+    _indexed(db, 1)
+    result = compare(db, FakeShopify([[1, 2]], scopes=("read_orders",)), START, END, now=NOW)
+
+    assert result.not_imported == ["2"]
+    assert result.verdict == "inconclusive"
+    report = render(result, "test")
+    assert "**Result: inconclusive.**" in report and "others may be too" in report

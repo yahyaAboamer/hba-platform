@@ -10,7 +10,7 @@ one shared source that this file and `AGENTS.md` both point at and neither
 repeats. Read it before changing anything that touches money, and never
 restate a rule here.
 
-**Where the work is: [`docs/plans/2026-09-24-continuation-handoff.md`](docs/plans/2026-09-24-continuation-handoff.md)**
+**Where the work is: [`docs/plans/2026-09-25-continuation-handoff.md`](docs/plans/2026-09-25-continuation-handoff.md)**
 — branch, commit, what is done, what is next. It replaces every earlier
 handoff; the old ones carry a banner saying so and are kept.
 

@@ -1278,8 +1278,13 @@ Code hygiene (no behaviour)
     proven locally and neither run on staging or production:
     `order_import_compare.py` (Shopify's order IDs for the period against
     the imported IDs; every page of the listing accounted for; access limits
-    such as a missing `read_all_orders` recorded - six tests in
-    `tests/test_import_completeness.py`) is what can show completeness;
+    such as a missing `read_all_orders` recorded - seven tests in
+    `tests/test_import_completeness.py`) is what can show completeness. Its
+    verdict is three-way since batch J: **shown complete** only when every
+    page was read, nothing limited the listing and every order is imported;
+    **incomplete** when the listing was read in full and orders are missing;
+    **inconclusive** whenever access or the listing was limited - even if it
+    found missing orders, which it still lists;
     `order_import_report.py` gives clues only - **a gap in the order numbers
     is something to investigate, not proof of a missing import**. Blocked on:
     the owner's go-ahead for production (not given), and `railway ssh`,
