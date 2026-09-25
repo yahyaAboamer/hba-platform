@@ -1,0 +1,45 @@
+## refresh - 2026-09-25T21:29:18.259Z
+[1280] arrive: "Connected
+· last successful refresh 26 September 2026, 00:27" / button "Refresh now"
+[1280] after click: "Refreshing
+· last successful refresh 26 September 2026, 00:27" / button "Refreshing…" disabled=true / server state=queued last_success_at unchanged=true
+[1280] finished: "Connected
+· last successful refresh 26 September 2026, 00:29" / server state=succeeded last_success_at moved=true / refresh POSTs=1
+[1280] jobs after: {"pending":1,"running":0,"succeeded":31,"failed":0}
+[1280] reload: "Connected
+· last successful refresh 26 September 2026, 00:29"
+[1280] 429: "Last refresh failed
+· last successful refresh 26 September 2026, 00:29" / button "Try again" / last_success_at kept=true
+[1280] 429 line: "Shopify limited how fast orders could be read (429). Nothing from this attempt was saved; the next refresh reads the same orders again."
+[1280] reload after failure: "Last refresh failed
+· last successful refresh 26 September 2026, 00:29" / button "Try again"
+[1280] try again: "Connected
+· last successful refresh 26 September 2026, 00:29" / server state=succeeded moved=true
+[1280] app button: {"text":"Refresh now","font":"13.5px 400 Arial","color":"rgb(35, 169, 92)","background":"rgba(35, 169, 92, 0.14)","border":"1px solid rgb(35, 169, 92)","radius":"8px","padding":"10px 15px","height":40}
+[1280] app state: {"text":"Connected","font":"13px 400 Inter","color":"rgb(35, 169, 92)","background":"rgba(0, 0, 0, 0)","border":"0px none rgb(35, 169, 92)","radius":"0px","padding":"0px","height":20}
+[1280] app when: {"text":"· last successful refresh 26 September 2026, 00:29","font":"12.5px 400 Inter","color":"rgb(138, 145, 138)","background":"rgba(0, 0, 0, 0)","border":"0px none rgb(138, 145, 138)","radius":"0px","padding":"0px","height":19}
+[1280] export button: {"text":"Refresh now","font":"13.5px 400 Arial","color":"rgb(35, 169, 92)","background":"rgba(35, 169, 92, 0.14)","border":"1px solid rgb(35, 169, 92)","radius":"8px","padding":"10px 15px","height":40}
+[1280] export state: {"text":"Connected","font":"13px 400 Inter","color":"rgb(35, 169, 92)","background":"rgba(0, 0, 0, 0)","border":"0px none rgb(35, 169, 92)","radius":"0px","padding":"0px","height":20}
+[1280] export when: {"text":"· last successful refresh 6 November 2026, 08:15","font":"12.5px 400 Inter","color":"rgb(138, 145, 138)","background":"rgba(0, 0, 0, 0)","border":"0px none rgb(138, 145, 138)","radius":"0px","padding":"0px","height":19}
+[1440] arrive: "Connected
+· last successful refresh 26 September 2026, 00:29" / button "Refresh now"
+[1440] after click: "Refreshing
+· last successful refresh 26 September 2026, 00:29" / button "Refreshing…" disabled=true / server state=queued last_success_at unchanged=true
+[1440] finished: "Connected
+· last successful refresh 26 September 2026, 00:29" / server state=succeeded last_success_at moved=true / refresh POSTs=1
+[1440] jobs after: {"pending":2,"running":0,"succeeded":33,"failed":0}
+[1440] reload: "Connected
+· last successful refresh 26 September 2026, 00:29"
+[1440] 429: "Last refresh failed
+· last successful refresh 26 September 2026, 00:29" / button "Try again" / last_success_at kept=true
+[1440] 429 line: "Shopify limited how fast orders could be read (429). Nothing from this attempt was saved; the next refresh reads the same orders again."
+[1440] reload after failure: "Last refresh failed
+· last successful refresh 26 September 2026, 00:29" / button "Try again"
+[1440] try again: "Connected
+· last successful refresh 26 September 2026, 00:29" / server state=succeeded moved=true
+[1440] app button: {"text":"Refresh now","font":"13.5px 400 Arial","color":"rgb(35, 169, 92)","background":"rgba(35, 169, 92, 0.14)","border":"1px solid rgb(35, 169, 92)","radius":"8px","padding":"10px 15px","height":40}
+[1440] app state: {"text":"Connected","font":"13px 400 Inter","color":"rgb(35, 169, 92)","background":"rgba(0, 0, 0, 0)","border":"0px none rgb(35, 169, 92)","radius":"0px","padding":"0px","height":20}
+[1440] app when: {"text":"· last successful refresh 26 September 2026, 00:29","font":"12.5px 400 Inter","color":"rgb(138, 145, 138)","background":"rgba(0, 0, 0, 0)","border":"0px none rgb(138, 145, 138)","radius":"0px","padding":"0px","height":19}
+[1440] export button: {"text":"Refresh now","font":"13.5px 400 Arial","color":"rgb(35, 169, 92)","background":"rgba(35, 169, 92, 0.14)","border":"1px solid rgb(35, 169, 92)","radius":"8px","padding":"10px 15px","height":40}
+[1440] export state: {"text":"Connected","font":"13px 400 Inter","color":"rgb(35, 169, 92)","background":"rgba(0, 0, 0, 0)","border":"0px none rgb(35, 169, 92)","radius":"0px","padding":"0px","height":20}
+[1440] export when: {"text":"· last successful refresh 6 November 2026, 08:15","font":"12.5px 400 Inter","color":"rgb(138, 145, 138)","background":"rgba(0, 0, 0, 0)","border":"0px none rgb(138, 145, 138)","radius":"0px","padding":"0px","height":19}

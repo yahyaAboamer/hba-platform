@@ -15,7 +15,22 @@ type Sync = {
   last_event_received_at: string | null;
   proof_stored_bytes: number;
   jobs: { pending: number; running: number; succeeded: number; failed: number };
+  refresh: Refresh;
 };
+
+/**
+ * The reconciliation sweep, as *Refresh now* shows it. Only a sweep that
+ * finished moves `last_success_at`; a failure keeps it.
+ */
+export type Refresh = {
+  state: "not_connected" | "never" | "queued" | "running" | "failed" | "succeeded";
+  last_success_at: string | null;
+  failed_at: string | null;
+  error_line: string | null;
+};
+
+/** How often to look again while a refresh is queued or running. */
+const REFRESH_POLL_MS = 2000;
 
 /**
  * The catalogue, and when HBA last heard about it.
@@ -110,10 +125,12 @@ const EARLIEST = "2026-01-01";
  * never arrived, work that stopped - is kept, behind that toggle. None of it
  * is in the export, and all of it is real work somebody sometimes has to do.
  *
- * **No *Refresh now* that refreshes nothing.** The export's button re-reads
- * the shop; orders here arrive by webhook and scheduled sync, and there is no
- * single refresh to start. The one read that is safe to run on demand is the
- * catalogue, so that is what the button does and what it says.
+ * ***Refresh now*** is the reconciliation sweep brought forward - the same
+ * 48-hour read of changed orders that runs every half hour, and read-only
+ * towards Shopify. Asking is not refreshing: the card says *Refreshing* until
+ * the sweep finishes, and *last successful refresh* moves only then. A failed
+ * sweep keeps the last success and says what went wrong. The catalogue read
+ * is under *Technical detail*.
  */
 export function DataPanel({ goLiveMonth }: { goLiveMonth: string | null }) {
   const [sync, setSync] = useState<Sync | null>(null);
@@ -131,6 +148,8 @@ export function DataPanel({ goLiveMonth }: { goLiveMonth: string | null }) {
   const [scanning, setScanning] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [connection, setConnection] = useState<ShopifyConnectionState | null>(null);
+  const [asking, setAsking] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
 
   const load = useCallback(() => {
     Promise.all([
@@ -156,6 +175,30 @@ export function DataPanel({ goLiveMonth }: { goLiveMonth: string | null }) {
   }, []);
 
   useEffect(load, [load]);
+
+  // While a refresh is queued or running, look again until it finishes. Only
+  // the status is re-read, not the whole panel.
+  const inFlight = sync?.refresh.state === "queued" || sync?.refresh.state === "running";
+  useEffect(() => {
+    if (!inFlight) return;
+    const timer = window.setTimeout(() => {
+      api.get<Sync>("/api/operations/sync").then(setSync).catch(() => undefined);
+    }, REFRESH_POLL_MS);
+    return () => window.clearTimeout(timer);
+  }, [inFlight, sync]);
+
+  async function refreshNow() {
+    setAsking(true);
+    setRefreshError(null);
+    try {
+      const body = await api.post<{ refresh: Refresh }>("/api/operations/refresh", {});
+      setSync((current) => (current ? { ...current, refresh: body.refresh } : current));
+    } catch (caught) {
+      setRefreshError(caught instanceof Error ? caught.message : "The refresh could not be started.");
+    } finally {
+      setAsking(false);
+    }
+  }
 
   async function syncCatalogue() {
     setSyncingCatalogue(true);
@@ -213,7 +256,20 @@ export function DataPanel({ goLiveMonth }: { goLiveMonth: string | null }) {
   }
 
   const failed = sync?.jobs.failed ?? 0;
-  const tone = !sync ? "quiet" : !sync.shopify_configured ? "refused" : failed > 0 ? "owed" : "approved";
+  const refresh = sync?.refresh;
+  const refreshing = inFlight || asking;
+  // The export's three states (`syncState`), and *Not connected*, which it
+  // never drew. Queued and running both read *Refreshing*: neither is done.
+  const tone = !refresh ? "quiet" : refresh.state === "not_connected" || refresh.state === "failed" ? "refused" : "approved";
+  const stateWords = !refresh
+    ? "Checking…"
+    : refresh.state === "not_connected"
+      ? "Not connected"
+      : refreshing
+        ? "Refreshing"
+        : refresh.state === "failed"
+          ? "Last refresh failed"
+          : "Connected";
 
   return (
     <>
@@ -221,25 +277,29 @@ export function DataPanel({ goLiveMonth }: { goLiveMonth: string | null }) {
         <div className="sync__head">
           <div>
             <h2 className="sync__store">{connection?.shop_name ?? connection?.shop_domain ?? "Shopify"}</h2>
-            <div className="sync__state">
+            <div className="sync__state" role="status">
               <span className={`sync__dot sync__dot--${tone}`} aria-hidden="true" />
-              <span className={`sync__tone--${tone}`}>
-                {!sync ? "Checking…" : !sync.shopify_configured ? "Not connected" : failed > 0 ? "Connected, with work that stopped" : "Connected"}
-              </span>
-              {sync?.last_order_synced_at && (
-                <span className="sync__when">· last order arrived {when(sync.last_order_synced_at)}</span>
+              <span className={`sync__tone--${tone}`}>{stateWords}</span>
+              {refresh && refresh.state !== "not_connected" && (
+                <span className="sync__when">
+                  · {refresh.last_success_at ? `last successful refresh ${longWhen(refresh.last_success_at)}` : "no successful refresh yet"}
+                </span>
               )}
             </div>
           </div>
           <button
             type="button"
-            className="button button--primary"
-            onClick={syncCatalogue}
-            disabled={syncingCatalogue || !sync?.shopify_configured}
+            className="sync__refresh"
+            onClick={refreshNow}
+            disabled={refreshing || !refresh || refresh.state === "not_connected"}
           >
-            {syncingCatalogue ? "Reading…" : "Read the catalogue"}
+            {refreshing ? "Refreshing…" : refresh?.state === "failed" ? "Try again" : "Refresh now"}
           </button>
         </div>
+        {refresh?.state === "failed" && !refreshing && refresh.error_line && (
+          <p className="sync__error">{refresh.error_line}</p>
+        )}
+        {refreshError && <p className="sync__error" role="alert">{refreshError}</p>}
         {failed > 0 && (
           <p className="sync__error">
             {failed} {failed === 1 ? "piece of work" : "pieces of work"} stopped and will not retry on its own. The technical detail below lists {failed === 1 ? "it" : "them"}.
@@ -571,6 +631,21 @@ function Fact({ label, value }: { label: string; value: React.ReactNode }) {
       <dd>{value}</dd>
     </div>
   );
+}
+
+/** The export's `lastSync`: *6 November 2026, 08:15*, in Cairo. */
+export function longWhen(iso: string): string {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Africa/Cairo",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date(iso));
+  const part = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  return `${part("day")} ${part("month")} ${part("year")}, ${part("hour")}:${part("minute")}`;
 }
 
 function when(iso: string): string {

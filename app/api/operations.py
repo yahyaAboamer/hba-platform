@@ -127,6 +127,9 @@ def sync_status(
             "failed": jobs.get(JobStatus.FAILED, 0),
         },
         "recurring": recurring,
+        # Settings → Shopify's *Refresh now* card. Only a finished sweep moves
+        # `last_success_at`; a failure keeps it.
+        "refresh": _refresh_state(db),
     }
 
 
@@ -452,6 +455,44 @@ def sync_catalogue_route(
         "job_id": job.id,
         "queued_at": _isoformat(utcnow()),
     }
+
+
+@router.post("/refresh")
+def refresh_route(
+    _actor: UserAccount = Depends(require_permission(Permission.SETTINGS_MANAGE)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """*Refresh now*: bring the reconciliation sweep forward.
+
+    Reads orders Shopify changed in the last 48 hours, exactly as the
+    half-hourly sweep does - it is that sweep, not a second mechanism. Nothing
+    is written to Shopify.
+
+    **Accepted is not refreshed.** The answer is 202 and the sweep's state;
+    *last successful refresh* moves only when the sweep finishes. A click while
+    one is queued or running starts nothing new.
+    """
+    from app.services.shopify.refresh import NotConnected, request_refresh
+
+    try:
+        requested = request_refresh(db)
+    except NotConnected:
+        raise HTTPException(
+            409, "There is no Shopify connection to refresh from."
+        ) from None
+    db.commit()
+    return {
+        "accepted": True,
+        "job_id": requested.job_id,
+        "joined_running": requested.state == "running",
+        "refresh": _refresh_state(db),
+    }
+
+
+def _refresh_state(db) -> dict:
+    from app.services.shopify.refresh import refresh_state
+
+    return refresh_state(db)
 
 
 @router.get("/catalogue")

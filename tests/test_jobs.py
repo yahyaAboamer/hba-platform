@@ -487,9 +487,35 @@ def test_pruning_removes_old_succeeded_jobs(db):
     complete_job(db, job)
     db.flush()
     _age(db, job.id, 40)
+    # A newer success of the same kind, so the old one is not the newest.
+    enqueue(db, "sync_order", {})
+    db.flush()
+    complete_job(db, lease_job(db, worker_id="w"))
+    db.flush()
 
     assert prune_succeeded_jobs(db, older_than_days=30) == 1
-    assert db.execute(text("SELECT count(*) FROM background_job")).scalar() == 0
+    assert db.execute(text("SELECT count(*) FROM background_job")).scalar() == 1
+
+
+def test_pruning_keeps_the_newest_success_of_each_kind_however_old(db):
+    """*Last successful refresh* reads the newest succeeded sweep. A month of
+    failed sweeps must not let pruning turn that into *never*.
+    """
+    ids = []
+    for kind in ("shopify_reconcile", "shopify_reconcile", "sync_order"):
+        enqueue(db, kind, {})
+        db.flush()
+        job = lease_job(db, worker_id="w")
+        complete_job(db, job)
+        db.flush()
+        ids.append(job.id)
+    _age(db, ids[0], 90)
+    _age(db, ids[1], 60)
+    _age(db, ids[2], 60)
+
+    assert prune_succeeded_jobs(db, older_than_days=30) == 1
+    kept = db.execute(text("SELECT id FROM background_job ORDER BY id")).scalars().all()
+    assert kept == [ids[1], ids[2]]
 
 
 def test_pruning_keeps_recent_succeeded_jobs(db):

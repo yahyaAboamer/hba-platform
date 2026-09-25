@@ -419,6 +419,24 @@
   color: var(--faint);
 }
 
+/* The export's `refreshSync` button (Admin line 662). The control font, as
+   every export button (ADR 0044). */
+.sync__refresh {
+  min-height: 40px;
+  padding: 10px 15px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 13.5px;
+  cursor: pointer;
+}
+
+.sync__refresh:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
 .sync__error,
 .sync__notice {
   margin: 13px 0 0;
@@ -494,7 +512,7 @@
   margin: 14px 0 0;
   padding: 14px 16px;
   border: 1px solid var(--accent);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius);
   background: var(--accent-soft);
   font-size: 13px;
   line-height: 1.6;
@@ -509,7 +527,7 @@
   margin-top: 14px;
   padding: 14px 16px;
   border: 1px solid var(--owed);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius);
   color: var(--text);
 }
 

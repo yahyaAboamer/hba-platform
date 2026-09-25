@@ -185,11 +185,16 @@ def test_the_prune_handler_removes_old_succeeded_jobs(db):
     complete_job(db, lease_job(db, worker_id="w"))
     db.flush()
     db.execute(text("UPDATE background_job SET finished_at = now() - interval '40 days'"))
+    # A newer success of the kind: the newest one is always kept.
+    enqueue(db, JobKind.SYNC_ORDER, {})
+    db.flush()
+    complete_job(db, lease_job(db, worker_id="w"))
+    db.flush()
 
     HANDLERS[JobKind.PRUNE_JOBS](db, {"older_than_days": 30})
     db.flush()
 
-    assert db.execute(text("SELECT count(*) FROM background_job")).scalar() == 0
+    assert db.execute(text("SELECT count(*) FROM background_job")).scalar() == 1
 
 
 # ── The schedule ───────────────────────────────────────────────────────────────

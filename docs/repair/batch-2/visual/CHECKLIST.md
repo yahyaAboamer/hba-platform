@@ -663,6 +663,99 @@ The owner answered the three questions the follow-up asked. Evidence:
 
 ---
 
+## Batch J - Shopify *Refresh now* (25 September)
+
+Owner's scope, 25 September: *Refresh now* and *last successful refresh*,
+reusing the existing synchronisation; accepted is not refreshed; running,
+success and failure shown accurately; a failure keeps the last success; no
+duplicate jobs from repeated clicks; read-only towards Shopify; permissions
+unchanged; tested against a disposable database and a simulated shop.
+
+**Reference to code.** Export: `Admin Dashboard.dc.html` lines 651-667
+(`syncStore`, `syncState`, `syncTone`, `lastSync`, `refreshSync`,
+`refreshLabel`, `syncErrorLine`), script 3551-3560. App:
+`frontend/src/screens/DataPanel.tsx` (the top card), `app/api/operations.py`
+(`POST /api/operations/refresh`; `refresh` in `GET /api/operations/sync`),
+`app/services/shopify/refresh.py` (new).
+
+**What a refresh is.** `JobKind.RECONCILE` - the sweep that already re-reads
+every order Shopify changed in the last 48 hours and runs every half hour.
+*Refresh now* brings the outstanding sweep forward (`run_after = now`), or
+queues one under the same dedupe key when none is outstanding, or joins the
+one running. Same payload as the schedule. It sends one GraphQL query per
+page; no mutation exists on the path (the simulated shop refuses any, and
+none arrived).
+
+- **States**, from the jobs themselves: *Connected* (latest sweep succeeded,
+  or none yet - then *no successful refresh yet*), *Refreshing* (queued and
+  due, or running under a live lease), *Last refresh failed* (the latest
+  finished sweep failed, or a retry is waiting after a failed attempt), and
+  *Not connected* (no connection; the button is disabled and the route
+  answers 409 with nothing queued). The export draws three; *Not connected*
+  is the state it never drew.
+- **Last successful refresh** is `finished_at` of the newest *succeeded*
+  sweep, in Cairo time, as the export prints it (*25 September 2026,
+  11:15*). Accepting a request moves nothing; a failure cannot move or clear
+  it. `prune_succeeded_jobs` now keeps the newest success of each kind
+  however old, so a month of failures cannot turn it into *never*.
+- **The failure line** is written from recognised causes (429, refused
+  credentials, refused access, no connection, Shopify 5xx, unreachable),
+  never the raw error, and ends *Nothing from this attempt was saved; the
+  next refresh reads the same orders again* - true: the worker rolls the
+  attempt back and the next sweep reads the same window. The export's
+  *continues where it stopped* is not what the sweep does, so it is not said.
+- **Duplicate clicks.** The button is disabled from the click until the sweep
+  finishes; the server keeps one outstanding sweep regardless (dedupe index
+  plus a row lock), so three requests give one job.
+- **Permissions unchanged.** `POST /refresh` needs `settings.manage`, as
+  *Read the catalogue* and *Import order history* do; the Shopify tab is
+  already admin-only. The status block rides on `/sync`, whose permission
+  is unchanged and which carries no credential.
+- The card's old button, *Read the catalogue*, was a stand-in; the catalogue
+  read stays under *Technical detail*. The old *· last order arrived* is
+  still there as *Last order synced*. Kept, not in the export: the sentence
+  counting work that stopped, shown only when a job has failed for good.
+- `Settings.css` used `var(--radius-md)`, which the app never defines, in
+  three places (the new button and two result boxes rendered square); now
+  `var(--radius)`, the export's 8px.
+
+**Checks run.**
+
+- Backend: `tests/test_shopify_refresh.py` (9, new: accepted-not-refreshed
+  then finished; a 429 keeps the last success and shows the line; *Try
+  again* brings the retry forward, no second job, then succeeds; three
+  clicks one job; a click while running joins it; the scheduled sweep
+  brought forward, not duplicated; no connection 409 and nothing queued;
+  a marketing role 403 and nothing queued), `test_jobs` (new: the newest
+  success of each kind survives pruning), `test_reconcile`,
+  `test_operations_api`, `test_shopify_connection`: 154 passing.
+- Frontend: `ShopifyRefresh.test.tsx` (6, new); the whole suite 436 tests,
+  23 files; `npm run build` green.
+- Browser, 1280 and 1440, the app started through `simulated_shopify.py`
+  (the real route, worker and sweep; only Shopify's transport simulated)
+  against the throwaway `hba_browser` database: arrive; click twice with a
+  slow shop - one POST, *Refreshing* / *Refreshing…* disabled, time
+  unchanged; finished - time moved; reload - same; shop answers 429 -
+  *Last refresh failed*, the line, *Try again*, time kept; reload - same;
+  *Try again* with the shop answering - *Connected*, time moved. Button,
+  state and time line measured equal to the export's (13.5px, 10px 15px,
+  40px high, 8px radius, accent border and fill; state 13px; time 12.5px
+  faint). `shots/batch-j/checks.txt`, `app-shopify-*-{1280,1440}.png`,
+  `export-shopify-{1280,1440}.png`; script `batch-j.mjs`.
+
+**Found, not fixed (outside this item).** The worker runs inside the web
+process's event loop and handlers are synchronous (`app/worker.py`,
+`worker_loop` calls `run_one` directly), so **while any job runs, the API
+answers nothing**: with the simulated shop set to answer after five seconds,
+the status request made during the sweep returned only when the sweep had
+finished. A sweep of a few pages is seconds every half hour; the historical
+import or a slow Shopify is longer. Recorded as item 19a.
+
+**Cloud-session note.** The export loads React from unpkg, which this
+session's network policy refuses; `batch-j.mjs` serves React 18.3.1's own UMD
+files from the npm registry copy (`EXPORT_VENDOR`) and fetches Google Fonts
+through curl. Unset, it loads the page as before.
+
 ## Remaining work - the one list (reconciled 24 September)
 
 Reconciled against: the 24 September handoff (*What is waiting on Yahya*,
@@ -731,14 +824,9 @@ Admin (1280 / 1440)
 16. **Products**: the per-model order reference the export prints on a
     product (not in the roster payload); the feature request's message
     presets (matrix B3, B4).
-17. **Settings → Shopify: *Refresh now* and *last successful refresh***
-    (Admin lines 659, 662; script 3560). **Not on hold.** An earlier version
-    of this list said *"held by the owner's instruction of 24 September"*.
-    No such instruction is recorded anywhere: the phrase first appears in
-    `4077b88` as an uncited paraphrase, and the only recorded words on it
-    are a question put to you on 16 September (`2026-09-16-exact-design-
-    handoff.md`, *Open questions*) and a proposal to build it (`ffde978`).
-    It is approved implementation like the rest of this list.
+17. ~~**Settings → Shopify: *Refresh now* and *last successful refresh***~~
+    - **done, batch J** (25 September). The reconciliation sweep brought
+    forward; see *Batch J* below.
 17b. ~~**Settings → Shopify: the editable connection**~~ - **done, batch I**
     (ADR 0045): *Store domain*, *Client ID*, *Client secret* (the owner's
     choice of fields, 25 September), *Update connection*; admin only;
@@ -753,6 +841,11 @@ Code hygiene (no behaviour)
     batch G**; it now states ADR 0025's rule.
 19. `/payroll/:month/reopen` (`PayrollReopen.tsx`): reopening is retired
     (05B); the route is a candidate for removal, with `test_reachability`.
+
+19a. **The worker blocks the web server while a job runs** (found in batch
+    J): `worker_loop` calls the synchronous `run_one` inside the event loop.
+    Candidate fix: run `run_one` in a thread (`asyncio.to_thread`). Not
+    started - it changes how every job runs and wants its own review.
 
 ### Verification - still to run
 
@@ -853,6 +946,7 @@ overpaid month (a real state the export never drew).
 | Wardrobe size, Targets words, payment-details words, Invitations words and dates, You buttons' font, the refund comment | Items 1, 2, 4, 7, 8, 18 | `1b0a240`; `shots/batch-g/checks.txt` |
 | Decisions c, d, e, g, h: account menu, product list line, top-sellers panel, the usual recording date, the password after *Save details* | Owner, 25 September | `52ab988`; `shots/batch-h/checks.txt` |
 | Decision b: the Shopify connection edited in Settings | Owner, 25 September | batch I (the commit that adds this row); ADR 0045; `tests/test_shopify_connection.py` (11), `ShopifyConnection.test.tsx` (4); `shots/batch-i/checks.txt` |
+| *Refresh now* and *last successful refresh* (item 17) | Admin export, handoff | batch J; `tests/test_shopify_refresh.py` (9), `ShopifyRefresh.test.tsx` (6); `shots/batch-j/checks.txt` |
 | Portal order filter *Failed*, chips naming the case (G, #13) | Thirteen | `6131d0c` |
 | Net sales and *Counts towards* from facts | Batch D | `7bd9650` |
 | Earnings explanations, per-order commission | Batch C | `1b1bb21` |

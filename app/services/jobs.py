@@ -327,13 +327,19 @@ def prune_succeeded_jobs(db: Session, older_than_days: int = 30) -> int:
 
     Only succeeded ones. A failed job is the record that work did not happen,
     and deleting it on a timer would erase exactly the evidence someone needs
-    (docs/limits.md).
+    (docs/limits.md). The newest success of each kind is kept too.
     """
     deleted = db.execute(
         text(
             "DELETE FROM background_job "
             "WHERE status = 'succeeded' "
-            "  AND finished_at < now() - make_interval(days => :days)"
+            "  AND finished_at < now() - make_interval(days => :days) "
+            # The newest success of each kind stays, however old: it is what
+            # *last successful refresh* reads, and a month of failures must
+            # not turn that into *never*.
+            "  AND id NOT IN (SELECT DISTINCT ON (kind) id FROM background_job "
+            "                 WHERE status = 'succeeded' "
+            "                 ORDER BY kind, finished_at DESC, id DESC)"
         ),
         {"days": older_than_days},
     )
