@@ -192,3 +192,19 @@ def test_a_domain_that_is_not_a_shop_is_refused_in_plain_words(client, monkeypat
     assert "your-store.myshopify.com" in response.json()["detail"]
     assert seen == [] and _stored() == []  # Shopify was not even asked
 
+
+
+def test_a_malformed_key_is_named_as_malformed_not_missing(client, monkeypatch):
+    """Half a pasted key is a different fault from no key, and the message says
+    which - without ever printing the key."""
+    _shopify(monkeypatch)
+    monkeypatch.setattr("app.config.settings.settings_encryption_key", "not-a-fernet-key")
+
+    body = client.get(URL).json()
+    refused = client.put(URL, json=FORM)
+
+    assert body["can_save"] is False
+    assert "not a valid key" in body["key_problem"]
+    assert refused.status_code == 422
+    assert "not a valid key" in refused.json()["detail"] and "not-a-fernet-key" not in refused.text
+    assert _stored() == []

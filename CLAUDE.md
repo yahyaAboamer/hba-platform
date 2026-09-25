@@ -148,8 +148,10 @@ Neither has run, and nothing in the repair reports satisfies either:
 1. **Reconciliation against an authorised restored copy of real data.**
    `docs/repair/batch-1/reconcile.py` has only ever run against the test
    database.
-2. **A migration/rollback rehearsal for `b1f0a40c0001` and `c3d51e7a0002`**
-   (the saved Shopify connection, ADR 0045).
+2. **A migration/rollback rehearsal for `b1f0a40c0001`, `c3d51e7a0002`**
+   (the saved Shopify connection, ADR 0045) **and `d4e7a2c90003`** (staff
+   preferences, batch J), including the `SETTINGS_ENCRYPTION_KEY` cases -
+   `docs/runbooks/settings-encryption-key.md`, *Rehearsal*.
 
 Do not describe the repair as releasable while these are open.
 

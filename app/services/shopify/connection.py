@@ -66,6 +66,23 @@ def _fernet() -> Fernet | None:
         return None
 
 
+def key_problem() -> str | None:
+    """Why this server cannot use its key, in words - or None if it can.
+
+    *Not set* and *not a valid key* are told apart: the second is the one
+    somebody meets after pasting half a key, and being told the variable is
+    missing sends them looking in the wrong place. Never includes the key.
+    """
+    if not (settings.settings_encryption_key or "").strip():
+        return "SETTINGS_ENCRYPTION_KEY is not set"
+    if _fernet() is None:
+        return (
+            "SETTINGS_ENCRYPTION_KEY is set but is not a valid key "
+            "(it must be a Fernet key: 44 characters of URL-safe base64)"
+        )
+    return None
+
+
 def _environment(problem: str | None = None) -> Effective:
     configured = settings.shopify_configured
     return Effective(
@@ -87,8 +104,8 @@ def effective(db: Session) -> Effective:
     fernet = _fernet()
     if fernet is None:
         return _environment(
-            "A connection is saved, but this server has no key to read it "
-            "(SETTINGS_ENCRYPTION_KEY); the environment's connection is in use."
+            f"A connection is saved, but this server cannot read it "
+            f"({key_problem()}); the environment's connection is in use."
         )
     try:
         secret = fernet.decrypt(row.client_secret_encrypted.encode()).decode()
@@ -138,6 +155,7 @@ def describe(db: Session) -> dict:
         "shop_name": row.shop_name if row and connection.source == "saved" else None,
         "problem": connection.problem,
         "can_save": _fernet() is not None,
+        "key_problem": key_problem(),
     }
 
 
@@ -169,8 +187,8 @@ def save(
     fernet = _fernet()
     if fernet is None:
         raise ConnectionRefused(
-            "This server cannot protect a saved secret yet: SETTINGS_ENCRYPTION_KEY "
-            "is not set. Nothing was changed."
+            f"This server cannot protect a saved secret yet: {key_problem()}. "
+            "Nothing was changed."
         )
     domain = (shop_domain or "").strip().removeprefix("https://").removeprefix("http://").rstrip("/")
     if not domain:

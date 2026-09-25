@@ -12,6 +12,8 @@ export type ShopifyConnectionState = {
   shop_name: string | null;
   problem: string | null;
   can_save: boolean;
+  /** Why the key cannot be used - not set, or not a valid key. */
+  key_problem?: string | null;
 };
 
 /**
@@ -95,7 +97,7 @@ export function ShopifyConnection({ onChanged }: { onChanged?: (state: ShopifyCo
         </label>
         {state?.problem && <p className="sync__error">{state.problem}</p>}
         {state && !state.can_save && (
-          <p className="sync__error">This server cannot protect a saved secret yet (SETTINGS_ENCRYPTION_KEY is not set).</p>
+          <p className="sync__error">This server cannot protect a saved secret yet ({state.key_problem ?? "SETTINGS_ENCRYPTION_KEY is not set"}).</p>
         )}
         {error && <p className="sync__error" role="alert">{error}</p>}
         {saved && <p className="sync__notice" role="status">{saved}</p>}

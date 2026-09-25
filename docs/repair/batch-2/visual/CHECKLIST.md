@@ -1259,14 +1259,19 @@ Code hygiene (no behaviour)
 29. **`payment-record-*` screenshots** predate the *No destination recorded*
     wording.
 30a. **Deploying the connection form** needs `SETTINGS_ENCRYPTION_KEY` (a
-    Fernet key) set on each environment, kept out of the database; and the
-    new migration `c3d51e7a0002` applied. Not done - no deployment is
-    authorised.
+    Fernet key, one per environment, sealed on Railway, escrowed in a password
+    manager, never in the database or its backups) and migrations
+    `c3d51e7a0002` and `d4e7a2c90003` applied. **Instructions written, batch
+    J**: `docs/runbooks/settings-encryption-key.md` (generation, storage,
+    deploy order and checks, what missing / malformed / wrong / lost / exposed
+    keys do, backups, rehearsal). Not done on any environment - no deployment
+    is authorised.
 30. **Before merge**: the full backend runner (`run-suite.sh`), the frontend
     suite and build. Not re-run for this batch; the focused files are.
 31. **Release gates** (`CLAUDE.md`): reconciliation against an authorised
     restored copy of real data (`reconcile.py` has only run on the test
-    database), and a migration/rollback rehearsal for `b1f0a40c0001`. Neither
+    database), and a migration/rollback rehearsal for `b1f0a40c0001`,
+    `c3d51e7a0002` and `d4e7a2c90003` with the key cases in the runbook. Neither
     has run; the repair is not releasable while they are open.
 
 31a. **Order-import completeness, on real data.** Two read-only tools, both
