@@ -209,7 +209,10 @@ export function PaymentRecord() {
       </Link>
       <div className="page__title">
         <h1>Record payment</h1>
-        <span className="page__subtitle">{formatMonth(month)}</span>
+        {/* The export's subtitle: `{name} · {month}` (Admin line 2365). */}
+        <span className="page__subtitle">
+          {balance?.name ? `${balance.name} · ${formatMonth(month)}` : formatMonth(month)}
+        </span>
       </div>
     </div>
   );
@@ -361,7 +364,7 @@ export function PaymentRecord() {
 
         <p className="pay-record__note">
           Saving records a transfer that finance already made outside this
-          dashboard. {balance.name} sees the receipt.
+          dashboard.
         </p>
       </form>
     </>

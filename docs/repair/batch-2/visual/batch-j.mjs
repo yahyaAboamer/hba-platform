@@ -294,6 +294,66 @@ steps.targets = async (browser) => {
   }
 };
 
+/** Recording a payment: the export's own `vRecord` view against ours, and a save. */
+steps.record = async (browser) => {
+  const texts = (page, scope) => page.locator(scope).evaluate((el) => el.innerText.split("\n").map((t) => t.trim()).filter(Boolean));
+  for (const width of [1280, 1440]) {
+    const { context: rc, ref } = await openExport(browser, ADMIN_EXPORT, width);
+    await exportNav(ref, NAV.payments).click();
+    await settle(ref, 800);
+    await ref.locator(".ad button", { hasText: /^Record payment$/ }).first().click();
+    await settle(ref, 800);
+    await ref.locator(".ad button", { hasText: /^Record payment$/ }).first().click();
+    await settle(ref, 800);
+    await ref.locator(".ad").screenshot({ path: join(OUT, `export-record-${width}.png`) });
+    const refMain = ".ad > div:nth-child(2)";
+    log(`[${width}] export vRecord: ${JSON.stringify(await texts(ref, refMain))}`);
+    log(`[${width}] export amount input: ${JSON.stringify(await style(ref, ref.locator("#ad-recamt")))}`);
+    log(`[${width}] export save: ${JSON.stringify(await style(ref, ref.locator(".ad button", { hasText: /^Record payment$/ })))}`);
+    await rc.close();
+
+    const { context, page } = await signIn(browser, OWNER, { width, height: 900 });
+    await page.goto(`${APP}/payments?month=${previousMonth()}`, { waitUntil: "networkidle" });
+    await settle(page, 800);
+    await page.locator("main").getByRole("link", { name: /Nadine Kamal/ }).first().click();
+    await page.waitForLoadState("networkidle");
+    await settle(page, 700);
+    await page.locator("main").getByRole("link", { name: /^Record payment$/ }).or(page.locator("main").getByRole("button", { name: /^Record payment$/ })).first().click();
+    await page.waitForLoadState("networkidle");
+    await settle(page, 700);
+    await page.screenshot({ path: join(OUT, `app-record-${width}.png`) });
+    log(`[${width}] app record: ${JSON.stringify(await texts(page, "main"))}`);
+    log(`[${width}] app amount input: ${JSON.stringify(await style(page, page.getByLabel("Amount transferred, EGP")))}`);
+    log(`[${width}] app save: ${JSON.stringify(await style(page, page.getByRole("button", { name: "Record payment" })))}`);
+
+    if (width === 1280) {
+      const amount = page.getByLabel("Amount transferred, EGP");
+      await amount.fill("0");
+      await settle(page, 300);
+      log(`[${width}] amount 0: ${JSON.stringify(await page.getByRole("alert").first().innerText().catch(() => "none"))}`);
+      await amount.fill("99999");
+      await settle(page, 300);
+      log(`[${width}] amount over: ${JSON.stringify(await page.locator(".pay-record__warn").innerText().catch(() => "none"))}`);
+      await amount.fill("500");
+      await page.getByLabel("Reference").fill("BATCHJ-500");
+      // A partial amount needs its reason (the platform's rule; not in the export).
+      await page.getByLabel("Why is it different from what is outstanding?").fill("Part of the month, batch J check.");
+      const url = page.url();
+      await page.getByRole("button", { name: "Record payment" }).click();
+      await page.waitForURL((u) => u.href !== url, { timeout: 10000 }).catch(() => undefined);
+      await settle(page, 1000);
+      const alert = await page.getByRole("alert").first().innerText().catch(() => "");
+      log(`[${width}] saved: url=${page.url().replace(APP, "")} alert=${JSON.stringify(alert)}`);
+      await page.reload({ waitUntil: "networkidle" });
+      await settle(page, 800);
+      const body = await page.locator("main").innerText();
+      log(`[${width}] after reload shows BATCHJ-500: ${body.includes("BATCHJ-500")} / EGP 500.00: ${body.includes("EGP 500.00")}`);
+      await page.screenshot({ path: join(OUT, `app-record-saved-${width}.png`) });
+    }
+    await context.close();
+  }
+};
+
 function previousMonth() {
   const now = new Date();
   const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);

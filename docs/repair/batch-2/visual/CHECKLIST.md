@@ -815,6 +815,39 @@ re-recorded row lost its confirmation; August reads *Below target*.
 August) is D08's as built; the checkbox before an unconfirmed name is how
 *Confirm* chooses (standing).
 
+## Batch J - Record payment (25 September)
+
+**The item's premise was wrong, and the approved HTML decides.** Item 10 said
+the export keeps *Record payment* on the payment detail. It does not: the
+detail's *Record payment* button (`openRecord`, Admin line 3249) pushes a
+`record` view onto the stack, titled *Record payment* with *{name} ·
+{month}* under it and Back to the model (line 2365); `vRecord` (1403-1443) is
+that screen. The sweep's `payment-record` pair put our record form beside the
+export's *detail*, because its reference step stopped before pressing the
+button, and #11 was read off that pair. So recording stays a view of its own,
+as the export draws it; moving it inline would have diverged from the
+approved design. **If the owner wants it inline regardless, that is a new
+instruction against the HTML and his to give.**
+
+Against the real `vRecord`:
+
+- Subtitle *{name} · {month}* (ours had the month alone) - fixed.
+- The note is the export's one sentence; ours added *{name} sees the
+  receipt* - removed.
+- Everything else already equal, measured at 1280 and 1440: the due line,
+  the five fields and their labels, the dashed receipt box, *Record payment*
+  (14px, 12px 18px, 44px, accent fill) and *Cancel*, the amount input (14px,
+  12px 13px, 44px, 8px radius), the refusal and over-amount lines.
+- Kept, not in the export: the *Why is it different from what is
+  outstanding?* field, required when the amount is not the balance - the
+  platform's rule for a partial or over payment.
+
+**Checks.** Browser (`shots/batch-j/`, `export-record-*`, `app-record-*`):
+0 refused with the export's line; over the balance warns with the export's
+line; EGP 500 with a reference and reason saved, back on the detail, the
+reference and EGP 500.00 there after a reload, the outstanding down from
+EGP 10,512.00 to EGP 10,012.00. Frontend suite and build.
+
 ## Remaining work - the one list (reconciled 24 September)
 
 Reconciled against: the 24 September handoff (*What is waiting on Yahya*,
@@ -860,7 +893,13 @@ Admin (1280 / 1440)
    export's words, confirmation kept separately, the export's column widths,
    and the guarantee label's rule; §T re-checked (see *Batch J - Admin
    Targets*). The confirmation-clearing defect it found is fixed.
-10. **Record payment on the payment detail**, not a screen of its own. Thirteen #11.
+10. ~~**Record payment on the payment detail**, not a screen of its own~~ -
+    **premise corrected, batch J.** The export records on its own view too
+    (`openRecord` pushes `record`, Admin lines 2365 and 3249; `vRecord`
+    1403-1443). Thirteen #11 compared our record form with the export's
+    *detail*, because the sweep's reference step never pressed *Record
+    payment*. Against the real `vRecord`, two words differed and are fixed.
+    See *Batch J - Record payment*.
 11. **Settings**: Appearance's two switches (*Show pop-up notices on Home*,
     *Weekly reminder to record achieved content*) (#1); Reference's audit rows
     as sentences, about forty event types (#2).
@@ -1002,6 +1041,7 @@ overpaid month (a real state the export never drew).
 | Wardrobe size, Targets words, payment-details words, Invitations words and dates, You buttons' font, the refund comment | Items 1, 2, 4, 7, 8, 18 | `1b0a240`; `shots/batch-g/checks.txt` |
 | Decisions c, d, e, g, h: account menu, product list line, top-sellers panel, the usual recording date, the password after *Save details* | Owner, 25 September | `52ab988`; `shots/batch-h/checks.txt` |
 | Decision b: the Shopify connection edited in Settings | Owner, 25 September | batch I (the commit that adds this row); ADR 0045; `tests/test_shopify_connection.py` (11), `ShopifyConnection.test.tsx` (4); `shots/batch-i/checks.txt` |
+| Record payment: premise corrected; subtitle and note as `vRecord` (item 10, #11) | Thirteen | batch J; `shots/batch-j/export-record-*`, `app-record-*` |
 | Admin Targets words, widths, guarantee label; unchanged rows keep their confirmation (item 9) | Thirteen E, matrix §T | batch J; `test_targets_api` (+1), `TargetsWords.test.tsx` (4) |
 | *Refresh now* and *last successful refresh* (item 17) | Admin export, handoff | batch J; `tests/test_shopify_refresh.py` (9), `ShopifyRefresh.test.tsx` (6); `shots/batch-j/checks.txt` |
 | Portal order filter *Failed*, chips naming the case (G, #13) | Thirteen | `6131d0c` |
