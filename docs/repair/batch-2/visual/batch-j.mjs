@@ -664,6 +664,30 @@ steps.product = async (browser) => {
   await pc.close();
 };
 
+/** Item 3: the Ranking board at 390. */
+steps.ranking = async (browser) => {
+  const { context: rc, ref } = await openExport(browser, PORTAL_EXPORT, 390, ".pt");
+  await portalTab(ref, "Ranking").click();
+  await settle(ref, 700);
+  const refRows = await ref.locator(".pt div").filter({ has: ref.locator("span", { hasText: /^uses$/ }) }).evaluateAll((els) => els.filter((e) => e.children.length >= 4).slice(0, 3).map((e) => e.innerText.replace(/\n/g, " | ")));
+  log(`[390] export ranking rows: ${JSON.stringify(refRows)}`);
+  const refCode = ref.locator(".pt span", { hasText: /^[A-Z0-9]{4,}$/ }).first();
+  log(`[390] export code: ${JSON.stringify(await style(ref, refCode))}`);
+  await ref.locator(".pt").screenshot({ path: join(OUT, "export-ranking-390.png") });
+  await rc.close();
+
+  const { context, page } = await signIn(browser, MODEL, { width: 390, height: 844 });
+  await page.goto(`${APP}/ranking`, { waitUntil: "networkidle" });
+  await settle(page, 800);
+  log(`[390] app ranking rows: ${JSON.stringify(await page.locator(".ranking__row, li:has(.ranking__who)").evaluateAll((els) => els.slice(0, 3).map((e) => e.innerText.replace(/\n/g, " | "))))}`);
+  log(`[390] app code: ${JSON.stringify(await style(page, page.locator(".ranking__code")))}`);
+  log(`[390] app name: ${JSON.stringify(await style(page, page.locator(".ranking__name")))}`);
+  const others = await page.evaluate(async () => (await (await fetch(location.origin + "/api/me/ranking/" + new Date().toISOString().slice(0, 7))).json()).rows.filter((r) => !r.is_me).map((r) => r.sales_piastres));
+  log(`[390] other rows' sales in the payload: ${JSON.stringify([...new Set(others)])}`);
+  await page.screenshot({ path: join(OUT, "app-ranking-390.png") });
+  await context.close();
+};
+
 function previousMonth() {
   const now = new Date();
   const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);

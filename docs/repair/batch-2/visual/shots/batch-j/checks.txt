@@ -239,3 +239,18 @@
 [1280] old reopen bookmark: url=/payroll/2026-08/reopen main="Nothing here\nThere is no screen at this address. Home"
 [1280] POST /api/payroll/2026-08/reopen: 405
 [1280] item 19a: status request 1.5s into a 5-second sweep answered in 23ms with state "running" (before: it waited for the sweep and said "succeeded")
+## ranking - 2026-09-25T23:08:47.647Z
+[390] export ranking rows: ["1 | S | Sara Edrees | SARAED | 7 | uses | 2 | M | Malak Fahmy | MALAK10 | 4 | uses | 3 | H | Hana Wagih | HANAW | 5 | uses | 4 | Y | You | HBA15 | 2 | uses | 5 | O | Omar Sabry | OMARS | 3 | uses | 6 | N | Nadine Kamal | NADK | 2 | uses | 7 | F | Farida Zaki | FARIDA | 1 | uses | 8 | Y | Youssef Adel | YADEL | 1 | uses | 9 | L | Laila Mostafa | LAILAM | 1 | uses","1 | S | Sara Edrees | SARAED | 7 | uses","2 | M | Malak Fahmy | MALAK10 | 4 | uses"]
+[390] export code: {"text":"SARAED","font":"12.5px 400 Inter","color":"rgb(138, 145, 138)","background":"rgba(0, 0, 0, 0)","border":"0px none rgb(138, 145, 138)","radius":"0px","padding":"0px","height":19}
+[390] app ranking rows: ["1 | N | Nour Eldin | NOURE | 1 | uses","2 | T | Tarek Aziz | TAREKA | 2 | uses","3 | L | Laila Mostafa | LAILAM | 2 | uses"]
+[390] app code: {"text":"NOURE","font":"12.5px 400 Inter","color":"rgb(138, 145, 138)","background":"rgba(0, 0, 0, 0)","border":"0px none rgb(138, 145, 138)","radius":"0px","padding":"0px","height":19}
+[390] app name: {"text":"Nour Eldin","font":"13.5px 400 Inter","color":"rgb(236, 239, 234)","background":"rgba(0, 0, 0, 0)","border":"0px none rgb(236, 239, 234)","radius":"0px","padding":"0px","height":21}
+[390] other rows' sales in the payload: [null]
+## ranking - 2026-09-25T23:09:25.129Z
+[390] export ranking rows: ["1 | S | Sara Edrees | SARAED | 7 | uses | 2 | M | Malak Fahmy | MALAK10 | 4 | uses | 3 | H | Hana Wagih | HANAW | 5 | uses | 4 | Y | You | HBA15 | 2 | uses | 5 | O | Omar Sabry | OMARS | 3 | uses | 6 | N | Nadine Kamal | NADK | 2 | uses | 7 | F | Farida Zaki | FARIDA | 1 | uses | 8 | Y | Youssef Adel | YADEL | 1 | uses | 9 | L | Laila Mostafa | LAILAM | 1 | uses","1 | S | Sara Edrees | SARAED | 7 | uses","2 | M | Malak Fahmy | MALAK10 | 4 | uses"]
+[390] export code: {"text":"SARAED","font":"12.5px 400 Inter","color":"rgb(138, 145, 138)","background":"rgba(0, 0, 0, 0)","border":"0px none rgb(138, 145, 138)","radius":"0px","padding":"0px","height":19}
+[390] app ranking rows: ["1 | N | Nour Eldin | NOURE | 1 | uses","2 | T | Tarek Aziz | TAREKA | 2 | uses","3 | L | Laila Mostafa | LAILAM | 2 | uses"]
+[390] app code: {"text":"NOURE","font":"12.5px 400 Inter","color":"rgb(138, 145, 138)","background":"rgba(0, 0, 0, 0)","border":"0px none rgb(138, 145, 138)","radius":"0px","padding":"0px","height":19}
+[390] app name: {"text":"Nour Eldin","font":"13.5px 400 Inter","color":"rgb(236, 239, 234)","background":"rgba(0, 0, 0, 0)","border":"0px none rgb(236, 239, 234)","radius":"0px","padding":"0px","height":21}
+[390] other rows' sales in the payload: [null]
+[390] app own row: "18 | S | You | SARAED | 1 | uses"

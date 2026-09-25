@@ -11,6 +11,7 @@ money goes. They may not touch a rate, a target, an order, or a month state.
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import current_affiliate, current_user
@@ -674,8 +675,9 @@ def my_ranking(
 
     **Ordered by sales; the figures shown are uses.** M02 is explicit that a
     peer value is never another model's sales, commission or salary — so the
-    board carries a rank, a name and a use count, and her own sales appear only
-    on her own row.
+    board carries a rank, a name, a code and a use count for everyone (the
+    approved export's board, item 3), and her own sales appear only on her own
+    row.
 
     That gap is deliberate and it has to be explained rather than hidden: two
     models can show the same uses and rank differently, because uses only break
@@ -684,8 +686,25 @@ def my_ranking(
     """
     from app.services.performance import month_performance
 
+    from app.services.codes import codes_for
+
     month = _month_or_400(month)
     board = month_performance(db, month)
+    # The export's board names every model with her code and initial (owner,
+    # item 3 - the approved design over our earlier anonymising). What stays
+    # hers alone is money: sales appear only on her own row (M02).
+    profiles = {
+        row.id: row
+        for row in db.scalars(
+            select(AffiliateProfile).where(
+                AffiliateProfile.id.in_([row.affiliate_id for row in board])
+            )
+        )
+    }
+    codes = {
+        affiliate_id: (codes_for(db, profile, month) or [None])[0]
+        for affiliate_id, profile in profiles.items()
+    }
 
     return {
         "month": month,
@@ -694,9 +713,8 @@ def my_ranking(
             {
                 "affiliate_id": row.affiliate_id,
                 "rank": row.rank,
-                # Her own name, and nobody else's - a leaderboard that names
-                # everybody turns twenty colleagues into a public table.
-                "name": row.name if row.affiliate_id == affiliate.id else None,
+                "name": row.name,
+                "code": codes.get(row.affiliate_id),
                 "is_me": row.affiliate_id == affiliate.id,
                 "uses": row.uses,
                 # Only ever her own. M02.

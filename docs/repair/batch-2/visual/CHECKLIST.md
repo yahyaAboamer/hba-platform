@@ -1148,8 +1148,13 @@ Portal (390)
 2. ~~**Targets words**: *met* / *not met* / *in progress*~~ - **done, batch G**
    (live month *in progress* / *targets met*; past *met* / *not met*).
    *not recorded* waits on exception (f); the pay sentence is item 6.
-3. **Ranking** names the other models, with code and avatar, as the export
-   does (F; ours writes *Another model*).
+3. ~~**Ranking** names the other models, with code and avatar~~ - **done,
+   batch J follow-up**: every row carries the model's name, code and
+   initial, her own row reads *You*, as the export's board (Portal lines
+   397-412). **Money stays hers alone (M02)**: no other row carries sales,
+   in the screen or the payload (checked). `test_the_board_names_every_model_
+   with_her_code_and_shows_only_her_own_sales`; `shots/batch-j/app-ranking-390`,
+   `export-ranking-390`; name 13.5px and code 12.5px faint measured equal.
 4. ~~**Payment details form** in the export's words~~ - **done, batch G**:
    *Where HBA should send your payment*, *Method*, *Save details*; our extra
    lead sentence removed. **Finished in batch H**: the export's *Method*

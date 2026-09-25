@@ -10,6 +10,8 @@ type Row = {
   affiliate_id: number;
   rank: number;
   name: string | null;
+  /** Her code that month, as the export prints under every name. */
+  code?: string | null;
   is_me: boolean;
   uses: number;
   sales_piastres: number | null;
@@ -32,13 +34,12 @@ type Board = { month: string; basis: string; rows: Row[] };
  * somebody's uses would match her rank would be making a promise the rule does
  * not keep — which is exactly what M02 warns against.
  *
- * ## Nobody else is named
+ * ## Everybody is named, nobody's money is shown
  *
- * A rank and a use count, and her own row is the only one with a name on it.
- * **The approved portal prints every model's name, code and initial**, and
- * that is the one thing on it we will not build: a leaderboard that names
- * everybody turns twenty colleagues into a public table, and none of them
- * agreed to that.
+ * The approved portal prints every model's name, code and initial, and so does
+ * this (item 3: the approved design over the anonymised board this screen had
+ * before). What stays hers alone is money - sales appear on no row but her own
+ * (M02); the board shows uses.
  *
  * ## Equal standings share a place (D03)
  *
@@ -148,13 +149,15 @@ export function MyRanking() {
                 ? ""
                 : row.rank}
             </span>
-            {/* Her initial on her own row, and an empty circle on everybody
-                else's: the column keeps the list aligned, and there is no
-                letter to print for a model who is not named. */}
             <span className="ranking__avatar">
-              {row.is_me ? (row.name ?? "You").trim().charAt(0).toUpperCase() : ""}
+              {(row.name ?? "").trim().charAt(0).toUpperCase()}
             </span>
-            <span className="ranking__who">{row.is_me ? row.name ?? "You" : "Another model"}</span>
+            {/* The export's name over code (Portal lines 403-406). */}
+            <span className="ranking__who">
+              {/* Her own row says *You*, as the export's; the initial is still hers. */}
+              <span className="ranking__name">{row.is_me ? "You" : row.name ?? ""}</span>
+              {row.code && <span className="ranking__code">{row.code}</span>}
+            </span>
             <span className="ranking__figure">
               <span className="ranking__uses">{row.uses}</span>
               <span className="ranking__caption">uses</span>

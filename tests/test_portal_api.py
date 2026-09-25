@@ -2786,3 +2786,23 @@ def test_home_counts_a_failed_delivery_and_not_a_cancellation(admin):
     assert body["orders"]["void"] == 3
     assert body["orders"]["failed_delivery"] == 1
 
+
+
+# ── The ranking board (item 3) ────────────────────────────────────────────────
+
+
+def test_the_board_names_every_model_with_her_code_and_shows_only_her_own_sales(admin):
+    """The approved portal's board: every model's name, code and uses. Money is
+    still hers alone (M02) - no other row carries sales."""
+    nour = _affiliate(admin)
+    sara = _affiliate(admin, name="Sara", email="sara@example.com", code="SARA10")
+    _order(nour["id"], "5001", 200_000)
+    _order(sara["id"], "5002", 500_000, code="SARA10")
+
+    rows = _sign_in().get(f"/api/me/ranking/{AUGUST}").json()["rows"]
+
+    by_name = {row["name"]: row for row in rows}
+    assert by_name["Sara"]["code"] == "SARA10" and by_name["Sara"]["rank"] == 1
+    assert by_name["Nour"]["code"] == "NOUR10" and by_name["Nour"]["is_me"] is True
+    assert by_name["Sara"]["sales_piastres"] is None and by_name["Sara"]["sales"] is None
+    assert by_name["Nour"]["sales_piastres"] == 200_000
