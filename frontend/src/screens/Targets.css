@@ -40,20 +40,28 @@
   min-height: 36px;
 }
 
+/*
+ * The export's widths are its columns' *content*, with a 16px gap between
+ * them and 18px at the row's ends. Here the gap is each cell's 8px + 8px of
+ * padding, and the cells are border-box, so each width is the export's plus
+ * that padding - written as 150px they were 16px narrower than the export,
+ * and *Last updated* had 94px where the export has 120 (a September date
+ * wrapped).
+ */
 .targets__number,
 .table th.targets__number {
-  width: 150px;
+  width: 166px; /* 150 + 8 + 8 */
   text-align: left;
 }
 
 .table th.targets__outcome,
 .table td.targets__outcome {
-  width: 140px;
+  width: 156px; /* 140 + 8 + 8 */
 }
 
 .table th.targets__updated,
 .table td.targets__updated {
-  width: 120px;
+  width: 146px; /* 120 + 8 + 18 */
 }
 
 /*
@@ -143,13 +151,15 @@
 }
 
 /*
- * Met and missed are both ordinary outcomes and neither is coloured. §11.3 is
- * explicit that the block is on missing information and never on a quiet
- * month, so colouring a miss would say the opposite of the rule. What is
- * coloured is the one state that holds a month up — nothing recorded — which
- * is how the export tones it too.
+ * Toned as the export tones `tgRows.state`: *Target met* in the lifted green
+ * (`--acctext`), *No record yet* amber - the one state that holds a month up
+ * (§11.3) - and everything else, a miss included, quiet. A miss is an ordinary
+ * outcome, never an alarm.
  */
-.targets__met,
+.targets__met {
+  color: var(--accent-lift);
+}
+
 .targets__missed {
   color: var(--quiet);
 }

@@ -183,6 +183,10 @@ def set_requirements(
         db.add(target)
     else:
         assert_recordable(db, target)
+        if (target.required_videos, target.required_stories) == (int(videos), int(stories)):
+            # The grid sends every row it shows. Asking for what is already
+            # asked for is not a change: nothing to write or audit.
+            return target
         target.required_videos = int(videos)
         target.required_stories = int(stories)
         target.updated_at = utcnow()
@@ -218,7 +222,8 @@ def record_actuals(
 
     **Re-recording clears any verification.** The confirmation was of the old
     numbers; leaving it in place would let a correction inherit somebody else's
-    approval and unlock a guarantee nobody agreed to.
+    approval and unlock a guarantee nobody agreed to. **The same numbers again
+    are not a re-recording** and change nothing.
 
     `recorded_at` is injectable, exactly as `verify`'s is and for the same
     reason. **When** a count was recorded became a fact with consequences in
@@ -230,6 +235,13 @@ def record_actuals(
     _refuse_counts_on_a_backfilled_month(target)
     if videos < 0 or stories < 0:
         raise ValueError("An actual cannot be negative")
+
+    if (target.actual_videos, target.actual_stories) == (int(videos), int(stories)):
+        # The same numbers again are not a re-recording. The grid sends every
+        # row it shows, so without this, saving one model's count cleared every
+        # other model's confirmation - and a confirmation is what releases a
+        # guaranteed minimum - and moved their *Last updated* to today.
+        return target
 
     before = _snapshot(target)
     was_verified = target.is_verified

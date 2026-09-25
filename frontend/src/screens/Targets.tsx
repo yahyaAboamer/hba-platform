@@ -514,13 +514,13 @@ export function Targets({ session, affiliateId, initialMonth, embedded = false }
                       </Link>
                       {/*
                        * The export writes the arrangement beside every name,
-                       * and replaces it with what the record decides where a
-                       * guarantee depends on it. Ours showed the second and
-                       * nothing at all for everybody else, so the column read
-                       * as a list of names with one warning in it.
+                       * and replaces it with *Guarantee needs this record*
+                       * where a guarantee depends on a record that does not
+                       * exist yet (`!targetKnown`). Once recorded, the
+                       * arrangement's own name comes back.
                        */}
                       <span className="targets__arrangement">
-                        {row.determines_pay
+                        {row.determines_pay && row.achieved === null
                           ? "Guarantee needs this record"
                           : row.arrangement
                             ? PAY_TYPE[row.arrangement] ?? row.arrangement
@@ -548,12 +548,13 @@ export function Targets({ session, affiliateId, initialMonth, embedded = false }
                     />
                     {/*
                      * The export draws one line here, toned by what it says.
-                     * D08's weekly pace was asked for after the export was
-                     * drawn and answers the same question a week at a time, so
-                     * it follows as a second, quieter line.
+                     * Confirmation (§15, decision E) and D08's weekly pace were
+                     * both asked for after the export was drawn; each follows
+                     * as its own quieter line.
                      */}
                     <td className="targets__outcome">
-                      <Outcome row={row} />
+                      <Outcome row={row} month={month} />
+                      <Confirmation row={row} />
                       <PaceCell row={row} />
                     </td>
                     <td className="targets__updated">
@@ -803,33 +804,41 @@ function PaceCell({ row }: { row: Row }) {
 }
 
 
-function Outcome({ row }: { row: Row }) {
+/**
+ * The export's word for the month's record (`tgRows.state`): *No record yet*,
+ * *Recorded zero*, *Target met*, and for a month not met *In progress* while
+ * it is still running, *Below target* once it has ended (the export's
+ * `mTargetHistory`). Toned as the export tones them.
+ */
+export function outcomeWord(row: Pick<Row, "achieved" | "actual_videos" | "actual_stories">, month: string, current: string): string {
+  if (row.achieved === null) return "No record yet";
+  if (row.actual_videos === 0 && row.actual_stories === 0) return "Recorded zero";
+  if (row.achieved) return "Target met";
+  return month >= current ? "In progress" : "Below target";
+}
+
+function Outcome({ row, month }: { row: Row; month: string }) {
   // **The outcome, not the counts**, though on this screen they agree: the
   // picker locks every month before go-live (`lockFor`), so the one row shape
   // where they differ — an outcome kept without counts, ADR 0036 — cannot be
   // reached here. Said in terms of the outcome anyway, because that is what
   // the column is for and the next person to widen the picker will not read
   // this file first.
-  if (row.achieved === null) {
-    // The export's words for this state, and the only one it colours.
-    return <span className="targets__unknown">No record yet</span>;
-  }
-  if (row.achieved) {
-    return (
-      <span className="targets__met">
-        Met{" "}
-        {row.verified ? (
-          <span className="targets__confirmed">· confirmed</span>
-        ) : (
-          <span className="targets__unconfirmed">· not confirmed</span>
-        )}
-      </span>
-    );
-  }
-  return (
-    <span className="targets__missed">
-      Missed{" "}
-      {row.verified && <span className="targets__confirmed">· confirmed</span>}
-    </span>
-  );
+  const word = outcomeWord(row, month, currentMonth());
+  const tone = word === "No record yet" ? "targets__unknown" : word === "Target met" ? "targets__met" : "targets__missed";
+  return <span className={tone}>{word}</span>;
+}
+
+/**
+ * Whether a second person has confirmed the numbers (§15) - a separate fact
+ * from the outcome (decision E), and what releases a guaranteed minimum. On
+ * its own line: *Target met · not confirmed* is wider than the export's
+ * 140px column.
+ */
+function Confirmation({ row }: { row: Row }) {
+  if (row.achieved === null) return null;
+  if (row.verified) return <span className="targets__confirmed">Confirmed</span>;
+  // An unmet month has nothing waiting on a confirmation.
+  if (!row.achieved) return null;
+  return <span className="targets__unconfirmed">Not confirmed</span>;
 }

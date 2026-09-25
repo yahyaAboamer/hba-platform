@@ -329,6 +329,38 @@ def test_re_saving_actuals_clears_the_verification(client):
     assert _grid(client)["rows"][0]["verified"] is False
 
 
+def test_saving_the_grid_leaves_every_unchanged_row_as_it_was(client):
+    """The grid sends every row it shows. Saving one model's count must not
+    clear another's confirmation (it releases her guarantee), move her *Last
+    updated*, or write audit rows for numbers nobody touched - which it did,
+    found in the batch J browser check.
+    """
+    from sqlalchemy import text
+    from app.db import engine
+
+    nour = _affiliate(client, "Nour", "nour@example.com")
+    sara = _affiliate(client, "Sara", "sara@example.com")
+    _save(client, [_row(nour["id"], (8, 5), (8, 5)), _row(sara["id"], (2, 1), (2, 1))])
+    client.post(f"/api/targets/{MONTH}/verify", json={"affiliate_ids": [nour["id"], sara["id"]]})
+    before = {row["affiliate_id"]: row for row in _grid(client)["rows"]}
+    with engine.connect() as connection:
+        audits = connection.execute(text("SELECT count(*) FROM audit_event")).scalar()
+
+    # Sara's stories change; Nour's row goes back exactly as it was.
+    response = _save(client, [_row(nour["id"], (8, 5), (8, 5)), _row(sara["id"], (2, 1), (2, 2))])
+    assert response.status_code == 200, response.text
+
+    after = {row["affiliate_id"]: row for row in _grid(client)["rows"]}
+    assert after[nour["id"]]["verified"] is True
+    assert after[nour["id"]]["recorded_at"] == before[nour["id"]]["recorded_at"]
+    assert after[sara["id"]]["verified"] is False
+    with engine.connect() as connection:
+        written = connection.execute(text(
+            "SELECT action, subject FROM audit_event ORDER BY id OFFSET :n"
+        ), {"n": audits}).all()
+    assert written == [("target.actuals_recorded", f"affiliate:{sara['id']}")]
+
+
 # ── Who may do what ────────────────────────────────────────────────────────────
 
 

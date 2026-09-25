@@ -199,6 +199,107 @@ steps.refresh = async (browser) => {
   }
 };
 
+/** Admin Targets: words, column widths, a save, reload, and two refusals. */
+steps.targets = async (browser) => {
+  const columns = (page, head, row) => page.evaluate(([h, r]) => {
+    const heads = [...document.querySelectorAll(h)].map((el) => {
+      const cs = getComputedStyle(el);
+      return `${el.textContent.trim()}:${Math.round(el.getBoundingClientRect().width - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight))}`;
+    });
+    const rows = [...document.querySelectorAll(r)].slice(0, 3).map((el) => Math.round(el.getBoundingClientRect().height));
+    return { heads, rows };
+  }, [head, row]);
+  for (const width of [1280, 1440]) {
+    const { context, page } = await signIn(browser, OWNER, { width, height: 900 });
+    await page.goto(`${APP}/targets`, { waitUntil: "networkidle" });
+    await settle(page, 800);
+    await page.screenshot({ path: join(OUT, `app-targets-${width}.png`) });
+    log(`[${width}] app columns (content px) and first rows: ${JSON.stringify(await columns(page, "thead th", "tbody tr"))}`);
+    const words = await page.locator("td.targets__outcome").evaluateAll((cells) => cells.map((c) => c.innerText.replace(/\n/g, " | ")));
+    log(`[${width}] app Recorded cells (September): ${JSON.stringify(words)}`);
+    const updated = await page.locator("td.targets__updated").first().evaluate((el) => ({ text: el.innerText, lines: Math.round(el.getBoundingClientRect().height / 19) }));
+    log(`[${width}] Last updated first cell: ${JSON.stringify(updated)}`);
+    for (const [cls, label] of [["targets__met", "Target met"], ["targets__missed", "other"], ["targets__unknown", "No record yet"]]) {
+      if (await page.locator(`.${cls}`).count()) log(`[${width}] tone ${label}: ${JSON.stringify(await style(page, page.locator(`.${cls}`)))}`);
+    }
+
+    if (width === 1280) {
+      const input = page.getByLabel("Jana Selim videos achieved");
+      const cell = page.locator("tr", { has: input }).locator("td.targets__outcome");
+      log(`[${width}] Jana before: ${JSON.stringify(await cell.innerText())} value=${await input.inputValue()}`);
+
+      // Refused: not a whole number. Nothing saved, the typing kept.
+      await input.fill("x");
+      await page.getByRole("button", { name: "Save changes" }).click();
+      await settle(page);
+      log(`[${width}] non-number: alert=${JSON.stringify(await page.getByRole("alert").first().innerText().catch(() => ""))} value kept=${(await input.inputValue()) === "x"}`);
+
+      // Refused: somebody else saved the month first.
+      await input.fill("2");
+      const other = await context.newPage();
+      await other.goto(`${APP}/targets`, { waitUntil: "networkidle" });
+      await settle(other, 600);
+      await other.getByLabel("Farida Zaki stories achieved").fill("7");
+      await other.getByRole("button", { name: "Save changes" }).click();
+      await settle(other, 900);
+      await page.getByRole("button", { name: "Save changes" }).click();
+      await settle(page, 900);
+      log(`[${width}] stale revision: alert=${JSON.stringify(await page.getByRole("alert").first().innerText().catch(() => ""))} value kept=${(await input.inputValue()) === "2"}`);
+      await page.screenshot({ path: join(OUT, `app-targets-stale-${width}.png`) });
+      await page.reload({ waitUntil: "networkidle" });
+      await settle(page, 700);
+      log(`[${width}] after reload: Jana=${JSON.stringify(await cell.innerText())} value=${await input.inputValue()}`);
+
+      // Saved: 2 of 4 in the running month is In progress, and survives a reload.
+      await input.fill("2");
+      await page.getByRole("button", { name: "Save changes" }).click();
+      await settle(page, 1000);
+      log(`[${width}] saved 2: ${JSON.stringify(await cell.innerText())}`);
+      await page.reload({ waitUntil: "networkidle" });
+      await settle(page, 700);
+      log(`[${width}] reload: ${JSON.stringify(await cell.innerText())} value=${await input.inputValue()}`);
+      await page.screenshot({ path: join(OUT, `app-targets-in-progress-${width}.png`) });
+      // Put back, both.
+      await input.fill("4");
+      await page.getByLabel("Farida Zaki stories achieved").fill("8");
+      await page.getByRole("button", { name: "Save changes" }).click();
+      await settle(page, 1000);
+      await page.reload({ waitUntil: "networkidle" });
+      await settle(page, 700);
+      log(`[${width}] put back: ${JSON.stringify(await cell.innerText())} value=${await input.inputValue()}`);
+      await other.close();
+    }
+
+    await page.goto(`${APP}/targets?month=${previousMonth()}`, { waitUntil: "networkidle" });
+    await settle(page, 800);
+    const past = await page.locator("td.targets__outcome").evaluateAll((cells) => cells.map((c) => c.innerText.replace(/\n/g, " | ")));
+    log(`[${width}] app Recorded cells (${previousMonth()}): ${JSON.stringify(past)}`);
+    await page.screenshot({ path: join(OUT, `app-targets-past-${width}.png`) });
+    await context.close();
+
+    const { context: rc, ref } = await openExport(browser, ADMIN_EXPORT, width);
+    await exportNav(ref, NAV.targets).click();
+    await settle(ref, 800);
+    await ref.locator(".ad").screenshot({ path: join(OUT, `export-targets-${width}.png`) });
+    const refCols = await ref.evaluate(() => {
+      const head = [...document.querySelectorAll(".ad span")].find((el) => el.textContent.trim() === "Model").parentElement;
+      return [...head.children].map((el) => `${el.textContent.trim()}:${Math.round(el.getBoundingClientRect().width)}`);
+    });
+    log(`[${width}] export columns: ${JSON.stringify(refCols)}`);
+    for (const word of ["Target met", "In progress", "No record yet", "Recorded zero"]) {
+      const loc = ref.locator(".ad span", { hasText: new RegExp(`^${word}$`) });
+      if (await loc.count()) log(`[${width}] export tone ${word}: ${JSON.stringify(await style(ref, loc))}`);
+    }
+    await rc.close();
+  }
+};
+
+function previousMonth() {
+  const now = new Date();
+  const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
 const browser = await chromium.launch();
 try {
   for (const name of process.argv.slice(2)) {

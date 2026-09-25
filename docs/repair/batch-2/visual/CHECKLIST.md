@@ -756,6 +756,65 @@ session's network policy refuses; `batch-j.mjs` serves React 18.3.1's own UMD
 files from the npm registry copy (`EXPORT_VENDOR`) and fetches Google Fonts
 through curl. Unset, it loads the page as before.
 
+## Batch J - Admin Targets (25 September)
+
+**Reference to code.** Export `vTargets` (Admin lines 465-525), `tgRows`
+(2753-2785: `state`, `stateTone`, `arrangement`), `mTargetHistory` (2966-2976,
+*Below target* for an ended month). App: `frontend/src/screens/Targets.tsx`
+(`outcomeWord`, `Outcome`, `Confirmation`, the arrangement label),
+`Targets.css`, `app/services/targets.py`.
+
+**§T re-checked against the sweep's `targets-*` pairs first.** Already as the
+export: search, the *Record achieved* / *Set requirements* switch, *Save
+changes* top right with the dirty count and *Discard*, inputs 56px with *of N*
+beside, the arrangement beside the name, the subtitle. So §T's list 1-8 was
+mostly done; what remained is below.
+
+- **The Recorded cell's first line is the export's word**, toned as the
+  export: *No record yet* (amber), *Recorded zero*, *Target met* (the lifted
+  green, `--acctext`), *In progress* while the month runs and *Below target*
+  once it has ended - both quiet. Was *Met* / *Missed*, untoned.
+- **Confirmation kept, separately** (decision E): *Confirmed* on any
+  confirmed record, *Not confirmed* on a met one - its own line, because
+  *Target met · not confirmed* (160px) is wider than the export's 140px
+  column. **Kept divergence, with its reason:** with D08's pace line
+  (standing) under it, a row with all three is 84px where the export's is
+  57px. Both lines are the owner's later instructions; the export predates
+  them.
+- **Column widths.** The export's 150/150/140/120 are *content* widths
+  between 16px gaps; ours were set as cell widths including padding, so every
+  column was narrower and *Last updated* had 94px of the export's 120 (a
+  September date wrapped to two lines). Now measured equal: 150/150/140/120
+  at 1280 and 1440.
+- **The guarantee label** reads *Guarantee needs this record* only while no
+  record exists (the export's `!targetKnown`), then *Guaranteed minimum*.
+  Ours said it on every guarantee row.
+
+**Defect found by the browser check, and fixed.** Saving the grid sends
+every row; `record_actuals` cleared the confirmation of any row it was
+handed, changed or not, and moved its *Last updated* to today, and
+`set_requirements` audited unchanged requirements. So **saving one model's
+count silently un-confirmed every other confirmed month on the grid** - and a
+confirmation is what releases a guaranteed minimum. Seen live: after changing
+two models at 1280, every row at 1440 read *Not confirmed*. Now the same
+numbers again are a no-op (after the same recordability check), so only a
+row whose numbers changed loses its confirmation. Test:
+`test_saving_the_grid_leaves_every_unchanged_row_as_it_was` (fails without
+the fix - checked).
+
+**Checks run.** Backend: every file that touches targets (13 files, 482
+tests) passing. Frontend: `TargetsWords.test.tsx` (4, new); suite 442 tests,
+24 files; `npm run build`. Browser at 1280 and 1440 (`shots/batch-j/`,
+`checks.txt`): columns and tones measured against the export; a non-number
+refused with the typing kept; a stale revision (another tab saved first)
+refused with the typing kept; reload shows the stored value; 2 of 4 saved
+reads *In progress*, survives a reload, put back reads *Target met*; only the
+re-recorded row lost its confirmation; August reads *Below target*.
+
+**Not changed.** The pace line on an ended month (*On pace · 12 of 12* in
+August) is D08's as built; the checkbox before an unconfirmed name is how
+*Confirm* chooses (standing).
+
 ## Remaining work - the one list (reconciled 24 September)
 
 Reconciled against: the 24 September handoff (*What is waiting on Yahya*,
@@ -797,13 +856,10 @@ Admin (1280 / 1440)
    invitations page and the roster. Still different: the roster's invitation
    row keeps its own *Resend* / *Withdraw*, where the export's row opens the
    invitation instead.
-9. **Targets state words**: the export's *In progress / Below target /
-   Recorded zero* for the outcome, keeping *confirmed* separately (E), plus
-   matrix §T's layout list (Save top right, one grid with a mode switch,
-   inputs with *of N* beside, one-line Recorded, arrangement beside the name,
-   search / dirty count / Discard) - **re-check §T against the sweep's
-   `targets-*` pairs first**: the sweep recorded only the vocabulary, so some
-   of §T may already be done.
+9. ~~**Targets state words** and matrix §T~~ - **done, batch J**: the
+   export's words, confirmation kept separately, the export's column widths,
+   and the guarantee label's rule; §T re-checked (see *Batch J - Admin
+   Targets*). The confirmation-clearing defect it found is fixed.
 10. **Record payment on the payment detail**, not a screen of its own. Thirteen #11.
 11. **Settings**: Appearance's two switches (*Show pop-up notices on Home*,
     *Weekly reminder to record achieved content*) (#1); Reference's audit rows
@@ -946,6 +1002,7 @@ overpaid month (a real state the export never drew).
 | Wardrobe size, Targets words, payment-details words, Invitations words and dates, You buttons' font, the refund comment | Items 1, 2, 4, 7, 8, 18 | `1b0a240`; `shots/batch-g/checks.txt` |
 | Decisions c, d, e, g, h: account menu, product list line, top-sellers panel, the usual recording date, the password after *Save details* | Owner, 25 September | `52ab988`; `shots/batch-h/checks.txt` |
 | Decision b: the Shopify connection edited in Settings | Owner, 25 September | batch I (the commit that adds this row); ADR 0045; `tests/test_shopify_connection.py` (11), `ShopifyConnection.test.tsx` (4); `shots/batch-i/checks.txt` |
+| Admin Targets words, widths, guarantee label; unchanged rows keep their confirmation (item 9) | Thirteen E, matrix §T | batch J; `test_targets_api` (+1), `TargetsWords.test.tsx` (4) |
 | *Refresh now* and *last successful refresh* (item 17) | Admin export, handoff | batch J; `tests/test_shopify_refresh.py` (9), `ShopifyRefresh.test.tsx` (6); `shots/batch-j/checks.txt` |
 | Portal order filter *Failed*, chips naming the case (G, #13) | Thirteen | `6131d0c` |
 | Net sales and *Counts towards* from facts | Batch D | `7bd9650` |
