@@ -973,8 +973,9 @@ def reopen_month(
 
     **Unreachable from the interface since 05B**, and deliberately still here.
 
-    Nothing an operator can press calls this: `POST /api/payroll/{month}/reopen`
-    refuses, because unmaking an agreement is not how an agreed figure changes
+    Nothing an operator can press calls this: the route that used to
+    (`POST /api/payroll/{month}/reopen`) refused from 05B and was removed in
+    batch J, because unmaking an agreement is not how an agreed figure changes
     any more - a correction is recorded against it instead (05C). What this
     still does is *construct* the state, which the tests covering reopened
     history need and which a future repair of an old month may need. Its own

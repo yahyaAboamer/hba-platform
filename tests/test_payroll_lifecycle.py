@@ -678,16 +678,15 @@ def test_one_blocked_model_does_not_stop_the_others(client):
     assert body["totals"]["blocked"] == 1
 
 
-def test_reopening_over_http_is_retired_and_changes_nothing(client):
-    """05B. An agreed month is what its name says.
+def test_there_is_no_way_to_reopen_an_agreed_month_over_http(client):
+    """05B retired reopening; the route that refused it is now gone too.
 
     Reopening worked by unmaking the agreement - the month went back to draft
     and the orders it had settled were released - and the one thing that could
     not be unmade was money already paid against the old figure. What changes
-    after an agreement is now a correction recorded against it (05C).
-
-    A 409 rather than a 404: the address is right and the capability is gone,
-    and whoever is still calling it deserves to be told which.
+    after an agreement is a correction recorded against it (05C). Past reopens
+    are still read (`/{month}/reopened`, the audit trail); nothing can make a
+    new one.
     """
     affiliate = _api_affiliate(client)
     _api_order(affiliate["id"], "1", 200_000)
@@ -701,7 +700,7 @@ def test_reopening_over_http_is_retired_and_changes_nothing(client):
         },
     )
 
-    assert response.status_code == 409
+    assert response.status_code in (404, 405)
     # **And the month is untouched.** A refusal that half-ran would be worse
     # than the operation it replaced.
     month = client.get(f"/api/payroll/{AUGUST}").json()["affiliates"][0]
@@ -770,13 +769,6 @@ def test_a_model_may_not_approve_anything(client):
                 "preview": False,
                 "source_versions": {str(affiliate["id"]): "whatever"},
             },
-        ).status_code
-        == 403
-    )
-    assert (
-        client.post(
-            f"/api/payroll/{AUGUST}/reopen",
-            json={"affiliate_ids": [affiliate["id"]], "reason": "no"},
         ).status_code
         == 403
     )

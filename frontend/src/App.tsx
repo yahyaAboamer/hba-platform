@@ -25,7 +25,6 @@ import { PaymentRecord } from "./screens/PaymentRecord";
 import { Payments } from "./screens/Payments";
 import { Payroll } from "./screens/Payroll";
 import { PayrollApprove } from "./screens/PayrollApprove";
-import { PayrollReopen } from "./screens/PayrollReopen";
 import { Settings } from "./screens/Settings";
 import { SignIn } from "./screens/SignIn";
 import { Targets } from "./screens/Targets";
@@ -149,7 +148,6 @@ export default function App() {
             <Route path="/orders/:orderId" element={<OrderDetail />} />
             <Route path="/payroll" element={<Payroll session={session} />} />
             <Route path="/payroll/:month/approve" element={<PayrollApprove />} />
-            <Route path="/payroll/:month/reopen" element={<PayrollReopen />} />
             <Route path="/payments" element={<Payments session={session} />} />
             {/* One model's month, as the approved export opens it: the
              *  figure, where to send it, the approval and the transfers. */}

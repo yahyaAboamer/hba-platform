@@ -9,11 +9,12 @@ honest way to do that is a flag on the same endpoint, so the preview and the
 commit compute identically — a separate preview path is a second implementation
 that can drift, and it drifts silently because nobody compares them.
 
-## Approving and reopening are different permissions
+## Approving, and why nothing here reopens
 
-`payroll.approve` agrees an open month. `payroll.reopen` reaches back into one
-somebody has already been paid for. Those are different acts and §5.1 separates
-them.
+`payroll.approve` agrees an open month. Reopening one (`payroll.reopen`) was
+retired in 05B and its route removed in batch J: what changes after an
+agreement is a correction recorded against it (05C). Months reopened before
+then are still read, by `/{month}/reopened` and the audit trail.
 
 ## Bulk approval is all-or-nothing per model, not per run
 
@@ -26,7 +27,7 @@ individually.
 from decimal import ROUND_HALF_UP, Decimal
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -72,11 +73,6 @@ class ApproveBody(BaseModel):
     #: working number into a debt - so a commit without one is refused rather
     #: than waved through. Ignored on a preview, which writes nothing.
     source_versions: dict[int, str] | None = None
-
-
-class ReopenBody(BaseModel):
-    affiliate_ids: list[int]
-    reason: str = Field(min_length=1, max_length=500)
 
 
 def _source_version_for(
@@ -451,57 +447,6 @@ def approve(
             "obligation_piastres": sum(row["obligation_piastres"] for row in approved),
         },
     }
-
-
-@router.post("/{month}/reopen")
-def reopen(
-    month: str,
-    body: ReopenBody,
-    _actor: UserAccount = Depends(require_permission(Permission.PAYROLL_REOPEN)),
-    _db: Session = Depends(get_session),
-) -> dict:
-    """**Retired in 05B.** An agreed month is not returned to draft any more.
-
-    ## Why it is gone
-
-    Reopening was the platform's only way to change an agreed figure, and it
-    worked by *unmaking the agreement*: the month went back to draft, the
-    orders it had settled were released, and the next approval wrote a new
-    version over the top. Everything about that is recoverable except the one
-    thing that matters - **money that had already moved against the old
-    figure**. The ledger kept the payment; the month it was made against no
-    longer existed in the same form; and `reconciliation_for` was written to
-    help a person work out afterwards what had happened to somebody's pay.
-
-    §11.5's own name for the dangerous state says it: *the dangerous state is
-    not reopening, it is forgetting*. A month left reopened and never agreed
-    again is a model with no figure at all, and the platform needed a
-    diagnostic to find those.
-
-    An agreed month is now what its name says. What changes after it is a
-    **correction** - an append-only event that records what moved and what is
-    owed because of it, leaving the original agreement standing. That is 05C's
-    subject, and this route is retired ahead of it so nothing new can be
-    reopened in the meantime.
-
-    ## Why the route is still here
-
-    A 404 says *this address is wrong*. A retired capability should say what
-    replaced it, to whoever is still calling it - an old tab, a bookmark, a
-    script. The permission and its audit history are untouched, and every
-    reader of past reopens still works.
-
-    **Nothing about a month that was already reopened changes.** Those months
-    are still visible, still diagnosed by `/{month}/reopened`, and still
-    agreed again through the ordinary approval.
-    """
-    _month_or_400(month)
-    raise HTTPException(
-        409,
-        "Agreed months are no longer reopened. The agreement stands and what "
-        "changed is recorded against it as a correction. Nothing has been "
-        "reopened.",
-    )
 
 
 @router.get("/{month}/reopened")

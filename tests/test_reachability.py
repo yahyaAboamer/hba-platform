@@ -55,15 +55,6 @@ UNREACHED_ON_PURPOSE = {
     ("GET", "/api/operations/order-facts"),
     ("GET", "/api/operations/shopify-scopes"),
     ("POST", "/api/operations/verify-code"),
-    # **Retired in 05B**, and answering rather than 404ing. An agreed month is
-    # not returned to draft any more: what changes after an agreement is
-    # recorded against it instead of replacing it, because the ledger keeps a
-    # payment while the figure it was made against disappears. The screen at
-    # `/payroll/{month}/reopen` still exists and now explains that, so this
-    # route is deliberately reached by nothing - an old tab or a bookmark gets
-    # a 409 that says what replaced it rather than a 404 that says they are
-    # lost.
-    ("POST", "/api/payroll/{month}/reopen"),
     # The affiliate's own equivalent is on their payments screen; the
     # maintainer's is the destination_changed_at flag already on the payments
     # row, which is where the warning belongs (§6.4.5).

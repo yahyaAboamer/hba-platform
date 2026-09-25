@@ -1091,6 +1091,42 @@ font (ADR 0044) and its pill is 20px. App: `Affiliates.tsx` / `.css`,
   refused save kept it and said so; saved, it was on the product after a
   reload.
 
+## Batch J - reopening removed (25 September)
+
+Owner's scope: remove the retired reopening route and its callers without
+deleting historical records or disabling supported correction workflows.
+
+**Removed**
+
+- The screen `PayrollReopen.tsx` and its route `/payroll/:month/reopen`.
+  Nothing linked to it (the Payroll screen's button went in 05B); an old
+  bookmark now lands on the app's ordinary unknown-address handling.
+- `POST /api/payroll/{month}/reopen`, which since 05B only answered 409, and
+  its request body. `test_reachability` no longer lists it as deliberately
+  unreached.
+
+**Kept, deliberately**
+
+- Every record of past reopens: the audit entries (read as *Reopened
+  {model}'s {month}* in Settings → Reference), `GET /api/payroll/{month}/
+  reopened` and `months_left_reopened` (Home's and Payroll's warning about a
+  month reopened and never agreed again), and the portal's reading of a month
+  agreed, reopened and agreed again.
+- The `reopen` service function: nothing an operator can reach calls it; it
+  constructs reopened history for the tests that cover those readers.
+- The `payroll.reopen` permission, so existing role grants and their audit
+  history still resolve.
+- Corrections (05C) - the supported way an agreed month changes -
+  untouched: Home's correction notice, the correction screen, carry-forward
+  and write-off.
+
+**Checks.** `test_payroll_lifecycle` (the refusal test now asserts the route
+is gone: 404/405; the permission test no longer posts to it) and
+`test_reachability`: 51 passing; every file that mentions reopening or
+reachability (20 files): 729 passing. Frontend 460 tests - the two fewer are
+the per-file font and accent checks that ran over `PayrollReopen.tsx` - and
+the build.
+
 ## Remaining work - the one list (reconciled 24 September)
 
 Reconciled against: the 24 September handoff (*What is waiting on Yahya*,
@@ -1191,9 +1227,9 @@ Code hygiene (no behaviour)
 
 18. ~~The *"pays nothing"* comment in `app/services/portal.py`~~ - **done,
     batch G**; it now states ADR 0025's rule.
-19. `/payroll/:month/reopen` (`PayrollReopen.tsx`): reopening is retired
-    (05B); the route is a candidate for removal, with `test_reachability`.
-
+19. ~~`/payroll/:month/reopen` (`PayrollReopen.tsx`)~~ - **removed, batch
+    J**, with `POST /api/payroll/{month}/reopen`. See *Batch J - reopening
+    removed*.
 19a. **The worker blocks the web server while a job runs** (found in batch
     J): `worker_loop` calls the synchronous `run_one` inside the event loop.
     Candidate fix: run `run_one` in a thread (`asyncio.to_thread`). Not
@@ -1298,6 +1334,7 @@ overpaid month (a real state the export never drew).
 | Wardrobe size, Targets words, payment-details words, Invitations words and dates, You buttons' font, the refund comment | Items 1, 2, 4, 7, 8, 18 | `1b0a240`; `shots/batch-g/checks.txt` |
 | Decisions c, d, e, g, h: account menu, product list line, top-sellers panel, the usual recording date, the password after *Save details* | Owner, 25 September | `52ab988`; `shots/batch-h/checks.txt` |
 | Decision b: the Shopify connection edited in Settings | Owner, 25 September | batch I (the commit that adds this row); ADR 0045; `tests/test_shopify_connection.py` (11), `ShopifyConnection.test.tsx` (4); `shots/batch-i/checks.txt` |
+| Retired reopening route and screen removed; history and corrections kept (item 19) | Handoff backlog | batch J; `test_payroll_lifecycle`, `test_reachability` |
 | Products: order reference per model, shipment record, presets (item 16, B3, B4) | Matrix | batch J; `test_wardrobe` (+1), `ProductShipment.test.tsx` (3) |
 | Terms editing: fonts verified, dead CSS removed, footnote as the export (item 15) | Sweep | batch J; `shots/batch-j/checks.txt` |
 | Admin Home chart: rule labels outside the plot, export geometry (item 13) | Matrix | batch J; `shots/batch-j/app-home-chart-*` |
