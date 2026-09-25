@@ -93,3 +93,38 @@
 [1440] app record: ["← Nadine Kamal","Record payment","Nadine Kamal · August 2026","EGP 10,012.00 outstanding for August 2026","Amount transferred, EGP","Transfer date","Destination used","No destination recorded","Reference","Receipt","Attach the transfer receipt","Record payment","Cancel","Saving records a transfer that finance already made outside this dashboard."]
 [1440] app amount input: {"text":"","font":"14px 400 Inter","color":"rgb(236, 239, 234)","background":"rgb(21, 23, 26)","border":"1px solid rgb(35, 39, 43)","radius":"8px","padding":"12px 13px","height":44}
 [1440] app save: {"text":"Record payment","font":"14px 400 Arial","color":"rgb(35, 169, 92)","background":"rgba(35, 169, 92, 0.14)","border":"1px solid rgb(35, 169, 92)","radius":"8px","padding":"12px 18px","height":44}
+## contact - 2026-09-25T21:50:47.902Z
+[1280] export contact card: 265,429 541x510
+[1280] export sizing card: 822,429 461x146
+[1280] export input: {"text":"","font":"14px 400 Inter","color":"rgb(236, 239, 234)","background":"rgb(8, 9, 10)","border":"1px solid rgb(35, 39, 43)","radius":"8px","padding":"11px 13px","height":42}
+[1280] export label: {"text":"Full name","font":"12.5px 400 Inter","color":"rgb(167, 173, 166)","background":"rgba(0, 0, 0, 0)","border":"0px none rgb(167, 173, 166)","radius":"0px","padding":"0px","height":19}
+[1280] export save: {"text":"Save details","font":"14px 400 Arial","color":"rgb(35, 169, 92)","background":"rgba(35, 169, 92, 0.14)","border":"1px solid rgb(35, 169, 92)","radius":"8px","padding":"11px 16px","height":42}
+[1280] export sizing value: {"text":"178 cm","font":"15px 400 Inter","color":"rgb(236, 239, 234)","background":"rgba(0, 0, 0, 0)","border":"0px none rgb(236, 239, 234)","radius":"0px","padding":"0px","height":23}
+[1280] app contact card: 238,339 542x631
+[1280] app side column: 796,339 462x580
+[1280] app input: {"text":"","font":"14px 400 Inter","color":"rgb(236, 239, 234)","background":"rgb(8, 9, 10)","border":"1px solid rgb(35, 39, 43)","radius":"8px","padding":"11px 13px","height":46}
+[1280] app label: {"text":"Full name","font":"12.5px 400 Inter","color":"rgb(167, 173, 166)","background":"rgba(0, 0, 0, 0)","border":"0px none rgb(167, 173, 166)","radius":"0px","padding":"0px","height":19}
+[1280] app save: {"text":"Save details","font":"14px 400 Arial","color":"rgb(35, 169, 92)","background":"rgba(35, 169, 92, 0.14)","border":"1px solid rgb(35, 169, 92)","radius":"8px","padding":"11px 16px","height":42}
+[1280] app sizing value: {"text":"Not given","font":"15px 400 Inter","color":"rgb(236, 239, 234)","background":"rgba(0, 0, 0, 0)","border":"0px none rgb(236, 239, 234)","radius":"0px","padding":"0px","height":23}
+[1280] app start value: {"text":"November 2025","font":"12.5px 400 Inter","color":"rgb(138, 145, 138)","background":"rgba(0, 0, 0, 0)","border":"0px none rgb(138, 145, 138)","radius":"0px","padding":"0px","height":19}
+[1280] app fields: ["Started with HBA","Full name","Signs in with","Phone","Shipping address","City"] / sign-in is an input: false
+[1280] saved City "" -> "Dokki"; after reload: "Dokki"
+[1280] refused: "That does not look like an Egyptian mobile number. It should be 11 digits starting 010, 011, 012 or 015 - it is the number that goes on the parcel. Nothing was saved." / typing kept: true
+[1280] after reload: name "Sara Edrees", heading "Sara Edrees"
+[1280] City put back to ""
+[1440] export contact card: 265,429 621x510
+[1440] export sizing card: 902,429 541x146
+[1440] export input: {"text":"","font":"14px 400 Inter","color":"rgb(236, 239, 234)","background":"rgb(8, 9, 10)","border":"1px solid rgb(35, 39, 43)","radius":"8px","padding":"11px 13px","height":42}
+[1440] export label: {"text":"Full name","font":"12.5px 400 Inter","color":"rgb(167, 173, 166)","background":"rgba(0, 0, 0, 0)","border":"0px none rgb(167, 173, 166)","radius":"0px","padding":"0px","height":19}
+[1440] export save: {"text":"Save details","font":"14px 400 Arial","color":"rgb(35, 169, 92)","background":"rgba(35, 169, 92, 0.14)","border":"1px solid rgb(35, 169, 92)","radius":"8px","padding":"11px 16px","height":42}
+[1440] export sizing value: {"text":"178 cm","font":"15px 400 Inter","color":"rgb(236, 239, 234)","background":"rgba(0, 0, 0, 0)","border":"0px none rgb(236, 239, 234)","radius":"0px","padding":"0px","height":23}
+[1440] app contact card: 238,339 622x631
+[1440] app side column: 876,339 542x580
+[1440] app input: {"text":"","font":"14px 400 Inter","color":"rgb(236, 239, 234)","background":"rgb(8, 9, 10)","border":"1px solid rgb(35, 39, 43)","radius":"8px","padding":"11px 13px","height":46}
+[1440] app label: {"text":"Full name","font":"12.5px 400 Inter","color":"rgb(167, 173, 166)","background":"rgba(0, 0, 0, 0)","border":"0px none rgb(167, 173, 166)","radius":"0px","padding":"0px","height":19}
+[1440] app save: {"text":"Save details","font":"14px 400 Arial","color":"rgb(35, 169, 92)","background":"rgba(35, 169, 92, 0.14)","border":"1px solid rgb(35, 169, 92)","radius":"8px","padding":"11px 16px","height":42}
+[1440] app sizing value: {"text":"Not given","font":"15px 400 Inter","color":"rgb(236, 239, 234)","background":"rgba(0, 0, 0, 0)","border":"0px none rgb(236, 239, 234)","radius":"0px","padding":"0px","height":23}
+[1440] app start value: {"text":"November 2025","font":"12.5px 400 Inter","color":"rgb(138, 145, 138)","background":"rgba(0, 0, 0, 0)","border":"0px none rgb(138, 145, 138)","radius":"0px","padding":"0px","height":19}
+[1440] app fields: ["Started with HBA","Full name","Signs in with","Phone","Shipping address","City"] / sign-in is an input: false
+[1280] after line-height fix: contact input 42px, Shopify connection input 42px (export 42)
+[1440] after line-height fix: contact input 42px, Shopify connection input 42px (export 42)

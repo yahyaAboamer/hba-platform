@@ -2170,3 +2170,61 @@ def test_the_profile_offers_her_months_not_the_platforms(client):
     assert months[-1] == "2026-03"
     assert "2026-02" not in months
     assert months == sorted(months, reverse=True)
+
+
+# ── The contact form (item 14) ────────────────────────────────────────────────
+
+
+def _contact_model(client) -> dict:
+    body = {"user_account_id": _make_account("sara@example.com"), "name": "Sara", "phone": "01010002000"}
+    response = client.post("/api/affiliates", json=body)
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+def test_the_contact_form_saves_what_it_sends_in_one_piece(client):
+    """The Overview's *Save details*: name, phone and the address it shows,
+    in one request. The address keys it does not send stay as they were."""
+    sara = _contact_model(client)
+    client.patch(f"/api/affiliates/{sara['id']}", json={"shipping": {
+        "shipping_line1": "4 El Nasr Rd", "shipping_governorate": "Giza"}})
+
+    response = client.patch(f"/api/affiliates/{sara['id']}", json={
+        "name": "Sara Edrees", "phone": "01010002001",
+        "shipping": {"shipping_line1": "9 Tahrir St", "shipping_city": "Dokki"},
+    })
+
+    assert response.status_code == 200, response.text
+    detail = client.get(f"/api/affiliates/{sara['id']}").json()
+    assert (detail["name"], detail["phone"]) == ("Sara Edrees", "01010002001")
+    assert detail["shipping"]["shipping_line1"] == "9 Tahrir St"
+    assert detail["shipping"]["shipping_city"] == "Dokki"
+    assert detail["shipping"]["shipping_governorate"] == "Giza"
+    assert detail["email"] == "sara@example.com"
+
+
+def test_a_refused_field_saves_nothing_from_the_form(client):
+    """A parcel phone that is not an Egyptian mobile refuses the whole save -
+    the name typed beside it is not kept either, and her sign-in never moves."""
+    sara = _contact_model(client)
+
+    response = client.patch(f"/api/affiliates/{sara['id']}", json={
+        "name": "Somebody Else", "shipping": {"shipping_phone": "12345"},
+    })
+
+    assert response.status_code == 400
+    assert "Egyptian mobile" in response.json()["detail"]
+    detail = client.get(f"/api/affiliates/{sara['id']}").json()
+    assert detail["name"] == "Sara"
+    assert detail["shipping"]["shipping_phone"] is None
+    assert detail["email"] == "sara@example.com"
+
+
+def test_only_staff_who_manage_models_can_save_the_form(client):
+    """Both staff roles hold `affiliates.manage`; a model's own account does not."""
+    sara = _contact_model(client)
+    _demote_to("affiliate")
+
+    response = client.patch(f"/api/affiliates/{sara['id']}", json={"name": "Changed"})
+
+    assert response.status_code == 403

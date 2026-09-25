@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
+import { ContactForm } from "../components/ContactForm";
 import { MonthPicker } from "../components/MonthPicker";
 import { Money } from "../components/Money";
 import { Corrections } from "../components/Corrections";
@@ -218,11 +219,6 @@ export function AffiliateDetail({ session }: { session: Session }) {
    * here because it is the same failure either side of the platform).
    */
   const [startDraft, setStartDraft] = useState<string | null>(null);
-  /**
-   * The address, as a draft. `null` means "not editing", so Cancel puts back
-   * what the server said rather than what was typed last time.
-   */
-  const [shipDraft, setShipDraft] = useState<Shipping | null>(null);
   /** What HBA has sent her. The same records her own screen reads (W08). */
   const [wardrobe, setWardrobe] = useState<{
     received: WardrobeItem[];
@@ -342,25 +338,6 @@ export function AffiliateDetail({ session }: { session: Session }) {
       live = false;
     };
   }, [id, wardrobeReload]);
-
-  async function saveShipping() {
-    if (!shipDraft) return;
-    setWorking("shipping");
-    setError(null);
-    setNotice(null);
-    try {
-      await api.patch(`/api/affiliates/${id}`, { shipping: shipDraft });
-      setShipDraft(null);
-      setNotice({ good: true, text: "Saved. This is what goes on her parcels." });
-      load();
-    } catch (caught) {
-      setError(
-        caught instanceof Error ? caught.message : "Could not save that.",
-      );
-    } finally {
-      setWorking(null);
-    }
-  }
 
   async function approve() {
     setWorking("approve");
@@ -755,227 +732,118 @@ export function AffiliateDetail({ session }: { session: Session }) {
             </span>
           </section>
         </div>
-        <section className="panel">
-          <div className="panel__head">
-            <h2 className="panel__title">Contact and shipping</h2>
+        {/*
+         * The export's two columns (Admin lines 870-915): *Contact and
+         * shipping* on the left, and on the right Sizing, Current terms and,
+         * kept, Discount codes - the one place a model's code is registered or
+         * replaced, which the export does not draw anywhere.
+         */}
+        <div className="profile__columns profile__full">
+        <section className="pay-detail__card profile__contact">
+          <h2 className="pay-detail__card-title">Contact and shipping</h2>
+          {/* H01: when she started. Not a contact detail and not in the
+           *  export's form, so it sits above it, not among the inputs. */}
+          <div className="profile__start">
+            <span className="contact-form__label">Started with HBA</span>
+            <div className="profile__start-value">
+          {startDraft === null ? (
+            <>
+              {detail.collaboration_start_month ? (
+                <span className="code">
+                  {formatMonth(detail.collaboration_start_month)}
+                </span>
+              ) : (
+                <span className="detail__note">Not recorded</span>
+              )}
+              {can(session, "affiliates.manage") && (
+                <button
+                  type="button"
+                  className="button detail__start-edit"
+                  onClick={() =>
+                    setStartDraft(detail.collaboration_start_month ?? "")
+                  }
+                >
+                  {detail.collaboration_start_month ? "Change" : "Record it"}
+                </button>
+              )}
+              {/*
+               * Said plainly rather than left to be inferred from a blank.
+               * An empty month here does not mean she has no history - it
+               * means the platform is guessing from her earliest order,
+               * which is a different fact and is usually but not always
+               * the same one.
+               */}
+              {!detail.collaboration_start_month && (
+                <span className="detail__note">
+                  Her months are being worked out from her earliest order.
+                  That is a good guess and a different fact — a month she
+                  was here for and sold nothing in is missing from it.
+                </span>
+              )}
+            </>
+          ) : (
+            <>
+              <input
+                className="input detail__start-input"
+                type="month"
+                value={startDraft}
+                min={detail.platform_start_month}
+                max={detail.current_month}
+                onChange={(event) => setStartDraft(event.target.value)}
+                aria-label="The month she started with HBA"
+              />
+              <span className="detail__step-action">
+                <button
+                  type="button"
+                  className="button button--primary"
+                  disabled={working === "start"}
+                  onClick={saveStartMonth}
+                >
+                  {working === "start" ? "Saving…" : "Save"}
+                </button>
+                <button
+                  type="button"
+                  className="button"
+                  disabled={working === "start"}
+                  onClick={() => setStartDraft(null)}
+                >
+                  Cancel
+                </button>
+              </span>
+              <span className="detail__note">
+                The month she actually started, not when her code was made
+                or when she signed up. Months before it are not offered to
+                her; months after it are, even the ones she sold nothing in.
+              </span>
+            </>
+          )}
+            </div>
           </div>
-          <dl className="detail__list">
-            <Row label="Started with HBA">
-              {startDraft === null ? (
-                <>
-                  {detail.collaboration_start_month ? (
-                    <span className="code">
-                      {formatMonth(detail.collaboration_start_month)}
-                    </span>
-                  ) : (
-                    <span className="detail__note">Not recorded</span>
-                  )}
-                  {can(session, "affiliates.manage") && (
-                    <button
-                      type="button"
-                      className="button detail__start-edit"
-                      onClick={() =>
-                        setStartDraft(detail.collaboration_start_month ?? "")
-                      }
-                    >
-                      {detail.collaboration_start_month ? "Change" : "Record it"}
-                    </button>
-                  )}
-                  {/*
-                   * Said plainly rather than left to be inferred from a blank.
-                   * An empty month here does not mean she has no history - it
-                   * means the platform is guessing from her earliest order,
-                   * which is a different fact and is usually but not always
-                   * the same one.
-                   */}
-                  {!detail.collaboration_start_month && (
-                    <span className="detail__note">
-                      Her months are being worked out from her earliest order.
-                      That is a good guess and a different fact — a month she
-                      was here for and sold nothing in is missing from it.
-                    </span>
-                  )}
-                </>
-              ) : (
-                <>
-                  <input
-                    className="input detail__start-input"
-                    type="month"
-                    value={startDraft}
-                    min={detail.platform_start_month}
-                    max={detail.current_month}
-                    onChange={(event) => setStartDraft(event.target.value)}
-                    aria-label="The month she started with HBA"
-                  />
-                  <span className="detail__step-action">
-                    <button
-                      type="button"
-                      className="button button--primary"
-                      disabled={working === "start"}
-                      onClick={saveStartMonth}
-                    >
-                      {working === "start" ? "Saving…" : "Save"}
-                    </button>
-                    <button
-                      type="button"
-                      className="button"
-                      disabled={working === "start"}
-                      onClick={() => setStartDraft(null)}
-                    >
-                      Cancel
-                    </button>
-                  </span>
-                  <span className="detail__note">
-                    The month she actually started, not when her code was made
-                    or when she signed up. Months before it are not offered to
-                    her; months after it are, even the ones she sold nothing in.
-                  </span>
-                </>
-              )}
-            </Row>
-            <Row label="Phone">
-              {detail.phone ? (
-                <span className="code">{detail.phone}</span>
-              ) : (
-                <span className="detail__note">Not given</span>
-              )}
-            </Row>
-            {/*
-             * **"Signs in with"**, not "Email" (D07, 9 September 2026). She
-             * has one address: it is her login and it is how marketing reaches
-             * her (A05). Naming it plainly is the whole of what that decision
-             * costs - a field called "email" on a profile is one somebody
-             * eventually edits as a contact detail, and what they have
-             * actually done is move her login.
-             */}
-            <Row label="Signs in with">
-              <span className="code">{detail.email}</span>
-            </Row>
-            {/*
-             * **Staff write this one** (D11), unlike the measurements below.
-             * It is what somebody types into an order, and a model who has
-             * moved should not be a parcel that cannot be sent.
-             *
-             * On the profile and not in the directory: a list of twenty models
-             * does not need twenty home addresses to render a table of names.
-             */}
-            <Row label="Parcels go to">
-              {shipDraft === null ? (
-                <>
-                  {detail.shipping.shipping_line1 ? (
-                    <span className="detail__address">
-                      {[
-                        detail.shipping.shipping_name,
-                        detail.shipping.shipping_line1,
-                        detail.shipping.shipping_line2,
-                        detail.shipping.shipping_city,
-                        detail.shipping.shipping_governorate,
-                      ]
-                        .filter(Boolean)
-                        .join(", ")}
-                      {detail.shipping.shipping_phone && (
-                        <>
-                          {" · "}
-                          <span className="code">
-                            {detail.shipping.shipping_phone}
-                          </span>
-                        </>
-                      )}
-                    </span>
-                  ) : (
-                    <span className="detail__note">
-                      Not recorded. Without it a parcel sent to her cannot be
-                      matched back to her wardrobe.
-                    </span>
-                  )}
-                  {can(session, "affiliates.manage") && (
-                    <button
-                      type="button"
-                      className="button detail__start-edit"
-                      onClick={() => setShipDraft({ ...detail.shipping })}
-                    >
-                      {detail.shipping.shipping_line1 ? "Change" : "Record it"}
-                    </button>
-                  )}
-                </>
-              ) : (
-                <div className="detail__address-form">
-                  {(
-                    [
-                      ["shipping_name", "Name on the parcel"],
-                      ["shipping_phone", "Phone on the parcel"],
-                      ["shipping_line1", "Street and number"],
-                      ["shipping_line2", "Flat, floor (optional)"],
-                      ["shipping_city", "Area"],
-                      ["shipping_governorate", "Governorate"],
-                      ["shipping_notes", "Anything the courier needs"],
-                    ] as [keyof Shipping, string][]
-                  ).map(([field, label]) => (
-                    <label key={field} className="field">
-                      <span className="field__label">{label}</span>
-                      <input
-                        className="input"
-                        value={shipDraft[field] ?? ""}
-                        onChange={(event) =>
-                          setShipDraft({
-                            ...shipDraft,
-                            [field]: event.target.value,
-                          })
-                        }
-                      />
-                    </label>
-                  ))}
-                  <span className="detail__step-action">
-                    <button
-                      type="button"
-                      className="button button--primary"
-                      disabled={working === "shipping"}
-                      onClick={saveShipping}
-                    >
-                      {working === "shipping" ? "Saving…" : "Save"}
-                    </button>
-                    <button
-                      type="button"
-                      className="button"
-                      disabled={working === "shipping"}
-                      onClick={() => setShipDraft(null)}
-                    >
-                      Cancel
-                    </button>
-                  </span>
-                </div>
-              )}
-            </Row>
-            {/*
-             * Read, never written here. A05 gives these to the model alone,
-             * and the enforcement is that no staff route can write them - so
-             * there is deliberately no control beside them, not a disabled one.
-             */}
-          </dl>
+          <ContactForm
+            key={detail.id}
+            contact={{ id: detail.id, name: detail.name, phone: detail.phone, email: detail.email, shipping: detail.shipping }}
+            canEdit={can(session, "affiliates.manage")}
+            onSaved={load}
+          />
         </section>
-
-        {/* Sizing is its own panel in the export, and says plainly why it
+        <div className="profile__side">
+        {/* Sizing is its own card in the export, and says plainly why it
          *  cannot be edited here. An absent control only tells somebody that
-         *  nothing happens when they look for one. */}
-        <section className="panel">
-          <div className="panel__head">
-            <h2 className="panel__title">Sizing</h2>
+         *  nothing happens when they look for one. Values at 15px, side by
+         *  side (Admin lines 884-890). */}
+        <section className="pay-detail__card">
+          <h2 className="pay-detail__card-title">Sizing</h2>
+          <div className="profile__sizing">
+            <span>
+              <span className="profile__sizing-label">Height</span>
+              <span className="profile__sizing-value">{detail.height_cm ? `${detail.height_cm} cm` : "Not given"}</span>
+            </span>
+            <span>
+              <span className="profile__sizing-label">Weight</span>
+              <span className="profile__sizing-value">{detail.weight_kg ? `${detail.weight_kg} kg` : "Not given"}</span>
+            </span>
           </div>
-          <dl className="detail__list">
-            <Row label="Height">
-              {detail.height_cm
-                ? <span className="code">{detail.height_cm} cm</span>
-                : <span className="detail__note">Not given</span>}
-            </Row>
-            <Row label="Weight">
-              {detail.weight_kg
-                ? <span className="code">{detail.weight_kg} kg</span>
-                : <span className="detail__note">Not given</span>}
-            </Row>
-          </dl>
-          <p className="detail__note detail__sizing-note">
-            Only the model can change these.
-          </p>
+          <p className="profile__sizing-note">Only the model can change these.</p>
         </section>
         <section className="pay-detail__card profile__card">
           <h2 className="pay-detail__card-title">Current terms</h2>
@@ -986,10 +854,8 @@ export function AffiliateDetail({ session }: { session: Session }) {
             </Link>
           )}
         </section>
-        <section className="panel">
-          <div className="panel__head">
-            <h2 className="panel__title">Discount codes</h2>
-          </div>
+        <section className="pay-detail__card">
+          <h2 className="pay-detail__card-title">Discount codes</h2>
           {detail.codes.length === 0 ? (
             <p className="empty">
               None registered for {formatMonth(detail.current_month)}.
@@ -1015,6 +881,8 @@ export function AffiliateDetail({ session }: { session: Session }) {
             />
           )}
         </section>
+        </div>
+        </div>
         </>}
         {section === "wardrobe" && <div className="profile__wardrobe profile__full">
           {wardrobeError && <p className="notice notice--refused" role="alert">{wardrobeError} <button className="button" onClick={() => setWardrobeReload(n => n + 1)}>Retry</button></p>}
@@ -1454,12 +1322,3 @@ function CodeForm({
   );
 }
 
-
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="detail__row">
-      <dt className="detail__label">{label}</dt>
-      <dd className="detail__value">{children}</dd>
-    </div>
-  );
-}

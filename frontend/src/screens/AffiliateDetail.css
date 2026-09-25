@@ -662,3 +662,72 @@ td.profile__muted,
 .detail__grid .detail__note {
   font-size: 12.5px;
 }
+
+/* The Overview's two columns (Admin lines 870-915): `flex:1 1 340px` and
+   `flex:1 1 260px`, 16px apart - 541px and 461px at 1280. */
+.profile__columns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.profile__contact {
+  flex: 1 1 340px;
+  min-width: 0;
+}
+
+.profile__side {
+  flex: 1 1 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.profile__start {
+  margin-top: 12px;
+}
+
+.profile__start-value {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  font-size: 12.5px;
+}
+
+.profile__start-value .code {
+  font-size: 12.5px;
+}
+
+.profile__sizing {
+  display: flex;
+  gap: 20px;
+  margin-top: 12px;
+}
+
+.profile__sizing-label {
+  display: block;
+  font-size: 12.5px;
+  color: var(--quiet);
+}
+
+.profile__sizing-value {
+  display: block;
+  margin-top: 5px;
+  font-size: 15px;
+}
+
+.profile__sizing-note {
+  margin: 12px 0 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--faint);
+}
+
+/* `.profile__card` is `flex: 1 1 260px` for a row of cards; in this column
+   that basis would be a 260px height. */
+.profile__side > * {
+  flex: none;
+}

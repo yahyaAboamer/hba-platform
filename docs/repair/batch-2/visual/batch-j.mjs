@@ -354,6 +354,71 @@ steps.record = async (browser) => {
   }
 };
 
+/** Admin profile Overview: the contact form against the export, a save, a refusal. */
+steps.contact = async (browser) => {
+  const box = (page, loc) => loc.first().evaluate((el) => { const r = el.getBoundingClientRect(); return `${Math.round(r.x)},${Math.round(r.y)} ${Math.round(r.width)}x${Math.round(r.height)}`; });
+  for (const width of [1280, 1440]) {
+    const { context: rc, ref } = await openExport(browser, ADMIN_EXPORT, width);
+    await exportNav(ref, NAV.models).click();
+    await exportTab(ref, "Active");
+    await ref.locator(".ad > div:nth-child(2) button").filter({ hasText: "Sara Edrees" }).first().click();
+    await settle(ref, 800);
+    await ref.locator(".ad").screenshot({ path: join(OUT, `export-overview-${width}.png`) });
+    const refCard = ref.locator(".ad div", { has: ref.locator("div", { hasText: /^Contact and shipping$/ }) }).last();
+    log(`[${width}] export contact card: ${await box(ref, refCard)}`);
+    log(`[${width}] export sizing card: ${await box(ref, ref.locator(".ad div", { has: ref.locator("div", { hasText: /^Sizing$/ }) }).last())}`);
+    log(`[${width}] export input: ${JSON.stringify(await style(ref, refCard.locator("input")))}`);
+    log(`[${width}] export label: ${JSON.stringify(await style(ref, refCard.locator("div", { hasText: /^Full name$/ })))}`);
+    log(`[${width}] export save: ${JSON.stringify(await style(ref, refCard.locator("button")))}`);
+    log(`[${width}] export sizing value: ${JSON.stringify(await style(ref, ref.locator(".ad span", { hasText: /^\d+ cm$/ })))}`);
+    await rc.close();
+
+    const { context, page } = await signIn(browser, OWNER, { width, height: 900 });
+    await page.goto(`${APP}/affiliates?q=Sara`, { waitUntil: "networkidle" });
+    await settle(page, 800);
+    await page.locator("tbody tr a").filter({ hasText: "Sara Edrees" }).first().click();
+    await page.waitForLoadState("networkidle");
+    await settle(page, 800);
+    const url = page.url();
+    await page.screenshot({ path: join(OUT, `app-overview-${width}.png`) });
+    log(`[${width}] app contact card: ${await box(page, page.locator(".profile__contact"))}`);
+    log(`[${width}] app side column: ${await box(page, page.locator(".profile__side"))}`);
+    log(`[${width}] app input: ${JSON.stringify(await style(page, page.getByLabel("Full name")))}`);
+    log(`[${width}] app label: ${JSON.stringify(await style(page, page.locator(".contact-form__label", { hasText: "Full name" })))}`);
+    log(`[${width}] app save: ${JSON.stringify(await style(page, page.getByRole("button", { name: "Save details" })))}`);
+    log(`[${width}] app sizing value: ${JSON.stringify(await style(page, page.locator(".profile__sizing-value")))}`);
+    log(`[${width}] app start value: ${JSON.stringify(await style(page, page.locator(".profile__start-value .code, .profile__start-value .detail__note")))}`);
+    log(`[${width}] app fields: ${JSON.stringify(await page.locator(".contact-form__label").allInnerTexts())} / sign-in is an input: ${await page.locator(".contact-form input[value='sara@example.com']").count() > 0}`);
+
+    if (width === 1280) {
+      const city = page.getByLabel("City");
+      const before = await city.inputValue();
+      await city.fill("Dokki");
+      await page.getByRole("button", { name: "Save details" }).click();
+      await page.getByRole("button", { name: "Saved" }).waitFor({ timeout: 8000 });
+      await page.reload({ waitUntil: "networkidle" });
+      await settle(page, 700);
+      log(`[${width}] saved City "${before}" -> "Dokki"; after reload: "${await page.getByLabel("City").inputValue()}"`);
+
+      await page.getByLabel("Full name").fill("Somebody Else");
+      await page.getByRole("button", { name: "More address details" }).click();
+      await page.getByLabel("Phone on the parcel").fill("12345");
+      await page.getByRole("button", { name: "Save details" }).click();
+      await settle(page, 900);
+      log(`[${width}] refused: ${JSON.stringify(await page.getByRole("alert").first().innerText())} / typing kept: ${(await page.getByLabel("Full name").inputValue()) === "Somebody Else"}`);
+      await page.screenshot({ path: join(OUT, `app-overview-refused-${width}.png`) });
+      await page.reload({ waitUntil: "networkidle" });
+      await settle(page, 700);
+      log(`[${width}] after reload: name "${await page.getByLabel("Full name").inputValue()}", heading "${await page.locator("h1").first().innerText()}"`);
+      await page.getByLabel("City").fill(before);
+      await page.getByRole("button", { name: "Save details" }).click();
+      await page.getByRole("button", { name: "Saved" }).waitFor({ timeout: 8000 });
+      log(`[${width}] City put back to "${before}"`);
+    }
+    await context.close();
+  }
+};
+
 function previousMonth() {
   const now = new Date();
   const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);

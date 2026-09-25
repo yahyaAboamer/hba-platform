@@ -555,6 +555,9 @@
   background: var(--paper);
   color: var(--ink);
   font-size: 14px;
+  /* The export's inputs set no line height, so the browser's normal:
+     42px high. Inherited 1.55 made them 46. */
+  line-height: normal;
 }
 
 .shop-conn__submit {

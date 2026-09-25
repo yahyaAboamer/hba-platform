@@ -474,7 +474,8 @@ export function DataPanel({ goLiveMonth }: { goLiveMonth: string | null }) {
                 More than one model has the same phone number on file, so the
                 platform cannot tell whose parcel it is. Give each model her own
                 number under <Link to="/affiliates">Models</Link> → her profile →
-                Parcels go to, then run this again.
+                Contact and shipping → More address details → Phone on the
+                parcel, then run this again.
               </p>
               <ul className="data__parcels">
                 {parcels.map((row) => (

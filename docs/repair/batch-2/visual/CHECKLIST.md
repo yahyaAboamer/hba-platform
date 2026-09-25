@@ -848,6 +848,63 @@ line; EGP 500 with a reference and reason saved, back on the detail, the
 reference and EGP 500.00 there after a reload, the outstanding down from
 EGP 10,512.00 to EGP 10,012.00. Frontend suite and build.
 
+## Batch J - Contact and shipping (25 September)
+
+**Reference to code.** Export: the Overview's two columns (Admin lines
+870-915), `mFields` / `saveProfile` / `profileSaveLabel` (2927-2934). App:
+`frontend/src/components/ContactForm.tsx` (new), the Overview in
+`AffiliateDetail.tsx`, `PATCH /api/affiliates/{id}` (unchanged).
+
+- **The export's card**: *Contact and shipping*, labelled inputs (12.5px
+  label 6px above; input 42px, 11px 13px, 14px, page ground) and *Save
+  details* → *Saved* (42px, 11px 16px, accent). Measured equal at 1280 and
+  1440; the columns are 542 / 462 at 1280 and 622 / 542 at 1440 against the
+  export's 541 / 461 and 621 / 541 (sub-pixel rounding).
+- **Contact details are not her sign-in.** The export's *Email* slot is her
+  login here (`update_details` moves the account she signs in with), so it
+  is shown as *Signs in with* (D07) - a value, not an input - with *Her
+  sign-in, not a contact detail - it is not changed from this form.* The
+  form never sends `email`. Changing a sign-in was not possible from the
+  profile before either; the API's ability to do it is unchanged.
+- **Fields.** *Full name* (`name`), *Phone* (her profile phone),
+  *Shipping address* (`shipping_line1`) and *City* (`shipping_city`) - the
+  export's slots, and the portal export's own labels for the address.
+  *More address details* opens what the courier also needs and the export's
+  two slots cannot hold (D11): flat/floor, governorate, name and phone on the
+  parcel, courier notes. Nothing staff could correct before is lost.
+- **Saving.** One request, only the fields that changed; the server applies
+  it in one transaction, so a refused parcel phone saves nothing - not the
+  name typed beside it. A refusal keeps every field as typed and says
+  *Nothing was saved*. A blank name is refused before any request.
+- **Permissions and validation unchanged**: `affiliates.manage` (admin,
+  affiliate manager, content manager) edits; anyone else sees the values
+  as text, no inputs. The parcel phone is still validated as an Egyptian
+  mobile on the server; measurements stay the model's alone (A05).
+- **Also in item 14**: Sizing is the export's card - values 15px side by
+  side (were 12px rows); *Started with HBA* (H01, not in the export) sits
+  above the form with its value at 12.5px; the right column is Sizing,
+  Current terms and Discount codes.
+- **Kept divergence, with its reason:** *Discount codes*. The export has no
+  way to register or replace a model's code anywhere (Settings' *Add code*
+  is house codes); here it is a supported workflow and this is its only
+  place. It is a card in the export's right column, not a third row.
+- Inputs in *Contact and shipping* and in Settings' Shopify *Connection*
+  were 46px (the body's 1.55 line height); the export's set none - 42px.
+  Both now 42.
+- Settings' parcel-matching note pointed at the old *Parcels go to* row; it
+  now names *Contact and shipping → More address details → Phone on the
+  parcel*.
+
+**Checks.** Backend: three new tests in `test_affiliates_api.py` (the
+form's request saves what it sends and leaves unsent address keys; a
+refused parcel phone saves nothing and the sign-in never moves; a model's
+own account is refused), with `test_recipients`: 157 passing. Frontend:
+`ContactForm.test.tsx` (5); suite 453 tests, 25 files; `npm run build`.
+Browser (`shots/batch-j/app-overview-*`, `export-overview-*`, `checks.txt`):
+City saved, *Saved*, and still there after a reload; a bad parcel phone
+refused with the server's words and *Nothing was saved*, the typed name
+kept, and after a reload the name unchanged; City put back.
+
 ## Remaining work - the one list (reconciled 24 September)
 
 Reconciled against: the 24 September handoff (*What is waiting on Yahya*,
@@ -908,12 +965,11 @@ Admin (1280 / 1440)
     removed (D).
 13. **Admin Home chart**: axis label outside the plot, as the export (matrix,
     kept for a preference only).
-14. **Admin profile body** (Overview): the Contact panel as the export's
-    editable form - **a separate task, as the owner set out on 24 September**:
-    field permissions, validation, saving, and contact email against sign-in
-    identity (D07's *Signs in with* is his later instruction). Also in that
-    body: Sizing values at 15px (ours 12px), the start value at 12.5px, and
-    the *Discount codes* panel, which the export does not have.
+14. ~~**Admin profile body** (Overview): the Contact panel as the export's
+    editable form~~ - **done, batch J** (see *Batch J - Contact and
+    shipping*): the form, contact details kept apart from her sign-in,
+    Sizing at 15px, the start value at 12.5px, the export's two columns.
+    *Discount codes* kept, with its reason.
 15. **Terms editing: buttons still set to Inter** (`Compensation.css` `.fork`,
     `.mo`, `.kinds`, `.seg`, `.comp__clear`), with its screen's review.
 16. **Products**: the per-model order reference the export prints on a
@@ -1041,6 +1097,7 @@ overpaid month (a real state the export never drew).
 | Wardrobe size, Targets words, payment-details words, Invitations words and dates, You buttons' font, the refund comment | Items 1, 2, 4, 7, 8, 18 | `1b0a240`; `shots/batch-g/checks.txt` |
 | Decisions c, d, e, g, h: account menu, product list line, top-sellers panel, the usual recording date, the password after *Save details* | Owner, 25 September | `52ab988`; `shots/batch-h/checks.txt` |
 | Decision b: the Shopify connection edited in Settings | Owner, 25 September | batch I (the commit that adds this row); ADR 0045; `tests/test_shopify_connection.py` (11), `ShopifyConnection.test.tsx` (4); `shots/batch-i/checks.txt` |
+| Contact and shipping as the export's form; sign-in kept apart; Sizing 15px; start 12.5px (item 14) | Matrix, owner 24 September | batch J; `ContactForm.test.tsx` (5), `test_affiliates_api` (+3) |
 | Record payment: premise corrected; subtitle and note as `vRecord` (item 10, #11) | Thirteen | batch J; `shots/batch-j/export-record-*`, `app-record-*` |
 | Admin Targets words, widths, guarantee label; unchanged rows keep their confirmation (item 9) | Thirteen E, matrix §T | batch J; `test_targets_api` (+1), `TargetsWords.test.tsx` (4) |
 | *Refresh now* and *last successful refresh* (item 17) | Admin export, handoff | batch J; `tests/test_shopify_refresh.py` (9), `ShopifyRefresh.test.tsx` (6); `shots/batch-j/checks.txt` |
