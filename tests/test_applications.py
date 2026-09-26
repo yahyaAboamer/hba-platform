@@ -295,3 +295,83 @@ def test_the_account_takes_the_name_the_model_gave(db):
     db.flush()
 
     assert account.display_name == "Nour Mahmoud"
+
+
+# ── Outside Egypt (ADR 0046) ─────────────────────────────────────────────────
+
+
+def test_applying_from_abroad_needs_no_destination(db):
+    """Every method is Egyptian, so somebody abroad has none to give - and
+    must still be able to apply. The profile says why nothing is on file."""
+    account = _account(db)
+
+    affiliate = _apply(db, account, payout_method=None, payout_fields={}, abroad=True)
+    db.flush()
+
+    assert affiliate.status == AffiliateStatus.PENDING
+    assert affiliate.payout_abroad is True
+    assert (
+        db.scalar(
+            select(PayoutDestination).where(
+                PayoutDestination.affiliate_id == affiliate.id
+            )
+        )
+        is None
+    )
+
+
+def test_details_sent_alongside_abroad_are_not_stored(db):
+    """Half an Egyptian destination for somebody abroad is money addressed
+    nowhere, so anything left in the fields is dropped rather than kept."""
+    account = _account(db)
+
+    affiliate = _apply(db, account, abroad=True)
+    db.flush()
+
+    assert affiliate.payout_abroad is True
+    assert (
+        db.scalar(
+            select(PayoutDestination).where(
+                PayoutDestination.affiliate_id == affiliate.id
+            )
+        )
+        is None
+    )
+
+
+def test_an_egyptian_application_is_not_marked_abroad(db):
+    account = _account(db)
+
+    affiliate = _apply(db, account)
+    db.flush()
+
+    assert affiliate.payout_abroad is False
+
+
+def test_without_abroad_a_method_is_still_required(db):
+    account = _account(db)
+
+    with pytest.raises(ValueError, match="Unknown payout method"):
+        _apply(db, account, payout_method=None, payout_fields={})
+
+
+def test_saving_a_destination_later_ends_the_abroad_arrangement(db):
+    """Once the platform can pay her itself, admin must stop arranging it by
+    hand - the flag goes the moment a destination exists."""
+    from app.services.payouts import set_destination
+
+    account = _account(db)
+    affiliate = _apply(db, account, payout_method=None, payout_fields={}, abroad=True)
+    db.flush()
+
+    set_destination(
+        db,
+        affiliate,
+        method=PayoutMethod.INSTAPAY,
+        actor_id=account.id,
+        actor_email=account.email,
+        **INSTAPAY,
+    )
+    db.flush()
+
+    assert affiliate.payout_abroad is False

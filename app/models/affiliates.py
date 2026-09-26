@@ -12,6 +12,7 @@ there. So ``user_account_id`` is not nullable and needs no placeholder.
 from datetime import datetime
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
@@ -150,6 +151,15 @@ class AffiliateProfile(Base):
     #: there is no default: a zero here would be a measurement.
     height_cm: Mapped[int | None] = mapped_column(SmallInteger)
     weight_kg: Mapped[int | None] = mapped_column(SmallInteger)
+
+    #: She is paid outside Egypt, and HBA arranges it with her directly
+    #: (ADR 0046). Every destination the platform can hold is Egyptian, so she
+    #: applies without one and this says why nothing is on file - rather than
+    #: leaving an empty destination that reads the same as one never filled
+    #: in. Saving any destination clears it (`set_destination`).
+    payout_abroad: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
 
     status: Mapped[str] = mapped_column(
         String(20), nullable=False, server_default=AffiliateStatus.PENDING

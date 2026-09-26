@@ -79,6 +79,8 @@ type Detail = Affiliate & {
   codes: Code[];
   compensation: Compensation | null;
   payout_destination: Destination | null;
+  /** Applied from outside Egypt; HBA arranges her payment by hand (ADR 0046). */
+  payout_abroad?: boolean;
   /**
    * The full destination, or `null` where the reader may not send money.
    * ADR 0042: the server decides, on `payments.record`, and this screen only
@@ -547,7 +549,11 @@ export function AffiliateDetail({ session }: { session: Session }) {
                   account is all this row has to do. */}
               <div>
                 <dt>Paid to</dt>
-                <dd>{describeDestination(detail.payout_destination)}</dd>
+                <dd>
+                  {detail.payout_destination === null && detail.payout_abroad
+                    ? "Outside Egypt — arranged directly"
+                    : describeDestination(detail.payout_destination)}
+                </dd>
               </div>
             </dl>
           </section>
@@ -1064,7 +1070,15 @@ export function AffiliateDetail({ session }: { session: Session }) {
           </section>
           <section className="pay-detail__card profile__card">
             <h2 className="pay-detail__card-title">Where to send it</h2>
-            {detail.payout_destination === null ? (
+            {detail.payout_destination === null && detail.payout_abroad ? (
+              /* ADR 0046: she applied from outside Egypt. Nothing is missing -
+               *  there is no Egyptian destination to give, and paying her is
+               *  arranged with her outside the platform. */
+              <p className="pay-detail__missing">
+                {detail.name} is paid outside Egypt. Arrange it with her directly,
+                or set a destination here once she has one.
+              </p>
+            ) : detail.payout_destination === null ? (
               <p className="pay-detail__missing">
                 {detail.name} has not submitted payment details, so nothing can be sent yet.
               </p>

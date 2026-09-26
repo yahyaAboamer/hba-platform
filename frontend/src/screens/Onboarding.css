@@ -1,0 +1,609 @@
+/*
+ * A model's way onto the programme: her details (`Apply.tsx`) and the screen
+ * she waits on (`ApplicationPending.tsx`).
+ *
+ * Drawn in the portal's language - an uppercase eyebrow, large tight
+ * headings, surfaces a step above the ground - and tokens only. The owner
+ * approved these screens from a phone mockup on 26 September (ADR 0047).
+ */
+
+/* Visually hidden, still read aloud. */
+.onboard__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.onboard__fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.onboard__fieldset > legend.field__label {
+  padding: 0;
+  margin-bottom: 8px;
+}
+
+.onboard__optional {
+  font-weight: 400;
+  color: var(--faint);
+}
+
+.onboard__eyebrow {
+  padding: 0;
+  margin-bottom: 14px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.onboard__rule {
+  width: 100%;
+  height: 1px;
+  margin: 8px 0;
+  border: 0;
+  background: var(--rule);
+}
+
+/* ── Labels with something beside them ─────────────────────────────────── */
+
+.onboard__label-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.onboard__label-row--split {
+  justify-content: space-between;
+}
+
+.onboard__code {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 500;
+}
+
+.onboard__code::placeholder {
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 400;
+}
+
+/* ── The circled i ──────────────────────────────────────────────────────── */
+
+.onboard__tip {
+  position: static;
+}
+
+/* 32px drawn, 44px to the finger: the margin reaches out without moving the
+   label it sits beside. */
+.onboard__tip-button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin: -6px 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--quiet);
+  cursor: pointer;
+}
+
+.onboard__tip-button:hover,
+.onboard__tip-button[aria-expanded="true"] {
+  color: var(--ink);
+}
+
+.onboard__bubble {
+  position: absolute;
+  z-index: 2;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 12px;
+  background: var(--raise);
+  box-shadow: var(--elev);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+/* ── Height and weight, with the unit inside the box ────────────────────── */
+
+.onboard__pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.onboard__unit {
+  position: relative;
+  display: block;
+}
+
+.onboard__unit .input {
+  width: 100%;
+  padding-right: 44px;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+/* A desktop browser's stepper arrows sit on top of the unit; a phone never
+   draws them, and nobody measures their height in single steps. */
+.onboard__unit .input::-webkit-inner-spin-button,
+.onboard__unit .input::-webkit-outer-spin-button {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.onboard__unit > span {
+  position: absolute;
+  top: 50%;
+  right: 16px;
+  transform: translateY(-50%);
+  color: var(--faint);
+  font-size: 14px;
+  pointer-events: none;
+}
+
+/* ── In Egypt / Outside Egypt ──────────────────────────────────────────── */
+
+.onboard__segments {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.onboard__segment,
+.onboard__method {
+  position: relative;
+  cursor: pointer;
+}
+
+/* The real radio stays in the page for the keyboard and the screen reader;
+   the face beside it is what is drawn. */
+.onboard__segment input,
+.onboard__method input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.onboard__segment span {
+  display: grid;
+  place-items: center;
+  min-height: 44px;
+  border-radius: 9px;
+  color: var(--faint);
+  font-size: 15px;
+  font-weight: 600;
+  transition: background-color 160ms ease-out, color 160ms ease-out;
+}
+
+.onboard__segment input:checked + span {
+  background: var(--rule-strong);
+  color: var(--ink);
+}
+
+.onboard__segment input:focus-visible + span,
+.onboard__method input:focus-visible + .onboard__method-face {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* ── InstaPay / Bank / Wallet ──────────────────────────────────────────── */
+
+.onboard__methods {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.onboard__method-face {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 76px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--quiet);
+  font-size: 14px;
+  font-weight: 600;
+  transition: background-color 160ms ease-out, border-color 160ms ease-out,
+    color 160ms ease-out;
+}
+
+.onboard__method input:checked + .onboard__method-face {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-lift);
+  box-shadow: inset 0 0 0 0.5px var(--accent);
+}
+
+/* ── The folded InstaPay guide ─────────────────────────────────────────── */
+
+.onboard__guide {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.onboard__guide img {
+  flex: 0 0 104px;
+  width: 104px;
+  height: 128px;
+  border-radius: 8px;
+  object-fit: cover;
+  object-position: top;
+}
+
+.onboard__guide ol {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+  font-size: 14px;
+}
+
+.onboard__guide li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  counter-increment: step;
+}
+
+.onboard__guide li::before {
+  content: counter(step);
+  display: grid;
+  place-items: center;
+  flex: 0 0 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* ── Outside Egypt ─────────────────────────────────────────────────────── */
+
+.onboard__abroad {
+  display: flex;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--rule);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.onboard__abroad-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.onboard__abroad-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--quiet);
+}
+
+.onboard__abroad-text strong {
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* ══ Waiting to be approved ═════════════════════════════════════════════ */
+
+.pending {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.pending__card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--rule);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.pending__hero {
+  gap: 14px;
+  padding: 22px 20px;
+}
+
+.pending__badge,
+.pending__pill {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 999px;
+  background: var(--owed-quiet);
+  color: var(--owed);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.pending__badge {
+  padding: 5px 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.pending__pill {
+  flex-shrink: 0;
+  padding: 4px 10px;
+}
+
+.pending__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--owed);
+  animation: pending-pulse 1.8s ease-out infinite;
+}
+
+@keyframes pending-pulse {
+  0% {
+    box-shadow: 0 0 0 0 var(--owed);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 8px transparent;
+  }
+}
+
+.pending__title {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  font-weight: 600;
+}
+
+.pending__lead {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--quiet);
+}
+
+.pending__lead strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* The four steps from invitation to earning. */
+.pending__steps {
+  display: flex;
+  flex-direction: column;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pending__step {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  column-gap: 14px;
+}
+
+.pending__marker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.pending__node {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--rule-strong);
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+
+.pending__step--done .pending__node {
+  border: 0;
+  background: var(--accent);
+  color: var(--paper);
+}
+
+.pending__step--now .pending__node {
+  border-color: var(--owed);
+}
+
+.pending__step--now .pending__dot {
+  width: 8px;
+  height: 8px;
+}
+
+.pending__line {
+  flex: 1;
+  width: 2px;
+  min-height: 16px;
+  background: var(--rule-strong);
+}
+
+.pending__step--done .pending__line {
+  background: var(--accent);
+}
+
+.pending__words {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px 0 18px;
+  font-size: 15px;
+}
+
+.pending__step:last-child .pending__words {
+  padding-bottom: 0;
+}
+
+/* The path ends at "Start earning"; a line below it leads nowhere. */
+.pending__step:last-child .pending__line {
+  display: none;
+}
+
+.pending__step--next .pending__words {
+  color: var(--faint);
+}
+
+.pending__step--now .pending__words strong {
+  font-weight: 600;
+}
+
+.pending__now {
+  font-size: 13px;
+  color: var(--owed);
+}
+
+/* Her details, as rows. */
+.pending__heading {
+  margin: 0;
+  padding: 16px 20px 6px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.pending__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.pending__row:last-child {
+  border-bottom: 0;
+  padding-bottom: 18px;
+}
+
+.pending__field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.pending__label {
+  font-size: 13px;
+  color: var(--faint);
+}
+
+.pending__value {
+  font-size: 16px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.pending__value--code {
+  letter-spacing: 0.04em;
+}
+
+.pending__value--plain {
+  font-size: 15px;
+  font-weight: 400;
+}
+
+.pending__sub {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 14px;
+  color: var(--quiet);
+  overflow-wrap: anywhere;
+}
+
+.pending__eye {
+  display: grid;
+  place-items: center;
+  flex: 0 0 32px;
+  height: 32px;
+  margin: -6px 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--quiet);
+  cursor: pointer;
+}
+
+.pending__eye:hover {
+  color: var(--ink);
+}
+
+.pending__change {
+  flex-shrink: 0;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 10px;
+  background: var(--raise);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pending__change:hover {
+  border-color: var(--quiet);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pending__dot {
+    animation: none;
+  }
+
+  .onboard__segment span,
+  .onboard__method-face {
+    transition: none;
+  }
+}

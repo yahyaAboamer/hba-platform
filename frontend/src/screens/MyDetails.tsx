@@ -48,6 +48,11 @@ export type Me = {
   since: string | null;
   codes: { code: string; verified: boolean }[];
   payout_destination: Record<string, string | null> | null;
+  /**
+   * She applied from outside Egypt and HBA arranges her payment directly
+   * (ADR 0046) - why `payout_destination` is empty, when it is.
+   */
+  payout_abroad?: boolean;
   required_fields: Record<string, string[]>;
 };
 

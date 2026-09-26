@@ -55,10 +55,11 @@ def submit_application(
     name: str,
     phone: str,
     code: str,
-    payout_method: str,
+    payout_method: str | None,
     payout_fields: dict[str, str | None],
     height_cm: int | None = None,
     weight_kg: int | None = None,
+    abroad: bool = False,
 ) -> AffiliateProfile:
     """Create the affiliate record a model has applied with.
 
@@ -76,6 +77,13 @@ def submit_application(
     programme exactly the same. They are validated when given and ignored when
     not, and there is no branch anywhere that treats a missing one as a reason
     to refuse - which is the difference between optional and optional-in-theory.
+
+    **Outside Egypt, there is no destination to give** (ADR 0046). Every method
+    here is Egyptian, so ``abroad`` takes the place of one: no destination row
+    is written, the profile says why, and HBA arranges payment with her
+    directly. Anything typed into the payout fields is ignored rather than
+    stored - half an Egyptian destination for somebody abroad is money
+    addressed nowhere.
     """
     if existing_application(db, user) is not None:
         raise ValueError("You have already applied")
@@ -94,24 +102,26 @@ def submit_application(
     if not phone:
         raise ValueError("Tell us your phone number")
 
-    if payout_method not in VALID_METHODS:
-        raise ValueError(f"Unknown payout method: {payout_method!r}")
+    cleaned: dict[str, str | None] = {}
+    if not abroad:
+        if payout_method not in VALID_METHODS:
+            raise ValueError(f"Unknown payout method: {payout_method!r}")
 
-    cleaned = {
-        field: (str(value).strip() or None) if value else None
-        for field, value in payout_fields.items()
-        if field in REQUIRED_PAYOUT_FIELDS[payout_method]
-    }
-    missing = [
-        field
-        for field in REQUIRED_PAYOUT_FIELDS[payout_method]
-        if not cleaned.get(field)
-    ]
-    if missing:
-        raise ValueError(
-            "These are needed before we can pay you: "
-            + ", ".join(field.replace("_", " ") for field in missing)
-        )
+        cleaned = {
+            field: (str(value).strip() or None) if value else None
+            for field, value in payout_fields.items()
+            if field in REQUIRED_PAYOUT_FIELDS[payout_method]
+        }
+        missing = [
+            field
+            for field in REQUIRED_PAYOUT_FIELDS[payout_method]
+            if not cleaned.get(field)
+        ]
+        if missing:
+            raise ValueError(
+                "These are needed before we can pay you: "
+                + ", ".join(field.replace("_", " ") for field in missing)
+            )
 
     # normalise_code raises on an empty or malformed code, so this refuses
     # before anything is written rather than half way through.
@@ -167,14 +177,17 @@ def submit_application(
         actor_email=user.email,
     )
 
-    set_destination(
-        db,
-        affiliate,
-        method=payout_method,
-        actor_id=user.id,
-        actor_email=user.email,
-        **cleaned,
-    )
+    if abroad:
+        affiliate.payout_abroad = True
+    else:
+        set_destination(
+            db,
+            affiliate,
+            method=payout_method,
+            actor_id=user.id,
+            actor_email=user.email,
+            **cleaned,
+        )
 
     record_audit(
         db,
@@ -184,7 +197,11 @@ def submit_application(
         actor_email=user.email,
         # The code is not a secret and is the thing being applied *with*; the
         # payout details are masked by `record_audit` on the way in regardless.
-        after={"name": name, "code": code, "payout_method": payout_method},
+        after={
+            "name": name,
+            "code": code,
+            "payout_method": "abroad" if abroad else payout_method,
+        },
     )
 
     # Section 16. Queued in this transaction, so an application that commits

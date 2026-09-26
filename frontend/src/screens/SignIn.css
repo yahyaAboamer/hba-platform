@@ -1,67 +1,254 @@
-.sign-in {
+/*
+ * The sign-in family: signing in, an invitation, a reset, first run, and a
+ * model's application (`components/AuthShell.tsx`).
+ *
+ * **The portal's look, for everyone** (ADR 0047) - its dark ground, its
+ * uppercase eyebrow, its large tight heading. Tokens only: the palette is
+ * `tokens.css` and the accent is `accent.css`, and `data-theme` on `.auth`
+ * picks the theme exactly as it does on `.affiliate`.
+ *
+ * Phone-first, like the portal: a model opens this from an email, standing
+ * up. Fields are 52px and 16px - below 16px iOS zooms the page on focus and
+ * leaves it zoomed.
+ */
+.auth {
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: 20px 24px 40px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 15px;
+}
+
+.auth__column {
+  width: 100%;
+  max-width: 24rem;
+  margin: 0 auto;
+}
+
+.auth__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 24px;
+}
+
+.auth__mark {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+
+.auth__steps {
+  display: flex;
+  gap: 6px;
+}
+
+.auth__step {
+  width: 28px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--rule-strong);
+}
+
+.auth__step--done {
+  background: var(--accent);
+}
+
+/* Starts a third of the way down rather than centred: centred content jumps
+   when the phone's keyboard opens, and this screen is nothing but typing. */
+.auth__body {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin-top: clamp(40px, 12vh, 96px);
+}
+
+.auth__head {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.auth__eyebrow {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent-text);
+}
+
+.auth__title {
+  margin: 0;
+  font-size: 30px;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  font-weight: 600;
+}
+
+.auth__lead {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--quiet);
+}
+
+.auth__chip {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 100%;
+  margin-top: 6px;
+  padding: 6px 14px 6px 6px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--surface);
+}
+
+.auth__avatar {
   display: grid;
   place-items: center;
-  min-height: 100vh;
-  padding: var(--space-4);
-}
-
-.sign-in__form {
-  width: 100%;
-  max-width: 22rem;
-}
-
-.sign-in__brand {
-  margin-bottom: var(--space-6);
-}
-
-.sign-in__mark {
-  display: block;
-  font-size: var(--text-xl);
+  flex: 0 0 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-size: 13px;
   font-weight: 600;
-  letter-spacing: -0.04em;
 }
 
-.sign-in__title {
-  font-size: var(--text-sm);
-  font-weight: 400;
+.auth__chip-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
   color: var(--quiet);
-  margin-top: var(--space-1);
 }
 
-.sign-in__error {
-  margin-bottom: var(--space-4);
+/* ── Fields, one size up from the maintainer's ─────────────────────────── */
+
+.auth .field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
 }
 
-.sign-in__submit {
+.auth .field__label {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.auth .field__label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.auth .input {
+  min-height: 52px;
+  padding: 0 16px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 12px;
+  background: var(--surface);
+  font-size: 16px;
+}
+
+.auth select.input {
+  appearance: none;
+  padding-right: 40px;
+  background-image: linear-gradient(45deg, transparent 50%, var(--faint) 50%),
+    linear-gradient(135deg, var(--faint) 50%, transparent 50%);
+  background-position: calc(100% - 22px) 50%, calc(100% - 17px) 50%;
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+}
+
+.auth .input::placeholder {
+  color: var(--faint);
+}
+
+.auth .input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.auth .input[aria-invalid="true"] {
+  border-color: var(--refused);
+}
+
+/* `.blocker` is a one-line reason on a table row, so it never wraps. Here it
+   is a sentence under a field on a 390px screen, and unwrapped it ran off the
+   edge mid-word - found at phone width, 26 September. */
+.auth .blocker {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: normal;
+}
+
+/* ── The one filled button in the product (ADR 0047) ────────────────────
+ *
+ * Everywhere else the export's strongest action is a hairline and a tint
+ * (`base.css`). Here the owner chose a filled green with dark text: white on
+ * this green is about 3:1, dark is about 7:1.
+ */
+.auth .button--primary {
+  min-height: 52px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--accent);
+  color: var(--paper);
+  font-size: 16px;
+  font-weight: 600;
+  transition: background-color 160ms ease-out, color 160ms ease-out;
+}
+
+.auth .button--primary:hover:not(:disabled) {
+  background: var(--accent);
+  filter: brightness(1.08);
+}
+
+.auth .button--primary:disabled {
+  background: var(--raise);
+  color: var(--faint);
+}
+
+.auth__submit {
   width: 100%;
-  justify-content: center;
+  margin-top: 4px;
 }
 
-/* The first-run screen only. Says why this form exists at all, because a
-   platform with nobody in it is a state most people meet once and never
-   again. */
-.sign-in__lead {
-  max-width: 40ch;
-  margin: 0 0 var(--space-5);
-  font-size: var(--text-sm);
-  color: var(--quiet);
+.auth__error {
+  margin: 0;
 }
 
-
-/* The way out of the one situation this screen cannot otherwise resolve.
-   Quiet and below the button: it answers "that did not work", which people
-   reach for after trying rather than before. */
-.sign-in__forgot {
-  margin: var(--space-4) 0 0;
-  text-align: center;
-  font-size: var(--text-sm);
+/* A text control that sits at the end of a label row: *Forgot?*, *Where do I
+   find it?*. Quiet enough to be skipped, big enough to hit. */
+.auth__link {
+  padding: 6px 0;
+  border: 0;
+  background: none;
+  color: var(--accent-text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
 }
 
-.sign-in__forgot a {
-  color: var(--quiet);
+.auth__link:hover {
+  text-decoration: underline;
   text-underline-offset: 2px;
 }
 
-.sign-in__forgot a:hover {
-  color: var(--ink);
+@media (prefers-reduced-motion: reduce) {
+  .auth .button--primary {
+    transition: none;
+  }
 }

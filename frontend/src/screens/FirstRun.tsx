@@ -3,10 +3,8 @@ import { useState } from "react";
 import { ApiError, api, rememberToken } from "../lib/api";
 import type { Actor, Session } from "../lib/api";
 import { currentUser } from "../lib/api";
-import "./SignIn.css";
-
-/** §5.1. Long enough to be worth having; the server enforces it too. */
-const MINIMUM_PASSWORD = 12;
+import { AuthShell } from "../components/AuthShell";
+import { MINIMUM_PASSWORD } from "../components/PasswordField";
 
 /**
  * The very first account on a fresh deployment.
@@ -71,14 +69,8 @@ export function FirstRun({ onSignedIn }: { onSignedIn: (session: Session) => voi
   }
 
   return (
-    <main className="sign-in">
-      <form className="sign-in__form" onSubmit={submit}>
-        <div className="sign-in__brand">
-          <span className="sign-in__mark">HBA</span>
-          <h1 className="sign-in__title">Set up the platform</h1>
-        </div>
-
-        <p className="sign-in__lead">
+    <AuthShell eyebrow="First run" title="Set up the platform" onSubmit={submit}>
+        <p className="auth__lead">
           Nobody has an account here yet. This makes the first one, and it is an
           administrator. Do it now — until you do, anyone who finds this page
           could do it instead.
@@ -135,22 +127,21 @@ export function FirstRun({ onSignedIn }: { onSignedIn: (session: Session) => voi
           />
         </label>
 
-        {problem && <p className="blocker sign-in__error">{problem}</p>}
+        {problem && <p className="blocker auth__error">{problem}</p>}
 
         {error && (
-          <p className="notice notice--refused sign-in__error" role="alert">
+          <p className="notice notice--refused auth__error" role="alert">
             {error}
           </p>
         )}
 
         <button
           type="submit"
-          className="button button--primary sign-in__submit"
+          className="button button--primary auth__submit"
           disabled={working || problem !== null || password.length === 0}
         >
           {working ? "Setting up…" : "Create my account"}
         </button>
-      </form>
-    </main>
+    </AuthShell>
   );
 }

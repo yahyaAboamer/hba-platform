@@ -111,6 +111,9 @@ def me(
         if affiliate.created_at
         else [],
         "payout_destination": mask_destination(destination),
+        #: Paid outside Egypt, arranged by HBA directly (ADR 0046) - why
+        #: `payout_destination` is empty, when it is.
+        "payout_abroad": affiliate.payout_abroad,
         "required_fields": {
             method: list(fields) for method, fields in REQUIRED_PAYOUT_FIELDS.items()
         },

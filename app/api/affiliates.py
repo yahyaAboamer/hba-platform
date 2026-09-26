@@ -278,6 +278,9 @@ def _affiliate_detail(
         "codes": codes_with_status(db, affiliate, month),
         "compensation": _compensation_payload(terms_for(db, affiliate, month)),
         "payout_destination": mask_destination(current_destination(db, affiliate)),
+        #: She applied from outside Egypt and HBA arranges her payment by hand
+        #: (ADR 0046). Why there is no destination, rather than a gap.
+        "payout_abroad": affiliate.payout_abroad,
         #: The full card, or `None`. Served on exactly the permission the
         #: desk uses, so one rule decides who sees a real account number.
         "payout_destination_card": (

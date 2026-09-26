@@ -30,7 +30,10 @@ class ApplicationBody(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     phone: str = Field(min_length=1, max_length=40)
     code: str = Field(min_length=1, max_length=120)
-    payout_method: str
+    #: Absent when ``abroad`` is set: there is no Egyptian method to choose.
+    payout_method: str | None = None
+    #: She is paid outside Egypt and HBA arranges it with her (ADR 0046).
+    abroad: bool = False
 
     instapay_address_url: str | None = Field(default=None, max_length=500)
     instapay_phone: str | None = Field(default=None, max_length=40)
@@ -116,6 +119,7 @@ def apply(
             },
             height_cm=body.height_cm,
             weight_kg=body.weight_kg,
+            abroad=body.abroad,
         )
     except ValueError as exc:
         db.rollback()

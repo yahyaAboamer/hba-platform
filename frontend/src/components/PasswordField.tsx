@@ -3,7 +3,19 @@ import { useEffect, useState } from "react";
 import { checkPassword } from "../lib/api";
 import "./PasswordField.css";
 
-const LABELS = ["Too weak", "Weak", "Getting there", "Good", "Strong"];
+/**
+ * The shortest password the server accepts - `MINIMUM_PASSWORD_LENGTH` in
+ * `app/core/passwords.py`, which the server enforces regardless.
+ *
+ * **One copy on this side.** Three screens each declared their own `12` after
+ * the server had moved to 8, so the button stayed disabled over passwords the
+ * server would have taken and the meter was already calling "good". The owner
+ * met it on a phone: *"1 character to go"* under a password two bars strong.
+ */
+export const MINIMUM_PASSWORD = 8;
+
+/** One word, never a sentence - the owner, 26 September. */
+const WORDS = ["", "Weak", "Fair", "Good", "Strong"];
 
 /**
  * The eye everybody already knows, crossed out when the password is hidden.
@@ -32,40 +44,65 @@ function Eye({ open }: { open: boolean }) {
   );
 }
 
+function Tick() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M5 12.5 10 17.5 19 7" />
+    </svg>
+  );
+}
+
 /**
- * Choosing a password, with the platform saying what it thinks as you type.
+ * A password box, with the platform saying what it thinks as you type.
  *
- * Three things, and each earns its place:
+ * **Show/hide**, inside the box. The single biggest reducer of typos on a
+ * phone, and the reason people paste a password they then cannot reproduce.
  *
- * **Show/hide.** The single biggest reducer of typos on a phone, and the
- * reason people paste a password they then cannot reproduce.
+ * **A meter, and one rule.** The only thing enforced by length is the
+ * minimum, so that is the one requirement shown - *"8+ characters"*, ticked
+ * once met - and the meter beside it is advice, never a gate, summed up in a
+ * single word. The owner asked for exactly that: a person choosing a password
+ * has seen a hundred of these and does not need the theory of guessing
+ * explained under a green bar.
  *
- * **A meter.** Deliberately advice, never a gate - what is actually enforced
- * is length and `password_problem`. A meter that blocked would be a
- * composition rule wearing a friendlier face, and composition rules are what
- * produce `Password1!`. Its job is to make somebody *lengthen* one, which is
- * the thing that genuinely resists guessing.
- *
- * **The reason, before the button.** A password that will be refused says so
- * while it is being typed, rather than after a round trip and a form reset.
+ * **The reason, before the button.** A password the server would refuse (a
+ * common one, her own name) says why while it is being typed.
  *
  * The strength comes from the server (see `checkPassword`): working it out
  * here would be a second implementation of the rules, and the day it drifted
  * the screen would say "strong" over something the server refuses.
+ *
+ * `advise={false}` is the same box for signing in: the eye, and nothing that
+ * judges a password somebody already has.
  */
 export function PasswordField({
   value,
   onChange,
   personal,
-  minimum,
-  label = "Choose a password",
+  minimum = MINIMUM_PASSWORD,
+  label = "Password",
+  labelAside,
+  advise = true,
   onProblemChange,
 }: {
   value: string;
   onChange: (value: string) => void;
   personal?: { email?: string; name?: string };
-  minimum: number;
+  minimum?: number;
   label?: string;
+  /** Beside the label, at the far end - *Forgot?* on the sign-in screen. */
+  labelAside?: React.ReactNode;
+  advise?: boolean;
   /** So the form can refuse to submit something the server would reject. */
   onProblemChange?: (problem: string | null) => void;
 }) {
@@ -73,9 +110,10 @@ export function PasswordField({
   const [strength, setStrength] = useState(0);
   const [problem, setProblem] = useState<string | null>(null);
 
-  const tooShort = value.length > 0 && value.length < minimum;
+  const longEnough = value.length >= minimum;
 
   useEffect(() => {
+    if (!advise) return;
     if (!value) {
       setStrength(0);
       setProblem(null);
@@ -111,20 +149,29 @@ export function PasswordField({
       clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value, personal?.email, personal?.name]);
+  }, [advise, value, personal?.email, personal?.name]);
+
+  const id = advise ? "password-new" : "password-current";
+  const word = advise && longEnough && !problem ? WORDS[strength] : "";
 
   return (
-    <label className="field">
-      <span className="field__label">{label}</span>
-      <span className="password__row">
+    <div className="field">
+      <span className="field__label-row">
+        <label className="field__label" htmlFor={id}>
+          {label}
+        </label>
+        {labelAside}
+      </span>
+      <span className="password__box">
         <input
+          id={id}
           className="input password__input"
           type={reveal ? "text" : "password"}
-          autoComplete="new-password"
+          autoComplete={advise ? "new-password" : "current-password"}
           required
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          aria-invalid={tooShort || problem !== null}
+          aria-invalid={advise && problem !== null}
         />
         <button
           type="button"
@@ -137,41 +184,45 @@ export function PasswordField({
         </button>
       </span>
 
-      {/*
-       * Four segments rather than a percentage bar: a bar invites the question
-       * "how do I get to 100%", which is the composition-rule mindset again.
-       * Four steps read as "longer is better" and stop there.
-       */}
-      {value.length > 0 && (
-        <span className="password__meter" aria-hidden="true">
-          {[0, 1, 2, 3].map((step) => (
+      {advise && (
+        <>
+          {/*
+           * Four segments rather than a percentage bar: a bar invites the
+           * question "how do I get to 100%", which is the composition-rule
+           * mindset again. Four steps read as "longer is better" and stop.
+           */}
+          <span className="password__meter" aria-hidden="true">
+            {[0, 1, 2, 3].map((step) => (
+              <span
+                key={step}
+                className={
+                  value.length > 0 && step < strength
+                    ? `password__segment password__segment--${strength}`
+                    : "password__segment"
+                }
+              />
+            ))}
+          </span>
+
+          <span className="password__status" role="status">
             <span
-              key={step}
               className={
-                step < strength
-                  ? `password__segment password__segment--on password__segment--${strength}`
-                  : "password__segment"
+                longEnough ? "password__rule password__rule--met" : "password__rule"
               }
-            />
-          ))}
-        </span>
-      )}
+            >
+              {longEnough && <Tick />}
+              {minimum}+ characters
+            </span>
+            {word && (
+              <span className={`password__word password__word--${strength}`}>
+                {word}
+              </span>
+            )}
+          </span>
 
-      {value.length > 0 && (
-        <span className="field__hint" role="status">
-          {tooShort
-            ? `${minimum - value.length} character${
-                minimum - value.length === 1 ? "" : "s"
-              } to go.`
-            : problem
-              ? ""
-              : `${LABELS[strength]}. Longer is what makes a password hard to guess — a few unrelated words beats a short jumble.`}
-        </span>
+          {problem && <span className="blocker password__problem">{problem}</span>}
+        </>
       )}
-
-      {problem && !tooShort && (
-        <span className="blocker password__problem">{problem}</span>
-      )}
-    </label>
+    </div>
   );
 }

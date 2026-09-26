@@ -1,16 +1,19 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
+import { AuthShell } from "../components/AuthShell";
+import { PasswordField } from "../components/PasswordField";
 import { ApiError, signIn } from "../lib/api";
 import type { Session } from "../lib/api";
-import "./SignIn.css";
 
 /**
- * The way in.
+ * The way in - for staff and models alike, in the portal's look (ADR 0047).
  *
- * Deliberately plain. This is the first thing anybody sees, and the thing it
- * needs to say is that the tool is careful with money — which is said by being
- * unhurried and specific, not by being decorated.
+ * Nothing here explains signing in; everybody has done it a thousand times.
+ * **"Forgot?" sits beside the password label**, where the owner's approved
+ * mockup and most sign-in screens put it. It used to sit under the button as
+ * the answer to "that did not work" - but a person who already knows she has
+ * forgotten should not have to fail once to find it.
  */
 export function SignIn({ onSignedIn }: { onSignedIn: (session: Session) => void }) {
   const [email, setEmail] = useState("");
@@ -25,8 +28,6 @@ export function SignIn({ onSignedIn }: { onSignedIn: (session: Session) => void 
     try {
       onSignedIn(await signIn(email, password));
     } catch (caught) {
-      // The platform deliberately does not say which half was wrong - that
-      // would confirm an email exists. So neither does this.
       setError(
         caught instanceof ApiError && caught.status === 401
           ? "That email and password do not match an account."
@@ -40,61 +41,43 @@ export function SignIn({ onSignedIn }: { onSignedIn: (session: Session) => void 
   }
 
   return (
-    <main className="sign-in">
-      <form className="sign-in__form" onSubmit={submit}>
-        <div className="sign-in__brand">
-          <span className="sign-in__mark">HBA</span>
-          <h1 className="sign-in__title">Affiliate payroll</h1>
-        </div>
+    <AuthShell eyebrow="Welcome back" title="Sign in" onSubmit={submit}>
+      <label className="field">
+        <span className="field__label">Email</span>
+        <input
+          className="input"
+          type="email"
+          autoComplete="username"
+          required
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+        />
+      </label>
 
-        <label className="field">
-          <span className="field__label">Email</span>
-          <input
-            className="input"
-            type="email"
-            autoComplete="username"
-            required
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-          />
-        </label>
+      <PasswordField
+        value={password}
+        onChange={setPassword}
+        advise={false}
+        labelAside={
+          <Link className="auth__link" to="/reset-password">
+            Forgot?
+          </Link>
+        }
+      />
 
-        <label className="field">
-          <span className="field__label">Password</span>
-          <input
-            className="input"
-            type="password"
-            autoComplete="current-password"
-            required
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-          />
-        </label>
-
-        {error && (
-          <p className="notice notice--refused sign-in__error" role="alert">
-            {error}
-          </p>
-        )}
-
-        <button
-          type="submit"
-          className="button button--primary sign-in__submit"
-          disabled={working}
-        >
-          {working ? "Signing in…" : "Sign in"}
-        </button>
-
-        {/*
-         * The way out of the one situation this screen cannot otherwise
-         * resolve. Under the button rather than beside the password field: it
-         * is the answer to "that did not work", which is a thing people reach
-         * for after trying, not before.
-         */}
-        <p className="sign-in__forgot">
-          <Link to="/reset-password">Forgotten your password?</Link>
+      {error && (
+        <p className="notice notice--refused auth__error" role="alert">
+          {error}
         </p>
-      </form>
-    </main>
+      )}
+
+      <button
+        type="submit"
+        className="button button--primary auth__submit"
+        disabled={working}
+      >
+        {working ? "Signing in…" : "Sign in"}
+      </button>
+    </AuthShell>
   );
 }

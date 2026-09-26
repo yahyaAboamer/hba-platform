@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
-import { PasswordField } from "../components/PasswordField";
+import { AccountChip, AuthShell } from "../components/AuthShell";
+import { MINIMUM_PASSWORD, PasswordField } from "../components/PasswordField";
 import {
   ApiError,
   completePasswordReset,
@@ -9,10 +10,6 @@ import {
   requestPasswordReset,
 } from "../lib/api";
 import type { Session } from "../lib/api";
-import "./SignIn.css";
-
-/** §5.1. Enforced by the server; said here so nobody meets it as a rejection. */
-const MINIMUM_PASSWORD = 12;
 
 /**
  * Getting back in when the password is gone.
@@ -42,20 +39,6 @@ export function ResetPassword({
   );
 }
 
-function shell(children: React.ReactNode) {
-  return (
-    <main className="sign-in">
-      <div className="sign-in__form">
-        <div className="sign-in__brand">
-          <span className="sign-in__mark">HBA</span>
-          <h1 className="sign-in__title">Reset your password</h1>
-        </div>
-        {children}
-      </div>
-    </main>
-  );
-}
-
 function AskForALink() {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
@@ -77,58 +60,48 @@ function AskForALink() {
   }
 
   if (sent) {
-    return shell(
-      <>
+    return (
+      <AuthShell eyebrow="Reset password" title="Check your email">
         {/*
          * **Says "if", not "we have".** Confirming that mail is on its way
          * would tell anybody who typed an address whether that person is on
          * the programme - and the people here are named individuals whose
          * association with HBA is theirs to disclose, not this screen's.
          */}
-        <p className="sign-in__lead">
+        <p className="auth__lead">
           If there is an account for that address, a link is on its way. It
-          works once and expires in two hours.
+          works once and expires in two hours. Your current password still
+          works until then.
         </p>
-        <p className="sign-in__lead">
-          Nothing has changed yet — your current password still works until you
-          open the link and choose a new one.
-        </p>
-      </>,
+        <Link className="auth__link" to="/">
+          Back to sign in
+        </Link>
+      </AuthShell>
     );
   }
 
   return (
-    <main className="sign-in">
-      <form className="sign-in__form" onSubmit={submit}>
-        <div className="sign-in__brand">
-          <span className="sign-in__mark">HBA</span>
-          <h1 className="sign-in__title">Reset your password</h1>
-        </div>
-        <p className="sign-in__lead">
-          Type the address you sign in with and we will send you a link.
-        </p>
+    <AuthShell eyebrow="Reset password" title="Forgot your password?" onSubmit={submit}>
+      <label className="field">
+        <span className="field__label">Email</span>
+        <input
+          className="input"
+          type="email"
+          autoComplete="username"
+          required
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+        />
+      </label>
 
-        <label className="field">
-          <span className="field__label">Email address</span>
-          <input
-            className="input"
-            type="email"
-            autoComplete="username"
-            required
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-          />
-        </label>
-
-        <button
-          type="submit"
-          className="button button--primary sign-in__submit"
-          disabled={working || !email.trim()}
-        >
-          {working ? "Sending…" : "Send me a link"}
-        </button>
-      </form>
-    </main>
+      <button
+        type="submit"
+        className="button button--primary auth__submit"
+        disabled={working || !email.trim()}
+      >
+        {working ? "Sending…" : "Send me a link"}
+      </button>
+    </AuthShell>
   );
 }
 
@@ -150,7 +123,7 @@ function UseTheLink({
   const [error, setError] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
 
-  const tooShort = password.length > 0 && password.length < MINIMUM_PASSWORD;
+  const tooShort = password.length < MINIMUM_PASSWORD;
 
   useEffect(() => {
     let current = true;
@@ -193,63 +166,51 @@ function UseTheLink({
   }
 
   if (checking) {
-    return shell(<p className="sign-in__lead">Checking your link…</p>);
+    return (
+      <AuthShell eyebrow="Reset password" title="Choose a new password">
+        <p className="auth__lead">Checking your link…</p>
+      </AuthShell>
+    );
   }
 
   if (linkProblem) {
-    return shell(
-      <>
+    return (
+      <AuthShell title="This link cannot be used">
         <p className="notice notice--refused" role="alert">
           {linkProblem}
         </p>
-        <p className="sign-in__lead">
-          Ask for a new one from the sign-in screen — this link cannot be used.
-        </p>
-      </>,
+        <Link className="auth__link" to="/reset-password">
+          Ask for a new link
+        </Link>
+      </AuthShell>
     );
   }
 
   return (
-    <main className="sign-in">
-      <form className="sign-in__form" onSubmit={submit}>
-        <div className="sign-in__brand">
-          <span className="sign-in__mark">HBA</span>
-          <h1 className="sign-in__title">Choose a new password</h1>
-        </div>
+    <AuthShell eyebrow="Reset password" title="Choose a new password" onSubmit={submit}>
+      {account && <AccountChip email={account} />}
 
-        <p className="sign-in__lead">
-          For <strong>{account}</strong>. Anywhere you are already signed in
-          will be signed out.
+      <PasswordField
+        value={password}
+        onChange={setPassword}
+        personal={{ email: account ?? undefined }}
+        label="New password"
+        onProblemChange={setPasswordProblem}
+      />
+
+      {error && (
+        <p className="notice notice--refused auth__error" role="alert">
+          {error}
         </p>
+      )}
 
-        <PasswordField
-          value={password}
-          onChange={setPassword}
-          personal={{ email: account ?? undefined }}
-          minimum={MINIMUM_PASSWORD}
-          label="New password"
-          onProblemChange={setPasswordProblem}
-        />
-
-        {error && (
-          <p className="notice notice--refused sign-in__error" role="alert">
-            {error}
-          </p>
-        )}
-
-        <button
-          type="submit"
-          className="button button--primary sign-in__submit"
-          disabled={
-            working ||
-            tooShort ||
-            password.length === 0 ||
-            passwordProblem !== null
-          }
-        >
-          {working ? "Saving…" : "Save and sign in"}
-        </button>
-      </form>
-    </main>
+      <button
+        type="submit"
+        className="button button--primary auth__submit"
+        disabled={working || tooShort || passwordProblem !== null}
+      >
+        {working ? "Saving…" : "Save and sign in"}
+      </button>
+    </AuthShell>
   );
 }

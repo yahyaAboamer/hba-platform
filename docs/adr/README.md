@@ -85,6 +85,8 @@ what was chosen.
 | [0043](0043-type-as-the-exports-set-it.md) | Type as the exports set it: proportional figures, one weight | Accepted; amends 0039; controls amended by 0044 |
 | [0044](0044-controls-in-the-browsers-control-font.md) | Buttons in the browser's control font, as the approved page draws them | Accepted; amends 0043 |
 | [0045](0045-the-shopify-connection-is-edited-in-settings.md) | The Shopify connection is edited in Settings | Accepted; amends 0015 |
+| [0046](0046-a-model-abroad-applies-without-a-destination.md) | A model abroad applies without a payout destination | Accepted |
+| [0047](0047-the-sign-in-family-and-onboarding-use-a-filled-button.md) | Sign-in and onboarding: portal look, and a filled button | Accepted; a recorded divergence |
 
 **0014 is superseded by 0036** and **0038 by 0039**. **0027 keeps its
 principle and loses its mechanism to 0039**: an agreed figure is still set

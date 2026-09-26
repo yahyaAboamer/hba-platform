@@ -8,8 +8,8 @@ import type { Session } from "../lib/api";
 import { MyBestSellers, MyWardrobe } from "./MyWardrobe";
 import { storedTheme } from "../lib/theme";
 import { Apply } from "./Apply";
+import { ApplicationPending } from "./ApplicationPending";
 import { Glossary } from "./Glossary";
-import { MyDetails } from "./MyDetails";
 import type { Me } from "./MyDetails";
 import { MyCalculation } from "./MyCalculation";
 import { MyMonth } from "./MyMonth";
@@ -163,19 +163,18 @@ export function AffiliatePortal({ session }: { session: Session }) {
 
   // "Waiting" and "nothing here yet" are completely different messages to the
   // one person they are about, so they are never the same screen.
+  //
+  // Its own screen (`ApplicationPending`), and a header without the month
+  // picker: she has no months yet, so a control for choosing one was noise.
   if (mine.status === "pending") {
     return (
       <main className="affiliate" data-theme={theme}>
-        {header}
-        <section className="panel affiliate__panel">
-          <h2 className="panel__title">We have your application</h2>
-          <p className="affiliate__lead">
-            Someone at HBA is checking your discount code against the shop. You
-            will hear from us once that is done — there is nothing else for you
-            to do right now.
-          </p>
-        </section>
-        <MyDetails me={me} onChanged={load} />
+        <PortalHeader
+          name={me.name || session.actor.display_name || session.actor.email}
+          code={firstCode?.code ?? null}
+          codePending={firstCode ? !firstCode.verified : false}
+        />
+        <ApplicationPending me={me} onChanged={load} />
       </main>
     );
   }

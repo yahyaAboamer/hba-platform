@@ -269,3 +269,25 @@ def test_a_nonsense_measurement_is_refused_without_creating_a_half_application(a
 
     assert response.status_code == 422, response.text
     assert admin.get("/api/affiliates").json()["affiliates"] == []
+
+
+# ── Outside Egypt (ADR 0046) ─────────────────────────────────────────────────
+
+
+def test_applying_from_abroad_over_http(admin):
+    """No method and no destination: the application is accepted, and both
+    her screen and the maintainer's say why nothing is on file."""
+    token = _invite(admin, "nour@example.com")
+    model = _accept(token, "Nour")
+
+    body = {key: APPLICATION[key] for key in ("name", "phone", "code")}
+    created = model.post("/api/applications", json={**body, "abroad": True})
+    assert created.status_code == 201, created.text
+
+    me = model.get("/api/me").json()
+    assert me["payout_abroad"] is True
+    assert me["payout_destination"] is None
+
+    detail = admin.get(f"/api/affiliates/{created.json()['id']}").json()
+    assert detail["payout_abroad"] is True
+    assert detail["payout_destination"] is None

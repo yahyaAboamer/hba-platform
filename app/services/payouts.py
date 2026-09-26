@@ -348,6 +348,13 @@ def set_destination(
     if previous is not None:
         previous.superseded_at = now
 
+    # A destination on file answers "where is her money going", so the
+    # abroad flag that stood in for one is over (ADR 0046). Kept, not cleared,
+    # would leave admin arranging a transfer abroad for somebody the platform
+    # can now pay itself.
+    was_abroad = affiliate.payout_abroad
+    affiliate.payout_abroad = False
+
     record_audit(
         db,
         action="payout_destination.changed" if previous else "payout_destination.set",
@@ -360,7 +367,11 @@ def set_destination(
 
     # Section 6.4.5. Only on a *change* - the first destination is part of
     # applying and warning about it would make the warning meaningless.
-    if previous is not None:
+    #
+    # **Except after applying from abroad.** Her first destination then
+    # arrives later, on its own, and replaces an arrangement HBA was making
+    # by hand - which is exactly the news the maintainer's warning exists for.
+    if previous is not None or was_abroad:
         from app.services.notifications import (
             destination_changed,
             destination_changed_for_them,
