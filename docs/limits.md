@@ -2560,6 +2560,36 @@ card shows an em dash for the counts and says the numbers were not kept on the
 old dashboard. This is the one place a pre-go-live month reads differently from
 a current one.
 
+## A code's backfill stopped at 1,000 orders, and said it had succeeded
+
+**What it looked like:** the first model tried on staging (HBA10) had a full
+January and February, a partial March, nothing from April to August, and
+September's orders again. *Refresh now* changed nothing: it re-reads only the
+last 48 hours. No job had failed; the 19 stopped jobs were unrelated.
+
+**The cause:** registering a code queues a backfill that attaches the orders it
+already had, 500 at a time, each batch queuing the next. Every continuation
+used the same dedupe key (`…:more`). The second batch is still *running* when it
+queues the third, so the third collided with it and was absorbed. Every backfill
+stopped after two batches, oldest orders first, and both jobs reported
+*succeeded*. The one test of the continuation checked only that the first was
+queued. Orders arriving later were unaffected, because indexing an order
+attributes it.
+
+**The fix** (`app/services/commission/backfill.py`): each continuation carries a
+cursor, `(business_month, shopify_order_id)`, and a key naming it. Orders held
+for a person (two owners) are passed over instead of being read again by every
+batch, which would also have stalled a code with 500 of them. **`ATTACH_ORPHANS`**
+runs hourly and re-queues the backfill of any code that still has an order in
+its months that belongs to nobody and would resolve to it. That repairs codes
+already stalled without anyone doing anything, and is the net under the next
+failure of this kind. Tests go through the real worker, past two batches.
+
+**Check a code on a live database, read-only:** per month, count orders in
+`order_index` carrying the code against those with an `attributed_order` row.
+Indexed but unattached means attribution. Missing from `order_index` altogether
+means the import, and `docs/repair/order_import_compare.py` is the proof.
+
 ## Business rules with deliberate exposure
 
 These are not bugs. They are accepted costs, recorded so nobody "fixes" them.

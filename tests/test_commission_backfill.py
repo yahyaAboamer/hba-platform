@@ -375,3 +375,130 @@ def test_a_long_backfill_queues_its_own_continuation(db):
     db.flush()
 
     assert db.query(BackgroundJob).filter_by(kind=JobKind.BACKFILL_CODE).count() == 1
+
+
+# ── Past the second batch (staging, 26 September) ──────────────────────────────
+#
+# HBA10 was attached from January to the middle of March and nothing after.
+# Every continuation shared one dedupe key; the second was still running when
+# it queued the third, so the third was absorbed and the backfill stopped at
+# two batches - with every job reporting *succeeded*. The test above checks
+# only that the first continuation is queued, which is why nothing caught it.
+
+
+@pytest.fixture()
+def small_batches():
+    import app.services.commission.backfill as backfill_module
+
+    original = backfill_module.MAX_ORDERS_PER_RUN
+    backfill_module.MAX_ORDERS_PER_RUN = 2
+    yield
+    backfill_module.MAX_ORDERS_PER_RUN = original
+
+
+def _drain(db) -> None:
+    from app.worker import run_one
+
+    for _ in range(100):
+        if not run_one(db, worker_id="test"):
+            return
+    raise AssertionError("the queue did not drain")
+
+
+def _attached(db, affiliate_id) -> int:
+    db.expire_all()
+    return db.query(AttributedOrder).filter_by(affiliate_id=affiliate_id).count()
+
+
+def test_a_backfill_finishes_however_many_batches_it_takes(fresh_database, small_batches):
+    """Through the real worker, as on staging: seven orders in batches of two
+    is four batches, and the old key stopped after the second.
+    """
+    from app.db import SessionLocal
+
+    with SessionLocal() as db:
+        for index in range(7):
+            _order(db, f"41{index:02d}", month=f"2026-0{index + 1}")
+        affiliate = _affiliate(db, code="NOUR10")
+        db.commit()
+
+        _drain(db)
+
+        assert _attached(db, affiliate.id) == 7
+        steps = db.query(BackgroundJob).filter_by(kind=JobKind.BACKFILL_CODE).all()
+        assert len(steps) == 4
+        assert {step.status for step in steps} == {"succeeded"}
+
+
+def test_an_order_held_for_a_person_does_not_stop_the_rest(fresh_database, small_batches):
+    """Two owners hold an order rather than guess. Those orders stay unattached,
+    so a batch that read them again every time would never reach past them.
+    """
+    from app.db import SessionLocal
+
+    with SessionLocal() as db:
+        _affiliate(db, name="Sara", code="SARA10")
+        for index in range(3):
+            held = _order(db, f"42{index:02d}", month="2026-01")
+            held.discount_codes = ["NOUR10", "SARA10"]
+        for index in range(3):
+            _order(db, f"43{index:02d}", month="2026-02")
+        db.flush()
+        affiliate = _affiliate(db, code="NOUR10")
+        db.commit()
+
+        _drain(db)
+
+        assert _attached(db, affiliate.id) == 3
+        assert db.get(AttributedOrder, "4200") is None
+
+
+def test_the_hourly_sweep_finds_a_code_with_orders_belonging_to_nobody(db):
+    from app.services.commission.backfill import codes_with_orphans
+
+    nour = _affiliate(db, code="NOUR10")
+    _affiliate(db, name="Sara", code="SARA10")
+    backfill_code(db, "NOUR10", "2026-01")
+    assert codes_with_orphans(db) == []
+
+    # Indexed without going through attribution: what a stalled backfill left.
+    _order(db, "4401")
+    assert [(p.code, p.affiliate_id) for p in codes_with_orphans(db)] == [
+        ("NOUR10", nour.id)
+    ]
+
+    # A held order is a person's decision; queuing again would change nothing.
+    backfill_code(db, "NOUR10", "2026-01")
+    held = _order(db, "4402")
+    held.discount_codes = ["NOUR10", "SARA10"]
+    db.flush()
+    assert codes_with_orphans(db) == []
+
+
+def test_the_sweep_repairs_a_code_whose_backfill_stopped(fresh_database):
+    """What staging needs: orders already indexed, nobody's, and the code's own
+    backfill long since finished. The sweep queues it again and it completes.
+    """
+    from app.db import SessionLocal
+    from app.services.jobs import enqueue
+
+    with SessionLocal() as db:
+        affiliate = _affiliate(db, code="NOUR10")
+        db.commit()
+        _drain(db)
+        for index in range(3):
+            _order(db, f"45{index:02d}", month="2026-05")
+        db.commit()
+        assert _attached(db, affiliate.id) == 0
+
+        enqueue(db, JobKind.ATTACH_ORPHANS, {})
+        db.commit()
+        _drain(db)
+
+        assert _attached(db, affiliate.id) == 3
+
+
+def test_the_sweep_is_on_the_schedule():
+    from app.services.schedule import SCHEDULE
+
+    assert JobKind.ATTACH_ORPHANS in SCHEDULE

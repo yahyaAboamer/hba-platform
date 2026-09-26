@@ -76,6 +76,12 @@ class JobKind:
     #: an email to staff who record targets and have not turned it off.
     TARGETS_REMINDER = "targets_weekly_reminder"
 
+    #: Find registered codes that still have orders belonging to nobody, and
+    #: queue their backfill again. The backfill is what attaches them; this is
+    #: what notices when it did not finish (staging, 26 September: HBA10 stopped
+    #: at 1,000 orders and every job said *succeeded*).
+    ATTACH_ORPHANS = "attach_orphaned_orders"
+
 
 class PermanentFailure(Exception):
     """A job failure that retrying cannot fix.

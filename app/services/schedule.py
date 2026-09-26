@@ -44,6 +44,9 @@ SCHEDULE: dict[str, tuple[timedelta, dict]] = {
     # Settings → Appearance. Roughly weekly; who receives it is decided when
     # it runs (app.services.staff_prefs).
     JobKind.TARGETS_REMINDER: (timedelta(days=7), {}),
+    # A query and, usually, nothing more (app.services.commission.backfill).
+    # Hourly so a code whose backfill stopped is whole again the same hour.
+    JobKind.ATTACH_ORPHANS: (timedelta(hours=1), {}),
 }
 
 
