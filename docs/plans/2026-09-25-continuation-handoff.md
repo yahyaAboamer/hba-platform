@@ -66,25 +66,48 @@ which were all already in `repair/batch-2`.
 platform runs and the form refuses to save, by design. Migrations
 `c3d51e7a0002` and `d4e7a2c90003` apply on deploy (additive).
 
+**Promoted to `production` on the owner's instruction of 26 September**:
+`production` fast-forwarded from `6a13958` to `156e65b`, level with `main`
+(ADR 0034). The three migrations it applies (`b1f0a40c0001`, `c3d51e7a0002`,
+`d4e7a2c90003`) are additive: a nullable column and a widened constraint on
+`payroll_adjustment`, and two new tables; nothing existing is rewritten. The
+release gates in `CLAUDE.md` had not been run; the owner promoted knowing
+that. On production, too, the connection form needs its own sealed
+`SETTINGS_ENCRYPTION_KEY` on `hba-platform`; and the weekly targets reminder
+(item 11) starts about a week after the deploy, to staff who record targets.
+
 **Not verified from here:** this session's network policy blocks the staging
 domain and the Railway connector sees no projects, so the deploy's success
 and a look at staging are the owner's to confirm.
 
 ## The other branches (checked with full history, 26 September)
 
-- **11 `phase*` branches** (`phase04b` ... `phase09`): every commit is in
-  `main`. Nothing to merge; they are labels from the build phase. Safe to
-  delete - not deleted, the owner decides.
-- **`repair/batch-1-financial-rules`**: fully in `repair/batch-2`, so in
-  `main` with this merge. Safe to delete afterwards.
-- **`feat/portal-dark-mode`** (5 commits, 31 August): a warm "lamplight"
-  dark theme for the portal with a light/dark/auto pick on My details, and
-  an ADR numbered 0035. **Superseded**: the redesign since made dark the
-  portal's default with its own theme system (`lib/theme.ts`, the export's
-  Appearance switch), and `main`'s ADR 0035 is a different decision. A merge
-  conflicts in `lib/theme.ts` and `MyDetails.tsx` and would bring back a
-  palette the approved exports replaced. Recommendation: do not merge; delete
-  it (or keep it only as a reference). Not deleted - the owner decides.
+The owner asked for all 13 below to be deleted. **This session could not
+delete them**: the git proxy refuses branch deletion (HTTP 403), while
+ordinary pushes succeed. They need deleting on GitHub (Branches page). Tips,
+so any of them can be restored (`git push origin <sha>:refs/heads/<name>`):
+
+| Branch | Tip | In `main`? |
+|---|---|---|
+| `feat/portal-dark-mode` | `4d501c320001465694a4b64a7d3b797295c3cafb` | **no** - superseded (see below) |
+| `phase04b/model-targets` | `d0cea97c2ec96f0e80d69b1c865c0c414c82a050` | yes |
+| `phase05a/pending-inclusive-earnings` | `6f69bddd60672a4c993500968caa32c5cae9a737` | yes |
+| `phase05b/immutable-approval` | `50a07d2060ce4bfd59684cdadab6831fe10175f1` | yes |
+| `phase05c/late-failure-corrections` | `b6203f80f403194910a5bf0d690bdb6234f5e761` | yes |
+| `phase06a/admin-month-end-payments` | `13a53f2d4b45f9b237b51be84ac0a49378dbce08` | yes |
+| `phase06b/model-payment-views` | `ace8c36b2f61938d0fe31b84e14f7b5fc22e7ee2` | yes |
+| `phase07/d03-d08-ranking-and-pace` | `75b08fe41bf88bc54ff4704ceeaeb0fe509c9616` | yes |
+| `phase07a/model-home-and-orders` | `d11c46df358425952deb021865d5844be92bd800` | yes |
+| `phase07b/owner-home-and-analytics` | `96d3ecfa40feed3f11afc0f8f85f4386956485a5` | yes |
+| `phase08/settings-and-notices` | `3196f08927ff6d2bd297abae4594bcfc5be25aef` | yes |
+| `phase09/rehearsal-and-release` | `a392165c942a9708d3295744a968a0d56f44eadd` | yes |
+| `repair/batch-1-financial-rules` | `723022e8e01c2df6e12b0d1f44b7c33ef838bfef` | yes |
+
+`feat/portal-dark-mode` (31 August) was a warm "lamplight" portal dark
+theme with a light/dark/auto pick and an ADR numbered 0035. The redesign
+since made dark the default with its own theme system, and `main`'s ADR 0035
+is a different decision; it conflicts and would bring back a replaced
+palette. Deleting it loses nothing the product uses.
 
 ## Remaining implementation (the one list, in its order)
 

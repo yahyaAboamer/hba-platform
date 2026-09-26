@@ -1319,8 +1319,11 @@ Code hygiene (no behaviour)
     confirmed.** No longer questions; each is recorded under *Owner decisions
     standing* below with where it stands.
 
-34. **Permissions**: merging to `main` and promoting to `production` are two
-    separate decisions; neither is given.
+34. ~~**Permissions**~~: both given by the owner on 26 September, in
+    order: merged to `main` (staging) and promoted to `production`, both at
+    `156e65b`. Each future merge and promotion needs its own yes again.
+    **Not verified from the session** (its network cannot reach staging or
+    production): the owner confirms both deploys came up.
 
 ### Owner decisions standing (not open)
 

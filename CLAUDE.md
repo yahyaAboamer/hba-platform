@@ -53,8 +53,15 @@ is not that sentence. Promotion is its own decision and needs its own yes.
 If a memory or an older document tells you to promote automatically, it is
 describing the build phase. This paragraph is the current one.
 
-**Read the remote before describing the remote.** `origin/main` and
-`origin/production` are both at `6a13958` — level, a gap of zero. A document
+**26 September 2026: the owner authorised both, separately and in that
+order** - the repair (through batch J's follow-up) was merged to `main`
+(staging), then promoted to `production`; both at `156e65b`. That was one
+merge and one promotion, each by his explicit instruction. **The standing rule
+above is unchanged**: the next merge and the next promotion each need their
+own yes again.
+
+**Read the remote before describing the remote.** Check with `git ls-remote`
+rather than trusting this file; on 26 September both were at `156e65b`. A document
 in this repository claimed production was *122 commits behind* for a day;
 that number came from the **local** `production` ref, which nobody had
 updated. `git ls-remote --heads origin main production` is the check, and a
