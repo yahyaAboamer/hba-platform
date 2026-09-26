@@ -103,7 +103,7 @@ This replaces two older instructions that still appear in old handoffs:
 **"run the suite in fifteen groups of five files"** and the hand-written
 `while read` loop. Both are superseded; the runner is that loop, hardened.
 
-**Current: 2,097 tests, 82 files, all passing** (26 September 2026),
+**Current: 2,135 tests, 85 files, all passing** (27 September 2026),
 reconciling exactly with `--collect-only`. No change merges below that. On
 this machine a full pass took three calls and about an hour.
 
@@ -136,7 +136,7 @@ prefer the foreground when it is tight.
 ### Frontend
 
 ```
-cd frontend && npm test          # 445 tests, 23 files
+cd frontend && npm test          # 477 tests, 28 files
 cd frontend && npm run build     # this is the typecheck
 ```
 
