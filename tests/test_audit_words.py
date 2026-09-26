@@ -17,8 +17,11 @@ APP = Path(__file__).resolve().parents[1] / "app"
 def _written_actions() -> set[str]:
     found = set()
     for path in APP.rglob("*.py"):
-        found |= set(re.findall(r'action="([a-z_]+\.[a-z_]+)"', path.read_text()))
-        found |= set(re.findall(r'"(payout_destination\.(?:set|changed))"', path.read_text()))
+        # UTF-8 said out loud: Windows defaults to cp1252, and audit_words.py's
+        # curly quotes stop that decoding - the test failed there, and only there.
+        source = path.read_text(encoding="utf-8")
+        found |= set(re.findall(r'action="([a-z_]+\.[a-z_]+)"', source))
+        found |= set(re.findall(r'"(payout_destination\.(?:set|changed))"', source))
     return found
 
 
