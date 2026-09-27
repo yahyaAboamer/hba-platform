@@ -1,4 +1,4 @@
-# Where the work is — 27 September 2026 (batches K and L)
+# Where the work is — 27 September 2026 (batches K, L and M)
 
 **Replaces `2026-09-25-continuation-handoff.md`**, which is kept with a banner
 for its record of batch J, its follow-up, the merge and promotion of 26
@@ -12,13 +12,13 @@ Read on 27 September; re-read the remote before describing it
 | | |
 |---|---|
 | **Branch** | `repair/batch-2` |
-| **Last code commit** | `8ed17fb` (batch L). This handoff is committed after it: run `git rev-parse --short HEAD` for the current head |
-| **`origin/repair/batch-2`** | `8ed17fb` |
-| **`origin/main`** (staging) | `8ed17fb` - level with the branch's code |
+| **Last code commit** | `27f1794` (batch M and ADR 0049). This handoff is committed after it: run `git rev-parse --short HEAD` for the current head |
+| **`origin/repair/batch-2`** | the handoff commit after `27f1794` |
+| **`origin/main`** (staging) | fast-forwarded to the branch on the owner's instruction of 27 September (*merge everything to the main*) - level with it |
 | **`origin/production`** | `156e65b` - 6 commits behind `main` (see *Production*) |
 | **Migration head** | `d7a2c4e10003` (a model paid outside Egypt, batch K, ADR 0046) ← `d4e7a2c90003` ← `c3d51e7a0002` ← `b1f0a40c0001`; `alembic heads` reports the one head |
-| **Backend** | **2,145 tests, 86 files, all passing** through `run-suite.sh` on `8ed17fb` (batch L's own run, recorded in its commit). Re-checked 27 September with `--collect-only`: 2,145 in 86 files. That is a count, not a new run |
-| **Frontend** | **492 tests, 29 files, all passing**, re-run 27 September on `8ed17fb`. `npm run build` green in batch L's run; not re-run for this handoff |
+| **Backend** | 86 files through `run-suite.sh` at `2c20b96`: 85 passed, `test_portal_api.py` failed on the one test pinning D03's old use rule; fixed in `27f1794` (a test-only change) and the file re-run: 108/108. No application code changed between the two |
+| **Frontend** | **500 tests, 30 files, all passing** on `27f1794`; `npm run build` green |
 | **Where this ran** | this Windows machine; the disposable Postgres in Docker on 5433 (`hba_platform_test`) |
 
 ## Standing restrictions
@@ -38,6 +38,8 @@ Read on 27 September; re-read the remote before describing it
 | `af0e6ad` | **Batch K - the way in, in the portal's look** (owner's audit of 26 September, from the mockup he approved). Sign in, invitation, reset, first run, the application and the waiting screen. Password minimum 8 from one constant (three screens still enforced 12). One dark portal frame (`AuthShell`), a two-step bar, the details form trimmed, *In Egypt / Outside Egypt*, the InstaPay guide folded, the waiting screen *In review* with a four-step path. **Outside Egypt now applies** (ADR 0046, migration `d7a2c4e10003`). A filled green button with dark text inside `.auth` only (ADR 0047) |
 | `fbdd3bc` | `test_audit_words` reads source as UTF-8 (on Windows it failed on the curly quotes whatever the code did) |
 | `6f3e1b3` | `CLAUDE.md`: the suite after batches J and K |
+| `2c20b96` | **Batch M - the portal Orders tab, Home's counts into it, every order a code use.** From the owner-approved Orders audit: the figure in Inter and the sentence's divider as the export draws them; an error keeps the title and offers Retry; true empty-filter and zero-month sentences; a struck figure read aloud as *not earned*. Home shows three outcomes (delivered, pending, failed - failed holding failed deliveries, cancellations and refunds), each opening its Orders filter (ADR 0048 amended). **Every order is a code use** (ADR 0049, superseding D03's definition; `docs/RULES.md`). Evidence `shots/batch-m/`, CHECKLIST *Batch M* |
+| `27f1794` | `test_portal_api`: the last test pinning D03's refused-parcel exclusion |
 | `8ed17fb` | **Batch L - the model's Home past the export** (owner's decisions of 27 September, ADR 0048). One request, `GET /api/me/home/{month}`; the month once, as a control opening a bottom sheet shared with Orders and Ranking; *Earned* and *Next payment · Around 3 October* in one card; every order outcome, so the parts add up to the uses; a like-for-like comparison worked out on the server in Cairo days; rank, average order and content tiles; *Share your code*; the year as bars; tab icons; her code as a copy chip; Payments opens with *Coming up* |
 
 Each batch's own check, from its commit: K - 82 backend files (2,097 tests),
@@ -70,6 +72,13 @@ Promotion is its own permission, and the release gates below have not run.
 
 ## Remaining, in order
 
+0. **Deferred from the Orders audit (owner, 27 September):** the header's
+   inline code chip is 50 x 19px on Orders and Ranking (below 24px) - a
+   shared-header fix; the portal month is not in the URL, so a reload
+   returns to the current month - a portal-shell change; the comment in
+   `app/services/portal.py` (~line 1175) that still says *not recorded*.
+   Staging, signed in: Home's three outcomes and their links, and the
+   code-use counts after ADR 0049.
 1. **Evidence for K and L in the parity documents.** Neither batch added a
    section to `docs/repair/batch-2/visual/CHECKLIST.md`, a row to
    `SCREEN_MATRIX.md`, or committed captures; their evidence is the commit
@@ -133,11 +142,17 @@ Neither has run; do not describe the repair as releasable.
   Everywhere else the export's hairline primary stands.
 - **The model's Home goes past the export exactly as ADR 0048 names**; the
   export stays the reference for everything it does not name.
+- **Home shows three order outcomes** - delivered, pending, failed - and
+  each opens its Orders filter (ADR 0048, amended 27 September).
+- **The Orders *Failed* filter holds failed deliveries, cancellations and
+  refunds**; each row's chip names which.
+- **A code use is every order**, whatever became of it (ADR 0049). Orders
+  counted is delivered and pending.
 - **The comparison is like for like**, same days of the month before, Cairo
   days, on the server.
 - **An ended month nobody approved reads *Awaiting approval***.
-- **A use is every order but a failed delivery** (D03, unchanged); Home shows
-  all five outcomes so they add up.
+- ~~A use is every order but a failed delivery (D03)~~ - superseded by ADR 0049
+  the same day: every order is a use.
 - **Better than the export is welcome** (owner, 27 September) - through a
   mockup the owner approves and an ADR recording the divergence. It is not licence
   to diverge without both.
