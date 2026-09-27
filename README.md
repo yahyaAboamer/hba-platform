@@ -9,7 +9,7 @@ commission and payroll module.
 |---|---|
 | **How the platform must behave** | [`docs/RULES.md`](docs/RULES.md) — the rules, one shared source for every agent and person |
 | **How to work in this repository** | [`CLAUDE.md`](CLAUDE.md) — verification, branches, the browser harness |
-| **Where the work is right now** | [`docs/plans/2026-09-24-continuation-handoff.md`](docs/plans/2026-09-24-continuation-handoff.md) |
+| **Where the work is right now** | [`docs/plans/2026-09-27-continuation-handoff.md`](docs/plans/2026-09-27-continuation-handoff.md) |
 | **Why it is built this way** | [`docs/adr/`](docs/adr/README.md) — architecture decision records |
 | **What will eventually break** | [`docs/limits.md`](docs/limits.md) — known limits and foreseeable failures |
 | **What it does** | [`docs/specs/2026-08-22-hba-platform-v1-design.md`](docs/specs/2026-08-22-hba-platform-v1-design.md) |

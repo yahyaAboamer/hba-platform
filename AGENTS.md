@@ -10,7 +10,7 @@
    superseded and by what. It is named for one tool and applies to all of
    them; renaming it would break the tooling that loads it automatically.
 
-Then **[`docs/plans/2026-09-24-continuation-handoff.md`](docs/plans/2026-09-24-continuation-handoff.md)**
+Then **[`docs/plans/2026-09-27-continuation-handoff.md`](docs/plans/2026-09-27-continuation-handoff.md)**
 for where the work actually is — branch, commit, next task.
 
 ## Why this file is three links and nothing else
@@ -29,8 +29,8 @@ in `CLAUDE.md`. Nothing but pointers lives here.
 
 They are in `docs/RULES.md` in full. In one line each:
 
-- **No merge, no deployment.** The repair stays on its branch until the owner
-  says otherwise.
+- **No merge, and separately no deployment**, without the owner's explicit
+  permission for each, each time (`CLAUDE.md`).
 - **Historical finalisation stays locked** behind
   `HISTORICAL_FINALISATION_UNLOCKED` until HBA supplies and verifies what
   `docs/repair/HISTORICAL-INFORMATION-NEEDED.md` lists.

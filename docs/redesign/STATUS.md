@@ -1,7 +1,7 @@
 # Implementation status — correction in progress
 
 > **SUPERSEDED as a statement of position, 24 September 2026.** Where the work
-> is now: [`../plans/2026-09-24-continuation-handoff.md`](../plans/2026-09-24-continuation-handoff.md).
+> is now: [`../plans/2026-09-27-continuation-handoff.md`](../plans/2026-09-27-continuation-handoff.md).
 > Per-screen state: `parity/SCREEN_MATRIX.md`. This file is kept for the
 > paragraph below on how the redesign came to be called complete when it was
 > not — that is worth re-reading and is still true.

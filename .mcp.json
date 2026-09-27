@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "jev-browser": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@jkudish/jev-browser"
+      ]
+    }
+  }
+}

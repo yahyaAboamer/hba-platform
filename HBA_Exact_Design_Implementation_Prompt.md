@@ -1,5 +1,15 @@
 # HBA — implement the approved interface faithfully
 
+> **Status, 27 September 2026.** The owner's instruction of 12 September. It
+> remains the definition of a screen being done (`CLAUDE.md`). Three kinds of
+> statement in it now defer elsewhere and were edited to point there:
+> business rules, including how money is formatted → `docs/RULES.md`; merge
+> and deployment permissions → `CLAUDE.md`; current work (§8's *Start now*
+> was the 12 September starting point) → the continuation handoff named in
+> `CLAUDE.md`. Divergences the owner has approved since, through a mockup
+> and an ADR (0047, 0048), override the export for what they name - that is
+> §1's authority item 1, not a licence to redesign.
+
 I am correcting the acceptance standard for this work. Implement the approved admin and model interfaces throughout the existing application. Match their structure, content, wording, typography, colors, spacing, surfaces and interactions. Do the implementation and verification; do not stop after proposing a plan.
 
 The Targets and Payments screenshots are examples of a platform-wide problem. They are not the entire scope. Every main tab, nested tab, secondary page, drawer, modal, menu, form, detail view and meaningful state belongs in this work.
@@ -23,7 +33,7 @@ Authority:
 2. Otherwise, the approved HTML defines the interface, including exact static wording.
 3. Existing code is an implementation to correct, not a competing design authority.
 
-Known later decisions include keeping **E£**, whole-pound payout rounding, optional feature-request messages, the approved whole-year target-requirements capability and target-confirmation behavior, and the other closed decisions already recorded in the project. Do not reopen settled questions. Whole-pound payout rounding does not authorize rounding sales or rewriting the integer-piastres calculation policy everywhere.
+Known later decisions (recorded in `docs/redesign/decisions/` and `docs/adr/`; the rules they produce, including the money format, are stated in `docs/RULES.md` and not here) include whole-pound payout rounding, optional feature-request messages, the approved whole-year target-requirements capability and target-confirmation behavior, and the other closed decisions already recorded in the project. Do not reopen settled questions. Whole-pound payout rounding does not authorize rounding sales or rewriting the integer-piastres calculation policy everywhere.
 
 The export's outer “Complete prototype” wrapper, laptop-width controls, review-scenario buttons and fake phone furniture are demonstration tools, not product UI. Do not reproduce them in the application. Real names, amounts, months, products and images come from the backend; do not copy sample data into live screens.
 
@@ -80,7 +90,7 @@ Payments must reproduce:
 - Three separate rounded summary cards with their own surfaces, gaps and semantic value colors; not one flat strip with vertical dividers.
 - The reference filter buttons, selected state, counts and search placement above the table.
 - The Model / To receive / Destination / State / Next action table, with the corresponding hierarchy, concise labels, badges, row heights and action styling.
-- Recorded amounts and payment destinations in their intended places. Keep E£ as I approved. Show authorized destination details and open the exact saved InstaPay link in the appropriate payment view; do not fabricate or unnecessarily mask details the finance workflow requires.
+- Recorded amounts and payment destinations in their intended places. Format money as `docs/RULES.md` states. Show authorized destination details and open the exact saved InstaPay link in the appropriate payment view; do not fabricate or unnecessarily mask details the finance workflow requires.
 - State-appropriate Review / Record payment / Open actions with the correct model and month maintained through navigation and reloads.
 
 Do not copy the reference's sample “Fully paid” states into records that are awaiting approval. A difference in business state is legitimate; inventing long alternative wording or a different layout for the same state is not. Identify each card/row amount's actual meaning before binding it; do not interchange earnings, approved amounts, transfers and remaining balances just because they are all money.
@@ -109,7 +119,7 @@ For each batch:
 
 Do not weaken or delete valid tests to make the redesign green. Update tests that encode superseded layout/copy only when their former behavioral guarantee is still covered. Backend tests must use a positively identified disposable database; the project's test setup can drop its schema. Never point it at development, staging or production to save setup time.
 
-Before any already-authorized merge/promotion, complete the applicable batch checks. Preserve my standing instruction to keep production aligned with staging after verified merges; do not mistake that deployment instruction for proof that the design has passed. After deployment, verify the expected build actually loaded, hard-refresh stale assets as needed, and inspect the deployed result. Do not change deployment permissions through this prompt.
+Before any already-authorized merge/promotion, complete the applicable batch checks. Whether a merge or a deployment is authorized is governed by `CLAUDE.md`, not by this document; a deployment is never proof that the design has passed. After deployment, verify the expected build actually loaded, hard-refresh stale assets as needed, and inspect the deployed result. Do not change deployment permissions through this prompt.
 
 If browser access or rendering fails, continue useful source work but mark visual verification blocked. State precisely what access is missing and request only that. Do not replace visual evidence with a computed-style scan or claim completion anyway.
 

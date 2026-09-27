@@ -1,3 +1,9 @@
+> **Superseded on 27 September 2026 by
+> [`2026-09-27-continuation-handoff.md`](2026-09-27-continuation-handoff.md).**
+> Kept for its record of batch J, its follow-up, the merge and promotion of
+> 26 September and the old branches' tips; its *exact position* table and
+> *remaining* lists are no longer current.
+
 # Where the work is — 25 September 2026 (batch J)
 
 **Replaces `2026-09-24-continuation-handoff.md`**, which is kept with a banner
