@@ -110,6 +110,27 @@
   line-height: normal;
   text-align: left;
   cursor: pointer;
+  transition: background-color 120ms ease;
+}
+
+/* A tap is answered on a phone too: hover never fires there, so the row gave
+   no sign it had been pressed (ADR 0050). */
+.affiliate .orders__button:active {
+  background: var(--hover);
+}
+
+/* Says the row opens, and turns when it has. It sits on the pill's line in
+   the amount column, so it can never cover a figure. Not a target of its own:
+   the whole row is. */
+.affiliate .orders__chevron {
+  display: block;
+  margin: 7px 0 0 auto;
+  color: var(--faint);
+  transition: transform 160ms ease;
+}
+
+.affiliate .orders__button[aria-expanded="true"] .orders__chevron {
+  transform: rotate(180deg);
 }
 
 /* Only where a pointer really hovers. On a phone the state sticks after a
@@ -181,6 +202,7 @@
 
 .affiliate .orders__net {
   display: block;
+  font-variant-numeric: tabular-nums;
   margin-top: 5px;
   font-size: 12.5px;
   color: var(--quiet);
@@ -190,6 +212,21 @@
 
 .affiliate .orders__detail {
   padding: 0 15px 14px;
+  animation: orders-in 140ms ease-out;
+}
+
+@keyframes orders-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .affiliate .orders__button,
+  .affiliate .orders__chevron,
+  .affiliate .orders__detail {
+    transition: none;
+    animation: none;
+  }
 }
 
 /* What was in an order. Inside the expansion, quiet, and never beside the
@@ -223,26 +260,136 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* The sentence that says what happened to this order. Ruled off rather than
-   tinted: it belongs to the row it sits in, and a tint would make it a second
-   card inside the first. One step stronger than the lines between products,
-   as the export draws it (its `--line` against `--div`). */
-.affiliate .orders__explain {
+/* Three facts in place of a paragraph (ADR 0050). Ruled off rather than
+   tinted: they belong to the row they sit in, and a tint would make them a
+   second card inside the first. One step stronger than the lines between
+   products, as the export draws its sentence (its `--line` against `--div`). */
+.affiliate .orders__facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 7px 16px;
   margin: 0;
   padding: 11px 0 0;
   border-top: 1px solid var(--rule-strong);
   font-size: 13px;
-  line-height: 1.55;
-  color: var(--quiet);
+  line-height: 1.45;
 }
 
-.affiliate .orders__explain + .orders__explain {
-  margin-top: 11px;
+.affiliate .orders__facts dt {
+  color: var(--faint);
+}
+
+.affiliate .orders__facts dd {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  text-align: right;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The export's ⓘ, as Targets draws it - at 24px, the web's minimum target
+   (WCAG 2.2 AA), where Targets' is 22. */
+.affiliate .orders__info {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--rule-strong);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--quiet);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.affiliate .orders__info[aria-expanded="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.affiliate .orders__info:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* What the ⓘ opens. */
+.affiliate .orders__why {
+  margin: 10px 0 0;
+  padding: 12px 13px;
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--quiet);
 }
 
 /* The list could not be read. Under the title, where the filters would be. */
 .affiliate .orders__error {
   margin-top: 13px;
+}
+
+/* What happens next, under a month still open with nothing in it. */
+.affiliate .orders__hint {
+  margin: 6px 0 0;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--faint);
+}
+
+/* ── Loading, in the page's own shape ─────────────────────────────────────
+ *
+ * Four chips and three rows at the real row height, so the list arriving
+ * moves nothing (ADR 0050). Still, not shimmering: nothing here needs motion.
+ */
+.affiliate .orders__skeleton-chip {
+  flex: 1 1 auto;
+  height: 38px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+}
+
+.affiliate .orders__skeleton {
+  display: flex;
+  justify-content: space-between;
+  height: 92px;
+  margin-top: 10px;
+  padding: 14px 15px;
+  box-sizing: border-box;
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.affiliate .orders__skeleton > span {
+  display: flex;
+  flex-direction: column;
+  width: 50%;
+}
+
+.affiliate .orders__skeleton > span:last-child {
+  align-items: flex-end;
+}
+
+.affiliate .orders__skeleton i {
+  display: block;
+  height: 11px;
+  border-radius: 6px;
+  background: var(--rule-strong);
+}
+
+.affiliate .orders__skeleton i + i {
+  margin-top: 9px;
+}
+
+/* A row given keyboard focus scrolls clear of the sticky header and the tab
+   bar, so neither covers it (WCAG 2.2 *focus not obscured*). */
+html:has(.affiliate .orders__head) {
+  scroll-padding-top: 76px;
+  scroll-padding-bottom: 96px;
 }
 
 /* True of the whole list, so it sits under it rather than on any one row. */

@@ -48,6 +48,7 @@ from sqlalchemy import (
     String,
     text,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -175,6 +176,13 @@ class OrderLineItem(Base):
     #: archived later must not rewrite what she was sent.
     title: Mapped[str] = mapped_column(String(400), nullable=False)
     variant_title: Mapped[str | None] = mapped_column(String(200))
+    #: The variant's options, name and value, as Shopify returns them
+    #: (`[{"name": "Size", "value": "XL"}]`), because the variant title alone
+    #: does not say which value is the size (ADR 0050). NULL: never read with
+    #: options. `[]`: read, and the variant had none or has been deleted.
+    #: `none_as_null`: Python None is SQL NULL, not the JSON value `null`, so
+    #: the sweep's `IS NULL` finds it - the default would hide it forever.
+    selected_options: Mapped[list[dict] | None] = mapped_column(JSONB(none_as_null=True))
     sku: Mapped[str | None] = mapped_column(String(200))
 
     quantity: Mapped[int] = mapped_column(Integer, nullable=False)

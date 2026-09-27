@@ -169,7 +169,7 @@ query OrderLineItems($id: ID!) {
         quantity
         variantTitle
         product { id legacyResourceId }
-        variant { id legacyResourceId }
+        variant { id legacyResourceId selectedOptions { name value } }
         discountedTotalSet { shopMoney { amount currencyCode } }
         originalTotalSet { shopMoney { amount currencyCode } }
       }

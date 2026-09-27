@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import type { MyOrder } from "../../lib/portal";
-import { explain, Row } from "../MyOrders";
+import { explain, facts, productDetail, Row } from "../MyOrders";
 import { countsTowards, orderStatus } from "../Orders";
 
 /**
@@ -42,14 +42,19 @@ const html = (patch: Partial<MyOrder>, open = false) =>
   renderToStaticMarkup(<Row order={order(patch)} month="2026-07" open={open} onToggle={() => {}} />);
 
 describe("the model's order rows", () => {
-  it("explains a delivered order in the export's sentence, at its month's rate", () => {
-    expect(explain(order({}), "2026-07")).toBe(
-      "Delivered and counted in July 2026. Commission is 10% of EGP 9,490.00.",
-    );
+  it("opens a delivered order on three facts, at its month's rate (ADR 0050)", () => {
+    expect(facts(order({}), "2026-07")).toEqual({
+      delivery: "Delivered",
+      commission: "10% of net sales",
+      countedIn: "July 2026",
+    });
+    expect(facts(order({ delivered_at: "2026-07-12T10:00:00+00:00" }), "2026-07").delivery).toBe("12 July");
+    // Nothing to explain: the facts already say it all.
+    expect(explain(order({}), "2026-07")).toBeNull();
   });
 
   it("uses the month's own rate, whatever it is", () => {
-    expect(explain(order({ rate_bp: 1250 }), "2026-07")).toContain("Commission is 12.5% of");
+    expect(facts(order({ rate_bp: 1250 }), "2026-07").commission).toBe("12.5% of net sales");
   });
 
   it("names a courier's failure *Failed delivery*, struck through", () => {
@@ -67,14 +72,17 @@ describe("the model's order rows", () => {
     expect(html(failed)).toContain("money--void");
     // A strike-through is never read aloud, so the figure says it in words.
     expect(html(failed)).toMatch(/<s class="orders__fee money--void">EGP 150\.00<span class="visually-hidden"> \(not earned\)<\/span><\/s>/);
-    expect(explain(order(failed), "2026-07")).toBe(
-      "Delivery failed, so this order is excluded from July 2026.",
-    );
+    expect(facts(order(failed), "2026-07")).toEqual({
+      delivery: "Failed",
+      commission: "Not earned",
+      countedIn: "Not counted",
+    });
+    expect(explain(order(failed), "2026-07")).toBeNull();
     // Neutral: nothing on record says a deduction was chosen, applied or
     // settled for this one order, so the sentence names no amount or month.
     const late = explain(order({ ...failed, failed_after_approval: true }), "2026-07");
     expect(late).toBe(
-      "Delivery failed, so this order is excluded from July 2026. It failed after July 2026 was approved. The approved amount and any payment stay as recorded, and HBA reviews the difference.",
+      "It failed after July 2026 was approved. The approved amount and any payment stay as recorded, and HBA reviews the difference.",
     );
     expect(late).not.toMatch(/settled in|recovered|EGP/);
   });
@@ -90,14 +98,13 @@ describe("the model's order rows", () => {
       net_sales: { kind: "unavailable" as const, piastres: null, amount: null },
     };
     expect(html(cancelled)).not.toContain("Failed delivery");
-    expect(explain(order(cancelled), "2026-07")).toBe(
-      "This order was cancelled, so the original sales amount is not available and nothing is counted.",
-    );
-    expect(explain(order({ ...cancelled, net_sales: { kind: "placed", piastres: 150_000, amount: "EGP 1,500.00" } }), "2026-07")).toBe(
-      "This order was cancelled, so nothing is counted. The amount shown is what it came to when it was placed.",
-    );
+    expect(facts(order(cancelled), "2026-07").delivery).toBe("Cancelled before delivery");
     const refunded = { ...cancelled, status: "refunded" as const, state_text: "Refunded" };
-    expect(explain(order(refunded), "2026-07")).not.toMatch(/fail/i);
+    expect(facts(order(refunded), "2026-07").delivery).toBe("Refunded before delivery");
+    for (const o of [cancelled, refunded]) {
+      expect(JSON.stringify(facts(order(o), "2026-07"))).not.toMatch(/fail/i);
+      expect(explain(order(o), "2026-07")).toBeNull();
+    }
   });
 
   it("says *no product lines available* on the row, and nothing twice inside", () => {
@@ -108,12 +115,19 @@ describe("the model's order rows", () => {
 
   it("lists each product with its size and price", () => {
     const row = html(
-      { contents: [{ title: "Panel Track Jacket", variant: "M", quantity: 1, price_piastres: 316_333, price: "EGP 3,163.33" }] },
+      { contents: [{ title: "Panel Track Jacket", variant: "M", size: "M", options: [], quantity: 1, price_piastres: 316_333, price: "EGP 3,163.33" }] },
       true,
     );
     expect(row).toContain("Size M");
     expect(row).toContain("EGP 3,163.33");
     expect(row).toContain("1 product");
+  });
+
+  it("puts a colour after the size and says how many, never calling a colour a size", () => {
+    const line = { title: "Wide Leg Denim", variant: "L / Indigo", quantity: 2, price_piastres: 0, price: "EGP 0.00" };
+    expect(productDetail({ ...line, size: "L", options: ["Indigo"] })).toBe("Size L · Indigo · Qty 2");
+    expect(productDetail({ ...line, size: null, options: ["For him"], quantity: 1 })).toBe("For him");
+    expect(productDetail({ ...line, size: "One size", options: [], quantity: 1 })).toBe("One size");
   });
 });
 
@@ -126,7 +140,7 @@ describe("net sales, and how it is known", () => {
 
   it("prints a cancelled order's recorded placed-at total as such", () => {
     const row = html({ state: "void", status: "cancelled", base_piastres: 0, net_sales: { kind: "placed", piastres: 120_000, amount: "EGP 1,200.00" } });
-    expect(row).toContain("EGP 1,200.00 when it was placed");
+    expect(row).toContain("EGP 1,200.00 at checkout");
   });
 
   it("says not available only when nothing was recorded", () => {

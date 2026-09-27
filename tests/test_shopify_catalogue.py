@@ -65,6 +65,7 @@ def _line_node(
     original="1500.00",
     product_id="8891234567890",
     variant_id="46912345678902",
+    options=(("Size", "M"),),
 ):
     return {
         "id": f"gid://shopify/LineItem/{line_id}",
@@ -85,6 +86,7 @@ def _line_node(
             {
                 "id": f"gid://shopify/ProductVariant/{variant_id}",
                 "legacyResourceId": variant_id,
+                "selectedOptions": [{"name": n, "value": v} for n, v in options],
             }
             if variant_id
             else None
@@ -218,6 +220,32 @@ def test_a_deleted_product_leaves_the_line_intact(db):
     assert values["shopify_product_id"] is None
     assert values["shopify_variant_id"] is None
     assert values["title"] == "Satin slip dress — black"
+
+
+def test_a_line_keeps_its_variants_options_as_shopify_names_them(db):
+    """ADR 0050. Name and value, untouched - HBA's catalogue calls its size
+    option "Size", "size", "Sizs" and "BLACK HBA CLUB PUMP COVER (Size)",
+    and deciding which is the size is the portal's job, not the sync's."""
+    values = normalise_line_item(
+        _line_node(
+            variant_title="M / Black",
+            options=(("BLACK HBA CLUB PUMP COVER (Size)", "M"), ("Color", " Black ")),
+        ),
+        "1001",
+    )
+
+    assert values["selected_options"] == [
+        {"name": "BLACK HBA CLUB PUMP COVER (Size)", "value": "M"},
+        {"name": "Color", "value": "Black"},
+    ]
+
+
+def test_a_deleted_variant_is_read_as_no_options_rather_than_unread(db):
+    """`[]` and not NULL: the sweep asks again only about lines never read
+    with options, and a deleted variant will never have any."""
+    values = normalise_line_item(_line_node(variant_id=None), "1001")
+
+    assert values["selected_options"] == []
 
 
 def test_a_line_with_no_original_reports_no_discount_rather_than_free(db):

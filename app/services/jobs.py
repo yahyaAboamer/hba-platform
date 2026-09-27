@@ -82,6 +82,12 @@ class JobKind:
     #: at 1,000 orders and every job said *succeeded*).
     ATTACH_ORPHANS = "attach_orphaned_orders"
 
+    #: Queue the product read for attributed orders that have none, or whose
+    #: lines were read before options were (ADR 0050). Hourly and bounded:
+    #: staging had 6,943 attributed orders and not one line item, because only
+    #: the webhook path ever asked (27 September).
+    FILL_LINE_ITEMS = "fill_missing_line_items"
+
 
 class PermanentFailure(Exception):
     """A job failure that retrying cannot fix.

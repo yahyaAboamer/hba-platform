@@ -47,6 +47,8 @@ SCHEDULE: dict[str, tuple[timedelta, dict]] = {
     # A query and, usually, nothing more (app.services.commission.backfill).
     # Hourly so a code whose backfill stopped is whole again the same hour.
     JobKind.ATTACH_ORPHANS: (timedelta(hours=1), {}),
+    # A query and a bounded batch of reads (app.services.recipients).
+    JobKind.FILL_LINE_ITEMS: (timedelta(hours=1), {}),
 }
 
 

@@ -594,3 +594,63 @@ def _handle_sync_line_items(db, payload: dict) -> None:
         report(Anomaly.LINE_ITEMS_TRUNCATED, order_id=order_id)
 
     db.commit()
+
+
+#: How many orders one sweep queues. Each is one Shopify read, paced by the
+#: client's throttle handling; 500 an hour clears 7,000 in under a day without
+#: spending the shop's whole rate limit on it.
+FILL_BATCH = 500
+
+
+def orders_missing_line_items(db, *, limit: int = FILL_BATCH) -> list[str]:
+    """Attributed orders whose products were never read, newest first.
+
+    *Never read* is either no line at all, or lines read before options were
+    (`selected_options IS NULL`) - a deleted variant is stored as `[]`, so it is
+    not asked about again. Newest first, because the month a model is looking
+    at is the one that should fill first.
+
+    An order Shopify no longer has returns no lines and is asked about again
+    next hour; that is one read an hour for a thing that should not exist, and
+    bounded by the batch.
+    """
+    from sqlalchemy import exists
+
+    from app.models.attributed_orders import AttributedOrder
+    from app.models.catalogue import OrderLineItem
+    from app.models.orders import OrderIndex
+
+    no_lines = ~exists().where(
+        OrderLineItem.shopify_order_id == AttributedOrder.shopify_order_id
+    )
+    unread_options = exists().where(
+        (OrderLineItem.shopify_order_id == AttributedOrder.shopify_order_id)
+        & OrderLineItem.selected_options.is_(None)
+    )
+    return list(
+        db.scalars(
+            select(AttributedOrder.shopify_order_id)
+            .join(OrderIndex, OrderIndex.shopify_order_id == AttributedOrder.shopify_order_id)
+            .where(no_lines | unread_options)
+            .order_by(OrderIndex.placed_at.desc())
+            .limit(limit)
+        )
+    )
+
+
+@register_handler(JobKind.FILL_LINE_ITEMS)
+def _handle_fill_line_items(db, payload: dict) -> None:
+    """Queue the product read for a batch of orders that are missing it.
+
+    Only queues; the reads are `SYNC_LINE_ITEMS` jobs, one per order, deduped
+    on the same key every other caller uses - so an order already queued by
+    the webhook or by attribution is not read twice.
+    """
+    limit = int(payload.get("limit") or FILL_BATCH)
+    for order_id in orders_missing_line_items(db, limit=limit):
+        enqueue(
+            db,
+            JobKind.SYNC_LINE_ITEMS,
+            {"order_id": order_id},
+            dedupe_key=f"{JobKind.SYNC_LINE_ITEMS}:{order_id}",
+        )

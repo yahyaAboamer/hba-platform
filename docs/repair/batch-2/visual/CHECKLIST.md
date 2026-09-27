@@ -59,7 +59,7 @@ shifted to stand the same distance from the working month as her counterpart.
 | Screen | 390 | Notes |
 |---|---|---|
 | Home | Matched | |
-| Orders | Corrected (batch D, E, M) | Filters, chips, rows, sentences and row metrics match; header identity and month control corrected in batch E (`9514fd1`, `a8eaab9`). Batch M: the figure in Inter and the sentence's divider, which batch E had not caught; error, empty and zero states - see *Batch M* |
+| Orders | Corrected (batch D, E, M) | Filters, chips, rows, sentences and row metrics match; header identity and month control corrected in batch E (`9514fd1`, `a8eaab9`). Batch M: the figure in Inter and the sentence's divider, which batch E had not caught; error, empty and zero states - see *Batch M*. Batch N: products with size, three facts and an ⓘ, page improvements (ADR 0050) |
 | Wardrobe | **Still differs** | Populated 24 Sept including a featured product. Best-sellers counting rule and a missing size, below |
 | Targets | Still differs | State vocabulary, below |
 | Ranking | Still differs | Other models are anonymised, below |
@@ -1164,6 +1164,37 @@ left, because this batch made no backend change.
 July failed filter, July scrolled end) predate batch E and show the old
 `<select>` header and, in *pending*, *Not counted* and *Did not arrive*. They
 are kept as history; `shots/batch-m/` is the current evidence.
+
+---
+
+## Batch N - an opened order: its products, three facts, and the page (27 September)
+
+ADR 0050, from the owner's approved mockup. Captures in `shots/batch-n/`: the
+built app against the throwaway `hba_browser` database, 390 and 360, dark and
+light. September and July come from the **real server path** (their line items
+given Shopify-shaped options in the throwaway database); void rows, loading,
+empty and error states are intercepted.
+
+**Grounded in real data, not assumed.** A read-only probe in the staging
+container (the app's own Shopify client; product fields only, nothing written)
+found: 6,943 attributed orders and 0 line items; `variantTitle` a bare size;
+`sku` null; `quantity` = `currentQuantity`; the size option named 32 ways.
+
+| What | Checked |
+|---|---|
+| Products: *Cargo Tailored Trouser · Size M*, *Ribbed Knit Top · Size M · Black · Qty 2* | real server path, `describe_variant` |
+| A line never read with options: *Wide Leg Denim · M* - no *Size* | real server path |
+| Facts: *11 September* · *10% of net sales* · *September 2026*; void: *Failed* / *Not earned* / *Not counted* | captures, tests |
+| ⓘ: 24 x 24, opens the export's pending sentence, Enter toggles, `aria-expanded` | browser, `MyOrders.test.tsx` |
+| Chevron turns open (`matrix(-1,0,0,-1)`); pressed state; detail fades in; none under reduced motion | browser |
+| Filter kept in the address: *Failed* -> `?status=void`, a reload keeps it | browser, test |
+| Skeleton loading in the page's shape; empty-month hint only while the month is open | captures, tests |
+| No sideways scroll at 390 or 360 | browser |
+| Products read on attribution from every path; hourly sweep, bounded, deduped; `[]` not re-read | `tests/test_order_products.py` |
+| Migration `e3f1a9c70004`: upgrade, downgrade, upgrade on a throwaway `hba_probe`, then dropped | alembic |
+
+**Needs staging after deploy:** the sweep filling the 6,943 orders (about 14
+hours at 500 an hour), then a signed-in look at a real order.
 
 ---
 

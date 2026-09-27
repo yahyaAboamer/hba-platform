@@ -44,6 +44,26 @@ from app.services.commission.base import base_for_order
 from app.services.commission.state import commission_state, is_final
 
 
+def _read_its_products(db: Session, order_id: str) -> None:
+    """Ask for what was in an order, the moment it becomes a model's (ADR 0050).
+
+    **Here, because every way in comes through here.** The webhook path used
+    to queue this itself, and the three others - the history import, the
+    reconciliation sweep and a code's backfill - never did, so on staging not
+    one of 6,943 attributed orders had its products (27 September). Deduped
+    on the same key as every other caller, so an order reached twice is read
+    once.
+    """
+    from app.services.jobs import JobKind, enqueue
+
+    enqueue(
+        db,
+        JobKind.SYNC_LINE_ITEMS,
+        {"order_id": order_id},
+        dedupe_key=f"{JobKind.SYNC_LINE_ITEMS}:{order_id}",
+    )
+
+
 def attribute_order(db: Session, order: OrderIndex) -> AttributedOrder | None:
     """Decide this order and record it. Returns the row, or None.
 
@@ -109,6 +129,7 @@ def attribute_order(db: Session, order: OrderIndex) -> AttributedOrder | None:
             business_month=order.business_month,
         )
         db.add(existing)
+        _read_its_products(db, order.shopify_order_id)
 
     # F03 / 05A: retain a known pre-failure basis for the struck-out amount.
     # A failed order is excluded by state in both policies; zeroing its basis

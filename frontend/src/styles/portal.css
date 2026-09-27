@@ -353,7 +353,7 @@
    nothing. */
 .affiliate .figure__note a,
 .affiliate .expl__body a,
-.affiliate .orders__explain a {
+.affiliate .orders__why a {
   color: var(--accent-text);
   text-underline-offset: 2px;
 }

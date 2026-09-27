@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter, Outlet, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Outlet, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { MyOrder } from "../../lib/portal";
@@ -78,13 +78,17 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function renderOrders(path = "/orders") {
+function Where() {
+  return <span data-testid="where">{useLocation().search}</span>;
+}
+
+function renderOrders(path = "/orders", showWhere = false) {
   const context = { me: {}, month: "2026-09", months: ["2026-09"], setMonth: vi.fn(), reload: vi.fn() };
   render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route element={<Outlet context={context} />}>
-          <Route path="/orders" element={<MyOrders />} />
+          <Route path="/orders" element={<><MyOrders />{showWhere && <Where />}</>} />
         </Route>
       </Routes>
     </MemoryRouter>,
@@ -134,6 +138,57 @@ describe("the Orders tab", () => {
     fetchMock.mockImplementation(() => reply(200, earnings([], null)));
     renderOrders();
     await waitFor(() => expect(screen.getByText("No orders used your code in September 2026.")).toBeTruthy());
+  });
+
+  it("keeps the why of a pending order behind an ⓘ, and says when it is open (ADR 0050)", async () => {
+    renderOrders();
+    await waitFor(() => expect(screen.getByText("#2")).toBeTruthy());
+
+    fireEvent.click(screen.getByText("#2"));
+    const info = screen.getByRole("button", { name: "How this order is counted" });
+    expect(info.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByText(/while it is on its way/)).toBeNull();
+
+    fireEvent.click(info);
+    expect(info.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByText(/Counted in September 2026 while it is on its way/)).toBeTruthy();
+  });
+
+  it("gives a delivered order no ⓘ: its facts say it all", async () => {
+    renderOrders();
+    await waitFor(() => expect(screen.getByText("#1")).toBeTruthy());
+
+    fireEvent.click(screen.getByText("#1"));
+    expect(screen.getByText("10% of net sales")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "How this order is counted" })).toBeNull();
+  });
+
+  it("keeps the chosen filter in the address, so Back and a refresh return to it", async () => {
+    renderOrders("/orders", true);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Failed 3" })).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("button", { name: "Failed 3" }));
+    expect(screen.getByTestId("where").textContent).toBe("?status=void");
+    fireEvent.click(screen.getByRole("button", { name: "All 5" }));
+    expect(screen.getByTestId("where").textContent).toBe("");
+  });
+
+  it("says it is loading in the page's own shape", async () => {
+    fetchMock.mockImplementation(() => new Promise(() => {}));
+    renderOrders();
+    expect(screen.getByRole("status").textContent).toContain("Loading your orders");
+  });
+
+  it("says what happens next under an empty month still open, and not under an ended one", async () => {
+    fetchMock.mockImplementation(() => reply(200, earnings([], 3)));
+    renderOrders();
+    await waitFor(() => expect(screen.getByText(/Orders appear here as soon as someone uses your code/)).toBeTruthy());
+    cleanup();
+
+    fetchMock.mockImplementation(() => reply(200, earnings([], null)));
+    renderOrders();
+    await waitFor(() => expect(screen.getByText("No orders used your code in September 2026.")).toBeTruthy());
+    expect(screen.queryByText(/Orders appear here/)).toBeNull();
   });
 
   it("keeps its title when the list cannot be read, and tries again", async () => {

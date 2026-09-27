@@ -531,6 +531,9 @@ def test_an_order_carries_what_was_in_it(db):
         {
             "title": "Wide-leg trousers",
             "variant": "M",
+            # Never read with options (ADR 0050), so nothing is called a size.
+            "size": None,
+            "options": ["M"],
             "quantity": 2,
             # What the customer paid for the line - the price the row prints.
             "price_piastres": 100_000,

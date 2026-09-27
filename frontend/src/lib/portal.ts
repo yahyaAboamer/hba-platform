@@ -76,13 +76,18 @@ export type CountsTowards = {
 
 export type MyOrder = {
   /**
-   * What was in the order. **Empty means not recorded, not empty**: contents
-   * are read only for orders that earned commission, and only from 07A
-   * onwards, so an older order legitimately has none.
+   * What was in the order. **Empty means not read yet, not empty**: Shopify
+   * is asked when an order becomes hers, and an hourly sweep fills the ones
+   * that were attributed before that (ADR 0050).
    */
   contents: {
     title: string;
+    /** Shopify's variant title as it was ordered ("XL", "M / Black"). */
     variant: string | null;
+    /** The size, where an option is named like one (ADR 0050); decided on the server. */
+    size: string | null;
+    /** Every other option value, in Shopify's order - a colour, a cut. */
+    options: string[];
     quantity: number;
     /** What the customer paid for the line, after the discount. */
     price_piastres: number;

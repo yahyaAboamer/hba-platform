@@ -1,4 +1,4 @@
-# Where the work is — 27 September 2026 (batches K, L and M)
+# Where the work is — 27 September 2026 (batches K, L, M and N)
 
 **Replaces `2026-09-25-continuation-handoff.md`**, which is kept with a banner
 for its record of batch J, its follow-up, the merge and promotion of 26
@@ -16,7 +16,7 @@ Read on 27 September; re-read the remote before describing it
 | **`origin/repair/batch-2`** | the handoff commit after `27f1794` |
 | **`origin/main`** (staging) | fast-forwarded to the branch on the owner's instruction of 27 September (*merge everything to the main*) - level with it |
 | **`origin/production`** | `156e65b` - 6 commits behind `main` (see *Production*) |
-| **Migration head** | `d7a2c4e10003` (a model paid outside Egypt, batch K, ADR 0046) ← `d4e7a2c90003` ← `c3d51e7a0002` ← `b1f0a40c0001`; `alembic heads` reports the one head |
+| **Migration head** | `e3f1a9c70004` (what each ordered line was, by option, batch N, ADR 0050) ← `d7a2c4e10003` (a model paid outside Egypt, batch K, ADR 0046) ← `d4e7a2c90003` ← `c3d51e7a0002` ← `b1f0a40c0001`; `alembic heads` reports the one head |
 | **Backend** | 86 files through `run-suite.sh` at `2c20b96`: 85 passed, `test_portal_api.py` failed on the one test pinning D03's old use rule; fixed in `27f1794` (a test-only change) and the file re-run: 108/108. No application code changed between the two |
 | **Frontend** | **500 tests, 30 files, all passing** on `27f1794`; `npm run build` green |
 | **Where this ran** | this Windows machine; the disposable Postgres in Docker on 5433 (`hba_platform_test`) |
@@ -72,6 +72,10 @@ Promotion is its own permission, and the release gates below have not run.
 
 ## Remaining, in order
 
+0a. **Batch N on staging** (after its merge): watch `fill_missing_line_items`
+    fill the 6,943 attributed orders' products (500 an hour), then open a real
+    order signed in. Production was not read; whether it has line items is
+    unknown.
 0. **Deferred from the Orders audit (owner, 27 September):** the header's
    inline code chip is 50 x 19px on Orders and Ranking (below 24px) - a
    shared-header fix; the portal month is not in the URL, so a reload
@@ -115,7 +119,8 @@ Neither has run; do not describe the repair as releasable.
 1. **Reconciliation against an authorised restored copy of real data.**
    `docs/repair/batch-1/reconcile.py` has only run against the test database.
 2. **Migration/rollback rehearsal** for `b1f0a40c0001`, `c3d51e7a0002`,
-   `d4e7a2c90003` and `d7a2c4e10003`, with the `SETTINGS_ENCRYPTION_KEY`
+   `d4e7a2c90003`, `d7a2c4e10003` and `e3f1a9c70004` (the last rehearsed up/down/up
+   on a throwaway database in batch N, not yet on a restored copy), with the `SETTINGS_ENCRYPTION_KEY`
    cases (`docs/runbooks/settings-encryption-key.md`, *Rehearsal*). The first
    three are already applied on production (promoted 26 September without the
    gates, by the owner's choice); `d7a2c4e10003` is additive (one boolean with

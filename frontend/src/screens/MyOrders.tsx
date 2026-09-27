@@ -49,7 +49,7 @@ export function MyOrders() {
   const { month } = usePortal();
   const [body, setBody] = useState<MyEarnings | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [query] = useSearchParams();
+  const [query, setQuery] = useSearchParams();
   const [filter, setFilter] = useState<Filter>((["earned","pending","void"].includes(query.get("status") ?? "") ? query.get("status") : "all") as Filter);
   const [open, setOpen] = useState<string | null>(null);
   const [retry, setRetry] = useState(0);
@@ -92,7 +92,27 @@ export function MyOrders() {
     );
   }
 
-  if (body === null) return <>{head}<p className="empty">Loading…</p></>;
+  // The page's own shape while it loads - four chips and three rows at their
+  // real height - so nothing jumps when the list arrives (ADR 0050).
+  if (body === null) {
+    return (
+      <>
+        {head}
+        <div className="orders__loading" role="status" aria-busy="true">
+          <span className="visually-hidden">Loading your orders</span>
+          <div className="orders__filters" aria-hidden="true">
+            {FILTERS.map((option) => <span key={option.key} className="orders__skeleton-chip" />)}
+          </div>
+          {[0, 1, 2].map((n) => (
+            <div key={n} className="orders__skeleton" aria-hidden="true">
+              <span><i style={{ width: "44%" }} /><i style={{ width: "80%" }} /><i style={{ width: "38%" }} /></span>
+              <span><i style={{ width: "70%" }} /><i style={{ width: "90%" }} /></span>
+            </div>
+          ))}
+        </div>
+      </>
+    );
+  }
 
   const all = body.orders_detail;
 
@@ -106,6 +126,12 @@ export function MyOrders() {
           No orders used your code in {formatMonth(month)}
           {body.window.days_left !== null ? " yet" : ""}.
         </p>
+        {/* What happens next, while it still can. */}
+        {body.window.days_left !== null && (
+          <p className="orders__hint">
+            Orders appear here as soon as someone uses your code at checkout.
+          </p>
+        )}
       </>
     );
   }
@@ -130,6 +156,17 @@ export function MyOrders() {
             onClick={() => {
               setFilter(option.key);
               setOpen(null);
+              // Kept in the address, so Back and a refresh return to it.
+              // Replaced rather than pushed: a filter is not a page.
+              setQuery(
+                (was) => {
+                  const next = new URLSearchParams(was);
+                  if (option.key === "all") next.delete("status");
+                  else next.set("status", option.key);
+                  return next;
+                },
+                { replace: true },
+              );
             }}
           >
             {option.label} <span className="orders__filter-count">{count(option.key)}</span>
@@ -173,14 +210,32 @@ export function MyOrders() {
  *
  * Shopify zeroes a cancelled order's totals — correct for commission, since
  * §9.3 pays on what the customer actually paid — so a cancelled row's base is
- * `0` and says nothing about what the order was. `placed` is the figure as it
- * was placed, kept for exactly this line, and where neither exists the row
- * says so rather than printing a zero that reads as *it was worth nothing*.
+ * `0` and says nothing about what the order was. `placed` is the figure at
+ * checkout, kept for exactly this line, and where neither exists the row says
+ * so rather than printing a zero that reads as *it was worth nothing*.
  */
 function saleLine(order: MyOrder): string {
   if (order.net_sales.kind === "known") return `${order.net_sales.amount} net sales`;
-  if (order.net_sales.kind === "placed") return `${order.net_sales.amount} when it was placed`;
+  if (order.net_sales.kind === "placed") return `${order.net_sales.amount} at checkout`;
   return "amount not available";
+}
+
+/**
+ * The second line under a product: `Size XL · Black · Qty 2`.
+ *
+ * Which value is the size is the server's answer (ADR 0050), from Shopify's
+ * own option names - HBA's catalogue spells *size* 32 ways, and a colour on
+ * its own must never read as one. Where the options were never read, the
+ * variant title is shown as it is, and nothing is called a size.
+ */
+export function productDetail(line: MyOrder["contents"][number]): string {
+  const size = line.size
+    ? line.size.toLowerCase() === "one size" ? "One size" : `Size ${line.size}`
+    : null;
+  const rest = line.options ?? (line.variant && line.variant !== "Default Title" ? [line.variant] : []);
+  return [size, ...rest, line.quantity > 1 ? `Qty ${line.quantity}` : null]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 export function Row({
@@ -194,13 +249,18 @@ export function Row({
   open: boolean;
   onToggle: () => void;
 }) {
+  const [why, setWhy] = useState(false);
+  // An order opened again starts on its facts, not on the last explanation.
+  useEffect(() => {
+    if (!open) setWhy(false);
+  }, [open]);
   const pieces = order.contents.reduce((total, line) => total + line.quantity, 0);
+  const fact = facts(order, month);
+  const sentence = explain(order, month);
+  const hasWhy = sentence !== null || order.paid_in_month !== null;
   return (
     <li className="orders__row">
-      {/*
-       * The whole row opens it. A chevron would be a 12px target on a screen
-       * held one-handed, and there is nothing else on the row to press.
-       */}
+      {/* The whole row opens it; the chevron only says that it does. */}
       <button
         type="button"
         className="orders__button"
@@ -246,58 +306,82 @@ export function Row({
             <span className="orders__fee orders__fee--none">—</span>
           )}
           <span className="orders__net">{saleLine(order)}</span>
+          <svg className="orders__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="m6 9 6 6 6-6" />
+          </svg>
         </span>
       </button>
 
       {open && (
         <div className="orders__detail">
           {/*
-           * **What was in the order** (owner, 11 September 2026).
+           * **What was in the order** (owner, 11 September 2026; ADR 0050):
+           * each product with its size, and how many where it was more than
+           * one. Inside the expansion, not on the row: a garment name printed
+           * beside a figure reads as though the figure belonged to it.
            *
-           * Inside the expansion, not on the row: the list answers *what did
-           * they buy* and the row answers *what did I earn*, and a garment
-           * name printed beside a figure reads as though the figure belonged
-           * to the garment.
-           *
-           * **Empty is not the same as none.** Contents are read only for
-           * orders that earned somebody commission, and only from 07A
-           * onwards, so an older order genuinely has nothing recorded - and
-           * saying so is the difference between an honest gap and a claim
-           * that somebody bought nothing.
+           * The row already says *no product lines available* where there are
+           * none yet, so the expansion does not say it twice.
            */}
-          {/* The row already says *no product lines available* where there
-              are none, so the expansion does not say it twice. */}
           {order.contents.length > 0 && (
             <ul className="orders__contents">
-              {order.contents.map((line, index) => (
-                <li key={`${line.title}-${index}`}>
-                  <span className="orders__item">
-                    {line.title}
-                    {line.quantity > 1 && ` × ${line.quantity}`}
-                    {line.variant && (
-                      <span className="orders__variant">Size {line.variant}</span>
-                    )}
-                  </span>
-                  <span className="orders__qty">{line.price}</span>
-                </li>
-              ))}
+              {order.contents.map((line, index) => {
+                const detail = productDetail(line);
+                return (
+                  <li key={`${line.title}-${index}`}>
+                    <span className="orders__item">
+                      {line.title}
+                      {detail && <span className="orders__variant">{detail}</span>}
+                    </span>
+                    <span className="orders__qty">{line.price}</span>
+                  </li>
+                );
+              })}
             </ul>
           )}
 
-          <p className="orders__explain">{explain(order, month)}</p>
+          {/* Three facts in place of a paragraph (ADR 0050): what happened to
+              it, what it earns, and which month it counts in. */}
+          <dl className="orders__facts">
+            <dt>Delivery</dt>
+            <dd>{fact.delivery}</dd>
+            <dt>Commission</dt>
+            <dd>{fact.commission}</dd>
+            <dt>Counted in</dt>
+            <dd>
+              {fact.countedIn}
+              {/* The why, on request - the export's own ⓘ, as on Targets. */}
+              {hasWhy && (
+                <button
+                  type="button"
+                  className="orders__info"
+                  aria-label="How this order is counted"
+                  aria-expanded={why}
+                  onClick={() => setWhy(!why)}
+                >
+                  i
+                </button>
+              )}
+            </dd>
+          </dl>
 
-          {/*
-           * §11.4, and the one row that will be asked about. Kept inside the
-           * expansion now rather than printed on every row: labelling all of
-           * them would bury the one or two that matter.
-           */}
-          {order.paid_in_month && (
-            <p className="orders__explain">
-              It had not reached the customer when {formatMonth(month)} closed,
-              so it was paid with {formatMonth(order.paid_in_month)} instead —
-              still at the rate you were on when you sold it, not that
-              month&rsquo;s. This is called{" "}
-              <Link to="/glossary#carried-forward">carried forward</Link>.
+          {why && (
+            <p className="orders__why">
+              {sentence}
+              {/*
+               * §11.4, and the one row that will be asked about: an order its
+               * month's agreement left for the month it arrived in.
+               */}
+              {order.paid_in_month && (
+                <>
+                  {sentence && " "}
+                  It had not reached the customer when {formatMonth(month)} closed,
+                  so it was paid with {formatMonth(order.paid_in_month)} instead —
+                  still at the rate you were on when you sold it, not that
+                  month&rsquo;s. This is called{" "}
+                  <Link to="/glossary#carried-forward">carried forward</Link>.
+                </>
+              )}
             </p>
           )}
         </div>
@@ -307,53 +391,65 @@ export function Row({
 }
 
 /**
- * What this order did, in a sentence.
+ * The three facts of an opened order (ADR 0050).
  *
- * The commission figure is the server's, never worked out here — §11.1's rule
- * about a second implementation applies to one order as much as to a month.
- * Where there is no figure the sentence says why rather than showing a zero.
+ * Words on the server's facts - the state, the rate the server used, the
+ * month that paid it - and never a figure worked out here: §11.1's rule about
+ * a second implementation applies to one order as much as to a month.
  */
-export function explain(order: MyOrder, month: string): string {
+export function facts(order: MyOrder, month: string): { delivery: string; commission: string; countedIn: string } {
+  const delivery = {
+    delivered: order.delivered_at ? onlyTheDate(order.delivered_at) : "Delivered",
+    pending: "On its way",
+    failed: "Failed",
+    cancelled: "Cancelled before delivery",
+    refunded: "Refunded before delivery",
+  }[order.status];
+  const commission =
+    order.state === "void"
+      ? "Not earned"
+      : order.rate_bp === null || order.rate_missing
+        ? "Rate not set yet"
+        : `${percent(order.rate_bp)} of net sales`;
+  const countedIn =
+    order.state === "void"
+      ? "Not counted"
+      : order.paid_in_month
+        ? formatMonth(order.paid_in_month)
+        : order.state === "pending" && !order.counted
+          ? "After it arrives"
+          : formatMonth(month);
+  return { delivery, commission, countedIn };
+}
+
+/**
+ * Why it is counted the way the facts say, behind the ⓘ - or `null` where the
+ * facts already say it all (a delivered order, a cancelled one).
+ *
+ * The carried-forward sentence is the Row's own, because it holds a link.
+ */
+export function explain(order: MyOrder, month: string): string | null {
   const noRate = order.rate_missing
-    ? ` No commission rate is set for ${formatMonth(month)}, so what it earns is not available yet.`
-    : "";
-  if (order.state === "earned") {
-    // The export's sentence, with this month's own rate and the server's
-    // figures - a delivered order later refunded is still this one (F04).
-    return order.rate_bp !== null && order.commission !== null
-      ? `Delivered and counted in ${formatMonth(month)}. Commission is ${percent(order.rate_bp)} of ${order.base}.`
-      : `Delivered and counted in ${formatMonth(month)}.${noRate}`;
-  }
+    ? `No commission rate is set for ${formatMonth(month)}, so what it earns is not available yet.`
+    : null;
   if (order.state === "pending") {
     // A month agreed before ADR 0040 counted delivered orders only, so an
     // order still on its way was left for the payroll after it arrives.
     if (!order.counted) {
       return `${formatMonth(month)} was agreed counting delivered orders only, so this order is paid with the month after it arrives — still at ${formatMonth(month)}'s rate.`;
     }
-    // The export's sentence, word for word; the figure is on the row above.
-    return `Counted in ${formatMonth(month)} while it is on its way. If it fails, it is removed and the difference is settled in a later month.${noRate}`;
+    // The export's sentence, word for word.
+    return `Counted in ${formatMonth(month)} while it is on its way. If it fails, it is removed and the difference is settled in a later month.` +
+      (noRate ? ` ${noRate}` : "");
   }
-  // Void, and said by why. The approved sentence for a courier's failure,
-  // and for a cancelled order with nothing left to show; our own, in the same
-  // voice, for the two cases the design has no words for.
-  if (order.status === "failed") {
-    // After approval, the approved amount and any payment stand as recorded,
-    // and what happens next is a review (05C). Nothing here says a deduction
-    // was chosen, applied or settled anywhere - no record says that of one
-    // order.
-    return `Delivery failed, so this order is excluded from ${formatMonth(month)}.` +
-      (order.failed_after_approval
-        ? ` It failed after ${formatMonth(month)} was approved. The approved amount and any payment stay as recorded, and HBA reviews the difference.`
-        : "");
+  // After approval, the approved amount and any payment stand as recorded,
+  // and what happens next is a review (05C). Nothing here says a deduction
+  // was chosen, applied or settled - no record says that of one order.
+  if (order.state === "void" && order.failed_after_approval) {
+    return `It failed after ${formatMonth(month)} was approved. The approved amount and any payment stay as recorded, and HBA reviews the difference.`;
   }
-  if (order.status === "refunded") {
-    return `The payment was refunded before this order arrived, so it is excluded from ${formatMonth(month)}.`;
-  }
-  if (order.net_sales.kind === "placed") {
-    return "This order was cancelled, so nothing is counted. The amount shown is what it came to when it was placed.";
-  }
-  if (order.net_sales.kind === "known") return "This order was cancelled, so nothing is counted.";
-  return "This order was cancelled, so the original sales amount is not available and nothing is counted.";
+  if (order.state === "earned") return noRate;
+  return null;
 }
 
 /** 1000 → `10%`, 1250 → `12.5%`. A rate, never an amount. */

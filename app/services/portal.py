@@ -51,6 +51,7 @@ name, address, phone or email, because §10.2's thin index never stored them.
 The test asserting it stays that way is what keeps this structural.
 """
 
+import re
 from dataclasses import asdict
 from datetime import date, timedelta
 from decimal import ROUND_HALF_UP, Decimal
@@ -954,6 +955,39 @@ def _credited_from(
 
 
 
+#: HBA's catalogue names its size option 32 ways ("Size", "size", "Sizs",
+#: "T-shirt Size", "BLACK HBA CLUB PUMP COVER (Size)" - staging, 27 September).
+#: Every one of them contains this.
+_SIZE_OPTION = re.compile(r"siz", re.IGNORECASE)
+
+#: What Shopify calls the variant of a product with no options.
+_NO_OPTIONS = "Default Title"
+
+
+def describe_variant(options: list[dict] | None, variant_title: str | None) -> dict:
+    """`{"size": "XL", "options": ["Black"]}` for one ordered line.
+
+    **From the options when they were read**: the value whose option is named
+    like a size is the size; every other value follows, in Shopify's order.
+    **From the variant title otherwise** - never read with options, or the
+    variant has since been deleted - and then nothing is called a size,
+    because "Black" alone is a colour and the title does not say which.
+    """
+    if options:
+        size = next(
+            (o["value"] for o in options if _SIZE_OPTION.search(o.get("name") or "")),
+            None,
+        )
+        rest = [
+            o["value"] for o in options
+            if o["value"] != size and o["value"] != _NO_OPTIONS
+        ]
+        return {"size": size, "options": rest}
+    if variant_title and variant_title != _NO_OPTIONS:
+        return {"size": None, "options": [part.strip() for part in variant_title.split(" / ") if part.strip()]}
+    return {"size": None, "options": []}
+
+
 def net_sales_of(order: AttributedOrder, index: OrderIndex) -> dict:
     """What the order's net sales are, and **how we know** - never inferred
     from a value being zero.
@@ -1169,11 +1203,11 @@ def my_orders(db: Session, affiliate: AffiliateProfile, month: str) -> list[dict
     # for a list nobody scrolls, which is the shape that made the products
     # screen slow in 03D.
     #
-    # `contents` is **empty rather than absent** where nothing has been read.
-    # Line items are fetched only for orders that earned somebody commission,
-    # and only from the moment 07A started asking for them, so an older order
-    # legitimately has none - and the screen says *not recorded* rather than
-    # implying the order was empty.
+    # `contents` is **empty rather than absent** where nothing has been read
+    # yet. Line items are read for every order that becomes a model's, and an
+    # hourly sweep reads the ones attributed before that (ADR 0050) - until it
+    # does, the screen says *no product lines available* rather than implying
+    # the order was empty.
     contents: dict[str, list[dict]] = {}
     if rows:
         for line in db.scalars(
@@ -1189,6 +1223,10 @@ def my_orders(db: Session, affiliate: AffiliateProfile, month: str) -> list[dict
                 {
                     "title": line.title,
                     "variant": line.variant_title,
+                    # Which value is the size, and what else the variant was
+                    # (ADR 0050) - decided here, once, from Shopify's own
+                    # option names, so no screen guesses from "M / Black".
+                    **describe_variant(line.selected_options, line.variant_title),
                     "quantity": line.quantity,
                     # What the customer paid for the line, after the discount -
                     # the approved row prints a price beside each product.

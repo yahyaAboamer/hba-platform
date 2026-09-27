@@ -167,6 +167,10 @@ def normalise_line_item(node: dict, order_id: str) -> dict | None:
         "shopify_variant_id": _numeric_id(variant) if variant else None,
         "title": str(node.get("title") or "").strip() or "Untitled item",
         "variant_title": node.get("variantTitle"),
+        # Name and value, as Shopify returns them - the only way to tell which
+        # value is the size (ADR 0050). A deleted variant comes back as null
+        # and is stored as `[]`: read, and nothing to say.
+        "selected_options": _selected_options(variant),
         "sku": node.get("sku"),
         "quantity": quantity,
         "discounted_total_piastres": discounted,
@@ -175,6 +179,17 @@ def normalise_line_item(node: dict, order_id: str) -> dict | None:
         # true, rather than "this was free", which is not.
         "original_total_piastres": original or discounted,
     }
+
+
+def _selected_options(variant: dict) -> list[dict]:
+    """`[{"name": "Size", "value": "XL"}]`, trimmed, empty pairs dropped."""
+    options = []
+    for option in (variant or {}).get("selectedOptions") or []:
+        name = str((option or {}).get("name") or "").strip()
+        value = str((option or {}).get("value") or "").strip()
+        if name and value:
+            options.append({"name": name, "value": value})
+    return options
 
 
 def _now() -> datetime:
