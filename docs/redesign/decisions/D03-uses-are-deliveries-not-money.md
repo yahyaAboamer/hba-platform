@@ -1,5 +1,11 @@
 # Decision — D03
 
+> **Superseded in part, 27 September 2026 (ADR 0049).** *What a use is* below
+> no longer holds: the owner made **every order that used her code a use**,
+> whatever became of it - failed deliveries, cancellations and refunds
+> included. *How Ranking uses it* still stands. Kept as the record of the
+> earlier rule.
+
 **Owner's question:** Does a displayed code-use count every placed attributed
 order, including failures, or only counted orders? Which period and tie
 treatment should Ranking use?

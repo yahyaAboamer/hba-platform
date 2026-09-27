@@ -112,10 +112,10 @@ def order_outcomes(db: Session, affiliate_id: int, month: str) -> dict:
 
     The owner found 16 code uses beside 10 delivered, 3 pending and 0 failed
     (FITBROS10, September 2026): three orders were cancelled before delivery.
-    A use is every order except a failed delivery (D03), so cancelled and
-    refunded orders are uses that no chip showed. Counted by `order_status`,
-    the same decision each order's own row shows, so the chips add up to the
-    uses beside them.
+    Every order is a use (ADR 0049), so all five outcomes add up to the uses;
+    Home shows them as three - *failed* holding failed deliveries,
+    cancellations and refunds (ADR 0048, amended). Counted by `order_status`,
+    the same decision each order's own row shows.
     """
     rows = db.execute(
         select(AttributedOrder, OrderIndex)

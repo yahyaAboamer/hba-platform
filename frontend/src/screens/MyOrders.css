@@ -163,9 +163,12 @@
   text-align: right;
 }
 
-/* What it was worth to her — the figure this screen is opened for. */
+/* What it was worth to her — the figure this screen is opened for. In Inter,
+   as the export sets it: the rest of the row is the button's control font
+   (ADR 0044), and this one figure is not. */
 .affiliate .orders__fee {
   display: block;
+  font-family: var(--sans);
   font-size: 16px;
   font-variant-numeric: tabular-nums;
 }
@@ -222,11 +225,12 @@
 
 /* The sentence that says what happened to this order. Ruled off rather than
    tinted: it belongs to the row it sits in, and a tint would make it a second
-   card inside the first. */
+   card inside the first. One step stronger than the lines between products,
+   as the export draws it (its `--line` against `--div`). */
 .affiliate .orders__explain {
   margin: 0;
   padding: 11px 0 0;
-  border-top: 1px solid var(--rule);
+  border-top: 1px solid var(--rule-strong);
   font-size: 13px;
   line-height: 1.55;
   color: var(--quiet);
@@ -234,6 +238,11 @@
 
 .affiliate .orders__explain + .orders__explain {
   margin-top: 11px;
+}
+
+/* The list could not be read. Under the title, where the filters would be. */
+.affiliate .orders__error {
+  margin-top: 13px;
 }
 
 /* True of the whole list, so it sits under it rather than on any one row. */

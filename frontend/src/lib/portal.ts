@@ -229,10 +229,9 @@ export type MyEarnings = {
     /** Delivered plus pending: the orders the month is paid on. */
     counted: number;
     /**
-     * How often her code was used (M01, D03). **Not the sum of the three
-     * above**: those are commission states and this is a delivery outcome, so
-     * a delivered order later refunded counts here and pays nothing, while a
-     * parcel refused at the door counts nowhere.
+     * How often her code was used (M01): **every order**, whatever became of
+     * it (ADR 0049) - a failed delivery, a cancellation and a refund included.
+     * The server counts it; `counted` beside it is delivered and pending only.
      */
     uses: number;
   };

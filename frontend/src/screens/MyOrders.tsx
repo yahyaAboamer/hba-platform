@@ -27,7 +27,7 @@ import "./MyOrders.css";
  * hers, and she opened this screen to check hers.
  */
 
-/** The three questions people actually arrive with. */
+/** The four filters, keyed by the order's counting state (`?status=` uses the same keys). */
 type Filter = "all" | "earned" | "pending" | "void";
 
 /**
@@ -52,6 +52,7 @@ export function MyOrders() {
   const [query] = useSearchParams();
   const [filter, setFilter] = useState<Filter>((["earned","pending","void"].includes(query.get("status") ?? "") ? query.get("status") : "all") as Filter);
   const [open, setOpen] = useState<string | null>(null);
+  const [retry, setRetry] = useState(0);
 
   useEffect(() => {
     let live = true;
@@ -65,15 +66,7 @@ export function MyOrders() {
       .then(value => { if(live) setBody(value); })
       .catch((caught) => {if(live) setError(caught.message);});
     return () => {live=false;};
-  }, [month]);
-
-  if (error) {
-    return (
-      <p className="notice notice--refused" role="alert">
-        {error}
-      </p>
-    );
-  }
+  }, [month, retry]);
 
   const head = (
     <div className="orders__head">
@@ -82,16 +75,36 @@ export function MyOrders() {
     </div>
   );
 
+  // The title and month stay, so she still knows where she is. The words are
+  // ours rather than the browser's: *Failed to fetch* describes a request,
+  // not her orders.
+  if (error) {
+    return (
+      <>
+        {head}
+        <p className="notice notice--refused orders__error" role="alert">
+          Could not load your orders.{" "}
+          <button type="button" className="button" onClick={() => setRetry((n) => n + 1)}>
+            Retry
+          </button>
+        </p>
+      </>
+    );
+  }
+
   if (body === null) return <>{head}<p className="empty">Loading…</p></>;
 
   const all = body.orders_detail;
 
   if (all.length === 0) {
+    // *Yet* only while the month can still take an order: `days_left` is
+    // null once it is over, and an agreed month is over whatever the date.
     return (
       <>
         {head}
         <p className="empty">
-          No orders used your code in {formatMonth(month)} yet.
+          No orders used your code in {formatMonth(month)}
+          {body.window.days_left !== null ? " yet" : ""}.
         </p>
       </>
     );
@@ -124,13 +137,13 @@ export function MyOrders() {
         ))}
       </div>
 
+      {/* A filter with nothing in it says so and names the month - nothing
+          more. It once said *nothing has counted yet* over a month of
+          pending orders, which count (ADR 0040). */}
       {shown.length === 0 ? (
         <p className="empty">
-          {filter === "earned"
-            ? "Nothing has counted yet this month."
-            : filter === "pending"
-              ? "Nothing is on its way — every order this month has arrived or been cancelled."
-              : "Every order this month counts."}
+          No {FILTERS.find((option) => option.key === filter)!.label.toLowerCase()} orders in{" "}
+          {formatMonth(month)}.
         </p>
       ) : (
         <ul className="orders">
@@ -220,9 +233,18 @@ export function Row({
            * is no figure at all - no rate set, or an order its month did not
            * count - the row prints a dash, never a zero.
            */}
-          <span className={order.commission !== null ? "orders__fee" : order.forgone ? "orders__fee money--void" : "orders__fee orders__fee--none"}>
-            {order.commission ?? order.forgone ?? "—"}
-          </span>
+          {/* A strike-through is not read aloud, so the struck figure says
+              in words that it was not earned. */}
+          {order.commission !== null ? (
+            <span className="orders__fee">{order.commission}</span>
+          ) : order.forgone ? (
+            <s className="orders__fee money--void">
+              {order.forgone}
+              <span className="visually-hidden"> (not earned)</span>
+            </s>
+          ) : (
+            <span className="orders__fee orders__fee--none">—</span>
+          )}
           <span className="orders__net">{saleLine(order)}</span>
         </span>
       </button>

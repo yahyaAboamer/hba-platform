@@ -310,6 +310,42 @@ a.home__card:hover {
   gap: 12px;
 }
 
+/* The head and the bar open every order. The card itself is not a link any
+   more - the counts below are, and a link inside a link is not one. The
+   negative margin gives the focus ring room without moving anything. */
+.home__orders-all {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: -6px -8px 0;
+  padding: 6px 8px 8px;
+  border-radius: 10px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.home__orders-uses {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.home__orders-all:focus-visible,
+a.home__key:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) {
+  .home__orders-all:hover .home__chevron {
+    color: var(--ink);
+  }
+
+  a.home__key:hover .home__key-word {
+    text-decoration-color: currentColor;
+  }
+}
+
 .home__big {
   font-size: 24px;
   font-weight: 600;
@@ -340,15 +376,11 @@ a.home__card:hover {
   background: var(--refused);
 }
 
-.home__seg--cancelled,
-.home__seg--refunded {
-  background: var(--faint);
-}
-
+/* Rows 14px apart, so the counts' 28px targets below do not touch. */
 .home__legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px 16px;
+  gap: 14px 16px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -360,6 +392,23 @@ a.home__card:hover {
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+/* A count with orders in it opens them. Underlined, quietly - the one sign
+   that it is a way in - with a 28px target the layout does not see. */
+a.home__key {
+  margin: -5px 0;
+  padding: 5px 0;
+  border-radius: 6px;
+  color: inherit;
+  text-decoration: none;
+}
+
+a.home__key .home__key-word {
+  text-decoration: underline;
+  text-decoration-color: var(--rule-strong);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
 }
 
 .home__dot {
@@ -381,7 +430,7 @@ a.home__card:hover {
   background: var(--refused);
 }
 
-.home__key--failed {
+.home__legend .home__key--failed {
   color: var(--refused);
 }
 

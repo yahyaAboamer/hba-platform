@@ -117,22 +117,46 @@ describe("Home", () => {
     expect(homeCalls.map(([url]) => String(url))).toEqual(["/api/me/home/2026-09"]);
   });
 
-  it("shows every order, so the parts add up to the uses", async () => {
+  it("shows her orders in the Orders tab's three states, failed holding every void one", async () => {
+    fetchMock.mockImplementation((url: string) =>
+      String(url).includes("/api/me/home/")
+        ? ok({ ...home, outcomes: { delivered: 10, pending: 3, failed: 1, cancelled: 2, refunded: 1 } })
+        : ok({}),
+    );
     renderHome();
-    await waitFor(() => expect(screen.getByText("16 code uses")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("4 failed")).toBeTruthy());
 
     expect(screen.getByText("10 delivered")).toBeTruthy();
     expect(screen.getByText("3 pending")).toBeTruthy();
-    expect(screen.getByText("3 cancelled")).toBeTruthy();
-    // 10 + 3 + 3 = 16: the three that used to be nowhere.
+    // Cancelled, refunded and a failed delivery are one state here, as they
+    // are one filter on the Orders tab; each row there still names which.
+    expect(screen.queryByText(/cancelled|refunded|failed delivery/)).toBeNull();
   });
 
-  it("does not paint a count of nothing as a warning", async () => {
+  it("opens each count's own orders, and the head opens them all", async () => {
     renderHome();
-    await waitFor(() => expect(screen.getByText("0 failed delivery")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("10 delivered")).toBeTruthy());
 
-    expect(screen.getByText("0 failed delivery").className).toContain("home__key--none");
-    expect(screen.queryByText("0 refunded")).toBeNull();
+    const orders = screen.getByRole("region", { name: "Orders" });
+    const links = Array.from(orders.querySelectorAll("a"), (a) => a.getAttribute("href"));
+    expect(links).toEqual(["/orders", "/orders?status=earned", "/orders?status=pending", "/orders?status=void"]);
+    // Never a link inside a link: the card itself is not one.
+    expect(orders.tagName).toBe("SECTION");
+    expect(orders.querySelector("a a")).toBeNull();
+    expect(screen.getByRole("link", { name: /16 code uses\s*, see all orders/ })).toBeTruthy();
+  });
+
+  it("does not paint a count of nothing as a warning, or offer a way into it", async () => {
+    fetchMock.mockImplementation((url: string) =>
+      String(url).includes("/api/me/home/")
+        ? ok({ ...home, outcomes: { delivered: 10, pending: 3, failed: 0, cancelled: 0, refunded: 0 } })
+        : ok({}),
+    );
+    renderHome();
+    await waitFor(() => expect(screen.getByText("0 failed")).toBeTruthy());
+
+    expect(screen.getByText("0 failed").className).toContain("home__key--none");
+    expect(screen.getByText("0 failed").closest("a")).toBeNull();
   });
 
   it("compares like for like, and names the window", async () => {

@@ -65,6 +65,8 @@ describe("the model's order rows", () => {
     };
     expect(html(failed)).toContain("Failed delivery");
     expect(html(failed)).toContain("money--void");
+    // A strike-through is never read aloud, so the figure says it in words.
+    expect(html(failed)).toMatch(/<s class="orders__fee money--void">EGP 150\.00<span class="visually-hidden"> \(not earned\)<\/span><\/s>/);
     expect(explain(order(failed), "2026-07")).toBe(
       "Delivery failed, so this order is excluded from July 2026.",
     );

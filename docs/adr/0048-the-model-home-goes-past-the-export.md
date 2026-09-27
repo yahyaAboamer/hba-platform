@@ -49,3 +49,32 @@ for both charts, the fourth order state, and a like-for-like comparison.
   shop domain; it needs checking once against the live shop.
 - A second filled button (Share) outside `.auth` - ADR 0047's divergence,
   extended to the one action Home exists to prompt.
+
+## Amended 27 September - three outcomes, and each one opens its orders
+
+The owner, after the Orders audit (a mockup approved the same day):
+
+> I want only three visible states which are delivered, pending, and failed.
+> [...] put cancelled, refunded, and failed the delivery inside failed. And
+> same as the failed filter in the order step.
+
+- **Home's orders card shows three outcomes**, the Orders tab's own:
+  *delivered*, *pending* and *failed*. *Failed* holds every order that did
+  not count - a failed delivery, a cancellation or a refund - which is
+  exactly the Orders tab's *Failed* filter (`state === "void"`). The bar has
+  the same three segments. Each row on the Orders tab still names its real
+  case in its chip; nothing about the rows changed.
+- **Each count opens its orders.** The card is no longer one link: the head
+  and the bar open all of them (`/orders`, with a chevron), *delivered*
+  opens `?status=earned`, *pending* `?status=pending`, *failed*
+  `?status=void`. Never a link inside a link. A count of zero is plain text,
+  not a way into an empty list. The counts are underlined links with 28px
+  targets; the legend's rows are 14px apart so no two targets touch.
+- The count is the sum of the server's own outcomes
+  (`failed + cancelled + refunded`); nothing about money is involved.
+
+**What it cost, and how it was settled.** Under D03 a failed delivery was
+in *failed* but not a code use, so the three counts could read one more
+than the uses beside them. The owner settled it the same day by making
+every order a code use (ADR 0049): delivered + pending + failed = code
+uses.

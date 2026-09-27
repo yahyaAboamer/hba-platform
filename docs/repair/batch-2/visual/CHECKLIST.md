@@ -59,7 +59,7 @@ shifted to stand the same distance from the working month as her counterpart.
 | Screen | 390 | Notes |
 |---|---|---|
 | Home | Matched | |
-| Orders | Corrected (batch D, E) | Filters, chips, rows, sentences and row metrics match; header identity and month control corrected in batch E (`9514fd1`, `a8eaab9`) |
+| Orders | Corrected (batch D, E, M) | Filters, chips, rows, sentences and row metrics match; header identity and month control corrected in batch E (`9514fd1`, `a8eaab9`). Batch M: the figure in Inter and the sentence's divider, which batch E had not caught; error, empty and zero states - see *Batch M* |
 | Wardrobe | **Still differs** | Populated 24 Sept including a featured product. Best-sellers counting rule and a missing size, below |
 | Targets | Still differs | State vocabulary, below |
 | Ranking | Still differs | Other models are anonymised, below |
@@ -1129,6 +1129,43 @@ is gone: 404/405; the permission test no longer posts to it) and
 reachability (20 files): 729 passing. Frontend 460 tests - the two fewer are
 the per-file font and accent checks that ran over `PayrollReopen.tsx` - and
 the build.
+
+## Batch M - the portal Orders tab, and Home's counts into it (27 September)
+
+From the owner-approved Orders audit of 27 September, and his approval of
+proposal P1 with one change: Home shows three outcomes, not five (ADR 0048,
+amended). Captures in `shots/batch-m/`, taken on the built app against the
+throwaway `hba_browser` database, with order counts and void rows supplied by
+intercepting the two API responses (the seed has no void orders in its
+current state). Full-page Orders captures draw the fixed tab bar at its
+viewport position; that is the capture, not an overlap.
+
+| # | What | Before | Now | Checked |
+|---|---|---|---|---|
+| PD1 | The commission figure | Arial (the button's control font) | Inter, as the export's `--font-heading` | computed `font-family`, dark and light |
+| PD2 | The line above the order's sentence | `--rule` (#23272B) | `--rule-strong` (#2D3237 dark, #C9CEC8 light) = the export's `--line`; product lines keep `--rule` | computed `border-top-color`, both themes |
+| FD1 | The list cannot be read | Title and month gone; *Internal error* / *Failed to fetch*; no retry | Title and month stay; *Could not load your orders.* and **Retry** | 500 captured, Retry reloads the list |
+| FD2 | A filter with nothing in it | *Nothing has counted yet this month* over pending orders (which count, ADR 0040); *this month* on past months | *No delivered / pending / failed orders in September 2026.* | `MyOrders.test.tsx`, capture |
+| FD3 | No orders at all | *… yet.* on ended months | *yet* only while `window.days_left` is not null | open and ended month |
+| FD4 | A struck-through figure | Read aloud as a plain amount | `<s>` with hidden *(not earned)* | DOM text *EGP 150.00 (not earned)* |
+| P1 | Home's orders card | One link to `/orders`; five outcomes | A `<section>`: head and bar open `/orders` (chevron); *delivered*, *pending*, *failed* open `?status=earned / pending / void`; a zero is plain text | links, tab order, month carried (July chosen on Home, July on Orders), 0 nested links, one legend row at 390 and 360, targets 60-88 x 30px |
+
+**Kept: `?status=`** in `MyOrders.tsx`, now used by Home (it had no caller
+after batch L).
+
+**Not in this batch:** the header's inline code chip (50 x 19px on Orders and
+Ranking, below 24px) belongs to the shared header; the month in the URL
+(a reload returns to the current month) belongs to the portal shell. Both
+were in the audit and deferred by the owner. The comment in
+`app/services/portal.py` that still says the screen reads *not recorded* was
+left, because this batch made no backend change.
+
+**The old app captures** `shots/app/portal-orders-*` (pending, delivered-open,
+July failed filter, July scrolled end) predate batch E and show the old
+`<select>` header and, in *pending*, *Not counted* and *Did not arrive*. They
+are kept as history; `shots/batch-m/` is the current evidence.
+
+---
 
 ## Remaining work - the one list (reconciled 24 September)
 

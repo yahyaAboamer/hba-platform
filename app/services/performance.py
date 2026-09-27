@@ -37,7 +37,6 @@ from app.models.affiliates import AccountKind, AffiliateProfile
 from app.models.attributed_orders import AttributedOrder, CommissionState
 from app.services.commission.calculate import COUNTED_STATES
 from app.models.orders import OrderIndex
-from app.services.shopify.fulfilment import FAILED
 
 
 @dataclass(frozen=True)
@@ -52,17 +51,17 @@ class Standing:
 
 
 def _use_count() -> object:
-    """The count of orders that count as a use.
+    """The count of orders that count as a use: **every one** (ADR 0049).
 
-    Everything except a failed delivery. `is_distinct_from` rather than `!=`
-    so a `NULL` delivery state — an order Shopify has not resolved yet — is
-    counted rather than dropped: SQL comparison with NULL is neither true nor
-    false, and `!= 'failed'` would quietly exclude exactly the orders D03 says
-    to include.
+    Delivered, pending, a failed delivery, cancelled or refunded - if her code
+    was used, it is a use (the owner, 27 September, superseding D03's
+    *everything except a failed delivery*). *Orders counted* is a different
+    figure, delivered and pending only, and is not worked out here.
+
+    Counted on the attributed row, not the index: the outer join leaves an
+    order the index has not caught up with as NULLs, and it is still a use.
     """
-    return func.count(AttributedOrder.shopify_order_id).filter(
-        OrderIndex.delivery_state.is_distinct_from(FAILED)
-    )
+    return func.count(AttributedOrder.shopify_order_id)
 
 
 def month_performance(db: Session, month: str) -> list[Standing]:

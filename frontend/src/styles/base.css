@@ -735,3 +735,20 @@ a {
 .table th strong {
   font-weight: 400;
 }
+
+/* -- Read aloud, not drawn --------------------------------------------------
+ *
+ * Words a screen reader needs and the eye does not: *(not earned)* after a
+ * struck-through figure, where the strike itself is never announced.
+ */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}

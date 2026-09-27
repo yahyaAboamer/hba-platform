@@ -214,8 +214,9 @@ def test_the_outcomes_add_up_to_the_uses(db):
         "delivered": 2, "pending": 1, "failed": 1, "cancelled": 1, "refunded": 0,
     }
     uses = uses_for(db, nour, SEPTEMBER)
-    assert uses == 4
-    assert uses == sum(outcomes.values()) - outcomes["failed"]
+    # Every order is a use (ADR 0049), so the outcomes add up to the uses.
+    assert uses == 5
+    assert uses == sum(outcomes.values())
 
 
 # -- Sharing -------------------------------------------------------------------

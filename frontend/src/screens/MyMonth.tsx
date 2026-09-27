@@ -394,58 +394,81 @@ function Payment({
 }
 
 /**
- * Her orders, **every one of them** (batch L). The owner found 16 uses
- * beside 10 + 3 + 0: three orders were cancelled, and no chip showed them.
- * Delivered, pending, cancelled and refunded are all uses; a failed delivery
- * is not (D03) - so the parts shown add up to the uses beside them.
+ * Her orders, in the three states the Orders tab files them under (the
+ * owner, 27 September, amending batch L's five): *delivered*, *pending* and
+ * *failed* - failed holding every order that did not count, whether the
+ * courier failed, the order was cancelled or it was refunded. Each row on the
+ * Orders tab still names which.
+ *
+ * **Each count opens its own orders** (ADR 0048, amended). The card is no
+ * longer one link: the head and the bar open them all, and each count with
+ * something in it opens the matching filter - never a link inside a link. A
+ * zero opens nothing, so it is plain text rather than a way into an empty
+ * list.
  */
+const OUTCOMES = [
+  { key: "delivered", status: "earned", word: "delivered" },
+  { key: "pending", status: "pending", word: "pending" },
+  { key: "failed", status: "void", word: "failed" },
+] as const;
+
 function Orders({ home }: { home: MyHome }) {
   const o = home.outcomes;
-  const parts = [
-    { key: "delivered", n: o.delivered, word: "delivered", always: true },
-    { key: "pending", n: o.pending, word: "pending", always: true },
-    { key: "cancelled", n: o.cancelled, word: "cancelled", always: false },
-    { key: "refunded", n: o.refunded, word: "refunded", always: false },
-    { key: "failed", n: o.failed, word: "failed delivery", always: true },
-  ];
+  const count = {
+    delivered: o.delivered,
+    pending: o.pending,
+    // The same orders as the Orders tab's *Failed* filter: every void one.
+    failed: o.failed + o.cancelled + o.refunded,
+  };
+  const parts = OUTCOMES.map((outcome) => ({ ...outcome, n: count[outcome.key] }));
   const total = parts.reduce((sum, part) => sum + part.n, 0);
 
   return (
-    <Link className="home__card home__orders" to="/orders">
-      <div className="home__orders-head">
-        <span>
-          <span className="home__big">{home.earnings.orders.counted}</span>{" "}
-          <span className="home__muted">
-            {home.earnings.orders.counted === 1 ? "order counted" : "orders counted"}
+    <section className="home__card home__orders" aria-label="Orders">
+      <Link className="home__orders-all" to="/orders">
+        <div className="home__orders-head">
+          <span>
+            <span className="home__big">{home.earnings.orders.counted}</span>{" "}
+            <span className="home__muted">
+              {home.earnings.orders.counted === 1 ? "order counted" : "orders counted"}
+            </span>
           </span>
-        </span>
-        <span className="home__faint">
-          {home.earnings.orders.uses} code {home.earnings.orders.uses === 1 ? "use" : "uses"}
-        </span>
-      </div>
-      {total > 0 && (
-        <div className="home__stack" aria-hidden="true">
-          {parts
-            .filter((part) => part.n > 0)
-            .map((part) => (
-              <span key={part.key} className={`home__seg home__seg--${part.key}`} style={{ flexGrow: part.n }} />
-            ))}
+          <span className="home__faint home__orders-uses">
+            {home.earnings.orders.uses} code {home.earnings.orders.uses === 1 ? "use" : "uses"}
+            <svg className="home__chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="m9 6 6 6-6 6" />
+            </svg>
+          </span>
         </div>
-      )}
+        {total > 0 && (
+          <div className="home__stack" aria-hidden="true">
+            {parts
+              .filter((part) => part.n > 0)
+              .map((part) => (
+                <span key={part.key} className={`home__seg home__seg--${part.key}`} style={{ flexGrow: part.n }} />
+              ))}
+          </div>
+        )}
+        <span className="visually-hidden">, see all orders</span>
+      </Link>
       <ul className="home__legend">
-        {parts
-          .filter((part) => part.always || part.n > 0)
-          .map((part) => (
-            <li
-              key={part.key}
-              className={part.n === 0 ? "home__key home__key--none" : `home__key home__key--${part.key}`}
-            >
-              <span className="home__dot" aria-hidden="true" />
-              {part.n} {part.word}
-            </li>
-          ))}
+        {parts.map((part) => (
+          <li key={part.key}>
+            {part.n > 0 ? (
+              <Link className={`home__key home__key--${part.key}`} to={`/orders?status=${part.status}`}>
+                <span className="home__dot" aria-hidden="true" />
+                <span className="home__key-word">{part.n} {part.word}</span>
+              </Link>
+            ) : (
+              <span className="home__key home__key--none">
+                <span className="home__dot" aria-hidden="true" />
+                {part.n} {part.word}
+              </span>
+            )}
+          </li>
+        ))}
       </ul>
-    </Link>
+    </section>
   );
 }
 

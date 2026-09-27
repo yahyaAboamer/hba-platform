@@ -59,6 +59,11 @@ payroll without touching a maintainer screen.
   a failed delivery is not. Approval settles every order it counted, and
   `carried_into` now pays only what a *delivered-only* approval left out — a
   backlog that shrinks and is never added to.
+- **A code use is every order that used her code** (ADR 0049, superseding
+  D03's definition): delivered, pending, failed delivery, cancelled or
+  refunded alike. *Orders counted* is delivered and pending only (F02).
+  Uses are a display figure and Ranking's tie-break; nothing about money
+  reads them.
 - **No component names a colour directly.** The accent lives in
   `frontend/src/styles/accent.css` — eight declarations, now covering both
   halves (ADR 0039) — and `styles/__tests__/accent-isolation.test.ts` fails the

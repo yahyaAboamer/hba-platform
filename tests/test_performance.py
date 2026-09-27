@@ -95,12 +95,16 @@ def _order(db, affiliate, order_id, base, *, delivery, state, month=AUGUST):
 # -- D03: what a use is --------------------------------------------------------
 
 
-def test_a_delivered_order_is_a_use_and_a_failed_one_is_not(db):
+def test_every_order_is_a_use_a_failed_delivery_included(db):
+    """ADR 0049 (the owner, 27 September), superseding D03's *everything but a
+    failed delivery*: if her code was used, it is a use - whatever became of
+    the order.
+    """
     affiliate = _model(db, "Nour")
     _order(db, affiliate, "1", 100_000, delivery=DELIVERED, state=CommissionState.EARNED)
     _order(db, affiliate, "2", 100_000, delivery=FAILED, state=CommissionState.VOID)
 
-    assert uses_for(db, affiliate, AUGUST) == 1
+    assert uses_for(db, affiliate, AUGUST) == 2
 
 
 def test_anything_in_between_counts_until_it_resolves(db):
@@ -463,15 +467,11 @@ def test_her_home_carries_how_often_her_code_was_used(db):
 def test_uses_on_home_is_not_the_sum_of_the_counts_beside_it(db):
     """**The reason it is its own figure rather than arithmetic on the others.**
 
-    The counts beside it are *commission* states; a use is a *delivery*
-    outcome, and the two disagree in both directions at once:
-
-    * an order delivered and later refunded is `void` and pays nothing, and it
-      is still a use - her code brought a parcel to a door;
-    * a parcel refused at the door is `void` too, and is not a use.
-
-    Adding earned and pending would be wrong for both. A screen deriving this
-    from what is already on it would quietly report the wrong number.
+    The counts beside it are *commission* states - earned and pending are what
+    the month pays on - and a use is every order her code brought in (ADR
+    0049). An order delivered and later refunded, and a parcel refused at the
+    door, are both `void`, pay nothing, and are both uses. Adding earned and
+    pending would miss them.
     """
     from app.services.portal import my_month
 
@@ -486,7 +486,7 @@ def test_uses_on_home_is_not_the_sum_of_the_counts_beside_it(db):
     home = my_month(db, affiliate, AUGUST)["orders"]
 
     assert (home["earned"], home["pending"], home["void"]) == (1, 0, 2)
-    assert home["uses"] == 2, "the refunded delivery counts; the refused one does not"
+    assert home["uses"] == 3, "every order is a use, the refused one included"
     assert home["uses"] != home["earned"] + home["pending"]
 
 
