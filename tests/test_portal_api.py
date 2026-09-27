@@ -2656,13 +2656,11 @@ def test_the_year_carries_the_code_uses_its_chart_asks_for(admin):
     )
 
 
-def test_a_use_is_a_delivery_outcome_not_a_commission_state(admin):
-    """A08, D03. Pending and delivered count; a refused parcel does not.
-
-    And it is **not** the order count renamed. An order that was delivered and
-    then failed to earn anything is still a use, so the two figures diverge on
-    purpose — which is why the repair had to be its own field rather than an
-    alias.
+def test_every_order_is_a_use_and_orders_counted_is_not_the_same_figure(admin):
+    """A08, ADR 0049 (superseding D03's definition). Every order her code
+    brought in is a use - the refused parcel included - while the orders the
+    month counts are delivered and pending only. The two figures diverge on
+    purpose, which is why `uses` is its own field rather than an alias.
     """
     affiliate = _affiliate(admin)
     _terms(admin, affiliate["id"])
@@ -2679,10 +2677,9 @@ def test_a_use_is_a_delivery_outcome_not_a_commission_state(admin):
         if m["month"] == AUGUST
     )
 
-    # Two uses: the parcel that arrived and the one still travelling.
-    assert august["uses"] == 2
-    # Two counted orders as well here - but not for the same reason, and the
-    # next test is the one where they part company.
+    # Three uses: every order, the refused one too.
+    assert august["uses"] == 3
+    # Two counted orders: the one that arrived and the one still travelling.
     assert august["orders"] == 2
 
 
