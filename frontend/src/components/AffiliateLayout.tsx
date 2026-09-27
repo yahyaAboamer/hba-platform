@@ -13,15 +13,36 @@ import { formatMonth, shortMonth } from "../lib/money";
 import { monthListStates } from "../lib/portal";
 import type { MonthListState, MyPayments } from "../lib/portal";
 import type { Me } from "../screens/MyDetails";
+import { MonthSheet } from "./MonthSheet";
 import "./AffiliateLayout.css";
 
-/** Approved mobile navigation; account and detail views sit outside the tab bar. */
+/** Stroke icons for the tab bar, in the portal's weight - never emoji. */
+function TabIcon({ name }: { name: string }) {
+  const paths: Record<string, React.ReactNode> = {
+    home: <><path d="M4 10.5 12 4l8 6.5V20H4v-9.5Z" /><path d="M10 20v-6h4v6" /></>,
+    orders: <><path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z" /><path d="M9 8h6M9 12h6" /></>,
+    wardrobe: <path d="M8 4 4 6.5l2 4 2-1V20h8V9.5l2 1 2-4L16 4a4 4 0 0 1-8 0Z" />,
+    targets: <><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="4.5" /><circle cx="12" cy="12" r="1" /></>,
+    ranking: <path d="M5 20V12M12 20V5M19 20v-5" />,
+  };
+  return (
+    <svg className="tabs__icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {paths[name]}
+    </svg>
+  );
+}
+
+/**
+ * Approved mobile navigation; account and detail views sit outside the tab bar.
+ * Icons since batch L: five words in a row are read one by one, five shapes
+ * are recognised at a glance.
+ */
 const TABS = [
-  { to: "/", label: "Home", end: true },
-  { to: "/orders", label: "Orders" },
-  { to: "/wardrobe", label: "Wardrobe" },
-  { to: "/targets", label: "Targets" },
-  { to: "/ranking", label: "Ranking" },
+  { to: "/", label: "Home", icon: "home", end: true },
+  { to: "/orders", label: "Orders", icon: "orders" },
+  { to: "/wardrobe", label: "Wardrobe", icon: "wardrobe" },
+  { to: "/targets", label: "Targets", icon: "targets" },
+  { to: "/ranking", label: "Ranking", icon: "ranking" },
 ];
 
 export type PortalContext = {
@@ -52,14 +73,6 @@ export type PortalContext = {
 export function usePortal(): PortalContext {
   return useOutletContext<PortalContext>();
 }
-
-/** The export's words and tones for each state in her month list. */
-const LIST_WORD: Record<MonthListState, { word: string; tone: string }> = {
-  open: { word: "in progress", tone: "pmonths__state--open" },
-  approved: { word: "approved", tone: "pmonths__state--agreed" },
-  paid: { word: "paid", tone: "pmonths__state--agreed" },
-  settled: { word: "settled", tone: "pmonths__state--settled" },
-};
 
 /**
  * Their name, their code, and the way in to their own details - and on Home,
@@ -161,7 +174,9 @@ export function PortalHeader({
     }
   }
 
-  const monthly = Boolean(month && months && onMonth && ["/", "/orders", "/ranking"].includes(pathname));
+  // Home carries its own month control since batch L - one line, in the
+  // page - so the header's is only for Orders and Ranking.
+  const monthly = Boolean(month && months && onMonth && ["/orders", "/ranking"].includes(pathname));
 
   return (
     <div className="phead-bar">
@@ -174,41 +189,49 @@ export function PortalHeader({
         <div className="phead__who">
           <span className="phead__name">{name}</span>
           <span className="phead__since">
-            {codePending ? "Code being checked" : "HBA ambassador"}{code && <> · <button type="button" className="phead__inline-code" onClick={copy}>{copied ? "Copied" : code}</button></>}
+            {codePending ? "Code being checked" : "HBA ambassador"}
+            {monthly && code && <> · <button type="button" className="phead__inline-code" onClick={copy}>{copied ? "Copied" : code}</button></>}
           </span>
         </div>
-        {monthly && (
+        {monthly ? (
           <button
             type="button"
             className="phead__month"
+            aria-haspopup="dialog"
             aria-expanded={listOpen}
-            aria-controls="portal-months"
             aria-label={`Month: ${formatMonth(month!)}`}
-            onClick={() => setListOpen((was) => !was)}
+            onClick={() => setListOpen(true)}
           >
             <span>{shortMonth(month!)}</span>
             <span className="phead__caret" aria-hidden="true">▼</span>
           </button>
+        ) : (
+          code && (
+            /* The thing she gives out, as a button that copies it (batch L).
+               It was a word in the grey line under her name. */
+            <button
+              type="button"
+              className="phead__code"
+              onClick={copy}
+              aria-label={copied ? "Code copied" : `Copy your code ${code}`}
+            >
+              {copied ? "Copied" : code}
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <rect x="8" y="8" width="12" height="12" rx="2.5" />
+                <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" />
+              </svg>
+            </button>
+          )
         )}
       </header>
       {monthly && listOpen && (
-        <div className="pmonths" id="portal-months">
-          {months!.map((value) => {
-            const state = states?.[value];
-            return (
-              <button
-                key={value}
-                type="button"
-                className={value === month ? "pmonths__month pmonths__month--on" : "pmonths__month"}
-                aria-current={value === month ? "true" : undefined}
-                onClick={() => { onMonth!(value); setListOpen(false); }}
-              >
-                <span>{formatMonth(value)}</span>
-                {state && <span className={`pmonths__state ${LIST_WORD[state].tone}`}>{LIST_WORD[state].word}</span>}
-              </button>
-            );
-          })}
-        </div>
+        <MonthSheet
+          months={months!}
+          current={month!}
+          states={states}
+          onPick={(value) => { onMonth!(value); setListOpen(false); }}
+          onClose={() => setListOpen(false)}
+        />
       )}
     </div>
   );
@@ -246,7 +269,8 @@ export function AffiliateLayout({
                 isActive ? "tabs__tab tabs__tab--on" : "tabs__tab"
               }
             >
-              {tab.label}
+              <span className="tabs__glyph"><TabIcon name={tab.icon} /></span>
+              <span className="tabs__label">{tab.label}</span>
             </NavLink>
           ))}
         </div>

@@ -349,6 +349,23 @@ def my_earnings(
     }
 
 
+@router.get("/home/{month}")
+def my_home(
+    month: str,
+    affiliate: AffiliateProfile = Depends(current_affiliate),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Everything Home draws for one month, in one request (batch L).
+
+    The same functions each figure's own screen reads - see
+    `app/services/home.py` - gathered so Home paints once instead of three
+    times, with the chart arriving last and moving the page.
+    """
+    from app.services.home import home
+
+    return home(db, affiliate, _month_or_400(month))
+
+
 @router.get("/payments")
 def my_payment_history(
     affiliate: AffiliateProfile = Depends(current_affiliate),

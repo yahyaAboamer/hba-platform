@@ -1,0 +1,630 @@
+/*
+ * Her Home, batch L (the owner, 27 September). Tokens only: the palette is
+ * `tokens.css`, the accent `accent.css`, and `.affiliate`'s data-theme picks
+ * light or dark. *How this adds up* keeps `MyMonth.css`.
+ */
+
+.home {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.home__card {
+  display: flex;
+  flex-direction: column;
+  padding: 18px 20px;
+  border: 1px solid var(--rule);
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+a.home__card:hover {
+  border-color: var(--rule-strong);
+}
+
+.home__eyebrow {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.home__faint {
+  font-size: 13px;
+  color: var(--faint);
+}
+
+.home__muted {
+  font-size: 15px;
+  color: var(--quiet);
+}
+
+.home__link {
+  align-self: flex-start;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--accent-text);
+  text-decoration: none;
+}
+
+.home__link:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.home__rule {
+  height: 1px;
+  background: var(--rule);
+}
+
+.home__clamp {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+/* ── The month, once ────────────────────────────────────────────────────── */
+
+.home__monthrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.home__month {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+}
+
+.home__month svg {
+  color: var(--faint);
+}
+
+.home__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  background: var(--hover);
+  color: var(--quiet);
+}
+
+.home__pill-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.home__pill--open,
+.home__pill--approved {
+  background: var(--owed-quiet);
+  color: var(--owed);
+}
+
+.home__pill--paid {
+  background: var(--settled-quiet);
+  color: var(--settled);
+}
+
+/* ── Earned, and when it arrives ───────────────────────────────────────── */
+
+.home__hero {
+  gap: 14px;
+  padding: 20px;
+}
+
+.home__figure {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.home__amount {
+  font-size: 40px;
+  line-height: 1.05;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+
+.home__sub {
+  font-size: 14px;
+  color: var(--quiet);
+}
+
+.home__sub strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.home__compare {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.home__compare--up {
+  color: var(--accent-text);
+}
+
+.home__compare--down {
+  color: var(--owed);
+}
+
+.home__compare-note {
+  font-weight: 400;
+  color: var(--faint);
+}
+
+.home__progress {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.home__bar {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--rule);
+}
+
+.home__bar span {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--accent);
+}
+
+.home__ends {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--faint);
+}
+
+.home__ends strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.home__guarantee {
+  margin: 0;
+  font-size: 13px;
+  color: var(--quiet);
+}
+
+.home__guarantee strong {
+  color: var(--ink);
+}
+
+.home__pay,
+.home__row,
+.home__card.home__row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  color: var(--ink);
+  text-align: left;
+  text-decoration: none;
+}
+
+.home__pay-icon,
+.home__row-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.home__pay-text,
+.home__row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.home__pay-label {
+  font-size: 12px;
+  color: var(--faint);
+}
+
+.home__pay-value {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.home__chevron {
+  flex: none;
+  color: var(--faint);
+}
+
+/* ── Something changed, and what she is waiting on ─────────────────────── */
+
+.home__change {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px solid var(--owed);
+  border-radius: 14px;
+  background: var(--owed-quiet);
+  color: var(--ink);
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.home__change-kicker {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--owed);
+}
+
+.home__waiting p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--quiet);
+}
+
+/* ── Orders, every one of them ─────────────────────────────────────────── */
+
+.home__orders {
+  gap: 12px;
+}
+
+.home__orders-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.home__big {
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.home__stack {
+  display: flex;
+  gap: 3px;
+  height: 8px;
+}
+
+.home__seg {
+  flex-basis: 0;
+  border-radius: 4px;
+  background: var(--rule-strong);
+}
+
+.home__seg--delivered {
+  background: var(--accent);
+}
+
+.home__seg--pending {
+  background: var(--owed);
+}
+
+.home__seg--failed {
+  background: var(--refused);
+}
+
+.home__seg--cancelled,
+.home__seg--refunded {
+  background: var(--faint);
+}
+
+.home__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  color: var(--quiet);
+}
+
+.home__key {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.home__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--faint);
+}
+
+.home__key--delivered .home__dot {
+  background: var(--accent);
+}
+
+.home__key--pending .home__dot {
+  background: var(--owed);
+}
+
+.home__key--failed .home__dot {
+  background: var(--refused);
+}
+
+.home__key--failed {
+  color: var(--refused);
+}
+
+/* A count of nothing is not a warning: grey, and an empty ring. */
+.home__key--none {
+  color: var(--faint);
+}
+
+.home__key--none .home__dot {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--rule-strong);
+}
+
+/* ── Three ways in ──────────────────────────────────────────────────────── */
+
+.home__tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.home__tile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 14px 12px;
+  border: 1px solid var(--rule);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+a.home__tile:hover {
+  border-color: var(--rule-strong);
+}
+
+.home__tile-icon {
+  color: var(--accent-text);
+}
+
+.home__tile-icon--rank {
+  color: var(--owed);
+}
+
+.home__tile-value {
+  margin-top: 4px;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+
+.home__tile-value--small {
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+.home__tile-label {
+  font-size: 12px;
+  color: var(--faint);
+}
+
+.home__tile-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--faint);
+}
+
+.home__tile-lines strong {
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* ── Share ──────────────────────────────────────────────────────────────── */
+
+.home__share {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.home__share-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: 15px;
+}
+
+.home__share-button {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--accent);
+  color: var(--paper);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.home__share-button:hover {
+  filter: brightness(1.08);
+}
+
+/* ── Her year ───────────────────────────────────────────────────────────── */
+
+.home__year {
+  gap: 14px;
+}
+
+.home__year-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.home__switch {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  background: var(--paper);
+}
+
+.home__switch button {
+  min-height: 30px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--faint);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.home__switch .home__switch-on {
+  background: var(--rule-strong);
+  color: var(--ink);
+}
+
+.home__year-figure {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.home__year-value {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.home__bars {
+  display: grid;
+  align-items: end;
+  gap: 8px;
+  height: 140px;
+}
+
+.home__col {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 8px;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.home__bar-fill {
+  display: block;
+  max-height: calc(100% - 22px);
+  border-radius: 6px;
+  background: var(--rule-strong);
+  transition: background-color 160ms ease-out, height 240ms ease-out;
+}
+
+.home__col--this .home__bar-fill {
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.home__col--on .home__bar-fill {
+  background: var(--accent);
+}
+
+.home__bar-label {
+  font-size: 11px;
+  font-weight: 500;
+  text-align: center;
+  color: var(--faint);
+}
+
+.home__col--on .home__bar-label {
+  color: var(--accent-text);
+  font-weight: 700;
+}
+
+.home__col:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* ── While it loads ─────────────────────────────────────────────────────── */
+
+.home__ghost {
+  display: block;
+  border-radius: 8px;
+  background: var(--hover);
+  animation: home-breathe 1.4s ease-in-out infinite;
+}
+
+@keyframes home-breathe {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home__ghost {
+    animation: none;
+  }
+
+  .home__bar-fill {
+    transition: none;
+  }
+}

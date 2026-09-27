@@ -195,3 +195,69 @@
 .phead__back { flex:none; padding:9px 11px; border:1px solid var(--rule); border-radius:8px; background:transparent; color:var(--ink); font-size:13px; cursor:pointer; }
 .phead__back:hover { border-color:var(--accent); }
 .phead__title { flex:1; min-width:0; padding-right:60px; font-size:15px; text-align:center; }
+
+/* ── Batch L: icons on the tabs, and the code as a button ─────────────────
+ *
+ * Each tab is an icon over its word; the one she is on sits in an accent
+ * pill. The border-top marker it had is kept off, since the pill says the
+ * same thing where the eye already is. */
+.tabs__tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding-top: 8px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.tabs__tab--on {
+  border-top-color: transparent;
+  font-weight: 600;
+}
+
+.tabs__glyph {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 28px;
+  border-radius: 14px;
+  transition: background-color 160ms ease-out;
+}
+
+.tabs__tab--on .tabs__glyph {
+  background: var(--accent-soft);
+}
+
+.tabs__label {
+  line-height: 1.2;
+}
+
+/* Her code, where she can take it: a chip that copies. */
+.phead__code {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 12px 0 14px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.phead__code:hover {
+  border-color: var(--quiet);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tabs__glyph {
+    transition: none;
+  }
+}

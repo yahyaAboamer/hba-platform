@@ -443,3 +443,56 @@ export function cairoToday(): string {
     day: "2-digit",
   }).format(new Date());
 }
+
+/**
+ * Her Home for one month, in one read (`GET /api/me/home/{month}`, batch L).
+ *
+ * Each part is what its own screen already reads - the month, the payments,
+ * the year - plus the figures Home gained on 27 September. Every figure is
+ * the server's; the screen only lays them out.
+ */
+export type MyHome = {
+  month: string;
+  earnings: MyEarnings;
+  /** Every order in the month, by how it ended. Adds up to the uses. */
+  outcomes: {
+    delivered: number;
+    pending: number;
+    failed: number;
+    cancelled: number;
+    refunded: number;
+  };
+  payments: MyPayments;
+  year: {
+    months: {
+      month: string;
+      sales_piastres: number | null;
+      uses: number | null;
+      in_progress: boolean;
+    }[];
+  };
+  rank: { rank: number; of: number } | null;
+  content: {
+    required_videos: number | null;
+    actual_videos: number | null;
+    required_stories: number | null;
+    actual_stories: number | null;
+    verified: boolean;
+  } | null;
+  best_seller: {
+    title: string;
+    quantity: number;
+    sales_piastres: number;
+    sales: string;
+  } | null;
+  /** Like for like: a running month against the same days of the last. */
+  comparison: {
+    previous_month: string;
+    window: string;
+    running: boolean;
+    now: string;
+    before: string;
+    change_pct: number;
+  } | null;
+  share: { code: string; url: string | null } | null;
+};

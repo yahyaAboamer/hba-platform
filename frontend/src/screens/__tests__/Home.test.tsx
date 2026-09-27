@@ -1,0 +1,168 @@
+// @vitest-environment jsdom
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter, Outlet, Route, Routes } from "react-router-dom";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { MyMonth } from "../MyMonth";
+
+/*
+ * Home, batch L (the owner, 27 September), drawn from FITBROS10's September
+ * on staging: 16 code uses beside 10 delivered, 3 pending, 0 failed - and 3
+ * cancelled orders no chip used to show.
+ */
+
+const ok = (body: unknown) =>
+  Promise.resolve({
+    ok: true,
+    status: 200,
+    headers: { get: () => "application/json" },
+    json: () => Promise.resolve(body),
+    text: () => Promise.resolve(JSON.stringify(body)),
+  } as unknown as Response);
+
+const home = {
+  month: "2026-09",
+  earnings: {
+    month: "2026-09",
+    state: "open",
+    policy: "pending_inclusive",
+    is_working_month: true,
+    not_started: false,
+    sales: {
+      counted_piastres: 1123287,
+      counted: "EGP 11,232.87",
+      counted_orders: 13,
+      average_order_piastres: 86407,
+      average_order: "EGP 864.07",
+    },
+    window: { opens: "2026-09-01", closes: "2026-09-30", progress_pct: 90, days_left: 3 },
+    orders: { earned: 10, pending: 3, void: 3, failed_delivery: 0, counted: 13, uses: 16 },
+    amount_piastres: 112300,
+    amount: "EGP 1,123.00",
+    makeup: [],
+    carried_in: [],
+    carried_out: [],
+    guarantee_applied: false,
+    guarantee: null,
+    commission_rate_bp: 1000,
+    waiting_on: [],
+  },
+  outcomes: { delivered: 10, pending: 3, failed: 0, cancelled: 3, refunded: 0 },
+  payments: { months: [], payments: [], adjustments: [], outstanding_piastres: 0 },
+  year: {
+    months: [
+      { month: "2026-08", sales_piastres: 1410000, uses: 19, in_progress: false },
+      { month: "2026-09", sales_piastres: 1123287, uses: 16, in_progress: true },
+    ],
+  },
+  rank: { rank: 4, of: 18 },
+  content: null,
+  best_seller: { title: "Everyday set", quantity: 5, sales_piastres: 400000, sales: "EGP 4,000.00" },
+  comparison: {
+    previous_month: "2026-08",
+    window: "1–27 Aug",
+    running: true,
+    now: "EGP 11,232.87",
+    before: "EGP 10,000.00",
+    change_pct: 12,
+  },
+  share: { code: "FITBROS10", url: "https://hba-wear.myshopify.com/discount/FITBROS10" },
+};
+
+let fetchMock: ReturnType<typeof vi.fn>;
+
+beforeEach(() => {
+  // The expected payment date is judged against today; fix today.
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-09-27T10:00:00Z"));
+  fetchMock = vi.fn((url: string) =>
+    String(url).includes("/api/me/home/") ? ok(home) : ok({}),
+  );
+  vi.stubGlobal("fetch", fetchMock);
+});
+
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
+
+function renderHome() {
+  const context = {
+    me: {},
+    month: "2026-09",
+    months: ["2026-09", "2026-08"],
+    setMonth: vi.fn(),
+    reload: vi.fn(),
+  };
+  render(
+    <MemoryRouter initialEntries={["/"]}>
+      <Routes>
+        <Route element={<Outlet context={context} />}>
+          <Route index element={<MyMonth />} />
+        </Route>
+      </Routes>
+    </MemoryRouter>,
+  );
+  return context;
+}
+
+describe("Home", () => {
+  it("asks the server once, for everything", async () => {
+    renderHome();
+    await waitFor(() => expect(screen.getByText("EGP 1,123.00")).toBeTruthy());
+
+    const homeCalls = fetchMock.mock.calls.filter(([url]) => String(url).includes("/api/me/"));
+    expect(homeCalls.map(([url]) => String(url))).toEqual(["/api/me/home/2026-09"]);
+  });
+
+  it("shows every order, so the parts add up to the uses", async () => {
+    renderHome();
+    await waitFor(() => expect(screen.getByText("16 code uses")).toBeTruthy());
+
+    expect(screen.getByText("10 delivered")).toBeTruthy();
+    expect(screen.getByText("3 pending")).toBeTruthy();
+    expect(screen.getByText("3 cancelled")).toBeTruthy();
+    // 10 + 3 + 3 = 16: the three that used to be nowhere.
+  });
+
+  it("does not paint a count of nothing as a warning", async () => {
+    renderHome();
+    await waitFor(() => expect(screen.getByText("0 failed delivery")).toBeTruthy());
+
+    expect(screen.getByText("0 failed delivery").className).toContain("home__key--none");
+    expect(screen.queryByText("0 refunded")).toBeNull();
+  });
+
+  it("compares like for like, and names the window", async () => {
+    renderHome();
+    await waitFor(() => expect(screen.getByText(/12% vs 1–27 Aug/)).toBeTruthy());
+  });
+
+  it("names the month once, as the control that changes it", async () => {
+    renderHome();
+    await waitFor(() => expect(screen.getByRole("button", { name: /September 2026/ })).toBeTruthy());
+
+    expect(screen.getAllByText("September 2026")).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: /September 2026/ }));
+    expect(screen.getByRole("dialog", { name: "Choose a month" })).toBeTruthy();
+  });
+
+  it("says when the money arrives, in the first card", async () => {
+    renderHome();
+    await waitFor(() => expect(screen.getByText("Next payment")).toBeTruthy());
+
+    expect(screen.getByText("Around 3 October")).toBeTruthy();
+  });
+
+  it("offers her code as a shop link, beside where she stands", async () => {
+    renderHome();
+    await waitFor(() => expect(screen.getByText("Share your code")).toBeTruthy());
+
+    expect(screen.getByRole("button", { name: /Share/ })).toBeTruthy();
+    expect(screen.getByText("#4")).toBeTruthy();
+    expect(screen.getByText("of 18 models")).toBeTruthy();
+    expect(screen.getByText("EGP 864.07")).toBeTruthy();
+  });
+});

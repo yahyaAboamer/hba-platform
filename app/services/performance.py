@@ -267,7 +267,9 @@ def top_products(db: Session, month: str, *, limit: int = 10) -> dict:
     }
 
 
-def best_sellers_for(db: Session, affiliate_id: int) -> list[ProductSales]:
+def best_sellers_for(
+    db: Session, affiliate_id: int, *, month: str | None = None
+) -> list[ProductSales]:
     """What sold through **her** code, all time, best first. W11.
 
     The approved portal's Wardrobe opens on *Your best sellers*, and the one
@@ -283,10 +285,13 @@ def best_sellers_for(db: Session, affiliate_id: int) -> list[ProductSales]:
     closes a gap with the design as well as with the money. A product whose
     Shopify record was deleted has no id to group by and is left out of the
     ranking, as it is on the admin list.
+
+    `month` narrows it to one business month - Home's *best seller this
+    month* (batch L). Absent, it is all time, as the Wardrobe has always read.
     """
     from app.models.catalogue import OrderLineItem
 
-    rows = db.execute(
+    query = (
         select(
             OrderLineItem.shopify_product_id,
             func.min(OrderLineItem.title),
@@ -301,8 +306,10 @@ def best_sellers_for(db: Session, affiliate_id: int) -> list[ProductSales]:
         .where(AttributedOrder.affiliate_id == affiliate_id)
         .where(AttributedOrder.commission_state.in_(COUNTED_STATES))
         .where(OrderLineItem.shopify_product_id.is_not(None))
-        .group_by(OrderLineItem.shopify_product_id)
-    ).all()
+    )
+    if month is not None:
+        query = query.where(AttributedOrder.business_month == parse_month(month))
+    rows = db.execute(query.group_by(OrderLineItem.shopify_product_id)).all()
 
     found = [
         ProductSales(

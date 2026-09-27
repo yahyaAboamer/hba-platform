@@ -63,8 +63,11 @@ describe("the portal header's month control", () => {
     expect(html).toContain('aria-expanded="false"');
   });
 
-  it("appears on Home, Orders and Ranking only", () => {
-    expect(renderToStaticMarkup(header("/"))).toContain("Month: September 2026");
+  it("appears on Orders and Ranking; Home names its month in the page (batch L)", () => {
+    const home = renderToStaticMarkup(header("/"));
+    expect(home).not.toContain("Month:");
+    // Home's header carries her code instead, as a button that copies it.
+    expect(home).toContain('aria-label="Copy your code TESTCODE"');
     expect(renderToStaticMarkup(header("/orders"))).toContain("Month: September 2026");
     expect(renderToStaticMarkup(header("/wardrobe"))).not.toContain("Month:");
     expect(renderToStaticMarkup(header("/targets"))).not.toContain("Month:");
@@ -75,7 +78,7 @@ describe("the portal header's month control", () => {
       String(path).includes("/api/me/payments") ? ok(payments) : ok({}),
     );
     const onMonth = vi.fn();
-    render(header("/", onMonth));
+    render(header("/orders", onMonth));
 
     fireEvent.click(screen.getByRole("button", { name: "Month: September 2026" }));
 
@@ -84,11 +87,11 @@ describe("the portal header's month control", () => {
     for (const label of rows) expect(screen.getByRole("button", { name: new RegExp(`^${label}`) })).toBeTruthy();
     expect(screen.queryByText("May 2026")).toBeNull();
 
-    await waitFor(() => expect(screen.getByText("in progress")).toBeTruthy());
-    expect(screen.getByRole("button", { name: /^September 2026/ }).textContent).toContain("in progress");
-    expect(screen.getByRole("button", { name: /^August 2026/ }).textContent).toContain("approved");
-    expect(screen.getByRole("button", { name: /^July 2026/ }).textContent).toContain("paid");
-    expect(screen.getByRole("button", { name: /^June 2026/ }).textContent).toContain("settled");
+    await waitFor(() => expect(screen.getByText("In progress")).toBeTruthy());
+    expect(screen.getByRole("button", { name: /^September 2026/ }).textContent).toContain("In progress");
+    expect(screen.getByRole("button", { name: /^August 2026/ }).textContent).toContain("Approved");
+    expect(screen.getByRole("button", { name: /^July 2026/ }).textContent).toContain("Paid");
+    expect(screen.getByRole("button", { name: /^June 2026/ }).textContent).toContain("Settled");
     expect(screen.getByRole("button", { name: /^September 2026/ }).getAttribute("aria-current")).toBe("true");
 
     fireEvent.click(screen.getByRole("button", { name: /^August 2026/ }));
@@ -98,13 +101,13 @@ describe("the portal header's month control", () => {
 
   it("names the months without guessing when her payments cannot be read", async () => {
     fetchMock.mockImplementation(() => Promise.reject(new TypeError("Failed to fetch")));
-    render(header("/"));
+    render(header("/orders"));
 
     fireEvent.click(screen.getByRole("button", { name: "Month: September 2026" }));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
     expect(screen.getByRole("button", { name: /^August 2026/ })).toBeTruthy();
-    for (const word of ["in progress", "approved", "paid", "settled"]) {
+    for (const word of ["In progress", "Approved", "Paid", "Settled"]) {
       expect(screen.queryByText(word)).toBeNull();
     }
   });

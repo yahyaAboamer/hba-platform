@@ -7,8 +7,75 @@ import { Money } from "../components/Money";
 import { api } from "../lib/api";
 import { formatMonth } from "../lib/money";
 import { describeDestination } from "../lib/payouts";
-import type { MyPayments as Body, Payment } from "../lib/portal";
+import type { MyHome, MyPayments as Body, Payment } from "../lib/portal";
+import { cairoToday, expectedRecording } from "../lib/portal";
+import { readHome } from "./MyMonth";
 import "./MyPayments.css";
+
+const SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/**
+ * The month she is still earning, and how it becomes money (batch L).
+ *
+ * It was nowhere on this screen: an empty ledger showed one grey sentence,
+ * though Home already knew the amount so far and when HBA usually pays. Three
+ * steps say where it has got to - earning, approved, paid - and the date is
+ * HBA's usual timing, said as *around*, never as a promise.
+ */
+function ComingUp({ home, destination }: { home: MyHome; destination: string }) {
+  const body = home.earnings;
+  const expected = expectedRecording(home.month, "open", cairoToday());
+  const closes = body.window.closes.slice(0, 10).split("-").map(Number);
+  const when = expected ? expected.label.split(" ").slice(0, 2).join(" ") : null;
+
+  return (
+    <>
+      <span className="pay-eyebrow">Coming up</span>
+      <section className="pay-coming">
+        <div className="pay-coming__head">
+          <strong>{formatMonth(home.month)}</strong>
+          <span className="pay-coming__pill">
+            <span aria-hidden="true" />
+            In progress
+          </span>
+        </div>
+        <div className="pay-coming__figure">
+          <span className="pay-coming__amount">
+            {body.amount_piastres === null ? "—" : <Money piastres={body.amount_piastres} />}
+          </span>
+          <span className="pay-coming__note">so far — final once HBA closes the month</span>
+        </div>
+        <ol className="pay-steps">
+          <li className="pay-steps__step pay-steps__step--now">
+            <span className="pay-steps__bar" />
+            <strong>Earning</strong>
+            <span>until {closes[2]} {SHORT[closes[1] - 1]}</span>
+          </li>
+          <li className="pay-steps__step">
+            <span className="pay-steps__bar" />
+            <strong>Approved</strong>
+            <span>by HBA</span>
+          </li>
+          <li className="pay-steps__step">
+            <span className="pay-steps__bar" />
+            <strong>Paid</strong>
+            <span>{when ? `around ${when}` : "after approval"}</span>
+          </li>
+        </ol>
+        <div className="pay-coming__rule" />
+        <div className="pay-coming__to">
+          <span>
+            <span className="pay-coming__label">Paid to</span>
+            <strong>{destination}</strong>
+          </span>
+          <Link className="pay-coming__change" to="/you/payout">
+            Change
+          </Link>
+        </div>
+      </section>
+    </>
+  );
+}
 
 /** The settlement states, in their words rather than the ledger's. */
 const STATE_TEXT: Record<string, string> = {
@@ -35,16 +102,22 @@ const STATE_TEXT: Record<string, string> = {
  * money* is a question about all of them at once.
  */
 export function MyPayments() {
-  const { me } = usePortal();
+  const { me, months } = usePortal();
   const [body, setBody] = useState<Body | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [running, setRunning] = useState<MyHome | null>(null);
 
   useEffect(() => {
     api
       .get<Body>("/api/me/payments")
       .then(setBody)
       .catch((caught) => setError(caught.message));
-  }, []);
+    // The month still being earned, for *Coming up* (batch L). Optional: if
+    // it cannot be read, the screen is exactly what it was without it.
+    if (months?.[0]) {
+      readHome(months[0]).then(setRunning).catch(() => setRunning(null));
+    }
+  }, [months]);
 
   if (error) {
     return (
@@ -56,17 +129,32 @@ export function MyPayments() {
 
   if (body === null) return <p className="empty">Loading…</p>;
 
+  const coming = running && running.earnings.state === "open" ? (
+    <ComingUp home={running} destination={describeDestination(me.payout_destination)} />
+  ) : null;
+
   if (body.months.length === 0 && body.payments.length === 0) {
     // A12. **"Nothing has been paid yet" was a claim this screen cannot
     // make.** It reads the platform's ledger, which begins at go-live - and
     // HBA paid models before it existed (ADR 0036). An empty ledger therefore
     // means there is no record *here*, which is a fact, rather than that she
-    // has never been paid, which is not one and which is a worse thing to
-    // read on your own payments page.
+    // has never been paid. Batch L keeps the claim and gives it a shape: what
+    // is coming, then an empty history that says what will fill it.
     return (
-      <p className="empty">
-        No payment is recorded here yet. A month appears once HBA closes it.
-      </p>
+      <div className="pay-screen">
+        {coming}
+        <span className="pay-eyebrow">History</span>
+        <section className="pay-empty">
+          <span className="pay-empty__icon" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z" />
+              <path d="M9 8h6M9 12h6" />
+            </svg>
+          </span>
+          <strong>No payments recorded here yet</strong>
+          <span>Each transfer HBA records shows up here, with its date and reference.</span>
+        </section>
+      </div>
     );
   }
 
@@ -74,6 +162,7 @@ export function MyPayments() {
 
   return (
     <>
+      {coming}
       <section className="figure">
         <p className="figure__state">
           {owed ? "Waiting to be paid" : "Nothing outstanding"}
@@ -103,7 +192,9 @@ export function MyPayments() {
        * is a decision, and a decision belongs on the screen built for it with
        * its own confirmation - not one press away from a balance.
        */}
-      <section className="panel destination">
+      {/* Batch L: *Coming up* already says where it goes, with its own
+          Change - one place for it, not two on one screen. */}
+      {!coming && <section className="panel destination">
         <div className="destination__row">
           <span className="destination__label">Going to</span>
           <span className="destination__value">
@@ -113,7 +204,7 @@ export function MyPayments() {
         <Link to="/you" className="destination__change">
           Change where I am paid
         </Link>
-      </section>
+      </section>}
 
       {/*
        * Agreed and not yet sent, at the top — the export leads with it, and it
