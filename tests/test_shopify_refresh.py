@@ -128,6 +128,8 @@ def test_a_failure_keeps_the_last_success_and_says_so(client, monkeypatch):
     client.post(URL)
     _work()
     first_success = _state(client)["last_success_at"]
+    # The parcel match that sweep queued (ADR 0051) is the next job due.
+    _work()
 
     _shopify(monkeypatch, status=429)
     client.post(URL)

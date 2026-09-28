@@ -84,7 +84,17 @@ def _attributed(db, affiliate, order_id, *, day=4):
     db.flush()
 
 
-def _line(db, order_id, line_id, *, options, title="HBA Washed PANTS", variant="M", quantity=1):
+def _line(
+    db,
+    order_id,
+    line_id,
+    *,
+    options,
+    title="HBA Washed PANTS",
+    variant="M",
+    quantity=1,
+    after_delivery=False,
+):
     db.add(
         OrderLineItem(
             shopify_line_item_id=line_id,
@@ -92,6 +102,9 @@ def _line(db, order_id, line_id, *, options, title="HBA Washed PANTS", variant="
             title=title,
             variant_title=variant,
             selected_options=options,
+            # Read after ADR 0051 asked whether it was an exchange item; None
+            # is a line read before the question existed.
+            after_delivery=after_delivery,
             quantity=quantity,
             discounted_total_piastres=125_000,
             original_total_piastres=125_000,
@@ -158,9 +171,11 @@ def test_the_sweep_finds_orders_never_read_and_leaves_read_ones_alone(db):
     _line(db, "6003", "L3", options=[])
     _attributed(db, nour, "6004", day=4)  # read, with its options
     _line(db, "6004", "L4", options=[{"name": "Size", "value": "M"}])
+    _attributed(db, nour, "6005", day=5)  # read before exchanges were asked about
+    _line(db, "6005", "L5", options=[{"name": "Size", "value": "M"}], after_delivery=None)
 
     # Newest first: the month she is looking at fills first.
-    assert orders_missing_line_items(db) == ["6002", "6001"]
+    assert orders_missing_line_items(db) == ["6005", "6002", "6001"]
 
 
 def test_the_sweep_queues_each_order_once_however_often_it_runs(db):
