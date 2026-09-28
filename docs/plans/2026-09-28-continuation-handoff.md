@@ -14,8 +14,8 @@ Read on 28 September; re-read the remote before describing it
 |---|---|
 | **Branch** | `repair/batch-2` |
 | **Last code commit** | `7913c79` (batch O's tests). This handoff is committed after it: `git rev-parse --short HEAD` |
-| **`origin/repair/batch-2`** | `e5ccdda` (batch N). **Batch O is local, not pushed** |
-| **`origin/main`** (staging) | `e5ccdda` - batch N; **batch O is not on staging** |
+| **`origin/repair/batch-2`** | Level with `origin/main` (fast-forwarded 28 September, evening) |
+| **`origin/main`** (staging) | Batch O merged by the owner at `383bff2` (28 September, 16:24 +03:00), so **batch O is on staging**. The commit after it adds the UI/UX Pro Max skill and this correction only, no app code |
 | **`origin/production`** | `156e65b`, unchanged since 26 September |
 | **Migration head** | `f4a2b8d10005` (batch O, ADR 0051) ← `e3f1a9c70004` ← `d7a2c4e10003` ← … ; up/down/up rehearsed on the disposable database |
 | **Backend** | **89/89 files** through `run-suite.sh` at `ccdcf32`; two failed first (`test_order_products`, `test_shopify_refresh`), both test-only updates for the intended change, both re-run green and committed in `7913c79` |
@@ -79,26 +79,43 @@ The same click is needed on production when batch O is promoted.
 
 ## Remaining, in order
 
-1. **Owner: merge batch O to `main`** (staging deploy), then step 2 above.
+1. ~~Owner: merge batch O to `main`~~ - **done, 28 September.** Still owed:
+   the owner's *Match parcels from 2026-01-01* click (step 2 above). The six-hourly
+   re-read's first run is six hours after the new version started, not at deploy
+   (`schedule.py`: a restart never triggers a sweep).
+   **The check that proves it, #29936** (FITBROS10, an E-stebdal exchange): at
+   16:49 the portal showed 4 products, *On its way*, EGP 765.09 net sales, because
+   nothing had re-read it yet. The owner's Shopify timeline shows F1 delivered
+   6 Sep 17:45 (Bosta's *shipment delivered* email), COD 859.19 settled the same
+   minute, and the exchange fulfilment created 7 Sep 13:42. Expected after the
+   line fill and the re-read: **2 products** (the original jersey and compression;
+   the exchange lines `after_delivery = true`), **Delivered**, net sales
+   **EGP 764.19** (859.19 paid by delivery less 95 shipping), commission
+   **EGP 76.42**, final. If it is still in flight the next day, read F1's stored
+   `displayStatus`/`deliveredAt` in `order_index.fulfilments` before anything else.
 2. **Verify on staging**: Mazen's Wardrobe (received, on the way, best
    sellers once his orders' products are read), #22369 / #29499 delivered,
    the staff list.
-3. **UI/UX Pro Max review of the Wardrobe tab** - the owner's request of 28
+3. **The owner is revising the Targets and Ranking tabs** in a new session meanwhile
+   (28 September), with UI/UX Pro Max, which is now vendored in
+   `.claude/skills/ui-ux-pro-max/` (see `CLAUDE.md`). Findings and options come to
+   him before anything is built.
+4. **UI/UX Pro Max review of the Wardrobe tab** - the owner's request of 28
    September, deliberately after real data is visible.
-4. **Owner decision (ADR 0051, *not decided here*):** orders already *earned*
+5. **Owner decision (ADR 0051, *not decided here*):** orders already *earned*
    with a base read after their return (imported after it). Rule 1 says their
    base is the cash at delivery; earned is final, so nothing rewrites them.
    After the resync fills `paid_by_delivery_piastres`, count them and the
    difference, and bring it to the owner.
-5. **Model deletion.** None exists (archive only). The owner asked for a way to
+6. **Model deletion.** None exists (archive only). The owner asked for a way to
    remove test models; recommended for testing: clear the test models' phones
    (they share the owner's number and make his parcels ambiguous). A real
    delete, for models with no money history only, is a future feature.
-6. **Leftover audit groups** the owner said to leave: orders with a return but
+7. **Leftover audit groups** the owner said to leave: orders with a return but
    no recorded delivery, failed-then-refulfilled, split shipments (#19177,
    #17542) - all older than a month except #20497.
-7. Everything in the 27 September handoff's *Remaining* list, from 0 onward.
-8. **`orders_audit.md`** (repo root, untracked, customer names and addresses):
+8. Everything in the 27 September handoff's *Remaining* list, from 0 onward.
+9. **`orders_audit.md`** (repo root, untracked, customer names and addresses):
    delete when staging editing is finished - the owner's instruction. Never
    commit it.
 

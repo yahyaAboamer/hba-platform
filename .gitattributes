@@ -3,3 +3,7 @@
 # a confusing way to lose a deploy.
 *.sh text eol=lf
 Dockerfile text eol=lf
+
+# The UI/UX Pro Max skill checks its data files against sha256 hashes taken
+# over LF bytes; a CRLF checkout on Windows would fail its own validation.
+.claude/skills/ui-ux-pro-max/data/** text eol=lf

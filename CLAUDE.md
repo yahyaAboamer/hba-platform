@@ -128,6 +128,12 @@ Treat context as a budget.
 - Native PG18 on 5432 is a different server.
 - `GO_LIVE_MONTH` differs by environment: staging `2026-08`, production `2026-09`; never assume one while operating in the other.
 - Staging DB access uses Railway SSH; its `DATABASE_URL` host resolves only inside Railway’s network.
+- **Railway:** the project is `hba-platform` in the **`HBA_Server`** workspace (not the personal
+  `yahyaaboamer's Projects`, which is empty). A Railway connector or token that sees only the
+  personal workspace sees no project; it must be granted `HBA_Server`.
+- **Checking Shopify:** use the platform's own app credentials (client id + secret, the same
+  connection `build_client()` uses, with the scopes the app was granted) and read-only queries,
+  so the answer is what the platform itself can see. Do not use a Shopify connector for this.
 - `app/web` is gitignored; never `git add` it.
 - This machine is memory-constrained. Prefer foreground work when memory is tight and avoid unnecessary concurrent heavy processes.
 
@@ -191,6 +197,18 @@ Use automatically for meaningful user-facing UI/UX work, including hierarchy, la
 Preserve the existing product design system and brand unless a redesign is explicitly requested.
 Do not redesign unrelated screens during a focused change.
 Small UI edits do not require a full redesign workflow.
+
+The skill is vendored at `.claude/skills/ui-ux-pro-max/` (upstream
+`nextlevelbuilder/ui-ux-pro-max-skill` at `09170ee`, copied unchanged), so
+every session loads it, cloud included; a session started before it was added
+does not see it. Its `SKILL.md` writes the search script's path with
+`${CLAUDE_PLUGIN_ROOT}`, which is unset for a project skill; from the repo root
+run `python .claude/skills/ui-ux-pro-max/scripts/search.py "<query>" --domain <domain>`
+(`.venv/Scripts/python.exe` on Windows; standard library only).
+
+Its results are recommendations. **The approved exports and the owner's
+explicit requirements win over them**, and a suggestion that departs from an
+approved screen is brought to the owner as a choice, not built.
 
 ## Jev Browser
 
