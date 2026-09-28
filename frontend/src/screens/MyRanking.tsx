@@ -19,33 +19,7 @@ type Row = {
 
 type Board = { month: string; basis: string; rows: Row[] };
 
-/**
- * Where she stands, and what the order is actually decided on.
- *
- * ## Two different numbers, on purpose
- *
- * M02: the board is **ordered by sales**, and the figure shown against every
- * other model is her **uses** — never their sales, commission or salary. So
- * the column somebody reads is not the column the order is made from, and that
- * has to be said rather than left to be discovered.
- *
- * It matters because uses only break a *tie*. Two models can show the same use
- * count and sit in different places, and a screen that implied matching
- * somebody's uses would match her rank would be making a promise the rule does
- * not keep — which is exactly what M02 warns against.
- *
- * ## Everybody is named, nobody's money is shown
- *
- * The approved portal prints every model's name, code and initial, and so does
- * this (item 3: the approved design over the anonymised board this screen had
- * before). What stays hers alone is money - sales appear on no row but her own
- * (M02); the board shows uses.
- *
- * ## Equal standings share a place (D03)
- *
- * Two models level on both figures are both first, and the next is third —
- * because two places have been used up. The jump is not a missing row.
- */
+/** Sales decide position; code uses only break ties (M02, D03). */
 export function MyRanking() {
   const { month } = usePortal();
   const [board, setBoard] = useState<Board | null>(null);
@@ -71,13 +45,6 @@ export function MyRanking() {
     };
   }, [month]);
 
-  const head = (
-    <div className="ranking__head">
-      <h1>Ranking</h1>
-      <span>{formatMonth(month)}</span>
-    </div>
-  );
-
   if (error) {
     return (
       <p className="notice notice--refused" role="alert">
@@ -85,16 +52,34 @@ export function MyRanking() {
       </p>
     );
   }
-  if (!board) return <>{head}<p className="empty">Loading…</p></>;
+  if (!board) return <p className="empty" role="status">Loading ranking…</p>;
 
-  const mine = board.rows.find((row) => row.is_me);
+  return <RankingContents key={board.month} board={board} />;
+}
+
+/** The short board answers "who is near me?" before offering every row. */
+export function RankingContents({ board }: { board: Board }) {
+  const [full, setFull] = useState(false);
+  const mineIndex = board.rows.findIndex((row) => row.is_me);
+  const mine = mineIndex >= 0 ? board.rows[mineIndex] : null;
+  const top = board.rows.slice(0, 3);
+  const nearStart = mineIndex > 2
+    ? Math.max(3, Math.min(mineIndex - 1, board.rows.length - 3))
+    : -1;
+  const nearby = nearStart >= 0 ? board.rows.slice(nearStart, nearStart + 3) : [];
+  const summaryIds = new Set([...top, ...nearby].map((row) => row.affiliate_id));
+  const hasMore = summaryIds.size < board.rows.length;
+
   const shared = mine
     ? board.rows.filter((row) => row.rank === mine.rank).length > 1
     : false;
 
   return (
     <div className="ranking">
-      {head}
+      <div className="ranking__head">
+        <h1>Ranking</h1>
+        <span>{formatMonth(board.month)}</span>
+      </div>
 
       {mine && (
         <section className="ranking__mine">
@@ -104,69 +89,61 @@ export function MyRanking() {
               <span className="ranking__number">{ordinal(mine.rank)}</span>
             </div>
             <div className="ranking__side">
-              <span className="ranking__tally">{mine.uses}</span>
+              <span className="ranking__sales">{mine.sales_piastres === null ? "Sales unavailable" : <Money piastres={mine.sales_piastres} />}</span>
               <span className="ranking__caption">
-                {mine.uses === 1 ? "use" : "uses"} of your code
+                Your code sales · {mine.uses} {mine.uses === 1 ? "use" : "uses"}
               </span>
             </div>
           </div>
-          {/*
-           * Said once, plainly, because the column below is uses and the order
-           * is not. Without this the board looks wrong to anybody who reads
-           * down it and finds a smaller number above a bigger one.
-           */}
           <div className="ranking__basis">
-            <p>
-              Ordered by the sales each code generated — yours came to{" "}
-              <Money piastres={mine.sales_piastres ?? 0} />. Only use counts are
-              shown.
-            </p>
-            <p>
-              The number beside each place is how many times that model&rsquo;s
-              code was used. It settles a tie, so the same number of uses does
-              not always mean the same place.
-            </p>
-            {shared && (
-              <p>You are level with somebody this month, so you share a place.</p>
-            )}
+            <strong>Sales decide the order.</strong> Code uses break ties. Other models&rsquo; sales stay private.
+            {shared && <p>You are level with somebody this month, so you share a place.</p>}
           </div>
         </section>
       )}
 
-      <ul className="ranking__board">
-        {board.rows.map((row, index) => (
-          <li
-            key={row.affiliate_id}
-            className={row.is_me ? "ranking__row ranking__row--me" : "ranking__row"}
-          >
-            {/*
-             * The place is printed only when it changes going down the list,
-             * so two models sharing first read as one place with two models
-             * in it rather than as the same number written twice.
-             */}
-            <span className="ranking__rank">
-              {index > 0 && board.rows[index - 1].rank === row.rank
-                ? ""
-                : row.rank}
-            </span>
-            <span className="ranking__avatar">
-              {(row.name ?? "").trim().charAt(0).toUpperCase()}
-            </span>
-            {/* The export's name over code (Portal lines 403-406). */}
-            <span className="ranking__who">
-              {/* Her own row says *You*, as the export's; the initial is still hers. */}
-              <span className="ranking__name">{row.is_me ? "You" : row.name ?? ""}</span>
-              {row.code && <span className="ranking__code">{row.code}</span>}
-            </span>
-            <span className="ranking__figure">
-              <span className="ranking__uses">{row.uses}</span>
-              <span className="ranking__caption">uses</span>
-            </span>
-          </li>
-        ))}
-      </ul>
+      {full ? (
+        <section className="ranking__group">
+          <div className="ranking__group-head"><h2>Full ranking</h2><span>Code uses at right</span></div>
+          <RankingRows rows={board.rows} />
+        </section>
+      ) : (
+        <>
+          {nearby.length > 0 && (
+            <section className="ranking__group">
+              <div className="ranking__group-head"><h2>Around your position</h2><span>Code uses at right</span></div>
+              <RankingRows rows={nearby} />
+            </section>
+          )}
+          <section className="ranking__group">
+            <div className="ranking__group-head"><h2>{nearby.length ? "Top of the board" : "Leaderboard"}</h2><span>Code uses at right</span></div>
+            <RankingRows rows={top} />
+          </section>
+        </>
+      )}
+      {hasMore && <button type="button" className="ranking__more" onClick={() => setFull(!full)}>{full ? "Show summary" : "View full ranking"}</button>}
+      <p className="ranking__foot">Equal sales and equal uses share a place.</p>
     </div>
   );
+}
+
+function RankingRows({ rows }: { rows: Row[] }) {
+  return <ul className="ranking__board">
+    {rows.map((row) => (
+      <li key={row.affiliate_id} className={row.is_me ? "ranking__row ranking__row--me" : "ranking__row"}>
+        <span className="ranking__rank">{row.rank}</span>
+        <span className="ranking__avatar">{(row.name ?? "").trim().charAt(0).toUpperCase() || "·"}</span>
+        <span className="ranking__who">
+          <span className="ranking__name">{row.is_me ? "You" : row.name ?? "Model"}</span>
+          {row.code && <span className="ranking__code">{row.code}</span>}
+        </span>
+        <span className="ranking__figure">
+          <span className="ranking__uses">{row.uses}</span>
+          <span className="ranking__caption">{row.uses === 1 ? "use" : "uses"}</span>
+        </span>
+      </li>
+    ))}
+  </ul>;
 }
 
 function ordinal(place: number): string {

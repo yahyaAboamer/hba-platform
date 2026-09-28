@@ -325,6 +325,7 @@ def populated_states(db, owner_id: int, made: dict, now) -> None:
                 # wardrobe reads the original - and a gift is an order whose
                 # original net was nothing.
                 subtotal_piastres=0,
+                original_subtotal_piastres=0,
                 total_piastres=0,
                 shipping_piastres=0,
                 tax_piastres=0,

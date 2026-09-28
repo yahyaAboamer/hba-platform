@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import type { MonthTargets } from "../portal";
 import {
+  describeCurrentTargetPay,
   describeTargetPay,
   targetChip,
   targetCounts,
   targetOutcome,
+  targetProgressNote,
 } from "../targets";
 
 /**
@@ -93,13 +95,44 @@ describe("targetCounts", () => {
           actual_stories: 0,
         }),
       ),
-    ).toBe("0 video, 0 story");
+    ).toBe("0 videos, 0 stories");
   });
 
   it("shows both halves of a partly counted month", () => {
     expect(targetCounts(target({ actual_videos: 4, actual_stories: 0 }))).toBe(
-      "4 of 6 video, 0 of 12 story",
+      "4 of 6 videos, 0 of 12 stories",
     );
+  });
+
+  it("does not turn one missing count into zero", () => {
+    expect(targetCounts(target({ actual_videos: null, actual_stories: 1 }))).toBe(
+      "— of 6 videos, 1 of 12 stories",
+    );
+  });
+});
+
+describe("the visible current-month explanation", () => {
+  it("names only recorded work still needed", () => {
+    expect(targetProgressNote(target({ achieved: false, actual_videos: 4 }))).toBe(
+      "2 videos left to reach this month’s target.",
+    );
+    expect(targetProgressNote(target({ achieved: false, actual_videos: 4, actual_stories: 9 }))).toBe(
+      "2 videos and 3 stories left to reach this month’s target.",
+    );
+    expect(targetProgressNote(target({ achieved: null, actual_videos: null }))).toBeNull();
+  });
+
+  it("does not settle a current shortfall before HBA confirms it", () => {
+    const said = describeCurrentTargetPay(target({ achieved: false }));
+    expect(said).toContain("HBA must confirm the final result");
+    expect(said).toContain("commission still applies");
+    expect(said).not.toContain("does not apply");
+  });
+
+  it("distinguishes missing, waiting, and confirmed guarantee records", () => {
+    expect(describeCurrentTargetPay(target({ achieved: null }))).toContain("not recorded");
+    expect(describeCurrentTargetPay(target({ verified: false }))).toContain("as soon as HBA confirms");
+    expect(describeCurrentTargetPay(target())).toContain("Met and confirmed");
   });
 });
 

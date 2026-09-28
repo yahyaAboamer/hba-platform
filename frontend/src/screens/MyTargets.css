@@ -1,6 +1,5 @@
-/* Her content record. The month she is in, then every month before it.
-
-   `onTargets` in `Affiliate Portal v3.dc.html`, lines 328–376. */
+/* Her current record and its pay consequence, then history. The inline pay
+   note is an owner-approved departure from the export's 22px info control. */
 
 .affiliate .mytargets {
   padding-bottom: var(--tab-clearance);
@@ -8,8 +7,9 @@
 
 .affiliate .mytargets__heading {
   margin: 0;
-  font-size: 15px;
-  font-weight: 400;
+  font-size: 24px;
+  font-weight: 650;
+  letter-spacing: -0.04em;
 }
 
 /* Who keeps this, and when they last touched it. */
@@ -22,8 +22,9 @@
 /* The month she is in, on the raised ground the hero figure uses. Everything
    else on this screen is history, and history is a list. */
 .affiliate .mytargets__now {
-  margin-top: 14px;
+  margin-top: 18px;
   padding: 16px;
+  border: 1px solid var(--rule-strong);
   border-radius: var(--radius-lg);
   background: var(--surface);
 }
@@ -37,6 +38,7 @@
 
 .affiliate .mytargets__now-month {
   font-size: 15px;
+  font-weight: 600;
 }
 
 /* Not "0 of 0". Nothing has been asked, which is a statement about HBA's
@@ -47,59 +49,67 @@
   color: var(--quiet);
 }
 
-/* No colour, deliberately, and the same reasoning as `.targets__note`: §15
-   makes a target informational on every arrangement but a guaranteed minimum,
-   and a red shortfall on a commission model says she has lost money she never
-   had. The sentence carries it. */
-/* The export's guarantee row (Portal lines 350-358): a rule 14px down, the
-   label 13px muted beside a 22px round *i*, and the sentence in a box on the
-   page ground when opened. */
-.affiliate .mytargets__guarantee {
-  margin-top: 14px;
-  padding-top: 12px;
-  border-top: 1px solid var(--rule);
+.affiliate .mytargets__progress {
+  margin: 14px 0 0;
+  color: var(--owed);
+  font-size: 12.5px;
+  line-height: 1.5;
 }
 
-.affiliate .mytargets__guarantee-head {
+.affiliate .mytargets__pay-note {
+  margin-top: 15px;
+  padding: 13px 15px;
+  border-left: 3px solid var(--owed);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  background: var(--owed-quiet);
+}
+
+.affiliate .mytargets__pay-note--met {
+  border-left-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.affiliate .mytargets__pay-note h2 {
+  margin: 0;
+  color: var(--owed);
+  font-size: 12.5px;
+  font-weight: 650;
+}
+
+.affiliate .mytargets__pay-note--met h2 { color: var(--accent-text); }
+
+.affiliate .mytargets__pay-note p {
+  margin: 5px 0 0;
+  color: var(--ink);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+
+.affiliate .mytargets__informational {
+  margin: 13px 0 0;
+  color: var(--quiet);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.affiliate .mytargets__history-head {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--quiet);
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 24px;
 }
 
-.affiliate .mytargets__info {
-  flex: none;
-  width: 22px;
-  height: 22px;
-  padding: 1px 6px;
-  border: 1px solid var(--rule);
-  border-radius: 50%;
-  background: transparent;
-  color: var(--quiet);
-  font-size: 12px;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.affiliate .mytargets__pay {
-  margin: 10px 0 0;
-  padding: 12px 13px;
-  border-radius: var(--radius-sm);
-  background: var(--paper);
-  font-size: 13px;
-  line-height: 1.6;
-  color: var(--quiet);
-}
+.affiliate .mytargets__history-head span { color: var(--quiet); font-size: 11px; }
 
 .affiliate .mytargets__title {
-  margin: 20px 0 0;
-  font-size: 15px;
-  font-weight: 400;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
 }
 
 .affiliate .mytargets__history {
-  margin: 12px 0 0;
+  margin: 11px 0 0;
   padding: 0;
   list-style: none;
   border-radius: var(--radius);
@@ -114,7 +124,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 13px 14px;
+  min-height: 68px;
+  padding: 11px 13px;
   border-bottom: 1px solid var(--rule);
 }
 
@@ -125,6 +136,7 @@
 .affiliate .mytargets__label {
   min-width: 0;
   font-size: 13.5px;
+  overflow-wrap: anywhere;
 }
 
 .affiliate .mytargets__detail {

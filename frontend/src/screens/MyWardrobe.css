@@ -1,112 +1,67 @@
+/* The owner-approved wardrobe order: owned pieces, requests, then sales. */
 .affiliate .wardrobe { padding-bottom: var(--tab-clearance); }
-.affiliate .wardrobe__block { margin-bottom: 24px; }
-.affiliate .wardrobe__title { margin: 0; font-size: 15px; font-weight: 400; }
-/* Inside the bordered box, where it labels a short list rather than opening
-   a section of the screen. */
-.affiliate .wardrobe__title--inset { font-size: 13.5px; }
-.affiliate .wardrobe__subtitle { margin: 5px 0 12px; font-size: 12.5px; color: var(--quiet); }
+.affiliate .wardrobe__page-title { margin: 0; font-size: 24px; font-weight: 650; letter-spacing: -0.04em; }
+.affiliate .wardrobe__intro { margin: 6px 0 0; color: var(--quiet); font-size: 12.5px; line-height: 1.45; }
+
+.affiliate .wardrobe__jumps { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 17px; }
+.affiliate .wardrobe__jumps button {
+  min-height: 44px; padding: 0 12px; border: 1px solid var(--rule-strong);
+  border-radius: 999px; background: var(--surface); color: var(--ink); font-size: 12px;
+}
+.affiliate .wardrobe__jumps button:first-child { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-text); }
+.affiliate .wardrobe__jumps button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+.affiliate .wardrobe__block { margin-top: 25px; scroll-margin-top: 85px; }
 .affiliate .wardrobe__heading { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
-.affiliate .wardrobe__rows,
-.affiliate .wardrobe__requests,
-.affiliate .wardrobe__waiting { list-style: none; padding: 0; margin: 0; }
-.affiliate .wardrobe__rows,
-.affiliate .wardrobe__requests { display: flex; flex-direction: column; gap: 10px; }
-.affiliate .wardrobe__rows li,
-.affiliate .wardrobe__requests li { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: var(--radius); background: var(--surface); }
-.affiliate .wardrobe__requests li { align-items: flex-start; padding-block: 13px; }
-.affiliate .wardrobe__pic,
-.affiliate .wardrobe__nopic { flex: none; width: 66px; height: 76px; object-fit: cover; border-radius: var(--radius); background: var(--raise); }
-.affiliate .wardrobe__requests .wardrobe__pic,
-.affiliate .wardrobe__requests .wardrobe__nopic { width: 62px; height: 72px; }
-.affiliate .wardrobe__nopic { display: flex; align-items: center; justify-content: center; border: 1px dashed var(--rule); font-size: 10px; color: var(--quiet); }
+.affiliate .wardrobe__title { margin: 0; font-size: 16px; font-weight: 600; line-height: 1.3; }
+.affiliate .wardrobe__count { flex: none; color: var(--quiet); font-size: 11.5px; }
+.affiliate .wardrobe__subtitle { margin: 6px 0 12px; color: var(--quiet); font-size: 12.5px; line-height: 1.45; }
+
+.affiliate .wardrobe__received, .affiliate .wardrobe__requests, .affiliate .wardrobe__waiting { list-style: none; padding: 0; margin: 0; }
+.affiliate .wardrobe__received { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.affiliate .wardrobe__received li { min-width: 0; overflow: hidden; border: 1px solid var(--rule-strong); border-radius: var(--radius-lg); background: var(--surface); }
+.affiliate .wardrobe__received .wardrobe__pic,
+.affiliate .wardrobe__received .wardrobe__nopic { display: flex; width: 100%; height: 116px; border: 0; border-radius: 0; object-fit: cover; }
+.affiliate .wardrobe__product-copy { min-width: 0; padding: 10px 11px 12px; overflow-wrap: anywhere; }
+.affiliate .wardrobe__product-copy .wardrobe__name { min-height: 36px; }
+
+.affiliate .wardrobe__pic, .affiliate .wardrobe__nopic { flex: none; width: 50px; height: 54px; border-radius: var(--radius); background: var(--raise); }
+.affiliate .wardrobe__pic { object-fit: cover; }
+.affiliate .wardrobe__nopic { display: flex; align-items: center; justify-content: center; border: 1px dashed var(--rule-strong); color: var(--quiet); font-size: 10px; }
 .affiliate .wardrobe__copy { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-.affiliate .wardrobe__name { display: block; font-size: 14px; line-height: 1.4; }
-.affiliate .wardrobe__size,
-.affiliate .wardrobe__date { display: block; margin-top: 5px; font-size: 13px; color: var(--quiet); }
-.affiliate .wardrobe__date { font-size: 12.5px; color: var(--faint); }
-.affiliate .wardrobe__state { display: block; margin-top: 5px; font-size: 12.5px; color: var(--quiet); }
-/* Something she has, something on its way, something that never arrived. The
-   last one is the only one anybody has to do anything about. */
+.affiliate .wardrobe__name { display: block; color: var(--ink); font-size: 13px; font-weight: 550; line-height: 1.4; }
+.affiliate .wardrobe__size, .affiliate .wardrobe__date { display: block; margin-top: 4px; color: var(--quiet); font-size: 11.5px; line-height: 1.4; }
+.affiliate .wardrobe__date { color: var(--faint); }
+.affiliate .wardrobe__state { display: block; margin-top: 4px; font-size: 11.5px; line-height: 1.4; }
 .affiliate .wardrobe__state--have { color: var(--accent-lift); }
 .affiliate .wardrobe__state--coming { color: var(--owed); }
 .affiliate .wardrobe__state--failed { color: var(--refused); }
-.affiliate .wardrobe__incoming .wardrobe__name { font-size: 13px; }
-.affiliate .wardrobe__incoming .wardrobe__size { margin-top: 3px; font-size: 12.5px; color: var(--faint); }
-.affiliate .wardrobe__ask { margin: 7px 0 0; font-size: 13px; line-height: 1.5; color: var(--quiet); }
-.affiliate .wardrobe__incoming { padding: 13px 14px; border: 1px solid var(--rule); border-radius: var(--radius); }
-.affiliate .wardrobe__waiting li { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 10px; }
-.affiliate .wardrobe__waiting .wardrobe__state { flex: none; }
 
-/* ── Your best sellers (the export's first Wardrobe section) ─────────────── */
+.affiliate .wardrobe__incoming { margin-top: 11px; padding: 12px; border: 1px solid var(--rule-strong); border-radius: var(--radius-lg); background: var(--surface); }
+.affiliate .wardrobe__incoming h3 { margin: 0 0 9px; font-size: 12.5px; font-weight: 600; }
+.affiliate .wardrobe__waiting li { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--rule); }
+.affiliate .wardrobe__waiting li:first-child { border-top: 0; }
+.affiliate .wardrobe__waiting .wardrobe__pic, .affiliate .wardrobe__waiting .wardrobe__nopic { width: 42px; height: 44px; }
 
-.affiliate .wardrobe__best {
-  margin: 12px 0 0;
-  padding: 0;
-  list-style: none;
-  border-radius: var(--radius);
-  background: var(--surface);
-  overflow: hidden;
-}
+.affiliate .wardrobe__requests { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.affiliate .wardrobe__requests li { display: flex; align-items: flex-start; gap: 12px; padding: 13px; border: 1px solid var(--accent); border-radius: var(--radius-lg); background: var(--accent-soft); }
+.affiliate .wardrobe__requests .wardrobe__pic, .affiliate .wardrobe__requests .wardrobe__nopic { width: 54px; height: 62px; }
+.affiliate .wardrobe__ask { margin: 8px 0 0; color: var(--quiet); font-size: 12px; line-height: 1.5; }
 
-.affiliate .wardrobe__best li {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 13px 14px;
-  border-bottom: 1px solid var(--rule);
-}
+.affiliate .wardrobe__best { margin: 0; padding: 0; overflow: hidden; list-style: none; border-radius: var(--radius-lg); background: var(--surface); }
+.affiliate .wardrobe__best li { display: grid; grid-template-columns: 18px 45px minmax(0, 1fr); align-items: center; gap: 7px 10px; padding: 12px 13px; border-bottom: 1px solid var(--rule); }
+.affiliate .wardrobe__best li:last-child { border-bottom: 0; }
+.affiliate .wardrobe__best .wardrobe__pic, .affiliate .wardrobe__best .wardrobe__nopic { width: 45px; height: 45px; }
+.affiliate .wardrobe__rank { color: var(--faint); font-size: 13px; font-variant-numeric: tabular-nums; }
+.affiliate .wardrobe__rank--first { color: var(--accent-text); }
+.affiliate .wardrobe__units { display: block; margin-top: 3px; color: var(--faint); font-size: 11.5px; }
+.affiliate .wardrobe__sales { grid-column: 3; color: var(--accent-lift); font-size: 13px; font-variant-numeric: tabular-nums; }
+.affiliate .wardrobe__sales-note { margin: 10px 0 0; color: var(--quiet); font-size: 11.5px; }
+.affiliate .wardrobe__all { display: block; min-height: 44px; margin-top: 10px; padding: 12px; border: 1px solid var(--rule-strong); border-radius: var(--radius); color: var(--ink); font-size: 13px; text-align: center; text-decoration: none; }
+.affiliate .wardrobe__all:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.affiliate .wardrobe__lead { margin: 0 0 13px; color: var(--quiet); font-size: 13px; line-height: 1.6; }
 
-.affiliate .wardrobe__best li:last-child {
-  border-bottom: 0;
-}
-
-.affiliate .wardrobe__best .wardrobe__pic,
-.affiliate .wardrobe__best .wardrobe__nopic {
-  width: 48px;
-  height: 48px;
-}
-
-.affiliate .wardrobe__rank {
-  flex: none;
-  width: 20px;
-  font-size: 14px;
-  color: var(--faint);
-  font-variant-numeric: tabular-nums;
-}
-
-.affiliate .wardrobe__rank--first {
-  color: var(--accent);
-}
-
-.affiliate .wardrobe__units {
-  display: block;
-  margin-top: 4px;
-  font-size: 12.5px;
-  color: var(--faint);
-}
-
-.affiliate .wardrobe__sales {
-  flex: none;
-  font-size: 14px;
-  color: var(--accent-lift);
-  font-variant-numeric: tabular-nums;
-}
-
-.affiliate .wardrobe__all {
-  display: block;
-  margin-top: 10px;
-  padding: 12px;
-  border: 1px solid var(--rule);
-  border-radius: var(--radius);
-  color: var(--ink);
-  font-size: 13.5px;
-  text-align: center;
-  text-decoration: none;
-}
-
-.affiliate .wardrobe__lead {
-  margin: 0;
-  font-size: 13px;
-  line-height: 1.6;
-  color: var(--quiet);
+@media (max-width: 350px) {
+  .affiliate .wardrobe__count { max-width: 104px; text-align: right; line-height: 1.3; }
+  .affiliate .wardrobe__jumps button { padding-inline: 10px; }
 }

@@ -117,48 +117,62 @@ export function WardrobeContents({
   onRetryBest?: () => void;
 }) {
   const waiting = [...body.processing, ...body.failed];
+  const hasBest = Boolean(best && best.length > 0);
   return (
     <div className="wardrobe">
-      {/*
-       * *Your best sellers* - the export's first section. What sold through
-       * her own code, delivered and pending as her money counts them (F02,
-       * ADR 0040), from `/api/me/best-sellers`;
-       * never the programme's totals with her name above them.
-       */}
-      {/* A12. The read failed, so this says so and offers another go. It is
-       *  deliberately the only extra line: a section that cannot load is one
-       *  short sentence, not a paragraph explaining itself. */}
-      {bestError && (
-        <section className="wardrobe__block">
-          <h2 className="wardrobe__title">Your best sellers</h2>
-          <p className="wardrobe__subtitle" role="status">
-            Could not load your best sellers.{" "}
-            {onRetryBest && (
-              <button type="button" className="button" onClick={onRetryBest}>
-                Try again
-              </button>
-            )}
-          </p>
-        </section>
-      )}
-      {best && best.length > 0 && (
-        <section className="wardrobe__block">
-          <h2 className="wardrobe__title">Your best sellers</h2>
-          <p className="wardrobe__subtitle">
-            Sales through {throughCodes(codes)} · all time · delivered and pending
-          </p>
-          <BestSellerList rows={best.slice(0, 3)} />
-          {best.length > 3 && (
-            <Link className="wardrobe__all" to="/best">
-              Show all {best.length} products
-            </Link>
-          )}
-        </section>
-      )}
+      <h1 className="wardrobe__page-title">Wardrobe</h1>
+      <p className="wardrobe__intro">Your pieces, feature requests and sales</p>
+      <nav className="wardrobe__jumps" aria-label="Wardrobe sections">
+        <button type="button" onClick={() => jumpTo("wardrobe-owned")}>{body.received.length} received</button>
+        {body.feature_requests.length > 0 && <button type="button" onClick={() => jumpTo("wardrobe-feature")}>To feature</button>}
+        {(hasBest || bestError) && <button type="button" onClick={() => jumpTo("wardrobe-best")}>Best sellers</button>}
+      </nav>
+
+      <section className="wardrobe__block" id="wardrobe-owned">
+        <div className="wardrobe__heading">
+          <h2 className="wardrobe__title">In your wardrobe</h2>
+          <span className="wardrobe__count">{body.received.length} {body.received.length === 1 ? "piece" : "pieces"} received</span>
+        </div>
+        {body.received.length === 0 ? (
+          <p className="empty">{waiting.length ? "Your received products will appear here." : "No products yet."}</p>
+        ) : (
+          <ul className="wardrobe__received">
+            {body.received.map((item) => (
+              <li key={item.shopify_product_id ?? `${item.shopify_order_id}:${item.title}`}>
+                <Picture source={item.image_thumb_url ?? item.image_url} />
+                <div className="wardrobe__product-copy">
+                  <span className="wardrobe__name">{item.title}</span>
+                  <span className="wardrobe__size">{item.size ? `Size ${item.size} · ` : ""}Received</span>
+                  <OrderDate value={item.placed_at} />
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+        {waiting.length > 0 && (
+          <div className="wardrobe__incoming">
+            <h3>Not received yet</h3>
+            <ul className="wardrobe__waiting">
+              {waiting.map((item) => (
+                <li key={item.shopify_product_id ?? `${item.shopify_order_id}:${item.title}`}>
+                  <Picture source={item.image_thumb_url ?? item.image_url} />
+                  <div className="wardrobe__copy">
+                    <span className="wardrobe__name">{item.title}</span>
+                    {item.size && <span className="wardrobe__size">Size {item.size}</span>}
+                    <span className={`wardrobe__state ${item.state === "failed" ? "wardrobe__state--failed" : "wardrobe__state--coming"}`}>
+                      {item.state === "failed" ? "Failed delivery" : "On the way"}
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </section>
+
       {body.feature_requests.length > 0 && (
-        <section className="wardrobe__block">
+        <section className="wardrobe__block" id="wardrobe-feature">
           <h2 className="wardrobe__title">HBA would like you to feature</h2>
-          <p className="wardrobe__subtitle">Chosen by the HBA team</p>
           <ul className="wardrobe__requests">
             {body.feature_requests.map((request) => {
               const received = body.received.find((item) => item.shopify_product_id === request.shopify_product_id);
@@ -168,11 +182,7 @@ export function WardrobeContents({
                   <Picture source={request.image_url} />
                   <div className="wardrobe__copy">
                     <span className="wardrobe__name">{request.title ?? received?.title ?? incoming?.title ?? "Product"}</span>
-                    {/* Whether she has it decides whether the request is one
-                        she can act on today, so it carries the tone. */}
-                    {/* The export's words, and the size she has or is getting:
-                        *In your wardrobe · size M*, *On the way · size M*. */}
-                    {received && <span className="wardrobe__state wardrobe__state--have">In your wardrobe{received.size ? ` · size ${received.size}` : ""}</span>}
+                    {received && <span className="wardrobe__state wardrobe__state--have">Ready to feature · in your wardrobe{received.size ? ` · size ${received.size}` : ""}</span>}
                     {!received && incoming && <span className="wardrobe__state wardrobe__state--coming">On the way{incoming.size ? ` · size ${incoming.size}` : ""}</span>}
                     <p className="wardrobe__ask">{request.message}</p>
                   </div>
@@ -183,49 +193,34 @@ export function WardrobeContents({
         </section>
       )}
 
-      <section className="wardrobe__block">
-        <div className="wardrobe__heading">
-          <h2 className="wardrobe__title">Your wardrobe</h2>
-          <span className="wardrobe__size">{body.received.length} {body.received.length === 1 ? "piece" : "pieces"} received</span>
-        </div>
-        {body.received.length === 0 ? (
-          <p className="empty">{waiting.length ? "Your received products will appear here." : "No products yet."}</p>
-        ) : (
-          <ul className="wardrobe__rows">
-            {body.received.map((item) => (
-              <li key={item.shopify_product_id ?? `${item.shopify_order_id}:${item.title}`}>
-                <Picture source={item.image_thumb_url ?? item.image_url} />
-                <div className="wardrobe__copy">
-                  <span className="wardrobe__name">{item.title}</span>
-                  {item.size && <span className="wardrobe__size">Size {item.size}</span>}
-                  <OrderDate value={item.placed_at} />
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      {waiting.length > 0 && (
-        <section className="wardrobe__incoming">
-          <h2 className="wardrobe__title wardrobe__title--inset">Not received yet</h2>
-          <ul className="wardrobe__waiting">
-            {waiting.map((item) => (
-              <li key={item.shopify_product_id ?? `${item.shopify_order_id}:${item.title}`}>
-                <div className="wardrobe__copy">
-                  <span className="wardrobe__name">{item.title}</span>
-                  {item.size && <span className="wardrobe__size">Size {item.size}</span>}
-                </div>
-                <span className={`wardrobe__state ${item.state === "failed" ? "wardrobe__state--failed" : "wardrobe__state--coming"}`}>
-                  {item.state === "failed" ? "Failed delivery" : "Processing"}
-                </span>
-              </li>
-            ))}
-          </ul>
+      {(hasBest || bestError) && (
+        <section className="wardrobe__block" id="wardrobe-best">
+          <div className="wardrobe__heading">
+            <h2 className="wardrobe__title">Your best sellers</h2>
+            {hasBest && <span className="wardrobe__count">Through {throughCodes(codes)}</span>}
+          </div>
+          {bestError ? (
+            <p className="wardrobe__subtitle" role="status">
+              Could not load your best sellers.{" "}
+              {onRetryBest && <button type="button" className="button" onClick={onRetryBest}>Try again</button>}
+            </p>
+          ) : (
+            <>
+              <p className="wardrobe__subtitle">Sales through {throughCodes(codes)} · all time · delivered and pending</p>
+              <BestSellerList rows={best!.slice(0, 3)} />
+              <p className="wardrobe__sales-note">Product sales, not your payout.</p>
+              {best!.length > 3 && <Link className="wardrobe__all" to="/best">Show all {best!.length} products</Link>}
+            </>
+          )}
         </section>
       )}
     </div>
   );
+}
+
+function jumpTo(id: string) {
+  const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  document.getElementById(id)?.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start" });
 }
 
 function BestSellerList({ rows, offset = 0 }: { rows: BestSeller[]; offset?: number }) {

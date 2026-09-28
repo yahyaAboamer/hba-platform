@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HBA model portal — three tab concepts</title>
+  <style>
+    :root { font-family: Inter, ui-sans-serif, system-ui, sans-serif; color: #14201a; background: #e8ece8; }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    button { font: inherit; cursor: pointer; }
+    button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px solid #7be0a6; outline-offset: 3px; }
+    .review { max-width: 1370px; margin: auto; padding: 32px 24px 56px; }
+    .review-head { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin-bottom: 28px; }
+    .review-head h1 { max-width: 750px; margin: 6px 0 9px; font-size: clamp(28px, 3vw, 42px); line-height: 1.08; letter-spacing: -.045em; }
+    .review-head p { max-width: 680px; margin: 0; color: #526259; font-size: 14px; line-height: 1.55; }
+    .review-tag { color: #256b43; font-size: 12px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
+    .review-meta { flex: none; padding: 10px 14px; border: 1px solid #bfcbc1; border-radius: 999px; color: #375542; font-size: 12px; font-weight: 650; }
+    .picker { display: none; gap: 8px; margin-bottom: 20px; }
+    .picker button { min-height: 44px; padding: 0 14px; border: 1px solid #b7c6ba; border-radius: 10px; background: white; color: #223c2b; }
+    .picker button[aria-pressed="true"] { background: #14653a; border-color: #14653a; color: white; }
+    .concepts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; gap: 30px; }
+    .concept { min-width: 0; }
+    .concept-label { min-height: 80px; padding: 0 5px; }
+    .concept-label h2 { margin: 0 0 4px; font-size: 20px; letter-spacing: -.03em; }
+    .concept-label p { max-width: 350px; margin: 0; color: #526259; font-size: 13px; line-height: 1.4; }
+    .phone { display: flex; flex-direction: column; width: 100%; max-width: 390px; height: 772px; margin: 0 auto; overflow: hidden; border: 7px solid #202725; border-radius: 32px; background: #08090a; color: #ecefea; box-shadow: 0 15px 40px #1b322529, 0 0 0 1px #667c6c; }
+    .phone * { box-sizing: border-box; }
+    .phone-header { display: flex; align-items: center; gap: 10px; flex: none; min-height: 64px; padding: 10px 15px; border-bottom: 1px solid #23272b; background: #08090a; }
+    .avatar { display: grid; flex: none; place-items: center; width: 40px; height: 40px; border: 1px solid #244e35; border-radius: 50%; background: #102719; color: #7be0a6; font-size: 16px; }
+    .person { flex: 1; min-width: 0; }
+    .person strong { display: block; font-size: 14px; font-weight: 650; }
+    .person small { display: block; margin-top: 2px; color: #a7ada6; font-size: 11px; }
+    .code-pill, .month-pill { display: inline-flex; align-items: center; justify-content: center; flex: none; min-height: 40px; padding: 0 11px; border: 1px solid #343a3f; border-radius: 9px; background: transparent; color: #ecefea; font-size: 12px; font-weight: 650; }
+    .code-pill { border-radius: 20px; letter-spacing: .04em; }
+    .screen { flex: 1; overflow: auto; padding: 18px 16px 28px; scrollbar-color: #343a3f transparent; }
+    .screen-head { display: flex; align-items: start; justify-content: space-between; gap: 10px; }
+    .screen-head h3 { margin: 0; font-size: 25px; line-height: 1.1; letter-spacing: -.055em; font-weight: 690; }
+    .screen-head p { margin: 7px 0 0; color: #a7ada6; font-size: 12px; line-height: 1.45; }
+    .section-link { display: inline-flex; align-items: center; gap: 5px; min-height: 36px; padding: 0 7px; border: 0; background: none; color: #7be0a6; font-size: 12px; white-space: nowrap; }
+    .subhead { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 25px 0 12px; }
+    .subhead h4 { margin: 0; font-size: 16px; letter-spacing: -.015em; }
+    .subhead span { color: #a7ada6; font-size: 11px; }
+    .jump-row { display: flex; gap: 7px; margin: 17px 0 0; }
+    .jump-row button { min-height: 42px; padding: 0 13px; border: 1px solid #2d3237; border-radius: 999px; background: #15171a; color: #dce5de; font-size: 12px; }
+    .jump-row button:first-child { border-color: #27734a; background: #102719; color: #7be0a6; }
+    .jump-row button:hover, .section-link:hover { filter: brightness(1.2); }
+    .product-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .product { min-width: 0; overflow: hidden; border: 1px solid #282d30; border-radius: 14px; background: #15171a; }
+    .product-art { display: grid; place-items: center; height: 116px; background: radial-gradient(circle at 50% 5%, #303939, #1d2526 70%); }
+    .product-art svg { width: 73px; height: 83px; fill: #a3aaa5; stroke: #707c76; stroke-width: 1.5; }
+    .product-art.denim { background: radial-gradient(circle at 50% 5%, #354148, #20292e 70%); }
+    .product-art.denim svg { fill: #6b8490; stroke: #90a8ad; }
+    .product-info { padding: 10px 11px 12px; }
+    .product-info strong { display: block; min-height: 34px; font-size: 12px; line-height: 1.4; }
+    .product-info small { display: block; margin-top: 5px; color: #a7ada6; font-size: 11px; }
+    .status-line { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding: 13px; border: 1px solid #30343b; border-radius: 12px; background: #111418; }
+    .status-line .mini-art { display: grid; flex: none; place-items: center; width: 42px; height: 44px; border-radius: 7px; background: #26302e; color: #a7ada6; }
+    .status-line .mini-art svg { width: 25px; height: 28px; stroke: currentColor; fill: none; stroke-width: 1.6; }
+    .status-line strong, .status-line small { display: block; }
+    .status-line strong { font-size: 12px; }
+    .status-line small { margin-top: 4px; color: #e0a458; font-size: 11px; }
+    .request { padding: 14px; border: 1px solid #316345; border-radius: 14px; background: #102019; }
+    .request .tiny { color: #7be0a6; font-size: 11px; font-weight: 700; }
+    .request strong { display: block; margin-top: 7px; font-size: 13px; }
+    .request p { margin: 8px 0 0; color: #c2d0c5; font-size: 12px; line-height: 1.5; }
+    .seller { display: flex; align-items: center; gap: 10px; padding: 13px; border-radius: 12px; background: #15171a; }
+    .seller .number { color: #7be0a6; font-size: 14px; }
+    .seller strong { flex: 1; font-size: 12px; }
+    .seller span:last-child { color: #7be0a6; font-size: 12px; white-space: nowrap; }
+    .screen-foot { margin-top: 14px; color: #8a918a; font-size: 11px; line-height: 1.45; }
+    .tabs { display: grid; grid-template-columns: repeat(5, 1fr); flex: none; height: 72px; border-top: 1px solid #23272b; background: #15171a; }
+    .tab { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; color: #a7ada6; font-size: 10px; }
+    .tab svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .tab.active { color: #7be0a6; font-weight: 650; }
+    .tab.active .tab-icon { display: grid; place-items: center; width: 48px; height: 25px; border-radius: 15px; background: #133723; }
+    .tab-icon { display: grid; place-items: center; width: 48px; height: 25px; }
+    .note { max-width: 390px; margin: 16px auto 0; padding: 0 6px; color: #526259; font-size: 13px; line-height: 1.5; }
+    .note strong { color: #203d2b; }
+
+    .card { margin-top: 17px; padding: 16px; border: 1px solid #292e31; border-radius: 16px; background: #15171a; }
+    .card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .card-top strong { font-size: 15px; }
+    .chip { padding: 6px 9px; border: 1px solid #3c423e; border-radius: 999px; color: #c4cbc4; font-size: 11px; white-space: nowrap; }
+    .chip.good { border-color: #27734a; color: #7be0a6; }
+    .chip.warn { border-color: #665537; color: #e0a458; }
+    .target-row { margin-top: 20px; }
+    .target-row .row-top { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
+    .target-row .row-top span:last-child { color: #c1c9c1; }
+    .track { height: 7px; margin-top: 9px; overflow: hidden; border-radius: 7px; background: #343a3f; }
+    .track span { display: block; height: 100%; border-radius: inherit; background: #23a95c; }
+    .progress-note { margin: 15px 0 0; color: #e0a458; font-size: 12px; }
+    .pay-note { margin-top: 15px; padding: 14px 15px; border-left: 3px solid #e0a458; border-radius: 0 11px 11px 0; background: #242019; }
+    .pay-note strong { display: block; color: #f0c486; font-size: 12px; }
+    .pay-note p { margin: 5px 0 0; color: #d9d0c1; font-size: 12px; line-height: 1.55; }
+    .history { margin-top: 8px; overflow: hidden; border: 1px solid #292e31; border-radius: 13px; background: #15171a; }
+    .history-row { display: flex; align-items: center; justify-content: space-between; gap: 11px; min-height: 68px; padding: 11px 13px; border-bottom: 1px solid #292e31; }
+    .history-row:last-child { border: 0; }
+    .history-row strong { display: block; font-size: 12px; }
+    .history-row small { display: block; max-width: 194px; margin-top: 4px; color: #a7ada6; font-size: 11px; line-height: 1.35; }
+    .history-row .chip { flex: none; }
+    .help-text { margin: 13px 0 0; color: #a7ada6; font-size: 12px; line-height: 1.5; }
+
+    .rank-hero { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; margin-top: 18px; padding: 18px; border: 1px solid #316345; border-radius: 16px; background: linear-gradient(135deg, #13251a, #151a19 75%); }
+    .rank-hero .label { color: #c0cfc3; font-size: 11px; }
+    .rank-big { display: flex; align-items: flex-start; margin-top: 4px; color: #ecefea; font-size: 53px; line-height: 1; letter-spacing: -.075em; }
+    .rank-big sup { margin: 7px 0 0 2px; color: #7be0a6; font-size: 15px; letter-spacing: 0; }
+    .rank-hero .side { align-self: end; text-align: right; }
+    .rank-hero .side strong { display: block; font-size: 16px; }
+    .rank-hero .side small { display: block; margin-top: 4px; color: #a7ada6; font-size: 11px; }
+    .rank-hero .rule { grid-column: 1 / -1; margin-top: 10px; padding-top: 11px; border-top: 1px solid #31503a; color: #d1e1d4; font-size: 12px; line-height: 1.5; }
+    .rank-hero .rule strong { color: #7be0a6; }
+    .board-head { display: flex; align-items: baseline; justify-content: space-between; margin: 23px 0 11px; }
+    .board-head h4 { margin: 0; font-size: 16px; }
+    .board-head span { color: #a7ada6; font-size: 11px; }
+    .board { overflow: hidden; border: 1px solid #292e31; border-radius: 13px; background: #15171a; }
+    .board-row { display: flex; align-items: center; gap: 9px; min-height: 58px; padding: 9px 11px; border-bottom: 1px solid #292e31; }
+    .board-row:last-child { border-bottom: 0; }
+    .board-row.me { background: #153524; }
+    .board-rank { width: 19px; flex: none; color: #a7ada6; font-size: 12px; }
+    .board-row.me .board-rank { color: #7be0a6; }
+    .board-avatar { display: grid; place-items: center; width: 31px; height: 31px; flex: none; border: 1px solid #343a3f; border-radius: 50%; color: #d5dbd5; font-size: 11px; }
+    .board-row.me .board-avatar { border-color: #23a95c; background: #14653a; color: white; }
+    .board-who { flex: 1; min-width: 0; }
+    .board-who strong, .board-who small { display: block; overflow-wrap: anywhere; }
+    .board-who strong { font-size: 12px; }
+    .board-who small { margin-top: 2px; color: #8a918a; font-size: 10px; }
+    .board-uses { min-width: 33px; text-align: right; font-size: 12px; }
+    .board-uses small { display: block; margin-top: 2px; color: #a7ada6; font-size: 10px; }
+    .gap-row { width: 100%; min-height: 42px; border: 0; border-bottom: 1px solid #292e31; background: #111416; color: #a7ada6; font-size: 11px; }
+    .hidden-row { display: none; }
+    .board.expanded .hidden-row { display: flex; }
+    .board.expanded .gap-row { display: none; }
+    .footer-note { max-width: 1370px; margin: 22px auto 0; padding: 18px 20px; border: 1px solid #c7d2c9; border-radius: 13px; color: #526259; font-size: 13px; line-height: 1.5; }
+    @media (max-width: 1120px) {
+      .review { max-width: 440px; padding: 24px 13px 36px; }
+      .review-head { display: block; }
+      .review-meta { display: inline-block; margin-top: 15px; }
+      .picker { display: flex; }
+      .concepts { display: block; }
+      .concept { display: none; }
+      .concept.selected { display: block; }
+      .concept-label { min-height: 72px; }
+      .phone { height: min(772px, calc(100dvh - 190px)); min-height: 530px; }
+    }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; } }
+  </style>
+</head>
+<body>
+  <svg aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden">
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M4 10.5 12 4l8 6.5V20H4v-9.5Z"/><path d="M10 20v-6h4v6"/></symbol>
+    <symbol id="i-orders" viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z"/><path d="M9 8h6M9 12h6"/></symbol>
+    <symbol id="i-wardrobe" viewBox="0 0 24 24"><path d="M8 4 4 6.5l2 4 2-1V20h8V9.5l2 1 2-4L16 4a4 4 0 0 1-8 0Z"/></symbol>
+    <symbol id="i-targets" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/></symbol>
+    <symbol id="i-ranking" viewBox="0 0 24 24"><path d="M5 20V12M12 20V5M19 20v-5"/></symbol>
+    <symbol id="garment" viewBox="0 0 80 90"><path d="M25 11 18 16 7 32l10 10 8-6v40h30V36l8 6 10-10-11-16-7-5c-3 7-8 10-15 10s-12-3-15-10Z"/></symbol>
+    <symbol id="jeans" viewBox="0 0 80 90"><path d="M18 10h44l-3 25-7 41H40l-3-35-4 35H21l-6-41 3-25Z"/></symbol>
+  </svg>
+  <main class="review">
+    <header class="review-head">
+      <div><span class="review-tag">Design exploration · 28 September 2026</span><h1>Three tabs, clearer first answers</h1><p>A visual direction for the model portal after the Home and Orders improvements. Scroll inside each phone. Figures and product art are illustrative; no portal code or money rules change here.</p></div>
+      <span class="review-meta">Concept only · no live data</span>
+    </header>
+    <div class="picker" role="group" aria-label="Choose concept">
+      <button type="button" data-show="wardrobe" aria-pressed="true">Wardrobe</button>
+      <button type="button" data-show="targets" aria-pressed="false">Targets</button>
+      <button type="button" data-show="ranking" aria-pressed="false">Ranking</button>
+    </div>
+    <div class="concepts">
+      <section class="concept selected" id="concept-wardrobe">
+        <div class="concept-label"><h2>Wardrobe</h2><p>What she owns appears first; sales and requests remain easy to reach.</p></div>
+        <div class="phone">
+          <div class="phone-header"><span class="avatar">S</span><span class="person"><strong>Sara Edrees</strong><small>HBA ambassador</small></span><button type="button" class="code-pill" aria-label="Example code SARAED">SARAED</button></div>
+          <div class="screen" id="wardrobe-screen">
+            <div class="screen-head"><div><h3>Wardrobe</h3><p>Your pieces, feature requests and sales</p></div></div>
+            <div class="jump-row" aria-label="Jump to a section"><button type="button" data-jump="owned">2 received</button><button type="button" data-jump="feature">To feature</button><button type="button" data-jump="sold">Best sellers</button></div>
+            <div id="owned"><div class="subhead"><h4>In your wardrobe</h4><span>2 pieces received</span></div>
+              <div class="product-grid">
+                <article class="product"><div class="product-art"><svg><use href="#garment"/></svg></div><div class="product-info"><strong>Oversized Wash Hoodie</strong><small>Size M · received</small></div></article>
+                <article class="product"><div class="product-art denim"><svg><use href="#jeans"/></svg></div><div class="product-info"><strong>Wide-leg Denim</strong><small>Size M · received</small></div></article>
+              </div>
+              <div class="status-line"><span class="mini-art"><svg><use href="#garment"/></svg></span><span><strong>Panel Track Jacket</strong><small>On the way · size M</small></span></div>
+            </div>
+            <div id="feature"><div class="subhead"><h4>HBA would like you to feature</h4></div><div class="request"><span class="tiny">Ready to feature · in your wardrobe</span><strong>Wide-leg Denim</strong><p>Style this with the Oversized Wash Hoodie for your next post.</p></div></div>
+            <div id="sold"><div class="subhead"><h4>Your best sellers</h4><span>Through SARAED</span></div><div class="seller"><span class="number">1</span><strong>Panel Track Jacket<br><small style="color:#a7ada6;font-weight:400">6 units sold</small></strong><span>EGP 19,206.66</span></div><p class="screen-foot">Delivered and pending sales. Money shown here is product sales, not your payout.</p><button type="button" class="section-link">Show all 6 products →</button></div>
+          </div>
+          <div class="tabs" aria-label="Preview navigation"><span class="tab"><span class="tab-icon"><svg><use href="#i-home"/></svg></span>Home</span><span class="tab"><span class="tab-icon"><svg><use href="#i-orders"/></svg></span>Orders</span><span class="tab active"><span class="tab-icon"><svg><use href="#i-wardrobe"/></svg></span>Wardrobe</span><span class="tab"><span class="tab-icon"><svg><use href="#i-targets"/></svg></span>Targets</span><span class="tab"><span class="tab-icon"><svg><use href="#i-ranking"/></svg></span>Ranking</span></div>
+        </div>
+        <p class="note"><strong>Decision:</strong> Put owned pieces ahead of sales. Use actual product photography when available; the garment drawings here mark image slots.</p>
+      </section>
+      <section class="concept" id="concept-targets">
+        <div class="concept-label"><h2>Targets</h2><p>Show progress and the possible pay effect together, in plain language.</p></div>
+        <div class="phone">
+          <div class="phone-header"><span class="avatar">H</span><span class="person"><strong>Hana Wagih</strong><small>HBA ambassador</small></span><button type="button" class="code-pill" aria-label="Example code HANAW">HANAW</button></div>
+          <div class="screen">
+            <div class="screen-head"><div><h3>Targets</h3><p>HBA records these · updated 25 September</p></div></div>
+            <section class="card"><div class="card-top"><strong>September 2026</strong><span class="chip">In progress</span></div>
+              <div class="target-row"><div class="row-top"><strong>Videos</strong><span>4 of 6 recorded</span></div><div class="track"><span style="width:66.7%"></span></div></div>
+              <div class="target-row"><div class="row-top"><strong>Stories</strong><span>12 of 12 recorded</span></div><div class="track"><span style="width:100%"></span></div></div>
+              <p class="progress-note">2 videos left to reach this month’s target.</p>
+            </section>
+            <div class="pay-note"><strong>How this affects your pay</strong><p>This record can affect your guaranteed minimum. HBA must confirm the final result. Your commission still applies.</p></div>
+            <div class="subhead"><h4>Earlier months</h4><span>Most recent first</span></div>
+            <div class="history"><div class="history-row"><div><strong>August 2026</strong><small>6 of 6 videos · 12 of 12 stories</small></div><span class="chip good">Met</span></div><div class="history-row"><div><strong>July 2026</strong><small>No record from HBA yet</small></div><span class="chip">Not recorded</span></div><div class="history-row"><div><strong>June 2026</strong><small>4 of 6 videos · 9 of 12 stories</small></div><span class="chip">Not met</span></div></div>
+            <p class="help-text">Something missing? Ask HBA to check the record. You cannot change it here.</p>
+          </div>
+          <div class="tabs" aria-label="Preview navigation"><span class="tab"><span class="tab-icon"><svg><use href="#i-home"/></svg></span>Home</span><span class="tab"><span class="tab-icon"><svg><use href="#i-orders"/></svg></span>Orders</span><span class="tab"><span class="tab-icon"><svg><use href="#i-wardrobe"/></svg></span>Wardrobe</span><span class="tab active"><span class="tab-icon"><svg><use href="#i-targets"/></svg></span>Targets</span><span class="tab"><span class="tab-icon"><svg><use href="#i-ranking"/></svg></span>Ranking</span></div>
+        </div>
+        <p class="note"><strong>Decision:</strong> Bring the guaranteed minimum explanation onto the page for models whose arrangement depends on it. Other arrangements would get a simpler informational note.</p>
+      </section>
+      <section class="concept" id="concept-ranking">
+        <div class="concept-label"><h2>Ranking</h2><p>Make the ranking rule obvious and show her neighbors without a long scroll.</p></div>
+        <div class="phone">
+          <div class="phone-header"><span class="avatar">S</span><span class="person"><strong>Sara Edrees</strong><small>HBA ambassador · SARAED</small></span><button type="button" class="month-pill">Sep ▾</button></div>
+          <div class="screen" id="ranking-screen">
+            <div class="screen-head"><div><h3>Ranking</h3><p>September 2026</p></div></div>
+            <div class="rank-hero"><div><span class="label">Your position</span><div class="rank-big">18<sup>th</sup></div></div><div class="side"><strong>EGP 10,710</strong><small>Your code sales · 1 use</small></div><div class="rule"><strong>Sales decide the order.</strong> Code uses break ties. Other models’ sales stay private.</div></div>
+            <div class="board-head"><h4>Around your position</h4><span>Code uses at right</span></div>
+            <div class="board">
+              <div class="board-row"><span class="board-rank">17</span><span class="board-avatar">M</span><span class="board-who"><strong>Malak Fahmy</strong><small>MALAK10</small></span><span class="board-uses">1<small>use</small></span></div>
+              <div class="board-row me" id="my-row"><span class="board-rank">18</span><span class="board-avatar">S</span><span class="board-who"><strong>You</strong><small>SARAED</small></span><span class="board-uses">1<small>use</small></span></div>
+              <div class="board-row"><span class="board-rank">19</span><span class="board-avatar">R</span><span class="board-who"><strong>Rana Adel</strong><small>RANAA</small></span><span class="board-uses">0<small>uses</small></span></div>
+            </div>
+            <div class="board-head"><h4>Top of the board</h4><span>September</span></div>
+            <div class="board" id="ranking-board">
+              <div class="board-row"><span class="board-rank">1</span><span class="board-avatar">N</span><span class="board-who"><strong>Nour Eldin</strong><small>NOURE</small></span><span class="board-uses">1<small>use</small></span></div>
+              <div class="board-row"><span class="board-rank">2</span><span class="board-avatar">T</span><span class="board-who"><strong>Tarek Aziz</strong><small>TAREKA</small></span><span class="board-uses">2<small>uses</small></span></div>
+              <div class="board-row"><span class="board-rank">3</span><span class="board-avatar">L</span><span class="board-who"><strong>Laila Mostafa</strong><small>LAILAM</small></span><span class="board-uses">2<small>uses</small></span></div>
+              <button type="button" class="gap-row" id="show-all">Show more positions ↓</button>
+              <div class="board-row hidden-row"><span class="board-rank">4</span><span class="board-avatar">O</span><span class="board-who"><strong>Omar Sabry</strong><small>OMARS</small></span><span class="board-uses">2<small>uses</small></span></div>
+              <div class="board-row hidden-row"><span class="board-rank">5</span><span class="board-avatar">A</span><span class="board-who"><strong>Aya Sherif</strong><small>AYASH</small></span><span class="board-uses">1<small>use</small></span></div>
+              <div class="board-row hidden-row"><span class="board-rank">…</span><span class="board-avatar">·</span><span class="board-who"><strong>Positions 6–16</strong><small>Shown in the complete board</small></span></div>
+            </div>
+            <p class="screen-foot">Equal sales and equal uses share a place.</p>
+          </div>
+          <div class="tabs" aria-label="Preview navigation"><span class="tab"><span class="tab-icon"><svg><use href="#i-home"/></svg></span>Home</span><span class="tab"><span class="tab-icon"><svg><use href="#i-orders"/></svg></span>Orders</span><span class="tab"><span class="tab-icon"><svg><use href="#i-wardrobe"/></svg></span>Wardrobe</span><span class="tab"><span class="tab-icon"><svg><use href="#i-targets"/></svg></span>Targets</span><span class="tab active"><span class="tab-icon"><svg><use href="#i-ranking"/></svg></span>Ranking</span></div>
+        </div>
+        <p class="note"><strong>Decision:</strong> Show the model’s neighborhood first, then the leaders. Additional positions can expand on demand; never show another model’s sales.</p>
+      </section>
+    </div>
+    <div class="footer-note">The mockup deliberately tests a different hierarchy from the approved HTML. It keeps the current dark HBA palette and five-tab navigation, but treats the model’s immediate question as the lead on each screen. All names, amounts and product art are sample content for design review.</div>
+  </main>
+  <script>
+    const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    document.querySelectorAll('[data-show]').forEach(button => button.addEventListener('click', () => {
+      document.querySelectorAll('[data-show]').forEach(item => item.setAttribute('aria-pressed', String(item === button)));
+      document.querySelectorAll('.concept').forEach(item => item.classList.toggle('selected', item.id === 'concept-' + button.dataset.show));
+    }));
+    document.querySelectorAll('[data-jump]').forEach(button => button.addEventListener('click', () => {
+      document.getElementById(button.dataset.jump).scrollIntoView({behavior: reduceMotion ? 'instant' : 'smooth', block: 'start'});
+    }));
+    document.getElementById('show-all').addEventListener('click', () => document.getElementById('ranking-board').classList.add('expanded'));
+  </script>
+</body>
+</html>

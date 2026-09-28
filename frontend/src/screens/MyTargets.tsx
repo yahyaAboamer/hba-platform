@@ -5,10 +5,12 @@ import { api } from "../lib/api";
 import type { MonthTargets } from "../lib/portal";
 import { formatDay, formatMonth } from "../lib/money";
 import {
+  describeCurrentTargetPay,
   describeTargetPay,
   targetChip,
   targetCounts,
   targetOutcome,
+  targetProgressNote,
 } from "../lib/targets";
 import "./MyTargets.css";
 
@@ -46,7 +48,6 @@ type Row = MonthTargets & { month: string };
 export function MyTargets() {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [guaranteeOpen, setGuaranteeOpen] = useState(false);
 
   useEffect(() => {
     let live = true;
@@ -90,26 +91,25 @@ export function MyTargets() {
 
   // Newest first, from the server. The first row is the month she is in.
   const [current, ...history] = rows;
+  const chip = targetChip(current);
+  const progress = targetProgressNote(current);
 
   return (
     <div className="mytargets">
-      <h1 className="mytargets__heading">Content record</h1>
-      {/* Who keeps it and when they last touched it. The export prints the
-          date flatly; where nobody has recorded anything yet there is no date
-          to print, and saying so is the whole of §11.3 in one line. */}
+      <h1 className="mytargets__heading">Targets</h1>
       <p className="mytargets__kept">
-        Recorded by HBA
+        HBA records these
         {current.recorded_at
           ? ` · updated ${formatDay(current.recorded_at.slice(0, 10))}`
-          : " · nothing recorded for this month yet"}
+          : " · nothing recorded this month yet"}
       </p>
 
       <section className="mytargets__now">
         <div className="mytargets__now-head">
           <span className="mytargets__now-month">{formatMonth(current.month)}</span>
-          {targetChip(current) && (
-            <span className={targetChip(current)!.className}>
-              {targetChip(current)!.text}
+          {chip && (
+            <span className={chip.className}>
+              {chip.text}
             </span>
           )}
         </div>
@@ -122,28 +122,24 @@ export function MyTargets() {
         ) : (
           <TargetBars target={current} />
         )}
-        {/*
-         * As the export draws it (Portal lines 350-358): only where a
-         * guaranteed minimum rides on these numbers, *Guaranteed minimum*
-         * with an ⓘ that opens the sentence - here, what this month's record
-         * means for it. Other arrangements show nothing: the numbers do not
-         * change their pay.
-         */}
-        {current.determines_pay && (
-          <div className="mytargets__guarantee">
-            <div className="mytargets__guarantee-head">
-              <span>Guaranteed minimum</span>
-              <button type="button" className="mytargets__info" aria-label="How the guaranteed minimum works"
-                aria-expanded={guaranteeOpen} onClick={() => setGuaranteeOpen(!guaranteeOpen)}>i</button>
-            </div>
-            {guaranteeOpen && <p className="mytargets__pay">{describeTargetPay(current)}</p>}
-          </div>
-        )}
+        {progress && <p className="mytargets__progress">{progress}</p>}
       </section>
+
+      {current.determines_pay ? (
+        <aside className={current.achieved && current.verified ? "mytargets__pay-note mytargets__pay-note--met" : "mytargets__pay-note"}>
+          <h2>How this affects your pay</h2>
+          <p>{describeCurrentTargetPay(current)}</p>
+        </aside>
+      ) : (
+        <p className="mytargets__informational">{describeTargetPay(current)}</p>
+      )}
 
       {history.length > 0 && (
         <>
-          <h2 className="mytargets__title">Earlier months</h2>
+          <div className="mytargets__history-head">
+            <h2 className="mytargets__title">Earlier months</h2>
+            <span>Most recent first</span>
+          </div>
           <ul className="mytargets__history">
             {history.map((row) => (
               <li key={row.month} className="mytargets__month">

@@ -1,173 +1,44 @@
-/* Where she stands. M02: ordered by sales, showing uses.
+/* The owner-approved ranking summary shows her neighbors before the leaders. */
+.affiliate .ranking { padding-bottom: var(--tab-clearance); }
+.affiliate .ranking__head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.affiliate .ranking__head h1 { margin: 0; font-size: 24px; font-weight: 650; letter-spacing: -0.04em; }
+.affiliate .ranking__head span { color: var(--quiet); font-size: 12.5px; }
 
-   `onRanking` in `Affiliate Portal v3.dc.html`, lines 378–416, minus the
-   names, codes and avatars it prints for everybody else. */
+.affiliate .ranking__mine { margin-top: 18px; padding: 17px; border: 1px solid var(--accent); border-radius: var(--radius-lg); background: var(--accent-soft); }
+.affiliate .ranking__top { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; }
+.affiliate .ranking__side { min-width: 0; text-align: right; }
+.affiliate .ranking__caption { display: block; color: var(--quiet); font-size: 11.5px; line-height: 1.4; }
+.affiliate .ranking__number { display: block; margin-top: 4px; font-size: 48px; line-height: 1; letter-spacing: -0.055em; font-variant-numeric: tabular-nums; }
+.affiliate .ranking__sales { display: block; font-size: 14px; font-weight: 650; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.affiliate .ranking__side .ranking__caption { margin-top: 5px; }
+.affiliate .ranking__basis { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--accent); color: var(--ink); font-size: 12px; line-height: 1.5; }
+.affiliate .ranking__basis strong { color: var(--accent-text); font-weight: 650; }
+.affiliate .ranking__basis p { margin: 8px 0 0; }
 
-.affiliate .ranking {
-  padding-bottom: var(--tab-clearance);
-}
+.affiliate .ranking__group { margin-top: 23px; }
+.affiliate .ranking__group-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 11px; }
+.affiliate .ranking__group-head h2 { margin: 0; font-size: 16px; font-weight: 600; }
+.affiliate .ranking__group-head span { color: var(--quiet); font-size: 11px; text-align: right; }
+.affiliate .ranking__board { margin: 0; padding: 0; overflow: hidden; list-style: none; border: 1px solid var(--rule-strong); border-radius: var(--radius-lg); background: var(--surface); }
+.affiliate .ranking__row { display: flex; align-items: center; gap: 10px; min-height: 58px; padding: 9px 12px; border-bottom: 1px solid var(--rule); }
+.affiliate .ranking__row:last-child { border-bottom: 0; }
+.affiliate .ranking__row--me { background: var(--accent-soft); }
+.affiliate .ranking__rank { flex: none; width: 20px; color: var(--quiet); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.affiliate .ranking__row--me .ranking__rank { color: var(--accent-text); }
+.affiliate .ranking__avatar { display: flex; flex: none; align-items: center; justify-content: center; width: 32px; height: 32px; border: 1px solid var(--rule-strong); border-radius: 50%; color: var(--quiet); font-size: 11px; }
+.affiliate .ranking__row--me .ranking__avatar { border-color: var(--accent); background: var(--accent); color: var(--paper); }
+.affiliate .ranking__who { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.affiliate .ranking__name { display: block; font-size: 12.5px; font-weight: 550; }
+.affiliate .ranking__code { display: block; margin-top: 3px; color: var(--faint); font-size: 11px; }
+.affiliate .ranking__figure { flex: none; min-width: 28px; text-align: right; }
+.affiliate .ranking__uses { display: block; font-size: 13px; font-variant-numeric: tabular-nums; }
+.affiliate .ranking__figure .ranking__caption { margin-top: 2px; font-size: 10px; }
+.affiliate .ranking__more { display: block; width: 100%; min-height: 44px; margin-top: 10px; border: 1px solid var(--rule-strong); border-radius: var(--radius); background: var(--surface); color: var(--ink); font-size: 13px; }
+.affiliate .ranking__more:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.affiliate .ranking__foot { margin: 13px 0 0; color: var(--quiet); font-size: 11.5px; line-height: 1.5; }
 
-.affiliate .ranking__head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.affiliate .ranking__head h1 {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 400;
-}
-
-.affiliate .ranking__head span {
-  font-size: 12.5px;
-  color: var(--quiet);
-}
-
-.affiliate .ranking__mine {
-  margin-top: 14px;
-  padding: 15px 16px;
-  border-radius: var(--radius-lg);
-  background: var(--surface);
-}
-
-.affiliate .ranking__top {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.affiliate .ranking__side {
-  text-align: right;
-}
-
-.affiliate .ranking__caption {
-  display: block;
-  font-size: 12.5px;
-  color: var(--quiet);
-}
-
-.affiliate .ranking__number {
-  display: block;
-  margin-top: 6px;
-  font-size: 30px;
-  line-height: 1.1;
-}
-
-.affiliate .ranking__tally {
-  display: block;
-  margin-bottom: 4px;
-  font-size: 20px;
-  font-variant-numeric: tabular-nums;
-}
-
-/* The sentences that stop the board reading as broken. Quiet, and never
-   hidden behind a disclosure: somebody reading down a column of uses and
-   finding a smaller number above a bigger one needs them in the same glance. */
-.affiliate .ranking__basis {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--rule);
-  font-size: 12.5px;
-  line-height: 1.55;
-  color: var(--quiet);
-}
-
-.affiliate .ranking__basis p {
-  margin: 0 0 7px;
-}
-
-.affiliate .ranking__basis p:last-child {
-  margin-bottom: 0;
-}
-
-.affiliate .ranking__board {
-  margin: 12px 0 0;
-  padding: 0;
-  list-style: none;
-  border-radius: var(--radius);
-  background: var(--surface);
-  overflow: hidden;
-}
-
-.affiliate .ranking__row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 13px 14px;
-  border-bottom: 1px solid var(--rule);
-}
-
-.affiliate .ranking__row:last-child {
-  border-bottom: 0;
-}
-
-/* Her own row, and the only place colour is spent here. A leaderboard is a
-   list of strangers until she can find herself in it. */
-.affiliate .ranking__row--me {
-  background: var(--accent-soft);
-}
-
-.affiliate .ranking__rank {
-  flex: none;
-  width: 20px;
-  font-size: 14px;
-  color: var(--quiet);
-  font-variant-numeric: tabular-nums;
-}
-
-.affiliate .ranking__row--me .ranking__rank {
-  color: var(--accent);
-}
-
-.affiliate .ranking__avatar {
-  display: flex;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border: 1px solid var(--rule);
-  border-radius: 50%;
-  font-size: 13px;
-  color: var(--quiet);
-}
-
-.affiliate .ranking__row--me .ranking__avatar {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.affiliate .ranking__who {
-  flex: 1;
-  min-width: 0;
-  font-size: 13.5px;
-}
-
-/* Name 13.5px, code under it 12.5px faint, 3px apart - the export's. */
-.affiliate .ranking__name { display: block; }
-.affiliate .ranking__code {
-  display: block;
-  margin-top: 3px;
-  font-size: 12.5px;
-  color: var(--faint);
-}
-
-.affiliate .ranking__figure {
-  flex: none;
-  text-align: right;
-}
-
-.affiliate .ranking__uses {
-  display: block;
-  font-size: 15px;
-  font-variant-numeric: tabular-nums;
-}
-
-.affiliate .ranking__figure .ranking__caption {
-  margin-top: 3px;
-  font-size: 12px;
-  color: var(--faint);
+@media (max-width: 350px) {
+  .affiliate .ranking__mine { padding: 14px; }
+  .affiliate .ranking__number { font-size: 43px; }
+  .affiliate .ranking__row { gap: 8px; padding-inline: 9px; }
 }

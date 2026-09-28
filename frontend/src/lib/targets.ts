@@ -59,11 +59,49 @@ export function targetCounts(
 ): string {
   if (row.numbers_kept === false) return "not kept";
   if (row.actual_videos === null && row.actual_stories === null) return "—";
-  const asked = (n: number | null) => (n ? ` of ${n}` : "");
+  const count = (actual: number | null, required: number | null, name: string) =>
+    `${actual ?? "—"}${required ? ` of ${required}` : ""} ${plural(name, required ?? actual)}`;
   return (
-    `${row.actual_videos ?? 0}${asked(row.required_videos)} video, ` +
-    `${row.actual_stories ?? 0}${asked(row.required_stories)} story`
+    `${count(row.actual_videos, row.required_videos, "video")}, ` +
+    count(row.actual_stories, row.required_stories, "story")
   );
+}
+
+/** A current-month nudge based only on counts HBA actually recorded. */
+export function targetProgressNote(
+  row: Pick<MonthTargets, "numbers_kept" | "achieved" | "required_videos" | "required_stories" | "actual_videos" | "actual_stories">,
+): string | null {
+  if (row.numbers_kept === false || row.achieved === null || row.achieved) return null;
+  const remaining = [
+    [row.required_videos, row.actual_videos, "video"],
+    [row.required_stories, row.actual_stories, "story"],
+  ] as const;
+  const gaps = remaining.flatMap(([required, actual, label]) => {
+    if (!required || actual === null || actual >= required) return [];
+    const left = required - actual;
+    return [`${left} ${plural(label, left)}`];
+  });
+  if (!gaps.length) return null;
+  return `${gaps.join(" and ")} left to reach this month’s target.`;
+}
+
+function plural(name: string, amount: number | null): string {
+  if (amount === 1) return name;
+  return name === "story" ? "stories" : `${name}s`;
+}
+
+/** The Targets tab's visible pay note, without deciding any amount in the browser. */
+export function describeCurrentTargetPay(
+  row: Pick<MonthTargets, "achieved" | "verified" | "determines_pay">,
+): string {
+  if (!row.determines_pay) return describeTargetPay(row);
+  if (row.achieved === null) {
+    return "HBA has not recorded your result yet, so your guaranteed minimum is not settled. Your commission still applies.";
+  }
+  if (!row.achieved) {
+    return "This record can affect your guaranteed minimum. HBA must confirm the final result. Your commission still applies.";
+  }
+  return describeTargetPay(row);
 }
 
 /**
