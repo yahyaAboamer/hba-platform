@@ -93,13 +93,10 @@ def _handle_reconcile(db: Session, payload: dict) -> None:
     count = reconcile_recent(db, client, since_hours=hours)
     logger.info("reconciliation re-indexed %s orders from the last %sh", count, hours)
 
-    # The index is kept before anything else is tried: what follows reads a
-    # protected field, and its refusal must cost the parcels, never the orders.
-    db.commit()
-    _match_recent(db, client, hours)
+    _queue_matching(db, hours)
 
 
-def _match_recent(db: Session, client: ShopifyClient, hours: int) -> None:
+def _queue_matching(db: Session, hours: int) -> None:
     """Match the window's parcels to models, the way the webhook does live.
 
     **The sweep never matched.** Only a webhook queued a match, and staging
@@ -107,27 +104,22 @@ def _match_recent(db: Session, client: ShopifyClient, hours: int) -> None:
     one manual scan on 10 September, and a parcel that reaches production
     through the sweep rather than a webhook was never attached either.
 
-    Its own query (`ORDERS_RECIPIENT_PAGE`), not fields added to the sweep's,
-    for the reason 03A set: the shipping phone is protected customer data, and
-    a refusal of it must not stop orders being indexed. Hence also the guard -
-    a failure here is reported and the sweep still succeeds.
-    """
-    from app.services.recipients import scan_recipients
+    **Queued, not run here.** Matching reads the shipping phone, which is
+    protected customer data, through its own query (`ORDERS_RECIPIENT_PAGE`);
+    as its own job a refusal fails *that* job - visibly, under failed jobs,
+    and retried - while the sweep's orders commit with the sweep, whole. Run
+    inline it would need a commit half-way through this handler, which the
+    worker's contract forbids.
 
+    Deduped on one key, so a sweep that finds the previous window's match
+    still queued joins it rather than stacking another.
+    """
     since = (utcnow() - timedelta(hours=hours)).strftime("%Y-%m-%dT%H:%M:%SZ")
-    try:
-        result = scan_recipients(
-            db, client, since=since, field="updated_at", pages_per_run=MAX_PAGES
-        )
-    except Exception as exc:  # noqa: BLE001 - the parcels, never the orders
-        db.rollback()
-        report(Anomaly.RECIPIENT_SCAN_FAILED, reason=type(exc).__name__)
-        logger.warning("recipient matching after the sweep failed: %s", exc)
-        return
-    logger.info(
-        "recipient matching after the sweep: %s seen, %s matched",
-        result["seen"],
-        result["matched"],
+    enqueue(
+        db,
+        JobKind.SCAN_RECIPIENTS,
+        {"since": since, "field": "updated_at"},
+        dedupe_key=f"{JobKind.SCAN_RECIPIENTS}:sweep",
     )
 
 

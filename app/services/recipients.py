@@ -542,11 +542,14 @@ def _handle_scan_recipients(db, payload: dict) -> None:
 
     since = str(payload.get("since") or "2026-01-01")
     cursor = payload.get("cursor")
+    # `created_at` walks history; the sweep queues `updated_at`, the window it
+    # has just re-indexed.
+    field = "updated_at" if payload.get("field") == "updated_at" else "created_at"
 
     try:
         client = build_client()
         client.require_scope("read_orders")
-        result = scan_recipients(db, client, since=since, cursor=cursor)
+        result = scan_recipients(db, client, since=since, cursor=cursor, field=field)
     except PERMANENT as exc:
         raise PermanentFailure(str(exc)) from exc
 
@@ -556,7 +559,7 @@ def _handle_scan_recipients(db, payload: dict) -> None:
     enqueue(
         db,
         JobKind.SCAN_RECIPIENTS,
-        {"since": since, "cursor": result["cursor"]},
+        {"since": since, "cursor": result["cursor"], "field": field},
         dedupe_key=f"{JobKind.SCAN_RECIPIENTS}:{result['cursor']}",
     )
 

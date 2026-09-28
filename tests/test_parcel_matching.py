@@ -251,36 +251,45 @@ def test_lines_read_before_exchanges_were_asked_about_are_read_again(db):
     assert orders_missing_line_items(db) == []
 
 
-# ── The sweep matches, and cannot be broken by matching ──────────────────────
+# ── The sweep matches, as its own job ────────────────────────────────────────
 
 
-def test_the_sweep_matches_its_window(db, monkeypatch):
+def test_the_sweep_queues_a_match_of_its_window(db, monkeypatch):
+    """Queued rather than run: a refused shipping phone then fails the match
+    job, visibly, and never the sweep that indexed the orders."""
     from app.services import reconcile
 
-    calls = []
     monkeypatch.setattr(reconcile, "reconcile_recent", lambda db, client, since_hours: 0)
-    monkeypatch.setattr(
-        "app.services.recipients.scan_recipients",
-        lambda db, client, **kw: calls.append(kw) or {"seen": 0, "matched": 0},
-    )
     monkeypatch.setattr("app.services.shopify.sync.build_client", lambda: object())
 
     reconcile._handle_reconcile(db, {"since_hours": 48})
+    reconcile._handle_reconcile(db, {"since_hours": 48})
 
-    assert calls and calls[0]["field"] == "updated_at"
+    queued = _queued(db, JobKind.SCAN_RECIPIENTS)
+    assert len(queued) == 1, "a second sweep joins the match already queued"
+    assert queued[0]["field"] == "updated_at"
 
 
-def test_a_matching_failure_does_not_fail_the_sweep(db, monkeypatch):
-    from app.services import reconcile
+def test_the_match_job_reads_the_window_it_was_given(db, monkeypatch):
+    from app.services import recipients
 
-    def refused(db, client, **kw):
-        raise RuntimeError("shippingAddress is protected customer data")
+    seen = []
+    monkeypatch.setattr(
+        recipients,
+        "scan_recipients",
+        lambda db, client, **kw: seen.append(kw) or {"done": True, "cursor": None},
+    )
 
-    monkeypatch.setattr(reconcile, "reconcile_recent", lambda db, client, since_hours: 0)
-    monkeypatch.setattr("app.services.recipients.scan_recipients", refused)
-    monkeypatch.setattr("app.services.shopify.sync.build_client", lambda: object())
+    class Client:
+        def require_scope(self, scope):
+            pass
 
-    reconcile._handle_reconcile(db, {"since_hours": 48})  # does not raise
+    monkeypatch.setattr("app.services.shopify.sync.build_client", lambda: Client())
+
+    recipients._handle_scan_recipients(db, {"since": "2026-09-26T00:00:00Z", "field": "updated_at"})
+    recipients._handle_scan_recipients(db, {"since": "2026-01-01"})
+
+    assert [call["field"] for call in seen] == ["updated_at", "created_at"]
 
 
 # ── Stuck orders are read again ───────────────────────────────────────────────

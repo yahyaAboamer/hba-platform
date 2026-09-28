@@ -2618,15 +2618,16 @@ orders Shopify shows as delivered sat *in flight* and pending for months -
 
 **The fix:** ADR 0051 (a return freezes the order; a cancelled fulfilment
 carries nothing), rebuilt from Shopify's own timestamps and payments so it is
-the same whenever an order was first seen. Matching runs after every sweep and
-import, and `rematch_for` attaches stored parcels the moment a model is added
-or her phone changes. The wardrobe decides *gift* from the order's price when
-it reads. `RESYNC_IN_FLIGHT` re-reads every undelivered order every six hours.
+the same whenever an order was first seen. Every sweep and every import queues
+a parcel match over what it indexed, and `rematch_for` attaches stored parcels
+the moment a model is added or her phone changes. The wardrobe decides *gift*
+from the order's price when it reads. `RESYNC_IN_FLIGHT` re-reads every
+undelivered order every six hours.
 
-**`RECIPIENT_SCAN_FAILED`** means the sweep's orders were indexed and its
-parcel matching then failed - usually the protected shipping phone being
-refused. The orders are safe; the parcels wait for the next sweep, or for
-*Match parcels* under Settings → Shopify & sync → Technical detail.
+**Matching is its own job, on purpose.** It reads the protected shipping
+phone; if Shopify refuses it, the `shopify_scan_recipients` job fails - under
+failed jobs, and retried - and the sweep's orders are unaffected. A failed
+match is visible there, never folded silently into a successful sweep.
 
 **Check a stuck order, read-only:** `order_index.fulfilments` holds each
 fulfilment's status, created and delivered times and courier.
