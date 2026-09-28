@@ -10,7 +10,7 @@
    superseded and by what. It is named for one tool and applies to all of
    them; renaming it would break the tooling that loads it automatically.
 
-Then **[`docs/plans/2026-09-27-continuation-handoff.md`](docs/plans/2026-09-27-continuation-handoff.md)**
+Then **[`docs/plans/2026-09-28-continuation-handoff.md`](docs/plans/2026-09-28-continuation-handoff.md)**
 for where the work actually is — branch, commit, next task.
 
 ## Why this file is three links and nothing else

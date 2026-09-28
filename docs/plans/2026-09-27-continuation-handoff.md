@@ -1,5 +1,7 @@
 # Where the work is — 27 September 2026 (batches K, L, M and N)
 
+> **Superseded by `2026-09-28-continuation-handoff.md`** (batch O). Kept for its record of batches K-N.
+
 **Replaces `2026-09-25-continuation-handoff.md`**, which is kept with a banner
 for its record of batch J, its follow-up, the merge and promotion of 26
 September and the list of old branches. Nothing was deleted.

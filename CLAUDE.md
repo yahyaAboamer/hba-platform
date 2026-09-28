@@ -7,7 +7,7 @@ Stack: FastAPI + SQLAlchemy + Postgres, React + Vite, Railway.
 ## Sources of truth
 
 - **Rules:** `docs/RULES.md`. Read before changing anything involving money. Do not restate rules here.
-- **Current work / branch / next steps:** `docs/plans/2026-09-27-continuation-handoff.md`. It supersedes older handoffs.
+- **Current work / branch / next steps:** `docs/plans/2026-09-28-continuation-handoff.md`. It supersedes older handoffs.
 - **Screen parity state:** `docs/redesign/parity/SCREEN_MATRIX.md`.
 - **Current visual repair evidence / decisions:** `docs/repair/batch-2/visual/CHECKLIST.md`.
 - **Definition of screen “done”:** `HBA_Exact_Design_Implementation_Prompt.md`. Approved exports win on structure, copy, sizes, tones and interactions. Passing tests do not prove visual parity.
