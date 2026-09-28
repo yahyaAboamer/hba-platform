@@ -30,6 +30,8 @@ from app.services.shopify.fulfilment import (
     derive_delivery,
     derive_refunds,
     derive_return,
+    paid_by_delivery,
+    summarise_fulfilments,
 )
 
 PIASTRES_PER_POUND = 100
@@ -87,11 +89,14 @@ def normalise_order(node: dict) -> dict:
     shipping, _ = _money(node.get("totalShippingPriceSet"))
     tax, _ = _money(node.get("currentTotalTaxSet"))
 
-    delivery_state, delivered_at, delivery_status = derive_delivery(
-        node.get("fulfillments"), order_id=order_id
-    )
+    # The return is read first because it decides which fulfilments count
+    # (ADR 0051): on an order with a return, one created after the first
+    # delivery is an exchange, not a parcel still travelling.
     return_status, return_open, return_activity = derive_return(
         node.get("returnStatus")
+    )
+    delivery_state, delivered_at, delivery_status = derive_delivery(
+        node.get("fulfillments"), order_id=order_id, return_status=return_status
     )
     refunded_total, refunded_merchandise = derive_refunds(node)
 
@@ -122,6 +127,15 @@ def normalise_order(node: dict) -> dict:
         "delivery_state": delivery_state,
         "delivery_status": delivery_status,
         "delivered_at": delivered_at,
+        # Each fulfilment's own facts, so the reduction above can be explained
+        # from the database rather than re-read from Shopify (ADR 0051).
+        "fulfilments": summarise_fulfilments(node.get("fulfillments")),
+        # What she had paid when the parcel arrived. `None` when the payments
+        # were not asked for (the bulk import) - never read as zero.
+        "paid_by_delivery_piastres": paid_by_delivery(
+            node.get("transactions") if "transactions" in node else None,
+            delivered_at,
+        ),
         "return_status": return_status,
         # Still being decided - blocks earning. Distinct from having ever
         # happened, which freezes the base for good.
@@ -163,6 +177,11 @@ def upsert_order_index(db: Session, values: dict):
     from app.services.commission.attribute import attribute_order
 
     payload = {**values, "last_synced_at": utcnow()}
+    # A read that did not ask for the payments (the bulk import) must not wipe
+    # a figure an earlier read established. Absent, not null: the column is
+    # then left as it is.
+    if payload.get("paid_by_delivery_piastres") is None:
+        payload.pop("paid_by_delivery_piastres", None)
     statement = insert(OrderIndex).values(**payload)
     statement = statement.on_conflict_do_update(
         index_elements=[OrderIndex.shopify_order_id],

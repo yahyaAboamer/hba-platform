@@ -39,7 +39,14 @@ ORDER_FIELDS = """
     totalShippingPriceSet { shopMoney { amount currencyCode } }
     currentTotalTaxSet { shopMoney { amount currencyCode } }
     returnStatus
-    fulfillments(first: 10) { displayStatus status deliveredAt inTransitAt updatedAt }
+    # `createdAt` and the courier decide ADR 0051: a fulfilment created after
+    # the first delivery on an order with a return is an exchange, not a
+    # parcel still travelling. Accepted by HBA's live shop in the 28 September
+    # audit, in exactly this shape.
+    fulfillments(first: 10) { displayStatus status deliveredAt inTransitAt updatedAt createdAt trackingInfo(first: 1) { company number } }
+    # The money actually paid, for ADR 0051's frozen base. Order totals are
+    # recomputed by every exchange; the payments are not.
+    transactions(first: 20) { kind status processedAt amountSet { shopMoney { amount currencyCode } } }
     refunds(first: 10) {
       id
       createdAt
@@ -88,8 +95,16 @@ SHOP_NAME = "query { shop { name myshopifyDomain } }"
 #: commission base (§9.3), so an imported month could over-report sales until
 #: the reconcile sweep catches up. It is corrected rather than permanent, and
 #: the alternative was an import that fails outright - which is what it did.
+#:
+#: **ADR 0051's additions are left out too**, as a precaution rather than a
+#: known refusal: `trackingInfo` and `transactions` were proven on ordinary
+#: queries, never on a bulk export, and the import is the one path that must
+#: not start failing. An imported order gains them on its next per-order read -
+#: the half-hourly sweep, or `RESYNC_IN_FLIGHT` for anything still undelivered.
 BULK_ORDER_FIELDS = "\n".join(
-    line for line in ORDER_FIELDS.splitlines() if "refundLineItems" not in line
+    line.replace(" trackingInfo(first: 1) { company number }", "")
+    for line in ORDER_FIELDS.splitlines()
+    if "refundLineItems" not in line and "transactions(" not in line
 )
 
 
@@ -160,6 +175,14 @@ query OrderLineItems($id: ID!) {
   order(id: $id) {
     id
     legacyResourceId
+    returnStatus
+    fulfillments(first: 20) {
+      status
+      displayStatus
+      createdAt
+      deliveredAt
+      fulfillmentLineItems(first: 100) { nodes { lineItem { id } } }
+    }
     lineItems(first: 100) {
       pageInfo { hasNextPage endCursor }
       nodes {

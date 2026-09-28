@@ -22,6 +22,7 @@ of Shopify.
 from datetime import datetime
 
 from sqlalchemy import ARRAY, BigInteger, Boolean, DateTime, Index, String, text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -68,6 +69,17 @@ class OrderIndex(Base):
     #: fulfilments, because a split shipment is not delivered until the last
     #: parcel lands.
     delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    #: Each fulfilment's own facts - status, created and delivered times,
+    #: courier, whether it is tracked (ADR 0051). The three columns above are
+    #: one reduced answer; this is what it was reduced from, so a stuck order
+    #: can be explained without asking Shopify again. No customer data.
+    fulfilments: Mapped[list[dict] | None] = mapped_column(JSONB(none_as_null=True))
+
+    #: What the customer had actually paid when the parcel arrived, from the
+    #: order's payments (ADR 0051). The frozen base of an order with a return.
+    #: `None` means *not read*, never *paid nothing*.
+    paid_by_delivery_piastres: Mapped[int | None] = mapped_column(BigInteger)
 
     return_status: Mapped[str | None] = mapped_column(String(40))
 

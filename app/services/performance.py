@@ -238,6 +238,8 @@ def top_products(db: Session, month: str, *, limit: int = 10) -> dict:
         # Counted sales, matching the figure every other screen calls sales:
         # delivered and pending, never a failed delivery (F02, ADR 0040).
         .where(AttributedOrder.commission_state.in_(COUNTED_STATES))
+        # ADR 0051: an exchange item is not what the customer bought.
+        .where(OrderLineItem.after_delivery.is_not(True))
         .group_by(OrderLineItem.shopify_product_id)
     ).all()
 
@@ -305,6 +307,8 @@ def best_sellers_for(
         .where(AttributedOrder.affiliate_id == affiliate_id)
         .where(AttributedOrder.commission_state.in_(COUNTED_STATES))
         .where(OrderLineItem.shopify_product_id.is_not(None))
+        # ADR 0051: the order as frozen at delivery, not its exchange items.
+        .where(OrderLineItem.after_delivery.is_not(True))
     )
     if month is not None:
         query = query.where(AttributedOrder.business_month == parse_month(month))

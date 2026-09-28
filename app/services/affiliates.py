@@ -56,6 +56,7 @@ def create_affiliate(
     )
     db.add(affiliate)
     db.flush()
+    _collect_waiting_parcels(db, affiliate)
 
     record_audit(
         db,
@@ -267,6 +268,7 @@ def update_details(
         if cleaned_phone != affiliate.phone:
             before["phone"], after["phone"] = affiliate.phone, cleaned_phone
             affiliate.phone = cleaned_phone
+            _collect_waiting_parcels(db, affiliate)
 
     if email is not None and (cleaned_email := email.strip().lower()):
         account = affiliate.account
@@ -512,6 +514,19 @@ def readiness(db: Session, month: str) -> dict[int, dict[str, bool]]:
 
 
 
+def _collect_waiting_parcels(db: Session, affiliate: AffiliateProfile) -> None:
+    """A new or changed phone picks up the parcels already sent to it (W05).
+
+    Every way a model's phone arrives goes through here - registration, staff
+    correcting her details, either side editing her shipping phone - so none
+    can forget. Local import: `recipients` reads the roster this module writes.
+    """
+    from app.services.recipients import rematch_for
+
+    db.flush()
+    rematch_for(db, affiliate)
+
+
 #: The address fields, named once. Two routes write them - hers and staff's
 #: (D11) - and two lists that must agree is how a field ends up editable from
 #: one side and invisible from the other.
@@ -582,6 +597,9 @@ def update_shipping_address(
 
     if not after:
         return
+
+    if "shipping_phone" in after:
+        _collect_waiting_parcels(db, affiliate)
 
     # **Which fields changed, not what to.** An address is hers; the audit
     # trail is read by staff, and "she changed her address" plus who did it is

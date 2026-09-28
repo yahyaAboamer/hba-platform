@@ -59,6 +59,13 @@ payroll without touching a maintainer screen.
   a failed delivery is not. Approval settles every order it counted, and
   `carried_into` now pays only what a *delivered-only* approval left out — a
   backlog that shrinks and is never added to.
+- **A return freezes the order; a cancelled fulfilment carries nothing**
+  (ADR 0051, amending how 0025 is applied). Delivered is judged on the
+  fulfilments created up to the first delivery; on an order with a return,
+  later ones (exchanges) are ignored, and so are cancelled ones anywhere. Its
+  items are what those fulfilments carried; its base, when not already final,
+  is the cash paid up to delivery less shipping and tax. Rebuilt from Shopify's
+  history, so it is the same whenever the order was first seen.
 - **A code use is every order that used her code** (ADR 0049, superseding
   D03's definition): delivered, pending, failed delivery, cancelled or
   refunded alike. *Orders counted* is delivered and pending only (F02).

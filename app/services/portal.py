@@ -1217,6 +1217,8 @@ def my_orders(db: Session, affiliate: AffiliateProfile, month: str) -> list[dict
                     [order.shopify_order_id for order, _ in rows]
                 )
             )
+            # ADR 0051: the products as delivered, not the exchange's.
+            .where(OrderLineItem.after_delivery.is_not(True))
             .order_by(OrderLineItem.title)
         ):
             contents.setdefault(line.shopify_order_id, []).append(

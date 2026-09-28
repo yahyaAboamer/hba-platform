@@ -46,7 +46,7 @@ from app.core.businesstime import utcnow
 
 from app.models.catalogue import OrderLineItem, Product
 from app.models.orders import OrderIndex
-from app.models.shipments import Classification, ModelShipment
+from app.models.shipments import ModelShipment
 
 #: How wide a grid thumbnail needs to be, at 2x for a retina phone.
 #:
@@ -95,6 +95,24 @@ def _state_for(order: OrderIndex) -> str:
     return _FROM_DELIVERY.get(order.delivery_state or "", PROCESSING)
 
 
+def _is_gift():
+    """A zero-priced order, decided **when read** rather than when matched.
+
+    The rule is D05's - only orders whose original price was zero - and it is
+    read from `order_index` every time, not from the label a match stored.
+    That label is decided once, at the moment a parcel is matched, and on
+    staging every parcel was matched on 10 September, before the order prices
+    had been read: all 14,000 were stored as *unknown*, Mazen's six gifts
+    among them, and nothing ever revisited them. A fact read at the point of
+    use cannot go stale.
+
+    Unknown still is not zero: an order with no original price is not a gift.
+    """
+    return OrderIndex.original_subtotal_piastres.is_not(None) & (
+        OrderIndex.original_subtotal_piastres <= 0
+    )
+
+
 def _gift_lines(db: Session, affiliate_id: int | None = None, product_id: str | None = None):
     """Every line of every matched gift, newest order first, in **one query**.
 
@@ -117,7 +135,9 @@ def _gift_lines(db: Session, affiliate_id: int | None = None, product_id: str | 
             OrderLineItem.shopify_order_id == ModelShipment.shopify_order_id,
         )
         .where(ModelShipment.affiliate_id.is_not(None))
-        .where(ModelShipment.classification == Classification.GIFT)
+        .where(_is_gift())
+        # ADR 0051: what HBA sent, not an exchange item added afterwards.
+        .where(OrderLineItem.after_delivery.is_not(True))
         .order_by(OrderIndex.placed_at.desc())
     )
     if affiliate_id is not None:
@@ -155,8 +175,10 @@ def coverage_for(db: Session, product_ids: list[str]) -> dict[str, int]:
             OrderLineItem,
             OrderLineItem.shopify_order_id == ModelShipment.shopify_order_id,
         )
+        .join(OrderIndex, OrderIndex.shopify_order_id == ModelShipment.shopify_order_id)
         .where(ModelShipment.affiliate_id.is_not(None))
-        .where(ModelShipment.classification == Classification.GIFT)
+        .where(_is_gift())
+        .where(OrderLineItem.after_delivery.is_not(True))
         .where(OrderLineItem.shopify_product_id.in_(clean))
         .group_by(OrderLineItem.shopify_product_id)
     )

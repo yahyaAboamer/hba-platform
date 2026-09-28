@@ -40,6 +40,7 @@ from datetime import datetime
 
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
@@ -184,6 +185,12 @@ class OrderLineItem(Base):
     #: the sweep's `IS NULL` finds it - the default would hide it forever.
     selected_options: Mapped[list[dict] | None] = mapped_column(JSONB(none_as_null=True))
     sku: Mapped[str | None] = mapped_column(String(200))
+
+    #: ADR 0051: the line only arrived after the order was delivered - an
+    #: exchange item E-stebdal added. Left out of the order's products, her best
+    #: sellers and the wardrobe, which show the order as it was when frozen.
+    #: NULL: read before this was asked, so the fill sweep reads it again.
+    after_delivery: Mapped[bool | None] = mapped_column(Boolean)
 
     quantity: Mapped[int] = mapped_column(Integer, nullable=False)
 

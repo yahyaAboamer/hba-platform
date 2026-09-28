@@ -118,6 +118,9 @@ def attribute_order(db: Session, order: OrderIndex) -> AttributedOrder | None:
         tax_piastres=order.tax_piastres,
         delivered=state == CommissionState.EARNED,
         stored_base_piastres=existing.commission_base_piastres if existing else None,
+        # ADR 0051: a return freezes the order at what was paid by delivery.
+        return_activity=bool(order.return_activity),
+        paid_by_delivery_piastres=order.paid_by_delivery_piastres,
     )
 
     if existing is None:

@@ -314,7 +314,12 @@ def test_a_completed_operation_ingests_the_file(db, monkeypatch):
     db.flush()
 
     assert db.query(OrderIndex).count() == 2
-    assert _queued(db) == [], "ingestion is the last step; nothing more to schedule"
+    # Ingestion is the import's last step. The one thing it hands on is the
+    # parcel match over the same history (ADR 0051): an imported history used
+    # to be attached to nobody.
+    assert [(kind, payload) for kind, payload in _queued(db)] == [
+        (JobKind.SCAN_RECIPIENTS, {"since": "2026-01-01"})
+    ]
 
 
 def test_a_completed_operation_with_no_file_matched_nothing(db, monkeypatch, caplog):

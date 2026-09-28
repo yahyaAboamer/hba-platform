@@ -495,6 +495,8 @@ export function DataPanel({ goLiveMonth }: { goLiveMonth: string | null }) {
           )}
         </div>
 
+        <StaleFulfilments />
+
         {/*
          * The attention panel says how many. This says which - and which month
          * to register each from, because guessing leaves a gap and the gap is
@@ -622,6 +624,106 @@ export function DataPanel({ goLiveMonth }: { goLiveMonth: string | null }) {
       </div>
     </section>}
     </>
+  );
+}
+
+type StaleOrder = {
+  shopify_order_id: string;
+  order_number: string;
+  days: number | null;
+  courier: string | null;
+  attributed: boolean;
+  admin_url: string | null;
+};
+
+type Stale = {
+  after_days: number;
+  total: number;
+  groups: { reason: string; orders: StaleOrder[] }[];
+};
+
+/** Why nothing will ever report on these, in the words the list uses. */
+const STALE_REASON: Record<string, string> = {
+  no_tracking: "No tracking number",
+  other_courier: "Shipped with another courier",
+  courier_silent: "Bosta has gone quiet",
+  not_yet_read: "Not read since the rules changed",
+};
+
+/**
+ * *Waiting on a person* (ADR 0051).
+ *
+ * Only Bosta reports delivery back to Shopify. An order shipped with no
+ * tracking number or with Aramex or DHL stays *fulfilled* for ever unless
+ * somebody marks it delivered or cancels it **in Shopify** — so each row opens
+ * the order there, and the next sweep brings the answer back. The platform
+ * never marks them itself: delivery comes from Shopify (ADR 0023).
+ *
+ * Its own read, so a failure here costs this list and not the panel.
+ */
+export function StaleFulfilments() {
+  const [stale, setStale] = useState<Stale | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    api.get<Stale>("/api/operations/stale-fulfilments")
+      .then((found) => { if (live) setStale(found); })
+      .catch((caught) => { if (live) setError(caught.message); });
+    return () => { live = false; };
+  }, []);
+
+  if (error) {
+    return (
+      <div className="data__import">
+        <h3 className="data__heading">Shipped, and nobody will report on it</h3>
+        <p className="data__note" role="status">Could not load this list.</p>
+      </div>
+    );
+  }
+  if (stale === null || stale.total === 0) return null;
+
+  return (
+    <div className="data__import">
+      <h3 className="data__heading">Shipped, and nobody will report on it</h3>
+      <p className="data__note data__parcels-lede">
+        <strong>
+          {stale.total} order{stale.total === 1 ? "" : "s"} shipped over{" "}
+          {stale.after_days} days ago still {stale.total === 1 ? "has" : "have"} no
+          delivery news.
+        </strong>{" "}
+        Only Bosta reports back to Shopify. Open each one in Shopify and mark it
+        delivered, or cancel it — the platform picks the change up on its next
+        sweep. Until then it counts as pending.
+      </p>
+      {stale.groups.filter((group) => group.orders.length > 0).map((group) => (
+        <details key={group.reason} className="data__stale">
+          <summary>
+            {STALE_REASON[group.reason] ?? group.reason} · {group.orders.length}
+          </summary>
+          <ul className="data__parcels">
+            {group.orders.map((row) => (
+              <li key={row.shopify_order_id}>
+                <span className="data__parcel-order">
+                  {row.admin_url ? (
+                    <a href={row.admin_url} target="_blank" rel="noreferrer">
+                      {row.order_number || `Order ${row.shopify_order_id}`}
+                    </a>
+                  ) : (
+                    row.order_number || `Order ${row.shopify_order_id}`
+                  )}
+                </span>
+                <span className="data__parcel-why">
+                  {row.days !== null ? `${row.days} days` : ""}
+                  {row.courier ? ` · ${row.courier}` : ""}
+                  {row.attributed ? " · a model's code" : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      ))}
+    </div>
   );
 }
 

@@ -328,6 +328,45 @@ def sync_catalogue(db: Session, client, *, page_size: int = PAGE_SIZE) -> dict:
     }
 
 
+def frozen_lines(fulfilments: list[dict] | None, return_status: str | None) -> set[str] | None:
+    """The lines an order was frozen with, or `None` when it is not frozen.
+
+    ADR 0051. An E-stebdal exchange adds the replacement as a new line and
+    ships it in a new fulfilment days after delivery - or holds it, with no
+    fulfilment at all, until the returned item arrives. The order is frozen as
+    it was before that, so its products are exactly the lines **the counting
+    fulfilments carried** (`frozen_fulfilments`: not cancelled, created by the
+    first delivery). Any other line on a frozen order arrived afterwards.
+
+    An order without a return, or without a delivery yet, is not frozen:
+    `None`, and every line is the order, as it always was. The returned item
+    stays one of the order's products - it was delivered, which is what is
+    frozen.
+    """
+    from app.services.shopify.fulfilment import (
+        DELIVERED_STATUSES,
+        RETURN_ACTIVITY_STATUSES,
+        frozen_fulfilments,
+    )
+
+    if str(return_status or "").strip().upper() not in RETURN_ACTIVITY_STATUSES:
+        return None
+    counted = frozen_fulfilments(fulfilments, return_status=return_status)
+    if not any(
+        str(row.get("displayStatus") or "").strip().upper() in DELIVERED_STATUSES
+        for row in counted
+    ):
+        return None
+
+    carried: set[str] = set()
+    for row in counted:
+        for node in ((row.get("fulfillmentLineItems") or {}).get("nodes") or []):
+            line_id = _numeric_id(node.get("lineItem") or {})
+            if line_id:
+                carried.add(line_id)
+    return carried
+
+
 def sync_order_line_items(db: Session, client, order_gid: str) -> dict:
     """What was in one order.
 
@@ -345,10 +384,14 @@ def sync_order_line_items(db: Session, client, order_gid: str) -> dict:
         return {"order_id": None, "lines": 0, "truncated": False}
 
     block = (order.get("lineItems") or {})
+    frozen = frozen_lines(order.get("fulfillments"), order.get("returnStatus"))
     rows = []
     for node in block.get("nodes") or []:
         values = normalise_line_item(node, order_id)
         if values is not None:
+            values["after_delivery"] = (
+                frozen is not None and values["shopify_line_item_id"] not in frozen
+            )
             rows.append(values)
 
     upsert_line_items(db, order_id, rows)

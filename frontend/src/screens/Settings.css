@@ -281,6 +281,24 @@
   width: 15rem;
 }
 
+/* Shipped with nobody to report on it (ADR 0051): one collapsed group per
+   reason, so two hundred rows are a count until somebody opens one. */
+.data__stale {
+  margin-top: var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.data__stale summary {
+  cursor: pointer;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+}
+
+.data__stale .data__parcel-order {
+  width: 8rem;
+}
+
 .settings__workspace { display:flex; gap:20px; align-items:flex-start; }
 .settings__navigation { flex:none; width:196px; display:flex; flex-direction:column; gap:3px; }
 .settings__navigation button { min-height:38px; padding:9px 12px; border:0; border-radius:8px; background:none; color:var(--quiet); text-align:left; font-size:13.5px; cursor:pointer; }

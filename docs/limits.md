@@ -2590,6 +2590,47 @@ failure of this kind. Tests go through the real worker, past two batches.
 Indexed but unattached means attribution. Missing from `order_index` altogether
 means the import, and `docs/repair/order_import_compare.py` is the proof.
 
+## Delivered orders stuck in flight, and a wardrobe with nothing in it
+
+**What it looked like:** Mazen's Wardrobe tab was empty although six gift
+parcels with his phone on them had been delivered. On the Orders side, 675
+orders Shopify shows as delivered sat *in flight* and pending for months -
+#22369 among them, *Delivered* in Shopify since 21 April.
+
+**The causes, four of them, found together (28 September):**
+
+- **Delivery.** An order was delivered only when *every* fulfilment was. A
+  cancelled fulfilment (fulfilled, cancelled, fulfilled again) counted as still
+  travelling, and so did an E-stebdal exchange's replacement - a new
+  fulfilment created after delivery, marked fulfilled by hand, that no courier
+  ever reports on. Locking at delivery (ADR 0025) only protected orders the
+  platform happened to see delivered *before* the exchange.
+- **Matching never ran.** Only a webhook queued a parcel match. Staging
+  receives none, the sweep and the import never matched, and the one manual
+  scan was on 10 September - before Mazen was added on the 26th. Nothing
+  re-checked stored parcels when a model joined.
+- **The gift label went stale.** A parcel's gift/purchase label was decided
+  once, when matched; on 10 September no order prices had been read yet, so
+  every parcel was stored *unknown* and the wardrobe, reading the label,
+  showed none of them.
+- **Nothing was ever read again.** The sweep re-reads two days; an order stuck
+  by a rule stays stuck when the rule is fixed.
+
+**The fix:** ADR 0051 (a return freezes the order; a cancelled fulfilment
+carries nothing), rebuilt from Shopify's own timestamps and payments so it is
+the same whenever an order was first seen. Matching runs after every sweep and
+import, and `rematch_for` attaches stored parcels the moment a model is added
+or her phone changes. The wardrobe decides *gift* from the order's price when
+it reads. `RESYNC_IN_FLIGHT` re-reads every undelivered order every six hours.
+
+**`RECIPIENT_SCAN_FAILED`** means the sweep's orders were indexed and its
+parcel matching then failed - usually the protected shipping phone being
+refused. The orders are safe; the parcels wait for the next sweep, or for
+*Match parcels* under Settings → Shopify & sync → Technical detail.
+
+**Check a stuck order, read-only:** `order_index.fulfilments` holds each
+fulfilment's status, created and delivered times and courier.
+
 ## Business rules with deliberate exposure
 
 These are not bugs. They are accepted costs, recorded so nobody "fixes" them.

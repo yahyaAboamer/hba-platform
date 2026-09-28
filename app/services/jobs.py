@@ -88,6 +88,11 @@ class JobKind:
     #: the webhook path ever asked (27 September).
     FILL_LINE_ITEMS = "fill_missing_line_items"
 
+    #: Re-read every order still held as undelivered (ADR 0051). The sweep
+    #: only re-reads what changed in two days, so an order stuck by a rule
+    #: since corrected - 1,114 on staging, 28 September - was never read again.
+    RESYNC_IN_FLIGHT = "resync_in_flight_orders"
+
 
 class PermanentFailure(Exception):
     """A job failure that retrying cannot fix.

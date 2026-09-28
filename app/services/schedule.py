@@ -49,6 +49,9 @@ SCHEDULE: dict[str, tuple[timedelta, dict]] = {
     JobKind.ATTACH_ORPHANS: (timedelta(hours=1), {}),
     # A query and a bounded batch of reads (app.services.recipients).
     JobKind.FILL_LINE_ITEMS: (timedelta(hours=1), {}),
+    # Re-read what is still undelivered (app.services.reconcile, ADR 0051).
+    # Every six hours: a stuck order is days old, not minutes.
+    JobKind.RESYNC_IN_FLIGHT: (timedelta(hours=6), {}),
 }
 
 

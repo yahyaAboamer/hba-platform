@@ -261,6 +261,8 @@ def order_detail(
         for line in db.scalars(
             select(OrderLineItem)
             .where(OrderLineItem.shopify_order_id == order.shopify_order_id)
+            # ADR 0051: the products as delivered, not the exchange's.
+            .where(OrderLineItem.after_delivery.is_not(True))
             .order_by(OrderLineItem.title)
         )
     ]

@@ -416,6 +416,69 @@ def test_reading_an_orders_lines_says_when_it_truncated(db):
     assert result["truncated"] is True
 
 
+def test_an_exchange_line_is_marked_after_delivery(db):
+    """ADR 0051, #29499's shape: the jersey was delivered, a return was opened,
+    and E-stebdal added the replacement as a new line shipped days later. The
+    order is frozen with the jersey; the replacement is marked, not deleted."""
+    from app.models.catalogue import OrderLineItem
+
+    order_id = _order_row(db)
+
+    def shipped(line_id, *, display, created, delivered=None):
+        return {
+            "status": "SUCCESS",
+            "displayStatus": display,
+            "createdAt": created,
+            "deliveredAt": delivered,
+            "fulfillmentLineItems": {
+                "nodes": [{"lineItem": {"id": f"gid://shopify/LineItem/{line_id}"}}]
+            },
+        }
+
+    client = FakeClient(
+        order={
+            "id": f"gid://shopify/Order/{order_id}",
+            "legacyResourceId": order_id,
+            "returnStatus": "RETURNED",
+            "fulfillments": [
+                shipped("1", display="DELIVERED", created="2026-08-27T12:55:00Z", delivered="2026-08-29T16:59:00Z"),
+                shipped("2", display="FULFILLED", created="2026-09-03T12:40:00Z"),
+            ],
+            "lineItems": {
+                "nodes": [
+                    _line_node(line_id="1", title="White HBA CLUB Pump Cover"),
+                    _line_node(line_id="2", title="HBA SILVER BASIC CUTOFF"),
+                ],
+                "pageInfo": {"hasNextPage": False},
+            },
+        }
+    )
+
+    sync_order_line_items(db, client, f"gid://shopify/Order/{order_id}")
+
+    marked = {row.title: row.after_delivery for row in db.query(OrderLineItem)}
+    assert marked == {"White HBA CLUB Pump Cover": False, "HBA SILVER BASIC CUTOFF": True}
+
+
+def test_an_order_without_a_return_has_no_exchange_lines(db):
+    from app.models.catalogue import OrderLineItem
+
+    order_id = _order_row(db)
+    client = FakeClient(
+        order={
+            "id": f"gid://shopify/Order/{order_id}",
+            "legacyResourceId": order_id,
+            "returnStatus": "NO_RETURN",
+            "fulfillments": [],
+            "lineItems": {"nodes": [_line_node()], "pageInfo": {"hasNextPage": False}},
+        }
+    )
+
+    sync_order_line_items(db, client, f"gid://shopify/Order/{order_id}")
+
+    assert [row.after_delivery for row in db.query(OrderLineItem)] == [False]
+
+
 # ── The boundary that must not move ────────────────────────────────────────
 
 

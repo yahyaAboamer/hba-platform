@@ -90,6 +90,11 @@ class Anomaly:
     #: tail of it went unchecked this time round.
     RECONCILE_TRUNCATED = "reconcile_truncated"
 
+    #: Matching the sweep's window to models failed after the orders were
+    #: indexed. The orders are safe; that window's parcels wait for the next
+    #: sweep, or for Scan recipients.
+    RECIPIENT_SCAN_FAILED = "recipient_scan_failed"
+
     #: The worker could not queue its recurring work. Ordinary jobs still run;
     #: the reconciliation sweep and the prune do not until this clears.
     SCHEDULE_TOP_UP_FAILED = "schedule_top_up_failed"

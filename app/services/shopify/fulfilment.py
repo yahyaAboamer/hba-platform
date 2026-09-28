@@ -141,25 +141,90 @@ def classify_fulfilment(display_status: str | None, *, order_id: str = "") -> st
     return IN_FLIGHT
 
 
+def is_cancelled(row: dict) -> bool:
+    """A fulfilment somebody took back. ADR 0051 Rule 2: it carries nothing.
+
+    Both fields are checked because they are two views of one fact: `status`
+    is the fulfilment's own lifecycle (`CANCELLED`, two Ls) and `displayStatus`
+    the shipment's (`CANCELED`, one). Either is enough.
+    """
+    return (
+        str(row.get("status") or "").strip().upper() == "CANCELLED"
+        or str(row.get("displayStatus") or "").strip().upper() == "CANCELED"
+    )
+
+
+def frozen_fulfilments(
+    fulfilments: list[dict] | None, *, return_status: str | None = None
+) -> list[dict]:
+    """The fulfilments that decide an order, under ADR 0051.
+
+    **Cancelled ones never count** (Rule 2). #22369 was fulfilled, cancelled
+    and fulfilled again; the cancelled one kept a delivered order in flight for
+    five months.
+
+    **On an order with a return, nothing created after the first delivery
+    counts** (Rule 1). An E-stebdal exchange ships its replacement as a new
+    fulfilment, marked fulfilled by hand, that no courier ever reports on -
+    565 orders on staging were held in flight by exactly that. The audit found
+    no late fulfilment on any order *without* a return, which is why the rule
+    is gated on one: a genuine late split shipment can never be hidden.
+
+    A fulfilment with no `createdAt` is kept. Rows stored before the field was
+    read have none, and keeping them is the old behaviour rather than a guess.
+    """
+    rows = [row for row in (fulfilments or []) if not is_cancelled(row)]
+    name = str(return_status or "").strip().upper()
+    if name not in RETURN_ACTIVITY_STATUSES:
+        return rows
+
+    deliveries = [
+        stamp
+        for row in rows
+        if str(row.get("displayStatus") or "").strip().upper() in DELIVERED_STATUSES
+        and (stamp := _timestamp(row.get("deliveredAt"))) is not None
+    ]
+    if not deliveries:
+        return rows
+    first = min(deliveries)
+    return [
+        row
+        for row in rows
+        if (created := _timestamp(row.get("createdAt"))) is None or created <= first
+    ]
+
+
 def derive_delivery(
-    fulfilments: list[dict] | None, *, order_id: str = ""
+    fulfilments: list[dict] | None,
+    *,
+    order_id: str = "",
+    return_status: str | None = None,
 ) -> tuple[str | None, datetime | None, str | None]:
     """Reduce an order's fulfilments to one answer.
 
     Returns ``(delivery_state, delivered_at, raw_status)``.
 
-    **An order is delivered only when every fulfilment is.** A split shipment
-    with one parcel arrived and one still travelling is not delivered - paying
-    on it would pay for goods the customer has not received. A mixed
-    delivered-and-failed order stays in flight rather than resolving itself
-    either way; see docs/limits.md.
+    **An order is delivered only when every fulfilment that counts is.** A
+    split shipment with one parcel arrived and one still travelling is not
+    delivered - paying on it would pay for goods the customer has not received.
+    A mixed delivered-and-failed order stays in flight rather than resolving
+    itself either way; see docs/limits.md.
+
+    *That counts* is ADR 0051: cancelled fulfilments never, and on an order
+    with a return nothing created after the first delivery. An order whose
+    only fulfilments were cancelled was **not shipped** - no state, and the
+    raw status says why.
 
     ``delivered_at`` is the **latest** delivery, because that is when the
     customer had all of it.
     """
-    rows = list(fulfilments or [])
-    if not rows:
+    every = list(fulfilments or [])
+    if not every:
         return None, None, None
+
+    rows = frozen_fulfilments(every, return_status=return_status)
+    if not rows:
+        return None, None, "CANCELED"
 
     states = [
         classify_fulfilment(row.get("displayStatus"), order_id=order_id) for row in rows
@@ -181,6 +246,82 @@ def derive_delivery(
         return FAILED, None, raw
 
     return IN_FLIGHT, None, raw
+
+
+#: How long after the last delivery a payment still belongs to it. Bosta marks a
+#: cash-on-delivery order paid when the courier settles, which on 246 audited
+#: orders was never more than twelve hours after the delivery itself. An
+#: exchange's extra payment comes days later, when E-stebdal releases it.
+PAYMENT_GRACE_HOURS = 12
+
+#: Transaction kinds that bring money in, and the one that sends it back.
+_MONEY_IN = frozenset({"SALE", "CAPTURE"})
+_MONEY_OUT = frozenset({"REFUND"})
+
+
+def paid_by_delivery(
+    transactions: list[dict] | None, delivered_at: datetime | None
+) -> int | None:
+    """What the customer had actually paid when the parcel arrived, in piastres.
+
+    ADR 0051's frozen money. **Read from the payments, not from a total**:
+    Shopify recomputes every order total after an exchange, and across 246
+    delivered orders with a return the *original* total matched the money
+    182 times, the *total before returns* 75, the current total 32. The
+    payments matched every one, because they are the money.
+
+    Successful sales and captures, less successful refunds, processed up to
+    `PAYMENT_GRACE_HOURS` after the (last) delivery. `None` when there is no
+    delivery, or when the payments were never read - which must not be
+    mistaken for "paid nothing".
+    """
+    from datetime import timedelta
+
+    from app.services.shopify.normalise import money_to_piastres
+
+    if transactions is None or delivered_at is None:
+        return None
+    cutoff = delivered_at + timedelta(hours=PAYMENT_GRACE_HOURS)
+    total = 0
+    for row in transactions:
+        if str(row.get("status") or "").strip().upper() != "SUCCESS":
+            continue
+        processed = _timestamp(row.get("processedAt"))
+        if processed is None or processed > cutoff:
+            continue
+        kind = str(row.get("kind") or "").strip().upper()
+        amount = money_to_piastres(_amount(row.get("amountSet")))
+        if kind in _MONEY_IN:
+            total += amount
+        elif kind in _MONEY_OUT:
+            total -= amount
+    return max(total, 0)
+
+
+def summarise_fulfilments(fulfilments: list[dict] | None) -> list[dict]:
+    """Each fulfilment's own facts, for `order_index.fulfilments`.
+
+    **So "why is this order in flight?" is one read** (ADR 0051). The order row
+    holds one reduced answer; answering the question behind it took a day's
+    audit against Shopify. Status, times and courier only - the tracking
+    *number* is reduced to whether there is one, and nothing about the
+    customer is kept.
+    """
+    out = []
+    for row in fulfilments or []:
+        tracking = (row.get("trackingInfo") or [{}]) or [{}]
+        first = tracking[0] if tracking else {}
+        out.append(
+            {
+                "status": str(row.get("status") or "").upper() or None,
+                "display_status": str(row.get("displayStatus") or "").upper() or None,
+                "created_at": row.get("createdAt"),
+                "delivered_at": row.get("deliveredAt"),
+                "company": (str(first.get("company") or "").strip() or None),
+                "tracked": bool(first.get("number")),
+            }
+        )
+    return out
 
 
 def derive_return(return_status: str | None) -> tuple[str | None, bool, bool]:

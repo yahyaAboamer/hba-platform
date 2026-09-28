@@ -236,3 +236,15 @@ def _handle_bulk_import(db: Session, payload: dict) -> None:
         since,
         operation.get("objectCount"),
     )
+
+    # **An imported history is matched to models too.** The import indexes
+    # orders and nothing else, so on staging a whole history came in on
+    # 26 September and not one parcel in it was attached to anybody. Queued,
+    # not run: the walk is long and resumable, and it reads the protected
+    # shipping phone in its own job so a refusal cannot touch this import.
+    enqueue(
+        db,
+        JobKind.SCAN_RECIPIENTS,
+        {"since": since},
+        dedupe_key=JobKind.SCAN_RECIPIENTS,
+    )

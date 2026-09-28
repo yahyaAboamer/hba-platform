@@ -565,6 +565,24 @@ def unmatched_parcels_route(
     return unmatched(db)
 
 
+@router.get("/stale-fulfilments")
+def stale_fulfilments_route(
+    _actor: UserAccount = Depends(require_permission(Permission.SETTINGS_MANAGE)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Orders shipped over two weeks ago that no courier will report on.
+
+    ADR 0051. No tracking number, a courier other than Bosta, or Bosta gone
+    quiet: Shopify will say *fulfilled* for ever unless a person marks each
+    one delivered or cancelled **in Shopify**, which is where every row links.
+    The platform never marks them itself - delivery comes from Shopify (0023).
+    """
+    from app.services.shopify.connection import effective
+    from app.services.stale import stale_fulfilments
+
+    return stale_fulfilments(db, shop_domain=effective(db).shop_domain)
+
+
 @router.get("/notifications")
 def notification_health(
     _actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_VIEW)),

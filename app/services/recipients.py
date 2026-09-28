@@ -153,9 +153,14 @@ def match_recipient(db: Session, phone: str | None) -> dict:
     candidates = [
         row
         for row in db.scalars(
-            select(AffiliateProfile).where(
-                AffiliateProfile.account_kind != AccountKind.HOUSE
-            )
+            select(AffiliateProfile)
+            .where(AffiliateProfile.account_kind != AccountKind.HOUSE)
+            # **Archived models take no new parcels.** Somebody who left is
+            # not receiving HBA's gifts, and her phone lingering on the roster
+            # would otherwise turn a parcel to whoever has that number now
+            # into an ambiguity nobody can clear. Parcels already matched to
+            # her stay hers - that is `record_shipment`'s rule, not this one.
+            .where(AffiliateProfile.archived_at.is_(None))
         )
         # Compared normalised on both sides. A model who typed her phone with a
         # +20 and an order carrying it without one are the same person, and
@@ -267,6 +272,56 @@ def record_shipment(db: Session, order, *, phone: str | None) -> "ModelShipment"
     return existing
 
 
+def rematch_for(db: Session, affiliate: AffiliateProfile) -> int:
+    """Give a model the parcels that were waiting for her phone. Returns how many.
+
+    W05: *a model joining the platform later can acquire links to earlier
+    orders.* The rule was written and nothing ever ran it - Mazen was added on
+    26 September and his six gift parcels, stored unmatched on 10 September
+    with his number on them, stayed unmatched.
+
+    **No Shopify call.** An unmatched parcel keeps the normalised phone it was
+    sent to (`recipient_token`), so a new or changed phone is compared against
+    the parcels already on file. Called when a model is added and whenever her
+    phone changes.
+
+    Decided through `match_recipient`, so the same rules hold: a phone two
+    models share is recorded as ambiguous and attaches to neither, and an
+    archived model takes nothing. Only unmatched parcels are touched - a
+    confirmed match is never re-decided.
+    """
+    token = normalise_phone(affiliate.shipping_phone or affiliate.phone)
+    if token is None:
+        return 0
+
+    rows = list(
+        db.scalars(
+            select(ModelShipment)
+            .where(ModelShipment.affiliate_id.is_(None))
+            .where(ModelShipment.recipient_token == token)
+        )
+    )
+    if not rows:
+        return 0
+
+    outcome = match_recipient(db, token)
+    now = utcnow()
+    for row in rows:
+        row.affiliate_id = outcome["affiliate_id"]
+        row.match_reason = outcome["reason"]
+        row.matched_at = now if outcome["affiliate_id"] else None
+        row.updated_at = now
+        if outcome["affiliate_id"] is not None:
+            enqueue(
+                db,
+                JobKind.SYNC_LINE_ITEMS,
+                {"order_id": row.shopify_order_id},
+                dedupe_key=f"{JobKind.SYNC_LINE_ITEMS}:{row.shopify_order_id}",
+            )
+    db.flush()
+    return len(rows) if outcome["affiliate_id"] is not None else 0
+
+
 def unmatched(db: Session, limit: int = 200) -> dict:
     """Parcels that need a person, and a count of the ones that do not.
 
@@ -370,6 +425,7 @@ def scan_recipients(
     cursor: str | None = None,
     page_size: int = SCAN_PAGE_SIZE,
     pages_per_run: int = PAGES_PER_RUN,
+    field: str = "created_at",
 ) -> dict:
     """Match a slice of the shop's history, and say where to resume.
 
@@ -398,7 +454,9 @@ def scan_recipients(
             {
                 "first": page_size,
                 "after": cursor,
-                "query": f"created_at:>={since}",
+                # `created_at` for the history walk; the sweep passes
+                # `updated_at`, the window it just re-indexed.
+                "query": f"{field}:>={since}",
             },
         )
         block = ((payload or {}).get("orders")) or {}
@@ -603,35 +661,51 @@ FILL_BATCH = 500
 
 
 def orders_missing_line_items(db, *, limit: int = FILL_BATCH) -> list[str]:
-    """Attributed orders whose products were never read, newest first.
+    """Orders whose products a screen needs and were never read, newest first.
 
-    *Never read* is either no line at all, or lines read before options were
-    (`selected_options IS NULL`) - a deleted variant is stored as `[]`, so it is
-    not asked about again. Newest first, because the month a model is looking
-    at is the one that should fill first.
+    Two kinds of order need their products: one **attributed** to a model (her
+    orders and best sellers) and one **matched as her parcel** (her wardrobe).
+    The second was missing until 28 September, so a parcel matched by anything
+    other than a live match was a wardrobe entry with nothing in it.
+
+    *Never read* is no line at all, or lines read before a later question was
+    asked: options (`selected_options IS NULL`, ADR 0050) or whether the line
+    was an exchange item (`after_delivery IS NULL`, ADR 0051). A deleted
+    variant is stored as `[]`, so it is not asked about again. Newest first,
+    because the month a model is looking at is the one that should fill first.
 
     An order Shopify no longer has returns no lines and is asked about again
     next hour; that is one read an hour for a thing that should not exist, and
     bounded by the batch.
     """
-    from sqlalchemy import exists
+    from sqlalchemy import exists, or_
 
     from app.models.attributed_orders import AttributedOrder
     from app.models.catalogue import OrderLineItem
     from app.models.orders import OrderIndex
 
-    no_lines = ~exists().where(
-        OrderLineItem.shopify_order_id == AttributedOrder.shopify_order_id
+    wanted = or_(
+        exists().where(AttributedOrder.shopify_order_id == OrderIndex.shopify_order_id),
+        exists().where(
+            (ModelShipment.shopify_order_id == OrderIndex.shopify_order_id)
+            & ModelShipment.affiliate_id.is_not(None)
+        ),
     )
-    unread_options = exists().where(
-        (OrderLineItem.shopify_order_id == AttributedOrder.shopify_order_id)
-        & OrderLineItem.selected_options.is_(None)
+    no_lines = ~exists().where(
+        OrderLineItem.shopify_order_id == OrderIndex.shopify_order_id
+    )
+    unread = exists().where(
+        (OrderLineItem.shopify_order_id == OrderIndex.shopify_order_id)
+        & (
+            OrderLineItem.selected_options.is_(None)
+            | OrderLineItem.after_delivery.is_(None)
+        )
     )
     return list(
         db.scalars(
-            select(AttributedOrder.shopify_order_id)
-            .join(OrderIndex, OrderIndex.shopify_order_id == AttributedOrder.shopify_order_id)
-            .where(no_lines | unread_options)
+            select(OrderIndex.shopify_order_id)
+            .where(wanted)
+            .where(no_lines | unread)
             .order_by(OrderIndex.placed_at.desc())
             .limit(limit)
         )

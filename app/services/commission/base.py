@@ -70,6 +70,8 @@ def base_for_order(
     tax_piastres: int,
     delivered: bool = False,
     stored_base_piastres: int | None = None,
+    return_activity: bool = False,
+    paid_by_delivery_piastres: int | None = None,
 ) -> BaseDecision:
     """Decide this order's base, given what it was worth last time we looked.
 
@@ -77,12 +79,27 @@ def base_for_order(
     "delivery is final" mean anything: without the previous value there is
     nothing to hold on to, and the figure would follow Shopify wherever
     E-stebdal took it.
+
+    **An order with a return is locked at the cash paid by delivery** (ADR
+    0051). Reaching this point means it was not already final - the platform
+    never saw it delivered before its return - so the stored figure is
+    whatever Shopify's totals said *after* the exchange edited them, and
+    holding on to it would freeze the inflation rather than keep it out. The
+    payments up to delivery are the one figure no exchange rewrites.
     """
     live = commission_base(total_piastres, shipping_piastres, tax_piastres)
 
     if not delivered:
         # Still travelling. A genuine edit before it ships should be reflected.
         return BaseDecision(piastres=live)
+
+    if return_activity and paid_by_delivery_piastres is not None:
+        return BaseDecision(
+            piastres=commission_base(
+                paid_by_delivery_piastres, shipping_piastres, tax_piastres
+            ),
+            is_final=True,
+        )
 
     # Delivered. Whatever it was worth on arrival is what it stays. Only an
     # order first seen *after* delivery has no stored value to keep, and takes
