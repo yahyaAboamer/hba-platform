@@ -172,7 +172,7 @@ describe("the wardrobe when best sellers cannot be loaded", () => {
 
     // Wait for the wardrobe itself to settle before asserting an absence,
     // or the assertion passes on a screen that has not loaded yet.
-    await waitFor(() => expect(screen.queryByText(/loading wardrobe/i)).toBeNull());
+    await waitFor(() => expect(screen.getByText("No products yet.")).toBeTruthy());
     expect(screen.queryByText(/could not load your best sellers/i)).toBeNull();
     expect(screen.queryByText(/your best sellers/i)).toBeNull();
   });

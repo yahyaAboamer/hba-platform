@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
+import { usePortal } from "../components/AffiliateLayout";
+import { PortalSkeleton } from "../components/PortalSkeleton";
 import { api } from "../lib/api";
+import { formatMonth } from "../lib/money";
 import "./MyWardrobe.css";
 
 type Item = {
@@ -36,8 +39,9 @@ type BestSellers = { products: BestSeller[]; codes: string[] };
 
 /**
  * *Sales through HBA15* - the export names her code where it could have said
- * "your code". Every code she has held, because the list is all time; "your
- * code" only for a model the server has no code on record for.
+ * "your code". The server lists every code she has held, including when the
+ * product list is narrowed to a month. "your code" is the fallback only when
+ * no code is on record.
  */
 export function throughCodes(codes: string[] | undefined): string {
   return codes && codes.length ? codes.join(", ") : "your code";
@@ -52,11 +56,15 @@ type Wardrobe = {
 
 /** Server-selected gift products and passive, Received/Processing-only requests. */
 export function MyWardrobe() {
+  const { month, months } = usePortal();
   const [body, setBody] = useState<Wardrobe | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const [sellerPeriod, setSellerPeriod] = useState<"all" | "month">("all");
+  const [sellerMonth, setSellerMonth] = useState(month);
   const [best, setBest] = useState<BestSeller[] | null>(null);
   const [bestError, setBestError] = useState<string | null>(null);
+  const [allTimeHadBest, setAllTimeHadBest] = useState(false);
   const [codes, setCodes] = useState<string[]>([]);
 
   useEffect(() => {
@@ -66,6 +74,11 @@ export function MyWardrobe() {
     api.get<Wardrobe>("/api/me/wardrobe")
       .then((found) => { if (live) setBody(found); })
       .catch((caught) => { if (live) setError(caught.message); });
+    return () => { live = false; };
+  }, [attempt]);
+
+  useEffect(() => {
+    let live = true;
     // Her own best sellers. A failure here costs the section rather than the
     // wardrobe: it is a second question on the same screen.
     //
@@ -75,13 +88,22 @@ export function MyWardrobe() {
     // read was indistinguishable from an empty one, on the screen least able
     // to tell the difference.
     setBestError(null);
-    api.get<BestSellers>("/api/me/best-sellers")
+    setBest(null);
+    const path = sellerPeriod === "month"
+      ? `/api/me/best-sellers?month=${encodeURIComponent(sellerMonth)}`
+      : "/api/me/best-sellers";
+    api.get<BestSellers>(path)
       .then((found) => {
-        if (live) { setBest(found.products); setCodes(found.codes ?? []); setBestError(null); }
+        if (live) {
+          setBest(found.products);
+          setCodes(found.codes ?? []);
+          if (sellerPeriod === "all") setAllTimeHadBest(found.products.length > 0);
+          setBestError(null);
+        }
       })
       .catch((caught) => { if (live) { setBest(null); setBestError(caught.message); } });
     return () => { live = false; };
-  }, [attempt]);
+  }, [attempt, sellerPeriod, sellerMonth]);
 
   if (error) return (
     <div className="notice notice--refused" role="alert">
@@ -89,13 +111,20 @@ export function MyWardrobe() {
       <button type="button" className="button" onClick={() => setAttempt((n) => n + 1)}>Try again</button>
     </div>
   );
-  if (body === null) return <p className="empty" role="status">Loading wardrobe…</p>;
+  if (body === null) return <PortalSkeleton screen="wardrobe" />;
   return (
     <WardrobeContents
       body={body}
       best={best}
       codes={codes}
       bestError={bestError}
+      bestLoading={best === null && !bestError}
+      allTimeHadBest={allTimeHadBest}
+      sellerPeriod={sellerPeriod}
+      sellerMonth={sellerMonth}
+      sellerMonths={months}
+      onSellerPeriod={setSellerPeriod}
+      onSellerMonth={setSellerMonth}
       onRetryBest={() => setAttempt((n) => n + 1)}
     />
   );
@@ -106,6 +135,13 @@ export function WardrobeContents({
   best = null,
   codes = [],
   bestError = null,
+  bestLoading = false,
+  allTimeHadBest = false,
+  sellerPeriod = "all",
+  sellerMonth = "",
+  sellerMonths = [],
+  onSellerPeriod,
+  onSellerMonth,
   onRetryBest,
 }: {
   body: Wardrobe;
@@ -114,10 +150,18 @@ export function WardrobeContents({
   codes?: string[];
   /** A12. Set when the best-sellers read failed, which is not "no sales". */
   bestError?: string | null;
+  bestLoading?: boolean;
+  allTimeHadBest?: boolean;
+  sellerPeriod?: "all" | "month";
+  sellerMonth?: string;
+  sellerMonths?: string[];
+  onSellerPeriod?: (period: "all" | "month") => void;
+  onSellerMonth?: (month: string) => void;
   onRetryBest?: () => void;
 }) {
   const waiting = [...body.processing, ...body.failed];
   const hasBest = Boolean(best && best.length > 0);
+  const showBest = hasBest || Boolean(bestError) || allTimeHadBest || sellerPeriod === "month";
   return (
     <div className="wardrobe">
       <h1 className="wardrobe__page-title">Wardrobe</h1>
@@ -125,7 +169,7 @@ export function WardrobeContents({
       <nav className="wardrobe__jumps" aria-label="Wardrobe sections">
         <button type="button" onClick={() => jumpTo("wardrobe-owned")}>{body.received.length} received</button>
         {body.feature_requests.length > 0 && <button type="button" onClick={() => jumpTo("wardrobe-feature")}>To feature</button>}
-        {(hasBest || bestError) && <button type="button" onClick={() => jumpTo("wardrobe-best")}>Best sellers</button>}
+        {showBest && <button type="button" onClick={() => jumpTo("wardrobe-best")}>Best sellers</button>}
       </nav>
 
       <section className="wardrobe__block" id="wardrobe-owned">
@@ -193,23 +237,29 @@ export function WardrobeContents({
         </section>
       )}
 
-      {(hasBest || bestError) && (
+      {showBest && (
         <section className="wardrobe__block" id="wardrobe-best">
           <div className="wardrobe__heading">
             <h2 className="wardrobe__title">Your best sellers</h2>
             {hasBest && <span className="wardrobe__count">Through {throughCodes(codes)}</span>}
           </div>
+          <SellerControls period={sellerPeriod} month={sellerMonth} months={sellerMonths} onPeriod={onSellerPeriod} onMonth={onSellerMonth} />
           {bestError ? (
             <p className="wardrobe__subtitle" role="status">
               Could not load your best sellers.{" "}
               {onRetryBest && <button type="button" className="button" onClick={onRetryBest}>Try again</button>}
             </p>
+          ) : bestLoading ? (
+            <div className="wardrobe__seller-loading" role="status" aria-label="Loading best sellers">
+              <span className="portal-skeleton__bar" aria-hidden="true" />
+              <span className="portal-skeleton__bar" aria-hidden="true" />
+            </div>
           ) : (
             <>
-              <p className="wardrobe__subtitle">Sales through {throughCodes(codes)} · all time · delivered and pending</p>
-              <BestSellerList rows={best!.slice(0, 3)} />
-              <p className="wardrobe__sales-note">Product sales, not your payout.</p>
-              {best!.length > 3 && <Link className="wardrobe__all" to="/best">Show all {best!.length} products</Link>}
+              <p className="wardrobe__subtitle">Sales through {throughCodes(codes)} · {sellerPeriod === "all" ? "all time" : formatMonth(sellerMonth)} · delivered and pending</p>
+              {hasBest ? <BestSellerList rows={best!.slice(0, 3)} /> : <p className="empty">{sellerPeriod === "month" ? `No products sold through your code in ${formatMonth(sellerMonth)}.` : "Nothing has sold through your code yet."}</p>}
+              {hasBest && <p className="wardrobe__sales-note">Product sales, not your payout.</p>}
+              {best && best.length > 3 && <Link className="wardrobe__all" to={sellerPeriod === "month" ? `/best?month=${encodeURIComponent(sellerMonth)}` : "/best"}>Show all {best.length} products</Link>}
             </>
           )}
         </section>
@@ -248,11 +298,15 @@ function BestSellerList({ rows, offset = 0 }: { rows: BestSeller[]; offset?: num
 /**
  * *All products sold* - `vBest` in the approved portal.
  *
- * Every product sold through her code, all time, best first. Delivered and
- * pending orders, failed deliveries excluded - the export's line, and the rule
- * she is paid on since ADR 0040.
+ * Every product sold through her code in the chosen period, best first.
+ * Delivered and pending orders count; failed deliveries do not (ADR 0040).
  */
 export function MyBestSellers() {
+  const { month: currentMonth, months } = usePortal();
+  const [query, setQuery] = useSearchParams();
+  const selected = query.get("month");
+  const sellerMonth = selected && months.includes(selected) ? selected : currentMonth;
+  const sellerPeriod = selected && months.includes(selected) ? "month" : "all";
   const [rows, setRows] = useState<BestSeller[] | null>(null);
   const [codes, setCodes] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -261,11 +315,15 @@ export function MyBestSellers() {
   useEffect(() => {
     let live = true;
     setError(null);
-    api.get<BestSellers>("/api/me/best-sellers")
+    setRows(null);
+    const path = sellerPeriod === "month"
+      ? `/api/me/best-sellers?month=${encodeURIComponent(sellerMonth)}`
+      : "/api/me/best-sellers";
+    api.get<BestSellers>(path)
       .then((found) => { if (live) { setRows(found.products); setCodes(found.codes ?? []); } })
       .catch((caught) => { if (live) setError(caught.message); });
     return () => { live = false; };
-  }, [attempt]);
+  }, [attempt, sellerPeriod, sellerMonth]);
 
   if (error) return (
     <div className="notice notice--refused" role="alert">
@@ -273,19 +331,47 @@ export function MyBestSellers() {
       <button type="button" className="button" onClick={() => setAttempt((n) => n + 1)}>Try again</button>
     </div>
   );
-  if (rows === null) return <p className="empty" role="status">Loading…</p>;
+  if (rows === null) return <PortalSkeleton screen="wardrobe" />;
 
   return (
     <div className="wardrobe">
+      <h1 className="wardrobe__page-title">Your best sellers</h1>
+      <SellerControls
+        period={sellerPeriod} month={sellerMonth} months={months}
+        onPeriod={(period) => setQuery(period === "all" ? {} : { month: sellerMonth })}
+        onMonth={(month) => setQuery({ month })}
+      />
       <p className="wardrobe__lead">
-        Every product sold through {throughCodes(codes)}, all time. Delivered and
+        Every product sold through {throughCodes(codes)}, {sellerPeriod === "all" ? "all time" : formatMonth(sellerMonth)}. Delivered and
         pending orders; failed deliveries excluded.
       </p>
       {rows.length === 0
-        ? <p className="empty">Nothing has sold through your code yet.</p>
+        ? <p className="empty">{sellerPeriod === "month" ? `No products sold through your code in ${formatMonth(sellerMonth)}.` : "Nothing has sold through your code yet."}</p>
         : <BestSellerList rows={rows} />}
     </div>
   );
+}
+
+function SellerControls({ period, month, months, onPeriod, onMonth }: {
+  period: "all" | "month";
+  month: string;
+  months: string[];
+  onPeriod?: (period: "all" | "month") => void;
+  onMonth?: (month: string) => void;
+}) {
+  if (!onPeriod) return null;
+  return <div className="wardrobe__period">
+    <div className="wardrobe__period-buttons" role="group" aria-label="Best seller period">
+      <button type="button" aria-pressed={period === "all"} onClick={() => onPeriod("all")}>All time</button>
+      <button type="button" aria-pressed={period === "month"} onClick={() => onPeriod("month")}>Monthly</button>
+    </div>
+    {period === "month" && <label className="wardrobe__month-label">
+      <span>Business month</span>
+      <select value={month} onChange={(event) => onMonth?.(event.target.value)}>
+        {months.map((option) => <option key={option} value={option}>{formatMonth(option)}</option>)}
+      </select>
+    </label>}
+  </div>;
 }
 
 function OrderDate({ value }: { value?: string | null }) {

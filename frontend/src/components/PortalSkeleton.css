@@ -1,0 +1,41 @@
+.affiliate .portal-skeleton { padding-bottom: var(--tab-clearance); }
+.affiliate .portal-skeleton h1 { margin: 0; color: var(--ink); font-size: 24px; font-weight: 650; letter-spacing: -0.04em; }
+.affiliate .portal-skeleton h2 { margin: 24px 0 11px; color: var(--ink); font-size: 16px; font-weight: 600; }
+.affiliate .portal-skeleton__bar,
+.affiliate .portal-skeleton__chips i,
+.affiliate .portal-skeleton__tiles > div,
+.affiliate .portal-skeleton__row,
+.affiliate .portal-skeleton__card i,
+.affiliate .portal-skeleton__note i {
+  display: block; border-radius: var(--radius); background: var(--raise);
+  background-image: linear-gradient(105deg, transparent 20%, var(--surface) 48%, transparent 75%);
+  background-size: 200% 100%; animation: portal-skeleton-sweep 1.7s ease-in-out infinite;
+}
+.affiliate .portal-skeleton__intro { width: 62%; max-width: 250px; height: 12px; margin-top: 12px; }
+.affiliate .portal-skeleton__chips { display: flex; gap: 7px; margin: 19px 0 25px; }
+.affiliate .portal-skeleton__chips i { width: 88px; height: 44px; border-radius: 99px; }
+.affiliate .portal-skeleton__chips i:nth-child(2) { width: 91px; }
+.affiliate .portal-skeleton__chips i:nth-child(3) { width: 96px; }
+.affiliate .portal-skeleton__tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.affiliate .portal-skeleton__tiles > div { height: 179px; border: 1px solid var(--rule-strong); border-radius: var(--radius-lg); }
+.affiliate .portal-skeleton__row { height: 64px; margin-top: 8px; border: 1px solid var(--rule-strong); border-radius: var(--radius-lg); }
+.affiliate .portal-skeleton__card { height: 170px; margin-top: 19px; padding: 19px; border: 1px solid var(--rule-strong); border-radius: var(--radius-lg); background: var(--surface); }
+.affiliate .portal-skeleton__card i { height: 14px; margin-bottom: 18px; }
+.affiliate .portal-skeleton__card i:first-child { width: 38%; }
+.affiliate .portal-skeleton__card i:nth-child(2) { width: 75%; }
+.affiliate .portal-skeleton__card i:last-child { width: 58%; }
+.affiliate .portal-skeleton__note { height: 82px; margin-top: 15px; padding: 18px; border-radius: var(--radius); background: var(--surface); }
+.affiliate .portal-skeleton__note i { height: 11px; width: 45%; margin-bottom: 14px; }
+.affiliate .portal-skeleton__note i:last-child { width: 80%; }
+.affiliate .portal-skeleton__rank-card { height: 163px; }
+.affiliate .wardrobe__seller-loading { display: grid; gap: 8px; margin-top: 12px; }
+.affiliate .wardrobe__seller-loading .portal-skeleton__bar { width: 100%; height: 65px; }
+@keyframes portal-skeleton-sweep { from { background-position: 150% 0; } to { background-position: -50% 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .affiliate .portal-skeleton__bar,
+  .affiliate .portal-skeleton__chips i,
+  .affiliate .portal-skeleton__tiles > div,
+  .affiliate .portal-skeleton__row,
+  .affiliate .portal-skeleton__card i,
+  .affiliate .portal-skeleton__note i { animation: none; }
+}

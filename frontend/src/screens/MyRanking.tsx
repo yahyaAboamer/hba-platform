@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { usePortal } from "../components/AffiliateLayout";
 import { Money } from "../components/Money";
+import { PortalSkeleton } from "../components/PortalSkeleton";
 import { api } from "../lib/api";
 import { formatMonth } from "../lib/money";
 import "./MyRanking.css";
@@ -10,10 +11,9 @@ type Row = {
   affiliate_id: number;
   rank: number;
   name: string | null;
-  /** Her code that month, as the export prints under every name. */
-  code?: string | null;
   is_me: boolean;
-  uses: number;
+  /** The API withholds peers' figures; only her own use count is returned. */
+  uses: number | null;
   sales_piastres: number | null;
 };
 
@@ -52,23 +52,14 @@ export function MyRanking() {
       </p>
     );
   }
-  if (!board) return <p className="empty" role="status">Loading ranking…</p>;
+  if (!board) return <PortalSkeleton screen="ranking" />;
 
   return <RankingContents key={board.month} board={board} />;
 }
 
-/** The short board answers "who is near me?" before offering every row. */
+/** Her figures and the complete order of models, without peers' figures. */
 export function RankingContents({ board }: { board: Board }) {
-  const [full, setFull] = useState(false);
-  const mineIndex = board.rows.findIndex((row) => row.is_me);
-  const mine = mineIndex >= 0 ? board.rows[mineIndex] : null;
-  const top = board.rows.slice(0, 3);
-  const nearStart = mineIndex > 2
-    ? Math.max(3, Math.min(mineIndex - 1, board.rows.length - 3))
-    : -1;
-  const nearby = nearStart >= 0 ? board.rows.slice(nearStart, nearStart + 3) : [];
-  const summaryIds = new Set([...top, ...nearby].map((row) => row.affiliate_id));
-  const hasMore = summaryIds.size < board.rows.length;
+  const mine = board.rows.find((row) => row.is_me);
 
   const shared = mine
     ? board.rows.filter((row) => row.rank === mine.rank).length > 1
@@ -91,37 +82,22 @@ export function RankingContents({ board }: { board: Board }) {
             <div className="ranking__side">
               <span className="ranking__sales">{mine.sales_piastres === null ? "Sales unavailable" : <Money piastres={mine.sales_piastres} />}</span>
               <span className="ranking__caption">
-                Your code sales · {mine.uses} {mine.uses === 1 ? "use" : "uses"}
+                Your code sales · {mine.uses ?? "—"} {mine.uses === 1 ? "use" : "uses"}
               </span>
             </div>
           </div>
           <div className="ranking__basis">
-            <strong>Sales decide the order.</strong> Code uses break ties. Other models&rsquo; sales stay private.
+            <strong>Sales decide the order.</strong> Code uses break ties. Only your sales and uses are shown.
             {shared && <p>You are level with somebody this month, so you share a place.</p>}
           </div>
         </section>
       )}
 
-      {full ? (
-        <section className="ranking__group">
-          <div className="ranking__group-head"><h2>Full ranking</h2><span>Code uses at right</span></div>
-          <RankingRows rows={board.rows} />
-        </section>
-      ) : (
-        <>
-          {nearby.length > 0 && (
-            <section className="ranking__group">
-              <div className="ranking__group-head"><h2>Around your position</h2><span>Code uses at right</span></div>
-              <RankingRows rows={nearby} />
-            </section>
-          )}
-          <section className="ranking__group">
-            <div className="ranking__group-head"><h2>{nearby.length ? "Top of the board" : "Leaderboard"}</h2><span>Code uses at right</span></div>
-            <RankingRows rows={top} />
-          </section>
-        </>
-      )}
-      {hasMore && <button type="button" className="ranking__more" onClick={() => setFull(!full)}>{full ? "Show summary" : "View full ranking"}</button>}
+      {!mine && <p className="ranking__unranked">You are not ranked this month yet.</p>}
+      <section className="ranking__group">
+        <div className="ranking__group-head"><h2>All models</h2><span>{formatMonth(board.month)}</span></div>
+        {board.rows.length ? <RankingRows rows={board.rows} /> : <p className="empty">No models ranked this month yet.</p>}
+      </section>
       <p className="ranking__foot">Equal sales and equal uses share a place.</p>
     </div>
   );
@@ -135,11 +111,6 @@ function RankingRows({ rows }: { rows: Row[] }) {
         <span className="ranking__avatar">{(row.name ?? "").trim().charAt(0).toUpperCase() || "·"}</span>
         <span className="ranking__who">
           <span className="ranking__name">{row.is_me ? "You" : row.name ?? "Model"}</span>
-          {row.code && <span className="ranking__code">{row.code}</span>}
-        </span>
-        <span className="ranking__figure">
-          <span className="ranking__uses">{row.uses}</span>
-          <span className="ranking__caption">{row.uses === 1 ? "use" : "uses"}</span>
         </span>
       </li>
     ))}

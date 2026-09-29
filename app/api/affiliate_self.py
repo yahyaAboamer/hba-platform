@@ -606,6 +606,7 @@ def my_wardrobe(
 
 @router.get("/best-sellers")
 def my_best_sellers(
+    month: str | None = None,
     affiliate: AffiliateProfile = Depends(current_affiliate),
     db: Session = Depends(get_session),
 ) -> dict:
@@ -616,8 +617,9 @@ def my_best_sellers(
     ADR 0040) - so no other model's sales can reach this payload however it is
     asked for: the route takes no affiliate id, as nothing under `/api/me` does.
 
-    `codes` is every code she has held, for the export's *Sales through
-    HBA15*: the list is all time, so a code she has since given up sold on it.
+    An optional business month filters only this model's attributed orders.
+    Without it the existing all-time response is unchanged. `codes` remains
+    every code she has held, including a code she has since given up.
     """
     from sqlalchemy import select
 
@@ -626,7 +628,7 @@ def my_best_sellers(
     from app.services.performance import best_sellers_for
     from app.services.wardrobe import thumbnail
 
-    rows = best_sellers_for(db, affiliate.id)
+    rows = best_sellers_for(db, affiliate.id, month=_month_or_400(month) if month else None)
     images = (
         {
             product.shopify_product_id: product.image_url
@@ -693,38 +695,16 @@ def my_ranking(
 ) -> dict:
     """Where she stands against the other models. M02, and D03.
 
-    **Ordered by sales; the figures shown are uses.** M02 is explicit that a
-    peer value is never another model's sales, commission or salary — so the
-    board carries a rank, a name, a code and a use count for everyone (the
-    approved export's board, item 3), and her own sales appear only on her own
-    row.
+    **Ordered by sales, with uses breaking ties.** The model sees her own
+    sales and uses, but peer rows disclose only position and name.
 
-    That gap is deliberate and it has to be explained rather than hidden: two
-    models can show the same uses and rank differently, because uses only break
-    a tie. The screen says the order is by sales, without promising that
-    matching somebody's uses would match her rank.
+    Positions are still computed from all models' underlying figures. Those
+    figures do not need to leave the server to explain the ordered board.
     """
     from app.services.performance import month_performance
 
-    from app.services.codes import codes_for
-
     month = _month_or_400(month)
     board = month_performance(db, month)
-    # The export's board names every model with her code and initial (owner,
-    # item 3 - the approved design over our earlier anonymising). What stays
-    # hers alone is money: sales appear only on her own row (M02).
-    profiles = {
-        row.id: row
-        for row in db.scalars(
-            select(AffiliateProfile).where(
-                AffiliateProfile.id.in_([row.affiliate_id for row in board])
-            )
-        )
-    }
-    codes = {
-        affiliate_id: (codes_for(db, profile, month) or [None])[0]
-        for affiliate_id, profile in profiles.items()
-    }
 
     return {
         "month": month,
@@ -734,9 +714,8 @@ def my_ranking(
                 "affiliate_id": row.affiliate_id,
                 "rank": row.rank,
                 "name": row.name,
-                "code": codes.get(row.affiliate_id),
                 "is_me": row.affiliate_id == affiliate.id,
-                "uses": row.uses,
+                "uses": row.uses if row.affiliate_id == affiliate.id else None,
                 # Only ever her own. M02.
                 "sales_piastres": (
                     row.sales_piastres if row.affiliate_id == affiliate.id else None

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { TargetBars } from "../components/TargetProgress";
+import { PortalSkeleton } from "../components/PortalSkeleton";
 import { api } from "../lib/api";
 import type { MonthTargets } from "../lib/portal";
 import { formatDay, formatMonth } from "../lib/money";
@@ -75,7 +76,7 @@ export function MyTargets() {
     );
   }
 
-  if (rows === null) return <p className="empty">Loading…</p>;
+  if (rows === null) return <PortalSkeleton screen="targets" />;
 
   // Defensive rather than expected: `months_for` always offers at least the
   // month she is in, so this is what stops an empty payload becoming a white

@@ -16,6 +16,23 @@
 .affiliate .wardrobe__title { margin: 0; font-size: 16px; font-weight: 600; line-height: 1.3; }
 .affiliate .wardrobe__count { flex: none; color: var(--quiet); font-size: 11.5px; }
 .affiliate .wardrobe__subtitle { margin: 6px 0 12px; color: var(--quiet); font-size: 12.5px; line-height: 1.45; }
+.affiliate .wardrobe__period { margin: 10px 0 13px; }
+.affiliate .wardrobe__period-buttons { display: flex; gap: 7px; }
+.affiliate .wardrobe__period-buttons button {
+  min-height: 44px; padding: 0 15px; border: 1px solid var(--rule-strong);
+  border-radius: 999px; background: var(--surface); color: var(--ink); font-size: 12.5px;
+}
+.affiliate .wardrobe__period-buttons button[aria-pressed="true"] {
+  border-color: var(--accent); background: var(--accent-soft); color: var(--accent-text);
+}
+.affiliate .wardrobe__period-buttons button:focus-visible,
+.affiliate .wardrobe__month-label select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.affiliate .wardrobe__month-label { display: block; margin-top: 11px; color: var(--quiet); font-size: 12px; }
+.affiliate .wardrobe__month-label span { display: block; margin-bottom: 5px; }
+.affiliate .wardrobe__month-label select {
+  width: 100%; min-height: 44px; padding: 0 11px; border: 1px solid var(--rule-strong);
+  border-radius: var(--radius); background: var(--surface); color: var(--ink); font: inherit;
+}
 
 .affiliate .wardrobe__received, .affiliate .wardrobe__requests, .affiliate .wardrobe__waiting { list-style: none; padding: 0; margin: 0; }
 .affiliate .wardrobe__received { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }

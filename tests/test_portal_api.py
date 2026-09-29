@@ -2582,6 +2582,21 @@ def test_her_best_sellers_are_her_own_sales_and_nobody_elses(admin):
     assert body["codes"] == ["NOUR10"]
 
 
+def test_her_best_sellers_can_be_filtered_to_a_business_month(admin):
+    nour = _affiliate(admin)
+    _order(nour["id"], "bs-aug", 100_000, month=AUGUST)
+    _order(nour["id"], "bs-sep", 300_000, month=SEPTEMBER)
+    _line("bs-aug", "AUG", 100_000)
+    _line("bs-sep", "SEP", 300_000)
+
+    client = _sign_in()
+    all_time = client.get("/api/me/best-sellers").json()["products"]
+    august = client.get(f"/api/me/best-sellers?month={AUGUST}").json()["products"]
+    assert [row["shopify_product_id"] for row in all_time] == ["SEP", "AUG"]
+    assert [row["shopify_product_id"] for row in august] == ["AUG"]
+    assert client.get("/api/me/best-sellers?month=not-a-month").status_code == 400
+
+
 def test_a_travelling_order_sells_and_a_failed_one_does_not(admin):
     """ADR 0040, and the same basis as the money beside it.
 
@@ -2788,9 +2803,8 @@ def test_home_counts_a_failed_delivery_and_not_a_cancellation(admin):
 # ── The ranking board (item 3) ────────────────────────────────────────────────
 
 
-def test_the_board_names_every_model_with_her_code_and_shows_only_her_own_sales(admin):
-    """The approved portal's board: every model's name, code and uses. Money is
-    still hers alone (M02) - no other row carries sales."""
+def test_the_board_names_peers_without_disclosing_their_figures(admin):
+    """The full order is visible; only her own sales and uses leave the API."""
     nour = _affiliate(admin)
     sara = _affiliate(admin, name="Sara", email="sara@example.com", code="SARA10")
     _order(nour["id"], "5001", 200_000)
@@ -2799,7 +2813,10 @@ def test_the_board_names_every_model_with_her_code_and_shows_only_her_own_sales(
     rows = _sign_in().get(f"/api/me/ranking/{AUGUST}").json()["rows"]
 
     by_name = {row["name"]: row for row in rows}
-    assert by_name["Sara"]["code"] == "SARA10" and by_name["Sara"]["rank"] == 1
-    assert by_name["Nour"]["code"] == "NOUR10" and by_name["Nour"]["is_me"] is True
+    assert by_name["Sara"]["rank"] == 1
+    assert by_name["Nour"]["is_me"] is True
+    assert "code" not in by_name["Sara"]
+    assert by_name["Sara"]["uses"] is None
     assert by_name["Sara"]["sales_piastres"] is None and by_name["Sara"]["sales"] is None
     assert by_name["Nour"]["sales_piastres"] == 200_000
+    assert by_name["Nour"]["uses"] == 1
