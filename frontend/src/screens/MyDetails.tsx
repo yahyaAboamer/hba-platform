@@ -271,7 +271,7 @@ export function MyDetails({
  */
 type FullDestination = Record<string, string | null>;
 
-function Reveal() {
+export function Reveal() {
   const [full, setFull] = useState<FullDestination | null>(null);
   const [working, setWorking] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -449,6 +449,8 @@ export function ShippingAddress({ me, onChanged }: { me: Me; onChanged: () => vo
                 <span className="field__label">{label}</span>
                 <input
                   className="input"
+                  type={field === "shipping_phone" ? "tel" : "text"}
+                  inputMode={field === "shipping_phone" ? "tel" : undefined}
                   value={draft[field] ?? ""}
                   onChange={(event) =>
                     setDraft({ ...draft, [field]: event.target.value })
@@ -620,24 +622,44 @@ export function Measurements({ me, onChanged }: { me: Me; onChanged: () => void 
 export function Notifications() {
   const [preferences, setPreferences] = useState<Preference[] | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [retry, setRetry] = useState(0);
 
   useEffect(() => {
     let current = true;
+    setLoading(true);
+    setLoadFailed(false);
     api
       .get<{ preferences: Preference[] }>("/api/me/notifications")
       .then((body) => {
-        if (current) setPreferences(body.preferences);
+        if (current) {
+          setPreferences(body.preferences);
+          setLoading(false);
+        }
       })
       .catch(() => {
-        // Quietly. The switches are a convenience; failing to load them is
-        // not worth an error banner on somebody's account page.
+        if (current) {
+          setLoadFailed(true);
+          setLoading(false);
+        }
       });
     return () => {
       current = false;
     };
-  }, []);
+  }, [retry]);
 
-  if (preferences === null) return null;
+  if (loading) return <section className="panel affiliate__panel notifications__loading" role="status" aria-label="Loading notification choices">
+    <div className="you__placeholder you__placeholder--name" />
+    <div className="you__placeholder you__placeholder--line" />
+    <div className="you__placeholder you__placeholder--line" />
+  </section>;
+
+  if (loadFailed || preferences === null) return <section className="panel affiliate__panel notifications__failure" role="alert">
+    <h2 className="panel__title">Could not load your choices</h2>
+    <p>Check your connection and try again. Your existing choices have not changed.</p>
+    <button type="button" className="button" onClick={() => setRetry((was) => was + 1)}>Try again</button>
+  </section>;
 
   async function toggle(preference: Preference) {
     setProblem(null);
@@ -666,7 +688,10 @@ export function Notifications() {
 
   return (
     <section className="panel affiliate__panel">
-      <h2 className="panel__title">Tell me when</h2>
+      <div className="notifications__head">
+        <h2 className="panel__title">Tell me when</h2>
+        <p>These choices save as soon as you switch them.</p>
+      </div>
       {problem && (
         <p className="notice notice--refused" role="alert">
           {problem}
@@ -687,10 +712,10 @@ export function Notifications() {
           </span>
         </button>
       ))}
-      <p className="affiliate__note">
-        Two, on purpose. An alert for every single order would be an email an
-        order.
-      </p>
+      <div className="notifications__foot">
+        <strong>Messages that always arrive</strong>
+        <p>Password, security and payment-destination-change messages cannot be switched off here. There is no email for every order.</p>
+      </div>
     </section>
   );
 }

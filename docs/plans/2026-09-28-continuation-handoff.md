@@ -5,6 +5,25 @@ for its record of batches K–N, the tooling notes and the open items it lists.
 Everything in its *Remaining*, *Release gates*, *Decisions not to reopen* and
 *Needs the owner* still stands unless this file says otherwise.
 
+## 29 September addendum — model account (You)
+
+The owner approved the You redesign and its linked pages, then explicitly
+authorized the notification and guide refinements plus a push and merge to
+`main` for staging. Production remains out of scope. This batch groups terms,
+payments, contact and delivery, sizes, notifications and appearance on the
+account page. The technical Help entry is replaced by a plain-language
+dashboard guide; the old `/glossary` route remains for existing links.
+
+Payment destination changes still use the password-confirmed server flow.
+Payment history and receipts remain available for paused models. Terms are
+labelled for the server's working month, and missing terms or an abroad payment
+arrangement have explicit states. Notifications now have padded headings,
+loading and retry states. Local frontend verification: 538 tests across 33
+files, production build green, and synthetic-data visual checks at 360, 390 and
+1280 pixels with no browser errors or horizontal overflow. These checks do not
+establish staging acceptance; check the staging deployment and real model
+session separately.
+
 ## The exact position
 
 Read on 28 September; re-read the remote before describing it

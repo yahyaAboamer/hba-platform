@@ -106,8 +106,11 @@ export function MyPayments() {
   const [body, setBody] = useState<Body | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState<MyHome | null>(null);
+  const [retry, setRetry] = useState(0);
 
   useEffect(() => {
+    setError(null);
+    setBody(null);
     api
       .get<Body>("/api/me/payments")
       .then(setBody)
@@ -117,20 +120,25 @@ export function MyPayments() {
     if (months?.[0]) {
       readHome(months[0]).then(setRunning).catch(() => setRunning(null));
     }
-  }, [months]);
+  }, [months, retry]);
 
   if (error) {
     return (
-      <p className="notice notice--refused" role="alert">
-        {error}
-      </p>
+      <section className="pay-load-error" role="alert">
+        <strong>Payment history could not load</strong>
+        <p>{error}</p>
+        <button type="button" className="button" onClick={() => setRetry((was) => was + 1)}>Try again</button>
+      </section>
     );
   }
 
-  if (body === null) return <p className="empty">Loading…</p>;
+  if (body === null) return <PaymentSkeleton />;
 
+  const destination = me.payout_abroad && !me.payout_destination
+    ? "HBA arranges your payment directly"
+    : describeDestination(me.payout_destination);
   const coming = running && running.earnings.state === "open" ? (
-    <ComingUp home={running} destination={describeDestination(me.payout_destination)} />
+    <ComingUp home={running} destination={destination} />
   ) : null;
 
   if (body.months.length === 0 && body.payments.length === 0) {
@@ -176,7 +184,7 @@ export function MyPayments() {
         <p className="figure__note">
           {owed
             ? "Agreed and not yet transferred. Months still being worked out are not counted here."
-            : "Every month HBA has closed has been paid in full."}
+            : "No agreed amount remains to send."}
         </p>
       </section>
 
@@ -198,7 +206,7 @@ export function MyPayments() {
         <div className="destination__row">
           <span className="destination__label">Going to</span>
           <span className="destination__value">
-            {describeDestination(me.payout_destination)}
+            {destination}
           </span>
         </div>
         <Link to="/you" className="destination__change">
@@ -341,6 +349,14 @@ export function MyPayments() {
       )}
     </>
   );
+}
+
+function PaymentSkeleton() {
+  return <div className="pay-skeleton" role="status" aria-label="Loading payment history">
+    <div className="pay-skeleton__card pay-skeleton__card--figure"><span /><span /><span /></div>
+    <div className="pay-skeleton__card"><span /><span /></div>
+    <div className="pay-skeleton__card"><span /><span /><span /></div>
+  </div>;
 }
 
 export function PaymentRow({ payment }: { payment: Payment }) {

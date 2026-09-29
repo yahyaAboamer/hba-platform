@@ -392,3 +392,17 @@
   background: var(--surface);
   color: var(--faint);
 }
+
+.pay-skeleton { display:grid;gap:13px;padding-bottom:var(--tab-clearance); }
+.pay-skeleton__card { display:grid;gap:14px;min-height:84px;padding:18px;border-radius:var(--radius);background:var(--surface); }
+.pay-skeleton__card--figure { min-height:165px; }
+.pay-skeleton__card span { display:block;width:75%;height:13px;border-radius:5px;background:var(--rule);animation:pay-pulse 1.4s ease-in-out infinite; }
+.pay-skeleton__card span:first-child { width:36%; }
+.pay-skeleton__card span:last-child { width:56%; }
+.pay-skeleton__card--figure span:nth-child(2) { width:62%;height:31px; }
+.pay-load-error { padding:18px;border-radius:var(--radius);background:var(--surface); }
+.pay-load-error strong { display:block;font-size:15px; }
+.pay-load-error p { margin:7px 0 14px;color:var(--quiet);font-size:13px;line-height:1.5; }
+.pay-load-error .button { min-height:44px; }
+@keyframes pay-pulse { 50% { opacity:.5; } }
+@media (prefers-reduced-motion:reduce) { .pay-skeleton__card span { animation:none; } }

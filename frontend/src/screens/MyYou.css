@@ -1,176 +1,107 @@
-/* Her account. `vYou` in `Affiliate Portal v3.dc.html`, lines 418–465. */
+/* The model's account uses the portal's existing tokens and a phone-first
+ * reading order. The wider layout groups the same cards without moving links. */
+.affiliate .you { padding-bottom: var(--tab-clearance); }
+.affiliate .you__hero { display:flex;align-items:center;gap:12px;min-width:0;margin-bottom:18px; }
+.affiliate .you__avatar { flex:0 0 52px;display:grid;place-items:center;width:52px;height:52px;border:1px solid var(--rule);border-radius:50%;background:var(--accent-soft);color:var(--accent);font-size:20px; }
+.affiliate .you__who { flex:1 1 auto;min-width:0; }
+.affiliate .you__name { overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:0;font-size:18px;line-height:1.3;font-weight:650; }
+.affiliate .you__since { display:block;margin-top:3px;color:var(--quiet);font-size:12.5px;line-height:1.4; }
+.affiliate .you__status { flex:none;padding:6px 9px;border:1px solid var(--accent);border-radius:999px;background:var(--accent-soft);color:var(--accent-text);font-size:11px;font-weight:650; }
+.affiliate .you__status--paused { border-color:var(--owed);background:var(--owed-quiet);color:var(--owed); }
+.affiliate .you__attention { margin:0 0 18px;padding:14px 15px;border:1px solid var(--owed);border-radius:var(--radius);background:var(--owed-quiet); }
+.affiliate .you__attention strong { display:block;font-size:13px;line-height:1.4; }
+.affiliate .you__attention p { margin:4px 0 0;color:var(--ink);font-size:12.5px;line-height:1.5; }
+.affiliate .you__attention a { display:inline-flex;align-items:center;min-height:40px;margin-top:4px;color:var(--accent-text);font-size:12.5px;font-weight:600; }
+.affiliate .you__section { min-width:0;margin:0 0 19px; }
+.affiliate .you__section-title { display:block;margin:0 2px 8px;color:var(--faint);font-size:11px;font-weight:700;letter-spacing:.09em;line-height:1.4;text-transform:uppercase; }
+.affiliate .you__card,.affiliate .you__rows,.affiliate .you__detail-card { border-radius:var(--radius);background:var(--surface); }
+.affiliate .you__terms-card { padding:16px; }
+.affiliate .you__terms-top { display:flex;justify-content:space-between;gap:10px;color:var(--quiet);font-size:12px; }
+.affiliate .you__terms-top span:last-child { color:var(--accent-text);white-space:nowrap; }
+.affiliate .you__terms-card h3 { margin:7px 0 5px;font-size:16px;line-height:1.3; }
+.affiliate .you__terms-card p { margin:0;color:var(--quiet);font-size:12.5px;line-height:1.5; }
+.affiliate .you__text-link { display:inline-flex;align-items:center;min-height:38px;margin-top:6px;color:var(--accent-text);font-size:12.5px;font-weight:650;text-decoration:none; }
+.affiliate .you__text-link:hover { text-decoration:underline;text-underline-offset:3px; }
+.affiliate .you__rows { overflow:hidden; }
+.affiliate .you__row { display:flex;align-items:center;gap:11px;width:100%;min-height:64px;padding:11px 14px;border:0;border-bottom:1px solid var(--rule);background:transparent;color:var(--ink);text-decoration:none;text-align:left; }
+.affiliate .you__row:last-child { border-bottom:0; }
+.affiliate a.you__row:hover { background:var(--hover); }
+.affiliate .you__row-icon { flex:0 0 31px;display:grid;place-items:center;width:31px;height:31px;border:1px solid var(--rule);border-radius:8px;background:var(--accent-soft);color:var(--accent-text); }
+.affiliate .you__row-copy { flex:1 1 auto;min-width:0; }
+.affiliate .you__row-label { display:block;font-size:13px;font-weight:630;line-height:1.35; }
+.affiliate .you__hint { display:block;overflow-wrap:anywhere;margin-top:3px;color:var(--quiet);font-size:11.5px;line-height:1.4; }
+.affiliate .you__go { flex:none;color:var(--accent-text);font-size:21px;line-height:1; }
+.affiliate .you__theme { flex:none;display:flex;gap:2px;margin:0;padding:2px;border:1px solid var(--rule);border-radius:8px; }
+.affiliate .you__theme-option { position:relative;cursor:pointer; }
+.affiliate .you__theme-option input { position:absolute;opacity:0;width:1px;height:1px; }
+.affiliate .you__theme-option span { display:grid;place-items:center;min-width:45px;min-height:34px;padding:5px;border-radius:6px;color:var(--quiet);font-size:11px; }
+.affiliate .you__theme-option input:checked + span { background:var(--accent-soft);color:var(--accent-text); }
+.affiliate .you__theme-option input:focus-visible + span { outline:2px solid var(--focus);outline-offset:2px; }
+.affiliate .you .sr-only { position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0; }
+.affiliate .you__signout { width:100%;min-height:47px;margin-top:2px;padding:11px;border:1px solid var(--rule);border-radius:var(--radius);background:transparent;color:var(--quiet);font-size:13px;cursor:pointer; }
+.affiliate .you__signout:hover { border-color:var(--rule-strong);color:var(--ink); }
+.affiliate .you__confirm { margin-top:10px;padding:15px;border:1px solid var(--rule);border-radius:var(--radius);background:var(--surface); }
+.affiliate .you__confirm strong { font-size:14px; }
+.affiliate .you__confirm p { margin:5px 0 0;color:var(--quiet);font-size:12.5px; }
+.affiliate .you__confirm-actions { display:flex;gap:9px;margin-top:14px; }
+.affiliate .you__stay,.affiliate .you__leave { flex:1;min-height:44px;border:1px solid var(--rule);border-radius:var(--radius);background:transparent;color:var(--ink);font-size:13px;cursor:pointer; }
+.affiliate .you__leave { border-color:var(--refused);color:var(--refused); }
 
-.affiliate .you {
-  padding-bottom: var(--tab-clearance);
+/* Secondary screens stay readable on phones and do not become excessively wide
+ * when the account overview grows into two columns on a laptop. */
+.affiliate .you__detail { width:100%;max-width:40rem;margin:0 auto;padding-bottom:var(--tab-clearance); }
+.affiliate .you__detail-card { margin-bottom:11px;padding:17px 16px; }
+.affiliate .you__detail-card h1 { margin:0 0 8px;font-size:17px;line-height:1.35;overflow-wrap:anywhere; }
+.affiliate .you__detail-card h2 { margin:0 0 7px;font-size:15px;line-height:1.4; }
+.affiliate .you__detail-card p { margin:0;color:var(--quiet);font-size:12.5px;line-height:1.55; }
+.affiliate .you__detail-card .you__detail-note { margin-top:11px; }
+.affiliate .you__eyebrow { display:block;margin-bottom:6px;color:var(--quiet);font-size:11px; }
+.affiliate .you__primary { min-height:44px;margin-top:14px;padding:10px 14px;border:1px solid var(--accent);border-radius:var(--radius);background:var(--accent);color:var(--accent-on);font-size:13px;font-weight:650;cursor:pointer; }
+.affiliate .you__detail .affiliate__reveal { min-height:40px;margin-top:8px; }
+.affiliate .you__detail .affiliate__note { margin:12px 0 2px; }
+.affiliate .you__facts { margin:9px 0 0; }
+.affiliate .you__facts div { display:flex;justify-content:space-between;gap:14px;padding:10px 0;border-bottom:1px solid var(--rule);font-size:12.5px; }
+.affiliate .you__facts div:last-child { border-bottom:0; }
+.affiliate .you__facts dt { flex:none;color:var(--quiet); }
+.affiliate .you__facts dd { min-width:0;margin:0;text-align:right;overflow-wrap:anywhere; }
+.affiliate .you__detail-foot { margin:11px 2px 0;color:var(--quiet);font-size:12px;line-height:1.5; }
+.affiliate .you__detail > .affiliate__panel { margin-bottom:11px; }
+.affiliate .you__detail--form .apply__panel { margin:0; }
+.affiliate .you__guide-intro { margin:0 2px 14px;color:var(--quiet);font-size:13px;line-height:1.5; }
+.affiliate .you__notifications .affiliate__panel { padding:0;overflow:hidden; }
+.affiliate .you__notifications .notifications__head { padding:18px 16px 13px; }
+.affiliate .you__notifications .notifications__head .panel__title { margin:0 0 5px;font-size:16px;line-height:1.35; }
+.affiliate .you__notifications .notifications__head p { margin:0;color:var(--quiet);font-size:12.5px;line-height:1.5; }
+.affiliate .you__notifications .pref--row { min-height:65px;padding:12px 16px; }
+.affiliate .you__notifications .notifications__foot { padding:14px 16px;border-top:1px solid var(--rule); }
+.affiliate .you__notifications .notifications__foot strong { font-size:13px; }
+.affiliate .you__notifications .notifications__foot p { margin:5px 0 0;color:var(--quiet);font-size:12.5px;line-height:1.5; }
+.affiliate .you__notifications .notifications__failure,.affiliate .you__notifications .notifications__loading { padding:18px 16px; }
+.affiliate .you__notifications .notifications__failure p { margin:5px 0 0;color:var(--quiet);font-size:12.5px; }
+.affiliate .you__notifications .notifications__failure button { min-height:44px;margin-top:14px; }
+
+/* A shape before the account arrives, with no invented figure or placeholder
+ * text presented as real data. */
+.affiliate .you__placeholder { display:block;height:13px;border-radius:5px;background:var(--rule);animation:you-pulse 1.4s ease-in-out infinite; }
+.affiliate .you__avatar.you__placeholder { background:var(--rule); }
+.affiliate .you__placeholder--name { width:min(190px,55vw);height:17px;margin-bottom:8px; }
+.affiliate .you__placeholder--sub { width:min(140px,45vw);height:11px; }
+.affiliate .you__placeholder--label { width:120px;height:10px;margin:0 0 10px 2px; }
+.affiliate .you--skeleton .you__card { display:grid;gap:12px;min-height:125px;padding:16px; }
+.affiliate .you__placeholder--line { width:85%; }
+@keyframes you-pulse { 50% { opacity:.5; } }
+@media (prefers-reduced-motion:reduce) { .affiliate .you__placeholder { animation:none; } }
+@media (min-width:760px) {
+  .affiliate .you__sections { display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"terms details" "payments preferences";column-gap:22px;align-items:start; }
+  .affiliate .you__section--terms { grid-area:terms; }
+  .affiliate .you__section--payments { grid-area:payments; }
+  .affiliate .you__section--details { grid-area:details; }
+  .affiliate .you__section--preferences { grid-area:preferences; }
+  .affiliate .you--skeleton .you__sections { grid-template-areas:none; }
 }
-
-.affiliate .you__hero {
-  display: flex;
-  align-items: center;
-  gap: 13px;
-}
-
-.affiliate .you__avatar {
-  display: flex;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  width: 52px;
-  height: 52px;
-  border: 1px solid var(--rule);
-  border-radius: 50%;
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-size: 20px;
-}
-
-.affiliate .you__who {
-  min-width: 0;
-}
-
-.affiliate .you__name {
-  display: block;
-  font-size: 18px;
-  /* A long name truncates rather than wrapping under the avatar, which is
-     what pushed the arrangement card down the screen on a 375px phone. */
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.affiliate .you__since {
-  display: block;
-  margin-top: 4px;
-  font-size: 13px;
-  color: var(--quiet);
-}
-
-.affiliate .you__card {
-  margin-top: 14px;
-  padding: 14px 15px;
-  border-radius: var(--radius);
-  background: var(--surface);
-}
-
-.affiliate .you__hero + .you__card {
-  margin-top: 16px;
-}
-
-.affiliate .you__card-label {
-  font-size: 13px;
-  color: var(--quiet);
-}
-
-.affiliate .you__card-line {
-  margin-top: 6px;
-  font-size: 14px;
-}
-
-.affiliate .you__card-note {
-  margin: 6px 0 0;
-  font-size: 12.5px;
-  line-height: 1.55;
-  color: var(--faint);
-}
-
-.affiliate .you__appearance {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 13px 15px;
-  font-size: 14px;
-}
-
-/* ── The rows ───────────────────────────────────────────────────────────
- *
- * One list, each row opening the one thing it names. The hint is what the
- * setting says *now*, so the common case — checking where her money goes —
- * is answered without opening anything.
- */
-.affiliate .you__rows {
-  margin-top: 14px;
-  border-radius: var(--radius);
-  background: var(--surface);
-  overflow: hidden;
-}
-
-.affiliate .you__row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  min-height: 52px;
-  padding: 14px 15px;
-  border-bottom: 1px solid var(--rule);
-  color: var(--ink);
-  font-size: 14px;
-  text-decoration: none;
-}
-
-.affiliate .you__row:last-child {
-  border-bottom: 0;
-}
-
-.affiliate .you__hint {
-  display: block;
-  margin-top: 3px;
-  font-size: 12.5px;
-  color: var(--faint);
-}
-
-.affiliate .you__go {
-  flex: none;
-  color: var(--accent);
-}
-
-/* ── The way out ────────────────────────────────────────────────────────── */
-
-.affiliate .you__signout {
-  width: 100%;
-  min-height: 48px;
-  margin-top: 14px;
-  padding: 13px;
-  border: 1px solid var(--rule);
-  border-radius: var(--radius);
-  background: transparent;
-  color: var(--quiet);
-  font-size: 14px;
-  cursor: pointer;
-}
-
-.affiliate .you__confirm {
-  margin-top: 14px;
-  padding: 15px;
-  border: 1px solid var(--rule);
-  border-radius: var(--radius);
-}
-
-.affiliate .you__confirm-question {
-  font-size: 14px;
-}
-
-.affiliate .you__confirm-actions {
-  display: flex;
-  gap: 10px;
-  margin-top: 14px;
-}
-
-.affiliate .you__stay,
-.affiliate .you__leave {
-  flex: 1;
-  min-height: 46px;
-  border: 1px solid var(--rule);
-  border-radius: var(--radius);
-  background: transparent;
-  color: var(--ink);
-  font-size: 14px;
-  cursor: pointer;
-}
-
-/* The only red button in the portal, and it ends the session rather than
-   destroying anything — outlined, never filled. */
-.affiliate .you__leave {
-  border-color: var(--refused);
-  color: var(--refused);
+@media (max-width:380px) {
+  .affiliate .you__row { padding:10px 11px;gap:8px; }
+  .affiliate .you__row-icon { flex-basis:29px;width:29px;height:29px; }
+  .affiliate .you__theme-option span { min-width:38px; }
+  .affiliate .you__hint { font-size:11px; }
 }

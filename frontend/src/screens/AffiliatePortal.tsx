@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Navigate, Route, Routes, useSearchParams } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation, useSearchParams } from "react-router-dom";
 
 import { AffiliateLayout, PortalHeader } from "../components/AffiliateLayout";
 import type { PortalContext } from "../components/AffiliateLayout";
@@ -20,10 +20,13 @@ import { MyRanking } from "./MyRanking";
 import { MyTargets } from "./MyTargets";
 import {
   MyYou,
+  YouGuide,
   YouDetails,
   YouNotifications,
   YouPayout,
+  YouSkeleton,
   YouSizes,
+  YouTerms,
 } from "./MyYou";
 import "./Apply.css";
 import "./AffiliateHome.css";
@@ -44,6 +47,9 @@ type Mine = { applied: boolean; status: string | null };
  * application". Tabs appear when there is something behind them.
  */
 export function AffiliatePortal({ session }: { session: Session }) {
+  const { pathname } = useLocation();
+  const isYouPath = pathname === "/you" || pathname.startsWith("/you/");
+  const accountClass = isYouPath ? "affiliate affiliate--account" : "affiliate";
   const [mine, setMine] = useState<Mine | null>(null);
   const [me, setMe] = useState<Me | null>(null);
   const [months, setMonths] = useState<string[]>([]);
@@ -142,8 +148,8 @@ export function AffiliatePortal({ session }: { session: Session }) {
 
   if (mine === null) {
     return (
-      <main className="affiliate" data-theme={theme}>
-        <p className="empty">Loading…</p>
+      <main className={accountClass} data-theme={theme}>
+        {isYouPath ? <>{header}<YouSkeleton /></> : <p className="empty">Loading…</p>}
       </main>
     );
   }
@@ -154,9 +160,9 @@ export function AffiliatePortal({ session }: { session: Session }) {
 
   if (me === null || month === null) {
     return (
-      <main className="affiliate" data-theme={theme}>
+      <main className={accountClass} data-theme={theme}>
         {header}
-        <p className="empty">Loading…</p>
+        {isYouPath ? <YouSkeleton /> : <p className="empty">Loading…</p>}
       </main>
     );
   }
@@ -190,7 +196,7 @@ export function AffiliatePortal({ session }: { session: Session }) {
   };
 
   return (
-    <main className="affiliate" data-theme={theme}>
+    <main className={accountClass} data-theme={theme}>
       {/*
        * True across every tab, so it sits above them rather than on one. §8:
        * *not earning, may return* - and anything they were already owed still
@@ -227,11 +233,13 @@ export function AffiliatePortal({ session }: { session: Session }) {
            * ones that were already here; what changed is that she no longer
            * scrolls past four forms to reach the fifth.
            */}
-          <Route path="you" element={<MyYou me={me} theme={theme} onTheme={setTheme} />} />
+          <Route path="you" element={<MyYou me={me} workingMonth={months[0] ?? null} theme={theme} onTheme={setTheme} />} />
+          <Route path="you/terms" element={<YouTerms me={me} workingMonth={months[0] ?? null} />} />
           <Route path="you/payout" element={<YouPayout me={me} onChanged={load} />} />
           <Route path="you/details" element={<YouDetails me={me} onChanged={load} />} />
           <Route path="you/sizes" element={<YouSizes me={me} onChanged={load} />} />
           <Route path="you/notifications" element={<YouNotifications />} />
+          <Route path="you/guide" element={<YouGuide />} />
           <Route path="policy/:id" element={<MyPolicy />} />
           <Route path="glossary" element={<Glossary />} />
           <Route path="*" element={<Navigate to="/" replace />} />

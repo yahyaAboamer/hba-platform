@@ -68,7 +68,7 @@ export function MyPayout({
 }: {
   current: Masked;
   required: Record<string, string[]>;
-  onChanged: () => void;
+  onChanged: () => void | Promise<void>;
   onCancel: () => void;
 }) {
   const [method, setMethod] = useState<Method>(
@@ -76,6 +76,7 @@ export function MyPayout({
   );
   const [fields, setFields] = useState<Record<string, string>>({});
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
@@ -95,7 +96,7 @@ export function MyPayout({
         method,
         ...fields,
       });
-      onChanged();
+      await onChanged();
     } catch (caught) {
       setError(
         caught instanceof Error ? caught.message : "Could not change that.",
@@ -193,6 +194,8 @@ export function MyPayout({
                   <input
                     className="input"
                     value={fields[field] ?? ""}
+                    type={field.endsWith("phone") ? "tel" : "text"}
+                    inputMode={field.endsWith("phone") || field === "bank_account_number" ? "numeric" : undefined}
                     onChange={(event) =>
                       setFields((was) => ({ ...was, [field]: event.target.value }))
                     }
@@ -255,13 +258,16 @@ export function MyPayout({
             <span className="field__label">Enter your password to confirm</span>
             <input
               className="input"
-              type="password"
+              type={showPassword ? "text" : "password"}
               autoComplete="current-password"
               required
               value={password}
               onChange={(event) => setPassword(event.target.value)}
             />
           </label>
+          <button type="button" className="payout__show-password" onClick={() => setShowPassword((was) => !was)}>
+            {showPassword ? "Hide password" : "Show password"}
+          </button>
 
           <div className="apply__actions">
             <button

@@ -125,15 +125,17 @@ export function PortalHeader({
 
   const secondaryTitles: Record<string,string> = {
     "/you": "You",
+    "/you/terms": "Your terms",
     "/earnings": "How this adds up",
     /* The export titles this screen **Payments** and calls the row that
        opens it *Payment history* - the row says what she will find, the
        screen says where she is. Ours said *Payment history* twice. */
     "/payments": "Payments",
-    "/you/payout": "Payment details",
-    "/you/details": "Personal and contact details",
+    "/you/payout": "Where you are paid",
+    "/you/details": "Contact & delivery",
     "/you/sizes": "Height and weight",
     "/you/notifications": "Notifications",
+    "/you/guide": "Dashboard guide",
     "/glossary": "Help",
     "/best": "All products sold",
   };

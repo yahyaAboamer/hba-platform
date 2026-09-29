@@ -7,6 +7,12 @@
   padding: var(--space-6) var(--space-5) var(--space-8);
 }
 
+/* The account groups into two columns on a wide screen. Its linked editors
+ * still cap their own reading width in MyYou.css. */
+@media (min-width: 760px) {
+  .affiliate--account { max-width: 56rem; }
+}
+
 .affiliate__panel {
   padding: var(--space-5);
 }

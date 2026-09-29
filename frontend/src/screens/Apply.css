@@ -230,7 +230,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 7px 12px;
+  min-height: 44px;
+  padding: 9px 10px;
   border: 0;
   background: none;
   color: var(--ink);
@@ -246,4 +247,15 @@
 .payout__seg [aria-checked="true"] {
   color: var(--accent);
   box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.payout__show-password {
+  min-height: 40px;
+  margin-top: 4px;
+  padding: 6px 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent-text);
+  font-size: var(--text-xs);
+  cursor: pointer;
 }
