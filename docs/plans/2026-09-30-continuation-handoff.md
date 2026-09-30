@@ -1,6 +1,17 @@
 # Where the work is — 30 September 2026 (data reset, batches Q1–Q3, Settings audit S1–S4)
 
-## Latest: the Settings audit (30 September, evening) — **local, not merged**
+## Latest: the Settings audit (30 September, evening) — **released**
+
+| | |
+|---|---|
+| **Commit** | `9639497` on `repair/batch-2`, fast-forwarded to `origin/main` and `origin/production` on the owner's order (30 September, 20:48 Cairo) |
+| **Deploys** | staging `hba-platform-staging` and production `hba-platform` SUCCESS; migration `a6b1c4e20006 -> b7c2d5e30007` ran on both (deploy logs); `/api/health/ready` 200 on both |
+| **`GO_LIVE_MONTH`** | **`2026-10` on both** (was staging `2026-08`, production `2026-09`), set on Railway and read back; both redeployed SUCCESS |
+| **Checks before the change** | One read-only query each (`default_transaction_read_only=on`): production and staging had no approved payroll month and no payment; production no model; **no admin invitation ever sent or resent by a non-admin**; the only staff account on each is the owner's admin. The audit log only reaches back to the 29 September reset. |
+
+Months before October 2026 are now settled outside the platform on both
+environments. `b7c2d5e30007` was rehearsed up/down/up on a throwaway database,
+not on a restored copy (owner's order to release).
 
 The audit is `docs/design/admin-settings-tab-audit-2026-09-30.html` (untracked,
 with its screenshots). The owner approved the design, then (same evening):
@@ -40,11 +51,8 @@ register/change-code form and routes are removed (ADR 0053).
   browser pass on a throwaway database at 1280 and 390, light and dark, as
   admin, content manager and affiliate manager. ECC Python and React
   reviewers ran; every finding above low was fixed with a test.
-- **Not done:** go-live to October 2026 (an environment variable change on
-  Railway, waiting on the owner's word for which environments); policy
-  versions editable before their month (D4) — needs its own ADR because
-  `policy_version` is append-only; the read-only production check for past
-  admin invitations by non-admins (D1).
+- **Not done:** policy versions editable before their month (D4) — needs its own ADR because
+  `policy_version` is append-only.
 - **New migration for the release gates:** `b7c2d5e30007` (one nullable
   column) joins the list to rehearse.
 - **Throwaway databases** `hba_browser_settings` and

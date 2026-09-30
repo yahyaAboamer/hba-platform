@@ -126,7 +126,7 @@ Treat context as a budget.
 - Use `.venv/Scripts/python.exe`, not bare `python`, for project Python commands.
 - Disposable test Postgres is Docker Compose on port **5433**.
 - Native PG18 on 5432 is a different server.
-- `GO_LIVE_MONTH` differs by environment: staging `2026-08`, production `2026-09`; never assume one while operating in the other.
+- `GO_LIVE_MONTH` is `2026-10` on both staging and production since 30 September 2026 (owner's order; it was `2026-08` / `2026-09`). Read it back from Railway before relying on it.
 - Staging DB access uses Railway SSH; its `DATABASE_URL` host resolves only inside Railway’s network.
 - **Railway:** the project is `hba-platform` in the **`HBA_Server`** workspace (not the personal
   `yahyaaboamer's Projects`, which is empty). A Railway connector or token that sees only the
