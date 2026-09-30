@@ -12,16 +12,18 @@ Re-read the remote before describing it (`git ls-remote --heads origin main prod
 
 | | |
 |---|---|
-| **Branch** | `repair/batch-2`, local commits `1c791fd` (Q1), `8e346b8` (Q2), and the Q3 commit that carries this file |
-| **`origin/repair/batch-2`** | `ca03559` — Q1–Q3 are **not pushed** |
-| **`origin/main`** (staging) | `4be2ae4` |
-| **`origin/production`** | `4be2ae4` — fast-forwarded from `156e65b` on 29 September **on the owner's explicit order**; Railway deploy succeeded, `/api/health/ready` 200, migration head there `f4a2b8d10005` |
-| **Migration head (local)** | `a6b1c4e20006` (ADR 0052) ← `f4a2b8d10005`; up/down/up rehearsed on a throwaway database, and the downgrade refuses while any profile is `declined` |
+| **Branch** | `repair/batch-2` at `c015066` (Q1 `1c791fd`, Q2 `8e346b8`, Q3 `c015066`), plus this handoff correction |
+| **`origin/main`** (staging) | `c015066` — pushed and merged 30 September on the owner's order |
+| **`origin/production`** | `c015066` — merged 30 September on the owner's explicit order (it was fast-forwarded to `4be2ae4` on 29 September) |
+| **Deploys** | Railway staging `hba-platform-staging` and production `hba-platform` both **SUCCESS on `c015066`** (30 September 13:46 Cairo); `/api/health/ready` 200 on both |
+| **Migration head, both databases** | `a6b1c4e20006` (ADR 0052), read back from each; the status check accepts `declined`; no guard trigger disabled; 0 model profiles |
 | **Backend** | **89/89 files** through `run-suite.sh` at the final Q3 code (label `q3-final2`) |
 | **Frontend** | 560 tests across 34 files; `npm run build` green |
 
-Nothing from Q1–Q3 is on staging or production. Merge and deploy are separate
-permissions; neither has been given for these batches.
+**A release gate was skipped by the owner's order:** `a6b1c4e20006` was
+rehearsed up/down/up on a throwaway database, not on a restored copy of real
+data, before production. Both databases were empty when it ran, so the risk was
+low. Staging acceptance of the Models tab by the owner is still to happen.
 
 ## 29 September: both environments emptied (owner's order)
 
@@ -105,11 +107,12 @@ fixed with a test. The one low left open is below.
 
 ## Remaining, in order
 
-1. **Owner review, then authorization** to push `repair/batch-2` and merge to
-   `main` (staging). Production is a separate order.
-2. **Release gate for `a6b1c4e20006`:** rehearse up/down on a restored copy,
-   like the other listed migrations. Staging and production are empty now, so
-   the data risk is low, but the rehearsal is still the gate.
+1. **Owner acceptance on staging** of the Models tab: list, Needs you, a
+   model's page (Her details, Where to pay her, Activity), pause/archive,
+   decline/reconsider, erase, and pay terms ahead. Not browser-checked on
+   staging by this session (the Jev browser did not connect; staging was empty).
+2. **`a6b1c4e20006` on a restored copy** was skipped by order (above). If a
+   restored copy is ever rehearsed for the other gates, include it.
 3. **Admin sidebar at phone width** (pre-existing, not Q3): at 390px
    `layout__sidebar` is 521px wide and every admin page scrolls sideways by
    131px. The admin is designed for 1280/1440; fix or accept it deliberately.
