@@ -900,3 +900,50 @@ def test_a_rate_change_cannot_disturb_an_approved_month(db):
 
     assert "2026-09" in str(refused.value)
     assert terms.end_month is None, "nothing may be left half-changed"
+
+
+# ── A rewrite keeps what it was not asked to change ────────────────────────────
+
+
+def test_rewriting_the_history_keeps_an_unmentioned_customer_discount(db):
+    """The terms screen never sends the expected customer discount.
+
+    Every save rewrites the whole history, so a value set any other way was
+    wiped by the next change of rate. Not mentioning it now keeps it; saying
+    it explicitly, even as nothing, still replaces it.
+    """
+    from app.services.compensation import all_terms, replace_pay_history
+
+    nour = _affiliate(db)
+    set_terms(
+        db,
+        nour,
+        start_month="2026-03",
+        end_month=None,
+        compensation_type=CompensationType.COMMISSION,
+        commission_rate_bp=1000,
+        expected_customer_discount_bp=1500,
+    )
+    db.flush()
+
+    replace_pay_history(
+        db,
+        nour,
+        [{"start_month": "2026-03", "end_month": None,
+          "compensation_type": "commission", "commission_rate_bp": 1200}],
+    )
+    db.flush()
+    (kept,) = all_terms(db, nour)
+    assert kept.commission_rate_bp == 1200
+    assert kept.expected_customer_discount_bp == 1500
+
+    replace_pay_history(
+        db,
+        nour,
+        [{"start_month": "2026-03", "end_month": None,
+          "compensation_type": "commission", "commission_rate_bp": 1200,
+          "expected_customer_discount_bp": None}],
+    )
+    db.flush()
+    (cleared,) = all_terms(db, nour)
+    assert cleared.expected_customer_discount_bp is None

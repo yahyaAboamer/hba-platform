@@ -976,6 +976,19 @@ class PayHistoryPeriodBody(BaseModel):
     expected_customer_discount_bp: int | None = None
 
 
+def _period_as_sent(period: PayHistoryPeriodBody) -> dict:
+    """The period, without a discount the client never mentioned.
+
+    `model_dump` fills every default, so an omitted discount arrived as an
+    explicit `None` and wiped the stored one on each save - the terms screen
+    never sends it. Absent now means *unchanged* (`replace_pay_history`).
+    """
+    raw = period.model_dump()
+    if "expected_customer_discount_bp" not in period.model_fields_set:
+        del raw["expected_customer_discount_bp"]
+    return raw
+
+
 class PayHistoryBody(BaseModel):
     """A model's whole pay history, as one act.
 
@@ -1139,7 +1152,7 @@ def set_pay_history_route(
         replace_pay_history(
             db,
             affiliate,
-            [period.model_dump() for period in body.periods],
+            [_period_as_sent(period) for period in body.periods],
             actor_id=actor.id,
             actor_email=actor.email,
         )

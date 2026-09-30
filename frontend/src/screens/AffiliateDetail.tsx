@@ -376,6 +376,12 @@ export function AffiliateDetail({ session }: { session: Session }) {
   if (!detail) return <p className="empty">Loading…</p>;
 
   const verified = detail.codes.some((entry) => entry.verified);
+  // Never paid and never asked for content: the model-only setup steps and
+  // payment wording do not apply to it.
+  const house = detail.account_kind === "house";
+  // Any month with a number asked for. The step used to have no done state
+  // at all, so it read as outstanding however long ago targets were set.
+  const targetsSet = record?.targets.some((row) => row.required_videos !== null) ?? false;
   /**
    * The code she sells under **now** — the open-ended one, or the last
    * registered if every period has closed. A hero that listed every code she
@@ -546,15 +552,18 @@ export function AffiliateDetail({ session }: { session: Session }) {
                 </dd>
               </div>
               {/* Masked, as it is everywhere else (ADR 0028). Recognising the
-                  account is all this row has to do. */}
-              <div>
-                <dt>Paid to</dt>
-                <dd>
-                  {detail.payout_destination === null && detail.payout_abroad
-                    ? "Outside Egypt — arranged directly"
-                    : describeDestination(detail.payout_destination)}
-                </dd>
-              </div>
+                  account is all this row has to do. A house account is never
+                  paid, so it has no such row. */}
+              {!house && (
+                <div>
+                  <dt>Paid to</dt>
+                  <dd>
+                    {detail.payout_destination === null && detail.payout_abroad
+                      ? "Outside Egypt — arranged directly"
+                      : describeDestination(detail.payout_destination)}
+                  </dd>
+                </div>
+              )}
             </dl>
           </section>
 
@@ -593,6 +602,9 @@ export function AffiliateDetail({ session }: { session: Session }) {
               )}
             </li>
 
+            {/* A house account is never paid and records no content, so only
+                the code check applies to it. */}
+            {!house && (
             <li className={detail.compensation ? "detail__step--done" : undefined}>
               <div>
                 <strong>Set what {detail.name} is paid</strong>
@@ -606,12 +618,16 @@ export function AffiliateDetail({ session }: { session: Session }) {
                 {detail.compensation ? "Change it" : "Set it"}
               </Link>
             </li>
+            )}
 
-            <li>
+            {!house && (
+            <li className={targetsSet ? "detail__step--done" : undefined}>
               <div>
                 <strong>Set the targets</strong>
                 <span className="detail__note">
-                  {detail.compensation?.compensation_type === "base_guarantee" ? (
+                  {targetsSet ? (
+                    "Targets are recorded."
+                  ) : detail.compensation?.compensation_type === "base_guarantee" ? (
                     <>
                       The{" "}
                       <Link
@@ -637,9 +653,10 @@ export function AffiliateDetail({ session }: { session: Session }) {
                 </span>
               </div>
               <Link className="button" to="/targets">
-                Open targets
+                {targetsSet ? "Change them" : "Open targets"}
               </Link>
             </li>
+            )}
           </ol>
           </section>
 
@@ -864,7 +881,9 @@ export function AffiliateDetail({ session }: { session: Session }) {
           <h2 className="pay-detail__card-title">Discount codes</h2>
           {detail.codes.length === 0 ? (
             <p className="empty">
-              None registered for {formatMonth(detail.current_month)}.
+              {/* `codes` describe `terms_month`, the month being looked at -
+                  naming the working month here contradicted the list. */}
+              None registered for {formatMonth(detail.terms_month)}.
             </p>
           ) : (
             <ul className="detail__codes">
@@ -1077,6 +1096,10 @@ export function AffiliateDetail({ session }: { session: Session }) {
               <p className="pay-detail__missing">
                 {detail.name} is paid outside Egypt. Arrange it with her directly,
                 or set a destination here once she has one.
+              </p>
+            ) : detail.payout_destination === null && house ? (
+              <p className="pay-detail__missing">
+                {detail.name} is a house account and is never paid.
               </p>
             ) : detail.payout_destination === null ? (
               <p className="pay-detail__missing">

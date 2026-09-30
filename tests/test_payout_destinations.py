@@ -865,3 +865,30 @@ def test_a_wallet_records_which_wallet(db):
     assert destination.wallet_provider == "Vodafone Cash"
     # Not a credential - it names a company, so it is shown in full.
     assert mask_destination(destination)["wallet_provider"] == "Vodafone Cash"
+
+
+def test_only_the_chosen_methods_fields_are_stored(db):
+    """A form that switched method once sent the abandoned fields as well.
+
+    The admin's correction screen kept a bank number typed before switching to
+    a wallet, and every field it was given was written. The row must describe
+    one destination, whatever the caller sends.
+    """
+    nour = _affiliate(db)
+    destination = set_destination(
+        db,
+        nour,
+        method=PayoutMethod.WALLET,
+        wallet_provider="Vodafone Cash",
+        wallet_phone="01001234567",
+        bank_name="CIB",
+        bank_account_number=ACCOUNT_NUMBER,
+        instapay_address_url=INSTAPAY_URL,
+    )
+    db.flush()
+
+    assert destination.wallet_provider == "Vodafone Cash"
+    assert destination.wallet_phone == "01001234567"
+    assert destination.bank_name is None
+    assert destination.bank_account_number is None
+    assert destination.instapay_address_url is None

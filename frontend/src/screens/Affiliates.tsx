@@ -91,15 +91,36 @@ export type Affiliate = {
 };
 
 /** An invitation nobody has opened yet. Not a model, and still ours. */
-type Invited = {
+export type Invited = {
   id: number;
   email: string;
-  expires_at: string;
+  expires_at?: string;
   expired: boolean;
   /** Cancelled on purpose, as opposed to simply lapsed. */
   withdrawn: boolean;
   created_at: string;
 };
+
+/**
+ * One invitation per person: the live one, else the newest.
+ *
+ * Resending issues a new invitation and lapses the old one, so the server
+ * returns both. Listing both showed one address as *Link expired* and
+ * *Awaiting application* at once, and counted her twice.
+ */
+export function onePerAddress(rows: Invited[]): Invited[] {
+  const kept = new Map<string, Invited>();
+  for (const row of rows) {
+    const key = row.email.trim().toLowerCase();
+    const held = kept.get(key);
+    const live = !row.expired && !row.withdrawn;
+    const heldLive = held && !held.expired && !held.withdrawn;
+    if (!held || (live && !heldLive) || (live === heldLive && row.created_at > held.created_at)) {
+      kept.set(key, row);
+    }
+  }
+  return [...kept.values()];
+}
 
 /**
  * When an invitation went out, as the export writes it: the date in full,
@@ -231,7 +252,6 @@ export function Affiliates() {
   const [rows, setRows] = useState<Affiliate[] | null>(null);
   const [invited, setInvited] = useState<Invited[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [includeArchived, setIncludeArchived] = useState(false);
   /**
    * The approved roster filters and search.
    *
@@ -285,30 +305,33 @@ export function Affiliates() {
   // does not fit there (§12.3's point), with no switch between them (D).
   const shown: View = isNarrow ? "cards" : "table";
   const visible = rows ? rosterMatches(rows, segment, query) : [];
-  // Archived is a segment now rather than a checkbox, so asking for it is what
-  // fetches it. Keeping both controls would let them contradict each other.
+  // A new filter or a new search starts at the first page. Resetting on the
+  // filter alone let a search typed on page 2 narrow the list to one page and
+  // leave an empty table with no pager to get back.
   useEffect(() => {
-    setIncludeArchived(segment === "inactive");
     setPage(0);
-  }, [segment]);
+  }, [segment, query]);
   // The column header names the month it is showing, so a figure can never be
   // read as "this month" when the list is answering for another one.
   // *Sept sales*, as the export's `monthShort` writes it. The full month
   // name does not fit a 130px uppercase header and ran into the next column.
   const monthShort = rows?.[0]?.month ? shortMonth(rows[0].month) : "Month";
 
+  // Archived models are always fetched. Fetching them only when Inactive was
+  // chosen made that chip's count jump the moment it was pressed; the
+  // segments already sort rows by status, so nobody else sees them.
   const reload = useCallback(() => {
     setError(null);
     api
       .get<{ affiliates: Affiliate[]; invited: Invited[] }>(
-        `/api/affiliates?include_archived=${includeArchived}`,
+        "/api/affiliates?include_archived=true",
       )
       .then((body) => {
         setRows(body.affiliates);
-        setInvited(body.invited ?? []);
+        setInvited(onePerAddress(body.invited ?? []));
       })
       .catch((caught) => setError(caught.message));
-  }, [includeArchived]);
+  }, []);
 
   useEffect(reload, [reload]);
 
@@ -414,7 +437,8 @@ export function Affiliates() {
         </p>
       )}
 
-      {rows === null && <p className="empty">Loading…</p>}
+      {/* Not while the error above is showing: a failed load is not still loading. */}
+      {rows === null && !error && <p className="empty">Loading…</p>}
 
       {rows !== null && segment === "invitations" && (
         <div className="surface">

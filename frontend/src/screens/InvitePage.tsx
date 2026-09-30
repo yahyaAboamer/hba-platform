@@ -1,19 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
-import { api } from "../lib/api";
-import { formatSentAt } from "./Affiliates";
+import { api, can, type Session } from "../lib/api";
+import { formatSentAt, onePerAddress, type Invited } from "./Affiliates";
 import "./InvitePage.css";
-
-/** An invitation nobody has opened yet. Not a model, and still ours. */
-type Invited = {
-  id: number;
-  email: string;
-  expired: boolean;
-  /** Cancelled on purpose, as opposed to simply lapsed. */
-  withdrawn: boolean;
-  created_at: string;
-};
 
 /** Only the fields this screen reads. The roster's payload is much wider. */
 type Applicant = {
@@ -44,7 +34,11 @@ type Applicant = {
  * free of anything deciding what they are paid, so approving them — and
  * setting their rate — stays a separate, deliberate act.
  */
-export function InvitePage() {
+export function InvitePage({ session }: { session: Session }) {
+  // A content manager may read this page but the server refuses every send,
+  // resend and withdraw from her: offer none of them rather than three
+  // buttons that each end in a refusal.
+  const mayInvite = can(session, "invitations.send");
   const [query] = useSearchParams();
   const opened = query.get("email");
   const [email, setEmail] = useState("");
@@ -62,7 +56,7 @@ export function InvitePage() {
       .get<{ affiliates: Applicant[]; invited: Invited[] }>("/api/affiliates")
       .then((body) => {
         setApplicants(body.affiliates.filter((row) => row.status === "pending"));
-        setInvited(body.invited ?? []);
+        setInvited(onePerAddress(body.invited ?? []));
       })
       .catch((caught) => setProblem(caught.message));
   }, []);
@@ -121,17 +115,40 @@ export function InvitePage() {
    * the build, and rightly: a path assembled from a variable is a path no
    * test can check against the routes that exist.
    */
-  function act(id: number, what: "resend" | "revoke") {
-    const call =
-      what === "resend"
-        ? api.post(`/api/staff/invitations/${id}/resend`)
-        : api.post(`/api/staff/invitations/${id}/revoke`);
-    call.then(reload).catch((caught) => setProblem(caught.message));
+  function act(row: Invited, what: "resend" | "revoke") {
+    setProblem(null);
+    if (what === "revoke") {
+      // Withdrawing kills a link somebody may be about to open, and it
+      // cannot be undone - only replaced by a new invitation.
+      if (!window.confirm(`Withdraw the invitation to ${row.email}? The link stops working.`)) return;
+      api
+        .post(`/api/staff/invitations/${row.id}/revoke`)
+        .then(reload)
+        .catch((caught) => setProblem(caught.message));
+      return;
+    }
+    // A resend is a new link, shown the way a new invitation's is. The server
+    // always returned it; this screen used to drop it, so with email off a
+    // resent link could not be delivered at all.
+    setLink(null);
+    setCopied(false);
+    api
+      .post<{ link: string; emailed: boolean }>(`/api/staff/invitations/${row.id}/resend`)
+      .then((result) => {
+        setEmailed(result.emailed);
+        setSentTo(row.email);
+        setLink(result.link);
+        reload();
+      })
+      .catch((caught) => setProblem(caught.message));
   }
 
   // Resending issues a new invitation and lapses the old one, so one address
   // can have two rows: the live one is the invitation, else the newest.
-  const sameAddress = invited.filter((row) => row.email === opened);
+  // Case-blind, as `onePerAddress` is, so the row it kept is the row found.
+  const sameAddress = invited.filter(
+    (row) => row.email.toLowerCase() === (opened ?? "").toLowerCase(),
+  );
   const openedId = (sameAddress.find((row) => !row.expired && !row.withdrawn) ?? sameAddress[0])?.id;
 
   return (
@@ -150,6 +167,13 @@ export function InvitePage() {
           Invite a model and manage outstanding links
         </p>
 
+        {!mayInvite && (
+          <p className="invite-page__hint">
+            You can see who has been invited. Sending, resending and
+            withdrawing invitations is for an administrator or affiliate manager.
+          </p>
+        )}
+        {mayInvite && (
         <form className="invite-page__form" onSubmit={send}>
           <input
             className="input"
@@ -168,6 +192,7 @@ export function InvitePage() {
             {working ? "Sending…" : "Send invitation"}
           </button>
         </form>
+        )}
 
         {/* This is what they sign in with, so it has to be the address they
             actually read. */}
@@ -277,14 +302,16 @@ export function InvitePage() {
                 {/* Resend always - *Send a new link* where the old one no
                     longer works, as the export says; withdraw only where it
                     can still do anything. */}
-                <button type="button" className="button button--row" onClick={() => act(row.id, "resend")}>
-                  {row.expired || row.withdrawn ? "Send a new link" : "Resend"}
-                </button>
-                {!row.expired && !row.withdrawn && (
+                {mayInvite && (
+                  <button type="button" className="button button--row" onClick={() => act(row, "resend")}>
+                    {row.expired || row.withdrawn ? "Send a new link" : "Resend"}
+                  </button>
+                )}
+                {mayInvite && !row.expired && !row.withdrawn && (
                   <button
                     type="button"
                     className="button button--row invite-page__withdraw"
-                    onClick={() => act(row.id, "revoke")}
+                    onClick={() => act(row, "revoke")}
                   >
                     Withdraw
                   </button>

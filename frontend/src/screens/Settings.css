@@ -560,6 +560,22 @@
   color: var(--text);
 }
 
+/* The second press before historical months are approved. Bordered like the
+   locked note, because it too is something to read before acting. */
+.settings__confirm {
+  margin-top: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+}
+.settings__confirm .settings__note { margin-top: 0; }
+.settings__confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
 /* The export's Connection card (`syncCreds`): a label at 12.5px muted above
    each field, fields 42px on the page ground, and *Update connection* as an
    outlined button. */

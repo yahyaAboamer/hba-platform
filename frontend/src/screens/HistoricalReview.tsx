@@ -85,6 +85,7 @@ export function HistoricalReview({ session }: { session: Session }) {
   const [error, setError] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const [confirming, setConfirming] = useState(false);
   const allowed = can(session, "payroll.approve");
 
   useEffect(() => {
@@ -144,17 +145,38 @@ export function HistoricalReview({ session }: { session: Session }) {
         </p>
       )}
 
-      {done === undefined && ready > 0 && allowed && body.finalisation_unlocked !== false && (
+      {done === undefined && ready > 0 && allowed && body.finalisation_unlocked !== false && !confirming && (
         <button
           type="button"
           className="button button--primary"
           disabled={working}
-          onClick={finalise}
+          onClick={() => setConfirming(true)}
         >
-          {working
-            ? "Finalising…"
-            : `Review months from ${formatMonth(body.from_month ?? body.working_month)}`}
+          {`Review months from ${formatMonth(body.from_month ?? body.working_month)}`}
         </button>
+      )}
+      {/* The export's label says *review*, and the act approves: months it
+          touches become final and are paid from. So the press that does it is
+          a second one, after the consequence is written out. */}
+      {done === undefined && ready > 0 && allowed && body.finalisation_unlocked !== false && confirming && (
+        <div className="settings__confirm" role="group" aria-label="Confirm approving these months">
+          <p className="settings__note">
+            <strong>
+              This approves {ready} month{ready === 1 ? "" : "s"} from{" "}
+              {formatMonth(body.from_month ?? body.working_month)}.
+            </strong>{" "}
+            Approved months are final: they cannot be changed afterwards, and
+            payments are worked out from them.
+          </p>
+          <div className="settings__confirm-actions">
+            <button type="button" className="button" disabled={working} onClick={() => setConfirming(false)}>
+              Cancel
+            </button>
+            <button type="button" className="button button--primary" disabled={working} onClick={finalise}>
+              {working ? "Approving…" : `Approve ${ready} month${ready === 1 ? "" : "s"}`}
+            </button>
+          </div>
+        </div>
       )}
       {/* The result line, written by the server - it says what was done to
           somebody's money, so it is not restated here. The export shows it in

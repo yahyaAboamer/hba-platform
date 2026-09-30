@@ -140,8 +140,9 @@ def assert_correctable(db: Session, terms, *, new_end_month: str | None = "") ->
         raise ValueError(
             "These terms were used to calculate an approved month "
             f"({', '.join(sorted(covered))}). Correcting them now would change "
-            "what that month was worth after it was agreed. Reopen the month "
-            "first - it requires a written reason."
+            "what that month was worth after it was agreed. An approved month "
+            "is final: change the terms from the next open month, and settle "
+            "any difference for this one as a correction on her Payments."
         )
 
 
@@ -491,9 +492,9 @@ def _refuse_to_move_an_approved_month(
     raise ValueError(
         f"{months} {'is' if one else 'are'} already approved, and this would "
         f"change what {'it was' if one else 'they were'} calculated from - "
-        "after the figure was agreed and possibly paid. Reopen "
-        f"{'that month' if one else 'those months'} first; it requires a "
-        "written reason."
+        "after the figure was agreed and possibly paid. Approved months are "
+        "final: leave them out of this change, and settle any difference as a "
+        "correction on her Payments."
     )
 
 
@@ -530,17 +531,32 @@ def replace_pay_history(
     `_refuse_to_move_an_approved_month`, which states that as *the answer does
     not move* rather than *the row does not change*.
     """
+    held = all_terms(db, affiliate)
     prepared: list[dict] = []
     for raw in periods:
         compensation_type = raw.get("compensation_type")
         commission_rate_bp = raw.get("commission_rate_bp")
         fixed = raw.get("fixed_amount_piastres")
         base = raw.get("base_amount_piastres")
-        discount = raw.get("expected_customer_discount_bp")
-        validate_terms(compensation_type, commission_rate_bp, fixed, base, discount)
         start_month, end_month = validate_period(
             raw.get("start_month"), raw.get("end_month", OPEN_ENDED)
         )
+        # A caller that does not mention the discount has not asked to change
+        # it. The terms screen never sends it, so every save used to wipe the
+        # stored value; it is kept from whatever covered this start month.
+        if "expected_customer_discount_bp" in raw:
+            discount = raw["expected_customer_discount_bp"]
+        else:
+            discount = next(
+                (
+                    row.expected_customer_discount_bp
+                    for row in held
+                    if row.start_month <= start_month
+                    and (row.end_month is None or start_month <= row.end_month)
+                ),
+                None,
+            )
+        validate_terms(compensation_type, commission_rate_bp, fixed, base, discount)
         prepared.append(
             {
                 "start_month": start_month,

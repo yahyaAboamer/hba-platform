@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { api } from "../lib/api";
-import { PAYOUT_FIELD_LABEL } from "../lib/payouts";
+import { PAYOUT_FIELD_LABEL, WALLET_PROVIDERS } from "../lib/payouts";
 import type { Affiliate } from "./Affiliates";
 import { instapayProblem } from "./Apply";
 import "./Payroll.css";
@@ -84,15 +84,13 @@ export function AffiliatePayout() {
     setWorking(true);
     setError(null);
     try {
-      await api.put(`/api/affiliates/${id}/payout-destination`, {
-        method,
-        instapay_address_url: fields.instapay_address_url ?? null,
-        instapay_phone: fields.instapay_phone ?? null,
-        bank_name: fields.bank_name ?? null,
-        bank_account_holder: fields.bank_account_holder ?? null,
-        bank_account_number: fields.bank_account_number ?? null,
-        wallet_phone: fields.wallet_phone ?? null,
-      });
+      // Exactly the chosen method's fields, from the same map the form was
+      // drawn from. Listing them by hand is how `wallet_provider` went
+      // missing, and how a bank number typed before switching to InstaPay
+      // was saved alongside it.
+      const body: Record<string, string | null> = { method };
+      for (const field of needed) body[field] = (fields[field] ?? "").trim();
+      await api.put(`/api/affiliates/${id}/payout-destination`, body);
       navigate(`/affiliates/${id}`);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not save that.");
@@ -166,7 +164,11 @@ export function AffiliatePayout() {
                 type="radio"
                 name="method"
                 checked={method === option}
-                onChange={() => setMethod(option)}
+                onChange={() => {
+                  // A different method's fields are not this one's: start clean.
+                  setMethod(option);
+                  setFields({});
+                }}
               />
               <span className="pay__option-body">
                 <strong>{METHOD_LABEL[option]}</strong>
@@ -178,14 +180,33 @@ export function AffiliatePayout() {
         {needed.map((field) => (
           <label key={field} className="field comp__field">
             <span className="field__label">{FIELD_LABEL[field] ?? field}</span>
-            <input
-              className="input"
-              value={fields[field] ?? ""}
-              onChange={(event) =>
-                setFields({ ...fields, [field]: event.target.value })
-              }
-              required
-            />
+            {field === "wallet_provider" ? (
+              // The same four wallets the model chooses from (MyPayout, Apply).
+              <select
+                className="input"
+                value={fields[field] ?? ""}
+                onChange={(event) =>
+                  setFields({ ...fields, [field]: event.target.value })
+                }
+                required
+              >
+                <option value="">Choose the wallet</option>
+                {WALLET_PROVIDERS.map((provider) => (
+                  <option key={provider} value={provider}>
+                    {provider}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                className="input"
+                value={fields[field] ?? ""}
+                onChange={(event) =>
+                  setFields({ ...fields, [field]: event.target.value })
+                }
+                required
+              />
+            )}
             {field === "instapay_address_url" && addressProblem && (
               <span className="blocker">{addressProblem}</span>
             )}

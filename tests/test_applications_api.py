@@ -291,3 +291,24 @@ def test_applying_from_abroad_over_http(admin):
     detail = admin.get(f"/api/affiliates/{created.json()['id']}").json()
     assert detail["payout_abroad"] is True
     assert detail["payout_destination"] is None
+
+
+def test_applying_with_a_code_somebody_else_holds_is_refused_plainly(admin):
+    """A code already registered to another model is a clear refusal, not a 500.
+
+    Registering it collides with the database constraint that stops two people
+    owning one code at once. The route only translated `ValueError`, so the
+    collision escaped as a server error and the model saw nothing she could act
+    on. Nothing from the refused application may be kept.
+    """
+    first = _accept(_invite(admin, "nour@example.com"), "Nour")
+    assert first.post("/api/applications", json=APPLICATION).status_code == 201
+
+    second = _accept(_invite(admin, "salma@example.com"), "Salma")
+    response = second.post(
+        "/api/applications", json={**APPLICATION, "name": "Salma Youssef"}
+    )
+
+    assert response.status_code == 409, response.text
+    assert "NOUR10" in response.json()["detail"]
+    assert second.get("/api/applications/mine").json()["applied"] is False

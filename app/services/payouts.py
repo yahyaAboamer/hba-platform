@@ -319,6 +319,13 @@ def set_destination(
         "bank_account_number": bank_account_number,
         "wallet_phone": wallet_phone,
     }
+    # Only this method's fields are kept. A form that switched from bank to
+    # InstaPay once sent the abandoned account number too, and it was stored
+    # beside the InstaPay row as if it were part of it.
+    fields = {
+        name: (value if name in PAYABLE_FIELDS[method] else None)
+        for name, value in fields.items()
+    }
 
     required = _REQUIRED_FIELD[method]
     if not (fields[required] or "").strip():

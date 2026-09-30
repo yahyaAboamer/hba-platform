@@ -1597,7 +1597,9 @@ def test_a_rate_an_approved_month_was_calculated_from_cannot_be_rewritten(
 
     assert response.status_code == 400
     assert "2026-08" in response.json()["detail"]
-    assert "Reopen" in response.json()["detail"]
+    # Reopening was retired (05B); the refusal names what to do instead.
+    assert "correction" in response.json()["detail"]
+    assert "Reopen" not in response.json()["detail"]
 
 
 def test_a_guarantee_month_before_go_live_carries_its_outcome(client, _go_live):
@@ -2228,3 +2230,48 @@ def test_only_staff_who_manage_models_can_save_the_form(client):
     response = client.patch(f"/api/affiliates/{sara['id']}", json={"name": "Changed"})
 
     assert response.status_code == 403
+
+
+def test_saving_terms_without_a_discount_keeps_the_stored_one(client):
+    """The terms screen never sends the expected customer discount.
+
+    The route used to dump every default, so leaving it out arrived as an
+    explicit nothing and wiped the stored value on each save. Absent now means
+    unchanged; sending it, even as null, still replaces it.
+    """
+    affiliate = _register(client)
+    first = _history(
+        client,
+        affiliate["id"],
+        [{"start_month": "2026-01", "end_month": None, **COMMISSION,
+          "expected_customer_discount_bp": 1500}],
+    )
+    assert first.status_code == 200, first.text
+
+    def stored():
+        with engine.connect() as connection:
+            return connection.execute(
+                text(
+                    "select expected_customer_discount_bp from compensation_period "
+                    "where affiliate_id = :id"
+                ),
+                {"id": affiliate["id"]},
+            ).scalar_one()
+
+    raised = _history(
+        client,
+        affiliate["id"],
+        [{"start_month": "2026-01", "end_month": None,
+          "compensation_type": "commission", "commission_rate_bp": 1200}],
+    )
+    assert raised.status_code == 200, raised.text
+    assert stored() == 1500
+
+    cleared = _history(
+        client,
+        affiliate["id"],
+        [{"start_month": "2026-01", "end_month": None, **COMMISSION,
+          "expected_customer_discount_bp": None}],
+    )
+    assert cleared.status_code == 200, cleared.text
+    assert stored() is None

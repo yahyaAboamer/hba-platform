@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { contentSummary, rosterMatches, type Affiliate } from "../Affiliates";
+import { contentSummary, onePerAddress, rosterMatches, type Affiliate, type Invited } from "../Affiliates";
 
 const model = (over: Partial<Affiliate> = {}): Affiliate => ({
   id: 1,
@@ -93,5 +93,41 @@ describe("the content column", () => {
     expect(contentSummary(model({
       content: { required_videos: 6, required_stories: 12, actual_videos: null, actual_stories: null, last_update: null },
     }))).toBe("0/6 · 0/12");
+  });
+});
+
+describe("onePerAddress", () => {
+  const invite = (over: Partial<Invited>): Invited => ({
+    id: 1,
+    email: "reem@example.com",
+    expired: false,
+    withdrawn: false,
+    created_at: "2026-09-20T10:00:00Z",
+    ...over,
+  });
+
+  it("keeps the live invitation when a resend lapsed the old one", () => {
+    const rows = onePerAddress([
+      invite({ id: 1, expired: true, created_at: "2026-09-20T10:00:00Z" }),
+      invite({ id: 2, created_at: "2026-09-26T10:00:00Z" }),
+    ]);
+    expect(rows.map((row) => row.id)).toEqual([2]);
+  });
+
+  it("keeps the newest when none is live", () => {
+    const rows = onePerAddress([
+      invite({ id: 3, expired: true, created_at: "2026-09-26T10:00:00Z" }),
+      invite({ id: 4, withdrawn: true, created_at: "2026-09-10T10:00:00Z" }),
+    ]);
+    expect(rows.map((row) => row.id)).toEqual([3]);
+  });
+
+  it("treats addresses that differ only in case as one person", () => {
+    const rows = onePerAddress([
+      invite({ id: 5, email: "Reem@Example.com", expired: true }),
+      invite({ id: 6, email: "reem@example.com", created_at: "2026-09-26T10:00:00Z" }),
+      invite({ id: 7, email: "dina@example.com" }),
+    ]);
+    expect(rows.map((row) => row.id).sort()).toEqual([6, 7]);
   });
 });

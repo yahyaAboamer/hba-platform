@@ -115,7 +115,7 @@ export default function App() {
             <Route path="/" element={<Overview session={session} />} />
             <Route path="/affiliates" element={<Affiliates />} />
             {/* Before the profile route so `invite` is never read as an id. */}
-            <Route path="/affiliates/invite" element={<InvitePage />} />
+            <Route path="/affiliates/invite" element={<InvitePage session={session} />} />
             <Route
               path="/affiliates/:id"
               element={<AffiliateDetail session={session} />}

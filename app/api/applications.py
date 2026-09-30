@@ -12,6 +12,7 @@ for them to apply as.
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps import active_role, current_user
@@ -124,6 +125,16 @@ def apply(
     except ValueError as exc:
         db.rollback()
         raise HTTPException(400, str(exc)) from exc
+    except IntegrityError as exc:
+        # The code is registered to another model for part of this period -
+        # the constraint that stops two people being paid for one code. The
+        # same words the maintainer's code routes use, and nothing is kept.
+        db.rollback()
+        raise HTTPException(
+            409,
+            f"{body.code.strip().upper()!r} is already owned by somebody else "
+            "during part of this period. Check the code with HBA before applying.",
+        ) from exc
 
     db.commit()
     return {"id": affiliate.id, "status": affiliate.status}
