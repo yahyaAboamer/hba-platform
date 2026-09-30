@@ -71,6 +71,7 @@ from app.services.payroll import (
 #: `setup_readiness` uses, because it is the same question asked of the same
 #: rows - see `month_gaps`, which both call.
 from app.services.setup import (
+    collaboration_from,
     NO_TARGET_OUTCOME,
     NO_TERMS,
     TARGET_NOT_VERIFIED,
@@ -155,9 +156,18 @@ def historical_review(db: Session, *, working: str | None = None) -> dict:
     blocked: list[dict] = []
     finalised: list[dict] = []
 
+    # Started models whose first month nobody knows yet - no recorded start
+    # and no order. Their months cannot be listed at all, so they are counted
+    # rather than silently absent: *nothing is waiting* must not be said while
+    # somebody's history cannot even be asked about (Settings review).
+    unknown_start = 0
     for affiliate in models:
         months = _historical_months(db, affiliate, working)
         if not months:
+            if affiliate.status not in ("pending", "declined") and collaboration_from(
+                db, affiliate
+            ) is None:
+                unknown_start += 1
             continue
         covers = _terms_by_month(db, affiliate, working)
         targets = _targets_by_month(db, affiliate)
@@ -192,6 +202,7 @@ def historical_review(db: Session, *, working: str | None = None) -> dict:
             "ready": len(ready),
             "blocked": len(blocked),
             "already_finalised": len(finalised),
+            "unknown_start": unknown_start,
         },
     }
 

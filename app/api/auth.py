@@ -8,18 +8,20 @@ from sqlalchemy.orm import Session
 from app.api.deps import (
     CSRF_COOKIE,
     SESSION_COOKIE,
+    active_role,
     actor_payload,
     current_user,
     permission_list,
     require_permission,
 )
 from app.config import settings
+from app.core.businesstime import utcnow
 from app.core.password_quality import password_problem, password_strength
 from app.core.passwords import MINIMUM_PASSWORD_LENGTH, hash_password
 from app.core.periods import PLATFORM_START_MONTH
-from app.core.permissions import VALID_ROLES, Permission
+from app.core.permissions import GRANT_REFUSED, VALID_ROLES, Permission, can_grant
 from app.db import get_session
-from app.models.identity import RoleAssignment, UserAccount
+from app.models.identity import Invitation, RoleAssignment, UserAccount
 from app.services.audit import record_audit
 from app.services.auth import (
     authenticate,
@@ -347,6 +349,25 @@ def invite(
     """
     if body.role not in VALID_ROLES:
         raise HTTPException(422, f"Unknown role: {body.role}")
+    # An invitation is a grant: nobody may give access they do not hold.
+    role = active_role(db, actor)
+    if not can_grant(role, body.role):
+        raise HTTPException(403, GRANT_REFUSED)
+    # Inviting replaces any live invitation for the address, so it must not
+    # be a way to cancel one for access this person could not have given.
+    live = db.scalars(
+        select(Invitation.role).where(
+            func.lower(Invitation.email) == str(body.email).strip().lower(),
+            Invitation.accepted_at.is_(None),
+            Invitation.expires_at > utcnow(),
+        )
+    ).all()
+    if any(not can_grant(role, other) for other in live):
+        raise HTTPException(
+            403,
+            "This address already has a live invitation that only somebody with "
+            "more access can replace.",
+        )
 
     try:
         token, invitation = create_invitation(db, str(body.email), body.role, actor.id)

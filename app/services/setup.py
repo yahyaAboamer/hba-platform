@@ -313,6 +313,7 @@ def roster_readiness(
                 "eligible": 0,
                 "ready": 0,
                 "blocking": 0,
+                "blocking_before_go_live": 0,
                 "first_gap": None,
                 "start_is_recorded": start is not None,
             }
@@ -329,6 +330,7 @@ def roster_readiness(
         mine = targets.get(affiliate.id, {})
         eligible = 0
         blocking = 0
+        blocking_before = 0
         first_gap = None
         cursor = first
         while cursor <= working:
@@ -336,10 +338,13 @@ def roster_readiness(
             # An approved month is finished whatever else is true of it: its
             # terms are frozen in the snapshot and nothing here can or should
             # ask it to change.
+            historical = is_historical(cursor)
             if cursor not in settled and month_gaps(
-                covers.get(cursor), mine.get(cursor), historical=is_historical(cursor)
+                covers.get(cursor), mine.get(cursor), historical=historical
             ):
                 blocking += 1
+                if historical:
+                    blocking_before += 1
                 if first_gap is None:
                     first_gap = cursor
             cursor = month_add(cursor, 1)
@@ -348,6 +353,10 @@ def roster_readiness(
             "eligible": eligible,
             "ready": eligible - blocking,
             "blocking": blocking,
+            #: Of those, the months before go-live - the ones the bulk review
+            #: under the table counts. Said separately so the row and the
+            #: review agree on the page (Settings audit H3).
+            "blocking_before_go_live": blocking_before,
             #: The earliest month that cannot be calculated, so the screen can
             #: send somebody to it rather than to the top of a year.
             "first_gap": first_gap,

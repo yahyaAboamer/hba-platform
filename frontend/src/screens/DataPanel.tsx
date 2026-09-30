@@ -150,6 +150,7 @@ export function DataPanel({ goLiveMonth }: { goLiveMonth: string | null }) {
   const [connection, setConnection] = useState<ShopifyConnectionState | null>(null);
   const [asking, setAsking] = useState(false);
   const [refreshError, setRefreshError] = useState<string | null>(null);
+  const [staleCount, setStaleCount] = useState(0);
 
   const load = useCallback(() => {
     Promise.all([
@@ -256,6 +257,7 @@ export function DataPanel({ goLiveMonth }: { goLiveMonth: string | null }) {
   }
 
   const failed = sync?.jobs.failed ?? 0;
+  const validSince = /^\d{4}-\d{2}-\d{2}$/.test(since) && since >= EARLIEST;
   const refresh = sync?.refresh;
   const refreshing = inFlight || asking;
   // The export's three states (`syncState`), and *Not connected*, which it
@@ -270,6 +272,14 @@ export function DataPanel({ goLiveMonth }: { goLiveMonth: string | null }) {
         : refresh.state === "failed"
           ? "Last refresh failed"
           : "Connected";
+
+  // S2: everything below that means somebody is waiting, gathered into one
+  // card at the top - it used to sit two clicks deep among tools and trivia.
+  // Counted in lists, not rows: forty orders and a hundred stopped jobs are
+  // two things to deal with, not "141 things".
+  const waiting = [codes?.length, mail?.failed.length, jobs?.length, parcels?.length, staleCount]
+    .filter((count) => (count ?? 0) > 0).length;
+  const connected = Boolean(sync?.shopify_configured);
 
   return (
     <>
@@ -296,335 +306,315 @@ export function DataPanel({ goLiveMonth }: { goLiveMonth: string | null }) {
             {refreshing ? "Refreshing…" : refresh?.state === "failed" ? "Try again" : "Refresh now"}
           </button>
         </div>
+        {/* S1: a disabled button says why. */}
+        {refresh?.state === "not_connected" && (
+          <p className="sync__hint">Connect the shop below first - there is nothing to refresh yet.</p>
+        )}
         {refresh?.state === "failed" && !refreshing && refresh.error_line && (
           <p className="sync__error">{refresh.error_line}</p>
         )}
         {refreshError && <p className="sync__error" role="alert">{refreshError}</p>}
-        {failed > 0 && (
-          <p className="sync__error">
-            {failed} {failed === 1 ? "piece of work" : "pieces of work"} stopped and will not retry on its own. The technical detail below lists {failed === 1 ? "it" : "them"}.
-          </p>
-        )}
         {error && <p className="sync__error" role="alert">{error}</p>}
         {notice && <p className="sync__notice">{notice}</p>}
+      </section>
+
+      <section className="panel" hidden={waiting === 0} aria-hidden={waiting === 0}>
+        <div className="panel__head">
+          <h2 className="panel__title">Needs attention</h2>
+          <span className="settings__head-note">
+            {waiting === 1 ? "One list is" : `${waiting} lists are`} waiting on a person
+          </span>
+        </div>
+        <div className="data__body">
+          <StaleFulfilments onCount={setStaleCount} />
+
+          {parcels && parcels.length > 0 && (
+            <div className="data__import">
+              <h3 className="data__heading">Parcels that cannot be attached to anyone</h3>
+              <p className="data__note data__parcels-lede">
+                <strong>
+                  {parcels.length} parcel{parcels.length === 1 ? "" : "s"} matched more
+                  than one model.
+                </strong>{" "}
+                More than one model has the same phone number on file, so the
+                platform cannot tell whose parcel it is. Give each model her own
+                number under <Link to="/affiliates">Models</Link> → her profile →
+                Contact and shipping → Phone on the parcel, then match again under
+                Tools.
+              </p>
+              <ul className="data__parcels">
+                {parcels.map((row) => (
+                  <li key={row.shopify_order_id}>
+                    <span className="data__parcel-order">Order {row.shopify_order_id}</span>
+                    <span className="data__parcel-why">
+                      {row.phone}
+                      {row.models.length > 0 && ` — ${row.models.join(", ")}`}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/*
+           * Which codes, and from which month. Since ADR 0053 a model's code is
+           * the one she applied with, so an unowned code is usually HBA's own -
+           * a brand code - or a model's that was typed differently when she
+           * applied.
+           */}
+          {codes && codes.length > 0 && (
+            <div className="data__list">
+              <h3 className="data__heading">Discount codes belonging to nobody</h3>
+              <p className="data__note">
+                These were used on orders and nobody owns them for those months,
+                so the sales count for no one. If a code is HBA's own, add it under{" "}
+                <Link to="/settings?section=codes">Brand codes</Link>. If a model
+                uses it, check the code on her profile - it should be the one she
+                applied with.
+              </p>
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Code</th>
+                    <th className="numeric">Orders</th>
+                    <th>Months with no owner</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {codes.map((row) => (
+                    <tr key={row.code}>
+                      <td><span className="code">{row.code}</span></td>
+                      <td className="numeric">{row.order_count}</td>
+                      <td className="data__months">{row.unowned_months.map(formatMonth).join(", ")}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {mail && mail.failed.length > 0 && (
+            <div className="data__list">
+              <h3 className="data__heading">Emails that never arrived</h3>
+              {/*
+               * The provider being switched off is the usual reason a batch
+               * fails, and it is fixed outside the platform - so the retry is a
+               * button rather than something automatic.
+               */}
+              <p className="data__note">
+                Somebody was told nothing. This is invisible from every other
+                screen - the month is approved, the payment recorded, and one
+                person simply never heard.
+              </p>
+              <button
+                type="button"
+                className="button"
+                onClick={() =>
+                  api
+                    .post<{ queued: number }>("/api/operations/notifications/retry")
+                    .then((result) => {
+                      setNotice(`${result.queued} queued again. They will go out within a minute if the problem is fixed.`);
+                      load();
+                    })
+                    .catch((caught) => setError(caught.message))
+                }
+              >
+                Send them again
+              </button>
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>To</th>
+                    <th>About</th>
+                    <th>Why not</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {mail.failed.map((row) => (
+                    <tr key={row.id}>
+                      <td>{row.recipient_email}</td>
+                      <td>{row.event}</td>
+                      <td className="data__error">{row.last_error ?? "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {jobs && jobs.length > 0 && (
+            <div className="data__list">
+              <h3 className="data__heading">Work that did not happen</h3>
+              <p className="data__note">
+                These will not retry on their own. The same failure is one line,
+                with how many times it happened.
+              </p>
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Job</th>
+                    <th className="numeric">Times</th>
+                    <th>Why it stopped</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {groupJobs(jobs).map((row) => (
+                    <tr key={`${row.kind}|${row.error}`}>
+                      <td><span className="code">{row.kind}</span></td>
+                      <td className="numeric">{row.count}</td>
+                      <td className="data__error">{row.error}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </section>
 
       {/* The export's Connection card, editable (owner, decision b). */}
       <ShopifyConnection onChanged={setConnection} />
 
-      <button
-        type="button"
-        className="sync__toggle"
-        aria-expanded={detailOpen}
-        onClick={() => setDetailOpen(!detailOpen)}
-      >
-        Technical detail
-      </button>
-
-      {detailOpen && <section className="panel settings__panel">
-      <div className="data__body">
-        <dl className="data__facts">
-          <Fact
-            label="Shopify"
-            value={sync?.shopify_configured ? "Connected" : "Not configured"}
-          />
-          <Fact
-            label="Webhooks"
-            value={sync?.webhooks_configured ? "Registered" : "Not registered"}
-          />
-          <Fact label="Go-live month" value={goLiveMonth ? formatMonth(goLiveMonth) : "Not set"} />
-          <Fact label="Orders indexed" value={sync?.orders_indexed ?? "—"} />
-          <Fact
-            label="Last order synced"
-            value={sync?.last_order_synced_at ? when(sync.last_order_synced_at) : "Never"}
-          />
-          <Fact
-            label="Email"
-            value={mail?.configured ? (mail.from_address ?? "On") : "Not configured"}
-          />
-          <Fact
-            label="Screenshots stored"
-            value={sync ? `${Math.round(sync.proof_stored_bytes / 1024)} KB` : "—"}
-          />
-        </dl>
-
-        {/*
-         * §18.2 step 3, and it had no button at all. Shopify runs one bulk
-         * operation per shop at a time, which is why the endpoint refuses a
-         * second one rather than queueing it — said here so the refusal is
-         * expected rather than alarming.
-         */}
-        <div className="data__import">
-          <h3 className="data__heading">Import order history</h3>
-          <p className="data__note">
-            A server-side export of everything from this date onwards. It takes
-            minutes, and Shopify allows one at a time — starting a second is
-            refused rather than queued.
-          </p>
-          <div className="data__import-row">
-            <label className="field data__field">
-              <span className="field__label">From</span>
-              <input
-                className="input code"
-                value={since}
-                onChange={(event) => setSince(event.target.value)}
-                placeholder={EARLIEST}
-              />
-            </label>
-            <button
-              type="button"
-              className="button button--primary"
-              onClick={startImport}
-              disabled={working || !sync?.shopify_configured}
-            >
-              {working ? "Starting…" : "Import from Shopify"}
-            </button>
-          </div>
+      {/*
+       * S2: the three things somebody runs rarely, together and out of the
+       * way of what needs a person. Each says whether it is safe against the
+       * shared shop, because one of them is not like the others.
+       */}
+      <section className="panel">
+        <div className="panel__head">
+          <h2 className="panel__title">Tools</h2>
+          <span className="settings__head-note">Rare, and each says whether it is safe to run</span>
         </div>
+        <div className="data__body">
+          {/*
+           * §18.2 step 3. Shopify runs one bulk operation per shop at a time,
+           * which is why the endpoint refuses a second one rather than
+           * queueing it - said here so the refusal is expected.
+           */}
+          <div className="data__tool">
+            <h3 className="data__heading">Import order history</h3>
+            <p className="data__note">
+              A server-side export of every order from the date below. It takes
+              minutes, and Shopify allows one at a time - starting a second is
+              refused rather than queued.
+            </p>
+            <div className="data__import-row">
+              <label className="field data__field">
+                <span className="field__label">From</span>
+                {/* S3: a real date, not free text. Nothing before 2026 is
+                 *  imported, so nothing earlier is offered. */}
+                <input
+                  className="input"
+                  type="date"
+                  min={EARLIEST}
+                  max={today()}
+                  value={since}
+                  onChange={(event) => setSince(event.target.value)}
+                />
+              </label>
+              <button type="button" className="button button--primary" onClick={startImport}
+                disabled={working || !connected || !validSince}>
+                {working ? "Starting…" : "Import from Shopify"}
+              </button>
+            </div>
+          </div>
 
-        {/*
-         * **Safe against the shared shop**, unlike the import above it, and
-         * said here because the two sit side by side and one of them is not.
-         * The import is a bulk operation and Shopify allows one per shop; this
-         * is ordinary paginated reads.
-         *
-         * The freshness line matters more than the counts. A catalogue nobody
-         * has synced for a fortnight looks identical to a fresh one until
-         * something says otherwise.
-         */}
-        <div className="data__import">
-          <h3 className="data__heading">Product catalogue</h3>
-          <p className="data__note">
-            {catalogue === null
-              ? "Checking…"
-              : catalogue.products === 0
-                ? "Nothing read yet. Products, sizes and images are what a wardrobe is built from."
-                : `${catalogue.products} product${catalogue.products === 1 ? "" : "s"} · ${catalogue.active_products} active · ${catalogue.variants} size${catalogue.variants === 1 ? "" : "s"}`}
-          </p>
-          <p className="data__note">
-            {catalogue?.last_synced_at
-              ? `Last read from Shopify ${when(catalogue.last_synced_at)}.`
-              : "Reading it is ordinary paginated requests — safe to run at any time, unlike the import above."}
-          </p>
-          <div className="data__import-row">
-            <button
-              type="button"
-              className="button"
-              onClick={syncCatalogue}
-              disabled={syncingCatalogue || !sync?.shopify_configured}
-            >
+          {/*
+           * **Safe against the shared shop**, unlike the import above it:
+           * ordinary paginated reads. The freshness line matters more than the
+           * counts - a stale catalogue looks identical to a fresh one.
+           */}
+          <div className="data__import">
+            <h3 className="data__heading">Read the catalogue</h3>
+            <p className="data__note">
+              {catalogue === null
+                ? "Checking…"
+                : catalogue.products === 0
+                  ? "Nothing read yet. Products, sizes and images are what a wardrobe is built from."
+                  : `${catalogue.products} product${catalogue.products === 1 ? "" : "s"} · ${catalogue.active_products} active · ${catalogue.variants} size${catalogue.variants === 1 ? "" : "s"}`}
+              {catalogue?.last_synced_at ? ` · last read ${when(catalogue.last_synced_at)}` : ""}. Safe to run at any time.
+            </p>
+            <button type="button" className="button" onClick={syncCatalogue} disabled={syncingCatalogue || !connected}>
               {syncingCatalogue ? "Starting…" : "Read the catalogue"}
             </button>
           </div>
-        </div>
-
-        {/*
-         * **Matching, not attribution.** Attribution asks who *sold* an order
-         * - a code on it. This asks who it was *sent to* - the phone on the
-         * parcel, which HBA typed from her profile (D11). A model can sell a
-         * hundred orders she never touched.
-         */}
-        <div className="data__import">
-          <h3 className="data__heading">Parcels sent to models</h3>
-          <p className="data__note">
-            Works out which orders were shipments to a model, by the phone on
-            the parcel. Ordinary paginated reads — safe to run at any time, and
-            it carries on by itself until the history is done.
-          </p>
-          <div className="data__import-row">
-            <button
-              type="button"
-              className="button"
-              onClick={scanRecipients}
-              disabled={scanning || !sync?.shopify_configured}
-            >
-              {scanning ? "Starting…" : "Match parcels from " + since}
-            </button>
-          </div>
-          {/*
-           * **The shape first, then the work.** Almost every order in the shop
-           * is a customer's, and saying so as a number is the difference
-           * between a screen that reports and one that appears to demand
-           * fourteen thousand things.
-           */}
-          {parcelSummary !== null && parcelSummary.matched + parcelSummary.customers > 0 && (
-            <p className="data__note">
-              {parcelSummary.matched} parcel
-              {parcelSummary.matched === 1 ? "" : "s"} attached to a model ·{" "}
-              {parcelSummary.customers} customer order
-              {parcelSummary.customers === 1 ? "" : "s"}, which is normal
-              {parcelSummary.unusable_phone > 0 &&
-                ` · ${parcelSummary.unusable_phone} with a number that is not an Egyptian mobile`}
-              .
-            </p>
-          )}
 
           {/*
-           * Only ambiguities. A parcel matching no model is a customer, not a
-           * problem — and the only genuinely stuck state is two models sharing
-           * a number, because then a real parcel cannot reach either of them.
+           * **Matching, not attribution.** Attribution asks who *sold* an
+           * order; this asks who it was *sent to* - the phone on the parcel,
+           * which HBA typed from her profile (D11).
            */}
-          {parcels && parcels.length > 0 && (
-            <>
-              <p className="data__note data__parcels-lede">
-                <strong>
-                  {parcels.length} parcel{parcels.length === 1 ? "" : "s"} cannot
-                  be attached to anyone.
-                </strong>{" "}
-                More than one model has the same phone number on file, so the
-                platform cannot tell whose parcel it is. Give each model her own
-                number under <Link to="/affiliates">Models</Link> → her profile →
-                Contact and shipping → More address details → Phone on the
-                parcel, then run this again.
-              </p>
-              <ul className="data__parcels">
-                {parcels.map((row) => (
-                  <li key={row.shopify_order_id}>
-                    <span className="data__parcel-order">
-                      Order {row.shopify_order_id}
-                    </span>
-                    <span className="data__parcel-why">
-                      {row.phone}
-                      {row.models.length > 0 &&
-                        ` — ${row.models.join(", ")}`}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-        </div>
-
-        <StaleFulfilments />
-
-        {/*
-         * The attention panel says how many. This says which - and which month
-         * to register each from, because guessing leaves a gap and the gap is
-         * somebody's sales.
-         */}
-        {codes && codes.length > 0 && (
-          <div className="data__list">
-            <h3 className="data__heading">
-              Discount codes belonging to nobody
-            </h3>
+          <div className="data__import">
+            <h3 className="data__heading">Match parcels to models</h3>
             <p className="data__note">
-              These have been used on orders and no model owns them for the
-              months in question, so those sales are attributed to no one.
-              Register the code from the first month listed.
+              Works out which orders were shipments to a model, by the phone on
+              the parcel, from {validSince ? formatDay(since) : "the date above"}. Safe to run at any
+              time, and it carries on by itself until the history is done.
+              {parcelSummary !== null && parcelSummary.matched + parcelSummary.customers > 0 && (
+                <>
+                  {" "}So far: {parcelSummary.matched} parcel{parcelSummary.matched === 1 ? "" : "s"} attached
+                  to a model · {parcelSummary.customers} customer order{parcelSummary.customers === 1 ? "" : "s"},
+                  which is normal
+                  {parcelSummary.unusable_phone > 0 && ` · ${parcelSummary.unusable_phone} with a number that is not an Egyptian mobile`}.
+                </>
+              )}
             </p>
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Code</th>
-                  <th className="numeric">Orders</th>
-                  <th>Months with no owner</th>
-                </tr>
-              </thead>
-              <tbody>
-                {codes.map((row) => (
-                  <tr key={row.code}>
-                    <td>
-                      <span className="code">{row.code}</span>
-                    </td>
-                    <td className="numeric">{row.order_count}</td>
-                    <td className="data__months">
-                      {row.unowned_months.map(formatMonth).join(", ")}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <p className="data__note">
-              Register one on the model's own page under{" "}
-              <Link to="/affiliates">Models</Link>.
-            </p>
-          </div>
-        )}
-
-        {mail && mail.failed.length > 0 && (
-          <div className="data__list">
-            <h3 className="data__heading">Emails that never arrived</h3>
-            {/*
-             * The provider being switched off is the usual reason a batch
-             * fails, and it is fixed outside the platform - so the retry is a
-             * button rather than something automatic. Retrying on its own
-             * would hide the cause by eventually succeeding.
-             */}
-            <button
-              type="button"
-              className="button"
-              onClick={() =>
-                api
-                  .post<{ queued: number }>("/api/operations/notifications/retry")
-                  .then((result) => {
-                    setNotice(
-                      `${result.queued} queued again. They will go out within a minute if the problem is fixed.`,
-                    );
-                    load();
-                  })
-                  .catch((caught) => setError(caught.message))
-              }
-            >
-              Send them again
+            <button type="button" className="button" onClick={scanRecipients} disabled={scanning || !connected || !validSince}>
+              {scanning ? "Starting…" : "Match parcels"}
             </button>
-            <p className="data__note">
-              Somebody was told nothing. This is invisible from every other
-              screen — the month is approved, the payment recorded, and one
-              person simply never heard.
-            </p>
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>To</th>
-                  <th>About</th>
-                  <th>Why not</th>
-                </tr>
-              </thead>
-              <tbody>
-                {mail.failed.map((row) => (
-                  <tr key={row.id}>
-                    <td>{row.recipient_email}</td>
-                    <td>{row.event}</td>
-                    <td className="data__error">{row.last_error ?? "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
-        )}
+        </div>
+      </section>
 
-        {jobs && jobs.length > 0 && (
-          <div className="data__list">
-            <h3 className="data__heading">Work that did not happen</h3>
-            <p className="data__note">
-              These will not retry on their own.
-            </p>
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Job</th>
-                  <th className="numeric">Tries</th>
-                  <th>Why it stopped</th>
-                </tr>
-              </thead>
-              <tbody>
-                {jobs.map((row) => (
-                  <tr key={row.id}>
-                    <td>
-                      <span className="code">{row.kind}</span>
-                    </td>
-                    <td className="numeric">{row.attempts}</td>
-                    <td className="data__error">{row.last_error ?? "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    </section>}
+      <button type="button" className="sync__toggle" aria-expanded={detailOpen} onClick={() => setDetailOpen(!detailOpen)}>
+        Technical detail
+      </button>
+
+      {/* S4: what is left is what somebody debugging needs - no trivia, and
+          nothing the card above already says. */}
+      {detailOpen && (
+        <section className="panel">
+          <dl className="data__facts data__body">
+            <Fact label="Order webhooks" value={sync?.webhooks_configured ? "Registered" : "Not registered"} />
+            <Fact label="Go-live month" value={goLiveMonth ? formatMonth(goLiveMonth) : "Not set"} />
+            <Fact label="Orders indexed" value={sync?.orders_indexed ?? "—"} />
+            <Fact label="Last order synced" value={sync?.last_order_synced_at ? when(sync.last_order_synced_at) : "Never"} />
+            <Fact label="Email" value={mail?.configured ? (mail.from_address ?? "On") : "Not configured"} />
+            <Fact label="Background work" value={sync ? `${sync.jobs.pending} waiting · ${sync.jobs.running} running · ${failed} stopped` : "—"} />
+          </dl>
+        </section>
+      )}
     </>
   );
+}
+
+/**
+ * Stopped work, one line per kind and reason. A shop that is not connected
+ * stops the same job a hundred times, and a hundred identical rows buried the
+ * one different failure somebody needed to see.
+ */
+function groupJobs(jobs: FailedJob[]) {
+  const groups = new Map<string, { kind: string; error: string; count: number }>();
+  for (const job of jobs) {
+    const error = job.last_error ?? "—";
+    const key = `${job.kind}|${error}`;
+    const found = groups.get(key) ?? { kind: job.kind, error, count: 0 };
+    found.count += 1;
+    groups.set(key, found);
+  }
+  return [...groups.values()].sort((a, b) => b.count - a.count);
+}
+
+/** Today's date in Cairo, as a date field wants it. */
+function today(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo" }).format(new Date());
+}
+
+/** *1 January 2026*, from `2026-01-01`. */
+function formatDay(iso: string): string {
+  const [year, month, day] = iso.split("-").map(Number);
+  return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })
+    .format(new Date(Date.UTC(year, month - 1, day)));
 }
 
 type StaleOrder = {
@@ -661,16 +651,17 @@ const STALE_REASON: Record<string, string> = {
  *
  * Its own read, so a failure here costs this list and not the panel.
  */
-export function StaleFulfilments() {
+export function StaleFulfilments({ onCount }: { onCount?: (count: number) => void } = {}) {
   const [stale, setStale] = useState<Stale | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let live = true;
     api.get<Stale>("/api/operations/stale-fulfilments")
-      .then((found) => { if (live) setStale(found); })
+      .then((found) => { if (live) { setStale(found); onCount?.(found.total); } })
       .catch((caught) => { if (live) setError(caught.message); });
     return () => { live = false; };
+    // Once, on arrival; `onCount` is the parent's setter.
   }, []);
 
   if (error) {

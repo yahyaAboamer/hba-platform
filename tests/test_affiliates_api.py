@@ -71,7 +71,7 @@ def _shopify(monkeypatch):
     returns, so tests can cover a code created in March, one Shopify has never
     heard of, and Shopify being unreachable.
     """
-    state = {"created_at": None, "exists": True, "error": None}
+    state = {"created_at": None, "starts_at": None, "exists": True, "error": None}
 
     def fake_verify(_client, code):
         if state["error"] is not None:
@@ -86,6 +86,7 @@ def _shopify(monkeypatch):
                 "usage_count": None,
                 "title": None,
                 "created_at": None,
+                "starts_at": None,
             }
         return {
             "exists": True,
@@ -95,6 +96,7 @@ def _shopify(monkeypatch):
             "usage_count": 3,
             "title": normalised,
             "created_at": state["created_at"],
+            "starts_at": state["starts_at"],
         }
 
     monkeypatch.setattr("app.api.affiliates.verify_discount_code", fake_verify)
@@ -102,8 +104,8 @@ def _shopify(monkeypatch):
     return state
 
 
-def _shopify_says(shopify, *, created_at=None, exists=True, error=None):
-    shopify.update(created_at=created_at, exists=exists, error=error)
+def _shopify_says(shopify, *, created_at=None, exists=True, error=None, starts_at=None):
+    shopify.update(created_at=created_at, exists=exists, error=error, starts_at=starts_at)
 
 
 def _add_order(order_id: str, code: str, *, month: str = "2026-08") -> None:
@@ -150,7 +152,6 @@ def test_reading_an_affiliate_requires_authentication(anonymous):
 def test_writing_requires_authentication(anonymous):
     for method, path in [
         ("PATCH", "/api/affiliates/1"),
-        ("POST", "/api/affiliates/1/codes"),
         ("PUT", "/api/affiliates/1/pay-history"),
         ("PUT", "/api/affiliates/1/payout-destination"),
     ]:
@@ -175,10 +176,6 @@ def test_an_affiliate_cannot_create_or_change_anything(client):
         "/api/affiliates/house", json={"name": "HBA10", "code": "HBA10"}
     ).status_code == 403
     assert client.patch("/api/affiliates/1", json={"status": "active"}).status_code == 403
-    assert client.post(
-        "/api/affiliates/1/codes",
-        json={"code": "X10"},
-    ).status_code == 403
     assert client.put(
         "/api/affiliates/1/pay-history",
         json={
@@ -355,14 +352,39 @@ def test_reading_a_fresh_affiliate_shows_nothing_set_yet(client):
 # ── Status ─────────────────────────────────────────────────────────────────────
 
 
+def _give_code(affiliate_id, code="NOUR10", *, verified=True, created_at=None) -> dict:
+    """Give a model a code the way applying does (ADR 0053).
+
+    There is no route to register or change a code any more: a model's code is
+    the one she applied with. Tests that need one give it through the same
+    service applying uses, confirmed or not.
+    """
+    from sqlalchemy.orm import Session as OrmSession
+
+    from app.core.businesstime import utcnow
+    from app.models.affiliates import AffiliateProfile
+    from app.services.codes import register_code, start_month_for
+
+    with OrmSession(engine) as db:
+        affiliate = db.get(AffiliateProfile, affiliate_id)
+        period = register_code(
+            db,
+            affiliate,
+            code,
+            start_month_for(created_at),
+            verified_at=utcnow() if verified else None,
+        )
+        db.commit()
+        return {
+            "code": period.code,
+            "start_month": period.start_month,
+            "is_verified": period.is_verified,
+        }
+
+
 def _verify_code(client, affiliate_id, code="NOUR10"):
-    """Register a code already confirmed against Shopify - the approval gate."""
-    response = client.post(
-        f"/api/affiliates/{affiliate_id}/codes",
-        json={"code": code},
-    )
-    assert response.status_code == 201, response.text
-    return response.json()
+    """A code already confirmed against Shopify - the approval gate."""
+    return _give_code(affiliate_id, code)
 
 
 def test_updating_status(client):
@@ -401,26 +423,21 @@ def test_updating_an_unknown_affiliate_is_404(client):
 # ── Discount codes ─────────────────────────────────────────────────────────────
 
 
-def test_registering_a_code(client):
+def test_the_code_routes_are_gone(client):
+    """ADR 0053: a model's code is the one she applied with and never changes,
+    so there is no route to register another or move her onto a new one."""
     affiliate = _register(client)
-    response = client.post(
-        f"/api/affiliates/{affiliate['id']}/codes",
-        json={"code": "nour10"},
-    )
-    assert response.status_code == 201
-    body = response.json()
-    assert body["code"] == "NOUR10"
-    assert body["is_verified"] is True
-    assert body["exists_in_shopify"] is True
+    for path in ("codes", "replace-code"):
+        response = client.post(
+            f"/api/affiliates/{affiliate['id']}/{path}", json={"code": "NEW10"}
+        )
+        assert response.status_code in (404, 405), path
 
 
 def test_a_registered_code_shows_up_on_the_affiliate(client):
     """Open-ended from January, so it covers whatever month the suite runs in."""
     affiliate = _register(client)
-    client.post(
-        f"/api/affiliates/{affiliate['id']}/codes",
-        json={"code": "NOUR10"},
-    )
+    _give_code(affiliate["id"], "NOUR10")
     body = client.get(f"/api/affiliates/{affiliate['id']}").json()
     # Each code carries whether Shopify has confirmed it. A screen showing a
     # registered code with no hint that nobody has confirmed it exists is how
@@ -429,42 +446,14 @@ def test_a_registered_code_shows_up_on_the_affiliate(client):
 
 
 def test_two_affiliates_cannot_own_the_same_code_at_once(client):
-    """The rule the whole task exists to expose over HTTP."""
+    """The rule the whole task exists to expose - held by the database."""
+    from sqlalchemy.exc import IntegrityError
+
     nour = _register(client, "Nour", "nour@example.com")
     sara = _register(client, "Sara", "sara@example.com")
-    client.post(
-        f"/api/affiliates/{nour['id']}/codes",
-        json={"code": "SHARED"},
-    )
-    response = client.post(
-        f"/api/affiliates/{sara['id']}/codes",
-        json={"code": "SHARED"},
-    )
-    assert response.status_code == 409
-
-
-def test_no_month_can_be_supplied_at_all(client):
-    """The field is gone, not merely defaulted.
-
-    An extra key is ignored rather than honoured - there is one right start
-    month and it is derived, so a caller cannot override it into orphaning
-    their own history.
-    """
-    affiliate = _register(client)
-    response = client.post(
-        f"/api/affiliates/{affiliate['id']}/codes",
-        json={"code": "NOUR10", "start_month": "2026-06"},
-    )
-    assert response.status_code == 201
-    assert response.json()["start_month"] == "2026-01"
-
-
-def test_registering_a_code_for_an_unknown_affiliate_is_404(client):
-    response = client.post(
-        "/api/affiliates/999999/codes",
-        json={"code": "NOUR10"},
-    )
-    assert response.status_code == 404
+    _give_code(nour["id"], "SHARED")
+    with pytest.raises(IntegrityError):
+        _give_code(sara["id"], "SHARED")
 
 
 # ── Pay terms ──────────────────────────────────────────────
@@ -640,74 +629,6 @@ def test_content_manager_can_manage_affiliates_and_compensation(client):
 # ── History is captured by default (the flow the business described) ───────────
 
 
-def test_a_code_older_than_the_platform_starts_at_the_horizon(client, _shopify):
-    """Created on Shopify in 2025. There are no orders before 2026 to claim -
-    the import does not reach back further.
-    """
-    from datetime import datetime, timezone
-
-    _shopify_says(_shopify, created_at=datetime(2025, 11, 15, tzinfo=timezone.utc))
-    affiliate = _register(client)
-
-    response = client.post(
-        f"/api/affiliates/{affiliate['id']}/codes", json={"code": "OLD10"}
-    )
-    assert response.json()["start_month"] == "2026-01"
-
-
-def test_a_code_created_after_the_platform_starts_when_it_was_created(client, _shopify):
-    """Claiming January would assert ownership of months the code did not
-    exist for - and collide with whoever held it before, if anyone did.
-    """
-    from datetime import datetime, timezone
-
-    _shopify_says(_shopify, created_at=datetime(2026, 3, 4, tzinfo=timezone.utc))
-    affiliate = _register(client)
-
-    response = client.post(
-        f"/api/affiliates/{affiliate['id']}/codes", json={"code": "NEW10"}
-    )
-    assert response.json()["start_month"] == "2026-03"
-
-
-def test_a_code_shopify_has_never_heard_of_is_recorded_unverified(client, _shopify):
-    """Some models apply with a code that has not been created yet.
-
-    Refusing to record it would be unhelpful; approving on it would be unsafe.
-    So it is stored, marked unverified, and the approval gate stops it becoming
-    a paying code until somebody checks.
-    """
-    _shopify_says(_shopify, exists=False)
-    affiliate = _register(client)
-
-    response = client.post(
-        f"/api/affiliates/{affiliate['id']}/codes", json={"code": "NOTYET"}
-    )
-    assert response.status_code == 201
-    assert response.json()["is_verified"] is False
-    assert response.json()["exists_in_shopify"] is False
-
-    refused = client.patch(
-        f"/api/affiliates/{affiliate['id']}", json={"status": "active"}
-    )
-    assert refused.status_code == 400
-
-
-def test_registration_fails_loudly_when_shopify_cannot_be_reached(client, _shopify):
-    """Registering blind would have to guess the start month, and a wrong
-    guess orphans orders silently. Better to fail while somebody is watching.
-    """
-    from app.services.shopify.client import ShopifyError
-
-    _shopify_says(_shopify, error=ShopifyError("Shopify returned 503"))
-    affiliate = _register(client)
-
-    response = client.post(
-        f"/api/affiliates/{affiliate['id']}/codes", json={"code": "NOUR10"}
-    )
-    assert response.status_code == 502
-
-
 def test_a_default_registration_picks_up_the_orders_already_placed(client):
     """The whole point, end to end: a code already in use stops being reported
     as belonging to nobody the moment it is registered.
@@ -719,7 +640,7 @@ def test_a_default_registration_picks_up_the_orders_already_placed(client):
     assert {row["code"] for row in before} == {"NOUR10"}
 
     affiliate = _register(client)
-    client.post(f"/api/affiliates/{affiliate['id']}/codes", json={"code": "NOUR10"})
+    _give_code(affiliate["id"], "NOUR10")
 
     after = client.get("/api/operations/unregistered-codes").json()["codes"]
     assert after == []
@@ -832,7 +753,7 @@ def test_a_code_can_be_rechecked_once_it_exists_on_shopify(client, _shopify):
 
     _shopify_says(_shopify, exists=False)
     affiliate = _register(client)
-    client.post(f"/api/affiliates/{affiliate['id']}/codes", json={"code": "NOTYET"})
+    _give_code(affiliate["id"], "NOTYET", verified=False)
 
     _shopify_says(_shopify, exists=True, created_at=datetime(2026, 5, 2, tzinfo=timezone.utc))
     response = client.post(f"/api/affiliates/{affiliate['id']}/recheck-code", json={})
@@ -850,10 +771,8 @@ def test_rechecking_corrects_the_start_month(client, _shopify):
 
     _shopify_says(_shopify, exists=False)
     affiliate = _register(client)
-    created = client.post(
-        f"/api/affiliates/{affiliate['id']}/codes", json={"code": "NOTYET"}
-    )
-    assert created.json()["start_month"] == "2026-01"
+    created = _give_code(affiliate["id"], "NOTYET", verified=False)
+    assert created["start_month"] == "2026-01"
 
     _shopify_says(_shopify, exists=True, created_at=datetime(2026, 7, 9, tzinfo=timezone.utc))
     response = client.post(f"/api/affiliates/{affiliate['id']}/recheck-code", json={})
@@ -863,7 +782,7 @@ def test_rechecking_corrects_the_start_month(client, _shopify):
 def test_a_recheck_that_still_finds_nothing_changes_nothing(client, _shopify):
     _shopify_says(_shopify, exists=False)
     affiliate = _register(client)
-    client.post(f"/api/affiliates/{affiliate['id']}/codes", json={"code": "NOTYET"})
+    _give_code(affiliate["id"], "NOTYET", verified=False)
 
     response = client.post(f"/api/affiliates/{affiliate['id']}/recheck-code", json={})
     assert response.status_code == 200
@@ -876,7 +795,7 @@ def test_a_mistyped_code_can_be_corrected_on_recheck(client, _shopify):
     """
     _shopify_says(_shopify, exists=False)
     affiliate = _register(client)
-    client.post(f"/api/affiliates/{affiliate['id']}/codes", json={"code": "NUOR10"})
+    _give_code(affiliate["id"], "NUOR10", verified=False)
 
     _shopify_says(_shopify, exists=True)
     response = client.post(
@@ -911,7 +830,7 @@ def test_rechecking_then_approving_works_end_to_end(client, _shopify):
     """
     _shopify_says(_shopify, exists=False)
     affiliate = _register(client)
-    client.post(f"/api/affiliates/{affiliate['id']}/codes", json={"code": "NOTYET"})
+    _give_code(affiliate["id"], "NOTYET", verified=False)
 
     refused = client.patch(
         f"/api/affiliates/{affiliate['id']}", json={"status": "active"}
@@ -933,257 +852,6 @@ def test_an_affiliate_cannot_recheck_their_own_code(client):
     assert client.post(
         "/api/affiliates/1/recheck-code", json={}
     ).status_code == 403
-
-
-# ── They changed their code on Shopify ────────────────────────────────────────────
-
-
-def _switch_to(client, affiliate_id, code, created, shopify, **extra):
-    from datetime import timezone
-
-    _shopify_says(shopify, exists=True, created_at=created.replace(tzinfo=timezone.utc))
-    return client.post(
-        f"/api/affiliates/{affiliate_id}/replace-code", json={"code": code, **extra}
-    )
-
-
-def test_replacing_a_code_keeps_the_same_model(client, _shopify):
-    """Nothing about them changes - same record, same dashboard, same history.
-    Only which code earns for them from which month.
-    """
-    from datetime import datetime
-
-    affiliate = _register(client)
-    _verify_code(client, affiliate["id"], "OLD10")
-
-    response = _switch_to(client, affiliate["id"], "NEW10", datetime(2026, 7, 3), _shopify)
-    assert response.status_code == 201
-
-    body = response.json()
-    assert body["retired"]["code"] == "OLD10"
-    assert body["took_over"]["code"] == "NEW10"
-
-    still_there = client.get(f"/api/affiliates/{affiliate['id']}").json()
-    assert still_there["status"] == affiliate["status"], "the model was not archived"
-    assert still_there["id"] == affiliate["id"]
-
-
-def test_the_old_code_ends_the_month_before_the_new_one_starts(client, _shopify):
-    """No gap and no overlap - every month belongs to exactly one of their codes."""
-    from datetime import datetime
-
-    affiliate = _register(client)
-    _verify_code(client, affiliate["id"], "OLD10")
-
-    body = _switch_to(
-        client, affiliate["id"], "NEW10", datetime(2026, 7, 3), _shopify
-    ).json()
-
-    assert body["retired"]["end_month"] == "2026-06"
-    assert body["took_over"]["start_month"] == "2026-07"
-
-
-def test_their_history_runs_continuously_across_both_codes(client, _shopify):
-    """The point of the whole operation: orders earned under either code are
-    theirs, and neither shows up as belonging to nobody.
-    """
-    from datetime import datetime
-
-    _add_order("1", "OLD10", month="2026-03")
-    _add_order("2", "OLD10", month="2026-05")
-    _add_order("3", "NEW10", month="2026-08")
-
-    affiliate = _register(client)
-    _verify_code(client, affiliate["id"], "OLD10")
-    _switch_to(client, affiliate["id"], "NEW10", datetime(2026, 7, 3), _shopify)
-
-    orphaned = client.get("/api/operations/unregistered-codes").json()["codes"]
-    assert orphaned == [], "an order stopped belonging to anybody across the switch"
-
-
-def test_the_old_code_still_owns_its_own_months(client, _shopify):
-    """Ending is not rewriting. What the old code earned, it keeps."""
-    from datetime import datetime
-
-    affiliate = _register(client)
-    _verify_code(client, affiliate["id"], "OLD10")
-    _switch_to(client, affiliate["id"], "NEW10", datetime(2026, 7, 3), _shopify)
-
-    from app.db import SessionLocal
-    from app.services.codes import owner_of
-
-    with SessionLocal() as session:
-        assert owner_of(session, "OLD10", "2026-04").id == affiliate["id"]
-        assert owner_of(session, "NEW10", "2026-09").id == affiliate["id"]
-        assert owner_of(session, "OLD10", "2026-09") is None
-
-
-def test_a_code_shopify_does_not_know_cannot_take_over(client, _shopify):
-    """Retiring their working code for one that does not exist would stop them
-    earning from that month, with nothing anywhere reporting it.
-    """
-    affiliate = _register(client)
-    _verify_code(client, affiliate["id"], "OLD10")
-
-    _shopify_says(_shopify, exists=False)
-    response = client.post(
-        f"/api/affiliates/{affiliate['id']}/replace-code", json={"code": "GHOST"}
-    )
-    assert response.status_code == 400
-
-    from app.db import SessionLocal
-    from app.services.codes import owner_of
-
-    with SessionLocal() as session:
-        assert owner_of(session, "OLD10", "2099-12") is not None, "the code was retired anyway"
-
-
-def test_a_replacement_that_does_not_follow_is_refused(client, _shopify):
-    """A new code created before the old one started is not a replacement -
-    it would end the old period before it began.
-    """
-    from datetime import datetime
-
-    affiliate = _register(client)
-    _shopify_says(_shopify, exists=True, created_at=None)
-    client.post(f"/api/affiliates/{affiliate['id']}/codes", json={"code": "OLD10"})
-
-    response = _switch_to(client, affiliate["id"], "NEW10", datetime(2026, 1, 5), _shopify)
-    assert response.status_code == 400
-    assert "not after" in response.json()["detail"]
-
-
-def test_replacing_when_they_hold_no_code_is_refused(client, _shopify):
-    from datetime import datetime
-
-    affiliate = _register(client)
-    response = _switch_to(client, affiliate["id"], "NEW10", datetime(2026, 7, 3), _shopify)
-    assert response.status_code == 404
-
-
-def test_which_code_is_replaced_must_be_named_when_they_hold_several(client, _shopify):
-    from datetime import datetime
-
-    affiliate = _register(client)
-    _verify_code(client, affiliate["id"], "ONE10")
-    _verify_code(client, affiliate["id"], "TWO10")
-
-    ambiguous = _switch_to(client, affiliate["id"], "NEW10", datetime(2026, 7, 3), _shopify)
-    assert ambiguous.status_code == 409
-
-    named = _switch_to(
-        client, affiliate["id"], "NEW10", datetime(2026, 7, 3), _shopify, replaces="ONE10"
-    )
-    assert named.status_code == 201
-    assert named.json()["retired"]["code"] == "ONE10"
-
-
-def test_the_switch_is_recorded(client, _shopify):
-    from datetime import datetime
-
-    affiliate = _register(client)
-    _verify_code(client, affiliate["id"], "OLD10")
-    _switch_to(client, affiliate["id"], "NEW10", datetime(2026, 7, 3), _shopify)
-
-    with engine.connect() as connection:
-        after = connection.execute(
-            text("SELECT after_json FROM audit_event WHERE action = 'code.replaced'")
-        ).scalar()
-    assert after["retired"]["code"] == "OLD10"
-    assert after["took_over"]["code"] == "NEW10"
-
-
-def test_an_affiliate_cannot_replace_their_own_code(client):
-    _demote_to("affiliate")
-    assert client.post(
-        "/api/affiliates/1/replace-code", json={"code": "NEW10"}
-    ).status_code == 403
-
-
-# ── A code created ahead of the switch ─────────────────────────────────────────
-#
-# The handover month is derived from when Shopify created the new code, which
-# is only the same thing as when they actually moved over because HBA creates a
-# code at the moment of switching. Nothing enforces that habit, so these guard
-# what happens when it is broken.
-
-
-def test_a_code_created_ahead_of_the_switch_is_refused(client, _shopify):
-    """The failure this exists to stop.
-
-    NEW10 was created in July but they kept earning on OLD10 through August.
-    Ending OLD10 in June - the month before NEW10 was created - would put their
-    July and August orders outside every period they own. They would belong to
-    nobody, and nothing would say so.
-    """
-    from datetime import datetime
-
-    _add_order("1", "OLD10", month="2026-08")
-
-    affiliate = _register(client)
-    _verify_code(client, affiliate["id"], "OLD10")
-
-    response = _switch_to(client, affiliate["id"], "NEW10", datetime(2026, 7, 3), _shopify)
-    assert response.status_code == 400
-    assert "belonging to nobody" in response.json()["detail"]
-
-    from app.db import SessionLocal
-    from app.services.codes import owner_of
-
-    with SessionLocal() as session:
-        assert owner_of(session, "OLD10", "2026-08") is not None, "the order was stranded anyway"
-        assert owner_of(session, "NEW10", "2026-08") is None, "the new code took over regardless"
-
-
-def test_the_refusal_names_what_is_missing(client, _shopify):
-    """A refusal a person cannot act on is a dead end. This one says which
-    code, how many orders, and where the decision is written down.
-    """
-    from datetime import datetime
-
-    _add_order("1", "OLD10", month="2026-09")
-    _add_order("2", "OLD10", month="2026-10")
-
-    affiliate = _register(client)
-    _verify_code(client, affiliate["id"], "OLD10")
-
-    detail = _switch_to(
-        client, affiliate["id"], "NEW10", datetime(2026, 7, 3), _shopify
-    ).json()["detail"]
-
-    assert "OLD10" in detail and "NEW10" in detail
-    assert "2 order" in detail
-    assert "docs/limits.md" in detail
-
-
-def test_a_code_created_at_the_moment_of_the_switch_still_works(client, _shopify):
-    """The normal case, and the reason this is a guard and not a ban. Their last
-    OLD10 order is in June, NEW10 was created in July, so nothing is stranded.
-    """
-    from datetime import datetime
-
-    _add_order("1", "OLD10", month="2026-06")
-
-    affiliate = _register(client)
-    _verify_code(client, affiliate["id"], "OLD10")
-
-    response = _switch_to(client, affiliate["id"], "NEW10", datetime(2026, 7, 3), _shopify)
-    assert response.status_code == 201
-
-
-def test_a_code_created_early_that_nobody_used_is_allowed(client, _shopify):
-    """What is checked is the harm, not the calendar. A code sitting unused on
-    Shopify since January costs nothing to hand over to - there are no orders
-    on the old code in those months to strand.
-    """
-    from datetime import datetime
-
-    affiliate = _register(client)
-    _verify_code(client, affiliate["id"], "OLD10")
-
-    response = _switch_to(client, affiliate["id"], "NEW10", datetime(2026, 4, 9), _shopify)
-    assert response.status_code == 201
-    assert response.json()["retired"]["end_month"] == "2026-03"
 
 
 # ── The list carries enough to answer "who needs me" ───────────────────────────
@@ -2324,7 +1992,7 @@ def test_declining_releases_the_code_for_somebody_else(client):
 
     # No order was ever hers, so the code is free for another model at once.
     other = _register(client, name="Jana", email="jana@example.com")
-    assert client.post(f"/api/affiliates/{other['id']}/codes", json={"code": "LAILA10"}).status_code == 201
+    assert _give_code(other["id"], "LAILA10")["code"] == "LAILA10"
 
 
 def test_only_an_application_can_be_declined(client):
@@ -2611,3 +2279,136 @@ def test_a_revoked_model_role_is_not_listed_as_joined(client):
         )
     assert client.get("/api/affiliates").json()["joined"] == []
     assert client.post(f"/api/affiliates/joined/{account_id}/remind").status_code == 404
+
+
+# ── Her start month is her code's start on Shopify (ADR 0053) ─────────────────
+
+
+def _start_of(client, affiliate_id):
+    return client.get(f"/api/affiliates/{affiliate_id}").json()["collaboration_start_month"]
+
+
+def test_confirming_her_code_records_when_it_starts(client, _shopify):
+    """June, not July: she started when her code went live, whatever month her
+    first order came in."""
+    from datetime import datetime, timezone
+
+    affiliate = _register(client)
+    _give_code(affiliate["id"], "NOUR10", verified=False)
+    _shopify_says(
+        _shopify,
+        created_at=datetime(2026, 5, 28, tzinfo=timezone.utc),
+        starts_at=datetime(2026, 6, 1, tzinfo=timezone.utc),
+    )
+
+    client.post(f"/api/affiliates/{affiliate['id']}/recheck-code", json={})
+
+    assert _start_of(client, affiliate["id"]) == "2026-06"
+
+
+def test_with_no_start_date_the_creation_month_is_used(client, _shopify):
+    from datetime import datetime, timezone
+
+    affiliate = _register(client)
+    _give_code(affiliate["id"], "NOUR10", verified=False)
+    _shopify_says(_shopify, created_at=datetime(2026, 4, 9, tzinfo=timezone.utc))
+
+    client.post(f"/api/affiliates/{affiliate['id']}/recheck-code", json={})
+
+    assert _start_of(client, affiliate["id"]) == "2026-04"
+
+
+def test_a_code_from_before_2026_starts_her_in_january(client, _shopify):
+    from datetime import datetime, timezone
+
+    affiliate = _register(client)
+    _give_code(affiliate["id"], "NOUR10", verified=False)
+    _shopify_says(_shopify, starts_at=datetime(2025, 8, 1, tzinfo=timezone.utc))
+
+    client.post(f"/api/affiliates/{affiliate['id']}/recheck-code", json={})
+
+    assert _start_of(client, affiliate["id"]) == "2026-01"
+
+
+def test_a_start_somebody_recorded_is_never_overwritten(client, _shopify):
+    from datetime import datetime, timezone
+
+    affiliate = _register(client)
+    _give_code(affiliate["id"], "NOUR10", verified=False)
+    client.patch(
+        f"/api/affiliates/{affiliate['id']}",
+        json={"collaboration_start_month": "2026-03", "collaboration_start_month_set": True},
+    )
+    _shopify_says(_shopify, starts_at=datetime(2026, 6, 1, tzinfo=timezone.utc))
+
+    client.post(f"/api/affiliates/{affiliate['id']}/recheck-code", json={})
+
+    assert _start_of(client, affiliate["id"]) == "2026-03"
+
+
+def test_a_code_shopify_does_not_know_records_no_start(client, _shopify):
+    _shopify_says(_shopify, exists=False)
+    affiliate = _register(client)
+    _give_code(affiliate["id"], "NOTYET", verified=False)
+
+    client.post(f"/api/affiliates/{affiliate['id']}/recheck-code", json={})
+
+    assert _start_of(client, affiliate["id"]) is None
+
+
+# ── Coming back from archive restarts her own code (ADR 0053, amending 0052) ──
+
+
+def _approved(client, name="Nour", email="nour@example.com", code="NOUR10"):
+    affiliate = _register(client, name=name, email=email)
+    _verify_code(client, affiliate["id"], code)
+    _history(client, affiliate["id"], [{"start_month": "2026-01", "end_month": None, **COMMISSION}])
+    assert _status(client, affiliate["id"], "active").status_code == 200
+    return affiliate
+
+
+def _open_codes(affiliate_id):
+    with engine.connect() as connection:
+        return [
+            row[0]
+            for row in connection.execute(
+                text(
+                    "SELECT code FROM discount_code_period WHERE affiliate_id = :a "
+                    "AND end_month IS NULL"
+                ),
+                {"a": affiliate_id},
+            )
+        ]
+
+
+def test_reactivating_an_archived_model_restarts_her_code(client):
+    affiliate = _approved(client)
+    assert _status(client, affiliate["id"], "archived", "Left for the summer").status_code == 200
+    assert _open_codes(affiliate["id"]) == []
+
+    back = _status(client, affiliate["id"], "active", "Back again")
+
+    assert back.status_code == 200, back.text
+    assert _open_codes(affiliate["id"]) == ["NOUR10"]
+
+
+def test_she_cannot_come_back_on_a_code_somebody_else_now_holds(client):
+    affiliate = _approved(client)
+    _status(client, affiliate["id"], "archived", "Left")
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "UPDATE discount_code_period SET end_month = to_char(now() - interval '1 month', 'YYYY-MM') "
+                "WHERE affiliate_id = :a"
+            ),
+            {"a": affiliate["id"]},
+        )
+    other = _register(client, name="Jana", email="jana@example.com")
+    from datetime import datetime, timezone
+
+    _give_code(other["id"], "NOUR10", created_at=datetime.now(timezone.utc))
+
+    back = _status(client, affiliate["id"], "active", "Back again")
+
+    assert back.status_code == 400
+    assert "belongs to somebody else" in back.json()["detail"]

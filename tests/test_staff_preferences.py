@@ -145,3 +145,25 @@ def test_the_reminder_goes_to_staff_who_record_targets_and_want_it(client):
     assert message.subject.startswith("Record achieved content for ")
     assert "2 of 3 active models have nothing recorded for" in message.body
     assert "turn this reminder off in Settings → Appearance" in message.body
+
+
+# ── The theme, on the account (Settings audit P1) ─────────────────────────────
+
+
+def test_the_theme_follows_the_account(client):
+    assert client.get("/api/staff/me/preferences").json()["theme"] is None
+
+    response = client.put("/api/staff/me/theme", json={"theme": "system"})
+
+    assert response.status_code == 200, response.text
+    assert response.json()["theme"] == "system"
+    assert client.get("/api/staff/me/preferences").json()["theme"] == "system"
+
+
+def test_an_unknown_theme_is_refused(client):
+    assert client.put("/api/staff/me/theme", json={"theme": "pink"}).status_code == 422
+
+
+def test_every_switch_says_what_it_does(client):
+    body = client.get("/api/staff/me/preferences").json()
+    assert set(body["descriptions"]) == set(body["labels"])

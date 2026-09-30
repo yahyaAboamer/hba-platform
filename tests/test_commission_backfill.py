@@ -283,27 +283,6 @@ def test_asking_twice_queues_one_backfill(db):
     assert sorted(job.payload["start_month"] for job in queued) == ["2026-01", "2026-07"]
 
 
-def test_a_handover_backfills_the_new_code(db):
-    """`retire_and_replace` creates a period without going through
-    `register_code`. A path that creates ownership and forgets to backfill
-    leaves those orders belonging to nobody.
-    """
-    from app.services.codes import retire_and_replace
-
-    affiliate = _affiliate(db)
-    old = register_code(db, affiliate, "OLD10", "2026-01")
-    db.query(BackgroundJob).delete()
-    db.flush()
-
-    retire_and_replace(
-        db, affiliate, old_period=old, new_code="NEW10", new_start_month="2026-07"
-    )
-    db.flush()
-
-    queued = db.query(BackgroundJob).filter_by(kind=JobKind.BACKFILL_CODE).all()
-    assert [job.payload["code"] for job in queued] == ["NEW10"]
-
-
 def test_correcting_a_mistyped_code_backfills_the_real_one(db):
     """The corrected code is a different code with its own history. A typo
     fixed on Monday must not leave the real code's orders orphaned.

@@ -5,7 +5,6 @@ import { Money } from "../components/Money";
 import { api } from "../lib/api";
 import { PAY_TYPE } from "../lib/payouts";
 import { formatMonth, shortMonth } from "../lib/money";
-import { AddHouseCode } from "./AddHouseCode";
 import "./Affiliates.css";
 
 /** The approved roster's segments. */
@@ -616,15 +615,9 @@ export function Affiliates() {
           />
 
 
-          {/*
-           * Deliberately its own button, not a second option folded into
-           * inviting a model. The two create opposite things - a person who
-           * signs in and gets paid, versus a code that never does either -
-           * and one control offering both invites exactly the mistake this
-           * exists to prevent. It is the quieter of the two, because it is
-           * the rarer of the two.
-           */}
-          <AddHouseCode onCreated={reload} />
+          {/* Brand codes are added under Settings → Brand codes, their one
+              home (owner, 30 September: D2) - here, beside *Invite a model*,
+              the button read as registering a model's code. */}
 
           {/*
            * The primary action on this screen, and it used to have no home at

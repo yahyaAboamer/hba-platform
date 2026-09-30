@@ -141,10 +141,11 @@ def test_an_unassignable_role_is_refused(client):
     assert response.status_code == 400
 
 
-def test_the_last_admin_cannot_be_demoted(client):
-    """Bootstrap creates exactly one admin. Demoting them would leave nobody
-    holding `settings.manage` to reverse it.
-    """
+def test_nobody_changes_their_own_access(client):
+    """Settings audit T2. One mis-click demoting yourself locks you out of the
+    screen that would undo it - with a second admin present, nothing else
+    stopped it. Another admin changes yours."""
+    _second_staff_account("admin")
     body = client.get("/api/staff").json()
     owner_id = next(r["id"] for r in body["staff"] if r["email"] == "owner@example.com")
 
@@ -153,7 +154,22 @@ def test_the_last_admin_cannot_be_demoted(client):
     )
 
     assert response.status_code == 400
-    assert "only active admin" in response.json()["detail"]
+    assert "your own access" in response.json()["detail"]
+
+
+def test_the_last_admin_guard_still_holds_below_the_api(client):
+    """Unreachable over HTTP now that nobody may act on themselves, and kept
+    anyway: it is the lock that matters if a second route ever changes roles."""
+    from sqlalchemy.orm import Session as OrmSession
+
+    from app.models.identity import UserAccount
+    from app.services.staff import change_role
+
+    with OrmSession(engine) as db:
+        owner = db.query(UserAccount).filter_by(email="owner@example.com").one()
+        with pytest.raises(ValueError, match="only active admin"):
+            change_role(db, owner, "content_manager", actor_id=None, actor_email=None)
+        db.rollback()
 
 
 def test_a_second_admin_can_be_demoted(client):
@@ -193,7 +209,8 @@ def test_a_suspended_account_is_refused_immediately(client):
     assert "staff.suspended" in _audit_actions()
 
 
-def test_the_last_admin_cannot_suspend_themselves(client):
+def test_nobody_suspends_themselves(client):
+    _second_staff_account("admin")
     body = client.get("/api/staff").json()
     owner_id = next(r["id"] for r in body["staff"] if r["email"] == "owner@example.com")
 
@@ -202,7 +219,7 @@ def test_the_last_admin_cannot_suspend_themselves(client):
     )
 
     assert response.status_code == 400
-    assert "only active admin" in response.json()["detail"]
+    assert "your own account" in response.json()["detail"]
 
 
 def test_reactivating_needs_no_reason(client):
@@ -305,3 +322,161 @@ def test_revoking_an_already_used_invitation_is_refused(client):
     response = client.post(f"/api/staff/invitations/{invitation_id}/revoke")
 
     assert response.status_code == 400
+
+
+def _invite(client, email: str, role: str):
+    return client.post("/api/auth/invitations", json={"email": email, "role": role})
+
+
+def _invitation_id(email: str) -> int:
+    with engine.connect() as connection:
+        return connection.execute(
+            text("SELECT max(id) FROM invitation WHERE email = :e"), {"e": email}
+        ).scalar_one()
+
+
+# ── Who may invite whom (Settings audit X1) ────────────────────────────────
+
+
+def test_an_affiliate_manager_cannot_invite_an_admin(client):
+    """The hole itself: invite a second address as admin, open the link, set
+    the password - and an affiliate manager had made themselves an admin."""
+    _demote_to("affiliate_manager")
+
+    response = _invite(client, "second.me@example.com", "admin")
+
+    assert response.status_code == 403
+    assert "access you hold" in response.json()["detail"]
+    with engine.connect() as connection:
+        assert connection.execute(text("SELECT count(*) FROM invitation")).scalar_one() == 0
+
+
+@pytest.mark.parametrize("role", ["affiliate_manager", "content_manager", "affiliate"])
+def test_an_affiliate_manager_may_invite_what_they_hold(client, role):
+    _demote_to("affiliate_manager")
+    assert _invite(client, f"{role}@example.com", role).status_code == 201
+
+
+def test_an_admin_may_invite_anyone(client):
+    assert _invite(client, "new.admin@example.com", "admin").status_code == 201
+
+
+def test_an_affiliate_manager_cannot_resend_or_withdraw_an_admin_invitation(client):
+    """Resend hands back a working link. On an admin invitation that link sets
+    the new admin's password - so it is a grant, held to the same rule."""
+    _invite(client, "new.admin@example.com", "admin")
+    invitation_id = _invitation_id("new.admin@example.com")
+    _demote_to("affiliate_manager")
+
+    resend = client.post(f"/api/staff/invitations/{invitation_id}/resend")
+    revoke = client.post(f"/api/staff/invitations/{invitation_id}/revoke")
+
+    assert resend.status_code == 403
+    assert revoke.status_code == 403
+    assert "link" not in resend.json()
+
+
+def test_the_roster_says_which_roles_you_may_invite(client):
+    assert client.get("/api/staff").json()["invitable_roles"] == [
+        "admin",
+        "affiliate_manager",
+        "content_manager",
+    ]
+
+
+def test_an_affiliate_manager_sees_the_invitations_they_may_act_on(client):
+    """X2: they used to get the invite form and nothing else."""
+    _invite(client, "new.admin@example.com", "admin")
+    _invite(client, "layla@example.com", "content_manager")
+    _demote_to("affiliate_manager")
+
+    body = client.get("/api/staff/invitations").json()
+
+    assert [row["email"] for row in body["invitations"]] == ["layla@example.com"]
+    assert body["invitable_roles"] == ["affiliate_manager", "content_manager"]
+
+
+def test_a_content_manager_may_not_list_or_send_invitations(client):
+    _demote_to("content_manager")
+    assert client.get("/api/staff/invitations").status_code == 403
+    assert _invite(client, "x@example.com", "content_manager").status_code == 403
+
+
+# ── One pending line per address (Settings audit T1) ────────────────────────
+
+
+def _pending(client) -> list[str]:
+    return [row["email"] for row in client.get("/api/staff").json()["invitations"]]
+
+
+def test_resending_leaves_one_line_not_two(client):
+    _invite(client, "layla@example.com", "content_manager")
+    client.post(f"/api/staff/invitations/{_invitation_id('layla@example.com')}/resend")
+
+    assert _pending(client) == ["layla@example.com"]
+
+
+def test_a_withdrawn_invitation_leaves_the_list(client):
+    _invite(client, "layla@example.com", "content_manager")
+    client.post(f"/api/staff/invitations/{_invitation_id('layla@example.com')}/revoke")
+
+    assert _pending(client) == []
+
+
+def test_a_lapsed_invitation_can_be_removed(client):
+    """It is shown so somebody can resend it - and until now nothing could take
+    it away, since withdrawing refused a link that had already expired."""
+    _invite(client, "layla@example.com", "content_manager")
+    invitation_id = _invitation_id("layla@example.com")
+    with engine.begin() as connection:
+        connection.execute(
+            text("UPDATE invitation SET expires_at = now() - interval '1 day' WHERE id = :i"),
+            {"i": invitation_id},
+        )
+    assert client.get("/api/staff").json()["invitations"][0]["expired"] is True
+
+    response = client.post(f"/api/staff/invitations/{invitation_id}/revoke")
+
+    assert response.status_code == 200, response.text
+    assert _pending(client) == []
+    again = client.post(f"/api/staff/invitations/{invitation_id}/revoke")
+    assert again.status_code == 400
+
+
+def test_the_roster_says_what_each_access_can_do(client):
+    """T4, from the server's own permission list."""
+    from app.core.permissions import permissions_for
+
+    body = client.get("/api/staff").json()["role_permissions"]
+
+    assert set(body) == {"admin", "affiliate_manager", "content_manager"}
+    assert body["content_manager"] == sorted(permissions_for("content_manager"))
+    assert "payments.record" in body["admin"]
+    assert "payments.record" not in body["affiliate_manager"]
+
+
+# ── One live link per address (review of the Settings changes) ─────────────
+
+
+def test_a_new_invitation_closes_the_earlier_live_link(client):
+    """Several live links for one address, with only the newest listed, meant
+    withdrawing the visible one left an older one working out of sight."""
+    first = _invite(client, "layla@example.com", "content_manager").json()["token"]
+    _invite(client, "layla@example.com", "affiliate_manager")
+
+    with TestClient(app) as other:
+        accept = other.post(
+            "/api/auth/invitations/accept",
+            json={"token": first, "display_name": "Layla", "password": "quiet-harbour-lantern"},
+        )
+    assert accept.status_code == 422
+
+
+def test_nobody_replaces_an_invitation_they_could_not_have_sent(client):
+    _invite(client, "new.admin@example.com", "admin")
+    _demote_to("affiliate_manager")
+
+    response = _invite(client, "new.admin@example.com", "content_manager")
+
+    assert response.status_code == 403
+    assert "more access" in response.json()["detail"]

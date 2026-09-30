@@ -60,6 +60,66 @@ export function storeTheme(theme: Theme, surface: Surface = "portal"): void {
 }
 
 /**
+ * The admin tool's choice, which may also be *follow the device*.
+ *
+ * Settings audit P1: the choice is saved on the staff member's account and
+ * follows them between laptops; this device's copy is only what paints the
+ * first frame before the account has answered. `system` is the one place the
+ * operating system is consulted - because somebody asked for it by name.
+ */
+export type ThemeChoice = Theme | "system";
+
+export function storedMaintainerChoice(): ThemeChoice {
+  try {
+    const found = window.localStorage.getItem(KEYS.maintainer);
+    if (found === "dark" || found === "light" || found === "system") return found;
+  } catch {
+    // As `storedTheme`.
+  }
+  return "dark";
+}
+
+export function storeMaintainerChoice(choice: ThemeChoice): void {
+  try {
+    window.localStorage.setItem(KEYS.maintainer, choice);
+  } catch {
+    // As `storeTheme`.
+  }
+}
+
+/** The theme a choice paints: `system` asks the device, once, now. */
+export function resolveChoice(choice: ThemeChoice): Theme {
+  if (choice !== "system") return choice;
+  try {
+    return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+  } catch {
+    return "dark";
+  }
+}
+
+/** Remember a choice on this device and paint it. */
+export function applyMaintainerChoice(choice: ThemeChoice): void {
+  storeMaintainerChoice(choice);
+  applyMaintainerTheme(resolveChoice(choice));
+}
+
+/**
+ * Whether somebody picked a theme on this visit. The account's copy arrives a
+ * moment after the page does, and a slow answer must not paint over a choice
+ * made in the meantime.
+ */
+let pickedThisVisit = false;
+
+export function pickMaintainerChoice(choice: ThemeChoice): void {
+  pickedThisVisit = true;
+  applyMaintainerChoice(choice);
+}
+
+export function themePickedThisVisit(): boolean {
+  return pickedThisVisit;
+}
+
+/**
  * Stamp the maintainer's theme on `<html>`.
  *
  * The portal puts `data-theme` on its own root element, because the screens a

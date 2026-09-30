@@ -167,6 +167,7 @@ def sentence(event: AuditEvent, names: _Names) -> str:
         "code.replaced": f"Replaced {who}'s code {b.get('code')} with {a.get('code')}",
         "code.released": f"Released the code {b.get('code')} when {who}'s application was declined",
         "code.closed": f"Closed {who}'s code {a.get('code') or b.get('code')}" + (f" after {_month(a['end_month'])}" if a.get("end_month") else ""),
+        "code.reopened": f"Restarted {who}'s code {a.get('code') or b.get('code')} when she came back",
         "compensation.set": f"Set {who}'s terms to {_PAY_TYPE.get(a.get('compensation_type'), 'new terms')}" + (f" from {_month(a['start_month'])}" if a.get("start_month") else ""),
         "compensation.corrected": f"Corrected {who}'s terms",
         "compensation.closed": f"Ended {who}'s terms" + (f" after {_month(a['end_month'])}" if a.get("end_month") else ""),

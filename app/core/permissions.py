@@ -91,6 +91,27 @@ def permissions_for(role: str) -> frozenset[str]:
     return ROLES.get(role, frozenset())
 
 
+#: What a refused grant says. The same words wherever it is refused.
+GRANT_REFUSED = "You can only give people access you hold yourself."
+
+
+def can_grant(actor_role: str, target_role: str) -> bool:
+    """Whether somebody holding `actor_role` may hand `target_role` to another.
+
+    **Only access they already hold in full.** Inviting is how an account comes
+    to exist, so an invitation is a grant - and an affiliate manager who could
+    invite an admin could make themselves one: invite a second address, open
+    the link, set the password. Found by doing exactly that (Settings audit,
+    30 September 2026). Holding `invitations.send` decides *whether* somebody
+    may invite; this decides *what to*.
+
+    A model's role grants nothing, so anybody who may invite may invite a model.
+    """
+    if target_role not in VALID_ROLES:
+        return False
+    return permissions_for(target_role) <= permissions_for(actor_role)
+
+
 def has_permission(role: str, permission: str) -> bool:
     """Whether a role grants a permission.
 

@@ -1,15 +1,18 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { AddHouseCode } from "./AddHouseCode";
+
 import { HistoricalReview } from "./HistoricalReview";
-import { applyMaintainerTheme, storedTheme, storeTheme } from "../lib/theme";
+import type { HistoricalReviewBody } from "./HistoricalReview";
+import { pickMaintainerChoice, storedMaintainerChoice, themePickedThisVisit } from "../lib/theme";
+import type { ThemeChoice } from "../lib/theme";
 
 import { MonthPicker } from "../components/MonthPicker";
 import { PolicyText } from "../components/PolicyText";
 import { api, can } from "../lib/api";
 import type { Session } from "../lib/api";
-import { currentMonth, formatMonth, monthsBetween } from "../lib/money";
+import { currentMonth, formatMonth, monthAdd, monthsBetween } from "../lib/money";
 import { DataPanel, longWhen } from "./DataPanel";
+import "./ModelLifecycle.css";
 import "./Settings.css";
 
 type SyncStatus = {
@@ -44,6 +47,10 @@ type Roster = {
   staff: StaffRow[];
   invitations: InvitationRow[];
   assignable_roles: string[];
+  /** Only access the signed-in person holds themselves (`can_grant`). */
+  invitable_roles: string[];
+  /** What each role grants, from the server's own list (T4). */
+  role_permissions: Record<string, string[]>;
 };
 
 type AuditEntry = {
@@ -53,10 +60,13 @@ type AuditEntry = {
   /** Who did it - their name, not their address. */
   who: string;
   action: string;
+  kind: string | null;
   subject: string;
   actor_email: string | null;
   reason: string | null;
   created_at: string;
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
 };
 
 const ROLE_LABEL: Record<string, string> = {
@@ -65,86 +75,1290 @@ const ROLE_LABEL: Record<string, string> = {
   content_manager: "Content manager",
 };
 
+const roleWords = (role: string) => ROLE_LABEL[role] ?? role;
+
+/**
+ * *What can each access do?* (Settings audit T4), in plain words. A role has a
+ * line when it holds every permission the line names - read from the server's
+ * own `ROLES`, so the table cannot drift from what the server enforces.
+ */
+const ACCESS_LINES: [string, string[]][] = [
+  ["See and edit models, and set their pay terms", ["affiliates.manage", "compensation.manage"]],
+  ["Set, record and confirm content targets", ["targets.manage", "targets.record", "targets.verify"]],
+  ["Read the activity log", ["audit.view"]],
+  ["Approve a month's pay", ["payroll.approve"]],
+  ["Invite staff, up to their own access", ["invitations.send"]],
+  ["Record payments and reopen approved months", ["payments.record", "payroll.reopen"]],
+  ["Change anyone's access, Shopify and the pay policy; erase a model", ["settings.manage", "affiliates.erase"]],
+];
+
+function holds(permissions: string[] | undefined, line: string[]) {
+  return !!permissions && line.every((permission) => permissions.includes(permission));
+}
+
 /**
  * The platform's own configuration and who may touch it.
  *
- * Not a workflow like the other screens — nothing here is walked through
- * every month. It is the handful of switches sitting on top of everything
- * already built: who has access, what they may do about it, and a plain
- * read of the platform's own state.
- *
- * Every section is gated on its own permission and simply does not render
- * without it, the same pattern Payroll and Payments already use for their
- * approve and reveal actions — a control that would refuse the request is
- * not offered rather than offered and refused.
+ * Not a workflow like the other screens - nothing here is walked through
+ * every month. The rail lists **only the sections this person can use**
+ * (Settings audit X2: a content manager used to open Settings on a blank Team
+ * page), grouped into what changes the business and what changes only you.
  */
-const SETTINGS_SECTIONS = [
-  ["team", "Team"], ["shopify", "Shopify and sync"], ["historical", "Historical setup"],
-  ["codes", "Brand codes"], ["appearance", "Appearance"], ["advanced", "Reference"],
-];
+type SectionId = "team" | "shopify" | "historical" | "codes" | "policy" | "activity" | "appearance";
+
+const SECTION_LABEL: Record<SectionId, string> = {
+  team: "Team",
+  shopify: "Shopify and sync",
+  historical: "Historical setup",
+  codes: "Brand codes",
+  policy: "Pay policy",
+  activity: "Activity log",
+  appearance: "My preferences",
+};
+
+/** Old links (`?section=advanced`) keep landing somewhere sensible. */
+const ALIASES: Record<string, SectionId[]> = { advanced: ["policy", "activity"] };
 
 export function Settings({ session }: { session: Session }) {
   const [query, setQuery] = useSearchParams();
-  const section = SETTINGS_SECTIONS.some(([id]) => id === query.get("section")) ? query.get("section")! : "team";
+  const history = useHistoryState(session);
+
+  const business = useMemo(() => {
+    const out: SectionId[] = [];
+    if (can(session, "settings.manage") || can(session, "invitations.send")) out.push("team");
+    out.push("shopify");
+    // D3 (owner, 30 September): once every month before go-live is final, the
+    // section has done its job and leaves the rail. A direct link still lands
+    // on the one line that says so.
+    if (can(session, "compensation.manage") && history.state !== "complete") out.push("historical");
+    out.push("codes");
+    if (can(session, "settings.manage")) out.push("policy");
+    if (can(session, "audit.view")) out.push("activity");
+    return out;
+  }, [session, history.state]);
+  const everything: SectionId[] = [...business, "appearance"];
+
+  const asked = query.get("section") ?? "";
+  const section: SectionId =
+    (everything as string[]).includes(asked)
+      ? (asked as SectionId)
+      : asked === "historical" && can(session, "compensation.manage")
+        ? "historical"
+        : (ALIASES[asked] ?? []).find((id) => everything.includes(id)) ?? everything[0];
+
+  const pick = (id: SectionId) => setQuery({ section: id });
+
   return <>
     <div className="page__head"><div className="page__title"><h1>Settings</h1></div></div>
     <div className="settings__workspace">
       <nav className="settings__navigation" aria-label="Settings sections">
-        {SETTINGS_SECTIONS.map(([id,label]) => <button key={id} type="button"
-          aria-current={section === id ? "page" : undefined} className={section === id ? "settings__selected" : ""}
-          onClick={() => setQuery({section:id})}>{label}</button>)}
+        <span className="settings__group" aria-hidden="true">Business</span>
+        {business.map((id) => <RailButton key={id} id={id} current={section} onPick={pick} />)}
+        <span className="settings__group" aria-hidden="true">Just me</span>
+        <RailButton id="appearance" current={section} onPick={pick} />
+        <Link className="settings__help" to="/glossary">Help and definitions →</Link>
       </nav>
       <div className="settings__sections">
         {section === "team" && (can(session, "settings.manage")
-          ? <RosterPanel invite={can(session, "invitations.send")} />
-          : can(session, "invitations.send") && <InvitePanel />)}
+          ? <RosterPanel session={session} />
+          : <InviteOnly />)}
         {section === "shopify" && (can(session, "settings.manage")
           ? <DataPanel goLiveMonth={session.platform.go_live_month} />
           : <PlatformPanel session={session} />)}
-        {section === "historical" && (can(session, "compensation.manage")
-          ? <SetupRoster kind="model" session={session} />
-          : <p className="empty">Your account cannot manage payment terms.</p>)}
-        {section === "codes" && <>
-          <SetupRoster kind="house" />
-          {can(session, "affiliates.manage") && <AddHouseCode onCreated={() => undefined} label="Add code" />}
-          <p className="settings__note">
-            {/* The export's sentence, whole. Ours dropped "and active
-             *  counts", which is the half somebody reads this note to
-             *  find out: it is why the roster says 19 and the codes
-             *  list has more than 19 codes in it. */}
-            HBA's own codes. They do not belong to a model, carry no pay
-            and are excluded from model rankings and active counts.
-          </p>
-        </>}
+        {section === "historical" && (history.state === "complete"
+          ? <section className="panel"><p className="settings__pad settings__done">
+              History is complete: every month before {history.goLive ? formatMonth(history.goLive) : "go-live"} is final.
+            </p></section>
+          : <SetupRoster session={session} />)}
+        {section === "codes" && <BrandCodes session={session} />}
+        {section === "policy" && <PolicyPanel />}
+        {section === "activity" && <ActivityPanel />}
         {section === "appearance" && <AppearancePanel />}
-        {section === "advanced" && <>
-          <Link to="/glossary">Help and definitions →</Link>
-          {can(session, "settings.manage") && <PolicyPanel />}
-          {can(session, "audit.view") && <ActivityPanel />}
-        </>}
       </div>
     </div>
   </>;
 }
 
-function AppearancePanel() {
-  const [theme, setTheme] = useState(() => storedTheme("maintainer"));
-  // The export's segmented switch - two radios that read as one control -
-  // rather than two buttons that could both look pressed.
+function RailButton({ id, current, onPick }: { id: SectionId; current: SectionId; onPick: (id: SectionId) => void }) {
+  return (
+    <button type="button" aria-current={current === id ? "page" : undefined}
+      className={current === id ? "settings__selected" : ""} onClick={() => onPick(id)}>
+      {SECTION_LABEL[id]}
+    </button>
+  );
+}
+
+/**
+ * Whether the months before go-live are all final (D3). Asked only of
+ * somebody who may see the review; for anybody else the section stays.
+ */
+function useHistoryState(session: Session) {
+  const [state, setState] = useState<"unknown" | "open" | "complete">("unknown");
+  const allowed = can(session, "payroll.approve");
+  useEffect(() => {
+    if (!allowed) return;
+    let live = true;
+    api.get<HistoricalReviewBody>("/api/payroll/historical/review")
+      .then((body) => {
+        if (!live) return;
+        const waiting = (body.totals.ready ?? 0) + body.totals.blocked + (body.totals.unknown_start ?? 0);
+        setState(waiting === 0 ? "complete" : "open");
+      })
+      .catch(() => undefined);
+    return () => { live = false; };
+  }, [allowed]);
+  return { state, goLive: session.platform.go_live_month };
+}
+
+// ── A confirmation, for anything that changes somebody's access ─────────────
+
+function ConfirmDialog({
+  title, effects, confirm, danger = false, needsReason = false, onConfirm, onCancel,
+}: {
+  title: string;
+  effects: string[];
+  confirm: string;
+  danger?: boolean;
+  needsReason?: boolean;
+  onConfirm: (reason: string) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const [reason, setReason] = useState("");
+  const [working, setWorking] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const reasonRef = useRef<HTMLTextAreaElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  // Focus goes in on opening and back to whatever opened it on closing - the
+  // select or the row's menu button, rather than the top of the page.
+  useEffect(() => {
+    const opener = document.activeElement as HTMLElement | null;
+    (needsReason ? reasonRef.current : cancelRef.current)?.focus();
+    return () => { opener?.focus?.(); };
+  }, [needsReason]);
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !working) onCancel();
+      if (event.key !== "Tab" || !dialogRef.current) return;
+      // Tab stays inside the dialog: it is modal, and says so.
+      const stops = Array.from(dialogRef.current.querySelectorAll<HTMLElement>("button:not([disabled]), textarea"));
+      if (stops.length === 0) return;
+      const first = stops[0];
+      const last = stops[stops.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onCancel, working]);
+
+  async function go() {
+    setWorking(true);
+    setProblem(null);
+    try {
+      await onConfirm(reason.trim());
+    } catch (caught) {
+      setProblem(caught instanceof Error ? caught.message : "That did not go through.");
+      setWorking(false);
+    }
+  }
+
+  return (
+    <div className="lifecycle__layer">
+      <button type="button" className="lifecycle__scrim" aria-hidden="true" tabIndex={-1}
+        onClick={() => !working && onCancel()} />
+      <div ref={dialogRef} className="lifecycle__dialog" role="dialog" aria-modal="true" aria-labelledby="settings-dialog-title">
+        <h2 id="settings-dialog-title" className="lifecycle__title">{title}</h2>
+        <ul className="lifecycle__effects">{effects.map((line) => <li key={line}>{line}</li>)}</ul>
+        {needsReason && (
+          <label className="lifecycle__field">
+            <span>Reason <span className="lifecycle__faint">(required, kept in the activity log)</span></span>
+            <textarea ref={reasonRef} className="input lifecycle__reason" rows={2} value={reason}
+              onChange={(event) => setReason(event.target.value)} />
+          </label>
+        )}
+        {problem && <p className="notice notice--refused" role="alert">{problem}</p>}
+        <div className="lifecycle__acts">
+          <button type="button" className="button" ref={cancelRef} onClick={onCancel} disabled={working}>Cancel</button>
+          <button type="button" className={danger ? "button lifecycle__danger" : "button button--primary"}
+            onClick={go} disabled={working || (needsReason && !reason.trim())}>
+            {working ? "Working…" : confirm}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Team ──────────────────────────────────────────────────────────────────
+
+/** *Today, 14:31*, *Yesterday*, *3 August*, or *Never*. In Cairo. */
+function lastSeen(iso: string | null): string {
+  if (!iso) return "Never";
+  const day = (value: Date) =>
+    new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo" }).format(value);
+  const then = new Date(iso);
+  const now = new Date();
+  if (day(then) === day(now)) {
+    return `Today, ${new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Cairo", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(then)}`;
+  }
+  if (day(then) === day(new Date(now.getTime() - 86_400_000))) return "Yesterday";
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Africa/Cairo", day: "numeric", month: "long",
+    ...(then.getFullYear() !== now.getFullYear() ? { year: "numeric" as const } : {}),
+  }).format(then);
+}
+
+const STATE_ORDER: Record<string, number> = { active: 0, invited: 1, suspended: 2 };
+
+type Pending =
+  | { kind: "role"; row: StaffRow; role: string }
+  | { kind: "suspend"; row: StaffRow }
+  | { kind: "reactivate"; row: StaffRow };
+
+function RosterPanel({ session }: { session: Session }) {
+  const [roster, setRoster] = useState<Roster | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState<Pending | null>(null);
+  const [menu, setMenu] = useState<number | null>(null);
+
+  const load = useCallback(() => {
+    api.get<Roster>("/api/staff").then(setRoster).catch((caught) => setError(caught.message));
+  }, []);
+  useEffect(load, [load]);
+
+  useEffect(() => {
+    if (menu === null) return;
+    const close = (event: Event) => {
+      if (event instanceof KeyboardEvent && event.key !== "Escape") return;
+      if (event.type === "click" && (event.target as HTMLElement).closest(".settings__menu-wrap")) return;
+      setMenu(null);
+    };
+    document.addEventListener("click", close);
+    document.addEventListener("keydown", close);
+    return () => { document.removeEventListener("click", close); document.removeEventListener("keydown", close); };
+  }, [menu]);
+
+  const staff = roster
+    ? [...roster.staff].sort((a, b) =>
+      (STATE_ORDER[a.status] ?? 9) - (STATE_ORDER[b.status] ?? 9)
+      || (a.display_name || a.email).localeCompare(b.display_name || b.email))
+    : [];
+
+  function dialogFor(action: Pending) {
+    const name = action.row.display_name || action.row.email;
+    if (action.kind === "role") {
+      const before = roster?.role_permissions[action.row.role];
+      const after = roster?.role_permissions[action.role];
+      const gains = ACCESS_LINES.filter(([, line]) => holds(after, line) && !holds(before, line)).map(([words]) => words);
+      const loses = ACCESS_LINES.filter(([, line]) => holds(before, line) && !holds(after, line)).map(([words]) => words);
+      return <ConfirmDialog
+        title={action.role === "admin" ? `Make ${name} an admin?` : `Change ${name} to ${roleWords(action.role)}?`}
+        effects={[
+          ...gains.map((line) => `Can now: ${line.charAt(0).toLowerCase()}${line.slice(1)}`),
+          ...loses.map((line) => `Can no longer: ${line.charAt(0).toLowerCase()}${line.slice(1)}`),
+          "Takes effect on their very next click.",
+        ]}
+        confirm={action.role === "admin" ? "Make admin" : "Change access"}
+        onCancel={() => setPending(null)}
+        onConfirm={async () => {
+          await api.post(`/api/staff/${action.row.id}/role`, { role: action.role });
+          setPending(null);
+          load();
+        }} />;
+    }
+    if (action.kind === "suspend") {
+      return <ConfirmDialog
+        title={`Suspend ${name}?`}
+        effects={[
+          "Signed out at once, on every device - an open tab is refused on its next click.",
+          "Nothing they did is removed. Reactivate brings them back as they were.",
+        ]}
+        confirm="Suspend" danger needsReason
+        onCancel={() => setPending(null)}
+        onConfirm={async (reason) => {
+          await api.post(`/api/staff/${action.row.id}/suspend`, { reason });
+          setPending(null);
+          load();
+        }} />;
+    }
+    return <ConfirmDialog
+      title={`Reactivate ${name}?`}
+      effects={[`They can sign in again, as ${roleWords(action.row.role)}.`]}
+      confirm="Reactivate"
+      onCancel={() => setPending(null)}
+      onConfirm={async () => {
+        await api.post(`/api/staff/${action.row.id}/reactivate`);
+        setPending(null);
+        load();
+      }} />;
+  }
+
+  return (
+    <>
+      {error && <p className="notice notice--refused" role="alert">{error}</p>}
+      {roster === null && !error && <p className="empty">Loading…</p>}
+
+      {roster && (
+        <section className="panel" aria-label="Staff">
+          <table className="table settings__table">
+            <thead>
+              <tr>
+                <th>Staff</th>
+                <th className="settings__access">Access</th>
+                <th className="settings__seen">Last signed in</th>
+                <th className="settings__state">State</th>
+                <th className="settings__action"><span className="visually-hidden">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              {staff.map((row) => {
+                const you = row.id === session.actor.id;
+                const name = row.display_name || row.email;
+                const changeable = !you && roster.assignable_roles.includes(row.role) && row.status !== "suspended";
+                return (
+                  <tr key={row.id} className={row.status === "suspended" ? "settings__row--off" : undefined}>
+                    <td>
+                      {name}
+                      {you && <span className="settings__you">You</span>}
+                      <span className="settings__email">{row.email}</span>
+                    </td>
+                    <td className="settings__access">
+                      {changeable ? (
+                        <select className="input settings__role-select" value={row.role}
+                          aria-label={`Access for ${name}`}
+                          onChange={(event) => setPending({ kind: "role", row, role: event.target.value })}>
+                          {roster.assignable_roles.map((role) => <option key={role} value={role}>{roleWords(role)}</option>)}
+                        </select>
+                      ) : (
+                        <>
+                          {roleWords(row.role)}
+                          {you && <span className="settings__email">Another admin changes yours</span>}
+                        </>
+                      )}
+                    </td>
+                    <td className="settings__seen">{lastSeen(row.last_login_at)}</td>
+                    <td className="settings__state">
+                      <span className={`pill settings__pill--${row.status}`}>
+                        {row.status === "active" ? "Active" : row.status === "suspended" ? "Suspended" : "Invited"}
+                      </span>
+                    </td>
+                    <td className="settings__action">
+                      {!you && (
+                        <span className="settings__menu-wrap">
+                          <button type="button" className="settings__kebab"
+                            aria-expanded={menu === row.id} aria-label={`More for ${name}`}
+                            onClick={() => setMenu(menu === row.id ? null : row.id)}>⋯</button>
+                          {menu === row.id && (
+                            <span className="settings__menu">
+                              {row.status === "suspended" ? (
+                                <button type="button" autoFocus
+                                  onClick={() => { setMenu(null); setPending({ kind: "reactivate", row }); }}>
+                                  Reactivate
+                                  <small>They can sign in again</small>
+                                </button>
+                              ) : (
+                                <button type="button" autoFocus className="settings__menu-danger"
+                                  onClick={() => { setMenu(null); setPending({ kind: "suspend", row }); }}>
+                                  Suspend…
+                                  <small>Signs them out at once</small>
+                                </button>
+                              )}
+                            </span>
+                          )}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </section>
+      )}
+
+      {roster && can(session, "invitations.send") && (
+        <InvitePanel roles={roster.invitable_roles} permissions={roster.role_permissions} onInvited={load} />
+      )}
+      {roster && <PendingInvitations rows={roster.invitations} onChanged={load} />}
+      {pending && dialogFor(pending)}
+    </>
+  );
+}
+
+/**
+ * For whoever may invite without holding `settings.manage` - an affiliate
+ * manager. The form, and the invitations they may still resend or withdraw
+ * (X2: they used to get the form and nothing else).
+ */
+type MyInvitations = { invitations: InvitationRow[]; invitable_roles: string[]; role_permissions: Record<string, string[]> };
+
+function InviteOnly() {
+  const [body, setBody] = useState<MyInvitations | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const load = useCallback(() => {
+    api.get<MyInvitations>("/api/staff/invitations").then(setBody).catch((caught) => setError(caught.message));
+  }, []);
+  useEffect(load, [load]);
+  if (error) return <p className="notice notice--refused" role="alert">{error}</p>;
+  if (!body) return <p className="empty">Loading…</p>;
   return <>
-    <section className="panel settings__appearance"><span>Theme</span>
-      <div className="seg" role="radiogroup" aria-label="Theme">{(["dark", "light"] as const).map(value =>
+    <InvitePanel roles={body.invitable_roles} permissions={body.role_permissions} onInvited={load} />
+    <PendingInvitations rows={body.invitations} onChanged={load} />
+  </>;
+}
+
+function InvitePanel({ roles, permissions, onInvited }: {
+  roles: string[];
+  permissions: Record<string, string[]>;
+  onInvited?: () => void;
+}) {
+  // The least access first: an invitation is easy to widen and awkward to
+  // take back.
+  const offered = [...roles].sort((a, b) => (permissions[a]?.length ?? 0) - (permissions[b]?.length ?? 0));
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState(offered[0] ?? "");
+  const [link, setLink] = useState<string | null>(null);
+  const [emailed, setEmailed] = useState(false);
+  const [copied, setCopied] = useState<boolean | null>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [working, setWorking] = useState(false);
+
+  useEffect(() => { if (!offered.includes(role)) setRole(offered[0] ?? ""); }, [offered, role]);
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    setWorking(true);
+    setError(null);
+    setLink(null);
+    setCopied(false);
+    try {
+      const result = await api.post<{ token: string; emailed: boolean; link?: string }>(
+        "/api/auth/invitations",
+        { email: email.trim(), role },
+      );
+      setEmailed(result.emailed);
+      // The server builds the link from its own public address; where none is
+      // set (a development machine) it sends "", and the page builds it.
+      setLink(result.link || `${window.location.origin}/accept-invitation?token=${result.token}`);
+      setEmail("");
+      onInvited?.();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not invite them.");
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  async function copy() {
+    if (!link) return;
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+    } catch {
+      // The browser refused. Say so, rather than let somebody paste nothing.
+      setCopied(null);
+    }
+  }
+
+  if (offered.length === 0) return null;
+
+  return (
+    <section className="panel">
+      <div className="panel__head"><h2 className="panel__title">Invite a staff member</h2></div>
+      <div className="settings__pad">
+        {error && <p className="notice notice--refused" role="alert">{error}</p>}
+        {/*
+         * §16. The platform emails the link, and the link is still shown here
+         * - once, because it is a working credential until it is used - for
+         * the moment the recipient says it never arrived.
+         */}
+        {link && (
+          <div className="settings__linkbox" role="status">
+            <span>
+              {emailed
+                ? "Emailed to them. The same link, in case it does not arrive - it only appears here once:"
+                : "Send this to them yourself - it only appears here once:"}
+            </span>
+            <code>{link}</code>
+            <button type="button" className="button button--row" onClick={copy}>
+              {copied ? "Copied" : copied === null ? "Could not copy - select it instead" : "Copy link"}
+            </button>
+          </div>
+        )}
+        <form onSubmit={submit} className="settings__invite-row">
+          <input className="input settings__invite-email" type="email" required value={email}
+            onChange={(event) => setEmail(event.target.value)} placeholder="name@hbawear.store" aria-label="Email" />
+          <select className="input settings__invite-role" value={role}
+            onChange={(event) => setRole(event.target.value)} aria-label="Access">
+            {offered.map((value) => <option key={value} value={value}>{roleWords(value)}</option>)}
+          </select>
+          <button type="submit" className="button button--primary settings__invite-send"
+            disabled={working || !email.trim() || !role}>
+            {working ? "Sending…" : "Send invitation"}
+          </button>
+        </form>
+        <details className="settings__explain">
+          <summary>What can each access do?</summary>
+          <table className="settings__perm">
+            <thead>
+              <tr><th>Can…</th>{["content_manager", "affiliate_manager", "admin"].filter((r) => permissions[r]).map((r) => <th key={r}>{roleWords(r)}</th>)}</tr>
+            </thead>
+            <tbody>
+              {ACCESS_LINES.map(([words, line]) => (
+                <tr key={words}>
+                  <td>{words}</td>
+                  {["content_manager", "affiliate_manager", "admin"].filter((r) => permissions[r]).map((r) => (
+                    <td key={r} className="settings__perm-mark">
+                      {holds(permissions[r], line) ? <span aria-label="Yes">✓</span> : <span aria-label="No" className="settings__perm-no">—</span>}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </details>
+      </div>
+    </section>
+  );
+}
+
+const longDate = (iso: string) =>
+  new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Cairo", day: "numeric", month: "long" }).format(new Date(iso));
+
+/**
+ * One line per address, the newest (T1). A live link can be resent or
+ * withdrawn; a lapsed one resent or removed - nothing sits here for ever.
+ */
+function PendingInvitations({ rows, onChanged }: { rows: InvitationRow[]; onChanged: () => void }) {
+  const [busy, setBusy] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function act(id: number, path: "resend" | "revoke") {
+    setBusy(id);
+    setError(null);
+    try {
+      await api.post(path === "resend" ? `/api/staff/invitations/${id}/resend` : `/api/staff/invitations/${id}/revoke`);
+      onChanged();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "That did not go through.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <section className="panel">
+      <div className="panel__head"><h2 className="panel__title">Pending staff invitations</h2></div>
+      {error && <p className="notice notice--refused settings__pad" role="alert">{error}</p>}
+      {rows.length === 0 ? (
+        <p className="settings__none">No staff invitation is outstanding.</p>
+      ) : (
+        <ul className="settings__pending">
+          {rows.map((row) => (
+            <li key={row.id}>
+              <span className="settings__pending-who">
+                {row.email}
+                <span className="settings__email">
+                  {roleWords(row.role)}
+                  {row.created_at && ` · Sent ${longDate(row.created_at)}`}
+                  {" · "}
+                  {row.expired
+                    ? <span className="settings__gap">Link expired {longDate(row.expires_at)}</span>
+                    : `expires ${longDate(row.expires_at)}`}
+                </span>
+              </span>
+              <button type="button" className="button button--row" disabled={busy === row.id}
+                onClick={() => act(row.id, "resend")}>Resend</button>
+              <button type="button" className={`button button--row${row.expired ? "" : " settings__withdraw"}`}
+                disabled={busy === row.id} onClick={() => act(row.id, "revoke")}>
+                {row.expired ? "Remove" : "Withdraw"}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+// ── Shopify and sync, for somebody without `settings.manage` ───────────────
+
+function PlatformPanel({ session }: { session: Session }) {
+  const [sync, setSync] = useState<SyncStatus | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.get<SyncStatus>("/api/operations/sync").then(setSync).catch((caught) => setError(caught.message));
+  }, []);
+
+  return (
+    <section className="panel">
+      <div className="panel__head"><h2 className="panel__title">Connection</h2></div>
+      {error && <p className="notice notice--refused settings__pad" role="alert">{error}</p>}
+      <dl className="settings__facts">
+        <Row label="Shopify">{sync ? (sync.shopify_configured ? "Connected" : "Not connected") : "—"}</Row>
+        <Row label="Order updates">{sync ? (sync.webhooks_configured ? "Arriving as they happen" : "Only on the half-hourly sweep") : "—"}</Row>
+        <Row label="Last order">{sync?.last_order_synced_at ? longWhen(sync.last_order_synced_at) : "None yet"}</Row>
+        <Row label="Go-live">{session.platform.go_live_month ? formatMonth(session.platform.go_live_month) : "Not set"}</Row>
+      </dl>
+    </section>
+  );
+}
+
+// ── Historical setup ──────────────────────────────────────────────────────
+
+type SetupRow = {
+  id: number;
+  name: string;
+  account_kind: string;
+  code?: string;
+  status: string;
+  uses?: number;
+  collaboration_start_month?: string | null;
+  /** The first month her terms cover. `null` means none were ever written. */
+  earliest_terms_month?: string | null;
+  /**
+   * A09. How many of her eligible months can actually be calculated, counted
+   * on the server with the same per-month rule the profile uses.
+   */
+  historical_setup?: {
+    eligible: number;
+    ready: number;
+    blocking: number;
+    /** Of `blocking`, the months before go-live - what the review counts. */
+    blocking_before_go_live?: number;
+    /** The earliest month that cannot be calculated, to link straight to. */
+    first_gap: string | null;
+    start_is_recorded: boolean;
+  } | null;
+};
+
+/** Whether her row asks anything of anybody (H2). */
+function needsSomething(row: SetupRow) {
+  const setup = row.historical_setup;
+  return !setup || setup.blocking > 0 || setup.eligible === 0;
+}
+
+/**
+ * Whether her months can be worked out, and what to do where not (H3, H5).
+ *
+ * The count is split at go-live, so the row and the review under the table
+ * agree on the page: it used to say *9 of 9* above *5 months* for one model.
+ */
+export function historicalState(row: SetupRow) {
+  const setup = row.historical_setup;
+  if (!setup) return <span className="settings__gap">Not known</span>;
+  if (setup.eligible === 0) {
+    return <>
+      <span className="pill settings__pill--owed">No start month</span>
+      <Link className="settings__fix" to={`/affiliates/${row.id}`}>Record her start month →</Link>
+    </>;
+  }
+  if (setup.blocking === 0) return <span className="pill settings__pill--ok">Ready</span>;
+  const before = setup.blocking_before_go_live ?? 0;
+  const after = setup.blocking - before;
+  const parts = [
+    before > 0 && `${before} ${before === 1 ? "month" : "months"} before go-live`,
+    after > 0 && `${after} after`,
+  ].filter(Boolean).join(" · ");
+  return <>
+    <span className="pill settings__pill--owed">{parts || `${setup.blocking} months`} cannot be calculated</span>
+    <Link className="settings__fix" to={`/affiliates/${row.id}/compensation`}>
+      {/* Only a model with no terms at all is known to need terms; a gap
+          later on may be a guarantee outcome or unconfirmed targets instead. */}
+      {!setup.first_gap
+        ? "Set the months →"
+        : row.earliest_terms_month
+          ? `Fix from ${formatMonth(setup.first_gap)} →`
+          : `Write her terms from ${formatMonth(setup.first_gap)} →`}
+    </Link>
+  </>;
+}
+
+/** The export's Historical setup opens on eight and expands to the whole list. */
+const HISTORICAL_PREVIEW = 8;
+
+function SetupRoster({ session }: { session: Session }) {
+  const [rows, setRows] = useState<SetupRow[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
+  useEffect(() => {
+    let live = true;
+    api.get<{ affiliates: SetupRow[] }>("/api/affiliates?include_archived=true")
+      // H1: models who have started. An applicant has no history to work out,
+      // and listing her as *No month can be worked out* padded the list.
+      .then((body) => { if (live) setRows(body.affiliates.filter((row) =>
+        row.account_kind === "model" && row.status !== "pending" && row.status !== "declined")); })
+      .catch((caught) => { if (live) setError(caught.message); });
+    return () => { live = false; };
+  }, []);
+  if (error) return <p className="notice notice--refused" role="alert">{error}</p>;
+  if (!rows) return <p className="empty">Loading…</p>;
+
+  // H2: whoever needs something first, so nobody hides behind *Show all*.
+  const sorted = [...rows].sort((a, b) =>
+    Number(needsSomething(b)) - Number(needsSomething(a)) || a.name.localeCompare(b.name));
+  const waiting = sorted.filter(needsSomething).length;
+  const shownRows = expanded ? sorted : sorted.slice(0, Math.max(HISTORICAL_PREVIEW, waiting));
+
+  return <section className="panel">
+    <div className="panel__head">
+      <h2 className="panel__title">Historical setup</h2>
+      <span className="settings__head-note">
+        {rows.length - waiting} ready · {waiting} {waiting === 1 ? "needs" : "need"} something
+      </span>
+    </div>
+    <table className="table settings__table settings__hist">
+      <thead><tr>
+        <th>Model</th><th>Started</th><th>Terms from</th><th>What is needed</th>
+      </tr></thead>
+      <tbody>{shownRows.map((row) => <tr key={row.id}>
+        <td><Link to={`/affiliates/${row.id}`}>{row.name}</Link></td>
+        <td>{row.collaboration_start_month ? formatMonth(row.collaboration_start_month) : <span className="settings__gap">Not recorded</span>}</td>
+        <td>{row.earliest_terms_month ? formatMonth(row.earliest_terms_month) : <span className="settings__gap">None written</span>}</td>
+        <td className="settings__need">{historicalState(row)}</td>
+      </tr>)}</tbody>
+    </table>
+    {rows.length === 0 && <p className="empty">No model has started yet.</p>}
+    {!expanded && sorted.length > shownRows.length && (
+      <div className="settings__pad settings__rule">
+        <button type="button" className="button" onClick={() => setExpanded(true)}>Show all {rows.length} models</button>
+      </div>
+    )}
+    <div className="settings__pad settings__rule"><HistoricalReview session={session} /></div>
+  </section>;
+}
+
+// ── Brand codes ───────────────────────────────────────────────────────────
+
+const CODE_STATE: Record<string, [string, string]> = {
+  active: ["Active", "ok"],
+  inactive: ["Paused", "owed"],
+  archived: ["Retired", "off"],
+  // A house account waits in *pending* only while Shopify has not confirmed
+  // its code.
+  pending: ["Not confirmed", "owed"],
+};
+
+function BrandCodes({ session }: { session: Session }) {
+  const [rows, setRows] = useState<SetupRow[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [showRetired, setShowRetired] = useState(false);
+  const [code, setCode] = useState("");
+  const [purpose, setPurpose] = useState("");
+  const [working, setWorking] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+
+  const load = useCallback(() => {
+    api.get<{ affiliates: SetupRow[] }>("/api/affiliates?include_archived=true")
+      .then((body) => setRows(body.affiliates.filter((row) => row.account_kind === "house")))
+      .catch((caught) => setError(caught.message));
+  }, []);
+  useEffect(load, [load]);
+
+  async function add(event: React.FormEvent) {
+    event.preventDefault();
+    setWorking(true);
+    setProblem(null);
+    setNotice(null);
+    const typed = code.trim().toUpperCase();
+    try {
+      const made = await api.post<{ status?: string }>("/api/affiliates/house", {
+        name: purpose.trim() || typed,
+        code: typed,
+      });
+      setNotice(made.status === "active"
+        ? `${typed} is confirmed by Shopify and counting.`
+        : `${typed} is saved, but Shopify does not know it yet - it starts counting once it is confirmed.`);
+      setCode("");
+      setPurpose("");
+      load();
+    } catch (caught) {
+      setProblem(caught instanceof Error ? caught.message : "Could not add it.");
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  if (error) return <p className="notice notice--refused" role="alert">{error}</p>;
+  if (!rows) return <p className="empty">Loading…</p>;
+  const retired = rows.filter((row) => row.status === "archived");
+  const shown = showRetired ? rows : rows.filter((row) => row.status !== "archived");
+
+  return (
+    <section className="panel">
+      <table className="table settings__table">
+        <thead><tr>
+          <th>Code</th><th>Purpose</th><th className="numeric">Orders this month</th><th>State</th>
+        </tr></thead>
+        <tbody>{shown.map((row) => {
+          const [words, tone] = CODE_STATE[row.status] ?? [row.status, "off"];
+          return <tr key={row.id}>
+            <td><Link to={`/affiliates/${row.id}`}>{row.code || "No code"}</Link></td>
+            <td className="settings__muted">{row.name === row.code ? "—" : row.name}</td>
+            <td className="numeric">{row.uses ?? 0}</td>
+            <td><span className={`pill settings__pill--${tone}`}>{words}</span></td>
+          </tr>;
+        })}</tbody>
+      </table>
+      {shown.length === 0 && <p className="settings__none">No brand codes yet.</p>}
+      {retired.length > 0 && (
+        <div className="settings__pad settings__rule">
+          <button type="button" className="settings__link-button" onClick={() => setShowRetired(!showRetired)}>
+            {showRetired ? "Hide retired" : `Show retired (${retired.length})`}
+          </button>
+        </div>
+      )}
+      <div className="settings__pad settings__rule">
+        {can(session, "affiliates.manage") && (
+          <form className="settings__invite-row" onSubmit={add}>
+            <input className="input settings__code-input" value={code} onChange={(event) => setCode(event.target.value)}
+              placeholder="New code, e.g. WINTER26" aria-label="New code" required />
+            <input className="input settings__invite-email" value={purpose} onChange={(event) => setPurpose(event.target.value)}
+              placeholder="Purpose (optional)" aria-label="Purpose" />
+            <button type="submit" className="button button--primary settings__invite-send" disabled={working || !code.trim()}>
+              {working ? "Asking Shopify…" : "Add code"}
+            </button>
+          </form>
+        )}
+        {problem && <p className="notice notice--refused" role="alert">{problem}</p>}
+        {notice && <p className="notice notice--settled" role="status">{notice}</p>}
+        <p className="settings__note settings__note--tail">
+          Checked with Shopify before it is saved. HBA's own codes do not belong
+          to a model, carry no pay and are excluded from model rankings and
+          active counts.
+        </p>
+      </div>
+    </section>
+  );
+}
+
+// ── Pay policy ────────────────────────────────────────────────────────────
+
+type PolicyVersionRow = {
+  id: number;
+  effective_month: string;
+  summary_markdown: string;
+  created_at: string;
+};
+
+/**
+ * §16, Phase 10 Batch C. The commission rules in the words a model reads -
+ * linked from her own statement of each month.
+ *
+ * **A new version, never an edit.** Every payroll snapshot freezes which
+ * version it was calculated under. The text is written beside a preview of
+ * exactly what she will see (R5), because a policy written blind is how a
+ * typo reaches twenty models.
+ */
+function PolicyPanel() {
+  const [versions, setVersions] = useState<PolicyVersionRow[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [effectiveMonth, setEffectiveMonth] = useState(currentMonth());
+  const [text, setText] = useState("");
+  const [working, setWorking] = useState(false);
+
+  const load = useCallback(() => {
+    api.get<{ versions: PolicyVersionRow[] }>("/api/policy/versions")
+      .then((body) => setVersions(body.versions)).catch((caught) => setError(caught.message));
+  }, []);
+  useEffect(load, [load]);
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    setWorking(true);
+    setError(null);
+    try {
+      await api.post("/api/policy/versions", { effective_month: effectiveMonth, summary_markdown: text });
+      setText("");
+      setAdding(false);
+      load();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not save that.");
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  const now = currentMonth();
+  const all = versions ?? [];
+  const newest = all.length > 0 ? all[all.length - 1] : null;
+  // The first month the server will take: this one, or the month after the
+  // newest version when that is already this month or later. The picker
+  // offered earlier months the server then refused.
+  const firstAllowed = newest && newest.effective_month >= now ? monthAdd(newest.effective_month, 1) : now;
+  const inForce = [...all].reverse().find((version) => version.effective_month <= now) ?? null;
+  const upcoming = all.filter((version) => version.effective_month > now);
+  const earlier = all.filter((version) => version !== inForce && version.effective_month <= now).reverse();
+
+  return (
+    <>
+      <section className="panel">
+        <div className="panel__head">
+          <h2 className="panel__title">Pay policy</h2>
+          <span className="settings__head-note">What every model reads about her pay</span>
+        </div>
+        <div className="settings__pad">
+          {error && <p className="notice notice--refused" role="alert">{error}</p>}
+          {versions === null ? <p className="empty">Loading…</p> : all.length === 0 ? (
+            <p className="settings__note">
+              None written yet. Every settled month shows that no rules were in
+              force - add the first version below.
+            </p>
+          ) : <>
+            {upcoming.map((version) => (
+              <PolicyCard key={version.id} version={version} tag={`Starts ${formatMonth(version.effective_month)}`} tone="owed" />
+            ))}
+            {inForce && <PolicyCard version={inForce} tag={`In force from ${formatMonth(inForce.effective_month)}`} tone="ok" />}
+            {earlier.length > 0 && (
+              <details className="settings__earlier">
+                <summary>Earlier versions ({earlier.length})</summary>
+                {earlier.map((version) => (
+                  <PolicyCard key={version.id} version={version} tag={`From ${formatMonth(version.effective_month)}`} tone="off" />
+                ))}
+              </details>
+            )}
+          </>}
+          {!adding && (
+            <button type="button" className="button settings__policy-add" onClick={() => { setAdding(true); setEffectiveMonth(firstAllowed); }}>
+              Write a new version
+            </button>
+          )}
+        </div>
+      </section>
+
+      {adding && (
+        <section className="panel">
+          <form onSubmit={submit}>
+            <div className="panel__head">
+              <h2 className="panel__title">New version</h2>
+              <label className="settings__head-note settings__inline-field">
+                From
+                {/* From this month (or the newest version's, if later) to the
+                 *  end of next year; the server still decides what may be saved. */}
+                <MonthPicker value={effectiveMonth} onChange={setEffectiveMonth} size="section" label={false}
+                  months={monthsBetween(firstAllowed, `${Number(now.slice(0, 4)) + 1}-12`)} />
+              </label>
+            </div>
+            <div className="settings__pad">
+              <p className="settings__note">
+                {newest
+                  ? `Must start later than ${formatMonth(newest.effective_month)}. Months already agreed keep the words they were agreed under.`
+                  : "Every month from here onward reads this version."}
+              </p>
+              <div className="settings__split">
+                <label className="field">
+                  <span className="field__label">The text</span>
+                  <textarea className="input settings__policy-text" rows={12} required value={text}
+                    onChange={(event) => setText(event.target.value)}
+                    placeholder={"## How commission works\n\nCommission is worked out on..."} />
+                  <span className="field__hint">`## ` starts a heading and `**text**` is bold - nothing else is read specially.</span>
+                </label>
+                <div className="field">
+                  <span className="field__label">What a model will see</span>
+                  <div className="settings__preview">
+                    {text.trim() ? <PolicyText markdown={text} /> : <p className="settings__muted">The preview appears as you type.</p>}
+                  </div>
+                </div>
+              </div>
+              <div className="settings__acts">
+                <button type="button" className="button" onClick={() => { setAdding(false); setError(null); }} disabled={working}>Cancel</button>
+                <button type="submit" className="button button--primary" disabled={working || !text.trim()}>
+                  {working ? "Saving…" : "Save this version"}
+                </button>
+              </div>
+            </div>
+          </form>
+        </section>
+      )}
+    </>
+  );
+}
+
+function PolicyCard({ version, tag, tone }: { version: PolicyVersionRow; tag: string; tone: string }) {
+  return (
+    <article className="settings__policy">
+      <span className={`pill settings__pill--${tone}`}>{tag}</span>
+      <PolicyText markdown={version.summary_markdown} />
+    </article>
+  );
+}
+
+// ── Activity log ──────────────────────────────────────────────────────────
+
+const KIND_LABEL: Record<string, string> = {
+  money: "Money",
+  access: "Access",
+  models: "Models",
+  content: "Content",
+  settings: "Settings",
+};
+
+type Filters = { models: { id: number; name: string }[]; people: { id: number; name: string }[]; kinds: string[] };
+
+/** *Today*, *Yesterday*, or *Tuesday 29 September*, in Cairo. */
+function dayHeading(iso: string): string {
+  const key = (value: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo" }).format(value);
+  const now = new Date();
+  const then = new Date(iso);
+  if (key(then) === key(now)) return "Today";
+  if (key(then) === key(new Date(now.getTime() - 86_400_000))) return "Yesterday";
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Africa/Cairo", weekday: "long", day: "numeric", month: "long",
+    ...(then.getFullYear() !== now.getFullYear() ? { year: "numeric" as const } : {}),
+  }).format(then);
+}
+
+const timeOf = (iso: string) =>
+  new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Cairo", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(iso));
+
+/** A value from the trail, readable. Objects are rare and shown whole. */
+function shown(value: unknown): string {
+  if (value === null || value === undefined || value === "") return "—";
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (typeof value === "object") return JSON.stringify(value);
+  return String(value);
+}
+
+const fieldWords = (key: string) => {
+  const words = key.replace(/_/g, " ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
+};
+
+/** R4: what moved, from the before and after the server already sends. */
+function changes(entry: AuditEntry): [string, string, string][] {
+  const before = entry.before ?? {};
+  const after = entry.after ?? {};
+  if (!entry.before || !entry.after) return [];
+  const keys = Array.from(new Set([...Object.keys(before), ...Object.keys(after)]));
+  return keys
+    .filter((key) => JSON.stringify(before[key]) !== JSON.stringify(after[key]))
+    .map((key) => [fieldWords(key), shown(before[key]), shown(after[key])]);
+}
+
+function ActivityPanel() {
+  const [events, setEvents] = useState<AuditEntry[] | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [filters, setFilters] = useState<Filters | null>(null);
+  const [q, setQ] = useState("");
+  const [search, setSearch] = useState("");
+  const [model, setModel] = useState("");
+  const [person, setPerson] = useState("");
+  const [kind, setKind] = useState("");
+  const [signIns, setSignIns] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  // Every request is numbered; an answer that is no longer the latest is
+  // dropped. A slow *Show older* from before a filter changed would otherwise
+  // append the old filter's rows to the new list.
+  const latest = useRef(0);
+
+  useEffect(() => {
+    api.get<Filters>("/api/audit/filters").then(setFilters).catch(() => undefined);
+  }, []);
+
+  // The search box waits for a pause in typing rather than a button press.
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSearch(q.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [q]);
+
+  const params = useCallback((before?: number) => {
+    const out = new URLSearchParams();
+    if (search) out.set("q", search);
+    if (model) out.set("affiliate_id", model);
+    if (person) out.set("actor_id", person);
+    if (kind) out.set("kind", kind);
+    out.set("include_sign_ins", String(signIns));
+    if (before) out.set("before", String(before));
+    return out.toString();
+  }, [search, model, person, kind, signIns]);
+
+  useEffect(() => {
+    const ticket = ++latest.current;
+    setError(null);
+    setEvents(null);
+    setHasMore(false);
+    api.get<{ events: AuditEntry[]; has_more: boolean }>(`/api/audit?${params()}`)
+      .then((body) => { if (ticket === latest.current) { setEvents(body.events); setHasMore(body.has_more); } })
+      .catch((caught) => { if (ticket === latest.current) setError(caught.message); });
+  }, [params]);
+
+  async function older() {
+    if (!events || events.length === 0) return;
+    const ticket = ++latest.current;
+    const shown = events;
+    setLoadingMore(true);
+    try {
+      const body = await api.get<{ events: AuditEntry[]; has_more: boolean }>(
+        `/api/audit?${params(shown[shown.length - 1].id)}`);
+      if (ticket !== latest.current) return;
+      setEvents([...shown, ...body.events]);
+      setHasMore(body.has_more);
+    } catch (caught) {
+      if (ticket === latest.current) setError(caught instanceof Error ? caught.message : "Could not load more.");
+    } finally {
+      setLoadingMore(false);
+    }
+  }
+
+  const days: [string, AuditEntry[]][] = [];
+  for (const entry of events ?? []) {
+    const heading = dayHeading(entry.created_at);
+    const last = days[days.length - 1];
+    if (last && last[0] === heading) last[1].push(entry);
+    else days.push([heading, [entry]]);
+  }
+  const narrowed = Boolean(search || model || person || kind);
+
+  return (
+    <>
+      <section className="panel">
+        <div className="settings__pad settings__filters">
+          <div className="settings__filter-row">
+            <input className="input settings__filter-search" type="search" value={q}
+              onChange={(event) => setQ(event.target.value)}
+              placeholder="Search - a model, a colleague, a word" aria-label="Search the activity log" />
+            <select className="input settings__filter-select" value={model} onChange={(event) => setModel(event.target.value)} aria-label="Model">
+              <option value="">Any model</option>
+              {filters?.models.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}
+            </select>
+            <select className="input settings__filter-select" value={person} onChange={(event) => setPerson(event.target.value)} aria-label="Done by">
+              <option value="">Anyone</option>
+              {filters?.people.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}
+            </select>
+          </div>
+          <div className="settings__filter-row" role="group" aria-label="Kind">
+            <button type="button" className={`chip${kind === "" ? " chip--on" : ""}`} aria-pressed={kind === ""} onClick={() => setKind("")}>All</button>
+            {(filters?.kinds ?? Object.keys(KIND_LABEL)).map((value) => (
+              <button key={value} type="button" className={`chip${kind === value ? " chip--on" : ""}`} aria-pressed={kind === value}
+                onClick={() => setKind(kind === value ? "" : value)}>{KIND_LABEL[value] ?? value}</button>
+            ))}
+            <button type="button" className={`chip${signIns ? " chip--on" : ""}`} aria-pressed={signIns} onClick={() => setSignIns(!signIns)}>
+              Include sign-ins
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {error && <p className="notice notice--refused" role="alert">{error}</p>}
+      {events === null && !error && <p className="empty">Loading…</p>}
+      {events?.length === 0 && (
+        <section className="panel"><p className="settings__none">
+          {narrowed ? "Nothing matches that." : "Nothing has been recorded yet."}
+        </p></section>
+      )}
+
+      {days.map(([heading, entries], index) => (
+        <section className="panel" key={`${heading}-${index}`}>
+          <div className="panel__head"><h2 className="panel__title">{heading}</h2></div>
+          <ul className="settings__activity">
+            {entries.map((entry) => {
+              const moved = changes(entry);
+              return (
+                <li key={entry.id} className="settings__activity-row">
+                  <span className="settings__activity-what">{entry.sentence}</span>
+                  <span className="settings__activity-who">
+                    {entry.kind && <span className={`settings__kind settings__kind--${entry.kind}`}>{KIND_LABEL[entry.kind] ?? entry.kind}</span>}
+                    {entry.who} · {timeOf(entry.created_at)}
+                  </span>
+                  {entry.reason && <span className="settings__activity-reason">"{entry.reason}"</span>}
+                  {moved.length > 0 && (
+                    <details className="settings__changed">
+                      <summary>What changed</summary>
+                      <dl>
+                        {moved.map(([field, from, to]) => (
+                          <div key={field}>
+                            <dt>{field}</dt>
+                            <dd><s>{from}</s> → <ins>{to}</ins></dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </details>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ))}
+
+      {hasMore && (
+        <button type="button" className="button settings__older" onClick={older} disabled={loadingMore}>
+          {loadingMore ? "Loading…" : "Show older"}
+        </button>
+      )}
+    </>
+  );
+}
+
+// ── My preferences ────────────────────────────────────────────────────────
+
+const THEME_WORDS: [ThemeChoice, string][] = [["dark", "Dark"], ["light", "Light"], ["system", "Match my device"]];
+
+/**
+ * The theme, saved on the account so it follows this person between devices
+ * (P1). It paints at once and is put back if the server refuses.
+ */
+function AppearancePanel() {
+  const [theme, setTheme] = useState<ThemeChoice>(() => storedMaintainerChoice());
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  // The account's choice is the one that holds. This device's copy can be a
+  // step behind it on the first visit from a new laptop, and a radio that
+  // shows the wrong side cannot be pressed back to the right one.
+  useEffect(() => {
+    let live = true;
+    api.get<{ theme: ThemeChoice | null }>("/api/staff/me/preferences")
+      .then((body) => { if (live && body.theme && !themePickedThisVisit()) setTheme(body.theme); })
+      .catch(() => undefined);
+    return () => { live = false; };
+  }, []);
+
+  async function choose(value: ThemeChoice) {
+    if (saving) return;
+    const before = theme;
+    setTheme(value);
+    pickMaintainerChoice(value);
+    setError(null);
+    setSaving(true);
+    try {
+      await api.put("/api/staff/me/theme", { theme: value });
+    } catch (caught) {
+      setTheme(before);
+      pickMaintainerChoice(before);
+      setError(`${caught instanceof Error ? caught.message : "Could not save that."} Nothing changed.`);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return <>
+    <section className="panel settings__appearance">
+      <span>Theme<small>Saved to your account, so it follows you to any device</small></span>
+      <div className="seg" role="radiogroup" aria-label="Theme">{THEME_WORDS.map(([value, words]) =>
         <label key={value} className="seg-opt">
-          <input type="radio" name="admin-theme" checked={theme === value}
-            onChange={() => { setTheme(value); storeTheme(value,"maintainer"); applyMaintainerTheme(value); }} />
-          <span>{value === "dark" ? "Dark" : "Light"}</span>
+          <input type="radio" name="admin-theme" checked={theme === value} disabled={saving} onChange={() => choose(value)} />
+          <span>{words}</span>
         </label>)}</div>
     </section>
+    {error && <p className="notice notice--refused" role="alert">{error}</p>}
     <PreferenceSwitches />
   </>;
 }
 
-type Preferences = { preferences: Record<string, boolean>; labels: Record<string, string> };
+type Preferences = {
+  preferences: Record<string, boolean>;
+  labels: Record<string, string>;
+  /** One line under each switch saying what it does (P2). */
+  descriptions?: Record<string, string>;
+  theme?: ThemeChoice | null;
+};
 
 /**
  * The export's two switches (`prefRows`, Admin lines 749-757), **saved on the
@@ -179,9 +1393,10 @@ export function PreferenceSwitches() {
     {body && <div className="settings__switches">
       {Object.entries(body.labels).map(([key, label]) => {
         const on = body.preferences[key];
-        return <button key={key} type="button" role="switch" aria-checked={on} disabled={saving === key}
+        const hint = body.descriptions?.[key];
+        return <button key={key} type="button" role="switch" aria-checked={on} aria-label={label} disabled={saving === key}
           className="settings__switch" onClick={() => toggle(key)}>
-          <span>{label}</span>
+          <span className="settings__switch-words">{label}{hint && <small>{hint}</small>}</span>
           <span className={`settings__track${on ? " settings__track--on" : ""}`} aria-hidden="true"><span /></span>
         </button>;
       })}
@@ -190,782 +1405,11 @@ export function PreferenceSwitches() {
   </>;
 }
 
-type SetupRow = {
-  id: number;
-  name: string;
-  account_kind: string;
-  code?: string;
-  status: string;
-  collaboration_start_month?: string | null;
-  /** The first month her terms cover. `null` means none were ever written. */
-  earliest_terms_month?: string | null;
-  /**
-   * A09. How many of her eligible months can actually be calculated.
-   *
-   * Counts, from the server's per-month rule — the same one the profile
-   * screen uses. **Not two dates**, which is what this column compared
-   * before: her earliest terms against her start month, an answer that cannot
-   * see a gap in the middle of a year or a guaranteed month with no recorded
-   * outcome.
-   */
-  historical_setup?: {
-    eligible: number;
-    ready: number;
-    blocking: number;
-    /** The earliest month that cannot be calculated, to link straight to. */
-    first_gap: string | null;
-    start_is_recorded: boolean;
-  } | null;
-};
-
-/**
- * Whether her terms reach back to when she started.
- *
- * **A month before her earliest terms cannot be calculated**, so this is not
- * a tidiness column: it is the list of months nobody can pay, and the state
- * word is what turns a date somebody has to compare into an answer.
- */
-export function historicalState(row: SetupRow) {
-  const setup = row.historical_setup;
-  // The server did not send a verdict. Say that, rather than working one out
-  // here from whatever else is on the row - which is how this column came to
-  // have its own rule in the first place (A09).
-  if (!setup) return <span className="settings__gap">Not known</span>;
-  if (setup.eligible === 0) {
-    return <span className="settings__gap">No month can be worked out</span>;
-  }
-  // **Ready**, exactly as the approved export words it - and it now means
-  // every eligible month rather than only that her terms began early enough.
-  // Whether her start was recorded is the STARTED column's fact, not this
-  // one's, and saying it twice made the cell read like a second verdict.
-  if (setup.blocking === 0) return "Ready";
-  // The state the export never has to draw, because everything in it is
-  // ready. Counts rather than a word, because *nearly ready* is what this
-  // column exists to show and how near is the whole of the question.
-  return (
-    <span className="settings__gap">
-      {setup.blocking} of {setup.eligible}{" "}
-      {setup.eligible === 1 ? "month" : "months"} cannot be calculated
-    </span>
-  );
-}
-
-/** The export's Historical setup opens on eight and expands to the whole list. */
-const HISTORICAL_PREVIEW = 8;
-
-function SetupRoster({kind, session}: {kind: "model" | "house"; session?: Session}) {
-  const [rows,setRows] = useState<SetupRow[] | null>(null);
-  const [error,setError] = useState<string | null>(null);
-  const [expanded,setExpanded] = useState(false);
-  useEffect(() => { let live = true; api.get<{affiliates:NonNullable<typeof rows>}>("/api/affiliates?include_archived=true")
-    .then(body => { if(live) setRows(body.affiliates.filter(row => row.account_kind === kind)); })
-    .catch(caught => { if(live) setError(caught.message); }); return () => {live=false;}; },[kind]);
-  if(error) return <p className="notice notice--refused" role="alert">{error}</p>;
-  if(!rows) return <p className="empty">Loading…</p>;
-  const shownRows =
-    kind === "model" && !expanded ? rows.slice(0, HISTORICAL_PREVIEW) : rows;
-  return <section className="panel">
-    <div className="panel__head"><h2 className="panel__title">{kind === "house" ? "Brand codes" : "Historical setup"}</h2></div>
-    {/* The export's four columns for models — Model, Started, Earliest terms,
-        State — and its three for brand codes, which have no terms at all. */}
-    <table className="table"><thead><tr>
-      <th>{kind === "house" ? "Code" : "Model"}</th>
-      <th>{kind === "house" ? "Purpose" : "Started"}</th>
-      <th>{kind === "house" ? "State" : "Earliest terms"}</th>
-      {kind === "model" && <th>State</th>}
-    </tr></thead>
-      <tbody>{shownRows.map(row => <tr key={row.id}>
-        <td><Link to={`/affiliates/${row.id}`}>{kind === "house" ? row.code || "No code" : row.name}</Link></td>
-        <td>{kind === "house" ? row.name : row.collaboration_start_month ? formatMonth(row.collaboration_start_month) : "Not recorded"}</td>
-        <td>{kind === "house"
-          ? row.status
-          : row.earliest_terms_month
-            ? formatMonth(row.earliest_terms_month)
-            : <span className="settings__gap">None written</span>}</td>
-        {kind === "model" && <td>
-          {historicalState(row)}
-          {/* The way to fix it, where there is something to fix - and it goes
-              to the first month that cannot be calculated rather than to the
-              top of the grid. */}
-          {row.historical_setup && row.historical_setup.blocking > 0 && <>
-            {" · "}<Link to={`/affiliates/${row.id}/compensation`}>
-              {row.historical_setup.first_gap
-                ? `Fix from ${formatMonth(row.historical_setup.first_gap)} →`
-                : "Set the months →"}
-            </Link>
-          </>}
-        </td>}
-      </tr>)}</tbody></table>
-    {rows.length === 0 && <p className="empty">No {kind === "house" ? "brand codes" : "models"}.</p>}
-    {/* The export opens this list on eight and offers the rest behind one
-        button — twenty models is a scroll past the thing you came here to
-        press. Only for models: brand codes are a handful. */}
-    {kind === "model" && !expanded && rows.length > HISTORICAL_PREVIEW && (
-      <button type="button" className="button settings__expand" onClick={() => setExpanded(true)}>
-        Show all {rows.length} models
-      </button>
-    )}
-    {/* A09. The approved export puts the bulk review directly under this
-        table - one panel, the list and the thing you do about it. */}
-    {kind === "model" && session && <HistoricalReview session={session} />}
-  </section>;
-}
-
-function PlatformPanel({ session }: { session: Session }) {
-  const [sync, setSync] = useState<SyncStatus | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    api
-      .get<SyncStatus>("/api/operations/sync")
-      .then(setSync)
-      .catch((caught) => setError(caught.message));
-  }, []);
-
-  return (
-    <section className="panel settings__panel">
-      <div className="panel__head">
-        <h2 className="panel__title">Connection</h2>
-      </div>
-
-      {error && (
-        <p className="notice notice--refused" role="alert">
-          {error}
-        </p>
-      )}
-
-      <dl className="detail__list">
-        <Row label="Go-live month">
-          {session.platform.go_live_month ? (
-            formatMonth(session.platform.go_live_month)
-          ) : (
-            <span className="orders__quiet">Not set</span>
-          )}
-          {/*
-           * Deliberately not a field on this page. §11.2 has this blank by
-           * default and refuses every approval until it is set, on purpose -
-           * an unset go-live would silently make months already settled
-           * outside the platform look approvable a second time. Changing it
-           * is rare and consequential enough to want a deploy, not a click,
-           * so it stays an environment variable rather than a setting here.
-           */}
-          <span className="detail__note">
-            Set on the server when the platform goes live, not from here.
-          </span>
-        </Row>
-        <Row label="Shopify">
-          {sync?.shopify_configured ? "Connected" : "Not connected"}
-        </Row>
-        <Row label="Order webhooks">
-          {sync?.webhooks_configured ? "Configured" : "Not configured"}
-        </Row>
-        <Row label="Orders indexed">{sync?.orders_indexed ?? "—"}</Row>
-      </dl>
-    </section>
-  );
-}
-
-function InvitePanel({ onInvited }: { onInvited?: () => void }) {
-  const [email, setEmail] = useState("");
-  const [role, setRole] = useState("content_manager");
-  const [link, setLink] = useState<string | null>(null);
-  const [emailed, setEmailed] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [working, setWorking] = useState(false);
-
-  async function submit(event: React.FormEvent) {
-    event.preventDefault();
-    setWorking(true);
-    setError(null);
-    setLink(null);
-    try {
-      const result = await api.post<{ token: string; emailed: boolean }>(
-        "/api/auth/invitations",
-        { email: email.trim(), role },
-      );
-      setEmailed(result.emailed);
-      setLink(`${window.location.origin}/accept-invitation?token=${result.token}`);
-      setEmail("");
-      onInvited?.();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not invite them.");
-    } finally {
-      setWorking(false);
-    }
-  }
-
-  return (
-    <section className="panel settings__panel">
-      <div className="panel__head">
-        <h2 className="panel__title">Invite a staff member</h2>
-      </div>
-
-      {error && (
-        <p className="notice notice--refused" role="alert">
-          {error}
-        </p>
-      )}
-
-      {/*
-       * §16. The platform emails the link, and the link is still shown here.
-       *
-       * Both, deliberately. An emailed link is exactly what somebody wants on
-       * screen the moment the recipient says it never arrived - and on a
-       * machine with no mail credentials, which is every development machine,
-       * the copyable link is the only way in at all.
-       *
-       * Shown once because it is a working credential until it is used.
-       */}
-      {link && (
-        <div className="notice notice--settled settings__link">
-          <p>
-            {emailed
-              ? "Emailed to them. Here is the same link, in case it does not arrive — it only appears here once."
-              : "Send this to them yourself — it only appears here once."}
-          </p>
-          <code className="code settings__link-value">{link}</code>
-        </div>
-      )}
-
-      {/*
-       * One row: the address, the access, and the act - the export's form.
-       * It used to be two labelled fields stacked over a button with a
-       * paragraph above them pointing models elsewhere; the Models screen's
-       * own *Invite a model* already says that, where somebody inviting a
-       * model actually is.
-       */}
-      <form onSubmit={submit} className="settings__invite-row">
-        <input
-          className="input settings__invite-email"
-          type="email"
-          required
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-          placeholder="name@hbawear.store"
-          aria-label="Email"
-        />
-        <select
-          className="input settings__invite-role"
-          value={role}
-          onChange={(event) => setRole(event.target.value)}
-          aria-label="Access"
-        >
-          <option value="content_manager">Content manager</option>
-          <option value="affiliate_manager">Affiliate manager</option>
-          <option value="admin">Admin</option>
-        </select>
-        <button
-          type="submit"
-          className="button button--primary settings__invite-send"
-          disabled={working || !email.trim()}
-        >
-          {working ? "Sending…" : "Send invitation"}
-        </button>
-      </form>
-    </section>
-  );
-}
-
-function RosterPanel({ invite = false }: { invite?: boolean }) {
-  const [roster, setRoster] = useState<Roster | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [busyId, setBusyId] = useState<number | null>(null);
-  const [suspending, setSuspending] = useState<number | null>(null);
-  const [reason, setReason] = useState("");
-
-  function load() {
-    api
-      .get<Roster>("/api/staff")
-      .then(setRoster)
-      .catch((caught) => setError(caught.message));
-  }
-
-  useEffect(load, []);
-
-  async function changeRole(id: number, role: string) {
-    setBusyId(id);
-    setError(null);
-    try {
-      await api.post(`/api/staff/${id}/role`, { role });
-      load();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not change that.");
-    } finally {
-      setBusyId(null);
-    }
-  }
-
-  async function suspend(id: number) {
-    if (!reason.trim()) return;
-    setBusyId(id);
-    setError(null);
-    try {
-      await api.post(`/api/staff/${id}/suspend`, { reason: reason.trim() });
-      setSuspending(null);
-      setReason("");
-      load();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not suspend them.");
-    } finally {
-      setBusyId(null);
-    }
-  }
-
-  async function reactivate(id: number) {
-    setBusyId(id);
-    setError(null);
-    try {
-      await api.post(`/api/staff/${id}/reactivate`);
-      load();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not reactivate them.");
-    } finally {
-      setBusyId(null);
-    }
-  }
-
-  async function resendInvitation(id: number) {
-    setBusyId(id);
-    setError(null);
-    try {
-      await api.post(`/api/staff/invitations/${id}/resend`);
-      load();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not send it again.");
-    } finally {
-      setBusyId(null);
-    }
-  }
-
-  async function revokeInvitation(id: number) {
-    setBusyId(id);
-    setError(null);
-    try {
-      await api.post(`/api/staff/invitations/${id}/revoke`);
-      load();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not withdraw it.");
-    } finally {
-      setBusyId(null);
-    }
-  }
-
-  /*
-   * The export's Team section, in its order: the staff list on a surface of
-   * its own with no title above it - its column header already says *Staff*
-   * - then the invite form, then *Pending staff invitations* as a third
-   * surface. Pending invitations used to be a sub-table inside the staff
-   * panel with no way to send one again.
-   */
-  return (
-    <>
-      {error && (
-        <p className="notice notice--refused" role="alert">
-          {error}
-        </p>
-      )}
-
-      {roster === null && !error && <p className="empty">Loading…</p>}
-
-      {roster && (
-        <section className="panel" aria-label="Staff">
-          <table className="table settings__table">
-            <thead>
-              <tr>
-                <th>Staff</th>
-                <th className="settings__access">Access</th>
-                <th className="settings__state">State</th>
-                <th className="settings__action" aria-label="Actions" />
-              </tr>
-            </thead>
-            <tbody>
-              {roster.staff.map((row) => (
-                <tr key={row.id}>
-                  <td>
-                    {row.display_name || row.email}
-                    <span className="settings__email">{row.email}</span>
-                  </td>
-                  <td className="settings__access">
-                    <select
-                      className="input settings__role-select"
-                      value={row.role}
-                      aria-label={`Access for ${row.display_name || row.email}`}
-                      disabled={busyId === row.id || !roster.assignable_roles.includes(row.role)}
-                      onChange={(event) => changeRole(row.id, event.target.value)}
-                    >
-                      {!roster.assignable_roles.includes(row.role) && (
-                        <option value={row.role}>{ROLE_LABEL[row.role] ?? row.role}</option>
-                      )}
-                      {roster.assignable_roles.map((role) => (
-                        <option key={role} value={role}>
-                          {ROLE_LABEL[role] ?? role}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className={`settings__state settings__status--${row.status}`}>
-                    {row.status.charAt(0).toUpperCase() + row.status.slice(1)}
-                  </td>
-                  {/*
-                   * Suspend and reactivate are not in the export, and they
-                   * are not optional: a departed member of staff has to be
-                   * locked out today. They sit at the end of the row, the
-                   * quietest place that still reaches them.
-                   */}
-                  <td className="settings__action">
-                    {row.status === "suspended" ? (
-                      <button
-                        type="button"
-                        className="button button--row"
-                        disabled={busyId === row.id}
-                        onClick={() => reactivate(row.id)}
-                      >
-                        Reactivate
-                      </button>
-                    ) : suspending === row.id ? (
-                      <div className="settings__suspend-form">
-                        <input
-                          className="input settings__reason"
-                          placeholder="Why?"
-                          value={reason}
-                          onChange={(event) => setReason(event.target.value)}
-                        />
-                        <button
-                          type="button"
-                          className="button button--row button--danger"
-                          disabled={busyId === row.id || !reason.trim()}
-                          onClick={() => suspend(row.id)}
-                        >
-                          Confirm
-                        </button>
-                        <button
-                          type="button"
-                          className="button button--row"
-                          onClick={() => {
-                            setSuspending(null);
-                            setReason("");
-                          }}
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        className="button button--row button--danger"
-                        onClick={() => setSuspending(row.id)}
-                      >
-                        Suspend
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
-      )}
-
-      {invite && <InvitePanel onInvited={load} />}
-
-      {roster && (
-        <section className="panel">
-          <div className="panel__head">
-            <h2 className="panel__title">Pending staff invitations</h2>
-          </div>
-          {roster.invitations.length === 0 ? (
-            <p className="settings__none">No staff invitation is outstanding.</p>
-          ) : (
-            <ul className="settings__pending">
-              {roster.invitations.map((row) => (
-                <li key={row.id}>
-                  <span className="settings__pending-who">
-                    {row.email}
-                    <span className="settings__email">
-                      {ROLE_LABEL[row.role] ?? row.role}
-                      {" · "}
-                      {row.expired
-                        ? "Link expired"
-                        : row.created_at
-                          ? `Sent ${new Date(row.created_at).toLocaleDateString("en-GB", {
-                              day: "numeric",
-                              month: "long",
-                              year: "numeric",
-                            })}`
-                          : "Sent"}
-                    </span>
-                  </span>
-                  <button
-                    type="button"
-                    className="button button--row"
-                    disabled={busyId === row.id}
-                    onClick={() => resendInvitation(row.id)}
-                  >
-                    Resend
-                  </button>
-                  {!row.expired && (
-                    <button
-                      type="button"
-                      className="button button--row settings__withdraw"
-                      disabled={busyId === row.id}
-                      onClick={() => revokeInvitation(row.id)}
-                    >
-                      Withdraw
-                    </button>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      )}
-    </>
-  );
-}
-
-type PolicyVersionRow = {
-  id: number;
-  effective_month: string;
-  summary_markdown: string;
-  created_at: string;
-};
-
-/**
- * §16, Phase 10 Batch C. The commission rules, in the words a model reads -
- * not the ADRs, which stay the engineering record for nobody but whoever
- * reads code.
- *
- * **A new version, never an edit.** A rate reworded next year is a fact about
- * the future, not a rewrite of what a model already agreed to in September -
- * every payroll snapshot freezes which version it was calculated under, and
- * that has to stay true regardless of what this form does later.
- */
-function PolicyPanel() {
-  const [versions, setVersions] = useState<PolicyVersionRow[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [adding, setAdding] = useState(false);
-  const [effectiveMonth, setEffectiveMonth] = useState(currentMonth());
-  const [text, setText] = useState("");
-  const [working, setWorking] = useState(false);
-
-  function load() {
-    api
-      .get<{ versions: PolicyVersionRow[] }>("/api/policy/versions")
-      .then((body) => setVersions(body.versions))
-      .catch((caught) => setError(caught.message));
-  }
-
-  useEffect(load, []);
-
-  async function submit(event: React.FormEvent) {
-    event.preventDefault();
-    setWorking(true);
-    setError(null);
-    try {
-      await api.post("/api/policy/versions", {
-        effective_month: effectiveMonth,
-        summary_markdown: text,
-      });
-      setText("");
-      setAdding(false);
-      load();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not save that.");
-    } finally {
-      setWorking(false);
-    }
-  }
-
-  const newest = versions && versions.length > 0 ? versions[versions.length - 1] : null;
-
-  return (
-    <section className="panel settings__panel">
-      <div className="panel__head">
-        <h2 className="panel__title">Policy in force</h2>
-      </div>
-
-      {error && (
-        <p className="notice notice--refused" role="alert">
-          {error}
-        </p>
-      )}
-
-      <p className="settings__note">
-        What a model reads, not the engineering record. A new version applies
-        from its effective month onward - it never changes what an already
-        agreed month was told.
-      </p>
-
-      {versions === null ? (
-        <p className="empty">Loading…</p>
-      ) : versions.length === 0 ? (
-        <p className="empty">
-          None recorded yet. Every settled month simply shows no rules were in
-          force - add the first version below.
-        </p>
-      ) : (
-        <ul className="settings__policy-list">
-          {versions.map((version) => (
-            <li key={version.id} className="settings__policy-item">
-              <div className="settings__policy-head">
-                <strong>Effective {formatMonth(version.effective_month)}</strong>
-                {version.id === newest?.id && (
-                  <span className="detail__note">current</span>
-                )}
-              </div>
-              <PolicyText markdown={version.summary_markdown} />
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {!adding ? (
-        <button
-          type="button"
-          className="button"
-          onClick={() => {
-            setAdding(true);
-            setEffectiveMonth(currentMonth());
-          }}
-        >
-          Add a version
-        </button>
-      ) : (
-        <form onSubmit={submit} className="comp__form">
-          <label className="field comp__field">
-            <span className="field__label">Effective from</span>
-            {/* A select, as every month control outside terms editing is. It
-             *  offers from this month (or the current version's, if later
-             *  than that is still ahead) to the end of next year; the server
-             *  still decides what may be saved. */}
-            <MonthPicker value={effectiveMonth} onChange={setEffectiveMonth} size="section" label={false}
-              months={monthsBetween(
-                [currentMonth(), newest?.effective_month ?? currentMonth()].sort()[0],
-                `${Number(currentMonth().slice(0, 4)) + 1}-12`,
-              )} />
-            <span className="field__hint">
-              {newest
-                ? `Must be later than ${formatMonth(newest.effective_month)}, the current version.`
-                : "Every month from here onward reads this version."}
-            </span>
-          </label>
-          <label className="field">
-            <span className="field__label">The text</span>
-            <textarea
-              className="input reopen__textarea"
-              rows={10}
-              required
-              value={text}
-              onChange={(event) => setText(event.target.value)}
-              placeholder="## How commission works&#10;&#10;Commission is worked out on..."
-            />
-            <span className="field__hint">
-              Plain language, not the ADRs. `## ` starts a heading, `**text**`
-              is bold - nothing else is read specially.
-            </span>
-          </label>
-          <div className="payroll__actions">
-            <button
-              type="button"
-              className="button"
-              onClick={() => {
-                setAdding(false);
-                setError(null);
-              }}
-              disabled={working}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="button button--primary"
-              disabled={working || !text.trim()}
-            >
-              {working ? "Saving…" : "Save this version"}
-            </button>
-          </div>
-        </form>
-      )}
-    </section>
-  );
-}
-
-function ActivityPanel() {
-  const [events, setEvents] = useState<AuditEntry[] | null>(null);
-  const [subject, setSubject] = useState("");
-  const [error, setError] = useState<string | null>(null);
-
-  function load(query: string) {
-    api
-      .get<{ events: AuditEntry[] }>(
-        `/api/audit${query ? `?subject=${encodeURIComponent(query)}` : ""}`,
-      )
-      .then((body) => setEvents(body.events))
-      .catch((caught) => setError(caught.message));
-  }
-
-  useEffect(() => load(""), []);
-
-  return (
-    <section className="panel settings__panel">
-      <div className="panel__head">
-        <h2 className="panel__title">Recent activity</h2>
-      </div>
-
-      <form
-        className="settings__search"
-        onSubmit={(event) => {
-          event.preventDefault();
-          load(subject.trim());
-        }}
-      >
-        <input
-          className="input"
-          placeholder="Filter by subject — affiliate:3, or a name"
-          value={subject}
-          onChange={(event) => setSubject(event.target.value)}
-        />
-        <button type="submit" className="button">
-          Filter
-        </button>
-      </form>
-
-      {error && (
-        <p className="notice notice--refused" role="alert">
-          {error}
-        </p>
-      )}
-
-      {events === null && !error && <p className="empty">Loading…</p>}
-
-      {events?.length === 0 && <p className="empty">Nothing matches that.</p>}
-
-      {events && events.length > 0 && (
-        <ul className="settings__activity">
-          {events.map((event) => (
-            // The export's entry (Admin lines 774-779): what happened in words,
-            // then who and when. The action code stays in the trail itself.
-            <li key={event.id} className="settings__activity-row" title={`${event.action} · ${event.subject}`}>
-              <span className="settings__activity-what">{event.sentence}</span>
-              <span className="settings__activity-who">
-                {event.who} · {longWhen(event.created_at)}
-              </span>
-              {event.reason && (
-                <span className="settings__activity-reason">"{event.reason}"</span>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-}
-
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="detail__row">
-      <dt className="detail__label">{label}</dt>
-      <dd className="detail__value">{children}</dd>
+    <div className="settings__fact">
+      <dt>{label}</dt>
+      <dd>{children}</dd>
     </div>
   );
 }

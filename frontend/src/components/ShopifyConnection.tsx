@@ -2,6 +2,13 @@ import { useEffect, useState } from "react";
 
 import { api } from "../lib/api";
 
+/** *30 September, 14:20*, in Cairo. */
+function verifiedWhen(iso: string): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Africa/Cairo", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  }).format(new Date(iso));
+}
+
 /** What the server says about the connection. **Never a secret.** */
 export type ShopifyConnectionState = {
   source: "saved" | "environment" | null;
@@ -77,6 +84,15 @@ export function ShopifyConnection({ onChanged }: { onChanged?: (state: ShopifyCo
   return (
     <section className="pay-detail__card sync__card">
       <h2 className="pay-detail__card-title">Connection</h2>
+      {/* S1: when it was last proven to work, and where the credentials in
+          use come from - the server sent both and the card showed neither. */}
+      {state && state.source && (
+        <p className="shop-conn__meta">
+          {state.verified_at ? `Verified ${verifiedWhen(state.verified_at)}` : "Not verified yet"}
+          {" · "}
+          {state.source === "saved" ? "saved here" : "from the server's own settings"}
+        </p>
+      )}
       <form className="shop-conn" onSubmit={update}>
         <label className="shop-conn__field">
           <span className="shop-conn__label">Store domain</span>

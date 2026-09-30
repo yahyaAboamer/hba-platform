@@ -42,6 +42,10 @@ class UserAccount(Base):
     __tablename__ = "user_account"
     __table_args__ = (
         CheckConstraint(f"status IN ({_STATUS_LIST})", name="user_account_status_valid"),
+        CheckConstraint(
+            "maintainer_theme IS NULL OR maintainer_theme IN ('dark', 'light', 'system')",
+            name="user_account_maintainer_theme_valid",
+        ),
         # Unique on lower(email): addresses are case-insensitive in practice, and
         # two accounts differing only by case would be an account-takeover route.
         Index("user_account_email_lower_key", text("lower(email)"), unique=True),
@@ -53,6 +57,9 @@ class UserAccount(Base):
     status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="invited")
     display_name: Mapped[str | None] = mapped_column(String(120))
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    #: A staff member's theme for the admin tool, on the account so it follows
+    #: them between devices (Settings audit P1). `None` is the dark default.
+    maintainer_theme: Mapped[str | None] = mapped_column(String(6))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )

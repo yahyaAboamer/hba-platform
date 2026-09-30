@@ -36,6 +36,7 @@ EXPECTED_KEYS = {
     #: so this is a safe earliest bound on the orders it can have - which is
     #: what decides the month its ownership starts from.
     "created_at",
+    "starts_at",
 }
 
 
@@ -53,13 +54,14 @@ def _client(node, capture: dict | None = None):
     )
 
 
-def _node(value, *, status="ACTIVE", title="X", usage=1, created=None):
+def _node(value, *, status="ACTIVE", title="X", usage=1, created=None, starts=None):
     return {
         "codeDiscount": {
             "__typename": "DiscountCodeBasic",
             "title": title,
             "status": status,
             "createdAt": created,
+            "startsAt": starts,
             "asyncUsageCount": usage,
             "customerGets": {"value": value},
         }
@@ -238,3 +240,28 @@ def test_an_unreadable_creation_date_does_not_break_verification():
 
     assert result["exists"] is True
     assert result["created_at"] is None
+
+
+# ── The code's start date (ADR 0053) ──────────────────────────────────────────
+
+
+def test_the_codes_start_date_is_read():
+    """A model's start month comes from when her code goes live on Shopify."""
+    node = _node(
+        {"__typename": "DiscountPercentage", "percentage": 0.1},
+        created="2026-05-20T09:00:00Z",
+        starts="2026-06-01T00:00:00Z",
+    )
+    result = verify_discount_code(_client(node), "NOUR10")
+
+    assert (result["starts_at"].year, result["starts_at"].month) == (2026, 6)
+
+
+def test_a_missing_code_has_no_start_date():
+    assert verify_discount_code(_client(None), "NOPE")["starts_at"] is None
+
+
+def test_the_start_date_is_asked_for():
+    capture: dict = {}
+    verify_discount_code(_client(None, capture), "NOPE")
+    assert "startsAt" in capture["body"]

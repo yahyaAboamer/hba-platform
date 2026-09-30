@@ -1,4 +1,54 @@
-# Where the work is — 30 September 2026 (data reset, batches Q1–Q3)
+# Where the work is — 30 September 2026 (data reset, batches Q1–Q3, Settings audit S1–S4)
+
+## Latest: the Settings audit (30 September, evening) — **local, not merged**
+
+The audit is `docs/design/admin-settings-tab-audit-2026-09-30.html` (untracked,
+with its screenshots). The owner approved the design, then (same evening):
+nothing removed outright; Historical setup hides itself once history is
+final; brand codes are added only under Settings; a model's start month comes
+from her code's start on Shopify; her code never changes, so the
+register/change-code form and routes are removed (ADR 0053).
+
+- **Security (was live on production):** an affiliate manager could invite an
+  admin, or resend a pending admin invitation, and so make themselves an
+  admin. Now `can_grant` (only access you hold) guards invite, resend and
+  withdraw; one live invitation per address; nobody changes or suspends their
+  own account.
+- **Settings screen rebuilt** to the approved mock: rail shows only what the
+  person can use (a content manager used to land on a blank page); Team with
+  last sign-in, *What can each access do?*, a confirmation for every access
+  change, a row menu for suspend/reactivate, copy-link; pending invitations one
+  per address with Remove for lapsed ones; Shopify with *Needs attention* and
+  *Tools*, a real date field, trivia removed, identical stopped jobs grouped;
+  Historical setup problems first, applicants left out, counts split at
+  go-live, auto-hidden when complete (`totals.unknown_start` keeps it while a
+  start is unknown); Brand codes with state pills, orders this month and a
+  one-row add; Pay policy with a live preview and a month picker that offers
+  only months the server takes; Activity log with name search (the old filter
+  found nothing by name), model/person/kind filters, sign-ins hidden, day
+  headings, *What changed* and *Show older*; My preferences with the theme
+  saved to the account (migration **`b7c2d5e30007`**) and a line under each
+  switch.
+- **ADR 0053** (and `docs/RULES.md`): start month from Shopify `startsAt`
+  (else `createdAt`), floored at January 2026, written when the code is
+  confirmed and never over a recorded one; `POST /api/affiliates/{id}/codes`
+  and `/replace-code` removed; reactivating an archived model restarts her own
+  code (with backfill), refused if someone else now holds it.
+- **Verified:** backend **90/90 files** through `run-suite.sh` (label
+  `settings-audit-2`; the tally also shows the first, since-fixed
+  reachability failure); frontend **568 tests / 35 files**, build green;
+  browser pass on a throwaway database at 1280 and 390, light and dark, as
+  admin, content manager and affiliate manager. ECC Python and React
+  reviewers ran; every finding above low was fixed with a test.
+- **Not done:** go-live to October 2026 (an environment variable change on
+  Railway, waiting on the owner's word for which environments); policy
+  versions editable before their month (D4) — needs its own ADR because
+  `policy_version` is append-only; the read-only production check for past
+  admin invitations by non-admins (D1).
+- **New migration for the release gates:** `b7c2d5e30007` (one nullable
+  column) joins the list to rehearse.
+- **Throwaway databases** `hba_browser_settings` and
+  `hba_browser_portal_tabs` can be dropped.
 
 **Replaces `2026-09-28-continuation-handoff.md`**, kept for its record of
 batches O and P. Its *Release gates* and *Decisions not to reopen* still stand
@@ -116,7 +166,7 @@ fixed with a test. The one low left open is below.
 3. **Admin sidebar at phone width** (pre-existing, not Q3): at 390px
    `layout__sidebar` is 521px wide and every admin page scrolls sideways by
    131px. The admin is designed for 1280/1440; fix or accept it deliberately.
-4. **Activity feed on long histories:** `/api/audit` matches the subject as a
+4. ~~**Activity feed on long histories**~~ fixed by the Settings audit: `/api/audit` now matches an exact subject (`q=affiliate:12`). Was: `/api/audit` matches the subject as a
    substring with a limit of 200, and the profile keeps exact matches. A
    low-numbered model with a very long history can lose her oldest entries.
    An exact-subject option on the endpoint fixes it.

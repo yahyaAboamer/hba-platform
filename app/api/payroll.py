@@ -563,8 +563,20 @@ def _render_historical(result: dict) -> dict:
     # and a reader who is not told where the line falls reads that as a bug.
     live = go_live_month()
     before = f" before {_month_words(live)}" if live else ""
+    from app.config import settings
+
+    unlocked = settings.historical_finalisation_unlocked
     if done is None:
-        line = f"{months(totals['ready'])}{before} can be finalised now."
+        # "Can be finalised now" sat directly under "Finalising is locked" on
+        # every environment still locked (Settings audit H4). Ready is the
+        # fact; whether it may be acted on is said by the lock, once.
+        line = (
+            f"{months(totals['ready'])}{before} can be finalised now."
+            if unlocked
+            else f"{months(totals['ready'])}{before} are ready."
+            if totals["ready"] != 1
+            else f"1 month{before} is ready."
+        )
         if not totals["ready"] and not totals["blocked"]:
             line = f"No month{before} is waiting to be finalised."
     else:
@@ -581,13 +593,11 @@ def _render_historical(result: dict) -> dict:
             f" {totals['blocked']} still {verb} information HBA has not "
             "recorded yet."
         )
-    from app.config import settings
-
     return {
         **result,
         #: A09. Whether finalising is permitted on this environment at all.
         #: The review is always available - it is how the gaps are found.
-        "finalisation_unlocked": settings.historical_finalisation_unlocked,
+        "finalisation_unlocked": unlocked,
         "summary": line,
         "approved_total": format_egp(
             sum(row.get("obligation_piastres", 0) for row in result.get("approved", []))

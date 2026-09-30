@@ -16,10 +16,10 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_permission
+from app.api.deps import active_role, require_permission
 from app.config import settings
 from app.core.businesstime import utcnow
-from app.core.permissions import Permission
+from app.core.permissions import GRANT_REFUSED, Permission, can_grant
 from app.db import get_session
 from app.models.identity import Invitation, UserAccount
 from app.services.audit import record_audit
@@ -28,6 +28,7 @@ from app.services.notifications import invitation_link, invitation_sent
 from app.services.staff import (
     ASSIGNABLE_ROLES,
     change_role,
+    invitable_roles,
     list_pending_invitations,
     list_staff,
     reactivate_staff,
@@ -64,6 +65,29 @@ def _invitation_or_404(db: Session, invitation_id: int) -> Invitation:
     return invitation
 
 
+def _may_act_on(db: Session, actor: UserAccount, invitation: Invitation) -> None:
+    """Resending or withdrawing an invitation is granting or refusing the access
+    it carries - and Resend hands back a working link - so both are held to the
+    same rule as sending one (`can_grant`). Without this an affiliate manager
+    could resend a pending *admin* invitation and set that account's password
+    themselves."""
+    if not can_grant(active_role(db, actor), invitation.role):
+        raise HTTPException(403, GRANT_REFUSED)
+
+
+def _invitation_row(invitation: Invitation, now) -> dict:
+    return {
+        "id": invitation.id,
+        "email": invitation.email,
+        "role": invitation.role,
+        "expires_at": _isoformat(invitation.expires_at),
+        "expired": invitation.expires_at <= now,
+        # When it went out - the approved panel writes *Finance - Sent
+        # 3 November 2026* under each address.
+        "created_at": _isoformat(invitation.created_at),
+    }
+
+
 @router.get("")
 def roster(
     _actor: UserAccount = Depends(require_permission(Permission.SETTINGS_MANAGE)),
@@ -82,20 +106,49 @@ def roster(
             for row in list_staff(db)
         ],
         "invitations": [
-            {
-                "id": invitation.id,
-                "email": invitation.email,
-                "role": invitation.role,
-                "expires_at": _isoformat(invitation.expires_at),
-                "expired": invitation.expires_at <= now,
-                # When it went out - the approved panel writes *Finance - Sent
-                # 3 November 2026* under each address, and two invitations to
-                # one address are otherwise indistinguishable.
-                "created_at": _isoformat(invitation.created_at),
-            }
-            for invitation in list_pending_invitations(db, exclude_roles=("affiliate",))
+            _invitation_row(invitation, now)
+            for invitation in list_pending_invitations(
+                db, exclude_roles=("affiliate",), current_only=True
+            )
         ],
         "assignable_roles": sorted(ASSIGNABLE_ROLES),
+        "invitable_roles": invitable_roles(active_role(db, _actor)),
+        #: What each role grants, from `ROLES` itself, so the screen's
+        #: "What can each access do?" can never disagree with the server (T4).
+        "role_permissions": _role_permissions(),
+    }
+
+
+def _role_permissions() -> dict[str, list[str]]:
+    from app.core.permissions import permissions_for
+
+    return {role: sorted(permissions_for(role)) for role in sorted(ASSIGNABLE_ROLES)}
+
+
+@router.get("/invitations")
+def staff_invitations(
+    actor: UserAccount = Depends(require_permission(Permission.INVITATIONS_SEND)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """The pending staff invitations this person may act on, and the roles they
+    may invite to.
+
+    For whoever may invite without holding `settings.manage` - an affiliate
+    manager. They used to get the invite form and nothing else: no list of what
+    they had sent, so nothing to resend or withdraw (Settings audit, X2).
+    """
+    role = active_role(db, actor)
+    now = utcnow()
+    return {
+        "invitations": [
+            _invitation_row(invitation, now)
+            for invitation in list_pending_invitations(
+                db, exclude_roles=("affiliate",), current_only=True
+            )
+            if can_grant(role, invitation.role)
+        ],
+        "invitable_roles": invitable_roles(role),
+        "role_permissions": _role_permissions(),
     }
 
 
@@ -161,6 +214,7 @@ def revoke(
     db: Session = Depends(get_session),
 ) -> dict:
     invitation = _invitation_or_404(db, invitation_id)
+    _may_act_on(db, actor, invitation)
     try:
         revoke_invitation(db, invitation, actor_id=actor.id, actor_email=actor.email)
     except ValueError as exc:
@@ -194,6 +248,7 @@ def resend(
     a moment when both work.
     """
     invitation = _invitation_or_404(db, invitation_id)
+    _may_act_on(db, actor, invitation)
     if invitation.accepted_at is not None:
         raise HTTPException(400, "This invitation has already been used")
 
@@ -234,15 +289,29 @@ class PreferenceBody(BaseModel):
     enabled: bool
 
 
+class ThemeBody(BaseModel):
+    theme: str = Field(min_length=1, max_length=6)
+
+
+def _preferences_body(db: Session, actor: UserAccount) -> dict:
+    from app.services.staff_prefs import DESCRIPTIONS, SWITCHES, preferences_for
+
+    return {
+        "preferences": preferences_for(db, actor.id),
+        "labels": SWITCHES,
+        "descriptions": DESCRIPTIONS,
+        #: `None` until chosen: the screen keeps the dark default.
+        "theme": actor.maintainer_theme,
+    }
+
+
 @router.get("/me/preferences")
 def my_preferences(
     actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_VIEW)),
     db: Session = Depends(get_session),
 ) -> dict:
-    """The signed-in member of staff's own switches. Absent means on."""
-    from app.services.staff_prefs import SWITCHES, preferences_for
-
-    return {"preferences": preferences_for(db, actor.id), "labels": SWITCHES}
+    """The signed-in member of staff's own switches and theme. Absent means on."""
+    return _preferences_body(db, actor)
 
 
 @router.put("/me/preferences")
@@ -252,11 +321,29 @@ def change_my_preference(
     db: Session = Depends(get_session),
 ) -> dict:
     """Turn one of this account's own switches on or off. Nobody else's."""
-    from app.services.staff_prefs import SWITCHES, set_preference
+    from app.services.staff_prefs import set_preference
 
     try:
-        preferences = set_preference(db, actor, body.key, body.enabled)
+        set_preference(db, actor, body.key, body.enabled)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from None
     db.commit()
-    return {"preferences": preferences, "labels": SWITCHES}
+    return _preferences_body(db, actor)
+
+
+@router.put("/me/theme")
+def change_my_theme(
+    body: ThemeBody,
+    actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_VIEW)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """This account's theme for the admin tool - dark, light, or the device's.
+    Saved on the account so it follows the person, not the laptop (P1)."""
+    from app.services.staff_prefs import set_theme
+
+    try:
+        set_theme(db, actor, body.theme)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from None
+    db.commit()
+    return _preferences_body(db, actor)

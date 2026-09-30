@@ -195,9 +195,28 @@ def set_status(
     affiliate.status = status
 
     # Reactivating somebody archived brings her back into parcel matching,
-    # which skips anyone with `archived_at` set (ADR 0052).
+    # which skips anyone with `archived_at` set (ADR 0052) - and restarts her
+    # own code from this month, since her code never changes (ADR 0053).
     if status == AffiliateStatus.ACTIVE and previous == AffiliateStatus.ARCHIVED:
         affiliate.archived_at = None
+        from sqlalchemy.exc import IntegrityError
+
+        from app.services.codes import reopen_code_for
+
+        try:
+            with db.begin_nested():
+                reopen_code_for(
+                    db,
+                    affiliate,
+                    business_month(utcnow()),
+                    actor_id=actor_id,
+                    actor_email=actor_email,
+                )
+        except IntegrityError as exc:
+            raise ValueError(
+                f"{affiliate.name}'s code belongs to somebody else now, so she "
+                "cannot be brought back on it."
+            ) from exc
 
     # Section 16, and the email the whole go-live depends on arriving. Only on
     # the transition into `active` from a pending application - reactivating a
@@ -543,6 +562,41 @@ def update_details(
     )
 
 
+def record_start_from_code(
+    db: Session,
+    affiliate: AffiliateProfile,
+    found: dict,
+    *,
+    actor_id: int | None = None,
+    actor_email: str | None = None,
+) -> str | None:
+    """Her start month, from what Shopify says about her code (ADR 0053).
+
+    Written only when nobody has recorded one - a start somebody typed is the
+    exception this field exists for and is never overwritten. A code set to
+    start next month starts her next month: the screens already cap what they
+    offer at the working month, so a start ahead of it opens nothing early.
+    """
+    from app.services.codes import model_start_month_for
+
+    if affiliate.collaboration_start_month is not None or not found.get("exists"):
+        return None
+    month = model_start_month_for(found.get("starts_at"), found.get("created_at"))
+    if month is None:
+        return None
+    affiliate.collaboration_start_month = month
+    record_audit(
+        db,
+        action="affiliate.collaboration_start_set",
+        subject=f"affiliate:{affiliate.id}",
+        actor_id=actor_id,
+        actor_email=actor_email,
+        before={"collaboration_start_month": None},
+        after={"collaboration_start_month": month, "from": "shopify_code"},
+    )
+    return month
+
+
 def set_collaboration_start(
     db: Session,
     affiliate: AffiliateProfile,
@@ -551,13 +605,13 @@ def set_collaboration_start(
     actor_id: int | None = None,
     actor_email: str | None = None,
 ) -> None:
-    """Record the month she actually started with HBA.
+    """Record the month she actually started with HBA, by hand.
 
-    **Nothing derives this and nothing ever will**, which is the reason the
-    column exists. Rule H01: a code's first order, the invitation and the
-    platform signup are three different dates, none of them this one, and they
-    agree often enough that using one as a proxy fails quietly rather than
-    loudly. So it is entered, by somebody who knows, per model.
+    Since ADR 0053 it is normally written for her, from her code's start on
+    Shopify (`record_start_from_code`); this is the exception, for somebody who
+    knows better. Rule H01 still holds for everything else: her first order,
+    the invitation and the platform signup are different dates, and none of
+    them is used.
 
     Refuses a month before the platform's data horizon. Not because a model
     cannot have started earlier — many did — but because there are no orders

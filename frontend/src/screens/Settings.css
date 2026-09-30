@@ -206,6 +206,7 @@
 
 .data__field {
   max-width: 11rem;
+  margin-bottom: 0;
 }
 
 .data__months {
@@ -318,7 +319,16 @@
 .settings__track--on { border-color:var(--accent); background:var(--accent); }
 .settings__track--on > span { left:21px; background:var(--paper); }
 .settings__switch-error { margin-top:12px; }
-@media(max-width:800px) { .settings__workspace { flex-direction:column; } .settings__navigation { flex-direction:row; overflow-x:auto; width:100%; } .settings__navigation button { white-space:nowrap; } .settings__workspace > .settings__sections { width:100%; } }
+/* X5: on a phone the rail wraps into rows of chips rather than scrolling
+   sideways with the last sections cut off and no hint that they exist. */
+@media(max-width:800px) {
+  .settings__workspace { flex-direction:column; }
+  .settings__navigation { flex-direction:row; flex-wrap:wrap; gap:6px; width:100%; }
+  .settings__navigation button { min-height:36px; padding:7px 11px; border:1px solid var(--rule); background:var(--surface); white-space:nowrap; font-size:13px; }
+  .settings__navigation .settings__selected { border-color:var(--accent); }
+  .settings__group, .settings__help { display:none; }
+  .settings__workspace > .settings__sections { width:100%; }
+}
 
 /* ── Team, measured off the export's Settings (lines 606–647) ──────────── */
 
@@ -343,7 +353,6 @@
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
-  padding: 12px 18px 16px;
 }
 
 .settings__invite-row .input {
@@ -605,8 +614,234 @@
   line-height: normal;
 }
 
+.shop-conn__meta { margin: 4px 0 0; font-size: 12.5px; color: var(--faint); }
+.sync__hint { margin: 10px 0 0; font-size: 12.5px; color: var(--faint); }
+.data__tool + .data__import { margin-top: var(--space-4); }
+
 .shop-conn__submit {
   margin-top: 14px;
   min-height: 40px;
   padding: 10px 15px;
+}
+
+/* ── The Settings redesign (audit of 30 September 2026) ────────────────────
+ *
+ * One panel rhythm throughout (X3): a title bar, then a body 14px 18px - the
+ * same inset as `.panel__head` - and a rule between stacked parts. Invite,
+ * Policy and Activity used to add a second layer of padding and the
+ * historical review had none.
+ */
+.settings__pad { padding: 14px 18px; }
+.settings__rule { border-top: 1px solid var(--rule); }
+.settings__muted { color: var(--quiet); }
+.settings__head-note { font-size: 12.5px; color: var(--faint); }
+.settings__done { margin: 0; font-size: 13.5px; }
+
+/* The rail's two groups: what changes the business, and what changes you. */
+.settings__group {
+  padding: 12px 12px 4px;
+  font-size: 11px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.settings__group:first-child { padding-top: 0; }
+.settings__help {
+  margin-top: 10px;
+  padding: 10px 12px 0;
+  border-top: 1px solid var(--rule);
+  font-size: 13px;
+  color: var(--accent);
+}
+.settings__navigation .settings__selected { font-weight: 600; }
+
+/* Team */
+.settings__seen { width: 130px; font-size: 13px; color: var(--quiet); }
+.settings__you {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 11px;
+}
+.settings__row--off td { color: var(--faint); }
+.settings__pill--active, .settings__pill--ok { color: var(--accent); }
+.settings__pill--invited, .settings__pill--owed { color: var(--owed); }
+.settings__pill--suspended { color: var(--refused); }
+.settings__pill--off { color: var(--faint); }
+
+.settings__menu-wrap { position: relative; display: inline-block; }
+.settings__kebab {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--quiet);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+.settings__kebab:hover, .settings__kebab[aria-expanded="true"] { background: var(--hover); }
+.settings__menu {
+  position: absolute;
+  right: 0;
+  top: 40px;
+  z-index: 5;
+  display: block;
+  min-width: 220px;
+  padding: 6px;
+  border-radius: var(--radius);
+  background: var(--raise);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .18), 0 0 0 1px var(--rule);
+  text-align: left;
+}
+.settings__menu button {
+  display: block;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--ink);
+  font-size: 13.5px;
+  text-align: left;
+  cursor: pointer;
+}
+.settings__menu button:hover { background: var(--hover); }
+.settings__menu small { display: block; margin-top: 2px; font-size: 12px; color: var(--faint); }
+.settings__menu .settings__menu-danger { color: var(--refused); }
+
+/* The link after an invitation: shown once, with a way to copy it. */
+.settings__linkbox {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 13px;
+}
+.settings__linkbox > span { flex: 1 1 100%; }
+.settings__linkbox code {
+  flex: 1 1 220px;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.settings__explain { margin-top: 12px; font-size: 13px; }
+.settings__explain summary { color: var(--accent); cursor: pointer; min-height: 32px; display: flex; align-items: center; }
+.settings__perm { width: 100%; margin-top: 8px; border-collapse: collapse; font-size: 12.5px; }
+.settings__perm th, .settings__perm td { padding: 7px 8px; border-top: 1px solid var(--rule); text-align: left; vertical-align: top; }
+.settings__perm thead th { border-top: 0; font-size: 11.5px; color: var(--faint); font-weight: 400; }
+.settings__perm th + th, .settings__perm-mark { width: 92px; text-align: center; }
+.settings__perm-mark { color: var(--accent); }
+.settings__perm-no { color: var(--faint); }
+
+/* Shopify, for somebody without settings.manage */
+.settings__facts { margin: 0; }
+.settings__fact {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 11px 18px;
+  border-top: 1px solid var(--rule);
+  font-size: 13px;
+}
+.settings__fact:first-child { border-top: 0; }
+.settings__fact dt { color: var(--quiet); }
+.settings__fact dd { margin: 0; text-align: right; }
+
+/* Historical setup: names and months on one line; what is needed below its
+   pill, so the link never runs off the edge. */
+.settings__hist td:nth-child(-n+3) { white-space: nowrap; }
+.settings__need { line-height: 1.5; }
+.settings__need .pill { display: inline-block; }
+.settings__fix { display: block; margin-top: 4px; font-size: 13px; }
+
+/* The first list in a card needs no rule above it. */
+.data__body > :first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+
+/* Brand codes */
+.settings__code-input { flex: 0 1 220px; min-width: 180px; text-transform: uppercase; }
+.settings__code-input::placeholder { text-transform: none; }
+.settings__link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-size: 13px;
+  cursor: pointer;
+}
+.settings__note--tail { margin: 12px 0 0; }
+
+/* Pay policy */
+.settings__policy { padding: 14px 0; border-top: 1px solid var(--rule); }
+.settings__policy:first-child { padding-top: 0; border-top: 0; }
+.settings__policy > .pill { display: inline-block; margin-bottom: 10px; }
+.settings__earlier { padding-top: 12px; border-top: 1px solid var(--rule); font-size: 13px; }
+.settings__earlier summary { color: var(--accent); cursor: pointer; min-height: 32px; display: flex; align-items: center; }
+.settings__policy-add { margin-top: 14px; }
+.settings__inline-field { display: inline-flex; align-items: center; gap: 8px; }
+.settings__split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.settings__policy-text { min-height: 260px; font-family: var(--font-mono, ui-monospace, monospace); font-size: 12.5px; }
+.settings__preview {
+  min-height: 260px;
+  padding: 12px 14px;
+  border: 1px dashed var(--rule-strong, var(--rule));
+  border-radius: var(--radius);
+  overflow-wrap: anywhere;
+}
+.settings__acts { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+@media (max-width: 800px) { .settings__split { grid-template-columns: 1fr; } }
+
+/* Activity log */
+.settings__filters { display: grid; gap: 10px; }
+.settings__filter-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.settings__filter-search { flex: 1 1 260px; min-width: 0; }
+.settings__filter-select { flex: 0 1 190px; width: auto; }
+.settings__kind {
+  display: inline-block;
+  margin-right: 8px;
+  padding: 1px 7px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 11px;
+}
+.settings__kind--money { color: var(--accent); }
+.settings__kind--access { color: var(--info, var(--accent)); }
+.settings__kind--models { color: var(--owed); }
+.settings__kind--content, .settings__kind--settings { color: var(--quiet); }
+.settings__changed { margin-top: 6px; font-size: 12.5px; }
+.settings__changed summary { color: var(--accent); cursor: pointer; }
+.settings__changed dl { margin: 6px 0 0; padding: 8px 10px; border-radius: 6px; background: var(--hover); }
+.settings__changed dl > div { display: grid; grid-template-columns: minmax(90px, 160px) 1fr; gap: 10px; padding: 2px 0; }
+.settings__changed dt { color: var(--faint); }
+.settings__changed dd { margin: 0; overflow-wrap: anywhere; }
+.settings__changed s { color: var(--refused); }
+.settings__changed ins { color: var(--accent); text-decoration: none; }
+.settings__older { align-self: flex-start; }
+
+/* My preferences: what each setting does, under it (P2). */
+.settings__appearance > span small,
+.settings__switch-words small {
+  display: block;
+  margin-top: 3px;
+  font-size: 12.5px;
+  color: var(--faint);
+}
+.settings__appearance { flex-wrap: wrap; }
+.settings__switch-words { min-width: 0; }
+.settings__switches .settings__switch:last-child { border-bottom: 0; }
+
+@media (max-width: 640px) {
+  .settings__seen, .settings__table th.settings__seen { display: none; }
+  .settings__pending li { flex-wrap: wrap; }
+  .settings__pending-who { flex-basis: 100%; }
 }

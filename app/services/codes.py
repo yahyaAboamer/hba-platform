@@ -8,14 +8,13 @@ change every time a code moved.
 
 from datetime import datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.businesstime import business_month, month_add, parse_month
 from app.core.periods import OPEN_ENDED, PLATFORM_START_MONTH, validate_period
 from app.models.affiliates import AffiliateProfile
 from app.models.codes import DiscountCodePeriod
-from app.models.orders import OrderIndex
 from app.services.audit import record_audit
 
 
@@ -72,6 +71,22 @@ def start_month_for(created_at: datetime | None) -> str:
     if created_at is None:
         return PLATFORM_START_MONTH
     return max(PLATFORM_START_MONTH, business_month(created_at))
+
+
+def model_start_month_for(
+    starts_at: datetime | None, created_at: datetime | None
+) -> str | None:
+    """The month a model starts with HBA, read from her code (ADR 0053).
+
+    The code's start date on Shopify where it has one, else when it was
+    created - in Cairo, and never before the platform's data horizon. `None`
+    when Shopify has told us neither, which leaves her start unrecorded rather
+    than guessed.
+    """
+    when = starts_at or created_at
+    if when is None:
+        return None
+    return max(PLATFORM_START_MONTH, business_month(when))
 
 
 def register_code(
@@ -318,24 +333,6 @@ def replace_code(
     return period
 
 
-def _orders_on_or_after(db: Session, code: str, month: str) -> int:
-    """How many orders used this code in that month or later.
-
-    Read straight from the order index rather than through attribution: the
-    question is whether ending a period here would strand real orders, and
-    that does not depend on who currently owns them.
-    """
-    return (
-        db.execute(
-            select(func.count())
-            .select_from(OrderIndex)
-            .where(OrderIndex.discount_codes.any(code))
-            .where(OrderIndex.business_month >= month)
-        ).scalar()
-        or 0
-    )
-
-
 def open_codes_for(
     db: Session, affiliate: AffiliateProfile
 ) -> list[DiscountCodePeriod]:
@@ -350,97 +347,62 @@ def open_codes_for(
     )
 
 
-def retire_and_replace(
+def reopen_code_for(
     db: Session,
     affiliate: AffiliateProfile,
+    month: str,
     *,
-    old_period: DiscountCodePeriod,
-    new_code: str,
-    new_start_month: str,
-    verified_at: datetime | None = None,
     actor_id: int | None = None,
     actor_email: str | None = None,
-) -> DiscountCodePeriod:
-    """They changed their code on Shopify. Carry them across to it.
+) -> DiscountCodePeriod | None:
+    """Give a returning model her own code back, from `month` (ADR 0053).
 
-    **Nothing about them changes.** Same affiliate, same record, same dashboard,
-    same history. Only which code earns for them from which month: the old code
-    ends, the new one begins the month after, and both point at them. Their
-    earlier months keep showing the old code and its orders; later months show
-    the new one. Their performance runs continuously across the two.
+    Archiving ended her code with the month she left. Her code is the one she
+    applied with and does not change, so coming back restarts that code rather
+    than asking for a new one: reopened where it ended this month or later,
+    otherwise a new period of the same code from `month`. Earlier months are
+    never touched - the gap while she was away stays hers to nobody.
 
-    This is deliberately not an edit of the old code. That code was live and
-    has attributed orders - rewriting it would change what those orders
-    belonged to, and a month already calculated would silently disagree with
-    itself. Ending it preserves exactly what it earned, for exactly the months
-    it earned them.
+    The database refuses the overlap if somebody else holds the code by now,
+    and the caller says so. `None` when she never had a code to restart.
     """
-    parse_month(new_start_month)
-
-    # The overlap case, refused rather than guessed at.
-    #
-    # Ending the old code the month before the new one starts is only right
-    # when the new code was created at the moment of handover. If it was
-    # created earlier - set up in June, switched to in August - the old code
-    # would be ended in May while they were still earning on it through July,
-    # and those months would fall outside every period they own. Two months of
-    # their sales would belong to nobody, and nothing would say so.
-    #
-    # The precise harm is what is checked, not the calendar gap: orders on the
-    # old code at or after the new code's start. A new code created early that
-    # nobody used costs nothing, and is allowed.
-    orphaned = _orders_on_or_after(db, old_period.code, new_start_month)
-    if orphaned:
-        raise ValueError(
-            f"{old_period.code} has {orphaned} order(s) in {new_start_month} or "
-            f"later, but {normalise_code(new_code)} was created in "
-            f"{new_start_month}. Retiring the old code there would leave those "
-            "orders belonging to nobody. "
-            "This is the case where a code is created ahead of the switch. "
-            "Handling it needs a way to say which month the switch actually "
-            "happened, which is deliberately not built - see docs/limits.md."
-        )
-
-    if new_start_month <= old_period.start_month:
-        raise ValueError(
-            f"{normalise_code(new_code)} would start in {new_start_month}, which is "
-            f"not after {old_period.code} started ({old_period.start_month}). A code "
-            "that overlaps rather than follows is a second code, not a replacement."
-        )
-
-    old_end = month_add(new_start_month, -1)
-    previous_end = old_period.end_month
-    old_period.end_month = old_end
-
-    replacement = DiscountCodePeriod(
-        affiliate_id=affiliate.id,
-        code=normalise_code(new_code),
-        start_month=new_start_month,
-        end_month=OPEN_ENDED,
-        shopify_verified_at=verified_at,
+    parse_month(month)
+    if open_codes_for(db, affiliate):
+        return None
+    last = db.scalar(
+        select(DiscountCodePeriod)
+        .where(DiscountCodePeriod.affiliate_id == affiliate.id)
+        .order_by(DiscountCodePeriod.end_month.desc().nulls_last(), DiscountCodePeriod.id.desc())
     )
-    db.add(replacement)
-    db.flush()
-
-    record_audit(
+    if last is None:
+        return None
+    if last.end_month is not None and last.end_month >= month_add(month, -1):
+        before = last.end_month
+        last.end_month = OPEN_ENDED
+        db.flush()
+        record_audit(
+            db,
+            action="code.reopened",
+            subject=f"affiliate:{affiliate.id}",
+            actor_id=actor_id,
+            actor_email=actor_email,
+            before={"code": last.code, "end_month": before},
+            after={"code": last.code, "end_month": None},
+        )
+        # Orders on her code after it ended belonged to nobody; they are hers
+        # again from the month after it ended, as registering would do.
+        queue_backfill(db, affiliate, last.code, month_add(before, 1), OPEN_ENDED)
+        return last
+    return register_code(
         db,
-        action="code.replaced",
-        subject=f"affiliate:{affiliate.id}",
+        affiliate,
+        last.code,
+        month,
+        OPEN_ENDED,
+        verified_at=last.shopify_verified_at,
         actor_id=actor_id,
         actor_email=actor_email,
-        before={"code": old_period.code, "end_month": previous_end},
-        after={
-            "retired": {"code": old_period.code, "end_month": old_end},
-            "took_over": {
-                "code": replacement.code,
-                "start_month": new_start_month,
-                "verified": verified_at is not None,
-            },
-        },
     )
-
-    queue_backfill(db, affiliate, replacement.code, new_start_month, OPEN_ENDED)
-    return replacement
 
 
 def close_codes_for(

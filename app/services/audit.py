@@ -14,6 +14,7 @@ the change it describes land in the same transaction: either both happen or
 neither does.
 """
 
+import re
 from typing import Any
 
 from sqlalchemy import select
@@ -125,19 +126,145 @@ def record_audit(
     return event
 
 
+#: The activity log's kinds (Settings audit R1), by the start of an action.
+#: Every action the platform records falls in exactly one - a test walks the
+#: source to keep that true.
+KINDS: dict[str, tuple[str, ...]] = {
+    "money": ("payroll.", "payment.", "payout_destination.", "compensation."),
+    "access": (
+        "auth.",
+        "invitation.",
+        "staff.role_changed",
+        "staff.suspended",
+        "staff.reactivated",
+    ),
+    "models": ("affiliate.", "application.", "code."),
+    "content": ("target.",),
+    "settings": ("shopify.", "policy_version.", "staff.preference_changed"),
+}
+
+#: Signing in and out: true, recorded, and the thing that buried every payment
+#: under a busy day's log-ins (R3). Hidden unless asked for.
+SIGN_IN_ACTIONS = ("auth.login", "auth.logout")
+
+#: `affiliate:12`, `user:3`, `invitation:nour@example.com` - an exact subject,
+#: copied from somewhere. Matched whole, so `affiliate:1` is not also 10 to 19.
+_SUBJECT = re.compile(r"^(affiliate|user|invitation|policy_version):\S+$")
+
+#: The escape character for LIKE patterns below.
+_ESCAPE = "\\"
+
+
+def kind_of(action: str) -> str | None:
+    """Which of `KINDS` an action belongs to, or `None`."""
+    for name, prefixes in KINDS.items():
+        if any(action.startswith(prefix) for prefix in prefixes):
+            return name
+    return None
+
+
+def _like(text: str) -> str:
+    """`%` and `_` typed into a search are letters, not wildcards."""
+    escaped = (
+        text.replace(_ESCAPE, _ESCAPE * 2)
+        .replace("%", _ESCAPE + "%")
+        .replace("_", _ESCAPE + "_")
+    )
+    return f"%{escaped}%"
+
+
 def recent_events(
-    db: Session, *, limit: int = 50, subject_contains: str | None = None
+    db: Session,
+    *,
+    limit: int = 50,
+    subject_contains: str | None = None,
+    q: str | None = None,
+    affiliate_id: int | None = None,
+    actor_id: int | None = None,
+    kind: str | None = None,
+    include_sign_ins: bool = True,
+    before_id: int | None = None,
 ) -> list[AuditEvent]:
     """The most recent business events, newest first. Read-only counterpart to
     `record_audit` - nothing here writes, and this is the only function in the
     module that reads.
 
-    Filtered by a substring on `subject` (`affiliate:12`,
-    `invitation:nour@example.com`) rather than a structured query, because
-    that is the shape a person actually has in hand when they come looking -
-    a name or an id copied from another screen, not a table and a column.
+    `q` is what a person types: a model's name, a colleague's name or address,
+    a word from a reason - or an exact subject such as `affiliate:12`. The box
+    promised "or a name" and searched only subjects, which never hold one:
+    *Sara* found nothing while a dozen entries were about her (R1).
+
+    `subject_contains` is the older substring filter, kept for its callers.
+    `before_id` pages backwards: everything older than the last entry already
+    shown (R2).
     """
-    query = select(AuditEvent).order_by(AuditEvent.created_at.desc()).limit(limit)
+    from sqlalchemy import or_, tuple_
+
+    from app.models.affiliates import AffiliateProfile
+    from app.models.identity import UserAccount
+
+    query = select(AuditEvent)
     if subject_contains:
-        query = query.where(AuditEvent.subject.ilike(f"%{subject_contains}%"))
-    return list(db.scalars(query))
+        query = query.where(
+            AuditEvent.subject.ilike(_like(subject_contains), escape=_ESCAPE)
+        )
+    if affiliate_id is not None:
+        query = query.where(AuditEvent.subject == f"affiliate:{affiliate_id}")
+    if actor_id is not None:
+        query = query.where(AuditEvent.actor_id == actor_id)
+    if kind:
+        prefixes = KINDS.get(kind)
+        if prefixes is None:
+            raise ValueError(f"No such kind: {kind!r}")
+        query = query.where(
+            or_(*(AuditEvent.action.startswith(p, autoescape=True) for p in prefixes))
+        )
+    if not include_sign_ins:
+        query = query.where(AuditEvent.action.notin_(SIGN_IN_ACTIONS))
+
+    text = (q or "").strip()
+    if text and _SUBJECT.match(text):
+        query = query.where(AuditEvent.subject == text)
+    elif text:
+        pattern = _like(text)
+        model_ids = list(
+            db.scalars(
+                select(AffiliateProfile.id).where(
+                    AffiliateProfile.name.ilike(pattern, escape=_ESCAPE)
+                )
+            )
+        )
+        people_ids = list(
+            db.scalars(
+                select(UserAccount.id).where(
+                    or_(
+                        UserAccount.display_name.ilike(pattern, escape=_ESCAPE),
+                        UserAccount.email.ilike(pattern, escape=_ESCAPE),
+                    )
+                )
+            )
+        )
+        query = query.where(
+            or_(
+                AuditEvent.subject.ilike(pattern, escape=_ESCAPE),
+                AuditEvent.reason.ilike(pattern, escape=_ESCAPE),
+                AuditEvent.actor_email.ilike(pattern, escape=_ESCAPE),
+                AuditEvent.subject.in_([f"affiliate:{m}" for m in model_ids]),
+                AuditEvent.subject.in_([f"user:{p}" for p in people_ids]),
+                AuditEvent.actor_id.in_(people_ids),
+            )
+        )
+
+    if before_id is not None:
+        anchor = db.get(AuditEvent, before_id)
+        # An anchor that is not there means nothing older can be named -
+        # answering with page one again would loop a caller for ever.
+        if anchor is None:
+            return []
+        if anchor is not None:
+            query = query.where(
+                tuple_(AuditEvent.created_at, AuditEvent.id)
+                < tuple_(anchor.created_at, anchor.id)
+            )
+    query = query.order_by(AuditEvent.created_at.desc(), AuditEvent.id.desc())
+    return list(db.scalars(query.limit(limit)))

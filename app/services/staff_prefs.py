@@ -39,6 +39,36 @@ SWITCHES = {
     "weekly_targets_reminder": "Weekly reminder to record achieved content",
 }
 
+#: key -> one line under the switch saying what it actually does (Settings
+#: audit P2). Neither label said, and a switch nobody understands stays on.
+DESCRIPTIONS = {
+    "home_notices": (
+        "The notice cards at the top of Home. Off, Home still says how many "
+        "are hidden."
+    ),
+    "weekly_targets_reminder": (
+        "An email once a week listing how many models have nothing recorded "
+        "for the month yet."
+    ),
+}
+
+#: The admin tool's themes. `system` follows the device's own setting.
+THEMES = ("dark", "light", "system")
+
+
+def set_theme(db: Session, account: UserAccount, theme: str) -> str:
+    """Save this account's theme. Leaves the transaction to the caller.
+
+    Not audited: how a screen looks to one person changes nothing anybody else
+    sees, and the trail is for what does.
+    """
+    if theme not in THEMES:
+        raise ValueError(f"There is no theme called {theme!r}.")
+    account.maintainer_theme = theme
+    db.flush()
+    return theme
+
+
 #: Roughly weekly: the gap after the last run finished (app.services.schedule).
 REMINDER_INTERVAL = timedelta(days=7)
 

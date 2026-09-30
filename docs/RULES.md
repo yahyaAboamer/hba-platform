@@ -127,13 +127,23 @@ payroll without touching a maintainer screen.
   written reason.
   - *Pause* keeps her sign-in, her code and her earnings.
   - *Archive* closes her sign-in and ends her codes with the current month;
-    reactivating clears `archived_at` and she needs a new code.
+    reactivating clears `archived_at` and ~~she needs a new code~~ **restarts
+    her own code from the current month** (ADR 0053, amending 0052).
   - *Decline* releases her code and she sees that she was not accepted;
     *Reconsider* returns her to Applications.
   - **Approval needs a verified code and, for a paid account, pay terms
     covering the working month.**
   - *Erase* is admin-only and only for a model with no order, payroll,
     payment, adjustment, parcel or proof file.
+- **A model's start month is her code's start on Shopify** (ADR 0053): the
+  code's start date, else its creation date, in Cairo, never before January
+  2026. Written when Shopify confirms her code, only if none is recorded;
+  staff may still change it on her profile. **Her code is the one she applied
+  with and is never replaced** - there is no route to register another or move
+  her onto a new one. A typo in an unconfirmed code may still be corrected.
+- **Nobody grants access they do not hold** (`can_grant`). An invitation, a
+  resend and a withdrawal are all held to it; nobody changes or suspends their
+  own staff account.
 - **Pay terms may be set up to twelve months ahead** (ADR 0052). An approved
   month still cannot change.
 - **Three compensation types, not one.** `commission`,

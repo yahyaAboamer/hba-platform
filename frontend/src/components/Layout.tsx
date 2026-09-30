@@ -3,7 +3,8 @@ import { Link, NavLink, Outlet } from "react-router-dom";
 
 import { api, signOutAndLeave } from "../lib/api";
 import type { Session } from "../lib/api";
-import { applyMaintainerTheme, storedTheme } from "../lib/theme";
+import { applyMaintainerChoice, storedMaintainerChoice, themePickedThisVisit } from "../lib/theme";
+import type { ThemeChoice } from "../lib/theme";
 import "./Layout.css";
 
 /** The six workspaces and account menu from the approved admin export. */
@@ -37,7 +38,6 @@ export function Layout({ session }: { session: Session }) {
    * white on the way there is a tool that flashes at you every morning.
    */
   const [accountOpen, setAccountOpen] = useState(false);
-  const [theme] = useState(() => storedTheme("maintainer"));
   /**
    * The counts beside the section names, as the approved export draws them.
    *
@@ -54,9 +54,29 @@ export function Layout({ session }: { session: Session }) {
       .catch(() => undefined);
   }, []);
 
+  // This device's copy paints the first frame; the account's choice, once it
+  // answers, is the one that holds (Settings audit P1). *Match my device*
+  // keeps following the device while the tool is open.
   useEffect(() => {
-    applyMaintainerTheme(theme);
-  }, [theme]);
+    applyMaintainerChoice(storedMaintainerChoice());
+    api
+      .get<{ theme: ThemeChoice | null }>("/api/staff/me/preferences")
+      .then((body) => {
+        if (body.theme && !themePickedThisVisit()) applyMaintainerChoice(body.theme);
+      })
+      .catch(() => undefined);
+    let media: MediaQueryList | null = null;
+    try {
+      media = window.matchMedia("(prefers-color-scheme: light)");
+    } catch {
+      media = null;
+    }
+    const follow = () => {
+      if (storedMaintainerChoice() === "system") applyMaintainerChoice("system");
+    };
+    media?.addEventListener?.("change", follow);
+    return () => media?.removeEventListener?.("change", follow);
+  }, []);
 
   return (
     <div className="layout">

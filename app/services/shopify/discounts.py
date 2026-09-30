@@ -31,6 +31,7 @@ query CodeByCode($code: String!) {
         title
         status
         createdAt
+        startsAt
         usageLimit
         asyncUsageCount
         customerGets {
@@ -68,6 +69,7 @@ def _not_found(code: str) -> dict:
         "usage_count": None,
         "title": None,
         "created_at": None,
+        "starts_at": None,
     }
 
 
@@ -77,7 +79,7 @@ def verify_discount_code(client: ShopifyClient, code: str) -> dict:
     A missing code is a normal answer, not an exception: it is the likeliest
     result of a typo, and the caller needs to show it rather than crash.
 
-    The same six keys come back in every branch, so a caller never has to guard
+    The same keys come back in every branch, so a caller never has to guard
     for a missing field.
     """
     normalised = str(code or "").strip().upper()
@@ -109,4 +111,8 @@ def verify_discount_code(client: ShopifyClient, code: str) -> dict:
         #: exists, so this is a safe earliest bound on the orders it can have -
         #: which is what decides the month its ownership starts from.
         "created_at": _timestamp(discount.get("createdAt")),
+        #: When the code is set to go live - Shopify's "Active dates". A
+        #: model's start month is read from this (ADR 0053), falling back to
+        #: `created_at` for a code that has none.
+        "starts_at": _timestamp(discount.get("startsAt")),
     }

@@ -64,6 +64,20 @@ def create_invitation(
             raise ValueError(f"{email} is already on the programme")
         raise ValueError(f"An account already exists for {email}")
 
+    # **One live link per address** (Settings audit review). Several could be
+    # live at once, and the staff list shows the newest - so withdrawing that
+    # one left an older link, possibly an admin's, working and out of sight.
+    # The new invitation replaces whatever was live for this address.
+    now = utcnow()
+    for earlier in db.scalars(
+        select(Invitation).where(
+            func.lower(Invitation.email) == email,
+            Invitation.accepted_at.is_(None),
+            Invitation.expires_at > now,
+        )
+    ):
+        earlier.expires_at = now
+
     token = secrets.token_urlsafe(TOKEN_BYTES)
     invitation = Invitation(
         email=email,

@@ -511,6 +511,7 @@ def test_every_month_covered_is_reported_ready(db):
         "eligible": 3,
         "ready": 3,
         "blocking": 0,
+        "blocking_before_go_live": 0,
         "first_gap": None,
         "start_is_recorded": True,
     }

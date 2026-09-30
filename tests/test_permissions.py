@@ -184,3 +184,24 @@ def test_no_test_references_a_role_that_does_not_exist():
 
 def test_the_four_expected_roles_exist_and_no_others():
     assert VALID_ROLES == {"admin", "affiliate_manager", "content_manager", "affiliate"}
+
+
+# ── Granting (Settings audit X1) ────────────────────────────────────────────
+
+
+def test_nobody_may_grant_more_than_they_hold():
+    from app.core.permissions import can_grant
+
+    assert can_grant("admin", "admin")
+    assert can_grant("affiliate_manager", "content_manager")
+    assert can_grant("affiliate_manager", "affiliate_manager")
+    assert not can_grant("affiliate_manager", "admin")
+    assert not can_grant("content_manager", "affiliate_manager")
+    assert not can_grant("admin", "no_such_role")
+
+
+def test_anybody_may_grant_a_model_role():
+    """A model's role grants nothing at all."""
+    from app.core.permissions import ROLES, can_grant
+
+    assert all(can_grant(role, "affiliate") for role in ROLES)

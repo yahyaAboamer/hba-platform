@@ -51,6 +51,8 @@ export type HistoricalReviewBody = {
     refused?: number;
     blocked: number;
     already_finalised: number;
+    /** Started models whose first month nobody knows yet. */
+    unknown_start?: number;
   };
 };
 

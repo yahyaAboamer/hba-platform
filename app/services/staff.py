@@ -18,7 +18,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.businesstime import utcnow
-from app.core.permissions import VALID_ROLES
+from app.core.permissions import VALID_ROLES, can_grant
 from app.models.identity import Invitation, RoleAssignment, UserAccount
 from app.services.audit import record_audit
 
@@ -26,6 +26,16 @@ from app.services.audit import record_audit
 #: assignment exists at all (app/api/deps.py, active_role) - nobody is
 #: deliberately given it, so it is not offered as a target here.
 ASSIGNABLE_ROLES = frozenset(VALID_ROLES - {"affiliate"})
+
+#: Refused when somebody acts on their own row. Another admin does it.
+OWN_ACCOUNT = "You cannot change your own access. Another admin can."
+
+
+def invitable_roles(actor_role: str) -> list[str]:
+    """The staff roles this person may invite somebody to - never more than
+    they hold themselves (`can_grant`). The invite form offers these and no
+    others, so a refusal is not the first the person hears of it."""
+    return sorted(role for role in ASSIGNABLE_ROLES if can_grant(actor_role, role))
 
 
 def list_staff(db: Session) -> list[dict]:
@@ -73,7 +83,7 @@ def list_staff(db: Session) -> list[dict]:
 
 
 def list_pending_invitations(
-    db: Session, *, exclude_roles: tuple[str, ...] = ()
+    db: Session, *, exclude_roles: tuple[str, ...] = (), current_only: bool = False
 ) -> list[Invitation]:
     """Invitations sent and not yet used, oldest first.
 
@@ -110,9 +120,27 @@ def list_pending_invitations(
     # `now()`, which in Postgres is the *transaction* start time, so rows
     # written together share a timestamp exactly and their order is otherwise
     # undefined. Two invitations sent in the same second would shuffle.
-    return list(
+    rows = list(
         db.scalars(query.order_by(Invitation.created_at.desc(), Invitation.id.desc()))
     )
+    if not current_only:
+        return rows
+    # **One line per address, the newest.** Resend replaces a link and Withdraw
+    # cancels one, and both used to leave the old row behind as "Link
+    # expired" - with nothing able to clear it, since an expired link cannot
+    # be withdrawn. The list grew with every press of the buttons meant to
+    # tidy it (Settings audit, T1). A withdrawn newest row means the person
+    # meant "nobody is invited", so the address goes altogether.
+    seen: set[str] = set()
+    current: list[Invitation] = []
+    for row in rows:
+        address = row.email.lower()
+        if address in seen:
+            continue
+        seen.add(address)
+        if row.withdrawn_at is None:
+            current.append(row)
+    return current
 
 
 def _admin_count(db: Session, *, excluding: int | None = None) -> int:
@@ -162,6 +190,10 @@ def change_role(
 
     if new_role not in ASSIGNABLE_ROLES:
         raise ValueError(f"Not an assignable role: {new_role!r}")
+    # Nobody changes their own access - one mis-click demoting yourself locks
+    # you out of the very screen that would undo it (Settings audit, T2).
+    if actor_id is not None and actor_id == user.id:
+        raise ValueError(OWN_ACCOUNT)
 
     before = active_role(db, user)
     if before == new_role:
@@ -214,6 +246,8 @@ def suspend_staff(
 
     if not str(reason or "").strip():
         raise ValueError("Suspending an account needs a written reason")
+    if actor_id is not None and actor_id == user.id:
+        raise ValueError("You cannot suspend your own account. Another admin can.")
     if user.status == "suspended":
         raise ValueError(f"{user.display_name or user.email} is already suspended")
 
@@ -269,7 +303,12 @@ def revoke_invitation(
     actor_id: int | None,
     actor_email: str | None,
 ) -> Invitation:
-    """Withdraw an invitation nobody has used yet.
+    """Withdraw an invitation nobody has used yet - or, once it has lapsed,
+    take it off the list.
+
+    A lapsed link is already closed, so the second case changes nothing about
+    who can get in; it records that somebody looked at it and meant *nobody is
+    invited*, which is what removes the address from the pending list.
 
     No separate "revoked" state on the row. `accept_invitation` already
     refuses anything past `expires_at`, so backdating it to now closes the
@@ -278,11 +317,13 @@ def revoke_invitation(
     """
     if invitation.accepted_at is not None:
         raise ValueError("This invitation has already been used")
-    if invitation.expires_at <= utcnow():
-        raise ValueError("This invitation has already expired")
+    if invitation.withdrawn_at is not None:
+        raise ValueError("This invitation has already been withdrawn")
 
     now = utcnow()
-    invitation.expires_at = now
+    lapsed = invitation.expires_at <= now
+    if not lapsed:
+        invitation.expires_at = now
     # Recorded as well as expired, so a link somebody cancelled can be told
     # from one nobody opened in time. Only one of those is worth resending.
     invitation.withdrawn_at = now
@@ -293,6 +334,6 @@ def revoke_invitation(
         subject=f"invitation:{invitation.email}",
         actor_id=actor_id,
         actor_email=actor_email,
-        after={"email": invitation.email, "role": invitation.role},
+        after={"email": invitation.email, "role": invitation.role, "lapsed": lapsed},
     )
     return invitation
