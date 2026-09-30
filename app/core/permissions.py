@@ -20,6 +20,8 @@ class Permission:
 
     AFFILIATES_VIEW = "affiliates.view"
     AFFILIATES_MANAGE = "affiliates.manage"
+    #: Erasing a model outright (ADR 0052). Held by no role but admin.
+    AFFILIATES_ERASE = "affiliates.erase"
     COMPENSATION_MANAGE = "compensation.manage"
     TARGETS_RECORD = "targets.record"
     TARGETS_MANAGE = "targets.manage"

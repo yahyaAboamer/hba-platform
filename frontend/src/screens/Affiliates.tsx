@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
-import { Link, useSearchParams, useNavigate } from "react-router-dom";
+import { Link, useLocation, useSearchParams, useNavigate } from "react-router-dom";
 
 import { Money } from "../components/Money";
 import { api } from "../lib/api";
@@ -34,8 +34,11 @@ export const SEGMENTS: { key: Segment; label: string }[] = [
 export const ROSTER_STATUS: Record<string, { label: string; tone: string }> = {
   pending: { label: "Application", tone: "owed" },
   active: { label: "Active", tone: "approved" },
-  inactive: { label: "Inactive", tone: "quiet" },
-  archived: { label: "Inactive", tone: "quiet" },
+  // ADR 0052: all three sit under the *Inactive* filter, and each says which
+  // kind of inactive it is - they mean different things to her.
+  inactive: { label: "Paused", tone: "owed" },
+  archived: { label: "Archived", tone: "quiet" },
+  declined: { label: "Declined", tone: "quiet" },
 };
 
 /** The export lists twelve to a page. */
@@ -45,7 +48,7 @@ export type Affiliate = {
   id: number;
   name: string;
   phone: string | null;
-  status: "pending" | "active" | "inactive" | "archived";
+  status: "pending" | "active" | "inactive" | "archived" | "declined";
   account_kind: "model" | "house";
   is_payable: boolean;
   created_at: string | null;
@@ -221,7 +224,8 @@ export function rosterMatches(
     if (
       segment === "inactive" &&
       row.status !== "inactive" &&
-      row.status !== "archived"
+      row.status !== "archived" &&
+      row.status !== "declined"
     ) {
       return false;
     }
@@ -270,6 +274,7 @@ export function Affiliates() {
    * link now, rather than four words of instruction.
    */
   const [params, setParams] = useSearchParams();
+  const arrivedWith = (useLocation().state as { notice?: string } | null)?.notice ?? null;
   // An address from before the filters were renamed (*all*, *waiting*)
   // lands on Active rather than on an empty table.
   const asked = params.get("segment");
@@ -434,6 +439,14 @@ export function Affiliates() {
       {error && (
         <p className="notice notice--refused" role="alert">
           {error}
+        </p>
+      )}
+
+      {/* Arriving from an erase (ADR 0052): her page is gone, so the
+          confirmation is said here. */}
+      {arrivedWith && (
+        <p className="notice" role="status">
+          {arrivedWith}
         </p>
       )}
 

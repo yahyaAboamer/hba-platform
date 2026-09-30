@@ -185,6 +185,27 @@ export function AffiliatePortal({ session }: { session: Session }) {
     );
   }
 
+  // ADR 0052: turned down. She is told here rather than by email, and there is
+  // nothing to do - only HBA can reconsider - so this is the whole screen.
+  if (mine.status === "declined") {
+    return (
+      <main className="affiliate" data-theme={theme}>
+        <PortalHeader
+          name={me.name || session.actor.display_name || session.actor.email}
+          code={null}
+          codePending={false}
+        />
+        <section className="affiliate__declined" role="status">
+          <h1>Your application wasn&rsquo;t accepted this time</h1>
+          <p>
+            Thank you for applying to HBA. If you think something was missed,
+            contact HBA and they can look at it again.
+          </p>
+        </section>
+      </main>
+    );
+  }
+
   const context: PortalContext = {
     me,
     month,
@@ -198,14 +219,15 @@ export function AffiliatePortal({ session }: { session: Session }) {
   return (
     <main className={accountClass} data-theme={theme}>
       {/*
-       * True across every tab, so it sits above them rather than on one. §8:
-       * *not earning, may return* - and anything they were already owed still
-       * stands, which is the part they will be worried about.
+       * True across every tab, so it sits above them rather than on one.
+       * ADR 0052: a pause keeps her code counting and her earnings running -
+       * this used to say new sales were not counted, which was never what
+       * the platform did.
        */}
       {mine.status === "inactive" && (
         <p className="notice affiliate__paused">
-          Your code is paused, so new sales are not being counted. Anything you
-          were already owed still stands.
+          HBA has paused your account. Your code still counts your sales, and
+          anything you are owed still stands.
         </p>
       )}
 

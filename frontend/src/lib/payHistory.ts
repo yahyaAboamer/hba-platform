@@ -28,6 +28,8 @@ export type MonthRow = {
   approved: boolean;
   /** Before go-live: a guaranteed minimum here records an outcome (ADR 0036). */
   settled_outside: boolean;
+  /** Not reached yet: terms may be set ahead, up to twelve months (ADR 0052). */
+  future?: boolean;
   terms: Terms | null;
   outcome: "met" | "missed" | null;
 };
@@ -74,6 +76,8 @@ export type PayHistory = {
   affiliate_id: number;
   name: string;
   working_month: string;
+  /** The last month listed. A run reaching it is saved open-ended (ADR 0052). */
+  horizon_month?: string;
   go_live_month: string | null;
   /** Her first month with an order. `null` for a model who has never sold. */
   /** The first month she sold in — `null` for a model who never has. */

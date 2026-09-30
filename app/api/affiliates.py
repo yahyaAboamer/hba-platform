@@ -34,7 +34,11 @@ from app.services.affiliates import (
     archive_affiliate,
     create_affiliate,
     create_house_account,
+    decline_application,
+    erase_affiliate,
+    erase_blockers,
     get_affiliate,
+    reconsider_application,
     list_affiliates,
     readiness,
     set_collaboration_start,
@@ -277,6 +281,9 @@ def _affiliate_detail(
         "months": months_for(db, affiliate),
         "codes": codes_with_status(db, affiliate, month),
         "compensation": _compensation_payload(terms_for(db, affiliate, month)),
+        #: What approval checks (ADR 0052): terms for the *working* month,
+        #: whichever month the profile happens to be showing.
+        "working_terms_set": terms_for(db, affiliate, working) is not None,
         "payout_destination": mask_destination(current_destination(db, affiliate)),
         #: She applied from outside Egypt and HBA arranges her payment by hand
         #: (ADR 0046). Why there is no destination, rather than a gap.
@@ -293,6 +300,9 @@ def _affiliate_detail(
         "required_payout_fields": {
             method: list(fields) for method, fields in REQUIRED_PAYOUT_FIELDS.items()
         },
+        #: Why she cannot be erased, in words (ADR 0052); empty when she can.
+        #: The screen offers Erase only to an admin and only when this is empty.
+        "erase_blockers": erase_blockers(db, affiliate),
     }
 
 
@@ -580,6 +590,42 @@ def get_affiliate_route(
     )
 
 
+class EraseBody(BaseModel):
+    reason: str = Field(min_length=1, max_length=500)
+    #: Typed by the admin as a last check: her name, exactly as shown.
+    confirm_name: str
+
+
+@router.post("/{affiliate_id}/erase")
+def erase_affiliate_route(
+    affiliate_id: int,
+    body: EraseBody,
+    actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_ERASE)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Erase a model who never earned anything (ADR 0052). Admin only.
+
+    Refused while any order, payroll month, payment, parcel or proof is hers,
+    and unless her name is typed back - there is no undo.
+    """
+    affiliate = _get_affiliate_or_404(db, affiliate_id)
+    if body.confirm_name.strip() != affiliate.name.strip():
+        raise HTTPException(400, "Type her name exactly as shown to confirm.")
+    try:
+        erased = erase_affiliate(
+            db,
+            affiliate,
+            reason=body.reason,
+            actor_id=actor.id,
+            actor_email=actor.email,
+        )
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(409, str(exc)) from exc
+    db.commit()
+    return {"erased": erased}
+
+
 @router.patch("/{affiliate_id}")
 def update_affiliate_status_route(
     affiliate_id: int,
@@ -637,8 +683,34 @@ def update_affiliate_status_route(
                 actor_is_staff=True,
             )
 
+        # ADR 0052: pausing, archiving and declining each carry a written
+        # reason, kept on her record and shown in her Activity.
+        if body.status in (
+            AffiliateStatus.INACTIVE, AffiliateStatus.ARCHIVED, AffiliateStatus.DECLINED
+        ) and body.status != affiliate.status and not (body.reason or "").strip():
+            raise ValueError("Give a reason. It is kept with her record.")
+
         if body.status is None:
             pass
+        elif body.status == AffiliateStatus.DECLINED:
+            decline_application(
+                db,
+                affiliate,
+                reason=body.reason or "",
+                actor_id=actor.id,
+                actor_email=actor.email,
+            )
+        elif (
+            body.status == AffiliateStatus.PENDING
+            and affiliate.status == AffiliateStatus.DECLINED
+        ):
+            reconsider_application(
+                db,
+                affiliate,
+                actor_id=actor.id,
+                actor_email=actor.email,
+                reason=body.reason,
+            )
         elif body.status == AffiliateStatus.ARCHIVED:
             archive_affiliate(
                 db,
@@ -1040,17 +1112,23 @@ def _pay_history_payload(db: Session, affiliate: AffiliateProfile) -> dict:
         if row.recorded_outcome is not None
     }
 
+    # ADR 0052: terms may be set up to twelve months ahead, so an agreed raise
+    # from next month is entered the day it is agreed. The last arrangement
+    # stays open-ended from wherever it starts; the screen closes a run at
+    # `horizon_month` by leaving its end open.
+    horizon = month_add(working, 12)
+
     periods = all_terms(db, affiliate)
     covers = {}
     for period in periods:
         month = period.start_month
-        while month <= (period.end_month or working):
+        while month <= (period.end_month or horizon):
             covers[month] = period
             month = month_add(month, 1)
 
     months = []
     month = PLATFORM_START_MONTH
-    while month <= working:
+    while month <= horizon:
         terms = covers.get(month)
         months.append(
             {
@@ -1064,6 +1142,8 @@ def _pay_history_payload(db: Session, affiliate: AffiliateProfile) -> dict:
                 # was calculated from these terms, and changing them now would
                 # change what it was worth after the money moved.
                 "approved": month in approved,
+                # Not reached yet: arrangeable, never sold in (ADR 0052).
+                "future": month > working,
                 # ADR 0036. Before go-live, so a guaranteed minimum here
                 # records an outcome rather than counts.
                 "settled_outside": is_historical(month),
@@ -1077,6 +1157,8 @@ def _pay_history_payload(db: Session, affiliate: AffiliateProfile) -> dict:
         "affiliate_id": affiliate.id,
         "name": affiliate.name,
         "working_month": working,
+        #: The last month listed; a run reaching it is saved open-ended.
+        "horizon_month": horizon,
         "go_live_month": go_live_month() or None,
         # **The verdict, beside the facts.** The months above say what is
         # recorded; this says whether it is enough, per month, and what is

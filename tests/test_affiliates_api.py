@@ -329,7 +329,7 @@ def test_listing_shows_created_affiliates(client):
 
 def test_listing_excludes_archived_by_default(client):
     affiliate = _register(client)
-    client.patch(f"/api/affiliates/{affiliate['id']}", json={"status": "archived"})
+    client.patch(f"/api/affiliates/{affiliate['id']}", json={"status": "archived", "reason": "Left the programme"})
 
     assert client.get("/api/affiliates").json()["affiliates"] == []
     included = client.get("/api/affiliates?include_archived=true").json()["affiliates"]
@@ -368,6 +368,7 @@ def _verify_code(client, affiliate_id, code="NOUR10"):
 def test_updating_status(client):
     affiliate = _register(client)
     _verify_code(client, affiliate["id"])
+    _history(client, affiliate["id"], [{"start_month": "2026-01", "end_month": None, **COMMISSION}])  # ADR 0052: terms before approval
     response = client.patch(
         f"/api/affiliates/{affiliate['id']}", json={"status": "active"}
     )
@@ -378,7 +379,7 @@ def test_updating_status(client):
 def test_archiving_stamps_archived_at(client):
     affiliate = _register(client)
     response = client.patch(
-        f"/api/affiliates/{affiliate['id']}", json={"status": "archived"}
+        f"/api/affiliates/{affiliate['id']}", json={"status": "archived", "reason": "Left the programme"}
     )
     assert response.json()["archived_at"] is not None
 
@@ -740,7 +741,7 @@ def test_deactivating_never_requires_a_verified_code(client):
     """The gate is on approval, not on every change of status."""
     affiliate = _register(client)
     response = client.patch(
-        f"/api/affiliates/{affiliate['id']}", json={"status": "inactive"}
+        f"/api/affiliates/{affiliate['id']}", json={"status": "inactive", "reason": "On a break"}
     )
     assert response.status_code == 200
 
@@ -799,6 +800,7 @@ def test_a_correction_records_what_it_changed_from(client):
 def test_details_and_status_can_change_together(client):
     affiliate = _register(client)
     _verify_code(client, affiliate["id"])
+    _history(client, affiliate["id"], [{"start_month": "2026-01", "end_month": None, **COMMISSION}])  # ADR 0052: terms before approval
     response = client.patch(
         f"/api/affiliates/{affiliate['id']}",
         json={"name": "Nour Mahmoud", "status": "active"},
@@ -919,6 +921,7 @@ def test_rechecking_then_approving_works_end_to_end(client, _shopify):
     _shopify_says(_shopify, exists=True)
     client.post(f"/api/affiliates/{affiliate['id']}/recheck-code", json={})
 
+    _history(client, affiliate["id"], [{"start_month": "2026-01", "end_month": None, **COMMISSION}])  # ADR 0052: terms before approval
     approved = client.patch(
         f"/api/affiliates/{affiliate['id']}", json={"status": "active"}
     )
@@ -2275,3 +2278,244 @@ def test_saving_terms_without_a_discount_keeps_the_stored_one(client):
     )
     assert cleared.status_code == 200, cleared.text
     assert stored() is None
+
+
+# ── A model's life (ADR 0052) ──────────────────────────────────────────────────
+
+
+def _status(client, affiliate_id, status, reason=None):
+    body = {"status": status}
+    if reason is not None:
+        body["reason"] = reason
+    return client.patch(f"/api/affiliates/{affiliate_id}", json=body)
+
+
+def _pending_with_code(client, name="Nour", email="nour@example.com", code="NOUR10"):
+    affiliate = _register(client, name=name, email=email)
+    _verify_code(client, affiliate["id"], code)
+    return affiliate
+
+
+def test_approving_a_paid_model_needs_pay_terms(client):
+    affiliate = _pending_with_code(client)
+
+    refused = _status(client, affiliate["id"], "active")
+    assert refused.status_code == 400
+    assert "before approving" in refused.json()["detail"]
+
+    _history(client, affiliate["id"], [{"start_month": "2026-01", "end_month": None, **COMMISSION}])
+    assert _status(client, affiliate["id"], "active").status_code == 200
+
+
+def test_pausing_archiving_and_declining_need_a_reason(client):
+    affiliate = _pending_with_code(client)
+    for status in ("inactive", "archived", "declined"):
+        response = _status(client, affiliate["id"], status)
+        assert response.status_code == 400, status
+        assert "reason" in response.json()["detail"]
+
+
+def test_declining_releases_the_code_for_somebody_else(client):
+    laila = _pending_with_code(client, name="Laila", email="laila@example.com", code="LAILA10")
+
+    declined = _status(client, laila["id"], "declined", "Not the right fit this season")
+    assert declined.status_code == 200, declined.text
+    assert declined.json()["status"] == "declined"
+
+    # No order was ever hers, so the code is free for another model at once.
+    other = _register(client, name="Jana", email="jana@example.com")
+    assert client.post(f"/api/affiliates/{other['id']}/codes", json={"code": "LAILA10"}).status_code == 201
+
+
+def test_only_an_application_can_be_declined(client):
+    affiliate = _pending_with_code(client)
+    _history(client, affiliate["id"], [{"start_month": "2026-01", "end_month": None, **COMMISSION}])
+    assert _status(client, affiliate["id"], "active").status_code == 200
+
+    response = _status(client, affiliate["id"], "declined", "Changed our mind")
+    assert response.status_code == 400
+
+
+def test_a_declined_application_can_be_reconsidered(client):
+    affiliate = _pending_with_code(client)
+    _status(client, affiliate["id"], "declined", "Missing measurements")
+
+    back = _status(client, affiliate["id"], "pending", "She sent them")
+    assert back.status_code == 200, back.text
+    assert back.json()["status"] == "pending"
+
+
+def test_reactivating_an_archived_model_brings_her_back_into_matching(client):
+    affiliate = _pending_with_code(client)
+    _history(client, affiliate["id"], [{"start_month": "2026-01", "end_month": None, **COMMISSION}])
+    _status(client, affiliate["id"], "active")
+    archived = _status(client, affiliate["id"], "archived", "Left for another brand")
+    assert archived.json()["archived_at"] is not None
+
+    back = _status(client, affiliate["id"], "active")
+    assert back.status_code == 200, back.text
+    # Parcel matching skips anyone with archived_at set.
+    assert back.json()["archived_at"] is None
+
+
+def _erase(client, affiliate_id, name="Nour", reason="Test entry"):
+    return client.post(
+        f"/api/affiliates/{affiliate_id}/erase",
+        json={"reason": reason, "confirm_name": name},
+    )
+
+
+def test_erasing_a_model_removes_every_trace_but_one(client):
+    affiliate = _pending_with_code(client)
+    # A destination and an invitation: both write-once or audited, both hers.
+    assert client.put(
+        f"/api/affiliates/{affiliate['id']}/payout-destination",
+        json={"method": "wallet", "wallet_provider": "Vodafone Cash", "wallet_phone": "01001234567"},
+    ).status_code == 200
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO invitation (email, role, token_hash, expires_at) "
+                "VALUES ('nour@example.com', 'affiliate', 'x' || md5(random()::text), now())"
+            )
+        )
+
+        # Invitation entries are subject `invitation:<email>`, in the case typed;
+        # a staff notice about her carries her profile as its subject.
+        connection.execute(
+            text(
+                "INSERT INTO audit_event (action, subject, after_json) VALUES "
+                "('invitation.create', 'invitation:Nour@Example.com', '{\"email\": \"Nour@Example.com\"}')"
+            )
+        )
+        connection.execute(
+            text(
+                "INSERT INTO notification_outbox (event, recipient_email, subject_ref, payload, state) "
+                "VALUES ('application_received', 'owner@example.com', 'affiliate:' || :id, '{}', 'pending')"
+            ),
+            {"id": affiliate["id"]},
+        )
+
+    response = _erase(client, affiliate["id"])
+    assert response.status_code == 200, response.text
+
+    with engine.connect() as connection:
+        def count(sql):
+            return connection.execute(text(sql), {"id": affiliate["id"]}).scalar_one()
+
+        assert count("SELECT count(*) FROM affiliate_profile WHERE id = :id") == 0
+        assert count("SELECT count(*) FROM payout_destination WHERE affiliate_id = :id") == 0
+        assert count("SELECT count(*) FROM discount_code_period WHERE affiliate_id = :id") == 0
+        assert count("SELECT count(*) FROM user_account WHERE email = 'nour@example.com'") == 0
+        assert count("SELECT count(*) FROM invitation WHERE email = 'nour@example.com'") == 0
+        assert count("SELECT count(*) FROM audit_event WHERE lower(subject) = 'invitation:nour@example.com'") == 0
+        assert count("SELECT count(*) FROM notification_outbox WHERE subject_ref = 'affiliate:' || :id") == 0
+        # One entry survives: that she was erased, and why - none of her details.
+        rows = connection.execute(
+            text("SELECT action, reason, before_json, after_json FROM audit_event "
+                 "WHERE subject = 'affiliate:' || :id"),
+            {"id": affiliate["id"]},
+        ).all()
+    assert [(row.action, row.reason) for row in rows] == [("affiliate.erased", "Test entry")]
+    assert rows[0].before_json is None and rows[0].after_json is None
+
+
+def test_a_model_with_money_on_record_cannot_be_erased(client):
+    affiliate = _pending_with_code(client)
+    with engine.begin() as connection:
+        connection.execute(
+            text("INSERT INTO payroll_month (affiliate_id, month) VALUES (:id, '2026-08')"),
+            {"id": affiliate["id"]},
+        )
+
+    response = _erase(client, affiliate["id"])
+    assert response.status_code == 409
+    assert "payroll month" in response.json()["detail"]
+    assert client.get(f"/api/affiliates/{affiliate['id']}").json()["erase_blockers"] == ["a payroll month"]
+
+
+def test_erasing_needs_her_name_typed_back(client):
+    affiliate = _pending_with_code(client)
+    assert _erase(client, affiliate["id"], name="nour").status_code == 400
+
+
+def test_only_an_admin_can_erase(client):
+    affiliate = _pending_with_code(client)
+    _demote_to("affiliate_manager")
+    assert _erase(client, affiliate["id"]).status_code == 403
+
+
+def test_the_guards_still_refuse_a_delete_outside_an_erase(client):
+    """The scoped exception must not become a general one."""
+    affiliate = _pending_with_code(client)
+    client.put(
+        f"/api/affiliates/{affiliate['id']}/payout-destination",
+        json={"method": "wallet", "wallet_provider": "Vodafone Cash", "wallet_phone": "01001234567"},
+    )
+    import sqlalchemy
+
+    with pytest.raises(sqlalchemy.exc.DatabaseError):
+        with engine.begin() as connection:
+            connection.execute(text("DELETE FROM payout_destination"))
+    with pytest.raises(sqlalchemy.exc.DatabaseError):
+        with engine.begin() as connection:
+            connection.execute(text("DELETE FROM audit_event"))
+
+
+def test_terms_can_be_set_up_to_a_year_ahead(client):
+    """ADR 0052: an agreed raise from next month is entered the day it is agreed."""
+    affiliate = _register(client)
+    body = client.get(f"/api/affiliates/{affiliate['id']}/pay-history").json()
+    working = body["working_month"]
+    horizon = body["horizon_month"]
+
+    months = [row["month"] for row in body["months"]]
+    assert months[-1] == horizon
+    assert all(row["future"] == (row["month"] > working) for row in body["months"])
+    ahead = next(row["month"] for row in body["months"] if row["future"])
+
+    # 8% until the month before `ahead`, 10% from `ahead` onwards.
+    response = _history(
+        client,
+        affiliate["id"],
+        [
+            {"start_month": "2026-01", "end_month": working, **COMMISSION, "commission_rate_bp": 800},
+            {"start_month": ahead, "end_month": None, **COMMISSION},
+        ],
+    )
+    assert response.status_code == 200, response.text
+    later = client.get(f"/api/affiliates/{affiliate['id']}/pay-history").json()
+    by_month = {row["month"]: row["terms"] for row in later["months"]}
+    assert by_month[working]["commission_rate_bp"] == 800
+    assert by_month[ahead]["commission_rate_bp"] == 1000
+    assert by_month[horizon]["commission_rate_bp"] == 1000
+
+
+
+def test_an_account_with_a_staff_role_cannot_be_erased(client):
+    """The scoped guard lets every row the account made go - never staff rows."""
+    affiliate = _pending_with_code(client)
+    with engine.begin() as connection:
+        user = connection.execute(
+            text("SELECT user_account_id FROM affiliate_profile WHERE id = :id"),
+            {"id": affiliate["id"]},
+        ).scalar_one()
+        connection.execute(
+            text("INSERT INTO role_assignment (user_account_id, role) VALUES (:u, 'content_manager')"),
+            {"u": user},
+        )
+
+    response = _erase(client, affiliate["id"])
+    assert response.status_code == 409
+    assert "staff role" in response.json()["detail"]
+
+
+def test_a_declined_application_cannot_jump_straight_to_active(client):
+    """Reconsider first, so the approval gates are met again (ADR 0052)."""
+    affiliate = _pending_with_code(client)
+    _history(client, affiliate["id"], [{"start_month": "2026-01", "end_month": None, **COMMISSION}])
+    _status(client, affiliate["id"], "declined", "Not now")
+
+    response = _status(client, affiliate["id"], "active")
+    assert response.status_code == 400
+    assert "cannot be made active directly" in response.json()["detail"]

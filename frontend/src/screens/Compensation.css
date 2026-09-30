@@ -696,6 +696,37 @@
   margin-top: 16px;
 }
 
+/* ADR 0052: what Apply is about to change, month by month. */
+.terms__review {
+  margin-top: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+}
+.terms__review-table {
+  width: 100%;
+  margin-top: 8px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.terms__review-table th,
+.terms__review-table td {
+  padding: 6px 8px 6px 0;
+  text-align: left;
+  vertical-align: top;
+  border-top: 1px solid var(--rule);
+}
+.terms__review-table thead th {
+  border-top: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--faint);
+}
+.terms__review-was {
+  color: var(--faint);
+  text-decoration: line-through;
+}
+
 .terms__big {
   min-height: 44px;
   padding: 12px 18px;

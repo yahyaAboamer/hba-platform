@@ -39,6 +39,15 @@ _PAY_TYPE = {
     "base_guarantee": "a guaranteed minimum with commission",
 }
 
+#: The statuses as the screens name them (ADR 0052).
+_STATUS_WORD = {
+    "pending": "an application again",
+    "active": "active",
+    "inactive": "paused",
+    "archived": "archived",
+    "declined": "declined",
+}
+
 
 def _month(value) -> str:
     try:
@@ -142,7 +151,9 @@ def sentence(event: AuditEvent, names: _Names) -> str:
         "affiliate.shipping_address_updated": (
             f"Changed where {who}'s parcels go" if a.get("by") == "staff" else f"{who} changed where her parcels go"
         ),
-        "affiliate.status_changed": f"Made {who} {a.get('status') or 'a different status'}",
+        "affiliate.status_changed": f"Made {who} {_STATUS_WORD.get(a.get('status'), a.get('status') or 'a different status')}",
+        # Her name went with her (ADR 0052): only the number is left to say.
+        "affiliate.erased": "Erased a model who had never earned anything",
         "application.approved": f"Approved {who}'s application",
         "auth.bootstrap": "Set up the platform's first admin account",
         "auth.login": f"{who} signed in",
@@ -153,6 +164,7 @@ def sentence(event: AuditEvent, names: _Names) -> str:
         "code.verified": f"Shopify confirmed {who}'s code",
         "code.corrected": f"Corrected {who}'s code from {b.get('code')} to {a.get('code')}",
         "code.replaced": f"Replaced {who}'s code {b.get('code')} with {a.get('code')}",
+        "code.released": f"Released the code {b.get('code')} when {who}'s application was declined",
         "code.closed": f"Closed {who}'s code {a.get('code') or b.get('code')}" + (f" after {_month(a['end_month'])}" if a.get("end_month") else ""),
         "compensation.set": f"Set {who}'s terms to {_PAY_TYPE.get(a.get('compensation_type'), 'new terms')}" + (f" from {_month(a['start_month'])}" if a.get("start_month") else ""),
         "compensation.corrected": f"Corrected {who}'s terms",

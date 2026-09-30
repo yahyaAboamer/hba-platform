@@ -96,6 +96,11 @@ export function Compensation() {
   const [sel, setSel] = useState<string[]>([]);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [year, setYear] = useState<string | null>(null);
+  /** The before/after shown between pressing Apply and applying (ADR 0052). */
+  const [review, setReview] = useState<{ month: string; before: string; after: string }[] | null>(null);
+  // A review describes one selection and one draft; changing either makes it
+  // describe something that is no longer on screen.
+  useEffect(() => setReview(null), [sel, draft]);
 
   useEffect(() => {
     api
@@ -132,10 +137,9 @@ export function Compensation() {
   const years = [...new Set(data.months.map((row) => row.month.slice(0, 4)))];
   const monthsOfYear = data.months.filter((row) => row.month.startsWith(year));
   /*
-   * The export draws a whole year of twelve. The server lists months only up
-   * to the working month, so the rest of the year is drawn as tiles that
-   * cannot be chosen yet - otherwise September sat alone on a second row,
-   * stretched across the whole card.
+   * The export draws a whole year of twelve. The server lists months up to
+   * twelve past the working month (ADR 0052); any of the year beyond that is
+   * drawn as tiles that cannot be chosen yet, so a row is never half empty.
    */
   const laterThisYear = Array.from({ length: 12 }, (_, index) => `${year}-${String(index + 1).padStart(2, "0")}`)
     .filter((month) => !monthsOfYear.some((row) => row.month === month));
@@ -194,7 +198,19 @@ export function Compensation() {
    * it. The screen only takes the new state once the server has accepted it,
    * so a refusal leaves both the page and the record as they were.
    */
-  async function apply() {
+  /** What an arrangement says, for the review's before and after columns. */
+  function words(arrangement: Arrangement | undefined): string {
+    if (!arrangement) return "Not set";
+    return describeRun(arrangement as unknown as Run);
+  }
+
+  /*
+   * **Review first** (ADR 0052). Pay terms decide what she is paid, and Apply
+   * used to save on the first press. Now the first press lays out, month by
+   * month, what each selected month was and what it becomes; the second one
+   * applies it.
+   */
+  function startReview() {
     if (!data || !draft || ordered.length === 0) return;
     const parsed = readDraft(draft);
     if (parsed === null) {
@@ -205,6 +221,20 @@ export function Compensation() {
       );
       return;
     }
+    setError(null);
+    setReview(
+      ordered.map((month) => ({
+        month,
+        before: words(set[month]),
+        after: words({ ...parsed, met: null }),
+      })),
+    );
+  }
+
+  async function apply() {
+    if (!data || !draft || ordered.length === 0) return;
+    const parsed = readDraft(draft);
+    if (parsed === null) return;
     const next = { ...set };
     for (const month of ordered) {
       const row = data.months.find((candidate) => candidate.month === month);
@@ -231,7 +261,9 @@ export function Compensation() {
       await api.put(`/api/affiliates/${id}/pay-history`, {
         periods: periodsToWrite(data.months, next).map((run) => ({
           start_month: run.from,
-          end_month: run.to === data.working_month ? null : run.to,
+          // A run reaching the last listed month runs until further notice.
+          // The list goes twelve months past the working month (ADR 0052).
+          end_month: run.to === (data.horizon_month ?? data.working_month) ? null : run.to,
           compensation_type: run.kind,
           commission_rate_bp: run.rateBp,
           fixed_amount_piastres: run.kind === "fixed_plus_commission" ? run.amountPiastres : null,
@@ -245,8 +277,10 @@ export function Compensation() {
       );
       setSel([]);
       setDraft(null);
+      setReview(null);
     } catch (caught) {
       setError((caught as Error).message);
+      setReview(null);
     } finally {
       setSaving(false);
     }
@@ -274,18 +308,22 @@ export function Compensation() {
               <ul>
                 {history.map((run) => {
                   const current = run.from <= data.working_month && run.to >= data.working_month;
+                  // ADR 0052: a run may start after the working month, and
+                  // one reaching the last listed month has no end yet.
+                  const ahead = run.from > data.working_month;
+                  const openEnded = run.to === (data.horizon_month ?? data.working_month);
                   return (
                     <li key={run.from}>
                       <span className="terms__run-head">
                         <span>{OPTION_LABEL[run.kind]}</span>
-                        <span className={current ? "terms__current" : "terms__earlier"}>
-                          {current ? "Current" : "Earlier"}
+                        <span className={current || ahead ? "terms__current" : "terms__earlier"}>
+                          {current ? "Current" : ahead ? "Ahead" : "Earlier"}
                         </span>
                       </span>
                       <span className="terms__run-detail">{describeRun(run)}</span>
                       <span className="terms__run-range">
                         {formatMonth(run.from)}
-                        {run.from === run.to ? "" : ` – ${formatMonth(run.to)}`}
+                        {openEnded ? " onwards" : run.from === run.to ? "" : ` – ${formatMonth(run.to)}`}
                       </span>
                     </li>
                   );
@@ -334,7 +372,7 @@ export function Compensation() {
                   <span className="terms__month-name">{shortMonth(row.month)}</span>
                   <span className="terms__month-what">{before ? "Before start" : tileWord(set[row.month])}</span>
                   <span className={row.approved ? "terms__month-note terms__month-note--locked" : "terms__month-note"}>
-                    {row.approved ? "Approved" : before ? "—" : ""}
+                    {row.approved ? "Approved" : before ? "—" : row.future ? "Ahead" : ""}
                   </span>
                 </button>
               );
@@ -454,22 +492,78 @@ export function Compensation() {
             )}
             {saved && <p className="terms__saved">{saved}</p>}
 
+            {review && (
+              <div className="terms__review" role="group" aria-label="Review before applying">
+                <h3 className="terms__title terms__title--bare">Review before applying</h3>
+                <table className="terms__review-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Month</th>
+                      <th scope="col">Now</th>
+                      <th scope="col">After</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {review.map((row) => (
+                      <tr key={row.month}>
+                        <th scope="row">{formatMonth(row.month)}</th>
+                        <td className={row.before === row.after ? undefined : "terms__review-was"}>{row.before}</td>
+                        <td>{row.after}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <p className="terms__note">
+                  {review.some((row) => row.month <= data.working_month)
+                    ? "Open months change their estimates on her Home page as soon as this is applied. "
+                    : ""}
+                  {review.some((row) => row.month > data.working_month)
+                    ? "Months ahead apply when they arrive. "
+                    : ""}
+                  Approved months are not touched, and she is not notified.
+                </p>
+              </div>
+            )}
+
             <div className="terms__acts">
-              <button
-                type="button"
-                className="button button--primary terms__big"
-                disabled={ordered.length === 0 || saving}
-                onClick={apply}
-              >
-                {saving
-                  ? "Applying…"
-                  : ordered.length === 0
-                    ? "Select months first"
-                    : `Apply to ${ordered.length} ${ordered.length === 1 ? "month" : "months"}`}
-              </button>
-              <Link className="button terms__big" to={`/affiliates/${id}`}>
-                Done
-              </Link>
+              {review ? (
+                <>
+                  <button
+                    type="button"
+                    className="button button--primary terms__big"
+                    disabled={saving}
+                    onClick={apply}
+                  >
+                    {saving
+                      ? "Applying…"
+                      : `Apply to ${ordered.length} ${ordered.length === 1 ? "month" : "months"}`}
+                  </button>
+                  <button
+                    type="button"
+                    className="button terms__big"
+                    disabled={saving}
+                    onClick={() => setReview(null)}
+                  >
+                    Back
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className="button button--primary terms__big"
+                    disabled={ordered.length === 0 || saving}
+                    onClick={startReview}
+                  >
+                    {ordered.length === 0
+                      ? "Select months first"
+                      : `Review ${ordered.length} ${ordered.length === 1 ? "month" : "months"}`}
+                  </button>
+                  <Link className="button terms__big" to={`/affiliates/${id}`}>
+                    Done
+                  </Link>
+                </>
+              )}
             </div>
             <p className="terms__note">
               {/* The export's `tmNote` and `tmLockedLine`, together. */}

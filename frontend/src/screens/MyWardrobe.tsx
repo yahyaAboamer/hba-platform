@@ -89,10 +89,12 @@ export function MyWardrobe() {
     // to tell the difference.
     setBestError(null);
     setBest(null);
-    const path = sellerPeriod === "month"
-      ? `/api/me/best-sellers?month=${encodeURIComponent(sellerMonth)}`
-      : "/api/me/best-sellers";
-    api.get<BestSellers>(path)
+    // Each branch calls with its own literal path: the reachability guard
+    // (tests/test_reachability.py) reads paths written into the call, and a
+    // path held in a variable read as a route nothing reached.
+    (sellerPeriod === "month"
+      ? api.get<BestSellers>(`/api/me/best-sellers?month=${encodeURIComponent(sellerMonth)}`)
+      : api.get<BestSellers>("/api/me/best-sellers"))
       .then((found) => {
         if (live) {
           setBest(found.products);
@@ -316,10 +318,9 @@ export function MyBestSellers() {
     let live = true;
     setError(null);
     setRows(null);
-    const path = sellerPeriod === "month"
-      ? `/api/me/best-sellers?month=${encodeURIComponent(sellerMonth)}`
-      : "/api/me/best-sellers";
-    api.get<BestSellers>(path)
+    (sellerPeriod === "month"
+      ? api.get<BestSellers>(`/api/me/best-sellers?month=${encodeURIComponent(sellerMonth)}`)
+      : api.get<BestSellers>("/api/me/best-sellers"))
       .then((found) => { if (live) { setRows(found.products); setCodes(found.codes ?? []); } })
       .catch((caught) => { if (live) setError(caught.message); });
     return () => { live = false; };

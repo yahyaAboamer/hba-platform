@@ -8,7 +8,7 @@ their life with the business.
 import re
 import secrets
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.core.businesstime import business_month, utcnow
@@ -149,6 +149,14 @@ def set_status(
     if previous == status:
         return
 
+    # ADR 0052. A declined application comes back only through Reconsider,
+    # so it meets the approval gates again; nothing goes back to *pending*
+    # except a declined one.
+    if status not in _ALLOWED_NEXT.get(previous, frozenset()):
+        raise ValueError(
+            f"A {previous} model cannot be made {status} directly."
+        )
+
     if status == AffiliateStatus.ACTIVE and not verified_codes_for(db, affiliate):
         # Spec 10.4: Shopify code verification is a *required gate* before
         # approval, and this is the gate.
@@ -166,7 +174,30 @@ def set_status(
             "attributes nothing, silently."
         )
 
+    if (
+        status == AffiliateStatus.ACTIVE
+        and previous == AffiliateStatus.PENDING
+        and affiliate.is_payable
+    ):
+        # ADR 0052: approving is when her deal is agreed. Approving without
+        # it put a model live beside a red *No terms set* while the panel said
+        # payroll stays blocked. A house account is never paid and needs none.
+        from app.services.compensation import terms_for
+        from app.services.payroll import working_month
+
+        month = working_month()
+        if terms_for(db, affiliate, month) is None:
+            raise ValueError(
+                f"Set what {affiliate.name} is paid for {month} before approving. "
+                "Approving is when her deal is agreed."
+            )
+
     affiliate.status = status
+
+    # Reactivating somebody archived brings her back into parcel matching,
+    # which skips anyone with `archived_at` set (ADR 0052).
+    if status == AffiliateStatus.ACTIVE and previous == AffiliateStatus.ARCHIVED:
+        affiliate.archived_at = None
 
     # Section 16, and the email the whole go-live depends on arriving. Only on
     # the transition into `active` from a pending application - reactivating a
@@ -231,6 +262,224 @@ def archive_affiliate(
         actor_email=actor_email,
         reason=reason,
     )
+
+
+#: Which status may follow which (ADR 0052).
+_ALLOWED_NEXT: dict[str, frozenset[str]] = {
+    AffiliateStatus.PENDING: frozenset(
+        {AffiliateStatus.ACTIVE, AffiliateStatus.DECLINED,
+         AffiliateStatus.INACTIVE, AffiliateStatus.ARCHIVED}
+    ),
+    AffiliateStatus.ACTIVE: frozenset({AffiliateStatus.INACTIVE, AffiliateStatus.ARCHIVED}),
+    AffiliateStatus.INACTIVE: frozenset({AffiliateStatus.ACTIVE, AffiliateStatus.ARCHIVED}),
+    AffiliateStatus.ARCHIVED: frozenset({AffiliateStatus.ACTIVE}),
+    AffiliateStatus.DECLINED: frozenset({AffiliateStatus.PENDING}),
+}
+
+
+def decline_application(
+    db: Session,
+    affiliate: AffiliateProfile,
+    *,
+    reason: str,
+    actor_id: int | None = None,
+    actor_email: str | None = None,
+) -> None:
+    """Turn an application down (ADR 0052).
+
+    Her code is released so another model can register it: removed outright
+    when no order was ever attributed to her, closed with the month otherwise,
+    because closing must never rewrite who earned an order already counted.
+    She can still sign in, to be told; nothing is emailed.
+    """
+    if affiliate.status != AffiliateStatus.PENDING:
+        raise ValueError("Only an application waiting for review can be declined.")
+    if not (reason or "").strip():
+        raise ValueError("Say why the application is declined. It is kept with her record.")
+
+    earned = db.execute(
+        text("SELECT EXISTS (SELECT 1 FROM attributed_order WHERE affiliate_id = :id)"),
+        {"id": affiliate.id},
+    ).scalar_one()
+    if earned:
+        this_month = business_month(utcnow())
+        close_codes_for(
+            db, affiliate, this_month,
+            actor_id=actor_id, actor_email=actor_email,
+        )
+        # A period that has not started yet earned nothing and would keep
+        # the code held: released outright, as when nothing was earned.
+        for period in db.scalars(
+            select(DiscountCodePeriod)
+            .where(DiscountCodePeriod.affiliate_id == affiliate.id)
+            .where(DiscountCodePeriod.start_month > this_month)
+        ):
+            db.delete(period)
+        db.flush()
+    else:
+        for period in db.scalars(
+            select(DiscountCodePeriod).where(DiscountCodePeriod.affiliate_id == affiliate.id)
+        ):
+            record_audit(
+                db,
+                action="code.released",
+                subject=f"affiliate:{affiliate.id}",
+                actor_id=actor_id,
+                actor_email=actor_email,
+                before={"code": period.code, "start_month": period.start_month},
+                after=None,
+                reason="Application declined",
+            )
+            db.delete(period)
+        db.flush()
+
+    set_status(
+        db, affiliate, AffiliateStatus.DECLINED,
+        actor_id=actor_id, actor_email=actor_email, reason=reason.strip(),
+    )
+
+
+def reconsider_application(
+    db: Session,
+    affiliate: AffiliateProfile,
+    *,
+    actor_id: int | None = None,
+    actor_email: str | None = None,
+    reason: str | None = None,
+) -> None:
+    """Return a declined application to review (ADR 0052). Only staff can:
+    she cannot reapply by herself."""
+    if affiliate.status != AffiliateStatus.DECLINED:
+        raise ValueError("Only a declined application can be reconsidered.")
+    set_status(
+        db, affiliate, AffiliateStatus.PENDING,
+        actor_id=actor_id, actor_email=actor_email, reason=reason,
+    )
+
+
+#: What makes a model un-erasable: anything money or goods touched (ADR 0052).
+_ERASE_BLOCKERS = (
+    ("attributed_order", "an order attributed to her"),
+    ("payroll_month", "a payroll month"),
+    ("payment_transaction", "a payment"),
+    ("proof_file", "a payment proof"),
+    ("model_shipment", "a parcel sent to her"),
+)
+
+
+def erase_blockers(db: Session, affiliate: AffiliateProfile) -> list[str]:
+    """Why this model cannot be erased, in words; empty when she can be."""
+    found = []
+    for table, words in _ERASE_BLOCKERS:
+        if db.execute(
+            text(f"SELECT EXISTS (SELECT 1 FROM {table} WHERE affiliate_id = :id)"),
+            {"id": affiliate.id},
+        ).scalar_one():
+            found.append(words)
+    return found
+
+
+def erase_affiliate(
+    db: Session,
+    affiliate: AffiliateProfile,
+    *,
+    reason: str,
+    actor_id: int,
+    actor_email: str | None = None,
+) -> int:
+    """Delete a model who never earned anything, and every trace of her.
+
+    ADR 0052, the owner's choice of a true delete. The append-only guards on
+    `payout_destination` and `audit_event` let her rows go only because this
+    transaction names her with `set_config(..., true)` - local to it, gone at
+    commit or rollback. One entry survives: that model #id was erased, by
+    whom, when and why, with none of her details. Returns the erased id.
+    """
+    if not (reason or "").strip():
+        raise ValueError("Say why she is being erased. The reason is the one thing kept.")
+    blockers = erase_blockers(db, affiliate)
+    if blockers:
+        raise ValueError(
+            f"{affiliate.name} cannot be erased: there is {', '.join(blockers)} on "
+            "record. Archive her instead - her history has to stay."
+        )
+
+    # Never a member of staff, and never yourself: the scoped guard lets every
+    # audit row this account *made* go, and a staff account's rows are the
+    # business's trail, not hers.
+    if actor_id == affiliate.user_account_id:
+        raise ValueError("You cannot erase your own account.")
+    if db.execute(
+        text(
+            "SELECT EXISTS (SELECT 1 FROM role_assignment "
+            "WHERE user_account_id = :user AND role <> 'affiliate')"
+        ),
+        {"user": affiliate.user_account_id},
+    ).scalar_one():
+        raise ValueError(
+            f"{affiliate.name}'s account also has a staff role. Erase is only for "
+            "model accounts - remove the staff role first."
+        )
+
+    affiliate_id = affiliate.id
+    account = db.get(UserAccount, affiliate.user_account_id)
+    email = (account.email if account else "") or ""
+    # Invitation entries are written as `invitation:<email>`, in whatever case
+    # the address was typed, so the exact subjects are read back, not built.
+    invitations = list(
+        db.scalars(
+            text(
+                "SELECT DISTINCT subject FROM audit_event "
+                "WHERE lower(subject) = 'invitation:' || lower(:email) "
+                "UNION SELECT DISTINCT subject_ref FROM notification_outbox "
+                "WHERE lower(subject_ref) = 'invitation:' || lower(:email)"
+            ),
+            {"email": email},
+        )
+    ) if email else []
+    subjects = [f"affiliate:{affiliate_id}", f"user:{affiliate.user_account_id}", *invitations]
+
+    db.execute(text("SELECT set_config('hba.erasing_affiliate', :v, true)"), {"v": str(affiliate_id)})
+    db.execute(text("SELECT set_config('hba.erasing_user', :v, true)"), {"v": str(affiliate.user_account_id)})
+    db.execute(text("SELECT set_config('hba.erasing_subjects', :v, true)"), {"v": ",".join(subjects)})
+
+    db.execute(
+        text(
+            "DELETE FROM audit_event WHERE subject = ANY(:subjects) OR actor_id = :user"
+        ),
+        {"subjects": subjects, "user": affiliate.user_account_id},
+    )
+    # Mail to her, and mail to staff about her ("New application: …").
+    db.execute(
+        text(
+            "DELETE FROM notification_outbox "
+            "WHERE subject_ref = ANY(:subjects) OR lower(recipient_email) = lower(:email)"
+        ),
+        {"subjects": subjects, "email": email},
+    )
+    if email:
+        db.execute(text("DELETE FROM invitation WHERE lower(email) = lower(:email)"), {"email": email})
+
+    # The profile cascades to her codes, terms, targets, preferences and
+    # payout destinations; the account to her sessions, resets and roles.
+    db.delete(affiliate)
+    db.flush()
+    if account is not None:
+        db.delete(account)
+        db.flush()
+
+    # Written after the deletes, or the delete above would have taken it too.
+    record_audit(
+        db,
+        action="affiliate.erased",
+        subject=f"affiliate:{affiliate_id}",
+        actor_id=actor_id,
+        actor_email=actor_email,
+        before=None,
+        after=None,
+        reason=reason.strip(),
+    )
+    return affiliate_id
 
 
 def update_details(

@@ -225,4 +225,8 @@ def application_state(db: Session, affiliate: AffiliateProfile) -> str:
         return "waiting"
     if affiliate.status == AffiliateStatus.ACTIVE:
         return "active"
+    # ADR 0052: turned down is its own answer, not a pause - she is told, and
+    # only HBA can reconsider.
+    if affiliate.status == AffiliateStatus.DECLINED:
+        return "declined"
     return "paused"

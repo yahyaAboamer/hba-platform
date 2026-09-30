@@ -31,6 +31,24 @@
   color: var(--quiet);
 }
 
+/* ADR 0052: the whole screen for a declined application. */
+.affiliate__declined {
+  max-width: 44ch;
+  margin: var(--space-6) auto;
+  padding: var(--space-5);
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--elev);
+}
+.affiliate__declined h1 {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-lg, 1.25rem);
+}
+.affiliate__declined p {
+  margin: 0;
+  color: var(--quiet);
+}
+
 .affiliate__details {
   margin-top: var(--space-4);
 }

@@ -117,7 +117,25 @@ payroll without touching a maintainer screen.
   `docs/repair/HISTORICAL-INFORMATION-NEEDED.md`.
 - **Append-only tables stay append-only**: `payroll_snapshot`,
   `payment_transaction`, `payment_allocation`, `payroll_adjustment`,
-  `payout_destination`, `policy_version`. Guarded by triggers.
+  `payout_destination`, `policy_version`. Guarded by triggers. **One
+  exception (ADR 0052):** erasing a model who never earned lets her own
+  `payout_destination` and `audit_event` rows be deleted, inside that one
+  transaction (`SET LOCAL hba.erasing_affiliate`); update and truncate stay
+  refused.
+- **A model's life (ADR 0052).** Statuses are `pending`, `active`,
+  `inactive` (*Paused*), `archived` and `declined`; every change carries a
+  written reason.
+  - *Pause* keeps her sign-in, her code and her earnings.
+  - *Archive* closes her sign-in and ends her codes with the current month;
+    reactivating clears `archived_at` and she needs a new code.
+  - *Decline* releases her code and she sees that she was not accepted;
+    *Reconsider* returns her to Applications.
+  - **Approval needs a verified code and, for a paid account, pay terms
+    covering the working month.**
+  - *Erase* is admin-only and only for a model with no order, payroll,
+    payment, adjustment, parcel or proof file.
+- **Pay terms may be set up to twelve months ahead** (ADR 0052). An approved
+  month still cannot change.
 - **Three compensation types, not one.** `commission`,
   `fixed_plus_commission` (**both** are paid — the one most often got wrong),
   `base_guarantee` (`max(commission, base)`, only where targets were met *and*

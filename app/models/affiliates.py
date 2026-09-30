@@ -48,8 +48,9 @@ class AffiliateStatus:
 
     PENDING = "pending"      # applied, not yet approved
     ACTIVE = "active"        # earning
-    INACTIVE = "inactive"    # not earning, may return
+    INACTIVE = "inactive"    # paused: keeps sign-in, code and earnings (ADR 0052)
     ARCHIVED = "archived"    # gone; history must still resolve
+    DECLINED = "declined"    # application turned down; Reconsider reopens it
 
 
 VALID_KINDS = frozenset(

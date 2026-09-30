@@ -235,10 +235,27 @@ def _verified_code(db, affiliate, code="NOUR10"):
     db.flush()
 
 
+def _terms(db, affiliate):
+    """Pay terms from January, open-ended - approval needs them (ADR 0052)."""
+    from app.models.compensation import CompensationType
+    from app.services.compensation import set_terms
+
+    set_terms(
+        db,
+        affiliate,
+        start_month="2026-01",
+        end_month=None,
+        compensation_type=CompensationType.COMMISSION,
+        commission_rate_bp=1000,
+    )
+    db.flush()
+
+
 def test_a_status_change_is_recorded(db):
     affiliate = create_affiliate(db, user_account_id=_account(db).id, name="Nour")
     db.flush()
     _verified_code(db, affiliate)
+    _terms(db, affiliate)
     set_status(db, affiliate, AffiliateStatus.ACTIVE)
     db.flush()
 
@@ -253,6 +270,7 @@ def test_the_audit_record_names_what_it_changed_from(db):
     affiliate = create_affiliate(db, user_account_id=_account(db).id, name="Nour")
     db.flush()
     _verified_code(db, affiliate)
+    _terms(db, affiliate)
     set_status(db, affiliate, AffiliateStatus.ACTIVE)
     db.flush()
 
@@ -453,6 +471,7 @@ def test_a_verified_code_opens_the_gate(db):
     affiliate = create_affiliate(db, user_account_id=_account(db).id, name="Nour")
     db.flush()
     _verified_code(db, affiliate)
+    _terms(db, affiliate)
 
     set_status(db, affiliate, AffiliateStatus.ACTIVE)
     db.flush()

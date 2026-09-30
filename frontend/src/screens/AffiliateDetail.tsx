@@ -15,6 +15,7 @@ import type { Session } from "../lib/api";
 import { formatEgp, formatMonth } from "../lib/money";
 import { ROSTER_STATUS } from "./Affiliates";
 import type { Affiliate } from "./Affiliates";
+import { ApproveDialog, ModelLifecycle } from "./ModelLifecycle";
 import "./PaymentDetail.css";
 import "./AffiliateDetail.css";
 
@@ -69,6 +70,10 @@ type WardrobeItem = {
 };
 
 type Detail = Affiliate & {
+  /** Why she cannot be erased; empty when she can (ADR 0052). */
+  erase_blockers?: string[];
+  /** Terms exist for the working month - what approval checks (ADR 0052). */
+  working_terms_set?: boolean;
   shipping: Shipping;
   current_month: string;
   /** Which month `compensation` and `codes` below actually describe. */
@@ -341,22 +346,14 @@ export function AffiliateDetail({ session }: { session: Session }) {
     };
   }, [id, wardrobeReload]);
 
-  async function approve() {
-    setWorking("approve");
+  /** ADR 0052: approving asks first - she is emailed the moment it happens. */
+  const [approving, setApproving] = useState(false);
+
+  /** After any change of status: say what happened, and read her again. */
+  function changed(message: string) {
     setError(null);
-    setNotice(null);
-    try {
-      await api.patch(`/api/affiliates/${id}`, { status: "active" });
-      setNotice({
-        good: true,
-        text: "Approved. Sales on this code are being counted.",
-      });
-      load();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not approve.");
-    } finally {
-      setWorking(null);
-    }
+    setNotice({ good: true, text: message });
+    load();
   }
 
   // **Only a failure to load replaces the page.** An action that fails - a
@@ -451,6 +448,14 @@ export function AffiliateDetail({ session }: { session: Session }) {
         {detail.status === "pending" && appliedOn && (
           <span className="profile__applied">Applied {appliedOn}</span>
         )}
+        {/* ADR 0052: what her status allows - decline, reconsider,
+            reactivate, and More actions for pause, archive and erase. */}
+        <ModelLifecycle
+          subject={detail}
+          session={session}
+          onChanged={changed}
+          onErased={(message) => navigate("/affiliates", { state: { notice: message } })}
+        />
       </header>
 
       {/*
@@ -611,7 +616,7 @@ export function AffiliateDetail({ session }: { session: Session }) {
                 <span className="detail__note">
                   {detail.compensation
                     ? "The arrangement is recorded."
-                    : "Payroll stays blocked until this is set."}
+                    : "Required before approving."}
                 </span>
               </div>
               <Link className="button" to={`/affiliates/${detail.id}/compensation`}>
@@ -665,18 +670,30 @@ export function AffiliateDetail({ session }: { session: Session }) {
            * unverified code. Saying so on the button means the maintainer sees
            * why before pressing rather than meeting a refusal after.
            */}
+          {/* ADR 0052: a paid model also needs pay terms, which the server
+              enforces; the button says which step is missing. */}
           <button
             type="button"
             className="button button--primary detail__approve"
-            onClick={approve}
-            disabled={working !== null || !verified}
+            onClick={() => setApproving(true)}
+            disabled={working !== null || !verified || (!house && !detail.working_terms_set)}
           >
-            {working === "approve"
-              ? "Approving…"
-              : verified
-                ? "Approve this application"
-                : "Check the code first"}
+            {!verified
+              ? "Check the code first"
+              : !house && !detail.working_terms_set
+                ? "Set the pay terms first"
+                : "Approve this application"}
           </button>
+          {approving && (
+            <ApproveDialog
+              subject={detail}
+              onCancel={() => setApproving(false)}
+              onDone={(message) => {
+                setApproving(false);
+                changed(message);
+              }}
+            />
+          )}
           </div>
         </div>
       )}
