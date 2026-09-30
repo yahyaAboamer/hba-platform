@@ -325,6 +325,24 @@ definition still needs the second theme.
 The docker-compose test database that stopped on 15 September was restarted
 the same day; the full suite has run since.
 
+## Owner-approved divergences — admin Models tab (29–30 September)
+
+From the owner's audit (`docs/design/admin-models-tab-audit-2026-09-29.html`),
+approved on 29 September with refinements on 30 September; ADR 0052 for the
+rules. Each goes past the export on purpose; none is a parity defect.
+
+| Row | Divergence | Why |
+|---|---|---|
+| A2 `vModels` | *Needs you* counts above the filters; blockers under each name; month and sort controls; select rows and export a CSV; search by email; first-run explainer; phone cards with code, sales and content, twelve at a time; *Joined, hasn't applied* with *Remind her* under Invitations; status pills say *Paused*, *Archived* or *Declined* instead of one *Inactive* | "Who needs me" was unanswerable without opening every profile; an accepted-but-not-applied model was on no list |
+| B1 `vModel` | Overview reads *Her details* (sizing folded in) with *Edit contact and shipping* behind a press, and a sign-in email change; *Where to pay her* replaces the Sizing card, with **Pay on InstaPay** (the desk keeps *Open InstaPay*); code timeline; *Activity* tab; *See every transfer and adjustment*; decline, reconsider, reactivate and More actions (pause, archive, erase) with reasons; approval confirms; house accounts show Overview, Performance, Activity | Owner, 29 September: everything about her on the first tab, and a pay button; ADR 0052 for the actions |
+| B2 `vInvite` | One row per person; a resent link is shown; withdraw confirms; read-only without `invitations.send` | The resend link was discarded and one address showed twice |
+| B11 `vTerms` | Months up to twelve past the working month (*Ahead*); a before/after review before applying; runs read *Current*, *Ahead*, *Earlier*, *onwards* | ADR 0052: an agreed raise is entered the day it is agreed, and a pay change is read before it is saved |
+| D (portal) | Paused banner now says her code still counts; a declined application has its own screen | ADR 0052; the old banner said sales stopped counting, which the platform never did |
+
+Browser-checked 30 September at 1280 and 390 on the harness seed (throwaway
+database), not against the export frames: that comparison, and staging
+acceptance, are still to do.
+
 ## Evidence
 
 Screenshots live in `docs/redesign/parity/shots/`, named

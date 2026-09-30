@@ -74,6 +74,8 @@ type Detail = Affiliate & {
   erase_blockers?: string[];
   /** Terms exist for the working month - what approval checks (ADR 0052). */
   working_terms_set?: boolean;
+  /** Every code she has held, oldest first, for the code timeline. */
+  code_history?: { code: string; start_month: string; end_month: string | null; verified: boolean }[];
   shipping: Shipping;
   current_month: string;
   /** Which month `compensation` and `codes` below actually describe. */
@@ -148,6 +150,16 @@ type StatementMonth = {
 
 type ProfileRecord = { targets: TargetMonth[]; statements: StatementMonth[] };
 
+/** One entry in her Activity (`GET /api/audit`), already in words. */
+type ActivityEntry = {
+  id: number;
+  subject: string;
+  sentence: string;
+  who: string | null;
+  reason: string | null;
+  created_at: string;
+};
+
 type Tone = { label: string; tone: string };
 
 /**
@@ -199,7 +211,7 @@ export function AffiliateDetail({ session }: { session: Session }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [query, setQuery] = useSearchParams();
-  const section = ["overview", "wardrobe", "performance", "targets", "payments"].includes(query.get("section") ?? "") ? query.get("section")! : "overview";
+  const section = ["overview", "wardrobe", "performance", "targets", "payments", "activity"].includes(query.get("section") ?? "") ? query.get("section")! : "overview";
   const [month, setMonth] = useState(query.get("month")?.match(/^\d{4}-(0[1-9]|1[0-2])$/) ? query.get("month")! : session.platform.working_month);
   const [wardrobeError, setWardrobeError] = useState<string | null>(null);
   const [wardrobeReload, setWardrobeReload] = useState(0);
@@ -348,6 +360,49 @@ export function AffiliateDetail({ session }: { session: Session }) {
 
   /** ADR 0052: approving asks first - she is emailed the moment it happens. */
   const [approving, setApproving] = useState(false);
+  /** Admin Models audit: Overview reads her details; editing is asked for. */
+  const [editingContact, setEditingContact] = useState(false);
+  const [emailDraft, setEmailDraft] = useState<string | null>(null);
+  const [emailProblem, setEmailProblem] = useState<string | null>(null);
+  /** Her Activity: the audit entries about her, in words. */
+  const [activity, setActivity] = useState<ActivityEntry[] | null>(null);
+  const [activityError, setActivityError] = useState<string | null>(null);
+
+  // Another model's page reuses this component: nothing typed or read for
+  // the last one may carry over (an open email change would save onto her).
+  useEffect(() => {
+    setEmailDraft(null);
+    setEmailProblem(null);
+    setEditingContact(false);
+    setActivity(null);
+  }, [id]);
+
+  useEffect(() => {
+    if (section !== "activity" || !can(session, "audit.view")) return;
+    let live = true;
+    setActivityError(null);
+    api
+      .get<{ events: ActivityEntry[] }>(`/api/audit?subject=${encodeURIComponent(`affiliate:${id}`)}&limit=200`)
+      .then((body) => {
+        // The feed matches a substring, so `affiliate:1` would also bring
+        // `affiliate:12`: only her own subject is kept.
+        if (live) setActivity(body.events.filter((event) => event.subject === `affiliate:${id}`));
+      })
+      .catch((caught) => { if (live) setActivityError(caught.message); });
+    return () => { live = false; };
+  }, [section, id, session]);
+
+  async function saveEmail() {
+    if (emailDraft === null) return;
+    setEmailProblem(null);
+    try {
+      await api.patch(`/api/affiliates/${id}`, { email: emailDraft.trim() });
+      setEmailDraft(null);
+      changed("Her sign-in email is changed. She signs in with the new address from now on.");
+    } catch (caught) {
+      setEmailProblem(caught instanceof Error ? caught.message : "Could not change it.");
+    }
+  }
 
   /** After any change of status: say what happened, and read her again. */
   function changed(message: string) {
@@ -411,6 +466,52 @@ export function AffiliateDetail({ session }: { session: Session }) {
   const statementState = statement
     ? STATEMENT_STATE[statement.state] ?? { label: statement.state, tone: "quiet" }
     : null;
+
+  /**
+   * Where her money goes, with *Pay on InstaPay* when she uses it (owner,
+   * 29 September): the same card on Overview and on Payments, so the two
+   * can never disagree. The InstaPay number is the one she gave for
+   * InstaPay (`instapay_phone`), never her contact phone.
+   */
+  const whereToPay = (title: string) => (
+    <section className="pay-detail__card profile__card">
+      <h2 className="pay-detail__card-title">{title}</h2>
+      {detail.payout_destination === null && detail.payout_abroad ? (
+        /* ADR 0046: she applied from outside Egypt. Nothing is missing -
+         *  there is no Egyptian destination to give, and paying her is
+         *  arranged with her outside the platform. */
+        <p className="pay-detail__missing">
+          {detail.name} is paid outside Egypt. Arrange it with her directly,
+          or set a destination here once she has one.
+        </p>
+      ) : detail.payout_destination === null && house ? (
+        <p className="pay-detail__missing">
+          {detail.name} is a house account and is never paid.
+        </p>
+      ) : detail.payout_destination === null ? (
+        <p className="pay-detail__missing">
+          {detail.name} has not submitted payment details, so nothing can be sent yet.
+        </p>
+      ) : detail.payout_destination_card ? (
+        /* **The whole destination** (ADR 0042), served only where
+         *  `payments.record` holds; marketing gets the shortened sentence. */
+        <DestinationDetails card={detail.payout_destination_card} linkLabel="Pay on InstaPay ↗" />
+      ) : (
+        <p className="profile__card-line">{describeDestination(detail.payout_destination)}</p>
+      )}
+      {can(session, "affiliates.manage") && !house && (
+        <p className="profile__card-actions">
+          <Link className="pay-detail__link profile__card-link" to={`/affiliates/${detail.id}/payout-destination`}>
+            {detail.payout_destination ? "Correct it →" : "Set it →"}
+          </Link>
+        </p>
+      )}
+      {/* Masking still governs every *record* (ADR 0028, as amended by
+       *  0042). This line says an old transfer is not rewritten by a new
+       *  destination. */}
+      <p className="pay-detail__faint">Earlier transfers keep the destination they were sent to.</p>
+    </section>
+  );
 
   return (
     <>
@@ -700,7 +801,11 @@ export function AffiliateDetail({ session }: { session: Session }) {
 
       <div className="profile__navigation">
         <nav className="profile__tabs" aria-label="Model sections">
-          {["Overview", "Wardrobe", "Performance", "Targets", "Payments"].map(label => {
+          {/* A house account has no wardrobe, targets or pay; Activity is for
+              whoever may read the audit (admin Models audit). */}
+          {(house ? ["Overview", "Performance"] : ["Overview", "Wardrobe", "Performance", "Targets", "Payments"])
+            .concat(can(session, "audit.view") ? ["Activity"] : [])
+            .map(label => {
             const key = label.toLowerCase();
             return <button key={label} type="button"
               className={section === key ? "profile__tab profile__tab--active" : "profile__tab"}
@@ -780,7 +885,79 @@ export function AffiliateDetail({ session }: { session: Session }) {
          */}
         <div className="profile__columns profile__full">
         <section className="pay-detail__card profile__contact">
-          <h2 className="pay-detail__card-title">Contact and shipping</h2>
+          <h2 className="pay-detail__card-title">Her details</h2>
+          {/*
+           * Owner, 29 September: open a model and everything about her is on
+           * the first tab. Read first; editing is a deliberate step below.
+           */}
+          <dl className="profile__details">
+            <div>
+              <dt>Signs in with</dt>
+              <dd>
+                {emailDraft === null ? (
+                  <>
+                    <span>{detail.email ?? "—"}</span>
+                    {can(session, "affiliates.manage") && (
+                      <button type="button" className="button button--quiet" onClick={() => setEmailDraft(detail.email ?? "")}>
+                        Change
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  <span className="profile__email-edit">
+                    <input
+                      className="input"
+                      type="email"
+                      value={emailDraft}
+                      aria-label="Her new sign-in email"
+                      onChange={(event) => setEmailDraft(event.target.value)}
+                    />
+                    <button type="button" className="button button--primary" onClick={saveEmail}>
+                      Save
+                    </button>
+                    <button type="button" className="button" onClick={() => { setEmailDraft(null); setEmailProblem(null); }}>
+                      Cancel
+                    </button>
+                    <span className="detail__note">
+                      She signs in with this address from now on; her password stays the same.
+                    </span>
+                    {emailProblem && <span className="blocker" role="alert">{emailProblem}</span>}
+                  </span>
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt>Phone</dt>
+              <dd>
+                <span>{detail.phone ?? "Not given"}</span>
+                {detail.phone && <CopyButton value={detail.phone} />}
+              </dd>
+            </div>
+            <div>
+              <dt>Ship to</dt>
+              <dd>
+                {[
+                  detail.shipping.shipping_line1,
+                  detail.shipping.shipping_line2,
+                  detail.shipping.shipping_city,
+                  detail.shipping.shipping_governorate,
+                ]
+                  .filter(Boolean)
+                  .join(", ") || "Not given"}
+              </dd>
+            </div>
+            {!house && (
+              <div>
+                <dt>Height · weight</dt>
+                <dd>
+                  {detail.height_cm || detail.weight_kg
+                    ? `${detail.height_cm ? `${detail.height_cm} cm` : "no height"} · ${detail.weight_kg ? `${detail.weight_kg} kg` : "no weight"}`
+                    : "Not given"}
+                  <span className="detail__note">Only she can change these.</span>
+                </dd>
+              </div>
+            )}
+          </dl>
           {/* H01: when she started. Not a contact detail and not in the
            *  export's form, so it sits above it, not among the inputs. */}
           <div className="profile__start">
@@ -859,32 +1036,31 @@ export function AffiliateDetail({ session }: { session: Session }) {
           )}
             </div>
           </div>
-          <ContactForm
-            key={detail.id}
-            contact={{ id: detail.id, name: detail.name, phone: detail.phone, email: detail.email, shipping: detail.shipping }}
-            canEdit={can(session, "affiliates.manage")}
-            onSaved={load}
-          />
+          {/* The export's form, now behind a deliberate press: Overview reads
+              her details, and changing them is its own step. */}
+          {can(session, "affiliates.manage") &&
+            (editingContact ? (
+              <>
+                <ContactForm
+                  key={detail.id}
+                  contact={{ id: detail.id, name: detail.name, phone: detail.phone, email: detail.email, shipping: detail.shipping }}
+                  canEdit
+                  onSaved={load}
+                />
+                <button type="button" className="button profile__edit-done" onClick={() => setEditingContact(false)}>
+                  Done editing
+                </button>
+              </>
+            ) : (
+              <button type="button" className="button profile__edit-open" onClick={() => setEditingContact(true)}>
+                Edit contact and shipping
+              </button>
+            ))}
         </section>
         <div className="profile__side">
-        {/* Sizing is its own card in the export, and says plainly why it
-         *  cannot be edited here. An absent control only tells somebody that
-         *  nothing happens when they look for one. Values at 15px, side by
-         *  side (Admin lines 884-890). */}
-        <section className="pay-detail__card">
-          <h2 className="pay-detail__card-title">Sizing</h2>
-          <div className="profile__sizing">
-            <span>
-              <span className="profile__sizing-label">Height</span>
-              <span className="profile__sizing-value">{detail.height_cm ? `${detail.height_cm} cm` : "Not given"}</span>
-            </span>
-            <span>
-              <span className="profile__sizing-label">Weight</span>
-              <span className="profile__sizing-value">{detail.weight_kg ? `${detail.weight_kg} kg` : "Not given"}</span>
-            </span>
-          </div>
-          <p className="profile__sizing-note">Only the model can change these.</p>
-        </section>
+        {/* Sizing moved into *Her details*; where to pay her takes its place
+            (owner, 29 September). A house account is never paid. */}
+        {!house && whereToPay("Where to pay her")}
         <section className="pay-detail__card profile__card">
           <h2 className="pay-detail__card-title">Current terms</h2>
           <p className="profile__card-line">{termLine}</p>
@@ -896,6 +1072,25 @@ export function AffiliateDetail({ session }: { session: Session }) {
         </section>
         <section className="pay-detail__card">
           <h2 className="pay-detail__card-title">Discount codes</h2>
+          {/* Admin Models audit: every code she has held, with its months, so
+              *why does she have no code?* answers itself. */}
+          {(detail.code_history?.length ?? 0) > 0 && (
+            <ol className="profile__code-timeline" aria-label="Every code she has held">
+              {detail.code_history!.map((period) => (
+                <li
+                  key={`${period.code}-${period.start_month}`}
+                  className={period.end_month === null ? "profile__code-period profile__code-period--open" : "profile__code-period"}
+                >
+                  <span className="code">{period.code}</span>
+                  <span className="profile__code-months">
+                    {formatMonth(period.start_month)}
+                    {period.end_month === null ? " → now" : period.end_month === period.start_month ? "" : ` – ${formatMonth(period.end_month)}`}
+                  </span>
+                  {!period.verified && <span className="blocker">not confirmed</span>}
+                </li>
+              ))}
+            </ol>
+          )}
           {detail.codes.length === 0 ? (
             <p className="empty">
               {/* `codes` describe `terms_month`, the month being looked at -
@@ -1104,47 +1299,7 @@ export function AffiliateDetail({ session }: { session: Session }) {
               </Link>
             )}
           </section>
-          <section className="pay-detail__card profile__card">
-            <h2 className="pay-detail__card-title">Where to send it</h2>
-            {detail.payout_destination === null && detail.payout_abroad ? (
-              /* ADR 0046: she applied from outside Egypt. Nothing is missing -
-               *  there is no Egyptian destination to give, and paying her is
-               *  arranged with her outside the platform. */
-              <p className="pay-detail__missing">
-                {detail.name} is paid outside Egypt. Arrange it with her directly,
-                or set a destination here once she has one.
-              </p>
-            ) : detail.payout_destination === null && house ? (
-              <p className="pay-detail__missing">
-                {detail.name} is a house account and is never paid.
-              </p>
-            ) : detail.payout_destination === null ? (
-              <p className="pay-detail__missing">
-                {detail.name} has not submitted payment details, so nothing can be sent yet.
-              </p>
-            ) : detail.payout_destination_card ? (
-              /* **The whole destination, here too** (ADR 0042). The export
-               *  draws the same card on this tab as on the payments desk,
-               *  and it is the same question asked from a different screen:
-               *  somebody looking at her profile with a banking app open
-               *  cannot type `…291` any more than somebody on the desk can.
-               *  The server sends the card only where `payments.record`
-               *  holds; marketing still gets the shortened sentence. */
-              <DestinationDetails card={detail.payout_destination_card} />
-            ) : (
-              <p className="profile__card-line">{describeDestination(detail.payout_destination)}</p>
-            )}
-            {can(session, "affiliates.manage") && (
-              <Link className="pay-detail__link profile__card-link" to={`/affiliates/${detail.id}/payout-destination`}>
-                {detail.payout_destination ? "Correct it →" : "Set it →"}
-              </Link>
-            )}
-            {/* Masking still governs every *record* (ADR 0028, as amended by
-             *  0042): audit rows, logs, notices and the confirmation shown
-             *  when a destination changes. This line is about neither - it
-             *  says an old transfer is not rewritten by a new destination. */}
-            <p className="pay-detail__faint">Earlier transfers keep the destination they were sent to.</p>
-          </section>
+          {whereToPay("Where to send it")}
         </div>
         <div className="surface profile__full">
           {!record ? (
@@ -1184,13 +1339,77 @@ export function AffiliateDetail({ session }: { session: Session }) {
               </tbody>
             </table>
           )}
+          {/* Admin Models audit: her whole ledger has its own page, which
+              nothing linked to. */}
+          <p className="profile__ledger-link">
+            <Link className="pay-detail__link" to={`/affiliates/${detail.id}/payments`}>
+              See every transfer and adjustment →
+            </Link>
+          </p>
         </div>
           {id && <Corrections key={`fix-${id}`} affiliateId={id} session={session} />}
           {id && <FinancialRulesPreview key={`${id}-${month}`} affiliateId={id} currentMonth={detail.current_month}
             firstMonth={detail.collaboration_start_month && detail.collaboration_start_month > detail.platform_start_month ? detail.collaboration_start_month : detail.platform_start_month} />}
         </>}
+        {/*
+         * Admin Models audit: who did what to her account, when, and why -
+         * approvals, code and term changes, pauses. It was all audited and
+         * none of it was visible from her page.
+         */}
+        {section === "activity" && (
+          <div className="surface profile__full profile__activity">
+            {activityError ? (
+              <p className="notice notice--refused" role="alert">{activityError}</p>
+            ) : activity === null ? (
+              <p className="empty">Loading…</p>
+            ) : activity.length === 0 ? (
+              <p className="empty">Nothing has been recorded about {detail.name} yet.</p>
+            ) : (
+              <ol className="profile__timeline">
+                {activity.map((entry) => (
+                  <li key={entry.id}>
+                    <time dateTime={entry.created_at}>
+                      {new Date(entry.created_at).toLocaleDateString("en-GB", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      })}
+                    </time>
+                    <span>
+                      {entry.sentence}
+                      {entry.who && <span className="profile__muted"> · {entry.who}</span>}
+                      {entry.reason && <span className="profile__timeline-reason">“{entry.reason}”</span>}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
+        )}
       </div>
     </>
+  );
+}
+
+/** Copy one value, saying so for a moment; silent if the browser refuses. */
+function CopyButton({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      className="button button--quiet"
+      onClick={() => {
+        navigator.clipboard
+          ?.writeText(value)
+          .then(() => {
+            setCopied(true);
+            window.setTimeout(() => setCopied(false), 1500);
+          })
+          .catch(() => undefined);
+      }}
+    >
+      {copied ? "Copied" : "Copy"}
+    </button>
   );
 }
 

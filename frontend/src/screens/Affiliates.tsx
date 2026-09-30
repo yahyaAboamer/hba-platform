@@ -4,7 +4,7 @@ import { Link, useLocation, useSearchParams, useNavigate } from "react-router-do
 import { Money } from "../components/Money";
 import { api } from "../lib/api";
 import { PAY_TYPE } from "../lib/payouts";
-import { shortMonth } from "../lib/money";
+import { formatMonth, shortMonth } from "../lib/money";
 import { AddHouseCode } from "./AddHouseCode";
 import "./Affiliates.css";
 
@@ -55,6 +55,8 @@ export type Affiliate = {
   archived_at: string | null;
   has_verified_code?: boolean;
   has_terms?: boolean;
+  /** Somewhere to send her money, or paid abroad by arrangement. */
+  has_payout?: boolean;
   /** The raw arrangement she is on that month, labelled by `PAY_TYPE`. */
   arrangement?: string | null;
   /** The code they sell under this month, if they have one registered. */
@@ -186,12 +188,97 @@ export const STATUS_LABEL: Record<string, string> = {
  * missing. An archived affiliate is not meant to be earning at all.
  */
 export function missingSetup(row: Affiliate): string[] {
-  if (row.status === "archived") return [];
+  if (row.status === "archived" || row.status === "declined") return [];
 
   const missing: string[] = [];
   if (row.is_payable && row.has_terms === false) missing.push("no pay terms");
   if (row.has_verified_code === false) missing.push("code unconfirmed");
+  // Admin Models audit: nothing can be sent to her without it.
+  if (row.is_payable && row.has_payout === false) missing.push("no payout details");
   return missing;
+}
+
+/** Somebody who accepted her invitation and has not applied yet. */
+export type Joined = {
+  account_id: number;
+  email: string;
+  name: string | null;
+  joined_at: string | null;
+};
+
+/**
+ * *Needs you* (admin Models audit): the four things that stop a model earning
+ * or being paid, each a count that is also a filter. Archived and declined
+ * models are not expected to be set up, so they are never counted.
+ */
+export type Need = "applications" | "code" | "terms" | "payout";
+
+export const NEEDS: { key: Need; label: string; tone: string }[] = [
+  { key: "applications", label: "applications to review", tone: "info" },
+  { key: "code", label: "codes Shopify hasn't confirmed", tone: "refused" },
+  { key: "terms", label: "with no pay terms", tone: "owed" },
+  { key: "payout", label: "with no payout details", tone: "owed" },
+];
+
+export function needs(row: Affiliate, need: Need): boolean {
+  if (row.status === "archived" || row.status === "declined") return false;
+  switch (need) {
+    case "applications":
+      return row.status === "pending";
+    case "code":
+      return row.has_verified_code === false;
+    case "terms":
+      return row.is_payable && row.has_terms === false;
+    case "payout":
+      return row.is_payable && row.has_payout === false;
+  }
+}
+
+export type Sort = "name" | "sales" | "content";
+
+/** Content done, as a fraction of what was asked; nothing asked sorts last. */
+function contentDone(row: Affiliate): number {
+  const content = row.content;
+  if (!content || content.required_videos === null) return 2;
+  const asked = (content.required_videos ?? 0) + (content.required_stories ?? 0);
+  const done = (content.actual_videos ?? 0) + (content.actual_stories ?? 0);
+  return asked === 0 ? 2 : done / asked;
+}
+
+export function sortRoster(rows: Affiliate[], sort: Sort): Affiliate[] {
+  const sorted = [...rows];
+  if (sort === "sales") sorted.sort((a, b) => (b.sales_piastres ?? 0) - (a.sales_piastres ?? 0));
+  else if (sort === "content") sorted.sort((a, b) => contentDone(a) - contentDone(b));
+  else sorted.sort((a, b) => a.name.localeCompare(b.name));
+  return sorted;
+}
+
+/** The chosen rows as a spreadsheet, for the selection's export. */
+export function rosterCsv(rows: Affiliate[]): string {
+  const cell = (value: unknown) => {
+    let text = value === null || value === undefined ? "" : String(value);
+    // A name she typed herself must never run as a formula in the sheet it
+    // is opened in: a leading = + - @ (or tab, return) is neutralised.
+    if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
+    return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+  };
+  const head = ["Name", "Code", "Status", "Month", "Sales (EGP)", "Content", "Terms", "Email", "Phone"];
+  const lines = rows.map((row) =>
+    [
+      row.name,
+      row.code ?? "",
+      (ROSTER_STATUS[row.status] ?? ROSTER_STATUS.inactive).label,
+      row.month ?? "",
+      ((row.sales_piastres ?? 0) / 100).toFixed(2),
+      contentSummary(row),
+      row.arrangement ? PAY_TYPE[row.arrangement] ?? row.arrangement : "",
+      row.email ?? "",
+      row.phone ?? "",
+    ]
+      .map(cell)
+      .join(","),
+  );
+  return [head.join(","), ...lines].join("\n");
 }
 
 /**
@@ -229,12 +316,19 @@ export function rosterMatches(
     ) {
       return false;
     }
-    if (!needle) return true;
-    return (
-      row.name.toLowerCase().includes(needle) ||
-      (row.code ?? "").toLowerCase().includes(needle)
-    );
+    return matchesSearch(row, needle);
   });
+}
+
+/** Name, code, or her sign-in address - often all somebody has in hand. */
+export function matchesSearch(row: Affiliate, query: string): boolean {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return true;
+  return (
+    row.name.toLowerCase().includes(needle) ||
+    (row.code ?? "").toLowerCase().includes(needle) ||
+    (row.email ?? "").toLowerCase().includes(needle)
+  );
 }
 
 /**
@@ -284,17 +378,34 @@ export function Affiliates() {
   const navigate = useNavigate();
   const [page, setPage] = useState(0);
   const query = params.get("q") ?? "";
+  // Admin Models audit: a *Needs you* filter, a sort and a month, kept in the
+  // address like the segment and search so back and a shared link keep them.
+  const askedNeed = params.get("need");
+  const need: Need | null = NEEDS.some((option) => option.key === askedNeed)
+    ? (askedNeed as Need)
+    : null;
+  const askedSort = params.get("sort");
+  const sort: Sort = askedSort === "sales" || askedSort === "content" ? askedSort : "name";
+  const chosenMonth = params.get("month") ?? "";
+  const [joined, setJoined] = useState<Joined[]>([]);
+  /** The working month, as the server answered with no month asked. */
+  const [latest, setLatest] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  /** Phone cards show twelve at a time, like the table's pages. */
+  const [cardLimit, setCardLimit] = useState(ROSTER_PAGE);
+  const [reminded, setReminded] = useState<Record<number, string>>({});
 
   const narrow = useCallback(
-    (next: { segment?: Segment; q?: string }) => {
+    (next: { segment?: Segment; q?: string; need?: Need | ""; sort?: Sort; month?: string }) => {
       setParams(
         (previous) => {
           const updated = new URLSearchParams(previous);
           for (const [key, value] of Object.entries(next)) {
-            // An empty search or the default segment leaves no trace: a URL
-            // carrying `?q=` says a search happened and found everything.
-            if (!value || value === "active") updated.delete(key);
-            else updated.set(key, value);
+            // An empty value or a default leaves no trace: a URL carrying
+            // `?q=` says a search happened and found everything.
+            if (!value || value === "active" || (key === "sort" && value === "name")) {
+              updated.delete(key);
+            } else updated.set(key, value);
           }
           return updated;
         },
@@ -309,13 +420,25 @@ export function Affiliates() {
   // The export has one layout, a table; a phone gets cards because a table
   // does not fit there (§12.3's point), with no switch between them (D).
   const shown: View = isNarrow ? "cards" : "table";
-  const visible = rows ? rosterMatches(rows, segment, query) : [];
+  // A *Needs you* count filters across segments - an application and an
+  // active model can both be missing payout details - so it replaces the
+  // segment rather than narrowing inside it.
+  const matched = rows
+    ? need
+      ? rows.filter((row) => needs(row, need) && matchesSearch(row, query))
+      : rosterMatches(rows, segment, query)
+    : [];
+  const visible = sortRoster(matched, sort);
   // A new filter or a new search starts at the first page. Resetting on the
   // filter alone let a search typed on page 2 narrow the list to one page and
   // leave an empty table with no pager to get back.
   useEffect(() => {
     setPage(0);
-  }, [segment, query]);
+    setCardLimit(ROSTER_PAGE);
+    // A selection belongs to the view it was made in; carrying it across a
+    // filter would export rows nobody can see.
+    setSelected(new Set());
+  }, [segment, query, need, sort, chosenMonth]);
   // The column header names the month it is showing, so a figure can never be
   // read as "this month" when the list is answering for another one.
   // *Sept sales*, as the export's `monthShort` writes it. The full month
@@ -328,15 +451,68 @@ export function Affiliates() {
   const reload = useCallback(() => {
     setError(null);
     api
-      .get<{ affiliates: Affiliate[]; invited: Invited[] }>(
-        "/api/affiliates?include_archived=true",
+      .get<{ affiliates: Affiliate[]; invited: Invited[]; joined?: Joined[]; working_month?: string }>(
+        `/api/affiliates?include_archived=true${chosenMonth ? `&month=${encodeURIComponent(chosenMonth)}` : ""}`,
       )
       .then((body) => {
         setRows(body.affiliates);
         setInvited(onePerAddress(body.invited ?? []));
+        setJoined(body.joined ?? []);
+        setSelected(new Set());
+        // The month picker counts back from the working month, which the
+        // server names even when the link asked for another one.
+        setLatest(body.working_month ?? body.affiliates[0]?.month ?? null);
       })
       .catch((caught) => setError(caught.message));
-  }, []);
+  }, [chosenMonth]);
+
+  /** Twelve months back from the working month, newest first. */
+  const monthChoices = latest
+    ? Array.from({ length: 12 }, (_, back) => {
+        const [year, month] = latest.split("-").map(Number);
+        const date = new Date(Date.UTC(year, month - 1 - back, 1));
+        return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+      })
+    : [];
+
+  function remind(person: Joined) {
+    setReminded({ ...reminded, [person.account_id]: "Sending…" });
+    api
+      .post<{ emailed: boolean }>(`/api/affiliates/joined/${person.account_id}/remind`)
+      .then((result) =>
+        setReminded((now) => ({
+          ...now,
+          [person.account_id]: result.emailed ? "Reminder emailed" : "Email is off - tell her yourself",
+        })),
+      )
+      .catch((caught) =>
+        setReminded((now) => ({ ...now, [person.account_id]: (caught as Error).message })),
+      );
+  }
+
+  function exportSelected() {
+    const chosen = (rows ?? []).filter((row) => selected.has(row.id));
+    // The byte-order mark tells Excel the file is UTF-8, or Arabic names
+    // arrive garbled.
+    const blob = new Blob(["﻿", rosterCsv(chosen)], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `hba-models-${rows?.[0]?.month ?? "export"}.csv`;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function toggleSelected(id: number) {
+    setSelected((now) => {
+      const next = new Set(now);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   useEffect(reload, [reload]);
 
@@ -350,6 +526,10 @@ export function Affiliates() {
     ...invited.filter((row) => row.expired),
   ].filter((row) => !needle || row.email.toLowerCase().includes(needle));
   const paged = visible.slice(page * ROSTER_PAGE, (page + 1) * ROSTER_PAGE);
+  const showingInvitations = segment === "invitations" && !need;
+  const joinedShown = joined.filter(
+    (person) => !needle || person.email.toLowerCase().includes(needle) || (person.name ?? "").toLowerCase().includes(needle),
+  );
 
   return (
     <>
@@ -372,6 +552,32 @@ export function Affiliates() {
       </div>
 
       {/*
+       * *Needs you* (admin Models audit): who needs something from you, as
+       * counts that are also filters. Only what is actually outstanding is
+       * drawn, so a clean roster shows nothing here at all.
+       */}
+      {rows && NEEDS.some((option) => rows.some((row) => needs(row, option.key))) && (
+        <div className="affiliates__needs" role="group" aria-label="Needs you">
+          {NEEDS.map((option) => {
+            const count = rows.filter((row) => needs(row, option.key)).length;
+            if (count === 0) return null;
+            return (
+              <button
+                key={option.key}
+                type="button"
+                className={`affiliates__need affiliates__need--${option.tone}${need === option.key ? " affiliates__need--on" : ""}`}
+                aria-pressed={need === option.key}
+                onClick={() => narrow({ need: need === option.key ? "" : option.key })}
+              >
+                <strong>{count}</strong>
+                <span>{count === 1 ? option.label.replace(/^applications/, "application").replace(/^codes/, "code") : option.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/*
        * **One row, as the export draws it.** The filters take the left, the
        * search and the primary act take the right. This screen had the acts
        * up in the page heading and the filters on a line of their own
@@ -383,15 +589,15 @@ export function Affiliates() {
             <button
               key={option.key}
               type="button"
-              className={segment === option.key ? "chip chip--on" : "chip"}
-              onClick={() => narrow({ segment: option.key })}
-              aria-pressed={segment === option.key}
+              className={!need && segment === option.key ? "chip chip--on" : "chip"}
+              onClick={() => narrow({ segment: option.key, need: "" })}
+              aria-pressed={!need && segment === option.key}
             >
               {option.label}
               {rows && (
                 <span className="affiliates__segment-count">
                   {option.key === "invitations"
-                    ? invited.length
+                    ? invited.length + joined.length
                     : rosterMatches(rows, option.key, "").length}
                 </span>
               )}
@@ -405,8 +611,8 @@ export function Affiliates() {
             className="input input--search"
             value={query}
             onChange={(event) => narrow({ q: event.target.value })}
-            placeholder="Search name or code"
-            aria-label="Search models by name or code"
+            placeholder="Search name, code or email"
+            aria-label="Search models by name, code or email"
           />
 
 
@@ -436,6 +642,79 @@ export function Affiliates() {
         </div>
       </div>
 
+      {/* Admin Models audit: which month the figures are for, and the order. */}
+      {rows !== null && rows.length > 0 && !showingInvitations && (
+        <div className="affiliates__view">
+          <label className="affiliates__view-field">
+            <span>Month</span>
+            <select
+              className="input affiliates__select"
+              value={chosenMonth || latest || ""}
+              onChange={(event) =>
+                narrow({ month: event.target.value === latest ? "" : event.target.value })
+              }
+            >
+              {monthChoices.map((month) => (
+                <option key={month} value={month}>
+                  {formatMonth(month)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="affiliates__view-field">
+            <span>Sort</span>
+            <select
+              className="input affiliates__select"
+              value={sort}
+              onChange={(event) => narrow({ sort: event.target.value as Sort })}
+            >
+              <option value="name">Name, A–Z</option>
+              <option value="sales">Sales, highest first</option>
+              <option value="content">Content, least done first</option>
+            </select>
+          </label>
+          {need && (
+            <button type="button" className="button button--row" onClick={() => narrow({ need: "" })}>
+              Show everyone
+            </button>
+          )}
+        </div>
+      )}
+
+      {selected.size > 0 && (
+        <div className="affiliates__bulk" role="region" aria-label="Selected models">
+          <strong>{selected.size} selected</strong>
+          <button type="button" className="button button--row" onClick={exportSelected}>
+            Export to spreadsheet
+          </button>
+          <button type="button" className="button button--row" onClick={() => setSelected(new Set())}>
+            Clear
+          </button>
+        </div>
+      )}
+
+      {/* First run: nobody yet, so the screen explains how somebody arrives. */}
+      {rows !== null && rows.length === 0 && invited.length === 0 && joined.length === 0 && (
+        <div className="surface affiliates__first">
+          <h2>No models yet</h2>
+          <p>Models join by invitation. Here is what happens:</p>
+          <ol className="affiliates__first-steps">
+            <li>
+              <strong>Invite</strong> You send a link to her email.
+            </li>
+            <li>
+              <strong>She applies</strong> Her name and phone, her discount code, and where to pay her.
+            </li>
+            <li>
+              <strong>You approve</strong> Check her code with Shopify, set her pay terms, approve.
+            </li>
+          </ol>
+          <Link className="button button--primary" to="/affiliates/invite">
+            Invite your first model
+          </Link>
+        </div>
+      )}
+
       {error && (
         <p className="notice notice--refused" role="alert">
           {error}
@@ -453,7 +732,40 @@ export function Affiliates() {
       {/* Not while the error above is showing: a failed load is not still loading. */}
       {rows === null && !error && <p className="empty">Loading…</p>}
 
-      {rows !== null && segment === "invitations" && (
+      {/*
+       * Admin Models audit: she accepted her invitation and made an account
+       * but never applied - no longer an invitation, not yet a model, so she
+       * was on neither list. On top, because a reminder can move her on.
+       */}
+      {rows !== null && showingInvitations && joinedShown.length > 0 && (
+        <div className="surface affiliates__joined">
+          <h2 className="affiliates__joined-title">Joined, hasn&rsquo;t applied yet</h2>
+          <ul>
+            {joinedShown.map((person) => (
+              <li key={person.account_id} className="affiliates__joined-row">
+                <span className="affiliates__who-text">
+                  <span className="affiliates__name">{person.name || person.email}</span>
+                  <span className="affiliates__sub">
+                    {person.email}
+                    {person.joined_at ? ` · joined ${formatSentAt(person.joined_at)}` : ""}
+                  </span>
+                </span>
+                {reminded[person.account_id] ? (
+                  <span className="affiliates__sub" role="status">
+                    {reminded[person.account_id]}
+                  </span>
+                ) : (
+                  <button type="button" className="button button--row" onClick={() => remind(person)}>
+                    Remind her
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {rows !== null && showingInvitations && (
         <div className="surface">
           {invitations.length === 0 ? (
             <p className="empty">No outstanding invitations.</p>
@@ -516,17 +828,24 @@ export function Affiliates() {
         </div>
       )}
 
-      {rows !== null && segment !== "invitations" && visible.length === 0 && (
+      {rows !== null && !showingInvitations && visible.length === 0 && (rows.length > 0 || invited.length + joined.length > 0) && (
         <div className="surface">
           <p className="empty">
             {query.trim()
-              ? `No model matches “${query.trim()}”.`
+              ? `No model matches “${query.trim()}”. Search looks at names, codes and sign-in emails${need ? "" : " in this filter"}.`
               : "Nothing in this view."}
           </p>
+          {query.trim() && (
+            <p className="affiliates__empty-acts">
+              <button type="button" className="button button--row" onClick={() => narrow({ q: "" })}>
+                Clear the search
+              </button>
+            </p>
+          )}
         </div>
       )}
 
-      {segment !== "invitations" && visible.length > 0 && shown === "table" && (
+      {!showingInvitations && visible.length > 0 && shown === "table" && (
         <div className="surface">
           <table className="table affiliates__table">
             <thead>
@@ -536,12 +855,29 @@ export function Affiliates() {
                  * them. The code is how an order is recognised as somebody's,
                  * so it is how a person is recognised on this list.
                  */}
+                <th className="affiliates__pick">
+                  <input
+                    type="checkbox"
+                    aria-label="Select every model on this page"
+                    checked={paged.length > 0 && paged.every((row) => selected.has(row.id))}
+                    onChange={(event) =>
+                      setSelected((now) => {
+                        const next = new Set(now);
+                        for (const row of paged) {
+                          if (event.target.checked) next.add(row.id);
+                          else next.delete(row.id);
+                        }
+                        return next;
+                      })
+                    }
+                  />
+                </th>
                 <th>Model</th>
                 <th className="affiliates__status-cell">Status</th>
                 <th className="affiliates__figure">{monthShort} sales</th>
                 <th className="affiliates__figure">Content</th>
                 <th className="affiliates__terms">
-                  {segment === "applications" ? "Applied" : "Terms"}
+                  {segment === "applications" && !need ? "Applied" : "Terms"}
                 </th>
                 <th aria-hidden="true" />
               </tr>
@@ -560,6 +896,14 @@ export function Affiliates() {
                   // the keyboard and a screen reader.
                   <tr key={row.id} className="control-font affiliates__row"
                     onClick={() => navigate(`/affiliates/${row.id}`)}>
+                    <td className="affiliates__pick" onClick={(event) => event.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${row.name}`}
+                        checked={selected.has(row.id)}
+                        onChange={() => toggleSelected(row.id)}
+                      />
+                    </td>
                     <td>
                       <Link className="affiliates__who" to={`/affiliates/${row.id}`}>
                         <span className="affiliates__avatar" aria-hidden="true">
@@ -575,6 +919,9 @@ export function Affiliates() {
                             {row.code && row.has_verified_code === false && " · not confirmed"}
                             {row.account_kind === "house" && " · house"}
                           </span>
+                          {/* What stops her earning or being paid, on the row
+                              itself - it used to show only on a phone. */}
+                          <Blockers row={row} />
                         </span>
                       </Link>
                     </td>
@@ -634,7 +981,7 @@ export function Affiliates() {
         </div>
       )}
 
-      {segment !== "invitations" && visible.length > ROSTER_PAGE && shown === "table" && (
+      {!showingInvitations && visible.length > ROSTER_PAGE && shown === "table" && (
         <div className="affiliates__pager">
           <span>
             {/* `1–12 of 19`, and `of 19 matching` while a search is on -
@@ -664,27 +1011,79 @@ export function Affiliates() {
         </div>
       )}
 
-      {segment !== "invitations" && visible.length > 0 && shown === "cards" && (
-        <ul className="affiliates__cards">
-          {visible.map((row) => {
-            const missing = missingSetup(row);
-            return (
-              <li key={row.id} className="affiliates__card">
-                <Link className="affiliates__name" to={`/affiliates/${row.id}`}>
-                  {row.name}
-                </Link>
-                <span className="affiliates__card-note">
-                  {(ROSTER_STATUS[row.status] ?? ROSTER_STATUS.inactive).label}
-                  {row.account_kind === "house" && " · house account"}
-                </span>
-                {missing.length > 0 && (
-                  <span className="blocker">{missing.join(", ")}</span>
-                )}
-              </li>
-            );
-          })}
-        </ul>
+      {!showingInvitations && visible.length > 0 && shown === "cards" && (
+        <>
+          <ul className="affiliates__cards">
+            {visible.slice(0, cardLimit).map((row) => {
+              const status = ROSTER_STATUS[row.status] ?? ROSTER_STATUS.inactive;
+              const applying = row.status === "pending";
+              return (
+                <li key={row.id} className="affiliates__card">
+                  {/* Admin Models audit: a card keeps what the table row
+                      says - her code, sales and content - not just her name. */}
+                  <span className="affiliates__card-top">
+                    <Link className="affiliates__name" to={`/affiliates/${row.id}`}>
+                      {row.name}
+                    </Link>
+                    <span className={`pill affiliates__tone--${status.tone}`}>{status.label}</span>
+                  </span>
+                  <span className="affiliates__card-note">
+                    {row.code ?? "no code yet"}
+                    {row.code && row.has_verified_code === false && " · not confirmed"}
+                    {row.account_kind === "house" && " · house account"}
+                  </span>
+                  <Blockers row={row} />
+                  {!applying && (
+                    <span className="affiliates__card-figures">
+                      <span>
+                        {monthShort} sales
+                        <strong>
+                          <Money piastres={row.sales_piastres ?? 0} kind="agreed" />
+                        </strong>
+                      </span>
+                      <span>
+                        Content
+                        <strong>{contentSummary(row)}</strong>
+                      </span>
+                    </span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+          {visible.length > cardLimit && (
+            <button
+              type="button"
+              className="button affiliates__more"
+              onClick={() => setCardLimit(cardLimit + ROSTER_PAGE)}
+            >
+              Show {Math.min(ROSTER_PAGE, visible.length - cardLimit)} more
+            </button>
+          )}
+        </>
       )}
     </>
+  );
+}
+
+/** What stops her earning or being paid, as small tags under her name. */
+function Blockers({ row }: { row: Affiliate }) {
+  const missing = missingSetup(row);
+  if (missing.length === 0) return null;
+  return (
+    <span className="affiliates__blockers">
+      {missing.map((reason) => (
+        <span
+          key={reason}
+          className={
+            reason === "code unconfirmed" || reason === "no pay terms"
+              ? "affiliates__blocker affiliates__blocker--refused"
+              : "affiliates__blocker"
+          }
+        >
+          {reason}
+        </span>
+      ))}
+    </span>
   );
 }

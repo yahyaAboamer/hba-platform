@@ -155,6 +155,7 @@ def sentence(event: AuditEvent, names: _Names) -> str:
         # Her name went with her (ADR 0052): only the number is left to say.
         "affiliate.erased": "Erased a model who had never earned anything",
         "application.approved": f"Approved {who}'s application",
+        "application.reminded": f"Reminded {who} to finish her application",
         "auth.bootstrap": "Set up the platform's first admin account",
         "auth.login": f"{who} signed in",
         "auth.logout": f"{who} signed out",

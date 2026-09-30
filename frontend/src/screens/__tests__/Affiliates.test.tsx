@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { contentSummary, onePerAddress, rosterMatches, type Affiliate, type Invited } from "../Affiliates";
+import { contentSummary, missingSetup, needs, onePerAddress, rosterCsv, rosterMatches, sortRoster, type Affiliate, type Invited } from "../Affiliates";
 
 const model = (over: Partial<Affiliate> = {}): Affiliate => ({
   id: 1,
@@ -129,5 +129,57 @@ describe("onePerAddress", () => {
       invite({ id: 7, email: "dina@example.com" }),
     ]);
     expect(rows.map((row) => row.id).sort()).toEqual([6, 7]);
+  });
+});
+
+describe("Needs you (admin Models audit)", () => {
+  it("counts only what stops a live or applying model", () => {
+    const noPayout = model({ id: 2, has_payout: false });
+    const archived = model({ id: 3, status: "archived", has_payout: false });
+    const house = model({ id: 4, account_kind: "house", is_payable: false, has_payout: false });
+    expect(needs(noPayout, "payout")).toBe(true);
+    expect(needs(archived, "payout")).toBe(false);
+    expect(needs(house, "payout")).toBe(false);
+    expect(needs(model({ status: "pending" }), "applications")).toBe(true);
+    expect(needs(model({ status: "declined" }), "applications")).toBe(false);
+  });
+
+  it("names missing payout details on the row", () => {
+    expect(missingSetup(model({ has_payout: false }))).toContain("no payout details");
+    expect(missingSetup(model({ status: "declined", has_payout: false }))).toEqual([]);
+  });
+
+  it("finds a model by her sign-in email", () => {
+    const rows = [model({ id: 1, email: "nour.h@example.com" }), model({ id: 2, name: "Salma", email: "s@example.com" })];
+    expect(rosterMatches(rows, "active", "nour.h@").map((row) => row.id)).toEqual([1]);
+  });
+});
+
+describe("sortRoster", () => {
+  const a = model({ id: 1, name: "Zeina", sales_piastres: 100 });
+  const b = model({ id: 2, name: "Amira", sales_piastres: 900 });
+  it("sorts by name, and by sales highest first", () => {
+    expect(sortRoster([a, b], "name").map((row) => row.id)).toEqual([2, 1]);
+    expect(sortRoster([a, b], "sales").map((row) => row.id)).toEqual([2, 1]);
+    expect(sortRoster([b, a], "sales").map((row) => row.id)).toEqual([2, 1]);
+  });
+});
+
+describe("rosterCsv", () => {
+  it("quotes a value with a comma and writes pounds, not piastres", () => {
+    const csv = rosterCsv([model({ name: "Nour, the first", sales_piastres: 123456 })]);
+    const [head, line] = csv.split("\n");
+    expect(head.startsWith("Name,Code,Status")).toBe(true);
+    expect(line.startsWith('"Nour, the first"')).toBe(true);
+    expect(line).toContain("1234.56");
+  });
+});
+
+describe("rosterCsv and formulas", () => {
+  it("never lets a name she typed run as a spreadsheet formula", () => {
+    const csv = rosterCsv([model({ name: '=HYPERLINK("http://x","y")', email: "@evil" })]);
+    const line = csv.split("\n")[1];
+    expect(line.startsWith(`"'=HYPERLINK(`)).toBe(true);
+    expect(line).toContain(",'@evil,");
   });
 });

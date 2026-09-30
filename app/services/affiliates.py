@@ -521,6 +521,10 @@ def update_details(
 
     if email is not None and (cleaned_email := email.strip().lower()):
         account = affiliate.account
+        # Her sign-in: the address the next password reset goes to. A shape
+        # check, since the change button made this reachable in one press.
+        if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", cleaned_email):
+            raise ValueError("That does not look like an email address. Nothing was saved.")
         if cleaned_email != account.email:
             before["email"], after["email"] = account.email, cleaned_email
             account.email = cleaned_email

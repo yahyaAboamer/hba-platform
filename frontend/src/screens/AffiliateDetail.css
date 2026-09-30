@@ -636,6 +636,115 @@ td.profile__muted,
   color: var(--quiet);
 }
 
+/* ── Admin Models audit (batch Q3): Overview reads her details ───────────── */
+
+.profile__details {
+  margin: 4px 0 12px;
+}
+.profile__details > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--rule);
+  font-size: 13.5px;
+}
+.profile__details dt {
+  flex: none;
+  color: var(--quiet);
+}
+.profile__details dd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: 0;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+.profile__details dd .detail__note {
+  flex-basis: 100%;
+}
+.profile__email-edit {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  width: 100%;
+}
+.profile__email-edit .input {
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+.profile__edit-open,
+.profile__edit-done {
+  margin-top: 12px;
+}
+
+.profile__code-timeline {
+  display: grid;
+  gap: 6px;
+  margin: 4px 0 12px;
+  padding: 0;
+  list-style: none;
+}
+.profile__code-period {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-left: 3px solid var(--rule-strong);
+  background: var(--hover);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+.profile__code-period--open {
+  border-left-color: var(--accent);
+}
+.profile__code-months {
+  color: var(--quiet);
+}
+
+.profile__ledger-link {
+  margin: 12px 0 0;
+  padding: 0 4px;
+}
+
+.profile__timeline {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.profile__timeline li {
+  display: grid;
+  grid-template-columns: 7.5rem 1fr;
+  gap: 12px;
+  padding: 11px 16px;
+  border-top: 1px solid var(--rule);
+  font-size: 13.5px;
+}
+.profile__timeline li:first-child {
+  border-top: 0;
+}
+.profile__timeline time {
+  color: var(--faint);
+  font-size: 12.5px;
+}
+.profile__timeline-reason {
+  display: block;
+  margin-top: 2px;
+  color: var(--quiet);
+}
+@media (max-width: 640px) {
+  .profile__timeline li {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+}
+
 /* Her answers, right-aligned against their labels and capped so a long
    address wraps inside its own column rather than pushing the label away. */
 .detail__facts dd {
@@ -730,4 +839,9 @@ td.profile__muted,
    that basis would be a 260px height. */
 .profile__side > * {
   flex: none;
+}
+
+/* The correction link sits on its own line under the pay button. */
+.profile__card-actions {
+  margin: 10px 0 0;
 }

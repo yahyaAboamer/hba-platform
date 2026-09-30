@@ -19,7 +19,10 @@ today's roles happen to grant both together (ADR 0018).
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import select, text
+
+from app.models.codes import DiscountCodePeriod
+from app.services.audit import record_audit
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -280,6 +283,22 @@ def _affiliate_detail(
         #: the owner and the model are offered the same months for her.
         "months": months_for(db, affiliate),
         "codes": codes_with_status(db, affiliate, month),
+        #: Every code she has held, oldest first, for the profile's code
+        #: timeline: the list shows only this month's, so *why does she have
+        #: no code?* was unanswerable without it (admin Models audit).
+        "code_history": [
+            {
+                "code": period.code,
+                "start_month": period.start_month,
+                "end_month": period.end_month,
+                "verified": period.shopify_verified_at is not None,
+            }
+            for period in db.scalars(
+                select(DiscountCodePeriod)
+                .where(DiscountCodePeriod.affiliate_id == affiliate.id)
+                .order_by(DiscountCodePeriod.start_month)
+            )
+        ],
         "compensation": _compensation_payload(terms_for(db, affiliate, month)),
         #: What approval checks (ADR 0052): terms for the *working* month,
         #: whichever month the profile happens to be showing.
@@ -395,7 +414,36 @@ def list_affiliates_route(
     ).all():
         if affiliate_id not in earliest or start_month < earliest[affiliate_id]:
             earliest[affiliate_id] = start_month
+
+    # *Needs you* (admin Models audit): who has somewhere to be paid. One
+    # query for everyone; a model paid abroad has no destination by design
+    # (ADR 0046) and is not missing one.
+    from app.models.payouts import PayoutDestination
+
+    with_destination = set(
+        db.scalars(
+            select(PayoutDestination.affiliate_id).where(
+                PayoutDestination.superseded_at.is_(None)
+            )
+        )
+    )
+
+    # She accepted her invitation and made an account, and has not applied:
+    # no longer an invitation, not yet a profile - so she was on neither list.
+    joined = db.execute(
+        text(
+            "SELECT u.id, u.email, u.display_name, u.created_at FROM user_account u "
+            "JOIN role_assignment r ON r.user_account_id = u.id AND r.role = 'affiliate' "
+            "AND r.revoked_at IS NULL "
+            "WHERE u.status = 'active' "
+            "AND NOT EXISTS (SELECT 1 FROM affiliate_profile p WHERE p.user_account_id = u.id) "
+            "ORDER BY u.created_at DESC"
+        )
+    ).all()
     return {
+        #: The working month, whichever month was asked for: the month
+        #: picker counts back from it even on a link to another month.
+        "working_month": working_month(),
         "affiliates": [
             {
                 **_affiliate_payload(a),
@@ -422,8 +470,19 @@ def list_affiliates_route(
                 #: than a boolean, because *nearly ready* is the state this
                 #: screen exists to show and a yes/no hides it.
                 "historical_setup": historical_setup.get(a.id),
+                #: Somewhere to send her money, or paid abroad by arrangement.
+                "has_payout": a.id in with_destination or bool(a.payout_abroad),
             }
             for a in affiliates
+        ],
+        "joined": [
+            {
+                "account_id": row.id,
+                "email": row.email,
+                "name": row.display_name,
+                "joined_at": row.created_at.isoformat() if row.created_at else None,
+            }
+            for row in joined
         ],
         # Invitations that have not been opened yet. They belong here rather
         # than on the staff panel: a model is not staff, and an invitation
@@ -590,6 +649,46 @@ def get_affiliate_route(
     )
 
 
+@router.post("/joined/{account_id}/remind")
+def remind_to_apply_route(
+    account_id: int,
+    actor: UserAccount = Depends(require_permission(Permission.INVITATIONS_SEND)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Email somebody who made her account and has not applied yet.
+
+    Only an account on the model role with no profile: the reminder says
+    *finish your application*, which is wrong for anybody else.
+    """
+    from app.models.affiliates import AffiliateProfile as Profile
+    from app.services.notifications import apply_reminder
+
+    account = db.get(UserAccount, account_id)
+    has_profile = account is not None and db.scalar(
+        select(Profile.id).where(Profile.user_account_id == account.id)
+    ) is not None
+    is_model = account is not None and db.execute(
+        text(
+            "SELECT EXISTS (SELECT 1 FROM role_assignment "
+            "WHERE user_account_id = :id AND role = 'affiliate' AND revoked_at IS NULL)"
+        ),
+        {"id": account.id},
+    ).scalar_one()
+    if account is None or has_profile or not is_model or account.status != "active":
+        raise HTTPException(404, "Nobody is waiting to apply with that account.")
+
+    sent = apply_reminder(db, account)
+    record_audit(
+        db,
+        action="application.reminded",
+        subject=f"user:{account.id}",
+        actor_id=actor.id,
+        actor_email=actor.email,
+    )
+    db.commit()
+    return {"emailed": sent is not None}
+
+
 class EraseBody(BaseModel):
     reason: str = Field(min_length=1, max_length=500)
     #: Typed by the admin as a last check: her name, exactly as shown.
@@ -728,8 +827,16 @@ def update_affiliate_status_route(
                 actor_email=actor.email,
                 reason=body.reason,
             )
+        # A changed sign-in email meets the unique index here rather than at
+        # commit, so the refusal below can say what it was.
+        db.flush()
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            409, "That email address already belongs to another account. Nothing was saved."
+        ) from exc
 
     db.commit()
     return _affiliate_payload(affiliate)

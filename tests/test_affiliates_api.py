@@ -2519,3 +2519,95 @@ def test_a_declined_application_cannot_jump_straight_to_active(client):
     response = _status(client, affiliate["id"], "active")
     assert response.status_code == 400
     assert "cannot be made active directly" in response.json()["detail"]
+
+
+# ── The Models list and profile, batch Q3 (admin Models audit) ──────────────────
+
+
+def _model_account(email: str) -> int:
+    """An account on the model role with no profile: accepted, not applied."""
+    account_id = _make_account(email)
+    with engine.begin() as connection:
+        connection.execute(
+            text("INSERT INTO role_assignment (user_account_id, role) VALUES (:u, 'affiliate')"),
+            {"u": account_id},
+        )
+    return account_id
+
+
+def test_the_list_says_who_has_no_payout_details(client):
+    without = _pending_with_code(client)
+    with_one = _pending_with_code(client, name="Salma", email="salma@example.com", code="SALMA10")
+    client.put(
+        f"/api/affiliates/{with_one['id']}/payout-destination",
+        json={"method": "wallet", "wallet_provider": "Vodafone Cash", "wallet_phone": "01001234567"},
+    )
+
+    rows = {row["id"]: row for row in client.get("/api/affiliates").json()["affiliates"]}
+    assert rows[without["id"]]["has_payout"] is False
+    assert rows[with_one["id"]]["has_payout"] is True
+
+
+def test_somebody_who_joined_and_never_applied_is_listed(client):
+    account_id = _model_account("dina@example.com")
+    joined = client.get("/api/affiliates").json()["joined"]
+    assert [row["account_id"] for row in joined] == [account_id]
+    assert joined[0]["email"] == "dina@example.com"
+
+
+def test_she_can_be_reminded_to_apply(client):
+    account_id = _model_account("dina@example.com")
+    response = client.post(f"/api/affiliates/joined/{account_id}/remind")
+    assert response.status_code == 200, response.text
+
+    with engine.connect() as connection:
+        queued = connection.execute(
+            text("SELECT count(*) FROM notification_outbox WHERE event = 'application.reminder' "
+                 "AND recipient_email = 'dina@example.com'")
+        ).scalar_one()
+    assert queued == 1
+
+
+def test_a_reminder_is_refused_for_somebody_who_already_applied(client):
+    affiliate = _pending_with_code(client)
+    with engine.connect() as connection:
+        account_id = connection.execute(
+            text("SELECT user_account_id FROM affiliate_profile WHERE id = :id"),
+            {"id": affiliate["id"]},
+        ).scalar_one()
+    assert client.post(f"/api/affiliates/joined/{account_id}/remind").status_code == 404
+
+
+def test_the_profile_carries_every_code_she_has_held(client):
+    affiliate = _pending_with_code(client, code="NOUR10")
+    history = client.get(f"/api/affiliates/{affiliate['id']}").json()["code_history"]
+    assert [(row["code"], row["verified"]) for row in history] == [("NOUR10", True)]
+    assert history[0]["end_month"] is None
+
+
+def test_changing_her_sign_in_to_an_address_in_use_is_refused_plainly(client):
+    """A clash with another account's address is a 409, not a 500."""
+    nour = _pending_with_code(client)
+    _pending_with_code(client, name="Salma", email="salma@example.com", code="SALMA10")
+
+    taken = client.patch(f"/api/affiliates/{nour['id']}", json={"email": "Salma@Example.com"})
+    assert taken.status_code == 409
+    assert "already belongs" in taken.json()["detail"]
+
+    malformed = client.patch(f"/api/affiliates/{nour['id']}", json={"email": "not-an-address"})
+    assert malformed.status_code == 400
+
+    moved = client.patch(f"/api/affiliates/{nour['id']}", json={"email": "nour.new@example.com"})
+    assert moved.status_code == 200, moved.text
+    assert moved.json()["email"] == "nour.new@example.com"
+
+
+def test_a_revoked_model_role_is_not_listed_as_joined(client):
+    account_id = _model_account("dina@example.com")
+    with engine.begin() as connection:
+        connection.execute(
+            text("UPDATE role_assignment SET revoked_at = now() WHERE user_account_id = :u"),
+            {"u": account_id},
+        )
+    assert client.get("/api/affiliates").json()["joined"] == []
+    assert client.post(f"/api/affiliates/joined/{account_id}/remind").status_code == 404

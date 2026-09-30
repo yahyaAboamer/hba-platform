@@ -1,3 +1,6 @@
+> **Superseded by `2026-09-30-continuation-handoff.md`.** Kept for its record
+> of batches O and P; its data follow-ups are moot after the 29 September reset.
+
 # Where the work is — 28 September 2026 (batches O and P)
 
 **Replaces `2026-09-27-continuation-handoff.md`**, which is kept with a banner

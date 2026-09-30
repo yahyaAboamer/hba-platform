@@ -70,6 +70,8 @@ class Event:
     APPLICATION_SUBMITTED = "application.submitted"
     APPLICATION_RECEIVED = "application.received"
     APPLICATION_APPROVED = "application.approved"
+    #: She made her account and has not sent her details (admin Models audit).
+    APPLY_REMINDER = "application.reminder"
     MONTH_APPROVED = "month.approved"
     PAYMENT_RECORDED = "payment.recorded"
     DESTINATION_CHANGED = "destination.changed"
@@ -195,6 +197,18 @@ def password_reset_requested(
             "name": account.display_name or "",
             "_secret": {"token": token},
         },
+    )
+
+
+def apply_reminder(db: Session, account) -> NotificationOutbox | None:
+    """A nudge to somebody who made her account and never applied."""
+    return queue(
+        db,
+        event=Event.APPLY_REMINDER,
+        recipient_email=account.email,
+        recipient_name=account.display_name,
+        subject_ref=f"user:{account.id}",
+        payload={"email": account.email, "name": account.display_name or ""},
     )
 
 
@@ -579,6 +593,22 @@ def render(event: str, payload: dict) -> Message | None:
                 "checking your discount code against the shop, and you will "
                 "hear from us once that is done. There is nothing else for you "
                 "to do right now."
+            )
+            + _sign_off(),
+        )
+
+    if event == Event.APPLY_REMINDER:
+        return Message(
+            to_address=payload["email"],
+            to_name=name or None,
+            subject="Finish your HBA application",
+            body=_with_link(
+                f"Hi {first},\n\n"
+                "You made your HBA account but have not sent your details yet. "
+                "It takes a few minutes: your name and phone, your discount "
+                "code, and where you want to be paid.",
+                "/",
+                "Sign in and finish it here:",
             )
             + _sign_off(),
         )

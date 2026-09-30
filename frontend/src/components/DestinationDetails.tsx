@@ -21,7 +21,15 @@ import type { DestinationCard } from "../lib/payouts";
  * submitted address straight to the InstaPay app, and an address assembled
  * from a phone number is an address that belongs to whoever owns that handle.
  */
-export function DestinationDetails({ card }: { card: DestinationCard }) {
+export function DestinationDetails({
+  card,
+  linkLabel = "Open InstaPay",
+}: {
+  card: DestinationCard;
+  /** The model profile says *Pay on InstaPay* (owner, 29 September); the
+   *  payments desk keeps the export's words. */
+  linkLabel?: string;
+}) {
   const [copied, setCopied] = useState<string | null>(null);
 
   async function copy(label: string, value: string) {
@@ -64,7 +72,7 @@ export function DestinationDetails({ card }: { card: DestinationCard }) {
           target="_blank"
           rel="noreferrer noopener"
         >
-          Open InstaPay
+          {linkLabel}
         </a>
       )}
     </>
