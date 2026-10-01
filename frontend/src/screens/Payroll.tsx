@@ -195,7 +195,11 @@ export function Payroll({ session }: { session: Session }) {
         <MonthPicker
           value={month}
           onChange={setMonth}
-          months={platformMonths(session.platform)}
+          // A month that has not begun has no payroll (owner, 1 October 2026),
+          // so the list stops at the working month rather than December.
+          months={platformMonths(session.platform).filter(
+            (candidate) => candidate <= [session.platform.working_month, currentMonth()].sort().at(-1)!,
+          )}
           lockFor={lockFor}
           onLockedClick={(candidate, lock) =>
             setLockNote(

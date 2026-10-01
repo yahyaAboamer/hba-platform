@@ -132,6 +132,20 @@ def _display_piastres(exact: Decimal | str) -> int:
     return int(Decimal(exact).quantize(Decimal(1), rounding=ROUND_HALF_UP))
 
 
+def _before_she_started(db: Session, affiliate: AffiliateProfile, month: str) -> bool:
+    """A month before she started is not hers, so she is not listed in it
+    (owner, 1 October 2026).
+
+    The payments desk's rule (`payments.on_the_desk`), so the two screens list
+    the same people: her recorded start, else her first order. An unknown
+    start is not a no - she stays, because she is the one to set up.
+    """
+    from app.services.setup import collaboration_from
+
+    first = collaboration_from(db, affiliate)
+    return first is not None and first > month
+
+
 def _row(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
     """One model's month: the figure, what blocks it, and what it carries.
 
@@ -231,6 +245,7 @@ def payroll_month_view(
     rows = [
         _row(db, affiliate, month)
         for affiliate in list_affiliates(db, include_archived=include_archived)
+        if not _before_she_started(db, affiliate, month)
     ]
     payable = [row for row in rows if row.get("is_payable")]
 

@@ -1,6 +1,6 @@
 # Where the work is — 1 October 2026 (data reset, batches Q1–Q3, Settings audit, Home and emails audit)
 
-## Latest: targets before her start, and who holds a code (1 October, ADR 0056) — **local, not deployed**
+## Latest: targets before her start, and who holds a code (1 October, ADR 0056)
 
 From the owner's staging check after ADR 0055.
 
@@ -24,15 +24,16 @@ From the owner's staging check after ADR 0055.
 - **ECC review:** 0 high. The medium (records before her start hidden) is
   fixed; three of the four lows are fixed.
 
-**Waiting on the owner:**
-- Authorisation to deploy.
-- Whether to delete Ali's staging targets for January to March 2026 (4 videos
-  each, set before her start was known).
-- Two findings, not changed:
-  - The Payroll page (`/payroll`, and `/api/payroll/{month}`, which Home also
-    reads) lists models in months before they started, blocked with *No pay
-    terms for this month*.
-  - Its month picker offers months that have not begun.
+**Owner's decisions (same day), done:**
+- **Payroll page:** `/api/payroll/{month}` leaves out a model whose start
+  (`collaboration_from`, the payments desk's rule) comes after the month. An
+  unknown start stays listed.
+- **Payroll page:** the month picker stops at the working month.
+- **Staging data:** Ali's January to March 2026 targets (4 videos, 8 stories
+  each, no counts) were deleted in one guarded transaction. Each has a
+  `target.deleted` audit row holding what it was.
+- **Release:** deploy to staging and production ordered; see the release line
+  below once done.
 
 ## Before that: ALI10 and pay-terms months (1 October, ADR 0055) — **released**
 

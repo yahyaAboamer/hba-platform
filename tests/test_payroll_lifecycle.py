@@ -1153,3 +1153,25 @@ def test_a_month_nobody_has_agreed_never_reports_a_moved_source(client):
 
     assert row["calculation_state"] == "draft"
     assert row["source_changed_since_approval"] is False
+
+
+def test_a_month_before_she_started_does_not_list_her(client):
+    """Owner, 1 October 2026: the Payroll page listed models in months before
+    they started, each blocked on pay terms nobody could set. The payments
+    desk's rule now applies here too."""
+    starts_in_april = _api_affiliate(client, name="Tarek", email="tarek@example.com")
+    client.patch(
+        f"/api/affiliates/{starts_in_april['id']}",
+        json={"collaboration_start_month": "2026-04", "collaboration_start_month_set": True},
+    )
+    unknown_start = _api_affiliate(client, name="Hala", email="hala@example.com")
+
+    def names(month):
+        response = client.get(f"/api/payroll/{month}")
+        assert response.status_code == 200, response.text
+        return {row["name"] for row in response.json()["affiliates"]}
+
+    assert "Tarek" not in names("2026-03")
+    assert "Tarek" in names("2026-04")
+    # An unknown start is not a no: she is the one somebody needs to set up.
+    assert unknown_start["name"] in names("2026-03")
