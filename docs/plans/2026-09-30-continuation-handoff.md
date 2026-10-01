@@ -1,6 +1,13 @@
 # Where the work is — 1 October 2026 (data reset, batches Q1–Q3, Settings audit, Home and emails audit)
 
-## Latest: ALI10 and pay-terms months (1 October, ADR 0055) — **local, not merged or deployed**
+## Latest: ALI10 and pay-terms months (1 October, ADR 0055) — **released**
+
+| | |
+|---|---|
+| **Commit** | `2ec5988` on `repair/batch-2`, fast-forwarded to `origin/main` and `origin/production` on the owner's order ("deploy and merge to staging and production") |
+| **Deploys** | All four (staging and production, app and worker) SUCCESS on `2ec5988`, 1 October ~13:48 Cairo; logs show `c8d3e6f40008 -> d9e4f7a50009` on both databases; `/api/health/ready` 200 on both |
+| **Read back** | Staging: Ali start `2026-04`, ALI10 from `2026-04`, Sara's last run `2026-08` open-ended, two ADR 0055 audit rows. Production: head `d9e4f7a50009`, no models or terms, so nothing changed |
+
 
 **ALI10 diagnosis (read-only on staging and Shopify).**
 - The sync is fine: `order_index` has 104 ALI10 orders from January to
@@ -45,8 +52,7 @@
   Youssef (start March) shows the start line, Jan–Feb *Before start*,
   Nov–Dec *Not yet*. October set to 12% saved as *October 2026 onwards*.
 
-**Waiting on the owner:** authorisation to merge and deploy. Merge and deploy
-are separate permissions.
+**Owner to check on staging:** Ali's terms editor (starts April 2026) and Sara's.
 
 **Not done:**
 - `mark_verified` may still move a re-opened period of a returning model (from
