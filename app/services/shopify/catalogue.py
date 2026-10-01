@@ -130,7 +130,7 @@ def normalise_variants(node: dict, product_id: str) -> list[dict]:
     return rows
 
 
-def normalise_line_item(node: dict, order_id: str) -> dict | None:
+def normalise_line_item(node: dict, order_id: str, shipped: int = 0) -> dict | None:
     """Map one Shopify line item onto `order_line_item` columns.
 
     The title and variant title are copied **as they are now**, which is the
@@ -138,16 +138,27 @@ def normalise_line_item(node: dict, order_id: str) -> dict | None:
     what a model was sent. The ids come along so a live product can still be
     joined for its picture, and both are nullable because a deleted product
     takes its id out of the payload while the line stays real.
+
+    **The quantity kept is what is still on the order, or what shipped,
+    whichever is more.** An order edit does not remove a line: Shopify keeps
+    it at its original `quantity` with `currentQuantity` 0, and reading
+    `quantity` alone showed Ali an XL he was swapped out of (#21585). But a
+    refund lowers `currentQuantity` too, and a delivered item that came back
+    is still the order's (ADR 0051) - so what the non-cancelled fulfilments
+    carried, `shipped`, is the floor. A payload without `currentQuantity` is
+    read as before.
     """
     line_id = _numeric_id(node)
     if not line_id:
         return None
 
-    quantity = int(node.get("quantity") or 0)
+    ordered = int(node.get("quantity") or 0)
+    current = node.get("currentQuantity")
+    quantity = ordered if current is None else min(ordered, max(int(current), shipped))
     if quantity <= 0:
         # The column refuses it, and a zero-quantity line is not a thing that
-        # was sent to anybody. Skipped rather than stored as evidence of
-        # nothing.
+        # was sent to anybody - including one an edit removed before it
+        # shipped. Skipped rather than stored as evidence of nothing.
         return None
 
     discounted = money_to_piastres(
@@ -156,6 +167,13 @@ def normalise_line_item(node: dict, order_id: str) -> dict | None:
     original = money_to_piastres(
         (((node.get("originalTotalSet") or {}).get("shopMoney")) or {}).get("amount")
     )
+    if quantity < ordered:
+        # Shopify's totals are for the quantity first ordered. Kept to the
+        # share that is still the order's, so an edit from two to one cannot
+        # count twice in her best sellers. Integer arithmetic, never a float
+        # on money; exact whenever the total is a unit price times quantity.
+        discounted = discounted * quantity // ordered
+        original = original * quantity // ordered
 
     product = node.get("product") or {}
     variant = node.get("variant") or {}
@@ -173,6 +191,7 @@ def normalise_line_item(node: dict, order_id: str) -> dict | None:
         "selected_options": _selected_options(variant),
         "sku": node.get("sku"),
         "quantity": quantity,
+        "ordered_quantity": ordered,
         "discounted_total_piastres": discounted,
         # An order placed before discounts existed reports no original. Falling
         # back to the discounted value says "no discount applied", which is
@@ -367,6 +386,25 @@ def frozen_lines(fulfilments: list[dict] | None, return_status: str | None) -> s
     return carried
 
 
+def shipped_quantities(fulfilments: list[dict] | None) -> dict[str, int]:
+    """How many of each line the fulfilments carried, by line id.
+
+    A cancelled fulfilment carries nothing (ADR 0051 Rule 2). A fulfilment line
+    read without its quantity counts as one, the least it can have carried.
+    """
+    from app.services.shopify.fulfilment import is_cancelled
+
+    shipped: dict[str, int] = {}
+    for row in fulfilments or []:
+        if is_cancelled(row):
+            continue
+        for node in ((row.get("fulfillmentLineItems") or {}).get("nodes") or []):
+            line_id = _numeric_id(node.get("lineItem") or {})
+            if line_id:
+                shipped[line_id] = shipped.get(line_id, 0) + int(node.get("quantity") or 1)
+    return shipped
+
+
 def sync_order_line_items(db: Session, client, order_gid: str) -> dict:
     """What was in one order.
 
@@ -385,9 +423,10 @@ def sync_order_line_items(db: Session, client, order_gid: str) -> dict:
 
     block = (order.get("lineItems") or {})
     frozen = frozen_lines(order.get("fulfillments"), order.get("returnStatus"))
+    shipped = shipped_quantities(order.get("fulfillments"))
     rows = []
     for node in block.get("nodes") or []:
-        values = normalise_line_item(node, order_id)
+        values = normalise_line_item(node, order_id, shipped.get(_numeric_id(node) or "", 0))
         if values is not None:
             values["after_delivery"] = (
                 frozen is not None and values["shopify_line_item_id"] not in frozen

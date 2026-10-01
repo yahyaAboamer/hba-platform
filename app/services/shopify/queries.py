@@ -169,6 +169,13 @@ query ProductsPage($first: Int!, $after: String) {{
 # `discountedTotalSet` is after the customer's discounts, which is the basis
 # W11 asks for. `originalTotalSet` is kept beside it because their difference
 # is the only evidence a discount applied at all.
+#
+# `currentQuantity` beside `quantity`, because **an order edit does not remove
+# a line**: Shopify keeps it at its original `quantity` and drops only the
+# current one (#21585, an XL swapped for an L). Each fulfilment's per-line
+# `quantity` is what actually shipped, which a later refund cannot lower.
+# Both fields were already proven against the shop - `currentQuantity` by the
+# commission facts, the fulfilment lines by the read of #21585.
 
 ORDER_LINE_ITEMS = """
 query OrderLineItems($id: ID!) {
@@ -181,7 +188,7 @@ query OrderLineItems($id: ID!) {
       displayStatus
       createdAt
       deliveredAt
-      fulfillmentLineItems(first: 100) { nodes { lineItem { id } } }
+      fulfillmentLineItems(first: 100) { nodes { quantity lineItem { id } } }
     }
     lineItems(first: 100) {
       pageInfo { hasNextPage endCursor }
@@ -190,6 +197,7 @@ query OrderLineItems($id: ID!) {
         title
         sku
         quantity
+        currentQuantity
         variantTitle
         product { id legacyResourceId }
         variant { id legacyResourceId selectedOptions { name value } }

@@ -672,8 +672,9 @@ def orders_missing_line_items(db, *, limit: int = FILL_BATCH) -> list[str]:
     other than a live match was a wardrobe entry with nothing in it.
 
     *Never read* is no line at all, or lines read before a later question was
-    asked: options (`selected_options IS NULL`, ADR 0050) or whether the line
-    was an exchange item (`after_delivery IS NULL`, ADR 0051). A deleted
+    asked: options (`selected_options IS NULL`, ADR 0050), whether the line
+    was an exchange item (`after_delivery IS NULL`, ADR 0051), or whether an
+    order edit removed it (`ordered_quantity IS NULL`, #21585). A deleted
     variant is stored as `[]`, so it is not asked about again. Newest first,
     because the month a model is looking at is the one that should fill first.
 
@@ -702,6 +703,7 @@ def orders_missing_line_items(db, *, limit: int = FILL_BATCH) -> list[str]:
         & (
             OrderLineItem.selected_options.is_(None)
             | OrderLineItem.after_delivery.is_(None)
+            | OrderLineItem.ordered_quantity.is_(None)
         )
     )
     return list(

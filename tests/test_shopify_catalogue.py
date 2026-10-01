@@ -260,6 +260,46 @@ def test_a_zero_quantity_line_is_skipped(db):
     assert normalise_line_item(_line_node(quantity=0), "1001") is None
 
 
+def test_a_line_removed_by_an_order_edit_is_skipped(db):
+    """#21585's shape: the underwear was swapped from XL to L by editing the
+    order. Shopify keeps the XL line with `quantity` 1 and `currentQuantity` 0;
+    it was never sent, so it is not something she has."""
+    node = {**_line_node(variant_title="XL"), "currentQuantity": 0}
+
+    assert normalise_line_item(node, "1001") is None
+
+
+def test_a_line_reduced_by_an_edit_keeps_what_is_left_and_its_share_of_money(db):
+    node = {
+        **_line_node(quantity=2, discounted="2400.00", original="3000.00"),
+        "currentQuantity": 1,
+    }
+
+    values = normalise_line_item(node, "1001")
+
+    assert values["quantity"] == 1
+    assert values["ordered_quantity"] == 2
+    assert values["discounted_total_piastres"] == 120000
+    assert values["original_total_piastres"] == 150000
+
+
+def test_a_shipped_line_refunded_later_keeps_what_was_shipped(db):
+    """ADR 0051: a returned item was delivered, and stays one of the order's
+    products. A refund lowers `currentQuantity`; what was shipped does not."""
+    node = {**_line_node(), "currentQuantity": 0}
+
+    values = normalise_line_item(node, "1001", shipped=1)
+
+    assert values["quantity"] == 1
+
+
+def test_a_line_read_without_current_quantity_falls_back_to_quantity(db):
+    values = normalise_line_item(_line_node(quantity=2), "1001")
+
+    assert values["quantity"] == 2
+    assert values["ordered_quantity"] == 2
+
+
 # ── Writing, twice ─────────────────────────────────────────────────────────
 
 
@@ -458,6 +498,110 @@ def test_an_exchange_line_is_marked_after_delivery(db):
 
     marked = {row.title: row.after_delivery for row in db.query(OrderLineItem)}
     assert marked == {"White HBA CLUB Pump Cover": False, "HBA SILVER BASIC CUTOFF": True}
+
+
+def test_a_size_swapped_by_an_edit_leaves_only_the_size_that_shipped(db):
+    """#21585 end to end: XL removed, L added, the parcel carried the L."""
+    order_id = _order_row(db)
+    client = FakeClient(
+        order={
+            "id": f"gid://shopify/Order/{order_id}",
+            "legacyResourceId": order_id,
+            "returnStatus": "NO_RETURN",
+            "fulfillments": [
+                {
+                    "status": "SUCCESS",
+                    "displayStatus": "DELIVERED",
+                    "createdAt": "2026-04-07T15:56:18Z",
+                    "deliveredAt": "2026-04-08T18:20:00Z",
+                    "fulfillmentLineItems": {
+                        "nodes": [
+                            {"quantity": 1, "lineItem": {"id": "gid://shopify/LineItem/2"}}
+                        ]
+                    },
+                }
+            ],
+            "lineItems": {
+                "nodes": [
+                    {**_line_node(line_id="1", variant_title="XL"), "currentQuantity": 0},
+                    {**_line_node(line_id="2", variant_title="L"), "currentQuantity": 1},
+                ],
+                "pageInfo": {"hasNextPage": False},
+            },
+        }
+    )
+
+    sync_order_line_items(db, client, f"gid://shopify/Order/{order_id}")
+
+    assert [row.variant_title for row in db.query(OrderLineItem)] == ["L"]
+
+
+def test_a_returned_line_stays_when_its_refund_zeroes_current_quantity(db):
+    """The shipped quantity is read from the fulfilment, so a delivered item
+    refunded after its return is still the order's (ADR 0051)."""
+    order_id = _order_row(db)
+    client = FakeClient(
+        order={
+            "id": f"gid://shopify/Order/{order_id}",
+            "legacyResourceId": order_id,
+            "returnStatus": "RETURNED",
+            "fulfillments": [
+                {
+                    "status": "SUCCESS",
+                    "displayStatus": "DELIVERED",
+                    "createdAt": "2026-08-27T12:55:00Z",
+                    "deliveredAt": "2026-08-29T16:59:00Z",
+                    "fulfillmentLineItems": {
+                        "nodes": [
+                            {"quantity": 1, "lineItem": {"id": "gid://shopify/LineItem/1"}}
+                        ]
+                    },
+                }
+            ],
+            "lineItems": {
+                "nodes": [{**_line_node(line_id="1"), "currentQuantity": 0}],
+                "pageInfo": {"hasNextPage": False},
+            },
+        }
+    )
+
+    sync_order_line_items(db, client, f"gid://shopify/Order/{order_id}")
+
+    assert [(row.quantity, row.after_delivery) for row in db.query(OrderLineItem)] == [(1, False)]
+
+
+def test_a_cancelled_fulfilment_ships_nothing(db):
+    """ADR 0051 Rule 2: a line only a cancelled fulfilment carried, then
+    removed by an edit, was never sent."""
+    order_id = _order_row(db)
+    client = FakeClient(
+        order={
+            "id": f"gid://shopify/Order/{order_id}",
+            "legacyResourceId": order_id,
+            "returnStatus": "NO_RETURN",
+            "fulfillments": [
+                {
+                    "status": "CANCELLED",
+                    "displayStatus": "CANCELED",
+                    "createdAt": "2026-08-27T12:55:00Z",
+                    "deliveredAt": None,
+                    "fulfillmentLineItems": {
+                        "nodes": [
+                            {"quantity": 1, "lineItem": {"id": "gid://shopify/LineItem/1"}}
+                        ]
+                    },
+                }
+            ],
+            "lineItems": {
+                "nodes": [{**_line_node(line_id="1"), "currentQuantity": 0}],
+                "pageInfo": {"hasNextPage": False},
+            },
+        }
+    )
+
+    sync_order_line_items(db, client, f"gid://shopify/Order/{order_id}")
+
+    assert db.query(OrderLineItem).count() == 0
 
 
 def test_an_order_without_a_return_has_no_exchange_lines(db):

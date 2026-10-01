@@ -94,6 +94,7 @@ def _line(
     variant="M",
     quantity=1,
     after_delivery=False,
+    ordered_quantity=1,
 ):
     db.add(
         OrderLineItem(
@@ -106,6 +107,9 @@ def _line(
             # is a line read before the question existed.
             after_delivery=after_delivery,
             quantity=quantity,
+            # Read after #21585 asked whether an edit removed it; None is a
+            # line read before, when `quantity` was the original one.
+            ordered_quantity=ordered_quantity,
             discounted_total_piastres=125_000,
             original_total_piastres=125_000,
         )
@@ -173,9 +177,11 @@ def test_the_sweep_finds_orders_never_read_and_leaves_read_ones_alone(db):
     _line(db, "6004", "L4", options=[{"name": "Size", "value": "M"}])
     _attributed(db, nour, "6005", day=5)  # read before exchanges were asked about
     _line(db, "6005", "L5", options=[{"name": "Size", "value": "M"}], after_delivery=None)
+    _attributed(db, nour, "6006", day=6)  # read before an order edit was asked about
+    _line(db, "6006", "L6", options=[{"name": "Size", "value": "XL"}], ordered_quantity=None)
 
     # Newest first: the month she is looking at fills first.
-    assert orders_missing_line_items(db) == ["6005", "6002", "6001"]
+    assert orders_missing_line_items(db) == ["6006", "6005", "6002", "6001"]
 
 
 def test_the_sweep_queues_each_order_once_however_often_it_runs(db):

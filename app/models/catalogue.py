@@ -192,7 +192,13 @@ class OrderLineItem(Base):
     #: NULL: read before this was asked, so the fill sweep reads it again.
     after_delivery: Mapped[bool | None] = mapped_column(Boolean)
 
+    #: What is still the order's: Shopify's current quantity, never below what
+    #: shipped. A line an edit removed before it shipped is not stored at all.
     quantity: Mapped[int] = mapped_column(Integer, nullable=False)
+    #: What was first ordered, Shopify's own `quantity`. NULL: read before an
+    #: order edit was asked about, when `quantity` held this instead - so the
+    #: fill sweep reads it again (#21585, an XL swapped out still shown).
+    ordered_quantity: Mapped[int | None] = mapped_column(Integer)
 
     #: After the customer's discounts, which is the basis W11 asks for.
     discounted_total_piastres: Mapped[int] = mapped_column(BigInteger, nullable=False)

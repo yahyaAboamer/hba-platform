@@ -82,9 +82,9 @@ def _line(db, order_id, line_id, title, *, after_delivery=False, product="889000
         text(
             "INSERT INTO order_line_item (shopify_line_item_id, shopify_order_id,"
             " shopify_product_id, title, variant_title, quantity,"
-            " discounted_total_piastres, original_total_piastres, after_delivery,"
-            " selected_options, synced_at)"
-            " VALUES (:l, :o, :p, :t, 'M', 1, 0, 0, :a, CAST('[]' AS jsonb), now())"
+            " ordered_quantity, discounted_total_piastres, original_total_piastres,"
+            " after_delivery, selected_options, synced_at)"
+            " VALUES (:l, :o, :p, :t, 'M', 1, 1, 0, 0, :a, CAST('[]' AS jsonb), now())"
         ),
         {"l": line_id, "o": order_id, "p": product, "t": title, "a": after_delivery},
     )
