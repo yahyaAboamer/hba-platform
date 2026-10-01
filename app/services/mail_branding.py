@@ -51,6 +51,9 @@ STORE_URL = "https://hbawear.store"
 
 _URL = re.compile(r"^https?://\S+$")
 
+#: How every plain-text template ends (`notifications._sign_off`).
+SIGN_OFF = "\n\nHBA Aesthetics"
+
 
 def _logo_url() -> str:
     """The mark, served from the platform's own domain.
@@ -63,7 +66,7 @@ def _logo_url() -> str:
     return f"{base}/hba-logo.png" if base else ""
 
 
-def _button(url: str) -> str:
+def _button(url: str, label: str = "Open it") -> str:
     """A link somebody can hit with a thumb.
 
     Padding rather than a fixed height, and a background on the anchor itself
@@ -76,7 +79,7 @@ def _button(url: str) -> str:
         'style="margin:24px 0;"><tr><td>'
         f'<a href="{safe}" style="display:inline-block;padding:12px 22px;'
         f"background:{BRAND};color:#ffffff;text-decoration:none;"
-        'border-radius:3px;font-weight:600;font-size:15px;">Open it</a>'
+        f'border-radius:3px;font-weight:600;font-size:15px;">{html.escape(label)}</a>'
         "</td></tr></table>"
         # The address in full underneath, because a button cannot be copied,
         # forwarded to a laptop, or read out over the phone - and somebody
@@ -86,7 +89,7 @@ def _button(url: str) -> str:
     )
 
 
-def _paragraphs(body: str) -> str:
+def _paragraphs(body: str, action: str | None = None) -> str:
     """The plain-text body as HTML blocks, with links made into buttons."""
     out = []
     for block in body.strip().split("\n\n"):
@@ -112,24 +115,33 @@ def _paragraphs(body: str) -> str:
         for line in block.split("\n"):
             if _URL.match(line.strip()):
                 flush()
-                out.append(_button(line.strip()))
+                out.append(_button(line.strip(), action or "Open it"))
             else:
                 run.append(line)
         flush()
     return "".join(out)
 
 
-def wrap(body: str) -> str:
+def wrap(body: str, action: str | None = None) -> str:
     """One plain-text body, wrapped in the brand.
 
     The signature is added here rather than by each template, so it cannot go
     missing from one of them - which is exactly what happened to the sign-off
     before this existed.
+
+    `action` is what the button says; `None` keeps "Open it".
     """
     # The templates end with their own sign-off, written for plain text. The
     # HTML has a signature block of its own, so the text one is lifted off
     # rather than printed twice.
-    body = body.replace("\n\nHBA Aesthetics", "").rstrip()
+    #
+    # **Only from the end.** This used to replace every "\n\nHBA Aesthetics"
+    # in the body, and the invitation's first sentence began with those words
+    # after a blank line - so every invitation arrived reading "Hi, has set up
+    # an account for you" (owner's staging test, 1 October 2026).
+    body = body.rstrip()
+    if body.endswith(SIGN_OFF):
+        body = body[: -len(SIGN_OFF)].rstrip()
 
     logo = _logo_url()
     mark = (
@@ -152,7 +164,7 @@ def wrap(body: str) -> str:
       <tr><td style="padding:8px 28px 24px;font-family:-apple-system,
                      BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,
                      sans-serif;">
-        {_paragraphs(body)}
+        {_paragraphs(body, action)}
       </td></tr>
       <tr><td style="padding:20px 28px 28px;border-top:1px solid {RULE};
                      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',

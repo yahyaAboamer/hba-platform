@@ -42,7 +42,9 @@ const HERO_LABEL: Record<HomeState, string> = {
   open: "Earned so far",
   approved: "Approved for payment",
   paid: "Paid",
-  settled: "Settled earnings",
+  // A settled month reads like any other (ADR 0054): the pill says *Settled*,
+  // and the figure is simply what she earned.
+  settled: "Earned",
   unknown: "Approved earnings",
 };
 
@@ -51,7 +53,7 @@ export const TOTAL_LABEL: Record<HomeState, string> = {
   open: "Earnings so far",
   approved: "Approved for payment",
   paid: "Recorded payment",
-  settled: "Settled",
+  settled: "Earned",
   unknown: "Approved earnings",
 };
 
@@ -248,22 +250,50 @@ function Hero({
     row.settles.some((part) => part.month === home.month),
   );
 
+  // A settled month with no terms recorded has no figure to show. Its sales
+  // are real, so they take the big number's place - named as sales, never
+  // passed off as earnings.
+  const noFigure = body.amount_piastres === null;
+
   return (
     <section className="home__card home__hero">
-      <span className="home__eyebrow">{HERO_LABEL[state]}</span>
+      <span className="home__eyebrow">{noFigure ? "Sales" : HERO_LABEL[state]}</span>
       <div className="home__figure">
         <span className="home__amount">
-          {body.amount_piastres === null ? "—" : <Money piastres={body.amount_piastres} />}
+          {noFigure ? body.sales.counted : <Money piastres={body.amount_piastres!} />}
         </span>
-        <span className="home__sub">
-          {/* "10% of" would be untrue on a fixed-plus-commission month, where
-              the total is more than the commission. Both halves are true on
-              every arrangement. */}
-          <strong>{body.sales.counted}</strong> in sales
-          {rate !== null && <> · {rate / 100}% commission</>}
-        </span>
-        {body.amount_piastres === null && (
-          <span className="home__sub">Earnings are not available for this month yet.</span>
+        {body.split ? (
+          /*
+           * Salary plus commission (audit, 1 October 2026): EGP 10,000.00
+           * earned above EGP 0.00 in sales read as a mistake. The two parts
+           * are the server's and add up to the figure above; only the
+           * commission grows as she sells.
+           */
+          <div className="home__split">
+            <div>
+              <span className="home__split-label">Monthly salary</span>
+              <span className="home__split-value">{body.split.salary}</span>
+              <span className="home__split-note">fixed</span>
+            </div>
+            <div className="home__split--grows">
+              <span className="home__split-label">Commission</span>
+              <span className="home__split-value">{body.split.commission}</span>
+              <span className="home__split-note">
+                {rate !== null ? `${rate / 100}% of ` : ""}
+                {body.sales.counted} in sales
+              </span>
+            </div>
+          </div>
+        ) : noFigure ? (
+          body.note && <span className="home__sub">{body.note}</span>
+        ) : (
+          <span className="home__sub">
+            {/* "10% of" would be untrue on a guaranteed-minimum month, where
+                the total may be more than the commission. Both halves are
+                true on every arrangement. */}
+            <strong>{body.sales.counted}</strong> in sales
+            {rate !== null && <> · {rate / 100}% commission</>}
+          </span>
         )}
       </div>
 
@@ -274,7 +304,7 @@ function Hero({
           }
         >
           <span aria-hidden="true">{compare.change_pct >= 0 ? "▲" : "▼"}</span>
-          {Math.abs(compare.change_pct)}% vs {compare.window}
+          {Math.abs(compare.change_pct)}% in sales vs {compare.window}
           <span className="home__compare-note">
             {" "}({compare.now} against {compare.before})
           </span>
@@ -363,6 +393,11 @@ function Payment({
         {reference && ` · ${reference}`}
       </>
     );
+  } else if (state === "settled") {
+    // One of the two places a settled month differs (ADR 0054). HBA paid it
+    // directly, so there is no transfer here to show - and that is normal.
+    label = "Payment";
+    value = "Paid directly by HBA";
   } else if (expected?.passed) {
     label = "Payment";
     value = `Expected ${when} — not recorded yet`;

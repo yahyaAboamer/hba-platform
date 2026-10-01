@@ -211,7 +211,7 @@ def test_inviting_an_email_already_on_the_programme_is_refused(admin):
     )
 
     assert again.status_code == 409
-    assert "already on the programme" in again.json()["detail"]
+    assert "already a model on HBA" in again.json()["detail"]
 
 
 # ── Height and weight, optional all the way down ─────────────────────────────

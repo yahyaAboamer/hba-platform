@@ -158,6 +158,52 @@ a.home__card:hover {
   font-weight: 600;
 }
 
+/* Salary plus commission: what the total is made of, side by side. Only the
+   commission grows as she sells, so only it carries the accent. */
+.home__split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin-top: 10px;
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.home__split > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  padding: 11px 12px;
+}
+
+.home__split > div + div {
+  border-left: 1px solid var(--rule);
+}
+
+.home__split-label {
+  font-size: 12px;
+  color: var(--faint);
+}
+
+.home__split-value {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.home__split--grows .home__split-value {
+  color: var(--accent-text);
+}
+
+.home__split-note {
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--faint);
+}
+
 .home__compare {
   align-self: flex-start;
   display: inline-flex;

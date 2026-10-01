@@ -161,7 +161,7 @@ describe("Home", () => {
 
   it("compares like for like, and names the window", async () => {
     renderHome();
-    await waitFor(() => expect(screen.getByText(/12% vs 1–27 Aug/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/12% in sales vs 1–27 Aug/)).toBeTruthy());
   });
 
   it("names the month once, as the control that changes it", async () => {
@@ -188,5 +188,83 @@ describe("Home", () => {
     expect(screen.getByText("#4")).toBeTruthy();
     expect(screen.getByText("of 18 models")).toBeTruthy();
     expect(screen.getByText("EGP 864.07")).toBeTruthy();
+  });
+
+  /*
+   * Audit, 1 October 2026: Sara's October opened at EGP 10,000.00 earned above
+   * EGP 0.00 in sales, with nothing saying the 10,000 was her salary.
+   */
+  it("splits a salaried month into her salary and her commission", async () => {
+    fetchMock.mockImplementation((url: string) =>
+      String(url).includes("/api/me/home/")
+        ? ok({
+            ...home,
+            earnings: {
+              ...home.earnings,
+              amount_piastres: 1112300,
+              amount: "EGP 11,123.00",
+              split: {
+                salary_piastres: 1000000,
+                salary: "EGP 10,000.00",
+                commission_piastres: 112300,
+                commission: "EGP 1,123.00",
+              },
+            },
+          })
+        : ok({}),
+    );
+    renderHome();
+    await waitFor(() => expect(screen.getByText("Monthly salary")).toBeTruthy());
+
+    expect(screen.getByText("EGP 11,123.00")).toBeTruthy();
+    expect(screen.getByText("EGP 10,000.00")).toBeTruthy();
+    expect(screen.getByText("EGP 1,123.00")).toBeTruthy();
+    expect(screen.getByText("10% of EGP 11,232.87 in sales")).toBeTruthy();
+    // The single line is replaced, not repeated under the split.
+    expect(screen.queryByText(/% commission/)).toBeNull();
+  });
+
+  /*
+   * ADR 0054: a settled month is a normal month. Only its pill and its
+   * payment line say otherwise.
+   */
+  it("shows a settled month like any other, paid directly by HBA", async () => {
+    fetchMock.mockImplementation((url: string) =>
+      String(url).includes("/api/me/home/")
+        ? ok({ ...home, earnings: { ...home.earnings, state: "historical" } })
+        : ok({}),
+    );
+    renderHome();
+    await waitFor(() => expect(screen.getByText("Paid directly by HBA")).toBeTruthy());
+
+    expect(screen.getByText("Settled")).toBeTruthy();
+    expect(screen.getByText("Earned")).toBeTruthy();
+    expect(screen.getByText("EGP 1,123.00")).toBeTruthy();
+    expect(screen.getByText("EGP 864.07")).toBeTruthy();
+    expect(screen.queryByText(/not available/)).toBeNull();
+  });
+
+  it("shows a settled month with no terms as its sales, never as 'not available yet'", async () => {
+    fetchMock.mockImplementation((url: string) =>
+      String(url).includes("/api/me/home/")
+        ? ok({
+            ...home,
+            earnings: {
+              ...home.earnings,
+              state: "historical",
+              amount_piastres: null,
+              amount: null,
+              commission_rate_bp: null,
+              note: "HBA settled this month with you directly, so only your sales are shown here.",
+            },
+          })
+        : ok({}),
+    );
+    renderHome();
+    await waitFor(() => expect(screen.getByText("Sales")).toBeTruthy());
+
+    expect(document.querySelector(".home__amount")?.textContent).toBe("EGP 11,232.87");
+    expect(screen.getByText(/settled this month with you directly/)).toBeTruthy();
+    expect(screen.queryByText(/yet\./)).toBeNull();
   });
 });

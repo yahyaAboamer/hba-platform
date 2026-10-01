@@ -570,6 +570,32 @@ def _makeup(figures: dict, total_piastres: int, policy: str = PENDING_INCLUSIVE)
     return [{**line, "amount": format_egp(line["piastres"])} for line in lines]
 
 
+def _split(figures: dict, total: int) -> dict | None:
+    """Her salary and her commission, side by side under the total.
+
+    Only on salary plus commission (audit, 1 October 2026). Sara's October
+    opened at EGP 10,000.00 earned above EGP 0.00 in sales, which reads as a
+    mistake: nothing on the screen said the 10,000 was her salary.
+
+    **The two halves always add up to the figure above them.** The salary is
+    her terms' own amount; the commission is the rest of the total - which
+    includes any orders carried in from an earlier month and the pound the
+    total is rounded to - so the screen never shows two parts that do not
+    make the whole. Every other arrangement gets `None` and keeps its own
+    line.
+    """
+    if figures.get("compensation_type") != CompensationType.FIXED_PLUS_COMMISSION:
+        return None
+    salary = int(figures.get("fixed_piastres") or 0)
+    commission = total - salary
+    return {
+        "salary_piastres": salary,
+        "salary": format_egp(salary),
+        "commission_piastres": commission,
+        "commission": format_egp(commission),
+    }
+
+
 def _guarantee(figures: dict) -> dict | None:
     """Their guaranteed minimum, and why it is or is not in the figure above.
 
@@ -636,7 +662,16 @@ def my_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
         and snapshot is not None
     )
 
-    if is_historical(month) and not agreed:
+    # **A settled month is a normal month** (ADR 0054, owner 1 October 2026:
+    # "for a model, it should be shown as a normal month, just like any month
+    # after the go live"). HBA records each month's agreed terms - and, for a
+    # guaranteed minimum, the target outcome - before a model is approved, so
+    # a month before go-live is calculated from its own terms exactly like
+    # October is. Only its pill and its payments differ: HBA paid it directly,
+    # and `balance_for` still keeps it off the payments desk.
+    settled = is_historical(month) and not agreed
+
+    if settled and terms_for(db, affiliate, month) is None:
         # **A normal month with one thing missing.** The business asked for
         # this and was right: the orders are real, the counting is real, only
         # the *payment* happened elsewhere. Reporting one lump of sales and
@@ -660,6 +695,12 @@ def my_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
         earned_base = sum(r.commission_base_piastres for r in counted)
         pending_base = sum(r.commission_base_piastres for r in travelling)
         failed_base = sum(r.commission_base_piastres for r in gone)
+        counted_orders = len(counted) + len(travelling)
+        average = (
+            round((earned_base + pending_base) / counted_orders)
+            if counted_orders
+            else None
+        )
 
         return {
             "month": month,
@@ -682,6 +723,10 @@ def my_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
                 "pending": format_egp(pending_base),
                 "failed_piastres": failed_base,
                 "failed": format_egp(failed_base),
+                # What an order was worth is a fact about her sales, and her
+                # sales are real either side of go-live.
+                "average_order_piastres": average,
+                "average_order": format_egp(average) if average is not None else None,
             },
             "orders": {
                 "earned": len(counted),
@@ -698,6 +743,7 @@ def my_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
             },
             "amount_piastres": None,
             "amount": None,
+            "split": None,
             "makeup": [],
             "carried_in": [],
             "carried_out": [],
@@ -708,10 +754,11 @@ def my_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
             "waiting_on": [],
             # Their words, not the platform's. They do not know or care what a
             # platform is, and the earlier version's blank read as *they did
-            # not pay me for June*.
+            # not pay me for June*. No "yet": with no terms recorded the amount
+            # is never going to appear by itself.
             "note": (
-                "HBA paid you for this month before this page existed, so the "
-                "amount is not shown here — but everything you sold is."
+                "HBA settled this month with you directly, so only your sales "
+                "are shown here."
             ),
         }
 
@@ -753,7 +800,10 @@ def my_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
 
     return {
         "month": month,
-        "state": "agreed" if agreed else "open",
+        # `historical` here is a settled month with its own terms: calculated
+        # like any other, and paid by HBA directly. The screen reads the state
+        # for its pill and its payment line, and nothing else.
+        "state": "agreed" if agreed else ("historical" if settled else "open"),
         #: The counting rule behind the figure: the snapshot's own on an
         #: agreed month, so a month agreed delivered-only (before ADR 0040)
         #: is described as it was agreed, and the live rule otherwise.
@@ -796,7 +846,7 @@ def my_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
                 format_egp(average_order) if average_order is not None else None
             ),
         },
-        "window": _window(month, agreed),
+        "window": _window(month, agreed or settled),
         "orders": {
             "earned": performance.delivered_orders,
             "pending": performance.pending_orders,
@@ -817,6 +867,7 @@ def my_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
         },
         "amount_piastres": total,
         "amount": format_egp(total),
+        "split": _split(figures, total),
         "makeup": _makeup(
             figures, total, policy_of(snapshot) if agreed else PENDING_INCLUSIVE
         ),
@@ -842,9 +893,13 @@ def my_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
         # that question has a stale answer: unverifying a target in October
         # would otherwise put "someone still has to confirm your numbers" on
         # top of a month they were paid for in September.
+        #
+        # A settled month waits on nobody either: HBA settled it directly, so
+        # "being checked" or "awaiting approval" would describe a step that is
+        # never going to happen.
         "waiting_on": (
             []
-            if agreed
+            if agreed or settled
             else [
                 WAITING_ON[key]
                 for key in blockers

@@ -146,6 +146,9 @@ class Invitation(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     email: Mapped[str] = mapped_column(String(320), nullable=False, index=True)
+    #: The first name the admin typed beside the address, if any. The email
+    #: greets her by it; without one it says "Hello," rather than a bare "Hi,".
+    name: Mapped[str | None] = mapped_column(String(120))
     role: Mapped[str] = mapped_column(String(40), nullable=False)
     token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

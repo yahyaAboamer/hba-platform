@@ -168,8 +168,9 @@ export type MyEarnings = {
   /**
    * §11.1, and the most important thing on the screen. `open` is a working
    * number that will move; `agreed` is what they are owed and cannot move;
-   * `historical` predates the platform and has no commission figure at all
-   * (ADR 0014).
+   * `historical` is a month before go-live that HBA settled directly. It is
+   * calculated from its own terms like any other month (ADR 0054), and has no
+   * figure only when no terms were recorded for it.
    */
   state: "historical" | "open" | "agreed";
   /**
@@ -240,9 +241,20 @@ export type MyEarnings = {
      */
     uses: number;
   };
-  /** `null` on a historical month, where no figure was ever calculated. */
+  /** `null` only on a settled month with no terms recorded for it. */
   amount_piastres: number | null;
   amount: string | null;
+  /**
+   * Salary and commission, side by side under the total - salary plus
+   * commission only, `null` otherwise. The server makes the two add up to
+   * `amount_piastres`; nothing here sums them.
+   */
+  split: {
+    salary_piastres: number;
+    salary: string;
+    commission_piastres: number;
+    commission: string;
+  } | null;
   makeup: MakeupLine[];
   carried_in: {
     from_month: string;

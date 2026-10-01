@@ -146,7 +146,7 @@ def _email_for(db: Session, affiliate) -> tuple[str | None, str]:
 
 
 def invitation_sent(
-    db: Session, email: str, token: str, role: str
+    db: Session, email: str, token: str, role: str, name: str | None = None
 ) -> NotificationOutbox | None:
     """Email somebody their invitation link. §13.
 
@@ -169,7 +169,12 @@ def invitation_sent(
         event=Event.INVITATION_SENT,
         recipient_email=email,
         subject_ref=f"invitation:{email}",
-        payload={"email": email, "role": role, "_secret": {"token": token}},
+        payload={
+            "email": email,
+            "role": role,
+            "name": name or "",
+            "_secret": {"token": token},
+        },
     )
 
 
@@ -238,14 +243,20 @@ def application_approved(db: Session, affiliate) -> None:
     The first thing most models will ever see from the platform, and the email
     the whole go-live depends on arriving.
     """
+    from app.services.codes import open_codes_for
+
     email, name = _email_for(db, affiliate)
+    # Her code, named in the email: it is the thing she will share, and "your
+    # code is live" reads better with the code in it. Her one open code (ADR
+    # 0053 - it never changes); none means the sentence goes without it.
+    codes = [period.code for period in open_codes_for(db, affiliate)]
     queue(
         db,
         event=Event.APPLICATION_APPROVED,
         recipient_email=email,
         recipient_name=name,
         subject_ref=f"affiliate:{affiliate.id}",
-        payload={"email": email, "name": name},
+        payload={"email": email, "name": name, "code": codes[0] if codes else ""},
     )
 
 
@@ -533,24 +544,45 @@ def render(event: str, payload: dict) -> Message | None:
         # §13: invited, accepted, and inside the tool in one step. The link is
         # the whole email - anything else in it competes with the one thing they
         # are meant to do.
+        #
+        # **Greeted by name when the admin gave one** (audit D, 1 October
+        # 2026). An invitation used to hold only an address, and the email
+        # opened with a bare "Hi," - nobody to greet. Without a name it says
+        # "Hello," which reads as meant rather than as missing.
         token = (payload.get("_secret") or {}).get("token", "")
         link = invitation_link(token) if token else ""
-        body = (
-            "Hi,\n\n"
-            "HBA Aesthetics has set up an account for you on the affiliate "
-            "platform. It is where you will see what you have earned, the "
-            "orders behind it, and everything you have been paid."
-        )
-        if link:
-            body += (
-                "\n\nOpen this link to choose a password and get started. It "
-                "works once, and it expires in three days:\n" + link
+        greeting = f"Hi {first}," if name else "Hello,"
+        if payload.get("role") == "affiliate":
+            subject = (
+                f"{first}, your HBA account is ready"
+                if name
+                else "Your HBA account is ready"
             )
+            body = (
+                f"{greeting}\n\n"
+                "Welcome to HBA. We've made you an account where you can follow "
+                "your sales, see what you've earned, and check every payment we "
+                "send you.\n\n"
+                "Choose a password to get in, then send us your discount code "
+                "and where you'd like to be paid. It takes a few minutes."
+            )
+        else:
+            # Staff. The model's wording - earnings, payments - was never
+            # theirs.
+            subject = "Your access to the HBA dashboard"
+            body = (
+                f"{greeting}\n\n"
+                "You've been given access to HBA's affiliate dashboard. Choose a "
+                "password to get in."
+            )
+        if link:
+            body += "\n\nThe link works once and expires in three days:\n" + link
         return Message(
             to_address=payload["email"],
-            to_name=None,
-            subject="Your HBA affiliate account",
+            to_name=name or None,
+            subject=subject,
             body=body + _sign_off(),
+            action="Choose my password",
         )
 
     if event == Event.PASSWORD_RESET:
@@ -580,6 +612,7 @@ def render(event: str, payload: dict) -> Message | None:
             to_name=name or None,
             subject="Reset your HBA password",
             body=body + _sign_off(),
+            action="Choose a new password",
         )
 
     if event == Event.APPLICATION_SUBMITTED:
@@ -619,7 +652,7 @@ def render(event: str, payload: dict) -> Message | None:
             to_name=None,
             subject=f"New application: {name}",
             body=_with_link(
-                f"{name} has applied to the programme"
+                f"{name} has applied to be an HBA ambassador"
                 + (f" with the code {payload['code']}." if payload.get("code") else ".")
                 + "\n\nThe code needs checking against Shopify before "
                 "the application can be approved.",
@@ -657,19 +690,30 @@ def render(event: str, payload: dict) -> Message | None:
     if event == Event.APPLICATION_APPROVED:
         # The one that carries the sign-in link, and the first thing most
         # models will ever see from the platform.
+        #
+        # **"Ambassador", not "programme"** (owner, 1 October 2026: "Me,
+        # myself, the one who built the program, don't know what is a
+        # programme"). The portal already calls her an HBA ambassador under her
+        # name, and her code is named because it is what she will share.
+        code = str(payload.get("code") or "").strip()
+        subject = f"You're approved, {first}" if name else "You're approved"
+        if code:
+            subject += f" — your code {code} is live"
         return Message(
             to_address=payload["email"],
             to_name=name or None,
-            subject="You are on the HBA programme",
+            subject=subject,
             body=_with_link(
                 f"Hi {first},\n\n"
-                "You are on the programme - your code is live and your sales "
-                "are being counted from now on.\n\n"
-                "You can see what you have earned, the orders behind it, and "
-                "everything you have been paid, whenever you like.",
+                "Good news: you're now an HBA ambassador. "
+                + (f"Your code {code} is active" if code else "Your code is active")
+                + ", and every order placed with it counts towards your "
+                "earnings from today.",
                 "/",
-                "Sign in here:",
+                "Sign in any time to see your sales, what you've earned, and "
+                "every payment we send you:",
             ),
+            action="Sign in",
         )
 
     if event == Event.MONTH_APPROVED:
@@ -866,7 +910,7 @@ def send_notification(db: Session, payload: dict) -> None:
     # HTML from that same text, which means the two versions of an email
     # cannot say different things - and a template added later is branded
     # without anybody remembering to brand it.
-    message = replace(message, html=wrap(message.body))
+    message = replace(message, html=wrap(message.body, message.action))
 
     row.attempts += 1
 

@@ -252,16 +252,16 @@ def resend(
     if invitation.accepted_at is not None:
         raise HTTPException(400, "This invitation has already been used")
 
-    email, role = invitation.email, invitation.role
+    email, role, name = invitation.email, invitation.role, invitation.name
     invitation.expires_at = utcnow()
 
     try:
-        token, fresh = create_invitation(db, email, role, actor.id)
+        token, fresh = create_invitation(db, email, role, actor.id, name=name)
     except ValueError as exc:
         db.rollback()
         raise HTTPException(409, str(exc)) from exc
 
-    queued = invitation_sent(db, fresh.email, token, role)
+    queued = invitation_sent(db, fresh.email, token, role, fresh.name)
     record_audit(
         db,
         action="invitation.resend",

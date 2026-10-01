@@ -78,6 +78,11 @@ class Message:
     #: falls back to the text, which is the version that was written.
     html: str | None = None
 
+    #: What the HTML button says - "Choose my password", "Sign in". `None`
+    #: keeps the generic "Open it". The text version has no button, so this
+    #: is the one word of an email that only the HTML carries.
+    action: str | None = None
+
 
 def _address(name: str | None, email: str) -> str:
     """A display name and an address, encoded safely.

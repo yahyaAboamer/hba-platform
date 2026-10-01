@@ -878,12 +878,91 @@ def test_a_month_before_go_live_with_no_terms_shows_sales_and_says_why(
 
     assert body["state"] == "historical"
     assert body["amount_piastres"] is None
+    assert body["split"] is None
     assert body["sales"]["earned_piastres"] == 100_000
-    assert "HBA paid you" in body["note"]
+    # What an order was worth is a fact about her sales, figure or no figure.
+    assert body["sales"]["average_order_piastres"] == 100_000
+    assert "settled this month with you directly" in body["note"]
     # Their words, not the platform's. They do not know what a platform is, and
     # a blank where the figure goes reads as *they did not pay me for March*.
     assert "platform" not in body["note"].lower()
+    # No "yet": with no terms recorded, the amount never appears by itself.
+    assert "yet" not in body["note"].lower()
     assert body["waiting_on"] == []
+
+
+def test_a_settled_month_with_its_terms_is_calculated_like_any_other(
+    admin, monkeypatch
+):
+    """ADR 0054. The owner records each month's agreed terms before a model is
+    approved, and a settled month is then a normal month: the figure, the
+    breakdown and the average order, exactly as October would show them.
+
+    Only the state says otherwise - the screen's pill and payment line - and
+    nothing waits on anybody, because HBA settled it directly.
+    """
+    from app.config import settings
+
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"], rate_bp=1000, start="2025-11")
+    _order(affiliate["id"], "s1", 100_000, month="2025-11", state="earned")
+    _order(affiliate["id"], "s2", 50_000, month="2025-11", state="pending")
+    monkeypatch.setattr(settings, "go_live_month", "2026-01", raising=False)
+
+    body = _sign_in().get("/api/me/earnings/2025-11").json()
+
+    assert body["state"] == "historical"
+    # 10% of EGP 1,500.00, delivered and pending (F02).
+    assert body["amount_piastres"] == 15_000
+    assert body["makeup"][0]["label"] == "Commission on this month's sales"
+    assert body["sales"]["average_order_piastres"] == 75_000
+    assert body["commission_rate_bp"] == 1000
+    assert body["window"]["days_left"] is None
+    assert body["waiting_on"] == []
+    assert body["note"] is None
+    assert body["split"] is None
+
+
+def test_a_settled_salaried_month_splits_salary_and_commission(admin, monkeypatch):
+    """Sara's September on staging: salary plus commission, settled directly.
+    The total, and the two parts that make it, the parts adding up."""
+    from app.config import settings
+
+    affiliate = _affiliate(admin)
+    _terms(
+        admin,
+        affiliate["id"],
+        rate_bp=1000,
+        start="2025-11",
+        compensation_type="fixed_plus_commission",
+        fixed_amount_piastres=1_000_000,
+    )
+    _order(affiliate["id"], "s1", 5_839_951, month="2025-11", state="earned")
+    monkeypatch.setattr(settings, "go_live_month", "2026-01", raising=False)
+
+    body = _sign_in().get("/api/me/earnings/2025-11").json()
+
+    assert body["state"] == "historical"
+    split = body["split"]
+    assert split["salary_piastres"] == 1_000_000
+    assert split["salary_piastres"] + split["commission_piastres"] == body["amount_piastres"]
+    assert split["salary"] == "EGP 10,000.00"
+
+
+def test_a_settled_month_still_never_reaches_the_payments_desk(admin, monkeypatch):
+    """A figure on her screen is not money HBA owes: the month was paid
+    directly, so her payments list has no row for it to be unpaid on."""
+    from app.config import settings
+
+    affiliate = _affiliate(admin)
+    _terms(admin, affiliate["id"], rate_bp=1000, start="2025-11")
+    _order(affiliate["id"], "s1", 100_000, month="2025-11", state="earned")
+    monkeypatch.setattr(settings, "go_live_month", "2026-01", raising=False)
+
+    client = _sign_in()
+    assert client.get("/api/me/earnings/2025-11").json()["amount_piastres"] == 10_000
+    payments = client.get("/api/me/payments").json()
+    assert "2025-11" not in [row["month"] for row in payments["months"]]
 
 
 # -- Blockers, in language that does not accuse them ---------------------------

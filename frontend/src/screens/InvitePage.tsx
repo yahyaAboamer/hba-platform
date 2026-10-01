@@ -42,6 +42,9 @@ export function InvitePage({ session }: { session: Session }) {
   const [query] = useSearchParams();
   const opened = query.get("email");
   const [email, setEmail] = useState("");
+  // Optional (audit D, 1 October 2026): the invitation email greets her by
+  // it, and says "Hello," without it.
+  const [name, setName] = useState("");
   const [link, setLink] = useState<string | null>(null);
   const [emailed, setEmailed] = useState(false);
   const [sentTo, setSentTo] = useState("");
@@ -72,7 +75,7 @@ export function InvitePage({ session }: { session: Session }) {
     try {
       const result = await api.post<{ link: string; emailed: boolean }>(
         "/api/auth/invitations",
-        { email: email.trim(), role: "affiliate" },
+        { email: email.trim(), role: "affiliate", name: name.trim() },
       );
       setEmailed(result.emailed);
       setSentTo(email.trim());
@@ -84,6 +87,7 @@ export function InvitePage({ session }: { session: Session }) {
       // not know its own address, which is said below rather than hidden.
       setLink(result.link);
       setEmail("");
+      setName("");
       reload();
     } catch (caught) {
       setProblem(
@@ -175,6 +179,16 @@ export function InvitePage({ session }: { session: Session }) {
         )}
         {mayInvite && (
         <form className="invite-page__form" onSubmit={send}>
+          <input
+            className="input invite-page__name"
+            type="text"
+            value={name}
+            maxLength={120}
+            autoComplete="off"
+            placeholder="First name (optional)"
+            aria-label="First name, optional"
+            onChange={(event) => setName(event.target.value)}
+          />
           <input
             className="input"
             type="email"

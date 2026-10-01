@@ -46,6 +46,12 @@
   min-width: 240px;
 }
 
+/* The first name is short; the address takes the rest of the row. */
+.invite-page__form .invite-page__name {
+  flex: 0 1 180px;
+  min-width: 150px;
+}
+
 .invite-page__hint {
   margin: 10px 0 0;
   font-size: 12.5px;

@@ -115,6 +115,12 @@ payroll without touching a maintainer screen.
   is set on that environment. The *review* is never locked - it is how the
   gaps are found. What HBA must supply first is listed in
   `docs/repair/HISTORICAL-INFORMATION-NEEDED.md`.
+- **A settled month reads like any other month to the model** (ADR 0054): with
+  terms recorded for it, her portal shows its calculated figure, breakdown and
+  average order without it being approved. Only its pill (*Settled*) and its
+  payment line (*Paid directly by HBA*) differ, and it is never owed. With no
+  terms it shows her sales and says HBA settled it directly - never a guessed
+  rate.
 - **Append-only tables stay append-only**: `payroll_snapshot`,
   `payment_transaction`, `payment_allocation`, `payroll_adjustment`,
   `payout_destination`, `policy_version`. Guarded by triggers. **One

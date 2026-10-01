@@ -65,6 +65,9 @@ class LoginBody(BaseModel):
 class InviteBody(BaseModel):
     email: EmailStr
     role: str
+    #: Optional. The invitation email greets her by it ("Hi Sara,"), and says
+    #: "Hello," without it.
+    name: str = Field(default="", max_length=120)
 
 
 class AcceptInviteBody(BaseModel):
@@ -370,15 +373,17 @@ def invite(
         )
 
     try:
-        token, invitation = create_invitation(db, str(body.email), body.role, actor.id)
+        token, invitation = create_invitation(
+            db, str(body.email), body.role, actor.id, name=body.name
+        )
     except ValueError as exc:
-        # Already on the programme, or already has an account. Both are
-        # ordinary mistakes with readable answers, not server errors.
+        # Already a model, or already has an account. Both are ordinary
+        # mistakes with readable answers, not server errors.
         raise HTTPException(409, str(exc)) from exc
     # §13, and the reason `create_invitation` keeps only the hash: the raw
     # token is a credential. It is erased from the outbox the moment the email
     # goes out - see `_forget_secrets`.
-    queued = invitation_sent(db, invitation.email, token, body.role)
+    queued = invitation_sent(db, invitation.email, token, body.role, invitation.name)
 
     record_audit(
         db,
@@ -574,7 +579,7 @@ def preview(token: str, db: Session = Depends(get_session)) -> dict:
         # 410, not 404: the link was real and is now spent. The screen shows
         # this message verbatim, so it has to read as a sentence.
         raise HTTPException(410, str(exc)) from exc
-    return {"email": invitation.email, "role": invitation.role}
+    return {"email": invitation.email, "role": invitation.role, "name": invitation.name}
 
 
 @router.post("/invitations/accept", status_code=201)

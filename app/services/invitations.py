@@ -37,6 +37,7 @@ def create_invitation(
     role: str,
     invited_by: int | None,
     valid_hours: int = DEFAULT_VALID_HOURS,
+    name: str | None = None,
 ) -> tuple[str, Invitation]:
     """Create an invitation and return (token, row).
 
@@ -61,7 +62,7 @@ def create_invitation(
             )
         )
         if owns_profile is not None:
-            raise ValueError(f"{email} is already on the programme")
+            raise ValueError(f"{email} is already a model on HBA")
         raise ValueError(f"An account already exists for {email}")
 
     # **One live link per address** (Settings audit review). Several could be
@@ -81,6 +82,7 @@ def create_invitation(
     token = secrets.token_urlsafe(TOKEN_BYTES)
     invitation = Invitation(
         email=email,
+        name=str(name or "").strip()[:120] or None,
         role=role,
         token_hash=_hash(token),
         expires_at=utcnow() + timedelta(hours=valid_hours),
@@ -165,7 +167,10 @@ def accept_invitation(
         email=invitation.email,
         password_hash=password_hash,
         status="active",
-        display_name=str(display_name or "").strip() or None,
+        # The name the admin invited her by, when the accept screen sends none
+        # (a model's does not - she gives it on the details step, which
+        # overwrites this). Until then her account is not nameless.
+        display_name=str(display_name or "").strip() or invitation.name or None,
     )
     db.add(user)
     db.flush()

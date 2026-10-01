@@ -513,6 +513,88 @@ def test_the_invitation_email_carries_a_link_that_works(monkeypatch):
     assert "expires in three days" in message.body
 
 
+def test_the_invitation_greets_her_by_the_name_she_was_invited_by(monkeypatch):
+    """Owner's staging test, 1 October 2026: the email opened "Hi," with
+    nobody after it. An invitation held only an address."""
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "public_base_url", "https://pay.example.com")
+    named = render(
+        Event.INVITATION_SENT,
+        {"email": "sara@example.com", "role": "affiliate", "name": "Sara Edris",
+         "_secret": {"token": "abc"}},
+    )
+    unnamed = render(
+        Event.INVITATION_SENT,
+        {"email": "sara@example.com", "role": "affiliate", "_secret": {"token": "abc"}},
+    )
+
+    assert named.body.startswith("Hi Sara,")
+    assert named.subject == "Sara, your HBA account is ready"
+    assert named.action == "Choose my password"
+    assert "discount code" in named.body
+    # Never a bare "Hi," - a greeting with nobody in it reads as a mistake.
+    assert unnamed.body.startswith("Hello,")
+    assert "Hi," not in unnamed.body
+
+
+def test_the_branded_invitation_keeps_every_word_of_its_first_sentence(monkeypatch):
+    """**"Hi, has set up an account for you."** The branding lifted the
+    plain-text sign-off by replacing every "\\n\\nHBA Aesthetics" in the body,
+    and the invitation's first sentence began with exactly that. Only the
+    sign-off at the very end may go."""
+    from app.services.mail_branding import wrap
+
+    body = "Hi Sara,\n\nHBA Aesthetics has set up an account for you.\n\nHBA Aesthetics"
+    rendered = wrap(body)
+
+    assert "HBA Aesthetics has set up an account for you." in rendered
+    # The plain-text sign-off is lifted rather than printed beside the HTML one.
+    assert rendered.count("HBA Aesthetics") == 1
+
+
+def test_the_button_says_what_it_does(monkeypatch):
+    from app.config import settings
+    from app.services.mail_branding import wrap
+
+    monkeypatch.setattr(settings, "public_base_url", "https://example.test")
+    rendered = wrap("Choose it here:\nhttps://example.test/x", "Choose my password")
+
+    assert ">Choose my password</a>" in rendered
+    assert "Open it" not in rendered
+
+
+def test_a_staff_invitation_is_not_written_for_a_model(monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "public_base_url", "https://pay.example.com")
+    message = render(
+        Event.INVITATION_SENT,
+        {"email": "ops@example.com", "role": "content_manager", "name": "Mona",
+         "_secret": {"token": "t"}},
+    )
+
+    assert message.body.startswith("Hi Mona,")
+    assert "dashboard" in message.body
+    assert "discount code" not in message.body
+    assert "earned" not in message.body
+
+
+def test_the_approval_names_her_code_and_never_says_programme():
+    """Owner, 1 October 2026: "Me, myself, the one who built the program,
+    don't know what is a programme." The portal calls her an ambassador."""
+    message = render(
+        Event.APPLICATION_APPROVED,
+        {"email": "sara@example.com", "name": "Sara Edris", "code": "SARAED"},
+    )
+
+    assert message.subject == "You're approved, Sara — your code SARAED is live"
+    assert "HBA ambassador" in message.body
+    assert "SARAED" in message.body
+    assert "programme" not in (message.subject + message.body).lower()
+    assert message.action == "Sign in"
+
+
 # -- Through the worker, the way production runs it --------------------------
 
 
@@ -569,7 +651,8 @@ def test_a_queued_email_is_sent_by_the_worker(fresh_database, monkeypatch):
         row = session.scalars(select(NotificationOutbox)).one()
         assert row.state == NotificationState.SENT, row.last_error
         assert len(sent) == 1
-        assert "on the programme" in sent[0].body
+        assert "HBA ambassador" in sent[0].body
+        assert "programme" not in sent[0].body
 
 
 def test_the_worker_does_not_leave_a_token_behind(fresh_database, monkeypatch):
