@@ -779,10 +779,11 @@ def test_rechecking_corrects_the_start_month(client, _shopify):
     assert response.json()["start_month"] == "2026-07"
 
 
-def test_a_recreated_code_is_hers_from_its_start_not_its_creation(client, _shopify):
-    """ALI10, 1 October 2026 (ADR 0055): a discount recreated on Shopify in April
-    with a start in February 2025. She started in January and so does her code,
-    or January's orders on the earlier ALI10 belong to nobody."""
+def test_a_code_is_hers_from_its_creation_not_its_active_from(client, _shopify):
+    """ALI10, 1 October 2026 (ADR 0055): created on Shopify in April, with an
+    "Active from" of February 2025 copied when it was duplicated. The ALI10
+    orders before April were another model's code (now ALI10 OLD), so both her
+    code and her start begin in April."""
     from datetime import datetime, timezone
 
     _shopify_says(_shopify, exists=False)
@@ -797,8 +798,8 @@ def test_a_recreated_code_is_hers_from_its_start_not_its_creation(client, _shopi
     )
     response = client.post(f"/api/affiliates/{affiliate['id']}/recheck-code", json={})
 
-    assert response.json()["start_month"] == "2026-01"
-    assert _start_of(client, affiliate["id"]) == "2026-01"
+    assert response.json()["start_month"] == "2026-04"
+    assert _start_of(client, affiliate["id"]) == "2026-04"
 
 
 def test_a_recheck_that_still_finds_nothing_changes_nothing(client, _shopify):
@@ -2278,7 +2279,7 @@ def test_the_editor_says_when_she_started_and_why(client, _shopify):
     assert client.get(path).json()["start_source"] == "none"
 
     _give_code(affiliate["id"], "NOUR10", verified=False)
-    _shopify_says(_shopify, starts_at=datetime(2026, 2, 3, tzinfo=timezone.utc))
+    _shopify_says(_shopify, created_at=datetime(2026, 2, 3, tzinfo=timezone.utc))
     client.post(f"/api/affiliates/{affiliate['id']}/recheck-code", json={})
     body = client.get(path).json()
     assert (body["arrangeable_from"], body["start_source"], body["code"]) == ("2026-02", "code", "NOUR10")
@@ -2417,9 +2418,9 @@ def _start_of(client, affiliate_id):
     return client.get(f"/api/affiliates/{affiliate_id}").json()["collaboration_start_month"]
 
 
-def test_confirming_her_code_records_when_it_starts(client, _shopify):
-    """June, not July: she started when her code went live, whatever month her
-    first order came in."""
+def test_confirming_her_code_records_when_it_was_created(client, _shopify):
+    """May, whatever month her first order came in, and whatever the code's
+    "Active from" says (ADR 0055): her start is her code's creation."""
     from datetime import datetime, timezone
 
     affiliate = _register(client)
@@ -2432,7 +2433,7 @@ def test_confirming_her_code_records_when_it_starts(client, _shopify):
 
     client.post(f"/api/affiliates/{affiliate['id']}/recheck-code", json={})
 
-    assert _start_of(client, affiliate["id"]) == "2026-06"
+    assert _start_of(client, affiliate["id"]) == "2026-05"
 
 
 def test_with_no_start_date_the_creation_month_is_used(client, _shopify):
@@ -2452,7 +2453,7 @@ def test_a_code_from_before_2026_starts_her_in_january(client, _shopify):
 
     affiliate = _register(client)
     _give_code(affiliate["id"], "NOUR10", verified=False)
-    _shopify_says(_shopify, starts_at=datetime(2025, 8, 1, tzinfo=timezone.utc))
+    _shopify_says(_shopify, created_at=datetime(2025, 8, 1, tzinfo=timezone.utc))
 
     client.post(f"/api/affiliates/{affiliate['id']}/recheck-code", json={})
 
@@ -2468,7 +2469,7 @@ def test_a_start_somebody_recorded_is_never_overwritten(client, _shopify):
         f"/api/affiliates/{affiliate['id']}",
         json={"collaboration_start_month": "2026-03", "collaboration_start_month_set": True},
     )
-    _shopify_says(_shopify, starts_at=datetime(2026, 6, 1, tzinfo=timezone.utc))
+    _shopify_says(_shopify, created_at=datetime(2026, 6, 1, tzinfo=timezone.utc))
 
     client.post(f"/api/affiliates/{affiliate['id']}/recheck-code", json={})
 

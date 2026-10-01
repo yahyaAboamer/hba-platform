@@ -50,52 +50,45 @@ def _covering(code: str, month: str):
     )
 
 
-def start_month_for(
-    created_at: datetime | None, starts_at: datetime | None = None
-) -> str:
+def start_month_for(created_at: datetime | None) -> str:
     """The month a code's ownership should start from.
 
-    **The later of the platform's data horizon and the code's start on
+    **The later of the platform's data horizon and the code's creation on
     Shopify** - and it is never a question anybody is asked, because there is
     exactly one right answer and a person typing it can only get it wrong.
 
-    **The start date before the creation date** (ADR 0055), the same rule as
-    her start month (`model_start_month_for`). The two were different until
-    1 October 2026: ALI10 on Shopify is a discount recreated on 4 April 2026
-    with a start date of February 2025, and her code was taken to start in
-    April while she was taken to start in January. Her January orders, made on
-    the earlier ALI10, belonged to nobody. A recreated or duplicated discount
-    keeps the code's earlier start; its creation date only says when this
-    particular object was made.
+    **The creation date, never the "Active from" date** (ADR 0055, owner
+    1 October 2026). ALI10 on Shopify was created on 4 April 2026, with an
+    "Active from" of February 2025 copied when it was duplicated. The ALI10
+    orders before April were another model's, on a discount since renamed
+    *ALI10 OLD*: Shopify keeps the text the customer typed, so they still read
+    ALI10. Only the creation date says when *this* code began.
 
-    - A code starting before 2026 starts at the horizon. There are no orders
+    - A code created before 2026 starts at the horizon. There are no orders
       before then to claim; the import does not reach back further.
-    - A code starting in March starts in March. Claiming January would assert
+    - A code created in March starts in March. Claiming January would assert
       ownership of months the code did not exist for - and if it previously
-      belonged to somebody else, collide with their period.
+      belonged to somebody else, take their orders.
 
-    Neither date known falls back to the horizon. That is the safe direction:
-    it claims at most a few empty months, where starting late would orphan
-    real orders and nobody would notice until the model asked why their
+    An unknown creation date falls back to the horizon. That is the safe
+    direction: it claims at most a few empty months, where starting late would
+    orphan real orders and nobody would notice until the model asked why their
     dashboard was empty.
     """
-    return model_start_month_for(starts_at, created_at) or PLATFORM_START_MONTH
+    return model_start_month_for(created_at) or PLATFORM_START_MONTH
 
 
-def model_start_month_for(
-    starts_at: datetime | None, created_at: datetime | None
-) -> str | None:
-    """The month a model starts with HBA, read from her code (ADR 0053).
+def model_start_month_for(created_at: datetime | None) -> str | None:
+    """The month a model starts with HBA, read from her code (ADR 0053, 0055).
 
-    The code's start date on Shopify where it has one, else when it was
-    created - in Cairo, and never before the platform's data horizon. `None`
-    when Shopify has told us neither, which leaves her start unrecorded rather
-    than guessed.
+    When her code was created on Shopify, in Cairo, never before the
+    platform's data horizon - the same month her code's ownership starts
+    (`start_month_for`), so the two can never disagree. `None` when Shopify
+    has not said, which leaves her start unrecorded rather than guessed.
     """
-    when = starts_at or created_at
-    if when is None:
+    if created_at is None:
         return None
-    return max(PLATFORM_START_MONTH, business_month(when))
+    return max(PLATFORM_START_MONTH, business_month(created_at))
 
 
 def register_code(

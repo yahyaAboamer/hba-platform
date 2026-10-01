@@ -141,13 +141,14 @@ payroll without touching a maintainer screen.
     covering the working month.**
   - *Erase* is admin-only and only for a model with no order, payroll,
     payment, adjustment, parcel or proof file.
-- **A model's start month is her code's start on Shopify** (ADR 0053): the
-  code's start date, else its creation date, in Cairo, never before January
-  2026. Written when Shopify confirms her code, only if none is recorded;
-  staff may still change it on her profile. **Her code is hers from that same
-  month** (ADR 0055): its ownership starts by the same rule, never at the
-  discount's creation date alone, so a recreated or duplicated discount keeps
-  the orders its code took before. **Her code is the one she applied
+- **A code starts in the month it was created on Shopify, and so does the
+  model who holds it** (ADR 0053, amended by 0055): the creation date, in
+  Cairo, never before January 2026, for both her code's ownership and her
+  start month. Never the code's *Active from* date, which a duplicated
+  discount copies. Orders with the same code text from before its creation
+  belong to whoever held the earlier code (ALI10 OLD). Her start is written
+  when Shopify confirms her code, only if none is recorded; staff may still
+  change it on her profile. **Her code is the one she applied
   with and is never replaced** - there is no route to register another or move
   her onto a new one. A typo in an unconfirmed code may still be corrected.
 - **Nobody grants access they do not hold** (`can_grant`). An invitation, a

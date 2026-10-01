@@ -8,16 +8,21 @@
   Shopify's *99 used*; September has 11.
 - The *5 January orders* the owner saw are under Settings → *Discount codes
   belonging to nobody*.
-- Cause: Shopify's ALI10 is a discount **recreated 4 April 2026** whose
-  `startsAt` (Feb 2025) was copied from SARAED. Her start used `startsAt`
-  (→ 2026-01), but her code's ownership used `createdAt` (→ 2026-04).
-- Shopify's usage count covers only the current discount object. ALI10 orders
-  exist on Shopify from October 2025.
-- Production has no models, so nothing there is affected.
+- Shopify's ALI10 was **created 4 April 2026**. Its "Active from" (Feb 2025)
+  was copied from SARAED when it was duplicated. Her start used "Active from"
+  (→ 2026-01), but her code's ownership used the creation date (→ 2026-04).
+- **The owner (decision):** the ALI10 orders before April were another
+  model's, on the code now named *ALI10 OLD*. A code, and the model holding
+  it, start when the code was **created** on Shopify. So Ali starts in April,
+  and the five January orders correctly stay under *belonging to nobody*.
+- Of 44 codes with 5+ orders, only ALI10 was created after its first order.
+  SPONSORSHIPPING (49 orders) is not a Shopify discount code. Production has
+  no models.
 
 **Shipped locally:**
-- **Code ownership:** `start_month_for(created_at, starts_at)` puts the start
-  date first, the same rule as her start month.
+- **One date for both:** `start_month_for(created_at)` and
+  `model_start_month_for(created_at)`; "Active from" (`startsAt`) is no longer
+  used for either.
 - **Pay terms, server:** only months from her start (once known) to the
   working month. A start after the working month is refused, and so is a
   change before her recorded start. The run reaching the working month is
@@ -26,14 +31,16 @@
   `code`). The "Ahead" wording is gone.
 - **Migration `d9e4f7a50009`** (data only, audited, idempotent; downgrade is a
   no-op):
-  - moves ALI10's ownership start from 2026-04 to 2026-01, after which the
-    hourly orphan sweep attaches January;
+  - sets a start taken from the code (audit `"from": "shopify_code"`) to the
+    code's creation month, which moves Ali from 2026-01 to 2026-04; typed
+    starts are untouched;
   - opens Sara's last run, which ended 2026-10.
   - Rehearsed up/down/up on a throwaway database only.
 - **Tests and review:** 8 new backend tests, 5 new frontend tests. The ECC
   reviewer found 0 high; its medium and lows were fixed or documented.
-- **Verified:** backend **90/90 files** through `run-suite.sh`
-  (`REV=adr0055-2`). Frontend 576 tests, build green.
+- **Verified:** backend through `run-suite.sh` (`REV=adr0055-3`, after the
+  owner's creation-date decision; `adr0055-2` was 90/90 on the first version).
+  Frontend 576 tests, build green.
 - **Browser, local throwaway `hba_browser_0055` (now dropped), 1280 dark:**
   Youssef (start March) shows the start line, Jan–Feb *Before start*,
   Nov–Dec *Not yet*. October set to 12% saved as *October 2026 onwards*.
@@ -42,7 +49,6 @@
 are separate permissions.
 
 **Not done:**
-- Changing her start month on her profile does not move her code's ownership.
 - `mark_verified` may still move a re-opened period of a returning model (from
   before this change).
 

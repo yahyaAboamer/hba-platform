@@ -567,8 +567,8 @@ def create_house_account_route(
             db,
             affiliate,
             body.code,
-            # ADR 0055: the code's start date first, as for her start month.
-            start_month_for(found["created_at"], found.get("starts_at")),
+            # ADR 0055: when the code was created on Shopify.
+            start_month_for(found["created_at"]),
             OPEN_ENDED,
             verified_at=utcnow() if found["exists"] else None,
             actor_id=actor.id,
@@ -855,9 +855,9 @@ def recheck_code_route(
         raise HTTPException(502, f"Could not reach Shopify: {exc}") from exc
 
     verified_at = utcnow() if found["exists"] else None
-    # ADR 0055: the code's start date first, the same rule as her start month.
-    # Its creation date alone cut ALI10 off at a recreation in April.
-    start_month = start_month_for(found["created_at"], found.get("starts_at"))
+    # ADR 0055: when the code was created on Shopify, never its "Active from"
+    # (a duplicated discount copies that). Her start month uses the same date.
+    start_month = start_month_for(found["created_at"])
 
     try:
         if body.code is not None and normalise_code(body.code) != period.code:

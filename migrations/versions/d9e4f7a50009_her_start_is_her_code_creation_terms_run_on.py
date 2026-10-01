@@ -1,16 +1,18 @@
-"""her code is hers from her start; the latest terms run on (ADR 0055)
+"""her start is her code's creation; the latest terms run on (ADR 0055)
 
 Two data corrections, no schema change.
 
-1. **A confirmed code whose ownership starts after its model's start month is
-   moved back to her start.** Until ADR 0055 the code's ownership started at
-   the discount's creation date on Shopify while her start month came from its
-   start date. ALI10 on staging was recreated on Shopify on 4 April 2026 with a
-   start of February 2025: she started in January, her code in April, and
-   January's five ALI10 orders belonged to nobody. Only her first code period
-   is moved, only to a start at or after January 2026, and only where no other
-   period of the same code covers those months (the exclusion constraint would
-   refuse it anyway). The hourly orphan sweep then attaches the orders.
+1. **A start month taken from her code is brought to her code's creation
+   month.** Until ADR 0055 her start month came from the code's "Active from"
+   date on Shopify, while her code's ownership came from its creation date.
+   ALI10 was created on 4 April 2026 with an "Active from" of February 2025,
+   copied when it was duplicated, so Ali was given January and her code April.
+   The owner, 1 October 2026: the code starts when it was created; the ALI10
+   orders before April were another model's, on the discount now named
+   *ALI10 OLD*. Only a start the platform took from her code is changed (the
+   last `affiliate.collaboration_start_set` for her says ``"from":
+   "shopify_code"``); a start somebody typed is never touched. It is set to
+   the month her first confirmed code starts, which is that code's creation.
 
 2. **The latest arrangement that ends in or after the current month is made
    open-ended.** Months that have not begun can no longer be arranged; each
@@ -24,10 +26,9 @@ none exist: read on 1 October 2026, staging has only Sara's three runs (the
 latest from August) and production has no terms at all. After this release
 nothing can create one; the server refuses a start after the working month.
 
-**Downgrade changes nothing.** Moving an ownership start back later would
-orphan orders attributed since, and closing an arrangement again would leave a
-month without terms. Both are corrections of what the records should always
-have said.
+**Downgrade changes nothing.** Both are corrections of what the records should
+always have said; putting them back would restore a start month that disagrees
+with her code, and a month without terms.
 
 Revision ID: d9e4f7a50009
 Revises: c8d3e6f40008
@@ -46,38 +47,37 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
-ALIGN_CODE_STARTS = """
-WITH candidates AS (
-    SELECT p.id, p.affiliate_id, p.code,
-           p.start_month AS was, a.collaboration_start_month AS now
-    FROM discount_code_period p
-    JOIN affiliate_profile a ON a.id = p.affiliate_id
+START_FROM_CODE_CREATION = """
+WITH last_set AS (
+    SELECT DISTINCT ON (subject) subject, after_json
+    FROM audit_event
+    WHERE action = 'affiliate.collaboration_start_set'
+    ORDER BY subject, id DESC
+),
+candidates AS (
+    SELECT a.id, a.collaboration_start_month AS was, p.start_month AS now
+    FROM affiliate_profile a
+    JOIN discount_code_period p
+      ON p.id = (SELECT min(q.id) FROM discount_code_period q
+                 WHERE q.affiliate_id = a.id)
+    JOIN last_set s ON s.subject = 'affiliate:' || a.id
     WHERE p.shopify_verified_at IS NOT NULL
-      AND a.collaboration_start_month IS NOT NULL
-      AND a.collaboration_start_month >= '2026-01'
-      AND p.start_month > a.collaboration_start_month
-      AND p.id = (SELECT min(q.id) FROM discount_code_period q
-                  WHERE q.affiliate_id = p.affiliate_id)
-      AND NOT EXISTS (
-          SELECT 1 FROM discount_code_period o
-          WHERE o.code = p.code AND o.id <> p.id
-            AND o.start_month < p.start_month
-            AND (o.end_month IS NULL OR o.end_month >= a.collaboration_start_month)
-      )
+      AND s.after_json ->> 'from' = 'shopify_code'
+      AND a.collaboration_start_month IS DISTINCT FROM p.start_month
 ),
 moved AS (
-    UPDATE discount_code_period p
-    SET start_month = c.now
+    UPDATE affiliate_profile a
+    SET collaboration_start_month = c.now
     FROM candidates c
-    WHERE p.id = c.id
-    RETURNING p.id
+    WHERE a.id = c.id
+    RETURNING a.id
 )
 INSERT INTO audit_event (action, subject, before_json, after_json, reason)
-SELECT 'code.start_aligned',
-       'affiliate:' || c.affiliate_id,
-       jsonb_build_object('code', c.code, 'start_month', c.was),
-       jsonb_build_object('code', c.code, 'start_month', c.now),
-       'ADR 0055: her code is hers from her start month (migration d9e4f7a50009)'
+SELECT 'affiliate.collaboration_start_set',
+       'affiliate:' || c.id,
+       jsonb_build_object('collaboration_start_month', c.was),
+       jsonb_build_object('collaboration_start_month', c.now, 'from', 'shopify_code'),
+       'ADR 0055: her start is when her code was created on Shopify (migration d9e4f7a50009)'
 FROM candidates c JOIN moved m ON m.id = c.id
 """
 
@@ -110,7 +110,7 @@ FROM candidates c JOIN opened o ON o.id = c.id
 
 
 def upgrade() -> None:
-    op.execute(ALIGN_CODE_STARTS)
+    op.execute(START_FROM_CODE_CREATION)
     op.execute(LATEST_TERMS_RUN_ON)
 
 

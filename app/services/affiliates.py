@@ -570,18 +570,17 @@ def record_start_from_code(
     actor_id: int | None = None,
     actor_email: str | None = None,
 ) -> str | None:
-    """Her start month, from what Shopify says about her code (ADR 0053).
+    """Her start month, from when her code was created on Shopify (ADR 0053,
+    0055) - the same month her code's ownership starts.
 
     Written only when nobody has recorded one - a start somebody typed is the
-    exception this field exists for and is never overwritten. A code set to
-    start next month starts her next month: the screens already cap what they
-    offer at the working month, so a start ahead of it opens nothing early.
+    exception this field exists for and is never overwritten.
     """
     from app.services.codes import model_start_month_for
 
     if affiliate.collaboration_start_month is not None or not found.get("exists"):
         return None
-    month = model_start_month_for(found.get("starts_at"), found.get("created_at"))
+    month = model_start_month_for(found.get("created_at"))
     if month is None:
         return None
     affiliate.collaboration_start_month = month
