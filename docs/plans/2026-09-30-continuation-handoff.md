@@ -1,6 +1,39 @@
-# Where the work is — 1 October 2026 (data reset, batches Q1–Q3, Settings audit, Home and emails audit)
+# Where the work is — 1 October 2026 (data reset, batches Q1–Q3, Settings audit, Home and emails audit, order edits)
 
-## Latest: targets before her start, and who holds a code (1 October, ADR 0056)
+## Latest: order edits, and the guaranteed-minimum home card (1 October, evening) — **released**
+
+- **Bosta (owner's question, answered read-only):** the platform does not
+  read Bosta (ADR 0023). Ali's four *On the way* items were Shopify #21585
+  (0 EGP, 6 April, matched by phone, not by ALI10): Bosta never wrote
+  *Delivered* back, until it was marked in Shopify on 1 October 16:13 UTC.
+  Bosta 38036009 (18 April, *Ali ugc*) has no Shopify order at all - made
+  directly in Bosta, so invisible by design. Owner told: send gifts as 0 EGP
+  Shopify orders.
+- **`009829a` - a line an order edit removed was not sent.** Shopify keeps an
+  edited-out line at its original `quantity`, `currentQuantity` 0; the line
+  reader took `quantity`, so Ali's wardrobe showed an XL he was swapped out
+  of. Now `max(currentQuantity, quantity shipped by non-cancelled
+  fulfilments)` (a returned item stays, ADR 0051); totals scaled to it.
+  Migration `e1a5c3b70010` adds nullable `order_line_item.ordered_quantity`;
+  NULL lines are re-read by the hourly fill sweep (701 orders on staging).
+  Read back: #21585 re-read 17:20 UTC with the L only.
+- **`4206f08` - Home, guaranteed minimum split out like a salary** (owner's
+  order, with his two screenshots). Two tiles, *Guaranteed minimum* (targets
+  state) and *Commission*; the tile the figure comes from has the accent and
+  says *paid this month* when it is the minimum; one line: *You're paid the
+  higher of the two.* `guarantee` gains `commission(_piastres)`. Commission-only
+  and salary homes unchanged.
+- **Verified:** backend 90/90 files after `009829a`; portal, earnings and
+  preview APIs after `4206f08`; frontend 578 tests, build green. Local
+  throwaway `hba_browser` (dropped) at 390: Mariam (not recorded), Hana
+  (being checked), Youssef (minimum applies), Sara (salary) all render, no
+  horizontal scroll.
+- **Released** on the owner's order: both commits fast-forwarded to
+  `origin/main` and `origin/production`; all four deploys SUCCESS each time
+  (~19:07 and ~19:25 Cairo); head `e1a5c3b70010` on both databases;
+  `/api/health/ready` 200 on both.
+
+## Before that: targets before her start, and who holds a code (1 October, ADR 0056)
 
 From the owner's staging check after ADR 0055.
 
