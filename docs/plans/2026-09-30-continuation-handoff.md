@@ -1,6 +1,48 @@
-# Where the work is — 30 September 2026 (data reset, batches Q1–Q3, Settings audit S1–S4)
+# Where the work is — 1 October 2026 (data reset, batches Q1–Q3, Settings audit, Home and emails audit)
 
-## Latest: the Settings audit (30 September, evening) — **released**
+## Latest: the Home and emails audit (1 October) — **released**
+
+| | |
+|---|---|
+| **Commit** | `b122fca` on `repair/batch-2`, fast-forwarded to `origin/main` and `origin/production` on the owner's order ("start the edit and merge and deploy to staging and production") |
+| **Deploys** | All four (staging and production, both services) SUCCESS on `b122fca`, 1 October ~05:06 Cairo; deploy logs show `b7c2d5e30007 -> c8d3e6f40008` on both databases; `/api/health/ready` 200 on `hba-platform-staging-staging.up.railway.app` and `affiliate.hbawear.store` |
+| **Migration** | `c8d3e6f40008` (`invitation.name`, one nullable column), rehearsed up/down/up on a throwaway database only |
+
+From the owner's staging test with Sara. The audit is
+`docs/design/portal-home-salary-and-settled-audit-2026-10-01.html`
+(untracked). The owner approved the emails, the Home changes, C ("Paid
+directly by HBA") and D (first name on the invite). For A and B he said he
+records every model's terms for every month, and the guarantee's target
+outcome, **before she is approved**. So nothing is carried back or assumed.
+
+- **ADR 0054** (and `docs/RULES.md`): a settled month (before go-live) that
+  has terms recorded is calculated and shown like any other month, without
+  approval. Its pill says *Settled*, its payment line says *Paid directly by
+  HBA*, `waiting_on` is empty, and it stays off the payments desk
+  (`balance_for` is unchanged). With no terms, the big number is her sales,
+  labelled *Sales*, with the line *"HBA settled this month with you
+  directly…"*. There is no "yet", and she gets an average order.
+- **Salary + commission split:** `my_month` returns `split` (salary plus the
+  rest as commission, so the two add up to the total). Home shows it under the
+  big number.
+- **Emails:** `mail_branding.wrap` removed every "\n\nHBA Aesthetics" in the
+  body, which is how the invitation came out as "Hi, has set up…". It now
+  removes only the trailing sign-off. The invitation greets her by the first
+  name (else "Hello,") and says what comes next. Staff invitations have their
+  own wording. The approval email says "HBA ambassador" and names her code.
+  Each button names its action (`Message.action`). The admin email says
+  "applied to be an HBA ambassador".
+- **Invite form:** optional first name. Resend keeps it. Accepting the invite
+  uses it as the display name when none is sent.
+- **Verified:** backend 90/90 files through `run-suite.sh` at `b122fca`.
+  Frontend 571 tests / 35 files, build green. Local browser on a throwaway
+  `hba_browser` (seed, go-live 2026-06, now dropped): October salary split and
+  a settled May at 375 px dark, "How this adds up" for May, the invite form at
+  1280, and an invite with a name stored on `invitation.name` and its payload.
+- **Not verified on staging by me:** sign-in there needs the owner's password.
+  The owner reviews Sara on staging.
+
+## Before that: the Settings audit (30 September, evening) — released
 
 | | |
 |---|---|
