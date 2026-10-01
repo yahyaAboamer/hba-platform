@@ -154,6 +154,9 @@ payroll without touching a maintainer screen.
 - **Nobody grants access they do not hold** (`can_grant`). An invitation, a
   resend and a withdrawal are all held to it; nobody changes or suspends their
   own staff account.
+- **No targets before her start** (ADR 0056). Once her start month is known,
+  the server refuses creating, changing or counting a target before it, and
+  *Whole year* skips those months. The Targets grid draws her row closed there.
 - **Pay terms are set only for months that have begun, from her start month**
   (ADR 0055, replacing 0052's *twelve months ahead*). The server refuses an
   arrangement starting after the working month, or, once her start is known,

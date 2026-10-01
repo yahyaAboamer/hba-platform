@@ -548,3 +548,66 @@ def test_a_model_added_mid_edit_counts_as_a_change(client):
     response = _save(client, [_row(nour["id"], (3, 3))], revision=stale)
 
     assert response.status_code == 409
+
+
+# ── Months before she started (ADR 0056) ─────────────────────────────────────
+
+
+def _starts_in(client, affiliate_id, month):
+    response = client.patch(
+        f"/api/affiliates/{affiliate_id}",
+        json={"collaboration_start_month": month, "collaboration_start_month_set": True},
+    )
+    assert response.status_code == 200, response.text
+
+
+def test_a_month_before_her_start_is_drawn_closed(client):
+    """Ali started in April 2026 and could be given targets for January."""
+    ali = _affiliate(client)
+    _starts_in(client, ali["id"], "2026-04")
+
+    january = next(r for r in _grid(client, "2026-01")["rows"] if r["affiliate_id"] == ali["id"])
+    april = next(r for r in _grid(client, "2026-04")["rows"] if r["affiliate_id"] == ali["id"])
+
+    assert (january["before_start"], january["start_month"]) == (True, "2026-04")
+    assert april["before_start"] is False
+
+
+def test_targets_before_her_start_are_refused(client):
+    ali = _affiliate(client)
+    _starts_in(client, ali["id"], "2026-04")
+
+    response = _save(client, [_row(ali["id"])], month="2026-02")
+
+    assert response.status_code == 400
+    assert "before her start" in response.json()["detail"]
+    assert _save(client, [_row(ali["id"])], month="2026-04").status_code == 200
+
+
+def test_the_whole_year_skips_months_before_her_start(client):
+    ali = _affiliate(client)
+    _starts_in(client, ali["id"], "2026-04")
+
+    revision = _grid(client, "2026-06")["revision"]
+    response = client.put(
+        "/api/targets/2026-06",
+        json={"rows": [_row(ali["id"])], "revision": revision, "apply_to_year": True},
+    )
+
+    assert response.status_code == 200, response.text
+    report = response.json()["applied_to_year"][0]
+    assert report["applied"][0] == "2026-04"
+    assert [s["month"] for s in report["skipped"] if s["why"] == "before_her_start"] == [
+        "2026-01", "2026-02", "2026-03",
+    ]
+
+
+def test_a_target_already_on_record_before_her_start_can_be_sent_back_unchanged(client):
+    """The grid sends every row it shows. A target set before her start was
+    known must not block a save; only changing it is refused."""
+    ali = _affiliate(client)
+    assert _save(client, [_row(ali["id"])], month="2026-02").status_code == 200
+    _starts_in(client, ali["id"], "2026-04")
+
+    assert _save(client, [_row(ali["id"])], month="2026-02").status_code == 200
+    assert _save(client, [_row(ali["id"], required=(9, 5))], month="2026-02").status_code == 400

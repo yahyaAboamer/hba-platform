@@ -27,6 +27,10 @@ type Row = {
   verified: boolean;
   verified_at: string | null;
   recorded_at: string | null;
+  /** The month she started with HBA, where it is known (ADR 0053, 0055). */
+  start_month?: string | null;
+  /** This month is before it, so it has no targets (ADR 0056). */
+  before_start?: boolean;
   /** D08. HBA only — nothing about pace reaches a model's own screens. */
   pace: {
     state: string;
@@ -191,7 +195,8 @@ export function Targets({ session, affiliateId, initialMonth, embedded = false }
     setSaved(null);
     try {
       const rows = [];
-      for (const row of grid.rows.filter((r) => r.account_kind !== "house" && (!affiliateId || r.affiliate_id === affiliateId))) {
+      // A month before her start has no targets (ADR 0056); its row is closed.
+      for (const row of grid.rows.filter((r) => r.account_kind !== "house" && !r.before_start && (!affiliateId || r.affiliate_id === affiliateId))) {
         const cells = draft[row.affiliate_id];
         const required_videos = count(cells.required_videos);
         const required_stories = count(cells.required_stories);
@@ -335,7 +340,7 @@ export function Targets({ session, affiliateId, initialMonth, embedded = false }
     && (!query.get("pace") || row.pace?.state === query.get("pace"))
     && (!needle || row.name.toLowerCase().includes(needle)));
   const confirmable = rows.filter(
-    (row) => row.achieved !== null && !row.verified,
+    (row) => row.achieved !== null && !row.verified && !row.before_start,
   );
   const confirmed = rows.filter((row) => row.verified);
 
@@ -475,8 +480,9 @@ export function Targets({ session, affiliateId, initialMonth, embedded = false }
               {rows.map((row) => {
                 const cells = draft[row.affiliate_id];
                 if (!cells) return null;
+                const closed = Boolean(row.before_start);
                 return (
-                  <tr key={row.affiliate_id}>
+                  <tr key={row.affiliate_id} className={closed ? "targets__row--closed" : undefined}>
                     {/*
                      * Name, and beside it what the record decides - the export
                      * lays the Model column out as one flex line with a 10px
@@ -488,7 +494,8 @@ export function Targets({ session, affiliateId, initialMonth, embedded = false }
                       <span className="targets__who">
                       {can(session, "targets.verify") &&
                         row.achieved !== null &&
-                        !row.verified && (
+                        !row.verified &&
+                        !closed && (
                           <input
                             type="checkbox"
                             aria-label={`Confirm ${row.name}'s numbers`}
@@ -520,7 +527,11 @@ export function Targets({ session, affiliateId, initialMonth, embedded = false }
                        * arrangement's own name comes back.
                        */}
                       <span className="targets__arrangement">
-                        {row.determines_pay && row.achieved === null
+                        {/* ADR 0056: the reason the row is closed, in place
+                            of an arrangement she could not have had. */}
+                        {closed && row.start_month
+                          ? `Starts ${formatMonth(row.start_month)}`
+                          : row.determines_pay && row.achieved === null
                           ? "Guarantee needs this record"
                           : row.arrangement
                             ? PAY_TYPE[row.arrangement] ?? row.arrangement
@@ -536,6 +547,7 @@ export function Targets({ session, affiliateId, initialMonth, embedded = false }
                         : "required"}
                       onChange={(v) => edit(row.affiliate_id,
                         mode === "achieved" ? "actual_videos" : "required_videos", v)}
+                      disabled={closed}
                     />
                     <Cell
                       value={mode === "achieved" ? cells.actual_stories : cells.required_stories}
@@ -545,6 +557,7 @@ export function Targets({ session, affiliateId, initialMonth, embedded = false }
                         : "required"}
                       onChange={(v) => edit(row.affiliate_id,
                         mode === "achieved" ? "actual_stories" : "required_stories", v)}
+                      disabled={closed}
                     />
                     {/*
                      * The export draws one line here, toned by what it says.
@@ -553,9 +566,26 @@ export function Targets({ session, affiliateId, initialMonth, embedded = false }
                      * as its own quieter line.
                      */}
                     <td className="targets__outcome">
-                      <Outcome row={row} month={month} />
-                      <Confirmation row={row} />
-                      <PaceCell row={row} />
+                      {closed ? (
+                        <>
+                          <span className="targets__closed">Before her start</span>
+                          {/* A record made before her start was known stays
+                              visible, and its confirmation can still be taken
+                              back below. */}
+                          {row.achieved !== null && (
+                            <>
+                              <Outcome row={row} month={month} />
+                              <Confirmation row={row} />
+                            </>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <Outcome row={row} month={month} />
+                          <Confirmation row={row} />
+                          <PaceCell row={row} />
+                        </>
+                      )}
                     </td>
                     <td className="targets__updated">
                       {row.recorded_at
@@ -694,12 +724,15 @@ function Cell({
   label,
   suffix,
   onChange,
+  disabled = false,
 }: {
   value: string;
   label: string;
   /** *of 6*, or *required* — what the box beside it is measured against. */
   suffix?: string;
   onChange: (value: string) => void;
+  /** A month before she started with HBA (ADR 0056): nothing to ask of her. */
+  disabled?: boolean;
 }) {
   return (
     <td className="targets__number">
@@ -709,6 +742,7 @@ function Cell({
           inputMode="numeric"
           aria-label={label}
           value={value}
+          disabled={disabled}
           onChange={(event) => onChange(event.target.value)}
         />
         {suffix && <span className="targets__of">{suffix}</span>}
@@ -759,7 +793,7 @@ function describeSave(
   return refused === 0
     ? `${rows} Applied to ${months}.`
     : `${rows} Applied to ${months}. ${refused} left alone — already agreed, ` +
-      `or from before the platform.`;
+      `before the platform, or before her start.`;
 }
 
 

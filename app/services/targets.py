@@ -67,6 +67,26 @@ def _refuse_counts_on_a_backfilled_month(target: MonthlyTarget | None) -> None:
         )
 
 
+def before_her_start(affiliate: AffiliateProfile, month: str) -> bool:
+    """Whether this month is before the month she started with HBA (ADR 0056).
+
+    Only a start that is known counts: from her code on Shopify, or typed on
+    her profile. With none recorded there is nothing to hold a month against.
+    """
+    start = affiliate.collaboration_start_month
+    return start is not None and month < start
+
+
+def _refuse_before_her_start(affiliate: AffiliateProfile, month: str) -> None:
+    """She was not working with HBA before her start, so a target there asks
+    her for work in a month that was never hers (owner, 1 October 2026)."""
+    if before_her_start(affiliate, month):
+        raise ValueError(
+            f"she started with HBA in {affiliate.collaboration_start_month}, so "
+            f"{month} is before her start and has no targets"
+        )
+
+
 def assert_month_recordable(db: Session, affiliate_id: int, month: str) -> None:
     """Refuse to record anything against a month that is already approved.
 
@@ -174,6 +194,7 @@ def set_requirements(
     before = _snapshot(target) if target else None
 
     if target is None:
+        _refuse_before_her_start(affiliate, month)
         target = MonthlyTarget(
             affiliate_id=affiliate.id,
             month=month,
@@ -187,6 +208,9 @@ def set_requirements(
             # The grid sends every row it shows. Asking for what is already
             # asked for is not a change: nothing to write or audit.
             return target
+        # After the no-change return, so a target already on record before her
+        # start can be re-sent as it is; only changing it is refused.
+        _refuse_before_her_start(affiliate, month)
         target.required_videos = int(videos)
         target.required_stories = int(stories)
         target.updated_at = utcnow()
@@ -242,6 +266,7 @@ def record_actuals(
         # other model's confirmation - and a confirmation is what releases a
         # guaranteed minimum - and moved their *Last updated* to today.
         return target
+    _refuse_before_her_start(db.get(AffiliateProfile, target.affiliate_id), target.month)
 
     before = _snapshot(target)
     was_verified = target.is_verified
@@ -513,6 +538,7 @@ def clear_actuals(
 #: Why a month was left out of a year-wide requirement change.
 ALREADY_AGREED = "already_agreed"
 BEFORE_THE_PLATFORM = "before_the_platform"
+BEFORE_HER_START = "before_her_start"
 
 
 def set_requirements_for_year(
@@ -570,6 +596,12 @@ def set_requirements_for_year(
         candidate = f"{year}-{index:02d}"
         existing = get_target(db, affiliate, candidate)
 
+        # **Not a month she was with HBA** (ADR 0056). "The whole year" is her
+        # year from her start; January to March of a model who began in April
+        # were never hers to be asked for anything.
+        if before_her_start(affiliate, candidate):
+            skipped.append({"month": candidate, "why": BEFORE_HER_START})
+            continue
         if existing is not None and existing.is_backfilled:
             skipped.append({"month": candidate, "why": BEFORE_THE_PLATFORM})
             continue

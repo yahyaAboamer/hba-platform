@@ -45,6 +45,7 @@ from app.models.targets import MonthlyTarget
 from app.services.affiliates import list_affiliates
 from app.services.compensation import terms_for
 from app.services.targets import (
+    before_her_start,
     clear_actuals as clear_actuals_service,
     get_target,
     record_actuals,
@@ -229,6 +230,11 @@ def target_grid(
                     arrangement=arrangement,
                 ),
                 "pace": _pace(db, affiliate, month),
+                # ADR 0056: a month before she started with HBA has no
+                # targets. The row stays, so nobody wonders where she went,
+                # and the screen draws it closed with the month she starts.
+                "start_month": affiliate.collaboration_start_month,
+                "before_start": before_her_start(affiliate, month),
             }
             for affiliate, arrangement in (
                 (affiliate, _arrangement(db, affiliate, month))

@@ -99,6 +99,22 @@
   border-color: var(--rule-strong);
 }
 
+/* ADR 0056: a month before she started with HBA. Dimmed and not clickable,
+   with the reason written beside her name, so it reads as closed rather
+   than as an empty row somebody forgot. */
+.targets__input:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.targets__input:disabled:hover {
+  border-color: var(--rule);
+}
+
+.targets__row--closed .targets__of {
+  opacity: 0.45;
+}
+
 .targets__input:focus {
   border-color: var(--focus);
   outline: 2px solid var(--focus);
@@ -202,6 +218,11 @@
    date that exists. */
 .targets__never {
   color: var(--owed);
+}
+
+/* Before her start is not something to act on (ADR 0056), so it is quiet. */
+.targets__closed {
+  color: var(--faint);
 }
 
 /* ── The toolbar ───────────────────────────────────────────────────────────

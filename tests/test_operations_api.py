@@ -1033,3 +1033,46 @@ def test_no_applications_means_no_notice(client):
     """A notice that is always there is furniture, not a notice."""
     keys = {row["key"] for row in client.get("/api/operations/attention").json()["items"]}
     assert "applications_waiting" not in keys
+
+
+def test_a_code_somebody_holds_later_is_listed_with_her(client):
+    """ALI10, 1 October 2026: five January orders before her code was created
+    were listed alone and read as ALI10's whole total. The row now names who
+    holds the code, from when, and how many orders are hers."""
+    affiliate_id = _register_code("ALI10", "2026-04")
+    _add_order("1", "ALI10", month="2026-01")
+    _add_order("2", "ALI10", month="2026-04")
+    _add_order("3", "ALI10", month="2026-05")
+    with engine.begin() as connection:
+        for order_id, month in (("2", "2026-04"), ("3", "2026-05")):
+            connection.execute(
+                text(
+                    "INSERT INTO attributed_order (shopify_order_id, affiliate_id, "
+                    "business_month) VALUES (:i, :a, :m)"
+                ),
+                {"i": order_id, "a": affiliate_id, "m": month},
+            )
+
+    row = next(
+        row
+        for row in client.get("/api/operations/unregistered-codes").json()["codes"]
+        if row["code"] == "ALI10"
+    )
+
+    assert row["order_count"] == 1
+    assert row["unowned_months"] == ["2026-01"]
+    assert row["held_by"] == [
+        {
+            "affiliate_id": affiliate_id,
+            "name": "ALI10",
+            "start_month": "2026-04",
+            "end_month": None,
+            "order_count": 2,
+        }
+    ]
+
+
+def test_a_code_nobody_holds_says_so(client):
+    _add_order("1", "QUIET")
+    row = client.get("/api/operations/unregistered-codes").json()["codes"][0]
+    assert row["held_by"] == []

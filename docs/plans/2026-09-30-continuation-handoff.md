@@ -1,6 +1,40 @@
 # Where the work is — 1 October 2026 (data reset, batches Q1–Q3, Settings audit, Home and emails audit)
 
-## Latest: ALI10 and pay-terms months (1 October, ADR 0055) — **released**
+## Latest: targets before her start, and who holds a code (1 October, ADR 0056) — **local, not deployed**
+
+From the owner's staging check after ADR 0055.
+
+- **Targets (ADR 0056):** a month before her known start has no targets.
+  - The server refuses creating, changing or counting one there. An
+    unchanged re-send is accepted.
+  - *Whole year* skips those months with the reason `before_her_start`.
+  - The grid row stays but is closed: disabled boxes, *Starts April 2026*,
+    and a quiet *Before her start*. A record made earlier stays visible so a
+    confirmation can still be taken back.
+- **Settings → Shopify and sync, *Discount codes belonging to nobody*:** the
+  count was only the unowned orders and read as the code's total (ALI10: 5).
+  - Each code now says who holds it, from when, and how many orders are
+    credited (`held_by`).
+  - The headers read *Orders with no owner* and *Held by*.
+- **Verified:** backend 90/90 files (`REV=adr0056-2`). Frontend 576 tests,
+  build green.
+- **Browser, local throwaway `hba_browser_0056` (now dropped), 1280 dark:**
+  closed rows on Targets for January; the Settings row *YADEL · 1 · January
+  2026 · Youssef Adel, from March 2026 · 10 orders credited*.
+- **ECC review:** 0 high. The medium (records before her start hidden) is
+  fixed; three of the four lows are fixed.
+
+**Waiting on the owner:**
+- Authorisation to deploy.
+- Whether to delete Ali's staging targets for January to March 2026 (4 videos
+  each, set before her start was known).
+- Two findings, not changed:
+  - The Payroll page (`/payroll`, and `/api/payroll/{month}`, which Home also
+    reads) lists models in months before they started, blocked with *No pay
+    terms for this month*.
+  - Its month picker offers months that have not begun.
+
+## Before that: ALI10 and pay-terms months (1 October, ADR 0055) — **released**
 
 | | |
 |---|---|

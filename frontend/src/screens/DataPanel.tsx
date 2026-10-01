@@ -81,8 +81,17 @@ type FailedJob = {
 
 type UnownedCode = {
   code: string;
+  /** Only the orders nobody owns — never the code's whole total. */
   order_count: number;
   unowned_months: string[];
+  /** Who holds the code in its other months, and how many orders are theirs. */
+  held_by?: {
+    affiliate_id: number;
+    name: string;
+    start_month: string;
+    end_month: string | null;
+    order_count: number;
+  }[];
 };
 
 type MailHealth = {
@@ -366,18 +375,19 @@ export function DataPanel({ goLiveMonth }: { goLiveMonth: string | null }) {
             <div className="data__list">
               <h3 className="data__heading">Discount codes belonging to nobody</h3>
               <p className="data__note">
-                These were used on orders and nobody owns them for those months,
-                so the sales count for no one. If a code is HBA's own, add it under{" "}
-                <Link to="/settings?section=codes">Brand codes</Link>. If a model
-                uses it, check the code on her profile - it should be the one she
-                applied with.
+                These were used on orders in months when nobody owns them, so
+                those sales count for no one. Only those orders are counted here:
+                a code a model holds from a later month is listed with her, and
+                her own orders are on her profile. If a code is HBA's own, add it
+                under <Link to="/settings?section=codes">Brand codes</Link>.
               </p>
               <table className="table">
                 <thead>
                   <tr>
                     <th>Code</th>
-                    <th className="numeric">Orders</th>
+                    <th className="numeric">Orders with no owner</th>
                     <th>Months with no owner</th>
+                    <th>Held by</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -386,6 +396,22 @@ export function DataPanel({ goLiveMonth }: { goLiveMonth: string | null }) {
                       <td><span className="code">{row.code}</span></td>
                       <td className="numeric">{row.order_count}</td>
                       <td className="data__months">{row.unowned_months.map(formatMonth).join(", ")}</td>
+                      <td className="data__months">
+                        {/* Owner, 1 October 2026: ALI10's five January orders
+                            read as the code's whole total. Naming who holds it,
+                            from when and with how many orders, says otherwise. */}
+                        {row.held_by && row.held_by.length > 0
+                          ? row.held_by.map((holder, index) => (
+                              <span key={`${holder.affiliate_id}-${holder.start_month}-${index}`} className="data__holder">
+                                <Link to={`/affiliates/${holder.affiliate_id}`}>{holder.name}</Link>
+                                {holder.end_month
+                                  ? `, ${formatMonth(holder.start_month)} – ${formatMonth(holder.end_month)}`
+                                  : `, from ${formatMonth(holder.start_month)}`}
+                                {` · ${holder.order_count} ${holder.order_count === 1 ? "order" : "orders"} credited`}
+                              </span>
+                            ))
+                          : "Nobody"}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

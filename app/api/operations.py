@@ -218,6 +218,7 @@ def unregistered_codes(
         .mappings()
         .all()
     )
+    held = _who_holds(db, [row["code"] for row in rows])
     return {
         "codes": [
             {
@@ -226,10 +227,60 @@ def unregistered_codes(
                 "first_seen": _isoformat(row["first_seen"]),
                 "last_seen": _isoformat(row["last_seen"]),
                 "unowned_months": list(row["unowned_months"]),
+                # **Who holds it in its other months** (owner, 1 October
+                # 2026). ALI10 was listed with its five January orders and
+                # nothing else, and read as "ALI10 has five orders" - while
+                # the 99 from April were Ali's. A code somebody holds is
+                # named with them, so the row says only part of it is unowned.
+                "held_by": held.get(row["code"], []),
             }
             for row in rows
         ]
     }
+
+
+def _who_holds(db: Session, codes: list[str]) -> dict[str, list[dict]]:
+    """For each code, who holds it, over which months, and how many of its
+    orders are theirs. One query for every code on the list."""
+    if not codes:
+        return {}
+    rows = (
+        db.execute(
+            text(
+                """
+                SELECT p.code, p.affiliate_id, a.name, p.start_month, p.end_month,
+                       (SELECT count(*) FROM attributed_order ao
+                          JOIN order_index o
+                            ON o.shopify_order_id = ao.shopify_order_id
+                         WHERE ao.affiliate_id = p.affiliate_id
+                           AND p.code = ANY(SELECT upper(c) FROM unnest(o.discount_codes) c)
+                           AND o.business_month >= p.start_month
+                           AND (p.end_month IS NULL
+                                OR o.business_month <= p.end_month)
+                       ) AS order_count
+                FROM discount_code_period p
+                JOIN affiliate_profile a ON a.id = p.affiliate_id
+                WHERE p.code = ANY(:codes)
+                ORDER BY p.code, p.start_month
+                """
+            ),
+            {"codes": codes},
+        )
+        .mappings()
+        .all()
+    )
+    held: dict[str, list[dict]] = {}
+    for row in rows:
+        held.setdefault(row["code"], []).append(
+            {
+                "affiliate_id": row["affiliate_id"],
+                "name": row["name"],
+                "start_month": row["start_month"],
+                "end_month": row["end_month"],
+                "order_count": row["order_count"],
+            }
+        )
+    return held
 
 
 @router.post("/verify-code")
