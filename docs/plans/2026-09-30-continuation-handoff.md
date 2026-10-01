@@ -32,8 +32,21 @@ From the owner's staging check after ADR 0055.
 - **Staging data:** Ali's January to March 2026 targets (4 videos, 8 stories
   each, no counts) were deleted in one guarded transaction. Each has a
   `target.deleted` audit row holding what it was.
-- **Release:** deploy to staging and production ordered; see the release line
-  below once done.
+- **Released:** `1fe852a` and `111212a` fast-forwarded to `origin/main` and
+  `origin/production` on the owner's order.
+  - All four deploys (staging and production, app and worker) SUCCESS on
+    `111212a`, 1 October ~17:58 Cairo. No migration.
+  - `/api/health/ready` 200 on both.
+  - Read back on staging: ALI10 is *5 with no owner (2026-01), held by Ali
+    Abunahla from 2026-04, 99 credited*.
+  - Backend 90/90 (`REV=adr0056-3`); frontend 576, build green.
+- **Raised with the owner:** the full suite takes about an hour on this
+  machine. Pytest itself is about 15 minutes; the rest is one Python start and
+  one database wipe per file, and about 0.4 GB of free memory. Options put to
+  him:
+  - CI on GitHub Actions (recommended);
+  - grouping files per process, which reopens a retired setup;
+  - freeing memory.
 
 ## Before that: ALI10 and pay-terms months (1 October, ADR 0055) — **released**
 
