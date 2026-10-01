@@ -203,13 +203,7 @@ export function MyMonth() {
           <span className="home__link">See the detail →</span>
         </Link>
       ))}
-      {body.waiting_on?.length > 0 && (
-        <div className="home__waiting">
-          {body.waiting_on.map((row) => (
-            <p key={row.text}>{row.text}</p>
-          ))}
-        </div>
-      )}
+      {body.waiting_on?.length > 0 && <Waiting rows={body.waiting_on} />}
 
       <Orders home={home} />
       <Tiles home={home} />
@@ -233,6 +227,39 @@ export function MyMonth() {
   );
 }
 
+/**
+ * What the month is waiting on, behind an ⓘ (owner, 1 October 2026): the
+ * sentences read as instructions under the card, and they are not hers to act
+ * on - every one today is HBA's move, which the line says.
+ */
+function Waiting({ rows }: { rows: MyEarnings["waiting_on"] }) {
+  const [open, setOpen] = useState(false);
+  const whose = rows.every((row) => row.who === "hba") ? "Waiting on HBA" : "Waiting";
+  return (
+    <div className="home__waiting">
+      <span className="home__waiting-head">
+        <span>{whose}</span>
+        <button
+          type="button"
+          className="home__info"
+          aria-label="What this month is waiting on"
+          aria-expanded={open}
+          onClick={() => setOpen(!open)}
+        >
+          i
+        </button>
+      </span>
+      {open && (
+        <div className="home__why">
+          {rows.map((row) => (
+            <p key={row.text}>{row.text}</p>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Earned, how, how far through the month - and when it arrives. */
 function Hero({
   home,
@@ -246,6 +273,8 @@ function Hero({
   const body = home.earnings;
   const rate = body.commission_rate_bp;
   const compare = home.comparison;
+  // The guaranteed minimum's rule, behind its ⓘ (owner, 1 October 2026).
+  const [rule, setRule] = useState(false);
   const transfer = home.payments.payments.find((row) =>
     row.settles.some((part) => part.month === home.month),
   );
@@ -257,7 +286,26 @@ function Hero({
 
   return (
     <section className="home__card home__hero">
-      <span className="home__eyebrow">{noFigure ? "Sales" : HERO_LABEL[state]}</span>
+      {body.guarantee && !noFigure ? (
+        /*
+         * The rule's ⓘ sits by the figure it explains. Beside the tile's own
+         * label it pushed *Guaranteed minimum* onto two lines at 390.
+         */
+        <span className="home__hero-head">
+          <span className="home__eyebrow">{HERO_LABEL[state]}</span>
+          <button
+            type="button"
+            className="home__info"
+            aria-label="How the guaranteed minimum works"
+            aria-expanded={rule}
+            onClick={() => setRule(!rule)}
+          >
+            i
+          </button>
+        </span>
+      ) : (
+        <span className="home__eyebrow">{noFigure ? "Sales" : HERO_LABEL[state]}</span>
+      )}
       <div className="home__figure">
         <span className="home__amount">
           {noFigure ? body.sales.counted : <Money piastres={body.amount_piastres!} />}
@@ -307,9 +355,11 @@ function Hero({
                 </span>
               </div>
             </div>
-            <span className="home__split-rule">
-              You're paid the higher of the two. The minimum counts once your targets are met and checked.
-            </span>
+            {rule && (
+              <p className="home__why">
+                You're paid the higher of the two. The minimum counts once your targets are met and checked.
+              </p>
+            )}
           </>
         ) : noFigure ? (
           body.note && <span className="home__sub">{body.note}</span>

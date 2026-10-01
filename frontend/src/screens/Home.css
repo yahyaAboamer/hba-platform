@@ -204,14 +204,57 @@ a.home__card:hover {
   color: var(--faint);
 }
 
-/* Guaranteed minimum: the two tiles do not add up, and this line says what
-   they do instead. */
-.home__split-rule {
-  display: block;
-  margin-top: 8px;
-  font-size: 13px;
-  line-height: 1.4;
+/* The eyebrow with the guaranteed minimum's ⓘ at the end of its row. */
+.home__hero-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* The portal's ⓘ, as Orders and Targets draw it: 24px, the web's minimum
+   target (WCAG 2.2 AA), and the accent when what it explains is open. */
+.home__info {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--rule-strong);
+  border-radius: 50%;
+  background: transparent;
   color: var(--quiet);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.home__info[aria-expanded="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.home__info:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* What an ⓘ opens. */
+.home__why {
+  margin: 10px 0 0;
+  padding: 12px 13px;
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--quiet);
+}
+
+.home__why p {
+  margin: 0;
+}
+
+.home__why p + p {
+  margin-top: 6px;
 }
 
 .home__compare {
@@ -338,8 +381,19 @@ a.home__card:hover {
   color: var(--owed);
 }
 
-.home__waiting p {
-  margin: 0;
+/* Under the card the page is the background, so what it opens is plain
+   text beneath the line rather than a box the colour of the page. */
+.home__waiting .home__why {
+  margin-top: 6px;
+  padding: 0;
+  background: none;
+}
+
+/* What the month waits on: one quiet line and its ⓘ. */
+.home__waiting-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 13px;
   color: var(--quiet);
 }

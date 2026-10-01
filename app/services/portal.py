@@ -122,11 +122,8 @@ WAITING_ON: dict[str, dict[str, str]] = {
     },
     "no_target_recorded_for_this_month": {
         "who": "hba",
-        "text": (
-            "Nobody has recorded what you posted this month yet. HBA does "
-            "that - if they have asked you for your numbers, sending them is "
-            "what moves it along."
-        ),
+        # Owner, 1 October 2026: the sentence alone, behind the home card's ⓘ.
+        "text": "Nobody has recorded what you posted this month yet.",
     },
     "targets_achieved_but_not_verified": {
         "who": "hba",

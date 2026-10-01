@@ -260,12 +260,40 @@ describe("Home", () => {
     expect(screen.getByText("targets not recorded yet")).toBeTruthy();
     expect(screen.getByText("Commission")).toBeTruthy();
     expect(screen.getByText("10% of EGP 11,232.87 in sales")).toBeTruthy();
+    // The rule is behind the minimum's ⓘ (owner, 1 October 2026).
+    expect(screen.queryByText(/paid the higher of the two/)).toBeNull();
+    const info = screen.getByRole("button", { name: "How the guaranteed minimum works" });
+    expect(info.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(info);
+    expect(info.getAttribute("aria-expanded")).toBe("true");
     expect(screen.getByText(/paid the higher of the two/)).toBeTruthy();
     // The commission is the figure, so it carries the accent.
     expect(
       screen.getByText("Commission").parentElement?.className,
     ).toContain("home__split--grows");
     expect(screen.queryByText(/% commission/)).toBeNull();
+  });
+
+  /*
+   * Owner, 1 October 2026: what the month waits on was a paragraph under the
+   * card. It is one line now, and the sentence is behind its ⓘ.
+   */
+  it("keeps what the month is waiting on behind an ⓘ", async () => {
+    const sentence = "Nobody has recorded what you posted this month yet.";
+    fetchMock.mockImplementation((url: string) =>
+      String(url).includes("/api/me/home/")
+        ? ok({
+            ...home,
+            earnings: { ...home.earnings, waiting_on: [{ who: "hba", text: sentence }] },
+          })
+        : ok({}),
+    );
+    renderHome();
+    await waitFor(() => expect(screen.getByText("Waiting on HBA")).toBeTruthy());
+
+    expect(screen.queryByText(sentence)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "What this month is waiting on" }));
+    expect(screen.getByText(sentence)).toBeTruthy();
   });
 
   it("says in words when the minimum is what is paid", async () => {
@@ -279,7 +307,7 @@ describe("Home", () => {
 
     expect(screen.getByText("EGP 112.30")).toBeTruthy();
     expect(
-      screen.getByText("Guaranteed minimum").parentElement?.className,
+      screen.getByText("Guaranteed minimum").closest(".home__split > div")?.className,
     ).toContain("home__split--grows");
   });
 
