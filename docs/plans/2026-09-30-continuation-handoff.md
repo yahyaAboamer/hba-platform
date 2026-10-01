@@ -1,6 +1,52 @@
 # Where the work is — 1 October 2026 (data reset, batches Q1–Q3, Settings audit, Home and emails audit)
 
-## Latest: the Home and emails audit (1 October) — **released**
+## Latest: ALI10 and pay-terms months (1 October, ADR 0055) — **local, not merged or deployed**
+
+**ALI10 diagnosis (read-only on staging and Shopify).**
+- The sync is fine: `order_index` has 104 ALI10 orders from January to
+  September, and 99 are attributed to Ali from April to September. That equals
+  Shopify's *99 used*; September has 11.
+- The *5 January orders* the owner saw are under Settings → *Discount codes
+  belonging to nobody*.
+- Cause: Shopify's ALI10 is a discount **recreated 4 April 2026** whose
+  `startsAt` (Feb 2025) was copied from SARAED. Her start used `startsAt`
+  (→ 2026-01), but her code's ownership used `createdAt` (→ 2026-04).
+- Shopify's usage count covers only the current discount object. ALI10 orders
+  exist on Shopify from October 2025.
+- Production has no models, so nothing there is affected.
+
+**Shipped locally:**
+- **Code ownership:** `start_month_for(created_at, starts_at)` puts the start
+  date first, the same rule as her start month.
+- **Pay terms, server:** only months from her start (once known) to the
+  working month. A start after the working month is refused, and so is a
+  change before her recorded start. The run reaching the working month is
+  stored open-ended, so each new month inherits it.
+- **Pay terms, editor:** says when she started and why (`start_source`,
+  `code`). The "Ahead" wording is gone.
+- **Migration `d9e4f7a50009`** (data only, audited, idempotent; downgrade is a
+  no-op):
+  - moves ALI10's ownership start from 2026-04 to 2026-01, after which the
+    hourly orphan sweep attaches January;
+  - opens Sara's last run, which ended 2026-10.
+  - Rehearsed up/down/up on a throwaway database only.
+- **Tests and review:** 8 new backend tests, 5 new frontend tests. The ECC
+  reviewer found 0 high; its medium and lows were fixed or documented.
+- **Verified:** backend **90/90 files** through `run-suite.sh`
+  (`REV=adr0055-2`). Frontend 576 tests, build green.
+- **Browser, local throwaway `hba_browser_0055` (now dropped), 1280 dark:**
+  Youssef (start March) shows the start line, Jan–Feb *Before start*,
+  Nov–Dec *Not yet*. October set to 12% saved as *October 2026 onwards*.
+
+**Waiting on the owner:** authorisation to merge and deploy. Merge and deploy
+are separate permissions.
+
+**Not done:**
+- Changing her start month on her profile does not move her code's ownership.
+- `mark_verified` may still move a re-opened period of a returning model (from
+  before this change).
+
+## Before that: the Home and emails audit (1 October) — **released**
 
 | | |
 |---|---|

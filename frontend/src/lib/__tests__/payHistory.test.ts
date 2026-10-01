@@ -5,6 +5,7 @@ import {
   outcomesFrom,
   periodsToWrite,
   runs,
+  startLine,
   toBasisPoints,
 } from "../payHistory";
 import type { Arrangement, MonthRow, PayHistory } from "../payHistory";
@@ -305,5 +306,43 @@ describe("what gets written when the route replaces everything", () => {
       from: "2026-01",
       to: "2026-02",
     });
+  });
+});
+
+describe("startLine (ADR 0055)", () => {
+  const fmt = (month: string) => `<${month}>`;
+  const base = { arrangeable_from: "2026-01", working_month: "2026-10", code: "ALI10" };
+
+  it("says she started when her code started on Shopify, and names it", () => {
+    const line = startLine({ ...base, start_source: "code" }, fmt);
+    expect(line.lead).toBe("She started in <2026-01>, from her code ALI10 on Shopify.");
+    expect(line.range).toBe(
+      "Terms can be set from <2026-01> to <2026-10>. Each new month takes the terms of the month before it when it begins.",
+    );
+  });
+
+  it("says a start typed on her profile came from there", () => {
+    expect(startLine({ ...base, start_source: "recorded" }, fmt).lead).toBe(
+      "She started in <2026-01>, as recorded on her profile.",
+    );
+  });
+
+  it("says when nothing is known, and offers only the working month", () => {
+    const line = startLine({ arrangeable_from: "2026-10", working_month: "2026-10", start_source: "none" }, fmt);
+    expect(line.lead).toContain("No start month is known yet");
+    expect(line.range.startsWith("Terms can be set for <2026-10>.")).toBe(true);
+  });
+
+  it("says so when her start has not arrived yet", () => {
+    expect(startLine({ ...base, arrangeable_from: "2026-11", start_source: "code" }, fmt)).toEqual({
+      lead: "She starts in <2026-11>.",
+      range: "Her terms can be set once <2026-11> begins.",
+    });
+  });
+
+  it("falls back to her first order when no start is recorded", () => {
+    expect(startLine({ ...base, arrangeable_from: "2026-03", start_source: "first_sale" }, fmt).lead).toBe(
+      "No start month is recorded, so terms start at her first order, in <2026-03>.",
+    );
   });
 });

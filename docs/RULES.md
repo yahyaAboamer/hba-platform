@@ -144,14 +144,21 @@ payroll without touching a maintainer screen.
 - **A model's start month is her code's start on Shopify** (ADR 0053): the
   code's start date, else its creation date, in Cairo, never before January
   2026. Written when Shopify confirms her code, only if none is recorded;
-  staff may still change it on her profile. **Her code is the one she applied
+  staff may still change it on her profile. **Her code is hers from that same
+  month** (ADR 0055): its ownership starts by the same rule, never at the
+  discount's creation date alone, so a recreated or duplicated discount keeps
+  the orders its code took before. **Her code is the one she applied
   with and is never replaced** - there is no route to register another or move
   her onto a new one. A typo in an unconfirmed code may still be corrected.
 - **Nobody grants access they do not hold** (`can_grant`). An invitation, a
   resend and a withdrawal are all held to it; nobody changes or suspends their
   own staff account.
-- **Pay terms may be set up to twelve months ahead** (ADR 0052). An approved
-  month still cannot change.
+- **Pay terms are set only for months that have begun, from her start month**
+  (ADR 0055, replacing 0052's *twelve months ahead*). The server refuses an
+  arrangement starting after the working month, or, once her start is known,
+  one that changes a month before it. The latest arrangement runs on until further notice, so
+  each new month takes the terms of the month before it. An approved month
+  still cannot change.
 - **Three compensation types, not one.** `commission`,
   `fixed_plus_commission` (**both** are paid — the one most often got wrong),
   `base_guarantee` (`max(commission, base)`, only where targets were met *and*

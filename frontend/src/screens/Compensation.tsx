@@ -14,6 +14,7 @@ import {
   outcomesFrom,
   periodsToWrite,
   runs,
+  startLine,
   toBasisPoints,
   MISSING_REASON,
 } from "../lib/payHistory";
@@ -134,12 +135,14 @@ export function Compensation() {
   }
   if (data === null || year === null) return <p className="empty">Loading…</p>;
 
+  const start = startLine(data, formatMonth);
   const years = [...new Set(data.months.map((row) => row.month.slice(0, 4)))];
   const monthsOfYear = data.months.filter((row) => row.month.startsWith(year));
   /*
    * The export draws a whole year of twelve. The server lists months up to
-   * twelve past the working month (ADR 0052); any of the year beyond that is
-   * drawn as tiles that cannot be chosen yet, so a row is never half empty.
+   * the working month (ADR 0055); the rest of the year is drawn as tiles that
+   * cannot be chosen, so a row is never half empty. They take the month
+   * before's terms when they begin.
    */
   const laterThisYear = Array.from({ length: 12 }, (_, index) => `${year}-${String(index + 1).padStart(2, "0")}`)
     .filter((month) => !monthsOfYear.some((row) => row.month === month));
@@ -261,8 +264,8 @@ export function Compensation() {
       await api.put(`/api/affiliates/${id}/pay-history`, {
         periods: periodsToWrite(data.months, next).map((run) => ({
           start_month: run.from,
-          // A run reaching the last listed month runs until further notice.
-          // The list goes twelve months past the working month (ADR 0052).
+          // A run reaching the last listed month - the working month - runs
+          // until further notice, so the next month takes it (ADR 0055).
           end_month: run.to === (data.horizon_month ?? data.working_month) ? null : run.to,
           compensation_type: run.kind,
           commission_rate_bp: run.rateBp,
@@ -308,16 +311,14 @@ export function Compensation() {
               <ul>
                 {history.map((run) => {
                   const current = run.from <= data.working_month && run.to >= data.working_month;
-                  // ADR 0052: a run may start after the working month, and
-                  // one reaching the last listed month has no end yet.
-                  const ahead = run.from > data.working_month;
+                  // A run reaching the working month has no end yet (ADR 0055).
                   const openEnded = run.to === (data.horizon_month ?? data.working_month);
                   return (
                     <li key={run.from}>
                       <span className="terms__run-head">
                         <span>{OPTION_LABEL[run.kind]}</span>
-                        <span className={current || ahead ? "terms__current" : "terms__earlier"}>
-                          {current ? "Current" : ahead ? "Ahead" : "Earlier"}
+                        <span className={current ? "terms__current" : "terms__earlier"}>
+                          {current ? "Current" : "Earlier"}
                         </span>
                       </span>
                       <span className="terms__run-detail">{describeRun(run)}</span>
@@ -352,6 +353,12 @@ export function Compensation() {
             </span>
           </div>
 
+          {/* ADR 0055: when she started and which months can be arranged,
+              before anybody picks one. */}
+          <p className="terms__start">
+            <strong>{start.lead}</strong> {start.range}
+          </p>
+
           <div className="terms__months">
             {monthsOfYear.map((row) => {
               const before = row.month < startMonth;
@@ -372,7 +379,7 @@ export function Compensation() {
                   <span className="terms__month-name">{shortMonth(row.month)}</span>
                   <span className="terms__month-what">{before ? "Before start" : tileWord(set[row.month])}</span>
                   <span className={row.approved ? "terms__month-note terms__month-note--locked" : "terms__month-note"}>
-                    {row.approved ? "Approved" : before ? "—" : row.future ? "Ahead" : ""}
+                    {row.approved ? "Approved" : before ? "—" : ""}
                   </span>
                 </button>
               );
@@ -514,11 +521,9 @@ export function Compensation() {
                   </tbody>
                 </table>
                 <p className="terms__note">
-                  {review.some((row) => row.month <= data.working_month)
-                    ? "Open months change their estimates on her Home page as soon as this is applied. "
-                    : ""}
-                  {review.some((row) => row.month > data.working_month)
-                    ? "Months ahead apply when they arrive. "
+                  Open months change their estimates on her Home page as soon as this is applied.{" "}
+                  {review.some((row) => row.month === data.working_month)
+                    ? `From ${formatMonth(data.working_month)} these terms carry on into each new month. `
                     : ""}
                   Approved months are not touched, and she is not notified.
                 </p>

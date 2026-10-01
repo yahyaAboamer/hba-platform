@@ -779,6 +779,28 @@ def test_rechecking_corrects_the_start_month(client, _shopify):
     assert response.json()["start_month"] == "2026-07"
 
 
+def test_a_recreated_code_is_hers_from_its_start_not_its_creation(client, _shopify):
+    """ALI10, 1 October 2026 (ADR 0055): a discount recreated on Shopify in April
+    with a start in February 2025. She started in January and so does her code,
+    or January's orders on the earlier ALI10 belong to nobody."""
+    from datetime import datetime, timezone
+
+    _shopify_says(_shopify, exists=False)
+    affiliate = _register(client)
+    _give_code(affiliate["id"], "ALI10", verified=False)
+
+    _shopify_says(
+        _shopify,
+        exists=True,
+        created_at=datetime(2026, 4, 4, 17, 33, tzinfo=timezone.utc),
+        starts_at=datetime(2025, 2, 26, 23, 39, tzinfo=timezone.utc),
+    )
+    response = client.post(f"/api/affiliates/{affiliate['id']}/recheck-code", json={})
+
+    assert response.json()["start_month"] == "2026-01"
+    assert _start_of(client, affiliate["id"]) == "2026-01"
+
+
 def test_a_recheck_that_still_finds_nothing_changes_nothing(client, _shopify):
     _shopify_says(_shopify, exists=False)
     affiliate = _register(client)
@@ -2130,33 +2152,140 @@ def test_the_guards_still_refuse_a_delete_outside_an_erase(client):
             connection.execute(text("DELETE FROM audit_event"))
 
 
-def test_terms_can_be_set_up_to_a_year_ahead(client):
-    """ADR 0052: an agreed raise from next month is entered the day it is agreed."""
+def test_only_months_that_have_begun_are_offered(client):
+    """ADR 0055, replacing 0052's twelve months ahead: the editor lists months up
+    to the working month and no further."""
     affiliate = _register(client)
     body = client.get(f"/api/affiliates/{affiliate['id']}/pay-history").json()
-    working = body["working_month"]
-    horizon = body["horizon_month"]
 
-    months = [row["month"] for row in body["months"]]
-    assert months[-1] == horizon
-    assert all(row["future"] == (row["month"] > working) for row in body["months"])
-    ahead = next(row["month"] for row in body["months"] if row["future"])
+    assert body["horizon_month"] == body["working_month"]
+    assert body["months"][-1]["month"] == body["working_month"]
+    assert not any(row["future"] for row in body["months"])
 
-    # 8% until the month before `ahead`, 10% from `ahead` onwards.
+
+def test_terms_for_a_month_that_has_not_begun_are_refused(client):
+    from app.core.businesstime import month_add
+
+    affiliate = _register(client)
+    working = client.get(f"/api/affiliates/{affiliate['id']}/pay-history").json()["working_month"]
+
     response = _history(
         client,
         affiliate["id"],
         [
             {"start_month": "2026-01", "end_month": working, **COMMISSION, "commission_rate_bp": 800},
-            {"start_month": ahead, "end_month": None, **COMMISSION},
+            {"start_month": month_add(working, 1), "end_month": None, **COMMISSION},
         ],
     )
+
+    assert response.status_code == 400
+    assert "has not begun" in response.json()["detail"]
+    assert client.get(f"/api/affiliates/{affiliate['id']}/pay-history").json()["periods"] == []
+
+
+def test_the_terms_reaching_this_month_run_on_into_the_next(client):
+    """When next month begins it takes this month's terms by itself (ADR 0055).
+    An end at the working month would leave it with nothing, so it is stored
+    until further notice."""
+    from app.core.businesstime import month_add
+    from app.db import SessionLocal
+    from app.models.affiliates import AffiliateProfile
+    from app.services.compensation import terms_for
+
+    affiliate = _register(client)
+    working = client.get(f"/api/affiliates/{affiliate['id']}/pay-history").json()["working_month"]
+
+    response = _history(
+        client,
+        affiliate["id"],
+        [{"start_month": "2026-01", "end_month": working, **COMMISSION}],
+    )
+
     assert response.status_code == 200, response.text
-    later = client.get(f"/api/affiliates/{affiliate['id']}/pay-history").json()
-    by_month = {row["month"]: row["terms"] for row in later["months"]}
-    assert by_month[working]["commission_rate_bp"] == 800
-    assert by_month[ahead]["commission_rate_bp"] == 1000
-    assert by_month[horizon]["commission_rate_bp"] == 1000
+    assert response.json()["periods"][0]["end_month"] is None
+    with SessionLocal() as db:
+        profile = db.get(AffiliateProfile, affiliate["id"])
+        assert terms_for(db, profile, month_add(working, 1)).commission_rate_bp == 1000
+
+
+def test_two_runs_that_overlap_are_reported_as_overlapping(client):
+    """Running the latest arrangement on happens after the overlap check, so the
+    message names the overlap rather than an open-ended run."""
+    affiliate = _register(client)
+    working = client.get(f"/api/affiliates/{affiliate['id']}/pay-history").json()["working_month"]
+
+    response = _history(
+        client,
+        affiliate["id"],
+        [
+            {"start_month": "2026-01", "end_month": working, **COMMISSION},
+            {"start_month": "2026-08", "end_month": None, **COMMISSION, "commission_rate_bp": 1200},
+        ],
+    )
+
+    assert response.status_code == 400
+    assert "overlap" in response.json()["detail"]
+
+
+def _start_her_in(client, affiliate_id, month):
+    response = client.patch(
+        f"/api/affiliates/{affiliate_id}",
+        json={"collaboration_start_month": month, "collaboration_start_month_set": True},
+    )
+    assert response.status_code == 200, response.text
+
+
+def test_terms_before_her_known_start_are_refused(client):
+    """She was not with HBA before her start, so a month there is not hers to
+    be paid for (ADR 0055)."""
+    affiliate = _register(client)
+    _start_her_in(client, affiliate["id"], "2026-03")
+
+    refused = _history(client, affiliate["id"], [{"start_month": "2026-01", "end_month": None, **COMMISSION}])
+    assert refused.status_code == 400
+    assert "before her start" in refused.json()["detail"]
+
+    accepted = _history(client, affiliate["id"], [{"start_month": "2026-03", "end_month": None, **COMMISSION}])
+    assert accepted.status_code == 200, accepted.text
+
+
+def test_terms_already_on_record_before_her_start_are_kept(client):
+    """The screen re-sends her whole history. Months before her start that come
+    back unchanged are not a change, and must not block one after it."""
+    affiliate = _register(client)
+    first = _history(client, affiliate["id"], [{"start_month": "2026-01", "end_month": None, **COMMISSION}])
+    assert first.status_code == 200, first.text
+    _start_her_in(client, affiliate["id"], "2026-03")
+
+    response = _history(
+        client,
+        affiliate["id"],
+        [
+            {"start_month": "2026-01", "end_month": "2026-04", **COMMISSION},
+            {"start_month": "2026-05", "end_month": None, **COMMISSION, "commission_rate_bp": 1200},
+        ],
+    )
+
+    assert response.status_code == 200, response.text
+    assert [period["start_month"] for period in response.json()["periods"]] == ["2026-01", "2026-05"]
+
+
+def test_the_editor_says_when_she_started_and_why(client, _shopify):
+    from datetime import datetime, timezone
+
+    affiliate = _register(client)
+    path = f"/api/affiliates/{affiliate['id']}/pay-history"
+    assert client.get(path).json()["start_source"] == "none"
+
+    _give_code(affiliate["id"], "NOUR10", verified=False)
+    _shopify_says(_shopify, starts_at=datetime(2026, 2, 3, tzinfo=timezone.utc))
+    client.post(f"/api/affiliates/{affiliate['id']}/recheck-code", json={})
+    body = client.get(path).json()
+    assert (body["arrangeable_from"], body["start_source"], body["code"]) == ("2026-02", "code", "NOUR10")
+
+    _start_her_in(client, affiliate["id"], "2026-03")
+    body = client.get(path).json()
+    assert (body["arrangeable_from"], body["start_source"]) == ("2026-03", "recorded")
 
 
 

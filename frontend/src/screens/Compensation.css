@@ -590,6 +590,23 @@
   border-top: 1px solid var(--rule);
 }
 
+/* ADR 0055: when she started, and which months can be arranged. */
+.terms__start {
+  margin: 12px 0 0;
+  padding: 11px 13px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--quiet);
+}
+
+.terms__start strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
 .terms__mixed {
   margin: 10px 0 0;
   padding: 11px 13px;

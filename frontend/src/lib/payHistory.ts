@@ -28,7 +28,8 @@ export type MonthRow = {
   approved: boolean;
   /** Before go-live: a guaranteed minimum here records an outcome (ADR 0036). */
   settled_outside: boolean;
-  /** Not reached yet: terms may be set ahead, up to twelve months (ADR 0052). */
+  /** Not reached yet. Never listed since ADR 0055: months that have not begun
+   *  are not arranged, they take the month before's terms when they begin. */
   future?: boolean;
   terms: Terms | null;
   outcome: "met" | "missed" | null;
@@ -76,7 +77,8 @@ export type PayHistory = {
   affiliate_id: number;
   name: string;
   working_month: string;
-  /** The last month listed. A run reaching it is saved open-ended (ADR 0052). */
+  /** The last month listed: the working month (ADR 0055). A run reaching it
+   *  is saved open-ended, so each new month takes its terms when it begins. */
   horizon_month?: string;
   go_live_month: string | null;
   /** Her first month with an order. `null` for a model who has never sold. */
@@ -92,10 +94,55 @@ export type PayHistory = {
    * and a salary is exactly what those months need.
    */
   arrangeable_from: string;
+  /** Where `arrangeable_from` came from (ADR 0055): her code's start on
+   *  Shopify, her profile, her first order, or nothing yet. */
+  start_source?: StartSource;
+  /** The code she holds now, for the line that names it. */
+  code?: string | null;
   months: MonthRow[];
   periods: Terms[];
   readiness: Readiness;
 };
+
+export type StartSource = "code" | "recorded" | "first_sale" | "none";
+
+/**
+ * When she started, where that came from, and which months can be arranged.
+ *
+ * ADR 0055: the owner set terms without seeing her start, and could put them
+ * on months she was not yet working, or on months that had not begun. The
+ * grid already refuses both; this says so before anybody tries.
+ */
+export function startLine(
+  body: Pick<PayHistory, "arrangeable_from" | "working_month" | "start_source" | "code">,
+  formatMonth: (month: string) => string,
+): { lead: string; range: string } {
+  const start = formatMonth(body.arrangeable_from);
+  const working = formatMonth(body.working_month);
+  // Her code may be set to start next month on Shopify. Nothing is hers yet.
+  if (body.arrangeable_from > body.working_month) {
+    return {
+      lead: `She starts in ${start}.`,
+      range: `Her terms can be set once ${start} begins.`,
+    };
+  }
+  const lead =
+    body.start_source === "code"
+      ? `She started in ${start}, from ${body.code ? `her code ${body.code}` : "her code"} on Shopify.`
+      : body.start_source === "recorded"
+        ? `She started in ${start}, as recorded on her profile.`
+        : body.start_source === "first_sale"
+          ? `No start month is recorded, so terms start at her first order, in ${start}.`
+          : `No start month is known yet. Confirm her code to set it; until then terms start in ${start}.`;
+  const range =
+    body.arrangeable_from === body.working_month
+      ? `Terms can be set for ${working}.`
+      : `Terms can be set from ${start} to ${working}.`;
+  return {
+    lead,
+    range: `${range} Each new month takes the terms of the month before it when it begins.`,
+  };
+}
 
 /** Each reason, as the person reading it would say it. */
 export const MISSING_REASON: Record<ReadinessMonth["missing"][number], string> = {

@@ -64,6 +64,7 @@ from app.services.codes import (
 from app.services.applications import REQUIRED_PAYOUT_FIELDS
 from app.services.compensation import (
     all_terms,
+    arrangeable_from,
     replace_pay_history,
     terms_for,
 )
@@ -566,7 +567,8 @@ def create_house_account_route(
             db,
             affiliate,
             body.code,
-            start_month_for(found["created_at"]),
+            # ADR 0055: the code's start date first, as for her start month.
+            start_month_for(found["created_at"], found.get("starts_at")),
             OPEN_ENDED,
             verified_at=utcnow() if found["exists"] else None,
             actor_id=actor.id,
@@ -853,7 +855,9 @@ def recheck_code_route(
         raise HTTPException(502, f"Could not reach Shopify: {exc}") from exc
 
     verified_at = utcnow() if found["exists"] else None
-    start_month = start_month_for(found["created_at"])
+    # ADR 0055: the code's start date first, the same rule as her start month.
+    # Its creation date alone cut ALI10 off at a recreation in April.
+    start_month = start_month_for(found["created_at"], found.get("starts_at"))
 
     try:
         if body.code is not None and normalise_code(body.code) != period.code:
@@ -979,6 +983,36 @@ class PayHistoryBody(BaseModel):
     outcomes: dict[str, str] = Field(default_factory=dict)
 
 
+def _start_source(db: Session, affiliate: AffiliateProfile, sold_in: set[str]) -> str:
+    """Where her first arrangeable month came from: `code`, `recorded`,
+    `first_sale` or `none` (ADR 0055).
+
+    Read from the audit entry that last set her start, which is the only place
+    that says whether Shopify or a person gave it (ADR 0053 writes
+    ``"from": "shopify_code"`` there).
+    """
+    from app.models.audit import AuditEvent
+
+    if affiliate.collaboration_start_month is None:
+        return "first_sale" if sold_in else "none"
+    after = db.scalar(
+        select(AuditEvent.after_json)
+        .where(AuditEvent.subject == f"affiliate:{affiliate.id}")
+        .where(AuditEvent.action == "affiliate.collaboration_start_set")
+        .order_by(AuditEvent.id.desc())
+        .limit(1)
+    )
+    return "code" if (after or {}).get("from") == "shopify_code" else "recorded"
+
+
+def _her_code(db: Session, affiliate: AffiliateProfile) -> str | None:
+    """The code she holds now, for the line that says where her start came from."""
+    from app.services.codes import open_codes_for
+
+    held = open_codes_for(db, affiliate)
+    return held[0].code if held else None
+
+
 def _pay_history_payload(db: Session, affiliate: AffiliateProfile) -> dict:
     """Every month the editor draws, and what is already true of each.
 
@@ -1017,11 +1051,11 @@ def _pay_history_payload(db: Session, affiliate: AffiliateProfile) -> dict:
         if row.recorded_outcome is not None
     }
 
-    # ADR 0052: terms may be set up to twelve months ahead, so an agreed raise
-    # from next month is entered the day it is agreed. The last arrangement
-    # stays open-ended from wherever it starts; the screen closes a run at
-    # `horizon_month` by leaving its end open.
-    horizon = month_add(working, 12)
+    # ADR 0055 (replacing 0052's twelve months ahead): only months that have
+    # begun are listed. A month that has not begun cannot be decided yet; when
+    # it begins it takes the terms of the month before it, because the run
+    # reaching the working month is saved open-ended (`horizon_month`).
+    horizon = working
 
     periods = all_terms(db, affiliate)
     covers = {}
@@ -1097,12 +1131,13 @@ def _pay_history_payload(db: Session, affiliate: AffiliateProfile) -> dict:
         # Decided here rather than in the browser: which months a person may
         # arrange is a rule, and a rule with two implementations is a rule with
         # two answers.
-        "arrangeable_from": max(
-            affiliate.collaboration_start_month
-            or (min(sold_in) if sold_in else None)
-            or working,
-            PLATFORM_START_MONTH,
-        ),
+        "arrangeable_from": arrangeable_from(db, affiliate, working),
+        # **Where that month came from** (ADR 0055), so whoever sets her terms
+        # can see when she started and why: `code` - her code's start on
+        # Shopify; `recorded` - typed on her profile; `first_sale` - nothing
+        # recorded, so her first order; `none` - nothing at all yet.
+        "start_source": _start_source(db, affiliate, sold_in),
+        "code": _her_code(db, affiliate),
         "months": months,
         "periods": [_compensation_payload(row) for row in periods],
     }

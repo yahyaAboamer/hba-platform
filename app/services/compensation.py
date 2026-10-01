@@ -498,6 +498,93 @@ def _refuse_to_move_an_approved_month(
     )
 
 
+def arrangeable_from(db: Session, affiliate: AffiliateProfile, working: str) -> str:
+    """The first month that is hers to arrange (A06, ADR 0055).
+
+    Her start month - from her code on Shopify, or recorded by hand - floored
+    at the platform's first month, falling back to her first sale and then to
+    the working month, so a model with neither still has a month to arrange.
+
+    One function for the screen and for the save: which months a person may
+    arrange is a rule, and a rule with two implementations has two answers.
+    """
+    from app.core.periods import PLATFORM_START_MONTH
+    from app.models.attributed_orders import AttributedOrder
+
+    first_sale = db.scalar(
+        select(AttributedOrder.business_month)
+        .where(AttributedOrder.affiliate_id == affiliate.id)
+        .order_by(AttributedOrder.business_month)
+        .limit(1)
+    )
+    return max(
+        affiliate.collaboration_start_month or first_sale or working,
+        PLATFORM_START_MONTH,
+    )
+
+
+def _months_of(period: dict | CompensationPeriod, last: str) -> list[str]:
+    """The months a period covers, never past ``last``.
+
+    Clamped even for a closed period, so an end typed as 9999-12 costs nothing.
+    """
+    read = period.get if isinstance(period, dict) else lambda name: getattr(period, name)
+    months, month = [], read("start_month")
+    end = min(read("end_month") or last, last)
+    while month <= end:
+        months.append(month)
+        month = month_add(month, 1)
+    return months
+
+
+def _refuse_months_not_hers_to_arrange(
+    held: list[CompensationPeriod], prepared: list[dict], *, start: str | None, working: str
+) -> None:
+    """Only months from her start to the working month are arranged (ADR 0055).
+
+    **Months ahead.** A month that has not begun cannot be decided yet. It
+    takes the terms of the month before it when it begins, which is why the
+    run reaching the working month is stored open-ended (`replace_pay_history`).
+
+    **Months before her start.** She was not working with HBA then, so an
+    arrangement there would pay for a month that was never hers. Terms already
+    on record there are not refused: the screen re-sends her whole history, and
+    a month before her start that comes back exactly as it was is unchanged.
+    Leaving one out removes its terms, and that is allowed: it pays for nothing
+    she was not there for, and an approved month is still held by
+    `_refuse_to_move_an_approved_month`.
+    """
+    ahead = sorted(row["start_month"] for row in prepared if row["start_month"] > working)
+    if ahead:
+        raise ValueError(
+            f"{ahead[0]} has not begun, so its terms cannot be set yet. When it "
+            "begins it takes the terms of the month before it."
+        )
+    if start is None:
+        return
+
+    def before_start(periods) -> dict[str, tuple]:
+        return {
+            month: _shape(period)
+            for period in periods
+            for month in _months_of(period, working)
+            if month < start
+        }
+
+    was = before_start(held)
+    changed = sorted(
+        month
+        for month, shape in before_start(prepared).items()
+        if was.get(month) != shape
+    )
+    if changed:
+        raise ValueError(
+            f"She started with HBA in {start}, so {changed[0]} is before her "
+            "start and cannot be given terms. If she started earlier, correct "
+            "her start month on her profile first."
+        )
+
+
 def replace_pay_history(
     db: Session,
     affiliate: AffiliateProfile,
@@ -570,6 +657,23 @@ def replace_pay_history(
         )
 
     prepared.sort(key=lambda row: row["start_month"])
+
+    # Imported here: `payroll` pulls in the commission engine, which imports
+    # this module.
+    from app.services.payroll import working_month
+
+    working = working_month()
+    # Held to her start only once it is known - from her code on Shopify or
+    # recorded by hand (ADR 0055: "when her code is checked and we know the
+    # date"). Before that the screen opens at her first sale, and there is no
+    # known start to hold a month against.
+    recorded = affiliate.collaboration_start_month
+    _refuse_months_not_hers_to_arrange(
+        held,
+        prepared,
+        start=arrangeable_from(db, affiliate, working) if recorded else None,
+        working=working,
+    )
     for earlier, later in zip(prepared, prepared[1:]):
         # Checked here as well as by the exclusion constraint, because the
         # constraint's message names a daterange and this one names two months.
@@ -587,6 +691,15 @@ def replace_pay_history(
                 f"{later['start_month']} overlap. A month cannot have been on "
                 "two arrangements at once."
             )
+
+    # **The latest arrangement runs on** (ADR 0055). A run that reaches the
+    # working month is stored until further notice, so the next month takes
+    # these terms when it begins. Ending it at the working month would leave
+    # that month with nothing, and nobody may arrange it in advance any more.
+    # After the overlap check, so two runs that overlap are reported as that.
+    for row in prepared:
+        if row["end_month"] is not None and row["end_month"] >= working:
+            row["end_month"] = None
 
     _refuse_to_move_an_approved_month(db, affiliate, prepared)
 

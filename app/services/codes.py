@@ -50,27 +50,36 @@ def _covering(code: str, month: str):
     )
 
 
-def start_month_for(created_at: datetime | None) -> str:
+def start_month_for(
+    created_at: datetime | None, starts_at: datetime | None = None
+) -> str:
     """The month a code's ownership should start from.
 
-    **The later of the platform's data horizon and the code's creation on
+    **The later of the platform's data horizon and the code's start on
     Shopify** - and it is never a question anybody is asked, because there is
     exactly one right answer and a person typing it can only get it wrong.
 
-    - A code created before 2026 starts at the horizon. There are no orders
+    **The start date before the creation date** (ADR 0055), the same rule as
+    her start month (`model_start_month_for`). The two were different until
+    1 October 2026: ALI10 on Shopify is a discount recreated on 4 April 2026
+    with a start date of February 2025, and her code was taken to start in
+    April while she was taken to start in January. Her January orders, made on
+    the earlier ALI10, belonged to nobody. A recreated or duplicated discount
+    keeps the code's earlier start; its creation date only says when this
+    particular object was made.
+
+    - A code starting before 2026 starts at the horizon. There are no orders
       before then to claim; the import does not reach back further.
-    - A code created in March starts in March. Claiming January would assert
+    - A code starting in March starts in March. Claiming January would assert
       ownership of months the code did not exist for - and if it previously
       belonged to somebody else, collide with their period.
 
-    An unknown creation date falls back to the horizon. That is the safe
-    direction: it claims at most a few empty months, where starting late would
-    orphan real orders and nobody would notice until the model asked why their
+    Neither date known falls back to the horizon. That is the safe direction:
+    it claims at most a few empty months, where starting late would orphan
+    real orders and nobody would notice until the model asked why their
     dashboard was empty.
     """
-    if created_at is None:
-        return PLATFORM_START_MONTH
-    return max(PLATFORM_START_MONTH, business_month(created_at))
+    return model_start_month_for(starts_at, created_at) or PLATFORM_START_MONTH
 
 
 def model_start_month_for(
