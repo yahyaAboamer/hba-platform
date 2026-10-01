@@ -283,6 +283,13 @@ export type MyEarnings = {
     piastres: number;
     amount: string;
     applied: boolean;
+    /**
+     * Their commission, beside the minimum on the home card. Not a part of
+     * the figure: they are paid the higher. The whole figure where the
+     * minimum did not apply; the commission it replaced where it did.
+     */
+    commission_piastres: number;
+    commission: string;
     /** §15. `null` means nobody has recorded what they produced. */
     targets_achieved: boolean | null;
     targets_verified: boolean;

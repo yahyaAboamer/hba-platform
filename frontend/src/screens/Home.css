@@ -204,6 +204,16 @@ a.home__card:hover {
   color: var(--faint);
 }
 
+/* Guaranteed minimum: the two tiles do not add up, and this line says what
+   they do instead. */
+.home__split-rule {
+  display: block;
+  margin-top: 8px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--quiet);
+}
+
 .home__compare {
   align-self: flex-start;
   display: inline-flex;
@@ -259,15 +269,6 @@ a.home__card:hover {
   font-weight: 600;
 }
 
-.home__guarantee {
-  margin: 0;
-  font-size: 13px;
-  color: var(--quiet);
-}
-
-.home__guarantee strong {
-  color: var(--ink);
-}
 
 .home__pay,
 .home__row,

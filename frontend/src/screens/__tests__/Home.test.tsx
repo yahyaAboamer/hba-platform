@@ -225,6 +225,65 @@ describe("Home", () => {
   });
 
   /*
+   * Owner, 1 October 2026: a guaranteed minimum is split out the way a salary
+   * is. Ali's October: EGP 2,000.00 minimum, targets not recorded, so the
+   * figure is his commission and the commission tile carries the accent.
+   */
+  const guaranteed = (applied: boolean, amount: string, commission: string) => ({
+    ...home,
+    earnings: {
+      ...home.earnings,
+      amount,
+      guarantee_applied: applied,
+      guarantee: {
+        piastres: 200000,
+        amount: "EGP 2,000.00",
+        applied,
+        commission_piastres: 0,
+        commission,
+        targets_achieved: applied ? true : null,
+        targets_verified: applied,
+      },
+    },
+  });
+
+  it("splits a guaranteed month into the minimum and the commission", async () => {
+    fetchMock.mockImplementation((url: string) =>
+      String(url).includes("/api/me/home/")
+        ? ok(guaranteed(false, "EGP 1,123.00", "EGP 1,123.00"))
+        : ok({}),
+    );
+    renderHome();
+    await waitFor(() => expect(screen.getByText("Guaranteed minimum")).toBeTruthy());
+
+    expect(screen.getByText("EGP 2,000.00")).toBeTruthy();
+    expect(screen.getByText("targets not recorded yet")).toBeTruthy();
+    expect(screen.getByText("Commission")).toBeTruthy();
+    expect(screen.getByText("10% of EGP 11,232.87 in sales")).toBeTruthy();
+    expect(screen.getByText(/paid the higher of the two/)).toBeTruthy();
+    // The commission is the figure, so it carries the accent.
+    expect(
+      screen.getByText("Commission").parentElement?.className,
+    ).toContain("home__split--grows");
+    expect(screen.queryByText(/% commission/)).toBeNull();
+  });
+
+  it("says in words when the minimum is what is paid", async () => {
+    fetchMock.mockImplementation((url: string) =>
+      String(url).includes("/api/me/home/")
+        ? ok(guaranteed(true, "EGP 2,000.00", "EGP 112.30"))
+        : ok({}),
+    );
+    renderHome();
+    await waitFor(() => expect(screen.getByText("targets met · paid this month")).toBeTruthy());
+
+    expect(screen.getByText("EGP 112.30")).toBeTruthy();
+    expect(
+      screen.getByText("Guaranteed minimum").parentElement?.className,
+    ).toContain("home__split--grows");
+  });
+
+  /*
    * ADR 0054: a settled month is a normal month. Only its pill and its
    * payment line say otherwise.
    */

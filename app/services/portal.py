@@ -596,7 +596,7 @@ def _split(figures: dict, total: int) -> dict | None:
     }
 
 
-def _guarantee(figures: dict) -> dict | None:
+def _guarantee(figures: dict, total: int) -> dict | None:
     """Their guaranteed minimum, and why it is or is not in the figure above.
 
     Only on a `base_guarantee` arrangement, and **present whether or not it
@@ -614,10 +614,23 @@ def _guarantee(figures: dict) -> dict | None:
         return None
 
     amount = int(figures.get("base_amount_piastres") or 0)
+    applied = bool(figures.get("guarantee_applied"))
+    # Her commission, beside the minimum on the home card (owner, 1 October
+    # 2026: split it out the way a salary is). **The two do not add up** - she
+    # is paid the higher, so the card says which one the figure is. Where the
+    # minimum did not apply, the commission *is* the figure, carried-in orders
+    # and rounding included, so the tile and the number above it agree. Where
+    # it did, this month's own commission: the one it replaced, the same
+    # figure "See how it adds up" names.
+    commission = (
+        _display_piastres(figures.get("commission_piastres") or 0) if applied else total
+    )
     return {
         "piastres": amount,
         "amount": format_egp(amount),
-        "applied": bool(figures.get("guarantee_applied")),
+        "applied": applied,
+        "commission_piastres": commission,
+        "commission": format_egp(commission),
         # §15. Three answers, not two. `null` means nobody has recorded what
         # they produced - a different thing from missing the target, and the
         # difference decides which sentence they should be reading.
@@ -885,7 +898,7 @@ def my_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
         ],
         "carried_out": _carried_out(db, affiliate, month),
         "guarantee_applied": bool(figures.get("guarantee_applied")),
-        "guarantee": _guarantee(figures),
+        "guarantee": _guarantee(figures, total),
         "targets": _targets(db, affiliate, month, figures),
         "commission_rate_bp": figures.get("commission_rate_bp"),
         # Nothing blocks a month that is already agreed. The live blocker list

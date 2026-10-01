@@ -284,6 +284,33 @@ function Hero({
               </span>
             </div>
           </div>
+        ) : body.guarantee && !noFigure ? (
+          /*
+           * Guaranteed minimum (owner, 1 October 2026): split out the way a
+           * salary is. Unlike a salary the two do not add up - they are paid
+           * the higher - so the tile the figure above comes from carries the
+           * accent and says so in words, and one line names the rule.
+           */
+          <>
+            <div className="home__split">
+              <div className={body.guarantee.applied ? "home__split--grows" : undefined}>
+                <span className="home__split-label">Guaranteed minimum</span>
+                <span className="home__split-value">{body.guarantee.amount}</span>
+                <span className="home__split-note">{guaranteeNote(body.guarantee)}</span>
+              </div>
+              <div className={body.guarantee.applied ? undefined : "home__split--grows"}>
+                <span className="home__split-label">Commission</span>
+                <span className="home__split-value">{body.guarantee.commission}</span>
+                <span className="home__split-note">
+                  {rate !== null ? `${rate / 100}% of ` : ""}
+                  {body.sales.counted} in sales
+                </span>
+              </div>
+            </div>
+            <span className="home__split-rule">
+              You're paid the higher of the two. The minimum counts once your targets are met and checked.
+            </span>
+          </>
         ) : noFigure ? (
           body.note && <span className="home__sub">{body.note}</span>
         ) : (
@@ -335,19 +362,6 @@ function Hero({
         </div>
       )}
 
-      {body.guarantee && (
-        <p className="home__guarantee">
-          Guaranteed minimum <strong>{body.guarantee.amount}</strong> ·{" "}
-          {body.guarantee.targets_achieved === null
-            ? "targets not recorded yet"
-            : body.guarantee.targets_achieved
-              ? body.guarantee.targets_verified
-                ? "targets met"
-                : "targets met, being checked"
-              : "targets not met"}
-        </p>
-      )}
-
       <Link className="home__link" to={`/earnings?month=${home.month}`}>
         See how it adds up →
       </Link>
@@ -357,6 +371,18 @@ function Hero({
       <Payment month={home.month} state={state} settlement={settlement} transferDate={transfer?.occurred_at ?? null} reference={transfer?.reference ?? null} />
     </section>
   );
+}
+
+/**
+ * Under the minimum, where its targets stand - §15's three answers, with
+ * `null` (nobody has recorded them) kept apart from a miss. Where the minimum
+ * is the figure, it says so in words as well as in colour.
+ */
+function guaranteeNote(guarantee: NonNullable<MyHome["earnings"]["guarantee"]>): string {
+  if (guarantee.applied) return "targets met · paid this month";
+  if (guarantee.targets_achieved === null) return "targets not recorded yet";
+  if (!guarantee.targets_achieved) return "targets not met";
+  return guarantee.targets_verified ? "targets met" : "targets met, being checked";
 }
 
 /** When the money arrives, from the ledger - one row, and a way to Payments. */

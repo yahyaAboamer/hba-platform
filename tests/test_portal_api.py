@@ -643,6 +643,10 @@ def test_a_guarantee_says_what_it_replaced(admin):
     assert body["guarantee_applied"] is True
     assert body["makeup"][0]["label"] == "Your guaranteed minimum"
     assert "commission" in body["makeup"][0]["detail"]
+    # The home card's commission tile is the one the minimum replaced - the
+    # same figure the breakdown names - not the figure above it.
+    assert body["guarantee"]["commission_piastres"] < body["amount_piastres"]
+    assert body["guarantee"]["commission"] in body["makeup"][0]["detail"]
 
 
 def test_a_guarantee_that_did_not_apply_is_still_named(admin):
@@ -670,6 +674,10 @@ def test_a_guarantee_that_did_not_apply_is_still_named(admin):
         "piastres": 800_000,
         "amount": "EGP 8,000.00",
         "applied": False,
+        # Split out on the home card beside the minimum. It did not apply, so
+        # the commission is the whole figure.
+        "commission_piastres": 110_000,
+        "commission": "EGP 1,100.00",
         # §15. `null` is a third answer, and the one that decides which
         # sentence they read: nobody has recorded their month, rather than they
         # missed their targets.
