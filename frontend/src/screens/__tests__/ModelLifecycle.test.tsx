@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { Session } from "../../lib/api";
+import { api, type Session } from "../../lib/api";
 import { ModelLifecycle } from "../ModelLifecycle";
 
 /** ADR 0052: what each status offers on her profile, and to whom. */
@@ -84,6 +84,38 @@ describe("ModelLifecycle", () => {
     expect(confirm.disabled).toBe(true);
     fireEvent.change(name, { target: { value: "Laila Samir" } });
     expect(confirm.disabled).toBe(false);
+  });
+
+  it("says declining deletes the application, and leaves the profile once it has", async () => {
+    // ADR 0058: the owner declined to fix a typo and could not invite again.
+    const patch = vi.spyOn(api, "patch").mockResolvedValue({ erased: 7, status: "declined" });
+    const erased = vi.fn();
+    const changed = vi.fn();
+    render(
+      <ModelLifecycle
+        subject={{ id: 7, name: "Laila Samir", status: "pending", erase_blockers: [] }}
+        session={manager}
+        onChanged={changed}
+        onErased={erased}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Decline" }));
+    expect(screen.getByText(/The application is deleted/)).toBeTruthy();
+    expect(screen.getByText(/invite the same email again/)).toBeTruthy();
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "Code typed wrong" } });
+    fireEvent.click(screen.getByRole("button", { name: "Decline and delete" }));
+
+    await waitFor(() => expect(erased).toHaveBeenCalled());
+    expect(erased.mock.calls[0][0]).toMatch(/declined and deleted/);
+    expect(changed).not.toHaveBeenCalled();
+    expect(patch).toHaveBeenCalledWith("/api/affiliates/7", { status: "declined", reason: "Code typed wrong" });
+    patch.mockRestore();
+  });
+
+  it("says when a declined application has to be kept", () => {
+    show("pending", admin, { erase_blockers: ["an order attributed to her"] });
+    fireEvent.click(screen.getByRole("button", { name: "Decline" }));
+    expect(screen.getByText(/It can't be deleted: there is an order attributed to her/)).toBeTruthy();
   });
 
   it("offers nothing to somebody who cannot manage models", () => {

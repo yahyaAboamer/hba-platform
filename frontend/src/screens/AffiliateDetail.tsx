@@ -231,6 +231,8 @@ export function AffiliateDetail({ session }: { session: Session }) {
   );
   const [working, setWorking] = useState<string | null>(null);
   const [correction, setCorrection] = useState("");
+  /** A confirmed code on a waiting application, opened to be changed (ADR 0058). */
+  const [changingCode, setChangingCode] = useState(false);
   /**
    * A draft, not the value. `null` means "not editing" - so the field shows
    * what is recorded until somebody deliberately opens it, and Cancel puts
@@ -259,7 +261,10 @@ export function AffiliateDetail({ session }: { session: Session }) {
       .then((body) => {
         if (version !== loadVersion.current) return;
         setDetail(body);
-        setCorrection("");
+        // Her code, filled in and editable, so a typo can be seen to be
+        // correctable (ADR 0058) - it used to show only as placeholder text.
+        setCorrection(body.codes[0]?.code ?? "");
+        setChangingCode(false);
         return Promise.all([
           api.get<Earnings>(`/api/affiliates/${id}/earnings/${month}`),
           api.get<ProfileRecord>(`/api/affiliates/${id}/record`),
@@ -292,13 +297,15 @@ export function AffiliateDetail({ session }: { session: Session }) {
     setError(null);
     setNotice(null);
     try {
-      const result = await api.post<{ verified: boolean; code: string }>(
+      const typed = correction.trim().toUpperCase();
+      const current = detail?.codes[0]?.code ?? "";
+      const result = await api.post<{ is_verified: boolean; code: string }>(
         `/api/affiliates/${id}/recheck-code`,
-        correction.trim() ? { code: correction.trim() } : {},
+        typed && typed !== current ? { code: typed } : {},
       );
       setNotice({
-        good: result.verified,
-        text: result.verified
+        good: result.is_verified,
+        text: result.is_verified
           ? `Shopify knows ${result.code}. You can approve now.`
           : `Shopify has never heard of ${result.code}. Check it against the shop.`,
       });
@@ -687,22 +694,50 @@ export function AffiliateDetail({ session }: { session: Session }) {
                     : "A code the shop has never heard of earns nothing, silently."}
                 </span>
               </div>
-              {!verified && (
+              {/* ADR 0058: her code, filled in, can be corrected until she is
+                  approved - a confirmed one too, through Change, since a
+                  mistyped code can happen to exist on Shopify. */}
+              {(!verified || changingCode) && (
                 <div className="detail__step-action">
                   <input
                     className="input detail__correction"
                     value={correction}
                     onChange={(event) => setCorrection(event.target.value)}
-                    placeholder={detail.codes[0]?.code ?? "Discount code"}
-                    aria-label="Correct the code before checking"
+                    placeholder="Discount code"
+                    aria-label="Her code, which you can correct"
+                    title="Correct a mistyped code here, then check it"
                   />
                   <button
                     type="button"
                     className="button"
                     onClick={verifyCode}
-                    disabled={working !== null}
+                    disabled={working !== null || !correction.trim()}
                   >
-                    {working === "code" ? "Asking Shopify…" : "Check it"}
+                    {working === "code"
+                      ? "Asking Shopify…"
+                      : correction.trim().toUpperCase() !== (detail.codes[0]?.code ?? "")
+                        ? "Save and check"
+                        : "Check it"}
+                  </button>
+                  {changingCode && (
+                    <button
+                      type="button"
+                      className="button"
+                      onClick={() => {
+                        setChangingCode(false);
+                        setCorrection(detail.codes[0]?.code ?? "");
+                      }}
+                      disabled={working !== null}
+                    >
+                      Cancel
+                    </button>
+                  )}
+                </div>
+              )}
+              {verified && !changingCode && detail.status === "pending" && detail.codes.length === 1 && (
+                <div className="detail__step-action">
+                  <button type="button" className="button" onClick={() => setChangingCode(true)}>
+                    Change
                   </button>
                 </div>
               )}

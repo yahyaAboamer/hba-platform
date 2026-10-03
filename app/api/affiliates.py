@@ -51,6 +51,7 @@ from app.services.affiliates import (
     update_details,
 )
 from app.services.codes import (
+    code_still_changeable,
     codes_for,
     registered_codes,
     codes_with_status,
@@ -60,6 +61,7 @@ from app.services.codes import (
     replace_code,
     start_month_for,
     unregistered_code_for,
+    verified_codes_for,
 )
 from app.services.applications import REQUIRED_PAYOUT_FIELDS
 from app.services.compensation import (
@@ -757,10 +759,13 @@ def update_affiliate_status_route(
         ) and body.status != affiliate.status and not (body.reason or "").strip():
             raise ValueError("Give a reason. It is kept with her record.")
 
+        erased = None
         if body.status is None:
             pass
         elif body.status == AffiliateStatus.DECLINED:
-            decline_application(
+            # ADR 0058: declining deletes the application, unless something
+            # about money or goods is already hers.
+            erased = decline_application(
                 db,
                 affiliate,
                 reason=body.reason or "",
@@ -808,6 +813,8 @@ def update_affiliate_status_route(
         ) from exc
 
     db.commit()
+    if erased is not None:
+        return {"erased": erased, "status": AffiliateStatus.DECLINED}
     return _affiliate_payload(affiliate)
 
 
@@ -834,6 +841,12 @@ def recheck_code_route(
 
     affiliate = _get_affiliate_or_404(db, affiliate_id)
     period = unregistered_code_for(db, affiliate)
+    # ADR 0058: while her application waits and nothing is counted to her, a
+    # confirmed code may be changed too - a mistyped code that happens to
+    # exist on Shopify otherwise had no fix but declining her.
+    changeable = body.code is not None and code_still_changeable(db, affiliate)
+    if period is None and changeable:
+        period = next(iter(verified_codes_for(db, affiliate)), None)
     if period is None:
         raise HTTPException(
             404,
@@ -861,6 +874,10 @@ def recheck_code_route(
 
     try:
         if body.code is not None and normalise_code(body.code) != period.code:
+            # Her start taken from the code being replaced follows the new
+            # one; a start somebody typed is left alone (ADR 0058).
+            if affiliate.collaboration_start_month == period.start_month and period.is_verified:
+                affiliate.collaboration_start_month = None
             replace_code(
                 db,
                 period,
@@ -869,6 +886,7 @@ def recheck_code_route(
                 verified_at=verified_at,
                 actor_id=actor.id,
                 actor_email=actor.email,
+                while_pending=changeable,
             )
         elif found["exists"]:
             mark_verified(

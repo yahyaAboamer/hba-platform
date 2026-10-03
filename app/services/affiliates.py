@@ -303,18 +303,36 @@ def decline_application(
     reason: str,
     actor_id: int | None = None,
     actor_email: str | None = None,
-) -> None:
-    """Turn an application down (ADR 0052).
+) -> int | None:
+    """Turn an application down (ADR 0052, amended by 0058).
 
-    Her code is released so another model can register it: removed outright
-    when no order was ever attributed to her, closed with the month otherwise,
-    because closing must never rewrite who earned an order already counted.
-    She can still sign in, to be told; nothing is emailed.
+    **Declining deletes it** (ADR 0058, the owner's ruling of 3 October):
+    somebody turned down never was a model, so she leaves no profile, no
+    account and no row on any list, and her address can be invited again.
+    It goes through the same erase as *Erase*; the one entry kept says an
+    application was declined, by whom and why. Returns the erased id.
+
+    Only when that erase is refused - an order, payroll, payment, parcel or
+    proof is already hers, or her account holds a staff role - is she kept,
+    declined as before: her code released so another model can register it,
+    removed outright when no order was ever attributed to her, closed with
+    the month otherwise, because closing must never rewrite who earned an
+    order already counted. Returns None then. Nothing is emailed either way.
     """
     if affiliate.status != AffiliateStatus.PENDING:
         raise ValueError("Only an application waiting for review can be declined.")
     if not (reason or "").strip():
         raise ValueError("Say why the application is declined. It is kept with her record.")
+
+    if not erase_blockers(db, affiliate) and not _holds_staff_role(db, affiliate):
+        return erase_affiliate(
+            db,
+            affiliate,
+            reason=reason,
+            actor_id=actor_id,
+            actor_email=actor_email,
+            action="affiliate.declined_and_erased",
+        )
 
     earned = db.execute(
         text("SELECT EXISTS (SELECT 1 FROM attributed_order WHERE affiliate_id = :id)"),
@@ -356,6 +374,7 @@ def decline_application(
         db, affiliate, AffiliateStatus.DECLINED,
         actor_id=actor_id, actor_email=actor_email, reason=reason.strip(),
     )
+    return None
 
 
 def reconsider_application(
@@ -398,6 +417,16 @@ def erase_blockers(db: Session, affiliate: AffiliateProfile) -> list[str]:
     return found
 
 
+def _holds_staff_role(db: Session, affiliate: AffiliateProfile) -> bool:
+    return db.execute(
+        text(
+            "SELECT EXISTS (SELECT 1 FROM role_assignment "
+            "WHERE user_account_id = :user AND role <> 'affiliate')"
+        ),
+        {"user": affiliate.user_account_id},
+    ).scalar_one()
+
+
 def erase_affiliate(
     db: Session,
     affiliate: AffiliateProfile,
@@ -405,6 +434,7 @@ def erase_affiliate(
     reason: str,
     actor_id: int,
     actor_email: str | None = None,
+    action: str = "affiliate.erased",
 ) -> int:
     """Delete a model who never earned anything, and every trace of her.
 
@@ -428,13 +458,7 @@ def erase_affiliate(
     # business's trail, not hers.
     if actor_id == affiliate.user_account_id:
         raise ValueError("You cannot erase your own account.")
-    if db.execute(
-        text(
-            "SELECT EXISTS (SELECT 1 FROM role_assignment "
-            "WHERE user_account_id = :user AND role <> 'affiliate')"
-        ),
-        {"user": affiliate.user_account_id},
-    ).scalar_one():
+    if _holds_staff_role(db, affiliate):
         raise ValueError(
             f"{affiliate.name}'s account also has a staff role. Erase is only for "
             "model accounts - remove the staff role first."
@@ -490,7 +514,7 @@ def erase_affiliate(
     # Written after the deletes, or the delete above would have taken it too.
     record_audit(
         db,
-        action="affiliate.erased",
+        action=action,
         subject=f"affiliate:{affiliate_id}",
         actor_id=actor_id,
         actor_email=actor_email,

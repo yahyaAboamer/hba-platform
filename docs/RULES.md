@@ -135,8 +135,12 @@ payroll without touching a maintainer screen.
   - *Archive* closes her sign-in and ends her codes with the current month;
     reactivating clears `archived_at` and ~~she needs a new code~~ **restarts
     her own code from the current month** (ADR 0053, amending 0052).
-  - *Decline* releases her code and she sees that she was not accepted;
-    *Reconsider* returns her to Applications.
+  - *Decline* **deletes the application** (ADR 0058, amending 0052): her
+    account, profile, code and details go, one audit entry keeps who declined
+    it and why, and her address can be invited again. Only when an order,
+    payroll, payment, parcel or proof is already hers, or she holds a staff
+    role, is she kept as `declined`: her code released, *Reconsider* returning
+    her to Applications, and no row on the Targets grid.
   - **Approval needs a verified code and, for a paid account, pay terms
     covering the working month.**
   - *Erase* is admin-only and only for a model with no order, payroll,
@@ -150,7 +154,9 @@ payroll without touching a maintainer screen.
   when Shopify confirms her code, only if none is recorded; staff may still
   change it on her profile. **Her code is the one she applied
   with and is never replaced** - there is no route to register another or move
-  her onto a new one. A typo in an unconfirmed code may still be corrected.
+  her onto a new one. **While her application waits and no order is counted
+  to her, her code may be changed, confirmed or not** (ADR 0058); a start
+  month taken from the old code follows the new one.
 - **Nobody grants access they do not hold** (`can_grant`). An invitation, a
   resend and a withdrawal are all held to it; nobody changes or suspends their
   own staff account.

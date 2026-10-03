@@ -61,6 +61,14 @@ def create_invitation(
                 AffiliateProfile.user_account_id == existing.id
             )
         )
+        if owns_profile is not None and owns_profile.status == "declined":
+            # Kept only because an order is already hers (ADR 0058); a
+            # declined application is otherwise deleted, address and all.
+            raise ValueError(
+                f"{email} applied and was declined, and is kept because an order "
+                "is already counted to them. Reconsider the application from "
+                "their profile instead."
+            )
         if owns_profile is not None:
             raise ValueError(f"{email} is already a model on HBA")
         raise ValueError(f"An account already exists for {email}")

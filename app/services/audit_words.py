@@ -154,6 +154,8 @@ def sentence(event: AuditEvent, names: _Names) -> str:
         "affiliate.status_changed": f"Made {who} {_STATUS_WORD.get(a.get('status'), a.get('status') or 'a different status')}",
         # Her name went with her (ADR 0052): only the number is left to say.
         "affiliate.erased": "Erased a model who had never earned anything",
+        # ADR 0058: a declined application is deleted the same way.
+        "affiliate.declined_and_erased": "Declined an application and deleted it",
         "application.approved": f"Approved {who}'s application",
         "application.reminded": f"Reminded {who} to finish her application",
         "auth.bootstrap": "Set up the platform's first admin account",

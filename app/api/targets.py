@@ -38,7 +38,7 @@ from app.api.deps import require_permission
 from app.core.businesstime import parse_month
 from app.core.permissions import Permission
 from app.db import get_session
-from app.models.affiliates import AffiliateProfile
+from app.models.affiliates import AffiliateProfile, AffiliateStatus
 from app.models.identity import UserAccount
 from app.models.compensation import CompensationType
 from app.models.targets import MonthlyTarget
@@ -212,7 +212,13 @@ def target_grid(
     absent row is an invisible gap, and the gap is what blocks their month.
     """
     month = _month_or_400(month)
-    affiliates = list_affiliates(db, include_archived=include_archived)
+    # A declined application is nobody's model (ADR 0058). Usually it is gone
+    # altogether; one kept because an order is hers still has no targets.
+    affiliates = [
+        affiliate
+        for affiliate in list_affiliates(db, include_archived=include_archived)
+        if affiliate.status != AffiliateStatus.DECLINED
+    ]
     found = targets_for(db, month)
 
     return {

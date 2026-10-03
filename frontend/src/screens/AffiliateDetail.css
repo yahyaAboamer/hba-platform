@@ -164,6 +164,11 @@
   gap: var(--space-2);
 }
 
+/* "Save and check" wrapped onto three lines beside the code (ADR 0058). */
+.detail__step-action .button {
+  white-space: nowrap;
+}
+
 /* Where a mistyped code is corrected. Mono, because it is compared character
    for character against Shopify (ADR 0027). */
 .detail__correction {

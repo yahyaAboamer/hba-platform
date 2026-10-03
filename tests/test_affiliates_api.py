@@ -836,15 +836,77 @@ def test_a_mistyped_code_can_be_corrected_on_recheck(client, _shopify):
     assert [row["code"] for row in body["codes"]] == ["NOUR10"], "the mistyped code was left behind"
 
 
-def test_a_verified_code_is_never_rechecked(client):
+def test_a_verified_code_is_never_rechecked_once_she_is_approved(client):
     """It may already have attributed orders; changing it would rewrite what
     those orders belonged to.
     """
     affiliate = _register(client)
     _verify_code(client, affiliate["id"])
+    _history(client, affiliate["id"], [{"start_month": "2026-01", "end_month": None, **COMMISSION}])
+    assert _status(client, affiliate["id"], "active").status_code == 200
 
     response = client.post(f"/api/affiliates/{affiliate['id']}/recheck-code", json={})
     assert response.status_code == 404
+    changed = client.post(
+        f"/api/affiliates/{affiliate['id']}/recheck-code", json={"code": "OTHER10"}
+    )
+    assert changed.status_code == 404
+
+
+def test_a_confirmed_code_can_be_changed_while_the_application_waits(client, _shopify):
+    """ADR 0058: a mistyped code that happens to exist on Shopify had no fix
+    but declining. While she is pending and nothing is counted to her, it does.
+    """
+    from datetime import datetime, timezone
+
+    affiliate = _register(client)
+    _give_code(affiliate["id"], "NUOR10", created_at=datetime(2026, 2, 3, tzinfo=timezone.utc))
+    client.patch(
+        f"/api/affiliates/{affiliate['id']}",
+        json={"collaboration_start_month": "2026-02", "collaboration_start_month_set": True},
+    )
+
+    _shopify_says(_shopify, exists=True, created_at=datetime(2026, 6, 9, tzinfo=timezone.utc))
+    response = client.post(
+        f"/api/affiliates/{affiliate['id']}/recheck-code", json={"code": "NOUR10"}
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["code"] == "NOUR10"
+    assert response.json()["is_verified"] is True
+    assert response.json()["start_month"] == "2026-06"
+
+    body = client.get(f"/api/affiliates/{affiliate['id']}").json()
+    assert [row["code"] for row in body["codes"]] == ["NOUR10"]
+    # Her start came from the code being replaced, so it follows the new one.
+    assert _start_of(client, affiliate["id"]) == "2026-06"
+
+
+def test_a_typed_start_month_survives_a_code_change(client, _shopify):
+    from datetime import datetime, timezone
+
+    affiliate = _register(client)
+    _give_code(affiliate["id"], "NUOR10", created_at=datetime(2026, 2, 3, tzinfo=timezone.utc))
+    client.patch(
+        f"/api/affiliates/{affiliate['id']}",
+        json={"collaboration_start_month": "2026-04", "collaboration_start_month_set": True},
+    )
+
+    _shopify_says(_shopify, exists=True, created_at=datetime(2026, 6, 9, tzinfo=timezone.utc))
+    client.post(f"/api/affiliates/{affiliate['id']}/recheck-code", json={"code": "NOUR10"})
+    assert _start_of(client, affiliate["id"]) == "2026-04"
+
+
+def test_a_pending_code_with_an_order_counted_is_not_changed(client):
+    affiliate = _register(client)
+    _verify_code(client, affiliate["id"])
+    _attributed(affiliate["id"], "1", "2026-03")
+
+    response = client.post(
+        f"/api/affiliates/{affiliate['id']}/recheck-code", json={"code": "OTHER10"}
+    )
+    assert response.status_code == 404
+    body = client.get(f"/api/affiliates/{affiliate['id']}").json()
+    assert [row["code"] for row in body["codes"]] == ["NOUR10"]
 
 
 def test_rechecking_then_approving_works_end_to_end(client, _shopify):
@@ -2006,16 +2068,71 @@ def test_pausing_archiving_and_declining_need_a_reason(client):
         assert "reason" in response.json()["detail"]
 
 
-def test_declining_releases_the_code_for_somebody_else(client):
+def test_declining_an_application_erases_it(client):
+    """ADR 0058: somebody turned down never was a model. Nothing of her stays
+    but one entry saying an application was declined, by whom and why."""
     laila = _pending_with_code(client, name="Laila", email="laila@example.com", code="LAILA10")
 
-    declined = _status(client, laila["id"], "declined", "Not the right fit this season")
+    declined = _status(client, laila["id"], "declined", "The code was written wrong")
+    assert declined.status_code == 200, declined.text
+    assert declined.json() == {"erased": laila["id"], "status": "declined"}
+
+    assert client.get(f"/api/affiliates/{laila['id']}").status_code == 404
+    with engine.connect() as connection:
+        assert connection.execute(
+            text("SELECT count(*) FROM user_account WHERE email = 'laila@example.com'")
+        ).scalar_one() == 0
+        left = connection.execute(
+            text("SELECT action, reason, before_json, after_json FROM audit_event "
+                 "WHERE subject = :s"),
+            {"s": f"affiliate:{laila['id']}"},
+        ).all()
+    assert [(row.action, row.reason) for row in left] == [
+        ("affiliate.declined_and_erased", "The code was written wrong")
+    ]
+    assert left[0].before_json is None and left[0].after_json is None
+
+    # Her code is free for another model at once.
+    other = _register(client, name="Jana", email="jana@example.com")
+    assert _give_code(other["id"], "LAILA10")["code"] == "LAILA10"
+
+
+def test_a_declined_address_can_be_invited_again(client):
+    """The owner's case on 3 October: declined to fix a mistyped code, then
+    refused with *already a model on HBA* when inviting him again."""
+    ziad = _pending_with_code(client, name="Ziad", email="ziad@example.com", code="ZYZZ")
+    assert _status(client, ziad["id"], "declined", "Code typed wrong").status_code == 200
+
+    again = client.post(
+        "/api/auth/invitations", json={"email": "ziad@example.com", "role": "affiliate"}
+    )
+    assert again.status_code == 201, again.text
+
+
+def test_a_declined_application_is_not_on_the_targets_grid(client):
+    nour = _pending_with_code(client)
+    _attributed(nour["id"], "1", "2026-03")  # kept: an order is hers
+    _status(client, nour["id"], "declined", "Not now")
+
+    rows = client.get("/api/targets/2026-10").json()["rows"]
+    assert nour["id"] not in [row["affiliate_id"] for row in rows]
+
+
+def test_declining_an_application_with_an_order_keeps_it(client):
+    """ADR 0058's exception: an order counted to her cannot be erased, so the
+    application is declined as before and can be reconsidered."""
+    nour = _pending_with_code(client)
+    _attributed(nour["id"], "1", "2026-03")
+
+    declined = _status(client, nour["id"], "declined", "Not now")
     assert declined.status_code == 200, declined.text
     assert declined.json()["status"] == "declined"
 
-    # No order was ever hers, so the code is free for another model at once.
-    other = _register(client, name="Jana", email="jana@example.com")
-    assert _give_code(other["id"], "LAILA10")["code"] == "LAILA10"
+    refused = client.post(
+        "/api/auth/invitations", json={"email": "nour@example.com", "role": "affiliate"}
+    )
+    assert refused.status_code == 409
+    assert "declined" in refused.json()["detail"]
 
 
 def test_only_an_application_can_be_declined(client):
@@ -2029,6 +2146,7 @@ def test_only_an_application_can_be_declined(client):
 
 def test_a_declined_application_can_be_reconsidered(client):
     affiliate = _pending_with_code(client)
+    _attributed(affiliate["id"], "1", "2026-03")  # kept, so there is one to reconsider
     _status(client, affiliate["id"], "declined", "Missing measurements")
 
     back = _status(client, affiliate["id"], "pending", "She sent them")
@@ -2312,6 +2430,7 @@ def test_a_declined_application_cannot_jump_straight_to_active(client):
     """Reconsider first, so the approval gates are met again (ADR 0052)."""
     affiliate = _pending_with_code(client)
     _history(client, affiliate["id"], [{"start_month": "2026-01", "end_month": None, **COMMISSION}])
+    _attributed(affiliate["id"], "1", "2026-03")  # kept, so it can still be asked
     _status(client, affiliate["id"], "declined", "Not now")
 
     response = _status(client, affiliate["id"], "active")

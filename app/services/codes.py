@@ -287,6 +287,29 @@ def unregistered_code_for(
     )
 
 
+def code_still_changeable(db: Session, affiliate: AffiliateProfile) -> bool:
+    """Whether her code may still be changed, confirmed or not (ADR 0058).
+
+    Only while her application waits for review, she holds a single code, and
+    no order has been counted to her: then nothing hangs on the code yet.
+    """
+    from sqlalchemy import exists
+
+    from app.models.affiliates import AffiliateStatus
+    from app.models.attributed_orders import AttributedOrder
+
+    if affiliate.status != AffiliateStatus.PENDING:
+        return False
+    periods = db.scalars(
+        select(DiscountCodePeriod.id).where(DiscountCodePeriod.affiliate_id == affiliate.id)
+    ).all()
+    if len(periods) != 1:
+        return False
+    return not db.scalar(
+        select(exists().where(AttributedOrder.affiliate_id == affiliate.id))
+    )
+
+
 def replace_code(
     db: Session,
     period: DiscountCodePeriod,
@@ -296,6 +319,7 @@ def replace_code(
     verified_at: datetime | None = None,
     actor_id: int | None = None,
     actor_email: str | None = None,
+    while_pending: bool = False,
 ) -> DiscountCodePeriod:
     """Correct a mistyped code.
 
@@ -304,11 +328,13 @@ def replace_code(
     preserve - and leaving the wrong code behind would keep it holding
     ownership that blocks the right person from claiming it.
 
-    **Only ever used on an unverified period.** A verified code has been live
-    and may have attributed orders; changing it would rewrite what those orders
-    belonged to.
+    **Only ever used on an unverified period**, or - ``while_pending``, which
+    the caller sets from `code_still_changeable` - on a waiting application
+    with nothing counted to it (ADR 0058). Otherwise a verified code has been
+    live and may have attributed orders; changing it would rewrite what those
+    orders belonged to.
     """
-    if period.is_verified:
+    if period.is_verified and not while_pending:
         raise ValueError(
             "A verified code cannot be rewritten - it may already have "
             "attributed orders. Close its period and register the new code."

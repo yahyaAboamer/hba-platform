@@ -88,20 +88,37 @@ function planFor(action: Action, subject: Subject): Plan {
         done: `${subject.name} is active again.`,
       };
     case "decline":
-      return {
-        title: `Decline ${subject.name}'s application?`,
-        effects: [
-          `${first} sees that her application wasn't accepted this time when she signs in. Nothing is emailed.`,
-          "Her code is released so another model can use it.",
-          "She cannot reapply herself; you can reconsider it later.",
-        ],
-        confirm: "Decline",
-        danger: true,
-        needsReason: true,
-        typeName: false,
-        send: patch("declined"),
-        done: `${subject.name}'s application is declined.`,
-      };
+      // ADR 0058: declining deletes the application, unless something about
+      // money or goods is already hers - then it is kept, as before.
+      return (subject.erase_blockers?.length ?? 0) === 0
+        ? {
+            title: `Decline ${subject.name}'s application?`,
+            effects: [
+              `The application is deleted: ${first}'s sign-in, code, details and payment details. Nothing is emailed.`,
+              "The code is free for another model at once.",
+              "You can invite the same email again, for a new application.",
+            ],
+            confirm: "Decline and delete",
+            danger: true,
+            needsReason: true,
+            typeName: false,
+            send: patch("declined"),
+            done: `${subject.name}'s application was declined and deleted. You can invite the same email again.`,
+          }
+        : {
+            title: `Decline ${subject.name}'s application?`,
+            effects: [
+              `It can't be deleted: there is ${subject.erase_blockers!.join(", ")} on record, so it is kept as declined.`,
+              `${first} sees that the application wasn't accepted this time when signing in. Nothing is emailed.`,
+              "The code is released so another model can use it. You can reconsider it later.",
+            ],
+            confirm: "Decline",
+            danger: true,
+            needsReason: true,
+            typeName: false,
+            send: patch("declined"),
+            done: `${subject.name}'s application is declined.`,
+          };
     case "reconsider":
       return {
         title: `Reconsider ${subject.name}'s application?`,
@@ -148,7 +165,7 @@ function Dialog({
   plan: Plan;
   name: string;
   onCancel: () => void;
-  onDone: (message: string) => void;
+  onDone: (message: string, result?: unknown) => void;
 }) {
   const [reason, setReason] = useState("");
   const [typed, setTyped] = useState("");
@@ -178,8 +195,8 @@ function Dialog({
     setWorking(true);
     setProblem(null);
     try {
-      await plan.send(reason.trim(), typed.trim());
-      onDone(plan.done);
+      const result = await plan.send(reason.trim(), typed.trim());
+      onDone(plan.done, result);
     } catch (caught) {
       setProblem(caught instanceof Error ? caught.message : "That did not go through.");
       setWorking(false);
@@ -360,10 +377,15 @@ export function ModelLifecycle({
           plan={planFor(open, subject)}
           name={subject.name}
           onCancel={() => setOpen(null)}
-          onDone={(message) => {
+          onDone={(message, result) => {
             const was = open;
             setOpen(null);
-            if (was === "erase") onErased(message);
+            // A declined application that was deleted has no profile left
+            // to come back to (ADR 0058).
+            const gone =
+              was === "erase" ||
+              (was === "decline" && (result as { erased?: number } | undefined)?.erased != null);
+            if (gone) onErased(message);
             else onChanged(message);
           }}
         />
