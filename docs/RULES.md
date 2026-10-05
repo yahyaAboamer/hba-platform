@@ -27,12 +27,13 @@ in place, and so is the sentence here that it replaced.
 
 ---
 
-## The two halves
+## The two halves, and Operations
 
 | | Who | Look |
 |---|---|---|
 | **Maintainer** | Owner, marketing and finance teams on laptops | Laptop-first; match the approved Admin HTML structure and styling |
 | **Affiliate portal** (`.affiliate`) | Models on phones | Dark by default, denser, phone-shaped |
+| **Operations** (ADR 0057) | The one operations manager, and the admin | Laptop-first, usable on a phone. Its own shell, built from the owner-approved mockup (`docs/design/operations-dashboard-2026-10-03.html`), because no approved export draws it. Same tokens and palette as the maintainer's tool. |
 
 **One palette across both, since ADR 0039** — HBA green, both themes, defined
 once in `tokens.css` with the accent alone in `accent.css`. `portal.css` is
@@ -160,6 +161,19 @@ payroll without touching a maintainer screen.
 - **Nobody grants access they do not hold** (`can_grant`). An invitation, a
   resend and a withdrawal are all held to it; nobody changes or suspends their
   own staff account.
+- **Operations only reads, and never decides pay** (ADR 0057). It writes
+  nothing to Shopify, Bosta or E-stebdal. Bosta's data is for operations only: delivery for pay is still
+  read from Shopify (ADR 0023).
+- **One operations manager, and Operations stands apart** (ADR 0057).
+  - Exactly one person holds the role at a time, and the database refuses a
+    second. Only an admin gives it, and he invites nobody.
+  - He sees nothing of models, codes, targets, payroll or payments. Nobody but
+    him and an admin sees Operations.
+  - No customer name, phone, address or note is stored or shown there.
+- **Operations' numbers are at most 10 minutes old** (ADR 0057).
+  - The platform reads each source every 5 minutes.
+  - A source that can't be read shows as a failure, never as 0.
+  - Its day limits count working days in Cairo time, Saturday to Thursday.
 - **No targets before her start** (ADR 0056). Once her start month is known,
   the server refuses creating, changing or counting a target before it, and
   *Whole year* skips those months. The Targets grid draws her row closed there.
