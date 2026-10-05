@@ -92,6 +92,28 @@ describe("Settings → Team", () => {
 });
 
 describe("Settings → the rail", () => {
+  it("names the operations manager, and says what that access can do", async () => {
+    const permissions = { ...PERMISSIONS, operations_manager: ["order_ops.view"] };
+    const roster = {
+      ...ROSTER,
+      staff: [...ROSTER.staff, { id: 3, email: "amr@hbawear.store", display_name: "Amr", role: "operations_manager", status: "active", last_login_at: null, created_at: null }],
+      assignable_roles: [...ROSTER.assignable_roles, "operations_manager"],
+      invitable_roles: [...ROSTER.invitable_roles, "operations_manager"],
+      role_permissions: permissions,
+    };
+    fetchMock.mockImplementation((url: string) => {
+      if (url.includes("/api/staff/invitations")) return reply(200, { invitations: [], invitable_roles: roster.invitable_roles, role_permissions: permissions });
+      if (url.includes("/api/staff")) return reply(200, roster);
+      return reply(200, {});
+    });
+    renderAt("admin", "team");
+
+    expect((await screen.findAllByText("Operations manager")).length).toBeGreaterThan(0);
+    expect(screen.queryByText("operations_manager")).toBeNull();
+    expect(screen.getByText("See the operations dashboard")).toBeTruthy();
+    expect(screen.getByRole("columnheader", { name: "Operations manager" })).toBeTruthy();
+  });
+
   it("lists only what a content manager can use, and opens on the first", async () => {
     renderAt("content_manager");
     const rail = screen.getByRole("navigation", { name: "Settings sections" });

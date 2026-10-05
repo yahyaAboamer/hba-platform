@@ -32,6 +32,9 @@ class Permission:
     INVITATIONS_SEND = "invitations.send"
     AUDIT_VIEW = "audit.view"
     SETTINGS_MANAGE = "settings.manage"
+    #: The operations dashboard - Shopify, Bosta and E-stebdal (ADR 0057).
+    #: Reading only: nothing behind it writes to any of the three.
+    ORDER_OPS_VIEW = "order_ops.view"
 
 
 ALL_PERMISSIONS = frozenset(
@@ -78,6 +81,11 @@ ROLES: dict[str, frozenset[str]] = {
             Permission.AUDIT_VIEW,
         }
     ),
+    # The operations manager (ADR 0057): the operations dashboard and nothing
+    # else - no model, code, target, payroll or payment, and no invitations,
+    # because he is the only one and the staff do not use it. There is one at
+    # a time; the database refuses a second live holder.
+    "operations_manager": frozenset({Permission.ORDER_OPS_VIEW}),
     # Affiliates reach their own portal by owning the record, not by holding a
     # staff permission, so this set is intentionally empty.
     "affiliate": frozenset(),

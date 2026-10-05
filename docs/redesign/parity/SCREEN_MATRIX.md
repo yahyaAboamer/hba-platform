@@ -56,6 +56,7 @@ had the wrong filter names.
 | A5 | `vPayments` | 526–597 | `/payments` `Payments.tsx` | Implemented · dark checked on staging | §P. Card 101 vs export 101px, row 82 vs 84px. Pending: 1280/1440, light, Record/Open actions exercised |
 | A6 | `vSettings` | 598–786 + script 3515 | `/settings` `Settings.tsx`, `DataPanel.tsx` | Team, Shopify, Historical and Brand codes implemented; Historical checked on staging (dark); Reference mapped | Rail, Team (staff, invite row, pending invitations with Resend) and Appearance switch done. Shopify and sync: store card, Connection card, operations behind *Technical detail*; *Read the catalogue* stands in for the export's *Refresh now*, which has no single backend act. Historical setup now has the export's four columns — the state says whether her terms reach back to when she started, off a new `earliest_terms_month` on the roster, and links to the months that need writing. Its bulk *Review months from January* button is still absent: no such operation exists, and a button that reviewed nothing would be worse than none. Reference: title renamed *Policy in force*; the version editor and activity filter are kept **30 September, Settings audit (owner-approved divergence):** rail grouped Business / Just me and filtered by permission; *Reference* split into *Pay policy* and *Activity log*; *Appearance* renamed *My preferences* (theme on the account, incl. *Match my device*); Team adds last sign-in, access explainer, confirmations and a row menu; Shopify adds *Needs attention* and *Tools*; Brand codes adds orders this month and a one-row add; see `docs/design/admin-settings-tab-audit-2026-09-30.html`. |
 | A7 | `vOrders` | 1060–1091 + script 3010 | `/orders` `Orders.tsx` | Implemented · dark checked on staging | Five columns, counted line, load-more. A row opening its order exercised on staging |
+| A8 | none: owner-approved mockup `docs/design/operations-dashboard-2026-10-03.html` | — | Operations: `/` for the operations manager, `/operations/*` for the admin; `OperationsLayout.tsx`, `OperationsDashboard.tsx` (to build) | Mapped · mockup approved 5 October | ADR 0057. Shopify, Bosta and E-stebdal tabs; old, failed and not-connected states; the admin's switch; phone at 390. See *Owner-approved divergences — Operations* below |
 
 ## B. Admin — secondary views
 
@@ -342,6 +343,19 @@ rules. Each goes past the export on purpose; none is a parity defect.
 Browser-checked 30 September at 1280 and 390 on the harness seed (throwaway
 database), not against the export frames: that comparison, and staging
 acceptance, are still to do.
+
+## Owner-approved divergences — Operations (5 October)
+
+Approved by the owner on 5 October 2026 with ADR 0057, from the mockup
+`docs/design/operations-dashboard-2026-10-03.html` and its captures beside it
+(`operations-dashboard-*-1280-*.png`, `*-390-*.png`). No export draws
+Operations, so the mockup is the reference for every row here.
+
+| Row | Divergence | Why |
+|---|---|---|
+| A8 Operations | A whole dashboard the export does not have. It is built from the export's own pieces: the sidebar shell, count cards, `.panel`, `.table` and `.chip`. Each card opens its list below the cards. The success rate is one figure with a bar; pickups are seven day rows with a bar each. Every tab carries "Updated N minutes ago", with amber and red states that always show a word and an icon. | The operations manager's work (ADR 0057). A single share reads faster as a figure than as Bosta's two-slice ring. |
+| Shell | The admin's sidebar gains an *Affiliates \| Operations* switch under the brand. The operations manager's sidebar holds Shopify, Bosta and E-stebdal only. | The six affiliate sections stay six, and the operations manager sees nothing else. |
+| A6 `vSettings` | Team: *Operations manager* in the access picker, a line *See the operations dashboard* in the access table, and a refusal when one already exists. The Shopify section gains Bosta and E-stebdal key cards. | One operations manager at a time; the keys are kept the way the Shopify secret is (ADR 0045). |
 
 ## Evidence
 

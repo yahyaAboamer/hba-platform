@@ -22,6 +22,7 @@ from app.core.passwords import hash_password
 from app.core.permissions import VALID_ROLES
 from app.models.affiliates import AffiliateProfile
 from app.models.identity import Invitation, RoleAssignment, UserAccount
+from app.services.staff import assert_role_free
 
 TOKEN_BYTES = 32
 DEFAULT_VALID_HOURS = 72
@@ -45,6 +46,8 @@ def create_invitation(
     """
     if role not in VALID_ROLES:
         raise ValueError(f"Unknown role: {role}")
+    # One operations manager at a time (ADR 0057), counting open invitations.
+    assert_role_free(db, role)
 
     email = str(email or "").strip().lower()
 
@@ -157,6 +160,8 @@ def accept_invitation(
     )
     if existing is not None:
         raise ValueError("An account already exists for this email address")
+    # Taken meanwhile - two requests racing past the check at invitation time.
+    assert_role_free(db, invitation.role, accepting_invitation_id=invitation.id)
 
     # Refused before the invitation is consumed, so a rejected password does
     # not burn the link - the same reasoning as hashing first, extended to the

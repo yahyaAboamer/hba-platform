@@ -78,4 +78,16 @@ def test_an_unknown_action_still_reads_as_words_not_a_code():
 
 def test_who_is_the_person_not_the_address():
     assert _names().who(_event("auth.login", subject="user:1")) == "Nour Hassan"
+
+
+def test_the_operations_manager_role_is_said_in_words():
+    """ADR 0057. Without its entry the log wrote the code, `operations_manager`."""
+    names = _names(users={1: "Nour Hassan", 7: "Amr"})
+    words = sentence(
+        _event("staff.role_changed", subject="user:7", after={"role": "operations_manager"}),
+        names,
+    )
+
+    assert "operations manager" in words
+    assert "operations_manager" not in words
     assert audit_words._month("2026-02") == "February 2026"

@@ -1,0 +1,698 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Operations dashboard — mockup</title>
+<style>
+/* Inter, the app's own files (frontend/src/main.tsx). Falls back to the system face when opened from disk. */
+@font-face{font-family:Inter;font-style:normal;font-weight:400;font-display:swap;src:url(../../frontend/node_modules/@fontsource/inter/files/inter-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:Inter;font-style:normal;font-weight:500;font-display:swap;src:url(../../frontend/node_modules/@fontsource/inter/files/inter-latin-500-normal.woff2) format("woff2")}
+@font-face{font-family:Inter;font-style:normal;font-weight:600;font-display:swap;src:url(../../frontend/node_modules/@fontsource/inter/files/inter-latin-600-normal.woff2) format("woff2")}
+
+/* The product's tokens, copied from frontend/src/styles/tokens.css and accent.css. */
+:root{
+  --paper:#eff1ee;--surface:#ffffff;--raise:#ffffff;--ink:#101214;--quiet:#4e534e;--faint:#5e645e;
+  --rule:#dde1dc;--rule-strong:#c9cec8;--hover:#eff1ee;
+  --accent:#14653a;--accent-text:#14653a;--accent-soft:rgba(20,101,58,.09);--accent-on:#fff;
+  --owed:#8a5a16;--owed-quiet:rgba(138,90,22,.1);--refused:#9a2f22;--refused-quiet:rgba(154,47,34,.1);
+  --radius-sm:4px;--radius:8px;--radius-lg:14px;
+  --elev:0 1px 2px rgba(16,18,20,.08),0 0 0 1px rgba(16,18,20,.05);
+}
+[data-theme="dark"]{
+  --paper:#08090a;--surface:#15171a;--raise:#1d2126;--ink:#ecefea;--quiet:#a7ada6;--faint:#8a918a;
+  --rule:#23272b;--rule-strong:#2d3237;--hover:#1d2126;
+  --accent:#23a95c;--accent-text:#23a95c;--accent-soft:rgba(35,169,92,.14);--accent-on:#fff;
+  --owed:#e0a458;--owed-quiet:rgba(224,164,88,.12);--refused:#e2705f;--refused-quiet:rgba(226,112,95,.12);
+  --elev:0 1px 2px rgba(0,0,0,.5),0 0 0 1px rgba(236,239,234,.06);
+}
+*{box-sizing:border-box}
+html{font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink);background:var(--paper);-webkit-font-smoothing:antialiased}
+body{margin:0}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* ── The review page around the screens ─────────────────────────────── */
+.review{max-width:1340px;margin:0 auto;padding:28px 24px 72px}
+.eyebrow{margin:0;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:600}
+.review h1{margin:6px 0 8px;font-size:30px;font-weight:500;letter-spacing:-.015em}
+.lead{max-width:80ch;margin:0 0 16px;color:var(--quiet);font-size:14.5px;line-height:1.55}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 26px}
+.toolbar span{font-size:13px;color:var(--faint);margin-right:4px}
+.index{display:flex;flex-wrap:wrap;gap:6px 16px;margin:0 0 32px;padding:0;list-style:none;font-size:13.5px}
+.index a{color:var(--accent-text);text-decoration:none}
+.frame{margin:0 0 48px}
+.frame__label{margin:0 0 12px}
+.frame__label h2{margin:0;font-size:17px;font-weight:500}
+.frame__label p{max-width:90ch;margin:4px 0 0;color:var(--quiet);font-size:13.5px;line-height:1.5}
+.frame__scroll{overflow-x:auto;padding-bottom:8px}
+.screen{border:1px solid var(--rule-strong);border-radius:12px;overflow:hidden;background:var(--paper)}
+.screen--1280{width:1280px}
+.screen--390{width:390px}
+.screen--crop{width:auto;display:inline-block}
+.row{display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start}
+#f-switch .row{width:max-content;max-width:100%}
+.decide{max-width:90ch;font-size:14px;line-height:1.6}
+.decide li{margin-bottom:6px}
+
+/* ── The app shell (components/Layout.css) ──────────────────────────── */
+.shell{display:grid;grid-template-columns:216px minmax(0,1fr);min-height:780px}
+.side{display:flex;flex-direction:column;background:var(--surface);border-right:1px solid var(--rule)}
+.brand{display:flex;align-items:center;gap:9px;padding:16px;border-bottom:1px solid var(--rule)}
+.brand__mark{display:grid;place-items:center;flex:none;width:30px;height:30px;border:1px solid var(--accent);color:var(--accent);border-radius:var(--radius-sm);font-size:12px}
+.brand__name{display:block;font-size:14px}
+.brand__role{display:block;margin-top:2px;font-size:11.5px;color:var(--faint)}
+.side > nav{flex:1}
+.nav{margin:0;padding:10px 9px;list-style:none}
+.nav a{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:40px;margin-bottom:2px;padding:9px 11px;border-radius:var(--radius);color:var(--quiet);font-size:14px;text-decoration:none}
+.nav a:hover{background:var(--hover);color:var(--ink)}
+.nav a[aria-current="page"]{background:var(--accent-soft);color:var(--accent-text)}
+.nav__count{min-width:20px;padding:1px 6px;border-radius:999px;background:var(--accent-soft);color:var(--accent-text);font-size:11.5px;text-align:center}
+.account{display:flex;gap:10px;align-items:center;padding:13px 16px;border-top:1px solid var(--rule)}
+.avatar{display:grid;place-items:center;flex:none;width:30px;height:30px;border:1px solid var(--rule);border-radius:50%;background:var(--accent-soft);color:var(--accent-text);font-size:12px}
+.account__who{flex:1;min-width:0;font-size:13px}
+.account__who small{display:block;margin-top:2px;color:var(--faint);font-size:11.5px}
+.caret{color:var(--faint);font-size:10px}
+.main{min-width:0;padding:0 22px 30px}
+.head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 14px;margin:0 -22px 20px;padding:14px 22px;min-height:68px;border-bottom:1px solid var(--rule);background:var(--paper)}
+.head h1{margin:0;font-size:18px;font-weight:500;line-height:1.12;letter-spacing:-.015em}
+.head__sub{display:block;margin-top:4px;font-size:12.5px;color:var(--quiet)}
+.fresh{display:inline-flex;align-items:center;gap:7px;margin:0;font-size:12.5px;color:var(--quiet)}
+.fresh svg{width:14px;height:14px;flex:none}
+.fresh--stale{color:var(--owed)}
+.fresh--failed{color:var(--refused)}
+
+/* The admin's switch between the two dashboards - new, sits under the brand. */
+.switch{display:flex;margin:10px 9px 0;padding:3px;border:1px solid var(--rule);border-radius:var(--radius);background:var(--paper)}
+.switch a{flex:1;padding:6px 8px;border-radius:6px;color:var(--quiet);font-size:12.5px;text-align:center;text-decoration:none}
+.switch a[aria-current="page"]{background:var(--surface);color:var(--ink);box-shadow:var(--elev)}
+
+/* ── Cards (screens/Overview.css, the count card) ──────────────────── */
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(205px,1fr));gap:14px;margin:0 0 18px}
+.tile{display:flex;flex-direction:column;align-items:flex-start;min-height:150px;padding:16px 18px 14px;border:1px solid transparent;border-radius:var(--radius-lg);background:var(--surface);text-align:left;cursor:pointer}
+.tile:hover{border-color:var(--rule-strong)}
+.tile[aria-expanded="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.tile__label{font-size:12.5px;color:var(--quiet)}
+.tile__value{margin:8px 0 4px;font-size:32px;font-weight:400;line-height:1.1;letter-spacing:-.02em}
+.tile__note{font-size:12.5px;line-height:1.4;color:var(--quiet)}
+.tile__more{display:inline-flex;align-items:center;gap:4px;margin-top:auto;padding-top:12px;color:var(--accent-text);font-size:13px}
+.tile__more svg{width:13px;height:13px}
+.tile--zero .tile__value{color:var(--faint)}
+.tile--zero{cursor:default}
+.tile--zero:hover{border-color:transparent}
+.tile__as-of{margin-top:6px;font-size:11.5px;color:var(--faint)}
+.tiles--old .tile__value,.tiles--old .tile__note{opacity:.55}
+.tile--reading .tile__value{color:var(--faint);font-size:15px;margin:18px 0 12px}
+
+/* ── Panels and lists (base.css .table, Layout.css .panel) ─────────── */
+.panel{border-radius:var(--radius-lg);background:var(--surface);overflow:hidden;margin:0 0 18px}
+.panel__head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 12px;padding:14px 18px;border-bottom:1px solid var(--rule)}
+.panel__title{margin:0;font-size:15px;font-weight:400}
+.panel__hint{margin:0;font-size:12.5px;color:var(--quiet)}
+.panel__foot{padding:11px 18px;border-top:1px solid var(--rule)}
+.table{width:100%;border-collapse:collapse;font-size:13.5px}
+.table th,.table td{padding:10px 8px;border-bottom:1px solid var(--rule);text-align:left;vertical-align:middle}
+.table th:first-child,.table td:first-child{padding-left:18px}
+.table th:last-child,.table td:last-child{padding-right:18px}
+.table th{font-size:11px;font-weight:400;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);white-space:nowrap}
+.table tr:last-child td{border-bottom:0}
+.num{font-variant-numeric:tabular-nums}
+.ext{display:inline-flex;align-items:center;gap:5px;color:var(--accent-text);text-decoration:none;white-space:nowrap}
+.ext svg{width:12px;height:12px}
+.tag{display:inline-block;margin:2px 4px 2px 0;padding:2px 8px;border:1px solid var(--rule);border-radius:999px;color:var(--quiet);font-size:12px;white-space:nowrap}
+.tag--hit{border-color:var(--rule-strong);color:var(--ink)}
+.muted{color:var(--faint)}
+.linkbtn{padding:0;border:0;background:none;color:var(--accent-text);font-size:13px;cursor:pointer}
+.yes{color:var(--ink)}
+.no{display:inline-flex;align-items:center;gap:6px;color:var(--owed)}
+.no svg{width:13px;height:13px}
+
+/* ── Picked up per day: one hue, thin bars, 4px rounded data-end ───── */
+.split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;margin:0 0 18px}
+.split .panel{margin:0}
+.days{margin:0;padding:6px 0 8px;list-style:none}
+.day{display:grid;grid-template-columns:86px minmax(0,1fr) 40px 14px;align-items:center;gap:12px;width:100%;min-height:42px;padding:5px 18px;border:0;background:none;color:var(--ink);font-size:13.5px;text-align:left;cursor:pointer}
+.day:hover{background:var(--hover)}
+.day__label small{display:block;margin-top:1px;color:var(--faint);font-size:11.5px}
+.bar{height:14px;border-left:1px solid var(--rule-strong)}
+.bar i{display:block;height:14px;border-radius:0 4px 4px 0;background:var(--accent)}
+.day__count{text-align:right;font-variant-numeric:tabular-nums}
+.day svg{width:13px;height:13px;color:var(--faint)}
+.day--off{cursor:default;color:var(--faint)}
+.day--off:hover{background:none}
+.day__off{font-size:12.5px;color:var(--faint);padding-left:10px}
+
+/* ── Success rate: a meter, not a two-slice pie ──────────────────────── */
+.filters{display:flex;flex-wrap:wrap;gap:8px;padding:14px 18px 0}
+.chip{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:8px 13px;border:1px solid var(--rule);border-radius:var(--radius);background:transparent;color:var(--quiet);font-size:13px;cursor:pointer}
+.chip[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--accent-text)}
+.range{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:12px 18px 0;font-size:13px;color:var(--quiet)}
+.range input{width:136px;min-height:36px;padding:6px 10px;border:1px solid var(--rule);border-radius:var(--radius);background:var(--surface)}
+.rate{padding:18px 18px 18px}
+.rate__value{margin:0 0 14px;font-size:48px;font-weight:400;line-height:1;letter-spacing:-.02em}
+.meter{height:10px;border-radius:5px;background:var(--accent-soft);overflow:hidden}
+.meter i{display:block;height:100%;border-radius:5px;background:var(--accent)}
+.rate__parts{display:flex;flex-wrap:wrap;gap:6px 18px;margin:12px 0 0;font-size:13.5px}
+.key{display:inline-flex;align-items:center;gap:7px}
+.key::before{content:"";width:10px;height:10px;border-radius:3px;background:var(--accent)}
+.key--fail::before{background:var(--accent-soft);box-shadow:inset 0 0 0 1px var(--rule-strong)}
+.key--all::before{display:none}
+.rate__note{margin:12px 0 0;font-size:12.5px;line-height:1.5;color:var(--quiet)}
+
+/* ── States ─────────────────────────────────────────────────────────── */
+.banner{display:flex;gap:11px;align-items:flex-start;margin:0 0 14px;padding:12px 14px;border:1px solid var(--owed);border-radius:var(--radius);background:var(--owed-quiet);font-size:13.5px}
+.banner svg{width:16px;height:16px;flex:none;margin-top:1px;color:var(--owed)}
+.banner small{display:block;margin-top:3px;color:var(--quiet);font-size:12.5px;line-height:1.45}
+.banner--failed{border-color:var(--refused);background:var(--refused-quiet)}
+.banner--failed svg{color:var(--refused)}
+.banner--off{border-color:var(--rule-strong);background:var(--surface)}
+.banner--off svg{color:var(--faint)}
+.states{display:grid;grid-template-columns:1fr 1fr;gap:0}
+.state{padding:0 22px 22px;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule)}
+.state:nth-child(2n){border-right:0}
+.state .head{margin:0 -22px 16px}
+.state .tiles{grid-template-columns:1fr 1fr;margin:0}
+.state__name{display:inline-block;margin:0 0 12px;padding:2px 9px;border-radius:999px;background:var(--hover);color:var(--quiet);font-size:11.5px;letter-spacing:.04em;text-transform:uppercase}
+
+/* ── Settings pieces ─────────────────────────────────────────────────── */
+.settings{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:18px;padding:22px;background:var(--paper)}
+.settings .panel{margin:0}
+.field{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--quiet)}
+.field input,.field select{min-height:38px;padding:7px 10px;border:1px solid var(--rule);border-radius:var(--radius);background:var(--surface);color:var(--ink)}
+.invite{display:grid;grid-template-columns:1fr 200px auto;gap:10px;align-items:end;padding:16px 18px}
+.btn{min-height:38px;padding:8px 16px;border:1px solid var(--accent);border-radius:var(--radius);background:var(--accent);color:var(--accent-on);font-size:13.5px;cursor:pointer}
+.btn--quiet{border-color:var(--rule-strong);background:transparent;color:var(--ink)}
+.refusal{margin:0 18px 16px;padding:10px 12px;border:1px solid var(--refused);border-radius:var(--radius);background:var(--refused-quiet);font-size:13px}
+.perm td,.perm th{text-align:center}
+.perm td:first-child,.perm th:first-child{text-align:left}
+.perm .new td{background:var(--accent-soft)}
+.conn{padding:16px 18px;border-bottom:1px solid var(--rule)}
+.conn:last-child{border-bottom:0}
+.conn__top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.conn__name{font-size:14.5px}
+.conn__state{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--accent-text)}
+.conn__state::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--accent)}
+.conn__state--env{color:var(--quiet)}
+.conn__state--env::before{background:var(--faint)}
+.conn dl{display:grid;grid-template-columns:120px 1fr;gap:6px 12px;margin:12px 0 12px;font-size:13px}
+.conn dt{color:var(--quiet)} .conn dd{margin:0}
+
+/* ── Phone (the shell's own <=800px rules, drawn at 390) ───────────── */
+.screen--390 .shell{display:block;min-height:0}
+.screen--390 .side{border-right:0;border-bottom:1px solid var(--rule)}
+.screen--390 .brand{justify-content:space-between;padding:10px 16px}
+.screen--390 .brand > span:first-child{display:flex;align-items:center;gap:9px}
+.screen--390 .nav{display:flex;gap:4px;padding:6px 8px;overflow-x:auto}
+.screen--390 .nav a{margin:0;white-space:nowrap}
+.screen--390 .main{padding:0 16px 24px}
+.screen--390 .head{margin:0 -16px 16px;padding:14px 16px}
+.screen--390 .fresh{flex-basis:100%}
+.screen--390 .tiles{grid-template-columns:1fr 1fr;gap:10px}
+.screen--390 .tile{min-height:0;padding:13px 14px 12px}
+.screen--390 .tile__value{font-size:28px}
+.screen--390 .split{grid-template-columns:1fr}
+.screen--390 .day{grid-template-columns:70px minmax(0,1fr) 34px 12px;padding:5px 14px;gap:10px}
+.screen--390 .rate__value{font-size:44px}
+.rows{margin:0;padding:0;list-style:none}
+.rows li{padding:12px 16px;border-bottom:1px solid var(--rule)}
+.rows li:last-child{border-bottom:0}
+.rows__top{display:flex;justify-content:space-between;gap:8px;font-size:14px}
+.rows__tags{margin-top:6px}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7.5v5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="16.5" r="1.2" fill="currentColor"/></symbol>
+  <symbol id="i-plug" viewBox="0 0 24 24"><path d="M9 3v5M15 3v5M7 8h10v3a5 5 0 0 1-10 0V8zM12 16v5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-ext" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><path d="M6 15l6-6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-right" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+</svg>
+
+<div class="review">
+  <p class="eyebrow">Mockup for approval · 3 October 2026 · ADR 0057 (proposed)</p>
+  <h1>Operations dashboard</h1>
+  <p class="lead">What the operations manager sees when he signs in, and how the admin reaches the same dashboard. The counts are the real ones from 3 October; order and tracking numbers in the lists are made up, and no customer details appear anywhere. It is drawn with the product's own colours, type, cards and tables. Nothing here is built yet.</p>
+  <div class="toolbar" role="group" aria-label="Theme">
+    <span>Theme</span>
+    <button class="chip" type="button" data-theme-choice="dark" aria-pressed="true">Dark</button>
+    <button class="chip" type="button" data-theme-choice="light" aria-pressed="false">Light</button>
+  </div>
+  <ol class="index">
+    <li><a href="#f-shopify">1. Shopify</a></li>
+    <li><a href="#f-bosta">2. Bosta</a></li>
+    <li><a href="#f-estebdal">3. E-stebdal</a></li>
+    <li><a href="#f-states">4. Old, failed and empty numbers</a></li>
+    <li><a href="#f-switch">5. The admin's switch</a></li>
+    <li><a href="#f-settings">6. Settings</a></li>
+    <li><a href="#f-phone">7. On a phone</a></li>
+    <li><a href="#f-decide">What you are approving</a></li>
+  </ol>
+
+  <!-- ═══════════════════════════ 1. SHOPIFY ═══════════════════════════ -->
+  <section class="frame" id="f-shopify">
+    <div class="frame__label">
+      <h2>1. The operations manager signs in and lands on Shopify</h2>
+      <p>Three sections, in the same sidebar the admin tool uses. Every card opens the list of orders behind its number, below the cards; one list is open at a time. Here <em>Bosta sync failed</em> is open.</p>
+    </div>
+    <div class="frame__scroll">
+      <div class="screen screen--1280" id="shot-shopify">
+        <div class="shell">
+          <aside class="side">
+            <div class="brand"><span class="brand__mark">H</span><span><span class="brand__name">HBA</span><span class="brand__role">Operations</span></span></div>
+            <nav aria-label="Operations"><ul class="nav">
+              <li><a href="#" aria-current="page">Shopify</a></li>
+              <li><a href="#">Bosta</a></li>
+              <li><a href="#">E-stebdal</a></li>
+            </ul></nav>
+            <div class="account"><span class="avatar">A</span><span class="account__who">Amr<small>Operations manager</small></span><span class="caret">▾</span></div>
+          </aside>
+          <main class="main">
+            <header class="head">
+              <div><h1>Shopify</h1><span class="head__sub">Open orders not shipped yet · 29</span></div>
+              <p class="fresh" role="status" title="Read from Shopify at 14:21. Read again every 5 minutes."><svg aria-hidden="true"><use href="#i-clock"/></svg>Updated 2 minutes ago</p>
+            </header>
+            <div class="tiles">
+              <button class="tile" type="button" aria-expanded="false"><span class="tile__label">Confirmed</span><span class="tile__value">17</span><span class="tile__note">Confirmed, not shipped yet</span><span class="tile__more">Show orders <svg aria-hidden="true"><use href="#i-down"/></svg></span></button>
+              <button class="tile" type="button" aria-expanded="false"><span class="tile__label">No answer</span><span class="tile__value">7</span><span class="tile__note">Not tried a second time yet</span><span class="tile__more">Show orders <svg aria-hidden="true"><use href="#i-down"/></svg></span></button>
+              <div class="tile tile--zero"><span class="tile__label">No answer, WhatsApp not sent</span><span class="tile__value">0</span><span class="tile__note">Nothing waiting</span></div>
+              <button class="tile" type="button" aria-expanded="false"><span class="tile__label">No WhatsApp</span><span class="tile__value">1</span><span class="tile__note">The number has no WhatsApp: call instead</span><span class="tile__more">Show orders <svg aria-hidden="true"><use href="#i-down"/></svg></span></button>
+              <button class="tile" type="button" aria-expanded="true" aria-controls="list-sync"><span class="tile__label">Bosta sync failed</span><span class="tile__value">5</span><span class="tile__note">Confirmed but never reached Bosta</span><span class="tile__more">Hide orders <svg aria-hidden="true"><use href="#i-up"/></svg></span></button>
+              <button class="tile" type="button" aria-expanded="false"><span class="tile__label">Compression, not call-confirmed</span><span class="tile__value">5</span><span class="tile__note">Needs a confirmation call</span><span class="tile__more">Show orders <svg aria-hidden="true"><use href="#i-down"/></svg></span></button>
+              <button class="tile" type="button" aria-expanded="false"><span class="tile__label">Cancel in Shopify</span><span class="tile__value">1</span><span class="tile__note">Tagged cancelled, still open in Shopify</span><span class="tile__more">Show orders <svg aria-hidden="true"><use href="#i-down"/></svg></span></button>
+            </div>
+            <section class="panel" id="list-sync" aria-labelledby="list-sync-title">
+              <div class="panel__head"><h2 class="panel__title" id="list-sync-title">Bosta sync failed · 5 orders</h2><p class="panel__hint">Each order opens in Shopify, where it is sent to Bosta again.</p></div>
+              <table class="table">
+                <thead><tr><th>Order</th><th>Placed</th><th>Waiting</th><th>Tags</th></tr></thead>
+                <tbody>
+                  <tr><td><a class="ext" href="#">#30931 <svg aria-hidden="true"><use href="#i-ext"/></svg></a></td><td class="num">3 Oct, 10:42</td><td class="muted">Today</td><td><span class="tag">Confirmed ✅</span><span class="tag tag--hit">bosta_sync_failed</span></td></tr>
+                  <tr><td><a class="ext" href="#">#30927 <svg aria-hidden="true"><use href="#i-ext"/></svg></a></td><td class="num">1 Oct, 21:15</td><td>2 days</td><td><span class="tag">Confirmed ✅</span><span class="tag tag--hit">bosta_sync_failed</span></td></tr>
+                  <tr><td><a class="ext" href="#">#30918 <svg aria-hidden="true"><use href="#i-ext"/></svg></a></td><td class="num">1 Oct, 13:08</td><td>2 days</td><td><span class="tag">Confirmed ✅</span><span class="tag tag--hit">bosta_sync_failed</span></td></tr>
+                  <tr><td><a class="ext" href="#">#30904 <svg aria-hidden="true"><use href="#i-ext"/></svg></a></td><td class="num">30 Sep, 18:40</td><td>3 days</td><td><span class="tag">Call Confirmed📞</span><span class="tag">Confirmed ✅</span><span class="tag tag--hit">bosta_sync_failed</span><span class="tag">compression</span></td></tr>
+                  <tr><td><a class="ext" href="#">#30889 <svg aria-hidden="true"><use href="#i-ext"/></svg></a></td><td class="num">29 Sep, 12:26</td><td>4 days</td><td><span class="tag">Confirmed ✅</span><span class="tag">No WhatsApp 📵</span><span class="tag tag--hit">bosta_sync_failed</span></td></tr>
+                </tbody>
+              </table>
+            </section>
+          </main>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════ 2. BOSTA ═══════════════════════════ -->
+  <section class="frame" id="f-bosta">
+    <div class="frame__label">
+      <h2>2. Bosta</h2>
+      <p>Four counts, the last seven days of pickups and the success rate. Each day opens the orders Bosta collected that day; Friday is drawn as a day off. The success rate is one figure with a bar, for the range chosen above it. Here <em>New, not shipped</em> is open.</p>
+    </div>
+    <div class="frame__scroll">
+      <div class="screen screen--1280" id="shot-bosta">
+        <div class="shell">
+          <aside class="side">
+            <div class="brand"><span class="brand__mark">H</span><span><span class="brand__name">HBA</span><span class="brand__role">Operations</span></span></div>
+            <nav aria-label="Operations"><ul class="nav">
+              <li><a href="#">Shopify</a></li>
+              <li><a href="#" aria-current="page">Bosta</a></li>
+              <li><a href="#">E-stebdal</a></li>
+            </ul></nav>
+            <div class="account"><span class="avatar">A</span><span class="account__who">Amr<small>Operations manager</small></span><span class="caret">▾</span></div>
+          </aside>
+          <main class="main">
+            <header class="head">
+              <div><h1>Bosta</h1><span class="head__sub">Every order HBA has on Bosta</span></div>
+              <p class="fresh" role="status" title="Read from Bosta at 14:19. Read again every 5 minutes."><svg aria-hidden="true"><use href="#i-clock"/></svg>Updated 4 minutes ago</p>
+            </header>
+            <div class="tiles">
+              <button class="tile" type="button" aria-expanded="true" aria-controls="list-new"><span class="tile__label">New, not shipped</span><span class="tile__value">29</span><span class="tile__note">Waiting for pickup more than 2 working days</span><span class="tile__more">Hide orders <svg aria-hidden="true"><use href="#i-up"/></svg></span></button>
+              <button class="tile" type="button" aria-expanded="false"><span class="tile__label">Not printed</span><span class="tile__value">1</span><span class="tile__note">Airway bill not printed yet</span><span class="tile__more">Show orders <svg aria-hidden="true"><use href="#i-down"/></svg></span></button>
+              <button class="tile" type="button" aria-expanded="false"><span class="tile__label">Awaiting your action</span><span class="tile__value">2</span><span class="tile__note">Bosta is waiting for HBA</span><span class="tile__more">Show orders <svg aria-hidden="true"><use href="#i-down"/></svg></span></button>
+              <button class="tile" type="button" aria-expanded="false"><span class="tile__label">Shipped, not delivered</span><span class="tile__value">9</span><span class="tile__note">Collected more than 3 working days ago</span><span class="tile__more">Show orders <svg aria-hidden="true"><use href="#i-down"/></svg></span></button>
+            </div>
+            <section class="panel" id="list-new" aria-labelledby="list-new-title">
+              <div class="panel__head"><h2 class="panel__title" id="list-new-title">New, not shipped · 29 orders</h2><p class="panel__hint">Oldest first. Each opens in Bosta.</p></div>
+              <table class="table">
+                <thead><tr><th>Tracking number</th><th>Shopify order</th><th>Type</th><th>Created on Bosta</th><th>Waiting</th><th>Airway bill</th></tr></thead>
+                <tbody>
+                  <tr><td><a class="ext num" href="#">5041829317 <svg aria-hidden="true"><use href="#i-ext"/></svg></a></td><td class="num">#30412</td><td>Send</td><td class="num">14 Sep</td><td>16 working days</td><td class="yes">Printed 14 Sep</td></tr>
+                  <tr><td><a class="ext num" href="#">5047710284 <svg aria-hidden="true"><use href="#i-ext"/></svg></a></td><td class="num">#30466</td><td>Exchange</td><td class="num">17 Sep</td><td>13 working days</td><td class="yes">Printed 17 Sep</td></tr>
+                  <tr><td><a class="ext num" href="#">5052264109 <svg aria-hidden="true"><use href="#i-ext"/></svg></a></td><td class="num">#30588</td><td>Send</td><td class="num">22 Sep</td><td>9 working days</td><td class="yes">Printed 22 Sep</td></tr>
+                  <tr><td><a class="ext num" href="#">5058130772 <svg aria-hidden="true"><use href="#i-ext"/></svg></a></td><td class="num">#30701</td><td>Send</td><td class="num">25 Sep</td><td>6 working days</td><td><span class="no"><svg aria-hidden="true"><use href="#i-alert"/></svg>Not printed</span></td></tr>
+                  <tr><td><a class="ext num" href="#">5060948815 <svg aria-hidden="true"><use href="#i-ext"/></svg></a></td><td class="num">#30744</td><td>Send</td><td class="num">27 Sep</td><td>5 working days</td><td class="yes">Printed 27 Sep</td></tr>
+                </tbody>
+              </table>
+              <div class="panel__foot"><button class="linkbtn" type="button">Show the other 24</button></div>
+            </section>
+            <div class="split">
+              <section class="panel" aria-labelledby="days-title">
+                <div class="panel__head"><h2 class="panel__title" id="days-title">Picked up, last 7 days</h2><p class="panel__hint">Collected from HBA, by day</p></div>
+                <ul class="days">
+                  <li><button class="day" type="button"><span class="day__label">Saturday<small>3 Oct · today</small></span><span class="bar"><i style="width:5.8%"></i></span><span class="day__count">5</span><svg aria-hidden="true"><use href="#i-right"/></svg></button></li>
+                  <li><div class="day day--off"><span class="day__label">Friday<small>2 Oct</small></span><span class="day__off">Day off, no pickups</span><span class="day__count">0</span><span></span></div></li>
+                  <li><button class="day" type="button"><span class="day__label">Thursday<small>1 Oct</small></span><span class="bar"><i style="width:81.4%"></i></span><span class="day__count">70</span><svg aria-hidden="true"><use href="#i-right"/></svg></button></li>
+                  <li><button class="day" type="button"><span class="day__label">Wednesday<small>30 Sep</small></span><span class="bar"><i style="width:15.1%"></i></span><span class="day__count">13</span><svg aria-hidden="true"><use href="#i-right"/></svg></button></li>
+                  <li><button class="day" type="button"><span class="day__label">Tuesday<small>29 Sep</small></span><span class="bar"><i style="width:40.7%"></i></span><span class="day__count">35</span><svg aria-hidden="true"><use href="#i-right"/></svg></button></li>
+                  <li><button class="day" type="button"><span class="day__label">Monday<small>28 Sep</small></span><span class="bar"><i style="width:37.2%"></i></span><span class="day__count">32</span><svg aria-hidden="true"><use href="#i-right"/></svg></button></li>
+                  <li><button class="day" type="button"><span class="day__label">Sunday<small>27 Sep</small></span><span class="bar"><i style="width:100%"></i></span><span class="day__count">86</span><svg aria-hidden="true"><use href="#i-right"/></svg></button></li>
+                </ul>
+              </section>
+              <section class="panel" aria-labelledby="rate-title">
+                <div class="panel__head"><h2 class="panel__title" id="rate-title">Success rate</h2><p class="panel__hint">Counted the way Bosta's dashboard counts it</p></div>
+                <div class="filters" role="group" aria-label="Range">
+                  <button class="chip" type="button" aria-pressed="false">Today</button>
+                  <button class="chip" type="button" aria-pressed="false">A day…</button>
+                  <button class="chip" type="button" aria-pressed="false">Last 7 days</button>
+                  <button class="chip" type="button" aria-pressed="false">Last 30 days</button>
+                  <button class="chip" type="button" aria-pressed="true">From – to…</button>
+                </div>
+                <div class="range"><label class="sr" for="r-from">From</label><input id="r-from" value="1 Sep 2026"><span>to</span><label class="sr" for="r-to">To</label><input id="r-to" value="30 Sep 2026"></div>
+                <div class="rate">
+                  <p class="rate__value">84.6%</p>
+                  <div class="meter" role="img" aria-label="84.6% successful"><i style="width:84.6%"></i></div>
+                  <p class="rate__parts"><span class="key">970 successful</span><span class="key key--fail">176 unsuccessful</span><span class="key key--all muted">1,146 finished</span></p>
+                  <p class="rate__note">Orders created on Bosta from 1 to 30 September. Successful: delivered, exchanged, or a return collected. Unsuccessful: a delivery that came back to HBA.</p>
+                </div>
+              </section>
+            </div>
+          </main>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════ 3. E-STEBDAL ═══════════════════════════ -->
+  <section class="frame" id="f-estebdal">
+    <div class="frame__label">
+      <h2>3. E-stebdal</h2>
+      <p>One card. Its list shows the request and order numbers, and each opens in E-stebdal.</p>
+    </div>
+    <div class="frame__scroll">
+      <div class="screen screen--1280" id="shot-estebdal">
+        <div class="shell" style="min-height:560px">
+          <aside class="side">
+            <div class="brand"><span class="brand__mark">H</span><span><span class="brand__name">HBA</span><span class="brand__role">Operations</span></span></div>
+            <nav aria-label="Operations"><ul class="nav">
+              <li><a href="#">Shopify</a></li>
+              <li><a href="#">Bosta</a></li>
+              <li><a href="#" aria-current="page">E-stebdal</a></li>
+            </ul></nav>
+            <div class="account"><span class="avatar">A</span><span class="account__who">Amr<small>Operations manager</small></span><span class="caret">▾</span></div>
+          </aside>
+          <main class="main">
+            <header class="head">
+              <div><h1>E-stebdal</h1><span class="head__sub">Return and exchange requests</span></div>
+              <p class="fresh" role="status" title="Read from E-stebdal at 14:22. Read again every 5 minutes."><svg aria-hidden="true"><use href="#i-clock"/></svg>Updated 1 minute ago</p>
+            </header>
+            <div class="tiles">
+              <button class="tile" type="button" aria-expanded="true" aria-controls="list-review"><span class="tile__label">Needs review</span><span class="tile__value">3</span><span class="tile__note">Nobody has approved or rejected them yet</span><span class="tile__more">Hide requests <svg aria-hidden="true"><use href="#i-up"/></svg></span></button>
+            </div>
+            <section class="panel" id="list-review" aria-labelledby="list-review-title">
+              <div class="panel__head"><h2 class="panel__title" id="list-review-title">Needs review · 3 requests</h2><p class="panel__hint">Each opens in E-stebdal.</p></div>
+              <table class="table">
+                <thead><tr><th>Request</th><th>Order</th><th>Requested</th><th>Waiting</th></tr></thead>
+                <tbody>
+                  <tr><td><a class="ext num" href="#">#30830-R1 <svg aria-hidden="true"><use href="#i-ext"/></svg></a></td><td class="num">#30830</td><td class="num">3 Oct, 13:49</td><td class="muted">Today</td></tr>
+                  <tr><td><a class="ext num" href="#">#30794-R1 <svg aria-hidden="true"><use href="#i-ext"/></svg></a></td><td class="num">#30794</td><td class="num">2 Oct, 19:05</td><td>1 day</td></tr>
+                  <tr><td><a class="ext num" href="#">#30751-R2 <svg aria-hidden="true"><use href="#i-ext"/></svg></a></td><td class="num">#30751</td><td class="num">30 Sep, 11:32</td><td>3 days</td></tr>
+                </tbody>
+              </table>
+            </section>
+          </main>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════ 4. STATES ═══════════════════════════ -->
+  <section class="frame" id="f-states">
+    <div class="frame__label">
+      <h2>4. When a number is old, failed or not there yet</h2>
+      <p>A number is never shown as current when it isn't, and a failure is never shown as 0. Older than 10 minutes turns amber; a source that can't be read turns red; both keep the last good numbers, greyed, with their time. Colour always comes with a word and an icon.</p>
+    </div>
+    <div class="frame__scroll">
+      <div class="screen screen--1280" id="shot-states">
+        <div class="states">
+          <div class="state">
+            <header class="head"><div><h1>Bosta</h1><span class="head__sub">Every order HBA has on Bosta</span></div><p class="fresh fresh--stale" role="status"><svg aria-hidden="true"><use href="#i-clock"/></svg>Not updated for 14 minutes</p></header>
+            <span class="state__name">Old</span>
+            <div class="banner" role="status"><svg aria-hidden="true"><use href="#i-clock"/></svg><div>These are Bosta's numbers from 14:05.<small>Bosta has been slow to answer. The platform keeps trying every 5 minutes.</small></div></div>
+            <div class="tiles tiles--old">
+              <div class="tile"><span class="tile__label">New, not shipped</span><span class="tile__value">29</span><span class="tile__note">Waiting for pickup more than 2 working days</span><span class="tile__as-of">As of 14:05</span></div>
+              <div class="tile"><span class="tile__label">Awaiting your action</span><span class="tile__value">2</span><span class="tile__note">Bosta is waiting for HBA</span><span class="tile__as-of">As of 14:05</span></div>
+            </div>
+          </div>
+          <div class="state">
+            <header class="head"><div><h1>Bosta</h1><span class="head__sub">Every order HBA has on Bosta</span></div><p class="fresh fresh--failed"><svg aria-hidden="true"><use href="#i-alert"/></svg>Can't reach Bosta</p></header>
+            <span class="state__name">Failed</span>
+            <div class="banner banner--failed" role="alert"><svg aria-hidden="true"><use href="#i-alert"/></svg><div>Bosta refused the key.<small>The numbers below are from 14:05. An admin needs to replace the Bosta key in Settings → Shopify.</small></div></div>
+            <div class="tiles tiles--old">
+              <div class="tile"><span class="tile__label">New, not shipped</span><span class="tile__value">29</span><span class="tile__note">Waiting for pickup more than 2 working days</span><span class="tile__as-of">As of 14:05</span></div>
+              <div class="tile"><span class="tile__label">Awaiting your action</span><span class="tile__value">2</span><span class="tile__note">Bosta is waiting for HBA</span><span class="tile__as-of">As of 14:05</span></div>
+            </div>
+          </div>
+          <div class="state">
+            <header class="head"><div><h1>E-stebdal</h1><span class="head__sub">Return and exchange requests</span></div><p class="fresh"><svg aria-hidden="true"><use href="#i-plug"/></svg>Not connected</p></header>
+            <span class="state__name">Not connected</span>
+            <div class="banner banner--off" role="status"><svg aria-hidden="true"><use href="#i-plug"/></svg><div>E-stebdal isn't connected yet.<small>An admin adds the E-stebdal key in Settings → Shopify. Until then this tab has no numbers.</small></div></div>
+          </div>
+          <div class="state">
+            <header class="head"><div><h1>Shopify</h1><span class="head__sub">Open orders not shipped yet</span></div><p class="fresh"><svg aria-hidden="true"><use href="#i-clock"/></svg>Reading Shopify…</p></header>
+            <span class="state__name">First read, and nothing waiting</span>
+            <div class="tiles">
+              <div class="tile tile--reading"><span class="tile__label">Confirmed</span><span class="tile__value">Reading…</span><span class="tile__note">Confirmed, not shipped yet</span></div>
+              <div class="tile tile--zero"><span class="tile__label">No answer, WhatsApp not sent</span><span class="tile__value">0</span><span class="tile__note">Nothing waiting</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════ 5. SWITCH ═══════════════════════════ -->
+  <section class="frame" id="f-switch">
+    <div class="frame__label">
+      <h2>5. The admin's switch between the two dashboards</h2>
+      <p>Only the admin sees it, under the brand at the top of the sidebar. The six affiliate sections stay six, as the approved design draws them; switching to Operations swaps them for Shopify, Bosta and E-stebdal.</p>
+    </div>
+    <div class="row">
+      <div class="screen screen--crop" id="shot-switch-affiliates">
+        <aside class="side" style="width:216px;min-height:520px">
+          <div class="brand"><span class="brand__mark">H</span><span><span class="brand__name">HBA</span><span class="brand__role">Admin</span></span></div>
+          <div class="switch" role="group" aria-label="Dashboard"><a href="#" aria-current="page">Affiliates</a><a href="#">Operations</a></div>
+          <nav aria-label="Affiliates"><ul class="nav">
+            <li><a href="#" aria-current="page">Home</a></li>
+            <li><a href="#">Models <span class="nav__count">2</span></a></li>
+            <li><a href="#">Products</a></li>
+            <li><a href="#">Targets</a></li>
+            <li><a href="#">Payments <span class="nav__count">1</span></a></li>
+            <li><a href="#">Settings</a></li>
+          </ul></nav>
+          <div class="account"><span class="avatar">Y</span><span class="account__who">Yahya<small>Admin</small></span><span class="caret">▾</span></div>
+        </aside>
+      </div>
+      <div class="screen screen--crop" id="shot-switch-operations">
+        <aside class="side" style="width:216px;min-height:520px">
+          <div class="brand"><span class="brand__mark">H</span><span><span class="brand__name">HBA</span><span class="brand__role">Admin</span></span></div>
+          <div class="switch" role="group" aria-label="Dashboard"><a href="#">Affiliates</a><a href="#" aria-current="page">Operations</a></div>
+          <nav aria-label="Operations"><ul class="nav">
+            <li><a href="#" aria-current="page">Shopify</a></li>
+            <li><a href="#">Bosta</a></li>
+            <li><a href="#">E-stebdal</a></li>
+          </ul></nav>
+          <div class="account"><span class="avatar">Y</span><span class="account__who">Yahya<small>Admin</small></span><span class="caret">▾</span></div>
+        </aside>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════ 6. SETTINGS ═══════════════════════════ -->
+  <section class="frame" id="f-settings">
+    <div class="frame__label">
+      <h2>6. Settings: the role in Team, and the two new keys</h2>
+      <p>The admin invites the operations manager like any staff member. A second one is refused with the reason. The Bosta and E-stebdal keys sit with the Shopify connection, and are never shown again once saved.</p>
+    </div>
+    <div class="frame__scroll">
+      <div class="screen screen--1280" id="shot-settings">
+        <div class="settings">
+          <section class="panel" aria-labelledby="team-title">
+            <div class="panel__head"><h2 class="panel__title" id="team-title">Team</h2><p class="panel__hint">Who can sign in to the admin tools</p></div>
+            <table class="table">
+              <thead><tr><th>Person</th><th>Access</th></tr></thead>
+              <tbody>
+                <tr><td>Yahya</td><td>Admin</td></tr>
+                <tr><td>Boda</td><td>Affiliate manager</td></tr>
+                <tr><td>Sara</td><td>Content manager</td></tr>
+                <tr><td>Amr</td><td>Operations manager</td></tr>
+              </tbody>
+            </table>
+            <div class="invite">
+              <label class="field">Invite someone<input value="new.person@example.com"></label>
+              <label class="field">Access<select><option>Operations manager</option><option>Content manager</option><option>Affiliate manager</option><option>Admin</option></select></label>
+              <button class="btn" type="button">Send invitation</button>
+            </div>
+            <p class="refusal" role="alert">HBA already has an operations manager: Amr. Change his access first.</p>
+            <table class="table perm">
+              <thead><tr><th>Can…</th><th>Content manager</th><th>Affiliate manager</th><th>Operations manager</th><th>Admin</th></tr></thead>
+              <tbody>
+                <tr><td>See and edit models, and set their pay terms</td><td>✓</td><td>✓</td><td class="muted">—</td><td>✓</td></tr>
+                <tr><td>Approve a month's pay</td><td class="muted">—</td><td>✓</td><td class="muted">—</td><td>✓</td></tr>
+                <tr class="new"><td>See the operations dashboard</td><td class="muted">—</td><td class="muted">—</td><td>✓</td><td>✓</td></tr>
+                <tr><td>Invite staff, up to their own access</td><td class="muted">—</td><td>✓</td><td class="muted">—</td><td>✓</td></tr>
+                <tr><td>Change anyone's access, Shopify and the pay policy</td><td class="muted">—</td><td class="muted">—</td><td class="muted">—</td><td>✓</td></tr>
+              </tbody>
+            </table>
+          </section>
+          <section class="panel" aria-labelledby="conn-title">
+            <div class="panel__head"><h2 class="panel__title" id="conn-title">Shopify, Bosta and E-stebdal</h2><p class="panel__hint">Admin only</p></div>
+            <div class="conn">
+              <div class="conn__top"><span class="conn__name">Shopify</span><span class="conn__state">Connected</span></div>
+              <dl><dt>Shop</dt><dd>HBA Wear</dd><dt>Checked</dt><dd>3 Oct, 14:02</dd></dl>
+            </div>
+            <div class="conn">
+              <div class="conn__top"><span class="conn__name">Bosta</span><span class="conn__state">Connected</span></div>
+              <dl><dt>Key</dt><dd>Read only · ends in a1b2</dd><dt>Checked</dt><dd>3 Oct, 14:02</dd></dl>
+              <button class="btn btn--quiet" type="button">Replace key</button>
+            </div>
+            <div class="conn">
+              <div class="conn__top"><span class="conn__name">E-stebdal</span><span class="conn__state conn__state--env">From Railway</span></div>
+              <dl><dt>Key</dt><dd>Set on the server · ends in 9f3c</dd><dt>Checked</dt><dd>3 Oct, 14:02</dd></dl>
+              <button class="btn btn--quiet" type="button">Save a key here instead</button>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════ 7. PHONE ═══════════════════════════ -->
+  <section class="frame" id="f-phone">
+    <div class="frame__label">
+      <h2>7. On a phone (390 wide)</h2>
+      <p>The sidebar becomes a row of tabs across the top, the same way the admin tool already folds. Cards go two to a row, lists become stacked rows, and nothing scrolls sideways.</p>
+    </div>
+    <div class="row">
+      <div class="screen screen--390" id="shot-phone-shopify">
+        <div class="shell">
+          <div class="side">
+            <div class="brand"><span><span class="brand__mark">H</span><span><span class="brand__name">HBA</span><span class="brand__role">Operations</span></span></span><span class="avatar">A</span></div>
+            <nav aria-label="Operations"><ul class="nav">
+              <li><a href="#" aria-current="page">Shopify</a></li>
+              <li><a href="#">Bosta</a></li>
+              <li><a href="#">E-stebdal</a></li>
+            </ul></nav>
+          </div>
+          <main class="main">
+            <header class="head">
+              <div><h1>Shopify</h1><span class="head__sub">Open orders not shipped yet · 29</span></div>
+              <p class="fresh" role="status"><svg aria-hidden="true"><use href="#i-clock"/></svg>Updated 2 minutes ago</p>
+            </header>
+            <div class="tiles">
+              <button class="tile" type="button" aria-expanded="false"><span class="tile__label">Confirmed</span><span class="tile__value">17</span><span class="tile__note">Not shipped yet</span></button>
+              <button class="tile" type="button" aria-expanded="false"><span class="tile__label">No answer</span><span class="tile__value">7</span><span class="tile__note">Not tried twice yet</span></button>
+              <div class="tile tile--zero"><span class="tile__label">No answer, WhatsApp not sent</span><span class="tile__value">0</span><span class="tile__note">Nothing waiting</span></div>
+              <button class="tile" type="button" aria-expanded="false"><span class="tile__label">No WhatsApp</span><span class="tile__value">1</span><span class="tile__note">Call instead</span></button>
+              <button class="tile" type="button" aria-expanded="true"><span class="tile__label">Bosta sync failed</span><span class="tile__value">5</span><span class="tile__note">Never reached Bosta</span></button>
+              <button class="tile" type="button" aria-expanded="false"><span class="tile__label">Compression, not call-confirmed</span><span class="tile__value">5</span><span class="tile__note">Needs a call</span></button>
+              <button class="tile" type="button" aria-expanded="false"><span class="tile__label">Cancel in Shopify</span><span class="tile__value">1</span><span class="tile__note">Still open in Shopify</span></button>
+            </div>
+            <section class="panel">
+              <div class="panel__head"><h2 class="panel__title">Bosta sync failed · 5</h2></div>
+              <ul class="rows">
+                <li><div class="rows__top"><a class="ext num" href="#">#30931 <svg aria-hidden="true"><use href="#i-ext"/></svg></a><span class="muted">Today</span></div><div class="rows__tags"><span class="tag">Confirmed ✅</span><span class="tag tag--hit">bosta_sync_failed</span></div></li>
+                <li><div class="rows__top"><a class="ext num" href="#">#30927 <svg aria-hidden="true"><use href="#i-ext"/></svg></a><span>2 days</span></div><div class="rows__tags"><span class="tag">Confirmed ✅</span><span class="tag tag--hit">bosta_sync_failed</span></div></li>
+                <li><div class="rows__top"><a class="ext num" href="#">#30904 <svg aria-hidden="true"><use href="#i-ext"/></svg></a><span>3 days</span></div><div class="rows__tags"><span class="tag">Call Confirmed📞</span><span class="tag">Confirmed ✅</span><span class="tag tag--hit">bosta_sync_failed</span><span class="tag">compression</span></div></li>
+              </ul>
+              <div class="panel__foot"><button class="linkbtn" type="button">Show the other 2</button></div>
+            </section>
+          </main>
+        </div>
+      </div>
+      <div class="screen screen--390" id="shot-phone-bosta">
+        <div class="shell">
+          <div class="side">
+            <div class="brand"><span><span class="brand__mark">H</span><span><span class="brand__name">HBA</span><span class="brand__role">Operations</span></span></span><span class="avatar">A</span></div>
+            <nav aria-label="Operations"><ul class="nav">
+              <li><a href="#">Shopify</a></li>
+              <li><a href="#" aria-current="page">Bosta</a></li>
+              <li><a href="#">E-stebdal</a></li>
+            </ul></nav>
+          </div>
+          <main class="main">
+            <header class="head">
+              <div><h1>Bosta</h1><span class="head__sub">Every order HBA has on Bosta</span></div>
+              <p class="fresh" role="status"><svg aria-hidden="true"><use href="#i-clock"/></svg>Updated 4 minutes ago</p>
+            </header>
+            <div class="tiles">
+              <button class="tile" type="button" aria-expanded="false"><span class="tile__label">New, not shipped</span><span class="tile__value">29</span><span class="tile__note">Over 2 working days</span></button>
+              <button class="tile" type="button" aria-expanded="false"><span class="tile__label">Not printed</span><span class="tile__value">1</span><span class="tile__note">Airway bill</span></button>
+              <button class="tile" type="button" aria-expanded="false"><span class="tile__label">Awaiting your action</span><span class="tile__value">2</span><span class="tile__note">Waiting for HBA</span></button>
+              <button class="tile" type="button" aria-expanded="false"><span class="tile__label">Shipped, not delivered</span><span class="tile__value">9</span><span class="tile__note">Over 3 working days</span></button>
+            </div>
+            <div class="split">
+              <section class="panel">
+                <div class="panel__head"><h2 class="panel__title">Success rate</h2></div>
+                <div class="filters" role="group" aria-label="Range">
+                  <button class="chip" type="button" aria-pressed="false">Today</button>
+                  <button class="chip" type="button" aria-pressed="false">A day…</button>
+                  <button class="chip" type="button" aria-pressed="false">Last 7 days</button>
+                  <button class="chip" type="button" aria-pressed="true">Last 30 days</button>
+                  <button class="chip" type="button" aria-pressed="false">From – to…</button>
+                </div>
+                <div class="rate">
+                  <p class="rate__value">84.6%</p>
+                  <div class="meter" role="img" aria-label="84.6% successful"><i style="width:84.6%"></i></div>
+                  <p class="rate__parts"><span class="key">970 successful</span><span class="key key--fail">176 unsuccessful</span></p>
+                </div>
+              </section>
+              <section class="panel">
+                <div class="panel__head"><h2 class="panel__title">Picked up, last 7 days</h2></div>
+                <ul class="days">
+                  <li><button class="day" type="button"><span class="day__label">Sat<small>3 Oct</small></span><span class="bar"><i style="width:5.8%"></i></span><span class="day__count">5</span><svg aria-hidden="true"><use href="#i-right"/></svg></button></li>
+                  <li><div class="day day--off"><span class="day__label">Fri<small>2 Oct</small></span><span class="day__off">Day off</span><span class="day__count">0</span><span></span></div></li>
+                  <li><button class="day" type="button"><span class="day__label">Thu<small>1 Oct</small></span><span class="bar"><i style="width:81.4%"></i></span><span class="day__count">70</span><svg aria-hidden="true"><use href="#i-right"/></svg></button></li>
+                  <li><button class="day" type="button"><span class="day__label">Wed<small>30 Sep</small></span><span class="bar"><i style="width:15.1%"></i></span><span class="day__count">13</span><svg aria-hidden="true"><use href="#i-right"/></svg></button></li>
+                  <li><button class="day" type="button"><span class="day__label">Tue<small>29 Sep</small></span><span class="bar"><i style="width:40.7%"></i></span><span class="day__count">35</span><svg aria-hidden="true"><use href="#i-right"/></svg></button></li>
+                  <li><button class="day" type="button"><span class="day__label">Mon<small>28 Sep</small></span><span class="bar"><i style="width:37.2%"></i></span><span class="day__count">32</span><svg aria-hidden="true"><use href="#i-right"/></svg></button></li>
+                  <li><button class="day" type="button"><span class="day__label">Sun<small>27 Sep</small></span><span class="bar"><i style="width:100%"></i></span><span class="day__count">86</span><svg aria-hidden="true"><use href="#i-right"/></svg></button></li>
+                </ul>
+              </section>
+            </div>
+          </main>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════ DECISIONS ═══════════════════════════ -->
+  <section class="frame" id="f-decide">
+    <div class="frame__label"><h2>What you are approving</h2></div>
+    <ol class="decide">
+      <li><strong>The operations manager's own shell</strong>: Shopify, Bosta and E-stebdal in the same sidebar the admin tool uses, and nothing else. On a phone they become tabs across the top.</li>
+      <li><strong>Cards that open their list</strong> below the cards, one at a time, oldest first, each order linking out to Shopify, Bosta or E-stebdal. Long lists show the first rows and a <em>Show the other N</em> button.</li>
+      <li><strong>The success rate as one figure with a bar</strong>, not Bosta's ring: a single share reads faster as a number. The range chips sit above it.</li>
+      <li><strong>Picked up per day as seven rows</strong> with a bar each, today first; Friday is drawn as a day off rather than a zero.</li>
+      <li><strong>"Updated N minutes ago" on every tab</strong>; amber with a clock when older than 10 minutes; red with a warning when the source can't be read, keeping the last good numbers greyed with their time. Never a 0 for a failure.</li>
+      <li><strong>The admin's switch</strong> under the brand: <em>Affiliates | Operations</em>. The six affiliate sections stay six.</li>
+      <li><strong>Settings</strong>: <em>Operations manager</em> in Team with the one-manager refusal, a new line in the access table, and Bosta and E-stebdal keys beside the Shopify connection.</li>
+    </ol>
+    <p class="lead" style="margin-top:14px">Where this departs from the approved export: Operations has no export, so its shell, cards, chips and tables are the export's own pieces, reused. The switch and the success-rate bar are new. Both are recorded against ADR 0057 once approved.</p>
+  </section>
+</div>
+
+<script>
+  // Theme switch for review only; the product keeps its own (dark by default).
+  document.querySelectorAll('[data-theme-choice]').forEach(function (button) {
+    button.addEventListener('click', function () {
+      var choice = button.getAttribute('data-theme-choice');
+      document.documentElement.setAttribute('data-theme', choice);
+      document.querySelectorAll('[data-theme-choice]').forEach(function (other) {
+        other.setAttribute('aria-pressed', String(other === button));
+      });
+    });
+  });
+</script>
+</body>
+</html>

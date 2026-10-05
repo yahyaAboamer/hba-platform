@@ -30,6 +30,60 @@ ASSIGNABLE_ROLES = frozenset(VALID_ROLES - {"affiliate"})
 #: Refused when somebody acts on their own row. Another admin does it.
 OWN_ACCOUNT = "You cannot change your own access. Another admin can."
 
+#: Roles one person holds at a time, and how a refusal names them (ADR 0057).
+#: The database's partial unique index refuses a second live holder; this says
+#: why before anything is written, and counts an invitation still open.
+SINGLE_HOLDER_ROLES = {"operations_manager": "an operations manager"}
+
+
+def assert_role_free(
+    db: Session,
+    role: str,
+    *,
+    for_user_id: int | None = None,
+    accepting_invitation_id: int | None = None,
+) -> None:
+    """Refuse a one-holder role while somebody holds it or is invited to it.
+
+    `for_user_id` is the person being given it, and `accepting_invitation_id`
+    the invitation being accepted: neither is a rival to itself.
+    """
+    words = SINGLE_HOLDER_ROLES.get(role)
+    if words is None:
+        return
+    # A resend expires the old link in this same transaction, and the session
+    # does not flush on its own: make that visible before asking.
+    db.flush()
+
+    holder_query = (
+        select(UserAccount)
+        .join(RoleAssignment, RoleAssignment.user_account_id == UserAccount.id)
+        .where(RoleAssignment.role == role, RoleAssignment.revoked_at.is_(None))
+    )
+    if for_user_id is not None:
+        holder_query = holder_query.where(UserAccount.id != for_user_id)
+    holder = db.scalar(holder_query.limit(1))
+    if holder is not None:
+        raise ValueError(
+            f"HBA already has {words}: {holder.display_name or holder.email}. "
+            "Change their access first."
+        )
+
+    open_query = select(Invitation).where(
+        Invitation.role == role,
+        Invitation.accepted_at.is_(None),
+        Invitation.withdrawn_at.is_(None),
+        Invitation.expires_at > utcnow(),
+    )
+    if accepting_invitation_id is not None:
+        open_query = open_query.where(Invitation.id != accepting_invitation_id)
+    pending = db.scalar(open_query.order_by(Invitation.id).limit(1))
+    if pending is not None:
+        raise ValueError(
+            f"An invitation to {pending.email} is still open for this access. "
+            "Withdraw it first."
+        )
+
 
 def invitable_roles(actor_role: str) -> list[str]:
     """The staff roles this person may invite somebody to - never more than
@@ -198,6 +252,7 @@ def change_role(
     before = active_role(db, user)
     if before == new_role:
         raise ValueError(f"{user.display_name or user.email} already holds {new_role}")
+    assert_role_free(db, new_role, for_user_id=user.id)
 
     if before == "admin" and user.status == "active":
         _assert_leaves_an_admin(db, user)

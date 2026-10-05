@@ -88,6 +88,15 @@ what was chosen.
 | [0046](0046-a-model-abroad-applies-without-a-destination.md) | A model abroad applies without a payout destination | Accepted |
 | [0047](0047-the-sign-in-family-and-onboarding-use-a-filled-button.md) | Sign-in and onboarding: portal look, and a filled button | Accepted; a recorded divergence |
 | [0048](0048-the-model-home-goes-past-the-export.md) | The model's Home goes past the approved export | Accepted; a recorded divergence |
+| [0049](0049-every-order-is-a-code-use.md) | Every order is a code use | Accepted; supersedes D03's definition of a use |
+| [0050](0050-an-opened-order-shows-what-was-in-it.md) | An opened order shows what was in it, and three facts | Accepted; a recorded divergence |
+| [0051](0051-a-return-freezes-the-order-and-a-cancelled-fulfilment-carries-nothing.md) | A return freezes the order, and a cancelled fulfilment carries nothing | Accepted |
+| [0052](0052-a-models-life-pause-archive-decline-and-erase.md) | A model's life: pause, archive, decline, reconsider and erase | Accepted |
+| [0053](0053-a-models-start-month-is-her-codes-start-and-her-code-does-not-change.md) | A model's start month is her code's start on Shopify, and her code does not change | Accepted |
+| [0054](0054-a-settled-month-shows-its-figure-from-its-own-terms.md) | A settled month shows its figure from its own terms | Accepted |
+| [0055](0055-her-start-is-when-her-code-was-created-and-terms-are-set-only-for-months-that-have-begun.md) | Her start is when her code was created, and terms are set only for months that have begun | Accepted |
+| [0056](0056-no-targets-before-her-start.md) | No targets before her start | Accepted |
+| [0057](0057-operations-dashboard-a-separate-read-only-role.md) | Operations is its own dashboard, for one operations manager, and it only reads | Accepted |
 | [0058](0058-declining-an-application-deletes-it-and-its-code-can-be-changed-while-it-waits.md) | Declining an application deletes it, and its code can be changed while it waits | Accepted; amends 0052 and 0053 |
 
 **0014 is superseded by 0036** and **0038 by 0039**. **0027 keeps its

@@ -182,8 +182,39 @@ def test_no_test_references_a_role_that_does_not_exist():
     assert unknown == {"wizard"}, f"tests reference unknown roles: {unknown - {'wizard'}}"
 
 
-def test_the_four_expected_roles_exist_and_no_others():
-    assert VALID_ROLES == {"admin", "affiliate_manager", "content_manager", "affiliate"}
+def test_the_five_expected_roles_exist_and_no_others():
+    assert VALID_ROLES == {
+        "admin",
+        "affiliate_manager",
+        "content_manager",
+        "operations_manager",
+        "affiliate",
+    }
+
+
+# ── operations_manager (ADR 0057) ─────────────────────────────────────────────
+
+
+def test_operations_manager_holds_only_the_operations_dashboard():
+    assert ROLES["operations_manager"] == {Permission.ORDER_OPS_VIEW}
+
+
+def test_operations_manager_sees_nothing_of_the_affiliate_side():
+    for permission in ALL_PERMISSIONS - {Permission.ORDER_OPS_VIEW}:
+        assert has_permission("operations_manager", permission) is False
+
+
+def test_no_affiliate_side_role_sees_operations():
+    for role in ("affiliate_manager", "content_manager", "affiliate"):
+        assert has_permission(role, Permission.ORDER_OPS_VIEW) is False
+
+
+def test_only_an_admin_may_give_the_operations_manager_role():
+    from app.core.permissions import can_grant
+
+    assert can_grant("admin", "operations_manager")
+    assert not can_grant("affiliate_manager", "operations_manager")
+    assert not can_grant("content_manager", "operations_manager")
 
 
 # ── Granting (Settings audit X1) ────────────────────────────────────────────
