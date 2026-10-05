@@ -32,6 +32,7 @@ from sqlalchemy.orm import Session
 from app.core.businesstime import utcnow
 from app.models.integration import BackgroundJob
 from app.services.jobs import JobKind, JobStatus, enqueue
+from app.services.order_ops.polling import POLL_EVERY
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +53,9 @@ SCHEDULE: dict[str, tuple[timedelta, dict]] = {
     # Re-read what is still undelivered (app.services.reconcile, ADR 0051).
     # Every six hours: a stuck order is days old, not minutes.
     JobKind.RESYNC_IN_FLIGHT: (timedelta(hours=6), {}),
+    # Operations' reads (ADR 0057): every 5 minutes, so no number on the
+    # dashboard is more than 10 minutes old (app.services.order_ops.polling).
+    JobKind.ORDER_OPS_SHOPIFY: (POLL_EVERY, {}),
 }
 
 

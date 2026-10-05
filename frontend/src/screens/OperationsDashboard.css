@@ -1,0 +1,70 @@
+/*
+ * Operations (ADR 0057), drawn from the owner-approved mockup
+ * docs/design/operations-dashboard-2026-10-03.html on the product's own
+ * tokens. The page heading, panels and shell are the affiliate dashboard's
+ * (.page__head, .panel, Layout.css); what is new is here, under `ops-`.
+ */
+
+/* ── The freshness line, right of the heading ─────────────────────────── */
+.ops-fresh { display:inline-flex; align-items:center; gap:7px; margin:0; font-size:12.5px; color:var(--quiet); }
+.ops-fresh svg { width:14px; height:14px; flex:none; }
+.ops-fresh--stale { color:var(--owed); }
+.ops-fresh--failed { color:var(--refused); }
+
+/* ── Old, failed, not connected ────────────────────────────────────────── */
+.ops-banner { display:flex; gap:11px; align-items:flex-start; margin:0 0 14px; padding:12px 14px; border:1px solid var(--owed); border-radius:var(--radius); background:var(--owed-quiet); font-size:13.5px; }
+.ops-banner svg { width:16px; height:16px; flex:none; margin-top:1px; color:var(--owed); }
+.ops-banner small { display:block; margin-top:3px; color:var(--quiet); font-size:12.5px; line-height:1.45; }
+.ops-banner--failed { border-color:var(--refused); background:var(--refused-quiet); }
+.ops-banner--failed svg { color:var(--refused); }
+.ops-banner--off { border-color:var(--rule-strong); background:var(--surface); }
+.ops-banner--off svg { color:var(--faint); }
+
+/* ── Cards (the Overview count card) ───────────────────────────────────── */
+.ops-tiles { display:grid; grid-template-columns:repeat(auto-fill,minmax(205px,1fr)); gap:14px; margin:0 0 18px; }
+.ops-tile { display:flex; flex-direction:column; align-items:flex-start; min-height:150px; padding:16px 18px 14px; border:1px solid transparent; border-radius:var(--radius-lg); background:var(--surface); color:var(--ink); font:inherit; text-align:left; cursor:pointer; }
+.ops-tile:hover { border-color:var(--rule-strong); }
+.ops-tile[aria-expanded="true"] { border-color:var(--accent); box-shadow:inset 0 0 0 1px var(--accent); }
+.ops-tile__label { font-size:12.5px; color:var(--quiet); }
+.ops-tile__value { margin:8px 0 4px; font-size:32px; font-weight:400; line-height:1.1; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
+.ops-tile__note { font-size:12.5px; line-height:1.4; color:var(--quiet); }
+.ops-tile__more { display:inline-flex; align-items:center; gap:4px; margin-top:auto; padding-top:12px; color:var(--accent-text); font-size:13px; }
+.ops-tile__more svg { width:13px; height:13px; }
+.ops-tile__as-of { margin-top:6px; font-size:11.5px; color:var(--faint); }
+.ops-tile--zero { cursor:default; }
+.ops-tile--zero:hover { border-color:transparent; }
+.ops-tile--zero .ops-tile__value { color:var(--faint); }
+.ops-tile--reading { cursor:default; }
+.ops-tile--reading:hover { border-color:transparent; }
+.ops-tile--reading .ops-tile__value { margin:18px 0 12px; font-size:15px; color:var(--faint); }
+.ops-tiles--old .ops-tile__value, .ops-tiles--old .ops-tile__note { opacity:.55; }
+
+/* ── A card's list ─────────────────────────────────────────────────────── */
+.ops-hint { margin:0; font-size:12.5px; color:var(--quiet); }
+.ops-table { width:100%; border-collapse:collapse; font-size:13.5px; }
+.ops-table th, .ops-table td { padding:10px 8px; border-bottom:1px solid var(--rule); text-align:left; vertical-align:middle; }
+.ops-table th:first-child, .ops-table td:first-child { padding-left:18px; }
+.ops-table th:last-child, .ops-table td:last-child { padding-right:18px; }
+.ops-table th { font-size:11px; font-weight:400; letter-spacing:.06em; text-transform:uppercase; color:var(--faint); white-space:nowrap; }
+.ops-table tr:last-child td { border-bottom:0; }
+.ops-table .num, .ops-rows .num { font-variant-numeric:tabular-nums; }
+.ops-ext { display:inline-flex; align-items:center; gap:5px; color:var(--accent-text); text-decoration:none; white-space:nowrap; }
+.ops-ext svg { width:12px; height:12px; }
+.ops-tag { display:inline-block; margin:2px 4px 2px 0; padding:2px 8px; border:1px solid var(--rule); border-radius:999px; color:var(--quiet); font-size:12px; white-space:nowrap; }
+.ops-tag--hit { border-color:var(--rule-strong); color:var(--ink); }
+.ops-muted { color:var(--faint); }
+.ops-linkbtn { padding:0; border:0; background:none; color:var(--accent-text); font:inherit; font-size:13px; cursor:pointer; }
+
+/* ── On a phone: two cards a row, lists as stacked rows ────────────────── */
+.ops-rows { margin:0; padding:0; list-style:none; }
+.ops-rows li { padding:12px 16px; border-bottom:1px solid var(--rule); }
+.ops-rows li:last-child { border-bottom:0; }
+.ops-rows__top { display:flex; justify-content:space-between; gap:8px; font-size:14px; }
+.ops-rows__tags { margin-top:6px; }
+.ops-foot { padding:11px 18px; border-top:1px solid var(--rule); }
+@media (max-width:800px) {
+  .ops-fresh { flex-basis:100%; }
+  .ops-tiles { grid-template-columns:1fr 1fr; gap:10px; }
+  .ops-tile { min-height:0; padding:13px 14px 12px; }
+  .ops-tile__value { font-size:28px; }
+}

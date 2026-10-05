@@ -12,6 +12,7 @@ Nothing here holds customer details, keys or anything that decides pay.
 from datetime import datetime
 
 from sqlalchemy import Boolean, CheckConstraint, DateTime, Integer, String, Text, text
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -47,3 +48,26 @@ class OpsSourceStatus(Base):
 
     #: How many rows the last good read stored.
     row_count: Mapped[int | None] = mapped_column(Integer)
+
+
+class OpsShopifyOrder(Base):
+    """One open, unshipped Shopify order, as the last clean read found it.
+
+    The whole set is replaced on every read, in the same transaction as the
+    read's record in ``ops_source_status``: an order that shipped or was
+    cancelled since simply is not here any more. **No customer details**:
+    the order's number, when it was placed, its tags and how far it shipped.
+    """
+
+    __tablename__ = "ops_shopify_order"
+
+    #: Shopify's numeric order id, for the link to the order in Shopify admin.
+    shopify_order_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    #: As the shop shows it, e.g. "#30931".
+    order_number: Mapped[str] = mapped_column(String(40), nullable=False)
+    placed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    tags: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), nullable=False, server_default=text("'{}'")
+    )
+    fulfillment_status: Mapped[str | None] = mapped_column(String(40))
+    seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
