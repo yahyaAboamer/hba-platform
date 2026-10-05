@@ -1,0 +1,55 @@
+/*
+ * Deliberately unlike every other screen.
+ *
+ * A hatched edge and a flag across the top, because the failure mode this
+ * guards against is somebody reading it as an ordinary page having a quiet
+ * day. It should be obvious in a screenshot, at a glance, without reading a
+ * word of it — that is the whole job.
+ */
+
+.unbuilt {
+  max-width: 46rem;
+  margin: var(--space-6) 0;
+  padding: var(--space-5) var(--space-6) var(--space-6);
+  border-radius: var(--radius);
+  background: var(--surface);
+  /* The hatch says "site works", which is exactly the register wanted: this is
+     a floor that has not been laid, not a room that is empty. */
+  border: 1px dashed var(--rule-strong);
+}
+
+.unbuilt__flag {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  /* `--owed` is the platform's "attention, not alarm". Nothing is wrong here;
+     something is simply not finished, which is the same register. */
+  color: var(--owed);
+}
+
+.unbuilt__title {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-lg);
+}
+
+.unbuilt__what {
+  margin: 0 0 var(--space-4);
+  max-width: 60ch;
+  color: var(--ink);
+}
+
+.unbuilt__phase {
+  margin: 0;
+  max-width: 60ch;
+  font-size: var(--text-sm);
+  color: var(--quiet);
+}
+
+/* On a phone it is the whole screen rather than a card in a column, and it
+   sits clear of the tab bar like everything else in the portal. */
+.affiliate .unbuilt {
+  margin: var(--space-4) 0 var(--tab-clearance);
+  padding: var(--space-5);
+}
