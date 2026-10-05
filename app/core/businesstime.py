@@ -17,7 +17,7 @@ this system never goes that way: it stores the instant and derives the month.
 """
 
 import re
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 BUSINESS_TIMEZONE = ZoneInfo("Africa/Cairo")
@@ -65,3 +65,33 @@ def month_add(month: str, delta: int) -> str:
     year, mon = (int(part) for part in month.split("-"))
     index = year * 12 + (mon - 1) + delta
     return f"{index // 12:04d}-{index % 12 + 1:02d}"
+
+
+#: HBA's one day off. Saturday to Thursday are working days, and there is no
+#: holiday list (owner, ADR 0057 §8).
+_FRIDAY = 4
+
+
+def working_days_since(moment_utc: datetime, now_utc: datetime) -> int:
+    """Working days that have begun in Cairo since the moment's own date.
+
+    Counts the Cairo dates after the moment's date, up to and including
+    today, leaving out Fridays. An order placed on Saturday is 0 that day and
+    2 on Monday; one placed on Thursday is 1 on Saturday, not 2. A moment
+    later than now counts 0 rather than going negative.
+
+    Operations' day limits ("waited more than 2 working days") use this. No
+    pay rule does: payroll months are calendar months (``business_month``).
+    """
+    first = business_date(moment_utc) + timedelta(days=1)
+    last = business_date(now_utc)
+    if last < first:
+        return 0
+    days = (last - first).days + 1
+    weeks, extra = divmod(days, 7)
+    # Every whole week holds one Friday wherever it starts; the remaining days
+    # start on the same weekday as `first`.
+    fridays = weeks + sum(
+        1 for offset in range(extra) if (first + timedelta(days=offset)).weekday() == _FRIDAY
+    )
+    return days - fridays

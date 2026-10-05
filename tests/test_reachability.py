@@ -115,6 +115,7 @@ def _served() -> set[tuple[str, str]]:
         earnings,
         health,
         operations,
+        order_ops,
         orders,
         payments,
         payroll,
@@ -132,7 +133,7 @@ def _served() -> set[tuple[str, str]]:
     found: set[tuple[str, str]] = set()
     for module in (
         affiliate_self, affiliates, applications, audit, auth, earnings,
-        health, operations, orders, payments, payroll, policy, products,
+        health, operations, order_ops, orders, payments, payroll, policy, products,
         staff, targets, webhooks,
     ):
         for route in module.router.routes:

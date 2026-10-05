@@ -10,6 +10,7 @@ from app.models import (  # noqa: F401
     identity,
     integration,
     notifications,
+    order_ops,
     orders,
     payouts,
     payments,

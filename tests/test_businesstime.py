@@ -22,6 +22,7 @@ from app.core.businesstime import (
     month_add,
     parse_month,
     utcnow,
+    working_days_since,
 )
 
 
@@ -215,3 +216,55 @@ def test_month_add_handles_multiple_years():
 def test_month_add_validates_its_input():
     with pytest.raises(ValueError):
         month_add("2026-13", 1)
+
+
+# ── Working days, for Operations' day limits (ADR 0057 §8) ────────────────────
+
+
+def _cairo(day: int, hour: int = 12) -> datetime:
+    """An instant on that day of October 2026, Cairo time (UTC+3 then)."""
+    return datetime(2026, 10, day, hour, tzinfo=BUSINESS_TIMEZONE)
+
+
+@pytest.mark.parametrize(
+    ("since", "now", "expected"),
+    [
+        # 3 October 2026 is a Saturday; 9 October a Friday.
+        (_cairo(3, 9), _cairo(3, 20), 0),  # the same day
+        (_cairo(3), _cairo(5), 2),  # Saturday to Monday: Sunday, Monday
+        (_cairo(8), _cairo(10), 1),  # Thursday to Saturday: Friday is off
+        (_cairo(8), _cairo(9), 0),  # Thursday to Friday: today is the day off
+        (_cairo(7), _cairo(9), 1),  # Wednesday to Friday: Thursday only
+        (_cairo(9), _cairo(10), 1),  # placed on the Friday itself
+        (_cairo(3), _cairo(12), 8),  # nine dates, one of them a Friday
+        (_cairo(5), _cairo(3), 0),  # a moment after now never goes negative
+    ],
+)
+def test_working_days_skip_fridays(since, now, expected):
+    assert working_days_since(since, now) == expected
+
+
+def test_working_days_turn_at_midnight_in_cairo_not_utc():
+    wednesday_late = datetime(2026, 10, 7, 20, 30, tzinfo=timezone.utc)  # 23:30 Cairo
+    thursday_early = datetime(2026, 10, 7, 21, 30, tzinfo=timezone.utc)  # 00:30 Cairo
+    # The same UTC date, but a new working day has begun in Cairo.
+    assert working_days_since(wednesday_late, thursday_early) == 1
+
+
+def test_working_days_match_counting_day_by_day():
+    """The week arithmetic, against the plain walk, over every pair in a span."""
+    start = datetime(2026, 9, 1, 10, tzinfo=BUSINESS_TIMEZONE)
+    instants = [start + timedelta(days=offset) for offset in range(40)]
+    for since in instants:
+        for now in instants:
+            walked = sum(
+                1
+                for offset in range(1, (now.date() - since.date()).days + 1)
+                if (since.date() + timedelta(days=offset)).weekday() != 4
+            )
+            assert working_days_since(since, now) == walked, (since, now)
+
+
+def test_working_days_refuse_a_naive_moment():
+    with pytest.raises(ValueError):
+        working_days_since(datetime(2026, 10, 3, 12), utcnow())

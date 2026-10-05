@@ -93,6 +93,13 @@ class JobKind:
     #: since corrected - 1,114 on staging, 28 September - was never read again.
     RESYNC_IN_FLIGHT = "resync_in_flight_orders"
 
+    #: Operations' reads (ADR 0057), one kind per source so a source that
+    #: fails holds up neither of the others. Each runs every 5 minutes
+    #: (app.services.order_ops.polling) and is scheduled with its handler.
+    ORDER_OPS_SHOPIFY = "order_ops_read_shopify"
+    ORDER_OPS_BOSTA = "order_ops_read_bosta"
+    ORDER_OPS_ESTEBDAL = "order_ops_read_estebdal"
+
 
 class PermanentFailure(Exception):
     """A job failure that retrying cannot fix.
