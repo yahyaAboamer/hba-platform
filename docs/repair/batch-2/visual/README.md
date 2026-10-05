@@ -1,5 +1,10 @@
 # The visual and interaction review
 
+Completed batch captures were archived on 4 October 2026. The
+[archive index](../../../cleanup/archive-index.md) maps their original paths
+and explains how to restore a selected capture. Baseline `shots/app/` and
+`shots/export/` pairs and digests remain here and are still read by this harness.
+
 Every admin screen at **1280 and 1440**, every model screen at **390**, each one
 captured twice - the approved export and the running application - and compared.
 

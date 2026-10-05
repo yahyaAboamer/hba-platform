@@ -65,7 +65,8 @@ $env:WORKER_ENABLED='false'
 .venv/Scripts/python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8010
 ```
 
-The isolated additive seed helper is `design-preview/seed-05a.py`, a gitignored
+The isolated additive seed helper is `design-preview/seed-05a.py`, now preserved
+in the [private evidence archive](../../cleanup/archive-index.md). It was a gitignored
 local artifact. It asserts the exact database name and refuses a nonempty
 database. The existing destructive `scripts/seed_demo.py` was **not run**.
 No existing dev data was cleared to prepare this review.

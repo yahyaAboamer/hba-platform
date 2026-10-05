@@ -168,8 +168,3 @@ def validate_period(start_month: str, end_month: str | None) -> tuple[str, str |
             f"A period cannot end before it starts: {start_month} to {end_month}"
         )
     return start_month, end_month
-
-
-def is_open_ended(end_month: str | None) -> bool:
-    """Whether a period runs until further notice."""
-    return end_month is OPEN_ENDED

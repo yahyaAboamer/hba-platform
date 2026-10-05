@@ -360,26 +360,6 @@ def _not_started(month: str) -> bool:
     return month > business_month(utcnow())
 
 
-def _average_order(figures: dict) -> int | None:
-    """What a counted order under their code was worth, on average.
-
-    Counted orders only - delivered and pending since F02, never a failed
-    delivery, which earned nothing and would drag the figure toward a number
-    describing no order she actually made.
-
-    `None` at zero counted orders, never zero: the difference between *your
-    average order is worth nothing* and *there is nothing to average yet*.
-
-    Kept for the statement path, which reads a snapshot's frozen figures.
-    `my_month` averages her live source-month sales instead (R3).
-    """
-    orders = (figures.get("earned_orders") or 0) + (figures.get("pending_orders") or 0)
-    if not orders:
-        return None
-    base = (figures.get("earned_base_piastres") or 0) + (
-        figures.get("pending_base_piastres") or 0
-    )
-    return round(base / orders)
 
 
 def _window(month: str, agreed: bool) -> dict:

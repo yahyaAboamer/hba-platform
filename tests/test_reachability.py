@@ -49,6 +49,10 @@ UNREACHED_ON_PURPOSE = {
     # Superseded. The payroll screen answers the same question with the
     # blockers attached, which is what anybody actually needs.
     ("GET", "/api/earnings/{month}"),
+    # The retired Year screen redirects to Home, whose annual data arrives
+    # through /api/me/home/{month}. Keep the existing read-only annual API
+    # compatible while removing unused UI; its API regression tests remain.
+    ("GET", "/api/me/year"),
     # Diagnostics, reached by hand when something is wrong. A screen for each
     # would be four screens nobody opens in a normal month.
     ("GET", "/api/auth/status"),

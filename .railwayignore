@@ -1,3 +1,6 @@
+# Application build/upload exclusions; keep identical to .dockerignore.
+# The backup service uses ops/backup as its own build context, where its
+# Dockerfile copies backup.py. These root exclusions do not alter that context.
 .venv/
 .git/
 __pycache__/
@@ -10,3 +13,14 @@ app/web/
 .env
 .pytest_cache/
 *.egg-info/
+
+# Build inputs that are never build outputs.
+design-preview/
+ops/
+scripts/
+.claude/
+
+# Local historical evidence is never an application build input.
+HBA_Readiness_Audit/
+HBA_Design_Parity_Code_Package/
+orders_audit.md

@@ -235,7 +235,8 @@ that rather than rediscovering it.
 05A used a separate synthetic **`hba_platform_05a_preview`** database on local
 Postgres 5433, at the same migration head. The existing `seed_demo.py` clears
 its target, so it was not run against the existing dev database. The isolated
-additive seed helper is `design-preview/seed-05a.py` (gitignored local artifact).
+additive seed helper was `design-preview/seed-05a.py` (gitignored local artifact),
+now preserved in the [private evidence archive](../cleanup/archive-index.md).
 It checks the exact database name and refuses to reseed a nonempty database.
 Runtime/review commands and synthetic account details are in the batch report.
 

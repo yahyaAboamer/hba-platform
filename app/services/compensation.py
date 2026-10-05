@@ -383,9 +383,6 @@ def close_terms(
     return terms
 
 
-def get_terms(db: Session, period_id: int) -> CompensationPeriod | None:
-    """One arrangement by id, for correcting or closing it."""
-    return db.get(CompensationPeriod, period_id)
 
 
 def terms_for(

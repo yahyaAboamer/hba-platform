@@ -171,25 +171,6 @@ export function destinationHolder(
 }
 
 /**
- * What the *Copy* button puts on the clipboard.
- *
- * The number alone, not the sentence around it. The next thing that happens
- * to this string is being pasted into a banking app, and a paste that reads
- * *InstaPay · ipn.eg/nour* into an account-number field is a paste somebody
- * has to edit by hand — which is the step this button exists to remove.
- */
-export function copyableDestination(
-  destination: { [field: string]: string | null | undefined },
-): string {
-  return (
-    destination.instapay_address_url ??
-    destination.bank_account_number ??
-    destination.wallet_phone ??
-    ""
-  );
-}
-
-/**
  * The three arrangements, in the words the screens use.
  *
  * One table, because it was three: Payments, the profile and Targets each

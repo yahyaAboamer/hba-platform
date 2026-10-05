@@ -379,39 +379,6 @@
 .portal-home__pay-line { margin:6px 0 0; font-size:16px; }
 .portal-home__pay-note { margin-top:6px; font-size:12.5px; line-height:1.5; color:var(--faint); }
 .portal-home__pay-more { display:inline-block; margin-top:11px; color:var(--accent); text-decoration:none; font-size:13px; }
-.portal-chart { padding:15px 13px 12px; background:var(--surface); border-radius:8px; }
-.portal-chart__heading { display:flex; justify-content:space-between; margin-bottom:12px; font-size:12px; color:var(--quiet); }
-.portal-chart__heading h2 { font-size:15px; color:var(--ink); font-weight:400; }
-/* The export's segmented control (`.seg` / `.seg-opt`): an outline, no
-   fill; the chosen half in accent with a 1px inset accent edge, the other in
-   ink; a divider between them. Labels in the page's font and rhythm. */
-.portal-chart__switch { display:flex; border:1px solid var(--rule); border-radius:8px; overflow:hidden; }
-.portal-chart__switch button { flex:1; display:inline-flex; align-items:center; justify-content:center; gap:6px; padding:7px 12px; border:0; background:none; color:var(--ink); font:inherit; font-size:13px; cursor:pointer; }
-.portal-chart__switch button + button { border-left:1px solid var(--rule); }
-.portal-chart__switch [aria-pressed="true"] { color:var(--accent); box-shadow:inset 0 0 0 1px var(--accent); }
-.portal-chart__switch [aria-pressed="false"]:hover { background:color-mix(in srgb, var(--ink) 7%, transparent); }
-/* The reading for whichever month is picked, above the plot it belongs to:
-   month, figure, and what the figure is. Held at a fixed height so tapping
-   from one month to another does not move the chart under the finger. */
-.portal-chart__readout { min-height:52px; padding:12px 3px 8px; font-size:12.5px; color:var(--quiet); }
-.portal-chart__readout strong { display:block; margin-top:4px; font-size:18px; color:var(--ink); font-weight:400; }
-.portal-chart__readout em { display:block; margin-top:3px; font-style:normal; color:var(--faint); }
-.portal-chart svg { display:block; width:100%; overflow:visible; }
-/* The export's plot: rules in the stronger line colour, labels in Inter 10
-   in the faint tier, a 2.25 line with open points, and the month being read
-   in accent. */
-.portal-chart text { fill:var(--faint); font-family:var(--sans); font-size:10px; }
-.portal-chart .portal-chart__tick--on { fill:var(--accent); }
-.portal-chart__grid { stroke:var(--rule-strong); stroke-width:1; }
-/* The month being read, named under its own point. */
-.portal-chart__line { fill:none; stroke:var(--accent); stroke-width:2.25; stroke-linejoin:round; stroke-linecap:round; }
-.portal-chart__point { fill:var(--surface); stroke:var(--accent); stroke-width:2; }
-.portal-chart__point--on { fill:var(--accent); }
-.portal-chart__bar { fill:var(--bar); }
-.portal-chart__bar--on { fill:var(--accent); }
-
-.portal-chart__hit { fill:transparent; cursor:pointer; }
-.portal-chart__hit:focus-visible { outline:none; stroke:var(--accent); stroke-width:1.5; }
 .portal-calculation { margin:0; border-radius:8px; background:var(--surface); overflow:hidden; }
 .portal-calculation > div { display:flex; align-items:baseline; justify-content:space-between; gap:12px; padding:14px 15px; border-bottom:1px solid var(--rule); font-size:14px; }
 .portal-calculation dd { margin:0; flex:none; font-variant-numeric:tabular-nums; }

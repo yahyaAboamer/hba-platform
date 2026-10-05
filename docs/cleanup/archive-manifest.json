@@ -1,0 +1,2655 @@
+{
+  "format": "hba-deduplicated-evidence-v1",
+  "archive": "historical-visual-evidence.zip",
+  "entries": [
+    {
+      "path": "docs/design/admin-models-tab-audit-1280-dark.png",
+      "bytes": 687174,
+      "sha256": "45e46b29ced1118638f6b8fac98b6f549824566bad7266ef40265edb2c9340f4",
+      "object": "objects/45e46b29ced1118638f6b8fac98b6f549824566bad7266ef40265edb2c9340f4"
+    },
+    {
+      "path": "docs/design/admin-models-tab-audit-1280.png",
+      "bytes": 676359,
+      "sha256": "95065e71491566e1bb2ee26e797cee4be459f6bf49bf84bb9c89ae4cc75568d8",
+      "object": "objects/95065e71491566e1bb2ee26e797cee4be459f6bf49bf84bb9c89ae4cc75568d8"
+    },
+    {
+      "path": "docs/design/admin-models-tab-audit-390.png",
+      "bytes": 624297,
+      "sha256": "cee05d96a7b99bdefc960ad9ed3de95a9a2cd051d4ec75c901db1f4bbc15cec5",
+      "object": "objects/cee05d96a7b99bdefc960ad9ed3de95a9a2cd051d4ec75c901db1f4bbc15cec5"
+    },
+    {
+      "path": "docs/design/admin-models-tab-audit-dialog.png",
+      "bytes": 138306,
+      "sha256": "c5ce798ff9b0e6ae3be1c001dcfe0029c7dca0302e5da8b20ca72a240487f78c",
+      "object": "objects/c5ce798ff9b0e6ae3be1c001dcfe0029c7dca0302e5da8b20ca72a240487f78c"
+    },
+    {
+      "path": "docs/design/admin-models-tab-audit-edit-application-1280.png",
+      "bytes": 54376,
+      "sha256": "27f232ef7d1f2cfdf4745b311ad05024306f49327c59fb654a16e346a6ae222c",
+      "object": "objects/27f232ef7d1f2cfdf4745b311ad05024306f49327c59fb654a16e346a6ae222c"
+    },
+    {
+      "path": "docs/design/admin-models-tab-audit-edit-application-390.png",
+      "bytes": 53924,
+      "sha256": "f8b9f85edde7a77e1e1e2f9902e13d69d56f37d54976cd3a971443c89950a6d0",
+      "object": "objects/f8b9f85edde7a77e1e1e2f9902e13d69d56f37d54976cd3a971443c89950a6d0"
+    },
+    {
+      "path": "docs/design/admin-models-tab-audit-edit-overview-1280.png",
+      "bytes": 63423,
+      "sha256": "bccd5f13a8bf3168df22dc29a0b319fd29858912310e04aab17bc7149d80222e",
+      "object": "objects/bccd5f13a8bf3168df22dc29a0b319fd29858912310e04aab17bc7149d80222e"
+    },
+    {
+      "path": "docs/design/admin-models-tab-audit-edit-overview-390.png",
+      "bytes": 63881,
+      "sha256": "5ee9ec53608dd5014be4a0d470cc462b8b9a96ec92c4263e17e95bdcb7752fb9",
+      "object": "objects/5ee9ec53608dd5014be4a0d470cc462b8b9a96ec92c4263e17e95bdcb7752fb9"
+    },
+    {
+      "path": "docs/design/admin-models-tab-audit-edit-payments-1280.png",
+      "bytes": 51149,
+      "sha256": "68cdd3ff64086d1a812719197bd789f9d31abb32ebf3898f1c6ed1c6061e4f6b",
+      "object": "objects/68cdd3ff64086d1a812719197bd789f9d31abb32ebf3898f1c6ed1c6061e4f6b"
+    },
+    {
+      "path": "docs/design/admin-models-tab-audit-edit-payments-390.png",
+      "bytes": 46287,
+      "sha256": "e022b08ecd65ad84de5f9488bb664d45a40bb646217648b99d13d1e6771c2739",
+      "object": "objects/e022b08ecd65ad84de5f9488bb664d45a40bb646217648b99d13d1e6771c2739"
+    },
+    {
+      "path": "docs/design/admin-models-tab-audit-profile-phone.png",
+      "bytes": 53857,
+      "sha256": "5361d3ae9999ae20c84123769daabf5595adad9406767f7065053b39dc12725b",
+      "object": "objects/5361d3ae9999ae20c84123769daabf5595adad9406767f7065053b39dc12725b"
+    },
+    {
+      "path": "docs/design/admin-models-tab-audit-roster-phone.png",
+      "bytes": 70592,
+      "sha256": "28da06c26f28f8437a1d1c6b9c8da850a142c47e9a582e0fae235946f670985b",
+      "object": "objects/28da06c26f28f8437a1d1c6b9c8da850a142c47e9a582e0fae235946f670985b"
+    },
+    {
+      "path": "docs/design/admin-settings-tab-audit-1280-dark.png",
+      "bytes": 817284,
+      "sha256": "9e763ccfcfe66f2ef878fe39fc87a816b14bde0a857f78e64f6f2058b9e214a2",
+      "object": "objects/9e763ccfcfe66f2ef878fe39fc87a816b14bde0a857f78e64f6f2058b9e214a2"
+    },
+    {
+      "path": "docs/design/admin-settings-tab-audit-1280.png",
+      "bytes": 806135,
+      "sha256": "7a787b88f7c178954f2f9b25bf0eba16bcd0db6a39aa849601b2a93ea1cfd7ed",
+      "object": "objects/7a787b88f7c178954f2f9b25bf0eba16bcd0db6a39aa849601b2a93ea1cfd7ed"
+    },
+    {
+      "path": "docs/design/admin-settings-tab-audit-390.png",
+      "bytes": 839980,
+      "sha256": "65056d2dcc5752731f835055ce8b941200db00178d4161dd2884d56682f99535",
+      "object": "objects/65056d2dcc5752731f835055ce8b941200db00178d4161dd2884d56682f99535"
+    },
+    {
+      "path": "docs/design/admin-settings-tab-audit-mock-log-1280.png",
+      "bytes": 40920,
+      "sha256": "04d5af4925e2361d6341a958493b85f3b544ed6bff4f2dbbdbdc2e779bd55a97",
+      "object": "objects/04d5af4925e2361d6341a958493b85f3b544ed6bff4f2dbbdbdc2e779bd55a97"
+    },
+    {
+      "path": "docs/design/admin-settings-tab-audit-mock-shop-1280.png",
+      "bytes": 71490,
+      "sha256": "b5cf6ff4ec9677ec1fc4bad3b21a1bd2a7e098efba9b4c7d76d4dd3a60fabe7c",
+      "object": "objects/b5cf6ff4ec9677ec1fc4bad3b21a1bd2a7e098efba9b4c7d76d4dd3a60fabe7c"
+    },
+    {
+      "path": "docs/design/admin-settings-tab-audit-mock-team-1280.png",
+      "bytes": 62397,
+      "sha256": "72dde476ef9586d67ac621883ca51adc41b33b26f01a590e8c1a33fc4b578e25",
+      "object": "objects/72dde476ef9586d67ac621883ca51adc41b33b26f01a590e8c1a33fc4b578e25"
+    },
+    {
+      "path": "docs/design/admin-settings-tab-audit-mock-team-390.png",
+      "bytes": 54058,
+      "sha256": "42e3279e408104eee5e9cd748bc532c6a29755ffb254a8eb811f31d543c8a5e9",
+      "object": "objects/42e3279e408104eee5e9cd748bc532c6a29755ffb254a8eb811f31d543c8a5e9"
+    },
+    {
+      "path": "docs/design/portal-five-tabs-audit-2026-09-29.png",
+      "bytes": 243300,
+      "sha256": "5605c04ce8023546248c7e4f6a9be07d2fd477cd688700f19207420c16fd95b2",
+      "object": "objects/5605c04ce8023546248c7e4f6a9be07d2fd477cd688700f19207420c16fd95b2"
+    },
+    {
+      "path": "docs/design/portal-tabs-concepts-2026-09-28.png",
+      "bytes": 200609,
+      "sha256": "982b74708f26a9e8b531f5206f5af64c92304d86821c72e95689358a2b7c4014",
+      "object": "objects/982b74708f26a9e8b531f5206f5af64c92304d86821c72e95689358a2b7c4014"
+    },
+    {
+      "path": "docs/design/portal-tabs-concepts-mobile-2026-09-28.png",
+      "bytes": 65464,
+      "sha256": "a7c2477e27c05100e6125460de46c49fcc7b97688f4215bb12274417d6e8e6d5",
+      "object": "objects/a7c2477e27c05100e6125460de46c49fcc7b97688f4215bb12274417d6e8e6d5"
+    },
+    {
+      "path": "docs/design/settings-tab-audit-now-advanced-policy-form-1280.png",
+      "bytes": 67187,
+      "sha256": "5f3af5fb6b30ecd3c8a37b3f91cb754cce2589bd44a57ee1b7b84cef213399a6",
+      "object": "objects/5f3af5fb6b30ecd3c8a37b3f91cb754cce2589bd44a57ee1b7b84cef213399a6"
+    },
+    {
+      "path": "docs/design/settings-tab-audit-now-appearance-1280.png",
+      "bytes": 34296,
+      "sha256": "1d1b96657f9c0d45b422c24ae844ba551a37cd61978f813818fcdc5995ea0134",
+      "object": "objects/1d1b96657f9c0d45b422c24ae844ba551a37cd61978f813818fcdc5995ea0134"
+    },
+    {
+      "path": "docs/design/settings-tab-audit-now-codes-add-1280.png",
+      "bytes": 68201,
+      "sha256": "9f42eba73ec1a701279175958976324c65faa1d2eba861a1e40eb0e17fe217bd",
+      "object": "objects/9f42eba73ec1a701279175958976324c65faa1d2eba861a1e40eb0e17fe217bd"
+    },
+    {
+      "path": "docs/design/settings-tab-audit-now-content_manager-team-1280.png",
+      "bytes": 26952,
+      "sha256": "0cf7b8954f5681ea52a929eefc8e7df835948330f96a00374d5cd258407bcbb6",
+      "object": "objects/0cf7b8954f5681ea52a929eefc8e7df835948330f96a00374d5cd258407bcbb6"
+    },
+    {
+      "path": "docs/design/settings-tab-audit-now-historical-1280.png",
+      "bytes": 103686,
+      "sha256": "1ef835e8a29d60e56ae610637067c223d403f7e3973b143bad054cea07349c9c",
+      "object": "objects/1ef835e8a29d60e56ae610637067c223d403f7e3973b143bad054cea07349c9c"
+    },
+    {
+      "path": "docs/design/settings-tab-audit-now-shopify-detail-1280.png",
+      "bytes": 63008,
+      "sha256": "2fc6bf6fa5d48dfd5310d88256688508086f22c78b95d8f7a32d0a95c4726911",
+      "object": "objects/2fc6bf6fa5d48dfd5310d88256688508086f22c78b95d8f7a32d0a95c4726911"
+    },
+    {
+      "path": "docs/design/settings-tab-audit-now-team-390.png",
+      "bytes": 49090,
+      "sha256": "c56cd78c0c08451b5fbb206d58db6c9a46d358014a631d7a41bbbab102653be9",
+      "object": "objects/c56cd78c0c08451b5fbb206d58db6c9a46d358014a631d7a41bbbab102653be9"
+    },
+    {
+      "path": "docs/design/settings-tab-audit-now-team-invited-1280.png",
+      "bytes": 61132,
+      "sha256": "4a345450e0f378ad0b3aab4225e18917ba5d265fa110a309ae4f6b5711d0409b",
+      "object": "objects/4a345450e0f378ad0b3aab4225e18917ba5d265fa110a309ae4f6b5711d0409b"
+    },
+    {
+      "path": "docs/design/you-tab-linked-pages-contact-2026-09-29.png",
+      "bytes": 105204,
+      "sha256": "44307d753ea4c824aa3a42f867275cf93d27719068264cfff8d0e1975cab68b7",
+      "object": "objects/44307d753ea4c824aa3a42f867275cf93d27719068264cfff8d0e1975cab68b7"
+    },
+    {
+      "path": "docs/design/you-tab-linked-pages-help-2026-09-29.png",
+      "bytes": 100649,
+      "sha256": "2f4107f51d1eb03a53758ee169080d01766ea17f22d1212f81105847f759414f",
+      "object": "objects/2f4107f51d1eb03a53758ee169080d01766ea17f22d1212f81105847f759414f"
+    },
+    {
+      "path": "docs/design/you-tab-linked-pages-history-2026-09-29.png",
+      "bytes": 117100,
+      "sha256": "b92c9167a3c0765b696c28205ea626e4111bfd66184fe6ed089f187468eea7e8",
+      "object": "objects/b92c9167a3c0765b696c28205ea626e4111bfd66184fe6ed089f187468eea7e8"
+    },
+    {
+      "path": "docs/design/you-tab-linked-pages-notifications-2026-09-29.png",
+      "bytes": 97691,
+      "sha256": "5b5e8d7b88bc2577b3c9670f8aa51394ef1d5ee11d71a814bb37d525615fd0b0",
+      "object": "objects/5b5e8d7b88bc2577b3c9670f8aa51394ef1d5ee11d71a814bb37d525615fd0b0"
+    },
+    {
+      "path": "docs/design/you-tab-linked-pages-payment-2026-09-29.png",
+      "bytes": 105652,
+      "sha256": "b86c224241c9e08c705a74e7916fedaa9869761ec261c8203675fe94e13e4816",
+      "object": "objects/b86c224241c9e08c705a74e7916fedaa9869761ec261c8203675fe94e13e4816"
+    },
+    {
+      "path": "docs/design/you-tab-linked-pages-sizes-2026-09-29.png",
+      "bytes": 89547,
+      "sha256": "d44138c36e275986eff6e00cd66ebcfa7c8aad723eb2a6e7aa50bbc43c28cc6b",
+      "object": "objects/d44138c36e275986eff6e00cd66ebcfa7c8aad723eb2a6e7aa50bbc43c28cc6b"
+    },
+    {
+      "path": "docs/design/you-tab-linked-pages-terms-2026-09-29.png",
+      "bytes": 100128,
+      "sha256": "6cf89001afa2db278c01a1a38c20e8e5dc21ef1b5e2d5e3e60a60307cc6f9e8c",
+      "object": "objects/6cf89001afa2db278c01a1a38c20e8e5dc21ef1b5e2d5e3e60a60307cc6f9e8c"
+    },
+    {
+      "path": "docs/design/you-tab-linked-pages-you-2026-09-29.png",
+      "bytes": 126516,
+      "sha256": "b6807c72964d0c9c2f0db16a4dfcf725d87b139f372ea6b22b9fab183264f669",
+      "object": "objects/b6807c72964d0c9c2f0db16a4dfcf725d87b139f372ea6b22b9fab183264f669"
+    },
+    {
+      "path": "docs/design/you-tab-redesign-audit-2026-09-29.png",
+      "bytes": 153476,
+      "sha256": "447435632eacf12631b654f3789c71972c0bcd612d965eb8470f8f2ff543ccfb",
+      "object": "objects/447435632eacf12631b654f3789c71972c0bcd612d965eb8470f8f2ff543ccfb"
+    },
+    {
+      "path": "docs/repair/batch-2/screens/admin-home-app-1280.jpg",
+      "bytes": 83822,
+      "sha256": "4aaf2a823476f6783dd337869f802af743f1ab26d05a657dfa2e40c3249092cd",
+      "object": "objects/4aaf2a823476f6783dd337869f802af743f1ab26d05a657dfa2e40c3249092cd"
+    },
+    {
+      "path": "docs/repair/batch-2/screens/admin-home-export-1280.jpg",
+      "bytes": 71493,
+      "sha256": "d6e2e35dac91c801a2941ac0b3d60bd246d83bade8c71f8e171412df3a23fa5d",
+      "object": "objects/d6e2e35dac91c801a2941ac0b3d60bd246d83bade8c71f8e171412df3a23fa5d"
+    },
+    {
+      "path": "docs/repair/batch-2/screens/admin-models-roster-app-1600.jpg",
+      "bytes": 33611,
+      "sha256": "c1ac01a20008888d7f6f80eb92d6886bd5c4b2cda448e0da851e1f37ddd3f9e0",
+      "object": "objects/c1ac01a20008888d7f6f80eb92d6886bd5c4b2cda448e0da851e1f37ddd3f9e0"
+    },
+    {
+      "path": "docs/repair/batch-2/screens/admin-payment-detail-app-1280.jpg",
+      "bytes": 43909,
+      "sha256": "7e1ef7d6b6592de02c5480b940ac2cbf3d13bfcfbca214b7b7ea72d0faeed3ec",
+      "object": "objects/7e1ef7d6b6592de02c5480b940ac2cbf3d13bfcfbca214b7b7ea72d0faeed3ec"
+    },
+    {
+      "path": "docs/repair/batch-2/screens/admin-payments-app-1280.jpg",
+      "bytes": 59540,
+      "sha256": "856c4a182ef18b96990c0fe0a9895504824a0176a8c57078d4d441f04ce9a1aa",
+      "object": "objects/856c4a182ef18b96990c0fe0a9895504824a0176a8c57078d4d441f04ce9a1aa"
+    },
+    {
+      "path": "docs/repair/batch-2/screens/admin-settings-historical-app-1600-locked.jpg",
+      "bytes": 48846,
+      "sha256": "c64cf2365af5ef40fee5cf270aa274d5d79c5a0556ae13ea1fd6064d352f5d47",
+      "object": "objects/c64cf2365af5ef40fee5cf270aa274d5d79c5a0556ae13ea1fd6064d352f5d47"
+    },
+    {
+      "path": "docs/repair/batch-2/screens/README.md",
+      "bytes": 2071,
+      "sha256": "638b1766b35c802089b23a109a2ff6c97a12b774c2c08095e945167e13480df0",
+      "object": "objects/638b1766b35c802089b23a109a2ff6c97a12b774c2c08095e945167e13480df0"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/app-admin-home-1280.json",
+      "bytes": 10038,
+      "sha256": "c77dbe8182e51deba5d975cd1ec249fcb86c6ada0fa2e3fe8661814f68fa00fe",
+      "object": "objects/c77dbe8182e51deba5d975cd1ec249fcb86c6ada0fa2e3fe8661814f68fa00fe"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/app-admin-home-1280.png",
+      "bytes": 125146,
+      "sha256": "afd304c838bed6d3361606f8d3c91d5142ef3ffa26b99ecd471e526e7f004248",
+      "object": "objects/afd304c838bed6d3361606f8d3c91d5142ef3ffa26b99ecd471e526e7f004248"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/app-admin-home-1440.json",
+      "bytes": 10038,
+      "sha256": "a79302266fe8e16d8077035ebfbd73dcf9752445132c0fc589eed44e6bedba71",
+      "object": "objects/a79302266fe8e16d8077035ebfbd73dcf9752445132c0fc589eed44e6bedba71"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/app-admin-home-1440.png",
+      "bytes": 126290,
+      "sha256": "bc438b218cd3a6675b0d9333e6540e930123d2f759fe84510d050e60b1df1c2d",
+      "object": "objects/bc438b218cd3a6675b0d9333e6540e930123d2f759fe84510d050e60b1df1c2d"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/app-admin-orders-1280.json",
+      "bytes": 9698,
+      "sha256": "9bfbd46102623e1f937bb5514e83a16e6769fdd1e887b6cfa903fecca5d21739",
+      "object": "objects/9bfbd46102623e1f937bb5514e83a16e6769fdd1e887b6cfa903fecca5d21739"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/app-admin-orders-1280.png",
+      "bytes": 112286,
+      "sha256": "c13ba66f378cbffc3fb2807e77b830dda25e7686adda686337fe1029e713a31a",
+      "object": "objects/c13ba66f378cbffc3fb2807e77b830dda25e7686adda686337fe1029e713a31a"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/app-admin-orders-1440.json",
+      "bytes": 9698,
+      "sha256": "329ff85e8efb201d6e99810056f6a0b5e3ad161490829e7b5dab3c2630332e01",
+      "object": "objects/329ff85e8efb201d6e99810056f6a0b5e3ad161490829e7b5dab3c2630332e01"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/app-admin-orders-1440.png",
+      "bytes": 113427,
+      "sha256": "32d664c25e6ba4c250a262c73b8b980384b2c6a38f2abb90ede1928aa148f3fb",
+      "object": "objects/32d664c25e6ba4c250a262c73b8b980384b2c6a38f2abb90ede1928aa148f3fb"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/app-admin-payments-1280.json",
+      "bytes": 9757,
+      "sha256": "9fdad29442ffc32c86ed0d0c5bca48b213abd9dd74abd41f6658568218842e9c",
+      "object": "objects/9fdad29442ffc32c86ed0d0c5bca48b213abd9dd74abd41f6658568218842e9c"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/app-admin-payments-1280.png",
+      "bytes": 139628,
+      "sha256": "742bfc393b2a34464aa403296512046fa15cd14a74ce7df7e9f0d956f489c736",
+      "object": "objects/742bfc393b2a34464aa403296512046fa15cd14a74ce7df7e9f0d956f489c736"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/app-admin-payments-1440.json",
+      "bytes": 9751,
+      "sha256": "f6e4f30f9fd0ed15a4f9266cdc8b53a2d1ff22655e45348e026a883216c39914",
+      "object": "objects/f6e4f30f9fd0ed15a4f9266cdc8b53a2d1ff22655e45348e026a883216c39914"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/app-admin-payments-1440.png",
+      "bytes": 139628,
+      "sha256": "96bc83d8b4bd25ebe144181b1be8e780f6d7a6ae884da7ae31c53c0166845cfc",
+      "object": "objects/96bc83d8b4bd25ebe144181b1be8e780f6d7a6ae884da7ae31c53c0166845cfc"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/app-admin-payroll-1280.json",
+      "bytes": 9714,
+      "sha256": "e3fc79d3bcd2ede560b4968057e68e3203317948a19a02c93ba77ef6736a8a43",
+      "object": "objects/e3fc79d3bcd2ede560b4968057e68e3203317948a19a02c93ba77ef6736a8a43"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/app-admin-payroll-1280.png",
+      "bytes": 122362,
+      "sha256": "34a5cc195a5e9a6b5455a6c083c895ec1a5c387723a079f86d253c5c0a99a616",
+      "object": "objects/34a5cc195a5e9a6b5455a6c083c895ec1a5c387723a079f86d253c5c0a99a616"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/app-admin-payroll-1440.json",
+      "bytes": 9714,
+      "sha256": "5887fdcc1ae028114138dadc2b8fc377ee5462bd22540ead9ae11804328df6c7",
+      "object": "objects/5887fdcc1ae028114138dadc2b8fc377ee5462bd22540ead9ae11804328df6c7"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/app-admin-payroll-1440.png",
+      "bytes": 123643,
+      "sha256": "23b8977df61edc2eb8aa7716d4496112cc971feba67c6ec1ab3ddf6193e4bc93",
+      "object": "objects/23b8977df61edc2eb8aa7716d4496112cc971feba67c6ec1ab3ddf6193e4bc93"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/app-admin-profile-1280.json",
+      "bytes": 9510,
+      "sha256": "3b1b1f8f3a9ee7afec5581a21faf805b885d0ff471e27ed6c59924960ad048d6",
+      "object": "objects/3b1b1f8f3a9ee7afec5581a21faf805b885d0ff471e27ed6c59924960ad048d6"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/app-admin-profile-1280.png",
+      "bytes": 90243,
+      "sha256": "3a060fa07e3b79e11c3bcd5ec3151cfebea4bda5c79ef010990b413b18b94802",
+      "object": "objects/3a060fa07e3b79e11c3bcd5ec3151cfebea4bda5c79ef010990b413b18b94802"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/app-admin-profile-1440.json",
+      "bytes": 9524,
+      "sha256": "1d468f54a2a6baad63497073701732a63c7dea472ec367462652966aa3622c62",
+      "object": "objects/1d468f54a2a6baad63497073701732a63c7dea472ec367462652966aa3622c62"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/app-admin-profile-1440.png",
+      "bytes": 92835,
+      "sha256": "2e748e87207f519bf45ac01dbfe6acda54d1b64b2061490d911eb6613d06c387",
+      "object": "objects/2e748e87207f519bf45ac01dbfe6acda54d1b64b2061490d911eb6613d06c387"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/app-admin-profile-long-1280.png",
+      "bytes": 33624,
+      "sha256": "7fea5006f7978e18216ff5b798cf7601333c1a946872f9e7f3f28c9c6602ac1f",
+      "object": "objects/7fea5006f7978e18216ff5b798cf7601333c1a946872f9e7f3f28c9c6602ac1f"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/app-admin-profile-month-picked-1280.json",
+      "bytes": 96,
+      "sha256": "d81b1a63d4c07f634b0110cd77a619bf0c54cd9c92fe8f58887c532510b41f61",
+      "object": "objects/d81b1a63d4c07f634b0110cd77a619bf0c54cd9c92fe8f58887c532510b41f61"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/app-admin-profile-month-picked-1280.png",
+      "bytes": 44064,
+      "sha256": "bed839a4ea8cfb9f8f5a72196c12e40f8555f78858a5b6c58ea2ddfff5f99d0b",
+      "object": "objects/bed839a4ea8cfb9f8f5a72196c12e40f8555f78858a5b6c58ea2ddfff5f99d0b"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/app-admin-profile-month-picked-1440.json",
+      "bytes": 96,
+      "sha256": "d81b1a63d4c07f634b0110cd77a619bf0c54cd9c92fe8f58887c532510b41f61",
+      "object": "objects/d81b1a63d4c07f634b0110cd77a619bf0c54cd9c92fe8f58887c532510b41f61"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/app-admin-profile-month-picked-1440.png",
+      "bytes": 44628,
+      "sha256": "a73450ad3a7dbcbdb26b3a455f58a0f14c5413f3875d790bd6d4d1f0de623075",
+      "object": "objects/a73450ad3a7dbcbdb26b3a455f58a0f14c5413f3875d790bd6d4d1f0de623075"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/app-admin-targets-1280.json",
+      "bytes": 9767,
+      "sha256": "185a872d1b2a84b77a6971fe22ac29e588e81da7645f76a13745d486dca11005",
+      "object": "objects/185a872d1b2a84b77a6971fe22ac29e588e81da7645f76a13745d486dca11005"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/app-admin-targets-1280.png",
+      "bytes": 135412,
+      "sha256": "2e506f55b04e522a422b5108a6596d991f6b5d97f492da01360689664eabd338",
+      "object": "objects/2e506f55b04e522a422b5108a6596d991f6b5d97f492da01360689664eabd338"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/app-admin-targets-1440.json",
+      "bytes": 9767,
+      "sha256": "31151f17dc2fb949cba27e955697606efe996d2063de4521c3e6ae77d1341bf8",
+      "object": "objects/31151f17dc2fb949cba27e955697606efe996d2063de4521c3e6ae77d1341bf8"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/app-admin-targets-1440.png",
+      "bytes": 137326,
+      "sha256": "915565143c71773fabaf61802eaaa2586043fefb72d67f5b07a8fdea5b6195fd",
+      "object": "objects/915565143c71773fabaf61802eaaa2586043fefb72d67f5b07a8fdea5b6195fd"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/app-portal-home-390.json",
+      "bytes": 9747,
+      "sha256": "95784806b114ecb5b36fc2796622d5454276a59a89ce819a08740b87310db7f2",
+      "object": "objects/95784806b114ecb5b36fc2796622d5454276a59a89ce819a08740b87310db7f2"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/app-portal-home-390.png",
+      "bytes": 51877,
+      "sha256": "1a7e89c504139aa47dc9fc56ddbb3131739fe1ff24e2a5590d6f0d2ea03ef76e",
+      "object": "objects/1a7e89c504139aa47dc9fc56ddbb3131739fe1ff24e2a5590d6f0d2ea03ef76e"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/app-portal-home-long-390.json",
+      "bytes": 1095,
+      "sha256": "b9dc6915a5fdc2b379120c197c9403d46293b534b3b341e57ad4154f0285f1e7",
+      "object": "objects/b9dc6915a5fdc2b379120c197c9403d46293b534b3b341e57ad4154f0285f1e7"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/app-portal-home-long-390.png",
+      "bytes": 14119,
+      "sha256": "ac2bd1ee2d838555621a436d0a55ea2deec9d04c6c3e720501683523688e7d97",
+      "object": "objects/ac2bd1ee2d838555621a436d0a55ea2deec9d04c6c3e720501683523688e7d97"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/app-portal-home-scrolled-end-390.json",
+      "bytes": 124,
+      "sha256": "a3912231b3e890011464a52714d9fe71cd73800c2f1ee2b494aa76a0d7655b85",
+      "object": "objects/a3912231b3e890011464a52714d9fe71cd73800c2f1ee2b494aa76a0d7655b85"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/app-portal-home-scrolled-end-390.png",
+      "bytes": 49052,
+      "sha256": "befab2ed57327718b712ecf60c11ad609d989b2565d8798b378d0a9bbb1bf68c",
+      "object": "objects/befab2ed57327718b712ecf60c11ad609d989b2565d8798b378d0a9bbb1bf68c"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/app-portal-month-open-390.json",
+      "bytes": 950,
+      "sha256": "61cffae4930636f35d5a87a7bcf539e08281171c5bb1fe4ba7504e7fde57b6b3",
+      "object": "objects/61cffae4930636f35d5a87a7bcf539e08281171c5bb1fe4ba7504e7fde57b6b3"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/app-portal-month-open-390.png",
+      "bytes": 56709,
+      "sha256": "c1a6aa4f77e35766ab8d2dd15fe7e3695b187a911c9b73e48ac78c5695bed5ae",
+      "object": "objects/c1a6aa4f77e35766ab8d2dd15fe7e3695b187a911c9b73e48ac78c5695bed5ae"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/app-portal-month-picked-390.json",
+      "bytes": 1040,
+      "sha256": "2db62028a0fc2d0848c245018235f455d8e4d226534aa94dc37d2dcd7f783208",
+      "object": "objects/2db62028a0fc2d0848c245018235f455d8e4d226534aa94dc37d2dcd7f783208"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/app-portal-month-picked-390.png",
+      "bytes": 50519,
+      "sha256": "dcf6654e9c441a70555308eadf11a597966f558fe7c35ef92c166d390af377f3",
+      "object": "objects/dcf6654e9c441a70555308eadf11a597966f558fe7c35ef92c166d390af377f3"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/app-portal-month-tab-closes-390.json",
+      "bytes": 18,
+      "sha256": "75fcacb808c8999988429dfb49e7173160f563fbe13cfb4635e56635289eae80",
+      "object": "objects/75fcacb808c8999988429dfb49e7173160f563fbe13cfb4635e56635289eae80"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/app-portal-orders-390.json",
+      "bytes": 5661,
+      "sha256": "b2cf0ed45e67a2d5f9d0a7e6da93e6791d8371a5458af6c969399a9a634e60f6",
+      "object": "objects/b2cf0ed45e67a2d5f9d0a7e6da93e6791d8371a5458af6c969399a9a634e60f6"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/app-portal-orders-390.png",
+      "bytes": 31269,
+      "sha256": "6f49de98dce411110385e140c9ee6be688260d8c8a57a83c32e4fccd9741c361",
+      "object": "objects/6f49de98dce411110385e140c9ee6be688260d8c8a57a83c32e4fccd9741c361"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/app-portal-orders-july-390.json",
+      "bytes": 42,
+      "sha256": "81e0439f170573f5e0fc7ae5be0c45f379e1c25f42de266db7c668eefd775e4b",
+      "object": "objects/81e0439f170573f5e0fc7ae5be0c45f379e1c25f42de266db7c668eefd775e4b"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/app-portal-orders-july-390.png",
+      "bytes": 55330,
+      "sha256": "c1339a92deab1a1f9f84308b84ca4ff6618e32a2469fb871179a77496e31b017",
+      "object": "objects/c1339a92deab1a1f9f84308b84ca4ff6618e32a2469fb871179a77496e31b017"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/app-portal-orders-scrolled-end-390.json",
+      "bytes": 84,
+      "sha256": "6e9ef10629d06e938f3708facf4b0c21a08b7e963bdce792709e1235499b15be",
+      "object": "objects/6e9ef10629d06e938f3708facf4b0c21a08b7e963bdce792709e1235499b15be"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/app-portal-orders-scrolled-end-390.png",
+      "bytes": 31269,
+      "sha256": "6f49de98dce411110385e140c9ee6be688260d8c8a57a83c32e4fccd9741c361",
+      "object": "objects/6f49de98dce411110385e140c9ee6be688260d8c8a57a83c32e4fccd9741c361"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/app-portal-ranking-390.json",
+      "bytes": 10720,
+      "sha256": "4d80ef069d7f99d9af3602aa7e4ee0c49277504520e0ceb60284296da9020072",
+      "object": "objects/4d80ef069d7f99d9af3602aa7e4ee0c49277504520e0ceb60284296da9020072"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/app-portal-ranking-390.png",
+      "bytes": 50679,
+      "sha256": "7242be483579f9cc9f3e6f53677c2462dfcc9c8c925704dbbb384f9bc90747fd",
+      "object": "objects/7242be483579f9cc9f3e6f53677c2462dfcc9c8c925704dbbb384f9bc90747fd"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/export-admin-home-1280.json",
+      "bytes": 9764,
+      "sha256": "c00d1fb32a4d4f48a7035837651e2e06e6edfb902d08a6e6ec1875a318684863",
+      "object": "objects/c00d1fb32a4d4f48a7035837651e2e06e6edfb902d08a6e6ec1875a318684863"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/export-admin-home-1280.png",
+      "bytes": 121361,
+      "sha256": "24aa6d8d5a588f75eb97550e30fecf0896c8437c463e935a3169f7444e6de436",
+      "object": "objects/24aa6d8d5a588f75eb97550e30fecf0896c8437c463e935a3169f7444e6de436"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/export-admin-home-1440.json",
+      "bytes": 9764,
+      "sha256": "991ee51abb0c7535389907e7adbb5c95d382c0d49499e8c660d65a5b5cc2842c",
+      "object": "objects/991ee51abb0c7535389907e7adbb5c95d382c0d49499e8c660d65a5b5cc2842c"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/export-admin-home-1440.png",
+      "bytes": 122730,
+      "sha256": "326182b68cb7428800e21bf4f12e7968c4f37c8a48fb4a6862ebcf9f2340b194",
+      "object": "objects/326182b68cb7428800e21bf4f12e7968c4f37c8a48fb4a6862ebcf9f2340b194"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/export-admin-payments-1280.json",
+      "bytes": 9575,
+      "sha256": "a97bac797988c20996ea80848bc4f2f4cc37d410d505b9996f4467bab1b607a0",
+      "object": "objects/a97bac797988c20996ea80848bc4f2f4cc37d410d505b9996f4467bab1b607a0"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/export-admin-payments-1280.png",
+      "bytes": 141697,
+      "sha256": "94bcc9e24fa94cf9ee20ba9e4b4e0e8b986d83c03124df54c1b9ffa838cb028b",
+      "object": "objects/94bcc9e24fa94cf9ee20ba9e4b4e0e8b986d83c03124df54c1b9ffa838cb028b"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/export-admin-payments-1440.json",
+      "bytes": 9579,
+      "sha256": "ec9dbb9738ed0ab5ceb44097721598343d3167e9a055f048f33732120c04e5cc",
+      "object": "objects/ec9dbb9738ed0ab5ceb44097721598343d3167e9a055f048f33732120c04e5cc"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/export-admin-payments-1440.png",
+      "bytes": 143348,
+      "sha256": "0f5ac28414df0b1af9f4bcf1b6e738d2b3ceee747e0cc313e9d74142bec1c034",
+      "object": "objects/0f5ac28414df0b1af9f4bcf1b6e738d2b3ceee747e0cc313e9d74142bec1c034"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/export-admin-profile-1280.json",
+      "bytes": 8622,
+      "sha256": "c0fb24003976ce020a0bd6ae27292af4ee8c148da2158468b19a5120a49d993c",
+      "object": "objects/c0fb24003976ce020a0bd6ae27292af4ee8c148da2158468b19a5120a49d993c"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/export-admin-profile-1280.png",
+      "bytes": 79643,
+      "sha256": "d2924ad7c138d09dec968dacbb9d56d2e376df32d9dbd9b7f4248689d783bd27",
+      "object": "objects/d2924ad7c138d09dec968dacbb9d56d2e376df32d9dbd9b7f4248689d783bd27"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/export-admin-profile-1440.json",
+      "bytes": 8622,
+      "sha256": "5bb3dcd720e2f7ed81a6fc7e76dd7c3f0e8074c34bde9d9d89f7f775eb94190c",
+      "object": "objects/5bb3dcd720e2f7ed81a6fc7e76dd7c3f0e8074c34bde9d9d89f7f775eb94190c"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/export-admin-profile-1440.png",
+      "bytes": 80663,
+      "sha256": "478db7d3a151b7e2eb923577f031f8f11375161ad040fb237ae7503636dbbf88",
+      "object": "objects/478db7d3a151b7e2eb923577f031f8f11375161ad040fb237ae7503636dbbf88"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/export-admin-targets-1280.json",
+      "bytes": 9512,
+      "sha256": "e386fc48228192650445597cd0526307be6c95b3ca43fb3b34d23bac3994ca2c",
+      "object": "objects/e386fc48228192650445597cd0526307be6c95b3ca43fb3b34d23bac3994ca2c"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/export-admin-targets-1280.png",
+      "bytes": 116884,
+      "sha256": "f698ba15de4a94a2278d6dbbd28bc4acc86ebf386532985e8a04abc5402aafca",
+      "object": "objects/f698ba15de4a94a2278d6dbbd28bc4acc86ebf386532985e8a04abc5402aafca"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/export-admin-targets-1440.json",
+      "bytes": 9512,
+      "sha256": "5fd8075807e94991dcd382dc2f4c97dc94faf277ade814d628983aabf5c87de2",
+      "object": "objects/5fd8075807e94991dcd382dc2f4c97dc94faf277ade814d628983aabf5c87de2"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/export-admin-targets-1440.png",
+      "bytes": 118272,
+      "sha256": "658d7e25f2747a57ec7fae019fd515d24f252c2ba03845930898ac25dc435db7",
+      "object": "objects/658d7e25f2747a57ec7fae019fd515d24f252c2ba03845930898ac25dc435db7"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/export-portal-home-390.json",
+      "bytes": 7786,
+      "sha256": "ecb59a699e0658e5bc92bb852d1387cdb2875d355d736536167577d00e9df9a0",
+      "object": "objects/ecb59a699e0658e5bc92bb852d1387cdb2875d355d736536167577d00e9df9a0"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/export-portal-home-390.png",
+      "bytes": 48163,
+      "sha256": "c8e6ce0386b30fcc039af97d95298b708f26188bd0962785435fdbae5562405e",
+      "object": "objects/c8e6ce0386b30fcc039af97d95298b708f26188bd0962785435fdbae5562405e"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/export-portal-month-open-390.json",
+      "bytes": 1132,
+      "sha256": "e6cbf5dac8cf3624e769364ce94faaf40c8c173fabe54d6382dbceb3ad38e02b",
+      "object": "objects/e6cbf5dac8cf3624e769364ce94faaf40c8c173fabe54d6382dbceb3ad38e02b"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/export-portal-month-open-390.png",
+      "bytes": 54237,
+      "sha256": "15abca3330d3bfe456fbff41e95ebcdfb7eda3167d9a3b62c38e476a97d1e466",
+      "object": "objects/15abca3330d3bfe456fbff41e95ebcdfb7eda3167d9a3b62c38e476a97d1e466"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/export-portal-month-picked-390.png",
+      "bytes": 49691,
+      "sha256": "18cb5cec09761e8496b4f96fadb379e2d5359976521982797c71af7b92d55f6b",
+      "object": "objects/18cb5cec09761e8496b4f96fadb379e2d5359976521982797c71af7b92d55f6b"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/export-portal-order-rows-390.json",
+      "bytes": 28,
+      "sha256": "bcfd6cdc1926bbbe6687c11f8cb91b0157a561e61a89e49a88bf59099098d403",
+      "object": "objects/bcfd6cdc1926bbbe6687c11f8cb91b0157a561e61a89e49a88bf59099098d403"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/export-portal-orders-390.json",
+      "bytes": 6504,
+      "sha256": "e1c22d06b282999e3abd76e59f125b23d5e3232750fbe045300b983d46800b81",
+      "object": "objects/e1c22d06b282999e3abd76e59f125b23d5e3232750fbe045300b983d46800b81"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/export-portal-orders-390.png",
+      "bytes": 34335,
+      "sha256": "ec8b5bf084ae0e410c9b8ac9cbed8e7902676171e3240171910f5d57c4f9da5a",
+      "object": "objects/ec8b5bf084ae0e410c9b8ac9cbed8e7902676171e3240171910f5d57c4f9da5a"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/export-portal-ranking-390.json",
+      "bytes": 13441,
+      "sha256": "fc2ebaff5b3197fb035da4541b257d70519091d5a5da0ec34004b03f3408f105",
+      "object": "objects/fc2ebaff5b3197fb035da4541b257d70519091d5a5da0ec34004b03f3408f105"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/after/export-portal-ranking-390.png",
+      "bytes": 48139,
+      "sha256": "4597e1e59a8d80810c943602010ec3c0ceaebc5db6ba4f2988e210e73031c78c",
+      "object": "objects/4597e1e59a8d80810c943602010ec3c0ceaebc5db6ba4f2988e210e73031c78c"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/app-admin-home-1280.json",
+      "bytes": 10231,
+      "sha256": "b86c8cd38f2b19164a4a85ba69fc9db3a595862b4f9f77a9d15ed6a1f8d48ed5",
+      "object": "objects/b86c8cd38f2b19164a4a85ba69fc9db3a595862b4f9f77a9d15ed6a1f8d48ed5"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/app-admin-home-1280.png",
+      "bytes": 129405,
+      "sha256": "d0ffc7ea487b5e23f9065b80cee9908e31a1a3301a3dc072879aef369cee296f",
+      "object": "objects/d0ffc7ea487b5e23f9065b80cee9908e31a1a3301a3dc072879aef369cee296f"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/app-admin-home-1440.json",
+      "bytes": 10231,
+      "sha256": "03a22e243f803902b0cae40b3cfa42da456d33ef97740822eefc64f4de7f3ba9",
+      "object": "objects/03a22e243f803902b0cae40b3cfa42da456d33ef97740822eefc64f4de7f3ba9"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/app-admin-home-1440.png",
+      "bytes": 130530,
+      "sha256": "48d6229258c0ebef5a6cc5a458b2164c0cd09270aea59c515c9833a6a653a7d2",
+      "object": "objects/48d6229258c0ebef5a6cc5a458b2164c0cd09270aea59c515c9833a6a653a7d2"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/app-admin-orders-1280.json",
+      "bytes": 9863,
+      "sha256": "1990baf5c24ff9254f076e96c9a59b356ccd86abd4da4981ab67f2daafed231f",
+      "object": "objects/1990baf5c24ff9254f076e96c9a59b356ccd86abd4da4981ab67f2daafed231f"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/app-admin-orders-1280.png",
+      "bytes": 115482,
+      "sha256": "e242a4f2b15475aaff62dd0a10cabd94f46547fbc250dd45be9acd737a0080a2",
+      "object": "objects/e242a4f2b15475aaff62dd0a10cabd94f46547fbc250dd45be9acd737a0080a2"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/app-admin-orders-1440.json",
+      "bytes": 9863,
+      "sha256": "c7a6d8e810abcfd72edf9e7a83583a18dcc8e5c137a3cfcc746769c096a30de1",
+      "object": "objects/c7a6d8e810abcfd72edf9e7a83583a18dcc8e5c137a3cfcc746769c096a30de1"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/app-admin-orders-1440.png",
+      "bytes": 116767,
+      "sha256": "d34e175d3df5c37b63af88ae60dfe229c1a5873236eb0ab3ea3bd926d9b1c7b0",
+      "object": "objects/d34e175d3df5c37b63af88ae60dfe229c1a5873236eb0ab3ea3bd926d9b1c7b0"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/app-admin-payments-1280.json",
+      "bytes": 9887,
+      "sha256": "e16eda7a2db2b86bed4bdcb9399c50e916aa8821fe338314bdec57cec4c12b59",
+      "object": "objects/e16eda7a2db2b86bed4bdcb9399c50e916aa8821fe338314bdec57cec4c12b59"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/app-admin-payments-1280.png",
+      "bytes": 139462,
+      "sha256": "98a0df83dec31a9747d299a685550a0bc1e39b0e85357cc8e5ac7fa06628ede6",
+      "object": "objects/98a0df83dec31a9747d299a685550a0bc1e39b0e85357cc8e5ac7fa06628ede6"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/app-admin-payments-1440.json",
+      "bytes": 9881,
+      "sha256": "8688d87ebc6ef65d15b16c5c31d9918c698786970833f590e087c69171bada2e",
+      "object": "objects/8688d87ebc6ef65d15b16c5c31d9918c698786970833f590e087c69171bada2e"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/app-admin-payments-1440.png",
+      "bytes": 139908,
+      "sha256": "f654392236f922f0294041abd78a5a15cbfc9de9959d0a72f371f38fe9acd750",
+      "object": "objects/f654392236f922f0294041abd78a5a15cbfc9de9959d0a72f371f38fe9acd750"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/app-admin-payroll-1280.json",
+      "bytes": 9863,
+      "sha256": "016eb130adbabc591396375d98f7e6622053afb2c49c0feda774dab58bc06e68",
+      "object": "objects/016eb130adbabc591396375d98f7e6622053afb2c49c0feda774dab58bc06e68"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/app-admin-payroll-1280.png",
+      "bytes": 127959,
+      "sha256": "c270b1fd7b38cd8c1814812123553493a63b5c18ec999c2799e59105b40d37b9",
+      "object": "objects/c270b1fd7b38cd8c1814812123553493a63b5c18ec999c2799e59105b40d37b9"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/app-admin-payroll-1440.json",
+      "bytes": 9865,
+      "sha256": "9e29ed5db88edc00e0f775511f812d5d069087dbb7aa6ea8292123fe96ac5c49",
+      "object": "objects/9e29ed5db88edc00e0f775511f812d5d069087dbb7aa6ea8292123fe96ac5c49"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/app-admin-payroll-1440.png",
+      "bytes": 127546,
+      "sha256": "8f6aefc1fec342877147c0c431597b0b4c42ef65c35018d9c4bf749c056fa244",
+      "object": "objects/8f6aefc1fec342877147c0c431597b0b4c42ef65c35018d9c4bf749c056fa244"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/app-admin-profile-1280.json",
+      "bytes": 9313,
+      "sha256": "6ef7d4661b801f4c3f2d5985160e333329e3b4a17fe87ea41fd8f36fd0d5a8c6",
+      "object": "objects/6ef7d4661b801f4c3f2d5985160e333329e3b4a17fe87ea41fd8f36fd0d5a8c6"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/app-admin-profile-1280.png",
+      "bytes": 89670,
+      "sha256": "d2ea377fe4c62c184223c0b099e339ec2e5a701a4b62d96b60d932a8bc55be3b",
+      "object": "objects/d2ea377fe4c62c184223c0b099e339ec2e5a701a4b62d96b60d932a8bc55be3b"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/app-admin-profile-1440.json",
+      "bytes": 9325,
+      "sha256": "c9e59e397522c91f2cc8d285633acde69679766841f96787e641c2e018294d10",
+      "object": "objects/c9e59e397522c91f2cc8d285633acde69679766841f96787e641c2e018294d10"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/app-admin-profile-1440.png",
+      "bytes": 92821,
+      "sha256": "cfaf034ac0de497f74f70b25a721640dc1d6fb1c71836511fca0b4c8555d08f6",
+      "object": "objects/cfaf034ac0de497f74f70b25a721640dc1d6fb1c71836511fca0b4c8555d08f6"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/app-admin-profile-long-1280.png",
+      "bytes": 30262,
+      "sha256": "59829bead2fb112d48df0cc48e354b3b3412836a6cfa84948942de83119867d5",
+      "object": "objects/59829bead2fb112d48df0cc48e354b3b3412836a6cfa84948942de83119867d5"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/app-admin-targets-1280.json",
+      "bytes": 9955,
+      "sha256": "98026a5de78f59bc4b5873764fd622d9759e874e0bd2853a43fbaebfd5457395",
+      "object": "objects/98026a5de78f59bc4b5873764fd622d9759e874e0bd2853a43fbaebfd5457395"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/app-admin-targets-1280.png",
+      "bytes": 135216,
+      "sha256": "4756592e96c69c654354ab22573397e92f85de387faf2098aa822b138d2668cb",
+      "object": "objects/4756592e96c69c654354ab22573397e92f85de387faf2098aa822b138d2668cb"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/app-admin-targets-1440.json",
+      "bytes": 9955,
+      "sha256": "a107d7dd64ecf556252b9f71a1b0910a14689f2788f6494ef14a20627e2ddd91",
+      "object": "objects/a107d7dd64ecf556252b9f71a1b0910a14689f2788f6494ef14a20627e2ddd91"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/app-admin-targets-1440.png",
+      "bytes": 137136,
+      "sha256": "7718f450f286da5631d13acd788522a9ed0c8ea71e6be83c423403f33187aea3",
+      "object": "objects/7718f450f286da5631d13acd788522a9ed0c8ea71e6be83c423403f33187aea3"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/app-portal-home-390.json",
+      "bytes": 9814,
+      "sha256": "78ff71e2f97d6ca8e305877d3e896e5c2fac0067b22d4f78afb2bad017e0c7a4",
+      "object": "objects/78ff71e2f97d6ca8e305877d3e896e5c2fac0067b22d4f78afb2bad017e0c7a4"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/app-portal-home-390.png",
+      "bytes": 51862,
+      "sha256": "7f0da306d4a72a985b4c5f98d3ef4643fc3e515d71959cd6830d8941a216a92b",
+      "object": "objects/7f0da306d4a72a985b4c5f98d3ef4643fc3e515d71959cd6830d8941a216a92b"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/app-portal-home-long-390.json",
+      "bytes": 1160,
+      "sha256": "294295f4ba9a582b73ab112a522c1d420301c218bd35c42e78cc7d738d6bfa15",
+      "object": "objects/294295f4ba9a582b73ab112a522c1d420301c218bd35c42e78cc7d738d6bfa15"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/app-portal-home-long-390.png",
+      "bytes": 12089,
+      "sha256": "4917d868bbf26ad5b0150442052969fe26af772a2c010ddc26d24e1638a0e8cd",
+      "object": "objects/4917d868bbf26ad5b0150442052969fe26af772a2c010ddc26d24e1638a0e8cd"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/app-portal-month-open-390.json",
+      "bytes": 186,
+      "sha256": "3c29820dff5bf287af1726c5fb911ac32a4f8576ac951e1cb7555c385d3de752",
+      "object": "objects/3c29820dff5bf287af1726c5fb911ac32a4f8576ac951e1cb7555c385d3de752"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/app-portal-orders-390.json",
+      "bytes": 5651,
+      "sha256": "d4c97489eb7dbe862b4a7dcf6f4a956f69263d7af40ef9d0af6f8815bdde9a89",
+      "object": "objects/d4c97489eb7dbe862b4a7dcf6f4a956f69263d7af40ef9d0af6f8815bdde9a89"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/app-portal-orders-390.png",
+      "bytes": 31672,
+      "sha256": "ce1f4c6a3cd28b12e5bd9e1263672b6c45b9dbccc5eb5bd1f38e6b301351b64e",
+      "object": "objects/ce1f4c6a3cd28b12e5bd9e1263672b6c45b9dbccc5eb5bd1f38e6b301351b64e"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/app-portal-orders-scrolled-end-390.json",
+      "bytes": 84,
+      "sha256": "73f7dc1d1395fd45a8e689d736459e36b46d6b7aaa6f4a68d28d39418caaf0f3",
+      "object": "objects/73f7dc1d1395fd45a8e689d736459e36b46d6b7aaa6f4a68d28d39418caaf0f3"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/app-portal-orders-scrolled-end-390.png",
+      "bytes": 31672,
+      "sha256": "ce1f4c6a3cd28b12e5bd9e1263672b6c45b9dbccc5eb5bd1f38e6b301351b64e",
+      "object": "objects/ce1f4c6a3cd28b12e5bd9e1263672b6c45b9dbccc5eb5bd1f38e6b301351b64e"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/app-portal-ranking-390.json",
+      "bytes": 10912,
+      "sha256": "93ca4a0ec3db75b213a56e5a6960adf777f8f004f1cd04913c2de2b438d98f91",
+      "object": "objects/93ca4a0ec3db75b213a56e5a6960adf777f8f004f1cd04913c2de2b438d98f91"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/app-portal-ranking-390.png",
+      "bytes": 51471,
+      "sha256": "6348673be47e63341e289aa70444ceb08be5790240c7189c207e62cb9b3149ec",
+      "object": "objects/6348673be47e63341e289aa70444ceb08be5790240c7189c207e62cb9b3149ec"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/export-admin-home-1280.json",
+      "bytes": 9764,
+      "sha256": "c00d1fb32a4d4f48a7035837651e2e06e6edfb902d08a6e6ec1875a318684863",
+      "object": "objects/c00d1fb32a4d4f48a7035837651e2e06e6edfb902d08a6e6ec1875a318684863"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/export-admin-home-1280.png",
+      "bytes": 121361,
+      "sha256": "24aa6d8d5a588f75eb97550e30fecf0896c8437c463e935a3169f7444e6de436",
+      "object": "objects/24aa6d8d5a588f75eb97550e30fecf0896c8437c463e935a3169f7444e6de436"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/export-admin-home-1440.json",
+      "bytes": 9764,
+      "sha256": "991ee51abb0c7535389907e7adbb5c95d382c0d49499e8c660d65a5b5cc2842c",
+      "object": "objects/991ee51abb0c7535389907e7adbb5c95d382c0d49499e8c660d65a5b5cc2842c"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/export-admin-home-1440.png",
+      "bytes": 122730,
+      "sha256": "326182b68cb7428800e21bf4f12e7968c4f37c8a48fb4a6862ebcf9f2340b194",
+      "object": "objects/326182b68cb7428800e21bf4f12e7968c4f37c8a48fb4a6862ebcf9f2340b194"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/export-admin-payments-1280.json",
+      "bytes": 9575,
+      "sha256": "a97bac797988c20996ea80848bc4f2f4cc37d410d505b9996f4467bab1b607a0",
+      "object": "objects/a97bac797988c20996ea80848bc4f2f4cc37d410d505b9996f4467bab1b607a0"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/export-admin-payments-1280.png",
+      "bytes": 141697,
+      "sha256": "94bcc9e24fa94cf9ee20ba9e4b4e0e8b986d83c03124df54c1b9ffa838cb028b",
+      "object": "objects/94bcc9e24fa94cf9ee20ba9e4b4e0e8b986d83c03124df54c1b9ffa838cb028b"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/export-admin-payments-1440.json",
+      "bytes": 9579,
+      "sha256": "ec9dbb9738ed0ab5ceb44097721598343d3167e9a055f048f33732120c04e5cc",
+      "object": "objects/ec9dbb9738ed0ab5ceb44097721598343d3167e9a055f048f33732120c04e5cc"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/export-admin-payments-1440.png",
+      "bytes": 143348,
+      "sha256": "0f5ac28414df0b1af9f4bcf1b6e738d2b3ceee747e0cc313e9d74142bec1c034",
+      "object": "objects/0f5ac28414df0b1af9f4bcf1b6e738d2b3ceee747e0cc313e9d74142bec1c034"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/export-admin-profile-1280.json",
+      "bytes": 8622,
+      "sha256": "c0fb24003976ce020a0bd6ae27292af4ee8c148da2158468b19a5120a49d993c",
+      "object": "objects/c0fb24003976ce020a0bd6ae27292af4ee8c148da2158468b19a5120a49d993c"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/export-admin-profile-1280.png",
+      "bytes": 79643,
+      "sha256": "d2924ad7c138d09dec968dacbb9d56d2e376df32d9dbd9b7f4248689d783bd27",
+      "object": "objects/d2924ad7c138d09dec968dacbb9d56d2e376df32d9dbd9b7f4248689d783bd27"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/export-admin-profile-1440.json",
+      "bytes": 8622,
+      "sha256": "5bb3dcd720e2f7ed81a6fc7e76dd7c3f0e8074c34bde9d9d89f7f775eb94190c",
+      "object": "objects/5bb3dcd720e2f7ed81a6fc7e76dd7c3f0e8074c34bde9d9d89f7f775eb94190c"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/export-admin-profile-1440.png",
+      "bytes": 80663,
+      "sha256": "478db7d3a151b7e2eb923577f031f8f11375161ad040fb237ae7503636dbbf88",
+      "object": "objects/478db7d3a151b7e2eb923577f031f8f11375161ad040fb237ae7503636dbbf88"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/export-admin-targets-1280.json",
+      "bytes": 9512,
+      "sha256": "e386fc48228192650445597cd0526307be6c95b3ca43fb3b34d23bac3994ca2c",
+      "object": "objects/e386fc48228192650445597cd0526307be6c95b3ca43fb3b34d23bac3994ca2c"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/export-admin-targets-1280.png",
+      "bytes": 116884,
+      "sha256": "f698ba15de4a94a2278d6dbbd28bc4acc86ebf386532985e8a04abc5402aafca",
+      "object": "objects/f698ba15de4a94a2278d6dbbd28bc4acc86ebf386532985e8a04abc5402aafca"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/export-admin-targets-1440.json",
+      "bytes": 9512,
+      "sha256": "5fd8075807e94991dcd382dc2f4c97dc94faf277ade814d628983aabf5c87de2",
+      "object": "objects/5fd8075807e94991dcd382dc2f4c97dc94faf277ade814d628983aabf5c87de2"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/export-admin-targets-1440.png",
+      "bytes": 118272,
+      "sha256": "658d7e25f2747a57ec7fae019fd515d24f252c2ba03845930898ac25dc435db7",
+      "object": "objects/658d7e25f2747a57ec7fae019fd515d24f252c2ba03845930898ac25dc435db7"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/export-portal-home-390.json",
+      "bytes": 7786,
+      "sha256": "ecb59a699e0658e5bc92bb852d1387cdb2875d355d736536167577d00e9df9a0",
+      "object": "objects/ecb59a699e0658e5bc92bb852d1387cdb2875d355d736536167577d00e9df9a0"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/export-portal-home-390.png",
+      "bytes": 48163,
+      "sha256": "c8e6ce0386b30fcc039af97d95298b708f26188bd0962785435fdbae5562405e",
+      "object": "objects/c8e6ce0386b30fcc039af97d95298b708f26188bd0962785435fdbae5562405e"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/export-portal-month-open-390.json",
+      "bytes": 1132,
+      "sha256": "e6cbf5dac8cf3624e769364ce94faaf40c8c173fabe54d6382dbceb3ad38e02b",
+      "object": "objects/e6cbf5dac8cf3624e769364ce94faaf40c8c173fabe54d6382dbceb3ad38e02b"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/export-portal-month-open-390.png",
+      "bytes": 54240,
+      "sha256": "2685401d38c5e418d6dc7a27901fad218b0b2d2d3ed8c083bf2090b41e73c07a",
+      "object": "objects/2685401d38c5e418d6dc7a27901fad218b0b2d2d3ed8c083bf2090b41e73c07a"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/export-portal-month-picked-390.png",
+      "bytes": 49691,
+      "sha256": "18cb5cec09761e8496b4f96fadb379e2d5359976521982797c71af7b92d55f6b",
+      "object": "objects/18cb5cec09761e8496b4f96fadb379e2d5359976521982797c71af7b92d55f6b"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/export-portal-orders-390.json",
+      "bytes": 6504,
+      "sha256": "e1c22d06b282999e3abd76e59f125b23d5e3232750fbe045300b983d46800b81",
+      "object": "objects/e1c22d06b282999e3abd76e59f125b23d5e3232750fbe045300b983d46800b81"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/export-portal-orders-390.png",
+      "bytes": 34335,
+      "sha256": "ec8b5bf084ae0e410c9b8ac9cbed8e7902676171e3240171910f5d57c4f9da5a",
+      "object": "objects/ec8b5bf084ae0e410c9b8ac9cbed8e7902676171e3240171910f5d57c4f9da5a"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/export-portal-ranking-390.json",
+      "bytes": 13441,
+      "sha256": "fc2ebaff5b3197fb035da4541b257d70519091d5a5da0ec34004b03f3408f105",
+      "object": "objects/fc2ebaff5b3197fb035da4541b257d70519091d5a5da0ec34004b03f3408f105"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/before/export-portal-ranking-390.png",
+      "bytes": 48139,
+      "sha256": "4597e1e59a8d80810c943602010ec3c0ceaebc5db6ba4f2988e210e73031c78c",
+      "object": "objects/4597e1e59a8d80810c943602010ec3c0ceaebc5db6ba4f2988e210e73031c78c"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/compare/admin-home-topbar-1280.png",
+      "bytes": 19446,
+      "sha256": "c8076c361e8a46eaa6a6138b922b404a275badb05425c374a16b574f82e60aad",
+      "object": "objects/c8076c361e8a46eaa6a6138b922b404a275badb05425c374a16b574f82e60aad"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/compare/admin-home-topbar-1440.png",
+      "bytes": 19471,
+      "sha256": "6681709dad59230e3b2628387bbf49b5f0b1dc7ab1920ed9b362daaf0c2ebedc",
+      "object": "objects/6681709dad59230e3b2628387bbf49b5f0b1dc7ab1920ed9b362daaf0c2ebedc"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/compare/admin-payments-topbar-1280.png",
+      "bytes": 20693,
+      "sha256": "7210b0f8be1e58d6d5bb4f377a3369a6c323122418fdf55e670c254c782b1031",
+      "object": "objects/7210b0f8be1e58d6d5bb4f377a3369a6c323122418fdf55e670c254c782b1031"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/compare/admin-payments-topbar-1440.png",
+      "bytes": 20696,
+      "sha256": "96f37f39b6896bd82990bac2bc5592ed29c832f87a007c70a8c43cbc88b79b06",
+      "object": "objects/96f37f39b6896bd82990bac2bc5592ed29c832f87a007c70a8c43cbc88b79b06"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/compare/admin-profile-1280.png",
+      "bytes": 49611,
+      "sha256": "e0266c80d74fd05782ff2321a56403730ad9ab4d4d10208f4b87402f414ef2b0",
+      "object": "objects/e0266c80d74fd05782ff2321a56403730ad9ab4d4d10208f4b87402f414ef2b0"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/compare/admin-profile-1440.png",
+      "bytes": 50763,
+      "sha256": "8b2fee0c696d72caf34ff397b0ea54f32b99b545ca88d2d7876d581150c50aba",
+      "object": "objects/8b2fee0c696d72caf34ff397b0ea54f32b99b545ca88d2d7876d581150c50aba"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/compare/admin-profile-long-1280.png",
+      "bytes": 60184,
+      "sha256": "20143fea24b8aa2838c588844a04308f2aef445c7f88f2f0211114e51477a923",
+      "object": "objects/20143fea24b8aa2838c588844a04308f2aef445c7f88f2f0211114e51477a923"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/compare/admin-targets-topbar-1280.png",
+      "bytes": 23827,
+      "sha256": "de7cf5db347285cb301e8bdae7e5453b4d951ea48823f98f78693e9ac648e159",
+      "object": "objects/de7cf5db347285cb301e8bdae7e5453b4d951ea48823f98f78693e9ac648e159"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/compare/admin-targets-topbar-1440.png",
+      "bytes": 24075,
+      "sha256": "976d48e4a448627a0efb76ccd5a87617dece14585fc2868972330b2919e34607",
+      "object": "objects/976d48e4a448627a0efb76ccd5a87617dece14585fc2868972330b2919e34607"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/compare/portal-home-390.png",
+      "bytes": 137950,
+      "sha256": "6c65e2329ef8b1a38375c479f980469db3771a634c8cb430aa5d13ad94ee022c",
+      "object": "objects/6c65e2329ef8b1a38375c479f980469db3771a634c8cb430aa5d13ad94ee022c"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/compare/portal-home-long-390.png",
+      "bytes": 27183,
+      "sha256": "0947d5c6b437eb9dccbd83949ab9d006d1eea4b2226d3871a3bc17e74c0d87bd",
+      "object": "objects/0947d5c6b437eb9dccbd83949ab9d006d1eea4b2226d3871a3bc17e74c0d87bd"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/compare/portal-month-open-390.png",
+      "bytes": 118117,
+      "sha256": "4454e3717c99df62efcf95e4d60094869c2b0b976bbc1907cdc4b179f3b46bc3",
+      "object": "objects/4454e3717c99df62efcf95e4d60094869c2b0b976bbc1907cdc4b179f3b46bc3"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/compare/portal-orders-390.png",
+      "bytes": 89395,
+      "sha256": "03de2de28d26a983486a3ff9166a48ba7b08598bbc5236714a675a5b901ed7e5",
+      "object": "objects/03de2de28d26a983486a3ff9166a48ba7b08598bbc5236714a675a5b901ed7e5"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/compare/portal-orders-july-and-scroll-390.png",
+      "bytes": 144041,
+      "sha256": "cd09a6a1465e3bb6cba490fb0119f84a5c5cbd924f8ea8c61d9505585ddd2943",
+      "object": "objects/cd09a6a1465e3bb6cba490fb0119f84a5c5cbd924f8ea8c61d9505585ddd2943"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/compare/portal-ranking-390.png",
+      "bytes": 144529,
+      "sha256": "c1b116aad2ddf092a2cfa153877f48ac78730e6c195f3d8ff73bdae7f9eccafa",
+      "object": "objects/c1b116aad2ddf092a2cfa153877f48ac78730e6c195f3d8ff73bdae7f9eccafa"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/compare-follow-up/admin-home-1280.png",
+      "bytes": 106427,
+      "sha256": "37c51a202888e15de58df1207fbfb7f86f32222897675e86db5995a42871052a",
+      "object": "objects/37c51a202888e15de58df1207fbfb7f86f32222897675e86db5995a42871052a"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/compare-follow-up/admin-home-1440.png",
+      "bytes": 108506,
+      "sha256": "536e9cc4a7e7c8ba3ebe19e9de1c11823a89f23379ff52c70ae880d693f84b9b",
+      "object": "objects/536e9cc4a7e7c8ba3ebe19e9de1c11823a89f23379ff52c70ae880d693f84b9b"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/compare-follow-up/admin-payments-1280.png",
+      "bytes": 220248,
+      "sha256": "9678d55fb47d70717dce5b5e6a0a06a6af47a581b6fbd7a818017d8b39e8bbf5",
+      "object": "objects/9678d55fb47d70717dce5b5e6a0a06a6af47a581b6fbd7a818017d8b39e8bbf5"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/compare-follow-up/admin-payments-1440.png",
+      "bytes": 221748,
+      "sha256": "95ba6609c129b59d8cce4a43266b0425d9cda348930babef6c1b1947b95c428f",
+      "object": "objects/95ba6609c129b59d8cce4a43266b0425d9cda348930babef6c1b1947b95c428f"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/compare-follow-up/admin-profile-1280.png",
+      "bytes": 122783,
+      "sha256": "b1d2838b317dd00c3f5c671bc0b1856bb89d6714b1a64124ade545427ad56a22",
+      "object": "objects/b1d2838b317dd00c3f5c671bc0b1856bb89d6714b1a64124ade545427ad56a22"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/compare-follow-up/admin-profile-1440.png",
+      "bytes": 126731,
+      "sha256": "8563a47aea04dddc8e819a126416ea127940a47efbe5bc67b09b3806e8762d5d",
+      "object": "objects/8563a47aea04dddc8e819a126416ea127940a47efbe5bc67b09b3806e8762d5d"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/compare-follow-up/portal-home-390.png",
+      "bytes": 108089,
+      "sha256": "843358abcda952e8b3107474dd7d5ecef591f9fdca6a1bba808e98273d5be3d9",
+      "object": "objects/843358abcda952e8b3107474dd7d5ecef591f9fdca6a1bba808e98273d5be3d9"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/compare-follow-up/portal-month-open-390.png",
+      "bytes": 126032,
+      "sha256": "cd2b3f60b3da327ee8b75668e6bd779b4144075350bcd6de70f400080546165b",
+      "object": "objects/cd2b3f60b3da327ee8b75668e6bd779b4144075350bcd6de70f400080546165b"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/compare-follow-up/portal-orders-390.png",
+      "bytes": 70972,
+      "sha256": "98ce340bde37a8718d11d2ca13740061987fa74a6cd2d433b7b6d440c42b8b39",
+      "object": "objects/98ce340bde37a8718d11d2ca13740061987fa74a6cd2d433b7b6d440c42b8b39"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/compare-follow-up/portal-orders-july-390.png",
+      "bytes": 89049,
+      "sha256": "e00d189036947a2a2eb7cddbe2b663bc4abee93b8fb6e7a53e2c69fc72d7c7c8",
+      "object": "objects/e00d189036947a2a2eb7cddbe2b663bc4abee93b8fb6e7a53e2c69fc72d7c7c8"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/app-admin-home-1280.json",
+      "bytes": 10046,
+      "sha256": "7315c99c6bf0ab634ce16b2f734c80e03948d2ec7f436a873115468d9b357553",
+      "object": "objects/7315c99c6bf0ab634ce16b2f734c80e03948d2ec7f436a873115468d9b357553"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/app-admin-home-1280.png",
+      "bytes": 122993,
+      "sha256": "1e35e723f731134662f5826feac616a3c24caf16aa3047dc38f0c1c47614e972",
+      "object": "objects/1e35e723f731134662f5826feac616a3c24caf16aa3047dc38f0c1c47614e972"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/app-admin-home-1440.json",
+      "bytes": 10046,
+      "sha256": "4a2ab8d3f32e5165e01352245df970a4b4ba84054c974fc52744f958e1b54f35",
+      "object": "objects/4a2ab8d3f32e5165e01352245df970a4b4ba84054c974fc52744f958e1b54f35"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/app-admin-home-1440.png",
+      "bytes": 124228,
+      "sha256": "62f4e3006d0f88ce21238e4d34ccbc9306719bcedda019f9b6893e0ec1d9d4f3",
+      "object": "objects/62f4e3006d0f88ce21238e4d34ccbc9306719bcedda019f9b6893e0ec1d9d4f3"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/app-admin-orders-1280.json",
+      "bytes": 9734,
+      "sha256": "eb04ddae5bdd11ad22346c4d966f82ea96ca7d33af85061ac125f0599a267fb0",
+      "object": "objects/eb04ddae5bdd11ad22346c4d966f82ea96ca7d33af85061ac125f0599a267fb0"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/app-admin-orders-1280.png",
+      "bytes": 111939,
+      "sha256": "6414596012d6e44acce37c737d15ea5d23e3f5543594ae79d49d833ff8b8ba49",
+      "object": "objects/6414596012d6e44acce37c737d15ea5d23e3f5543594ae79d49d833ff8b8ba49"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/app-admin-orders-1440.json",
+      "bytes": 9734,
+      "sha256": "9231cd5308cd439c9b431755d5ca67e89350bd80692e0c8c0621d25477e4e06e",
+      "object": "objects/9231cd5308cd439c9b431755d5ca67e89350bd80692e0c8c0621d25477e4e06e"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/app-admin-orders-1440.png",
+      "bytes": 113083,
+      "sha256": "98d1a8057090a49ebbbc67082b116acef2e92619616e35ee8ec4e55f708379cf",
+      "object": "objects/98d1a8057090a49ebbbc67082b116acef2e92619616e35ee8ec4e55f708379cf"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/app-admin-payments-1280.json",
+      "bytes": 10018,
+      "sha256": "7ed1e01a7dcc30fd6d177b0d46bcfdb33cb1092b09ccf19e2236613fc6de67ca",
+      "object": "objects/7ed1e01a7dcc30fd6d177b0d46bcfdb33cb1092b09ccf19e2236613fc6de67ca"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/app-admin-payments-1280.png",
+      "bytes": 130398,
+      "sha256": "873184ca5b8f194a373e2c0eda0ef27d7930d9a008cf0f9c8697ed16fd5dbccd",
+      "object": "objects/873184ca5b8f194a373e2c0eda0ef27d7930d9a008cf0f9c8697ed16fd5dbccd"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/app-admin-payments-1440.json",
+      "bytes": 10012,
+      "sha256": "fa0e860b5903863e0fc2958f4a695ec6d483648759d4f76f3fbac7d02f93f77a",
+      "object": "objects/fa0e860b5903863e0fc2958f4a695ec6d483648759d4f76f3fbac7d02f93f77a"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/app-admin-payments-1440.png",
+      "bytes": 130341,
+      "sha256": "d9567b79581f022650cfbdc898736abf9a771f9a8a4a7722fc9107893a615586",
+      "object": "objects/d9567b79581f022650cfbdc898736abf9a771f9a8a4a7722fc9107893a615586"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/app-admin-payroll-1280.json",
+      "bytes": 9750,
+      "sha256": "35787912001603fca418328b7e3ace5d80d2cd8493cc8f1fa65e999e3b67e9c4",
+      "object": "objects/35787912001603fca418328b7e3ace5d80d2cd8493cc8f1fa65e999e3b67e9c4"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/app-admin-payroll-1280.png",
+      "bytes": 121969,
+      "sha256": "b32d21726aea337f40e4103be5ab2b5de25ff1acfd9aa5a1ef6f419ad29abe58",
+      "object": "objects/b32d21726aea337f40e4103be5ab2b5de25ff1acfd9aa5a1ef6f419ad29abe58"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/app-admin-payroll-1440.json",
+      "bytes": 9750,
+      "sha256": "e18be67fbd2f0911113e26f72889b47cbae3e1587121f2fd29d467a22ee6035a",
+      "object": "objects/e18be67fbd2f0911113e26f72889b47cbae3e1587121f2fd29d467a22ee6035a"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/app-admin-payroll-1440.png",
+      "bytes": 123202,
+      "sha256": "3695d8320c6298af6773b7323e454a2a29b3a4b369146d49c8c063dfb2cec2aa",
+      "object": "objects/3695d8320c6298af6773b7323e454a2a29b3a4b369146d49c8c063dfb2cec2aa"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/app-admin-profile-1280.json",
+      "bytes": 9590,
+      "sha256": "20c59e4b6e4e457b899ab8ac8b8858efd8f7060b4f78a914f446e9c175782ce0",
+      "object": "objects/20c59e4b6e4e457b899ab8ac8b8858efd8f7060b4f78a914f446e9c175782ce0"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/app-admin-profile-1280.png",
+      "bytes": 84281,
+      "sha256": "8c3aa83f5c7c7dedbaa066ea1f8144839857bdd07182208b79d4eaa1e5f59451",
+      "object": "objects/8c3aa83f5c7c7dedbaa066ea1f8144839857bdd07182208b79d4eaa1e5f59451"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/app-admin-profile-1440.json",
+      "bytes": 9604,
+      "sha256": "d7495ec1f2b885f66bb495d90fb3b7b270bef9247e04388972f8d249f0332091",
+      "object": "objects/d7495ec1f2b885f66bb495d90fb3b7b270bef9247e04388972f8d249f0332091"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/app-admin-profile-1440.png",
+      "bytes": 86892,
+      "sha256": "51bba436ecba49129f2fbf9e91e270cacf99ec0f67173aaf6db3d37e3f3696ca",
+      "object": "objects/51bba436ecba49129f2fbf9e91e270cacf99ec0f67173aaf6db3d37e3f3696ca"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/app-admin-profile-long-1280.png",
+      "bytes": 31453,
+      "sha256": "9f48099d0ea68fd926522958640e087ee2e54ea0bfab770f3dc2fadf782cc4a4",
+      "object": "objects/9f48099d0ea68fd926522958640e087ee2e54ea0bfab770f3dc2fadf782cc4a4"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/app-admin-profile-month-picked-1280.json",
+      "bytes": 96,
+      "sha256": "d81b1a63d4c07f634b0110cd77a619bf0c54cd9c92fe8f58887c532510b41f61",
+      "object": "objects/d81b1a63d4c07f634b0110cd77a619bf0c54cd9c92fe8f58887c532510b41f61"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/app-admin-profile-month-picked-1280.png",
+      "bytes": 41541,
+      "sha256": "26777b6ca719de30f76755969e6506a0bc3faed2a5779b54e0e4a4fafaf22b40",
+      "object": "objects/26777b6ca719de30f76755969e6506a0bc3faed2a5779b54e0e4a4fafaf22b40"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/app-admin-profile-month-picked-1440.json",
+      "bytes": 96,
+      "sha256": "d81b1a63d4c07f634b0110cd77a619bf0c54cd9c92fe8f58887c532510b41f61",
+      "object": "objects/d81b1a63d4c07f634b0110cd77a619bf0c54cd9c92fe8f58887c532510b41f61"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/app-admin-profile-month-picked-1440.png",
+      "bytes": 42127,
+      "sha256": "fdf27ac8faa379bddf3ad70ee8a3a81cfcac2a0305442373eacb8b0b391d0fa6",
+      "object": "objects/fdf27ac8faa379bddf3ad70ee8a3a81cfcac2a0305442373eacb8b0b391d0fa6"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/app-admin-profile-months-1280.json",
+      "bytes": 136,
+      "sha256": "0e0cf2b63286f091536061d41ec8ce14b22088fb6a7afd811769b69dfcbdc2d4",
+      "object": "objects/0e0cf2b63286f091536061d41ec8ce14b22088fb6a7afd811769b69dfcbdc2d4"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/app-admin-profile-months-1440.json",
+      "bytes": 136,
+      "sha256": "0e0cf2b63286f091536061d41ec8ce14b22088fb6a7afd811769b69dfcbdc2d4",
+      "object": "objects/0e0cf2b63286f091536061d41ec8ce14b22088fb6a7afd811769b69dfcbdc2d4"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/app-admin-targets-1280.json",
+      "bytes": 9799,
+      "sha256": "3855ba2e6fdd799caebbce957102856ba56d90e5e30ba336a02d9f78e63f2b2f",
+      "object": "objects/3855ba2e6fdd799caebbce957102856ba56d90e5e30ba336a02d9f78e63f2b2f"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/app-admin-targets-1280.png",
+      "bytes": 134121,
+      "sha256": "fc6d3fc341ed04133664981d57050afa1328e3fce9e7b78f21d075488f47626b",
+      "object": "objects/fc6d3fc341ed04133664981d57050afa1328e3fce9e7b78f21d075488f47626b"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/app-admin-targets-1440.json",
+      "bytes": 9799,
+      "sha256": "4a05e9ea3cf81cf97c4f3c1d94c7eb157e693031c8425ebde015d0bce257291c",
+      "object": "objects/4a05e9ea3cf81cf97c4f3c1d94c7eb157e693031c8425ebde015d0bce257291c"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/app-admin-targets-1440.png",
+      "bytes": 136063,
+      "sha256": "b7b04af71cdd1769adbb49a729ac69925e10e8680c83da0bf5743eb89fff7bde",
+      "object": "objects/b7b04af71cdd1769adbb49a729ac69925e10e8680c83da0bf5743eb89fff7bde"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/app-portal-home-390.json",
+      "bytes": 7202,
+      "sha256": "ff00a2b40a37ac744ccbc3fa9895f7faa3da5f8cf10401ece791e1b4d1e1ff48",
+      "object": "objects/ff00a2b40a37ac744ccbc3fa9895f7faa3da5f8cf10401ece791e1b4d1e1ff48"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/app-portal-home-390.png",
+      "bytes": 49637,
+      "sha256": "67838fd01493852165a4216c8553226167e1cce77caa46f61ab1332b0b6ef91d",
+      "object": "objects/67838fd01493852165a4216c8553226167e1cce77caa46f61ab1332b0b6ef91d"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/app-portal-home-long-390.json",
+      "bytes": 1095,
+      "sha256": "a19b8635938fc3a2687ed16c04fce76d3bd37b9c839169f59b4d4d60b4a95f6b",
+      "object": "objects/a19b8635938fc3a2687ed16c04fce76d3bd37b9c839169f59b4d4d60b4a95f6b"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/app-portal-home-long-390.png",
+      "bytes": 13954,
+      "sha256": "74463b13ff2bdcf900e85b235b14608fb8ae6ab8b9b32aeb8870c3552050bb4b",
+      "object": "objects/74463b13ff2bdcf900e85b235b14608fb8ae6ab8b9b32aeb8870c3552050bb4b"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/app-portal-home-scrolled-end-390.json",
+      "bytes": 124,
+      "sha256": "bc6cb64c6a41dd98c8dd9bd96886d63545704cbad148b4df29beb3e802e11f41",
+      "object": "objects/bc6cb64c6a41dd98c8dd9bd96886d63545704cbad148b4df29beb3e802e11f41"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/app-portal-home-scrolled-end-390.png",
+      "bytes": 48742,
+      "sha256": "254085766a6984659ae87892246f2368144499668c197bd2a6fc939aa7059f75",
+      "object": "objects/254085766a6984659ae87892246f2368144499668c197bd2a6fc939aa7059f75"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/app-portal-month-open-390.json",
+      "bytes": 1121,
+      "sha256": "ebc415c217b68992d080e4ef634cb145aa9396b635ffc7b22a73fda378487f5d",
+      "object": "objects/ebc415c217b68992d080e4ef634cb145aa9396b635ffc7b22a73fda378487f5d"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/app-portal-month-open-390.png",
+      "bytes": 49839,
+      "sha256": "55bb7f6825c25a9bd26ae830b6b4e3bddbe37d5a3df7ea1ab9567ee6475abc13",
+      "object": "objects/55bb7f6825c25a9bd26ae830b6b4e3bddbe37d5a3df7ea1ab9567ee6475abc13"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/app-portal-month-picked-390.json",
+      "bytes": 1042,
+      "sha256": "d236e177cab366eceeb3ac6e9792313f9f3735d9924e1c8b157c8098da40395b",
+      "object": "objects/d236e177cab366eceeb3ac6e9792313f9f3735d9924e1c8b157c8098da40395b"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/app-portal-month-picked-390.png",
+      "bytes": 48295,
+      "sha256": "1a08163e4be058b513090cb70a1edc787f5a490b970ab6d914e40752f27d44e0",
+      "object": "objects/1a08163e4be058b513090cb70a1edc787f5a490b970ab6d914e40752f27d44e0"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/app-portal-month-tab-closes-390.json",
+      "bytes": 18,
+      "sha256": "75fcacb808c8999988429dfb49e7173160f563fbe13cfb4635e56635289eae80",
+      "object": "objects/75fcacb808c8999988429dfb49e7173160f563fbe13cfb4635e56635289eae80"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/app-portal-orders-390.json",
+      "bytes": 5657,
+      "sha256": "3bc2e9155961d38a68d1d750f011ac4f294e61530b909f3d2487407a331572f4",
+      "object": "objects/3bc2e9155961d38a68d1d750f011ac4f294e61530b909f3d2487407a331572f4"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/app-portal-orders-390.png",
+      "bytes": 26834,
+      "sha256": "d7e4064b08aa81fa5808f54d4dcf710997a5aebeb2475b57b1ae512143c694ea",
+      "object": "objects/d7e4064b08aa81fa5808f54d4dcf710997a5aebeb2475b57b1ae512143c694ea"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/app-portal-orders-july-390.json",
+      "bytes": 42,
+      "sha256": "3df1fa65c9b949c486d7c52fc6166c440a8c3f3ae647e9ff402510c4bcc0665d",
+      "object": "objects/3df1fa65c9b949c486d7c52fc6166c440a8c3f3ae647e9ff402510c4bcc0665d"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/app-portal-orders-july-390.png",
+      "bytes": 42263,
+      "sha256": "68ce4e6657fd18353b3d45bfbf6476feb964aabe4742489e745751b8408f0d4c",
+      "object": "objects/68ce4e6657fd18353b3d45bfbf6476feb964aabe4742489e745751b8408f0d4c"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/app-portal-orders-scrolled-end-390.json",
+      "bytes": 84,
+      "sha256": "c28010d446a37122582fc37daa7b622f72e28b637cb25f176393a2ac2684de25",
+      "object": "objects/c28010d446a37122582fc37daa7b622f72e28b637cb25f176393a2ac2684de25"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/app-portal-orders-scrolled-end-390.png",
+      "bytes": 26834,
+      "sha256": "d7e4064b08aa81fa5808f54d4dcf710997a5aebeb2475b57b1ae512143c694ea",
+      "object": "objects/d7e4064b08aa81fa5808f54d4dcf710997a5aebeb2475b57b1ae512143c694ea"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/app-portal-ranking-390.json",
+      "bytes": 10724,
+      "sha256": "1dcd8d24726e402eb0a9304b3f42e6dbc98d29255734be3baba9cbb986356aea",
+      "object": "objects/1dcd8d24726e402eb0a9304b3f42e6dbc98d29255734be3baba9cbb986356aea"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/app-portal-ranking-390.png",
+      "bytes": 50511,
+      "sha256": "22bf49473d062343e91680e0e31fa7c390a531d78bb32f107d77009cdad5815a",
+      "object": "objects/22bf49473d062343e91680e0e31fa7c390a531d78bb32f107d77009cdad5815a"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/export-admin-home-1280.json",
+      "bytes": 9800,
+      "sha256": "c8e76793414ebfec7e462679a5baa690f9ce99abe770d7b6902de5e15c1be46c",
+      "object": "objects/c8e76793414ebfec7e462679a5baa690f9ce99abe770d7b6902de5e15c1be46c"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/export-admin-home-1280.png",
+      "bytes": 121361,
+      "sha256": "24aa6d8d5a588f75eb97550e30fecf0896c8437c463e935a3169f7444e6de436",
+      "object": "objects/24aa6d8d5a588f75eb97550e30fecf0896c8437c463e935a3169f7444e6de436"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/export-admin-home-1440.json",
+      "bytes": 9800,
+      "sha256": "cd404585252a03f808e263205faa368062c9742a012232bf2363783f6c517d09",
+      "object": "objects/cd404585252a03f808e263205faa368062c9742a012232bf2363783f6c517d09"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/export-admin-home-1440.png",
+      "bytes": 122730,
+      "sha256": "326182b68cb7428800e21bf4f12e7968c4f37c8a48fb4a6862ebcf9f2340b194",
+      "object": "objects/326182b68cb7428800e21bf4f12e7968c4f37c8a48fb4a6862ebcf9f2340b194"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/export-admin-payments-1280.json",
+      "bytes": 9807,
+      "sha256": "db48812f1cc75ab4555a36c033fe66a6b963c6316eb21ea08e34deab88426995",
+      "object": "objects/db48812f1cc75ab4555a36c033fe66a6b963c6316eb21ea08e34deab88426995"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/export-admin-payments-1280.png",
+      "bytes": 141697,
+      "sha256": "94bcc9e24fa94cf9ee20ba9e4b4e0e8b986d83c03124df54c1b9ffa838cb028b",
+      "object": "objects/94bcc9e24fa94cf9ee20ba9e4b4e0e8b986d83c03124df54c1b9ffa838cb028b"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/export-admin-payments-1440.json",
+      "bytes": 9811,
+      "sha256": "97840c0f824f0659273ace26c2ae5bff294bb36f088ba3f419fa487844aa8167",
+      "object": "objects/97840c0f824f0659273ace26c2ae5bff294bb36f088ba3f419fa487844aa8167"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/export-admin-payments-1440.png",
+      "bytes": 143348,
+      "sha256": "0f5ac28414df0b1af9f4bcf1b6e738d2b3ceee747e0cc313e9d74142bec1c034",
+      "object": "objects/0f5ac28414df0b1af9f4bcf1b6e738d2b3ceee747e0cc313e9d74142bec1c034"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/export-admin-profile-1280.json",
+      "bytes": 8658,
+      "sha256": "85e5234489b9b52d473820c3fe89eb9091bd87b8db9a75c9e8929f63edf2fce6",
+      "object": "objects/85e5234489b9b52d473820c3fe89eb9091bd87b8db9a75c9e8929f63edf2fce6"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/export-admin-profile-1280.png",
+      "bytes": 79643,
+      "sha256": "d2924ad7c138d09dec968dacbb9d56d2e376df32d9dbd9b7f4248689d783bd27",
+      "object": "objects/d2924ad7c138d09dec968dacbb9d56d2e376df32d9dbd9b7f4248689d783bd27"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/export-admin-profile-1440.json",
+      "bytes": 8658,
+      "sha256": "bb08238b14855a630a21cba158dfe1c25e37d5d99c9c13dc80ab5435ffb58e37",
+      "object": "objects/bb08238b14855a630a21cba158dfe1c25e37d5d99c9c13dc80ab5435ffb58e37"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/export-admin-profile-1440.png",
+      "bytes": 80663,
+      "sha256": "478db7d3a151b7e2eb923577f031f8f11375161ad040fb237ae7503636dbbf88",
+      "object": "objects/478db7d3a151b7e2eb923577f031f8f11375161ad040fb237ae7503636dbbf88"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/export-admin-targets-1280.json",
+      "bytes": 9629,
+      "sha256": "dc88d836f59e1ef675373f1bbd8511d9ceb600af26f096a1977ceeb83017e26a",
+      "object": "objects/dc88d836f59e1ef675373f1bbd8511d9ceb600af26f096a1977ceeb83017e26a"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/export-admin-targets-1280.png",
+      "bytes": 116884,
+      "sha256": "f698ba15de4a94a2278d6dbbd28bc4acc86ebf386532985e8a04abc5402aafca",
+      "object": "objects/f698ba15de4a94a2278d6dbbd28bc4acc86ebf386532985e8a04abc5402aafca"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/export-admin-targets-1440.json",
+      "bytes": 9629,
+      "sha256": "3e58b9317248a02bb126ceb15830d6fad77a932a47a34fdf3b9d8590b9f568dd",
+      "object": "objects/3e58b9317248a02bb126ceb15830d6fad77a932a47a34fdf3b9d8590b9f568dd"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/export-admin-targets-1440.png",
+      "bytes": 118272,
+      "sha256": "658d7e25f2747a57ec7fae019fd515d24f252c2ba03845930898ac25dc435db7",
+      "object": "objects/658d7e25f2747a57ec7fae019fd515d24f252c2ba03845930898ac25dc435db7"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/export-portal-home-390.json",
+      "bytes": 7786,
+      "sha256": "ecb59a699e0658e5bc92bb852d1387cdb2875d355d736536167577d00e9df9a0",
+      "object": "objects/ecb59a699e0658e5bc92bb852d1387cdb2875d355d736536167577d00e9df9a0"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/export-portal-home-390.png",
+      "bytes": 48163,
+      "sha256": "c8e6ce0386b30fcc039af97d95298b708f26188bd0962785435fdbae5562405e",
+      "object": "objects/c8e6ce0386b30fcc039af97d95298b708f26188bd0962785435fdbae5562405e"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/export-portal-month-open-390.json",
+      "bytes": 1341,
+      "sha256": "1ba363eeb852818ece3b83f30b6ff4218752e9fccd949886e8fb569711ff868b",
+      "object": "objects/1ba363eeb852818ece3b83f30b6ff4218752e9fccd949886e8fb569711ff868b"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/export-portal-month-open-390.png",
+      "bytes": 54237,
+      "sha256": "15abca3330d3bfe456fbff41e95ebcdfb7eda3167d9a3b62c38e476a97d1e466",
+      "object": "objects/15abca3330d3bfe456fbff41e95ebcdfb7eda3167d9a3b62c38e476a97d1e466"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/export-portal-month-picked-390.png",
+      "bytes": 49691,
+      "sha256": "18cb5cec09761e8496b4f96fadb379e2d5359976521982797c71af7b92d55f6b",
+      "object": "objects/18cb5cec09761e8496b4f96fadb379e2d5359976521982797c71af7b92d55f6b"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/export-portal-order-rows-390.json",
+      "bytes": 28,
+      "sha256": "bcfd6cdc1926bbbe6687c11f8cb91b0157a561e61a89e49a88bf59099098d403",
+      "object": "objects/bcfd6cdc1926bbbe6687c11f8cb91b0157a561e61a89e49a88bf59099098d403"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/export-portal-orders-390.json",
+      "bytes": 6504,
+      "sha256": "e1c22d06b282999e3abd76e59f125b23d5e3232750fbe045300b983d46800b81",
+      "object": "objects/e1c22d06b282999e3abd76e59f125b23d5e3232750fbe045300b983d46800b81"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/export-portal-orders-390.png",
+      "bytes": 34335,
+      "sha256": "ec8b5bf084ae0e410c9b8ac9cbed8e7902676171e3240171910f5d57c4f9da5a",
+      "object": "objects/ec8b5bf084ae0e410c9b8ac9cbed8e7902676171e3240171910f5d57c4f9da5a"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/export-portal-ranking-390.json",
+      "bytes": 13441,
+      "sha256": "fc2ebaff5b3197fb035da4541b257d70519091d5a5da0ec34004b03f3408f105",
+      "object": "objects/fc2ebaff5b3197fb035da4541b257d70519091d5a5da0ec34004b03f3408f105"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-e/follow-up/export-portal-ranking-390.png",
+      "bytes": 48139,
+      "sha256": "4597e1e59a8d80810c943602010ec3c0ceaebc5db6ba4f2988e210e73031c78c",
+      "object": "objects/4597e1e59a8d80810c943602010ec3c0ceaebc5db6ba4f2988e210e73031c78c"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-f/app-admin-correction-1280.png",
+      "bytes": 75394,
+      "sha256": "db032e99af60e363f9c41748a2a10b4b90826652847c06b4002a6d03255f146e",
+      "object": "objects/db032e99af60e363f9c41748a2a10b4b90826652847c06b4002a6d03255f146e"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-f/app-admin-correction-1440.png",
+      "bytes": 75292,
+      "sha256": "c5c81913034346fd80480d5cd7084d0be63b6761a11e24d362daa5c7b52fdf79",
+      "object": "objects/c5c81913034346fd80480d5cd7084d0be63b6761a11e24d362daa5c7b52fdf79"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-f/app-admin-home-1280.png",
+      "bytes": 67932,
+      "sha256": "54a0687bcab1ae3f7f35ebc8b3bd90ab49217f768e362c51aeece8b8d8ba5299",
+      "object": "objects/54a0687bcab1ae3f7f35ebc8b3bd90ab49217f768e362c51aeece8b8d8ba5299"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-f/app-admin-home-1440.png",
+      "bytes": 68564,
+      "sha256": "5e073f2f200581e93c3051ee37b19c64d8135907d57f9fc2a736073d19c93d61",
+      "object": "objects/5e073f2f200581e93c3051ee37b19c64d8135907d57f9fc2a736073d19c93d61"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-f/app-admin-payments-1280.png",
+      "bytes": 79778,
+      "sha256": "6a5f4162fe32dfe7ac04397f3d94373ffe4e90176ec65d7822c5e13962680b9d",
+      "object": "objects/6a5f4162fe32dfe7ac04397f3d94373ffe4e90176ec65d7822c5e13962680b9d"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-f/app-admin-payments-1440.png",
+      "bytes": 79090,
+      "sha256": "16e8199fd2f4310ab70671af8c38f1b572837c3a7f4b806463824373fce1e41b",
+      "object": "objects/16e8199fd2f4310ab70671af8c38f1b572837c3a7f4b806463824373fce1e41b"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-f/app-portal-chart-sales-390.png",
+      "bytes": 17892,
+      "sha256": "eb0f9a24c35606cf01c0fbeb7f31ca101e956604faaa3dc61a53be0b433f6f54",
+      "object": "objects/eb0f9a24c35606cf01c0fbeb7f31ca101e956604faaa3dc61a53be0b433f6f54"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-f/app-portal-chart-uses-390.png",
+      "bytes": 12183,
+      "sha256": "4ab1acc6a7df08185c7531e9db5d80bbcfae0cbbf64b8f2405e0bd4291bfc2c3",
+      "object": "objects/4ab1acc6a7df08185c7531e9db5d80bbcfae0cbbf64b8f2405e0bd4291bfc2c3"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-f/checks.txt",
+      "bytes": 6275,
+      "sha256": "1d1ce0b2c5a938f421e504585cf5be46556243b5a656ffb7518fc774bac78263",
+      "object": "objects/1d1ce0b2c5a938f421e504585cf5be46556243b5a656ffb7518fc774bac78263"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-f/compare-chart-390.png",
+      "bytes": 39008,
+      "sha256": "2d8c2e59d4fc6d927ae9dc41666c34aaa919dee0837f156a729ebab463766a1a",
+      "object": "objects/2d8c2e59d4fc6d927ae9dc41666c34aaa919dee0837f156a729ebab463766a1a"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-f/export-portal-chart-390.png",
+      "bytes": 13675,
+      "sha256": "38e89496d4892337869fccc983d55199122c985c86e92714c4db3bdcd1a0d807",
+      "object": "objects/38e89496d4892337869fccc983d55199122c985c86e92714c4db3bdcd1a0d807"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-g/app-admin-invitations-1280.png",
+      "bytes": 77452,
+      "sha256": "3525f57c6dae7b0a6bf1ec292435d380fb9e446be737fd876f27eb06374ee6e4",
+      "object": "objects/3525f57c6dae7b0a6bf1ec292435d380fb9e446be737fd876f27eb06374ee6e4"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-g/app-admin-invitations-1440.png",
+      "bytes": 78571,
+      "sha256": "c1a94850c009491e972f3529d6e3f6a2b1535429b02b4af96fcb17f61f590892",
+      "object": "objects/c1a94850c009491e972f3529d6e3f6a2b1535429b02b4af96fcb17f61f590892"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-g/app-portal-payout-390.png",
+      "bytes": 22836,
+      "sha256": "f9987c88fb2a6e84d22dc82d25c2f7feda53f52d6ca4b5280a31567a9aafe9a1",
+      "object": "objects/f9987c88fb2a6e84d22dc82d25c2f7feda53f52d6ca4b5280a31567a9aafe9a1"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-g/app-portal-targets-390.png",
+      "bytes": 55238,
+      "sha256": "48ad3fe56fbd9b827e0b417c4ec1bcb0c8e2ad8b4d7a3a3e0e2ceaf6ac28fe3a",
+      "object": "objects/48ad3fe56fbd9b827e0b417c4ec1bcb0c8e2ad8b4d7a3a3e0e2ceaf6ac28fe3a"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-g/app-portal-wardrobe-390.png",
+      "bytes": 62971,
+      "sha256": "f92e6796c7bf81e194cbefad22be3ac35bd5e4e742432fd651c192912b4f51fa",
+      "object": "objects/f92e6796c7bf81e194cbefad22be3ac35bd5e4e742432fd651c192912b4f51fa"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-g/checks.txt",
+      "bytes": 1331,
+      "sha256": "5e37716af615d1f5f739d303c30b51650387f1937f6046a4e625a72e21e817ef",
+      "object": "objects/5e37716af615d1f5f739d303c30b51650387f1937f6046a4e625a72e21e817ef"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-h/app-admin-account-menu-1280.png",
+      "bytes": 5197,
+      "sha256": "bf74036e45fd5023ea022d1c2b9df168660cb0199ca54c1b83bd192fa6f340b0",
+      "object": "objects/bf74036e45fd5023ea022d1c2b9df168660cb0199ca54c1b83bd192fa6f340b0"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-h/app-admin-account-menu-1440.png",
+      "bytes": 5197,
+      "sha256": "bf74036e45fd5023ea022d1c2b9df168660cb0199ca54c1b83bd192fa6f340b0",
+      "object": "objects/bf74036e45fd5023ea022d1c2b9df168660cb0199ca54c1b83bd192fa6f340b0"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-h/app-admin-products-1280.png",
+      "bytes": 80134,
+      "sha256": "94369b2a1ce10e3b29212c6eb3e7ede1899fc8dc129d9115e8a4859dd8b00b9d",
+      "object": "objects/94369b2a1ce10e3b29212c6eb3e7ede1899fc8dc129d9115e8a4859dd8b00b9d"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-h/app-admin-products-1440.png",
+      "bytes": 81395,
+      "sha256": "3a3343529ccbde00fb92576058e4894a528b2d7aad040d6fb1fc990f14b05fbd",
+      "object": "objects/3a3343529ccbde00fb92576058e4894a528b2d7aad040d6fb1fc990f14b05fbd"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-h/app-portal-payment-card-2026-09-390.png",
+      "bytes": 9385,
+      "sha256": "7c86496533811bf267813d1078b9fd50ab0cce26039213134263a60c292aeec0",
+      "object": "objects/7c86496533811bf267813d1078b9fd50ab0cce26039213134263a60c292aeec0"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-h/app-portal-payout-390.png",
+      "bytes": 20023,
+      "sha256": "75e700ee391cf7029323617d33a87f97124bb0a42254c712dad29c7351b7e9c4",
+      "object": "objects/75e700ee391cf7029323617d33a87f97124bb0a42254c712dad29c7351b7e9c4"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-h/checks.txt",
+      "bytes": 1158,
+      "sha256": "eda58df1a4b2edcf1f83875c160188f4c007b6821cff3bb525831b01db4cd768",
+      "object": "objects/eda58df1a4b2edcf1f83875c160188f4c007b6821cff3bb525831b01db4cd768"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-i/app-admin-shopify-1280.png",
+      "bytes": 50178,
+      "sha256": "a1c589d3b5999ab09427e76ac474ceaeb3ffc8832b551762769346c2269e0067",
+      "object": "objects/a1c589d3b5999ab09427e76ac474ceaeb3ffc8832b551762769346c2269e0067"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-i/app-admin-shopify-1440.png",
+      "bytes": 51043,
+      "sha256": "f1c0c8cdd372c625c273dd60a0a96aab526e25b3e8b0f2ebfe9e26ba23ee6a12",
+      "object": "objects/f1c0c8cdd372c625c273dd60a0a96aab526e25b3e8b0f2ebfe9e26ba23ee6a12"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-i/app-admin-shopify-refused-1280.png",
+      "bytes": 62102,
+      "sha256": "622ccdc50b9ccdf90e7b97f962a1437d44bd51c268d575f52cb2fd3390eae024",
+      "object": "objects/622ccdc50b9ccdf90e7b97f962a1437d44bd51c268d575f52cb2fd3390eae024"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-i/app-admin-shopify-refused-1440.png",
+      "bytes": 62015,
+      "sha256": "79da54618463f22b98e0a18652856d684e1090d30a4c339e0ecde18b7654dbb0",
+      "object": "objects/79da54618463f22b98e0a18652856d684e1090d30a4c339e0ecde18b7654dbb0"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-i/checks.txt",
+      "bytes": 661,
+      "sha256": "f76e3f69d144b32263df92e2459743ee37c42d8ea29c0e6f6eabf96e8a86315b",
+      "object": "objects/f76e3f69d144b32263df92e2459743ee37c42d8ea29c0e6f6eabf96e8a86315b"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/app-appearance-1280.png",
+      "bytes": 40945,
+      "sha256": "741ee439f829af9ed374df293fee71131bde2109d7030e57e7f6b8d91b745d47",
+      "object": "objects/741ee439f829af9ed374df293fee71131bde2109d7030e57e7f6b8d91b745d47"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/app-appearance-1440.png",
+      "bytes": 41564,
+      "sha256": "d4cd31575a6bfd7ff02f99754438d22e5120d622a378ac53bfeb9f2f24aacef0",
+      "object": "objects/d4cd31575a6bfd7ff02f99754438d22e5120d622a378ac53bfeb9f2f24aacef0"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/app-appearance-off-1280.png",
+      "bytes": 40919,
+      "sha256": "6034f98f9b7de2ad94eb3ba5f3d7eb12bab17ab966c95d11cd5a5be795a8ae5d",
+      "object": "objects/6034f98f9b7de2ad94eb3ba5f3d7eb12bab17ab966c95d11cd5a5be795a8ae5d"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/app-home-chart-1280.png",
+      "bytes": 15329,
+      "sha256": "f3b2ee77b858e33df599a318a729b634bb99ca9eb2ed9f71a35378dac2f41f15",
+      "object": "objects/f3b2ee77b858e33df599a318a729b634bb99ca9eb2ed9f71a35378dac2f41f15"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/app-home-chart-1440.png",
+      "bytes": 16645,
+      "sha256": "e53252fb6f78ca1b5bae5bec9619943f8966e90423ff29f81433a9c59ca4064d",
+      "object": "objects/e53252fb6f78ca1b5bae5bec9619943f8966e90423ff29f81433a9c59ca4064d"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/app-home-notices-off-1280.png",
+      "bytes": 110347,
+      "sha256": "25d1996ceeb9d3d392a2664ea02ef6941760e85141981b5373f96612e50b0731",
+      "object": "objects/25d1996ceeb9d3d392a2664ea02ef6941760e85141981b5373f96612e50b0731"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/app-invite-opened-1280.png",
+      "bytes": 80751,
+      "sha256": "d20038745d80cfef0d070df9dd1bc62c959d827969f121d9d7580096a1656928",
+      "object": "objects/d20038745d80cfef0d070df9dd1bc62c959d827969f121d9d7580096a1656928"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/app-invite-opened-1440.png",
+      "bytes": 88868,
+      "sha256": "71d46f926101a6fa2c94707e49c76394e0def59f9f50cf33750ae798bd0cbd28",
+      "object": "objects/71d46f926101a6fa2c94707e49c76394e0def59f9f50cf33750ae798bd0cbd28"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/app-overview-1280.png",
+      "bytes": 87273,
+      "sha256": "9e61bff6af9050d1b20d1e8e66a17290361f753e313297cf57a52de250f7cd46",
+      "object": "objects/9e61bff6af9050d1b20d1e8e66a17290361f753e313297cf57a52de250f7cd46"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/app-overview-1440.png",
+      "bytes": 88488,
+      "sha256": "2335ceba044a3d0fd635206ca1e1f348423bb3505bd4500c4f9705c2ef26e4d0",
+      "object": "objects/2335ceba044a3d0fd635206ca1e1f348423bb3505bd4500c4f9705c2ef26e4d0"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/app-overview-refused-1280.png",
+      "bytes": 63344,
+      "sha256": "84b3a377d341599a303e357cfb8f14224b56e96e16145b4a9e3dc6e927c78010",
+      "object": "objects/84b3a377d341599a303e357cfb8f14224b56e96e16145b4a9e3dc6e927c78010"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/app-portal-home-390.png",
+      "bytes": 47754,
+      "sha256": "a89020a1989eecc6cf686d0e67af88721261c17b49c12859f7d8618320036797",
+      "object": "objects/a89020a1989eecc6cf686d0e67af88721261c17b49c12859f7d8618320036797"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/app-portal-targets-open-390.png",
+      "bytes": 51926,
+      "sha256": "e2f75288850607cfbe97e9e766547fb84802d9ef1513d5ae4959d878fa701b2b",
+      "object": "objects/e2f75288850607cfbe97e9e766547fb84802d9ef1513d5ae4959d878fa701b2b"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/app-product-1280.png",
+      "bytes": 65258,
+      "sha256": "4c3cd40415c359f3c790c9c970124016cf1846f67624b8bd8b01186e6f0c6bad",
+      "object": "objects/4c3cd40415c359f3c790c9c970124016cf1846f67624b8bd8b01186e6f0c6bad"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/app-product-1440.png",
+      "bytes": 66196,
+      "sha256": "dd06070a04b2dbab2f3444946b2e0bb93ab12b956e390442c5fdef2d47c7bae9",
+      "object": "objects/dd06070a04b2dbab2f3444946b2e0bb93ab12b956e390442c5fdef2d47c7bae9"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/app-products-1280.png",
+      "bytes": 82447,
+      "sha256": "90822acd7535d0337e044dfffbf248e3edc5fa49b7183e143ab0ba7bd0edf48d",
+      "object": "objects/90822acd7535d0337e044dfffbf248e3edc5fa49b7183e143ab0ba7bd0edf48d"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/app-products-1440.png",
+      "bytes": 83516,
+      "sha256": "7a82b97b3b8ba906342ef7c8bfbf26821fc64d5eba5615f9fca8d291d9d7f5ac",
+      "object": "objects/7a82b97b3b8ba906342ef7c8bfbf26821fc64d5eba5615f9fca8d291d9d7f5ac"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/app-ranking-390.png",
+      "bytes": 51115,
+      "sha256": "2a0de8396266110b2652d066a33192defdd35724692e326f09f78c88f3fe3c3e",
+      "object": "objects/2a0de8396266110b2652d066a33192defdd35724692e326f09f78c88f3fe3c3e"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/app-record-1280.png",
+      "bytes": 55209,
+      "sha256": "0083f3c3ef0427c7fc2564c01a3a26e51ac164cc270e4ea238ae5caaf8cbfd58",
+      "object": "objects/0083f3c3ef0427c7fc2564c01a3a26e51ac164cc270e4ea238ae5caaf8cbfd58"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/app-record-1440.png",
+      "bytes": 55581,
+      "sha256": "472b1a79e286234d8bd9c63c744eb9bbb5bed87971a289f7f0c5f53c2a7491c3",
+      "object": "objects/472b1a79e286234d8bd9c63c744eb9bbb5bed87971a289f7f0c5f53c2a7491c3"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/app-record-saved-1280.png",
+      "bytes": 76201,
+      "sha256": "8719135ce26b71fe526bcf5fd98bf58dcf8710e8532569a81c75d49b1f960fd6",
+      "object": "objects/8719135ce26b71fe526bcf5fd98bf58dcf8710e8532569a81c75d49b1f960fd6"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/app-reference-1280.png",
+      "bytes": 76007,
+      "sha256": "b62ff4e13e10ddfddb4f4c4f66121fa11e10df5fa35fdb3b4fab9053f8e16dfb",
+      "object": "objects/b62ff4e13e10ddfddb4f4c4f66121fa11e10df5fa35fdb3b4fab9053f8e16dfb"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/app-reference-1440.png",
+      "bytes": 76235,
+      "sha256": "2869cf2a513637333ee9deaac5634257c633c76defac1e63d909b44d0854afec",
+      "object": "objects/2869cf2a513637333ee9deaac5634257c633c76defac1e63d909b44d0854afec"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/app-reopen-bookmark-1280.png",
+      "bytes": 23413,
+      "sha256": "f87531a9cdcda839e5ed9a78589aaf0054a83e4da31a732218932e364ffaeefc",
+      "object": "objects/f87531a9cdcda839e5ed9a78589aaf0054a83e4da31a732218932e364ffaeefc"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/app-roster-1280.png",
+      "bytes": 128009,
+      "sha256": "252fece5bb8fb2f4b407ab87f78b2102e8371d77418b37dbd3935c96fe09ba03",
+      "object": "objects/252fece5bb8fb2f4b407ab87f78b2102e8371d77418b37dbd3935c96fe09ba03"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/app-roster-1440.png",
+      "bytes": 129339,
+      "sha256": "07b6690f64c3674ce479fdeef0a369233be4ceee72493f54ebf26b8f7d07abc6",
+      "object": "objects/07b6690f64c3674ce479fdeef0a369233be4ceee72493f54ebf26b8f7d07abc6"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/app-shipment-1280.png",
+      "bytes": 40797,
+      "sha256": "2d146245e12530a35ea08cc94f635a349e9bab6ae5eedc6541038eb8ea3cc3b1",
+      "object": "objects/2d146245e12530a35ea08cc94f635a349e9bab6ae5eedc6541038eb8ea3cc3b1"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/app-shipment-1440.png",
+      "bytes": 41351,
+      "sha256": "315be1bf06cb5047f738cd00bf6769bb3f895599bf67ff01eb2bb3c0fdc3782a",
+      "object": "objects/315be1bf06cb5047f738cd00bf6769bb3f895599bf67ff01eb2bb3c0fdc3782a"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/app-shopify-arrive-1280.png",
+      "bytes": 55313,
+      "sha256": "c3234c328401d0395a29e28dc53cb404186ec83024f95d436689cbecf5c4e3da",
+      "object": "objects/c3234c328401d0395a29e28dc53cb404186ec83024f95d436689cbecf5c4e3da"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/app-shopify-arrive-1440.png",
+      "bytes": 56194,
+      "sha256": "5992dcdb2a404873fcf51defcac7cbcf87968bcd16d376fb9f1b4c6e1c542dc8",
+      "object": "objects/5992dcdb2a404873fcf51defcac7cbcf87968bcd16d376fb9f1b4c6e1c542dc8"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/app-shopify-failed-1280.png",
+      "bytes": 62721,
+      "sha256": "3db550939ff9fc2487c7fda9771f624bda4e46adedf2a58f6c78edd2b8f3d828",
+      "object": "objects/3db550939ff9fc2487c7fda9771f624bda4e46adedf2a58f6c78edd2b8f3d828"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/app-shopify-failed-1440.png",
+      "bytes": 62074,
+      "sha256": "96f2c20f730a6ea6abea0911806946e9faf975c6bde0a0dff0e8f44ed684f4ca",
+      "object": "objects/96f2c20f730a6ea6abea0911806946e9faf975c6bde0a0dff0e8f44ed684f4ca"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/app-shopify-refreshing-1280.png",
+      "bytes": 55308,
+      "sha256": "7b00c3b5e075526a75c718d72638018ae134253cff7090f91ac5040dc136925b",
+      "object": "objects/7b00c3b5e075526a75c718d72638018ae134253cff7090f91ac5040dc136925b"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/app-shopify-refreshing-1440.png",
+      "bytes": 56183,
+      "sha256": "2dd302a0aab8f27c262a915c93ceec5bc365d8ffbb7d43caf18a819855c6cce7",
+      "object": "objects/2dd302a0aab8f27c262a915c93ceec5bc365d8ffbb7d43caf18a819855c6cce7"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/app-shopify-succeeded-1280.png",
+      "bytes": 55434,
+      "sha256": "fe550caf8869c8dfc6f523039e49dcaa36621696270a5de9ed98ddb5bb9dc6e0",
+      "object": "objects/fe550caf8869c8dfc6f523039e49dcaa36621696270a5de9ed98ddb5bb9dc6e0"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/app-shopify-succeeded-1440.png",
+      "bytes": 56195,
+      "sha256": "634e78891c1de6c36a7f650740623de84f73fceef6e3b31cc0c496e68aa11e70",
+      "object": "objects/634e78891c1de6c36a7f650740623de84f73fceef6e3b31cc0c496e68aa11e70"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/app-targets-1280.png",
+      "bytes": 114298,
+      "sha256": "2c35806d009aa42e53f73b6efd25c9974831f3820d377c216e65bc69d87d32fc",
+      "object": "objects/2c35806d009aa42e53f73b6efd25c9974831f3820d377c216e65bc69d87d32fc"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/app-targets-1440.png",
+      "bytes": 115439,
+      "sha256": "956f3c36d3d9b82a3e7fc6af4cf7f85185ba5d3aaa5e321fd8ffb4f1e13146e5",
+      "object": "objects/956f3c36d3d9b82a3e7fc6af4cf7f85185ba5d3aaa5e321fd8ffb4f1e13146e5"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/app-targets-in-progress-1280.png",
+      "bytes": 113404,
+      "sha256": "51331704c01868334d1ac69e5762868dd0415e3354721f5d1ddd3e4adeead90e",
+      "object": "objects/51331704c01868334d1ac69e5762868dd0415e3354721f5d1ddd3e4adeead90e"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/app-targets-past-1280.png",
+      "bytes": 114298,
+      "sha256": "d3a8234eb5fe320e63d3ab79f6cd048012cb21d9d0c115c872b832aff0fc47e6",
+      "object": "objects/d3a8234eb5fe320e63d3ab79f6cd048012cb21d9d0c115c872b832aff0fc47e6"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/app-targets-past-1440.png",
+      "bytes": 115451,
+      "sha256": "140597857ad4e893fabe77798dd6305ae04bb00b0e51927b8663a2da5c0c09e9",
+      "object": "objects/140597857ad4e893fabe77798dd6305ae04bb00b0e51927b8663a2da5c0c09e9"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/app-targets-stale-1280.png",
+      "bytes": 117284,
+      "sha256": "57885fd979730feab782ba42326251762b50a1d27948505d68e0be324c0d318e",
+      "object": "objects/57885fd979730feab782ba42326251762b50a1d27948505d68e0be324c0d318e"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/app-terms-after-1280.png",
+      "bytes": 84151,
+      "sha256": "564b189080e37405cadb3d36be8a8259f8ce8b277d8189fe11c6bf84670f49b0",
+      "object": "objects/564b189080e37405cadb3d36be8a8259f8ce8b277d8189fe11c6bf84670f49b0"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/app-terms-after-1440.png",
+      "bytes": 84478,
+      "sha256": "859bc9ee7a5dcad6c1302acba6d39bf5e7d15d227e189edac818360c8d89231f",
+      "object": "objects/859bc9ee7a5dcad6c1302acba6d39bf5e7d15d227e189edac818360c8d89231f"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/app-terms-before-1280.png",
+      "bytes": 81485,
+      "sha256": "53502e688801246a7a351d53e763de6bda745f493c9a0440dbc629d45669b46a",
+      "object": "objects/53502e688801246a7a351d53e763de6bda745f493c9a0440dbc629d45669b46a"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/app-terms-before-months-1280.png",
+      "bytes": 86583,
+      "sha256": "dcfd33f8a546860981dbb90f1569b6e570b5bfca32f700342dccf2b84c6a6909",
+      "object": "objects/dcfd33f8a546860981dbb90f1569b6e570b5bfca32f700342dccf2b84c6a6909"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/app-terms-before-months-1440.png",
+      "bytes": 91299,
+      "sha256": "5bb832efdc0a2a757e7ad8e4c4de8bec26646c1f8b78dbe61a43957bcfc1cf39",
+      "object": "objects/5bb832efdc0a2a757e7ad8e4c4de8bec26646c1f8b78dbe61a43957bcfc1cf39"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/checks.txt",
+      "bytes": 42240,
+      "sha256": "e656eb8b401bc3c49228a3d1357d0034f20bce84e4fb57a97d1f650f82a01bfb",
+      "object": "objects/e656eb8b401bc3c49228a3d1357d0034f20bce84e4fb57a97d1f650f82a01bfb"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/export-appearance-1280.png",
+      "bytes": 42515,
+      "sha256": "2775e398d6e30f3513bce8deabfa9d082fa1adecda086d2dd4ec9784f8a204a9",
+      "object": "objects/2775e398d6e30f3513bce8deabfa9d082fa1adecda086d2dd4ec9784f8a204a9"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/export-appearance-1440.png",
+      "bytes": 43100,
+      "sha256": "c097cc48b1aeb01acc09c39a4bcd6558afc7249bdb9561e75ae2ec2f4fc6d1c4",
+      "object": "objects/c097cc48b1aeb01acc09c39a4bcd6558afc7249bdb9561e75ae2ec2f4fc6d1c4"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/export-home-chart-1280.png",
+      "bytes": 9794,
+      "sha256": "7b74bb9e3c9bd29ba94f91394f6047005fe8626b0372f674d000ce4c73543b67",
+      "object": "objects/7b74bb9e3c9bd29ba94f91394f6047005fe8626b0372f674d000ce4c73543b67"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/export-home-chart-1440.png",
+      "bytes": 10691,
+      "sha256": "aa3f1eb2463062a5c1eb01d59df5f72ab9922e86624c9cb50676d9f110010631",
+      "object": "objects/aa3f1eb2463062a5c1eb01d59df5f72ab9922e86624c9cb50676d9f110010631"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/export-overview-1280.png",
+      "bytes": 80460,
+      "sha256": "f9fb27350034d0c9b676a73413b0f2d250db423db8a2e942e406b02b099f14f0",
+      "object": "objects/f9fb27350034d0c9b676a73413b0f2d250db423db8a2e942e406b02b099f14f0"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/export-overview-1440.png",
+      "bytes": 81384,
+      "sha256": "3ccd499593db96ea2da7b8c99bf98676d3dc7ebe14f4c448b0e2b01dd2927ddc",
+      "object": "objects/3ccd499593db96ea2da7b8c99bf98676d3dc7ebe14f4c448b0e2b01dd2927ddc"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/export-portal-home-390.png",
+      "bytes": 48972,
+      "sha256": "3b0ca1c21104b2179a5e002971e6aaabea97f7532cc9da0e48c894c156844560",
+      "object": "objects/3b0ca1c21104b2179a5e002971e6aaabea97f7532cc9da0e48c894c156844560"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/export-portal-targets-open-390.png",
+      "bytes": 52772,
+      "sha256": "638b188480f6a37c52893e7ded594005327906332cb3fc35149bfbb77345ac4e",
+      "object": "objects/638b188480f6a37c52893e7ded594005327906332cb3fc35149bfbb77345ac4e"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/export-product-1280.png",
+      "bytes": 74832,
+      "sha256": "934c67bfb785d9ece3963575e97801e34e236ba9e01a1653352ec5be09cfae54",
+      "object": "objects/934c67bfb785d9ece3963575e97801e34e236ba9e01a1653352ec5be09cfae54"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/export-product-1440.png",
+      "bytes": 75773,
+      "sha256": "a86e453c998eeaf5b91ad944e66fdea5cd80ee241bab4a760923ef78c926836d",
+      "object": "objects/a86e453c998eeaf5b91ad944e66fdea5cd80ee241bab4a760923ef78c926836d"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/export-products-1280.png",
+      "bytes": 110317,
+      "sha256": "f013e5accaf4de8d281f8ec6b862f084a58aea5595c684d8155d7f7be8ad1c6f",
+      "object": "objects/f013e5accaf4de8d281f8ec6b862f084a58aea5595c684d8155d7f7be8ad1c6f"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/export-products-1440.png",
+      "bytes": 111516,
+      "sha256": "255aba6de02deb9d4bc3234a5ac3cedb4131859e6e875f400ee7cae32bccc5d9",
+      "object": "objects/255aba6de02deb9d4bc3234a5ac3cedb4131859e6e875f400ee7cae32bccc5d9"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/export-promo-1280.png",
+      "bytes": 80275,
+      "sha256": "9ec48a30c63d454f26152b7da8520bfa38d80968e8e7d56570d1f50c2801a88c",
+      "object": "objects/9ec48a30c63d454f26152b7da8520bfa38d80968e8e7d56570d1f50c2801a88c"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/export-ranking-390.png",
+      "bytes": 48109,
+      "sha256": "ca943881eb28d7d7c82f08ad5a453371ef83e2a47c072223acc1d5af3d44ce56",
+      "object": "objects/ca943881eb28d7d7c82f08ad5a453371ef83e2a47c072223acc1d5af3d44ce56"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/export-record-1280.png",
+      "bytes": 58006,
+      "sha256": "af916416d1b41153a578656677daac0d762e7033121655d8feae86337de67741",
+      "object": "objects/af916416d1b41153a578656677daac0d762e7033121655d8feae86337de67741"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/export-record-1440.png",
+      "bytes": 58816,
+      "sha256": "cd84a3e35b82e68c24d498a06fe6f7c3a6355da4806adf6e869259a1e32a10e2",
+      "object": "objects/cd84a3e35b82e68c24d498a06fe6f7c3a6355da4806adf6e869259a1e32a10e2"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/export-reference-1280.png",
+      "bytes": 74549,
+      "sha256": "7023758a4b8f868bf43c8a496646145c6638d96b739a88ad54bd4cbf08607509",
+      "object": "objects/7023758a4b8f868bf43c8a496646145c6638d96b739a88ad54bd4cbf08607509"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/export-reference-1440.png",
+      "bytes": 75470,
+      "sha256": "90cb69356293f9b46dc91a97345bcee77f168e3bafc946c0425c1acfbf243bda",
+      "object": "objects/90cb69356293f9b46dc91a97345bcee77f168e3bafc946c0425c1acfbf243bda"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/export-roster-1280.png",
+      "bytes": 130530,
+      "sha256": "470660122d2de900a6fa0faa431e52822d4e83780b5300e30eb1807c39b2d915",
+      "object": "objects/470660122d2de900a6fa0faa431e52822d4e83780b5300e30eb1807c39b2d915"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/export-roster-1440.png",
+      "bytes": 131847,
+      "sha256": "21556c41193f90f97cc268d6e5a49a3dfa19210ebf6b080f69ce8daaa7d4366c",
+      "object": "objects/21556c41193f90f97cc268d6e5a49a3dfa19210ebf6b080f69ce8daaa7d4366c"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/export-shipment-1280.png",
+      "bytes": 42868,
+      "sha256": "03d29ee6eae161f689c23641c847943153ca6a0975e13c613744651928048c22",
+      "object": "objects/03d29ee6eae161f689c23641c847943153ca6a0975e13c613744651928048c22"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/export-shipment-1440.png",
+      "bytes": 43385,
+      "sha256": "2c0e6565c2b29c1b12f5eb6ff2976f50d3b4f10626298e223889132a1b63460d",
+      "object": "objects/2c0e6565c2b29c1b12f5eb6ff2976f50d3b4f10626298e223889132a1b63460d"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/export-shopify-1280.png",
+      "bytes": 51218,
+      "sha256": "25ff10b602c74078bc9fe6d188f945b14a366cca673d2258d80a8475ebd86edc",
+      "object": "objects/25ff10b602c74078bc9fe6d188f945b14a366cca673d2258d80a8475ebd86edc"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/export-shopify-1440.png",
+      "bytes": 51912,
+      "sha256": "151e264a0f425b8069f76d82e62bc06e58ac36dbf781b32737bb28d48c9888c7",
+      "object": "objects/151e264a0f425b8069f76d82e62bc06e58ac36dbf781b32737bb28d48c9888c7"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/export-targets-1280.png",
+      "bytes": 115781,
+      "sha256": "a80439a9ea07dd0fa2ee2c6cd4ab365edf7dbb2fc46bfec1b2ead7f47d24f795",
+      "object": "objects/a80439a9ea07dd0fa2ee2c6cd4ab365edf7dbb2fc46bfec1b2ead7f47d24f795"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/export-targets-1440.png",
+      "bytes": 117031,
+      "sha256": "9b86a469464dca4f33c3041cb702d2b11b5ee78454bbb4aede444d0a0565c1f3",
+      "object": "objects/9b86a469464dca4f33c3041cb702d2b11b5ee78454bbb4aede444d0a0565c1f3"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-j/export-terms-1280.png",
+      "bytes": 89233,
+      "sha256": "78236d699ef5f92dab8cf2f77fcc6aa7be981f6e4550d82947ea3a2a099bcb45",
+      "object": "objects/78236d699ef5f92dab8cf2f77fcc6aa7be981f6e4550d82947ea3a2a099bcb45"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-m/home-orders-dark-360.png",
+      "bytes": 8939,
+      "sha256": "41bab34bfba22f010e7feb63c8f76f4a65c043e9a7f6d7a4523f52d4a0928a3f",
+      "object": "objects/41bab34bfba22f010e7feb63c8f76f4a65c043e9a7f6d7a4523f52d4a0928a3f"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-m/home-orders-dark-390.png",
+      "bytes": 8986,
+      "sha256": "52eab343e0124f79f28c9547733bcb852a2d77d282186c43c75a6330fe239170",
+      "object": "objects/52eab343e0124f79f28c9547733bcb852a2d77d282186c43c75a6330fe239170"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-m/home-orders-focus-dark-390.png",
+      "bytes": 9645,
+      "sha256": "13b57b3ce0eee986fea0f284b1dfb472c439544f1046d88032dedc6badbc7b20",
+      "object": "objects/13b57b3ce0eee986fea0f284b1dfb472c439544f1046d88032dedc6badbc7b20"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-m/home-orders-light-360.png",
+      "bytes": 8617,
+      "sha256": "2e7e37f2e6e911a9ab5a352d0e5814b272fe71f6a957b1f1c4f5df25a51038f5",
+      "object": "objects/2e7e37f2e6e911a9ab5a352d0e5814b272fe71f6a957b1f1c4f5df25a51038f5"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-m/home-orders-light-390.png",
+      "bytes": 8642,
+      "sha256": "d24c63dd8793c61e9f2be885fa2fb426c8482ee9a0aa3343a2f73264f31d0df5",
+      "object": "objects/d24c63dd8793c61e9f2be885fa2fb426c8482ee9a0aa3343a2f73264f31d0df5"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-m/home-orders-zeroes-dark-390.png",
+      "bytes": 8133,
+      "sha256": "b9188e6faf2440cab1bae6546df969ac22afe9371059bbd1ee2ee8a84978488d",
+      "object": "objects/b9188e6faf2440cab1bae6546df969ac22afe9371059bbd1ee2ee8a84978488d"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-m/orders-all-open-dark-360.png",
+      "bytes": 59538,
+      "sha256": "de7e434af71357f2b390f2210927c0a033535d173a3477273e13c66cfb2a2677",
+      "object": "objects/de7e434af71357f2b390f2210927c0a033535d173a3477273e13c66cfb2a2677"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-m/orders-all-open-dark-390.png",
+      "bytes": 60690,
+      "sha256": "267225c83501e5099e79ade317cbcc162874ea3e8bd048f92c73d3a164b6893d",
+      "object": "objects/267225c83501e5099e79ade317cbcc162874ea3e8bd048f92c73d3a164b6893d"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-m/orders-all-open-light-360.png",
+      "bytes": 56837,
+      "sha256": "8d7cbc6379dbc75ceb515bd84f1854f92f57f1b3a50be704f40bf0dc8dc74897",
+      "object": "objects/8d7cbc6379dbc75ceb515bd84f1854f92f57f1b3a50be704f40bf0dc8dc74897"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-m/orders-all-open-light-390.png",
+      "bytes": 57801,
+      "sha256": "45855a9c35c81edf16edf1ae6c3657d3521b75d55a6e8a6806914f44dc1effde",
+      "object": "objects/45855a9c35c81edf16edf1ae6c3657d3521b75d55a6e8a6806914f44dc1effde"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-m/orders-empty-pending-dark-390.png",
+      "bytes": 27204,
+      "sha256": "adc9de9fd95b9b5c7cab5864f87465e3a0ab92e47b50d52de273804a56f6fdb3",
+      "object": "objects/adc9de9fd95b9b5c7cab5864f87465e3a0ab92e47b50d52de273804a56f6fdb3"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-m/orders-error-dark-390.png",
+      "bytes": 21643,
+      "sha256": "71abac8a624c7f51e0a5ea73747a3e3d3807223bf0364a41786b29bf5ffcad70",
+      "object": "objects/71abac8a624c7f51e0a5ea73747a3e3d3807223bf0364a41786b29bf5ffcad70"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-m/orders-failed-filter-dark-390.png",
+      "bytes": 45163,
+      "sha256": "edab9a0e1669f1582f99a6f9aac32098e3890fed80e4828833dfa1cdefb7fc76",
+      "object": "objects/edab9a0e1669f1582f99a6f9aac32098e3890fed80e4828833dfa1cdefb7fc76"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-m/orders-zero-current-dark-390.png",
+      "bytes": 22504,
+      "sha256": "b30b19205ffffa237131ffa65b81eb96418e5fa2194c95eb636e8963173d6eaa",
+      "object": "objects/b30b19205ffffa237131ffa65b81eb96418e5fa2194c95eb636e8963173d6eaa"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-n/orders-empty-dark-390.png",
+      "bytes": 26996,
+      "sha256": "76a1c06d899d70ebc55f60f1da3ccdcd5960d934f3ac33cc3ac3c6421d6a9b69",
+      "object": "objects/76a1c06d899d70ebc55f60f1da3ccdcd5960d934f3ac33cc3ac3c6421d6a9b69"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-n/orders-empty-light-390.png",
+      "bytes": 25884,
+      "sha256": "39733bc2f4385c6fdb294676e2da1777ceafa90744d9246601f43646df4cd3ca",
+      "object": "objects/39733bc2f4385c6fdb294676e2da1777ceafa90744d9246601f43646df4cd3ca"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-n/orders-error-dark-390.png",
+      "bytes": 21571,
+      "sha256": "6bc28249b1becad6ede4cc60f7cb0bfdab068f362dc2814554b49684792d3f7e",
+      "object": "objects/6bc28249b1becad6ede4cc60f7cb0bfdab068f362dc2814554b49684792d3f7e"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-n/orders-error-light-390.png",
+      "bytes": 20832,
+      "sha256": "0d12460082963550320e9356fbbc1b10670a4758eff68fc212c9cbfeecd89a83",
+      "object": "objects/0d12460082963550320e9356fbbc1b10670a4758eff68fc212c9cbfeecd89a83"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-n/orders-failed-filter-dark-360.png",
+      "bytes": 43632,
+      "sha256": "336f846c41759e1e45ec4e2b48110e95e1accfa09dacb2113ce9267947aa675e",
+      "object": "objects/336f846c41759e1e45ec4e2b48110e95e1accfa09dacb2113ce9267947aa675e"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-n/orders-failed-filter-dark-390.png",
+      "bytes": 44269,
+      "sha256": "3d925d0f66921ac2cdbf9e2fd6a809dc4a144e7046ce35ea2c3d290a5fab2b87",
+      "object": "objects/3d925d0f66921ac2cdbf9e2fd6a809dc4a144e7046ce35ea2c3d290a5fab2b87"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-n/orders-failed-filter-light-360.png",
+      "bytes": 41972,
+      "sha256": "c2181031435615522e61d9563f944d3cfa5c6e1ee2f6201cb53022cf7f487287",
+      "object": "objects/c2181031435615522e61d9563f944d3cfa5c6e1ee2f6201cb53022cf7f487287"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-n/orders-failed-filter-light-390.png",
+      "bytes": 42532,
+      "sha256": "f238c88de49c196f3b4a4288f4cf0a7278bfed5ac05fd6ac71bc1ba47471d05d",
+      "object": "objects/f238c88de49c196f3b4a4288f4cf0a7278bfed5ac05fd6ac71bc1ba47471d05d"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-n/orders-list-dark-360.png",
+      "bytes": 29986,
+      "sha256": "6e4fd350c7eb6fb19c807853bfe7123a348fb93b345df9c7ae51d9d2d5c3b39f",
+      "object": "objects/6e4fd350c7eb6fb19c807853bfe7123a348fb93b345df9c7ae51d9d2d5c3b39f"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-n/orders-list-dark-390.png",
+      "bytes": 30464,
+      "sha256": "c7cf2e808c8ad207e2cb0e9cd2be4ef10d6d2232b2a30b20a51a8d93728eb448",
+      "object": "objects/c7cf2e808c8ad207e2cb0e9cd2be4ef10d6d2232b2a30b20a51a8d93728eb448"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-n/orders-list-light-360.png",
+      "bytes": 28785,
+      "sha256": "eab9a99f957409ea2f31d46c3c403796d9210fc37737d3ae6880cbcde83a18af",
+      "object": "objects/eab9a99f957409ea2f31d46c3c403796d9210fc37737d3ae6880cbcde83a18af"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-n/orders-list-light-390.png",
+      "bytes": 29295,
+      "sha256": "24836d74845a8ead629b40306b22b65f05789424fea1ec31b636cf7682874031",
+      "object": "objects/24836d74845a8ead629b40306b22b65f05789424fea1ec31b636cf7682874031"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-n/orders-loading-dark-390.png",
+      "bytes": 21464,
+      "sha256": "22c939cb7f01ff74fd9150e81dec8b6276ce5fb9da27f7f1d9d3d2a27b415fb3",
+      "object": "objects/22c939cb7f01ff74fd9150e81dec8b6276ce5fb9da27f7f1d9d3d2a27b415fb3"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-n/orders-loading-light-390.png",
+      "bytes": 20627,
+      "sha256": "d85fbd37a708476653b66047cffe8ec190fa812290c68398237986cdc77cdd40",
+      "object": "objects/d85fbd37a708476653b66047cffe8ec190fa812290c68398237986cdc77cdd40"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-n/orders-open-cancelled-dark-360.png",
+      "bytes": 13386,
+      "sha256": "0c6c8660478452111f193d21d78826fcb2604095c6f82e6759cc45531eb77299",
+      "object": "objects/0c6c8660478452111f193d21d78826fcb2604095c6f82e6759cc45531eb77299"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-n/orders-open-cancelled-dark-390.png",
+      "bytes": 13580,
+      "sha256": "a9c6b1921a7118a816f8a93990a598b1f2279d6f1f29745eaa75103b6d6939e6",
+      "object": "objects/a9c6b1921a7118a816f8a93990a598b1f2279d6f1f29745eaa75103b6d6939e6"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-n/orders-open-cancelled-light-360.png",
+      "bytes": 13062,
+      "sha256": "bf53eb1066464b1179b6f10aa3646b72c665ad6e5d5b2ba7fa4c90bdf974f805",
+      "object": "objects/bf53eb1066464b1179b6f10aa3646b72c665ad6e5d5b2ba7fa4c90bdf974f805"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-n/orders-open-cancelled-light-390.png",
+      "bytes": 13143,
+      "sha256": "dcf865e98b0fe5445cf5701fe6bfd986e5148e28c6758d7fd94ac8a6db16cc99",
+      "object": "objects/dcf865e98b0fe5445cf5701fe6bfd986e5148e28c6758d7fd94ac8a6db16cc99"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-n/orders-open-delivered-dark-360.png",
+      "bytes": 22802,
+      "sha256": "8e6e4eb9aad4ab6ed06a415ee3b447c6df9be942570ee3a401a374627d2d4e5f",
+      "object": "objects/8e6e4eb9aad4ab6ed06a415ee3b447c6df9be942570ee3a401a374627d2d4e5f"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-n/orders-open-delivered-dark-390.png",
+      "bytes": 22962,
+      "sha256": "1d0a2ed415ed8f552f6bdb50a3957797dc5a447766bc7deaa4deaaefcb30372c",
+      "object": "objects/1d0a2ed415ed8f552f6bdb50a3957797dc5a447766bc7deaa4deaaefcb30372c"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-n/orders-open-delivered-light-360.png",
+      "bytes": 22262,
+      "sha256": "b941e11bcfc38bc48c6480c7e8309af2c6fe8456dc8c2c8b416a3521e6ecc9f2",
+      "object": "objects/b941e11bcfc38bc48c6480c7e8309af2c6fe8456dc8c2c8b416a3521e6ecc9f2"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-n/orders-open-delivered-light-390.png",
+      "bytes": 22412,
+      "sha256": "a7a41ddea3099268fbf82fe57df6d93cf2bf545ea48a940be0120fd10bb9ebd8",
+      "object": "objects/a7a41ddea3099268fbf82fe57df6d93cf2bf545ea48a940be0120fd10bb9ebd8"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-n/orders-open-failed-dark-360.png",
+      "bytes": 16121,
+      "sha256": "d0fc20be00b5825d9f21afafbd9f032122ab5b555c25f32b56dfb675de1c1636",
+      "object": "objects/d0fc20be00b5825d9f21afafbd9f032122ab5b555c25f32b56dfb675de1c1636"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-n/orders-open-failed-dark-390.png",
+      "bytes": 16257,
+      "sha256": "7eda13470e89c4e8bad131631aba025597575b25e0fc216d300e2975ea365c99",
+      "object": "objects/7eda13470e89c4e8bad131631aba025597575b25e0fc216d300e2975ea365c99"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-n/orders-open-failed-light-360.png",
+      "bytes": 15721,
+      "sha256": "c65da7a8448f62d1dfeed20831fc93bb87530d74327c5b226a4c25e894f33a1d",
+      "object": "objects/c65da7a8448f62d1dfeed20831fc93bb87530d74327c5b226a4c25e894f33a1d"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-n/orders-open-failed-light-390.png",
+      "bytes": 15860,
+      "sha256": "75edce87496307f1b40299ea9f28c2706ef3addf1aecbe49f4bf0efddac923e6",
+      "object": "objects/75edce87496307f1b40299ea9f28c2706ef3addf1aecbe49f4bf0efddac923e6"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-n/orders-open-fallback-dark-390.png",
+      "bytes": 19285,
+      "sha256": "125d41086a953301049713958ad788ec11406a6a39bfee9b039f537e5034c55b",
+      "object": "objects/125d41086a953301049713958ad788ec11406a6a39bfee9b039f537e5034c55b"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-n/orders-open-pending-dark-360.png",
+      "bytes": 16943,
+      "sha256": "e0f2db49e46d4fb92a82193a6ac90374caa50d4f41671109efd8e3cd570e9de4",
+      "object": "objects/e0f2db49e46d4fb92a82193a6ac90374caa50d4f41671109efd8e3cd570e9de4"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-n/orders-open-pending-dark-390.png",
+      "bytes": 17074,
+      "sha256": "d69dca40100cbd84c1c6d366740e9b804b477eec29b856f930210c7ff1603c5c",
+      "object": "objects/d69dca40100cbd84c1c6d366740e9b804b477eec29b856f930210c7ff1603c5c"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-n/orders-open-pending-light-360.png",
+      "bytes": 16616,
+      "sha256": "725320b5518bfd2523423a2245a62253405ff5ded7abf75545f0de56f66f5857",
+      "object": "objects/725320b5518bfd2523423a2245a62253405ff5ded7abf75545f0de56f66f5857"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-n/orders-open-pending-light-390.png",
+      "bytes": 16752,
+      "sha256": "02958b110a84fd8d982e74404574c009a3ba6777538258a142a42797a8bba91d",
+      "object": "objects/02958b110a84fd8d982e74404574c009a3ba6777538258a142a42797a8bba91d"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-n/orders-open-pending-why-dark-360.png",
+      "bytes": 24124,
+      "sha256": "d78d5b2f077864047ac12ebf5d3681e5a7d987fbdfdcb3e43731424eb7c38129",
+      "object": "objects/d78d5b2f077864047ac12ebf5d3681e5a7d987fbdfdcb3e43731424eb7c38129"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-n/orders-open-pending-why-dark-390.png",
+      "bytes": 24401,
+      "sha256": "00b23744d5bb8a817df29105c04c35b2c0b0b57a385dd03f60d0b83c0d768c2c",
+      "object": "objects/00b23744d5bb8a817df29105c04c35b2c0b0b57a385dd03f60d0b83c0d768c2c"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-n/orders-open-pending-why-light-360.png",
+      "bytes": 23260,
+      "sha256": "17721f79ecec7e1a37206ece02fcb44049698dd1209a43b734bda0693b232eaf",
+      "object": "objects/17721f79ecec7e1a37206ece02fcb44049698dd1209a43b734bda0693b232eaf"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-n/orders-open-pending-why-light-390.png",
+      "bytes": 23511,
+      "sha256": "e0e52bd69b0e5c54acb1b53c7265b6d02ec6633ab72b5d451b9ec4ec09b5bfb6",
+      "object": "objects/e0e52bd69b0e5c54acb1b53c7265b6d02ec6633ab72b5d451b9ec4ec09b5bfb6"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-p/ranking-390.png",
+      "bytes": 57483,
+      "sha256": "f3c09d51995c414ffee25ecec063452630cfd711c21b733853140fe98dc9ecf3",
+      "object": "objects/f3c09d51995c414ffee25ecec063452630cfd711c21b733853140fe98dc9ecf3"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-p/ranking-full-390.png",
+      "bytes": 61013,
+      "sha256": "98827a442a22ef25afcb2a122d79274c6c9395438ef20ab08131c25e3692b5ac",
+      "object": "objects/98827a442a22ef25afcb2a122d79274c6c9395438ef20ab08131c25e3692b5ac"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-p/targets-390.png",
+      "bytes": 61220,
+      "sha256": "b8e2f5bd41e5bc89432a568cb4ba1d59d3799f001bf4d5a6dca1347c55ddbb36",
+      "object": "objects/b8e2f5bd41e5bc89432a568cb4ba1d59d3799f001bf4d5a6dca1347c55ddbb36"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-p/targets-full-390.png",
+      "bytes": 98966,
+      "sha256": "f8dd319c72a79e852ea976591c61334eb8f14d0ac6782e9e48fecd1154e038f4",
+      "object": "objects/f8dd319c72a79e852ea976591c61334eb8f14d0ac6782e9e48fecd1154e038f4"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-p/wardrobe-390.png",
+      "bytes": 55803,
+      "sha256": "e72d6f043f6bd8933b8da43445698f78f7af4f8eb1ea9195333e096d613dc31c",
+      "object": "objects/e72d6f043f6bd8933b8da43445698f78f7af4f8eb1ea9195333e096d613dc31c"
+    },
+    {
+      "path": "docs/repair/batch-2/visual/shots/batch-p/wardrobe-full-390.png",
+      "bytes": 89656,
+      "sha256": "6f52aaad675df013b4c0dd9b26d0ae6448de2302c5742de4f3b838a1d8e84b93",
+      "object": "objects/6f52aaad675df013b4c0dd9b26d0ae6448de2302c5742de4f3b838a1d8e84b93"
+    }
+  ],
+  "unique_objects": 391,
+  "source_bytes": 27894762,
+  "deduplicated_bytes": 2491075
+}

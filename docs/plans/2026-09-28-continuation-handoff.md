@@ -158,9 +158,11 @@ The same click is needed on production when batch O is promoted.
    no recorded delivery, failed-then-refulfilled, split shipments (#19177,
    #17542) - all older than a month except #20497.
 7. Everything in the 27 September handoff's *Remaining* list, from 0 onward.
-8. **`orders_audit.md`** (repo root, untracked, customer names and addresses):
-   delete when staging editing is finished - the owner's instruction. Never
-   commit it.
+8. **`orders_audit.md`** (formerly repo root, untracked, customer names and addresses):
+   archived privately during the owner-authorised 4 October cleanup; its exact
+   bytes are preserved in the [private evidence archive](../cleanup/archive-index.md).
+   Never commit the archive or restored scratchpad. This replaces the earlier
+   instruction to delete it when staging editing was finished.
 
 ## Release gates
 

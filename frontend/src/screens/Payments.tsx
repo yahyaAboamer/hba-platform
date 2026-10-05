@@ -102,12 +102,6 @@ export const STATE_LABEL: Record<SettlementState, string> = {
   settled_externally: "Paid outside the platform",
 };
 
-export function toneFor(state: SettlementState): "owed" | "settled" | "neutral" {
-  if (state === "unpaid" || state === "partially_paid") return "owed";
-  if (state === "settled") return "settled";
-  return "neutral";
-}
-
 /**
  * What the button in the last column says.
  *

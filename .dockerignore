@@ -1,6 +1,6 @@
-# Mirrors .railwayignore. Kept in step with it deliberately: the two files
-# answer the same question for two builders, and a path excluded from one and
-# not the other is how a build starts behaving differently from the deploy.
+# Application build/upload exclusions; keep identical to .railwayignore.
+# The backup service uses ops/backup as its own build context, where its
+# Dockerfile copies backup.py. These root exclusions do not alter that context.
 .venv/
 .git/
 __pycache__/
@@ -19,3 +19,8 @@ design-preview/
 ops/
 scripts/
 .claude/
+
+# Local historical evidence is never an application build input.
+HBA_Readiness_Audit/
+HBA_Design_Parity_Code_Package/
+orders_audit.md

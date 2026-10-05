@@ -142,16 +142,3 @@ def readable_by(db: Session, file_id: str, *, affiliate_id: int) -> ProofFile | 
     if stored is None or stored.affiliate_id != affiliate_id:
         return None
     return stored
-
-
-def total_stored_bytes(db: Session) -> int:
-    """How much proof is being kept.
-
-    ADR 0026 puts the trigger for revisiting storage at 200 MB, which is only a
-    trigger if somebody can see the number.
-    """
-    from sqlalchemy import func, select
-
-    return (
-        db.scalar(select(func.coalesce(func.sum(ProofFile.size_bytes), 0))) or 0
-    )

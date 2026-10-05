@@ -1,5 +1,24 @@
 # Where the work is — 1 October 2026 (data reset, batches Q1–Q3, Settings audit, Home and emails audit, order edits)
 
+## Latest local work: authorised project cleanup (5 October) — local commit only
+
+The six cleanup steps are complete on `repair/batch-2`, based on
+`c91aff0e0486a0d551dc4999be49e0fe376ce912`. The owner authorised a separate
+cleanup commit; existing Operations work remains uncommitted. See the
+[cleanup completion report](../cleanup/2026-10-05-cleanup.md) for the removed
+files/functions, full verification results and preserved API compatibility.
+Frontend: 569 tests and production build passed. Backend: all 90 files,
+2,280 tests passed. Local mobile Home/account/Orders checks passed; the
+temporary test environment was removed.
+
+Historical screenshots and private audit material now live in verified ZIPs
+outside the repository, with original paths and a restore utility in the
+[archive index](../cleanup/archive-index.md). Current visual baselines,
+approved exports and all existing Operations/rule/ADR work remain in place;
+the 20 protected files match their pre-cleanup hashes. The working folder
+is approximately 33 MiB smaller. There was no push, merge or deployment;
+existing release restrictions and next feature work still apply.
+
 ## Latest: order edits, and the guaranteed-minimum home card (1 October, evening) — **released**
 
 - **Bosta (owner's question, answered read-only):** the platform does not

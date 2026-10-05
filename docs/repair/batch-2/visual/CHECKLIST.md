@@ -1,5 +1,10 @@
 # Visual and interaction review — the checklist
 
+> **4 October 2026 cleanup:** historical `shots/batch-*` capture paths named
+> below are now entries in the [verified evidence archive](../../../cleanup/archive-index.md).
+> Their original names and bytes are preserved there. The current comparison
+> baseline in `shots/app/` and `shots/export/` remains in the repository.
+
 One row per screen, at every width it was reviewed at. Every row has a pair of
 screenshots in `shots/` named `<screen>-<width>.png`, one under `app/` and one
 under `export/`, and a `.json` digest beside each.

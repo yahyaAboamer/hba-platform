@@ -10,7 +10,7 @@ frontend/dist/
 *.egg-info/
 design-preview/
 
-# The readiness audit, as supplied. Kept on disk as evidence and deliberately
+# The readiness audit, as supplied. Archived privately as evidence and deliberately
 # not committed: its screenshots are authenticated staging captures carrying
 # real model names and real figures, and the repair brief is explicit about
 # not committing copies of data. The repair's own evidence - what changed,
@@ -21,3 +21,6 @@ HBA_Readiness_Audit/
 # (imported from its bundle) and its two documents are in docs/. What is left
 # in it is a duplicate bundle and patch of commits this repository already has.
 HBA_Design_Parity_Code_Package/
+
+# Private order-audit scratchpads must never be committed or uploaded.
+orders_audit.md

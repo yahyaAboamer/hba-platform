@@ -10,6 +10,7 @@ Stack: FastAPI + SQLAlchemy + Postgres, React + Vite, Railway.
 - **Current work / branch / next steps:** `docs/plans/2026-09-30-continuation-handoff.md`. It supersedes older handoffs.
 - **Screen parity state:** `docs/redesign/parity/SCREEN_MATRIX.md`.
 - **Current visual repair evidence / decisions:** `docs/repair/batch-2/visual/CHECKLIST.md`.
+- **Archived historical captures / private local evidence:** `docs/cleanup/archive-index.md`. Completed batch evidence is stored in verified local ZIPs outside the repository; retain those ZIPs separately when transferring the checkout.
 - **Definition of screen “done”:** `HBA_Exact_Design_Implementation_Prompt.md`. Approved exports win on structure, copy, sizes, tones and interactions. Passing tests do not prove visual parity.
 
 ## Current operating mode
