@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { BrowserRouter, Link, Navigate, Route, Routes } from "react-router-dom";
 
 import { Layout } from "./components/Layout";
-import { api, currentUser } from "./lib/api";
+import { OperationsLayout } from "./components/OperationsLayout";
+import { api, can, currentUser } from "./lib/api";
 import type { Session } from "./lib/api";
 import { AcceptInvitation } from "./screens/AcceptInvitation";
 import { ResetPassword } from "./screens/ResetPassword";
@@ -15,6 +16,7 @@ import { Compensation } from "./screens/Compensation";
 import { FirstRun } from "./screens/FirstRun";
 import { Glossary } from "./screens/Glossary";
 import { InvitePage } from "./screens/InvitePage";
+import { OperationsDashboard } from "./screens/OperationsDashboard";
 import { OrderDetail, Orders } from "./screens/Orders";
 import { Overview } from "./screens/Overview";
 import { ProductDetail, Products } from "./screens/Products";
@@ -28,6 +30,19 @@ import { PayrollApprove } from "./screens/PayrollApprove";
 import { Settings } from "./screens/Settings";
 import { SignIn } from "./screens/SignIn";
 import { Targets } from "./screens/Targets";
+
+/**
+ * Operations' addresses (ADR 0057), for the operations manager and for the
+ * admin who switches to it. `/operations` opens on Shopify.
+ */
+function operationsRoutes(session: Session) {
+  return (
+    <Route path="/operations" element={<OperationsLayout session={session} />}>
+      <Route index element={<Navigate to="shopify" replace />} />
+      <Route path=":tab" element={<OperationsDashboard />} />
+    </Route>
+  );
+}
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
@@ -110,7 +125,19 @@ export default function App() {
          */}
         {session && session.actor.role === "affiliate" ? (
           <Route path="*" element={<AffiliatePortal session={session} />} />
+        ) : session && session.actor.role === "operations_manager" ? (
+          /*
+           * ADR 0057: Operations and nothing else. Any other address - the
+           * root after signing in or accepting an invitation, an old bookmark
+           * to the affiliate side - lands on Shopify.
+           */
+          <>
+            {operationsRoutes(session)}
+            <Route path="*" element={<Navigate to="/operations/shopify" replace />} />
+          </>
         ) : session ? (
+          <>
+          {can(session, "order_ops.view") && operationsRoutes(session)}
           <Route element={<Layout session={session} />}>
             <Route path="/" element={<Overview session={session} />} />
             <Route path="/affiliates" element={<Affiliates />} />
@@ -188,6 +215,7 @@ export default function App() {
               </div>
             } />
           </Route>
+          </>
         ) : (
           <Route path="*" element={<Navigate to="/sign-in" replace />} />
         )}

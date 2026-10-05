@@ -953,3 +953,20 @@ def test_security_mail_is_not_something_a_model_can_mute(db, affiliate):
     from app.services.notification_prefs import GATED_BY
 
     assert set(GATED_BY) == {Event.MONTH_APPROVED, Event.PAYMENT_RECORDED}
+
+
+def test_the_operations_managers_invitation_names_the_operations_dashboard(monkeypatch):
+    """ADR 0057: the staff wording said "HBA's affiliate dashboard", which is
+    the one place an operations manager never goes."""
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "public_base_url", "https://pay.example.com")
+    message = render(
+        Event.INVITATION_SENT,
+        {"email": "amr@example.com", "role": "operations_manager", "name": "Amr",
+         "_secret": {"token": "abc"}},
+    )
+
+    assert "operations dashboard" in message.subject.lower() + message.body
+    assert "affiliate" not in message.body
+    assert "https://pay.example.com/accept-invitation?token=abc" in message.body

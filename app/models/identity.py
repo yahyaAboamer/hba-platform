@@ -85,6 +85,14 @@ class RoleAssignment(Base):
     __tablename__ = "role_assignment"
     __table_args__ = (
         CheckConstraint(f"role IN ({_ROLE_LIST})", name="role_assignment_role_valid"),
+        # One operations manager at a time (ADR 0057). The service refuses a
+        # second with the reason; this holds when two invitations race.
+        Index(
+            "role_assignment_one_operations_manager",
+            "role",
+            unique=True,
+            postgresql_where=text("role = 'operations_manager' AND revoked_at IS NULL"),
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)

@@ -115,6 +115,30 @@ def test_a_revoked_assignment_is_kept_not_deleted(db):
     assert stored.role == "content_manager"
 
 
+def test_the_database_refuses_a_second_live_operations_manager(db):
+    """ADR 0057: one operations manager at a time, held by the database as
+    well as by the screens, so a race between two invitations cannot make two."""
+    first = _user(db, "ops1@example.com")
+    second = _user(db, "ops2@example.com")
+    db.add(RoleAssignment(user_account_id=first.id, role="operations_manager"))
+    db.flush()
+    db.add(RoleAssignment(user_account_id=second.id, role="operations_manager"))
+    with pytest.raises(IntegrityError):
+        db.flush()
+
+
+def test_a_revoked_operations_manager_frees_the_role(db):
+    first = _user(db, "ops3@example.com")
+    second = _user(db, "ops4@example.com")
+    old = RoleAssignment(user_account_id=first.id, role="operations_manager")
+    db.add(old)
+    db.flush()
+    old.revoked_at = utcnow()
+    db.flush()
+    db.add(RoleAssignment(user_account_id=second.id, role="operations_manager"))
+    db.flush()
+
+
 # ── auth_session ───────────────────────────────────────────────────────────────
 
 

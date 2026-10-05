@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet } from "react-router-dom";
 
-import { api, signOutAndLeave } from "../lib/api";
+import { api, can, signOutAndLeave } from "../lib/api";
 import type { Session } from "../lib/api";
-import { applyMaintainerChoice, storedMaintainerChoice, themePickedThisVisit } from "../lib/theme";
-import type { ThemeChoice } from "../lib/theme";
+import { DashboardSwitch } from "./DashboardSwitch";
+import { useMaintainerTheme } from "./useMaintainerTheme";
 import "./Layout.css";
 
 /** The six workspaces and account menu from the approved admin export. */
@@ -54,29 +54,9 @@ export function Layout({ session }: { session: Session }) {
       .catch(() => undefined);
   }, []);
 
-  // This device's copy paints the first frame; the account's choice, once it
-  // answers, is the one that holds (Settings audit P1). *Match my device*
-  // keeps following the device while the tool is open.
-  useEffect(() => {
-    applyMaintainerChoice(storedMaintainerChoice());
-    api
-      .get<{ theme: ThemeChoice | null }>("/api/staff/me/preferences")
-      .then((body) => {
-        if (body.theme && !themePickedThisVisit()) applyMaintainerChoice(body.theme);
-      })
-      .catch(() => undefined);
-    let media: MediaQueryList | null = null;
-    try {
-      media = window.matchMedia("(prefers-color-scheme: light)");
-    } catch {
-      media = null;
-    }
-    const follow = () => {
-      if (storedMaintainerChoice() === "system") applyMaintainerChoice("system");
-    };
-    media?.addEventListener?.("change", follow);
-    return () => media?.removeEventListener?.("change", follow);
-  }, []);
+  // This device's copy paints the first frame; the account's choice holds
+  // once it answers (shared with Operations' shell, ADR 0057).
+  useMaintainerTheme();
 
   return (
     <div className="layout">
@@ -86,6 +66,9 @@ export function Layout({ session }: { session: Session }) {
           <span><span className="layout__brand-name">Admin</span>
             <span className="layout__brand-role">hbawear.store</span></span>
         </Link>
+        {/* The admin's way to Operations (ADR 0057); nobody else on this
+            side holds it, so nobody else sees it. */}
+        {can(session, "order_ops.view") && <DashboardSwitch current="affiliates" />}
 
         <ul className="layout__nav">
           {SECTIONS.map((section) => (

@@ -381,6 +381,7 @@ def test_the_roster_says_which_roles_you_may_invite(client):
         "admin",
         "affiliate_manager",
         "content_manager",
+        "operations_manager",
     ]
 
 
@@ -449,8 +450,14 @@ def test_the_roster_says_what_each_access_can_do(client):
 
     body = client.get("/api/staff").json()["role_permissions"]
 
-    assert set(body) == {"admin", "affiliate_manager", "content_manager"}
+    assert set(body) == {
+        "admin",
+        "affiliate_manager",
+        "content_manager",
+        "operations_manager",
+    }
     assert body["content_manager"] == sorted(permissions_for("content_manager"))
+    assert body["operations_manager"] == ["order_ops.view"]
     assert "payments.record" in body["admin"]
     assert "payments.record" not in body["affiliate_manager"]
 

@@ -16,10 +16,10 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.api.deps import active_role, require_permission
+from app.api.deps import active_role, require_permission, require_staff
 from app.config import settings
 from app.core.businesstime import utcnow
-from app.core.permissions import GRANT_REFUSED, Permission, can_grant
+from app.core.permissions import GRANT_REFUSED, Permission, can_grant, has_permission
 from app.db import get_session
 from app.models.identity import Invitation, UserAccount
 from app.services.audit import record_audit
@@ -296,6 +296,16 @@ class ThemeBody(BaseModel):
 def _preferences_body(db: Session, actor: UserAccount) -> dict:
     from app.services.staff_prefs import DESCRIPTIONS, SWITCHES, preferences_for
 
+    # The switches belong to the affiliate side - Home's notices, the weekly
+    # targets reminder. The operations manager keeps his theme and is offered
+    # none of them (ADR 0057).
+    if not has_permission(active_role(db, actor), Permission.AFFILIATES_VIEW):
+        return {
+            "preferences": {},
+            "labels": {},
+            "descriptions": {},
+            "theme": actor.maintainer_theme,
+        }
     return {
         "preferences": preferences_for(db, actor.id),
         "labels": SWITCHES,
@@ -307,7 +317,7 @@ def _preferences_body(db: Session, actor: UserAccount) -> dict:
 
 @router.get("/me/preferences")
 def my_preferences(
-    actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_VIEW)),
+    actor: UserAccount = Depends(require_staff),
     db: Session = Depends(get_session),
 ) -> dict:
     """The signed-in member of staff's own switches and theme. Absent means on."""
@@ -334,7 +344,7 @@ def change_my_preference(
 @router.put("/me/theme")
 def change_my_theme(
     body: ThemeBody,
-    actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_VIEW)),
+    actor: UserAccount = Depends(require_staff),
     db: Session = Depends(get_session),
 ) -> dict:
     """This account's theme for the admin tool - dark, light, or the device's.

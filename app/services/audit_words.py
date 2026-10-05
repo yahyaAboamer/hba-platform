@@ -28,6 +28,7 @@ _ROLE = {
     "admin": "admin",
     "affiliate_manager": "affiliate manager",
     "content_manager": "content manager",
+    "operations_manager": "operations manager",
     "affiliate": "model",
 }
 

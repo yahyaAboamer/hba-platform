@@ -84,6 +84,20 @@ def require_permission(permission: str):
     return dependency
 
 
+def require_staff(
+    user: UserAccount = Depends(current_user), db: Session = Depends(get_session)
+) -> UserAccount:
+    """Any member of staff, whatever their role - never a model.
+
+    For what belongs to the person rather than to a permission, such as their
+    own theme: the operations manager holds no affiliate permission and still
+    chooses dark or light (ADR 0057).
+    """
+    if active_role(db, user) == "affiliate":
+        raise HTTPException(403, "Staff only")
+    return user
+
+
 def actor_payload(db: Session, user: UserAccount) -> dict:
     """The caller's own details, safe to return to them."""
     return {

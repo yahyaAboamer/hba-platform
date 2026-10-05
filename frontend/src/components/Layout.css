@@ -161,3 +161,55 @@
   background: var(--accent-soft);
   color: var(--accent-lift);
 }
+
+/* The admin's switch between the affiliate dashboard and Operations, under
+   the brand (ADR 0057; docs/design/operations-dashboard-2026-10-03.html). */
+.layout__switch {
+  display: flex;
+  margin: 10px 9px 0;
+  padding: 3px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--paper);
+}
+
+.layout__switch a {
+  flex: 1;
+  padding: 6px 8px;
+  border-radius: 6px;
+  color: var(--quiet);
+  font-size: 12.5px;
+  text-align: center;
+  text-decoration: none;
+}
+
+.layout__switch a:hover {
+  color: var(--ink);
+}
+
+.layout__switch a[aria-current="page"] {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--elev);
+}
+
+/* Operations' theme choice sits in the account menu: the operations manager
+   has no Settings to choose it in. */
+.layout__themes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--rule);
+  margin-bottom: 4px;
+}
+
+.layout__account-menu .layout__themes button {
+  padding: 7px 9px;
+}
+
+.layout__account-menu .layout__themes button[aria-pressed="true"] {
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}

@@ -566,6 +566,15 @@ def render(event: str, payload: dict) -> Message | None:
                 "Choose a password to get in, then send us your discount code "
                 "and where you'd like to be paid. It takes a few minutes."
             )
+        elif payload.get("role") == "operations_manager":
+            # ADR 0057: the one place this person never goes is the affiliate
+            # dashboard, so the staff wording below would send him to it.
+            subject = "Your access to HBA's operations dashboard"
+            body = (
+                f"{greeting}\n\n"
+                "You've been given access to HBA's operations dashboard. Choose "
+                "a password to get in."
+            )
         else:
             # Staff. The model's wording - earnings, payments - was never
             # theirs.

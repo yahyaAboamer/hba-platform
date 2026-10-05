@@ -73,6 +73,7 @@ const ROLE_LABEL: Record<string, string> = {
   admin: "Admin",
   affiliate_manager: "Affiliate manager",
   content_manager: "Content manager",
+  operations_manager: "Operations manager",
 };
 
 const roleWords = (role: string) => ROLE_LABEL[role] ?? role;
@@ -87,6 +88,7 @@ const ACCESS_LINES: [string, string[]][] = [
   ["Set, record and confirm content targets", ["targets.manage", "targets.record", "targets.verify"]],
   ["Read the activity log", ["audit.view"]],
   ["Approve a month's pay", ["payroll.approve"]],
+  ["See the operations dashboard", ["order_ops.view"]],
   ["Invite staff, up to their own access", ["invitations.send"]],
   ["Record payments and reopen approved months", ["payments.record", "payroll.reopen"]],
   ["Change anyone's access, Shopify and the pay policy; erase a model", ["settings.manage", "affiliates.erase"]],
@@ -603,13 +605,13 @@ function InvitePanel({ roles, permissions, onInvited }: {
           <summary>What can each access do?</summary>
           <table className="settings__perm">
             <thead>
-              <tr><th>Can…</th>{["content_manager", "affiliate_manager", "admin"].filter((r) => permissions[r]).map((r) => <th key={r}>{roleWords(r)}</th>)}</tr>
+              <tr><th>Can…</th>{["content_manager", "affiliate_manager", "operations_manager", "admin"].filter((r) => permissions[r]).map((r) => <th key={r}>{roleWords(r)}</th>)}</tr>
             </thead>
             <tbody>
               {ACCESS_LINES.map(([words, line]) => (
                 <tr key={words}>
                   <td>{words}</td>
-                  {["content_manager", "affiliate_manager", "admin"].filter((r) => permissions[r]).map((r) => (
+                  {["content_manager", "affiliate_manager", "operations_manager", "admin"].filter((r) => permissions[r]).map((r) => (
                     <td key={r} className="settings__perm-mark">
                       {holds(permissions[r], line) ? <span aria-label="Yes">✓</span> : <span aria-label="No" className="settings__perm-no">—</span>}
                     </td>
