@@ -194,6 +194,11 @@ The plan has seven phases:
 
 ### Phase 2 — Shared operations foundation
 
+**Done 5 Oct 2026 at `e5d3b0c`** (on `feature/operations-dashboard`, not merged). Phases 0–1 plus the cleanup went to staging (`main`) at `405a86d` the same day; production stays at `c91aff0`. Whole suite 92/92; migration `b3d81f6a2c07` rehearsed up/down/up on `hba_probe`. Two departures from the tasks below, for phases 3–5 to pick up:
+- **Scheduling arrives with each handler.** The three `JobKind.ORDER_OPS_*` exist, but each joins `SCHEDULE` in its own phase, together with its handler (a scheduled kind with no handler fails every 5 minutes; `test_every_scheduled_kind_has_a_handler`). A handler is just `run_poll(db, "<source>", read)`; `read` raises `NotConnected` with no key, `KeyRefused`/`SourceUnavailable` with plain words, and returns the rows stored.
+- **The API module has no route yet.** The `order_ops.view` guard is on the router itself; the permission matrix is proven on a probe route mounted with the router's own dependencies (`tests/test_order_ops_foundation.py`). Each tab's route lands with its tab, returns `freshness(db, source)`, and must be called by the frontend (reachability).
+- `run_poll` replaces any non-`SourceUnavailable` exception with "Couldn't read <source>" before the worker sees it: the worker stores a failed job's message in `last_error`, its log and the failed-jobs panel.
+
 #### Task 2.1: Working days
 - **Action**: `working_days_since(moment_utc, now_utc) -> int` in `businesstime.py`. It counts Cairo dates after the moment's date, up to today, skipping Fridays. No holiday list (owner).
 - **Validate**: Table-driven tests:
