@@ -57,6 +57,7 @@ SCHEDULE: dict[str, tuple[timedelta, dict]] = {
     # dashboard is more than 10 minutes old (app.services.order_ops.polling).
     JobKind.ORDER_OPS_SHOPIFY: (POLL_EVERY, {}),
     JobKind.ORDER_OPS_ESTEBDAL: (POLL_EVERY, {}),
+    JobKind.ORDER_OPS_BOSTA: (POLL_EVERY, {}),
 }
 
 

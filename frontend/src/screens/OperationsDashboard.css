@@ -68,3 +68,46 @@
   .ops-tile { min-height:0; padding:13px 14px 12px; }
   .ops-tile__value { font-size:28px; }
 }
+
+/* ── Bosta: the airway bill, the 7 days, the success rate ─────────────────── */
+.ops-yes { color:var(--ink); }
+.ops-no { display:inline-flex; align-items:center; gap:6px; color:var(--owed); }
+.ops-no svg { width:13px; height:13px; }
+.ops-list { margin:0 0 18px; }
+.ops-split { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:14px; margin:0 0 18px; }
+.ops-split .panel { margin:0; }
+.ops-days { margin:0; padding:6px 0 8px; list-style:none; }
+.ops-day { display:grid; grid-template-columns:86px minmax(0,1fr) 40px 14px; align-items:center; gap:12px; width:100%; min-height:42px; padding:5px 18px; border:0; background:none; color:var(--ink); font:inherit; font-size:13.5px; text-align:left; cursor:pointer; }
+.ops-day:hover { background:var(--hover); }
+.ops-day[aria-expanded="true"] { background:var(--accent-soft); }
+.ops-day__label small { display:block; margin-top:1px; color:var(--faint); font-size:11.5px; }
+.ops-bar { height:14px; border-left:1px solid var(--rule-strong); }
+.ops-bar i { display:block; height:14px; border-radius:0 4px 4px 0; background:var(--accent); }
+.ops-day__count { text-align:right; font-variant-numeric:tabular-nums; }
+.ops-day svg { width:13px; height:13px; color:var(--faint); }
+.ops-day--off { cursor:default; color:var(--faint); }
+.ops-day--off:hover { background:none; }
+.ops-day__off { font-size:12.5px; color:var(--faint); padding-left:10px; }
+.ops-days--old { opacity:.55; }
+/* Tighter than the mockup's 8px/13px: drawn in the app's Inter rather than the
+   mockup's fallback face, the five chips needed it to stay on one row. */
+.ops-filters { display:flex; flex-wrap:wrap; gap:6px; padding:14px 18px 0; }
+.ops-chip { display:inline-flex; align-items:center; gap:6px; min-height:36px; padding:8px 11px; border:1px solid var(--rule); border-radius:var(--radius); background:transparent; color:var(--quiet); font:inherit; font-size:13px; cursor:pointer; }
+.ops-chip[aria-pressed="true"] { border-color:var(--accent); background:var(--accent-soft); color:var(--accent-text); }
+.ops-range { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:12px 18px 0; font-size:13px; color:var(--quiet); }
+.ops-range input { width:150px; min-height:36px; padding:6px 10px; border:1px solid var(--rule); border-radius:var(--radius); background:var(--surface); color:var(--ink); font:inherit; }
+.ops-rate { padding:18px; }
+.ops-rate__value { margin:0 0 14px; font-size:48px; font-weight:400; line-height:1; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
+.ops-meter { height:10px; border-radius:5px; background:var(--accent-soft); overflow:hidden; }
+.ops-meter i { display:block; height:100%; border-radius:5px; background:var(--accent); }
+.ops-rate__parts { display:flex; flex-wrap:wrap; gap:6px 18px; margin:12px 0 0; font-size:13.5px; }
+.ops-key { display:inline-flex; align-items:center; gap:7px; }
+.ops-key::before { content:""; width:10px; height:10px; border-radius:3px; background:var(--accent); }
+.ops-key--fail::before { background:var(--accent-soft); box-shadow:inset 0 0 0 1px var(--rule-strong); }
+.ops-key--all::before { display:none; }
+.ops-rate__note { margin:12px 0 0; font-size:12.5px; line-height:1.5; color:var(--quiet); }
+.ops-panel-note { margin:12px 18px 0; font-size:12.5px; line-height:1.45; color:var(--owed); }
+@media (max-width:800px) {
+  .ops-split { grid-template-columns:1fr; }
+  .ops-day { grid-template-columns:70px minmax(0,1fr) 34px 12px; padding:5px 14px; gap:10px; }
+}

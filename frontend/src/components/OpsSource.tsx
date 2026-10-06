@@ -22,7 +22,11 @@ export type Freshness = {
 };
 
 /** The mockup's icons, drawn inline. */
-export function OpsIcon({ name }: { name: "clock" | "alert" | "plug" | "ext" | "down" | "up" }) {
+export function OpsIcon({
+  name,
+}: {
+  name: "clock" | "alert" | "plug" | "ext" | "down" | "up" | "right";
+}) {
   const common = {
     fill: "none",
     stroke: "currentColor",
@@ -54,6 +58,7 @@ export function OpsIcon({ name }: { name: "clock" | "alert" | "plug" | "ext" | "
       )}
       {name === "down" && <path d="M6 9l6 6 6-6" {...common} />}
       {name === "up" && <path d="M6 15l6-6 6 6" {...common} />}
+      {name === "right" && <path d="M9 6l6 6-6 6" {...common} />}
     </svg>
   );
 }
@@ -65,7 +70,9 @@ const CLOCK = new Intl.DateTimeFormat("en-GB", {
   hourCycle: "h23",
 });
 
-const DAY_AND_TIME = new Intl.DateTimeFormat("en-GB", {
+// en-US for the parts, put back together day first: en-GB now writes
+// September as "Sept", and the approved design reads "14 Sep".
+const DAY_AND_TIME = new Intl.DateTimeFormat("en-US", {
   timeZone: "Africa/Cairo",
   day: "numeric",
   month: "short",
@@ -73,6 +80,21 @@ const DAY_AND_TIME = new Intl.DateTimeFormat("en-GB", {
   minute: "2-digit",
   hourCycle: "h23",
 });
+
+const DAY_MONTH = new Intl.DateTimeFormat("en-US", {
+  timeZone: "Africa/Cairo",
+  day: "numeric",
+  month: "short",
+});
+
+/** "14 Sep", Cairo time. A bare "2026-09-14" is that day, not UTC midnight. */
+export function dayMonth(isoOrDate: string): string {
+  const moment = /^\d{4}-\d{2}-\d{2}$/.test(isoOrDate) ? `${isoOrDate}T12:00:00+02:00` : isoOrDate;
+  const parts = Object.fromEntries(
+    DAY_MONTH.formatToParts(new Date(moment)).map((part) => [part.type, part.value]),
+  );
+  return `${parts.day} ${parts.month}`;
+}
 
 /** "14:21", Cairo time. */
 export function clockTime(iso: string): string {

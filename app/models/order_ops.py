@@ -9,9 +9,21 @@ one row per source, and every response about a source carries it.
 Nothing here holds customer details, keys or anything that decides pay.
 """
 
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, Integer, String, Text, text
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    Date,
+    DateTime,
+    Index,
+    Integer,
+    SmallInteger,
+    String,
+    Text,
+    UniqueConstraint,
+    text,
+)
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -90,3 +102,66 @@ class OpsEstebdalReturn(Base):
     order_number: Mapped[str | None] = mapped_column(String(40))
     requested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class OpsBostaDelivery(Base):
+    """One order HBA has on Bosta, as the platform last read it (ADR 0057).
+
+    A mirror, not a snapshot: Bosta holds every order HBA ever sent, and the
+    success rate needs months of them, so rows are upserted and kept. One
+    that Bosta no longer has is marked ``deleted_at`` rather than removed.
+
+    **No customer details.** Bosta's answer carries the receiver's name,
+    phone and address, notes, the cash to collect and more; only the fields
+    below are read out of it. Bosta never decides pay (ADR 0023).
+    """
+
+    __tablename__ = "ops_bosta_delivery"
+    __table_args__ = (
+        UniqueConstraint("tracking_number", name="ops_bosta_delivery_tracking_number"),
+        Index("ix_ops_bosta_delivery_state_code", "state_code"),
+        Index("ix_ops_bosta_delivery_created_at", "created_at"),
+        Index("ix_ops_bosta_delivery_collected_at", "collected_at"),
+    )
+
+    bosta_id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    tracking_number: Mapped[str] = mapped_column(String(40), nullable=False)
+    #: "Send", "Exchange", "Customer Return Pickup", "Return to Origin", ...
+    type_value: Mapped[str] = mapped_column(String(60), nullable=False)
+    state_code: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    state_value: Mapped[str | None] = mapped_column(String(80))
+    #: When the order was created on Bosta (``creationTimestamp``).
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at_bosta: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    #: When Bosta collected it from HBA (``collectedFromBusiness``). Not
+    #: ``state.pickedUpTime``, which carries the delivery date.
+    collected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    #: When its airway bill was last printed (``latestAWBPrintDate``).
+    awb_printed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    #: Bosta's "waiting for business action" flag, behind its own count.
+    waiting_for_action: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
+    #: From ``businessReference`` ("<store>:#31038"), where Bosta has one.
+    shopify_order_number: Mapped[str | None] = mapped_column(String(60))
+    #: Still on its way somewhere (``bosta.UNFINISHED``), as of the last read.
+    unfinished: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    synced_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class OpsBostaSync(Base):
+    """How far the Bosta mirror has read. One row.
+
+    History is read backwards a few days per read, from the first day the
+    mirror ran back to 1 January 2026, so the most recent ranges are whole
+    first. ``backfill_next`` is the next day to read; null once complete.
+    """
+
+    __tablename__ = "ops_bosta_sync"
+    __table_args__ = (CheckConstraint("id = 1", name="ops_bosta_sync_one_row"),)
+
+    id: Mapped[int] = mapped_column(SmallInteger, primary_key=True)
+    backfill_next: Mapped[date | None] = mapped_column(Date)
+    #: The newest ``updatedAt`` seen; changes are read down to just below it.
+    high_water: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

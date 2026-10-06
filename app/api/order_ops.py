@@ -10,16 +10,18 @@ E-stebdal while a page waits. Each response carries ``freshness`` for the
 source it is about, so a number is never shown without the time it was read,
 and a source that could not be read never shows as 0.
 
-The tabs' routes arrive with their tabs: Shopify and E-stebdal now, Bosta next.
+One route per tab - Shopify, E-stebdal, Bosta - and Bosta's success rate.
 """
 
-from fastapi import APIRouter, Depends
+from datetime import date
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_permission
 from app.core.permissions import Permission
 from app.db import get_session
-from app.services.order_ops import estebdal, shopify
+from app.services.order_ops import bosta, estebdal, shopify
 from app.services.order_ops.freshness import State, describe
 
 #: The one guard, kept by name so a test can find it on every route.
@@ -69,4 +71,39 @@ def estebdal_tab(db: Session = Depends(get_session)) -> dict:
     if _has_numbers(described):
         body.update(estebdal.tab(db, effective(db).shop_domain))
     return body
+
+
+@router.get("/bosta")
+def bosta_tab(db: Session = Depends(get_session)) -> dict:
+    """B1, B2, B5 and B6 with their orders, and the last 7 days of pickups.
+
+    ``cards`` and ``pickups`` are null when there are no numbers to show.
+    The pickups say whether the mirror's history is whole yet.
+    """
+    described = freshness(db, "bosta")
+    body: dict = {"freshness": described, "cards": None, "pickups": None}
+    if _has_numbers(described):
+        body.update(bosta.tab(db))
+    return body
+
+
+@router.get("/bosta/success-rate")
+def bosta_success_rate(
+    start: date = Query(alias="from"),
+    end: date = Query(alias="to"),
+    db: Session = Depends(get_session),
+) -> dict:
+    """B4 for orders created on Bosta from ``from`` to ``to`` (Cairo dates).
+
+    422 for a range that cannot be asked; ``available: false`` while the
+    mirror has not read that far back yet, or has not read Bosta at all.
+    """
+    described = freshness(db, "bosta")
+    try:
+        rate = bosta.success_rate(db, start, end)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from None
+    if not _has_numbers(described):
+        rate = {"from": rate["from"], "to": rate["to"], "available": False, "read_back_to": None}
+    return {"freshness": described, **rate}
 
