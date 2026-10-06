@@ -231,6 +231,12 @@ The plan has seven phases:
 
 ### Phase 3 — Shopify tab (PRD milestone 3)
 
+**Built 5–6 Oct 2026 at `afbb7d7`; on staging (`main`) with phase 2 on 6 Oct.** Whole suite 93/93, frontend 608 tests and build, migrations `b3d81f6a2c07` + `c7e2a9d40b15` rehearsed up/down/up on `hba_probe`. The search was checked read-only on the live shop (29 orders, as on 3 Oct). Captured headless against the mockup at 1280 and 390, both themes: the tab matches. Notes:
+- The S3 card's non-zero note ("No WhatsApp message sent yet" / phone "Send a WhatsApp") is ours: the mockup only draws S3 at 0.
+- At 390 the phase-1 shell puts the account row under the tabs; the mockup has the avatar in the brand row. Left for Task 7.2.
+- **Worker lanes (`260325c`).** On staging's first hour a Shopify read waited 4.5 minutes behind the hourly batch of 500 line-item reads (one queue, oldest first), 10m22s after the previous read. Operations' reads (`OPERATIONS_READS`) now run in a lane of their own (`app.worker.LANES`); the main lane takes everything else and tops up the schedule. Phases 4–5 need nothing more: their kinds are already in the set.
+- **Gate still open:** the owner compares each card with the same filter in Shopify admin on staging.
+
 #### Task 3.1: Read open, unshipped orders
 - **Action**: Put `OPEN_UNSHIPPED` in `order_ops/shopify.py`, not in the shared `queries.py`, so the order-sync query never changes.
   - Fields: `legacyResourceId name createdAt displayFulfillmentStatus tags`.
