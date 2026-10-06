@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 
 import { api } from "../lib/api";
 import {
@@ -10,6 +10,8 @@ import {
   stateNow,
   useIsNarrow,
   useNow,
+  useOpsTab,
+  waitingLabel as waiting,
 } from "../components/OpsSource";
 import type { Freshness } from "../components/OpsSource";
 import "./OperationsDashboard.css";
@@ -67,16 +69,8 @@ const COPY: Record<string, { label: string; note: string; short: string; hint?: 
   },
 };
 
-/** Read again this often, so a new read shows without a reload. */
-const REFRESH_MS = 60_000;
-
 /** On a phone a list shows this many, then "Show the other N". */
 const PHONE_FIRST = 3;
-
-function waiting(days: number): string {
-  if (days === 0) return "Today";
-  return days === 1 ? "1 day" : `${days} days`;
-}
 
 function OrderLink({ order }: { order: Order }) {
   if (!order.admin_url) return <span className="num">{order.order_number}</span>;
@@ -175,31 +169,15 @@ function OrderList({ card, narrow }: { card: Card; narrow: boolean }) {
 }
 
 export function OperationsShopify() {
-  const [tab, setTab] = useState<ShopifyTab | null>(null);
-  const [failed, setFailed] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
   const now = useNow();
   const narrow = useIsNarrow();
-
-  const load = useCallback(() => {
-    api
-      .get<ShopifyTab>("/api/order-ops/shopify")
-      .then((body) => {
-        setTab(body);
-        setFailed(false);
-        // A list whose card has emptied closes, and stays closed if it fills.
-        setOpen((current) =>
-          body.cards?.some((card) => card.key === current && card.count > 0) ? current : null,
-        );
-      })
-      .catch(() => setFailed(true));
-  }, []);
-
-  useEffect(() => {
-    load();
-    const timer = window.setInterval(load, REFRESH_MS);
-    return () => window.clearInterval(timer);
-  }, [load]);
+  const { tab, failed, reload: load } = useOpsTab(() => api.get<ShopifyTab>("/api/order-ops/shopify"), (body) =>
+    // A list whose card has emptied closes, and stays closed if it fills.
+    setOpen((current) =>
+      body.cards?.some((card) => card.key === current && card.count > 0) ? current : null,
+    ),
+  );
 
   const freshness = tab?.freshness;
   const cards = tab?.cards ?? null;

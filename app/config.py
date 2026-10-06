@@ -95,6 +95,12 @@ class Settings(BaseSettings):
     shopify_api_version: str = "2026-07"
     shopify_timeout_seconds: float = 20.0
 
+    # Operations' other sources (ADR 0057). Read-only keys, blank by default:
+    # a blank key shows its tab as "not connected", never as a failure. They
+    # live here until Settings can hold them encrypted (build plan, phase 6).
+    bosta_api_key: str = ""
+    estebdal_api_key: str = ""
+
     # Where links in emails point. Blank means the platform will not put a
     # link in an email at all rather than send one to localhost - a sign-in
     # link that goes nowhere is worse than no email, because it teaches twenty

@@ -1,4 +1,4 @@
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 /**
  * What every Operations tab says about its source (ADR 0057 §6; the approved
@@ -85,6 +85,51 @@ export function dayAndTime(iso: string): string {
     DAY_AND_TIME.formatToParts(new Date(iso)).map((part) => [part.type, part.value]),
   );
   return `${parts.day} ${parts.month}, ${parts.hour}:${parts.minute}`;
+}
+
+/** Read a tab again this often, so a new read shows without a reload. */
+const REFRESH_MS = 60_000;
+
+/**
+ * A tab's body, read on arrival and every minute after. `failed` is the
+ * platform itself not answering, which is not the source failing: that is in
+ * the body's `freshness`.
+ *
+ * Takes the request itself rather than its path, so each screen's own call
+ * to its route stays where the reachability test reads it.
+ */
+export function useOpsTab<T>(fetchTab: () => Promise<T>, onLoad?: (body: T) => void) {
+  const [tab, setTab] = useState<T | null>(null);
+  const [failed, setFailed] = useState(false);
+  const fetcher = useRef(fetchTab);
+  fetcher.current = fetchTab;
+  const loaded = useRef(onLoad);
+  loaded.current = onLoad;
+
+  const reload = useCallback(() => {
+    fetcher
+      .current()
+      .then((body) => {
+        setTab(body);
+        setFailed(false);
+        loaded.current?.(body);
+      })
+      .catch(() => setFailed(true));
+  }, []);
+
+  useEffect(() => {
+    reload();
+    const timer = window.setInterval(reload, REFRESH_MS);
+    return () => window.clearInterval(timer);
+  }, [reload]);
+
+  return { tab, failed, reload };
+}
+
+/** "Today", "1 day", "3 days": calendar days in Cairo, as the server counts. */
+export function waitingLabel(days: number): string {
+  if (days === 0) return "Today";
+  return days === 1 ? "1 day" : `${days} days`;
 }
 
 /**
@@ -231,7 +276,10 @@ export function SourceBanner({ freshness, now }: { freshness: Freshness; now: nu
         <div>
           {label} isn't connected yet.
           <small>
-            An admin connects {label} in Settings → Shopify. Until then this tab has no numbers.
+            {freshness.source === "shopify"
+              ? "An admin connects Shopify in Settings → Shopify."
+              : `An admin adds the ${label} key.`}{" "}
+            Until then this tab has no numbers.
           </small>
         </div>
       </div>

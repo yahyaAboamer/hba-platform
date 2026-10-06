@@ -56,6 +56,7 @@ SCHEDULE: dict[str, tuple[timedelta, dict]] = {
     # Operations' reads (ADR 0057): every 5 minutes, so no number on the
     # dashboard is more than 10 minutes old (app.services.order_ops.polling).
     JobKind.ORDER_OPS_SHOPIFY: (POLL_EVERY, {}),
+    JobKind.ORDER_OPS_ESTEBDAL: (POLL_EVERY, {}),
 }
 
 

@@ -10,7 +10,7 @@ E-stebdal while a page waits. Each response carries ``freshness`` for the
 source it is about, so a number is never shown without the time it was read,
 and a source that could not be read never shows as 0.
 
-The tabs' routes arrive with their tabs: Shopify now, E-stebdal and Bosta next.
+The tabs' routes arrive with their tabs: Shopify and E-stebdal now, Bosta next.
 """
 
 from fastapi import APIRouter, Depends
@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import require_permission
 from app.core.permissions import Permission
 from app.db import get_session
-from app.services.order_ops import shopify
+from app.services.order_ops import estebdal, shopify
 from app.services.order_ops.freshness import State, describe
 
 #: The one guard, kept by name so a test can find it on every route.
@@ -53,5 +53,20 @@ def shopify_tab(db: Session = Depends(get_session)) -> dict:
     body: dict = {"freshness": described, "total": None, "cards": None}
     if _has_numbers(described):
         body.update(shopify.tab(db, effective(db).shop_domain))
+    return body
+
+
+@router.get("/estebdal")
+def estebdal_tab(db: Session = Depends(get_session)) -> dict:
+    """E1, Needs review, and the requests behind it, from the last clean read.
+
+    ``cards`` is null when there are no numbers to show, as on Shopify.
+    """
+    from app.services.shopify.connection import effective
+
+    described = freshness(db, "estebdal")
+    body: dict = {"freshness": described, "total": None, "cards": None}
+    if _has_numbers(described):
+        body.update(estebdal.tab(db, effective(db).shop_domain))
     return body
 

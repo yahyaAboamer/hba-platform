@@ -71,3 +71,22 @@ class OpsShopifyOrder(Base):
     )
     fulfillment_status: Mapped[str | None] = mapped_column(String(40))
     seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class OpsEstebdalReturn(Base):
+    """One return or exchange request waiting for review on E-stebdal.
+
+    Replaced whole on every read, like ``ops_shopify_order``. E-stebdal's
+    answer carries the customer's name, phone, address and the items; none
+    of it is kept. Only the numbers a person needs to find the request.
+    """
+
+    __tablename__ = "ops_estebdal_return"
+
+    estebdal_id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    #: As E-stebdal shows it, e.g. "#30830-R1".
+    return_number: Mapped[str] = mapped_column(String(40), nullable=False)
+    #: The Shopify order it is for, e.g. "#30830".
+    order_number: Mapped[str | None] = mapped_column(String(40))
+    requested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
