@@ -300,6 +300,14 @@ The plan has seven phases:
 
 ### Phase 5 — Bosta tab (PRD milestone 5)
 
+**Built 6 Oct 2026 at `b2a2928`; to staging with phase 4.** Whole suite 95/95, frontend 631 tests and build, migrations `d4f1b8e62a39` + `e5a7c1f93b28` rehearsed up/down/up on `hba_probe`; captured headless against frames 2 and 7 (1280 and 390). Checked read-only from staging: `stateCodes` must be **strings**; `count` always 0; a wrong key 401; an unknown tracking number 400; the single-order answer has the search item's shape; type values are exactly Send, Exchange, Customer Return Pickup, Return to Origin. The new rules over live data (6 Oct): 131 unfinished; B1 28 of 37 waiting for pickup, B2 0, B5 1, B6 13; ~55 orders created a day. Departures and what is left:
+- **Mirror tables are `ops_bosta_delivery` / `ops_bosta_sync`** (the `ops_` prefix of the others), and history reads **backwards** from the first run, ten days a read (~2.5 hours to January), so recent ranges are whole first. Until history reaches a range, the rate says "not ready", and the 7 days carry a note until history is 60 days behind them.
+- `read_back_to` keeps a day's margin: Bosta's day bounds may be UTC days.
+- One unreadable order is skipped (and asked again later); a batch of 3+ where none reads is a failure. More than 10 pages of changes rereads history from today.
+- **Links** go to `https://business.bosta.co/orders/<tracking>` — Bosta publishes no address; owner to confirm.
+- Not done from Task 5.4's list: `sortBy` on day windows (untested value; days are well under a page).
+- **Gate still open:** B5 against Bosta's "Awaiting your action"; B1, B2, B6 spot-checked in Bosta; B4 for September reconciled with Bosta's export.
+
 #### Task 5.1: Client
 - **Action**: `BostaClient(api_key, transport=None)`:
   - Base `https://app.bosta.co/api/v2`, header `Authorization: <key>` (raw, as milestone 1 proved).
