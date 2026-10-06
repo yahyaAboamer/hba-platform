@@ -277,6 +277,11 @@ The plan has seven phases:
 
 ### Phase 4 — E-stebdal tab (PRD milestone 4)
 
+**Built 6 Oct 2026 at `35cba0a`, on `feature/operations-dashboard`; not on staging yet.** Whole suite 94/94, frontend 619 tests and build, migration `d4f1b8e62a39` rehearsed up/down/up on `hba_probe`; captured headless against the mockup's frame 3 (1280, both themes) and checked at 390. Facts checked read-only from staging: `x-api-key` header, `page` paging with `meta.hasNextPage`, `limit=250` honoured, 200 requests a minute, **a wrong key answers 500** (so it reads as "didn't answer", not "refused"); `ESTEBDAL_API_KEY` is set on staging (5 requests waiting on 6 Oct). Departures:
+- **Links.** E-stebdal publishes no address for one request; each opens E-stebdal's dashboard in Shopify admin (`https://<shop>/admin/apps/e-stebdal`, assumed from the app's listing handle). Owner to confirm, or supply a per-request address.
+- **The count is the rows stored**, not `meta.totalCount`; they agree, and a mismatch cannot then show a number the list does not have.
+- A page where no item has the status asked for is a failure, not a 0; a request on two pages counts once (review findings).
+
 #### Task 4.1: Client and poll
 - **Action**: `EstebdalClient(api_key, transport=None)`:
   - `GET https://api.e-stebdal.com/api/v1/public/returns`, header `x-api-key`.
