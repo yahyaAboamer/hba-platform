@@ -140,7 +140,7 @@ KINDS: dict[str, tuple[str, ...]] = {
     ),
     "models": ("affiliate.", "application.", "code."),
     "content": ("target.",),
-    "settings": ("shopify.", "policy_version.", "staff.preference_changed"),
+    "settings": ("shopify.", "order_ops.key_saved", "policy_version.", "staff.preference_changed"),
 }
 
 #: Signing in and out: true, recorded, and the thing that buried every payment
