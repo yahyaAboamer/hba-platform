@@ -47,6 +47,8 @@ function serve(post: (init?: RequestInit) => Promise<Response>) {
     if (url.endsWith("/catalogue")) return reply(200, { products: 0, active_products: 0, variants: 0, line_items: 0, last_synced_at: null });
     if (url.endsWith("/unmatched-parcels")) return reply(200, { parcels: [], summary: { needs_you: 0, customers: 0, unusable_phone: 0, no_phone: 0, matched: 0 } });
     if (url.endsWith("/shopify-connection")) return reply(200, { source: "environment", shop_domain: "hbawear.myshopify.com", client_id_hint: null, secret_saved: false, verified_at: null, shop_name: null, problem: null, can_save: true });
+    // Operations' keys sit beside the connection (ADR 0057); not this test's subject.
+    if (url.includes("/api/order-ops/connections/")) return reply(200, { provider: "bosta", label: "Bosta", source: "environment", hint: null, verified_at: null, problem: null, can_save: true, key_problem: null });
     return reply(404, { detail: "not found" });
   });
 }

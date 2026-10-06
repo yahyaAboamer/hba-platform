@@ -15,13 +15,17 @@ One route per tab - Shopify, E-stebdal, Bosta - and Bosta's success rate.
 
 from datetime import date
 
+from typing import Literal
+
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_permission
 from app.core.permissions import Permission
 from app.db import get_session
-from app.services.order_ops import bosta, estebdal, shopify
+from app.models.identity import UserAccount
+from app.services.order_ops import bosta, connections, estebdal, shopify
 from app.services.order_ops.freshness import State, describe
 
 #: The one guard, kept by name so a test can find it on every route.
@@ -106,4 +110,54 @@ def bosta_success_rate(
     if not _has_numbers(described):
         rate = {"from": rate["from"], "to": rate["to"], "available": False, "read_back_to": None}
     return {"freshness": described, **rate}
+
+
+# ── The keys, for Settings ────────────────────────────────────────────────────
+
+#: Changing a key is an admin's: ``settings.manage`` on top of the router's
+#: own guard, which an admin holds as well. The operations manager sees the
+#: dashboard and never its keys.
+SETTINGS_GUARD = require_permission(Permission.SETTINGS_MANAGE)
+
+Provider = Literal["bosta", "estebdal"]
+
+
+class KeyBody(BaseModel):
+    #: No length rule here: a validation error would echo the value back.
+    #: ``connections.save`` checks it and refuses in its own words.
+    key: str = ""
+
+
+@router.get("/connections/{provider}")
+def key_state(
+    provider: Provider,
+    _actor: UserAccount = Depends(SETTINGS_GUARD),
+    db: Session = Depends(get_session),
+) -> dict:
+    """The key in use, for Settings: where it comes from and its last four
+    characters. **Never the key.**"""
+    return connections.describe(db, provider)
+
+
+@router.put("/connections/{provider}")
+def save_key(
+    provider: Provider,
+    body: KeyBody,
+    actor: UserAccount = Depends(SETTINGS_GUARD),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Save a new key - only if it answers its provider.
+
+    A refusal leaves the key in use exactly as it was, and says why in words
+    safe to show; the key is never echoed back, logged or audited.
+    """
+    try:
+        described = connections.save(
+            db, provider, body.key, actor_id=actor.id, actor_email=actor.email
+        )
+    except connections.KeyNotSaved as exc:
+        db.rollback()
+        raise HTTPException(422, str(exc)) from None
+    db.commit()
+    return described
 

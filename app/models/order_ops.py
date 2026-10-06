@@ -165,3 +165,30 @@ class OpsBostaSync(Base):
     backfill_next: Mapped[date | None] = mapped_column(Date)
     #: The newest ``updatedAt`` seen; changes are read down to just below it.
     high_water: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class OpsIntegrationKey(Base):
+    """A Bosta or E-stebdal key saved from Settings, overriding the server's.
+
+    One row per provider. **The key is stored encrypted** (Fernet, keyed by
+    ``SETTINGS_ENCRYPTION_KEY``) and is never read back out of the API, a
+    log or the audit trail. A row is written only after its key answered
+    the provider, so the key in use is always one that worked.
+    """
+
+    __tablename__ = "ops_integration_key"
+    __table_args__ = (
+        CheckConstraint("provider IN ('bosta', 'estebdal')", name="ops_integration_key_provider_valid"),
+    )
+
+    provider: Mapped[str] = mapped_column(String(20), primary_key=True)
+    #: Fernet token of the key. Never the key itself.
+    secret_encrypted: Mapped[str] = mapped_column(Text, nullable=False)
+    #: Its last four characters, so a person can tell two keys apart (the
+    #: approved mockup's "ends in a1b2").
+    hint: Mapped[str] = mapped_column(String(8), nullable=False)
+    verified_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_by: Mapped[int | None] = mapped_column(Integer)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )

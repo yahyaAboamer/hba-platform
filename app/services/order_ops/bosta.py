@@ -39,7 +39,6 @@ from sqlalchemy import and_, func, or_, select, true
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from app.config import settings
 from app.core.businesstime import BUSINESS_TIMEZONE, business_date, utcnow, working_days_since
 from app.models.order_ops import OpsBostaDelivery, OpsBostaSync
 from app.services.jobs import JobKind
@@ -125,6 +124,12 @@ class BostaClient:
                 continue
             return response
         raise SourceUnavailable(DIDNT_ANSWER)
+
+    def check(self) -> None:
+        """One small read, to prove a key before it is saved."""
+        response = self._send("POST", "/deliveries/search", {"limit": 1, "page": 1})
+        if response.status_code != 200:
+            raise SourceUnavailable("Bosta didn't accept Operations' search.")
 
     def search(self, page: int, **filters) -> list[dict]:
         body = {"limit": PAGE_SIZE, "page": page, **filters}
@@ -260,8 +265,10 @@ def _held(db: Session) -> int:
 
 def read(db: Session, client: BostaClient | None = None, now: datetime | None = None) -> int:
     """Bring the mirror up to date. Returns how many orders it holds."""
+    from app.services.order_ops.connections import api_key
+
     owned = client is None
-    client = client or BostaClient(settings.bosta_api_key)
+    client = client or BostaClient(api_key(db, "bosta"))
     now = now or utcnow()
     try:
         sync = db.get(OpsBostaSync, 1)

@@ -61,6 +61,7 @@ The connection check on 3 October established:
 
    The gap is reconciled order by order when the Bosta tab is accepted.
 10. **Keys.** The Bosta key is read-only. The Bosta and E-stebdal keys are environment variables until Settings can hold them encrypted, as the Shopify secret is (ADR 0045).
+    - *7 October 2026 (build phase 6):* Settings → Shopify now holds them, encrypted the same way and checked against their provider before saving; only the last four characters are ever shown. The environment variables remain the fallback when nothing is saved.
 
 ## Consequences
 

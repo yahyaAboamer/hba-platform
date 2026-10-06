@@ -23,10 +23,12 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Callable
 
-from cryptography.fernet import Fernet, InvalidToken
+from cryptography.fernet import InvalidToken
 from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.core.secrets import fernet as _fernet
+from app.core.secrets import key_problem
 from app.models.integration import ShopifyConnection
 from app.services.audit import record_audit
 from app.services.shopify.client import (
@@ -52,35 +54,6 @@ class Effective:
     source: str | None
     #: Something wrong with the saved connection that made us fall back.
     problem: str | None = None
-
-
-def _fernet() -> Fernet | None:
-    key = (settings.settings_encryption_key or "").strip()
-    if not key:
-        return None
-    try:
-        return Fernet(key.encode())
-    except (ValueError, TypeError):
-        # A malformed key is a configuration fault; saying so beats storing a
-        # secret under something that is not a key.
-        return None
-
-
-def key_problem() -> str | None:
-    """Why this server cannot use its key, in words - or None if it can.
-
-    *Not set* and *not a valid key* are told apart: the second is the one
-    somebody meets after pasting half a key, and being told the variable is
-    missing sends them looking in the wrong place. Never includes the key.
-    """
-    if not (settings.settings_encryption_key or "").strip():
-        return "SETTINGS_ENCRYPTION_KEY is not set"
-    if _fernet() is None:
-        return (
-            "SETTINGS_ENCRYPTION_KEY is set but is not a valid key "
-            "(it must be a Fernet key: 44 characters of URL-safe base64)"
-        )
-    return None
 
 
 def _environment(problem: str | None = None) -> Effective:

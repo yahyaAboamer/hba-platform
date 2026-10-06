@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
+import { IntegrationKeys } from "../components/IntegrationKey";
 import { ShopifyConnection } from "../components/ShopifyConnection";
 import type { ShopifyConnectionState } from "../components/ShopifyConnection";
 import { api } from "../lib/api";
@@ -500,6 +501,9 @@ export function DataPanel({ goLiveMonth }: { goLiveMonth: string | null }) {
 
       {/* The export's Connection card, editable (owner, decision b). */}
       <ShopifyConnection onChanged={setConnection} />
+
+      {/* Operations' Bosta and E-stebdal keys, beside it (ADR 0057 §10). */}
+      <IntegrationKeys />
 
       {/*
        * S2: the three things somebody runs rarely, together and out of the

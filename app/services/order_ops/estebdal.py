@@ -24,7 +24,6 @@ import httpx
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from app.config import settings
 from app.core.businesstime import utcnow
 from app.models.order_ops import OpsEstebdalReturn
 from app.services.jobs import JobKind
@@ -93,6 +92,12 @@ class EstebdalClient:
                     raise SourceUnavailable(DIDNT_ANSWER) from None
         raise SourceUnavailable(DIDNT_ANSWER)
 
+    def check(self) -> None:
+        """One small read, to prove a key before it is saved."""
+        body = self._get("/returns", {"limit": 1})
+        if not isinstance(body, dict) or "meta" not in body:
+            raise SourceUnavailable("E-stebdal answered in a way Operations doesn't recognise.")
+
     def needs_review(self) -> list[dict]:
         """Every request waiting for review, reduced to the fields kept."""
         kept: dict[str, dict] = {}
@@ -132,7 +137,9 @@ def _parse_time(value: str) -> datetime:
 
 def read(db: Session, client: EstebdalClient | None = None) -> int:
     """Replace the snapshot with what waits for review now. Returns how many."""
-    client = client or EstebdalClient(settings.estebdal_api_key)
+    from app.services.order_ops.connections import api_key
+
+    client = client or EstebdalClient(api_key(db, "estebdal"))
     requests = client.needs_review()
 
     seen = utcnow()

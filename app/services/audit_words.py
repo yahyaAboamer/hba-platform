@@ -24,6 +24,9 @@ _MONTHS = (
     "November December"
 ).split()
 
+#: Operations' sources, as the audit sentence names them (ADR 0057).
+_PROVIDER = {"bosta": "Bosta", "estebdal": "E-stebdal"}
+
 _ROLE = {
     "admin": "admin",
     "affiliate_manager": "affiliate manager",
@@ -188,6 +191,7 @@ def sentence(event: AuditEvent, names: _Names) -> str:
         "payroll.reopened": f"Reopened {who}'s {month or 'month'}",
         "policy_version.created": f"Put a new commission policy in force from {_month(a.get('effective_month'))}",
         "shopify.connection_updated": "Updated the Shopify connection",
+        "order_ops.key_saved": f"Saved a new {_PROVIDER.get(a.get('provider'), 'operations')} key",
         "staff.preference_changed": f"Turned {'on' if a.get('on') else 'off'} “{a.get('switch')}” for themselves",
         "staff.role_changed": f"Changed {who}'s access to {_ROLE.get(a.get('role'), a.get('role'))}",
         "staff.suspended": f"Suspended {who}'s access",
