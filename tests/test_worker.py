@@ -393,3 +393,64 @@ def test_a_slow_job_does_not_stop_the_event_loop(session, monkeypatch):
     # 1.2 seconds of 50ms sleeps is about 24 ticks; blocked by the job it was 1.
     assert ticks >= 15
     assert _status(session, job.id).status == JobStatus.SUCCEEDED
+
+
+# ── Lanes: Operations' reads apart from everything else (ADR 0057) ────────────
+
+
+def _due_now(session, kind, seconds_ago):
+    from datetime import timedelta
+
+    from app.core.businesstime import utcnow
+
+    job = enqueue(session, kind, {}, run_after=utcnow() - timedelta(seconds=seconds_ago))
+    session.commit()
+    return job.id
+
+
+def test_an_operations_read_is_not_kept_waiting_by_a_backlog(session):
+    """Staging, 6 October: 500 line-item reads queued a minute earlier held a
+    Shopify read back 4.5 minutes. In its own lane it goes first."""
+    from app.services.jobs import OPERATIONS_READS, JobKind, lease_job
+
+    for n in range(5):
+        _due_now(session, f"backlog_{n}", seconds_ago=120)
+    read_id = _due_now(session, JobKind.ORDER_OPS_SHOPIFY, seconds_ago=60)
+
+    leased = lease_job(session, "w/operations", only=OPERATIONS_READS)
+
+    assert leased is not None and leased.id == read_id
+
+
+def test_the_main_lane_never_takes_an_operations_read(session):
+    from app.services.jobs import OPERATIONS_READS, JobKind, lease_job
+
+    _due_now(session, JobKind.ORDER_OPS_SHOPIFY, seconds_ago=600)
+    other_id = _due_now(session, "backlog", seconds_ago=60)
+
+    first = lease_job(session, "w", exclude=OPERATIONS_READS)
+    session.commit()
+    second = lease_job(session, "w", exclude=OPERATIONS_READS)
+
+    assert first is not None and first.id == other_id
+    assert second is None
+
+
+def test_the_operations_lane_takes_nothing_else(session):
+    from app.services.jobs import OPERATIONS_READS, lease_job
+
+    _due_now(session, "backlog", seconds_ago=60)
+    assert lease_job(session, "w/operations", only=OPERATIONS_READS) is None
+
+
+def test_between_them_the_lanes_take_every_kind_and_only_one_tops_up():
+    from app.services.jobs import OPERATIONS_READS, JobKind
+    from app.worker import LANES
+
+    assert LANES["main"]["exclude"] == LANES["operations"]["only"] == OPERATIONS_READS
+    assert OPERATIONS_READS == {
+        JobKind.ORDER_OPS_SHOPIFY,
+        JobKind.ORDER_OPS_BOSTA,
+        JobKind.ORDER_OPS_ESTEBDAL,
+    }
+    assert [lane for lane, config in LANES.items() if config["schedule"]] == ["main"]

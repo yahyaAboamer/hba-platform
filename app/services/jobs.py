@@ -101,6 +101,15 @@ class JobKind:
     ORDER_OPS_ESTEBDAL = "order_ops_read_estebdal"
 
 
+#: Operations' reads run in a lane of their own (app.worker): the dashboard
+#: promises no number older than 10 minutes, and in the shared queue a read
+#: waited behind the hourly batch of 500 line-item reads - 4.5 minutes late
+#: on staging, 6 October 2026. They are short, and nothing else waits on them.
+OPERATIONS_READS = frozenset(
+    {JobKind.ORDER_OPS_SHOPIFY, JobKind.ORDER_OPS_BOSTA, JobKind.ORDER_OPS_ESTEBDAL}
+)
+
+
 class PermanentFailure(Exception):
     """A job failure that retrying cannot fix.
 
@@ -242,8 +251,14 @@ def lease_job(
     db: Session,
     worker_id: str,
     lease_seconds: int = LEASE_SECONDS,
+    *,
+    only: frozenset[str] | None = None,
+    exclude: frozenset[str] | None = None,
 ) -> BackgroundJob | None:
     """Claim the oldest runnable job, or return None if there is none.
+
+    ``only`` and ``exclude`` limit which kinds this caller takes, so a lane of
+    the worker can keep to its own work (``OPERATIONS_READS``).
 
     Runnable means pending and due, or running with an expired lease - the
     second case being a worker that died holding a job.
@@ -253,16 +268,20 @@ def lease_job(
     contend and never collide.
     """
     now = utcnow()
-    candidate = db.execute(
-        select(BackgroundJob.id)
-        .where(
-            or_(
-                (BackgroundJob.status == JobStatus.PENDING)
-                & (BackgroundJob.run_after <= now),
-                (BackgroundJob.status == JobStatus.RUNNING)
-                & (BackgroundJob.leased_until < now),
-            )
+    runnable = select(BackgroundJob.id).where(
+        or_(
+            (BackgroundJob.status == JobStatus.PENDING)
+            & (BackgroundJob.run_after <= now),
+            (BackgroundJob.status == JobStatus.RUNNING)
+            & (BackgroundJob.leased_until < now),
         )
+    )
+    if only is not None:
+        runnable = runnable.where(BackgroundJob.kind.in_(only))
+    if exclude:
+        runnable = runnable.where(BackgroundJob.kind.not_in(exclude))
+    candidate = db.execute(
+        runnable
         .order_by(BackgroundJob.run_after, BackgroundJob.id)
         .limit(1)
         .with_for_update(skip_locked=True)

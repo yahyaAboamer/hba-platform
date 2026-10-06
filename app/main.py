@@ -60,16 +60,18 @@ async def lifespan(_app: FastAPI):
     lease expires and the next worker to start picks it up, which is exactly
     the case leases exist for.
     """
-    task = None
+    tasks: list[asyncio.Task] = []
     if settings.worker_enabled:
-        task = asyncio.create_task(worker_loop())
+        # Two lanes (app.worker.LANES): Operations' reads apart from the rest.
+        tasks = [asyncio.create_task(worker_loop(lane)) for lane in ("main", "operations")]
     else:
         logger.info("background worker disabled by configuration")
     try:
         yield
     finally:
-        if task is not None:
+        for task in tasks:
             task.cancel()
+        for task in tasks:
             with contextlib.suppress(asyncio.CancelledError):
                 await task
 

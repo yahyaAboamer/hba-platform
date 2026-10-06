@@ -34,7 +34,13 @@ from app.config import settings
 from app.core.signals import Anomaly, report
 from app.db import SessionLocal
 from app.models.integration import BackgroundJob
-from app.services.jobs import PermanentFailure, complete_job, fail_job, lease_job
+from app.services.jobs import (
+    OPERATIONS_READS,
+    PermanentFailure,
+    complete_job,
+    fail_job,
+    lease_job,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -94,13 +100,19 @@ def _record_failure(db: Session, job_id: int, message: str, *, give_up: bool) ->
     db.commit()
 
 
-def run_one(db: Session, worker_id: str) -> bool:
+def run_one(
+    db: Session,
+    worker_id: str,
+    *,
+    only: frozenset[str] | None = None,
+    exclude: frozenset[str] | None = None,
+) -> bool:
     """Process at most one job. Returns whether there was one.
 
     Commits. The caller must not be inside a transaction it intends to roll
-    back.
+    back. ``only`` / ``exclude`` keep a lane to its own kinds (``lease_job``).
     """
-    job = lease_job(db, worker_id)
+    job = lease_job(db, worker_id, only=only, exclude=exclude)
     if job is None:
         return False
 
@@ -159,7 +171,12 @@ def top_up_schedule(db: Session) -> int:
     return queued
 
 
-def _iteration(worker_id: str, check_schedule: bool) -> bool:
+def _iteration(
+    worker_id: str,
+    check_schedule: bool,
+    only: frozenset[str] | None = None,
+    exclude: frozenset[str] | None = None,
+) -> bool:
     """One pass of the loop: top up the schedule if due, then run at most one
     job. Returns whether there was a job. **Synchronous, and run in a thread.**
     """
@@ -174,10 +191,19 @@ def _iteration(worker_id: str, check_schedule: bool) -> bool:
             report(Anomaly.SCHEDULE_TOP_UP_FAILED, worker_id=worker_id)
 
     with SessionLocal() as db:
-        return run_one(db, worker_id)
+        return run_one(db, worker_id, only=only, exclude=exclude)
 
 
-async def worker_loop() -> None:
+#: The worker's two lanes. ``main`` runs everything but Operations' reads and
+#: keeps the recurring schedule topped up; ``operations`` runs only those
+#: reads, so a backlog elsewhere never makes the dashboard's numbers late.
+LANES: dict[str, dict] = {
+    "main": {"exclude": OPERATIONS_READS, "schedule": True},
+    "operations": {"only": OPERATIONS_READS, "schedule": False},
+}
+
+
+async def worker_loop(lane: str = "main") -> None:
     """Poll for work until cancelled.
 
     Sleeps only when idle, so a backlog drains at full speed rather than one
@@ -195,9 +221,11 @@ async def worker_loop() -> None:
     or is abandoned with the process, and its lease expiring hands it to the
     next worker - the case leases exist for.
     """
-    worker_id = worker_identity()
+    config = LANES[lane]
+    only, exclude = config.get("only"), config.get("exclude")
+    worker_id = worker_identity() if lane == "main" else f"{worker_identity()}/{lane}"
     logger.info("background worker %s started", worker_id)
-    next_schedule_check = 0.0
+    next_schedule_check = 0.0 if config["schedule"] else float("inf")
 
     while True:
         did_work = False
@@ -208,7 +236,7 @@ async def worker_loop() -> None:
                 # Set the next check before trying, so a failure waits a minute
                 # rather than retrying on every pass.
                 next_schedule_check = now + SCHEDULE_CHECK_SECONDS
-            did_work = await asyncio.to_thread(_iteration, worker_id, check)
+            did_work = await asyncio.to_thread(_iteration, worker_id, check, only, exclude)
         except asyncio.CancelledError:
             logger.info("background worker %s stopping", worker_id)
             raise
