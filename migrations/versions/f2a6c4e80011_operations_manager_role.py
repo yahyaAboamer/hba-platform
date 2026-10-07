@@ -47,6 +47,11 @@ def _roles(roles: str) -> None:
 
 
 def upgrade() -> None:
+    # Both tables are read on every sign-in. Rebuilding a constraint takes a
+    # lock that queues every sign-in behind it while it waits; give up after
+    # five seconds (and retry the deploy) rather than stall sign-ins for as
+    # long as some other transaction holds the table.
+    op.execute("SET LOCAL lock_timeout = '5s'")
     _roles(AFTER)
     op.create_index(
         "role_assignment_one_operations_manager",

@@ -128,15 +128,23 @@ export function useOpsTab<T>(fetchTab: () => Promise<T>, onLoad?: (body: T) => v
   const loaded = useRef(onLoad);
   loaded.current = onLoad;
 
+  const latest = useRef(0);
+
   const reload = useCallback(() => {
+    // Only the newest request's answer counts: a slow one that lands after a
+    // newer one must not put older numbers back.
+    const asked = ++latest.current;
     fetcher
       .current()
       .then((body) => {
+        if (asked !== latest.current) return;
         setTab(body);
         setFailed(false);
         loaded.current?.(body);
       })
-      .catch(() => setFailed(true));
+      .catch(() => {
+        if (asked === latest.current) setFailed(true);
+      });
   }, []);
 
   useEffect(() => {
@@ -232,7 +240,7 @@ export function FreshLine({ freshness, now }: { freshness: Freshness; now: numbe
   }
   if (state === "never" || !updatedAt) {
     return (
-      <p className="ops-fresh" role="status">
+      <p className="ops-fresh">
         <OpsIcon name="clock" />
         Reading {label}…
       </p>
@@ -240,7 +248,7 @@ export function FreshLine({ freshness, now }: { freshness: Freshness; now: numbe
   }
   if (state === "stale") {
     return (
-      <p className="ops-fresh ops-fresh--stale" role="status">
+      <p className="ops-fresh ops-fresh--stale">
         <OpsIcon name="clock" />
         Not updated for {age(updatedAt, now)}
       </p>
@@ -250,7 +258,7 @@ export function FreshLine({ freshness, now }: { freshness: Freshness; now: numbe
   return (
     <p
       className="ops-fresh"
-      role="status"
+     
       title={`Read from ${label} at ${clockTime(updatedAt)}. Read again every 5 minutes.`}
     >
       <OpsIcon name="clock" />

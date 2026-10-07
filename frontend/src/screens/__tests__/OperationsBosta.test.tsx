@@ -182,6 +182,31 @@ describe("Operations → Bosta (ADR 0057)", () => {
     ).toBeTruthy();
   });
 
+  it("shows a day history has not reached as not read, never as 0 or a day off", async () => {
+    serve(
+      tabBody({
+        pickups: { complete: false, read_back_to: "2026-10-01", days: seven([5, 0, 70, 13, 35, 32, 86]) },
+      }),
+    );
+    render(<OperationsBosta />);
+
+    await screen.findByText("Picked up, last 7 days");
+    // 30 Sep back to 27 Sep are before what history has read.
+    expect(screen.getAllByText("Not read yet")).toHaveLength(4);
+    expect(screen.queryByText("Day off, no pickups")).toBeTruthy(); // 2 Oct was read: a real day off
+    expect(screen.queryByRole("button", { name: /Sunday/ })).toBeNull();
+  });
+
+  it("marks the success rate and the pickups as old when Bosta's numbers are", async () => {
+    serve(tabBody({ freshness: freshness({ state: "stale", updated_at: minutesAgo(25) }) }));
+    const { container } = render(<OperationsBosta />);
+
+    await screen.findByText("84.6%");
+    expect(container.querySelector(".ops-rate--old")).toBeTruthy();
+    expect(container.querySelector(".ops-days--old")).toBeTruthy();
+    expect(screen.getAllByText(/^As of /).length).toBeGreaterThan(1);
+  });
+
   it("asks for the last 30 days first and shows the rate with its parts", async () => {
     serve(tabBody());
     render(<OperationsBosta />);

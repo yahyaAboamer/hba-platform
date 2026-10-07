@@ -89,6 +89,7 @@
 .ops-day--off:hover { background:none; }
 .ops-day__off { font-size:12.5px; color:var(--faint); padding-left:10px; }
 .ops-days--old { opacity:.55; }
+.ops-rate--old .ops-rate__value, .ops-rate--old .ops-meter, .ops-rate--old .ops-rate__parts { opacity:.55; }
 /* Tighter than the mockup's 8px/13px: drawn in the app's Inter rather than the
    mockup's fallback face, the five chips needed it to stay on one row. */
 .ops-filters { display:flex; flex-wrap:wrap; gap:6px; padding:14px 18px 0; }

@@ -248,12 +248,15 @@ function PickupDays({
   open,
   onOpen,
   narrow,
+  asOf,
 }: {
   pickups: Pickups;
   today: string;
   open: string | null;
   onOpen: (day: string) => void;
   narrow: boolean;
+  /** The time of Bosta's last clean read, when that read is old. */
+  asOf: string | null;
 }) {
   const most = Math.max(1, ...pickups.days.map((day) => day.count));
   return (
@@ -271,7 +274,8 @@ function PickupDays({
           these days may be short.
         </p>
       )}
-      <ul className={pickups.complete ? "ops-days" : "ops-days ops-days--old"}>
+      {asOf && <p className="ops-panel-note">As of {asOf}.</p>}
+      <ul className={pickups.complete && !asOf ? "ops-days" : "ops-days ops-days--old"}>
         {pickups.days.map((day) => {
           const label = (
             <span className="ops-day__label">
@@ -282,6 +286,21 @@ function PickupDays({
               </small>
             </span>
           );
+          // A day history has not reached yet is not a 0, and not a day off.
+          const unread =
+            !pickups.complete && (!pickups.read_back_to || day.date < pickups.read_back_to);
+          if (unread) {
+            return (
+              <li key={day.date}>
+                <div className="ops-day ops-day--off">
+                  {label}
+                  <span className="ops-day__off">Not read yet</span>
+                  <span className="ops-day__count">—</span>
+                  <span />
+                </div>
+              </li>
+            );
+          }
           if (day.count === 0) {
             const friday = new Date(`${day.date}T12:00:00Z`).getUTCDay() === 5;
             return (
@@ -307,6 +326,7 @@ function PickupDays({
                 type="button"
                 className="ops-day"
                 aria-expanded={open === day.date}
+                aria-controls={open === day.date ? `ops-list-panel-day-${day.date}` : undefined}
                 onClick={() => onOpen(day.date)}
               >
                 {label}
@@ -355,7 +375,17 @@ function bounds(preset: Preset, today: string, day: string, from: string, to: st
   return [from, to];
 }
 
-function SuccessRate({ narrow }: { narrow: boolean }) {
+function SuccessRate({
+  narrow,
+  updatedAt,
+  asOf,
+}: {
+  narrow: boolean;
+  /** Bosta's last clean read: a new one asks for the rate again. */
+  updatedAt: string | null;
+  /** That read's time, when it is old. */
+  asOf: string | null;
+}) {
   const today = cairoToday();
   const [preset, setPreset] = useState<Preset>("last30");
   const [day, setDay] = useState(today);
@@ -370,6 +400,9 @@ function SuccessRate({ narrow }: { narrow: boolean }) {
     // range's figure standing under the new choice.
     setRate(null);
     setProblem(null);
+  }, [start, end]);
+
+  useEffect(() => {
     if (!start || !end) return;
     let current = true;
     api
@@ -389,7 +422,7 @@ function SuccessRate({ narrow }: { narrow: boolean }) {
     return () => {
       current = false;
     };
-  }, [start, end]);
+  }, [start, end, updatedAt]);
 
   const value =
     rate?.available && rate.rate != null ? `${(rate.rate * 100).toFixed(1)}%` : null;
@@ -450,7 +483,8 @@ function SuccessRate({ narrow }: { narrow: boolean }) {
           />
         </div>
       )}
-      <div className="ops-rate" aria-live="polite">
+      <div className={asOf ? "ops-rate ops-rate--old" : "ops-rate"} aria-live="polite">
+        {asOf && <p className="ops-tile__as-of">As of {asOf}</p>}
         {problem && <p className="ops-panel-note">{problem}</p>}
         {!problem && rate && !rate.available && (
           <p className="ops-panel-note">
@@ -504,13 +538,24 @@ export function OperationsBosta() {
   const [open, setOpen] = useState<string | null>(null);
   const now = useNow();
   const narrow = useIsNarrow();
-  const { tab, failed, reload } = useOpsTab(() => api.get<BostaTab>("/api/order-ops/bosta"));
+  const { tab, failed, reload } = useOpsTab(
+    () => api.get<BostaTab>("/api/order-ops/bosta"),
+    (body) =>
+      // A list whose card or day has emptied closes, and stays closed if it fills.
+      setOpen((current) => {
+        const stillThere =
+          body.cards?.some((card) => card.key === current && card.count > 0) ||
+          body.pickups?.days.some((day) => `day:${day.date}` === current && day.count > 0);
+        return stillThere ? current : null;
+      }),
+  );
 
   const freshness = tab?.freshness;
   const cards = tab?.cards ?? null;
   const pickups = tab?.pickups ?? null;
   const state = freshness ? stateNow(freshness, now) : null;
   const old = state === "stale" || state === "failed";
+  const asOfTime = old && freshness?.updated_at ? clockTime(freshness.updated_at) : null;
   const today = cairoToday();
 
   const openCard = cards?.find((card) => card.key === open && card.count > 0) ?? null;
@@ -525,9 +570,12 @@ export function OperationsBosta() {
       open={openDay?.date ?? null}
       onOpen={(date) => toggle(`day:${date}`)}
       narrow={narrow}
+      asOf={asOfTime}
     />
   );
-  const rate = cards && <SuccessRate narrow={narrow} />;
+  const rate = cards && (
+    <SuccessRate narrow={narrow} updatedAt={freshness?.updated_at ?? null} asOf={asOfTime} />
+  );
 
   return (
     <>
