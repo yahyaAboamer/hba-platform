@@ -173,9 +173,8 @@ def test_a_failed_read_stays_on_record_after_the_rollback(committing):
     def poll(session):
         raise SourceUnavailable("Bosta didn't answer.")
 
-    with pytest.raises(SourceUnavailable):
-        run_poll(committing, "bosta", poll)
-    committing.rollback()  # what the worker does with a failed job's session
+    assert run_poll(committing, "bosta", poll) is None
+    committing.commit()  # an expected failure is recorded and the job succeeds
 
     described = describe(committing, "bosta")
     assert described["state"] == State.FAILED
@@ -234,8 +233,7 @@ def test_through_the_worker_a_failure_is_kept_and_the_job_retried(
     status = committing.execute(
         text("SELECT status, last_error FROM background_job WHERE id = :i"), {"i": job_id}
     ).one()
-    assert status.status == JobStatus.PENDING  # retried, like any temporary failure
-    assert "E-stebdal didn't answer." in status.last_error
+    assert status.status == JobStatus.SUCCEEDED  # recorded on the dashboard, not a failed job
     assert describe(committing, "estebdal")["state"] == State.FAILED
 
 

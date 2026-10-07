@@ -61,25 +61,38 @@ SCHEDULE: dict[str, tuple[timedelta, dict]] = {
 }
 
 
-def ensure_scheduled(db: Session) -> int:
+def ensure_scheduled(
+    db: Session,
+    *,
+    only: frozenset[str] | None = None,
+    exclude: frozenset[str] | None = None,
+) -> int:
     """Queue any recurring job that is not already outstanding.
 
     Returns how many were queued. Safe to call as often as you like - that is
     the point - and it commits nothing, leaving the transaction to the caller.
+
+    ``only`` / ``exclude`` let each worker lane top up its own kinds, so one
+    lane busy for an hour never leaves the other's work unqueued.
     """
     queued = 0
     now = utcnow()
+    kinds = {
+        kind: entry
+        for kind, entry in SCHEDULE.items()
+        if (only is None or kind in only) and not (exclude and kind in exclude)
+    }
 
     outstanding = set(
         db.scalars(
             select(BackgroundJob.kind).where(
-                BackgroundJob.kind.in_(SCHEDULE),
+                BackgroundJob.kind.in_(kinds),
                 BackgroundJob.status.in_([JobStatus.PENDING, JobStatus.RUNNING]),
             )
         )
     )
 
-    for kind, (interval, payload) in SCHEDULE.items():
+    for kind, (interval, payload) in kinds.items():
         if kind in outstanding:
             continue
         # Due one interval from now rather than immediately: a restart must not

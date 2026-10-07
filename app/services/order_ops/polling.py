@@ -86,15 +86,21 @@ def run_poll(
     through a session of its own.
     """
     try:
-        stored = poll(db)
+        # A savepoint: a read that fails part-way leaves none of its writes.
+        with db.begin_nested():
+            stored = poll(db)
     except NotConnected:
         record_not_connected(db, source)
         logger.info("order-ops %s: not connected", source)
         return None
     except SourceUnavailable as exc:
+        # Expected - a source down, a key refused. The dashboard shows it, and
+        # the job succeeds: failing it would add a failed job every few
+        # minutes and push real failures off the failed-jobs list.
         reason = str(exc) or f"Couldn't read {SOURCE_LABEL[source]}."
-        _record_failure_apart(failure_session, source, reason)
-        raise
+        record_failure(db, source, reason)
+        logger.warning("order-ops %s read failed: %s", source, reason)
+        return None
     except Exception as exc:
         # Anything else is replaced, not re-raised: the worker writes a
         # failed job's message into ``background_job.last_error``, its log

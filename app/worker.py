@@ -35,6 +35,7 @@ from app.core.signals import Anomaly, report
 from app.db import SessionLocal
 from app.models.integration import BackgroundJob
 from app.services.jobs import (
+    LEASE_SECONDS,
     OPERATIONS_READS,
     PermanentFailure,
     complete_job,
@@ -106,13 +107,14 @@ def run_one(
     *,
     only: frozenset[str] | None = None,
     exclude: frozenset[str] | None = None,
+    lease_seconds: int = LEASE_SECONDS,
 ) -> bool:
     """Process at most one job. Returns whether there was one.
 
     Commits. The caller must not be inside a transaction it intends to roll
     back. ``only`` / ``exclude`` keep a lane to its own kinds (``lease_job``).
     """
-    job = lease_job(db, worker_id, only=only, exclude=exclude)
+    job = lease_job(db, worker_id, lease_seconds, only=only, exclude=exclude)
     if job is None:
         return False
 
@@ -158,7 +160,11 @@ def run_one(
 SCHEDULE_CHECK_SECONDS = 60
 
 
-def top_up_schedule(db: Session) -> int:
+def top_up_schedule(
+    db: Session,
+    only: frozenset[str] | None = None,
+    exclude: frozenset[str] | None = None,
+) -> int:
     """Queue recurring work that is not already outstanding.
 
     Imported inside the function to keep the import graph acyclic: the schedule
@@ -166,7 +172,7 @@ def top_up_schedule(db: Session) -> int:
     """
     from app.services.schedule import ensure_scheduled
 
-    queued = ensure_scheduled(db)
+    queued = ensure_scheduled(db, only=only, exclude=exclude)
     db.commit()
     return queued
 
@@ -176,6 +182,7 @@ def _iteration(
     check_schedule: bool,
     only: frozenset[str] | None = None,
     exclude: frozenset[str] | None = None,
+    lease_seconds: int = LEASE_SECONDS,
 ) -> bool:
     """One pass of the loop: top up the schedule if due, then run at most one
     job. Returns whether there was a job. **Synchronous, and run in a thread.**
@@ -183,7 +190,7 @@ def _iteration(
     if check_schedule:
         try:
             with SessionLocal() as db:
-                top_up_schedule(db)
+                top_up_schedule(db, only=only, exclude=exclude)
         except Exception:  # noqa: BLE001 - never stop running jobs over this
             # Running queued work matters more than topping up the
             # schedule. Failing here must not cost us both.
@@ -191,15 +198,18 @@ def _iteration(
             report(Anomaly.SCHEDULE_TOP_UP_FAILED, worker_id=worker_id)
 
     with SessionLocal() as db:
-        return run_one(db, worker_id, only=only, exclude=exclude)
+        return run_one(db, worker_id, only=only, exclude=exclude, lease_seconds=lease_seconds)
 
 
-#: The worker's two lanes. ``main`` runs everything but Operations' reads and
-#: keeps the recurring schedule topped up; ``operations`` runs only those
-#: reads, so a backlog elsewhere never makes the dashboard's numbers late.
+#: The worker's two lanes. ``main`` runs everything but Operations' reads;
+#: ``operations`` runs only those, so a backlog elsewhere never makes the
+#: dashboard's numbers late. Each tops up its own share of the schedule, so a
+#: long job in one never leaves the other's work unqueued. Operations' reads
+#: hold a longer lease: a Bosta read can pass a minute, and a lease that ran
+#: out mid-read would let a second container start the same read at once.
 LANES: dict[str, dict] = {
-    "main": {"exclude": OPERATIONS_READS, "schedule": True},
-    "operations": {"only": OPERATIONS_READS, "schedule": False},
+    "main": {"exclude": OPERATIONS_READS, "lease_seconds": LEASE_SECONDS},
+    "operations": {"only": OPERATIONS_READS, "lease_seconds": 300},
 }
 
 
@@ -225,7 +235,8 @@ async def worker_loop(lane: str = "main") -> None:
     only, exclude = config.get("only"), config.get("exclude")
     worker_id = worker_identity() if lane == "main" else f"{worker_identity()}/{lane}"
     logger.info("background worker %s started", worker_id)
-    next_schedule_check = 0.0 if config["schedule"] else float("inf")
+    lease_seconds = config["lease_seconds"]
+    next_schedule_check = 0.0
 
     while True:
         did_work = False
@@ -236,7 +247,9 @@ async def worker_loop(lane: str = "main") -> None:
                 # Set the next check before trying, so a failure waits a minute
                 # rather than retrying on every pass.
                 next_schedule_check = now + SCHEDULE_CHECK_SECONDS
-            did_work = await asyncio.to_thread(_iteration, worker_id, check, only, exclude)
+            did_work = await asyncio.to_thread(
+                _iteration, worker_id, check, only, exclude, lease_seconds
+            )
         except asyncio.CancelledError:
             logger.info("background worker %s stopping", worker_id)
             raise
