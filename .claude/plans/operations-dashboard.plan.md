@@ -369,6 +369,11 @@ The plan has seven phases:
 
 ### Phase 6 — Keys in Settings
 
+**Built 7 Oct 2026 at `ee04327`, on `feature/operations-dashboard`; not on staging yet.** Whole suite 96/96, frontend 639 tests and build, migration `f6b2d8a41c57` rehearsed up/down/up; security review (no leak found; its three small points fixed: printable-ASCII keys only, no length rule in the request model that would echo a key, the stored hint under the same 12-character rule). Departures:
+- Table `ops_integration_key` (the `ops_` prefix), helpers in `app/core/secrets.py`.
+- The cards follow the existing Settings → Shopify layout, one card per connection, not the mockup's single panel; "Read only" is not shown, because a key's level cannot be checked from the API (the Bosta card asks for a read-only key instead).
+- An environment key shows no "checked" time: only a saved key is checked, when it is saved.
+
 #### Task 6.1: Saved keys
 - **Action**:
   - Table `integration_secret`: `provider` PK in `{bosta, estebdal}`, `secret_encrypted`, `hint` (last 4), `verified_at`, `updated_by`, `updated_at`.
