@@ -56,7 +56,7 @@ had the wrong filter names.
 | A5 | `vPayments` | 526–597 | `/payments` `Payments.tsx` | Implemented · dark checked on staging | §P. Card 101 vs export 101px, row 82 vs 84px. Pending: 1280/1440, light, Record/Open actions exercised |
 | A6 | `vSettings` | 598–786 + script 3515 | `/settings` `Settings.tsx`, `DataPanel.tsx` | Team, Shopify, Historical and Brand codes implemented; Historical checked on staging (dark); Reference mapped | Rail, Team (staff, invite row, pending invitations with Resend) and Appearance switch done. Shopify and sync: store card, Connection card, operations behind *Technical detail*; *Read the catalogue* stands in for the export's *Refresh now*, which has no single backend act. Historical setup now has the export's four columns — the state says whether her terms reach back to when she started, off a new `earliest_terms_month` on the roster, and links to the months that need writing. Its bulk *Review months from January* button is still absent: no such operation exists, and a button that reviewed nothing would be worse than none. Reference: title renamed *Policy in force*; the version editor and activity filter are kept **30 September, Settings audit (owner-approved divergence):** rail grouped Business / Just me and filtered by permission; *Reference* split into *Pay policy* and *Activity log*; *Appearance* renamed *My preferences* (theme on the account, incl. *Match my device*); Team adds last sign-in, access explainer, confirmations and a row menu; Shopify adds *Needs attention* and *Tools*; Brand codes adds orders this month and a one-row add; see `docs/design/admin-settings-tab-audit-2026-09-30.html`. |
 | A7 | `vOrders` | 1060–1091 + script 3010 | `/orders` `Orders.tsx` | Implemented · dark checked on staging | Five columns, counted line, load-more. A row opening its order exercised on staging |
-| A8 | none: owner-approved mockup `docs/design/operations-dashboard-2026-10-03.html` | — | Operations: `/` for the operations manager, `/operations/*` for the admin; `OperationsLayout.tsx`, `OperationsDashboard.tsx` (to build) | Mapped · mockup approved 5 October | ADR 0057. Shopify, Bosta and E-stebdal tabs; old, failed and not-connected states; the admin's switch; phone at 390. See *Owner-approved divergences — Operations* below |
+| A8 | none: owner-approved mockup `docs/design/operations-dashboard-2026-10-03.html` | — | Operations: `/` for the operations manager, `/operations/*` for the admin; `OperationsLayout.tsx`, `OperationsDashboard.tsx`, `OperationsShopify/Estebdal/Bosta.tsx`; Settings key cards `IntegrationKey.tsx` | Built 5–7 October; captured headless against the mockup at 1280, 1440 and 390, both themes, and the four states (7 October) — matches; on staging | ADR 0057. Shopify, Bosta and E-stebdal tabs; old, failed and not-connected states; the admin's switch; phone at 390. See *Owner-approved divergences — Operations* below |
 
 ## B. Admin — secondary views
 
@@ -369,3 +369,13 @@ line, every control label, every money string, the typeface and the colour.
 `compare.mjs` diffs the digests, which is what finds a renamed tab or a
 heading that lost its unit; a screenshot pair on its own finds neither.
 `CHECKLIST.md` beside them is the reading of that diff, one row per screen.
+
+### Operations as built, against its mockup (7 October)
+
+| Where | Built differently | Why |
+|---|---|---|
+| Range chips | 6px gap and 11px side padding, not 8/13 | Drawn in the app's Inter, not the mockup's fallback face; the five chips stay on one row |
+| Bosta pickups and success rate | Dimmed with an *As of* time when Bosta's numbers are old; days history has not read say *Not read yet* | The mockup draws only the cards in the old state; the same rule applied to every number |
+| *No answer, WhatsApp not sent* | Non-zero note "No WhatsApp message sent yet" / phone "Send a WhatsApp" | The mockup draws the card only at 0 |
+| Settings keys | One card per key in the Shopify section's card style; no *Read only* label | The section already draws one card per connection; a key's level cannot be read from the API |
+| Shell at 390 | Account row under the tabs, not the avatar in the brand row | Phase 1 shell, unchanged here; open for a later pass |

@@ -391,6 +391,8 @@ The plan has seven phases:
 
 ### Phase 7 — Verify, review, hand over
 
+**Done 7 Oct 2026; to staging with this handoff.** Whole-feature reviews (Python+security, React, database) — fixed: each worker lane tops up its own schedule (a long main-lane job no longer starves the reads); a source down or a key refused is recorded on the dashboard and the job succeeds, in a savepoint (no flood of failed jobs); a 5-minute lease for operations reads; the Bosta rate and pickups refresh and grey when old, unread days say so, an emptied list stays closed, the freshness line is no longer a minute-by-minute live region, a stale response cannot overwrite a newer one; the role migration takes `lock_timeout = 5s`. Parity sweep recorded in `docs/repair/batch-2/visual/CHECKLIST.md` and SCREEN_MATRIX. Not done: a staging browser pass as the operations manager (no such account on staging yet) — the owner's.
+
 #### Task 7.1: Gates
 - **Action**:
   - The whole backend suite, the frontend tests and the build.

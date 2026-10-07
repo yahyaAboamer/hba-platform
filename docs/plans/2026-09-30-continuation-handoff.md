@@ -1,3 +1,5 @@
+> **Superseded by `2026-10-07-continuation-handoff.md`.** Kept for its record of 29 September – 5 October; its *Remaining* items are carried there.
+
 # Where the work is — 1 October 2026 (data reset, batches Q1–Q3, Settings audit, Home and emails audit, order edits)
 
 ## Latest local work: authorised project cleanup (5 October) — local commit only

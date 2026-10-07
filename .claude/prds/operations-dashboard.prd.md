@@ -152,10 +152,10 @@ We'll know we're right when:
 | # | Milestone | Outcome | Status | Plan |
 |---|---|---|---|---|
 | 1 | Prove the Bosta and E-stebdal connections | The owner creates a **read-only** Bosta API key and an E-stebdal API key. A one-off read-only check confirms, card by card, what Bosta's API can supply: search with a key, the printed flag, the pickup day, the success figure and date ranges. Each Bosta card gets a go or no-go before anything is built. | complete — keys work and every card is supplied (Appendix C); B4 is within half a point of Bosta's dashboard, with the exact match left to acceptance | — |
-| 2 | Operations-manager access | The admin can invite an operations manager. That person lands on Operations and sees nothing else, and the admin can switch between the two dashboards. A mockup is approved first, because no approved design exists for this screen. | in-progress | `.claude/plans/operations-dashboard.plan.md` (Phases 0–1) |
-| 3 | Shopify tab | S1–S7 live with their lists, matching Shopify. | pending | `.claude/plans/operations-dashboard.plan.md` (Phases 2–3) |
-| 4 | E-stebdal tab | E1 live with its list, matching E-stebdal. | pending | `.claude/plans/operations-dashboard.plan.md` (Phase 4) |
-| 5 | Bosta tab | The B cards that passed milestone 1 are live with their lists, the success-rate range and the 7-day pickups. | pending | `.claude/plans/operations-dashboard.plan.md` (Phases 5–7) |
+| 2 | Operations-manager access | The admin can invite an operations manager. That person lands on Operations and sees nothing else, and the admin can switch between the two dashboards. A mockup is approved first, because no approved design exists for this screen. | built, on staging — owner invites the operations manager and checks | `.claude/plans/operations-dashboard.plan.md` (Phases 0–1) |
+| 3 | Shopify tab | S1–S7 live with their lists, matching Shopify. | built, on staging (6 Oct); total matched a live search (34) — card-by-card check with Shopify admin is the owner's | `.claude/plans/operations-dashboard.plan.md` (Phases 2–3) |
+| 4 | E-stebdal tab | E1 live with its list, matching E-stebdal. | built, on staging (6 Oct); 5 waiting, as a direct read showed — owner checks against E-stebdal | `.claude/plans/operations-dashboard.plan.md` (Phase 4) |
+| 5 | Bosta tab | The B cards that passed milestone 1 are live with their lists, the success-rate range and the 7-day pickups. | built, on staging (6 Oct); live counts and 1 Oct/30 Sep pickups match Appendix C — B5 vs Bosta's count and the September B4 reconciliation are the owner's | `.claude/plans/operations-dashboard.plan.md` (Phases 5–7) |
 
 ## Open Questions
 
@@ -256,4 +256,4 @@ We'll know we're right when:
 - **E-stebdal rate limits:** 200 requests a minute.
 
 ---
-*Status: DRAFT — requirements only. Implementation planning pending via /plan.*
+*Status: built (plan phases 0–7, 3–7 October 2026) and on staging; acceptance against the sources is the owner's. Production not deployed.*

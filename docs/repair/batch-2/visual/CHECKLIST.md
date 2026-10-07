@@ -1454,3 +1454,17 @@ overpaid month (a real state the export never drew).
 | Five empty screens populated and recaptured | *Not covered* | `ffde978` |
 | Currency `EGP`, the Home applications notice, desk applications removed, profile destination unmasked, words | Sweep *Corrected on this branch* | `f83b4fc`, `8456045` (ADR 0042) |
 | Matrix *E£ not EGP*, *masked destination*, *Not counted*, *Resend/Withdraw with no invitation view* | Matrix kept list | superseded by the rows above and by `vInvite` |
+
+## Operations (ADR 0057) — 7 October 2026
+
+Reference: the owner-approved mockup `docs/design/operations-dashboard-2026-10-03.html` (no export draws Operations). Captured headless (Playwright, throwaway database `hba_browser_ops`, synthetic orders, worker off), the mockup's frames captured by element from `python -m http.server`. Captures kept locally, not committed.
+
+| Screen | Widths × themes | Result |
+|---|---|---|
+| Shopify (Bosta sync failed open) | 1280, 1440, 390 × dark, light | Matches frame 1 and the phone frame |
+| E-stebdal (Needs review open) | 1280, 1440, 390 × dark, light | Matches frame 3 (no phone frame drawn; folds as Shopify) |
+| Bosta (New, not shipped open) | 1280, 1440, 390 × dark, light | Matches frames 2 and 7; range chips tightened (SCREEN_MATRIX) |
+| States: old, failed (Bosta), not connected (E-stebdal), first read (Shopify) | 1280 dark | Match frame 4; pickups and rate now also dimmed when old |
+| Operations manager | 1280 dark | Lands on `/operations/shopify`; no *Affiliates \| Operations* switch; asks only `/api/auth/me`, `/api/staff/me/preferences`, `/api/order-ops/*` |
+| Settings → Shopify, key cards | 1280 dark | Not connected / From Railway / form states as built (SCREEN_MATRIX) |
+
