@@ -316,6 +316,60 @@ def test_an_oversized_body_is_refused_before_it_is_read(client):
     assert _count("integration_event") == 0
 
 
+def test_a_body_with_no_declared_size_stops_being_read_at_the_cap(client):
+    """A chunked body declares no Content-Length, so the header check above
+    never sees it. The endpoint must stop reading at the cap rather than hold
+    the whole body in memory first (security audit, October 2026).
+
+    Driven at the ASGI level so the test can count what the endpoint consumed.
+    """
+    import asyncio
+
+    from app.main import app
+
+    chunk = b"x" * 65_536
+    total = MAX_BODY_BYTES * 4
+    consumed = {"bytes": 0}
+    statuses = []
+
+    async def receive():
+        if consumed["bytes"] >= total:
+            return {"type": "http.request", "body": b"", "more_body": False}
+        consumed["bytes"] += len(chunk)
+        return {"type": "http.request", "body": chunk, "more_body": True}
+
+    async def send(message):
+        if message["type"] == "http.response.start":
+            statuses.append(message["status"])
+
+    scope = {
+        "type": "http",
+        "asgi": {"version": "3.0"},
+        "http_version": "1.1",
+        "method": "POST",
+        "scheme": "http",
+        "path": "/api/webhooks/shopify",
+        "raw_path": b"/api/webhooks/shopify",
+        "query_string": b"",
+        "root_path": "",
+        "headers": [
+            (b"host", b"testserver"),
+            (b"x-shopify-topic", b"orders/create"),
+            (b"transfer-encoding", b"chunked"),
+        ],
+        "client": ("127.0.0.1", 1234),
+        "server": ("testserver", 80),
+    }
+
+    asyncio.run(app(scope, receive, send))
+
+    assert statuses == [413]
+    assert consumed["bytes"] <= MAX_BODY_BYTES + len(chunk), (
+        f"read {consumed['bytes']} bytes of an oversized body before refusing it"
+    )
+    assert _count("integration_event") == 0
+
+
 def test_a_missing_secret_rejects_everything(client, monkeypatch):
     """Fail closed. An unconfigured secret must never mean "accept anything"."""
     monkeypatch.setattr("app.config.settings.shopify_webhook_secret", "")

@@ -892,3 +892,17 @@ def test_only_the_chosen_methods_fields_are_stored(db):
     assert destination.bank_name is None
     assert destination.bank_account_number is None
     assert destination.instapay_address_url is None
+
+
+@pytest.mark.parametrize(
+    "address",
+    ["javascript://ipn.eg/x", "http://ipn.eg/S/nour", "ftp://ipn.eg/S/nour", "data://ipn.eg/x"],
+)
+def test_an_instapay_address_must_be_an_https_link(db, address):
+    """Staff open this link from the payment screen, so only https is kept.
+    The host check alone let any scheme through that named ipn.eg (security
+    audit, October 2026)."""
+    from app.services.payouts import normalise_instapay_address
+
+    with pytest.raises(ValueError, match="https://"):
+        normalise_instapay_address(address)

@@ -1002,3 +1002,31 @@ def test_an_adjustment_cannot_touch_a_month_settled_outside(db, monkeypatch):
             amount_piastres=100,
             reason="tidying up",
         )
+
+
+# ── A transfer settles only the model it was sent to (security audit, Oct 2026) ─
+
+
+def test_a_payment_cannot_be_allocated_to_another_models_month(db):
+    nour = _affiliate(db, "Nour")
+    sara = _affiliate(db, "Sara")
+    _owed(db, nour)
+    saras_august = _owed(db, sara)
+
+    with pytest.raises(ValueError, match="another model"):
+        record_payment(
+            db, nour, amount_piastres=200_000, allocations={saras_august.id: 200_000}
+        )
+
+
+def test_a_recorded_transfer_cannot_later_settle_another_model(db):
+    nour = _affiliate(db, "Nour")
+    sara = _affiliate(db, "Sara")
+    _owed(db, nour)
+    saras_august = _owed(db, sara)
+    transfer = record_payment(db, nour, amount_piastres=200_000)
+
+    with pytest.raises(ValueError, match="another model"):
+        allocate(db, transfer, saras_august, 200_000)
+
+    assert balance_for(db, sara, AUGUST)["balance_piastres"] == 200_000

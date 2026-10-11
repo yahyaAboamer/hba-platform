@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.core.businesstime import utcnow
-from app.core.passwords import verify_password
+from app.core.passwords import hash_password, verify_password
 from app.models.identity import AuthSession, UserAccount
 
 TOKEN_BYTES = 32
@@ -150,8 +150,23 @@ def authenticate(db: Session, email: str, password: str) -> UserAccount | None:
         select(UserAccount).where(func.lower(UserAccount.email) == str(email).lower())
     )
     if user is None or user.status != "active":
+        # The same cost as a real check. Returning before hashing answered an
+        # unknown address quickly, and the speed said it had no account
+        # (security audit, October 2026).
+        verify_password(password or "", _decoy_hash())
         return None
     if not verify_password(password or "", user.password_hash):
         return None
     user.last_login_at = utcnow()
     return user
+
+
+_DECOY: str | None = None
+
+
+def _decoy_hash() -> str:
+    """A stored-form hash nobody's password matches, made once on first use."""
+    global _DECOY
+    if _DECOY is None:
+        _DECOY = hash_password(secrets.token_urlsafe(TOKEN_BYTES))
+    return _DECOY

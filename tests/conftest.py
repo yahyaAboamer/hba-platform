@@ -42,6 +42,17 @@ def _cheap_password_hashing():
     passwords.ITERATIONS = original
 
 
+@pytest.fixture(autouse=True)
+def _fresh_throttles():
+    """Sign-in limits live in this process's memory (`app/core/throttle.py`);
+    one test's failed attempts must not pause the next test's sign-in."""
+    from app.core import throttle
+
+    for limit in throttle.ALL:
+        limit.reset()
+    yield
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _clean_session_start():
     """Guarantee the first test of the session meets an empty database."""

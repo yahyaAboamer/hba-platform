@@ -1,5 +1,7 @@
 """Authentication endpoints."""
 
+import ipaddress
+
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import func, select
@@ -20,6 +22,7 @@ from app.core.password_quality import password_problem, password_strength
 from app.core.passwords import MINIMUM_PASSWORD_LENGTH, hash_password
 from app.core.periods import PLATFORM_START_MONTH
 from app.core.permissions import GRANT_REFUSED, VALID_ROLES, Permission, can_grant
+from app.core import throttle
 from app.db import get_session
 from app.models.identity import Invitation, RoleAssignment, UserAccount
 from app.services.audit import record_audit
@@ -83,6 +86,31 @@ class AcceptInviteBody(BaseModel):
 
 def _client_ip(request: Request) -> str | None:
     return request.client.host if request.client else None
+
+
+def _source(request: Request) -> str | None:
+    """The address an attempt came from, for the sign-in limits - or None.
+
+    None when the address is not a public one: that is the proxy in front of
+    the service (or this machine), and keying limits on it would pool every
+    visitor into one, so one person's mistakes could pause everybody. Only the
+    account-wide limit applies then. Anything that is not an address at all
+    (a test client's name) is used as it is.
+    """
+    host = request.client.host if request.client else None
+    if not host:
+        return None
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError:
+        return host
+    return host if address.is_global else None
+
+
+def _paused(seconds: int) -> HTTPException:
+    return HTTPException(
+        429, throttle.try_again_message(seconds), headers={"Retry-After": str(seconds)}
+    )
 
 
 def _set_cookie(response: Response, token: str, csrf: str) -> None:
@@ -224,11 +252,32 @@ def login(
     response: Response,
     db: Session = Depends(get_session),
 ) -> dict:
+    # Checked before the password, and the right password is refused while
+    # paused: otherwise a pause only slows a guess (security audit, Oct 2026).
+    # Counted before the password is checked, so attempts arriving together
+    # cannot all slip under the limit.
+    email = str(body.email).strip().lower()
+    source = _source(request)
+    checks = [(throttle.LOGIN_PER_ACCOUNT, email)]
+    if source is not None:
+        checks += [
+            (throttle.LOGIN_PER_PAIR, f"{email}|{source}"),
+            (throttle.LOGIN_PER_SOURCE, source),
+        ]
+    wait = throttle.acquire_all(checks)
+    if wait:
+        raise _paused(wait)
+
     user = authenticate(db, str(body.email), body.password)
     if user is None:
         # One message for both causes. Distinguishing them would confirm which
         # email addresses have accounts.
         raise HTTPException(401, "Incorrect email or password")
+    # It worked, so it was never a failed attempt.
+    throttle.LOGIN_PER_ACCOUNT.clear(email)
+    if source is not None:
+        throttle.LOGIN_PER_PAIR.clear(f"{email}|{source}")
+        throttle.LOGIN_PER_SOURCE.release(source)
 
     token, csrf, _ = issue_session(
         db, user.id, _client_ip(request), request.headers.get("user-agent")
@@ -483,6 +532,24 @@ def request_password_reset(
     The person who genuinely owns the address learns the answer the only way
     that matters: an email arrives, or it does not.
     """
+    # Limited per address, never per account alone: a stranger must not be able
+    # to use up the owner's reset emails, or the way back in could be blocked
+    # (security audit, October 2026).
+    # Past a cap nothing is sent and the answer is still "sent": a refusal here
+    # would say the address is real.
+    source = _source(request)
+    email = str(body.email).strip().lower()
+    if source is not None:
+        wait = throttle.RESET_PER_SOURCE.acquire(source)
+        if wait:
+            raise _paused(wait)
+        if throttle.RESET_PER_PAIR.acquire(f"{email}|{source}"):
+            return {"sent": True}
+    elif throttle.RESET_PER_ACCOUNT.acquire(email):
+        # Only the proxy's address is visible, so the limit falls back to the
+        # email alone rather than switching off.
+        return {"sent": True}
+
     started = request_reset(db, str(body.email), ip_address=_client_ip(request))
     if started is not None:
         token, account = started
@@ -537,6 +604,14 @@ def complete_password_reset(
         raise HTTPException(422, str(exc)) from exc
 
     ended = revoke_all_sessions(db, account.id)
+    # They have just proved they own the address, so a pause from somebody
+    # else's guessing must not keep them out.
+    owner = account.email.strip().lower()
+    throttle.LOGIN_PER_ACCOUNT.clear(owner)
+    source = _source(request)
+    if source is not None:
+        throttle.LOGIN_PER_PAIR.clear(f"{owner}|{source}")
+    throttle.PASSWORD_RECHECK.clear(f"user:{account.id}")
     token, csrf, _ = issue_session(
         db, account.id, _client_ip(request), request.headers.get("user-agent")
     )

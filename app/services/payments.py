@@ -470,6 +470,28 @@ def _refuse_settled_outside(db: Session, allocations: dict[int, int]) -> None:
         )
 
 
+def _refuse_another_models(db: Session, affiliate_id: int, snapshot_ids) -> None:
+    """Refuse an allocation onto a month that is not this model's.
+
+    A transfer may cover several of one model's months, never somebody else's:
+    money sent to one model must not mark another's month settled (security
+    audit, October 2026).
+    """
+    ids = list(snapshot_ids)
+    if not ids:
+        return
+    owners = db.execute(
+        select(PayrollMonth.affiliate_id)
+        .join(PayrollSnapshot, PayrollSnapshot.payroll_month_id == PayrollMonth.id)
+        .where(PayrollSnapshot.id.in_(ids))
+    ).scalars().all()
+    if any(owner != affiliate_id for owner in owners):
+        raise ValueError(
+            "That month belongs to another model. A transfer can only settle "
+            "months of the model it was sent to."
+        )
+
+
 def record_payment(
     db: Session,
     affiliate: AffiliateProfile,
@@ -566,6 +588,7 @@ def record_payment(
     # one failure ADR 0014 was written to prevent, arriving by a different
     # door.
     _refuse_settled_outside(db, requested)
+    _refuse_another_models(db, affiliate.id, requested)
 
     transaction = PaymentTransaction(
         affiliate_id=affiliate.id,
@@ -699,6 +722,7 @@ def allocate(
     # transfer recorded with no months against it is normal and is allocated
     # here afterwards - which would otherwise be the way in.
     _refuse_settled_outside(db, {snapshot.id: piastres})
+    _refuse_another_models(db, transaction.affiliate_id, [snapshot.id])
 
     allocation = PaymentAllocation(
         payment_transaction_id=transaction.id,

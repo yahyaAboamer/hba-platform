@@ -26,11 +26,15 @@ WORKDIR /app
 # not reinstall every package. `pyproject.toml` names the package explicitly
 # (`include = ["app*"]`), so app/ has to be present for the editable install
 # to resolve - it is the only source directory pip needs at this point.
-COPY pyproject.toml ./
+#
+# `constraints.txt` pins every version, so a build installs exactly what the
+# suite last passed with rather than whatever was released since (security
+# audit, October 2026). It says how to regenerate it.
+COPY pyproject.toml constraints.txt ./
 COPY app ./app
 RUN python -m venv --copies /opt/venv \
  && /opt/venv/bin/pip install --no-cache-dir --upgrade pip \
- && /opt/venv/bin/pip install --no-cache-dir -e .
+ && /opt/venv/bin/pip install --no-cache-dir -c constraints.txt -e .
 
 # Same reasoning for npm: the lockfile alone, so `npm ci` is cached until a
 # dependency actually changes.

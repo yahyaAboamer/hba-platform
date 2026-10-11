@@ -31,15 +31,29 @@ router = APIRouter(prefix="/api/webhooks")
 SYNC_ORDER = JobKind.SYNC_ORDER
 
 
+async def _read_capped(request: Request) -> bytes:
+    """The body, refused the moment it passes the cap.
+
+    `request.body()` reads everything before anything can be measured, and a
+    chunked request declares no Content-Length for the check above to see - so
+    an unauthenticated caller could make this hold any amount in memory
+    (security audit, October 2026).
+    """
+    received = bytearray()
+    async for chunk in request.stream():
+        received += chunk
+        if len(received) > MAX_BODY_BYTES:
+            raise HTTPException(413, "Body too large")
+    return bytes(received)
+
+
 @router.post("/shopify", include_in_schema=False)
 async def shopify_webhook(request: Request, db: Session = Depends(get_session)) -> dict:
     declared = request.headers.get("content-length")
     if declared and declared.isdigit() and int(declared) > MAX_BODY_BYTES:
         raise HTTPException(413, "Body too large")
 
-    raw_body = await request.body()
-    if len(raw_body) > MAX_BODY_BYTES:
-        raise HTTPException(413, "Body too large")
+    raw_body = await _read_capped(request)
 
     # Attacker-controlled until the signature verifies, and it is reported on
     # rejection - so it is capped before it can be used to bloat the logs.

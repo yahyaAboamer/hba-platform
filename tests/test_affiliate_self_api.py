@@ -596,3 +596,23 @@ def test_her_record_carries_the_one_email_she_signs_in_with(admin):
     model = _model(admin, "nour@example.com", "Nour Hassan", "NOUR10")
 
     assert model.get("/api/me").json()["email"] == "nour@example.com"
+
+
+def test_the_payout_password_check_pauses_after_repeated_misses(admin):
+    """A stolen session could otherwise guess at the one password that guards
+    where her money goes (security audit, October 2026)."""
+    from app.core import throttle
+
+    nour = _model(admin, "nour@example.com", "Nour Hassan", "NOUR10")
+    change = {
+        "password": "not-the-password",
+        "method": PayoutMethod.INSTAPAY,
+        "instapay_address_url": NEW_ADDRESS,
+        "instapay_phone": "01009999999",
+    }
+    for _ in range(throttle.PASSWORD_RECHECK.limit):
+        assert nour.put("/api/me/payout-destination", json=change).status_code == 403
+
+    paused = nour.put("/api/me/payout-destination", json={**change, "password": PASSWORD})
+
+    assert paused.status_code == 429

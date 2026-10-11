@@ -99,6 +99,14 @@ def normalise_instapay_address(value: str) -> str:
     parsed = urlparse(cleaned)
     host = (parsed.hostname or "").lower()
 
+    # Staff open this link from the payment screen, so it must be an ordinary
+    # web link: any other scheme naming ipn.eg used to pass the host check.
+    if parsed.scheme.lower() != "https":
+        raise ValueError(
+            "A payment address is a link starting https://ipn.eg/ - copy it "
+            "from the Link button in InstaPay."
+        )
+
     if not host:
         raise ValueError(
             "That is not a payment address. It should be a link starting "

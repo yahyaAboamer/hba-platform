@@ -15,6 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import current_affiliate, current_user
+from app.core import throttle
 from app.core.money import format_egp
 from app.db import get_session
 from app.models.affiliates import AffiliateProfile
@@ -246,10 +247,20 @@ def change_payout_destination(
     value. Echoing it back is a second place it could be logged, and a
     response body gets captured by more things than a request body does.
     """
+    # A stolen session could otherwise guess at the one password guarding where
+    # her money goes (security audit, October 2026).
+    # Counted before the check, so attempts sent together cannot all get in.
+    recheck = f"user:{user.id}"
+    wait = throttle.PASSWORD_RECHECK.acquire(recheck)
+    if wait:
+        raise HTTPException(
+            429, throttle.try_again_message(wait), headers={"Retry-After": str(wait)}
+        )
     if authenticate(db, user.email, body.password) is None:
         # Deliberately not "wrong password" versus "account problem": both
         # answers are the same to somebody who should not be here.
         raise HTTPException(403, "That password is not right")
+    throttle.PASSWORD_RECHECK.clear(recheck)
 
     fields = {
         field: getattr(body, field)
