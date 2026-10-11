@@ -35,6 +35,7 @@ from app.core.signals import Anomaly, report
 from app.db import SessionLocal
 from app.models.integration import BackgroundJob
 from app.services.jobs import (
+    INBOX_WORK,
     LEASE_SECONDS,
     OPERATIONS_READS,
     PermanentFailure,
@@ -207,9 +208,14 @@ def _iteration(
 #: long job in one never leaves the other's work unqueued. Operations' reads
 #: hold a longer lease: a Bosta read can pass a minute, and a lease that ran
 #: out mid-read would let a second container start the same read at once.
+#:
+#: ``inbox`` (ADR 0059) runs only the customer inbox's work, for the same
+#: reason turned around: a WhatsApp outage never delays order sync, and a
+#: backlog of order work never delays a customer's confirmation.
 LANES: dict[str, dict] = {
-    "main": {"exclude": OPERATIONS_READS, "lease_seconds": LEASE_SECONDS},
+    "main": {"exclude": OPERATIONS_READS | INBOX_WORK, "lease_seconds": LEASE_SECONDS},
     "operations": {"only": OPERATIONS_READS, "lease_seconds": 300},
+    "inbox": {"only": INBOX_WORK, "lease_seconds": LEASE_SECONDS},
 }
 
 

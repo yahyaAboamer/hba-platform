@@ -94,6 +94,23 @@ def _handle_reconcile(db: Session, payload: dict) -> None:
     logger.info("reconciliation re-indexed %s orders from the last %sh", count, hours)
 
     _queue_matching(db, hours)
+    _queue_confirmations(db)
+
+
+def _queue_confirmations(db: Session) -> None:
+    """Find recent orders with no WhatsApp confirmation on record (ADR 0059).
+
+    A webhook queues an order's confirmation when it arrives. An order whose
+    webhook was missed reaches the index only through this sweep, which never
+    went through that path - and staging receives no webhooks at all. Queued,
+    not run here, and deduped on one key like the matching above.
+    """
+    enqueue(
+        db,
+        JobKind.INBOX_CONFIRM_SWEEP,
+        {},
+        dedupe_key=f"{JobKind.INBOX_CONFIRM_SWEEP}:sweep",
+    )
 
 
 def _queue_matching(db: Session, hours: int) -> None:

@@ -44,6 +44,7 @@ from app.services import notifications as _notifications  # noqa: F401  (registe
 from app.services import reconcile as _reconcile  # noqa: F401  (registers handlers)
 from app.services import staff_prefs as _staff_prefs  # noqa: F401  (registers handlers)
 from app.services.commission import backfill as _backfill  # noqa: F401  (registers handlers)
+from app.services.inbox import confirmations as _inbox_confirmations  # noqa: F401  (registers handlers)
 from app.services.order_ops import bosta as _order_ops_bosta  # noqa: F401  (registers handlers)
 from app.services.order_ops import estebdal as _order_ops_estebdal  # noqa: F401  (registers handlers)
 from app.services.order_ops import shopify as _order_ops_shopify  # noqa: F401  (registers handlers)
@@ -66,7 +67,9 @@ async def lifespan(_app: FastAPI):
     tasks: list[asyncio.Task] = []
     if settings.worker_enabled:
         # Two lanes (app.worker.LANES): Operations' reads apart from the rest.
-        tasks = [asyncio.create_task(worker_loop(lane)) for lane in ("main", "operations")]
+        tasks = [
+            asyncio.create_task(worker_loop(lane)) for lane in ("main", "operations", "inbox")
+        ]
     else:
         logger.info("background worker disabled by configuration")
     try:

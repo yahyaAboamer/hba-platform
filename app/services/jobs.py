@@ -100,6 +100,19 @@ class JobKind:
     ORDER_OPS_BOSTA = "order_ops_read_bosta"
     ORDER_OPS_ESTEBDAL = "order_ops_read_estebdal"
 
+    #: Decide whether one order gets a WhatsApp confirmation, and record it
+    #: (ADR 0059). One per order, queued when the order is first indexed.
+    INBOX_CONFIRM_ORDER = "inbox_confirm_order"
+    #: Find recent orders with no confirmation on record and queue each. Runs
+    #: after the reconciliation sweep, so an order whose webhook was missed is
+    #: still considered.
+    INBOX_CONFIRM_SWEEP = "inbox_confirm_sweep"
+
+
+#: The inbox's work (ADR 0059) runs in a lane of its own too: a WhatsApp outage
+#: must never delay order sync or anything that decides pay, and a backlog of
+#: line-item reads must never delay a customer's confirmation.
+INBOX_WORK = frozenset({JobKind.INBOX_CONFIRM_ORDER, JobKind.INBOX_CONFIRM_SWEEP})
 
 #: Operations' reads run in a lane of their own (app.worker): the dashboard
 #: promises no number older than 10 minutes, and in the shared queue a read

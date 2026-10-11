@@ -97,6 +97,32 @@ Left of phase 1:
 
 **Done when:** over seven days in production, every order n8n messaged is one the platform would have messaged, and the reverse, or each difference is explained in writing.
 
+### Phase 2 as built (11 October 2026)
+
+- **The engine** (`app/services/inbox/confirmations.py`): one decision per order, recorded in `order_confirmation` as `would_send`, `not_needed`, `no_phone` or `bad_phone`, with the reason. It has no way to reach WhatsApp, and a test keeps it so.
+- **Its own Shopify query**, read with the platform's existing read-only connection. Run against the real store from staging on 11 October: every field answers.
+- **When an order is considered**: as soon as it is indexed (the webhook's path), and by a sweep after each reconciliation for an order whose webhook was missed.
+- **Its own worker lane**, `inbox`, beside `main` and `operations`.
+- **The comparison** (`app/services/inbox/shadow.py`): run by hand with n8n's order ids, it prints what agrees and each difference by order number, with no name or phone.
+
+Where it differs from n8n, on purpose:
+
+| | n8n | The platform |
+|---|---|---|
+| A paid order | Dropped unmarked, retried, called failed | `not_needed`, finished |
+| The phone | The first one on the order, whatever it is | The first that reads as an Egyptian mobile |
+| A number that is not an Egyptian mobile | Messaged anyway | `bad_phone`, shown for a call |
+| An order already cancelled or a test order | Messaged | `not_needed` |
+| An order met more than 48 hours late | Never met late | Not considered at all |
+
+Each of these will show as a difference in the comparison, and is its explanation.
+
+Left of phase 2:
+
+- **It is on the branch only.** The seven-day comparison needs it on production, which is the owner's call.
+- **Deployed to staging it would hold real customers' phones and first names** in the staging database, because staging reads the real store. Nothing is sent, but it is the first customer data staging would hold. The owner decides whether staging runs the engine.
+- **A late order at the switch** (phase 7): whether an order found hours late is messaged automatically or left for Send again is the owner's to decide then. For now nothing sends.
+
 ## Phase 3 — Inbox backend
 
 - **Meta callback receiver.** Signature checked, stored first, applied once. Built and tested from recorded callbacks, not connected to Meta yet.

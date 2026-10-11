@@ -108,6 +108,14 @@ def _handle_sync_order(db: Session, payload: dict) -> None:
             dedupe_key=f"{JobKind.MATCH_ORDER}:{order_id}",
         )
 
+        # **Its WhatsApp confirmation** (ADR 0059). Its own job in its own
+        # lane, after the index is written, for the same reason as matching:
+        # nothing about a message may stop an order being indexed. Imported
+        # here because that module builds its client from this one.
+        from app.services.inbox.confirmations import queue_if_new
+
+        queue_if_new(db, order)
+
         # **What was in an order she earned on** (07A, owner 11 September).
         #
         # Read **only where the order was attributed to a model**, which is the
