@@ -4,6 +4,8 @@ Every permission decision happens here, server-side. Hiding a control in the
 interface is presentation; this is the protection.
 """
 
+import ipaddress
+
 from fastapi import Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -96,6 +98,40 @@ def require_staff(
     if active_role(db, user) == "affiliate":
         raise HTTPException(403, "Staff only")
     return user
+
+
+#: Railway's private proxy tier. A connection from here is the proxy, never a
+#: visitor; the visitor's address arrives in the header below.
+_RAILWAY_PROXY = ipaddress.ip_network("100.64.0.0/10")
+
+
+def client_address(request: Request) -> str | None:
+    """The visitor's address, as far as it can be known.
+
+    Behind Railway every connection comes from its private proxy, and Railway's
+    edge puts the visitor's address in `X-Real-IP` (docs: networking, specs and
+    limits). `X-Forwarded-For` will not do: its last entry is Railway's own edge
+    node, not the visitor - measured on staging, 11 October 2026.
+
+    The header is believed **only** from Railway's proxy. Any other connection
+    is its own address, so a visitor cannot name themselves something else by
+    sending the header. Railway's health check has no header and gets None.
+    Anything that is not an address at all (a test client's name) is used as
+    it is.
+    """
+    peer = request.client.host if request.client else None
+    if not peer:
+        return None
+    try:
+        peer_address = ipaddress.ip_address(peer)
+    except ValueError:
+        return peer
+    if peer_address in _RAILWAY_PROXY:
+        try:
+            return str(ipaddress.ip_address(request.headers.get("x-real-ip", "").strip()))
+        except ValueError:
+            return None
+    return peer
 
 
 def actor_payload(db: Session, user: UserAccount) -> dict:

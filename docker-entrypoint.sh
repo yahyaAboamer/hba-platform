@@ -14,9 +14,4 @@ alembic upgrade head
 
 # exec, so uvicorn becomes PID 1 and receives Railway's shutdown signal
 # directly instead of it stopping at this script.
-# Trust X-Forwarded-For only from Railway's private proxy range (100.64.0.0/10),
-# so request.client is the visitor and not the proxy. Uvicorn takes the right-
-# most address that is not a trusted proxy, so a header a visitor writes
-# themselves is ignored. Sign-in limits and audit addresses depend on it.
-exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}" \
-  --proxy-headers --forwarded-allow-ips "${FORWARDED_ALLOW_IPS:-100.64.0.0/10}"
+exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}"

@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.api.deps import active_role, require_permission, require_staff
+from app.api.deps import active_role, client_address, require_permission, require_staff
 from app.config import settings
 from app.core.businesstime import utcnow
 from app.core.permissions import GRANT_REFUSED, Permission, can_grant, has_permission
@@ -269,7 +269,7 @@ def resend(
         actor_id=actor.id,
         actor_email=actor.email,
         after={"email": email, "role": role, "replaced": invitation.id},
-        ip_address=request.client.host if request.client else None,
+        ip_address=client_address(request),
     )
     db.commit()
     return {

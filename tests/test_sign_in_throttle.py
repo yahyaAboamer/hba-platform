@@ -219,3 +219,55 @@ def test_reset_emails_stay_capped_when_the_visitor_address_is_unknown(client, ma
         assert _ask_for_reset(proxy, OWNER).status_code == 202
 
     assert len(mailed) == throttle.RESET_PER_ACCOUNT.limit
+
+
+# ── Which address a visitor has (measured on staging, 11 October 2026) ────────
+
+
+def _via_railway(real_ip: str, forwarded_for: str | None = None) -> TestClient:
+    """A visitor as Railway delivers them: the connection from its private
+    proxy, their own address in X-Real-IP, X-Forwarded-For ending in the edge
+    node's address."""
+    visitor = TestClient(app, client=("100.64.0.12", 50000))
+    visitor.headers["X-Real-IP"] = real_ip
+    if forwarded_for:
+        visitor.headers["X-Forwarded-For"] = forwarded_for
+    return visitor
+
+
+def test_behind_railway_the_visitor_is_read_from_x_real_ip(client):
+    stranger = _via_railway("41.33.0.20", "41.33.0.20, 79.127.178.81")
+    owner = _via_railway("41.33.0.10", "41.33.0.10, 79.127.178.81")
+    for _ in range(throttle.LOGIN_PER_PAIR.limit):
+        _login(stranger, OWNER, WRONG)
+    assert _login(stranger, OWNER, WRONG).status_code == 429
+
+    # Same edge node, different visitor: not pooled with the stranger.
+    assert _login(owner, OWNER, BOOTSTRAP["password"]).status_code == 200
+
+
+def test_a_caller_cannot_rename_themselves_with_the_header(client):
+    """Only Railway's proxy is believed. A direct caller sending X-Real-IP is
+    still counted at its own address."""
+    caller = _from("41.33.0.20")
+    for n in range(throttle.LOGIN_PER_PAIR.limit):
+        caller.headers["X-Real-IP"] = f"41.36.0.{n + 1}"
+        _login(caller, OWNER, WRONG)
+    caller.headers["X-Real-IP"] = "41.36.1.1"
+
+    assert _login(caller, OWNER, WRONG).status_code == 429
+
+
+def test_a_sign_in_records_the_visitors_own_address(client):
+    from sqlalchemy import text
+
+    from app.db import engine
+
+    owner = _via_railway("41.33.0.10", "41.33.0.10, 79.127.178.81")
+    assert _login(owner, OWNER, BOOTSTRAP["password"]).status_code == 200
+
+    with engine.connect() as connection:
+        recorded = connection.execute(
+            text("SELECT ip_address FROM auth_session ORDER BY id DESC LIMIT 1")
+        ).scalar_one()
+    assert recorded == "41.33.0.10"

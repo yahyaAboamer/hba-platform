@@ -12,6 +12,7 @@ from app.api.deps import (
     SESSION_COOKIE,
     active_role,
     actor_payload,
+    client_address,
     current_user,
     permission_list,
     require_permission,
@@ -85,19 +86,19 @@ class AcceptInviteBody(BaseModel):
 
 
 def _client_ip(request: Request) -> str | None:
-    return request.client.host if request.client else None
+    return client_address(request)
 
 
 def _source(request: Request) -> str | None:
     """The address an attempt came from, for the sign-in limits - or None.
 
-    None when the address is not a public one: that is the proxy in front of
-    the service (or this machine), and keying limits on it would pool every
-    visitor into one, so one person's mistakes could pause everybody. Only the
-    account-wide limit applies then. Anything that is not an address at all
-    (a test client's name) is used as it is.
+    None when no public visitor address is known (Railway's health check, this
+    machine): keying limits on a shared address would pool every visitor into
+    one, so one person's mistakes could pause everybody. Only the per-account
+    limits apply then. Anything that is not an address at all (a test client's
+    name) is used as it is.
     """
-    host = request.client.host if request.client else None
+    host = client_address(request)
     if not host:
         return None
     try:
