@@ -182,10 +182,19 @@ Built on the branch, not deployed. Nothing on staging or production runs it. Who
 - Send again is refused for any order that has, or may have, its message. It and a hand-recorded answer are audited, under a new activity-log kind, Inbox.
 - **Each message's record of who sent it is the message itself** (`sent_by`), not a line in the activity log: a busy day would bury everything else there.
 
-Left of phase 3:
+**Part d, files** (`08ce682`, whole suite 111/111):
 
-- **Part d, files:** copying a customer's file to our own storage when it arrives; serving it to a signed-in holder of `inbox.use`; staff sending a photo, a file or a voice note; the approved-message picker for a closed window. Needs a storage bucket on Railway for each environment, which is the owner's to approve, and a library to talk to it.
-- A security review of the receiver and the media endpoint.
+- `app/services/inbox/storage.py`: the bucket, through a small client of its own, not a library - three calls, on a small server. Its signing is checked against the worked example in AWS's documentation.
+- `app/services/inbox/media.py`: a customer's file is queued to be copied when its message arrives; kept under `inbox/<conversation>/<message>/<file>`; served through the server to a signed-in holder of `inbox.use`, and only a photo, audio, a video or a PDF is shown in place - anything else is a plain download the browser may not run.
+- Staff send a photo, a voice note, a video or a document, under the same rule on who may be messaged. The approved messages are read from Meta for the closed-window picker.
+- A file larger than 25 MB is not copied: the server holds a file in memory while it copies it.
+
+Phase 3 is built. What it still owes before it is done:
+
+- **An independent security review** of the receiver and the media endpoint. Both were written against the risks named here and tested for them, and the automated review found one fault in part a, since fixed; nobody other than the author has reviewed them.
+- **Nothing has met the real thing.** Meta, Shopify's tag writes and the Railway bucket are all stand-ins in the tests. That is phase 6.
+- **A voice note recorded in a browser.** WhatsApp shows a voice note only for Opus in an Ogg file, and Chrome records WebM. The server takes Ogg and refuses WebM with the reason; producing Ogg in the browser is phase 4's.
+- **Sending an approved message other than the order confirmation.** The list is read; filling in another message's details and sending it waits for the owner to say which messages exist (phase 0's open row).
 
 ## Phase 4 — Inbox screens
 
