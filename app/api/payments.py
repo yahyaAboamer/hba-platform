@@ -38,6 +38,7 @@ from app.models.identity import UserAccount
 from app.models.payments import AdjustmentType, PaymentTransaction
 from app.services.affiliates import list_affiliates
 from app.services.corrections import open_corrections
+from app.services.money_gate import hold_money_gate
 from app.services.payments import (
     PaymentOperationConflict,
     adjust,
@@ -531,6 +532,12 @@ def make_adjustment(
     _month_or_400(body.source_month)
     if body.destination_month:
         _month_or_400(body.destination_month)
+
+    # Serialise this model's money writes and re-read behind the lock, the same
+    # gate record_payment and corrections.resolve take. Without it two credits
+    # racing both read the overpayment open and both carry it (security audit,
+    # 7 October 2026); adjust() trusts its caller to have taken the gate.
+    hold_money_gate(db, affiliate)
 
     try:
         adjustment = adjust(

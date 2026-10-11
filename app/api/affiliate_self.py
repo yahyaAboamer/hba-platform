@@ -206,7 +206,7 @@ def my_payout_destination_in_full(
     log would recreate exactly the leak masking exists to prevent.
     """
     try:
-        return reveal_destination(
+        revealed = reveal_destination(
             db,
             affiliate,
             actor_id=user.id,
@@ -214,6 +214,12 @@ def my_payout_destination_in_full(
         )
     except ValueError as exc:
         raise HTTPException(404, str(exc)) from exc
+
+    # reveal_destination only stages the audit row; get_session never commits,
+    # so without this the "somebody looked" trail the docstring promises rolls
+    # back on close (security audit, 7 October 2026).
+    db.commit()
+    return revealed
 
 
 @router.put("/payout-destination")

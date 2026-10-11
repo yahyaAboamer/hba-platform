@@ -10,6 +10,7 @@ under which that risk was accepted, not niceties that came with the feature.
 """
 
 import io
+import threading
 from datetime import datetime, timezone
 
 import pytest
@@ -1496,3 +1497,100 @@ def test_the_sidebar_badge_counts_the_people_the_desk_lists(client):
     badge = client.get("/api/operations/counts").json()["payments_awaiting_approval"]
 
     assert badge == awaiting
+
+
+# ── A credit race cannot recover an overpayment twice (security audit) ──────────
+
+
+def _login() -> TestClient:
+    """A second signed-in admin client, its own session and CSRF.
+
+    The adjustments race needs two requests genuinely in flight at once, which
+    one client cannot do. Each logs in as the bootstrapped owner and carries
+    its own cookie, so both are the same authorised person acting twice.
+    """
+    extra = TestClient(app)
+    response = extra.post(
+        "/api/auth/login",
+        json={"email": BOOTSTRAP["email"], "password": BOOTSTRAP["password"]},
+    )
+    assert response.status_code == 200, response.text
+    extra.headers["X-CSRF-Token"] = response.json()["csrf"]
+    return extra
+
+
+def test_two_credits_racing_recover_an_overpayment_once(client):
+    """§11.5. `make_adjustment` must take the money gate the other money
+    writers take. Two identical credits, fired together against an August
+    overpaid by exactly one of them, may carry that excess into September once:
+    sequentially the second is refused, and the gate makes the race read the
+    same way. Found by the security audit, 7 October 2026.
+    """
+    affiliate = _affiliate(client)
+    august = _owed(client, affiliate, AUGUST)
+    _owed(client, affiliate, SEPTEMBER, base=1_000_000)
+
+    paid = client.post(
+        "/api/payments",
+        json={
+            "affiliate_id": affiliate["id"],
+            "amount_piastres": 200_000,
+            "allocations": [{"payroll_snapshot_id": august, "piastres": 200_000}],
+        },
+    )
+    assert paid.status_code == 201, paid.text
+
+    # EGP 200 of excess, from a second allocation against the same snapshot -
+    # exactly one credit's worth, so a second credit has nothing left to carry.
+    with engine.begin() as connection:
+        payment = connection.execute(
+            text(
+                "INSERT INTO payment_transaction (affiliate_id, amount_piastres, "
+                "occurred_at) VALUES (:a, 20000, now()) RETURNING id"
+            ),
+            {"a": affiliate["id"]},
+        ).scalar_one()
+        connection.execute(
+            text(
+                "INSERT INTO payment_allocation (payment_transaction_id, "
+                "payroll_snapshot_id, allocated_piastres) VALUES (:p, :s, 20000)"
+            ),
+            {"p": payment, "s": august},
+        )
+
+    clients = [client, _login()]
+    ready = threading.Barrier(2, timeout=30)
+    results: list = [None, None]
+
+    def fire(index: int) -> None:
+        ready.wait()
+        results[index] = clients[index].post(
+            "/api/adjustments",
+            json={
+                "affiliate_id": affiliate["id"],
+                "type": "credit",
+                "source_month": AUGUST,
+                "destination_month": SEPTEMBER,
+                "amount_piastres": 20_000,
+                "reason": f"overpayment carried ({index})",
+            },
+        )
+
+    threads = [threading.Thread(target=fire, args=(i,)) for i in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=60)
+    assert not any(thread.is_alive() for thread in threads), "a request never finished"
+
+    statuses = sorted(response.status_code for response in results)
+    assert statuses == [201, 400], [r.status_code for r in results] 
+
+    with engine.connect() as connection:
+        credits = connection.execute(
+            text("SELECT amount_piastres FROM payroll_adjustment WHERE type = 'credit'")
+        ).scalars().all()
+    assert credits == [20_000], f"the overpayment was recovered twice: {credits}"
+
+    september = client.get(f"/api/payments/{SEPTEMBER}").json()["affiliates"][0]
+    assert september["balance_piastres"] == 80_000

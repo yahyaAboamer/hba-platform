@@ -35,6 +35,7 @@ from app.services.shopify.client import (
     REQUIRED_SCOPES,
     ShopifyClient,
     ShopifyError,
+    is_shop_domain,
 )
 
 SHOP_QUERY = "{ shop { name } }"
@@ -166,7 +167,7 @@ def save(
     domain = (shop_domain or "").strip().removeprefix("https://").removeprefix("http://").rstrip("/")
     if not domain:
         raise ConnectionRefused("Enter the store domain. Nothing was changed.")
-    if "/" in domain or not domain.endswith(".myshopify.com"):
+    if not is_shop_domain(domain):
         raise ConnectionRefused(
             "The store domain should look like your-store.myshopify.com. Nothing was changed."
         )

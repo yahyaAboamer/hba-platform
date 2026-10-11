@@ -80,6 +80,29 @@ def test_the_shop_domain_must_be_a_myshopify_domain():
         )
 
 
+@pytest.mark.parametrize(
+    "domain",
+    [
+        "elsewhere.example#x.myshopify.com",
+        "elsewhere.example?x.myshopify.com",
+        "10.0.0.5:8080?x=.myshopify.com",
+        "user@hbawear.myshopify.com",
+        # Unicode case-fold confusables: i/s/k fold onto these under a plain
+        # IGNORECASE, each resolving to a different punycode host.
+        "x.myshopİfy.com",
+        "x.myshopıfy.com",
+        "x.myſhopify.com",
+        "Ka.myshopify.com",
+    ],
+)
+def test_only_a_bare_myshopify_host_is_accepted(domain):
+    """The whole host is matched, not its ending. Each of these ends in
+    .myshopify.com yet names another host once parsed as a URL (security
+    audit, 7 October 2026)."""
+    with pytest.raises(ShopifyNotConfigured):
+        ShopifyClient(shop_domain=domain, client_id="a", client_secret="b", api_version="v")
+
+
 def test_a_pasted_url_is_reduced_to_the_domain():
     client = ShopifyClient(
         shop_domain="https://hbawear.myshopify.com/",

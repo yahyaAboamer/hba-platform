@@ -194,6 +194,24 @@ def test_a_domain_that_is_not_a_shop_is_refused_in_plain_words(client, monkeypat
 
 
 
+@pytest.mark.parametrize(
+    "domain", ["elsewhere.example#x.myshopify.com", "10.0.0.5:8080?x=.myshopify.com"]
+)
+def test_a_domain_that_only_ends_like_a_shop_never_reaches_the_check(client, monkeypatch, domain):
+    """With a secret already saved, a blank secret field means *keep it* - so
+    the saved secret must never be offered to a host that is not a shop."""
+    seen = []
+    _shopify(monkeypatch, seen=seen)
+    client.put(URL, json=FORM)
+    seen.clear()
+
+    response = client.put(URL, json={**FORM, "shop_domain": domain, "client_secret": ""})
+
+    assert response.status_code == 422, response.text
+    assert seen == []
+    assert _stored()[0]["shop_domain"] == "hbawear.myshopify.com"
+
+
 def test_a_malformed_key_is_named_as_malformed_not_missing(client, monkeypatch):
     """Half a pasted key is a different fault from no key, and the message says
     which - without ever printing the key."""

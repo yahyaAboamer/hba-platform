@@ -23,6 +23,7 @@ request details, so only status codes and our own text are included.
 """
 
 import logging
+import re
 import threading
 import time
 from typing import Any
@@ -30,6 +31,21 @@ from typing import Any
 import httpx
 
 logger = logging.getLogger(__name__)
+
+# `re.ASCII`, not just `re.IGNORECASE`: a Unicode case-insensitive match folds
+# `i`/`s`/`k` onto `İ`/`ı`/`ſ`/`K` (U+212A), so `x.myshopİfy.com` would pass and
+# then resolve to a different punycode host. ASCII keeps the fold to a-z only.
+_SHOP_DOMAIN = re.compile(r"[a-z0-9][a-z0-9-]*\.myshopify\.com", re.ASCII | re.IGNORECASE)
+
+
+def is_shop_domain(domain: str) -> bool:
+    """Whether `domain` is exactly `<store>.myshopify.com` and nothing more.
+
+    The whole value is matched, not its ending: `elsewhere.example#x.myshopify.com`
+    ends the same way but, built into a URL, sends the request - and the client
+    secret - to `elsewhere.example` (security audit, 7 October 2026).
+    """
+    return bool(_SHOP_DOMAIN.fullmatch(domain))
 
 
 class ShopifyError(RuntimeError):
@@ -93,7 +109,7 @@ class ShopifyClient:
             )
         # Guard the domain shape. A typo here would send client credentials to
         # somebody else's server.
-        if "/" in domain or not domain.endswith(".myshopify.com"):
+        if not is_shop_domain(domain):
             raise ShopifyNotConfigured(
                 "SHOPIFY_SHOP_DOMAIN must look like your-store.myshopify.com"
             )

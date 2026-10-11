@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.core.businesstime import business_month, utcnow
 from app.core.periods import PLATFORM_START_MONTH
 from app.core.passwords import hash_password
+from app.core.permissions import can_grant
 from app.models.affiliates import (
     VALID_KINDS,
     VALID_STATUSES,
@@ -23,9 +24,56 @@ from app.models.affiliates import (
 )
 from app.models.codes import DiscountCodePeriod
 from app.models.compensation import CompensationPeriod
-from app.models.identity import UserAccount
+from app.models.identity import RoleAssignment, UserAccount
 from app.services.audit import record_audit
 from app.services.codes import close_codes_for, verified_codes_for
+
+
+#: What a refusal to act on somebody's staff account says.
+STAFF_ACCOUNT_REFUSED = (
+    "That account holds staff access you do not hold yourself. Nothing was changed."
+)
+
+
+class StaffAccountProtected(Exception):
+    """An actor tried to manage an account whose staff access they lack.
+
+    A plain `Exception`, deliberately not `PermissionError` - that is an
+    `OSError` subclass, so a route catching it would turn an unrelated
+    filesystem error into a 403 and could put an OS path in the response.
+    """
+
+
+def _live_role(db: Session, user_account_id: int) -> str:
+    """The role an account holds now, read as `app.api.deps.active_role` reads it."""
+    role = db.scalar(
+        select(RoleAssignment.role)
+        .where(
+            RoleAssignment.user_account_id == user_account_id,
+            RoleAssignment.revoked_at.is_(None),
+        )
+        .order_by(RoleAssignment.id.desc())
+        .limit(1)
+    )
+    return role or "affiliate"
+
+
+def _refuse_unless_actor_holds(
+    db: Session, actor_id: int | None, user_account_id: int
+) -> None:
+    """Managing models is not a way into a staff account.
+
+    Registering a profile on an account, or moving its sign-in email, hands the
+    profile's manager that account's next password reset. So the same rule as
+    `can_grant` applies: only an account whose access the actor holds in full.
+    Found by the security audit of 7 October 2026.
+    """
+    target = _live_role(db, user_account_id)
+    if target == "affiliate":
+        return
+    actor = _live_role(db, actor_id) if actor_id is not None else "affiliate"
+    if not can_grant(actor, target):
+        raise StaffAccountProtected(STAFF_ACCOUNT_REFUSED)
 
 
 def create_affiliate(
@@ -46,6 +94,7 @@ def create_affiliate(
     """
     if account_kind not in VALID_KINDS:
         raise ValueError(f"Unknown account kind: {account_kind!r}")
+    _refuse_unless_actor_holds(db, actor_id, user_account_id)
 
     affiliate = AffiliateProfile(
         user_account_id=user_account_id,
@@ -569,6 +618,7 @@ def update_details(
         if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", cleaned_email):
             raise ValueError("That does not look like an email address. Nothing was saved.")
         if cleaned_email != account.email:
+            _refuse_unless_actor_holds(db, actor_id, account.id)
             before["email"], after["email"] = account.email, cleaned_email
             account.email = cleaned_email
 

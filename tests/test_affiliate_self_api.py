@@ -459,6 +459,26 @@ def test_a_switch_we_do_not_send_is_refused(admin):
     assert "Not something we send" in refused.text
 
 
+def test_revealing_over_http_leaves_the_audit_row(admin):
+    """The route promises a trail: "the audit row records that somebody looked."
+    A reveal that returns without committing would stage the row and roll it
+    back when the session closes (security audit, 7 October 2026).
+    """
+    nour = _model(admin, "nour@example.com", "Nour Hassan", "NOUR10")
+
+    full = nour.get("/api/me/payout-destination")
+    assert full.status_code == 200, full.text
+
+    with engine.connect() as connection:
+        revealed = connection.execute(
+            text(
+                "SELECT count(*) FROM audit_event "
+                "WHERE action = 'payout_destination.revealed'"
+            )
+        ).scalar_one()
+    assert revealed == 1, "the reveal left no audit row"
+
+
 def test_a_model_can_read_back_what_they_typed(admin):
     """Masked at rest is right; masked with no way to look is not.
 

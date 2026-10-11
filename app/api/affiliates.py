@@ -34,6 +34,7 @@ from app.db import get_session
 from app.models.affiliates import AffiliateProfile, AffiliateStatus
 from app.models.identity import UserAccount
 from app.services.affiliates import (
+    StaffAccountProtected,
     archive_affiliate,
     create_affiliate,
     create_house_account,
@@ -494,6 +495,9 @@ def create_affiliate_route(
             actor_id=actor.id,
             actor_email=actor.email,
         )
+    except StaffAccountProtected as exc:
+        db.rollback()
+        raise HTTPException(403, str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
     except IntegrityError as exc:
@@ -803,6 +807,9 @@ def update_affiliate_status_route(
         # A changed sign-in email meets the unique index here rather than at
         # commit, so the refusal below can say what it was.
         db.flush()
+    except StaffAccountProtected as exc:
+        db.rollback()
+        raise HTTPException(403, str(exc)) from exc
     except ValueError as exc:
         db.rollback()
         raise HTTPException(400, str(exc)) from exc

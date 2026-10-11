@@ -2661,3 +2661,94 @@ def test_she_cannot_come_back_on_a_code_somebody_else_now_holds(client):
 
     assert back.status_code == 400
     assert "belongs to somebody else" in back.json()["detail"]
+
+
+# ── A staff account is not a model's to manage (security audit, 7 Oct 2026) ────
+
+
+def _staff_account(email: str, role: str) -> int:
+    """An account holding a staff role, with no affiliate profile."""
+    account_id = _make_account(email)
+    with engine.begin() as connection:
+        connection.execute(
+            text("INSERT INTO role_assignment (user_account_id, role) VALUES (:u, :r)"),
+            {"u": account_id, "r": role},
+        )
+    return account_id
+
+
+def _profile_for(account_id: int, name: str = "Dual") -> int:
+    """A profile on an existing account, written directly - a legacy dual role."""
+    with engine.begin() as connection:
+        return connection.execute(
+            text(
+                "INSERT INTO affiliate_profile (user_account_id, name, account_kind, status) "
+                "VALUES (:u, :n, 'model', 'pending') RETURNING id"
+            ),
+            {"u": account_id, "n": name},
+        ).scalar_one()
+
+
+def _email_of(account_id: int) -> str:
+    with engine.connect() as connection:
+        return connection.execute(
+            text("SELECT email FROM user_account WHERE id = :i"), {"i": account_id}
+        ).scalar_one()
+
+
+@pytest.mark.parametrize("role", ["affiliate_manager", "content_manager"])
+def test_a_manager_cannot_register_a_profile_on_an_admin_account(client, role):
+    """Holding affiliates.manage decides who may register models, not whose
+    account may become one. An account holding access the actor lacks is
+    refused, the same rule `can_grant` applies to invitations."""
+    _demote_to(role)
+    admin_account = _staff_account("boss@example.com", "admin")
+
+    response = client.post(
+        "/api/affiliates", json={"user_account_id": admin_account, "name": "X"}
+    )
+
+    assert response.status_code == 403, response.text
+    with engine.connect() as connection:
+        assert connection.execute(
+            text("SELECT count(*) FROM affiliate_profile WHERE user_account_id = :u"),
+            {"u": admin_account},
+        ).scalar_one() == 0
+
+
+@pytest.mark.parametrize("role", ["affiliate_manager", "content_manager"])
+def test_a_manager_cannot_change_an_admin_accounts_sign_in_email(client, role):
+    _demote_to(role)
+    admin_account = _staff_account("boss@example.com", "admin")
+    profile = _profile_for(admin_account)
+
+    response = client.patch(
+        f"/api/affiliates/{profile}", json={"email": "elsewhere@example.com"}
+    )
+
+    assert response.status_code == 403, response.text
+    assert _email_of(admin_account) == "boss@example.com"
+
+
+def test_an_admin_may_still_correct_a_staff_members_profile_email(client):
+    """The guard is about holding the access, not about staff never being models."""
+    staff_account = _staff_account("sara@example.com", "content_manager")
+    profile = _profile_for(staff_account)
+
+    response = client.patch(
+        f"/api/affiliates/{profile}", json={"email": "sara.new@example.com"}
+    )
+
+    assert response.status_code == 200, response.text
+    assert _email_of(staff_account) == "sara.new@example.com"
+
+
+def test_a_manager_may_still_register_and_correct_a_model(client):
+    _demote_to("affiliate_manager")
+    affiliate = _register(client, email="typo@example.com")
+
+    response = client.patch(
+        f"/api/affiliates/{affiliate['id']}", json={"email": "nour@example.com"}
+    )
+
+    assert response.status_code == 200, response.text
