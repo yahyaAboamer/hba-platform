@@ -155,6 +155,29 @@ All 6 that only n8n messaged are orders cancelled **after** n8n had messaged the
 
 **Done when:** the suite covers each of these, including a repeated callback, a forged callback, an expired window and a refused role, and a security review of the receiver and the media endpoint finds nothing open.
 
+### Phase 3 so far (11 October 2026)
+
+Built on the branch, not deployed. Nothing on staging or production runs it. Whole suite 107/107 at `c3cb773`.
+
+**Part a, receiving** (`d811c68`):
+
+- `/api/webhooks/meta`: a callback is checked against the saved app secret, stored whole by the SHA-256 of its bytes, queued and answered. Unsigned, forged or arriving before WhatsApp is connected, it is refused and nothing is kept. Meta's one-time check of the address answers only to the saved check word.
+- `app/services/inbox/events.py` applies it in the inbox lane: a message opens or joins a conversation; a file is recorded as waiting to be copied; a tap is kept as the order's answer, the latest winning, including a tap on a message n8n sent; a tick moves one of our messages forward and never back.
+
+**Part b, sending and tagging** (`c3cb773`):
+
+- `app/services/inbox/outbound.py`, the one place a message is sent from. The confirmation is the approved message exactly as n8n sends it (read from n8n's workflow). It is tried five times, a number with no WhatsApp is not retried, and an order is claimed before WhatsApp is asked so it is sent at most once. An order a crash left half-sent is shown as failed, never sent again.
+- The two automatic replies: Edit as before, Cancel reworded, none after Confirm. One per tap, and only while the tap is fresh (15 minutes).
+- `app/services/inbox/tags.py`, the only thing the platform writes to Shopify: one of the five tags per order, through the second app. Checked against n8n: answering clears *WA Sent*, as n8n does.
+- **An order recorded as `would_send` is never sent later.** Turning sending on affects orders decided from then on.
+- Migration `d3f6b9c40015` adds the `sending` state.
+
+Left of phase 3:
+
+- **Part c:** the conversations API and staff sending: text, files, voice notes, replies, reactions, marking read, the approved-message list, Send again, and the failures read for Operations.
+- **Part d:** copying a customer's file to our own storage when it arrives, and serving it to a signed-in holder of `inbox.use`. Needs a storage bucket and a decision on the library that talks to it.
+- A security review of the receiver and the media endpoint.
+
 ## Phase 4 — Inbox screens
 
 Built from the approved mockup.
