@@ -78,9 +78,14 @@ def _shopify(monkeypatch, *, status: int = 200, requests: list | None = None):
 
 
 def _work():
-    """What the worker does: take one due job and run it."""
+    """What the main lane does: take one due job of its own and run it.
+
+    As the main lane, not as "any job": the sweep also queues work for the
+    inbox lane (ADR 0059), which the main lane never takes."""
+    from app.worker import LANES
+
     with SessionLocal() as db:
-        return run_one(db, "test-worker")
+        return run_one(db, "test-worker", exclude=LANES["main"]["exclude"])
 
 
 def _state(client):
