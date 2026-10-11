@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { BrowserRouter, Link, Navigate, Route, Routes } from "react-router-dom";
 
+import { InboxLayout } from "./components/InboxLayout";
 import { Layout } from "./components/Layout";
 import { OperationsLayout } from "./components/OperationsLayout";
 import { api, can, currentUser } from "./lib/api";
@@ -15,6 +16,8 @@ import { Affiliates } from "./screens/Affiliates";
 import { Compensation } from "./screens/Compensation";
 import { FirstRun } from "./screens/FirstRun";
 import { Glossary } from "./screens/Glossary";
+import { InboxChats } from "./screens/InboxChats";
+import { InboxConfirmations } from "./screens/InboxConfirmations";
 import { InvitePage } from "./screens/InvitePage";
 import { OperationsDashboard } from "./screens/OperationsDashboard";
 import { OrderDetail, Orders } from "./screens/Orders";
@@ -40,6 +43,23 @@ function operationsRoutes(session: Session) {
     <Route path="/operations" element={<OperationsLayout session={session} />}>
       <Route index element={<Navigate to="shopify" replace />} />
       <Route path=":tab" element={<OperationsDashboard />} />
+    </Route>
+  );
+}
+
+/**
+ * The Inbox's addresses (ADR 0059), for customer service and for the
+ * operations manager and the admin who switch to it. `/inbox` opens on Chats,
+ * and a chat's own address is `/inbox/chats/<id>`.
+ */
+function inboxRoutes(session: Session) {
+  return (
+    <Route path="/inbox" element={<InboxLayout session={session} />}>
+      <Route index element={<Navigate to="chats" replace />} />
+      <Route path="chats" element={<InboxChats />} />
+      <Route path="chats/:conversationId" element={<InboxChats />} />
+      <Route path="confirmations" element={<InboxConfirmations />} />
+      <Route path="*" element={<Navigate to="/inbox/chats" replace />} />
     </Route>
   );
 }
@@ -133,11 +153,23 @@ export default function App() {
            */
           <>
             {operationsRoutes(session)}
+            {/* ADR 0059: he holds the Inbox as well, and nothing more. */}
+            {can(session, "inbox.use") && inboxRoutes(session)}
             <Route path="*" element={<Navigate to="/operations/shopify" replace />} />
+          </>
+        ) : session && session.actor.role === "customer_service" ? (
+          /*
+           * ADR 0059: the Inbox and nothing else. Any other address lands on
+           * Chats, as the operations manager's lands on Shopify.
+           */
+          <>
+            {inboxRoutes(session)}
+            <Route path="*" element={<Navigate to="/inbox/chats" replace />} />
           </>
         ) : session ? (
           <>
           {can(session, "order_ops.view") && operationsRoutes(session)}
+          {can(session, "inbox.use") && inboxRoutes(session)}
           <Route element={<Layout session={session} />}>
             <Route path="/" element={<Overview session={session} />} />
             <Route path="/affiliates" element={<Affiliates />} />

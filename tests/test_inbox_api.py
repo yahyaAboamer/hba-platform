@@ -74,6 +74,14 @@ def test_the_list_the_chat_and_its_orders(client, chat):
     assert [message["body"] for message in messages["messages"]] == ["Hello"]
 
 
+def test_the_inbox_is_told_whether_whatsapp_is_being_heard_from(client, chat):
+    body = client.get("/api/inbox/health")
+    assert body.status_code == 200
+    assert body.json() == {
+        "connected": False, "sending": False, "last_heard_at": None, "quiet_since": None,
+    }
+
+
 def test_a_search_and_a_view_go_through(client, chat):
     assert client.get("/api/inbox/conversations", params={"q": "#31044"}).json()["conversations"]
     assert client.get("/api/inbox/conversations", params={"view": "edit"}).json()["conversations"] == []
@@ -148,6 +156,7 @@ def test_customer_details_are_in_the_inbox_and_only_for_those_who_hold_it(
     assert client.get("/api/inbox/conversations").status_code == inbox
     assert client.get(f"/api/inbox/conversations/{chat}/messages").status_code == inbox
     assert client.get("/api/inbox/confirmations").status_code == inbox
+    assert client.get("/api/inbox/health").status_code == inbox
     assert client.post("/api/inbox/confirmations/5001/answer", json={"answer": "confirmed"}).status_code == inbox
     assert client.get("/api/order-ops/whatsapp").status_code == operations
 

@@ -25,7 +25,7 @@ from app.api.deps import require_permission
 from app.core.permissions import Permission
 from app.db import get_session
 from app.models.identity import UserAccount
-from app.services.inbox import chats, connection, media, outbound, sending
+from app.services.inbox import chats, connection, health, media, outbound, sending
 from app.services.inbox.meta import MetaClient, MetaError
 
 logger = logging.getLogger(__name__)
@@ -78,6 +78,12 @@ def conversations(
     body = _answering(lambda: chats.list_conversations(db, view=view, q=q, before=before, limit=limit))
     body["counts"] = chats.counts(db)
     return body
+
+
+@router.get("/health")
+def inbox_health(db: Session = Depends(get_session)) -> dict:
+    """Whether WhatsApp is connected, sending and being heard from."""
+    return health.pulse(db)
 
 
 @router.get("/conversations/{conversation_id}")

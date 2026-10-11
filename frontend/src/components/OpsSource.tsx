@@ -210,7 +210,8 @@ export function stateNow(freshness: Freshness, now: number): FreshnessState {
   return state;
 }
 
-function age(iso: string, now: number): string {
+/** "1 minute", "40 minutes", "3 hours": how long ago, to the minute. */
+export function age(iso: string, now: number): string {
   const minutes = Math.max(0, Math.floor((now - new Date(iso).getTime()) / 60_000));
   if (minutes < 60) return minutes === 1 ? "1 minute" : `${minutes} minutes`;
   const hours = Math.floor(minutes / 60);

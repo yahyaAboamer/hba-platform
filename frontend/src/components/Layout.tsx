@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet } from "react-router-dom";
 
-import { api, can, signOutAndLeave } from "../lib/api";
+import { api, signOutAndLeave } from "../lib/api";
 import type { Session } from "../lib/api";
 import { DashboardSwitch } from "./DashboardSwitch";
 import { useMaintainerTheme } from "./useMaintainerTheme";
@@ -66,9 +66,9 @@ export function Layout({ session }: { session: Session }) {
           <span><span className="layout__brand-name">Admin</span>
             <span className="layout__brand-role">hbawear.store</span></span>
         </Link>
-        {/* The admin's way to Operations (ADR 0057); nobody else on this
-            side holds it, so nobody else sees it. */}
-        {can(session, "order_ops.view") && <DashboardSwitch current="affiliates" />}
+        {/* The admin's way to Operations and the Inbox (ADR 0057, ADR 0059);
+            nobody else on this side holds either, so nobody else sees it. */}
+        <DashboardSwitch session={session} current="affiliates" />
 
         <ul className="layout__nav">
           {SECTIONS.map((section) => (

@@ -193,6 +193,20 @@
   box-shadow: var(--elev);
 }
 
+/* The admin holds three dashboards (ADR 0059). Sized by their names rather
+   than in thirds, so "Operations" is not cut short in a 216px sidebar. */
+.layout__switch--three a {
+  flex: 1 1 auto;
+  padding: 6px 4px;
+}
+
+/* A screen that runs edge to edge and scrolls inside itself: the Inbox's
+   Chats, whose three columns each scroll on their own. */
+.layout--flush .layout__main {
+  padding: 0;
+  overflow: hidden;
+}
+
 /* Operations' theme choice sits in the account menu: the operations manager
    has no Settings to choose it in. */
 .layout__themes {

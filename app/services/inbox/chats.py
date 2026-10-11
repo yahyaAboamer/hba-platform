@@ -28,6 +28,7 @@ from app.services.audit import record_audit
 from app.services.inbox import outbound, sending, tags
 from app.services.inbox.events import ANSWERS, _TAP
 from app.services.inbox.meta import MetaClient
+from app.services.stale import admin_url
 
 PAGE = 30
 MESSAGE_PAGE = 50
@@ -208,10 +209,19 @@ def _conversation(db: Session, conversation_id: int) -> InboxConversation:
     return conversation
 
 
-def describe_order(row: OrderConfirmation) -> dict:
+def shop_domain(db: Session) -> str | None:
+    """The store, for an order's link into the Shopify admin."""
+    from app.services.shopify.connection import effective
+
+    return effective(db).shop_domain
+
+
+def describe_order(row: OrderConfirmation, domain: str | None = None) -> dict:
     return {
         "order_id": row.shopify_order_id,
         "order": row.order_name,
+        # Where the order itself is changed or cancelled: never from here.
+        "admin_url": admin_url(domain, row.shopify_order_id),
         "state": row.state,
         "answer": row.answer,
         "answered_at": _iso(row.answered_at),
@@ -234,9 +244,10 @@ def conversation_detail(db: Session, conversation_id: int) -> dict:
         .order_by(OrderConfirmation.created_at.desc(), OrderConfirmation.id.desc())
         .limit(10)
     ).all()
+    domain = shop_domain(db)
     return {
         **describe_conversation(conversation, orders[0].answer if orders else None),
-        "orders": [describe_order(order) for order in orders],
+        "orders": [describe_order(order, domain) for order in orders],
     }
 
 
@@ -450,7 +461,7 @@ def send_again(db: Session, order_id: str, *, actor_id: int, actor_email: str | 
         after={"state": "pending", "order": row.order_name},
     )
     db.flush()
-    return describe_order(row)
+    return describe_order(row, shop_domain(db))
 
 
 def set_answer(
@@ -477,7 +488,7 @@ def set_answer(
         before={"answer": before},
         after={"answer": answer, "order": row.order_name},
     )
-    return describe_order(row)
+    return describe_order(row, shop_domain(db))
 
 
 # ── The Confirmations screen ──────────────────────────────────────────────────
@@ -522,10 +533,13 @@ def confirmations(db: Session, *, tile: str | None = None, days: int = 7) -> dic
             .order_by(OrderConfirmation.placed_at.desc())
             .limit(200)
         ).all()
+        domain = shop_domain(db)
         body["orders"] = [
             {
-                **describe_order(row),
+                **describe_order(row, domain),
                 "customer": row.customer_name if row.customer_name != "there" else None,
+                # A number with no WhatsApp is a call, so the number is shown.
+                "phone": row.phone,
                 "conversation_id": row.conversation_id,
             }
             for row in rows

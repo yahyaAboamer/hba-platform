@@ -14,7 +14,13 @@ from sqlalchemy import select, text
 from app.core.businesstime import utcnow
 from app.models.audit import AuditEvent
 from app.models.identity import UserAccount
-from app.models.inbox import InboxConversation, InboxMedia, InboxMessage, OrderConfirmation
+from app.models.inbox import (
+    InboxConversation,
+    InboxMedia,
+    InboxMessage,
+    MetaWebhookEvent,
+    OrderConfirmation,
+)
 from app.models.integration import BackgroundJob
 from app.services.inbox import chats, connection, health, sending
 from app.services.inbox.meta import MetaClient, NumberInfo
@@ -429,11 +435,78 @@ def test_operations_sees_what_went_wrong_and_no_customer_details(db):
         "failed": 1, "no_whatsapp": 1, "never_messaged": 2, "answers_not_recorded": 1, "waiting": 1,
     }
     assert body["connected"] is False and body["last_heard_at"] is None
+    # Placed two hours ago: today, or yesterday if Cairo's midnight fell between.
+    assert body["orders"][0].pop("waiting_days") in (0, 1)
     assert body["orders"] == [{
         "order_id": "1", "order": "#1", "placed_at": (NOW - timedelta(hours=2)).isoformat(),
-        "why": "WhatsApp did not answer", "state": "failed", "answer": None,
+        "why": "WhatsApp did not answer", "state": "failed", "answer": None, "tag": None,
     }]
     everything = json.dumps([health.summary(db, card=card) for card in health.CARDS])
     assert "201005550188" not in everything
     assert "Nour" not in everything
     assert [o["order"] for o in health.summary(db, card="answers_not_recorded")["orders"]] == ["#7"]
+
+
+def test_operations_shows_how_long_an_order_has_waited_and_the_tag_it_carries(db):
+    _order(db, "1", state="no_whatsapp", placed_at=NOW - timedelta(days=3))
+    _order(db, "2", state="sent", sent_at=NOW - timedelta(hours=30), placed_at=NOW - timedelta(days=2))
+
+    [called] = health.summary(db, card="no_whatsapp")["orders"]
+    assert called["waiting_days"] == 3
+    assert called["tag"] == "No WhatsApp 📵"
+    assert health.summary(db, card="waiting")["orders"][0]["tag"] == "WA Sent 📤"
+
+
+def test_whatsapp_is_quiet_only_when_something_sent_went_unanswered(db):
+    """Nothing arriving at night is not a fault. A send WhatsApp never
+    acknowledged is."""
+    nour = _chat(db, "201005550188", "Nour")
+    assert health.summary(db)["quiet_since"] is None
+
+    # Sent a moment ago: too soon to say.
+    sent = _message(db, nour, "Hello", direction="out", minutes_ago=2, wa_message_id="wamid.A")
+    assert health.summary(db)["quiet_since"] is None
+
+    # Sent forty minutes ago, and nothing has ever been heard.
+    sent.occurred_at = NOW - timedelta(minutes=40)
+    db.flush()
+    assert health.summary(db)["quiet_since"] == (NOW - timedelta(minutes=40)).isoformat()
+
+    # Heard from before that send, and not since.
+    db.add(MetaWebhookEvent(
+        digest="a" * 64, payload={}, received_at=NOW - timedelta(minutes=50),
+    ))
+    db.flush()
+    assert health.summary(db)["quiet_since"] == (NOW - timedelta(minutes=50)).isoformat()
+
+    # Heard from after it: all is well.
+    db.add(MetaWebhookEvent(
+        digest="b" * 64, payload={}, received_at=NOW - timedelta(minutes=39),
+    ))
+    db.flush()
+    assert health.summary(db)["quiet_since"] is None
+
+
+def test_a_message_that_never_reached_whatsapp_does_not_call_it_quiet(db):
+    nour = _chat(db, "201005550188", "Nour")
+    _message(db, nour, "Hello", direction="out", minutes_ago=40, status="failed")
+    assert health.summary(db)["quiet_since"] is None
+
+
+def test_each_order_links_to_shopify_where_it_is_changed(db, monkeypatch):
+    monkeypatch.setattr("app.config.settings.shopify_shop_domain", "hbawear.myshopify.com")
+    nour = _chat(db, "201005550188", "Nour")
+    _order(db, "5001", nour, state="no_whatsapp")
+
+    link = "https://hbawear.myshopify.com/admin/orders/5001"
+    assert chats.conversation_detail(db, nour.id)["orders"][0]["admin_url"] == link
+    [listed] = chats.confirmations(db, tile="no_whatsapp")["orders"]
+    assert listed["admin_url"] == link
+    # A number with no WhatsApp is a call: the Confirmations screen shows it.
+    assert listed["phone"] == "201005550188"
+
+
+def test_no_link_is_invented_when_no_store_is_connected(db, monkeypatch):
+    monkeypatch.setattr("app.config.settings.shopify_shop_domain", "")
+    _order(db, "5001", state="failed")
+    assert chats.confirmations(db, tile="not_sent")["orders"][0]["admin_url"] is None
