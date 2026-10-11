@@ -74,15 +74,18 @@ Also in this phase:
 - **Tables** (`app/models/inbox.py`): conversations, messages, media, one confirmation per order, Meta's callbacks, and the two connections.
 - **WhatsApp client** (`app/services/inbox/meta.py`): send text, template, media and reaction; mark read; upload and download a file; read the number and its approved messages; check a callback's signature. A file is fetched only from Meta's own hosts.
 - **Connections** (`app/services/inbox/connection.py`, `/api/inbox/connection`, Settings → Shopify): the WhatsApp keys and the second Shopify app, saved encrypted and only after their provider answers. The app that reads money is refused as the second app, and so is an app that may not change orders.
-- **Who may be messaged** (`app/services/inbox/sending.py`): sending is off until an admin turns it on; outside production only `INBOX_TEST_NUMBERS` are messaged; only an Egyptian mobile is accepted.
+- **Who may be messaged** (`app/services/inbox/sending.py`): sending is off until an admin turns it on; a server not told it may message customers (`INBOX_SEND_TO_CUSTOMERS`) messages only `INBOX_TEST_NUMBERS`; only an Egyptian mobile is accepted.
 - **`docs/RULES.md`** carries the two narrowed rules and the inbox's own.
 
 Left of phase 1:
 
-- **Saving the keys on staging.** That needs the branch on `main`, which is the owner's call.
+- **Saving the keys on staging.** The branch went to `main` on 11 October on the owner's order. Staging has no `SETTINGS_ENCRYPTION_KEY`, so the cards refuse to save there until it is set.
 - **The app secret is proved by the first signed callback**, not at save: Meta offers nothing to try it against. Phase 3 shows whether it has been proved.
 - **A customer-service account has no screens yet.** Until phase 4 it signs in to the affiliate shell and is refused everything by the server. Do not invite one before then.
-- **Railway variables to add when it is deployed**: `INBOX_TEST_NUMBERS` on staging (the test phones). Nothing on production.
+- **Railway variables**:
+  - Staging: `SETTINGS_ENCRYPTION_KEY` (to save keys at all) and `INBOX_TEST_NUMBERS` (the test phones). Never `INBOX_SEND_TO_CUSTOMERS`.
+  - Production: `INBOX_SEND_TO_CUSTOMERS=true`, at the switch-over in phase 7 and not before.
+  - Staging reports `APP_ENV=production`, so nothing about sending may be decided from `APP_ENV`.
 
 ## Phase 2 — Confirmation engine, running silently
 

@@ -248,7 +248,7 @@ def test_how_a_phone_number_on_an_order_is_read(raw, read):
 
 
 def test_nobody_is_messaged_until_whatsapp_is_connected_and_sending_is_on(db, protected, monkeypatch):
-    monkeypatch.setattr("app.config.settings.app_env", "production")
+    monkeypatch.setattr("app.config.settings.inbox_send_to_customers", True)
     assert sending.refusal(db, "201005550188") == sending.NOT_CONNECTED
     _save(db)
     assert sending.refusal(db, "201005550188") == sending.SENDING_OFF
@@ -256,11 +256,17 @@ def test_nobody_is_messaged_until_whatsapp_is_connected_and_sending_is_on(db, pr
     assert sending.refusal(db, "201005550188") is None
 
 
-def test_outside_production_only_the_test_numbers_are_messaged(db, protected, monkeypatch):
-    """A staging server holding real keys still cannot write to a customer."""
+def test_a_server_not_told_it_may_message_customers_messages_only_test_numbers(
+    db, protected, monkeypatch
+):
+    """A staging server holding real keys still cannot write to a customer.
+
+    Staging runs with APP_ENV=production, so that is set here too: it must
+    make no difference. Only the inbox's own switch does."""
     _save(db)
     _switch(db, True)
-    monkeypatch.setattr("app.config.settings.app_env", "staging")
+    monkeypatch.setattr("app.config.settings.app_env", "production")
+    monkeypatch.setattr("app.config.settings.inbox_send_to_customers", False)
     monkeypatch.setattr("app.config.settings.inbox_test_numbers", "")
     assert sending.refusal(db, "201005550188") == sending.NOT_A_TEST_NUMBER
     monkeypatch.setattr("app.config.settings.inbox_test_numbers", "0100 555 0188, +201105550199")
@@ -268,6 +274,13 @@ def test_outside_production_only_the_test_numbers_are_messaged(db, protected, mo
     assert sending.refusal(db, "201105550199") is None
     assert sending.refusal(db, "201205550177") == sending.NOT_A_TEST_NUMBER
     assert connection.describe_whatsapp(db)["test_numbers_only"] is True
+
+
+def test_customers_are_not_messaged_unless_the_server_was_told_it_may():
+    """The default, with nothing set: off."""
+    from app.config import Settings
+
+    assert Settings.model_fields["inbox_send_to_customers"].default is False
 
 
 # ── Shopify, for tags ─────────────────────────────────────────────────────────

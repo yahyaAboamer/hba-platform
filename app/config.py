@@ -107,10 +107,16 @@ class Settings(BaseSettings):
     # schedule, and an unpinned client would change behaviour without a deploy.
     meta_api_version: str = "v23.0"
     meta_timeout_seconds: float = 20.0
-    #: **Outside production the platform messages only these numbers**
+    #: **Whether this server may message customers at all.** Off unless set,
+    #: and set on the production service only. It is its own switch rather
+    #: than `is_production` on purpose: staging runs with APP_ENV=production
+    #: (for secure cookies), so that could never tell the two apart - found on
+    #: 11 October 2026, before anything could send.
+    inbox_send_to_customers: bool = False
+    #: **A server that may not message customers messages only these numbers**
     #: (comma-separated, any usual spelling of an Egyptian mobile). Blank
     #: means nobody, so a staging or development server can never write to a
-    #: customer. Production ignores it.
+    #: customer.
     inbox_test_numbers: str = ""
 
     # Where links in emails point. Blank means the platform will not put a

@@ -159,7 +159,7 @@ def describe_whatsapp(db: Session) -> dict:
         "can_save": fernet() is not None,
         "key_problem": key_problem(),
         # Said beside the switch, so nobody expects a staging server to send.
-        "test_numbers_only": not settings.is_production,
+        "test_numbers_only": not settings.inbox_send_to_customers,
     }
 
 

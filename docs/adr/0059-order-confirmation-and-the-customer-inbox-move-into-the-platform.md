@@ -76,7 +76,8 @@ The owner's requirements, set on 11 October 2026: everything in one place; a rea
 12. **Media is copied to our own storage when it arrives**, in an object bucket, and is served only to a signed-in person holding `inbox.use`. Meta's copy is gone after 7 days, so a file not copied in that time is lost.
 13. **Meta's callbacks are checked and never trusted blindly.** Each one is verified by its signature, stored before anything acts on it, and applied once however many times Meta repeats it.
 14. **Sending runs in its own lane of the background worker**, so a Meta outage never delays order sync or anything that decides pay.
-15. **Staging never messages a customer.** Outside production the platform sends only to numbers on a short list of test phones.
+15. **Staging never messages a customer.** A server messages customers only when it has been told it may, by a variable set on production alone (`INBOX_SEND_TO_CUSTOMERS`). Every other server sends only to numbers on a short list of test phones.
+    - *11 October 2026 (phase 1):* first written as "outside production", read from `APP_ENV`. Staging also runs with `APP_ENV=production`, so that would not have held. It was found before anything could send, and replaced with its own switch that is off unless set.
 16. **Keys are kept encrypted in Settings**, as the Shopify secret is (0045): Meta's token, phone number id, app secret and callback check word, and the second Shopify connection.
 17. **The old chats are imported.** Media that Meta has already deleted cannot be recovered and shows as no longer available. That is nearly all of the old media, since n8n never kept its own copy.
 18. **Operations gains a fourth tab, WhatsApp, that shows the failures** (owner, 11 October 2026). It sits beside Shopify, Bosta and E-stebdal and follows Operations' rules (0057):

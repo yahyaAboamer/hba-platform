@@ -189,7 +189,10 @@ payroll without touching a maintainer screen.
 - **Nobody is messaged by accident** (ADR 0059).
   - Sending is off until an admin turns it on, and off again when the
     WhatsApp number is changed.
-  - Outside production only the listed test numbers are ever messaged.
+  - A server messages customers only when told it may
+    (`INBOX_SEND_TO_CUSTOMERS`, set on production alone). Any other server
+    messages only its listed test numbers. This does not rely on `APP_ENV`,
+    which staging also sets to `production`.
   - Only an Egyptian mobile number is messaged; anything else is refused,
     not guessed at.
   - An order gets one confirmation, and a paid order gets none.

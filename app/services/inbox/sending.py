@@ -4,9 +4,12 @@ Two rules live here so that nothing which sends can skip them:
 
 - **Sending is off until an admin turns it on.** A saved connection
   receives; it sends nothing on its own.
-- **Outside production, only the listed test numbers are ever messaged**
-  (``INBOX_TEST_NUMBERS``). A staging or development server holding real
-  keys still cannot write to a customer.
+- **A server messages customers only if it has been told it may**
+  (``INBOX_SEND_TO_CUSTOMERS``, set on production alone). Every other server
+  messages only its listed test numbers (``INBOX_TEST_NUMBERS``), so a
+  staging or development server holding real keys still cannot write to a
+  customer. The switch is its own variable because staging also runs with
+  ``APP_ENV=production``.
 """
 
 import re
@@ -44,7 +47,7 @@ def egyptian_mobile(raw: object) -> str | None:
 
 
 def allowed_test_numbers() -> frozenset[str]:
-    """The numbers a server outside production may message."""
+    """The numbers a server that may not message customers still may."""
     numbers = (egyptian_mobile(part) for part in settings.inbox_test_numbers.split(","))
     return frozenset(number for number in numbers if number)
 
@@ -56,6 +59,6 @@ def refusal(db: Session, phone: str) -> str | None:
         return NOT_CONNECTED
     if not connection.sending_enabled:
         return SENDING_OFF
-    if not settings.is_production and phone not in allowed_test_numbers():
+    if not settings.inbox_send_to_customers and phone not in allowed_test_numbers():
         return NOT_A_TEST_NUMBER
     return None
