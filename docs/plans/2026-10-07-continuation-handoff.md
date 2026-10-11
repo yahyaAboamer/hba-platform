@@ -1,3 +1,5 @@
+> **Superseded by `2026-10-11-continuation-handoff.md`.** Kept for its record of 3–7 October; its *Remaining* items are carried there.
+
 # Where the work is — 7 October 2026 (Operations dashboard, ADR 0057, built and on staging)
 
 Supersedes `2026-09-30-continuation-handoff.md`, whose open items are carried
