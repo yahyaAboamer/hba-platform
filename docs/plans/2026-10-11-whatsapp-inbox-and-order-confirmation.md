@@ -121,7 +121,20 @@ Each of these will show as a difference in the comparison, and is its explanatio
 
 Left of phase 2:
 
-- **The seven-day comparison.** Deployed to production on 11 October on the owner's order, switched on. The comparison runs from the first full day after that.
+- **The seven-day comparison.** Deployed to production on 11 October, 18:28 UTC, on the owner's order, switched on. The comparison runs from the first full day after that, 12 October.
+
+First run, 11 October 18:52 UTC, over the 59 orders of the 48 hours before the deploy (which the first sweep picked up):
+
+| | Orders |
+|---|---|
+| n8n messaged | 51 |
+| The platform would message | 45 |
+| Both | 45 |
+| Only the platform | 0 |
+| Only n8n | 6 |
+| Paid, no message from either | 7 |
+
+All 6 that only n8n messaged are orders cancelled **after** n8n had messaged them. The platform met them up to two days late in this first sweep and found them already cancelled. It is the "already cancelled" row of the table above, and should not recur for an order decided within seconds of arriving. No job failed, and every would-send row carries a phone, a first name and a total.
 - **A late order at the switch** (phase 7): whether an order found hours late is messaged automatically or left for Send again is the owner's to decide then. For now nothing sends.
 
 ## Phase 3 — Inbox backend
