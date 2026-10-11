@@ -454,7 +454,11 @@ def test_between_them_the_lanes_take_every_kind_and_only_one_tops_up():
     # What the other lanes take, the main lane leaves - and nothing else.
     assert LANES["main"]["exclude"] == OPERATIONS_READS | INBOX_WORK
     assert not OPERATIONS_READS & INBOX_WORK
-    assert INBOX_WORK == {JobKind.INBOX_CONFIRM_ORDER, JobKind.INBOX_CONFIRM_SWEEP}
+    assert INBOX_WORK == {
+        JobKind.INBOX_CONFIRM_ORDER,
+        JobKind.INBOX_CONFIRM_SWEEP,
+        JobKind.INBOX_APPLY_EVENT,
+    }
     assert OPERATIONS_READS == {
         JobKind.ORDER_OPS_SHOPIFY,
         JobKind.ORDER_OPS_BOSTA,

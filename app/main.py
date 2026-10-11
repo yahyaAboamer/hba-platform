@@ -45,6 +45,7 @@ from app.services import reconcile as _reconcile  # noqa: F401  (registers handl
 from app.services import staff_prefs as _staff_prefs  # noqa: F401  (registers handlers)
 from app.services.commission import backfill as _backfill  # noqa: F401  (registers handlers)
 from app.services.inbox import confirmations as _inbox_confirmations  # noqa: F401  (registers handlers)
+from app.services.inbox import events as _inbox_events  # noqa: F401  (registers handlers)
 from app.services.order_ops import bosta as _order_ops_bosta  # noqa: F401  (registers handlers)
 from app.services.order_ops import estebdal as _order_ops_estebdal  # noqa: F401  (registers handlers)
 from app.services.order_ops import shopify as _order_ops_shopify  # noqa: F401  (registers handlers)

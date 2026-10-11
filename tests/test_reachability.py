@@ -44,6 +44,10 @@ VERBS = {
 UNREACHED_ON_PURPOSE = {
     # Shopify calls these, and Railway calls the health checks.
     ("POST", "/api/webhooks/shopify"),
+    # Meta calls these: its callbacks, and its one-time check when the
+    # callback address is set (ADR 0059).
+    ("POST", "/api/webhooks/meta"),
+    ("GET", "/api/webhooks/meta"),
     ("GET", "/api/health/live"),
     ("GET", "/api/health/ready"),
     # Superseded. The payroll screen answers the same question with the

@@ -9,14 +9,21 @@ does *before* verifying the signature is attack surface, so it does nothing
 before verifying except check the size.
 """
 
+import hashlib
+import hmac
 import json
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import PlainTextResponse
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.core.signals import Anomaly, report
 from app.db import get_session
+from app.models.inbox import MetaWebhookEvent
+from app.services.inbox import connection as inbox_connection
+from app.services.inbox.meta import verify_signature
 from app.services.jobs import JobKind, enqueue, record_event
 from app.services.shopify.webhooks import (
     MAX_BODY_BYTES,
@@ -31,7 +38,7 @@ router = APIRouter(prefix="/api/webhooks")
 SYNC_ORDER = JobKind.SYNC_ORDER
 
 
-async def _read_capped(request: Request) -> bytes:
+async def _read_capped(request: Request, limit: int = MAX_BODY_BYTES) -> bytes:
     """The body, refused the moment it passes the cap.
 
     `request.body()` reads everything before anything can be measured, and a
@@ -42,9 +49,107 @@ async def _read_capped(request: Request) -> bytes:
     received = bytearray()
     async for chunk in request.stream():
         received += chunk
-        if len(received) > MAX_BODY_BYTES:
+        if len(received) > limit:
             raise HTTPException(413, "Body too large")
     return bytes(received)
+
+
+# ── Meta (WhatsApp) ───────────────────────────────────────────────────────────
+
+#: Meta batches many updates into one callback, and says a callback can reach
+#: 3 MB. Larger than that is not Meta.
+META_MAX_BODY_BYTES = 3_000_000
+
+#: The longest challenge echoed back. Meta's is a short number.
+MAX_CHALLENGE = 200
+
+
+@router.get("/meta", include_in_schema=False)
+def meta_verify(request: Request, db: Session = Depends(get_session)) -> PlainTextResponse:
+    """Meta's one-time check when the callback address is set.
+
+    It sends the check word saved in Settings and a challenge; answering with
+    the challenge proves this server holds the same word. A wrong word, or no
+    WhatsApp connection at all, is refused the same way.
+    """
+    query = request.query_params
+    connection = inbox_connection.whatsapp(db)
+    offered = query.get("hub.verify_token") or ""
+    challenge = query.get("hub.challenge") or ""
+    if (
+        connection is None
+        or query.get("hub.mode") != "subscribe"
+        or not offered
+        or not hmac.compare_digest(offered.encode(), connection.verify_token.encode())
+        or not challenge
+        or len(challenge) > MAX_CHALLENGE
+    ):
+        report(
+            Anomaly.WEBHOOK_REJECTED,
+            topic="meta:verify",
+            secret_configured=connection is not None,
+            body_bytes=0,
+        )
+        raise HTTPException(403, "Not verified")
+    return PlainTextResponse(challenge)
+
+
+@router.post("/meta", include_in_schema=False)
+async def meta_webhook(request: Request, db: Session = Depends(get_session)) -> dict:
+    """A callback from Meta: verify, write it down, queue the work, answer.
+
+    **Stored before anything acts on it** (ADR 0059, point 13). A customer's
+    message exists nowhere else until it has been applied, so the callback
+    is kept whole, by the SHA-256 of the exact bytes Meta sent. A callback
+    Meta repeats is acknowledged and neither stored nor queued again.
+    """
+    declared = request.headers.get("content-length")
+    if declared and declared.isdigit() and int(declared) > META_MAX_BODY_BYTES:
+        raise HTTPException(413, "Body too large")
+    raw_body = await _read_capped(request, META_MAX_BODY_BYTES)
+
+    connection = inbox_connection.whatsapp(db)
+    if connection is None or not verify_signature(
+        raw_body, request.headers.get("X-Hub-Signature-256"), connection.app_secret
+    ):
+        # Nothing is recorded for an unverified request, and nothing from
+        # its body is reported: it is unverified input.
+        report(
+            Anomaly.WEBHOOK_REJECTED,
+            topic="meta",
+            secret_configured=connection is not None,
+            body_bytes=len(raw_body),
+        )
+        raise HTTPException(401, "Invalid signature")
+
+    try:
+        payload = json.loads(raw_body)
+    except ValueError:
+        payload = None
+    if not isinstance(payload, dict):
+        # Signed by Meta but not a callback we can read. Acknowledge, so Meta
+        # does not retry it for days, and say so.
+        report(Anomaly.WEBHOOK_UNUSABLE, topic="meta", reason="body is not a JSON object")
+        return {"status": "ignored"}
+
+    event_id = db.execute(
+        insert(MetaWebhookEvent)
+        .values(digest=hashlib.sha256(raw_body).hexdigest(), payload=payload)
+        .on_conflict_do_nothing(index_elements=["digest"])
+        .returning(MetaWebhookEvent.id)
+    ).scalar()
+    if event_id is None:
+        db.commit()
+        return {"status": "duplicate"}
+
+    enqueue(
+        db,
+        JobKind.INBOX_APPLY_EVENT,
+        {"event_id": event_id},
+        dedupe_key=f"{JobKind.INBOX_APPLY_EVENT}:{event_id}",
+    )
+    db.commit()
+    return {"status": "accepted"}
 
 
 @router.post("/shopify", include_in_schema=False)

@@ -107,12 +107,22 @@ class JobKind:
     #: after the reconciliation sweep, so an order whose webhook was missed is
     #: still considered.
     INBOX_CONFIRM_SWEEP = "inbox_confirm_sweep"
+    #: Apply one stored callback from Meta: a customer's message, a button
+    #: tap, or a delivery tick. The callback is written down first and
+    #: answered at once; this is the work that follows.
+    INBOX_APPLY_EVENT = "inbox_apply_event"
 
 
 #: The inbox's work (ADR 0059) runs in a lane of its own too: a WhatsApp outage
 #: must never delay order sync or anything that decides pay, and a backlog of
 #: line-item reads must never delay a customer's confirmation.
-INBOX_WORK = frozenset({JobKind.INBOX_CONFIRM_ORDER, JobKind.INBOX_CONFIRM_SWEEP})
+INBOX_WORK = frozenset(
+    {
+        JobKind.INBOX_CONFIRM_ORDER,
+        JobKind.INBOX_CONFIRM_SWEEP,
+        JobKind.INBOX_APPLY_EVENT,
+    }
+)
 
 #: Operations' reads run in a lane of their own (app.worker): the dashboard
 #: promises no number older than 10 minutes, and in the shared queue a read

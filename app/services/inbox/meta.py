@@ -87,6 +87,21 @@ _KNOWN: dict[int, tuple[str, str, bool]] = {
 }
 
 
+def failure_words(code: object) -> tuple[str, str]:
+    """``(kind, words)`` for the code Meta gives when a message is not delivered.
+
+    A delivery failure arrives later, in a callback, with the same codes a
+    refused request carries. Said in the same words, and with nothing of
+    Meta's own text - which can name the customer's number.
+    """
+    code = code if isinstance(code, int) and not isinstance(code, bool) else None
+    if code in _KNOWN:
+        kind, words, _ = _KNOWN[code]
+        return kind, f"{words} (code {code})"
+    suffix = f" (code {code})" if code is not None else ""
+    return "refused", f"WhatsApp could not deliver the message{suffix}"
+
+
 def verify_signature(raw_body: bytes, header_value: str | None, app_secret: str) -> bool:
     """Whether a callback was signed by Meta. Fails closed.
 

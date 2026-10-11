@@ -303,7 +303,10 @@ def test_the_reconciliation_sweep_queues_the_confirmation_sweep(db):
 def test_both_kinds_have_a_handler_and_run_in_the_inbox_lane():
     from app.worker import HANDLERS
 
-    assert INBOX_WORK == {JobKind.INBOX_CONFIRM_ORDER, JobKind.INBOX_CONFIRM_SWEEP}
+    assert {JobKind.INBOX_CONFIRM_ORDER, JobKind.INBOX_CONFIRM_SWEEP} <= INBOX_WORK
+    # Every kind the inbox lane takes has something to run it.
+    import app.main  # noqa: F401 - registers the handlers
+
     assert INBOX_WORK <= set(HANDLERS)
 
 
