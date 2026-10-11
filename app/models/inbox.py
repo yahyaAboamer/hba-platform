@@ -56,8 +56,11 @@ MEDIA_STATES = ("pending", "stored", "gone", "failed")
 #:   not failed.
 #: - ``would_send``: the silent run beside the old automation - what would
 #:   have been sent, with nothing sent.
+#: - ``sending``: claimed by the sender, in a transaction of its own, just
+#:   before WhatsApp is asked. An order is claimed once, so a crash after
+#:   WhatsApp accepted the message can never send it a second time.
 CONFIRMATION_STATES = (
-    "pending", "would_send", "sent", "failed",
+    "pending", "sending", "would_send", "sent", "failed",
     "not_needed", "no_phone", "bad_phone", "no_whatsapp",
 )
 

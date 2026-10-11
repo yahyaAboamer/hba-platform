@@ -1,11 +1,19 @@
 """Whether an order gets a WhatsApp confirmation, decided once per order
 (ADR 0059).
 
-**Silent, for now.** This is the confirmation engine running beside the old
-automation: it decides what n8n decides and writes it down as ``would_send``.
-Nothing here sends, and nothing here can - there is no sender to call. The
-record is compared against n8n's own until the two agree
-(``app.services.inbox.shadow``).
+**This decides; it does not send.** An order that should get the message is
+recorded one of two ways:
+
+- ``would_send`` on a server that may not message that customer - WhatsApp
+  not connected, sending off in Settings, or a server not told it may message
+  customers (``sending.refusal``). That is the silent run beside the old
+  automation: the record is compared against n8n's own until the two agree
+  (``app.services.inbox.shadow``).
+- ``pending`` on a server that may, with the sending queued as a job of its
+  own (``app.services.inbox.outbound``).
+
+**An order recorded as ``would_send`` is never sent later.** Turning sending
+on changes what happens to orders decided from then on, and nothing before.
 
 The rules are n8n's, kept as they were (ADR 0059, point 8):
 
@@ -47,7 +55,7 @@ from app.core.businesstime import utcnow
 from app.core.signals import Anomaly, report
 from app.models.inbox import OrderConfirmation
 from app.models.orders import OrderIndex
-from app.services.inbox.sending import egyptian_mobile
+from app.services.inbox.sending import egyptian_mobile, refusal
 from app.services.jobs import JobKind, PermanentFailure, enqueue
 from app.services.shopify.client import ShopifyClient
 from app.services.shopify.sync import PERMANENT, build_client, order_gid
@@ -190,14 +198,20 @@ def confirm_order(
         return None
 
     decision = decide(node)
+    state = decision.state
+    # May this server message her? If so the order waits to be sent; if not
+    # it is recorded as what would have been sent, and stays that way.
+    to_send = state == "would_send" and refusal(db, decision.phone) is None
+    if to_send:
+        state = "pending"
     # ON CONFLICT, not check-then-insert: a webhook and the sweep can reach
     # the same order at once, and the second must lose quietly.
-    db.execute(
+    inserted = db.execute(
         insert(OrderConfirmation)
         .values(
             shopify_order_id=order_id,
             order_name=str(node.get("name") or "")[:40] or None,
-            state=decision.state,
+            state=state,
             phone=decision.phone,
             customer_name=decision.customer_name,
             total_text=decision.total_text,
@@ -206,7 +220,14 @@ def confirm_order(
             placed_at=placed_at,
         )
         .on_conflict_do_nothing(index_elements=["shopify_order_id"])
-    )
+        .returning(OrderConfirmation.id)
+    ).scalar()
+    # Queued only by whoever recorded the decision, so the loser of a race
+    # does not queue a second sending.
+    if to_send and inserted is not None:
+        from app.services.inbox.outbound import queue_confirmation_send
+
+        queue_confirmation_send(db, order_id)
     return _recorded(db, order_id)
 
 
@@ -279,6 +300,12 @@ def _handle_confirm_order(db: Session, payload: dict) -> None:
 def _handle_confirm_sweep(db: Session, payload: dict) -> None:
     if not enabled():
         return
+    # An order a crash left half-sent is shown as failed, never sent again.
+    from app.services.inbox.outbound import recover_interrupted
+
+    interrupted = recover_interrupted(db)
+    if interrupted:
+        logger.warning("%s confirmations were interrupted while sending", interrupted)
     order_ids = unconfirmed_recent(db)
     for order_id in order_ids:
         queue_confirmation(db, order_id)

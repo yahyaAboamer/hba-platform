@@ -111,6 +111,15 @@ class JobKind:
     #: tap, or a delivery tick. The callback is written down first and
     #: answered at once; this is the work that follows.
     INBOX_APPLY_EVENT = "inbox_apply_event"
+    #: Send one order's confirmation, if it is still waiting and this server
+    #: may message that customer. Claimed before WhatsApp is asked, so sent
+    #: at most once.
+    INBOX_SEND_CONFIRMATION = "inbox_send_confirmation"
+    #: The automatic reply to a tap on Edit or Cancel. One per tap.
+    INBOX_AUTO_REPLY = "inbox_auto_reply"
+    #: Write an order's one confirmation tag to Shopify, through the second
+    #: Shopify app - the only thing the platform writes there.
+    INBOX_TAG_ORDER = "inbox_tag_order"
 
 
 #: The inbox's work (ADR 0059) runs in a lane of its own too: a WhatsApp outage
@@ -121,6 +130,9 @@ INBOX_WORK = frozenset(
         JobKind.INBOX_CONFIRM_ORDER,
         JobKind.INBOX_CONFIRM_SWEEP,
         JobKind.INBOX_APPLY_EVENT,
+        JobKind.INBOX_SEND_CONFIRMATION,
+        JobKind.INBOX_AUTO_REPLY,
+        JobKind.INBOX_TAG_ORDER,
     }
 )
 

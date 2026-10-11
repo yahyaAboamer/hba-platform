@@ -239,6 +239,37 @@ def test_a_tap_is_recorded_as_her_answer(db, connected, payload, answer, preview
     assert conversation.last_preview == preview
 
 
+def _queued(db) -> list[tuple]:
+    from sqlalchemy import text
+
+    db.flush()
+    return db.execute(text("SELECT kind, dedupe_key FROM background_job ORDER BY id")).all()
+
+
+def test_an_answer_queues_the_orders_tag_and_the_reply(db, connected):
+    """Queued, not done here: Shopify or WhatsApp being down must not lose
+    her answer."""
+    apply_event(db, _callback(messages=[_tap("edit_5001")]))
+    tap = db.query(InboxMessage).one()
+    assert _queued(db) == [
+        ("inbox_tag_order", "inbox_tag_order:5001:Edit ✏️"),
+        ("inbox_auto_reply", f"inbox_auto_reply:{tap.id}"),
+    ]
+
+
+def test_a_message_that_is_not_an_answer_queues_nothing(db, connected):
+    apply_event(db, _callback(messages=[_text()]))
+    assert _queued(db) == []
+
+
+def test_a_confirmation_that_could_not_reach_her_queues_the_no_whatsapp_tag(db, connected):
+    _ours(db, wamid="wamid.CONF")
+    db.add(OrderConfirmation(shopify_order_id="5001", state="sent", wa_message_id="wamid.CONF"))
+    db.flush()
+    apply_event(db, _callback(statuses=[_status("failed", "wamid.CONF", 131026)]))
+    assert _queued(db) == [("inbox_tag_order", "inbox_tag_order:5001:No WhatsApp 📵")]
+
+
 def test_the_same_tap_works_as_a_newer_kind_of_button(db, connected):
     interactive = {
         "from": HER, "id": "wamid.I", "timestamp": str(T0), "type": "interactive",

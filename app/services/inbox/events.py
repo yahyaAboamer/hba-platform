@@ -17,7 +17,8 @@ and each is the database's, not this code's good behaviour:
 callback names the one it is about. Anything for another number is ignored.
 
 Nothing here sends, tags an order or fetches a file. A tap is recorded as
-the customer's answer; what follows from an answer is separate work.
+the customer's answer; what follows from an answer - the order's tag, the
+reply to a tap - is queued as work of its own.
 """
 
 import logging
@@ -153,14 +154,27 @@ def _answer(fields: dict) -> tuple[str, str] | None:
 
 
 def _record_answer(
-    db: Session, order_id: str, answer: str, at: datetime, conversation: InboxConversation
+    db: Session,
+    order_id: str,
+    answer: str,
+    at: datetime,
+    conversation: InboxConversation,
+    message_id: int,
 ) -> None:
     """Keep the customer's answer with her order. The latest tap wins.
 
     A confirmation n8n sent before the platform took over has no row here,
     or has one that says only what *would* have been sent. Her tap proves a
     confirmation reached her, so either way the order stands as sent.
+
+    What follows from an answer is queued, not done here: the order's tag in
+    Shopify, and the reply to a tap on Edit or Cancel. Each is its own job,
+    so Shopify or WhatsApp being down never loses her answer.
     """
+    # Imported here: both modules build on this one.
+    from app.services.inbox.outbound import queue_auto_reply
+    from app.services.inbox.tags import queue_tags
+
     db.execute(
         insert(OrderConfirmation)
         .values(shopify_order_id=order_id, state="sent", phone=conversation.phone)
@@ -176,6 +190,9 @@ def _record_answer(
         row.answered_at = at
     row.conversation_id = conversation.id
     row.updated_at = utcnow()
+    db.flush()
+    queue_tags(db, row)
+    queue_auto_reply(db, message_id)
 
 
 def apply_message(db: Session, message: dict, names: dict[str, str]) -> bool:
@@ -229,7 +246,7 @@ def apply_message(db: Session, message: dict, names: dict[str, str]) -> bool:
         )
 
     if answer:
-        _record_answer(db, answer[1], answer[0], occurred_at, conversation)
+        _record_answer(db, answer[1], answer[0], occurred_at, conversation, message_id)
 
     # She wrote: free replies are allowed for 24 hours from now.
     if conversation.last_inbound_at is None or occurred_at > conversation.last_inbound_at:
@@ -282,6 +299,15 @@ def apply_status(db: Session, status: dict) -> bool:
             )
         )
         db.flush()
+        order = db.scalar(
+            select(OrderConfirmation).where(OrderConfirmation.wa_message_id == wa_message_id)
+        )
+        if order is not None:
+            from app.services.inbox.tags import queue_tags
+
+            db.refresh(order)
+            # WA Sent becomes No WhatsApp, so the order shows it needs a call.
+            queue_tags(db, order)
         return True
 
     if state not in _RANK or message.status == "failed":

@@ -458,7 +458,13 @@ def test_between_them_the_lanes_take_every_kind_and_only_one_tops_up():
         JobKind.INBOX_CONFIRM_ORDER,
         JobKind.INBOX_CONFIRM_SWEEP,
         JobKind.INBOX_APPLY_EVENT,
+        JobKind.INBOX_SEND_CONFIRMATION,
+        JobKind.INBOX_AUTO_REPLY,
+        JobKind.INBOX_TAG_ORDER,
     }
+    # Every kind named for the inbox runs in the inbox lane.
+    named = {value for name, value in vars(JobKind).items() if name.startswith("INBOX_")}
+    assert named == INBOX_WORK
     assert OPERATIONS_READS == {
         JobKind.ORDER_OPS_SHOPIFY,
         JobKind.ORDER_OPS_BOSTA,

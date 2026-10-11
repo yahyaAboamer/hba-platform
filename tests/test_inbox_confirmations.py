@@ -353,14 +353,71 @@ def test_switched_off_a_job_already_queued_reads_nothing_and_keeps_nothing(
     assert db.query(OrderConfirmation).count() == 0
 
 
-def test_nothing_in_the_engine_can_send(db):
-    """Phase 2 is silent by construction: the module has no way to reach
-    WhatsApp, so no setting or accident can make it send."""
+def test_the_engine_decides_and_never_reaches_whatsapp_itself(db):
+    """Sending is other code's (``outbound``), behind the one rule on who may
+    be messaged. The engine has no way to reach WhatsApp."""
     import inspect
 
     source = inspect.getsource(confirmations)
     for sender in ("MetaClient", "send_template", "send_text", "inbox.meta"):
         assert sender not in source
+
+
+def test_on_a_server_that_may_not_message_her_the_order_only_records(db):
+    """The silent run: no WhatsApp connection, so nothing waits to be sent."""
+    row = confirm_order(db, "5001", client=_shopify(_order()))
+    assert row.state == "would_send"
+    assert not any(kind == "inbox_send_confirmation" for kind, _, _ in _jobs(db))
+
+
+@pytest.fixture()
+def may_message_customers(db, monkeypatch):
+    """WhatsApp connected, sending on, and the server told it may."""
+    from cryptography.fernet import Fernet
+
+    from app.services.inbox import connection
+    from app.services.inbox.meta import NumberInfo
+
+    monkeypatch.setattr(
+        "app.config.settings.settings_encryption_key", Fernet.generate_key().decode()
+    )
+    connection.save_whatsapp(
+        db,
+        phone_number_id="100200300400500",
+        business_account_id="777888999000111",
+        access_token="EAAG-made-up-access-key-0000a1b2",
+        app_secret="made-up-app-secret-000000009f3c",
+        verify_token="made-up-check-word-0001",
+        actor_id=None,
+        actor_email=None,
+        checker=lambda *args: NumberInfo("+20 100 555 0100", "HBA Wear", "GREEN"),
+    )
+    connection.set_sending(db, True, actor_id=None, actor_email=None)
+    monkeypatch.setattr("app.config.settings.inbox_send_to_customers", True)
+
+
+def test_on_a_server_that_may_message_her_the_order_waits_to_be_sent(db, may_message_customers):
+    row = confirm_order(db, "5001", client=_shopify(_order()))
+    assert row.state == "pending"
+    assert ("inbox_send_confirmation", "5001", "inbox_send_confirmation:5001:0") in _jobs(db)
+
+
+def test_an_order_that_gets_no_message_queues_no_sending(db, may_message_customers):
+    paid = _order(paymentGatewayNames=CARD, displayFinancialStatus="PAID")
+    assert confirm_order(db, "5002", client=_shopify(paid)).state == "not_needed"
+    assert _jobs(db) == []
+
+
+def test_an_order_recorded_as_would_send_is_never_sent_later(db, monkeypatch):
+    """Turning sending on changes orders decided from then on, and none before."""
     confirm_order(db, "5001", client=_shopify(_order()))
-    states = set(db.scalars(select(OrderConfirmation.state)))
-    assert states == {"would_send"}
+    assert db.query(OrderConfirmation).one().state == "would_send"
+
+    from app.services.inbox.outbound import send_confirmation
+
+    def never(*args, **kwargs):
+        raise AssertionError("an order that was only recorded must not be sent")
+
+    monkeypatch.setattr("app.services.inbox.outbound._client", never)
+    send_confirmation(db, "5001", claim=never)
+    assert db.query(OrderConfirmation).one().state == "would_send"
