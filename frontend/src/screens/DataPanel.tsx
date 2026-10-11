@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
+import { InboxConnections } from "../components/InboxConnection";
 import { IntegrationKeys } from "../components/IntegrationKey";
 import { ShopifyConnection } from "../components/ShopifyConnection";
 import type { ShopifyConnectionState } from "../components/ShopifyConnection";
@@ -504,6 +505,9 @@ export function DataPanel({ goLiveMonth }: { goLiveMonth: string | null }) {
 
       {/* Operations' Bosta and E-stebdal keys, beside it (ADR 0057 §10). */}
       <IntegrationKeys />
+
+      {/* The inbox's WhatsApp keys and its second Shopify app (ADR 0059). */}
+      <InboxConnections />
 
       {/*
        * S2: the three things somebody runs rarely, together and out of the

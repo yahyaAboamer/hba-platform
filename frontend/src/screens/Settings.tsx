@@ -74,6 +74,7 @@ const ROLE_LABEL: Record<string, string> = {
   affiliate_manager: "Affiliate manager",
   content_manager: "Content manager",
   operations_manager: "Operations manager",
+  customer_service: "Customer service",
 };
 
 const roleWords = (role: string) => ROLE_LABEL[role] ?? role;
@@ -89,6 +90,7 @@ const ACCESS_LINES: [string, string[]][] = [
   ["Read the activity log", ["audit.view"]],
   ["Approve a month's pay", ["payroll.approve"]],
   ["See the operations dashboard", ["order_ops.view"]],
+  ["Read and answer customers in the inbox", ["inbox.use"]],
   ["Invite staff, up to their own access", ["invitations.send"]],
   ["Record payments and reopen approved months", ["payments.record", "payroll.reopen"]],
   ["Change anyone's access, Shopify and the pay policy; erase a model", ["settings.manage", "affiliates.erase"]],

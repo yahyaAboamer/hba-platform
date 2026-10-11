@@ -35,6 +35,9 @@ class Permission:
     #: The operations dashboard - Shopify, Bosta and E-stebdal (ADR 0057).
     #: Reading only: nothing behind it writes to any of the three.
     ORDER_OPS_VIEW = "order_ops.view"
+    #: The customer inbox - WhatsApp chats and order confirmations (ADR 0059).
+    #: Reading and replying: the one permission customer service holds.
+    INBOX_USE = "inbox.use"
 
 
 ALL_PERMISSIONS = frozenset(
@@ -84,8 +87,13 @@ ROLES: dict[str, frozenset[str]] = {
     # The operations manager (ADR 0057): the operations dashboard and nothing
     # else - no model, code, target, payroll or payment, and no invitations,
     # because he is the only one and the staff do not use it. There is one at
-    # a time; the database refuses a second live holder.
-    "operations_manager": frozenset({Permission.ORDER_OPS_VIEW}),
+    # a time; the database refuses a second live holder. He also holds the
+    # customer inbox (ADR 0059, owner, 11 October 2026).
+    "operations_manager": frozenset({Permission.ORDER_OPS_VIEW, Permission.INBOX_USE}),
+    # Customer service (ADR 0059): the inbox and nothing else - no model, code,
+    # target, payroll, payment or Operations, and no invitations. Any number
+    # of people may hold it; only an admin gives it.
+    "customer_service": frozenset({Permission.INBOX_USE}),
     # Affiliates reach their own portal by owning the record, not by holding a
     # staff permission, so this set is intentionally empty.
     "affiliate": frozenset(),

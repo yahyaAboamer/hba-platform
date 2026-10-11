@@ -182,26 +182,58 @@ def test_no_test_references_a_role_that_does_not_exist():
     assert unknown == {"wizard"}, f"tests reference unknown roles: {unknown - {'wizard'}}"
 
 
-def test_the_five_expected_roles_exist_and_no_others():
+def test_the_six_expected_roles_exist_and_no_others():
     assert VALID_ROLES == {
         "admin",
         "affiliate_manager",
         "content_manager",
         "operations_manager",
+        "customer_service",
         "affiliate",
     }
 
 
-# ── operations_manager (ADR 0057) ─────────────────────────────────────────────
+# ── operations_manager (ADR 0057, and the inbox from ADR 0059) ────────────────
 
 
-def test_operations_manager_holds_only_the_operations_dashboard():
-    assert ROLES["operations_manager"] == {Permission.ORDER_OPS_VIEW}
+def test_operations_manager_holds_the_operations_dashboard_and_the_inbox():
+    assert ROLES["operations_manager"] == {Permission.ORDER_OPS_VIEW, Permission.INBOX_USE}
 
 
 def test_operations_manager_sees_nothing_of_the_affiliate_side():
-    for permission in ALL_PERMISSIONS - {Permission.ORDER_OPS_VIEW}:
+    for permission in ALL_PERMISSIONS - {Permission.ORDER_OPS_VIEW, Permission.INBOX_USE}:
         assert has_permission("operations_manager", permission) is False
+
+
+# ── customer_service (ADR 0059) ───────────────────────────────────────────────
+
+
+def test_customer_service_holds_only_the_inbox():
+    assert ROLES["customer_service"] == {Permission.INBOX_USE}
+
+
+def test_customer_service_sees_nothing_else():
+    for permission in ALL_PERMISSIONS - {Permission.INBOX_USE}:
+        assert has_permission("customer_service", permission) is False
+
+
+def test_no_affiliate_side_role_sees_the_inbox():
+    for role in ("affiliate_manager", "content_manager", "affiliate"):
+        assert has_permission(role, Permission.INBOX_USE) is False
+
+
+def test_only_an_admin_can_invite_customer_service():
+    """`can_grant` alone would let the operations manager hand the role on,
+    because he holds everything it grants. What stops him is that he may not
+    invite at all - so that is what is pinned."""
+    from app.core.permissions import can_grant
+
+    assert can_grant("admin", "customer_service")
+    assert not can_grant("affiliate_manager", "customer_service")
+    assert not can_grant("content_manager", "customer_service")
+    for role in ("operations_manager", "customer_service"):
+        assert has_permission(role, Permission.INVITATIONS_SEND) is False
+        assert has_permission(role, Permission.SETTINGS_MANAGE) is False
 
 
 def test_no_affiliate_side_role_sees_operations():

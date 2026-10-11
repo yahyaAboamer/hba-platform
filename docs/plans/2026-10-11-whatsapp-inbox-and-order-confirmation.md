@@ -4,7 +4,7 @@
 **Written:** 11 October 2026
 **Started:** 11 October 2026, on the owner's order, ahead of the audit repair's release gates.
 **Branch:** `feature/whatsapp-inbox`, cut from `repair/batch-2`. It stays off the repair branch so the repair remains releasable, and nothing is merged or deployed without the owner's separate go-ahead.
-**Where it stands:** phase 0 checks answered below; mockup `docs/design/whatsapp-inbox-2026-10-11.html` awaiting the owner's approval.
+**Where it stands:** mockup `docs/design/whatsapp-inbox-2026-10-11.html` approved by the owner on 11 October. Phase 1 is built on the branch; see "Phase 1 as built" below for what is left of it.
 **Replaces:** the Railway project `order-confirmation-message` (n8n + Postgres, production only).
 
 ## Shape of the work
@@ -66,6 +66,23 @@ Also in this phase:
 - The structural test that keeps customer data out of `order_index` and `attributed_order` stays and passes.
 
 **Done when:** the suite passes, the migration goes up and down cleanly, and an admin can save and verify the keys on staging.
+
+### Phase 1 as built (11 October 2026)
+
+- **Migrations** `b1d4f7a20013` (the role) and `c2e5a8b30014` (seven tables), after `f6b2d8a41c57`. Rehearsed up, down and up again on the disposable database. The second one's downgrade drops every chat.
+- **Role and permission**: `customer_service` holds `inbox.use`; the operations manager holds it too. Server-side tests cover who reaches the inbox and that it opens nothing else.
+- **Tables** (`app/models/inbox.py`): conversations, messages, media, one confirmation per order, Meta's callbacks, and the two connections.
+- **WhatsApp client** (`app/services/inbox/meta.py`): send text, template, media and reaction; mark read; upload and download a file; read the number and its approved messages; check a callback's signature. A file is fetched only from Meta's own hosts.
+- **Connections** (`app/services/inbox/connection.py`, `/api/inbox/connection`, Settings → Shopify): the WhatsApp keys and the second Shopify app, saved encrypted and only after their provider answers. The app that reads money is refused as the second app, and so is an app that may not change orders.
+- **Who may be messaged** (`app/services/inbox/sending.py`): sending is off until an admin turns it on; outside production only `INBOX_TEST_NUMBERS` are messaged; only an Egyptian mobile is accepted.
+- **`docs/RULES.md`** carries the two narrowed rules and the inbox's own.
+
+Left of phase 1:
+
+- **Saving the keys on staging.** That needs the branch on `main`, which is the owner's call.
+- **The app secret is proved by the first signed callback**, not at save: Meta offers nothing to try it against. Phase 3 shows whether it has been proved.
+- **A customer-service account has no screens yet.** Until phase 4 it signs in to the affiliate shell and is refused everything by the server. Do not invite one before then.
+- **Railway variables to add when it is deployed**: `INBOX_TEST_NUMBERS` on staging (the test phones). Nothing on production.
 
 ## Phase 2 — Confirmation engine, running silently
 

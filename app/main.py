@@ -22,6 +22,7 @@ from app.api import (
     auth,
     earnings,
     health,
+    inbox,
     operations,
     order_ops,
     orders,
@@ -126,6 +127,7 @@ app.include_router(auth.router)
 app.include_router(webhooks.router)
 app.include_router(operations.router)
 app.include_router(order_ops.router)
+app.include_router(inbox.router)
 app.include_router(affiliates.router)
 app.include_router(applications.router)
 app.include_router(affiliate_self.router)

@@ -101,6 +101,18 @@ class Settings(BaseSettings):
     bosta_api_key: str = ""
     estebdal_api_key: str = ""
 
+    # The customer inbox (ADR 0059). The WhatsApp keys themselves are saved
+    # from Settings, encrypted; nothing here is a secret.
+    # Pinned deliberately, as Shopify's is: Meta retires versions on a
+    # schedule, and an unpinned client would change behaviour without a deploy.
+    meta_api_version: str = "v23.0"
+    meta_timeout_seconds: float = 20.0
+    #: **Outside production the platform messages only these numbers**
+    #: (comma-separated, any usual spelling of an Egyptian mobile). Blank
+    #: means nobody, so a staging or development server can never write to a
+    #: customer. Production ignores it.
+    inbox_test_numbers: str = ""
+
     # Where links in emails point. Blank means the platform will not put a
     # link in an email at all rather than send one to localhost - a sign-in
     # link that goes nowhere is worse than no email, because it teaches twenty

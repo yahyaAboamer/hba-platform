@@ -32,6 +32,7 @@ _ROLE = {
     "affiliate_manager": "affiliate manager",
     "content_manager": "content manager",
     "operations_manager": "operations manager",
+    "customer_service": "customer service",
     "affiliate": "model",
 }
 
@@ -192,6 +193,9 @@ def sentence(event: AuditEvent, names: _Names) -> str:
         "policy_version.created": f"Put a new commission policy in force from {_month(a.get('effective_month'))}",
         "shopify.connection_updated": "Updated the Shopify connection",
         "order_ops.key_saved": f"Saved a new {_PROVIDER.get(a.get('provider'), 'operations')} key",
+        "inbox.whatsapp_saved": "Saved the WhatsApp connection",
+        "inbox.sending_changed": f"Turned WhatsApp sending {'on' if a.get('sending') else 'off'}",
+        "inbox.tags_connection_saved": "Saved the Shopify connection that writes order tags",
         "staff.preference_changed": f"Turned {'on' if a.get('on') else 'off'} “{a.get('switch')}” for themselves",
         "staff.role_changed": f"Changed {who}'s access to {_ROLE.get(a.get('role'), a.get('role'))}",
         "staff.suspended": f"Suspended {who}'s access",

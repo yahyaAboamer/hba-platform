@@ -34,6 +34,7 @@ in place, and so is the sentence here that it replaced.
 | **Maintainer** | Owner, marketing and finance teams on laptops | Laptop-first; match the approved Admin HTML structure and styling |
 | **Affiliate portal** (`.affiliate`) | Models on phones | Dark by default, denser, phone-shaped |
 | **Operations** (ADR 0057) | The one operations manager, and the admin | Laptop-first, usable on a phone. Its own shell, built from the owner-approved mockup (`docs/design/operations-dashboard-2026-10-03.html`), because no approved export draws it. Same tokens and palette as the maintainer's tool. |
+| **Inbox** (ADR 0059, being built) | Customer service, the operations manager, and the admin | Laptop-first, usable on a phone. Its own shell, built from the owner-approved mockup (`docs/design/whatsapp-inbox-2026-10-11.html`). Same tokens and palette. |
 
 **One palette across both, since ADR 0039** — HBA green, both themes, defined
 once in `tokens.css` with the accent alone in `accent.css`. `portal.css` is
@@ -77,7 +78,9 @@ payroll without touching a maintainer screen.
   halves (ADR 0039) — and `styles/__tests__/accent-isolation.test.ts` fails the
   build if those values appear anywhere else.
 - **No customer data.** `order_index` and `attributed_order` hold no name,
-  address, phone or email, and a test keeps it structural.
+  address, phone or email, and a test keeps it structural. **The customer
+  inbox's own tables are the one exception** (ADR 0059): a customer's phone,
+  name, messages and files live there and nowhere else.
 - **A correction settles money that moved; a balance is money that has not**
   (ADR 0041, amending 0035). Carrying a difference into a later month recovers
   it **there** — taking it off the source month as well recovers it twice, and
@@ -170,6 +173,26 @@ payroll without touching a maintainer screen.
   - He sees nothing of models, codes, targets, payroll or payments. Nobody but
     him and an admin sees Operations.
   - No customer name, phone, address or note is stored or shown there.
+  - He also holds the customer inbox (ADR 0059).
+- **The customer inbox stands apart, and holds the only customer data**
+  (ADR 0059).
+  - Customer service sees the inbox and nothing else. Any number of people
+    may hold the role, and only an admin gives it.
+  - Affiliate managers, content managers and models see nothing of it.
+  - Only an admin sees or changes its keys. They are stored encrypted and
+    never shown, logged or audited.
+- **The platform writes to Shopify only to tag an order's confirmation**
+  (ADR 0059), and only through a second Shopify app.
+  - The connection that reads money stays read-only (ADR 0015). The app it
+    uses is refused as the second one.
+  - The second app is refused unless it may change orders.
+- **Nobody is messaged by accident** (ADR 0059).
+  - Sending is off until an admin turns it on, and off again when the
+    WhatsApp number is changed.
+  - Outside production only the listed test numbers are ever messaged.
+  - Only an Egyptian mobile number is messaged; anything else is refused,
+    not guessed at.
+  - An order gets one confirmation, and a paid order gets none.
 - **Operations' numbers are at most 10 minutes old** (ADR 0057).
   - The platform reads each source every 5 minutes.
   - A source that can't be read shows as a failure, never as 0.

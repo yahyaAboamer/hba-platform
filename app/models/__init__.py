@@ -8,6 +8,7 @@ from app.models import (  # noqa: F401
     codes,
     compensation,
     identity,
+    inbox,
     integration,
     notifications,
     order_ops,

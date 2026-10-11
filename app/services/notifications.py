@@ -575,6 +575,14 @@ def render(event: str, payload: dict) -> Message | None:
                 "You've been given access to HBA's operations dashboard. Choose "
                 "a password to get in."
             )
+        elif payload.get("role") == "customer_service":
+            # ADR 0059: the inbox is all this person sees.
+            subject = "Your access to HBA's customer inbox"
+            body = (
+                f"{greeting}\n\n"
+                "You've been given access to HBA's customer inbox, where you "
+                "answer customers on WhatsApp. Choose a password to get in."
+            )
         else:
             # Staff. The model's wording - earnings, payments - was never
             # theirs.
