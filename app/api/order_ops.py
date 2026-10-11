@@ -112,6 +112,23 @@ def bosta_success_rate(
     return {"freshness": described, **rate}
 
 
+@router.get("/whatsapp")
+def whatsapp_tab(
+    card: Literal["failed", "no_whatsapp", "never_messaged", "answers_not_recorded", "waiting"]
+    | None = None,
+    days: int = Query(7, ge=1, le=90),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Order confirmations that went wrong (ADR 0059, point 18).
+
+    Read-only like every other tab here, and with no customer details: an
+    order number, when it was placed and why. The fix is made in the Inbox.
+    """
+    from app.services.inbox import health
+
+    return health.summary(db, card=card, days=days)
+
+
 # ── The keys, for Settings ────────────────────────────────────────────────────
 
 #: Changing a key is an admin's: ``settings.manage`` on top of the router's

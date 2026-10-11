@@ -38,6 +38,9 @@ _ROLE = {
 
 _METHOD = {"instapay": "InstaPay", "wallet": "a wallet", "bank": "a bank account"}
 
+#: A customer's answer to her order's confirmation, as staff recorded it.
+_ANSWER = {"confirmed": "confirmed", "edit": "wanting a change", "cancelled": "cancelled"}
+
 _PAY_TYPE = {
     "commission": "commission",
     "fixed_plus_commission": "salary plus commission",
@@ -196,6 +199,8 @@ def sentence(event: AuditEvent, names: _Names) -> str:
         "inbox.whatsapp_saved": "Saved the WhatsApp connection",
         "inbox.sending_changed": f"Turned WhatsApp sending {'on' if a.get('sending') else 'off'}",
         "inbox.tags_connection_saved": "Saved the Shopify connection that writes order tags",
+        "inbox.confirmation_resent": f"Sent the WhatsApp confirmation for order {a.get('order') or '?'} again",
+        "inbox.answer_set": f"Marked order {a.get('order') or '?'} as {_ANSWER.get(a.get('answer'), 'answered')}",
         "staff.preference_changed": f"Turned {'on' if a.get('on') else 'off'} “{a.get('switch')}” for themselves",
         "staff.role_changed": f"Changed {who}'s access to {_ROLE.get(a.get('role'), a.get('role'))}",
         "staff.suspended": f"Suspended {who}'s access",

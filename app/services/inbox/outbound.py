@@ -114,8 +114,13 @@ def record_outbound(
     reply_to: str | None = None,
     order_id: str | None = None,
     source_ref: str | None = None,
+    heads_list: bool = True,
 ) -> InboxMessage:
-    """Put one of our messages in the chat, sent or refused."""
+    """Put one of our messages in the chat, sent or refused.
+
+    ``heads_list`` is off for a reaction: it is not a message, and does not
+    become the conversation's last line.
+    """
     now = utcnow()
     message = InboxMessage(
         conversation_id=conversation.id,
@@ -135,11 +140,50 @@ def record_outbound(
         source_ref=source_ref,
     )
     db.add(message)
-    conversation.last_message_at = now
-    conversation.last_direction = "out"
-    conversation.last_preview = (body or "")[:160] or None
+    if heads_list:
+        conversation.last_message_at = now
+        conversation.last_direction = "out"
+        conversation.last_preview = (body or "")[:160] or None
     db.flush()
     return message
+
+
+def send_reaction(
+    db: Session,
+    conversation: InboxConversation,
+    target: InboxMessage,
+    emoji: str,
+    *,
+    sent_by: int,
+    client: MetaClient | None = None,
+) -> InboxMessage:
+    """React to one of her messages. An empty ``emoji`` takes it back.
+
+    A reaction is a free message as far as WhatsApp is concerned, so it is
+    held to the same two rules: who may be messaged, and the 24 hours.
+    """
+    reason = sending.refusal(db, conversation.phone)
+    if reason:
+        raise NotSent(reason)
+    if not window_open(conversation):
+        raise NotSent(WINDOW_CLOSED, kind="window_closed")
+    if not target.wa_message_id or target.conversation_id != conversation.id:
+        raise NotSent("That message cannot be reacted to.", kind="invalid")
+
+    owned = client is None
+    client = client or _client(db)
+    try:
+        wa_message_id = client.send_reaction(conversation.phone, target.wa_message_id, emoji)
+    except MetaError as exc:
+        raise NotSent(str(exc), kind=exc.kind) from None
+    finally:
+        if owned:
+            client.close()
+    return record_outbound(
+        db, conversation, kind="reaction", body=emoji or None, origin="staff", status="sent",
+        wa_message_id=wa_message_id, sent_by=sent_by, reply_to=target.wa_message_id,
+        heads_list=False,
+    )
 
 
 def send_text(
@@ -257,7 +301,9 @@ def components(row: OrderConfirmation) -> list[dict[str, Any]]:
     return built
 
 
-def queue_confirmation_send(db: Session, order_id: str, *, attempt: int = 0, run_after=None) -> None:
+def queue_confirmation_send(
+    db: Session, order_id: str, *, attempt: int | str = 0, run_after=None
+) -> None:
     enqueue(
         db,
         JobKind.INBOX_SEND_CONFIRMATION,

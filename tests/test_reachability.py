@@ -88,6 +88,19 @@ NOT_BUILT_YET = {
     # not "affiliates without invitations" in general, just a model who
     # genuinely cannot receive one.
     ("POST", "/api/affiliates"),
+    # The customer inbox (ADR 0059). Its backend is built ahead of its
+    # screens, which are the plan's phase 4; each line comes off when the
+    # screen that calls it exists.
+    ("GET", "/api/inbox/conversations"),
+    ("GET", "/api/inbox/conversations/{conversation_id}"),
+    ("GET", "/api/inbox/conversations/{conversation_id}/messages"),
+    ("POST", "/api/inbox/conversations/{conversation_id}/messages"),
+    ("POST", "/api/inbox/conversations/{conversation_id}/reactions"),
+    ("POST", "/api/inbox/conversations/{conversation_id}/read"),
+    ("GET", "/api/inbox/confirmations"),
+    ("POST", "/api/inbox/confirmations/{order_id}/send-again"),
+    ("POST", "/api/inbox/confirmations/{order_id}/answer"),
+    ("GET", "/api/order-ops/whatsapp"),
 }
 
 

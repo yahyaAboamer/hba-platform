@@ -5,11 +5,19 @@ operations manager and the admin, and by nobody else. The guard is on the
 router itself rather than repeated per route, so a route added later cannot
 be added without it.
 
-So far only the connections, for Settings. The chats come with the inbox's
-own screens.
+The chats, the Confirmations screen, and the connections for Settings.
+These are the only routes that return a customer's name, phone and words.
+
+A refusal says why in words safe to show: 404 for a chat or an order that is
+not there, 422 for something that cannot be done as asked, and 409 for a
+message that may not be sent - sending is off, this server may not message
+that customer, or her 24 hours have passed.
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+import logging
+from typing import Literal
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -17,12 +25,172 @@ from app.api.deps import require_permission
 from app.core.permissions import Permission
 from app.db import get_session
 from app.models.identity import UserAccount
-from app.services.inbox import connection
+from app.services.inbox import chats, connection, outbound, sending
+from app.services.inbox.meta import MetaClient, MetaError
+
+logger = logging.getLogger(__name__)
 
 #: The one guard, kept by name so a test can find it on every route.
 GUARD = require_permission(Permission.INBOX_USE)
 
 router = APIRouter(prefix="/api/inbox", tags=["inbox"], dependencies=[Depends(GUARD)])
+
+# ── The chats ─────────────────────────────────────────────────────────────────
+
+
+def _answering(call):
+    """Run ``call``, turning each refusal into its status."""
+    try:
+        return call()
+    except chats.NotFound as exc:
+        raise HTTPException(404, str(exc)) from None
+    except chats.Refused as exc:
+        raise HTTPException(422, str(exc)) from None
+    except outbound.NotSent as exc:
+        raise HTTPException(409, str(exc)) from None
+
+
+class ReplyBody(BaseModel):
+    body: str = ""
+    #: The message this answers, by our own id.
+    reply_to: int | None = None
+
+
+class ReactionBody(BaseModel):
+    message_id: int
+    #: One emoji; empty takes the reaction back.
+    emoji: str = ""
+
+
+class AnswerBody(BaseModel):
+    answer: str
+
+
+@router.get("/conversations")
+def conversations(
+    view: Literal["all", "unread", "edit", "cancelled"] = "all",
+    q: str | None = Query(None, max_length=120),
+    before: str | None = Query(None, max_length=80),
+    limit: int | None = Query(None, ge=1, le=100),
+    db: Session = Depends(get_session),
+) -> dict:
+    """One page of the list, newest first, with the chips' counts."""
+    body = _answering(lambda: chats.list_conversations(db, view=view, q=q, before=before, limit=limit))
+    body["counts"] = chats.counts(db)
+    return body
+
+
+@router.get("/conversations/{conversation_id}")
+def conversation(conversation_id: int, db: Session = Depends(get_session)) -> dict:
+    """A chat's header, and the customer's orders beside it."""
+    return _answering(lambda: chats.conversation_detail(db, conversation_id))
+
+
+@router.get("/conversations/{conversation_id}/messages")
+def messages(
+    conversation_id: int,
+    before: str | None = Query(None, max_length=80),
+    limit: int | None = Query(None, ge=1, le=100),
+    db: Session = Depends(get_session),
+) -> dict:
+    """One page of the chat, ending at its newest message or at ``before``."""
+    return _answering(lambda: chats.list_messages(db, conversation_id, before=before, limit=limit))
+
+
+@router.post("/conversations/{conversation_id}/messages")
+def send_message(
+    conversation_id: int,
+    body: ReplyBody,
+    actor: UserAccount = Depends(GUARD),
+    db: Session = Depends(get_session),
+) -> dict:
+    """A reply from a member of staff. It carries their name.
+
+    A message WhatsApp refuses is still returned, as failed with the reason:
+    it is in the chat, so whoever sent it sees that it did not go.
+    """
+    sent = _answering(
+        lambda: chats.reply(db, conversation_id, body.body, actor_id=actor.id, reply_to=body.reply_to)
+    )
+    db.commit()
+    return sent
+
+
+@router.post("/conversations/{conversation_id}/reactions")
+def send_reaction(
+    conversation_id: int,
+    body: ReactionBody,
+    actor: UserAccount = Depends(GUARD),
+    db: Session = Depends(get_session),
+) -> dict:
+    sent = _answering(
+        lambda: chats.react(db, conversation_id, body.message_id, body.emoji, actor_id=actor.id)
+    )
+    db.commit()
+    return sent
+
+
+@router.post("/conversations/{conversation_id}/read")
+def read(conversation_id: int, db: Session = Depends(get_session)) -> dict:
+    """Clear the unread count, and turn her ticks blue where this server may
+    message her. The count is ours; the ticks are a courtesy and never fail
+    the request."""
+    last = _answering(lambda: chats.mark_read(db, conversation_id))
+    db.commit()
+    detail = chats.conversation_detail(db, conversation_id)
+    keys = connection.whatsapp(db)
+    if last and keys and sending.refusal(db, detail["phone"]) is None:
+        try:
+            with MetaClient(keys.access_token, keys.phone_number_id) as client:
+                client.mark_read(last)
+        except MetaError as exc:
+            logger.info("could not mark a chat read on WhatsApp: %s", exc)
+    return detail
+
+
+# ── Confirmations ─────────────────────────────────────────────────────────────
+
+
+@router.get("/confirmations")
+def confirmations(
+    tile: Literal["waiting", "edit", "cancelled", "not_sent", "no_whatsapp", "confirmed"] | None = None,
+    days: int = Query(7, ge=1, le=90),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Where each cash-on-delivery order's confirmation stands."""
+    return _answering(lambda: chats.confirmations(db, tile=tile, days=days))
+
+
+@router.post("/confirmations/{order_id}/send-again")
+def send_again(
+    order_id: str,
+    actor: UserAccount = Depends(GUARD),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Queue an order's confirmation again. Refused for an order that
+    already has one, so it can never become a second message."""
+    order = _answering(
+        lambda: chats.send_again(db, order_id, actor_id=actor.id, actor_email=actor.email)
+    )
+    db.commit()
+    return order
+
+
+@router.post("/confirmations/{order_id}/answer")
+def set_answer(
+    order_id: str,
+    body: AnswerBody,
+    actor: UserAccount = Depends(GUARD),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Record the customer's answer by hand. Changes the order's tag in
+    Shopify; does not cancel or edit the order there."""
+    order = _answering(
+        lambda: chats.set_answer(db, order_id, body.answer, actor_id=actor.id, actor_email=actor.email)
+    )
+    db.commit()
+    return order
+
 
 # ── The connections, for Settings ─────────────────────────────────────────────
 

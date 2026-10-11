@@ -149,6 +149,8 @@ KINDS: dict[str, tuple[str, ...]] = {
         "policy_version.",
         "staff.preference_changed",
     ),
+    # What staff did to an order's confirmation from the Inbox (ADR 0059).
+    "inbox": ("inbox.confirmation_resent", "inbox.answer_set"),
 }
 
 #: Signing in and out: true, recorded, and the thing that buried every payment
