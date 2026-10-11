@@ -173,10 +173,16 @@ Built on the branch, not deployed. Nothing on staging or production runs it. Who
 - Migration `d3f6b9c40015` adds the `sending` state.
 - **A tap is believed only from the order's own phone** (security review, 11 October). The order number inside a tap is whatever the sender's phone sent, and a modified WhatsApp can name any order. A tap naming somebody else's order, or one with no record, stays in the chat and changes no order, tag or reply.
 
+**Part c, what the screens read and staff do** (`4cdee64`, whole suite 109/109):
+
+- `app/services/inbox/chats.py` and the routes in `app/api/inbox.py`, all behind `inbox.use`: the list a page at a time with four views and a search by name, phone or order number; a chat paged backwards with who sent each message; a reply and a reaction under the staff member's name; marking read; Send again; recording her answer by hand; the Confirmations cards.
+- `app/services/inbox/health.py` and `GET /api/order-ops/whatsapp`, behind `order_ops.view`: Operations' five cards, with an order number and a reason and no customer detail.
+- Send again is refused for any order that has, or may have, its message. It and a hand-recorded answer are audited, under a new activity-log kind, Inbox.
+- **Each message's record of who sent it is the message itself** (`sent_by`), not a line in the activity log: a busy day would bury everything else there.
+
 Left of phase 3:
 
-- **Part c:** the conversations API and staff sending: text, files, voice notes, replies, reactions, marking read, the approved-message list, Send again, and the failures read for Operations.
-- **Part d:** copying a customer's file to our own storage when it arrives, and serving it to a signed-in holder of `inbox.use`. Needs a storage bucket and a decision on the library that talks to it.
+- **Part d, files:** copying a customer's file to our own storage when it arrives; serving it to a signed-in holder of `inbox.use`; staff sending a photo, a file or a voice note; the approved-message picker for a closed window. Needs a storage bucket on Railway for each environment, which is the owner's to approve, and a library to talk to it.
 - A security review of the receiver and the media endpoint.
 
 ## Phase 4 — Inbox screens
