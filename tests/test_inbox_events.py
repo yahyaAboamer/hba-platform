@@ -225,8 +225,7 @@ def test_a_message_with_a_nul_in_it_does_not_fail_the_job(db, connected):
     ],
 )
 def test_a_tap_is_recorded_as_her_answer(db, connected, payload, answer, preview):
-    db.add(OrderConfirmation(shopify_order_id="5001", state="sent", wa_message_id="wamid.OURS"))
-    db.flush()
+    _order(db, wa_message_id="wamid.OURS")
     apply_event(db, _callback(messages=[_tap(payload)]))
 
     order = db.query(OrderConfirmation).one()
@@ -239,6 +238,14 @@ def test_a_tap_is_recorded_as_her_answer(db, connected, payload, answer, preview
     assert conversation.last_preview == preview
 
 
+def _order(db, order_id="5001", *, phone=HER, state="sent", **fields) -> OrderConfirmation:
+    """An order whose own phone, read from Shopify, is ``phone``."""
+    row = OrderConfirmation(shopify_order_id=order_id, state=state, phone=phone, **fields)
+    db.add(row)
+    db.flush()
+    return row
+
+
 def _queued(db) -> list[tuple]:
     from sqlalchemy import text
 
@@ -249,6 +256,7 @@ def _queued(db) -> list[tuple]:
 def test_an_answer_queues_the_orders_tag_and_the_reply(db, connected):
     """Queued, not done here: Shopify or WhatsApp being down must not lose
     her answer."""
+    _order(db)
     apply_event(db, _callback(messages=[_tap("edit_5001")]))
     tap = db.query(InboxMessage).one()
     assert _queued(db) == [
@@ -275,11 +283,13 @@ def test_the_same_tap_works_as_a_newer_kind_of_button(db, connected):
         "from": HER, "id": "wamid.I", "timestamp": str(T0), "type": "interactive",
         "interactive": {"type": "button_reply", "button_reply": {"id": "cancel_5001", "title": "Cancel"}},
     }
+    _order(db)
     apply_event(db, _callback(messages=[interactive]))
     assert db.query(OrderConfirmation).one().answer == "cancelled"
 
 
 def test_the_latest_tap_wins(db, connected):
+    _order(db)
     apply_event(db, _callback(messages=[_tap("confirm_5001", "wamid.T1", T0)]))
     apply_event(db, _callback(messages=[_tap("cancel_5001", "wamid.T2", T0 + 300)]))
     # And an older one arriving late does not undo it.
@@ -291,17 +301,68 @@ def test_the_latest_tap_wins(db, connected):
 
 def test_a_tap_on_a_message_n8n_sent_is_still_an_answer(db, connected):
     """After the switch, customers will tap confirmations the platform never
-    sent. Each still has to count."""
+    sent. Each still counts - because n8n's sends are imported first, so the
+    order is on record with her phone and no message id of ours."""
+    _order(db, "7007")
     apply_event(db, _callback(messages=[_tap("confirm_7007")]))
     order = db.query(OrderConfirmation).one()
-    assert (order.shopify_order_id, order.state, order.answer, order.phone) == (
-        "7007", "sent", "confirmed", HER,
-    )
+    db.refresh(order)
+    assert (order.state, order.answer) == ("sent", "confirmed")
+
+
+# ── Whose order it is ─────────────────────────────────────────────────────────
+
+
+def _nothing_changed(db, order=None):
+    """No answer, no tag, no reply - and the tap is still in the chat."""
+    if order is not None:
+        db.refresh(order)
+        assert (order.answer, order.answered_at, order.conversation_id) == (None, None, None)
+    assert _queued(db) == []
+    tap = db.query(InboxMessage).one()
+    assert tap.kind == "button"
+    assert tap.shopify_order_id is None
+    assert tap.extra["unmatched"] is True
+
+
+def test_a_tap_naming_somebody_elses_order_changes_nothing(db, connected):
+    """The order number in a tap is whatever the sender's phone sent. A
+    modified WhatsApp can name any order; only its own customer may answer."""
+    hers = _order(db, "5001", phone="201105550199")
+    apply_event(db, _callback(messages=[_tap("cancel_5001")]))
+    _nothing_changed(db, hers)
+
+
+def test_a_tap_naming_an_order_we_have_no_record_of_changes_nothing(db, connected):
+    """Nothing says whose it is, so nobody is believed about it. No order is
+    invented for it either."""
+    apply_event(db, _callback(messages=[_tap("cancel_8888")]))
+    assert db.query(OrderConfirmation).count() == 0
+    _nothing_changed(db)
+
+
+def test_a_tap_naming_an_order_with_no_phone_on_record_changes_nothing(db, connected):
+    paid = _order(db, "5001", phone=None, state="not_needed")
+    apply_event(db, _callback(messages=[_tap("cancel_5001")]))
+    _nothing_changed(db, paid)
+
+
+def test_a_tap_that_was_not_believed_still_shows_and_counts_as_unread(db, connected):
+    apply_event(db, _callback(messages=[_tap("cancel_8888", text="Cancel")]))
+    conversation = db.query(InboxConversation).one()
+    assert conversation.unread_count == 1
+    assert conversation.last_preview == "Cancel"
+
+
+def test_the_order_s_phone_is_compared_as_digits(db, connected):
+    """However it was written on the record."""
+    _order(db, "5001", phone="+20 100 555 0188")
+    apply_event(db, _callback(messages=[_tap("confirm_5001")]))
+    assert db.query(OrderConfirmation).one().answer == "confirmed"
 
 
 def test_a_tap_shows_the_order_was_sent_even_if_we_only_recorded_would_send(db, connected):
-    db.add(OrderConfirmation(shopify_order_id="5001", state="would_send"))
-    db.flush()
+    _order(db, state="would_send")
     apply_event(db, _callback(messages=[_tap("confirm_5001")]))
     order = db.query(OrderConfirmation).one()
     db.refresh(order)

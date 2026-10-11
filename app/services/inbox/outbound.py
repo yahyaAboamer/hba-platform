@@ -212,6 +212,10 @@ def auto_reply(
     tap = db.get(InboxMessage, message_id)
     if tap is None or tap.direction != "in" or tap.kind != "button" or not tap.wa_message_id:
         return None
+    # Only a tap that was taken as her answer carries its order. One that
+    # named somebody else's order is not answered.
+    if not tap.shopify_order_id:
+        return None
     found = _TAP.fullmatch(str((tap.extra or {}).get("payload") or ""))
     words = REPLIES.get(ANSWERS[found.group(1)]) if found else None
     if words is None or utcnow() - tap.occurred_at > REPLY_WHILE_FRESH:

@@ -171,6 +171,7 @@ Built on the branch, not deployed. Nothing on staging or production runs it. Who
 - `app/services/inbox/tags.py`, the only thing the platform writes to Shopify: one of the five tags per order, through the second app. Checked against n8n: answering clears *WA Sent*, as n8n does.
 - **An order recorded as `would_send` is never sent later.** Turning sending on affects orders decided from then on.
 - Migration `d3f6b9c40015` adds the `sending` state.
+- **A tap is believed only from the order's own phone** (security review, 11 October). The order number inside a tap is whatever the sender's phone sent, and a modified WhatsApp can name any order. A tap naming somebody else's order, or one with no record, stays in the chat and changes no order, tag or reply.
 
 Left of phase 3:
 
@@ -200,6 +201,7 @@ Built from the approved mockup.
 - The import can be run again without duplicating anything.
 - Media still held by Meta is copied; the rest is marked no longer available.
 - The record of sends is imported first, so nothing n8n already confirmed is ever sent again.
+- **Each imported send carries the order's phone.** A tap is believed only for an order whose recorded phone is the phone it came from, so an order imported without one could never be answered.
 - Rehearsed on a throwaway database before it touches staging or production.
 
 **Done when:** conversation and message counts match the source, and a spot check of twenty conversations reads the same in both.

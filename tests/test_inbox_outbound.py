@@ -199,6 +199,8 @@ def _tap(db, payload, *, ago=timedelta(seconds=5), wamid="wamid.TAP1") -> InboxM
     tap = InboxMessage(
         conversation_id=conversation.id, direction="in", kind="button", body="Edit",
         wa_message_id=wamid, status="received", origin="customer",
+        # Taken as her answer: it carries its order.
+        shopify_order_id="5001",
         extra={"payload": payload}, occurred_at=utcnow() - ago,
     )
     db.add(tap)
@@ -266,6 +268,17 @@ def test_a_message_that_is_not_a_tap_is_not_answered(db, may_send):
     db.flush()
     assert auto_reply(db, text_message.id, client=_meta([])) is None
     assert auto_reply(db, 987654, client=_meta([])) is None
+
+
+def test_a_tap_that_was_not_taken_as_her_answer_is_not_answered(db, may_send):
+    """It named an order that is not the sender's. Nothing follows from it."""
+    asked: list = []
+    tap = _tap(db, "edit_5001")
+    tap.shopify_order_id = None
+    tap.extra = {"payload": "edit_5001", "unmatched": True}
+    db.flush()
+    assert auto_reply(db, tap.id, client=_meta(asked)) is None
+    assert asked == []
 
 
 # ── An order's confirmation ───────────────────────────────────────────────────

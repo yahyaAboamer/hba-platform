@@ -153,9 +153,31 @@ def _answer(fields: dict) -> tuple[str, str] | None:
     return (ANSWERS[found.group(1)], found.group(2)) if found else None
 
 
+def _her_order(db: Session, order_id: str, phone: str) -> OrderConfirmation | None:
+    """The order a tap names, **only if it is this customer's**.
+
+    The order number inside a tap is whatever the sender's phone sent. An
+    ordinary WhatsApp sends back what our button carried; a modified one can
+    send any number it likes, and an answer taken on trust would let a
+    stranger tag somebody else's order Cancelled. So a tap counts only for an
+    order whose own phone, read from Shopify when it was decided, is the
+    phone the tap came from.
+
+    No record of the order means no way to know whose it is, and so no
+    answer. Orders n8n messaged have a record once its sends are imported,
+    which the plan does before the switch.
+    """
+    row = db.scalar(
+        select(OrderConfirmation).where(OrderConfirmation.shopify_order_id == order_id)
+    )
+    if row is None or not row.phone or _phone(row.phone) != phone:
+        return None
+    return row
+
+
 def _record_answer(
     db: Session,
-    order_id: str,
+    row: OrderConfirmation,
     answer: str,
     at: datetime,
     conversation: InboxConversation,
@@ -163,9 +185,8 @@ def _record_answer(
 ) -> None:
     """Keep the customer's answer with her order. The latest tap wins.
 
-    A confirmation n8n sent before the platform took over has no row here,
-    or has one that says only what *would* have been sent. Her tap proves a
-    confirmation reached her, so either way the order stands as sent.
+    An order n8n messaged may say only what *would* have been sent. Her tap
+    proves a confirmation reached her, so the order stands as sent.
 
     What follows from an answer is queued, not done here: the order's tag in
     Shopify, and the reply to a tap on Edit or Cancel. Each is its own job,
@@ -175,14 +196,6 @@ def _record_answer(
     from app.services.inbox.outbound import queue_auto_reply
     from app.services.inbox.tags import queue_tags
 
-    db.execute(
-        insert(OrderConfirmation)
-        .values(shopify_order_id=order_id, state="sent", phone=conversation.phone)
-        .on_conflict_do_nothing(index_elements=["shopify_order_id"])
-    )
-    row = db.scalar(
-        select(OrderConfirmation).where(OrderConfirmation.shopify_order_id == order_id)
-    )
     if row.state in ("pending", "would_send"):
         row.state = "sent"
     if row.answered_at is None or at >= row.answered_at:
@@ -206,6 +219,13 @@ def apply_message(db: Session, message: dict, names: dict[str, str]) -> bool:
     occurred_at = _when(message.get("timestamp"))
     conversation = _conversation(db, phone, _text(names.get(phone), 120))
     answer = _answer(fields)
+    order = _her_order(db, answer[1], phone) if answer else None
+    if answer and order is None:
+        # A tap naming an order that is not hers, or one we have no record
+        # of. It stays in the chat for somebody to see; it changes no order.
+        logger.warning("a tap named an order that is not the sender's; no answer recorded")
+        fields["extra"] = {**(fields["extra"] or {}), "unmatched": True}
+        answer = None
 
     message_id = db.execute(
         insert(InboxMessage)
@@ -246,7 +266,7 @@ def apply_message(db: Session, message: dict, names: dict[str, str]) -> bool:
         )
 
     if answer:
-        _record_answer(db, answer[1], answer[0], occurred_at, conversation, message_id)
+        _record_answer(db, order, answer[0], occurred_at, conversation, message_id)
 
     # She wrote: free replies are allowed for 24 hours from now.
     if conversation.last_inbound_at is None or occurred_at > conversation.last_inbound_at:
