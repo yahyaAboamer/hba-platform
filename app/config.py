@@ -107,6 +107,12 @@ class Settings(BaseSettings):
     # schedule, and an unpinned client would change behaviour without a deploy.
     meta_api_version: str = "v23.0"
     meta_timeout_seconds: float = 20.0
+    #: **Whether this server decides order confirmations at all.** Off unless
+    #: set, and set on production. The decision keeps a customer's phone and
+    #: first name, and staging reads the real store - so staging holds no
+    #: customer data unless somebody turns this on there for a test (owner,
+    #: 11 October 2026).
+    inbox_confirmations_enabled: bool = False
     #: **Whether this server may message customers at all.** Off unless set,
     #: and set on the production service only. It is its own switch rather
     #: than `is_production` on purpose: staging runs with APP_ENV=production

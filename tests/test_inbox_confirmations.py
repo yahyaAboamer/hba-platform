@@ -34,6 +34,13 @@ COD = ["Cash on Delivery (COD)"]
 CARD = ["Paymob - Native Checkout for Debit/Credit Cards"]
 
 
+@pytest.fixture(autouse=True)
+def switched_on(monkeypatch):
+    """The engine is off unless a server is told otherwise; these tests are
+    about what it does when on. The last section turns it off again."""
+    monkeypatch.setattr("app.config.settings.inbox_confirmations_enabled", True)
+
+
 def _iso(moment) -> str:
     return moment.strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -298,6 +305,49 @@ def test_both_kinds_have_a_handler_and_run_in_the_inbox_lane():
 
     assert INBOX_WORK == {JobKind.INBOX_CONFIRM_ORDER, JobKind.INBOX_CONFIRM_SWEEP}
     assert INBOX_WORK <= set(HANDLERS)
+
+
+# ── Switched off ──────────────────────────────────────────────────────────────
+
+
+@pytest.fixture()
+def switched_off(monkeypatch):
+    monkeypatch.setattr("app.config.settings.inbox_confirmations_enabled", False)
+
+
+def test_the_engine_is_off_unless_a_server_is_told_otherwise():
+    """Staging reads the real store. Off by default is what keeps a customer's
+    phone out of its database."""
+    from app.config import Settings
+
+    assert Settings.model_fields["inbox_confirmations_enabled"].default is False
+
+
+def test_switched_off_an_indexed_order_queues_nothing(db, switched_off):
+    assert queue_if_new(db, _indexed(db)) is False
+    assert _jobs(db) == []
+
+
+def test_switched_off_the_sweeps_queue_nothing(db, switched_off):
+    from app.services.reconcile import _queue_confirmations
+
+    _indexed(db)
+    _queue_confirmations(db)
+    confirmations._handle_confirm_sweep(db, {})
+    assert _jobs(db) == []
+
+
+def test_switched_off_a_job_already_queued_reads_nothing_and_keeps_nothing(
+    db, switched_off, monkeypatch
+):
+    """Turned off between the queueing and the run."""
+
+    def never():
+        raise AssertionError("Shopify must not be asked while the engine is off")
+
+    monkeypatch.setattr(confirmations, "build_client", never)
+    confirmations._handle_confirm_order(db, {"order_id": "5001"})
+    assert db.query(OrderConfirmation).count() == 0
 
 
 def test_nothing_in_the_engine_can_send(db):

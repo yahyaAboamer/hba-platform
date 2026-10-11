@@ -104,7 +104,13 @@ def _queue_confirmations(db: Session) -> None:
     webhook was missed reaches the index only through this sweep, which never
     went through that path - and staging receives no webhooks at all. Queued,
     not run here, and deduped on one key like the matching above.
+
+    Nothing is queued on a server that does not decide confirmations.
     """
+    from app.services.inbox.confirmations import enabled
+
+    if not enabled():
+        return
     enqueue(
         db,
         JobKind.INBOX_CONFIRM_SWEEP,

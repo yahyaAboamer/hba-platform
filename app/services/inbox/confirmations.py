@@ -25,6 +25,11 @@ confirmation for one.
 The order is read with a query of its own. The shared order query feeds
 commission, and a customer field Shopify refused there would stop orders
 indexing; here a refusal fails only this job.
+
+**Off unless the server is told to** (``INBOX_CONFIRMATIONS_ENABLED``). A
+decision keeps the customer's phone and first name, and staging reads the
+real store: switched off, nothing is queued, nothing is read and nothing is
+kept. It is on in production.
 """
 
 import logging
@@ -37,6 +42,7 @@ from sqlalchemy import exists, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.core.businesstime import utcnow
 from app.core.signals import Anomaly, report
 from app.models.inbox import OrderConfirmation
@@ -207,6 +213,11 @@ def confirm_order(
 # ── Queueing ──────────────────────────────────────────────────────────────────
 
 
+def enabled() -> bool:
+    """Whether this server decides confirmations at all."""
+    return bool(settings.inbox_confirmations_enabled)
+
+
 def queue_confirmation(db: Session, order_id: str) -> None:
     enqueue(
         db,
@@ -222,6 +233,8 @@ def queue_if_new(db: Session, order: OrderIndex) -> bool:
     Called each time an order is indexed. Reads only our own tables, so an
     order synced for the tenth time costs one small query and no job.
     """
+    if not enabled():
+        return False
     if order.placed_at is None or order.placed_at < utcnow() - FRESH_FOR:
         return False
     if _recorded(db, order.shopify_order_id) is not None:
@@ -255,11 +268,17 @@ def _handle_confirm_order(db: Session, payload: dict) -> None:
             f"{JobKind.INBOX_CONFIRM_ORDER} requires an order_id; got payload keys "
             f"{sorted(payload)!r}"
         )
+    # Queued while it was on, run after it was turned off: read nothing and
+    # keep nothing. The job simply finishes.
+    if not enabled():
+        return
     confirm_order(db, order_id)
 
 
 @register_handler(JobKind.INBOX_CONFIRM_SWEEP)
 def _handle_confirm_sweep(db: Session, payload: dict) -> None:
+    if not enabled():
+        return
     order_ids = unconfirmed_recent(db)
     for order_id in order_ids:
         queue_confirmation(db, order_id)

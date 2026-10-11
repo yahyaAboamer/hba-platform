@@ -84,7 +84,7 @@ Left of phase 1:
 - **A customer-service account has no screens yet.** Until phase 4 it signs in to the affiliate shell and is refused everything by the server. Do not invite one before then.
 - **Railway variables**:
   - Staging: `SETTINGS_ENCRYPTION_KEY` (to save keys at all) and `INBOX_TEST_NUMBERS` (the test phones). Never `INBOX_SEND_TO_CUSTOMERS`.
-  - Production: `INBOX_SEND_TO_CUSTOMERS=true`, at the switch-over in phase 7 and not before.
+  - Production: `INBOX_CONFIRMATIONS_ENABLED=true` (set 11 October, phase 2). `INBOX_SEND_TO_CUSTOMERS=true` at the switch-over in phase 7 and not before.
   - Staging reports `APP_ENV=production`, so nothing about sending may be decided from `APP_ENV`.
 
 ## Phase 2 — Confirmation engine, running silently
@@ -117,10 +117,11 @@ Where it differs from n8n, on purpose:
 
 Each of these will show as a difference in the comparison, and is its explanation.
 
+- **A switch**, `INBOX_CONFIRMATIONS_ENABLED`, off unless set. Off, nothing is queued, nothing is read from Shopify and nothing is kept. The owner's decision on 11 October: on in production, off on staging, because staging reads the real store and a decision keeps a customer's phone and first name. Turn it on there only for a test.
+
 Left of phase 2:
 
-- **It is on the branch only.** The seven-day comparison needs it on production, which is the owner's call.
-- **Deployed to staging it would hold real customers' phones and first names** in the staging database, because staging reads the real store. Nothing is sent, but it is the first customer data staging would hold. The owner decides whether staging runs the engine.
+- **The seven-day comparison.** Deployed to production on 11 October on the owner's order, switched on. The comparison runs from the first full day after that.
 - **A late order at the switch** (phase 7): whether an order found hours late is messaged automatically or left for Send again is the owner's to decide then. For now nothing sends.
 
 ## Phase 3 — Inbox backend
