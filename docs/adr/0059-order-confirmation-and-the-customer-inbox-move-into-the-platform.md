@@ -1,6 +1,6 @@
 # 0059. Order confirmation and the customer inbox move into the platform, which now holds customer chats and writes order tags
 
-**Status:** Accepted — owner, 11 October 2026. **Not built.** Work starts only after the audit repair's release gates are finished. The plan is `docs/plans/2026-10-11-whatsapp-inbox-and-order-confirmation.md`.
+**Status:** Accepted — owner, 11 October 2026. **Being built**, on branch `feature/whatsapp-inbox`. The owner first set the start for after the audit repair's release gates, then ordered it started at once the same day. It is kept off `repair/batch-2` so the repair stays releasable, and nothing reaches staging or production without his separate go-ahead. The plan is `docs/plans/2026-10-11-whatsapp-inbox-and-order-confirmation.md`.
 **Date:** 2026-10-11
 **Follows:** 0057 (Operations is a separate, read-only dashboard), 0015 (Shopify is read with client credentials and no write access), 0045 (keys are kept encrypted in Settings), 0009 (Postgres is the job queue)
 **Narrows:** 0015's "this platform only reads from Shopify" and the "no customer data" rule in `docs/RULES.md`. Both now have one stated exception each, below.
@@ -20,10 +20,12 @@ What it does, read from its workflows on 11 October 2026:
 
 What is wrong with it:
 
-- **No accounts.** The chat page has no per-person sign-in and no record of who sent what.
+- **No accounts.** The chat page is opened with one fixed key carried in its address, shared by everyone who uses it. There is no per-person sign-in and no record of who sent what.
 - **It shows at most 200 chats and 500 messages a chat.** These are fixed caps, because the page loads everything at once.
-- **Media breaks.** Images and voice notes are fetched from Meta each time they are viewed, and Meta deletes them after about a month.
-- **Failures are easy to miss.** 220 of 3,042 queued orders ended as failed. Seven runs failed between 9 and 11 October. They show only inside n8n.
+- **Media breaks.** Images and voice notes are fetched from Meta each time they are viewed, and Meta keeps an incoming file for only 7 days.
+- **Its failure count means nothing.** 220 of 3,042 queued orders ended as failed, and every one of them is a paid order that was never meant to get a message: the flow drops them without marking them done, retries five times and calls them failed. No customer was missed, but a real failure would look the same.
+- **Real failures are easy to miss.** Seven runs failed between 9 and 11 October, and they show only inside n8n.
+- **A Shopify secret sits in plain text** inside the workflows, readable by anyone who can open the n8n editor or its database.
 - **It is edited live in production**, with no tests, no staging copy and no history of changes.
 - **It costs a second system.** n8n holds about 0.48 GB of memory whatever the traffic, which is most of that project's bill. The stored chats are not the cost: 13,603 messages take 2.8 MB.
 
@@ -54,25 +56,29 @@ The owner's requirements, set on 11 October 2026: everything in one place; a rea
 6. **The 24-hour rule is shown, not hidden.** When a customer has been silent for 24 hours the chat says so and offers only approved templates.
 7. **Every outgoing message records who sent it**: the staff member, or the system for automatic ones.
 8. **The confirmation rules do not change.** One confirmation per order, only for cash on delivery or pending payment, to the customer's Egyptian number, with the same template and the same five tags. A failed send is retried up to five times and then shown as failed.
-   - **Automatic replies after a button tap** (proposed to the owner on 11 October 2026; awaiting his confirmation):
+   - **Automatic replies after a button tap** (owner, 11 October 2026):
 
      | Tap | Reply | Why |
      |---|---|---|
      | Confirm | None | WhatsApp already shows the customer their own tap, and it is 880 of the 1,020 automatic replies a month |
-     | Edit | Kept as it is | Without it the customer does not know to type what they want changed |
-     | Cancel | Kept, reworded to say the request was received | The order is only tagged, not cancelled, so "your order has been cancelled" is not yet true |
+     | Edit | Kept as it is: "What would you like to change? ✏️ Type it here and our team will help you." | Without it the customer does not know to type what they want changed |
+     | Cancel | Reworded: "We received your cancellation request ❌" | The order is only tagged, not cancelled, so "your order has been cancelled" is not yet true |
+   - **A paid order is finished, not failed.** It gets no message and is recorded as not needing one.
 9. **The platform now stores customer data, in the inbox's own tables only**: phone, name, message text and media.
    - `order_index` and `attributed_order` still hold none, and the test that keeps that true stays.
    - Operations still shows none (0057, point 7).
    - Conversations are kept without a time limit.
 10. **The platform now writes to Shopify, and only order tags.** It adds and removes the five confirmation tags and nothing else. It never cancels or edits an order: a customer's Cancel or Edit is a tag for staff to act on.
-11. **Tag writes use a second Shopify connection, not the money connection.** The existing connection stays read-only exactly as 0015 requires. The inbox uses its own credentials, limited to what it needs.
-12. **Media is copied to our own storage when it arrives**, in an object bucket, and is served only to a signed-in person holding `inbox.use`.
+11. **Tag writes use a second Shopify connection, not the money connection.** The existing connection stays read-only exactly as 0015 requires.
+    - Checked on 11 October 2026: the platform's app and the app n8n uses are two different apps on the same store. The platform's holds only read access, and that access already includes the customer's name and phone.
+    - So the platform reads the order and the phone through its existing connection, and the second connection is used for tag writes and nothing else.
+    - The second connection is the app n8n uses today. Its secret is replaced when n8n is retired, because the old one has sat in plain text.
+12. **Media is copied to our own storage when it arrives**, in an object bucket, and is served only to a signed-in person holding `inbox.use`. Meta's copy is gone after 7 days, so a file not copied in that time is lost.
 13. **Meta's callbacks are checked and never trusted blindly.** Each one is verified by its signature, stored before anything acts on it, and applied once however many times Meta repeats it.
 14. **Sending runs in its own lane of the background worker**, so a Meta outage never delays order sync or anything that decides pay.
 15. **Staging never messages a customer.** Outside production the platform sends only to numbers on a short list of test phones.
 16. **Keys are kept encrypted in Settings**, as the Shopify secret is (0045): Meta's token, phone number id, app secret and callback check word, and the second Shopify connection.
-17. **The old chats are imported.** Media that Meta has already deleted cannot be recovered and shows as no longer available.
+17. **The old chats are imported.** Media that Meta has already deleted cannot be recovered and shows as no longer available. That is nearly all of the old media, since n8n never kept its own copy.
 18. **Operations gains a fourth tab, WhatsApp, that shows the failures** (owner, 11 October 2026). It sits beside Shopify, Bosta and E-stebdal and follows Operations' rules (0057):
     - it only reads, and nothing on it sends or retries; each row links to the Inbox, where the fix is made;
     - it lists order numbers and the reason, and no name, phone or message text;
@@ -90,7 +96,8 @@ The owner's requirements, set on 11 October 2026: everything in one place; a rea
 - **A new outside dependency in the request path.** Meta's API limits, template approvals and number quality rating are now the platform's problem to show and explain.
 - **Meta sends callbacks to one address per app.** The switch from n8n is a single moment, not a gradual one, and a mistake means customers get two messages or none.
 - **A chat needs to feel live.** The service runs one process on one replica; the inbox must refresh every few seconds without loading the whole list, or it will be the heaviest screen on the platform.
-- **More storage to look after**: an object bucket, with its own cost and backup.
+- **More storage to look after**: an object bucket, with its own backup. Railway prices it at $0.015 per GB a month, so the cost is small.
+- **It is built while the repair's release gates are still open.** Two lines of work run side by side. The inbox's database changes stay off the repair branch until the gates are done, so the migration rehearsal the gates require is not disturbed.
 - **New screens without an approved export.** Like Operations, Inbox is built from an owner-approved mockup and recorded as a divergence.
 - **Losing n8n loses quick edits.** Changing the message flow becomes a code change and a deploy.
 

@@ -1,0 +1,691 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Inbox and Operations · WhatsApp — mockup</title>
+<style>
+/* Inter, the app's own files (frontend/src/main.tsx). Falls back to the system face when opened from disk. */
+@font-face{font-family:Inter;font-style:normal;font-weight:400;font-display:swap;src:url(../../frontend/node_modules/@fontsource/inter/files/inter-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:Inter;font-style:normal;font-weight:500;font-display:swap;src:url(../../frontend/node_modules/@fontsource/inter/files/inter-latin-500-normal.woff2) format("woff2")}
+@font-face{font-family:Inter;font-style:normal;font-weight:600;font-display:swap;src:url(../../frontend/node_modules/@fontsource/inter/files/inter-latin-600-normal.woff2) format("woff2")}
+
+/* The product's tokens, copied from frontend/src/styles/tokens.css and accent.css. */
+:root{
+  --paper:#eff1ee;--surface:#ffffff;--raise:#ffffff;--ink:#101214;--quiet:#4e534e;--faint:#5e645e;
+  --rule:#dde1dc;--rule-strong:#c9cec8;--hover:#eff1ee;
+  --accent:#14653a;--accent-text:#14653a;--accent-soft:rgba(20,101,58,.09);--accent-on:#fff;
+  --owed:#8a5a16;--owed-quiet:rgba(138,90,22,.1);--refused:#9a2f22;--refused-quiet:rgba(154,47,34,.1);
+  --radius-sm:4px;--radius:8px;--radius-lg:14px;
+  --elev:0 1px 2px rgba(16,18,20,.08),0 0 0 1px rgba(16,18,20,.05);
+  color-scheme:light;
+}
+[data-theme="dark"]{
+  color-scheme:dark;
+  --paper:#08090a;--surface:#15171a;--raise:#1d2126;--ink:#ecefea;--quiet:#a7ada6;--faint:#8a918a;
+  --rule:#23272b;--rule-strong:#2d3237;--hover:#1d2126;
+  --accent:#23a95c;--accent-text:#23a95c;--accent-soft:rgba(35,169,92,.14);--accent-on:#fff;
+  --owed:#e0a458;--owed-quiet:rgba(224,164,88,.12);--refused:#e2705f;--refused-quiet:rgba(226,112,95,.12);
+  --elev:0 1px 2px rgba(0,0,0,.5),0 0 0 1px rgba(236,239,234,.06);
+}
+*{box-sizing:border-box}
+html{font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink);background:var(--paper);-webkit-font-smoothing:antialiased}
+body{margin:0}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* ── The review page around the screens (same as the Operations mockup) ── */
+.review{max-width:1340px;margin:0 auto;padding:28px 24px 72px}
+.eyebrow{margin:0;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:600}
+.review > h1{margin:6px 0 8px;font-size:30px;font-weight:500;letter-spacing:-.015em}
+.lead{max-width:80ch;margin:0 0 16px;color:var(--quiet);font-size:14.5px;line-height:1.55}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 26px}
+.toolbar span{font-size:13px;color:var(--faint);margin-right:4px}
+.index{display:flex;flex-wrap:wrap;gap:6px 16px;margin:0 0 32px;padding:0;list-style:none;font-size:13.5px}
+.index a{color:var(--accent-text);text-decoration:none}
+.frame{margin:0 0 48px}
+.frame__label{margin:0 0 12px}
+.frame__label h2{margin:0;font-size:17px;font-weight:500}
+.frame__label p{max-width:90ch;margin:4px 0 0;color:var(--quiet);font-size:13.5px;line-height:1.5}
+.frame__scroll{overflow-x:auto;padding-bottom:8px}
+.screen{border:1px solid var(--rule-strong);border-radius:12px;overflow:hidden;background:var(--paper)}
+.screen--1280{width:1280px}
+.screen--390{width:390px}
+.screen--crop{width:440px}
+.row{display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start}
+.decide{max-width:90ch;font-size:14px;line-height:1.6}
+.decide li{margin-bottom:6px}
+.cap{margin:0 0 8px;font-size:12.5px;color:var(--quiet)}
+
+/* ── The app shell (components/Layout.css) ──────────────────────────── */
+.shell{display:grid;grid-template-columns:216px minmax(0,1fr);min-height:780px}
+.side{display:flex;flex-direction:column;background:var(--surface);border-right:1px solid var(--rule)}
+.brand{display:flex;align-items:center;gap:9px;padding:16px;border-bottom:1px solid var(--rule)}
+.brand__mark{display:grid;place-items:center;flex:none;width:30px;height:30px;border:1px solid var(--accent);color:var(--accent);border-radius:var(--radius-sm);font-size:12px}
+.brand__name{display:block;font-size:14px}
+.brand__role{display:block;margin-top:2px;font-size:11.5px;color:var(--faint)}
+.side > nav{flex:1}
+.nav{margin:0;padding:10px 9px;list-style:none}
+.nav a{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:40px;margin-bottom:2px;padding:9px 11px;border-radius:var(--radius);color:var(--quiet);font-size:14px;text-decoration:none}
+.nav a:hover{background:var(--hover);color:var(--ink)}
+.nav a[aria-current="page"]{background:var(--accent-soft);color:var(--accent-text)}
+.nav__count{min-width:20px;padding:1px 6px;border-radius:999px;background:var(--accent-soft);color:var(--accent-text);font-size:11.5px;text-align:center}
+.nav__new{padding:1px 7px;border:1px solid var(--rule-strong);border-radius:999px;color:var(--faint);font-size:10.5px;letter-spacing:.04em;text-transform:uppercase}
+.account{display:flex;gap:10px;align-items:center;padding:13px 16px;border-top:1px solid var(--rule)}
+.avatar{display:grid;place-items:center;flex:none;width:30px;height:30px;border:1px solid var(--rule);border-radius:50%;background:var(--accent-soft);color:var(--accent-text);font-size:12px}
+.account__who{flex:1;min-width:0;font-size:13px}
+.account__who small{display:block;margin-top:2px;color:var(--faint);font-size:11.5px}
+.caret{color:var(--faint);font-size:10px}
+.main{min-width:0;padding:0 22px 30px}
+.head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 14px;margin:0 -22px 20px;padding:14px 22px;min-height:68px;border-bottom:1px solid var(--rule);background:var(--paper)}
+.head h1{margin:0;font-size:18px;font-weight:500;line-height:1.12;letter-spacing:-.015em}
+.head__sub{display:block;margin-top:4px;font-size:12.5px;color:var(--quiet)}
+.fresh{display:inline-flex;align-items:center;gap:7px;margin:0;font-size:12.5px;color:var(--quiet)}
+.fresh svg{width:14px;height:14px;flex:none}
+.fresh--failed{color:var(--refused)}
+.switch{display:flex;margin:10px 9px 0;padding:3px;border:1px solid var(--rule);border-radius:var(--radius);background:var(--paper)}
+.switch a{flex:1;padding:6px 8px;border-radius:6px;color:var(--quiet);font-size:12.5px;text-align:center;text-decoration:none}
+.switch a[aria-current="page"]{background:var(--surface);color:var(--ink);box-shadow:var(--elev)}
+
+/* ── Cards, panels and tables (as Operations) ───────────────────────── */
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(205px,1fr));gap:14px;margin:0 0 18px}
+.tile{display:flex;flex-direction:column;align-items:flex-start;min-height:150px;padding:16px 18px 14px;border:1px solid transparent;border-radius:var(--radius-lg);background:var(--surface);text-align:left;cursor:pointer}
+.tile:hover{border-color:var(--rule-strong)}
+.tile[aria-expanded="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.tile__label{font-size:12.5px;color:var(--quiet)}
+.tile__value{margin:8px 0 4px;font-size:32px;font-weight:400;line-height:1.1;letter-spacing:-.02em}
+.tile__note{font-size:12.5px;line-height:1.4;color:var(--quiet)}
+.tile__more{display:inline-flex;align-items:center;gap:4px;margin-top:auto;padding-top:12px;color:var(--accent-text);font-size:13px}
+.tile__more svg{width:13px;height:13px}
+.tile--zero .tile__value{color:var(--faint)}
+.tile--zero{cursor:default}
+.tile--zero:hover{border-color:transparent}
+.panel{border-radius:var(--radius-lg);background:var(--surface);overflow:hidden;margin:0 0 18px}
+.panel__head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 12px;padding:14px 18px;border-bottom:1px solid var(--rule)}
+.panel__title{margin:0;font-size:15px;font-weight:400}
+.panel__hint{margin:0;font-size:12.5px;color:var(--quiet)}
+.table{width:100%;border-collapse:collapse;font-size:13.5px}
+.table th,.table td{padding:10px 8px;border-bottom:1px solid var(--rule);text-align:left;vertical-align:middle}
+.table th:first-child,.table td:first-child{padding-left:18px}
+.table th:last-child,.table td:last-child{padding-right:18px}
+.table th{font-size:11px;font-weight:400;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);white-space:nowrap}
+.table tr:last-child td{border-bottom:0}
+.num{font-variant-numeric:tabular-nums}
+.ext{display:inline-flex;align-items:center;gap:5px;color:var(--accent-text);text-decoration:none;white-space:nowrap}
+.ext svg{width:12px;height:12px}
+.tag{display:inline-block;margin:2px 4px 2px 0;padding:2px 8px;border:1px solid var(--rule);border-radius:999px;color:var(--quiet);font-size:12px;white-space:nowrap}
+.tag--hit{border-color:var(--rule-strong);color:var(--ink)}
+.muted{color:var(--faint)}
+.chip{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:8px 13px;border:1px solid var(--rule);border-radius:var(--radius);background:transparent;color:var(--quiet);font-size:13px;cursor:pointer}
+.chip[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--accent-text)}
+.btn{min-height:38px;padding:8px 16px;border:1px solid var(--accent);border-radius:var(--radius);background:var(--accent);color:var(--accent-on);font-size:13.5px;cursor:pointer}
+.btn--quiet{border-color:var(--rule-strong);background:transparent;color:var(--ink)}
+.btn--small{min-height:32px;padding:5px 11px;font-size:12.5px}
+.banner{display:flex;gap:11px;align-items:flex-start;margin:0 0 14px;padding:12px 14px;border:1px solid var(--owed);border-radius:var(--radius);background:var(--owed-quiet);font-size:13.5px}
+.banner svg{width:16px;height:16px;flex:none;margin-top:1px;color:var(--owed)}
+.banner small{display:block;margin-top:3px;color:var(--quiet);font-size:12.5px;line-height:1.45}
+.perm td,.perm th{text-align:center}
+.perm td:first-child,.perm th:first-child{text-align:left}
+.perm .new td{background:var(--accent-soft)}
+.conn{padding:16px 18px}
+.conn__top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.conn__name{font-size:14.5px}
+.conn__state{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--accent-text)}
+.conn__state::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--accent)}
+.conn dl{display:grid;grid-template-columns:150px 1fr;gap:6px 12px;margin:12px 0;font-size:13px}
+.conn dt{color:var(--quiet)} .conn dd{margin:0}
+.settings{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:18px;padding:22px;background:var(--paper)}
+.settings .panel{margin:0}
+
+/* ── Inbox: new. Three columns inside the shell's main area. ────────── */
+.inbox{display:grid;grid-template-columns:330px minmax(0,1fr) 292px;height:780px;min-width:0}
+.col{display:flex;flex-direction:column;min-width:0;min-height:0;border-right:1px solid var(--rule)}
+.col:last-child{border-right:0}
+.col__head{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:68px;padding:12px 16px;border-bottom:1px solid var(--rule)}
+.col__head h1,.col__head h2{margin:0;font-size:16px;font-weight:500;letter-spacing:-.01em}
+.col__head small{display:block;margin-top:3px;font-size:12px;color:var(--quiet)}
+.iconbtn{display:grid;place-items:center;flex:none;width:40px;height:40px;border:0;border-radius:var(--radius);background:none;color:var(--quiet);cursor:pointer}
+.iconbtn:hover{background:var(--hover);color:var(--ink)}
+.iconbtn svg{width:18px;height:18px}
+
+.search{display:block;position:relative;margin:12px 12px 8px}
+.search svg{position:absolute;left:11px;top:11px;width:16px;height:16px;color:var(--faint)}
+.search input{width:100%;min-height:38px;padding:7px 10px 7px 34px;border:1px solid var(--rule);border-radius:var(--radius);background:var(--surface)}
+.search input::placeholder{color:var(--faint)}
+.filters{display:flex;flex-wrap:wrap;gap:6px;padding:0 12px 10px}
+.filters .chip{min-height:32px;padding:5px 11px;font-size:12.5px;white-space:nowrap}
+.chats{flex:1;margin:0;padding:0;list-style:none;overflow-y:auto}
+.chat{display:grid;grid-template-columns:38px minmax(0,1fr) auto;gap:2px 11px;align-items:center;width:100%;min-height:66px;padding:10px 14px;border:0;border-bottom:1px solid var(--rule);background:none;text-align:left;cursor:pointer}
+.chat:hover{background:var(--hover)}
+.chat[aria-current="true"]{background:var(--accent-soft)}
+.chat .avatar{grid-row:span 2;width:38px;height:38px;font-size:13px}
+.chat__name{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chat__time{font-size:11.5px;color:var(--faint);font-variant-numeric:tabular-nums}
+.chat__last{display:flex;align-items:center;gap:5px;min-width:0;font-size:12.5px;color:var(--quiet);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chat__last svg{width:13px;height:13px;flex:none}
+.chat__badge{justify-self:end;min-width:20px;padding:1px 6px;border-radius:999px;background:var(--accent);color:var(--accent-on);font-size:11.5px;text-align:center}
+.chat--unread .chat__name,.chat--unread .chat__last{color:var(--ink);font-weight:500}
+.chat--unread .chat__time{color:var(--accent-text)}
+.chat__flag{justify-self:end;font-size:11px;color:var(--owed)}
+.chats__more{padding:12px;text-align:center;font-size:12.5px;color:var(--faint)}
+
+.thread{flex:1;display:flex;flex-direction:column;gap:6px;padding:16px 18px;overflow-y:auto;background:var(--paper)}
+.day-mark{align-self:center;margin:6px 0;padding:3px 10px;border-radius:999px;background:var(--surface);color:var(--quiet);font-size:11.5px}
+.note{align-self:center;max-width:78%;margin:4px 0;padding:6px 12px;border-radius:var(--radius);background:var(--surface);color:var(--quiet);font-size:12px;text-align:center;line-height:1.4}
+.msg{max-width:66%;padding:8px 11px 6px;border-radius:12px;background:var(--surface);font-size:14px;line-height:1.45;box-shadow:var(--elev)}
+.msg--in{align-self:flex-start;border-top-left-radius:4px}
+.msg--out{align-self:flex-end;border-top-right-radius:4px;background:var(--accent-soft);box-shadow:none}
+.msg p{margin:0}
+.msg__meta{display:flex;justify-content:flex-end;align-items:center;gap:5px;margin-top:3px;font-size:11px;color:var(--faint);font-variant-numeric:tabular-nums}
+.msg__meta svg{width:15px;height:15px}
+.msg__meta .read{color:var(--accent-text)}
+.msg__who{display:block;margin-bottom:2px;font-size:11.5px;color:var(--accent-text)}
+.msg__quote{margin:0 0 5px;padding:5px 8px;border-left:3px solid var(--accent);border-radius:4px;background:var(--hover);color:var(--quiet);font-size:12.5px}
+.msg__btns{display:grid;gap:4px;margin-top:7px}
+.msg__btns span{padding:6px;border:1px solid var(--rule-strong);border-radius:var(--radius);color:var(--quiet);font-size:12.5px;text-align:center}
+.msg__btns .picked{border-color:var(--accent);color:var(--accent-text)}
+.photo{display:grid;place-items:center;width:220px;height:150px;margin-bottom:5px;border-radius:8px;background:linear-gradient(135deg,var(--hover),var(--rule-strong));color:var(--faint)}
+.photo svg{width:28px;height:28px}
+.voice{display:flex;align-items:center;gap:10px;min-width:210px}
+.voice__play{display:grid;place-items:center;flex:none;width:34px;height:34px;border:0;border-radius:50%;background:var(--accent);color:var(--accent-on);cursor:pointer}
+.voice__play svg{width:14px;height:14px}
+.voice__wave{flex:1;height:22px;background:repeating-linear-gradient(90deg,var(--faint) 0 2px,transparent 2px 5px);-webkit-mask:linear-gradient(90deg,#000 0 38%,rgba(0,0,0,.35) 38%);mask:linear-gradient(90deg,#000 0 38%,rgba(0,0,0,.35) 38%);border-radius:2px}
+.voice__len{font-size:12px;color:var(--quiet);font-variant-numeric:tabular-nums}
+.file{display:flex;align-items:center;gap:10px;min-width:200px}
+.file svg{width:26px;height:26px;color:var(--quiet);flex:none}
+.file small{display:block;color:var(--faint);font-size:11.5px}
+.gone{display:flex;align-items:center;gap:8px;color:var(--faint);font-size:13px;font-style:italic}
+.gone svg{width:15px;height:15px}
+.msg--failed{border:1px solid var(--refused);background:var(--refused-quiet)}
+.failed{display:flex;align-items:center;gap:8px;align-self:flex-end;margin-top:-2px;font-size:12px;color:var(--refused)}
+.failed svg{width:13px;height:13px}
+.failed .linkbtn{color:var(--refused);text-decoration:underline}
+.linkbtn{padding:0;border:0;background:none;color:var(--accent-text);font-size:13px;cursor:pointer}
+
+.composer{display:flex;align-items:flex-end;gap:4px;padding:10px 12px;border-top:1px solid var(--rule);background:var(--surface)}
+.composer textarea{flex:1;min-width:0;min-height:40px;max-height:120px;padding:9px 12px;border:1px solid var(--rule);border-radius:var(--radius);background:var(--paper);resize:none;line-height:1.4}
+.composer textarea::placeholder{color:var(--faint)}
+.send{display:grid;place-items:center;flex:none;width:40px;height:40px;border:0;border-radius:var(--radius);background:var(--accent);color:var(--accent-on);cursor:pointer}
+.send svg{width:17px;height:17px}
+.closed{padding:12px 14px;border-top:1px solid var(--rule);background:var(--surface)}
+.closed p{margin:0 0 10px;font-size:13px;color:var(--quiet);line-height:1.45}
+.closed strong{color:var(--ink);font-weight:500}
+.templates{display:grid;gap:6px}
+.template{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;min-height:44px;padding:8px 12px;border:1px solid var(--rule);border-radius:var(--radius);background:var(--paper);text-align:left;font-size:13px;cursor:pointer}
+.template small{display:block;color:var(--faint);font-size:11.5px}
+.template svg{width:14px;height:14px;color:var(--faint);flex:none}
+
+.order{padding:14px 16px;overflow-y:auto}
+.order h3{margin:16px 0 8px;font-size:11px;font-weight:400;letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
+.order h3:first-child{margin-top:0}
+.order dl{display:grid;grid-template-columns:92px 1fr;gap:7px 10px;margin:0;font-size:13px}
+.order dt{color:var(--quiet)} .order dd{margin:0}
+.status{display:inline-flex;align-items:center;gap:6px;align-self:flex-start;padding:3px 10px;border-radius:999px;background:var(--owed-quiet);color:var(--owed);font-size:12.5px}
+.setstatus{display:grid;gap:6px;margin-top:10px}
+.setstatus .btn{width:100%}
+.other{margin:0;padding:0;list-style:none;font-size:13px}
+.other li{display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--rule)}
+.other li:last-child{border-bottom:0}
+.empty{display:grid;place-items:center;align-content:center;gap:6px;padding:30px 20px;color:var(--quiet);font-size:13.5px;text-align:center}
+.empty svg{width:26px;height:26px;color:var(--faint)}
+
+/* ── Phone (the shell's own <=800px rules, drawn at 390) ───────────── */
+.screen--390 .shell{display:block;min-height:0}
+.screen--390 .side{border-right:0;border-bottom:1px solid var(--rule)}
+.screen--390 .brand{justify-content:space-between;padding:10px 16px}
+.screen--390 .brand > span:first-child{display:flex;align-items:center;gap:9px}
+.screen--390 .nav{display:flex;gap:4px;padding:6px 8px;overflow-x:auto}
+.screen--390 .nav a{margin:0;white-space:nowrap}
+.screen--390 .inbox{display:block;height:auto}
+.screen--390 .col{border-right:0;height:640px}
+.screen--390 .msg{max-width:82%}
+.screen--390 .photo{width:190px;height:130px}
+.back{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border:0;background:none;color:var(--accent-text);cursor:pointer}
+.back svg{width:18px;height:18px}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7.5v5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="16.5" r="1.2" fill="currentColor"/></symbol>
+  <symbol id="i-ext" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><path d="M6 15l6-6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-right" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-left" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M20 20l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="i-clip" viewBox="0 0 24 24"><path d="M20 11.5l-8.2 8.2a5 5 0 0 1-7-7L13 4.5a3.3 3.3 0 0 1 4.7 4.7l-8.2 8.1a1.7 1.7 0 0 1-2.3-2.3L14.5 7.6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M4 12l16-8-6 16-3-7-7-1z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+  <symbol id="i-tick" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-ticks" viewBox="0 0 24 24"><path d="M2 12.5l4.5 4.5L15 8M9.5 15.5L11 17l9.5-9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="9" cy="10" r="1.6" fill="currentColor"/><path d="M4 18l5-5 4 4 3-3 4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M7 3h7l5 5v12a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM14 3v5h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5l11 7-11 7z" fill="currentColor"/></symbol>
+  <symbol id="i-template" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 9h8M8 13h8M8 17h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+</svg>
+
+<div class="review">
+  <p class="eyebrow">Mockup for approval · 11 October 2026 · ADR 0059</p>
+  <h1>Inbox, and Operations · WhatsApp</h1>
+  <p class="lead">What a customer-service employee sees when they sign in, and the new WhatsApp tab in Operations. Every name, phone number, order number and message here is made up. It is drawn with the product's own colours, type, cards and tables, and the same sidebar Operations uses. Nothing here is built yet.</p>
+  <div class="toolbar" role="group" aria-label="Theme">
+    <span>Theme</span>
+    <button class="chip" type="button" data-theme-choice="dark" aria-pressed="true">Dark</button>
+    <button class="chip" type="button" data-theme-choice="light" aria-pressed="false">Light</button>
+  </div>
+  <ol class="index">
+    <li><a href="#f-inbox">1. Chats</a></li>
+    <li><a href="#f-states">2. What a chat can look like</a></li>
+    <li><a href="#f-confirm">3. Confirmations</a></li>
+    <li><a href="#f-ops">4. Operations · WhatsApp</a></li>
+    <li><a href="#f-switch">5. Who switches between what</a></li>
+    <li><a href="#f-settings">6. Settings</a></li>
+    <li><a href="#f-phone">7. On a phone</a></li>
+    <li><a href="#f-decide">What you are approving</a></li>
+  </ol>
+
+  <!-- ═══════════════════════════ 1. CHATS ═══════════════════════════ -->
+  <section class="frame" id="f-inbox">
+    <div class="frame__label">
+      <h2>1. Customer service signs in and lands on Chats</h2>
+      <p>Three columns: every conversation on the left, loaded as you scroll; the open chat in the middle; the customer's order on the right. Each message the team sends carries the sender's name. The order's confirmation status can be set here, which changes the tag in Shopify.</p>
+    </div>
+    <div class="frame__scroll">
+      <div class="screen screen--1280" id="shot-inbox">
+        <div class="shell">
+          <aside class="side">
+            <div class="brand"><span class="brand__mark">H</span><span><span class="brand__name">HBA</span><span class="brand__role">Inbox</span></span></div>
+            <nav aria-label="Inbox"><ul class="nav">
+              <li><a href="#" aria-current="page">Chats <span class="nav__count">4</span></a></li>
+              <li><a href="#">Confirmations</a></li>
+            </ul></nav>
+            <div class="account"><span class="avatar">M</span><span class="account__who">Mariam<small>Customer service</small></span><span class="caret">▾</span></div>
+          </aside>
+          <div class="inbox">
+            <section class="col" aria-label="Conversations">
+              <div class="col__head"><div><h1>Chats</h1><small>2,995 conversations</small></div><p class="fresh" role="status" title="The last message from WhatsApp arrived at 14:21."><svg aria-hidden="true"><use href="#i-clock"/></svg>Live</p></div>
+              <label class="search"><span class="sr">Search chats</span><svg aria-hidden="true"><use href="#i-search"/></svg><input type="search" placeholder="Name, phone or order number"></label>
+              <div class="filters" role="group" aria-label="Show">
+                <button class="chip" type="button" aria-pressed="true">All</button>
+                <button class="chip" type="button" aria-pressed="false">Unread · 4</button>
+                <button class="chip" type="button" aria-pressed="false">Wants a change · 3</button>
+                <button class="chip" type="button" aria-pressed="false">Cancelled</button>
+              </div>
+              <ul class="chats">
+                <li><button class="chat chat--unread" type="button" aria-current="true"><span class="avatar">N</span><span class="chat__name">Nour Adel</span><span class="chat__time">14:21</span><span class="chat__last"><svg aria-hidden="true"><use href="#i-mic"/></svg>Voice note · 0:14</span><span class="chat__badge">2</span></button></li>
+                <li><button class="chat chat--unread" type="button"><span class="avatar">S</span><span class="chat__name">Salma Hany</span><span class="chat__time">14:09</span><span class="chat__last">Can I change the size to M?</span><span class="chat__badge">1</span></button></li>
+                <li><button class="chat chat--unread" type="button"><span class="avatar">+</span><span class="chat__name">+20 100 555 0143</span><span class="chat__time">13:52</span><span class="chat__last"><svg aria-hidden="true"><use href="#i-image"/></svg>Photo</span><span class="chat__badge">1</span></button></li>
+                <li><button class="chat" type="button"><span class="avatar">H</span><span class="chat__name">Habiba Tarek</span><span class="chat__time">13:40</span><span class="chat__last"><svg aria-hidden="true"><use href="#i-ticks"/></svg>Done, it will ship tomorrow.</span><span></span></button></li>
+                <li><button class="chat" type="button"><span class="avatar">R</span><span class="chat__name">Rana Sherif</span><span class="chat__time">12:58</span><span class="chat__last">Tapped Confirm · #31042</span><span></span></button></li>
+                <li><button class="chat" type="button"><span class="avatar">M</span><span class="chat__name">Mai Ashraf</span><span class="chat__time">12:31</span><span class="chat__last">Tapped Cancel · #31039</span><span class="chat__flag">Cancel</span></button></li>
+                <li><button class="chat" type="button"><span class="avatar">Y</span><span class="chat__name">Yara Magdy</span><span class="chat__time">11:47</span><span class="chat__last"><svg aria-hidden="true"><use href="#i-tick"/></svg>Order confirmation · #31036</span><span></span></button></li>
+                <li><button class="chat" type="button"><span class="avatar">L</span><span class="chat__name">Laila Emad</span><span class="chat__time">Yesterday</span><span class="chat__last">Thank you ❤️</span><span></span></button></li>
+                <li><button class="chat" type="button"><span class="avatar">F</span><span class="chat__name">Farida Samir</span><span class="chat__time">Yesterday</span><span class="chat__last"><svg aria-hidden="true"><use href="#i-file"/></svg>receipt.pdf</span><span></span></button></li>
+                <li class="chats__more">Scroll for older chats</li>
+              </ul>
+            </section>
+
+            <section class="col" aria-label="Chat with Nour Adel">
+              <div class="col__head"><div><h2>Nour Adel</h2><small>+20 100 555 0188 · can reply freely until 14:21 tomorrow</small></div><button class="iconbtn" type="button" aria-label="Search in this chat"><svg aria-hidden="true"><use href="#i-search"/></svg></button></div>
+              <div class="thread">
+                <span class="day-mark">Today</span>
+                <div class="msg msg--out"><span class="msg__who">Automatic · order confirmation</span><p>Hi Nour, thank you for your order #31044. Your total is EGP 1,450, cash on delivery. Please confirm it below.</p><div class="msg__btns"><span>Confirm</span><span class="picked">Edit</span><span>Cancel</span></div><div class="msg__meta">13:02 <svg class="read" role="img" aria-label="Read"><use href="#i-ticks"/></svg></div></div>
+                <div class="note">Nour tapped Edit · the order is now tagged Edit ✏️</div>
+                <div class="msg msg--out"><span class="msg__who">Automatic</span><p>What would you like to change? ✏️ Type it here and our team will help you.</p><div class="msg__meta">13:05 <svg class="read" role="img" aria-label="Read"><use href="#i-ticks"/></svg></div></div>
+                <div class="msg msg--in"><p>Hi, I ordered the black set but I want it in beige please</p><div class="msg__meta">13:06</div></div>
+                <div class="msg msg--in"><div class="photo"><svg aria-hidden="true"><use href="#i-image"/></svg></div><p>This one</p><div class="msg__meta">13:06</div></div>
+                <div class="msg msg--out"><span class="msg__who">Mariam</span><div class="msg__quote">This one</div><p>Of course. Beige in the same size, M?</p><div class="msg__meta">13:11 <svg class="read" role="img" aria-label="Read"><use href="#i-ticks"/></svg></div></div>
+                <div class="msg msg--in"><p>Yes M</p><div class="msg__meta">14:20</div></div>
+                <div class="msg msg--in"><div class="voice"><button class="voice__play" type="button" aria-label="Play voice note"><svg aria-hidden="true"><use href="#i-play"/></svg></button><span class="voice__wave"></span><span class="voice__len">0:14</span></div><div class="msg__meta">14:21</div></div>
+              </div>
+              <div class="composer">
+                <button class="iconbtn" type="button" aria-label="Attach a photo, video or file"><svg aria-hidden="true"><use href="#i-clip"/></svg></button>
+                <button class="iconbtn" type="button" aria-label="Send an approved message"><svg aria-hidden="true"><use href="#i-template"/></svg></button>
+                <label class="sr" for="reply-1">Message</label><textarea id="reply-1" rows="1" placeholder="Type a message"></textarea>
+                <button class="iconbtn" type="button" aria-label="Record a voice note"><svg aria-hidden="true"><use href="#i-mic"/></svg></button>
+                <button class="send" type="button" aria-label="Send"><svg aria-hidden="true"><use href="#i-send"/></svg></button>
+              </div>
+            </section>
+
+            <aside class="col order" aria-label="Order">
+              <h3>Order</h3>
+              <dl>
+                <dt>Number</dt><dd><a class="ext" href="#">#31044 <svg aria-hidden="true"><use href="#i-ext"/></svg></a></dd>
+                <dt>Placed</dt><dd class="num">Today, 13:01</dd>
+                <dt>Total</dt><dd class="num">EGP 1,450</dd>
+                <dt>Payment</dt><dd>Cash on delivery</dd>
+                <dt>Items</dt><dd>Lounge set, black, M</dd>
+              </dl>
+              <h3>Confirmation</h3>
+              <span class="status">Wants a change</span>
+              <div class="setstatus">
+                <button class="btn btn--small" type="button">Mark confirmed</button>
+                <button class="btn btn--quiet btn--small" type="button">Mark cancelled</button>
+              </div>
+              <h3>Tags in Shopify</h3>
+              <div><span class="tag">WA Sent 📤</span><span class="tag tag--hit">Edit ✏️</span></div>
+              <h3>Earlier orders</h3>
+              <ul class="other">
+                <li><a class="ext" href="#">#29871 <svg aria-hidden="true"><use href="#i-ext"/></svg></a><span class="muted">Confirmed · 2 Sep</span></li>
+                <li><a class="ext" href="#">#28104 <svg aria-hidden="true"><use href="#i-ext"/></svg></a><span class="muted">Confirmed · 14 Jul</span></li>
+              </ul>
+            </aside>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════ 2. STATES ═══════════════════════════ -->
+  <section class="frame" id="f-states">
+    <div class="frame__label">
+      <h2>2. What a chat can look like</h2>
+      <p>Four situations, each drawn as one column only.</p>
+    </div>
+    <div class="row">
+      <div>
+        <p class="cap">The customer has been silent for more than 24 hours</p>
+        <div class="screen screen--crop">
+          <div class="thread" style="height:230px">
+            <span class="day-mark">8 October</span>
+            <div class="msg msg--in"><p>When will it arrive?</p><div class="msg__meta">16:40</div></div>
+            <div class="msg msg--out"><span class="msg__who">Mariam</span><p>Within three working days.</p><div class="msg__meta">16:52 <svg class="read" role="img" aria-label="Read"><use href="#i-ticks"/></svg></div></div>
+          </div>
+          <div class="closed">
+            <p><strong>You can't type a message here.</strong> WhatsApp only allows free replies for 24 hours after the customer's last message. Send one of the approved messages; when she answers, the chat opens again.</p>
+            <div class="templates">
+              <button class="template" type="button"><span>Order confirmation<small>Asks her to confirm, edit or cancel her order</small></span><svg aria-hidden="true"><use href="#i-right"/></svg></button>
+              <button class="template" type="button"><span>We tried to reach you<small>Asks her to reply so we can help</small></span><svg aria-hidden="true"><use href="#i-right"/></svg></button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <p class="cap">A message WhatsApp refused</p>
+        <div class="screen screen--crop">
+          <div class="thread" style="height:230px">
+            <span class="day-mark">Today</span>
+            <div class="msg msg--in"><p>Is the beige available?</p><div class="msg__meta">11:02</div></div>
+            <div class="msg msg--out msg--failed"><span class="msg__who">Mariam</span><p>Yes, it is. Shall I change your order?</p><div class="msg__meta">11:04</div></div>
+            <div class="failed"><svg aria-hidden="true"><use href="#i-alert"/></svg>Not sent: WhatsApp could not reach this number. <button class="linkbtn" type="button">Try again</button></div>
+          </div>
+          <div class="composer">
+            <button class="iconbtn" type="button" aria-label="Attach a photo, video or file"><svg aria-hidden="true"><use href="#i-clip"/></svg></button>
+            <label class="sr" for="reply-2">Message</label><textarea id="reply-2" rows="1" placeholder="Type a message"></textarea>
+            <button class="send" type="button" aria-label="Send"><svg aria-hidden="true"><use href="#i-send"/></svg></button>
+          </div>
+        </div>
+      </div>
+      <div>
+        <p class="cap">An old chat, brought over from the previous inbox</p>
+        <div class="screen screen--crop">
+          <div class="thread" style="height:372px">
+            <span class="day-mark">19 August</span>
+            <div class="note">Brought over from the old inbox. Who sent each reply was not recorded there.</div>
+            <div class="msg msg--in"><div class="gone"><svg aria-hidden="true"><use href="#i-image"/></svg>Photo no longer available</div><div class="msg__meta">10:15</div></div>
+            <div class="msg msg--in"><p>It arrived like this</p><div class="msg__meta">10:15</div></div>
+            <div class="msg msg--out"><span class="msg__who">HBA</span><p>Sorry about that. We will send a replacement.</p><div class="msg__meta">10:31 <svg class="read" role="img" aria-label="Read"><use href="#i-ticks"/></svg></div></div>
+            <div class="msg msg--in"><div class="file"><svg aria-hidden="true"><use href="#i-file"/></svg><span>receipt.pdf<small>No longer available</small></span></div><div class="msg__meta">10:40</div></div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <p class="cap">A search that finds nothing</p>
+        <div class="screen screen--crop" style="width:330px">
+          <label class="search"><span class="sr">Search chats</span><svg aria-hidden="true"><use href="#i-search"/></svg><input type="search" value="#99999"></label>
+          <div class="empty" style="height:200px"><svg aria-hidden="true"><use href="#i-search"/></svg><span>No chat matches “#99999”.<br>Check the number, or search by phone.</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════ 3. CONFIRMATIONS ═══════════════════════════ -->
+  <section class="frame" id="f-confirm">
+    <div class="frame__label">
+      <h2>3. Confirmations</h2>
+      <p>Where every order's confirmation message stands, and the one place a message can be sent again. Paid orders are not listed: they never get a confirmation. Here <em>Not sent</em> is open.</p>
+    </div>
+    <div class="frame__scroll">
+      <div class="screen screen--1280" id="shot-confirm">
+        <div class="shell">
+          <aside class="side">
+            <div class="brand"><span class="brand__mark">H</span><span><span class="brand__name">HBA</span><span class="brand__role">Inbox</span></span></div>
+            <nav aria-label="Inbox"><ul class="nav">
+              <li><a href="#">Chats <span class="nav__count">4</span></a></li>
+              <li><a href="#" aria-current="page">Confirmations</a></li>
+            </ul></nav>
+            <div class="account"><span class="avatar">M</span><span class="account__who">Mariam<small>Customer service</small></span><span class="caret">▾</span></div>
+          </aside>
+          <main class="main">
+            <header class="head">
+              <div><h1>Confirmations</h1><span class="head__sub">Cash-on-delivery orders from the last 7 days · 262</span></div>
+              <p class="fresh" role="status"><svg aria-hidden="true"><use href="#i-clock"/></svg>Updated just now</p>
+            </header>
+            <div class="tiles">
+              <button class="tile" type="button" aria-expanded="false"><span class="tile__label">Waiting for an answer</span><span class="tile__value">31</span><span class="tile__note">Message delivered, no button tapped yet</span><span class="tile__more">Show orders <svg aria-hidden="true"><use href="#i-down"/></svg></span></button>
+              <button class="tile" type="button" aria-expanded="false"><span class="tile__label">Wants a change</span><span class="tile__value">3</span><span class="tile__note">Tapped Edit</span><span class="tile__more">Show orders <svg aria-hidden="true"><use href="#i-down"/></svg></span></button>
+              <button class="tile" type="button" aria-expanded="false"><span class="tile__label">Asked to cancel</span><span class="tile__value">2</span><span class="tile__note">Tapped Cancel, still open in Shopify</span><span class="tile__more">Show orders <svg aria-hidden="true"><use href="#i-down"/></svg></span></button>
+              <button class="tile" type="button" aria-expanded="true" aria-controls="list-notsent"><span class="tile__label">Not sent</span><span class="tile__value">4</span><span class="tile__note">The message never went out</span><span class="tile__more">Hide orders <svg aria-hidden="true"><use href="#i-up"/></svg></span></button>
+              <button class="tile" type="button" aria-expanded="false"><span class="tile__label">No WhatsApp</span><span class="tile__value">1</span><span class="tile__note">The number has no WhatsApp: call instead</span><span class="tile__more">Show orders <svg aria-hidden="true"><use href="#i-down"/></svg></span></button>
+              <button class="tile" type="button" aria-expanded="false"><span class="tile__label">Confirmed</span><span class="tile__value">221</span><span class="tile__note">Tapped Confirm</span><span class="tile__more">Show orders <svg aria-hidden="true"><use href="#i-down"/></svg></span></button>
+            </div>
+            <section class="panel" id="list-notsent" aria-labelledby="list-notsent-title">
+              <div class="panel__head"><h2 class="panel__title" id="list-notsent-title">Not sent · 4 orders</h2><p class="panel__hint">Sending again never sends twice: an order that already has a message is refused.</p></div>
+              <table class="table">
+                <thead><tr><th>Order</th><th>Customer</th><th>Placed</th><th>Why</th><th><span class="sr">Action</span></th></tr></thead>
+                <tbody>
+                  <tr><td><a class="ext" href="#">#31040 <svg aria-hidden="true"><use href="#i-ext"/></svg></a></td><td>Dina Fouad</td><td class="num">Today, 12:40</td><td>WhatsApp was not answering · tried 5 times</td><td><button class="btn btn--small" type="button">Send again</button></td></tr>
+                  <tr><td><a class="ext" href="#">#31033 <svg aria-hidden="true"><use href="#i-ext"/></svg></a></td><td>Jana Wael</td><td class="num">Today, 10:12</td><td>WhatsApp was not answering · tried 5 times</td><td><button class="btn btn--small" type="button">Send again</button></td></tr>
+                  <tr><td><a class="ext" href="#">#31007 <svg aria-hidden="true"><use href="#i-ext"/></svg></a></td><td>Malak Nabil</td><td class="num">10 Oct, 19:55</td><td>The phone number on the order is not a valid Egyptian number</td><td><button class="btn btn--quiet btn--small" type="button">Open in Shopify</button></td></tr>
+                  <tr><td><a class="ext" href="#">#30988 <svg aria-hidden="true"><use href="#i-ext"/></svg></a></td><td>Reem Khaled</td><td class="num">10 Oct, 08:03</td><td>The order has no phone number</td><td><button class="btn btn--quiet btn--small" type="button">Open in Shopify</button></td></tr>
+                </tbody>
+              </table>
+            </section>
+          </main>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════ 4. OPERATIONS · WHATSAPP ═══════════════════════════ -->
+  <section class="frame" id="f-ops">
+    <div class="frame__label">
+      <h2>4. Operations gains a fourth tab: WhatsApp</h2>
+      <p>For the operations manager, beside Shopify, Bosta and E-stebdal. It only reads, as the rest of Operations does, and it shows order numbers and reasons with no name, phone or message. Each order opens in the Inbox, where the fix is made. Here <em>Failed to send</em> is open.</p>
+    </div>
+    <div class="frame__scroll">
+      <div class="screen screen--1280" id="shot-ops">
+        <div class="shell">
+          <aside class="side">
+            <div class="brand"><span class="brand__mark">H</span><span><span class="brand__name">HBA</span><span class="brand__role">Operations</span></span></div>
+            <div class="switch" role="group" aria-label="Dashboard"><a href="#" aria-current="page">Operations</a><a href="#">Inbox</a></div>
+            <nav aria-label="Operations"><ul class="nav">
+              <li><a href="#">Shopify</a></li>
+              <li><a href="#">Bosta</a></li>
+              <li><a href="#">E-stebdal</a></li>
+              <li><a href="#" aria-current="page">WhatsApp <span class="nav__new">New</span></a></li>
+            </ul></nav>
+            <div class="account"><span class="avatar">A</span><span class="account__who">Amr<small>Operations manager</small></span><span class="caret">▾</span></div>
+          </aside>
+          <main class="main">
+            <header class="head">
+              <div><h1>WhatsApp</h1><span class="head__sub">Order confirmations that went wrong · last 7 days</span></div>
+              <p class="fresh" role="status" title="Read at 14:21. Read again every 5 minutes."><svg aria-hidden="true"><use href="#i-clock"/></svg>Updated 2 minutes ago · WhatsApp last heard from 1 minute ago</p>
+            </header>
+            <div class="tiles">
+              <button class="tile" type="button" aria-expanded="true" aria-controls="list-failed"><span class="tile__label">Failed to send</span><span class="tile__value">2</span><span class="tile__note">Tried 5 times and gave up</span><span class="tile__more">Hide orders <svg aria-hidden="true"><use href="#i-up"/></svg></span></button>
+              <button class="tile" type="button" aria-expanded="false"><span class="tile__label">No WhatsApp</span><span class="tile__value">1</span><span class="tile__note">The number has no WhatsApp: call instead</span><span class="tile__more">Show orders <svg aria-hidden="true"><use href="#i-down"/></svg></span></button>
+              <button class="tile" type="button" aria-expanded="false"><span class="tile__label">Never messaged</span><span class="tile__value">2</span><span class="tile__note">No phone, or not a valid number</span><span class="tile__more">Show orders <svg aria-hidden="true"><use href="#i-down"/></svg></span></button>
+              <div class="tile tile--zero"><span class="tile__label">Answers not recorded</span><span class="tile__value">0</span><span class="tile__note">A tap that could not be turned into a tag</span></div>
+              <button class="tile" type="button" aria-expanded="false"><span class="tile__label">Waiting over 24 hours</span><span class="tile__value">9</span><span class="tile__note">Delivered, no button tapped</span><span class="tile__more">Show orders <svg aria-hidden="true"><use href="#i-down"/></svg></span></button>
+            </div>
+            <section class="panel" id="list-failed" aria-labelledby="list-failed-title">
+              <div class="panel__head"><h2 class="panel__title" id="list-failed-title">Failed to send · 2 orders</h2><p class="panel__hint">Each order opens in the Inbox, where the message is sent again.</p></div>
+              <table class="table">
+                <thead><tr><th>Order</th><th>Placed</th><th>Waiting</th><th>Why</th><th>Tags</th></tr></thead>
+                <tbody>
+                  <tr><td><a class="ext" href="#">#31040 <svg aria-hidden="true"><use href="#i-right"/></svg></a></td><td class="num">11 Oct, 12:40</td><td class="muted">Today</td><td>WhatsApp was not answering</td><td><span class="muted">None yet</span></td></tr>
+                  <tr><td><a class="ext" href="#">#31033 <svg aria-hidden="true"><use href="#i-right"/></svg></a></td><td class="num">11 Oct, 10:12</td><td class="muted">Today</td><td>WhatsApp was not answering</td><td><span class="muted">None yet</span></td></tr>
+                </tbody>
+              </table>
+            </section>
+            <div class="banner" role="note"><svg aria-hidden="true"><use href="#i-alert"/></svg><div>If WhatsApp goes quiet, this is what the top of the tab shows instead<small>“WhatsApp has not been heard from for 40 minutes. New confirmations may not be going out.” The cards keep their last numbers and show their age; they never drop to 0.</small></div></div>
+          </main>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════ 5. THE SWITCH ═══════════════════════════ -->
+  <section class="frame" id="f-switch">
+    <div class="frame__label">
+      <h2>5. Who switches between what</h2>
+      <p>The switch under the brand shows only the dashboards a person holds. Customer service holds one, so they see no switch.</p>
+    </div>
+    <div class="row">
+      <div><p class="cap">Admin</p><div class="screen" style="width:260px"><aside class="side" style="border:0"><div class="brand"><span class="brand__mark">H</span><span><span class="brand__name">HBA</span><span class="brand__role">Inbox</span></span></div><div class="switch" role="group" aria-label="Dashboard" style="margin-bottom:10px"><a href="#">Affiliates</a><a href="#">Operations</a><a href="#" aria-current="page">Inbox</a></div></aside></div></div>
+      <div><p class="cap">Operations manager</p><div class="screen" style="width:216px"><aside class="side" style="border:0"><div class="brand"><span class="brand__mark">H</span><span><span class="brand__name">HBA</span><span class="brand__role">Operations</span></span></div><div class="switch" role="group" aria-label="Dashboard" style="margin-bottom:10px"><a href="#" aria-current="page">Operations</a><a href="#">Inbox</a></div></aside></div></div>
+      <div><p class="cap">Customer service</p><div class="screen" style="width:216px"><aside class="side" style="border:0"><div class="brand" style="border:0"><span class="brand__mark">H</span><span><span class="brand__name">HBA</span><span class="brand__role">Inbox</span></span></div></aside></div></div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════ 6. SETTINGS ═══════════════════════════ -->
+  <section class="frame" id="f-settings">
+    <div class="frame__label">
+      <h2>6. Settings: the new role and the WhatsApp connection</h2>
+      <p>Only an admin sees this. The role table gains one row and one column; the operations manager gains the Inbox. The WhatsApp keys are saved encrypted, the way the Shopify secret is, and only their last four characters are ever shown.</p>
+    </div>
+    <div class="frame__scroll">
+      <div class="screen screen--1280">
+        <div class="settings">
+          <section class="panel">
+            <div class="panel__head"><h2 class="panel__title">What each role can open</h2></div>
+            <table class="table perm">
+              <thead><tr><th>Role</th><th>Models and pay</th><th>Operations</th><th>Inbox</th><th>How many</th></tr></thead>
+              <tbody>
+                <tr><td>Admin</td><td>Yes</td><td>Yes</td><td>Yes</td><td>Any</td></tr>
+                <tr><td>Affiliate manager</td><td>Yes</td><td class="muted">No</td><td class="muted">No</td><td>Any</td></tr>
+                <tr><td>Content manager</td><td>Yes</td><td class="muted">No</td><td class="muted">No</td><td>Any</td></tr>
+                <tr><td>Operations manager</td><td class="muted">No</td><td>Yes</td><td>Yes</td><td>One</td></tr>
+                <tr class="new"><td>Customer service</td><td class="muted">No</td><td class="muted">No</td><td>Yes</td><td>Any</td></tr>
+              </tbody>
+            </table>
+          </section>
+          <section class="panel">
+            <div class="panel__head"><h2 class="panel__title">WhatsApp</h2></div>
+            <div class="conn">
+              <div class="conn__top"><span class="conn__name">HBA Wear · +20 100 555 0100</span><span class="conn__state">Connected</span></div>
+              <dl>
+                <dt>Access key</dt><dd>•••• 4f2a</dd>
+                <dt>App secret</dt><dd>•••• 91c0</dd>
+                <dt>Last heard from</dt><dd>1 minute ago</dd>
+                <dt>Number rating</dt><dd>High</dd>
+                <dt>Sending</dt><dd>On</dd>
+              </dl>
+              <button class="btn btn--quiet btn--small" type="button">Change keys</button>
+              <button class="btn btn--quiet btn--small" type="button">Turn sending off</button>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════ 7. PHONE ═══════════════════════════ -->
+  <section class="frame" id="f-phone">
+    <div class="frame__label">
+      <h2>7. On a phone</h2>
+      <p>The list fills the screen; opening a chat replaces it, with a way back. The order sits behind the Order button at the top of the chat.</p>
+    </div>
+    <div class="row">
+      <div class="screen screen--390" id="shot-phone-list">
+        <div class="shell">
+          <aside class="side">
+            <div class="brand"><span><span class="brand__mark">H</span><span><span class="brand__name">HBA</span><span class="brand__role">Inbox</span></span></span><span class="avatar">M</span></div>
+            <nav aria-label="Inbox"><ul class="nav"><li><a href="#" aria-current="page">Chats <span class="nav__count">4</span></a></li><li><a href="#">Confirmations</a></li></ul></nav>
+          </aside>
+          <div class="inbox">
+            <section class="col" aria-label="Conversations">
+              <label class="search"><span class="sr">Search chats</span><svg aria-hidden="true"><use href="#i-search"/></svg><input type="search" placeholder="Name, phone or order number"></label>
+              <div class="filters" role="group" aria-label="Show">
+                <button class="chip" type="button" aria-pressed="true">All</button>
+                <button class="chip" type="button" aria-pressed="false">Unread · 4</button>
+                <button class="chip" type="button" aria-pressed="false">Wants a change · 3</button>
+              </div>
+              <ul class="chats">
+                <li><button class="chat chat--unread" type="button"><span class="avatar">N</span><span class="chat__name">Nour Adel</span><span class="chat__time">14:21</span><span class="chat__last"><svg aria-hidden="true"><use href="#i-mic"/></svg>Voice note · 0:14</span><span class="chat__badge">2</span></button></li>
+                <li><button class="chat chat--unread" type="button"><span class="avatar">S</span><span class="chat__name">Salma Hany</span><span class="chat__time">14:09</span><span class="chat__last">Can I change the size to M?</span><span class="chat__badge">1</span></button></li>
+                <li><button class="chat chat--unread" type="button"><span class="avatar">+</span><span class="chat__name">+20 100 555 0143</span><span class="chat__time">13:52</span><span class="chat__last"><svg aria-hidden="true"><use href="#i-image"/></svg>Photo</span><span class="chat__badge">1</span></button></li>
+                <li><button class="chat" type="button"><span class="avatar">H</span><span class="chat__name">Habiba Tarek</span><span class="chat__time">13:40</span><span class="chat__last"><svg aria-hidden="true"><use href="#i-ticks"/></svg>Done, it will ship tomorrow.</span><span></span></button></li>
+                <li><button class="chat" type="button"><span class="avatar">R</span><span class="chat__name">Rana Sherif</span><span class="chat__time">12:58</span><span class="chat__last">Tapped Confirm · #31042</span><span></span></button></li>
+                <li><button class="chat" type="button"><span class="avatar">M</span><span class="chat__name">Mai Ashraf</span><span class="chat__time">12:31</span><span class="chat__last">Tapped Cancel · #31039</span><span class="chat__flag">Cancel</span></button></li>
+                <li><button class="chat" type="button"><span class="avatar">Y</span><span class="chat__name">Yara Magdy</span><span class="chat__time">11:47</span><span class="chat__last"><svg aria-hidden="true"><use href="#i-tick"/></svg>Order confirmation · #31036</span><span></span></button></li>
+              </ul>
+            </section>
+          </div>
+        </div>
+      </div>
+      <div class="screen screen--390" id="shot-phone-chat">
+        <div class="inbox">
+          <section class="col" aria-label="Chat with Nour Adel" style="height:756px">
+            <div class="col__head" style="padding-left:6px"><div style="display:flex;align-items:center;gap:2px;min-width:0"><button class="back" type="button" aria-label="Back to chats"><svg aria-hidden="true"><use href="#i-left"/></svg></button><div><h2>Nour Adel</h2><small>#31044 · Wants a change</small></div></div><button class="btn btn--quiet btn--small" type="button">Order</button></div>
+            <div class="thread">
+              <span class="day-mark">Today</span>
+              <div class="note">Nour tapped Edit · the order is now tagged Edit ✏️</div>
+              <div class="msg msg--out"><span class="msg__who">Automatic</span><p>What would you like to change? ✏️ Type it here and our team will help you.</p><div class="msg__meta">13:05 <svg class="read" role="img" aria-label="Read"><use href="#i-ticks"/></svg></div></div>
+              <div class="msg msg--in"><p>Hi, I ordered the black set but I want it in beige please</p><div class="msg__meta">13:06</div></div>
+              <div class="msg msg--in"><div class="photo"><svg aria-hidden="true"><use href="#i-image"/></svg></div><p>This one</p><div class="msg__meta">13:06</div></div>
+              <div class="msg msg--out"><span class="msg__who">Mariam</span><p>Of course. Beige in the same size, M?</p><div class="msg__meta">13:11 <svg class="read" role="img" aria-label="Read"><use href="#i-ticks"/></svg></div></div>
+              <div class="msg msg--in"><p>Yes M</p><div class="msg__meta">14:20</div></div>
+              <div class="msg msg--in"><div class="voice"><button class="voice__play" type="button" aria-label="Play voice note"><svg aria-hidden="true"><use href="#i-play"/></svg></button><span class="voice__wave"></span><span class="voice__len">0:14</span></div><div class="msg__meta">14:21</div></div>
+            </div>
+            <div class="composer">
+              <button class="iconbtn" type="button" aria-label="Attach a photo, video or file"><svg aria-hidden="true"><use href="#i-clip"/></svg></button>
+              <label class="sr" for="reply-3">Message</label><textarea id="reply-3" rows="1" placeholder="Type a message"></textarea>
+              <button class="iconbtn" type="button" aria-label="Record a voice note"><svg aria-hidden="true"><use href="#i-mic"/></svg></button>
+              <button class="send" type="button" aria-label="Send"><svg aria-hidden="true"><use href="#i-send"/></svg></button>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════ DECIDE ═══════════════════════════ -->
+  <section class="frame" id="f-decide">
+    <div class="frame__label"><h2>What you are approving</h2></div>
+    <ol class="decide">
+      <li><strong>Inbox has two sections</strong>: Chats and Confirmations. There are no settings, calls, statuses or groups.</li>
+      <li><strong>Chats is three columns on a laptop</strong>: conversations, the chat, the order. On a phone it is one at a time.</li>
+      <li><strong>Four ways to narrow the list</strong>: All, Unread, Wants a change, Cancelled, and a search by name, phone or order number.</li>
+      <li><strong>The customer's name and phone are shown in the Inbox.</strong> They are not shown anywhere in Operations.</li>
+      <li><strong>Every reply shows who sent it.</strong> Old replies brought over from the previous inbox show “HBA”, because the sender was never recorded.</li>
+      <li><strong>Staff can set an order to confirmed or cancelled from the chat.</strong> That changes the tag in Shopify. It does not cancel the order in Shopify; that is still done there.</li>
+      <li><strong>After 24 hours of silence the typing box is replaced</strong> by an explanation and the approved messages. The second message shown here, “We tried to reach you”, does not exist yet and would need Meta's approval.</li>
+      <li><strong>Old photos, voice notes and files show as no longer available.</strong> WhatsApp deleted them and the old inbox kept no copy.</li>
+      <li><strong>Confirmations lists only cash-on-delivery orders</strong>, with a Send again button that refuses an order already messaged.</li>
+      <li><strong>Operations · WhatsApp shows five cards</strong>: Failed to send, No WhatsApp, Never messaged, Answers not recorded, Waiting over 24 hours.</li>
+      <li><strong>The operations manager gets a switch</strong> between Operations and Inbox.</li>
+    </ol>
+  </section>
+</div>
+
+<script>
+  document.querySelectorAll('[data-theme-choice]').forEach(function (button) {
+    button.addEventListener('click', function () {
+      var choice = button.getAttribute('data-theme-choice');
+      document.documentElement.setAttribute('data-theme', choice);
+      document.querySelectorAll('[data-theme-choice]').forEach(function (other) {
+        other.setAttribute('aria-pressed', String(other === button));
+      });
+    });
+  });
+  // A chat opens at its newest message.
+  document.querySelectorAll('.thread').forEach(function (thread) {
+    thread.scrollTop = thread.scrollHeight;
+  });
+</script>
+</body>
+</html>

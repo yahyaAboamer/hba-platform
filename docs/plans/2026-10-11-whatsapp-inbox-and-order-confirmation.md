@@ -2,7 +2,9 @@
 
 **Decision record:** `docs/adr/0059-order-confirmation-and-the-customer-inbox-move-into-the-platform.md`
 **Written:** 11 October 2026
-**Starts:** only after the audit repair's release gates are finished. Nothing here is built yet.
+**Started:** 11 October 2026, on the owner's order, ahead of the audit repair's release gates.
+**Branch:** `feature/whatsapp-inbox`, cut from `repair/batch-2`. It stays off the repair branch so the repair remains releasable, and nothing is merged or deployed without the owner's separate go-ahead.
+**Where it stands:** phase 0 checks answered below; mockup `docs/design/whatsapp-inbox-2026-10-11.html` awaiting the owner's approval.
 **Replaces:** the Railway project `order-confirmation-message` (n8n + Postgres, production only).
 
 ## Shape of the work
@@ -27,24 +29,32 @@ Phases 2 and 3 can overlap. Phase 4 needs phase 3. Phase 7 needs everything befo
 
 No code. Each item changes the design if the answer is not what we expect.
 
+Answered on 11 October 2026, each by a read-only check:
+
+| Check | Answer | What it changes |
+|---|---|---|
+| Which Shopify app n8n uses | A different app from the platform's, on the same store | The second connection (ADR 0059, point 11) is that app; no new app is needed |
+| What the platform's own app may read | Read access only, and it already includes the customer's name and phone | Intake reads the phone through the existing connection. The second connection only writes tags |
+| Why 220 queued orders ended as failed | All 220 are paid orders, which are never meant to get a message. n8n drops them unmarked, retries five times and calls them failed. All 2,823 sent ones are cash on delivery | No customer was missed. The rebuild records a paid order as finished, so the failed count means something |
+| How the n8n chat page checks who may use it | One fixed key in the page's address, shared by everyone | Anyone who has seen the link can read every chat. A reason not to delay the switch |
+| Where n8n keeps its Shopify secret | In plain text inside the workflows | The secret is replaced when n8n is retired |
+| How long Meta keeps media | 7 days for an incoming file; a download link lasts 5 minutes | Media is copied the moment it arrives. Almost none of the old media can be imported |
+| An object bucket on Railway | $0.015 per GB a month, downloads free | Media storage costs cents |
+
+Still to be answered, by the owner:
+
 | Check | Why it matters |
 |---|---|
-| October's charges in WhatsApp Manager | Settles whether free-form replies are billed, and how much the automatic replies cost |
-| Which Shopify app n8n uses, and what access it holds | Decides whether the second connection (ADR 0059, point 11) reuses it or needs a new app |
-| Whether the platform's own Shopify webhooks carry the customer's phone | Shopify hides customer fields from apps without approved access. If hidden, intake reads the phone through the second connection |
+| October's charges in WhatsApp Manager | Settles whether free-form replies are billed |
 | Who owns the Meta business account, the app and the number | Needed to change the callback address in phase 7 |
 | The approved templates, and their exact wording | Outside the 24-hour window only these can be sent |
-| How long Meta keeps media | Sets how soon media must be copied |
-| Why 220 queued orders ended as failed | The rebuild should not copy the cause |
-| How the n8n chat page checks who may use it | If it is weak, phase 7 becomes more urgent |
-| An object bucket on Railway, and its cost | Media storage |
 
 Also in this phase:
 
-- **Mockups of the Inbox and of the Operations WhatsApp tab**, approved by the owner before any screen is built, the way Operations was. Desktop and phone.
-- **The owner's confirmation of the automatic replies** proposed in ADR 0059, point 8: none after Confirm, Edit kept, Cancel kept and reworded. The new Cancel wording is agreed here.
+- **Mockup of the Inbox and of the Operations WhatsApp tab**: `docs/design/whatsapp-inbox-2026-10-11.html`. The owner approves it before any screen is built, the way Operations was. Desktop and phone.
+- **Automatic replies**: settled by the owner on 11 October (ADR 0059, point 8).
 
-**Done when:** every row has an answer written into this plan, and both mockups are approved.
+**Done when:** the three remaining rows have answers written here, and the mockup is approved.
 
 ## Phase 1 — Foundations
 
@@ -59,7 +69,7 @@ Also in this phase:
 
 ## Phase 2 — Confirmation engine, running silently
 
-- On each new order the platform decides what n8n decides: cash on delivery or pending payment, the Egyptian number, the three template values.
+- On each new order the platform decides what n8n decides: cash on delivery or pending payment, the Egyptian number, the three template values. A paid order is recorded as finished with no message, not as failed.
 - It records what it **would** send and sends nothing.
 - A job in its own worker lane, with the retry rule (five attempts, then failed).
 - The reconciliation sweep also feeds it, so an order whose webhook was missed is still caught.
@@ -141,6 +151,7 @@ Needs the owner's explicit go-ahead to deploy and to change Meta's settings.
 After two clean weeks, and only on the owner's word:
 
 - Export the workflows and take a final database dump, stored with the other archives.
+- Replace the secret of the Shopify app n8n used, since the old one sat in plain text there.
 - Remove the Shopify webhook that points at n8n.
 - Delete the Railway project.
 - Record the divergence and the parity state, update the handoff, and note the saved cost.
@@ -156,10 +167,12 @@ From the owner, 11 October 2026:
 - Inbox is its own dashboard with a customer-service role.
 - Staff keep chatting on the API number; the per-message cost is accepted.
 - The old chats are imported.
-- Work starts after the release gates.
+- Work starts now, not after the release gates (he first said after, then ordered the start the same day).
 - Operations gains a fourth tab, WhatsApp, showing the failures.
 - The operations manager sees the Inbox as well as Operations.
+- Automatic replies: none after Confirm, Edit kept, Cancel reworded to "We received your cancellation request ❌".
 
 ## Still open
 
-- The owner's confirmation of the automatic replies, and the new Cancel wording (phase 0).
+- The owner's approval of the mockup.
+- The three phase 0 rows only the owner can answer.
