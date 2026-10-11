@@ -253,17 +253,21 @@ def apply_message(db: Session, message: dict, names: dict[str, str]) -> bool:
     media = fields["media"]
     if media is not None:
         size = media.get("file_size")
-        db.add(
-            InboxMedia(
-                message_id=message_id,
-                wa_media_id=_text(str(media.get("id") or ""), 200),
-                mime_type=_text(media.get("mime_type"), 120),
-                filename=_text(media.get("filename"), 255),
-                sha256=_text(media.get("sha256"), 64),
-                size_bytes=size if isinstance(size, int) and size >= 0 else None,
-                state="pending",
-            )
+        file = InboxMedia(
+            message_id=message_id,
+            wa_media_id=_text(str(media.get("id") or ""), 200),
+            mime_type=_text(media.get("mime_type"), 120),
+            filename=_text(media.get("filename"), 255),
+            sha256=_text(media.get("sha256"), 64),
+            size_bytes=size if isinstance(size, int) and size >= 0 else None,
+            state="pending",
         )
+        db.add(file)
+        db.flush()
+        # WhatsApp deletes it after 7 days: copy it now, as work of its own.
+        from app.services.inbox.media import queue_fetch
+
+        queue_fetch(db, file.id)
 
     if answer:
         _record_answer(db, order, answer[0], occurred_at, conversation, message_id)

@@ -120,6 +120,9 @@ class JobKind:
     #: Write an order's one confirmation tag to Shopify, through the second
     #: Shopify app - the only thing the platform writes there.
     INBOX_TAG_ORDER = "inbox_tag_order"
+    #: Copy a customer's photo, voice note or file from Meta into our own
+    #: bucket. WhatsApp deletes it after 7 days.
+    INBOX_FETCH_MEDIA = "inbox_fetch_media"
 
 
 #: The inbox's work (ADR 0059) runs in a lane of its own too: a WhatsApp outage
@@ -133,6 +136,7 @@ INBOX_WORK = frozenset(
         JobKind.INBOX_SEND_CONFIRMATION,
         JobKind.INBOX_AUTO_REPLY,
         JobKind.INBOX_TAG_ORDER,
+        JobKind.INBOX_FETCH_MEDIA,
     }
 )
 

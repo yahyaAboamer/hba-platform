@@ -148,6 +148,55 @@ def record_outbound(
     return message
 
 
+def send_file(
+    db: Session,
+    conversation: InboxConversation,
+    *,
+    kind: str,
+    content: bytes,
+    mime_type: str,
+    filename: str,
+    caption: str | None,
+    voice: bool,
+    sent_by: int,
+    reply_to: str | None = None,
+    client: MetaClient | None = None,
+) -> InboxMessage:
+    """Send a photo, a voice note, a video or a document from staff.
+
+    Held to the same two rules as a text. The file is handed to WhatsApp
+    first and then sent by the id it gives back; a refusal at either step is
+    shown in the chat as a failed message, with the reason.
+    """
+    reason = sending.refusal(db, conversation.phone)
+    if reason:
+        raise NotSent(reason)
+    if not window_open(conversation):
+        raise NotSent(WINDOW_CLOSED, kind="window_closed")
+
+    extra = {"voice": True} if voice else None
+    owned = client is None
+    client = client or _client(db)
+    try:
+        media_id = client.upload_media(content, mime_type, filename)
+        wa_message_id = client.send_media(
+            conversation.phone, kind, media_id,
+            caption=caption, filename=filename, voice=voice, reply_to=reply_to,
+        )
+    except MetaError as exc:
+        return record_outbound(
+            db, conversation, kind=kind, body=caption, origin="staff", status="failed",
+            error=str(exc), sent_by=sent_by, reply_to=reply_to, extra=extra,
+        )
+    finally:
+        if owned:
+            client.close()
+    return record_outbound(
+        db, conversation, kind=kind, body=caption, origin="staff", status="sent",
+        wa_message_id=wa_message_id, sent_by=sent_by, reply_to=reply_to, extra=extra,
+    )
+
+
 def send_reaction(
     db: Session,
     conversation: InboxConversation,

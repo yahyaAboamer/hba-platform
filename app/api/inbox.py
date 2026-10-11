@@ -17,7 +17,7 @@ that customer, or her 24 hours have passed.
 import logging
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -25,7 +25,7 @@ from app.api.deps import require_permission
 from app.core.permissions import Permission
 from app.db import get_session
 from app.models.identity import UserAccount
-from app.services.inbox import chats, connection, outbound, sending
+from app.services.inbox import chats, connection, media, outbound, sending
 from app.services.inbox.meta import MetaClient, MetaError
 
 logger = logging.getLogger(__name__)
@@ -146,6 +146,107 @@ def read(conversation_id: int, db: Session = Depends(get_session)) -> dict:
         except MetaError as exc:
             logger.info("could not mark a chat read on WhatsApp: %s", exc)
     return detail
+
+
+# ── Files ─────────────────────────────────────────────────────────────────────
+
+
+@router.get("/media/{media_id}")
+def file(media_id: int, db: Session = Depends(get_session)) -> Response:
+    """A chat's file, to someone signed in who holds the inbox.
+
+    Never straight from the bucket, and never as a page of ours: only a
+    photo, audio, a video or a PDF is shown in place; anything else is a
+    download, and the browser is told not to guess what it is.
+    """
+    try:
+        found = media.read(db, media_id)
+    except media.Unavailable as exc:
+        raise HTTPException(404, str(exc)) from None
+    disposition = "inline" if found["inline"] else "attachment"
+    return Response(
+        content=found["content"],
+        media_type=found["mime_type"],
+        headers={
+            "Content-Disposition": f'{disposition}; filename="{found["filename"]}"',
+            "X-Content-Type-Options": "nosniff",
+            "Content-Security-Policy": "default-src 'none'; sandbox",
+            # No Cache-Control here: the app marks every API response
+            # no-store, which is right for a customer's file too.
+        },
+    )
+
+
+@router.post("/conversations/{conversation_id}/media")
+async def send_file(
+    conversation_id: int,
+    upload: UploadFile = File(...),
+    caption: str = Form(""),
+    voice: bool = Form(False),
+    actor: UserAccount = Depends(GUARD),
+    db: Session = Depends(get_session),
+) -> dict:
+    """A photo, a voice note, a video or a document from a member of staff."""
+    # One byte past the largest file WhatsApp takes: enough to know it is
+    # too large without holding more of it.
+    content = await upload.read(media.MAX_UPLOAD_BYTES + 1)
+    if len(content) > media.MAX_UPLOAD_BYTES:
+        raise HTTPException(413, "That file is larger than WhatsApp allows.")
+    try:
+        message, kept = media.send_file(
+            db,
+            conversation_id,
+            content=content,
+            mime_type=upload.content_type or "",
+            filename=upload.filename or "",
+            caption=caption,
+            voice=voice,
+            actor_id=actor.id,
+        )
+    except LookupError as exc:
+        raise HTTPException(404, str(exc)) from None
+    except media.NotSendable as exc:
+        raise HTTPException(422, str(exc)) from None
+    except outbound.NotSent as exc:
+        raise HTTPException(409, str(exc)) from None
+    db.commit()
+    return chats.describe_message(message, actor.display_name, kept)
+
+
+@router.get("/templates")
+def templates(db: Session = Depends(get_session)) -> dict:
+    """The approved messages, read from Meta: what can be sent once her 24
+    hours have passed. Only the approved ones, and only what a person needs
+    to tell them apart."""
+    keys = connection.whatsapp(db)
+    if keys is None:
+        raise HTTPException(409, sending.NOT_CONNECTED)
+    try:
+        with MetaClient(keys.access_token, keys.phone_number_id) as client:
+            found = client.templates(keys.business_account_id)
+    except MetaError as exc:
+        raise HTTPException(502, str(exc)) from None
+    approved = []
+    for template in found:
+        if not isinstance(template, dict) or template.get("status") != "APPROVED":
+            continue
+        body = next(
+            (
+                part.get("text")
+                for part in template.get("components") or []
+                if isinstance(part, dict) and part.get("type") == "BODY"
+            ),
+            None,
+        )
+        approved.append(
+            {
+                "name": template.get("name"),
+                "language": template.get("language"),
+                "category": template.get("category"),
+                "body": body,
+            }
+        )
+    return {"templates": approved}
 
 
 # ── Confirmations ─────────────────────────────────────────────────────────────

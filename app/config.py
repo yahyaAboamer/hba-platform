@@ -107,6 +107,16 @@ class Settings(BaseSettings):
     # schedule, and an unpinned client would change behaviour without a deploy.
     meta_api_version: str = "v23.0"
     meta_timeout_seconds: float = 20.0
+    #: Where the inbox keeps its own copy of a customer's photo, voice note or
+    #: file (ADR 0059, point 12): an S3-compatible bucket, one per
+    #: environment, wired on Railway as references to the bucket so no
+    #: credential is ever typed. Blank by default: without it a file stays
+    #: "waiting to be copied", and nothing else about the inbox stops.
+    inbox_media_bucket: str = ""
+    inbox_media_endpoint: str = ""
+    inbox_media_access_key_id: str = ""
+    inbox_media_secret_access_key: str = ""
+    inbox_media_region: str = "auto"
     #: **Whether this server decides order confirmations at all.** Off unless
     #: set, and set on production. The decision keeps a customer's phone and
     #: first name, and staging reads the real store - so staging holds no
