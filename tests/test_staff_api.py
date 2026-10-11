@@ -381,6 +381,7 @@ def test_the_roster_says_which_roles_you_may_invite(client):
         "admin",
         "affiliate_manager",
         "content_manager",
+        "customer_service",
         "operations_manager",
     ]
 
@@ -454,10 +455,13 @@ def test_the_roster_says_what_each_access_can_do(client):
         "admin",
         "affiliate_manager",
         "content_manager",
+        "customer_service",
         "operations_manager",
     }
     assert body["content_manager"] == sorted(permissions_for("content_manager"))
-    assert body["operations_manager"] == ["order_ops.view"]
+    # ADR 0059: he holds the inbox as well as Operations.
+    assert body["operations_manager"] == ["inbox.use", "order_ops.view"]
+    assert body["customer_service"] == ["inbox.use"]
     assert "payments.record" in body["admin"]
     assert "payments.record" not in body["affiliate_manager"]
 
