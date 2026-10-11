@@ -52,8 +52,11 @@ customer receives has changed.
 3. **From the owner, for the inbox:** October's charges in WhatsApp Manager;
    who owns the Meta business account, app and number; the WhatsApp keys and
    the second Shopify app's credentials, typed into Settings when wanted.
-4. **`SETTINGS_ENCRYPTION_KEY` is set on neither staging nor production**, so
-   nothing can be saved from Settings on either. The WhatsApp cards need it.
+4. **`SETTINGS_ENCRYPTION_KEY` is set on both since 12 October** (owner's
+   order; a different key on each, never displayed, kept only in Railway).
+   Settings can now save keys on both. It must never be changed or deleted.
+   The media buckets `inbox-media-staging` and `inbox-media-production` were
+   created the same day; see the inbox plan for the variables.
 5. **Owner acceptance of Operations, on production**: Shopify cards against
    Shopify admin; E-stebdal *Needs review* against its list; Bosta B5 against
    *Awaiting your action*, spot-check B1, B2, B6; one Bosta and one E-stebdal

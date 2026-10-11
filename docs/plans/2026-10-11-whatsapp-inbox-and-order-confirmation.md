@@ -86,6 +86,8 @@ Left of phase 1:
   - Staging: `SETTINGS_ENCRYPTION_KEY` (to save keys at all) and `INBOX_TEST_NUMBERS` (the test phones). Never `INBOX_SEND_TO_CUSTOMERS`.
   - Production: `INBOX_CONFIRMATIONS_ENABLED=true` (set 11 October, phase 2). `INBOX_SEND_TO_CUSTOMERS=true` at the switch-over in phase 7 and not before.
   - Staging reports `APP_ENV=production`, so nothing about sending may be decided from `APP_ENV`.
+  - **`SETTINGS_ENCRYPTION_KEY` was set on both on 12 October**, on the owner's order, a different key on each, generated on the spot and never displayed. It lives only in Railway's variables; the owner keeps a copy. **Never change or delete it**: every key saved from Settings would have to be typed in again.
+  - **Media buckets, created 12 October**: `inbox-media-staging` and `inbox-media-production`, region `ams`. Each app service reads its own through `INBOX_MEDIA_BUCKET`, `INBOX_MEDIA_ENDPOINT`, `INBOX_MEDIA_ACCESS_KEY_ID`, `INBOX_MEDIA_SECRET_ACCESS_KEY` and `INBOX_MEDIA_REGION`, set as references to the bucket, so no credential was ever typed or shown. They take effect at each service's next deploy. Railway's buckets are addressed with the bucket name as a subdomain of the endpoint.
 
 ## Phase 2 — Confirmation engine, running silently
 
