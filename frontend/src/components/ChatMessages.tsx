@@ -206,12 +206,31 @@ function whoSent(message: ChatMessage): string {
   return message.sender ?? "HBA";
 }
 
+/** `text` with each place it holds `words` marked, ignoring case. */
+function Marked({ text, words }: { text: string; words?: string }) {
+  const wanted = words?.trim().toLowerCase();
+  const lower = text.toLowerCase();
+  // A letter whose lower case is longer would put the marks in the wrong place.
+  if (!wanted || wanted.length < 2 || lower.length !== text.length) return <>{text}</>;
+  const parts = [];
+  let from = 0;
+  for (let at = lower.indexOf(wanted); at !== -1; at = lower.indexOf(wanted, from)) {
+    if (at > from) parts.push(text.slice(from, at));
+    parts.push(<mark key={at}>{text.slice(at, at + wanted.length)}</mark>);
+    from = at + wanted.length;
+  }
+  parts.push(text.slice(from));
+  return <>{parts}</>;
+}
+
 export function ChatMessages({
   messages,
   orders,
   customer,
   now,
   canSend,
+  found = null,
+  marked,
   onRetry,
   onReply,
   onReact,
@@ -223,6 +242,10 @@ export function ChatMessages({
   now: number;
   /** Whether a reply or a reaction may be sent right now. */
   canSend: boolean;
+  /** The message a search inside the chat is on, picked out. */
+  found?: number | null;
+  /** The words searched for, marked wherever a message holds them. */
+  marked?: string;
   onRetry?: (message: ChatMessage) => void;
   onReply?: (message: ChatMessage) => void;
   onReact?: (message: ChatMessage, emoji: string) => void;
@@ -284,7 +307,10 @@ export function ChatMessages({
           return (
             <Fragment key={message.id}>
               {marks}
-              <div className="inbox-note">
+              <div
+                className={found === message.id ? "inbox-note inbox-msg--found" : "inbox-note"}
+                data-message={message.id}
+              >
                 {customer} tapped {BUTTON_FOR[message.tapped] ?? message.tapped}
                 {tagNow ? ` · the order is now tagged ${tagNow}` : order?.order ? ` · ${order.order}` : ""}
               </div>
@@ -309,12 +335,14 @@ export function ChatMessages({
                 "inbox-msg",
                 out ? "inbox-msg--out" : "inbox-msg--in",
                 failed && "inbox-msg--failed",
+                found === message.id && "inbox-msg--found",
               ]
                 .filter(Boolean)
                 .join(" ")}
               // Not a stop for the Tab key, but a tap on a phone lands here,
               // which is what brings up Reply and React.
               tabIndex={-1}
+              data-message={message.id}
             >
               {out ? (
                 <span className="inbox-msg__who">{whoSent(message)}</span>
@@ -331,7 +359,11 @@ export function ChatMessages({
               {message.kind === "unsupported" ? (
                 <p className="inbox-msg__cannot">A message this inbox cannot show</p>
               ) : (
-                message.body && <p dir="auto">{message.body}</p>
+                message.body && (
+                  <p dir="auto">
+                    <Marked text={message.body} words={marked} />
+                  </p>
+                )
               )}
               {message.buttons && message.buttons.length > 0 && (
                 <div className="inbox-msg__btns">

@@ -212,6 +212,48 @@ def test_a_chat_reads_oldest_to_newest_and_pages_backwards(db):
     assert earlier["earlier"] is None
 
 
+def test_a_search_inside_a_chat_finds_her_words_and_a_files_name_newest_first(db):
+    conversation = _chat(db, "201005550188", "Nour")
+    older = _message(db, conversation, "Is the beige one in stock?", minutes_ago=50)
+    _message(db, conversation, "Yes, beige in M and L", direction="out", minutes_ago=40)
+    _message(db, conversation, "Thanks", minutes_ago=30)
+    receipt = _message(db, conversation, None, kind="document", minutes_ago=20)
+    db.add(InboxMedia(message_id=receipt.id, mime_type="application/pdf", filename="Beige-receipt.pdf",
+                      state="stored", storage_key="inbox/1/receipt.pdf"))
+    # A reaction's emoji is never a match, and another chat's words are not this chat's.
+    _message(db, conversation, "beige", kind="reaction", minutes_ago=10)
+    elsewhere = _chat(db, "201005550199", "Salma")
+    _message(db, elsewhere, "beige please", minutes_ago=5)
+    db.flush()
+
+    found = chats.search_messages(db, conversation.id, "  BEIGE ")
+    assert [m["id"] for m in found["matches"]][0] == receipt.id
+    assert [m["body"] for m in found["matches"]] == [None, "Yes, beige in M and L", "Is the beige one in stock?"]
+    assert found["matches"][-1]["id"] == older.id
+    assert found["more"] is False
+
+
+def test_a_search_inside_a_chat_takes_its_words_as_letters_and_needs_two(db):
+    conversation = _chat(db, "201005550188", "Nour")
+    _message(db, conversation, "100% cotton", minutes_ago=3)
+    _message(db, conversation, "Hello", minutes_ago=2)
+    assert [m["body"] for m in chats.search_messages(db, conversation.id, "0%")["matches"]] == ["100% cotton"]
+    assert chats.search_messages(db, conversation.id, "%")["matches"] == []
+    assert chats.search_messages(db, conversation.id, "_e")["matches"] == []
+    with pytest.raises(chats.NotFound):
+        chats.search_messages(db, 987654, "Hello")
+
+
+def test_a_search_inside_a_chat_says_when_there_are_more_than_it_returns(db, monkeypatch):
+    monkeypatch.setattr(chats, "SEARCH_LIMIT", 2)
+    conversation = _chat(db, "201005550188", "Nour")
+    for index in range(3):
+        _message(db, conversation, f"size {index}", minutes_ago=10 - index)
+    found = chats.search_messages(db, conversation.id, "size")
+    assert [m["body"] for m in found["matches"]] == ["size 2", "size 1"]
+    assert found["more"] is True
+
+
 def test_a_message_says_who_sent_it(db):
     conversation = _chat(db, "201005550188", "Nour")
     mariam = _staff(db)

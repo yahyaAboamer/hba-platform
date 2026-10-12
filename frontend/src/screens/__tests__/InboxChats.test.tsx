@@ -79,6 +79,9 @@ type Served = {
   detail?: object;
   messages?: object[];
   earlier?: string | null;
+  /** The page above `earlier`, when it is asked for. */
+  earlierMessages?: object[];
+  search?: (url: string) => object;
   health?: object;
   templates?: object[];
   post?: (url: string, body: Record<string, unknown>) => [number, unknown];
@@ -114,6 +117,12 @@ function serve(served: Served = {}) {
       }
       if (url.startsWith("/api/inbox/health")) return reply(200, served.health ?? HEALTH);
       if (url.startsWith("/api/inbox/templates")) return reply(200, { templates: served.templates ?? [] });
+      if (/\/conversations\/\d+\/search/.test(url)) {
+        return reply(200, served.search?.(url) ?? { matches: [], more: false });
+      }
+      if (/\/conversations\/\d+\/messages\?.*before=/.test(url) && served.earlierMessages) {
+        return reply(200, { messages: served.earlierMessages, earlier: null });
+      }
       if (/\/conversations\/\d+\/messages/.test(url)) {
         return reply(200, { messages: served.messages ?? [], earlier: served.earlier ?? null });
       }
@@ -648,6 +657,62 @@ describe("an open chat", () => {
     ).toBeTruthy();
     expect(screen.getByText("HBA")).toBeTruthy();
     expect(screen.getByText("receipt.pdf").textContent).toContain("No longer available");
+  });
+
+  it("searches inside the chat, reaching a match above what is loaded", async () => {
+    serve({
+      messages: [message(5, { body: "Thanks" }), message(6, { body: "Is the Beige one in stock?" })],
+      earlier: "page-1",
+      earlierMessages: [message(1, { body: "Do you have beige?" })],
+      search: () => ({ matches: [{ id: 6 }, { id: 1 }], more: false }),
+    });
+    const { container } = show("/inbox/chats/12");
+
+    await screen.findByText("Thanks");
+    const open = screen.getByRole("button", { name: "Search in this chat" });
+    fireEvent.click(open);
+    const box = await screen.findByRole("searchbox", { name: "Search in this chat" });
+    fireEvent.change(box, { target: { value: "beige" } });
+
+    // The newest match first, picked out, with the words marked.
+    expect(await screen.findByText("1 of 2")).toBeTruthy();
+    expect(calls.some((call) => call.url === "/api/inbox/conversations/12/search?q=beige")).toBe(true);
+    await waitFor(() =>
+      expect(container.querySelector('[data-message="6"]')?.className).toContain("inbox-msg--found"),
+    );
+    expect(container.querySelector('[data-message="6"] mark')?.textContent).toBe("Beige");
+
+    // The earlier match is on a page not yet loaded: it is read, then shown.
+    fireEvent.keyDown(box, { key: "Enter" });
+    expect(await screen.findByText("2 of 2")).toBeTruthy();
+    await waitFor(() =>
+      expect(container.querySelector('[data-message="1"]')?.className).toContain("inbox-msg--found"),
+    );
+    expect(calls.some((call) => /messages\?limit=100&before=page-1/.test(call.url))).toBe(true);
+    expect(container.querySelector('[data-message="6"]')?.className).not.toContain("inbox-msg--found");
+
+    // Escape closes it, takes the marks away and returns to the button.
+    fireEvent.keyDown(box, { key: "Escape" });
+    expect(screen.queryByRole("searchbox", { name: "Search in this chat" })).toBeNull();
+    expect(container.querySelector("mark")).toBeNull();
+    expect(document.activeElement).toBe(open);
+  });
+
+  it("says so when nothing in the chat holds the words, and waits for two letters", async () => {
+    serve({ messages: [message(5, { body: "Thanks" })] });
+    show("/inbox/chats/12");
+
+    await screen.findByText("Thanks");
+    fireEvent.click(screen.getByRole("button", { name: "Search in this chat" }));
+    const box = await screen.findByRole("searchbox", { name: "Search in this chat" });
+    fireEvent.change(box, { target: { value: "x" } });
+    await new Promise((done) => setTimeout(done, 400));
+    expect(calls.some((call) => call.url.includes("/search"))).toBe(false);
+
+    fireEvent.change(box, { target: { value: "#31044" } });
+    expect(await screen.findByText("No message holds that")).toBeTruthy();
+    expect(calls.some((call) => call.url === "/api/inbox/conversations/12/search?q=%2331044")).toBe(true);
+    expect(screen.getByRole("button", { name: "Earlier match" })).toHaveProperty("disabled", true);
   });
 
   it("says so when there is no chat at the address", async () => {

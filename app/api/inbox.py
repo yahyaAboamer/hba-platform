@@ -103,6 +103,16 @@ def messages(
     return _answering(lambda: chats.list_messages(db, conversation_id, before=before, limit=limit))
 
 
+@router.get("/conversations/{conversation_id}/search")
+def search(
+    conversation_id: int,
+    q: str = Query(..., max_length=120),
+    db: Session = Depends(get_session),
+) -> dict:
+    """The messages in this chat that hold ``q``, newest first."""
+    return _answering(lambda: chats.search_messages(db, conversation_id, q))
+
+
 @router.post("/conversations/{conversation_id}/messages")
 def send_message(
     conversation_id: int,

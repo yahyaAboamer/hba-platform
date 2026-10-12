@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import type { KeyboardEvent } from "react";
 import { Link } from "react-router-dom";
 
 import { ApiError, api } from "../lib/api";
@@ -17,6 +18,12 @@ const CHAT_EVERY_MS = 4_000;
 const NEAR_END_PX = 120;
 
 type MessagePage = { messages: ChatMessage[]; earlier: string | null };
+type SearchFound = { matches: { id: number }[]; more: boolean };
+
+/** A search inside the chat is asked this long after the last key. */
+const SEARCH_AFTER_MS = 300;
+/** Pages read above what is loaded, at most, to reach a match. */
+const MOST_PAGES_TO_A_MATCH = 50;
 
 function inOrder(a: ChatMessage, b: ChatMessage): number {
   const byTime = new Date(a.at ?? 0).getTime() - new Date(b.at ?? 0).getTime();
@@ -71,6 +78,14 @@ export function ChatPane({
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [announced, setAnnounced] = useState("");
+  // Searching inside the chat: what is typed, what the server found for it
+  // (newest first), and which of those is on screen.
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [found, setFound] = useState<SearchFound | null>(null);
+  const [foundFor, setFoundFor] = useState("");
+  const [onMatch, setOnMatch] = useState(0);
+  const [searchProblem, setSearchProblem] = useState<string | null>(null);
   const now = useNow();
   const narrow = useIsNarrow();
 
@@ -81,6 +96,13 @@ export function ChatPane({
   // before earlier messages were put above what is on screen.
   const follow = useRef(true);
   const heightBefore = useRef<number | null>(null);
+  // The page marker above what is loaded, read inside a loop that outlives
+  // one render.
+  const earlierRef = useRef<string | null>(null);
+  earlierRef.current = earlier;
+  const scrollTo = useRef<number | null>(null);
+  const searchBox = useRef<HTMLInputElement | null>(null);
+  const searchButton = useRef<HTMLButtonElement | null>(null);
   const changed = useRef(onChanged);
   changed.current = onChanged;
 
@@ -198,6 +220,109 @@ export function ChatPane({
       .finally(() => setReadingEarlier(false));
   }, [conversationId, earlier, readingEarlier]);
 
+  // Asked of the server, not of what is on screen: a match pages above what
+  // is loaded is still found, and then loaded to be shown.
+  useEffect(() => {
+    if (!searchOpen) return;
+    const words = query.trim();
+    if (words.length < 2) {
+      setFound(null);
+      setFoundFor("");
+      setSearchProblem(null);
+      return;
+    }
+    let current = true;
+    const timer = window.setTimeout(() => {
+      api
+        .get<SearchFound>(
+          `/api/inbox/conversations/${conversationId}/search?q=${encodeURIComponent(words)}`,
+        )
+        .then((result) => {
+          if (!current) return;
+          setFound(result);
+          setFoundFor(words);
+          setSearchProblem(null);
+          setOnMatch(0);
+          if (result.matches.length > 0) void showMatch(result.matches[0].id);
+        })
+        .catch((error) => {
+          if (current) {
+            setSearchProblem(error instanceof ApiError ? error.message : "Couldn't search this chat.");
+          }
+        });
+    }, SEARCH_AFTER_MS);
+    return () => {
+      current = false;
+      window.clearTimeout(timer);
+    };
+    // showMatch reads only refs and stable setters.
+  }, [conversationId, query, searchOpen]);
+
+  /** Read earlier pages until the message is loaded, then bring it into view. */
+  async function showMatch(id: number) {
+    follow.current = false;
+    let pages = 0;
+    while (!held.current.some((message) => message.id === id) && earlierRef.current) {
+      if (pages++ >= MOST_PAGES_TO_A_MATCH) break;
+      try {
+        const page = await api.get<MessagePage>(
+          `/api/inbox/conversations/${conversationId}/messages?limit=100&before=${encodeURIComponent(earlierRef.current)}`,
+        );
+        held.current = merged(held.current, page.messages);
+        earlierRef.current = page.earlier;
+        setEarlier(page.earlier);
+      } catch {
+        break;
+      }
+    }
+    scrollTo.current = id;
+    setMessages([...held.current]);
+  }
+
+  // A match that has just been loaded or stepped to is brought to the middle.
+  useEffect(() => {
+    const id = scrollTo.current;
+    const box = thread.current;
+    if (id === null || !box) return;
+    const bubble = box.querySelector<HTMLElement>(`[data-message="${id}"]`);
+    if (!bubble) return;
+    scrollTo.current = null;
+    follow.current = false;
+    bubble.scrollIntoView?.({ block: "center" });
+  }, [messages]);
+
+  function step(by: number) {
+    if (!found || found.matches.length === 0) return;
+    const next = (onMatch + by + found.matches.length) % found.matches.length;
+    setOnMatch(next);
+    void showMatch(found.matches[next].id);
+  }
+
+  function openSearch() {
+    setSearchOpen(true);
+    window.setTimeout(() => searchBox.current?.focus(), 0);
+  }
+
+  function closeSearch() {
+    setSearchOpen(false);
+    setQuery("");
+    setFound(null);
+    setFoundFor("");
+    setSearchProblem(null);
+    searchButton.current?.focus();
+  }
+
+  function onSearchKey(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeSearch();
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      // Enter goes back in time, as the list of matches does; Shift goes forward.
+      step(event.shiftKey ? -1 : 1);
+    }
+  }
+
   function onScroll() {
     const box = thread.current;
     if (!box) return;
@@ -271,6 +396,14 @@ export function ChatPane({
     }
   }
 
+  /** "2 of 5", "No message holds that", or nothing while there is nothing to say. */
+  function searchWords(): string {
+    if (searchProblem) return searchProblem;
+    if (!found || query.trim() !== foundFor) return "";
+    if (found.matches.length === 0) return "No message holds that";
+    return `${onMatch + 1} of ${found.matches.length}${found.more ? "+" : ""}`;
+  }
+
   if (missing) {
     return (
       <section className="inbox-col inbox-col--none" aria-label="Chat">
@@ -310,16 +443,72 @@ export function ChatPane({
               {detail && <small>{under}</small>}
             </div>
           </div>
-          <button
-            type="button"
-            className="inbox-btn inbox-btn--quiet inbox-btn--small inbox-orderbtn"
-            aria-expanded={orderOpen}
-            aria-controls="inbox-order-panel"
-            onClick={() => setOrderOpen(!orderOpen)}
-          >
-            Order
-          </button>
+          <div className="inbox-chathead__tools">
+            <button
+              type="button"
+              ref={searchButton}
+              className="inbox-iconbtn"
+              aria-label="Search in this chat"
+              aria-expanded={searchOpen}
+              aria-controls="inbox-chatsearch"
+              onClick={() => (searchOpen ? closeSearch() : openSearch())}
+            >
+              <InboxIcon name="search" />
+            </button>
+            <button
+              type="button"
+              className="inbox-btn inbox-btn--quiet inbox-btn--small inbox-orderbtn"
+              aria-expanded={orderOpen}
+              aria-controls="inbox-order-panel"
+              onClick={() => setOrderOpen(!orderOpen)}
+            >
+              Order
+            </button>
+          </div>
         </div>
+
+        {searchOpen && (
+          <div className="inbox-chatsearch" id="inbox-chatsearch" role="search">
+            <label className="inbox-search">
+              <span className="visually-hidden">Search in this chat</span>
+              <InboxIcon name="search" />
+              <input
+                ref={searchBox}
+                type="search"
+                dir="auto"
+                maxLength={120}
+                placeholder="Search in this chat"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                onKeyDown={onSearchKey}
+              />
+            </label>
+            <span className="inbox-chatsearch__count" role="status">
+              {searchWords()}
+            </span>
+            <button
+              type="button"
+              className="inbox-iconbtn"
+              aria-label="Earlier match"
+              disabled={!found || found.matches.length < 2}
+              onClick={() => step(1)}
+            >
+              <InboxIcon name="up" />
+            </button>
+            <button
+              type="button"
+              className="inbox-iconbtn"
+              aria-label="Later match"
+              disabled={!found || found.matches.length < 2}
+              onClick={() => step(-1)}
+            >
+              <InboxIcon name="down" />
+            </button>
+            <button type="button" className="inbox-iconbtn" aria-label="Close the search" onClick={closeSearch}>
+              <InboxIcon name="close" />
+            </button>
+          </div>
+        )}
 
         <div
           className="inbox-thread"
@@ -358,6 +547,8 @@ export function ChatPane({
               customer={customer}
               now={now}
               canSend={windowOpen}
+              found={searchOpen && found?.matches[onMatch] ? found.matches[onMatch].id : null}
+              marked={searchOpen ? foundFor : undefined}
               onRetry={(message) => void send(message.body ?? "", null).then(setProblem)}
               onReply={setReplyTo}
               onReact={(message, emoji) => void react(message, emoji)}

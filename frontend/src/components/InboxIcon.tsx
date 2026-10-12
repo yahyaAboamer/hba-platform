@@ -19,7 +19,9 @@ export type InboxIconName =
   | "reply"
   | "smile"
   | "close"
-  | "stop";
+  | "stop"
+  | "up"
+  | "down";
 
 export function InboxIcon({ name }: { name: InboxIconName }) {
   const line = {
@@ -82,6 +84,8 @@ export function InboxIcon({ name }: { name: InboxIconName }) {
         </>
       )}
       {name === "close" && <path d="M6 6l12 12M18 6L6 18" {...line} />}
+      {name === "up" && <path d="M6 15l6-6 6 6" {...line} />}
+      {name === "down" && <path d="M6 9l6 6 6-6" {...line} />}
     </svg>
   );
 }

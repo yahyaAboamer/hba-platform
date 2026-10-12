@@ -1,7 +1,7 @@
 /*
  * The accent. This file is the whole brand decision.
  *
- * Eight declarations, and switching the platform from HBA green to anything
+ * Twelve declarations, and switching the platform from HBA green to anything
  * else is editing them and nothing else. That promise was made when the
  * accent was chosen, and it only holds while one rule holds with it:
  *
@@ -62,6 +62,22 @@
  * reads at 7.11:1 on a card and 6.26:1 on the page. One value, written twice,
  * so neither token is left undefined in a theme.
  *
+ * ## A filled green that white text can be read on
+ *
+ * White on `#23A95C` is 3.04:1, under the 4.5:1 text needs, and the Inbox
+ * fills its buttons with the accent and writes on them in white (Send, Send
+ * again, the unread count, the play button). The owner chose, on 12 October
+ * 2026, to keep the look and darken the green slightly in the dark theme
+ * only. So `--accent-fill` is the background of a filled accent that carries
+ * `--accent-on`:
+ *
+ *   | dark     | white on it | against page #08090A | card #15171A |
+ *   | #1C874A  |   4.55:1    |        4.38:1        |    3.95:1    |
+ *
+ * The same hue as `#23A95C`, lowered in lightness until white passes, and
+ * still above the 3:1 a control's edge needs against both grounds. On light
+ * it is the deep step again: white on `#14653A` is already 7.11:1.
+ *
  * ## Green already meant something
  *
  * `tokens.css` points `--settled` and `--settled-quiet` at these values
@@ -76,6 +92,7 @@
   --accent-lift: #14653a; /* on light the design uses one step for both */
   --accent-soft: rgba(20, 101, 58, 0.09); /* tints and pressed states */
   --accent-on: #ffffff; /* text on a filled accent */
+  --accent-fill: #14653a; /* a filled accent that carries --accent-on */
 }
 
 [data-theme="dark"] {
@@ -84,4 +101,5 @@
   --accent-lift: #7be0a6; /* only on a tinted ground - its 9 uses */
   --accent-soft: rgba(35, 169, 92, 0.14);
   --accent-on: #ffffff;
+  --accent-fill: #1c874a; /* white on it is 4.55:1; on #23a95c it is 3.04:1 */
 }

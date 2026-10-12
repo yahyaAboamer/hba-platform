@@ -101,6 +101,13 @@ def test_a_search_and_a_view_go_through(client, chat):
     assert client.get("/api/inbox/conversations", params={"before": "nonsense"}).status_code == 422
 
 
+def test_a_search_inside_a_chat_goes_through(client, chat):
+    found = client.get(f"/api/inbox/conversations/{chat}/search", params={"q": "hell"}).json()
+    assert [m["body"] for m in found["matches"]] == ["Hello"]
+    assert client.get(f"/api/inbox/conversations/{chat}/search").status_code == 422
+    assert client.get("/api/inbox/conversations/987654/search", params={"q": "hello"}).status_code == 404
+
+
 def test_a_chat_that_is_not_there_is_a_404(client):
     assert client.get("/api/inbox/conversations/987654").status_code == 404
     assert client.get("/api/inbox/conversations/987654/messages").status_code == 404

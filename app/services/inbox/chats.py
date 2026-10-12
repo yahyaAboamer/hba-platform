@@ -334,6 +334,51 @@ def list_messages(
     }
 
 
+#: The most a search inside one chat returns, newest first.
+SEARCH_LIMIT = 100
+
+
+def search_messages(db: Session, conversation_id: int, q: str) -> dict:
+    """The messages in one chat whose words, or whose file's name, hold ``q``,
+    newest first (the approved mockup's search button in the chat's head).
+
+    Read from the server rather than from what is on screen, so a message
+    pages above what has been loaded is still found. A reaction is not
+    searched: its words are one emoji, sitting on another message.
+    """
+    conversation = _conversation(db, conversation_id)
+    q = q.strip()
+    if len(q) < 2:
+        return {"matches": [], "more": False}
+    pattern = _like(q)
+    rows = db.execute(
+        select(InboxMessage)
+        .outerjoin(InboxMedia, InboxMedia.message_id == InboxMessage.id)
+        .where(
+            InboxMessage.conversation_id == conversation.id,
+            InboxMessage.kind != "reaction",
+            or_(
+                InboxMessage.body.ilike(pattern, escape="\\"),
+                InboxMedia.filename.ilike(pattern, escape="\\"),
+            ),
+        )
+        .order_by(InboxMessage.occurred_at.desc(), InboxMessage.id.desc())
+        .limit(SEARCH_LIMIT + 1)
+    ).scalars().all()
+    return {
+        "matches": [
+            {
+                "id": message.id,
+                "direction": message.direction,
+                "at": _iso(message.occurred_at),
+                "body": (message.body or "")[:160] or None,
+            }
+            for message in rows[:SEARCH_LIMIT]
+        ],
+        "more": len(rows) > SEARCH_LIMIT,
+    }
+
+
 def mark_read(db: Session, conversation_id: int) -> str | None:
     """She has been read. Returns her last message's WhatsApp id, for the
     blue ticks, or None if there is nothing to tick."""
