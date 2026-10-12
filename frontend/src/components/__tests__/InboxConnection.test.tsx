@@ -67,6 +67,38 @@ const card = (name: string) => screen.findByRole("region", { name });
 const sentBody = (init?: RequestInit) => JSON.parse(String(init?.body));
 
 describe("The inbox's connections in Settings (ADR 0059)", () => {
+  it("says when WhatsApp was last heard from, and how Meta rates the number", async () => {
+    fetchMock.mockImplementation((url: string) =>
+      url.endsWith("/connection/health")
+        ? reply(200, {
+            connected: true,
+            sending: true,
+            last_heard_at: "2026-10-12T08:20:00Z",
+            quiet_since: null,
+            rating: "GREEN",
+          })
+        : reply(200, { whatsapp: CONNECTED, tags: tags() }),
+    );
+    render(<InboxConnections />);
+
+    const region = await card("WhatsApp");
+    expect(
+      await within(region).findByText("Last heard from 12 Oct, 11:20 · number rating high"),
+    ).toBeTruthy();
+  });
+
+  it("does not guess a rating it could not read, or a callback that has not come", async () => {
+    fetchMock.mockImplementation((url: string) =>
+      url.endsWith("/connection/health")
+        ? reply(200, { connected: true, sending: false, last_heard_at: null, quiet_since: null, rating: null })
+        : reply(200, { whatsapp: CONNECTED, tags: tags() }),
+    );
+    render(<InboxConnections />);
+
+    const region = await card("WhatsApp");
+    expect(await within(region).findByText("Not heard from yet · number rating not known")).toBeTruthy();
+  });
+
   it("shows a connected number, two last-fours and the sending switch, and no key", async () => {
     fetchMock.mockImplementation(() =>
       reply(200, {

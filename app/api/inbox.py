@@ -359,6 +359,29 @@ def connection_state(
     return _described(db)
 
 
+@router.get("/connection/health")
+def connection_health(
+    _actor: UserAccount = Depends(SETTINGS_GUARD),
+    db: Session = Depends(get_session),
+) -> dict:
+    """For the Settings card: when WhatsApp was last heard from, and Meta's
+    own rating of the number, read now.
+
+    Apart from the card's other details, so a slow answer from Meta holds up
+    one line and not the screen. A rating that cannot be read is absent, not
+    guessed.
+    """
+    rating = None
+    keys = connection.whatsapp(db)
+    if keys is not None:
+        try:
+            with MetaClient(keys.access_token, keys.phone_number_id) as client:
+                rating = client.check().quality_rating
+        except MetaError as exc:
+            logger.info("could not read the WhatsApp number's rating: %s", exc)
+    return {**health.pulse(db), "rating": rating}
+
+
 @router.put("/connection/whatsapp")
 def save_whatsapp(
     body: WhatsAppBody,

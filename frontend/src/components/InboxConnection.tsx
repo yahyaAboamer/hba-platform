@@ -19,6 +19,16 @@ function checkedWhen(iso: string): string {
   return `${parts.day} ${parts.month}, ${parts.hour}:${parts.minute}`;
 }
 
+/** Whether WhatsApp is being heard from, and how Meta rates the number. */
+type WhatsAppHealth = {
+  connected: boolean;
+  last_heard_at: string | null;
+  rating: string | null;
+};
+
+/** Meta's three colours, in the words its own screens use. */
+const RATING: Record<string, string> = { GREEN: "high", YELLOW: "medium", RED: "low" };
+
 /** What the server says. **Never a key**, only two keys' last four characters. */
 type WhatsAppState = {
   connected: boolean;
@@ -113,6 +123,24 @@ function WhatsAppCard({ state, onChanged }: { state: WhatsAppState; onChanged: (
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
+  const [health, setHealth] = useState<WhatsAppHealth | null>(null);
+
+  // When WhatsApp was last heard from, and Meta's own rating of the number
+  // (the mockup's frame 6). Read apart from the card, and again after a save,
+  // so a slow answer from Meta holds up this one line and nothing else.
+  useEffect(() => {
+    if (!state.connected) return;
+    let wanted = true;
+    api
+      .get<WhatsAppHealth>("/api/inbox/connection/health")
+      .then((found) => {
+        if (wanted && typeof found?.connected === "boolean") setHealth(found);
+      })
+      .catch(() => undefined);
+    return () => {
+      wanted = false;
+    };
+  }, [state.connected, state.verified_at]);
 
   function close() {
     // The keys leave the page as soon as they have done their job.
@@ -183,6 +211,15 @@ function WhatsAppCard({ state, onChanged }: { state: WhatsAppState; onChanged: (
         <p className="shop-conn__meta">
           Sending is {state.sending_enabled ? "on" : "off"}
           {state.test_numbers_only && " · this server only messages its test numbers"}
+        </p>
+      )}
+      {state.connected && health && (
+        <p className="shop-conn__meta">
+          {health.last_heard_at
+            ? `Last heard from ${checkedWhen(health.last_heard_at)}`
+            : "Not heard from yet"}
+          {" · number rating "}
+          {RATING[health.rating ?? ""] ?? "not known"}
         </p>
       )}
       {state.problem && <p className="sync__error">{state.problem}</p>}

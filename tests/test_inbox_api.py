@@ -82,6 +82,18 @@ def test_the_inbox_is_told_whether_whatsapp_is_being_heard_from(client, chat):
     }
 
 
+def test_settings_is_told_how_the_number_stands_and_only_an_admin_is(client, chat):
+    body = client.get("/api/inbox/connection/health")
+    assert body.status_code == 200
+    # Not connected: nothing heard, and no rating is made up for it.
+    assert body.json() == {
+        "connected": False, "sending": False, "last_heard_at": None, "quiet_since": None,
+        "rating": None,
+    }
+    _demote_to("customer_service")
+    assert client.get("/api/inbox/connection/health").status_code == 403
+
+
 def test_a_search_and_a_view_go_through(client, chat):
     assert client.get("/api/inbox/conversations", params={"q": "#31044"}).json()["conversations"]
     assert client.get("/api/inbox/conversations", params={"view": "edit"}).json()["conversations"] == []
