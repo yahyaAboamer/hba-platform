@@ -278,15 +278,29 @@ What phase 4 still owes before it is done:
 
 ### Phase 5 so far (12 October 2026)
 
-Started, and waiting on one thing: **the shape of n8n's tables.** Neither the plan nor the code records the names of n8n's chat, message and send tables or their columns, and a cloud session cannot reach n8n's database. `docs/plans/inbox-phase5-n8n-schema.sql` is a read-only query that returns table names, row counts, columns, keys and indexes, and no row's values. Its output, pasted into the session, is what the importer is written against.
+**Built** (`f9fdde3`): `app/services/inbox/importer.py`, run by hand with n8n's database address in `N8N_DATABASE_URL`, which it opens read-only. `--dry-run` does everything and keeps nothing; `--check` compares each chat's message count with n8n's and changes nothing. It prints counts only. Tested on made-up rows of the real shape (`tests/test_inbox_importer.py`) and end to end against a throwaway copy of n8n's three tables.
 
-What the importer will be, from what is already built:
+**What n8n kept**, read from its database on 12 October (layout and counts only):
 
-- A module, `app/services/inbox/importer.py`, run by hand on the server like `shadow.py`, reading n8n's database through a read-only connection given on the command line, never stored.
-- The sends first, into `order_confirmation`, each with the order's phone, so nothing n8n confirmed is sent again and a tap on an old message is believed.
-- Then conversations by phone, then messages, each keyed `n8n:<id>` in `inbox_message.source_ref`, which is unique, so a second run adds only what is new. Imported replies carry the origin `imported`.
-- Media: copied while Meta still holds it, else marked `gone`.
-- Rehearsed on a throwaway database with a copy of the source before staging or production. The counts are compared with the source, then twenty conversations by eye.
+| Table | Rows | What it holds |
+|---|---|---|
+| `inbox_messages` | 13,699 (6,114 in, 7,585 out), 3,015 phones | Phone, name, `in`/`out`, the words, time in milliseconds, read, a file's WhatsApp id and kind (211 photos, 46 voice notes, 5 videos). **No WhatsApp message id on any row** |
+| `wa_sends` | 2,975, for 2,973 orders | WhatsApp's id, the order, the phone, the time |
+| `shopify_order_events` | 3,069 | Shopify's order webhook as it arrived (2,848 sent, 221 failed) |
+
+How it is brought over, and why:
+
+- **The sends first.** Each order becomes `sent` with its phone and WhatsApp's id: never sent again, and a tap from that phone is believed. A silently recorded order (`would_send` and the rest) is moved to `sent`; one the platform sent itself is left. Nothing is tagged; n8n tagged them. The number, first name, total and time come from the order's webhook where n8n kept one (2,837 of 2,975).
+- **Taps.** n8n wrote a tap into the chat as "👆 Confirm order" (2,908), "👆 Edit order" (251) and "👆 Cancel order" (285), with no order. Each goes to the order last sent to that phone before it, as the button's payload would have said; the last tap is the order's answer.
+- **"⚠️ Not delivered"** (165) is n8n's note, stored as if she wrote it. It becomes the order's `no_whatsapp` and is not a message. "⚠️ Sent something we cannot view" (30) becomes *a message this inbox cannot show*; "[reaction message]" (208) a reaction with nothing to sit on, which the chat does not draw.
+- **Our side.** The outgoing message nearest each send, within 5 minutes, is the confirmation, shown with its buttons and her tap. The three automatic replies are marked automatic; every other reply is *imported*, since n8n never recorded who sent it.
+- **Files.** "📷 Photo" and "🎤 Voice note" are n8n's words for a file with none of its own, so they are dropped and a caption is kept. A file under 30 days old waits to be copied (55 on 12 October; Meta may still refuse it, and it then shows as no longer available); older ones are gone.
+- **Phones.** Seven Egyptian numbers were kept as `2001…`; the 0 is dropped so her next message joins the same chat.
+- **The name** on a chat is the latest one she wrote under, else the latest on our messages (1,870 phones carry two).
+
+**When it runs on production, and why not yet.** The phase 2 comparison (`shadow.py`) counts orders the platform left at `would_send`. The import moves n8n's orders to `sent`, so importing into production before that comparison's seven days end (19 October) would spoil it. So: rehearse now on a throwaway database; import into production after the 19th, and again at the switch-over (phase 7, step 2). Staging gets none of it: it holds no customer data, by the owner's decision.
+
+**Done when:** `--check` reports `conversations_that_differ: 0` after an import, and twenty chats read the same in both.
 
 ## Phase 6 — End to end on staging
 

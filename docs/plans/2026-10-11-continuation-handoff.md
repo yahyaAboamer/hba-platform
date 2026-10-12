@@ -1,4 +1,4 @@
-# Where the work is — 12 October 2026 (the Inbox is on staging and production; phase 5 waits on n8n's table shapes)
+# Where the work is — 12 October 2026 (the Inbox is on staging and production; phase 5's importer is built)
 
 Supersedes the earlier 12 October version of this file; its open items are
 carried under *Remaining*.
@@ -9,12 +9,12 @@ Re-read the remote before describing it (`git ls-remote --heads origin main prod
 
 | | |
 |---|---|
-| **Branch** | `feature/whatsapp-inbox`, pushed. Code at `4f939f5`; the commit carrying this file is ahead of it on the branch only. |
+| **Branch** | `feature/whatsapp-inbox`, pushed. Code at `f9fdde3` (the phase 5 importer, on the branch only); the commit carrying this file is ahead of it. |
 | **Staging and production** | `origin/main` and `origin/production` both on `4f939f5`, deployed 12 October on the owner's order (fast-forwards from `6533260`). Both came up, ran the migration and answered `/api/health/ready` 200; production logged no error after it. |
 | **Migration head** | `d3f6b9c40015` on staging and production. |
 | **Production config** | `INBOX_CONFIRMATIONS_ENABLED=true`. `INBOX_SEND_TO_CUSTOMERS` is **not** set, per the previous handoff (a cloud session may not read the variables), and must not be until the switch-over. No WhatsApp keys are typed into Settings there, so nothing can be sent. `SETTINGS_ENCRYPTION_KEY` and the media bucket variables are set. |
 | **Staging config** | No inbox switch is set: the engine is off there. |
-| **Backend** | whole suite through `run-suite.sh`, 111/111 files, at `4f939f5`. |
+| **Backend** | whole suite through `run-suite.sh`, 112/112 files, at `f9fdde3`. |
 | **Frontend** | `npm test` 46 files / 767 tests and `npm run build`, at `4f939f5`. |
 
 **n8n is still the only thing that messages customers.** Deploying phases 3
@@ -50,11 +50,14 @@ tag writes or the real bucket.
 
 ## Remaining, in order
 
-1. **Inbox phase 5: n8n's table shapes.** Run
-   `docs/plans/inbox-phase5-n8n-schema.sql` (read-only, no row values)
-   against the `Postgres` service of `order-confirmation-message` and paste
-   the output into a session; then write the importer as the plan's *Phase 5
-   so far* describes, and rehearse it on a throwaway database.
+1. **Inbox phase 5: rehearse the import with the real rows** on a throwaway
+   database (the local `hba_platform_test` will do), with
+   `--dry-run`, then for real, then `--check`; see the plan's *Phase 5 so
+   far*. n8n's address is its Postgres service's `DATABASE_PUBLIC_URL`,
+   given in `N8N_DATABASE_URL` and never written down. **Not into
+   production before 19 October**: it would spoil the phase 2 comparison.
+   Then deploy the importer and run it on production, and again at the
+   switch-over.
 2. **The owner tries the Inbox on staging.** Type the WhatsApp keys and the
    second Shopify app into Settings → Shopify there; set
    `INBOX_TEST_NUMBERS` on the staging service; invite a customer-service
