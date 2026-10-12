@@ -50,7 +50,9 @@ tag writes or the real bucket.
 
 ## Remaining, in order
 
-1. **Inbox phase 5: rehearse the import with the real rows** on a throwaway
+1. **Inbox phase 5.** Rehearsed on 12 October with the real rows: `--check`
+   found 0 chats that differ (the plan has the counts). Left: rehearse again if
+   the code changes, on a throwaway
    database (the local `hba_platform_test` will do), with
    `--dry-run`, then for real, then `--check`; see the plan's *Phase 5 so
    far*. n8n's address is its Postgres service's `DATABASE_PUBLIC_URL`,

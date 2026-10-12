@@ -300,7 +300,22 @@ How it is brought over, and why:
 
 **When it runs on production, and why not yet.** The phase 2 comparison (`shadow.py`) counts orders the platform left at `would_send`. The import moves n8n's orders to `sent`, so importing into production before that comparison's seven days end (19 October) would spoil it. So: rehearse now on a throwaway database; import into production after the 19th, and again at the switch-over (phase 7, step 2). Staging gets none of it: it holds no customer data, by the owner's decision.
 
+**Rehearsed on 12 October** by the owner, with n8n's real rows, into the throwaway `hba_platform_test` on his machine (`f9fdde3`):
+
+| | |
+|---|---|
+| n8n's messages / sends | 13,706 / 2,976 |
+| Imported messages | 13,541, plus 165 "Not delivered" notes kept as the order's state: 13,706 |
+| Confirmations matched to their message | 2,976 of 2,976 |
+| Orders recorded | 2,974 (two orders were sent twice) |
+| Taps | 3,445 |
+| Chats | 3,009: n8n's 3,015 phones less those kept as `2001…`, which joined the chat with the right number |
+| Files | 55 to be copied, 207 gone |
+| `--check` | 3,009 chats and 13,541 messages on each side, **0 that differ** |
+
 **Done when:** `--check` reports `conversations_that_differ: 0` after an import, and twenty chats read the same in both.
+
+What is left of phase 5: the twenty chats read by eye, on production after the import there (after 19 October).
 
 ## Phase 6 — End to end on staging
 
