@@ -14,7 +14,7 @@ import { OpsIcon, dayMonth } from "./OpsSource";
  * cancelled here is still cancelled in Shopify, by hand.
  *
  * The mockup also lists the payment method and the items. The platform keeps
- * neither for a customer's order (ADR 0059, point 5): they are one click
+ * neither for a customer's order (ADR 0059, point 9): they are one click
  * away, on the order in Shopify.
  */
 

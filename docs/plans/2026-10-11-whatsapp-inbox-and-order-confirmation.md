@@ -4,7 +4,7 @@
 **Written:** 11 October 2026
 **Started:** 11 October 2026, on the owner's order, ahead of the audit repair's release gates.
 **Branch:** `feature/whatsapp-inbox`, cut from `repair/batch-2`. It stays off the repair branch so the repair remains releasable, and nothing is merged or deployed without the owner's separate go-ahead.
-**Where it stands:** mockup `docs/design/whatsapp-inbox-2026-10-11.html` approved by the owner on 11 October. Phase 1 is built on the branch; see "Phase 1 as built" below for what is left of it.
+**Where it stands (12 October):** mockup `docs/design/whatsapp-inbox-2026-10-11.html` approved by the owner on 11 October. Phases 1 and 2 are on production, with the engine running silently. Phases 3 and 4 are built on the branch and deployed nowhere; each has an "as built" section below saying what it still owes.
 **Replaces:** the Railway project `order-confirmation-message` (n8n + Postgres, production only).
 
 ## Shape of the work
@@ -193,8 +193,8 @@ Phase 3 is built. What it still owes before it is done:
 
 - **An independent security review** of the receiver and the media endpoint. Both were written against the risks named here and tested for them, and the automated review found one fault in part a, since fixed; nobody other than the author has reviewed them.
 - **Nothing has met the real thing.** Meta, Shopify's tag writes and the Railway bucket are all stand-ins in the tests. That is phase 6.
-- **A voice note recorded in a browser.** WhatsApp shows a voice note only for Opus in an Ogg file, and Chrome records WebM. The server takes Ogg and refuses WebM with the reason; producing Ogg in the browser is phase 4's.
-- **Sending an approved message other than the order confirmation.** The list is read; filling in another message's details and sending it waits for the owner to say which messages exist (phase 0's open row).
+- **A voice note recorded in a browser.** Done in phase 4: the browser now hands the server an Ogg file.
+- **Sending an approved message other than the order confirmation.** Done in phase 4 for a message with nothing to fill in. One with blanks of its own, other than the confirmation, still waits for the owner to say which messages exist (phase 0's open row).
 
 ## Phase 4 — Inbox screens
 
@@ -211,6 +211,52 @@ Built from the approved mockup.
 - Works on a phone at 390 wide, by keyboard, and with a screen reader.
 
 **Done when:** the screens match the mockup in captured comparisons, `npm test` and `npm run build` pass, and the flows are exercised in a real browser on staging.
+
+### Phase 4 as built (12 October 2026)
+
+Built on the branch, not deployed. Nothing on staging or production runs it. Commits `9fc3944`, `292a4a5` and `5ea7d0d`.
+
+- **Who lands where.** Customer service signs in to the Inbox and nothing else. The operations manager gains it beside Operations. The admin holds all three dashboards. The switch under the brand shows only what a person holds, so customer service sees none. Operations and the Inbox share one shell (`SideShell`).
+- **Operations → WhatsApp**, the fourth tab: the five cards, each with its orders, an order number and a reason and no customer detail. Each order opens in the Inbox on the card it stands under.
+- **Inbox → Confirmations**: the six cards, Send again, and the number to call for an order with no WhatsApp.
+- **Inbox → Chats**: every conversation a page at a time, search, the four views, read again every 5 seconds. The open chat: who sent each reply, ticks, dates, her taps, replies, reactions, photos, voice notes, videos and files, read again every 4 seconds. The order beside it, where her answer is recorded by hand.
+- **The composer**: text, a file with a caption, a voice note recorded in the browser, and the approved messages. Once her 24 hours have passed the box is replaced by the reason and the approved messages.
+- **Settings**: the WhatsApp card says when WhatsApp was last heard from and how Meta rates the number.
+- **On a phone**: the list, then the chat with its own way back, then the order behind the Order button.
+
+What the server gained for it:
+
+- Each order's link into the Shopify admin, how long an order has waited and the tag it carries (Operations), and the number to call (Confirmations).
+- **Whether WhatsApp has gone quiet.** Not "nothing for a while": at night nothing arrives for hours and nothing is wrong. It is quiet when the platform sent something more than 10 minutes ago and has heard nothing since, not even that it was sent. Shown on Operations → WhatsApp and at the top of Chats (`GET /api/inbox/health`).
+- **Sending an approved message from a chat** (`POST /api/inbox/conversations/{id}/template`). Meta's list is read again for the send, so only a message approved now, with nothing left to fill in, can go out. It is held to the rule on who may be messaged and carries the sender's name. The order confirmation is filled in from an order, so it is listed with the reason and is not sent from a chat.
+- `GET /api/inbox/connection/health`, admin only, for the Settings card.
+
+**A voice note.** WhatsApp shows one only for Opus sound in an Ogg file, and Chrome records the same sound in a WebM file. The browser lifts each packet of sound out of the WebM and writes it into an Ogg, with nothing re-encoded (`frontend/src/lib/oggOpus.ts`). It is recorded in one channel, mixed down where the microphone hands over two. Firefox records Ogg already. **Safari records another kind of sound; from Safari it arrives as an audio file that plays, not as a voice note.**
+
+Where it differs from the mockup, on purpose:
+
+| The mockup | As built | Why |
+|---|---|---|
+| The order panel lists the payment method and the items | Number, placed and total only | The platform keeps neither for a customer's order (ADR 0059, point 9). They are one click away in Shopify |
+| Two tags on the order, *WA Sent* and *Edit* | One | Answering clears *WA Sent*, as n8n does (phase 3) |
+| A search button inside the chat | Not there | The server has no search inside a chat. Searching only the messages on screen would miss the rest |
+| A *New* label on Operations' WhatsApp tab | Not there | It marked the tab for the approval; left on, it would be untrue within a week |
+| A second approved message, *We tried to reach you* | Whatever Meta has approved is listed | That message does not exist yet. The day Meta approves one with nothing to fill in, it can be sent with no change to the platform |
+| One list drawn on Confirmations, *Not sent* | All six cards open | Each with the column it is about: when it was sent, when she answered, the number to call. An order that has a chat opens it |
+| A fixed "not heard from for 40 minutes" | The rule above | A clock alone would raise the alarm every night |
+| No way drawn to reply to one message or to react | Shown on a message when the pointer or the keyboard is on it; on a phone, when it is tapped | ADR 0059, point 5, has both |
+| On a phone the account sits in the brand row | Under the tabs | As Operations does today; the shell is shared |
+| Full names on Confirmations | First names | The first name is what the platform keeps for an order |
+
+Seen working in a real browser on 12 October, on a local copy with a throwaway database holding the mockup's own cast (`docs/repair/batch-2/visual/seed_inbox.py`): signing in as customer service, as the operations manager and as the admin; the three dashboards' switch; Chats, an open chat and the order panel at 1280 and at 390; marking read; Confirmations; Operations → WhatsApp; a reply refused with the server's reason; and a voice note recorded in Chrome from a generated tone, which the app turned into an Ogg file that the browser decoded at the length recorded, in one channel.
+
+What phase 4 still owes before it is done:
+
+- **Captured comparisons against the mockup.** The screens were looked at beside it by eye. The harness's own capture-and-compare has not been run on them.
+- **The flows on staging.** Needs the branch on `main`, which is the owner's to order, and a customer-service test account there.
+- **A real screen reader.** The screens are built for one (names on every control, the new-message announcement, focus that follows the keyboard) and none has been tried on them. Known and not yet done: Reply and React are two stops for the Tab key on every message.
+- **A kept photo, voice note or video on screen.** That needs the media bucket, so it is phase 6. Until then only "being fetched" and "no longer available" have been seen in a browser; a kept file is covered by tests.
+- **The owner's choices**, listed under *Still open*.
 
 ## Phase 5 — Import the old chats
 
@@ -276,5 +322,10 @@ From the owner, 11 October 2026:
 
 ## Still open
 
-- The owner's approval of the mockup.
 - The three phase 0 rows only the owner can answer.
+- From phase 4, for the owner to choose:
+  - **The filled green buttons in the dark theme.** The mockup draws *Send again*, *Mark confirmed*, the send button and the unread count as white on the accent green, and they are built so. In the dark theme that is about 3 to 1, under the 4.5 to 1 that small text should have, and it is the only place the product fills a button; everywhere else the strongest action is a green outline on a tint. Recommended: keep the mockup's look and darken the fill for these in the dark theme only, which needs his eye on one screenshot.
+  - **The payment method and the items beside a chat.** The mockup lists them and the platform keeps neither. Showing them means keeping more about each customer's order, or asking Shopify each time a chat is opened. Recommended: leave them a click away in Shopify.
+  - **Searching inside one chat.** Drawn as a button in the mockup, and not built: it needs a search on the server. Small to add if he wants it.
+  - **The wording of new approved messages**, such as *We tried to reach you*, which he submits to Meta. One with nothing to fill in works from a chat the day it is approved.
+- Putting the branch on staging (`main`), so phases 3 and 4 can be tried there. His to order.

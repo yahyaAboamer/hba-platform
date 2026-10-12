@@ -2,7 +2,7 @@
 
 **Status:** Accepted — owner, 5 October 2026, with the mockup `docs/design/operations-dashboard-2026-10-03.html`
 **Date:** 2026-10-03
-**To be amended by [0059](0059-order-confirmation-and-the-customer-inbox-move-into-the-platform.md) when that is built:** a fourth tab, WhatsApp, and the operations manager also holds the customer inbox. Until then this record stands as written.
+**Amended by [0059](0059-order-confirmation-and-the-customer-inbox-move-into-the-platform.md), built on 12 October 2026:** Operations has a fourth tab, WhatsApp, and the operations manager also holds the customer inbox, with a switch between the two. The tab follows every rule below: it only reads, and it shows no customer detail. Where this record says three tabs, or that the operations manager reaches Operations and nothing else, 0059 is what holds. Until that build is deployed, production still runs this record as written.
 **Follows:** 0023 (delivery is read from Shopify, not from Bosta), 0015 and 0045 (Shopify is read-only; its secret is kept encrypted in Settings)
 
 ## Context
