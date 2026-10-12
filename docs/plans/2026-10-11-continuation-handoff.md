@@ -1,6 +1,6 @@
-# Where the work is — 12 October 2026 (the Inbox's backend and screens are built, on the branch only)
+# Where the work is — 12 October 2026 (the Inbox is on staging and production; phase 5 waits on n8n's table shapes)
 
-Supersedes the 11 October evening version of this file; its open items are
+Supersedes the earlier 12 October version of this file; its open items are
 carried under *Remaining*.
 
 ## The exact position
@@ -9,18 +9,21 @@ Re-read the remote before describing it (`git ls-remote --heads origin main prod
 
 | | |
 |---|---|
-| **Branch** | `feature/whatsapp-inbox`, cut from `repair/batch-2`. Code at `5ea7d0d`; a later commit carrying this file and the plan may be ahead. **Not pushed since `9834aec`**: the commits of 12 October for phase 4 are local only. |
-| **Staging and production** | `origin/main` (staging) and `origin/production` are both on `6533260`, unchanged since 11 October. They have the inbox's phases 0 to 2 and nothing of phases 3 and 4. |
-| **Migration head** | `c2e5a8b30014` on staging and production. The branch adds `d3f6b9c40015` (a confirmation can be "sending"), which runs at the first deploy of phase 3. |
-| **Production config** | `INBOX_CONFIRMATIONS_ENABLED=true`. `INBOX_SEND_TO_CUSTOMERS` is **not** set anywhere, and must not be until the switch-over. `SETTINGS_ENCRYPTION_KEY` and the media bucket variables are set on both. |
-| **Staging config** | No inbox switch is set: the engine is off there, so staging holds no customer data. |
-| **Backend** | whole suite through `run-suite.sh`, 111/111 files, at `5ea7d0d`. |
-| **Frontend** | `npm test` 46 files / 765 tests and `npm run build`, at `5ea7d0d`. |
+| **Branch** | `feature/whatsapp-inbox`, pushed. Code at `4f939f5`; the commit carrying this file is ahead of it on the branch only. |
+| **Staging and production** | `origin/main` and `origin/production` both on `4f939f5`, deployed 12 October on the owner's order (fast-forwards from `6533260`). Both came up, ran the migration and answered `/api/health/ready` 200; production logged no error after it. |
+| **Migration head** | `d3f6b9c40015` on staging and production. |
+| **Production config** | `INBOX_CONFIRMATIONS_ENABLED=true`. `INBOX_SEND_TO_CUSTOMERS` is **not** set, per the previous handoff (a cloud session may not read the variables), and must not be until the switch-over. No WhatsApp keys are typed into Settings there, so nothing can be sent. `SETTINGS_ENCRYPTION_KEY` and the media bucket variables are set. |
+| **Staging config** | No inbox switch is set: the engine is off there. |
+| **Backend** | whole suite through `run-suite.sh`, 111/111 files, at `4f939f5`. |
+| **Frontend** | `npm test` 46 files / 767 tests and `npm run build`, at `4f939f5`. |
+
+**n8n is still the only thing that messages customers.** Deploying phases 3
+and 4 changed nothing a customer receives.
 
 ## What was built since the last handoff
 
-All on the branch. **n8n is still the thing that messages customers. Nothing
-about what a customer receives has changed, and nothing built here is deployed.**
+Deployed to staging and production on 12 October. **n8n is still the thing
+that messages customers. Nothing about what a customer receives has changed.**
 
 The plan, with an "as built" section per phase, is
 `docs/plans/2026-10-11-whatsapp-inbox-and-order-confirmation.md`. In short:
@@ -35,23 +38,28 @@ The plan, with an "as built" section per phase, is
   open chat and the order beside it; the composer with files, voice notes and
   the approved messages; two lines on the Settings WhatsApp card.
 
+- **The owner's phase 4 choices** (12 October, `4f939f5`): search inside one
+  chat, built; the dark theme's filled green darkened slightly
+  (`--accent-fill`); payment method and items left in Shopify.
+
 Phase 4 was looked at in a real browser on a local copy with a throwaway
-database. It has **not** been tried on staging, and has not met real WhatsApp,
-real Shopify tag writes or the real bucket.
+database. On staging it is deployed but nobody has clicked through it: the
+cloud session that deployed has no Jev password origin and the staging
+address is outside its network. It has not met real WhatsApp, real Shopify
+tag writes or the real bucket.
 
 ## Remaining, in order
 
-1. **The owner looks at the Inbox.** The quickest way is the branch on
-   staging, which is his to order. That deploy runs migration
-   `d3f6b9c40015`. To try it there he would then: type the WhatsApp keys and
-   the second Shopify app into Settings → Shopify; set `INBOX_TEST_NUMBERS`
-   on the staging service to the phones to test with; invite a
-   customer-service test account. Staging can message only those test
-   numbers.
-2. **His choices from phase 4** (the plan's *Still open*): the filled green
-   buttons in the dark theme; whether the payment method and the items
-   belong beside a chat; searching inside one chat; the wording of new
-   approved messages.
+1. **Inbox phase 5: n8n's table shapes.** Run
+   `docs/plans/inbox-phase5-n8n-schema.sql` (read-only, no row values)
+   against the `Postgres` service of `order-confirmation-message` and paste
+   the output into a session; then write the importer as the plan's *Phase 5
+   so far* describes, and rehearse it on a throwaway database.
+2. **The owner tries the Inbox on staging.** Type the WhatsApp keys and the
+   second Shopify app into Settings → Shopify there; set
+   `INBOX_TEST_NUMBERS` on the staging service; invite a customer-service
+   test account. Staging can message only those numbers. A local session
+   with Jev configured should click through the flows too.
 3. **What phase 4 still owes**: the harness's captured comparison against the
    mockup; the flows on staging; a real screen reader; a kept photo or voice
    note seen on screen.
@@ -63,7 +71,7 @@ real Shopify tag writes or the real bucket.
    is read through `railway ssh` into the `Postgres` service of the
    `order-confirmation-message` project, read-only, order ids only. Every
    difference needs a written reason; the plan lists the expected ones.
-6. **Inbox phase 5**, importing the old chats, then phase 6 on staging.
+6. **Inbox phase 6** on staging, after phase 5.
 7. **From the owner, for the inbox:** October's charges in WhatsApp Manager;
    who owns the Meta business account, app and number; the WhatsApp keys and
    the second Shopify app's credentials, typed into Settings when wanted.
@@ -116,9 +124,9 @@ real Shopify tag writes or the real bucket.
 
 - **Staging and production both report `APP_ENV=production`.** Nothing may be
   decided from it that should differ between them.
-- **Do not invite a customer-service account on production yet.** Its screens
-  exist on the branch only; on production it would still sign in to a shell
-  that refuses it everything.
+- **A customer-service account on production now lands in the Inbox**, which
+  is empty until the import and the switch-over. Invite one there only when
+  there is something for it to do.
 - **`tests/test_reachability.py` reads the frontend's calls as text.** A route
   is seen only where the call is written out, `` api.get(`/api/inbox/…`) ``. A
   path built into a variable first is not seen, and the test then reports the

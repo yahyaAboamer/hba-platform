@@ -214,7 +214,7 @@ Built from the approved mockup.
 
 ### Phase 4 as built (12 October 2026)
 
-Built on the branch, not deployed. Nothing on staging or production runs it. Commits `9fc3944`, `292a4a5` and `5ea7d0d`.
+Commits `9fc3944`, `292a4a5`, `5ea7d0d`, and `4f939f5` for the owner's choices. **On staging and production since 12 October** (`4f939f5`, the owner's order), with migration `d3f6b9c40015`. Customers still receive only what n8n sends: nothing on either server may message them.
 
 - **Who lands where.** Customer service signs in to the Inbox and nothing else. The operations manager gains it beside Operations. The admin holds all three dashboards. The switch under the brand shows only what a person holds, so customer service sees none. Operations and the Inbox share one shell (`SideShell`).
 - **Operations → WhatsApp**, the fourth tab: the five cards, each with its orders, an order number and a reason and no customer detail. Each order opens in the Inbox on the card it stands under.
@@ -237,9 +237,10 @@ Where it differs from the mockup, on purpose:
 
 | The mockup | As built | Why |
 |---|---|---|
-| The order panel lists the payment method and the items | Number, placed and total only | The platform keeps neither for a customer's order (ADR 0059, point 9). They are one click away in Shopify |
+| The order panel lists the payment method and the items | Number, placed and total only | The platform keeps neither for a customer's order (ADR 0059, point 9). They are one click away in Shopify. **The owner chose this on 12 October** |
 | Two tags on the order, *WA Sent* and *Edit* | One | Answering clears *WA Sent*, as n8n does (phase 3) |
-| A search button inside the chat | Not there | The server has no search inside a chat. Searching only the messages on screen would miss the rest |
+| A search button inside the chat | Built on 12 October, on the owner's word; the bar it opens is not drawn | It searches the server, not the screen (below) |
+| White on the accent green on filled buttons | The same look, the green slightly darker in the dark theme only (`--accent-fill`, `#1C874A`) | White on `#23A95C` is 3.04:1; on `#1C874A` it is 4.55:1. The owner chose this on 12 October |
 | A *New* label on Operations' WhatsApp tab | Not there | It marked the tab for the approval; left on, it would be untrue within a week |
 | A second approved message, *We tried to reach you* | Whatever Meta has approved is listed | That message does not exist yet. The day Meta approves one with nothing to fill in, it can be sent with no change to the platform |
 | One list drawn on Confirmations, *Not sent* | All six cards open | Each with the column it is about: when it was sent, when she answered, the number to call. An order that has a chat opens it |
@@ -250,13 +251,19 @@ Where it differs from the mockup, on purpose:
 
 Seen working in a real browser on 12 October, on a local copy with a throwaway database holding the mockup's own cast (`docs/repair/batch-2/visual/seed_inbox.py`): signing in as customer service, as the operations manager and as the admin; the three dashboards' switch; Chats, an open chat and the order panel at 1280 and at 390; marking read; Confirmations; Operations → WhatsApp; a reply refused with the server's reason; and a voice note recorded in Chrome from a generated tone, which the app turned into an Ogg file that the browser decoded at the length recorded, in one channel.
 
+**The owner's choices of 12 October** (commit `4f939f5`):
+
+- **The filled green in the dark theme**: the look is kept and the fill darkened slightly in dark only. A new token, `--accent-fill` in `styles/accent.css` (`#14653A` light, `#1C874A` dark), is the background of every Inbox fill that carries white: the buttons, the send and play buttons, the unread count. Nothing outside the Inbox changed.
+- **The payment method and the items**: left one click away in Shopify, as built. Nothing more is kept about a customer's order.
+- **Search inside one chat**: the search button in the chat's head opens a bar under it. What is typed (two letters or more) is asked of the server, `GET /api/inbox/conversations/{id}/search?q=`, which returns up to 100 matches newest first, on the message's words or its file's name; a reaction is not searched, and `%` and `_` are letters. The newest match is brought into view, picked out with its words marked. A match above what is loaded is reached by reading earlier pages until it is there. Enter or the up arrow goes to the earlier match, Shift+Enter or the down arrow to the later, Escape closes and returns to the button. "2 of 5" is announced as it changes.
+- **The branch on staging and production**: ordered by the owner the same day.
+
 What phase 4 still owes before it is done:
 
 - **Captured comparisons against the mockup.** The screens were looked at beside it by eye. The harness's own capture-and-compare has not been run on them.
-- **The flows on staging.** Needs the branch on `main`, which is the owner's to order, and a customer-service test account there.
+- **The flows on staging.** The code is there; trying them needs the WhatsApp keys and test numbers on staging and a customer-service test account. The cloud session that deployed could not sign in to staging (no browser password origin there), so nobody has clicked through it on staging yet.
 - **A real screen reader.** The screens are built for one (names on every control, the new-message announcement, focus that follows the keyboard) and none has been tried on them. Known and not yet done: Reply and React are two stops for the Tab key on every message.
 - **A kept photo, voice note or video on screen.** That needs the media bucket, so it is phase 6. Until then only "being fetched" and "no longer available" have been seen in a browser; a kept file is covered by tests.
-- **The owner's choices**, listed under *Still open*.
 
 ## Phase 5 — Import the old chats
 
@@ -268,6 +275,18 @@ What phase 4 still owes before it is done:
 - Rehearsed on a throwaway database before it touches staging or production.
 
 **Done when:** conversation and message counts match the source, and a spot check of twenty conversations reads the same in both.
+
+### Phase 5 so far (12 October 2026)
+
+Started, and waiting on one thing: **the shape of n8n's tables.** Neither the plan nor the code records the names of n8n's chat, message and send tables or their columns, and a cloud session cannot reach n8n's database. `docs/plans/inbox-phase5-n8n-schema.sql` is a read-only query that returns table names, row counts, columns, keys and indexes, and no row's values. Its output, pasted into the session, is what the importer is written against.
+
+What the importer will be, from what is already built:
+
+- A module, `app/services/inbox/importer.py`, run by hand on the server like `shadow.py`, reading n8n's database through a read-only connection given on the command line, never stored.
+- The sends first, into `order_confirmation`, each with the order's phone, so nothing n8n confirmed is sent again and a tap on an old message is believed.
+- Then conversations by phone, then messages, each keyed `n8n:<id>` in `inbox_message.source_ref`, which is unique, so a second run adds only what is new. Imported replies carry the origin `imported`.
+- Media: copied while Meta still holds it, else marked `gone`.
+- Rehearsed on a throwaway database with a copy of the source before staging or production. The counts are compared with the source, then twenty conversations by eye.
 
 ## Phase 6 — End to end on staging
 
@@ -323,9 +342,5 @@ From the owner, 11 October 2026:
 ## Still open
 
 - The three phase 0 rows only the owner can answer.
-- From phase 4, for the owner to choose:
-  - **The filled green buttons in the dark theme.** The mockup draws *Send again*, *Mark confirmed*, the send button and the unread count as white on the accent green, and they are built so. In the dark theme that is about 3 to 1, under the 4.5 to 1 that small text should have, and it is the only place the product fills a button; everywhere else the strongest action is a green outline on a tint. Recommended: keep the mockup's look and darken the fill for these in the dark theme only, which needs his eye on one screenshot.
-  - **The payment method and the items beside a chat.** The mockup lists them and the platform keeps neither. Showing them means keeping more about each customer's order, or asking Shopify each time a chat is opened. Recommended: leave them a click away in Shopify.
-  - **Searching inside one chat.** Drawn as a button in the mockup, and not built: it needs a search on the server. Small to add if he wants it.
-  - **The wording of new approved messages**, such as *We tried to reach you*, which he submits to Meta. One with nothing to fill in works from a chat the day it is approved.
-- Putting the branch on staging (`main`), so phases 3 and 4 can be tried there. His to order.
+- **The wording of new approved messages**, such as *We tried to reach you*, which he submits to Meta. One with nothing to fill in works from a chat the day it is approved.
+- To try the Inbox on staging: the WhatsApp keys and the second Shopify app typed into Settings there, `INBOX_TEST_NUMBERS` on the staging service, and a customer-service test account.
