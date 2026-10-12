@@ -317,6 +317,12 @@ How it is brought over, and why:
 
 What is left of phase 5: the twenty chats read by eye, on production after the import there (after 19 October).
 
+## The owner's change of course, 12 October 2026
+
+**Phase 6 on staging and the rest of the seven-day comparison are dropped, on the owner's order.** A Meta test app was begun (*HBA Inbox Test*) but he chose not to wait on a second account and a second approved message. The platform goes straight to production at the switch-over (phase 7), with n8n kept ready as the way back for two weeks, then retired (phase 8) once the two weeks have run clean.
+
+What that gives up, written down so it is a choice and not a gap: no flow was seen end to end before customers meet it, and the comparison had one day (6 differences, each explained). What stands in for them: a quiet hour, one real order placed with the owner's own phone before anything else, Send again for any order n8n did not message, and n8n's workflows left switchable for two weeks. The production import no longer waits for 19 October; it is step 2 of the switch-over.
+
 ## Phase 6 — End to end on staging
 
 - A Meta test number connected to staging.
