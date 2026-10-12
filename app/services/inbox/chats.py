@@ -419,6 +419,96 @@ def react(
     return _described(db, message)
 
 
+# ── The approved messages ─────────────────────────────────────────────────────
+
+#: A header of one of these needs a file handed over with every send.
+_HEADER_NEEDS_A_FILE = ("IMAGE", "VIDEO", "DOCUMENT", "LOCATION")
+
+NEEDS_AN_ORDER = (
+    "This one is filled in from an order. It goes out on its own for a new order, "
+    "and from Confirmations for an order that never got it."
+)
+NEEDS_A_FILE = "This one carries a picture or a file, which cannot be sent from here yet."
+
+
+def _why_not(template: dict) -> str | None:
+    """Why an approved message cannot be sent as it stands, or None if it can."""
+    parts = [part for part in template.get("components") or [] if isinstance(part, dict)]
+    if any(part.get("type") == "HEADER" and part.get("format") in _HEADER_NEEDS_A_FILE for part in parts):
+        return NEEDS_A_FILE
+    # "{{1}}" anywhere - the body, a heading, a button's link - is a blank.
+    if "{{" in str(parts):
+        return NEEDS_AN_ORDER
+    return None
+
+
+def describe_templates(found: list) -> list[dict]:
+    """The approved messages, as the picker shows them.
+
+    Only the approved ones, only what a person needs to tell them apart, and
+    whether each can be sent from a chat as it stands.
+    """
+    listed = []
+    for template in found:
+        if not isinstance(template, dict) or template.get("status") != "APPROVED":
+            continue
+        body = next(
+            (
+                part.get("text")
+                for part in template.get("components") or []
+                if isinstance(part, dict) and part.get("type") == "BODY"
+            ),
+            None,
+        )
+        why_not = _why_not(template)
+        listed.append(
+            {
+                "name": template.get("name"),
+                "language": template.get("language"),
+                "category": template.get("category"),
+                "body": body,
+                "sendable": why_not is None,
+                "why_not": why_not,
+            }
+        )
+    return listed
+
+
+def send_template(
+    db: Session,
+    conversation_id: int,
+    name: str,
+    language: str,
+    *,
+    found: list,
+    actor_id: int,
+    client: MetaClient | None = None,
+) -> dict:
+    """Staff send an approved message, as Meta approved it.
+
+    ``found`` is Meta's own list, read for this send: what may go out is
+    decided by what is approved now, not by what the screen was shown.
+    """
+    conversation = _conversation(db, conversation_id)
+    chosen = next(
+        (
+            template
+            for template in describe_templates(found)
+            if template["name"] == name and template["language"] == language
+        ),
+        None,
+    )
+    if chosen is None:
+        raise Refused("That is not one of the approved messages.")
+    if not chosen["sendable"]:
+        raise Refused("That message cannot be sent from here. " + chosen["why_not"])
+    message = outbound.send_template(
+        db, conversation, name=name, language=language, body=chosen["body"],
+        sent_by=actor_id, client=client,
+    )
+    return _described(db, message)
+
+
 def _order(db: Session, order_id: str) -> OrderConfirmation:
     row = db.scalar(
         select(OrderConfirmation).where(OrderConfirmation.shopify_order_id == str(order_id))

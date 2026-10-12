@@ -80,10 +80,24 @@ type Served = {
   messages?: object[];
   earlier?: string | null;
   health?: object;
+  templates?: object[];
   post?: (url: string, body: Record<string, unknown>) => [number, unknown];
 };
 
 let calls: { method: string; url: string; body: Record<string, unknown> | null }[] = [];
+
+/** What was sent: JSON as it is, a form as its fields. */
+function sentBody(body: RequestInit["body"]): Record<string, unknown> | null {
+  if (!body) return null;
+  if (body instanceof FormData) {
+    const fields: Record<string, unknown> = {};
+    body.forEach((value, name) => {
+      fields[name] = value;
+    });
+    return fields;
+  }
+  return JSON.parse(String(body)) as Record<string, unknown>;
+}
 
 function serve(served: Served = {}) {
   calls = [];
@@ -92,13 +106,14 @@ function serve(served: Served = {}) {
     "fetch",
     vi.fn((url: string, init?: RequestInit) => {
       const method = init?.method ?? "GET";
-      const body = init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : null;
+      const body = sentBody(init?.body);
       calls.push({ method, url, body });
       if (method === "POST") {
         const [status, answer] = served.post?.(url, body ?? {}) ?? [200, { ...detail, unread_count: 0 }];
         return reply(status, answer);
       }
       if (url.startsWith("/api/inbox/health")) return reply(200, served.health ?? HEALTH);
+      if (url.startsWith("/api/inbox/templates")) return reply(200, { templates: served.templates ?? [] });
       if (/\/conversations\/\d+\/messages/.test(url)) {
         return reply(200, { messages: served.messages ?? [], earlier: served.earlier ?? null });
       }
@@ -427,6 +442,114 @@ describe("an open chat", () => {
     expect(await within(hers).findByText("from the team")).toBeTruthy();
   });
 
+  it("sends a file, with what is typed as its caption", async () => {
+    serve({
+      messages: THREAD,
+      post: () => [200, ours(6, { kind: "image", body: "The beige one", media: null })],
+    });
+    show("/inbox/chats/12");
+    const box = (await screen.findByRole("textbox", { name: "Message" })) as HTMLTextAreaElement;
+    const photo = new File(["made up"], "beige-set.jpg", { type: "image/jpeg" });
+
+    fireEvent.change(screen.getByTestId("inbox-file"), { target: { files: [photo] } });
+    expect(screen.getByText("beige-set.jpg")).toBeTruthy();
+    fireEvent.change(box, { target: { value: "The beige one" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    await waitFor(() => expect(posts()).toHaveLength(1));
+    expect(posts()[0]?.url).toBe("/api/inbox/conversations/12/media");
+    expect(posts()[0]?.body).toMatchObject({ caption: "The beige one", voice: "false" });
+    expect((posts()[0]?.body?.upload as File).name).toBe("beige-set.jpg");
+    // Sent: the file and its caption are cleared for the next message.
+    await waitFor(() => expect(screen.queryByText("beige-set.jpg")).toBeNull());
+    expect(box.value).toBe("");
+  });
+
+  it("can drop a file chosen by mistake, and refuses one too large before sending it", async () => {
+    serve({ messages: THREAD });
+    show("/inbox/chats/12");
+    await screen.findByRole("textbox", { name: "Message" });
+    const chooser = screen.getByTestId("inbox-file");
+
+    fireEvent.change(chooser, { target: { files: [new File(["x"], "wrong.pdf", { type: "application/pdf" })] } });
+    fireEvent.click(screen.getByRole("button", { name: "Remove wrong.pdf" }));
+    expect(screen.queryByText("wrong.pdf")).toBeNull();
+
+    const huge = new File(["x"], "film.mp4", { type: "video/mp4" });
+    Object.defineProperty(huge, "size", { value: 26 * 1024 * 1024 });
+    fireEvent.change(chooser, { target: { files: [huge] } });
+
+    expect(screen.getByRole("alert").textContent).toBe("That file is larger than WhatsApp allows (25 MB).");
+    expect(screen.queryByText("film.mp4")).toBeNull();
+    expect(posts()).toEqual([]);
+  });
+
+  it("records a voice note and sends it as one", async () => {
+    // A browser that records Opus in an Ogg file, as Firefox does.
+    class Recorder {
+      static isTypeSupported = (form: string) => form === "audio/ogg;codecs=opus";
+      state = "inactive";
+      mimeType = "audio/ogg;codecs=opus";
+      ondataavailable: ((event: { data: Blob }) => void) | null = null;
+      onstop: (() => void) | null = null;
+      start() {
+        this.state = "recording";
+      }
+      stop() {
+        this.state = "inactive";
+        this.ondataavailable?.({ data: new Blob(["sound"], { type: this.mimeType }) });
+        this.onstop?.();
+      }
+    }
+    const released = vi.fn();
+    vi.stubGlobal("MediaRecorder", Recorder);
+    vi.stubGlobal("navigator", {
+      ...navigator,
+      mediaDevices: { getUserMedia: async () => ({ getTracks: () => [{ stop: released }] }) },
+    });
+    serve({ messages: THREAD, post: () => [200, ours(6, { kind: "audio", body: null, voice: true })] });
+    show("/inbox/chats/12");
+
+    fireEvent.click(await screen.findByRole("button", { name: "Record a voice note" }));
+    expect(await screen.findByText(/Recording 0:00/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Send the voice note" }));
+
+    await waitFor(() => expect(posts()).toHaveLength(1));
+    expect(posts()[0]?.url).toBe("/api/inbox/conversations/12/media");
+    expect(posts()[0]?.body).toMatchObject({ voice: "true", caption: "" });
+    const sent = posts()[0]?.body?.upload as File;
+    expect([sent.type, sent.name]).toEqual(["audio/ogg", "voice-note.ogg"]);
+    // The microphone is let go of once the note is made.
+    expect(released).toHaveBeenCalled();
+    expect(await screen.findByRole("textbox", { name: "Message" })).toBeTruthy();
+  });
+
+  it("says why when the microphone is refused", async () => {
+    vi.stubGlobal("MediaRecorder", class { static isTypeSupported = () => true; });
+    vi.stubGlobal("navigator", {
+      ...navigator,
+      mediaDevices: { getUserMedia: () => Promise.reject(new Error("NotAllowedError")) },
+    });
+    serve({ messages: THREAD });
+    show("/inbox/chats/12");
+
+    fireEvent.click(await screen.findByRole("button", { name: "Record a voice note" }));
+
+    expect((await screen.findByRole("alert")).textContent).toContain("The microphone is blocked for this site.");
+  });
+
+  const APPROVED = [
+    {
+      name: "we_tried_to_reach_you", language: "en", category: "UTILITY",
+      body: "We tried to reach you about your order.", sendable: true, why_not: null,
+    },
+    {
+      name: "order_confirmation", language: "en", category: "UTILITY",
+      body: "Hi {{1}}, thank you for your order {{2}}.", sendable: false,
+      why_not: "This one is filled in from an order.",
+    },
+  ];
+
   it("replaces the box with the reason once her 24 hours have passed", async () => {
     serve({ detail: { window_open: false, window_closes_at: minutesAgo(600) }, messages: THREAD });
     show("/inbox/chats/12");
@@ -435,6 +558,64 @@ describe("an open chat", () => {
     expect(screen.queryByRole("textbox", { name: "Message" })).toBeNull();
     // Nor can a message be answered or reacted to.
     expect(screen.queryByRole("button", { name: "Reply to this message" })).toBeNull();
+    expect(await screen.findByText("No message has been approved yet.")).toBeTruthy();
+  });
+
+  it("offers the approved messages then, and sends one only after it is read and confirmed", async () => {
+    serve({
+      detail: { window_open: false, window_closes_at: minutesAgo(600) },
+      messages: THREAD,
+      templates: APPROVED,
+      post: () => [200, ours(6, { kind: "template", body: "We tried to reach you about your order." })],
+    });
+    show("/inbox/chats/12");
+
+    const reach = await screen.findByRole("button", { name: /We tried to reach you/ });
+    // The confirmation is filled in from an order: listed, with why, not sent from here.
+    const confirmation = screen.getByRole("button", { name: /Order confirmation/ }) as HTMLButtonElement;
+    expect(confirmation.disabled).toBe(true);
+    expect(confirmation.textContent).toContain("This one is filled in from an order.");
+
+    fireEvent.click(reach);
+    expect(posts()).toEqual([]);
+    fireEvent.click(screen.getByRole("button", { name: "Send this message" }));
+
+    await waitFor(() =>
+      expect(posts()[0]).toMatchObject({
+        url: "/api/inbox/conversations/12/template",
+        body: { name: "we_tried_to_reach_you", language: "en" },
+      }),
+    );
+    // Sent: it is in the chat, and the list is back.
+    expect(await screen.findByRole("button", { name: /We tried to reach you/ })).toBeTruthy();
+  });
+
+  it("keeps an approved message unsent, with the reason, when it is refused", async () => {
+    serve({
+      detail: { window_open: false, window_closes_at: minutesAgo(600) },
+      messages: THREAD,
+      templates: APPROVED,
+      post: () => [409, { detail: "This server only messages its test numbers." }],
+    });
+    show("/inbox/chats/12");
+
+    fireEvent.click(await screen.findByRole("button", { name: /We tried to reach you/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Send this message" }));
+
+    expect((await screen.findByRole("alert")).textContent).toBe("This server only messages its test numbers.");
+    expect(screen.getByRole("button", { name: "Send this message" })).toBeTruthy();
+  });
+
+  it("offers the approved messages from the box too, while she can still be written to", async () => {
+    serve({ messages: THREAD, templates: APPROVED });
+    show("/inbox/chats/12");
+
+    const open = await screen.findByRole("button", { name: "Send an approved message" });
+    expect(screen.queryByRole("button", { name: /We tried to reach you/ })).toBeNull();
+    fireEvent.click(open);
+
+    expect(await screen.findByRole("button", { name: /We tried to reach you/ })).toBeTruthy();
+    expect(open.getAttribute("aria-expanded")).toBe("true");
   });
 
   it("shows an old chat as it was brought over, with what is gone marked gone", async () => {

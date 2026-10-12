@@ -133,14 +133,23 @@ async function request<T>(
  * Separate from `request` because the body must not be stringified and the
  * content-type must be left alone — the browser sets it, including the
  * boundary, and overriding it produces a request the server cannot parse.
+ *
+ * `options` is for a route that names its file field differently, or takes
+ * other fields beside it: the inbox's `upload`, with a caption (ADR 0059).
  */
-async function upload<T>(path: string, file: File): Promise<T> {
+async function upload<T>(
+  path: string,
+  file: File | Blob,
+  options: { field?: string; filename?: string; fields?: Record<string, string> } = {},
+): Promise<T> {
   const headers: Record<string, string> = {};
   const token = readToken();
   if (token) headers[CSRF_HEADER] = token;
 
   const form = new FormData();
-  form.append("file", file);
+  for (const [name, value] of Object.entries(options.fields ?? {})) form.append(name, value);
+  if (options.filename) form.append(options.field ?? "file", file, options.filename);
+  else form.append(options.field ?? "file", file);
 
   const response = await fetch(path, {
     method: "POST",

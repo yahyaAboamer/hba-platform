@@ -222,8 +222,8 @@ async def send_file(
 @router.get("/templates")
 def templates(db: Session = Depends(get_session)) -> dict:
     """The approved messages, read from Meta: what can be sent once her 24
-    hours have passed. Only the approved ones, and only what a person needs
-    to tell them apart."""
+    hours have passed. Only the approved ones, what a person needs to tell
+    them apart, and whether each can be sent from a chat as it stands."""
     keys = connection.whatsapp(db)
     if keys is None:
         raise HTTPException(409, sending.NOT_CONNECTED)
@@ -232,27 +232,43 @@ def templates(db: Session = Depends(get_session)) -> dict:
             found = client.templates(keys.business_account_id)
     except MetaError as exc:
         raise HTTPException(502, str(exc)) from None
-    approved = []
-    for template in found:
-        if not isinstance(template, dict) or template.get("status") != "APPROVED":
-            continue
-        body = next(
-            (
-                part.get("text")
-                for part in template.get("components") or []
-                if isinstance(part, dict) and part.get("type") == "BODY"
-            ),
-            None,
-        )
-        approved.append(
-            {
-                "name": template.get("name"),
-                "language": template.get("language"),
-                "category": template.get("category"),
-                "body": body,
-            }
-        )
-    return {"templates": approved}
+    return {"templates": chats.describe_templates(found)}
+
+
+class TemplateBody(BaseModel):
+    name: str
+    language: str
+
+
+@router.post("/conversations/{conversation_id}/template")
+def send_template(
+    conversation_id: int,
+    body: TemplateBody,
+    actor: UserAccount = Depends(GUARD),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Send one of the approved messages as it stands: the way to reach a
+    customer whose 24 hours have passed.
+
+    Meta's list is read again for the send, so only a message approved now,
+    with nothing left to fill in, can go out.
+    """
+    keys = connection.whatsapp(db)
+    if keys is None:
+        raise HTTPException(409, sending.NOT_CONNECTED)
+    try:
+        with MetaClient(keys.access_token, keys.phone_number_id) as client:
+            found = client.templates(keys.business_account_id)
+            sent = _answering(
+                lambda: chats.send_template(
+                    db, conversation_id, body.name, body.language,
+                    found=found, actor_id=actor.id, client=client,
+                )
+            )
+    except MetaError as exc:
+        raise HTTPException(502, str(exc)) from None
+    db.commit()
+    return sent
 
 
 # ── Confirmations ─────────────────────────────────────────────────────────────

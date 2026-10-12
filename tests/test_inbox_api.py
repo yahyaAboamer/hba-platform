@@ -112,6 +112,15 @@ def test_a_reply_is_refused_with_the_reason_when_this_server_may_not_send(client
     assert len(client.get(f"/api/inbox/conversations/{chat}/messages").json()["messages"]) == 1
 
 
+def test_an_approved_message_cannot_be_sent_before_whatsapp_is_connected(client, chat):
+    refused = client.post(
+        f"/api/inbox/conversations/{chat}/template",
+        json={"name": "we_tried_to_reach_you", "language": "en"},
+    )
+    assert refused.status_code == 409
+    assert client.get("/api/inbox/templates").status_code == 409
+
+
 def test_an_empty_reply_is_a_422(client, chat):
     refused = client.post(f"/api/inbox/conversations/{chat}/messages", json={"body": "  "})
     assert refused.status_code == 422

@@ -7,6 +7,7 @@ import type { ChatMessage, ConversationDetail } from "../lib/inbox";
 import { ChatComposer } from "./ChatComposer";
 import { ChatMessages } from "./ChatMessages";
 import { ChatOrderPanel } from "./ChatOrderPanel";
+import type { Template } from "./ChatTemplates";
 import { InboxIcon } from "./InboxIcon";
 import { clockTime, dayMonth, useIsNarrow, useNow } from "./OpsSource";
 
@@ -225,6 +226,38 @@ export function ChatPane({
     }
   }
 
+  /** A photo, a video, a document, or a voice note just recorded. */
+  async function sendFile(
+    file: Blob,
+    options: { filename: string; caption: string; voice: boolean },
+  ): Promise<string | null> {
+    try {
+      const sent = await api.upload<ChatMessage>(`/api/inbox/conversations/${conversationId}/media`, file, {
+        field: "upload",
+        filename: options.filename,
+        fields: { caption: options.caption, voice: options.voice ? "true" : "false" },
+      });
+      took(sent);
+      return null;
+    } catch (error) {
+      return error instanceof ApiError ? error.message : "That file could not be sent. Try again.";
+    }
+  }
+
+  /** One of the approved messages: the way to reach her after her 24 hours. */
+  async function sendTemplate(template: Template): Promise<string | null> {
+    try {
+      const sent = await api.post<ChatMessage>(`/api/inbox/conversations/${conversationId}/template`, {
+        name: template.name,
+        language: template.language,
+      });
+      took(sent);
+      return null;
+    } catch (error) {
+      return error instanceof ApiError ? error.message : "That message could not be sent. Try again.";
+    }
+  }
+
   async function react(message: ChatMessage, emoji: string) {
     setProblem(null);
     try {
@@ -346,6 +379,8 @@ export function ChatPane({
             replyTo={replyTo}
             onCancelReply={() => setReplyTo(null)}
             onSend={(body) => send(body, replyTo)}
+            onSendFile={sendFile}
+            onSendTemplate={sendTemplate}
           />
         )}
       </section>

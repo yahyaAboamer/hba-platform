@@ -510,3 +510,84 @@ def test_no_link_is_invented_when_no_store_is_connected(db, monkeypatch):
     monkeypatch.setattr("app.config.settings.shopify_shop_domain", "")
     _order(db, "5001", state="failed")
     assert chats.confirmations(db, tile="not_sent")["orders"][0]["admin_url"] is None
+
+
+# ── The approved messages, once her 24 hours have passed ──────────────────────
+
+REACH_YOU = {
+    "name": "we_tried_to_reach_you", "language": "en", "status": "APPROVED", "category": "UTILITY",
+    "components": [{"type": "BODY", "text": "We tried to reach you about your order."}],
+}
+CONFIRMATION = {
+    "name": "order_confirmation", "language": "en", "status": "APPROVED", "category": "UTILITY",
+    "components": [
+        {"type": "BODY", "text": "Hi {{1}}, thank you for your order {{2}}. Your total is {{3}}."},
+        {"type": "BUTTONS", "buttons": [{"type": "QUICK_REPLY", "text": "Confirm"}]},
+    ],
+}
+WITH_A_PICTURE = {
+    "name": "new_collection", "language": "en", "status": "APPROVED", "category": "MARKETING",
+    "components": [{"type": "HEADER", "format": "IMAGE"}, {"type": "BODY", "text": "New in."}],
+}
+NOT_APPROVED = {**REACH_YOU, "name": "still_in_review", "status": "PENDING"}
+
+
+def test_only_an_approved_message_that_needs_nothing_filled_in_can_be_picked():
+    listed = {t["name"]: t for t in chats.describe_templates(
+        [REACH_YOU, CONFIRMATION, WITH_A_PICTURE, NOT_APPROVED, "not a template"]
+    )}
+    assert set(listed) == {"we_tried_to_reach_you", "order_confirmation", "new_collection"}
+    assert listed["we_tried_to_reach_you"] == {
+        "name": "we_tried_to_reach_you", "language": "en", "category": "UTILITY",
+        "body": "We tried to reach you about your order.", "sendable": True, "why_not": None,
+    }
+    # The confirmation is filled in from an order, and goes out on its own.
+    assert listed["order_confirmation"]["sendable"] is False
+    assert "order" in listed["order_confirmation"]["why_not"]
+    assert listed["new_collection"]["sendable"] is False
+
+
+def test_an_approved_message_reaches_her_after_her_24_hours_under_the_senders_name(db, may_send):
+    asked: list = []
+    silent = _chat(db, "201005550188", "Nour", minutes_ago=60 * 30)
+    mariam = _staff(db)
+
+    sent = chats.send_template(
+        db, silent.id, "we_tried_to_reach_you", "en",
+        found=[REACH_YOU, CONFIRMATION], actor_id=mariam.id, client=_meta(asked),
+    )
+
+    assert asked[0]["type"] == "template"
+    assert asked[0]["template"] == {"name": "we_tried_to_reach_you", "language": {"code": "en"}}
+    assert (sent["kind"], sent["origin"], sent["sender"], sent["status"]) == (
+        "template", "staff", "Mariam", "sent",
+    )
+    assert sent["body"] == "We tried to reach you about your order."
+    assert sent["template"] == "we_tried_to_reach_you"
+    db.refresh(silent)
+    assert silent.last_preview == "We tried to reach you about your order."
+
+
+@pytest.mark.parametrize(("name", "words"), [
+    ("order_confirmation", "cannot be sent from here"),
+    ("still_in_review", "not one of the approved messages"),
+    ("made_up", "not one of the approved messages"),
+])
+def test_a_message_that_is_not_approved_or_needs_filling_in_is_never_sent(db, may_send, name, words):
+    asked: list = []
+    silent = _chat(db, "201005550188", "Nour", minutes_ago=60 * 30)
+    with pytest.raises(chats.Refused, match=words):
+        chats.send_template(
+            db, silent.id, name, "en", found=[REACH_YOU, CONFIRMATION, NOT_APPROVED],
+            actor_id=_staff(db).id, client=_meta(asked),
+        )
+    assert asked == []
+
+
+def test_an_approved_message_is_held_to_the_rule_on_who_may_be_messaged(db):
+    silent = _chat(db, "201005550188", "Nour", minutes_ago=60 * 30)
+    with pytest.raises(NotSent):
+        chats.send_template(
+            db, silent.id, "we_tried_to_reach_you", "en", found=[REACH_YOU],
+            actor_id=_staff(db).id, client=_meta([]),
+        )

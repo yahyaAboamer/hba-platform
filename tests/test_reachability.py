@@ -88,11 +88,6 @@ NOT_BUILT_YET = {
     # not "affiliates without invitations" in general, just a model who
     # genuinely cannot receive one.
     ("POST", "/api/affiliates"),
-    # The customer inbox (ADR 0059). Its screens are the plan's phase 4, built
-    # in parts; these two are the composer's, and come off when it sends a
-    # file and offers the approved messages.
-    ("POST", "/api/inbox/conversations/{conversation_id}/media"),
-    ("GET", "/api/inbox/templates"),
 }
 
 

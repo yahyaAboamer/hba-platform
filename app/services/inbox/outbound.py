@@ -280,6 +280,44 @@ def send_text(
     )
 
 
+def send_template(
+    db: Session,
+    conversation: InboxConversation,
+    *,
+    name: str,
+    language: str,
+    body: str | None,
+    sent_by: int,
+    client: MetaClient | None = None,
+) -> InboxMessage:
+    """Send one of the approved messages exactly as Meta approved it.
+
+    The one way to reach a customer whose 24 hours have passed, so it is not
+    held to them - only to the rule on who may be messaged. ``body`` is the
+    approved wording, kept so the chat shows what she was sent.
+    """
+    reason = sending.refusal(db, conversation.phone)
+    if reason:
+        raise NotSent(reason)
+
+    owned = client is None
+    client = client or _client(db)
+    try:
+        wa_message_id = client.send_template(conversation.phone, name, language)
+    except MetaError as exc:
+        return record_outbound(
+            db, conversation, kind="template", body=body, origin="staff", status="failed",
+            error=str(exc), sent_by=sent_by, template_name=name,
+        )
+    finally:
+        if owned:
+            client.close()
+    return record_outbound(
+        db, conversation, kind="template", body=body, origin="staff", status="sent",
+        wa_message_id=wa_message_id, sent_by=sent_by, template_name=name,
+    )
+
+
 # ── The automatic reply to a tap ──────────────────────────────────────────────
 
 
