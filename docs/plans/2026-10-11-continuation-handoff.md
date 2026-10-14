@@ -48,38 +48,47 @@ cloud session that deployed has no Jev password origin and the staging
 address is outside its network. It has not met real WhatsApp, real Shopify
 tag writes or the real bucket.
 
+**Superseded on 12 October, 13:35 UTC (`b121508`): the owner dropped phase 6
+on staging and the rest of the seven-day comparison, and goes straight to the
+switch-over.** The plan's section *The owner's change of course* says what
+that gives up and what stands in for it. The list below is rewritten to
+match. `origin/main` and `origin/production` were on `aae38ee` on 14 October,
+which carries the importer (`f9fdde3`); that Railway deployed it cleanly was
+not checked.
+
 ## Remaining, in order
 
-1. **Inbox phase 5.** Rehearsed on 12 October with the real rows: `--check`
-   found 0 chats that differ (the plan has the counts). Left: rehearse again if
-   the code changes, on a throwaway
-   database (the local `hba_platform_test` will do), with
-   `--dry-run`, then for real, then `--check`; see the plan's *Phase 5 so
-   far*. n8n's address is its Postgres service's `DATABASE_PUBLIC_URL`,
-   given in `N8N_DATABASE_URL` and never written down. **Not into
-   production before 19 October**: it would spoil the phase 2 comparison.
-   Then deploy the importer and run it on production, and again at the
-   switch-over.
-2. **The owner tries the Inbox on staging.** Type the WhatsApp keys and the
-   second Shopify app into Settings → Shopify there; set
-   `INBOX_TEST_NUMBERS` on the staging service; invite a customer-service
-   test account. Staging can message only those numbers. A local session
-   with Jev configured should click through the flows too.
+1. **Inbox phase 7, the switch-over** (the plan's *Phase 7*). Needs the
+   owner's explicit go-ahead, and these first:
+   - the WhatsApp keys and the second Shopify app's credentials typed into
+     Settings → Shopify **on production** (none were on 12 October);
+   - who owns the Meta business account, app and number, so the callback
+     address can be changed;
+   - a quiet hour, and whoever answers customers told.
+
+   Then: run the import on production (`app/services/inbox/importer.py`,
+   `--dry-run`, for real, then `--check`; n8n's address in
+   `N8N_DATABASE_URL`, never written down) — it no longer waits for
+   19 October; turn off n8n's sending and tagging workflows, leaving n8n
+   running; point Meta's callback at the platform; switch sending on and set
+   `INBOX_SEND_TO_CUSTOMERS=true` on production; one real order from the
+   owner's own phone; Send again for any order n8n did not message; watch
+   the health strip and the failed list for the day.
+2. **After the import on production**: read twenty chats against n8n's by
+   eye (what is left of phase 5).
 3. **What phase 4 still owes**: the harness's captured comparison against the
-   mockup; the flows on staging; a real screen reader; a kept photo or voice
-   note seen on screen.
+   mockup; a real screen reader; a kept photo or voice note seen on screen.
+   Staging is no longer where the flows are first tried; production is, at
+   the switch-over.
 4. **What phase 3 still owes**: an independent security review of the
-   callback receiver and the media endpoint; meeting the real thing (phase 6).
-5. **The seven-day comparison (inbox phase 2).** From 12 October, compare
-   production's `order_confirmation` with n8n's `wa_sends`, daily, with
-   `python -m app.services.inbox.shadow` (see its docstring). n8n's database
-   is read through `railway ssh` into the `Postgres` service of the
-   `order-confirmation-message` project, read-only, order ids only. Every
-   difference needs a written reason; the plan lists the expected ones.
-6. **Inbox phase 6** on staging, after phase 5.
-7. **From the owner, for the inbox:** October's charges in WhatsApp Manager;
-   who owns the Meta business account, app and number; the WhatsApp keys and
-   the second Shopify app's credentials, typed into Settings when wanted.
+   callback receiver and the media endpoint, before the switch-over if it can
+   be had.
+5. **Phase 8, retiring n8n**, after two clean weeks and only on the owner's
+   word. Until then n8n's workflows stay switchable as the way back.
+6. **Dropped on the owner's order, 12 October:** phase 6 on staging and the
+   rest of the seven-day comparison (it had one day: 6 differences, each
+   explained).
+7. **From the owner, for the inbox:** October's charges in WhatsApp Manager.
 8. **Owner acceptance of Operations, on production**: Shopify cards against
    Shopify admin; E-stebdal *Needs review* against its list; Bosta B5 against
    *Awaiting your action*, spot-check B1, B2, B6; one Bosta and one E-stebdal
