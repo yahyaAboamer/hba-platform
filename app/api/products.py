@@ -16,7 +16,10 @@ from app.db import get_session
 from app.models.catalogue import Product, ProductStatus, ProductVariant
 from app.models.identity import UserAccount
 from app.services.wardrobe import (
+    AssignmentRefused,
+    assign_by_hand,
     feature_request_for,
+    remove_by_hand,
     thumbnail,
     remove_feature_request,
     roster_for,
@@ -271,3 +274,46 @@ def delete_feature_request(
     removed = remove_feature_request(db, shopify_product_id)
     db.commit()
     return {"removed": removed}
+
+
+class ManualAssignmentBody(BaseModel):
+    """ADR 0061: who has this piece without an order behind it."""
+
+    affiliate_ids: list[int] = Field(min_length=1, max_length=500)
+    size: str | None = Field(default=None, max_length=200)
+
+
+@router.post("/{shopify_product_id}/manual-assignments")
+def post_manual_assignments(
+    shopify_product_id: str,
+    body: ManualAssignmentBody,
+    actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_MANAGE)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """*Assign manually*: these models have it, collected from the warehouse
+    or otherwise given without a Shopify order. Returns the new roster."""
+    if db.get(Product, shopify_product_id) is None:
+        raise HTTPException(404, "No such product")
+    try:
+        added = assign_by_hand(
+            db, shopify_product_id, body.affiliate_ids, size=body.size, actor=actor
+        )
+    except AssignmentRefused as refused:
+        db.rollback()
+        raise HTTPException(400, str(refused)) from None
+    db.commit()
+    return {"added": added, "roster": roster_for(db, shopify_product_id)}
+
+
+@router.delete("/{shopify_product_id}/manual-assignments/{affiliate_id}")
+def delete_manual_assignment(
+    shopify_product_id: str,
+    affiliate_id: int,
+    actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_MANAGE)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Take back a hand assignment. A parcel that carried it is untouched."""
+    if not remove_by_hand(db, shopify_product_id, affiliate_id, actor=actor):
+        raise HTTPException(404, "She has no hand assignment of this product.")
+    db.commit()
+    return {"roster": roster_for(db, shopify_product_id)}

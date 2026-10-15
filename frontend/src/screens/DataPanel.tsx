@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
+import { GiftReview } from "../components/GiftReview";
 import { InboxConnections } from "../components/InboxConnection";
 import { IntegrationKeys } from "../components/IntegrationKey";
 import { ShopifyConnection } from "../components/ShopifyConnection";
@@ -162,6 +163,7 @@ export function DataPanel({ goLiveMonth }: { goLiveMonth: string | null }) {
   const [asking, setAsking] = useState(false);
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const [staleCount, setStaleCount] = useState(0);
+  const [giftCount, setGiftCount] = useState(0);
 
   const load = useCallback(() => {
     Promise.all([
@@ -288,7 +290,7 @@ export function DataPanel({ goLiveMonth }: { goLiveMonth: string | null }) {
   // card at the top - it used to sit two clicks deep among tools and trivia.
   // Counted in lists, not rows: forty orders and a hundred stopped jobs are
   // two things to deal with, not "141 things".
-  const waiting = [codes?.length, mail?.failed.length, jobs?.length, parcels?.length, staleCount]
+  const waiting = [codes?.length, mail?.failed.length, jobs?.length, parcels?.length, staleCount, giftCount]
     .filter((count) => (count ?? 0) > 0).length;
   const connected = Boolean(sync?.shopify_configured);
 
@@ -338,6 +340,8 @@ export function DataPanel({ goLiveMonth }: { goLiveMonth: string | null }) {
         </div>
         <div className="data__body">
           <StaleFulfilments onCount={setStaleCount} />
+
+          <GiftReview onCount={setGiftCount} />
 
           {parcels && parcels.length > 0 && (
             <div className="data__import">

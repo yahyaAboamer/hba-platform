@@ -99,6 +99,8 @@ what was chosen.
 | [0057](0057-operations-dashboard-a-separate-read-only-role.md) | Operations is its own dashboard, for one operations manager, and it only reads | Accepted |
 | [0058](0058-declining-an-application-deletes-it-and-its-code-can-be-changed-while-it-waits.md) | Declining an application deletes it, and its code can be changed while it waits | Accepted; amends 0052 and 0053 |
 | [0059](0059-order-confirmation-and-the-customer-inbox-move-into-the-platform.md) | Order confirmation and the customer inbox move into the platform, which now holds customer chats and writes order tags | Accepted, being built; narrows 0015, amends 0057 |
+| [0060](0060-a-gift-sent-to-a-number-not-on-her-profile-is-shown-and-staff-say-whose-it-is.md) | A gift sent to a number not on her profile is shown, and staff say whose it is | Accepted; amends W03 and W12 |
+| [0061](0061-a-product-can-be-assigned-to-a-model-by-hand.md) | A product can be assigned to a model by hand | Accepted; amends D05 and W02 |
 
 **0014 is superseded by 0036** and **0038 by 0039**. **0027 keeps its
 principle and loses its mechanism to 0039**: an agreed figure is still set

@@ -46,7 +46,7 @@ from app.core.businesstime import utcnow
 
 from app.models.catalogue import OrderLineItem, Product
 from app.models.orders import OrderIndex
-from app.models.shipments import ModelShipment
+from app.models.shipments import ManualWardrobeItem, ModelShipment
 
 #: How wide a grid thumbnail needs to be, at 2x for a retina phone.
 #:
@@ -166,23 +166,43 @@ def coverage_for(db: Session, product_ids: list[str]) -> dict[str, int]:
     clean = [value for value in product_ids if value]
     if not clean:
         return {}
-    rows = db.execute(
-        select(
-            OrderLineItem.shopify_product_id,
-            func.count(func.distinct(ModelShipment.affiliate_id)),
-        )
-        .join(
-            OrderLineItem,
-            OrderLineItem.shopify_order_id == ModelShipment.shopify_order_id,
-        )
-        .join(OrderIndex, OrderIndex.shopify_order_id == ModelShipment.shopify_order_id)
-        .where(ModelShipment.affiliate_id.is_not(None))
-        .where(_is_gift())
-        .where(OrderLineItem.after_delivery.is_not(True))
-        .where(OrderLineItem.shopify_product_id.in_(clean))
-        .group_by(OrderLineItem.shopify_product_id)
+    pairs = set(
+        db.execute(
+            select(OrderLineItem.shopify_product_id, ModelShipment.affiliate_id)
+            .join(
+                OrderLineItem,
+                OrderLineItem.shopify_order_id == ModelShipment.shopify_order_id,
+            )
+            .join(OrderIndex, OrderIndex.shopify_order_id == ModelShipment.shopify_order_id)
+            .where(ModelShipment.affiliate_id.is_not(None))
+            .where(_is_gift())
+            .where(OrderLineItem.after_delivery.is_not(True))
+            .where(OrderLineItem.shopify_product_id.in_(clean))
+            .distinct()
+        ).all()
     )
-    return {product_id: count for product_id, count in rows}
+    # ADR 0061: a piece she collected from the warehouse is covered too. A
+    # model with it both ways is still one model.
+    pairs |= set(
+        db.execute(
+            select(ManualWardrobeItem.shopify_product_id, ManualWardrobeItem.affiliate_id)
+            .where(ManualWardrobeItem.shopify_product_id.in_(clean))
+        ).all()
+    )
+    counts: dict[str, int] = {}
+    for product_id, _affiliate_id in pairs:
+        counts[product_id] = counts.get(product_id, 0) + 1
+    return counts
+
+
+def _manual(db: Session, *, affiliate_id: int | None = None, product_id: str | None = None):
+    """Pieces staff assigned by hand (ADR 0061), oldest first."""
+    query = select(ManualWardrobeItem).order_by(ManualWardrobeItem.created_at)
+    if affiliate_id is not None:
+        query = query.where(ManualWardrobeItem.affiliate_id == affiliate_id)
+    if product_id is not None:
+        query = query.where(ManualWardrobeItem.shopify_product_id == product_id)
+    return list(db.scalars(query))
 
 
 def _products_by_id(db: Session, ids: set[str]) -> dict[str, Product]:
@@ -212,7 +232,12 @@ def wardrobe_for(db: Session, affiliate_id: int) -> dict:
     Two queries total, whatever the size of her history.
     """
     rows = _gift_lines(db, affiliate_id)
-    products = _products_by_id(db, {line.shopify_product_id for _, _, line in rows})
+    manual = _manual(db, affiliate_id=affiliate_id)
+    products = _products_by_id(
+        db,
+        {line.shopify_product_id for _, _, line in rows}
+        | {item.shopify_product_id for item in manual},
+    )
 
     entries: dict[str, dict] = {}
 
@@ -251,7 +276,40 @@ def wardrobe_for(db: Session, affiliate_id: int) -> dict:
             "image_thumb_url": thumbnail(product.image_url if product else None),
             "shopify_order_id": shipment.shopify_order_id,
             "placed_at": order.placed_at.isoformat() if order.placed_at else None,
+            "manual": False,
             "history": [],
+        }
+
+    # ADR 0061: a piece staff say she has, with no order behind it. She has
+    # it, so it is received - and it outranks a parcel still on its way or
+    # one that failed, which stays readable as history.
+    for item in manual:
+        existing = entries.get(item.shopify_product_id)
+        if existing is not None and existing["state"] == RECEIVED:
+            continue
+        product = products.get(item.shopify_product_id)
+        history = []
+        if existing is not None:
+            history = [
+                {
+                    "shopify_order_id": existing["shopify_order_id"],
+                    "state": existing["state"],
+                    "placed_at": existing["placed_at"],
+                },
+                *existing["history"],
+            ]
+        entries[item.shopify_product_id] = {
+            "shopify_product_id": item.shopify_product_id,
+            "title": product.title if product else "",
+            "size": item.size,
+            "quantity": 1,
+            "state": RECEIVED,
+            "image_url": product.image_url if product else None,
+            "image_thumb_url": thumbnail(product.image_url if product else None),
+            "shopify_order_id": None,
+            "placed_at": item.created_at.isoformat() if item.created_at else None,
+            "manual": True,
+            "history": history,
         }
 
     items = list(entries.values())
@@ -288,6 +346,9 @@ def roster_for(db: Session, shopify_product_id: str) -> dict:
         # counts and later rows are her earlier history.
         latest.setdefault(shipment.affiliate_id, (_state_for(order), order, line))
 
+    # ADR 0061: assigned by hand. Received, unless a parcel already says so.
+    by_hand = {item.affiliate_id: item for item in _manual(db, product_id=shopify_product_id)}
+
     models = list(
         db.scalars(
             select(AffiliateProfile)
@@ -303,8 +364,23 @@ def roster_for(db: Session, shopify_product_id: str) -> dict:
         "not_sent": [],
     }
     for model in models:
-        row = {"affiliate_id": model.id, "name": model.name, "status": model.status}
+        row = {
+            "affiliate_id": model.id,
+            "name": model.name,
+            "status": model.status,
+            # Whether a hand assignment exists, so the screen can offer to
+            # take it back even where a parcel also carried the piece.
+            "manual": model.id in by_hand,
+        }
         found = latest.get(model.id)
+        if model.id in by_hand and (found is None or found[0] != RECEIVED):
+            row.update(
+                shopify_order_id=None,
+                order_number=None,
+                size=by_hand[model.id].size,
+            )
+            groups[RECEIVED].append(row)
+            continue
         if found is None:
             groups["not_sent"].append(row)
             continue
@@ -479,3 +555,94 @@ def eligible_requests(db: Session, affiliate_id: int) -> list[dict]:
             }
         )
     return out
+
+
+# ── Assigned by hand (ADR 0061) ──────────────────────────────────────────────
+
+
+class AssignmentRefused(ValueError):
+    """A sentence for the person who clicked."""
+
+
+def assign_by_hand(
+    db: Session,
+    shopify_product_id: str,
+    affiliate_ids: list[int],
+    *,
+    size: str | None = None,
+    actor=None,
+) -> list[int]:
+    """Say these models have this product. Returns who was added.
+
+    For a piece collected from the warehouse, which no order records. A model
+    who already has it by hand is left alone, so a second click adds nothing.
+    House accounts are refused: nobody receives anything as one.
+    """
+    from app.models.affiliates import AccountKind, AffiliateProfile
+    from app.services.audit import record_audit
+
+    wanted = sorted(set(affiliate_ids))
+    if not wanted:
+        raise AssignmentRefused("Choose at least one model.")
+    models = {
+        model.id: model
+        for model in db.scalars(select(AffiliateProfile).where(AffiliateProfile.id.in_(wanted)))
+    }
+    for affiliate_id in wanted:
+        model = models.get(affiliate_id)
+        if model is None or model.account_kind == AccountKind.HOUSE:
+            raise AssignmentRefused("Choose models only.")
+
+    already = set(
+        db.scalars(
+            select(ManualWardrobeItem.affiliate_id)
+            .where(ManualWardrobeItem.shopify_product_id == shopify_product_id)
+            .where(ManualWardrobeItem.affiliate_id.in_(wanted))
+        )
+    )
+    clean_size = (size or "").strip() or None
+    added = [affiliate_id for affiliate_id in wanted if affiliate_id not in already]
+    for affiliate_id in added:
+        db.add(
+            ManualWardrobeItem(
+                affiliate_id=affiliate_id,
+                shopify_product_id=shopify_product_id,
+                size=clean_size,
+                assigned_by_id=getattr(actor, "id", None),
+            )
+        )
+        record_audit(
+            db,
+            action="affiliate.wardrobe_added",
+            subject=f"affiliate:{affiliate_id}",
+            actor_id=getattr(actor, "id", None),
+            actor_email=getattr(actor, "email", None),
+            after={"shopify_product_id": shopify_product_id, "size": clean_size},
+        )
+    db.flush()
+    return added
+
+
+def remove_by_hand(db: Session, shopify_product_id: str, affiliate_id: int, *, actor=None) -> bool:
+    """Take back a hand assignment. Parcels are untouched: what an order
+    carried is Shopify's record, not something to undo here."""
+    from app.services.audit import record_audit
+
+    item = db.scalar(
+        select(ManualWardrobeItem)
+        .where(ManualWardrobeItem.shopify_product_id == shopify_product_id)
+        .where(ManualWardrobeItem.affiliate_id == affiliate_id)
+    )
+    if item is None:
+        return False
+    db.delete(item)
+    record_audit(
+        db,
+        action="affiliate.wardrobe_removed",
+        subject=f"affiliate:{affiliate_id}",
+        actor_id=getattr(actor, "id", None),
+        actor_email=getattr(actor, "email", None),
+        before={"shopify_product_id": shopify_product_id, "size": item.size},
+    )
+    db.flush()
+    return True

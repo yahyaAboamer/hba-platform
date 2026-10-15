@@ -106,7 +106,15 @@ def normalise_phone(value: str | None) -> str | None:
 
     # International prefixes, longest first. `0020…` and `20…` both mean Egypt,
     # and stripping the shorter one first would leave a stray zero.
-    if digits.startswith("0020") and len(digits) == 14:
+    #
+    # `+20 010…` is the country code *and* the leading zero - wrong, and how
+    # about forty of the shop's orders are written (ADR 0060). It is still the
+    # number it plainly is, so the zero is kept once rather than twice.
+    if digits.startswith("00200") and len(digits) == 15:
+        digits = "0" + digits[5:]
+    elif digits.startswith("200") and len(digits) == 13:
+        digits = "0" + digits[3:]
+    elif digits.startswith("0020") and len(digits) == 14:
         digits = "0" + digits[4:]
     elif digits.startswith("20") and len(digits) == 12:
         digits = "0" + digits[2:]
@@ -124,6 +132,13 @@ NO_PHONE = "no_phone"
 UNUSABLE_PHONE = "unusable_phone"
 NO_MATCH = "no_match"
 AMBIGUOUS = "ambiguous"
+#: Staff looked at an unmatched gift and said it went to somebody who is not a
+#: model (ADR 0060). Still unmatched; it only leaves the gift list.
+NOT_A_MODEL = "not_a_model"
+
+#: On a **matched** row: staff said whose it was (ADR 0060), rather than the
+#: phone on her profile. The number on it is one of hers from then on.
+ASSIGNED = "assigned"
 
 
 def match_recipient(db: Session, phone: str | None) -> dict:
@@ -150,9 +165,8 @@ def match_recipient(db: Session, phone: str | None) -> dict:
     if token is None:
         return {"affiliate_id": None, "reason": UNUSABLE_PHONE, "token": None}
 
-    candidates = [
-        row
-        for row in db.scalars(
+    roster = list(
+        db.scalars(
             select(AffiliateProfile)
             .where(AffiliateProfile.account_kind != AccountKind.HOUSE)
             # **Archived models take no new parcels.** Somebody who left is
@@ -162,10 +176,24 @@ def match_recipient(db: Session, phone: str | None) -> dict:
             # her stay hers - that is `record_shipment`'s rule, not this one.
             .where(AffiliateProfile.archived_at.is_(None))
         )
+    )
+    # A number staff confirmed is one of hers (ADR 0060): a gift they assigned
+    # to her is the record of it, so the next parcel to it needs nobody.
+    remembered = set(
+        db.scalars(
+            select(ModelShipment.affiliate_id)
+            .where(ModelShipment.match_reason == ASSIGNED)
+            .where(ModelShipment.recipient_token == token)
+        )
+    )
+    candidates = [
+        row
+        for row in roster
         # Compared normalised on both sides. A model who typed her phone with a
         # +20 and an order carrying it without one are the same person, and
         # comparing the stored strings would say otherwise.
         if normalise_phone(row.shipping_phone or row.phone) == token
+        or row.id in remembered
     ]
 
     if not candidates:
@@ -249,6 +277,15 @@ def record_shipment(db: Session, order, *, phone: str | None) -> "ModelShipment"
     outcome = match_recipient(db, phone)
     net = original_net_of(order)
 
+    # Staff said this went to somebody who is not a model. A rescan keeps that
+    # answer, unless the number now does belong to one (ADR 0060).
+    if (
+        existing is not None
+        and existing.match_reason == NOT_A_MODEL
+        and outcome["affiliate_id"] is None
+    ):
+        outcome = {**outcome, "reason": NOT_A_MODEL}
+
     values = {
         "affiliate_id": outcome["affiliate_id"],
         "recipient_token": outcome["token"],
@@ -307,6 +344,8 @@ def rematch_for(db: Session, affiliate: AffiliateProfile) -> int:
     outcome = match_recipient(db, token)
     now = utcnow()
     for row in rows:
+        if outcome["affiliate_id"] is None and row.match_reason == NOT_A_MODEL:
+            continue
         row.affiliate_id = outcome["affiliate_id"]
         row.match_reason = outcome["reason"]
         row.matched_at = now if outcome["affiliate_id"] else None

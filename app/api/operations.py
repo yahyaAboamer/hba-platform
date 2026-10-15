@@ -616,6 +616,71 @@ def unmatched_parcels_route(
     return unmatched(db)
 
 
+class AssignGiftBody(BaseModel):
+    affiliate_id: int
+
+
+@router.get("/unclaimed-gifts")
+def unclaimed_gifts_route(
+    _actor: UserAccount = Depends(require_permission(Permission.SETTINGS_MANAGE)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """HBA's gifts that matched no model, for staff to say whose each was.
+
+    ADR 0060. Who received each is read from Shopify here, because nothing
+    stores it for a parcel that matched nobody; without Shopify the list still
+    comes back, without names.
+    """
+    from app.services.gifts import unclaimed_gifts
+    from app.services.shopify.sync import build_client
+
+    try:
+        client = build_client()
+    except Exception:  # noqa: BLE001 - no connection costs the names, not the list
+        client = None
+    return unclaimed_gifts(db, client)
+
+
+@router.post("/unclaimed-gifts/{order_id}/assign")
+def assign_gift_route(
+    order_id: str,
+    body: AssignGiftBody,
+    actor: UserAccount = Depends(require_permission(Permission.SETTINGS_MANAGE)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """*This is her*: the gift, every other parcel to its number, and the
+    number itself become hers."""
+    from app.services.gifts import ParcelNotFound, ParcelRefused, assign_gift
+
+    try:
+        result = assign_gift(db, order_id=order_id, affiliate_id=body.affiliate_id, actor=actor)
+    except ParcelNotFound:
+        raise HTTPException(404, "There is no such parcel.") from None
+    except ParcelRefused as refused:
+        raise HTTPException(409, str(refused)) from None
+    db.commit()
+    return result
+
+
+@router.post("/unclaimed-gifts/{order_id}/dismiss")
+def dismiss_gift_route(
+    order_id: str,
+    actor: UserAccount = Depends(require_permission(Permission.SETTINGS_MANAGE)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """*Not a model*: it leaves the list and stays unmatched."""
+    from app.services.gifts import ParcelNotFound, ParcelRefused, dismiss_gift
+
+    try:
+        result = dismiss_gift(db, order_id=order_id, actor=actor)
+    except ParcelNotFound:
+        raise HTTPException(404, "There is no such parcel.") from None
+    except ParcelRefused as refused:
+        raise HTTPException(409, str(refused)) from None
+    db.commit()
+    return result
+
+
 @router.get("/stale-fulfilments")
 def stale_fulfilments_route(
     _actor: UserAccount = Depends(require_permission(Permission.SETTINGS_MANAGE)),

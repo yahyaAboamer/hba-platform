@@ -200,6 +200,14 @@ payroll without touching a maintainer screen.
   - The platform reads each source every 5 minutes.
   - A source that can't be read shows as a failure, never as 0.
   - Its day limits count working days in Cairo time, Saturday to Thursday.
+- **A parcel is hers only when its number is hers** (ADR 0060). Her numbers
+  are her profile phone and every number staff confirmed for her by
+  assigning a gift. A number two models share attaches to neither. Free
+  orders with a discount code that match nobody are listed in Settings for
+  staff to assign or dismiss; nothing is matched by name.
+- **A product can be assigned to a model by hand** (ADR 0061), for a piece
+  she has without a gift order. It counts as received in her wardrobe and
+  the product's coverage, once per model; removing it never touches a parcel.
 - **No targets before her start** (ADR 0056). Once her start month is known,
   the server refuses creating, changing or counting a target before it, and
   *Whole year* skips those months. The Targets grid draws her row closed there.

@@ -305,6 +305,44 @@
   width: 8rem;
 }
 
+/* Gifts that reached no model (ADR 0060): who it went to on the left, whose
+   it is on the right; the two stack on a narrow screen. */
+.data__gift {
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.data__gift-what {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 20rem;
+}
+
+.data__gift-order {
+  color: var(--quiet);
+}
+
+.data__gift-phone,
+.data__gift-more,
+.data__gift-items {
+  color: var(--faint);
+}
+
+.data__gift-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.data__gift-actions select {
+  min-height: 34px;
+  max-width: 14rem;
+}
+
 .settings__workspace { display:flex; gap:20px; align-items:flex-start; }
 .settings__navigation { flex:none; width:196px; display:flex; flex-direction:column; gap:3px; }
 .settings__navigation button { min-height:38px; padding:9px 12px; border:0; border-radius:8px; background:none; color:var(--quiet); text-align:left; font-size:13.5px; cursor:pointer; }

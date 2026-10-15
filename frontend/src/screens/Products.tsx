@@ -25,9 +25,11 @@ type RosterEntry = {
   status: string;
   /** Her newest gift of this product, when there is one: the order that
    *  carried it and the size (the export's `orderRefFor` / `vShipment`). */
-  shopify_order_id?: string;
-  order_number?: string;
+  shopify_order_id?: string | null;
+  order_number?: string | null;
   size?: string | null;
+  /** Staff assigned it by hand, with no order behind it (ADR 0061). */
+  manual?: boolean;
 };
 
 /**
@@ -372,6 +374,7 @@ function ProductDetailPage({ id, session }: { id: string; session: Session }) {
   const search = query.get("q") ?? "";
   const mayEdit = can(session, "affiliates.manage");
   const [closed, setClosed] = useState<string[]>([]);
+  const [assigning, setAssigning] = useState(false);
 
   useEffect(() => {
     let live = true;
@@ -412,6 +415,17 @@ function ProductDetailPage({ id, session }: { id: string; session: Session }) {
       await api.del(`/api/products/${id}/feature-request`);
       setDetail((current) => current && { ...current, feature_request: null });
       setView(false);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not remove it.");
+    } finally { setSaving(false); }
+  }
+
+  async function removeByHand(entry: RosterEntry) {
+    setSaving(true);
+    setError(null);
+    try {
+      const done = await api.del<{ roster: Detail["roster"] }>(`/api/products/${id}/manual-assignments/${entry.affiliate_id}`);
+      setDetail((current) => current && { ...current, roster: done.roster });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not remove it.");
     } finally { setSaving(false); }
@@ -514,9 +528,19 @@ function ProductDetailPage({ id, session }: { id: string; session: Session }) {
 
       <div className="product__coverage-head">
         <h2>Model coverage</h2>
+        <div className="product__coverage-acts">
+        {mayEdit && !assigning && (
+          <button type="button" className="button button--primary" onClick={() => setAssigning(true)} disabled={saving}>Assign manually</button>
+        )}
         <input className="input product__search" aria-label="Search model names" placeholder="Search model names" value={search}
           onChange={(event) => setQuery((previous) => { const next = new URLSearchParams(previous); if (event.target.value) next.set("q", event.target.value); else next.delete("q"); return next; }, { replace: true })} />
+        </div>
       </div>
+      {assigning && (
+        <ManualAssign productId={id} detail={detail}
+          onDone={(roster) => { setDetail((current) => current && { ...current, roster }); setAssigning(false); }}
+          onCancel={() => setAssigning(false)} />
+      )}
       <div className="product__groups">
         {groups.map(([label, entries, tone]) => {
           const shown = entries.filter((entry) => entry.name.toLocaleLowerCase().includes(search.toLocaleLowerCase())).sort((a, b) => a.name.localeCompare(b.name));
@@ -540,7 +564,13 @@ function ProductDetailPage({ id, session }: { id: string; session: Session }) {
                      *  opening its shipment record; *not sent* otherwise. */}
                     {entry.shopify_order_id
                       ? <Link className="product__roster-ref control-font" to={`/products/${id}?shipment=${entry.shopify_order_id}&model=${entry.affiliate_id}`}>{entry.order_number}</Link>
-                      : <span className="product__roster-ref product__roster-ref--none">not sent</span>}
+                      : entry.manual
+                        ? <span className="product__roster-ref product__roster-ref--hand">Assigned manually{entry.size ? ` · ${entry.size}` : ""}</span>
+                        : <span className="product__roster-ref product__roster-ref--none">not sent</span>}
+                    {mayEdit && entry.manual && (
+                      <button type="button" className="button button--quiet" disabled={saving}
+                        aria-label={`Remove the manual assignment for ${entry.name}`} onClick={() => removeByHand(entry)}>Remove</button>
+                    )}
                   </li>)}
                 </ul>)}
           </section>;
@@ -548,6 +578,75 @@ function ProductDetailPage({ id, session }: { id: string; session: Session }) {
       </div>
     </>}
   </>;
+}
+
+/**
+ * *Assign manually* (ADR 0061).
+ *
+ * Models sometimes collect a piece from the warehouse, and no Shopify order
+ * records it, so her wardrobe and this coverage would say she never had it.
+ * Staff tick who has it; each becomes *Received* here and in her wardrobe.
+ * Only models who have not received it are offered.
+ */
+function ManualAssign({ productId, detail, onDone, onCancel }: {
+  productId: string; detail: Detail;
+  onDone: (roster: Detail["roster"]) => void; onCancel: () => void;
+}) {
+  const [picked, setPicked] = useState<number[]>([]);
+  const [size, setSize] = useState("");
+  const [filter, setFilter] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
+  const offered = [...detail.roster.processing, ...detail.roster.needs_checking, ...detail.roster.not_sent]
+    .filter((entry) => entry.status !== "archived")
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const shown = offered.filter((entry) => entry.name.toLocaleLowerCase().includes(filter.toLocaleLowerCase()));
+
+  async function save() {
+    setBusy(true);
+    setFailure(null);
+    try {
+      const done = await api.post<{ roster: Detail["roster"] }>(`/api/products/${productId}/manual-assignments`, {
+        affiliate_ids: picked, ...(size ? { size } : {}),
+      });
+      onDone(done.roster);
+    } catch (caught) {
+      setFailure(caught instanceof Error ? caught.message : "Could not save.");
+    } finally { setBusy(false); }
+  }
+
+  return <section className="pay-detail__card product__assign" aria-label="Assign manually">
+    <h3 className="product__assign-title">Assign manually</h3>
+    <p className="product__assign-note">For a piece a model has without a gift order, such as one collected from the warehouse. Each model you tick shows it as received, here and in her wardrobe.</p>
+    {failure && <p className="notice notice--refused" role="alert">{failure}</p>}
+    <div className="product__assign-tools">
+      <input className="input product__search" aria-label="Search models to assign" placeholder="Search models" value={filter} onChange={(event) => setFilter(event.target.value)} />
+      {detail.sizes.length > 0 && (
+        <select aria-label="Size" value={size} onChange={(event) => setSize(event.target.value)}>
+          <option value="">Size not known</option>
+          {detail.sizes.map((each) => <option key={each.title} value={each.title}>{each.title}</option>)}
+        </select>
+      )}
+    </div>
+    {offered.length === 0
+      ? <p className="product__group-empty">Every model already has it.</p>
+      : <ul className="product__assign-list">
+          {shown.map((entry) => <li key={entry.affiliate_id}>
+            <label>
+              <input type="checkbox" checked={picked.includes(entry.affiliate_id)} disabled={busy}
+                onChange={(event) => setPicked(event.target.checked ? [...picked, entry.affiliate_id] : picked.filter((each) => each !== entry.affiliate_id))} />
+              {entry.name}
+            </label>
+          </li>)}
+          {shown.length === 0 && <li className="product__group-empty">No matching models.</li>}
+        </ul>}
+    <div className="product__assign-acts">
+      <button type="button" className="button button--primary" disabled={busy || picked.length === 0} onClick={save}>
+        {busy ? "Saving…" : picked.length > 1 ? `Assign to ${picked.length} models` : "Assign"}
+      </button>
+      <button type="button" className="button" disabled={busy} onClick={onCancel}>Cancel</button>
+    </div>
+  </section>;
 }
 
 /** The export's message presets (`prPresets`, Admin lines 3103-3107). */

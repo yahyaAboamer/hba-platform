@@ -97,3 +97,37 @@ class ModelShipment(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )
+
+
+class ManualWardrobeItem(Base):
+    """A product staff say a model has, with no order behind it (ADR 0061).
+
+    Models sometimes collect a piece from the warehouse, and no Shopify order
+    ever records it. Without this row her wardrobe and the product's coverage
+    would say she never received it. One row per model and product: having it
+    twice is still having it.
+    """
+
+    __tablename__ = "manual_wardrobe_item"
+    __table_args__ = (
+        UniqueConstraint(
+            "affiliate_id", "shopify_product_id", name="manual_wardrobe_item_once"
+        ),
+        Index("manual_wardrobe_item_product_idx", "shopify_product_id"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    affiliate_id: Mapped[int] = mapped_column(
+        ForeignKey("affiliate_profile.id", ondelete="CASCADE"), nullable=False
+    )
+    shopify_product_id: Mapped[str] = mapped_column(
+        ForeignKey("product.shopify_product_id", ondelete="CASCADE"), nullable=False
+    )
+    #: The size she took, when somebody knows it.
+    size: Mapped[str | None] = mapped_column(String(200))
+    assigned_by_id: Mapped[int | None] = mapped_column(
+        ForeignKey("user_account.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
