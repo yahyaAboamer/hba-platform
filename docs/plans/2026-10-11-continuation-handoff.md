@@ -1,4 +1,4 @@
-# Where the work is — 12 October 2026 (the Inbox is on staging and production; phase 5's importer is built)
+# Where the work is — 15 October 2026 (gifts to unknown numbers and hand-assigned products are live; the Inbox is on staging and production)
 
 Supersedes the earlier 12 October version of this file; its open items are
 carried under *Remaining*.
@@ -9,18 +9,44 @@ Re-read the remote before describing it (`git ls-remote --heads origin main prod
 
 | | |
 |---|---|
-| **Branch** | `feature/whatsapp-inbox`, pushed. Code at `f9fdde3` (the phase 5 importer, on the branch only); the commit carrying this file is ahead of it. |
-| **Staging and production** | `origin/main` and `origin/production` both on `4f939f5`, deployed 12 October on the owner's order (fast-forwards from `6533260`). Both came up, ran the migration and answered `/api/health/ready` 200; production logged no error after it. |
-| **Migration head** | `d3f6b9c40015` on staging and production. |
+| **Branch** | `feature/whatsapp-inbox`, pushed. Code at `fdcbd73` (ADR 0060 and 0061); the commit carrying this file is ahead of it. |
+| **Staging and production** | `origin/main` and `origin/production` both on `fdcbd73`, deployed 15 October on the owner's order (fast-forwards from `aae38ee`). Both built, ran migration `e4a7c1d50016` and answered `/api/health/ready` 200. |
+| **Migration head** | `e4a7c1d50016` on staging and production (rehearsed down and up on a throwaway database). |
 | **Production config** | `INBOX_CONFIRMATIONS_ENABLED=true`. `INBOX_SEND_TO_CUSTOMERS` is **not** set, per the previous handoff (a cloud session may not read the variables), and must not be until the switch-over. No WhatsApp keys are typed into Settings there, so nothing can be sent. `SETTINGS_ENCRYPTION_KEY` and the media bucket variables are set. |
 | **Staging config** | No inbox switch is set: the engine is off there. |
-| **Backend** | whole suite through `run-suite.sh`, 112/112 files, at `f9fdde3`. |
-| **Frontend** | `npm test` 46 files / 767 tests and `npm run build`, at `4f939f5`. |
+| **Backend** | whole suite through `run-suite.sh`, 114/114 files, on the `fdcbd73` tree before commit. |
+| **Frontend** | `npm test` 48 files / 781 tests and `npm run build`, on the `fdcbd73` tree. |
 
 **n8n is still the only thing that messages customers.** Deploying phases 3
 and 4 changed nothing a customer receives.
 
-## What was built since the last handoff
+## 15 October: gifts that reached no model, and products assigned by hand
+
+The owner found models' products missing after *Read the catalogue* and
+*Match parcels*. Cause: a parcel matches a model only by the phone on it, and
+HBA ships many gifts (code `sponsordis`, zero price) to a number that is not
+on her profile; those were filed as customers and shown nowhere.
+
+- **ADR 0060**: Settings → Shopify and sync → *Needs attention* lists free
+  orders with a discount code that matched nobody. *Attach* gives the parcel,
+  and every parcel to its number, to the chosen model, and remembers the number
+  (`match_reason = 'assigned'`). *Not a model* drops it from the list.
+  `+20 010…` is now read as an Egyptian mobile.
+- **ADR 0061**: a product's *Model coverage* has *Assign manually*, for pieces
+  collected from the warehouse with no order. New table `manual_wardrobe_item`.
+- **Production data, 15 October, on the owner's word**: 13 gift orders attached
+  through `assign_gift` (audited under the owner's account): Mahmoud
+  eldahshan 6 (number …882), MOHAMED FAYTOURY 2 (…190), Mohamed Hany 1 (…054),
+  Mohamed ahmed 4 (…413). Their products were read; the wardrobes filled.
+- **Left for the owner to do on the new screen**: the other ~32 unlinked gifts
+  (Ziad Ahmed …442 and Ziad C/G …546 may be Ziad Mohamed; the rest look like
+  people not on the roster), and hand assignments. Ahmad Radwan has no gift
+  order at all; Anas ouijjane's phone is not an Egyptian mobile.
+- Not clicked through on staging or production in a browser (Jev did not
+  connect); checked locally in the browser pane, and on staging the gift list
+  was read against real Shopify data from inside the container.
+
+## What was built before 15 October
 
 Deployed to staging and production on 12 October. **n8n is still the thing
 that messages customers. Nothing about what a customer receives has changed.**
@@ -95,8 +121,8 @@ not checked.
    link (both addresses are assumed); sign in as the operations manager.
 9. **Release gates**, open and behind production: reconciliation against a
    restored copy, the `SETTINGS_ENCRYPTION_KEY` cases, and `a6b1c4e20006` on a
-   restored copy. The inbox migrations, now three, are part of what a rollback
-   rehearsal has to cover. A restored copy of production contains customer
+   restored copy. The inbox migrations, now three, and `e4a7c1d50016`
+   (ADR 0061) are part of what a rollback rehearsal has to cover. A restored copy of production contains customer
    phones and first names (`order_confirmation`) and must be handled as
    customer data.
 10. **One security point raised and not agreed.** The reset-email limits are
