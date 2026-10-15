@@ -1,4 +1,4 @@
-# Where the work is — 15 October 2026 (gifts to unknown numbers and hand-assigned products are live; the Inbox is on staging and production)
+# Where the work is — 15 October 2026 (the WhatsApp inbox is switched over and confirming orders; gifts to unknown numbers and hand-assigned products are live)
 
 Supersedes the earlier 12 October version of this file; its open items are
 carried under *Remaining*.
@@ -12,13 +12,17 @@ Re-read the remote before describing it (`git ls-remote --heads origin main prod
 | **Branch** | `feature/whatsapp-inbox`, pushed. Code at `fdcbd73` (ADR 0060 and 0061); the commit carrying this file is ahead of it. |
 | **Staging and production** | `origin/main` and `origin/production` both on `fdcbd73`, deployed 15 October on the owner's order (fast-forwards from `aae38ee`). Both built, ran migration `e4a7c1d50016` and answered `/api/health/ready` 200. |
 | **Migration head** | `e4a7c1d50016` on staging and production (rehearsed down and up on a throwaway database). |
-| **Production config** | `INBOX_CONFIRMATIONS_ENABLED=true`. `INBOX_SEND_TO_CUSTOMERS` is **not** set, per the previous handoff (a cloud session may not read the variables), and must not be until the switch-over. No WhatsApp keys are typed into Settings there, so nothing can be sent. `SETTINGS_ENCRYPTION_KEY` and the media bucket variables are set. |
+| **Production config** | `INBOX_CONFIRMATIONS_ENABLED=true` and, since the switch-over on 14 October 22:42 UTC, `INBOX_SEND_TO_CUSTOMERS=true`. Both connections are saved in Settings and sending is on. `SETTINGS_ENCRYPTION_KEY` and the media bucket variables are set. |
 | **Staging config** | No inbox switch is set: the engine is off there. |
 | **Backend** | whole suite through `run-suite.sh`, 114/114 files, on the `fdcbd73` tree before commit. |
 | **Frontend** | `npm test` 48 files / 781 tests and `npm run build`, on the `fdcbd73` tree. |
 
-**n8n is still the only thing that messages customers.** Deploying phases 3
-and 4 changed nothing a customer receives.
+**The WhatsApp inbox is switched over.** Since 15 October, 00:52 Cairo time,
+the platform sends every order confirmation, writes the tags and holds the
+chats; n8n's workflows are off and kept as the way back until phase 8. The
+owner reports it works well; the server side was read at 11:19 UTC: 18 orders
+since the switch, none missed, none messaged twice, no failed job. The plan's
+*Phase 7 as done* has the detail.
 
 ## 15 October: gifts that reached no model, and products assigned by hand
 
@@ -48,8 +52,8 @@ on her profile; those were filed as customers and shown nowhere.
 
 ## What was built before 15 October
 
-Deployed to staging and production on 12 October. **n8n is still the thing
-that messages customers. Nothing about what a customer receives has changed.**
+Deployed to staging and production on 12 October, and switched over on
+14 October 22:52 UTC (see the top of this file).
 
 The plan, with an "as built" section per phase, is
 `docs/plans/2026-10-11-whatsapp-inbox-and-order-confirmation.md`. In short:
@@ -84,33 +88,25 @@ not checked.
 
 ## Remaining, in order
 
-1. **Inbox phase 7, the switch-over** (the plan's *Phase 7*). Needs the
-   owner's explicit go-ahead, and these first:
-   - the WhatsApp keys and the second Shopify app's credentials typed into
-     Settings → Shopify **on production** (none were on 12 October);
-   - who owns the Meta business account, app and number, so the callback
-     address can be changed;
-   - a quiet hour, and whoever answers customers told.
-
-   Then: run the import on production (`app/services/inbox/importer.py`,
-   `--dry-run`, for real, then `--check`; n8n's address in
-   `N8N_DATABASE_URL`, never written down) — it no longer waits for
-   19 October; turn off n8n's sending and tagging workflows, leaving n8n
-   running; point Meta's callback at the platform; switch sending on and set
-   `INBOX_SEND_TO_CUSTOMERS=true` on production; one real order from the
-   owner's own phone; Send again for any order n8n did not message; watch
-   the health strip and the failed list for the day.
-2. **After the import on production**: read twenty chats against n8n's by
-   eye (what is left of phase 5).
-3. **What phase 4 still owes**: the harness's captured comparison against the
-   mockup; a real screen reader; a kept photo or voice note seen on screen.
-   Staging is no longer where the flows are first tried; production is, at
-   the switch-over.
-4. **What phase 3 still owes**: an independent security review of the
-   callback receiver and the media endpoint, before the switch-over if it can
-   be had.
-5. **Phase 8, retiring n8n**, after two clean weeks and only on the owner's
-   word. Until then n8n's workflows stay switchable as the way back.
+1. **Inbox phase 7, the day's check.** Done on 14 October 22:52 UTC. After
+   15 October 22:52 UTC, read the same counts again (the plan's *Phase 7 as
+   done*) and write phase 7 done.
+2. **Inbox phase 8, retiring n8n**, after two clean weeks (about
+   29 October) and only on the owner's word. **The platform sends with n8n's
+   Meta key (system user `n8n-bot`) and tags with n8n's Shopify app**: keep
+   both, and if that app's secret is replaced, save the new one in Settings in
+   the same sitting.
+3. **Carried from the inbox, not blocking**: an independent security review
+   of the callback receiver and the media endpoint; the captured comparison
+   against the mockup; a real screen reader; twenty imported chats read
+   against n8n's by eye.
+4. **The owner's Facebook account still texts a phone number the business no
+   longer has**, so he cannot make Meta keys. Replace it in Meta's Accounts
+   Center; then the platform can have a key of its own.
+5. **Ambassador Nada alhady cannot sign in.** No reset was ever requested for
+   her account's address, which starts `nm3…@gmail.com`; the request on
+   14 October 22:48 UTC was for an address with no account. The owner is to
+   check the address with her. There is no admin "send a reset link" button.
 6. **Dropped on the owner's order, 12 October:** phase 6 on staging and the
    rest of the seven-day comparison (it had one day: 6 differences, each
    explained).
@@ -164,9 +160,12 @@ not checked.
 
 - **Staging and production both report `APP_ENV=production`.** Nothing may be
   decided from it that should differ between them.
-- **A customer-service account on production now lands in the Inbox**, which
-  is empty until the import and the switch-over. Invite one there only when
-  there is something for it to do.
+- **A customer-service account on production lands in the Inbox**, which now
+  holds every chat, n8n's included.
+- **To read production's inbox from the server**, pipe a script into
+  `railway ssh -p <hba-platform project> -s hba-platform -e production --
+  python -`; standard input reaches it, so a key never has to sit in a
+  command line. Print counts and hints only.
 - **`tests/test_reachability.py` reads the frontend's calls as text.** A route
   is seen only where the call is written out, `` api.get(`/api/inbox/…`) ``. A
   path built into a variable first is not seen, and the test then reports the

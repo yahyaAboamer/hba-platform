@@ -4,7 +4,7 @@
 **Written:** 11 October 2026
 **Started:** 11 October 2026, on the owner's order, ahead of the audit repair's release gates.
 **Branch:** `feature/whatsapp-inbox`, cut from `repair/batch-2`. It stays off the repair branch so the repair remains releasable, and nothing is merged or deployed without the owner's separate go-ahead.
-**Where it stands (12 October):** mockup `docs/design/whatsapp-inbox-2026-10-11.html` approved by the owner on 11 October. Phases 1 and 2 are on production, with the engine running silently. Phases 3 and 4 are built on the branch and deployed nowhere; each has an "as built" section below saying what it still owes.
+**Where it stands (15 October):** **switched over.** Since 15 October, 00:52 Cairo time, the platform confirms orders and holds the chats; n8n's sending and tagging workflows are off and kept as the way back. What is left is phase 8, retiring n8n after two clean weeks, on the owner's word. See *Phase 7 as done*.
 **Replaces:** the Railway project `order-confirmation-message` (n8n + Postgres, production only).
 
 ## Shape of the work
@@ -348,12 +348,42 @@ Needs the owner's explicit go-ahead to deploy and to change Meta's settings.
 
 **Done when:** a full day of real orders has gone through with no double message and no missed one, checked against Shopify's order list.
 
+### Phase 7 as done (15 October 2026)
+
+On the owner's order, in one sitting late on 14 October (UTC), and confirmed working by him on 15 October.
+
+- **The keys.** The owner saved the second Shopify app (n8n's own, which may change orders) in Settings. The WhatsApp keys were taken, on his word, from n8n's own saved logins - the access key of the system user `n8n-bot` (a permanent key) and the app's secret - and saved into production from the server, never shown. He could not make a new key: Meta's check texts a phone number the business no longer has. Number ID `1193424320523179`, business account `1565619928560138`, *HBA Wear*, +20 10 30141651.
+- **`INBOX_SEND_TO_CUSTOMERS=true`** set on production, 22:42 UTC, while sending was still off.
+- **The import**, for real, then `--check`: 3,054 chats and 13,878 messages on each side, 0 that differ. The 135 orders the platform had held as `would_send` were all n8n's, and became `sent`. Run once more after n8n was turned off: nothing new.
+- **n8n**: the owner turned off its sending, tagging and inbox workflows, leaving *06 · Alert on n8n workflow failure* and n8n itself running.
+- **Meta's callback** points at `https://affiliate.hbawear.store/api/webhooks/meta`, verified 22:51 UTC with the platform's check word, `messages` subscribed.
+- **Sending switched on** about 22:52 UTC. No order had arrived in the gap.
+- **The owner's own test order** went through, and he reports it works well.
+
+Read on production on 15 October, 11:19 UTC, about 12½ hours in:
+
+| | |
+|---|---|
+| Orders since the switch | 18: 16 confirmed by message, 1 with a phone that is not an Egyptian mobile (shown for a call), 1 paid. **None missed**, against the platform's order index |
+| Confirmations sent | 16, every one delivered (11 read). **No order sent twice** |
+| Taps, tags | 20 taps; 37 tag writes, all succeeded; 5 automatic replies |
+| Meta's callbacks | 90, all applied, none in error; last heard 10:53 UTC, not quiet |
+| Background jobs | none failed; 63 files copied from Meta |
+
+Not yet: the "full day" in *Done when* ends 14 October 22:52 UTC plus 24 hours. Read the same counts again after that before calling phase 7 done in writing.
+
+Known while it runs:
+
+- The check word appears in Railway's request log, as Meta sends it in the address of its one-time check. It guards only that check; it is no secret beyond it.
+- **The platform now depends on two things that were n8n's**: the system user `n8n-bot`'s key in Meta, and n8n's Shopify app. Retiring n8n must keep both (see phase 8).
+
 ## Phase 8 — Retire n8n
 
 After two clean weeks, and only on the owner's word:
 
 - Export the workflows and take a final database dump, stored with the other archives.
-- Replace the secret of the Shopify app n8n used, since the old one sat in plain text there.
+- Replace the secret of the Shopify app n8n used, since the old one sat in plain text there. **The platform now writes tags with that same app**: save the new secret in Settings → Shopify and sync → *Shopify, for order tags* in the same sitting, or tags stop.
+- **Keep the Meta system user `n8n-bot` and its key**: the platform sends with it. Once the lost phone number on the owner's Facebook account is replaced, a key of the platform's own can be made and saved in the WhatsApp card, and only then may `n8n-bot`'s go.
 - Remove the Shopify webhook that points at n8n.
 - Delete the Railway project.
 - Record the divergence and the parity state, update the handoff, and note the saved cost.
@@ -378,4 +408,5 @@ From the owner, 11 October 2026:
 
 - The three phase 0 rows only the owner can answer.
 - **The wording of new approved messages**, such as *We tried to reach you*, which he submits to Meta. One with nothing to fill in works from a chat the day it is approved.
-- To try the Inbox on staging: the WhatsApp keys and the second Shopify app typed into Settings there, `INBOX_TEST_NUMBERS` on the staging service, and a customer-service test account.
+- Phase 8, after two clean weeks (from 15 October, so about 29 October) and on the owner's word.
+- Carried from phases 3 and 4, no longer blocking anything: an independent security review of the callback receiver and the media endpoint; the harness's captured comparison against the mockup; a real screen reader; twenty imported chats read against n8n's by eye.
