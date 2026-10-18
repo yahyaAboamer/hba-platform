@@ -313,11 +313,17 @@ def queue_if_new(db: Session, order: OrderIndex) -> bool:
     if not enabled():
         return False
     from app.services.inbox.payments import note_paid
+    from app.services.inbox.tags import READ_FOR, queue_read
 
     note_paid(db, order)
+    recorded = _recorded(db, order.shopify_order_id)
+    # The order changed in Shopify - perhaps its tag (ADR 0063). Read it
+    # back, in a job of its own, while its confirmation is still recent.
+    if recorded is not None and recorded.placed_at and recorded.placed_at >= utcnow() - READ_FOR:
+        queue_read(db, order.shopify_order_id)
     if order.placed_at is None or order.placed_at < utcnow() - FRESH_FOR:
         return False
-    if _recorded(db, order.shopify_order_id) is not None:
+    if recorded is not None:
         return False
     queue_confirmation(db, order.shopify_order_id)
     return True
@@ -370,6 +376,16 @@ def _handle_confirm_sweep(db: Session, payload: dict) -> None:
         queue_confirmation(db, order_id)
     if order_ids:
         logger.info("confirmation sweep queued %s recent orders", len(order_ids))
+
+    # Tags changed in Shopify since they were last read, or never read
+    # (ADR 0063): the catch-up, and the first read once this shipped.
+    from app.services.inbox import tags
+
+    stale = tags.stale_reads(db)
+    for order_id in stale:
+        tags.queue_read(db, order_id)
+    if stale:
+        logger.info("confirmation sweep queued %s tag reads", len(stale))
 
     # A payment request's one reminder, 24 hours on (ADR 0062).
     from app.services.inbox import payments

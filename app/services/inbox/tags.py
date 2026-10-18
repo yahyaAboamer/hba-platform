@@ -24,11 +24,13 @@ card stops counting.
 """
 
 import logging
+from datetime import timedelta
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.core.businesstime import utcnow
 from app.models.inbox import OrderConfirmation
 from app.services.inbox import connection
 from app.services.jobs import JobKind, PermanentFailure, enqueue
@@ -156,6 +158,194 @@ def queue_tags(db: Session, row: OrderConfirmation) -> None:
         {"order_id": row.shopify_order_id},
         dedupe_key=f"{JobKind.INBOX_TAG_ORDER}:{row.shopify_order_id}:{wanted}",
     )
+
+
+# ── Reading them back (ADR 0063) ──────────────────────────────────────────────
+
+#: Which answer each answer tag means.
+ANSWER_FROM_TAG = {tag: answer for answer, tag in ANSWER_TAGS.items()}
+
+#: Orders whose confirmation was decided this recently have their tags read
+#: when Shopify says they changed. Older ones are settled.
+READ_FOR = timedelta(days=14)
+
+#: How many orders one sweep queues for a read.
+READ_BATCH = 500
+
+ORDER_TAGS = """
+query ConfirmationTagsRead($id: ID!) {
+  order(id: $id) { tags }
+}
+"""
+
+
+def _answer_tags(joined: str | None) -> set[str]:
+    return {tag for tag in (joined or "").split(" + ") if tag in ANSWER_FROM_TAG}
+
+
+def adopt(
+    row: OrderConfirmation,
+    shopify_tags: list[str],
+    *,
+    asked_at=None,
+    tagged_at=None,
+    may_answer: bool = True,
+) -> bool:
+    """Keep what Shopify says, and take an answer tagged there. Pure.
+
+    Exactly one answer tag becomes the answer, given in Shopify - but only
+    when the answer tags **changed since the last read** (or were never
+    read). An unchanged tag is one the platform already knows, and taking it
+    again would undo a newer tap or mark. Two answer tags at once are left
+    alone; a removed tag takes nothing away. Returns whether the answer
+    changed.
+
+    ``asked_at`` is when Shopify was asked, so a change made while the read
+    was running is still newer than the read. ``tagged_at`` is the closest
+    the platform knows to when the tag was set (the order's last change in
+    Shopify), so a tap made after it still wins.
+    """
+    asked_at = asked_at or utcnow()
+    ours = [tag for tag in ALL_TAGS if tag in shopify_tags]
+    first_read = row.tags_read_at is None
+    changed = first_read or _answer_tags(row.shopify_tags) != set(ours) & set(ANSWER_FROM_TAG)
+    row.shopify_tags = " + ".join(ours)[:160] or None
+    row.tags_read_at = asked_at
+    answers = [ANSWER_FROM_TAG[tag] for tag in ours if tag in ANSWER_FROM_TAG]
+    # A payment request is answered by paying, which Shopify reports itself.
+    if (
+        not may_answer
+        or not changed
+        or row.kind == "payment"
+        or len(answers) != 1
+        or answers[0] == row.answer
+    ):
+        return False
+    at = min(tagged_at or asked_at, asked_at)
+    row.answer = answers[0]
+    # A tag that changed since the last read is newer than the answer before it.
+    row.answered_at = max(at, row.answered_at) if row.answered_at else at
+    row.answered_in = "shopify"
+    row.updated_at = utcnow()
+    return True
+
+
+def read_tags(
+    db: Session, order_id: str, client: ShopifyClient | None = None
+) -> OrderConfirmation | None:
+    """Read the order's tags from Shopify and keep them. Writes nothing there.
+
+    Through the connection that reads money, which stays read-only.
+    """
+    from app.services.shopify.sync import build_client, order_gid
+
+    row = db.scalar(
+        select(OrderConfirmation).where(OrderConfirmation.shopify_order_id == order_id)
+    )
+    if row is None:
+        return None
+    if _writing(db, order_id):
+        # Our own tag is on its way: what Shopify has now is about to be
+        # replaced, and taking it as the answer would undo hers. The write
+        # changes the order, which queues another read once it lands.
+        return row
+    answered_before = row.answered_at
+    asked_at = utcnow()
+    try:
+        data = (client or build_client()).execute(ORDER_TAGS, {"id": order_gid(order_id)})
+    except (ShopifyNotConfigured, ShopifyMissingScope) as exc:
+        raise PermanentFailure(f"Cannot read order {order_id}'s tags: {exc}") from exc
+    node = (data or {}).get("order")
+    if node is None:
+        return row
+    # Shopify took a moment to answer. If she tapped, or staff marked it, in
+    # that moment, theirs is newer than the tag just read: keep the tags, take
+    # no answer from them.
+    db.refresh(row)
+    may_answer = row.answered_at == answered_before and not _writing(db, order_id)
+    if adopt(
+        row,
+        [str(tag) for tag in node.get("tags") or []],
+        asked_at=asked_at,
+        tagged_at=_changed_in_shopify(db, order_id),
+        may_answer=may_answer,
+    ):
+        logger.info("order %s: answer taken from its tag in Shopify", order_id)
+    return row
+
+
+def _changed_in_shopify(db: Session, order_id: str):
+    """When Shopify last changed the order, as the index has it."""
+    from app.models.orders import OrderIndex
+
+    return db.scalar(
+        select(OrderIndex.updated_at_shopify).where(OrderIndex.shopify_order_id == order_id)
+    )
+
+
+def _writing(db: Session, order_id: str) -> bool:
+    """Whether a tag write for this order is waiting or running."""
+    from app.models.integration import BackgroundJob
+    from app.services.jobs import JobStatus
+
+    return bool(
+        db.scalar(
+            select(BackgroundJob.id)
+            .where(
+                BackgroundJob.kind == JobKind.INBOX_TAG_ORDER,
+                BackgroundJob.payload["order_id"].astext == order_id,
+                BackgroundJob.status.in_((JobStatus.PENDING, JobStatus.RUNNING)),
+            )
+            .limit(1)
+        )
+    )
+
+
+def queue_read(db: Session, order_id: str) -> None:
+    enqueue(
+        db,
+        JobKind.INBOX_READ_TAGS,
+        {"order_id": order_id},
+        dedupe_key=f"{JobKind.INBOX_READ_TAGS}:{order_id}",
+    )
+
+
+def stale_reads(db: Session, *, limit: int = READ_BATCH) -> list[str]:
+    """Recent orders whose tags were never read, or changed in Shopify since.
+
+    The catch-up for a change that arrived while a read was already running,
+    and the first read of every recent order once this ships.
+    """
+    from app.models.orders import OrderIndex
+
+    return list(
+        db.scalars(
+            select(OrderConfirmation.shopify_order_id)
+            .join(OrderIndex, OrderIndex.shopify_order_id == OrderConfirmation.shopify_order_id)
+            .where(
+                OrderConfirmation.placed_at >= utcnow() - READ_FOR,
+                or_(
+                    OrderConfirmation.tags_read_at.is_(None),
+                    OrderIndex.updated_at_shopify > OrderConfirmation.tags_read_at,
+                ),
+            )
+            .order_by(OrderConfirmation.placed_at.desc())
+            .limit(limit)
+        )
+    )
+
+
+@register_handler(JobKind.INBOX_READ_TAGS)
+def _handle_read_tags(db: Session, payload: dict) -> None:
+    order_id = str(payload.get("order_id") or "").strip()
+    if not order_id:
+        raise PermanentFailure(
+            f"{JobKind.INBOX_READ_TAGS} requires an order_id; got payload keys {sorted(payload)!r}"
+        )
+    # Queued while confirmations were on, run after they were turned off.
+    if not settings.inbox_confirmations_enabled:
+        return
+    read_tags(db, order_id)
 
 
 @register_handler(JobKind.INBOX_TAG_ORDER)

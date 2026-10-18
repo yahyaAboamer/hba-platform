@@ -18,12 +18,13 @@ import time
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, exists, func, or_, select, true
 from sqlalchemy.orm import Session
 
 from app.core.businesstime import utcnow
 from app.models.identity import UserAccount
 from app.models.inbox import InboxConversation, InboxMedia, InboxMessage, OrderConfirmation
+from app.models.orders import OrderIndex
 from app.services.audit import record_audit
 from app.services.inbox import outbound, payments, sending, tags
 from app.services.inbox.events import ANSWERS, _TAP
@@ -51,6 +52,9 @@ TILES = (
     "awaiting_payment", "paid",
 )
 NOT_SENT_STATES = ("failed", "would_send", "no_phone", "bad_phone", "pending", "sending")
+#: The cards that are work, not outcomes. They count only orders still open
+#: in Shopify (ADR 0063).
+ACTION_TILES = ("waiting", "edit", "cancelled", "not_sent", "no_whatsapp", "awaiting_payment")
 
 EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
 
@@ -232,8 +236,12 @@ def describe_order(row: OrderConfirmation, domain: str | None = None) -> dict:
         "placed_at": _iso(row.placed_at),
         "sent_at": _iso(row.sent_at),
         "total": row.total_text,
-        # The one tag the order carries in Shopify for this.
+        # The one tag the platform last wrote for this, and - once read - the
+        # platform's tags as Shopify really has them (ADR 0063).
         "tag": tags.wanted_tag(row),
+        "shopify_tags": row.shopify_tags,
+        "tags_read_at": _iso(row.tags_read_at),
+        "answered_in": row.answered_in,
         "why": row.last_error or (SENDING_WAS_OFF if row.state == "would_send" else None),
         "can_send_again": row.state in SEND_AGAIN_FROM and bool(row.phone) and not row.wa_message_id,
         # A payment request (ADR 0062). The link itself is never kept.
@@ -626,6 +634,7 @@ def set_answer(
     before = row.answer
     row.answer = answer
     row.answered_at = utcnow()
+    row.answered_in = "inbox"
     row.updated_at = utcnow()
     db.flush()
     tags.queue_tags(db, row)
@@ -661,9 +670,40 @@ def _tile(tile: str):
     }[tile]
 
 
+def _settled(*, shipped_counts: bool = True):
+    """The order has been cancelled or shipped in Shopify (ADR 0063).
+
+    Shipped is the test that gives an order its delivery state: Shopify holds
+    a fulfilment that counts (ADR 0051), any part of it. Shopify's own
+    fulfilled status is taken too, for an order whose fulfilments have not
+    been read yet.
+
+    ``shipped_counts=False`` is for *Waiting for payment*: an international
+    order shipped while still owing money is exactly one somebody must see
+    (ADR 0062), so only cancelling it takes it off.
+    """
+    done = [OrderIndex.cancelled_at.is_not(None)]
+    if shipped_counts:
+        done += [
+            OrderIndex.delivery_state.is_not(None),
+            OrderIndex.fulfillment_status.in_(("fulfilled", "partially_fulfilled")),
+        ]
+    return exists().where(
+        OrderIndex.shopify_order_id == OrderConfirmation.shopify_order_id, or_(*done)
+    )
+
+
+def _count(db: Session, *where) -> int:
+    return db.scalar(select(func.count()).select_from(OrderConfirmation).where(*where)) or 0
+
+
 def confirmations(db: Session, *, tile: str | None = None, days: int = 7) -> dict:
     """Where each cash-on-delivery order's confirmation stands, and each
     unpaid international order's payment request (ADR 0062).
+
+    The action cards count only orders still open in Shopify - not cancelled,
+    not shipped - and say beside it how many of theirs already were
+    (ADR 0063). *Confirmed* and *Paid by link* are outcomes and count all.
 
     An order paid at checkout is not here: it never gets either.
     """
@@ -671,21 +711,24 @@ def confirmations(db: Session, *, tile: str | None = None, days: int = 7) -> dic
         raise Refused("That is not one of the Confirmations cards.")
     since = utcnow() - timedelta(days=max(1, min(days, 90)))
     recent = and_(OrderConfirmation.placed_at >= since, OrderConfirmation.state != "not_needed")
+    def settled(name: str):
+        return _settled(shipped_counts=name != "awaiting_payment")
+
+    def still_open(name: str):
+        return ~settled(name) if name in ACTION_TILES else and_(true())
+
     body: dict[str, Any] = {
         "days": days,
-        "total": db.scalar(select(func.count()).select_from(OrderConfirmation).where(recent)) or 0,
-        "tiles": {
-            name: db.scalar(
-                select(func.count()).select_from(OrderConfirmation).where(recent, _tile(name))
-            ) or 0
-            for name in TILES
-        },
+        "total": _count(db, recent),
+        "tiles": {name: _count(db, recent, _tile(name), still_open(name)) for name in TILES},
+        # What left each action card because Shopify already settled it.
+        "done": {name: _count(db, recent, _tile(name), settled(name)) for name in ACTION_TILES},
         "orders": None,
     }
     if tile is not None:
         rows = db.scalars(
             select(OrderConfirmation)
-            .where(recent, _tile(tile))
+            .where(recent, _tile(tile), still_open(tile))
             .order_by(OrderConfirmation.placed_at.desc())
             .limit(200)
         ).all()

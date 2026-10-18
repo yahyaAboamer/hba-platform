@@ -18,6 +18,13 @@ import { OpsIcon, dayMonth } from "./OpsSource";
  * away, on the order in Shopify.
  */
 
+/** Where the answer was given (ADR 0063). */
+const ANSWERED_IN: Record<string, string> = {
+  whatsapp: "She answered in WhatsApp.",
+  inbox: "Marked here in the Inbox.",
+  shopify: "Tagged by the team in Shopify.",
+};
+
 const MARK: [string, string][] = [
   ["confirmed", "Mark confirmed"],
   ["edit", "Mark wants a change"],
@@ -114,6 +121,9 @@ export function ChatOrderPanel({
         <>
           <h3>Confirmation</h3>
           <span className={`inbox-status inbox-status--${status.tone}`}>{status.words}</span>
+          {order.answer && order.answered_in && ANSWERED_IN[order.answered_in] && (
+            <p className="inbox-order__hint">{ANSWERED_IN[order.answered_in]}</p>
+          )}
           {order.why && !order.answer && <p className="inbox-order__why">{order.why}</p>}
           <div className="inbox-setstatus">
             {MARK.filter(([answer]) => answer !== order.answer).map(([answer, label]) => (
@@ -144,13 +154,30 @@ export function ChatOrderPanel({
       )}
 
       <h3>Tags in Shopify</h3>
+      {/* What Shopify really has, once read - not what the platform last
+          wrote, which the team may have changed there (ADR 0063). */}
       <div>
-        {order.tag ? (
+        {order.tags_read_at ? (
+          order.shopify_tags ? (
+            order.shopify_tags.split(" + ").map((tag) => (
+              <span key={tag} className="ops-tag ops-tag--hit">
+                {tag}
+              </span>
+            ))
+          ) : (
+            <span className="ops-muted">None</span>
+          )
+        ) : order.tag ? (
           <span className="ops-tag ops-tag--hit">{order.tag}</span>
         ) : (
           <span className="ops-muted">None yet</span>
         )}
       </div>
+      <p className="inbox-order__hint">
+        {order.tags_read_at
+          ? `As Shopify had them ${dayTimeLabel(order.tags_read_at, now)}.`
+          : "The tag the platform wrote. Not read back from Shopify yet."}
+      </p>
 
       {earlier.length > 0 && (
         <>
