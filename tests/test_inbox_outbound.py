@@ -372,6 +372,27 @@ def test_after_five_tries_it_is_failed_and_shown(db, may_send):
     assert "did not answer" in row.last_error
 
 
+def test_a_retry_is_written_back_after_the_real_claim(db, may_send):
+    """The claim commits ``sending`` in a session of its own. Putting the
+    order back to ``pending`` must reach the database, or the retry finds it
+    still ``sending`` and it is later called interrupted (found 18 October)."""
+    _pending(db)
+
+    def claimed_elsewhere(order_id: str) -> bool:
+        db.execute(
+            text("UPDATE order_confirmation SET state = 'sending' WHERE shopify_order_id = :id"),
+            {"id": order_id},
+        )
+        return True
+
+    send_confirmation(db, "5001", client=_meta([], fail_network=True), claim=claimed_elsewhere)
+    db.flush()
+    stored = db.execute(
+        text("SELECT state FROM order_confirmation WHERE shopify_order_id = '5001'")
+    ).scalar()
+    assert stored == "pending"
+
+
 def test_a_refusal_that_retrying_cannot_fix_fails_at_once(db, may_send):
     row = _pending(db)
     send_confirmation(db, "5001", client=_meta([], refuse=(400, 132001)), claim=_yes)

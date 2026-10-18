@@ -258,8 +258,17 @@ class ShopifyClient:
                 },
             )
 
-    def execute(self, document: str, variables: dict | None = None) -> dict[str, Any]:
-        """Run a GraphQL document and return its data block."""
+    def execute(
+        self, document: str, variables: dict | None = None, *, at_most_once: bool = False
+    ) -> dict[str, Any]:
+        """Run a GraphQL document and return its data block.
+
+        ``at_most_once`` is for a mutation that must not run twice - one
+        that sends a customer an email (ADR 0062). A timeout, a dropped
+        connection or a 5xx may each have reached Shopify and run, so none
+        is retried: it raises at once. A refusal Shopify answers plainly
+        (throttled, credentials to refresh) did not run, and is retried.
+        """
         last_error: ShopifyError | None = None
         reauthenticated = False
 
@@ -273,11 +282,15 @@ class ShopifyClient:
                 response = self._post_graphql(document, variables or {}, token)
             except httpx.TimeoutException:
                 last_error = ShopifyError("Shopify request timed out")
+                if at_most_once:
+                    raise last_error from None
                 continue
             except httpx.HTTPError as exc:
                 last_error = ShopifyError(
                     f"Shopify request failed: {type(exc).__name__}"
                 )
+                if at_most_once:
+                    raise last_error from None
                 continue
 
             if response.status_code in (401, 403):
@@ -293,6 +306,9 @@ class ShopifyClient:
 
             if response.status_code in RETRYABLE_STATUS:
                 last_error = ShopifyError(f"Shopify returned {response.status_code}")
+                # 429 was refused before it ran; a 5xx may have run.
+                if at_most_once and response.status_code != 429:
+                    raise last_error
                 continue
             if response.status_code >= 400:
                 raise ShopifyError(f"Shopify returned {response.status_code}")

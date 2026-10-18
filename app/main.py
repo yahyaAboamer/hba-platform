@@ -48,6 +48,7 @@ from app.services.inbox import confirmations as _inbox_confirmations  # noqa: F4
 from app.services.inbox import events as _inbox_events  # noqa: F401  (registers handlers)
 from app.services.inbox import media as _inbox_media  # noqa: F401  (registers handlers)
 from app.services.inbox import outbound as _inbox_outbound  # noqa: F401  (registers handlers)
+from app.services.inbox import payments as _inbox_payments  # noqa: F401  (registers handlers)
 from app.services.inbox import tags as _inbox_tags  # noqa: F401  (registers handlers)
 from app.services.order_ops import bosta as _order_ops_bosta  # noqa: F401  (registers handlers)
 from app.services.order_ops import estebdal as _order_ops_estebdal  # noqa: F401  (registers handlers)

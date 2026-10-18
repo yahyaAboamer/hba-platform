@@ -449,6 +449,7 @@ def test_the_cards_count_cash_on_delivery_orders_by_where_they_stand(db):
     assert body["total"] == 7
     assert body["tiles"] == {
         "waiting": 1, "edit": 1, "cancelled": 1, "not_sent": 2, "no_whatsapp": 1, "confirmed": 1,
+        "awaiting_payment": 0, "paid": 0,
     }
     listed = {order["order"]: order for order in body["orders"]}
     assert set(listed) == {"#5", "#6"}

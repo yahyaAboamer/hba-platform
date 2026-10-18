@@ -107,6 +107,15 @@ export type ChatOrder = {
   tag: string | null;
   why: string | null;
   can_send_again: boolean;
+  /** "payment" for an unpaid international order's payment link (ADR 0062). */
+  kind?: "confirmation" | "payment";
+  country?: string | null;
+  paid_at?: string | null;
+  reminded_at?: string | null;
+  /** Unpaid three days after the link went out. */
+  needs_a_person?: boolean;
+  invoice_at?: string | null;
+  invoice_error?: string | null;
 };
 
 export type ConversationDetail = Conversation & { orders: ChatOrder[] };
@@ -157,10 +166,21 @@ export function chatName(chat: { name: string | null; phone: string }): string {
 }
 
 /** Where an order's confirmation stands, in a few words and a tone. */
-export function orderStatus(order: { state: string; answer: string | null }): {
+export function orderStatus(order: {
+  state: string;
+  answer: string | null;
+  kind?: string;
+  paid_at?: string | null;
+  needs_a_person?: boolean;
+}): {
   words: string;
   tone: "settled" | "owed" | "refused" | "plain";
 } {
+  if (order.kind === "payment") {
+    if (order.paid_at) return { words: "Paid", tone: "settled" };
+    if (order.needs_a_person) return { words: "Unpaid for 3 days", tone: "owed" };
+    if (order.state === "sent") return { words: "Payment link sent", tone: "plain" };
+  }
   if (order.answer === "confirmed") return { words: ANSWER_WORDS.confirmed, tone: "settled" };
   if (order.answer === "edit") return { words: ANSWER_WORDS.edit, tone: "owed" };
   if (order.answer === "cancelled") return { words: ANSWER_WORDS.cancelled, tone: "refused" };
@@ -170,9 +190,11 @@ export function orderStatus(order: { state: string; answer: string | null }): {
   return { words: "Not sent", tone: "owed" };
 }
 
-/** "EGP 1,450" from the stored "1450.00". */
+/** "EGP 1,450" from the stored "1450.00". A payment request's amount
+ * already says its currency ("EGP 5,850.00") and is shown as it is. */
 export function totalLabel(total: string | null): string {
   if (!total) return "—";
+  if (/^[A-Z]{3} /.test(total)) return total;
   const amount = Number(total.replace(/[^\d.]/g, ""));
   if (!Number.isFinite(amount) || !/\d/.test(total)) return total;
   return `EGP ${amount.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;

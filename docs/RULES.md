@@ -182,7 +182,8 @@ payroll without touching a maintainer screen.
   - Only an admin sees or changes its keys. They are stored encrypted and
     never shown, logged or audited.
 - **The platform writes to Shopify only to tag an order's confirmation**
-  (ADR 0059), and only through a second Shopify app.
+  (ADR 0059) **and to ask Shopify to email an unpaid international order's
+  invoice** (ADR 0062), and only through a second Shopify app.
   - The connection that reads money stays read-only (ADR 0015). The app it
     uses is refused as the second one.
   - The second app is refused unless it may change orders.
@@ -194,8 +195,19 @@ payroll without touching a maintainer screen.
     messages only its listed test numbers. This does not rely on `APP_ENV`,
     which staging also sets to `production`.
   - Only an Egyptian mobile number is messaged; anything else is refused,
-    not guessed at.
+    not guessed at. The one exception is a payment request (below), which
+    reads a foreign number with the shipping country's calling code.
   - An order gets one confirmation, and a paid order gets none.
+- **An international order is paid before it ships** (ADR 0062).
+  - An order shipped outside Egypt that still owes money gets a WhatsApp
+    payment request with Shopify's own payment link, instead of the
+    confirmation. Shopify's invoice email is sent once as well.
+  - The link is read from Shopify each time it is sent and is never stored.
+    A link that doesn't begin with the approved template's link is not sent.
+  - There is one reminder, 24 hours later, if it is still unpaid. After 72
+    hours it is shown as needing a person. Nothing is cancelled
+    automatically.
+  - Off unless `INBOX_PAYMENT_REQUESTS_ENABLED` is set.
 - **Operations' numbers are at most 10 minutes old** (ADR 0057).
   - The platform reads each source every 5 minutes.
   - A source that can't be read shows as a failure, never as 0.

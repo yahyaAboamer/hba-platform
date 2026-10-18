@@ -55,7 +55,7 @@ from app.core.businesstime import utcnow
 from app.core.signals import Anomaly, report
 from app.models.inbox import OrderConfirmation
 from app.models.orders import OrderIndex
-from app.services.inbox.sending import egyptian_mobile, refusal
+from app.services.inbox.sending import egyptian_mobile, international_mobile, refusal
 from app.services.jobs import JobKind, PermanentFailure, enqueue
 from app.services.shopify.client import ShopifyClient
 from app.services.shopify.sync import PERMANENT, build_client, order_gid
@@ -83,9 +83,10 @@ query ConfirmationOrder($id: ID!) {
     displayFinancialStatus
     paymentGatewayNames
     totalPriceSet { shopMoney { amount } }
+    totalOutstandingSet { shopMoney { amount currencyCode } }
     phone
     customer { firstName phone }
-    shippingAddress { phone }
+    shippingAddress { phone countryCodeV2 }
   }
 }
 """
@@ -95,6 +96,10 @@ CANCELLED = "Cancelled before a confirmation went out."
 TEST_ORDER = "A test order."
 NO_PHONE = "The order has no phone number."
 BAD_PHONE = "The phone number on the order is not a valid Egyptian number."
+BAD_FOREIGN_PHONE = (
+    "The phone number on the order could not be read as a number in the "
+    "country it ships to. Shopify's invoice email still goes."
+)
 
 
 @dataclass(frozen=True)
@@ -106,6 +111,9 @@ class Decision:
     phone: str | None = None
     customer_name: str | None = None
     total_text: str | None = None
+    #: ``payment`` for an unpaid international order (ADR 0062).
+    kind: str = "confirmation"
+    country: str | None = None
 
 
 def is_cash_on_delivery(gateways: Any, financial_status: Any) -> bool:
@@ -124,14 +132,45 @@ def _total_text(node: dict) -> str | None:
         return None
 
 
-def decide(node: dict) -> Decision:
-    """What n8n would do with this order. Pure: no clock, no database."""
+def shipping_country(node: dict) -> str | None:
+    """Where the order ships, as Shopify writes it (``SA``), or None."""
+    country = str((node.get("shippingAddress") or {}).get("countryCodeV2") or "").strip().upper()
+    return country[:2] or None
+
+
+def _payment_decision(node: dict, country: str, given: list[str], first_name: str) -> Decision:
+    """An international order (ADR 0062): a payment request if it still
+    owes money, nothing if it does not."""
+    from app.services.inbox.payments import money_text, owed_from
+
+    owed = owed_from(node)
+    if owed.amount <= 0:
+        return Decision("not_needed", PAID)
+    kind = {"kind": "payment", "country": country}
+    if not given:
+        return Decision("no_phone", NO_PHONE, **kind)
+    phone = next((read for read in (international_mobile(raw, country) for raw in given) if read), None)
+    if phone is None:
+        return Decision("bad_phone", BAD_FOREIGN_PHONE, **kind)
+    return Decision(
+        "would_send",
+        phone=phone,
+        customer_name=(first_name or "there")[:120],
+        total_text=money_text(owed.amount, owed.currency),
+        **kind,
+    )
+
+
+def decide(node: dict, *, payments: bool = False) -> Decision:
+    """What n8n would do with this order. Pure: no clock, no database.
+
+    With ``payments`` on, an order shipped outside Egypt is decided as a
+    payment request instead (ADR 0062).
+    """
     if node.get("test"):
         return Decision("not_needed", TEST_ORDER)
     if node.get("cancelledAt"):
         return Decision("not_needed", CANCELLED)
-    if not is_cash_on_delivery(node.get("paymentGatewayNames"), node.get("displayFinancialStatus")):
-        return Decision("not_needed", PAID)
 
     customer = node.get("customer") or {}
     shipping = node.get("shippingAddress") or {}
@@ -140,13 +179,19 @@ def decide(node: dict) -> Decision:
         for raw in (node.get("phone"), customer.get("phone"), shipping.get("phone"))
         if raw and str(raw).strip()
     ]
+    first_name = str(customer.get("firstName") or "").strip()
+    country = shipping_country(node)
+    if payments and country and country != "EG":
+        return _payment_decision(node, country, given, first_name)
+
+    if not is_cash_on_delivery(node.get("paymentGatewayNames"), node.get("displayFinancialStatus")):
+        return Decision("not_needed", PAID)
     if not given:
         return Decision("no_phone", NO_PHONE)
     phone = next((read for read in map(egyptian_mobile, given) if read), None)
     if phone is None:
         return Decision("bad_phone", BAD_PHONE)
 
-    first_name = str(customer.get("firstName") or "").strip()
     return Decision(
         "would_send",
         phone=phone,
@@ -197,7 +242,9 @@ def confirm_order(
     if placed_at is None or placed_at < utcnow() - FRESH_FOR:
         return None
 
-    decision = decide(node)
+    from app.services.inbox import payments
+
+    decision = decide(node, payments=payments.enabled())
     state = decision.state
     # May this server message her? If so the order waits to be sent; if not
     # it is recorded as what would have been sent, and stays that way.
@@ -218,6 +265,8 @@ def confirm_order(
             # Why there is no message, for the states that have none.
             last_error=decision.reason,
             placed_at=placed_at,
+            kind=decision.kind,
+            country=decision.country,
         )
         .on_conflict_do_nothing(index_elements=["shopify_order_id"])
         .returning(OrderConfirmation.id)
@@ -228,7 +277,12 @@ def confirm_order(
         from app.services.inbox.outbound import queue_confirmation_send
 
         queue_confirmation_send(db, order_id)
-    return _recorded(db, order_id)
+    row = _recorded(db, order_id)
+    # Shopify's invoice email goes whether or not WhatsApp can reach her
+    # (ADR 0062, point 6) - most of all when it cannot.
+    if inserted is not None and row is not None and row.state != "not_needed":
+        payments.queue_invoice(db, row)
+    return row
 
 
 # ── Queueing ──────────────────────────────────────────────────────────────────
@@ -252,10 +306,15 @@ def queue_if_new(db: Session, order: OrderIndex) -> bool:
     """Queue ``order``'s confirmation if it is fresh and not yet decided.
 
     Called each time an order is indexed. Reads only our own tables, so an
-    order synced for the tenth time costs one small query and no job.
+    order synced for the tenth time costs one small query and no job. An
+    order whose payment request is open is closed here once it is paid
+    (ADR 0062).
     """
     if not enabled():
         return False
+    from app.services.inbox.payments import note_paid
+
+    note_paid(db, order)
     if order.placed_at is None or order.placed_at < utcnow() - FRESH_FOR:
         return False
     if _recorded(db, order.shopify_order_id) is not None:
@@ -311,3 +370,11 @@ def _handle_confirm_sweep(db: Session, payload: dict) -> None:
         queue_confirmation(db, order_id)
     if order_ids:
         logger.info("confirmation sweep queued %s recent orders", len(order_ids))
+
+    # A payment request's one reminder, 24 hours on (ADR 0062).
+    from app.services.inbox import payments
+
+    if payments.enabled():
+        reminders = payments.queue_reminders(db)
+        if reminders:
+            logger.info("confirmation sweep queued %s payment reminders", reminders)

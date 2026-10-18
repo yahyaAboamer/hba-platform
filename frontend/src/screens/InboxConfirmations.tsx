@@ -19,7 +19,12 @@ import "./Inbox.css";
  * the number to call - and a way into the chat.
  */
 
-const TILES = ["waiting", "edit", "cancelled", "not_sent", "no_whatsapp", "confirmed"] as const;
+const TILES = [
+  "waiting", "edit", "cancelled", "not_sent", "no_whatsapp", "confirmed",
+  // An unpaid international order's payment link (ADR 0062). Not in the
+  // approved mockup: the owner asked for it on 18 October 2026.
+  "awaiting_payment", "paid",
+] as const;
 type TileKey = (typeof TILES)[number];
 
 type Order = {
@@ -36,6 +41,10 @@ type Order = {
   customer: string | null;
   phone: string | null;
   conversation_id: number | null;
+  kind?: "confirmation" | "payment";
+  paid_at?: string | null;
+  reminded_at?: string | null;
+  needs_a_person?: boolean;
 };
 
 type Confirmations = {
@@ -73,12 +82,19 @@ const COPY: Record<TileKey, { label: string; note: string; column: string; hint?
     column: "Phone",
   },
   confirmed: { label: "Confirmed", note: "Tapped Confirm", column: "Answered" },
+  awaiting_payment: {
+    label: "Waiting for payment",
+    note: "International: payment link sent, not paid yet",
+    column: "Sent",
+    hint: "One reminder goes 24 hours after the link. Unpaid after 3 days, get in touch. Nothing is cancelled automatically.",
+  },
+  paid: { label: "Paid by link", note: "International: paid after the link", column: "Paid" },
 };
 
 /** Why an order has no message, where the server recorded no reason. */
 const WHY: Record<string, string> = {
   no_phone: "The order has no phone number",
-  bad_phone: "The phone number on the order is not a valid Egyptian number",
+  bad_phone: "The phone number on the order could not be read",
   failed: "WhatsApp was not answering",
   pending: "Being sent now",
   sending: "Being sent now",
@@ -103,6 +119,12 @@ function OrderLink({ order }: { order: Order }) {
 function detail(tile: TileKey, order: Order, now: number): string {
   if (tile === "not_sent") return order.why ?? WHY[order.state] ?? "Not sent";
   if (tile === "no_whatsapp") return formatPhone(order.phone) || "—";
+  if (tile === "paid") return order.paid_at ? dayTimeLabel(order.paid_at, now) : "—";
+  if (tile === "awaiting_payment") {
+    const sent = order.sent_at ? dayTimeLabel(order.sent_at, now) : "—";
+    if (order.needs_a_person) return `${sent} · Unpaid for 3 days: get in touch`;
+    return order.reminded_at ? `${sent} · Reminded` : sent;
+  }
   const at = tile === "waiting" ? order.sent_at : order.answered_at;
   return at ? dayTimeLabel(at, now) : "—";
 }
@@ -322,7 +344,7 @@ export function InboxConfirmations() {
         <div className="page__title">
           <h1>Confirmations</h1>
           <span className="page__subtitle">
-            Cash-on-delivery orders from the last {tab?.days ?? 7} days
+            Cash-on-delivery and unpaid international orders from the last {tab?.days ?? 7} days
             {tab ? ` · ${tab.total}` : ""}
           </span>
         </div>
@@ -354,7 +376,7 @@ export function InboxConfirmations() {
       {tab && (
         <div className={failed ? "ops-tiles ops-tiles--old" : "ops-tiles"}>
           {TILES.map((tile) => {
-            const count = tab.tiles[tile];
+            const count = tab.tiles[tile] ?? 0;
             const copy = COPY[tile];
             if (count === 0) {
               return (

@@ -48,6 +48,8 @@ def _where(card: str, since):
             recent,
             state == "sent",
             answer.is_(None),
+            # A payment request has nothing to tap (ADR 0062).
+            OrderConfirmation.kind == "confirmation",
             OrderConfirmation.sent_at < utcnow() - WAITING_AFTER,
         ),
     }[card]

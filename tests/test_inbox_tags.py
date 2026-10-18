@@ -64,10 +64,12 @@ def test_an_order_carries_one_tag_for_where_its_confirmation_stands(db, state, a
     assert wanted_tag(_row(db, state=state, answer=answer)) == tag
 
 
-def test_the_five_tags_are_spelled_as_operations_reads_them():
-    """Operations' Shopify cards count these exact strings."""
+def test_the_tags_are_spelled_as_operations_reads_them():
+    """Operations' Shopify cards count these exact strings. The last two are
+    a payment request's (ADR 0062)."""
     assert set(ALL_TAGS) == {
         "WA Sent 📤", "No WhatsApp 📵", "Confirmed ✅", "Edit ✏️", "Cancelled ❌",
+        "Awaiting payment 💳", "Paid 💳",
     }
 
 

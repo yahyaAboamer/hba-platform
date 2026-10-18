@@ -1,20 +1,23 @@
 """An order's confirmation tag in Shopify (ADR 0059, points 10 and 11).
 
-**The only thing the platform ever writes to Shopify.** One of five tags, on
-an order, through the second Shopify app - never the connection that reads
+**One of the two things the platform writes to Shopify**, beside an unpaid
+international order's invoice email (ADR 0062). One of seven tags, on an
+order, through the second Shopify app - never the connection that reads
 money, which stays read-only (ADR 0015). It never cancels or edits an order:
 a customer's Cancel is a tag for somebody to act on.
 
-An order carries **one** of the five at a time, as n8n left it: answering
+An order carries **one** of the seven at a time, as n8n left it: answering
 clears *WA Sent*, and a number with no WhatsApp replaces it.
 
-==================  ================================================
-``WA Sent 📤``       the confirmation went out, no answer yet
-``No WhatsApp 📵``   the number cannot be reached: call instead
-``Confirmed ✅``     she tapped Confirm
-``Edit ✏️``          she tapped Edit
-``Cancelled ❌``     she tapped Cancel
-==================  ================================================
+======================  ================================================
+``WA Sent 📤``           the confirmation went out, no answer yet
+``No WhatsApp 📵``       the number cannot be reached: call instead
+``Confirmed ✅``         she tapped Confirm
+``Edit ✏️``              she tapped Edit
+``Cancelled ❌``         she tapped Cancel
+``Awaiting payment 💳``  an international order's payment link went out
+``Paid 💳``              it has been paid since
+======================  ================================================
 
 Operations' Shopify cards read these same spellings. Change one here and a
 card stops counting.
@@ -42,9 +45,12 @@ logger = logging.getLogger(__name__)
 SENT = "WA Sent 📤"
 NO_WHATSAPP = "No WhatsApp 📵"
 ANSWER_TAGS = {"confirmed": "Confirmed ✅", "edit": "Edit ✏️", "cancelled": "Cancelled ❌"}
+#: A payment request's two (ADR 0062, point 7).
+AWAITING_PAYMENT = "Awaiting payment 💳"
+PAID = "Paid 💳"
 
 #: Every tag this module may add or remove. Nothing outside it is touched.
-ALL_TAGS = (SENT, NO_WHATSAPP, *ANSWER_TAGS.values())
+ALL_TAGS = (SENT, NO_WHATSAPP, *ANSWER_TAGS.values(), AWAITING_PAYMENT, PAID)
 
 TAGS_REMOVE = """
 mutation ConfirmationTagsRemove($id: ID!, $tags: [String!]!) {
@@ -65,8 +71,19 @@ NOT_CONNECTED = (
 def wanted_tag(row: OrderConfirmation) -> str | None:
     """The one tag this order should carry, or None if it should carry none.
 
-    Her answer first: once she has answered, that is what the order says.
+    Her answer first: once she has answered, that is what the order says. A
+    payment request has no answer: it is paid, awaiting payment, or cannot
+    be reached (ADR 0062).
     """
+    if row.kind == "payment":
+        # Only a request a message went out for is tagged at all: one that
+        # was never sent - recorded on a server that may not message
+        # customers, or with no usable number - leaves Shopify alone.
+        if row.state not in ("sent", "no_whatsapp"):
+            return None
+        if row.paid_at is not None:
+            return PAID
+        return NO_WHATSAPP if row.state == "no_whatsapp" else AWAITING_PAYMENT
     if row.answer in ANSWER_TAGS:
         return ANSWER_TAGS[row.answer]
     if row.state == "no_whatsapp":

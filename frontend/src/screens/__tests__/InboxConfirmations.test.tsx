@@ -87,8 +87,34 @@ describe("Inbox → Confirmations (ADR 0059)", () => {
     for (const name of [/Wants a change/, /Asked to cancel/, /Not sent/, /No WhatsApp/, /Confirmed/]) {
       expect(screen.getByRole("button", { name })).toBeTruthy();
     }
-    expect(screen.getByText("Cash-on-delivery orders from the last 7 days · 262")).toBeTruthy();
+    expect(
+      screen.getByText("Cash-on-delivery and unpaid international orders from the last 7 days · 262"),
+    ).toBeTruthy();
     expect(screen.getByText("Updated just now")).toBeTruthy();
+  });
+
+  it("lists international orders waiting for payment, and the ones unpaid for 3 days (ADR 0062)", async () => {
+    const waiting = [
+      order("31510", {
+        state: "sent", kind: "payment", sent_at: "2026-10-14T09:00:00+00:00",
+        reminded_at: "2026-10-15T09:00:00+00:00", needs_a_person: true, why: null,
+        can_send_again: false, customer: "Sara", conversation_id: 7,
+      }),
+    ];
+    const counts = { ...body().tiles, awaiting_payment: 1, paid: 2 };
+    fetchMock.mockImplementation((url: string) =>
+      reply(200, body({ tiles: counts, orders: url.includes("tile=awaiting_payment") ? waiting : null })),
+    );
+    show();
+
+    expect((await screen.findByRole("button", { name: /Paid by link/ })).textContent).toContain("2");
+    fireEvent.click(screen.getByRole("button", { name: /Waiting for payment/ }));
+
+    expect(await screen.findByText("Waiting for payment · 1 order")).toBeTruthy();
+    expect(screen.getByText(/Nothing is cancelled automatically/)).toBeTruthy();
+    const row = screen.getByText("Sara").closest("tr") as HTMLElement;
+    expect(row.textContent).toContain("Unpaid for 3 days: get in touch");
+    expect(within(row).getByRole("link", { name: /Open chat/ }).getAttribute("href")).toBe("/inbox/chats/7");
   });
 
   it("opens Not sent, with why, and the one action each order can take", async () => {

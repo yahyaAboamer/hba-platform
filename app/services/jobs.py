@@ -123,6 +123,12 @@ class JobKind:
     #: Copy a customer's photo, voice note or file from Meta into our own
     #: bucket. WhatsApp deletes it after 7 days.
     INBOX_FETCH_MEDIA = "inbox_fetch_media"
+    #: An unpaid international order's one payment reminder (ADR 0062),
+    #: claimed before WhatsApp is asked.
+    INBOX_PAYMENT_REMINDER = "inbox_payment_reminder"
+    #: Ask Shopify to email an unpaid international order's invoice, once,
+    #: through the second Shopify app (ADR 0062).
+    INBOX_SEND_INVOICE = "inbox_send_invoice"
 
 
 #: The inbox's work (ADR 0059) runs in a lane of its own too: a WhatsApp outage
@@ -137,6 +143,8 @@ INBOX_WORK = frozenset(
         JobKind.INBOX_AUTO_REPLY,
         JobKind.INBOX_TAG_ORDER,
         JobKind.INBOX_FETCH_MEDIA,
+        JobKind.INBOX_PAYMENT_REMINDER,
+        JobKind.INBOX_SEND_INVOICE,
     }
 )
 

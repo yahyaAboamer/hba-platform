@@ -24,6 +24,7 @@ from typing import Any, Callable
 
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import set_committed_value
 
 from app.core.businesstime import utcnow
 from app.models.inbox import InboxConversation, InboxMessage, OrderConfirmation
@@ -463,13 +464,32 @@ def send_confirmation(
         row.updated_at = utcnow()
         return row
 
+    paying = row.kind == "payment"
     owned = client is None
     client = client or _client(db)
     try:
         if not claim(order_id):
             return row
+        # The claim was committed in a session of its own, so this one still
+        # holds the row as ``pending``. Tell it what the database now says:
+        # otherwise putting it back to ``pending`` for a retry is no change,
+        # is never written, and the order stays ``sending`` until it is
+        # called interrupted.
+        set_committed_value(row, "state", "sending")
+        if paying:
+            # A payment request (ADR 0062): its link is read now, after the
+            # claim, and never stored. No link, no message - the row says why.
+            from app.services.inbox import payments
+
+            suffix = payments.link_for(db, row)
+            if suffix is None:
+                return row
+            template, built = payments.TEMPLATE, payments.components(row, suffix)
+            language = payments.LANGUAGE
+        else:
+            template, built, language = TEMPLATE, components(row), LANGUAGE
         try:
-            wa_message_id = client.send_template(row.phone, TEMPLATE, LANGUAGE, components(row))
+            wa_message_id = client.send_template(row.phone, template, language, built)
         except MetaError as exc:
             _not_taken(db, row, exc)
             return row
@@ -492,12 +512,12 @@ def send_confirmation(
         db,
         conversation,
         kind="template",
-        body=f"Order confirmation · {row.order_name or order_id}",
+        body=f"{'Payment request' if paying else 'Order confirmation'} · {row.order_name or order_id}",
         origin="automatic",
         status="sent",
         wa_message_id=wa_message_id,
-        template_name=TEMPLATE,
-        extra={"buttons": ["Confirm", "Edit", "Cancel"]},
+        template_name=template,
+        extra={"buttons": ["Pay now"] if paying else ["Confirm", "Edit", "Cancel"]},
         order_id=order_id,
     )
     tags.queue_tags(db, row)

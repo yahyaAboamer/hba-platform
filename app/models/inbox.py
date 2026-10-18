@@ -66,6 +66,10 @@ CONFIRMATION_STATES = (
 
 CONFIRMATION_ANSWERS = ("confirmed", "edit", "cancelled")
 
+#: What an order's message is (ADR 0062): the confirmation, or - for an
+#: international order that still owes money - a request to pay by link.
+CONFIRMATION_KINDS = ("confirmation", "payment")
+
 
 def _in(column: str, values: tuple[str, ...]) -> str:
     return f"{column} IN ({', '.join(repr(value) for value in values)})"
@@ -211,6 +215,7 @@ class OrderConfirmation(Base):
             name="order_confirmation_answer_valid",
         ),
         CheckConstraint("attempts >= 0", name="order_confirmation_attempts_not_negative"),
+        CheckConstraint(_in("kind", CONFIRMATION_KINDS), name="order_confirmation_kind_valid"),
         # What the sender picks up next.
         Index(
             "order_confirmation_due",
@@ -241,6 +246,23 @@ class OrderConfirmation(Base):
     wa_message_id: Mapped[str | None] = mapped_column(String(200), unique=True)
     placed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    #: ``confirmation``, or ``payment`` for an unpaid international order
+    #: (ADR 0062). Decided once, with the row.
+    kind: Mapped[str] = mapped_column(
+        String(12), nullable=False, default="confirmation", server_default="confirmation"
+    )
+    #: Where the order ships, as Shopify writes it: ``SA``. Only kept for a
+    #: payment request, whose number is read with this country's code.
+    country: Mapped[str | None] = mapped_column(String(2))
+    #: A payment request's one reminder. Set just before it is sent, so it
+    #: is sent at most once.
+    reminded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    #: When a payment request's order was seen paid.
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    #: When Shopify was asked to email the order's invoice - set just before
+    #: asking, so it is asked once - and why it refused, if it did.
+    invoice_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    invoice_error: Mapped[str | None] = mapped_column(String(300))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )

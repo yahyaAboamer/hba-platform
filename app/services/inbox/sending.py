@@ -46,6 +46,74 @@ def egyptian_mobile(raw: object) -> str | None:
     return digits if _EGYPTIAN_MOBILE.fullmatch(digits) else None
 
 
+#: Calling codes for the countries the store ships to, by the code Shopify
+#: gives a shipping address. A number written the local way from a country
+#: missing here is refused, never guessed at (ADR 0062, point 5).
+CALLING_CODES = {
+    # The Gulf, the Levant, Iraq and North Africa.
+    "SA": "966", "AE": "971", "KW": "965", "QA": "974", "BH": "973", "OM": "968",
+    "JO": "962", "LB": "961", "PS": "970", "SY": "963", "IQ": "964", "YE": "967",
+    "LY": "218", "TN": "216", "DZ": "213", "MA": "212", "SD": "249", "TR": "90",
+    # Europe.
+    "GB": "44", "IE": "353", "FR": "33", "DE": "49", "NL": "31", "BE": "32",
+    "LU": "352", "CH": "41", "AT": "43", "IT": "39", "ES": "34", "PT": "351",
+    "SE": "46", "NO": "47", "DK": "45", "FI": "358", "PL": "48", "CZ": "420",
+    "GR": "30", "CY": "357", "RO": "40", "HU": "36",
+    # North America and elsewhere.
+    "US": "1", "CA": "1", "AU": "61", "NZ": "64", "MY": "60", "SG": "65",
+    "ZA": "27", "NG": "234", "KE": "254", "PK": "92", "IN": "91",
+}
+
+#: The shortest and longest a full international number can be (ITU E.164).
+_INTERNATIONAL = re.compile(r"[1-9]\d{7,14}")
+
+
+def international_mobile(raw: object, country: str | None) -> str | None:
+    """``raw`` as a full international number without the plus, or None.
+
+    For a payment request only (ADR 0062, point 5), whose order ships to
+    ``country``:
+
+    - written with ``+`` or ``00``, it is taken as written;
+    - already starting with the country's code, it is taken as written;
+    - otherwise it is local: a leading ``0`` is dropped and the country's
+      code put in front - unless it is shaped like an Egyptian mobile
+      written the Egyptian way, which could be either and is refused.
+
+    An Egyptian number must still be a valid Egyptian mobile. Anything that
+    does not come out as 8 to 15 digits is refused.
+    """
+    text = str(raw or "").strip()
+    digits = re.sub(r"\D", "", text)
+    if not digits:
+        return None
+    code = CALLING_CODES.get(str(country or "").upper())
+    if text.startswith("+"):
+        full = digits
+    elif digits.startswith("00"):
+        full = digits[2:]
+    elif code and digits.startswith(code):
+        # ``3931234567`` on an order to Italy is either an Italian mobile
+        # written locally or one with its code: ten digits or fewer could be
+        # either, so it is refused. Longer, it can only be the code.
+        if len(digits) <= 10 or len(digits) - len(code) < 8:
+            return None
+        full = digits
+    elif code and digits.startswith("01") and egyptian_mobile(digits):
+        # ``010…`` on an order to Saudi Arabia is an Egyptian mobile written
+        # the Egyptian way - or a local number that happens to look like one.
+        # Which, the platform cannot tell, so it messages neither.
+        return None
+    elif code and len(digits.removeprefix("0")) >= 7:
+        full = code + digits.removeprefix("0")
+    else:
+        # No code for the country, or too short to be anybody's number.
+        return None
+    if full.startswith("20"):
+        return egyptian_mobile(full)
+    return full if _INTERNATIONAL.fullmatch(full) else None
+
+
 def allowed_test_numbers() -> frozenset[str]:
     """The numbers a server that may not message customers still may."""
     numbers = (egyptian_mobile(part) for part in settings.inbox_test_numbers.split(","))

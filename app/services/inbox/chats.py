@@ -25,7 +25,7 @@ from app.core.businesstime import utcnow
 from app.models.identity import UserAccount
 from app.models.inbox import InboxConversation, InboxMedia, InboxMessage, OrderConfirmation
 from app.services.audit import record_audit
-from app.services.inbox import outbound, sending, tags
+from app.services.inbox import outbound, payments, sending, tags
 from app.services.inbox.events import ANSWERS, _TAP
 from app.services.inbox.meta import MetaClient
 from app.services.stale import admin_url
@@ -44,8 +44,12 @@ MAX_TEXT = 4096
 #: being sent, or is waiting to be - that is how a second message would start.
 SEND_AGAIN_FROM = ("failed", "would_send")
 
-#: The Confirmations screen's tiles, and the orders behind each.
-TILES = ("waiting", "edit", "cancelled", "not_sent", "no_whatsapp", "confirmed")
+#: The Confirmations screen's tiles, and the orders behind each. The last two
+#: are an international order's payment request (ADR 0062, point 12).
+TILES = (
+    "waiting", "edit", "cancelled", "not_sent", "no_whatsapp", "confirmed",
+    "awaiting_payment", "paid",
+)
 NOT_SENT_STATES = ("failed", "would_send", "no_phone", "bad_phone", "pending", "sending")
 
 EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
@@ -232,6 +236,14 @@ def describe_order(row: OrderConfirmation, domain: str | None = None) -> dict:
         "tag": tags.wanted_tag(row),
         "why": row.last_error or (SENDING_WAS_OFF if row.state == "would_send" else None),
         "can_send_again": row.state in SEND_AGAIN_FROM and bool(row.phone) and not row.wa_message_id,
+        # A payment request (ADR 0062). The link itself is never kept.
+        "kind": row.kind or "confirmation",
+        "country": row.country,
+        "paid_at": _iso(row.paid_at),
+        "reminded_at": _iso(row.reminded_at),
+        "needs_a_person": payments.needs_a_person(row),
+        "invoice_at": _iso(row.invoice_at),
+        "invoice_error": row.invoice_error,
     }
 
 
@@ -608,6 +620,9 @@ def set_answer(
     if answer not in tags.ANSWER_TAGS:
         raise Refused("An order is confirmed, wants a change, or is cancelled.")
     row = _order(db, order_id)
+    if row.kind == "payment":
+        # Its tag says paid or not, which Shopify decides (ADR 0062).
+        raise Refused("This order was sent a payment link, not a confirmation.")
     before = row.answer
     row.answer = answer
     row.answered_at = utcnow()
@@ -631,20 +646,26 @@ def set_answer(
 
 def _tile(tile: str):
     answer, state = OrderConfirmation.answer, OrderConfirmation.state
+    paying, paid = OrderConfirmation.kind == "payment", OrderConfirmation.paid_at
     return {
-        "waiting": and_(state == "sent", answer.is_(None)),
+        # There is nothing to tap in a payment request, so it is never
+        # waiting for an answer.
+        "waiting": and_(state == "sent", answer.is_(None), ~paying),
         "edit": answer == "edit",
         "cancelled": answer == "cancelled",
         "confirmed": answer == "confirmed",
-        "no_whatsapp": and_(state == "no_whatsapp", answer.is_(None)),
-        "not_sent": and_(state.in_(NOT_SENT_STATES), answer.is_(None)),
+        "no_whatsapp": and_(state == "no_whatsapp", answer.is_(None), paid.is_(None)),
+        "not_sent": and_(state.in_(NOT_SENT_STATES), answer.is_(None), paid.is_(None)),
+        "awaiting_payment": and_(paying, state == "sent", paid.is_(None)),
+        "paid": and_(paying, paid.is_not(None)),
     }[tile]
 
 
 def confirmations(db: Session, *, tile: str | None = None, days: int = 7) -> dict:
-    """Where each cash-on-delivery order's confirmation stands.
+    """Where each cash-on-delivery order's confirmation stands, and each
+    unpaid international order's payment request (ADR 0062).
 
-    A paid order is not here: it never gets a confirmation.
+    An order paid at checkout is not here: it never gets either.
     """
     if tile is not None and tile not in TILES:
         raise Refused("That is not one of the Confirmations cards.")

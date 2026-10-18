@@ -88,33 +88,59 @@ export function ChatOrderPanel({
         <dd className="num">{totalLabel(order.total)}</dd>
       </dl>
 
-      <h3>Confirmation</h3>
-      <span className={`inbox-status inbox-status--${status.tone}`}>{status.words}</span>
-      {order.why && !order.answer && <p className="inbox-order__why">{order.why}</p>}
-      <div className="inbox-setstatus">
-        {MARK.filter(([answer]) => answer !== order.answer).map(([answer, label]) => (
-          <button
-            key={answer}
-            type="button"
-            className={
-              answer === "confirmed"
-                ? "inbox-btn inbox-btn--small"
-                : "inbox-btn inbox-btn--quiet inbox-btn--small"
-            }
-            disabled={busy !== null}
-            onClick={() => mark(answer)}
-          >
-            {busy === answer ? "Saving…" : label}
-          </button>
-        ))}
-      </div>
-      <p className="inbox-order__hint">
-        Changes the order's tag in Shopify. It does not cancel or change the order there.
-      </p>
-      {problem && (
-        <p className="notice notice--refused" role="alert">
-          {problem}
-        </p>
+      {order.kind === "payment" ? (
+        <>
+          {/* An international order's payment link (ADR 0062): nothing to
+              tap, so nothing to record here. Shopify says when it is paid. */}
+          <h3>Payment</h3>
+          <span className={`inbox-status inbox-status--${status.tone}`}>{status.words}</span>
+          {order.why && !order.paid_at && <p className="inbox-order__why">{order.why}</p>}
+          <p className="inbox-order__hint">
+            {order.paid_at
+              ? `Paid ${dayTimeLabel(order.paid_at, now)}.`
+              : order.reminded_at
+                ? `Reminded ${dayTimeLabel(order.reminded_at, now)}. No more reminders are sent.`
+                : "One reminder is sent 24 hours after the link if it is still unpaid."}
+          </p>
+          <p className="inbox-order__hint">
+            {order.invoice_error
+              ? `Invoice email: ${order.invoice_error}`
+              : order.invoice_at
+                ? `Shopify emailed the invoice ${dayTimeLabel(order.invoice_at, now)}.`
+                : "No invoice email has been sent."}
+          </p>
+        </>
+      ) : (
+        <>
+          <h3>Confirmation</h3>
+          <span className={`inbox-status inbox-status--${status.tone}`}>{status.words}</span>
+          {order.why && !order.answer && <p className="inbox-order__why">{order.why}</p>}
+          <div className="inbox-setstatus">
+            {MARK.filter(([answer]) => answer !== order.answer).map(([answer, label]) => (
+              <button
+                key={answer}
+                type="button"
+                className={
+                  answer === "confirmed"
+                    ? "inbox-btn inbox-btn--small"
+                    : "inbox-btn inbox-btn--quiet inbox-btn--small"
+                }
+                disabled={busy !== null}
+                onClick={() => mark(answer)}
+              >
+                {busy === answer ? "Saving…" : label}
+              </button>
+            ))}
+          </div>
+          <p className="inbox-order__hint">
+            Changes the order's tag in Shopify. It does not cancel or change the order there.
+          </p>
+          {problem && (
+            <p className="notice notice--refused" role="alert">
+              {problem}
+            </p>
+          )}
+        </>
       )}
 
       <h3>Tags in Shopify</h3>
