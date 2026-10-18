@@ -125,6 +125,7 @@ def _served() -> set[tuple[str, str]]:
         payments,
         payroll,
         policy,
+        portal_preview,
         products,
         staff,
         targets,
@@ -138,8 +139,8 @@ def _served() -> set[tuple[str, str]]:
     found: set[tuple[str, str]] = set()
     for module in (
         affiliate_self, affiliates, applications, audit, auth, earnings,
-        health, inbox, operations, order_ops, orders, payments, payroll, policy, products,
-        staff, targets, webhooks,
+        health, inbox, operations, order_ops, orders, payments, payroll, policy,
+        portal_preview, products, staff, targets, webhooks,
     ):
         for route in module.router.routes:
             for method in getattr(route, "methods", set()):
@@ -162,7 +163,7 @@ def _called() -> set[tuple[str, str]]:
     call = re.compile(
         r"""api\s*\.\s*(get|post|put|patch|upload|del)\s*(?:<[^>]*>)?\s*\(\s*[`"']([^`"']*)[`"']"""
     )
-    image = re.compile(r"""src=\{`(/api/[^`]*)`\}""")
+    image = re.compile(r"""src=\{(?:portalPath\()?`(/api/[^`]*)`\)?\}""")
 
     for file in FRONTEND.rglob("*.ts*"):
         text = file.read_text(encoding="utf-8")
@@ -171,7 +172,33 @@ def _called() -> set[tuple[str, str]]:
         # An <img src> is a GET the browser makes on its own.
         for raw in image.findall(text):
             calls.add(("GET", _clean(raw)))
-    return calls
+    return calls | _previewed(calls)
+
+
+#: ADR 0064. Kept out of the preview on purpose, as `NOT_IN_PREVIEW` in
+#: `frontend/src/lib/api.ts` keeps it: her full payout details.
+NOT_PREVIEWED = {"/api/me/payout-destination"}
+
+
+def _previewed(calls: set[tuple[str, str]]) -> set[tuple[str, str]]:
+    """Her reads as staff looking at her portal make them (ADR 0064).
+
+    `portalPath` in `frontend/src/lib/api.ts` sends each of her `/api/me` reads,
+    and her `/api/applications/mine`, to `/api/affiliates/{id}/portal` at run
+    time, so no screen names those addresses. This is that mapping, written
+    again on purpose: a new read on her portal then appears here as a path
+    nothing serves, until the preview can show it too.
+    """
+    base = "/api/affiliates/{}/portal"
+    found = set()
+    for method, path in calls:
+        if method != "GET" or path in NOT_PREVIEWED:
+            continue
+        if path == "/api/applications/mine":
+            found.add(("GET", f"{base}/application"))
+        elif path == "/api/me" or path.startswith("/api/me/"):
+            found.add(("GET", base + path[len("/api/me"):]))
+    return found
 
 
 def test_every_capability_has_a_way_in():

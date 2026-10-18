@@ -24,6 +24,7 @@ import { OrderDetail, Orders } from "./screens/Orders";
 import { Overview } from "./screens/Overview";
 import { ProductDetail, Products } from "./screens/Products";
 import { PaymentReconcile } from "./screens/PaymentReconcile";
+import { PortalPreview, PortalPreviewFrame, previewFrameFor } from "./screens/PortalPreview";
 import { PaymentCorrection } from "./screens/PaymentCorrection";
 import { PaymentDetail, PaymentReceipt } from "./screens/PaymentDetail";
 import { PaymentRecord } from "./screens/PaymentRecord";
@@ -107,6 +108,14 @@ export default function App() {
     );
   }
 
+  // ADR 0064: the frame inside "View her portal". Her portal is decided before
+  // the router, because it brings a router of its own - and only for somebody
+  // who may open her profile; anybody else falls through to the routes below.
+  const previewed = previewFrameFor(window.location.pathname);
+  if (session && previewed !== null && can(session, "affiliates.view")) {
+    return <PortalPreviewFrame affiliateId={previewed} session={session} />;
+  }
+
   return (
     <BrowserRouter>
       <Routes>
@@ -179,6 +188,9 @@ export default function App() {
               path="/affiliates/:id"
               element={<AffiliateDetail session={session} />}
             />
+            {can(session, "affiliates.view") && (
+              <Route path="/affiliates/:id/portal" element={<PortalPreview />} />
+            )}
             <Route
               path="/affiliates/:id/compensation"
               element={<Compensation />}

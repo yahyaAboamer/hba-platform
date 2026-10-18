@@ -532,6 +532,13 @@ export function AffiliateDetail({ session }: { session: Session }) {
           <h1>{detail.name}</h1>
           {current && <span className="page__subtitle">{current.code}</span>}
         </div>
+        {/* ADR 0064: her portal as she sees it, read only. A house account
+         *  is not a person and has no portal to look at. */}
+        {!house && (
+          <Link className="button" to={`/affiliates/${detail.id}/portal`}>
+            View her portal
+          </Link>
+        )}
       </div>
 
       {/*

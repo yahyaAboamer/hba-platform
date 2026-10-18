@@ -138,7 +138,8 @@ KINDS: dict[str, tuple[str, ...]] = {
         "staff.suspended",
         "staff.reactivated",
     ),
-    "models": ("affiliate.", "application.", "code.", "parcel."),
+    # `portal.previewed`: staff looking at her portal, read only (ADR 0064).
+    "models": ("affiliate.", "application.", "code.", "parcel.", "portal."),
     "content": ("target.",),
     "settings": (
         "shopify.",

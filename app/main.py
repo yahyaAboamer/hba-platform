@@ -7,6 +7,7 @@ a single deployable, which is what holds the running cost inside budget.
 import asyncio
 import contextlib
 import logging
+import re
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -29,6 +30,7 @@ from app.api import (
     payments,
     payroll,
     policy,
+    portal_preview,
     products,
     staff,
     targets,
@@ -96,11 +98,22 @@ app = FastAPI(
 )
 
 
+#: The frame inside *View her portal* (ADR 0064, `frontend/src/screens/PortalPreview.tsx`).
+_PREVIEW_FRAME = re.compile(r"^/affiliates/\d+/portal/frame/?$")
+
+
 @app.middleware("http")
 async def security_headers(request: Request, call_next):
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["X-Frame-Options"] = "DENY"
+    if _PREVIEW_FRAME.match(request.url.path):
+        # ADR 0064: the one page the platform frames itself - a model's portal
+        # inside *View her portal*. Our own pages may frame it; no other site
+        # may, so the reason for DENY (clickjacking) still holds.
+        response.headers["X-Frame-Options"] = "SAMEORIGIN"
+        response.headers["Content-Security-Policy"] = "frame-ancestors 'self'"
+    else:
+        response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "no-referrer"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
     if settings.is_production:
@@ -139,6 +152,7 @@ app.include_router(inbox.router)
 app.include_router(affiliates.router)
 app.include_router(applications.router)
 app.include_router(affiliate_self.router)
+app.include_router(portal_preview.router)
 app.include_router(earnings.router)
 app.include_router(targets.router)
 app.include_router(orders.router)

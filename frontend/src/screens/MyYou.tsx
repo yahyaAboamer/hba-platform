@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
-import { signOutAndLeave } from "../lib/api";
+import { isPortalPreview, signOutAndLeave } from "../lib/api";
 import { formatMonth } from "../lib/money";
 import { PAY_TYPE, describeDestination } from "../lib/payouts";
 import { storeTheme } from "../lib/theme";
@@ -126,7 +126,8 @@ export function MyYou({ me, workingMonth, theme, onTheme }: {
         </div>
       </section>
     </div>
-    <SignOut />
+    {/* In a preview, signing out would sign out the staff member (ADR 0064). */}
+    {!isPortalPreview() && <SignOut />}
   </div>;
 }
 
@@ -162,17 +163,19 @@ export function YouPayout({ me, onChanged }: { me: Me; onChanged: () => void | P
 
   const abroad = me.payout_abroad && !me.payout_destination;
   const missing = !me.payout_destination && !abroad;
+  const preview = isPortalPreview();
   return <div className="you__detail">
     {saved && <p className="notice notice--settled" role="status">Payment details saved. This is where future payments will be sent.</p>}
     <div className="you__section-title">Your current payment method</div>
     <section className="you__detail-card">
       <h1>{abroad ? "HBA arranges your payment directly" : missing ? "No payment method on file" : describeDestination(me.payout_destination)}</h1>
       <p>{abroad ? "HBA is arranging how to pay you outside Egypt. If you now have an Egyptian payment method, you can add it here." : missing ? "Add where HBA should send future payments." : "These details are shortened until you choose to see them in full."}</p>
-      {me.payout_destination && <Reveal />}
+      {/* ADR 0064: shortened in a preview, with no way to show them in full. */}
+      {me.payout_destination && !preview && <Reveal />}
     </section>
     <section className="you__detail-card"><h2>{missing || abroad ? "Add a payment method" : "Change where you are paid"}</h2>
       <p>Choose the method, check the old and new details, then confirm with your password. HBA is alerted when a current method changes.</p>
-      <button type="button" className="you__primary" onClick={() => { setSaved(false); setEditing(true); }}>{missing || abroad ? "Add payment method" : "Change payment method"}</button>
+      {!preview && <button type="button" className="you__primary" onClick={() => { setSaved(false); setEditing(true); }}>{missing || abroad ? "Add payment method" : "Change payment method"}</button>}
     </section>
     <section className="you__detail-card"><h2>Past payments stay accurate</h2><p>Payment history keeps the destination recorded when each transfer was sent, even if you change your current method.</p><Link className="you__text-link" to="/payments">View payment history →</Link></section>
   </div>;

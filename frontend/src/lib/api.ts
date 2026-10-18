@@ -87,11 +87,65 @@ export function forgetToken(): void {
   }
 }
 
+/**
+ * A model's portal, opened by staff to look at - read only (ADR 0064).
+ *
+ * Her screens ask for `/api/me/...` as they always do; while a preview is on,
+ * this module sends those reads to `/api/affiliates/{id}/portal/...` instead,
+ * which answers with the same handlers for the model named. **Every write is
+ * refused here, before it is sent**, and the server has no write route for the
+ * preview either, so a control a screen forgot to hide still changes nothing.
+ *
+ * Module-wide on purpose: the preview runs in a frame of its own, a separate
+ * page in which everything is the preview.
+ */
+let previewBase: string | null = null;
+
+export const PREVIEW_READ_ONLY =
+  "This is a read-only preview of her portal. Nothing can be changed from here.";
+
+/** Her full payout details stay shortened in the preview: there is no route. */
+const NOT_IN_PREVIEW = new Set(["/api/me/payout-destination"]);
+
+export function startPortalPreview(affiliateId: number): void {
+  previewBase = `/api/affiliates/${affiliateId}/portal`;
+}
+
+export function stopPortalPreview(): void {
+  previewBase = null;
+}
+
+/** Whether this page is staff looking at a model's portal. */
+export function isPortalPreview(): boolean {
+  return previewBase !== null;
+}
+
+/**
+ * Where one of her reads goes: unchanged normally, the preview's address in a
+ * preview. Exported for the one read the browser makes by itself - a transfer
+ * screenshot's `<img src>`. `tests/test_reachability.py` mirrors this mapping.
+ */
+export function portalPath(path: string): string {
+  if (previewBase === null) return path;
+  if (path === "/api/applications/mine") return `${previewBase}/application`;
+  if (path === "/api/me" || path.startsWith("/api/me/") || path.startsWith("/api/me?")) {
+    return previewBase + path.slice("/api/me".length);
+  }
+  return path;
+}
+
 async function request<T>(
   method: string,
   path: string,
   body?: unknown,
 ): Promise<T> {
+  if (previewBase !== null) {
+    if (method !== "GET" || NOT_IN_PREVIEW.has(path.split("?")[0])) {
+      throw new ApiError(403, PREVIEW_READ_ONLY);
+    }
+    path = portalPath(path);
+  }
+
   const headers: Record<string, string> = {};
   if (body !== undefined) headers["content-type"] = "application/json";
 
@@ -142,6 +196,8 @@ async function upload<T>(
   file: File | Blob,
   options: { field?: string; filename?: string; fields?: Record<string, string> } = {},
 ): Promise<T> {
+  if (previewBase !== null) throw new ApiError(403, PREVIEW_READ_ONLY);
+
   const headers: Record<string, string> = {};
   const token = readToken();
   if (token) headers[CSRF_HEADER] = token;

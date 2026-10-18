@@ -1,0 +1,51 @@
+/* A model's portal, read only (ADR 0064). The admin page around the frame. */
+
+.preview__note {
+  margin: 0 0 var(--space-4);
+  font-size: 13px;
+  color: var(--faint);
+}
+
+/* **Phone first**, because that is what most models hold: 390 wide, as the
+ * approved portal exports are drawn, and as tall as a phone where the window
+ * allows - shorter on a laptop, which is still a phone, just a smaller one. */
+.preview__stage {
+  display: flex;
+  justify-content: center;
+}
+
+.preview__frame {
+  display: block;
+  border: 1px solid var(--rule-strong);
+  background: var(--surface);
+}
+
+.preview__stage--phone .preview__frame {
+  width: 390px;
+  max-width: 100%;
+  height: min(844px, calc(100dvh - 190px));
+  min-height: 560px;
+  border-radius: 28px;
+}
+
+.preview__stage--full .preview__frame {
+  width: 100%;
+  height: calc(100dvh - 190px);
+  min-height: 600px;
+  border-radius: var(--radius-lg);
+}
+
+/* Only when the frame is opened on its own, outside the admin page. */
+.preview__strip {
+  margin: 0;
+  padding: 8px 16px;
+  font-size: 13px;
+  text-align: center;
+  color: var(--accent-on);
+  background: var(--accent-fill);
+}
+
+.preview__strip a {
+  color: inherit;
+  text-decoration: underline;
+}

@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 
 import { usePortal } from "../components/AffiliateLayout";
 import { Money } from "../components/Money";
-import { api } from "../lib/api";
+import { api, portalPath } from "../lib/api";
 import { formatMonth } from "../lib/money";
 import { describeDestination } from "../lib/payouts";
 import type { MyHome, MyPayments as Body, Payment } from "../lib/portal";
@@ -464,7 +464,7 @@ export function PaymentRow({ payment }: { payment: Payment }) {
             ) : (
               <img
                 className="settle__proof"
-                src={`/api/me/payments/${payment.id}/proof`}
+                src={portalPath(`/api/me/payments/${payment.id}/proof`)}
                 alt={`Confirmation of the transfer on ${onlyTheDate(payment.occurred_at)}`}
                 onError={() => setBroken(true)}
               />

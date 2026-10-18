@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { api } from "../lib/api";
+import { api, isPortalPreview } from "../lib/api";
 import "./Apply.css";
 
 export type Me = {
@@ -218,7 +218,8 @@ export function ShippingAddress({ me, onChanged }: { me: Me; onChanged: () => vo
               ? lines.join(", ")
               : "You have not given us an address. We cannot send you anything without one."}
           </p>
-          <button
+          {/* ADR 0064: staff looking at her portal see it, and change nothing. */}
+          {!isPortalPreview() && <button
             type="button"
             className="button"
             onClick={() => {
@@ -228,7 +229,7 @@ export function ShippingAddress({ me, onChanged }: { me: Me; onChanged: () => vo
             }}
           >
             {lines.length > 0 ? "Change it" : "Add it"}
-          </button>
+          </button>}
         </>
       ) : (
         <>
@@ -346,9 +347,9 @@ export function Measurements({ me, onChanged }: { me: Me; onChanged: () => void 
               "You have not given these. They are optional — HBA only uses them to send you things that fit."
             )}
           </p>
-          <button type="button" className="button" onClick={start}>
+          {!isPortalPreview() && <button type="button" className="button" onClick={start}>
             {me.height_cm || me.weight_kg ? "Change these" : "Add them"}
-          </button>
+          </button>}
         </>
       ) : (
         <>
@@ -498,6 +499,8 @@ export function Notifications() {
           className="pref pref--row"
           role="switch"
           aria-checked={preference.enabled}
+          // Her switches as she has them, held still (ADR 0064).
+          disabled={isPortalPreview()}
           onClick={() => toggle(preference)}
         >
           <span className="pref__label">{preference.label}</span>

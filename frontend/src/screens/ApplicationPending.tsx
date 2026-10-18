@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { api } from "../lib/api";
+import { api, isPortalPreview } from "../lib/api";
 import { destinationHolder } from "../lib/payouts";
 import type { Me } from "./MyDetails";
 import { MyPayout } from "./MyPayout";
@@ -125,6 +125,7 @@ export function ApplicationPending({
 
   const code = me.codes[0]?.code ?? null;
   const destination = me.payout_destination;
+  const preview = isPortalPreview();
 
   if (changing) {
     return (
@@ -215,7 +216,8 @@ export function ApplicationPending({
                 <span className="pending__value">{destinationHolder(destination)}</span>
                 <span className="pending__sub">
                   <span>{identifying(full ?? destination).join(" · ")}</span>
-                  <button
+                  {/* ADR 0064: a preview keeps her details shortened. */}
+                  {!preview && <button
                     type="button"
                     className="pending__eye"
                     onClick={toggleFull}
@@ -224,7 +226,7 @@ export function ApplicationPending({
                     aria-label={full ? "Shorten the number again" : "Show the full number"}
                   >
                     <EyeIcon open={full !== null} />
-                  </button>
+                  </button>}
                 </span>
               </>
             ) : me.payout_abroad ? (
@@ -238,13 +240,13 @@ export function ApplicationPending({
               </span>
             )}
           </span>
-          <button
+          {!preview && <button
             type="button"
             className="pending__change"
             onClick={() => setChanging(true)}
           >
             {destination ? "Change" : "Add"}
-          </button>
+          </button>}
         </div>
         {problem && (
           <p className="notice notice--refused" role="alert">
