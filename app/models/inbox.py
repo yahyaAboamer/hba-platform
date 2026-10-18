@@ -70,6 +70,9 @@ CONFIRMATION_ANSWERS = ("confirmed", "edit", "cancelled")
 #: international order that still owes money - a request to pay by link.
 CONFIRMATION_KINDS = ("confirmation", "payment")
 
+#: Where an answer was given (ADR 0063).
+ANSWERED_IN = ("whatsapp", "inbox", "shopify")
+
 
 def _in(column: str, values: tuple[str, ...]) -> str:
     return f"{column} IN ({', '.join(repr(value) for value in values)})"
@@ -216,6 +219,10 @@ class OrderConfirmation(Base):
         ),
         CheckConstraint("attempts >= 0", name="order_confirmation_attempts_not_negative"),
         CheckConstraint(_in("kind", CONFIRMATION_KINDS), name="order_confirmation_kind_valid"),
+        CheckConstraint(
+            f"answered_in IS NULL OR {_in('answered_in', ANSWERED_IN)}",
+            name="order_confirmation_answered_in_valid",
+        ),
         # What the sender picks up next.
         Index(
             "order_confirmation_due",
@@ -263,6 +270,14 @@ class OrderConfirmation(Base):
     #: asking, so it is asked once - and why it refused, if it did.
     invoice_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     invoice_error: Mapped[str | None] = mapped_column(String(300))
+    #: Where the answer was given (ADR 0063): ``whatsapp`` (her tap),
+    #: ``inbox`` (staff marked it) or ``shopify`` (the team tagged the order
+    #: there). Empty for an answer from before 18 October 2026.
+    answered_in: Mapped[str | None] = mapped_column(String(8))
+    #: The platform's own tags as Shopify last had them on this order, and
+    #: when they were read. Not what the platform wrote: what is there.
+    shopify_tags: Mapped[str | None] = mapped_column(String(160))
+    tags_read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )

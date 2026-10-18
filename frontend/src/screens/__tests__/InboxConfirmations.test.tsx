@@ -93,6 +93,21 @@ describe("Inbox → Confirmations (ADR 0059)", () => {
     expect(screen.getByText("Updated just now")).toBeTruthy();
   });
 
+  it("says under each action card how many were already shipped or cancelled (ADR 0063)", async () => {
+    fetchMock.mockImplementation(() =>
+      reply(200, body({ tiles: { ...body().tiles, cancelled: 1 }, done: { cancelled: 14, waiting: 30 } })),
+    );
+    show();
+
+    const cancel = await screen.findByRole("button", { name: /Asked to cancel/ });
+    expect(cancel.textContent).toContain("14 already shipped or cancelled");
+    expect(screen.getByRole("button", { name: /Waiting for an answer/ }).textContent).toContain(
+      "30 already shipped or cancelled",
+    );
+    // An outcome card says nothing of the kind.
+    expect(screen.getByRole("button", { name: /Confirmed/ }).textContent).not.toContain("already");
+  });
+
   it("lists international orders waiting for payment, and the ones unpaid for 3 days (ADR 0062)", async () => {
     const waiting = [
       order("31510", {

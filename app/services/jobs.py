@@ -129,6 +129,9 @@ class JobKind:
     #: Ask Shopify to email an unpaid international order's invoice, once,
     #: through the second Shopify app (ADR 0062).
     INBOX_SEND_INVOICE = "inbox_send_invoice"
+    #: Read a recent order's confirmation tags back from Shopify, and take an
+    #: answer the team tagged there (ADR 0063). Reads only.
+    INBOX_READ_TAGS = "inbox_read_tags"
 
 
 #: The inbox's work (ADR 0059) runs in a lane of its own too: a WhatsApp outage
@@ -145,6 +148,7 @@ INBOX_WORK = frozenset(
         JobKind.INBOX_FETCH_MEDIA,
         JobKind.INBOX_PAYMENT_REMINDER,
         JobKind.INBOX_SEND_INVOICE,
+        JobKind.INBOX_READ_TAGS,
     }
 )
 

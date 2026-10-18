@@ -50,7 +50,10 @@ type Order = {
 type Confirmations = {
   days: number;
   total: number;
+  /** The action cards count only orders still open in Shopify (ADR 0063). */
   tiles: Record<TileKey, number>;
+  /** How many of each action card's orders were already shipped or cancelled. */
+  done?: Partial<Record<TileKey, number>>;
   orders: Order[] | null;
 };
 
@@ -60,13 +63,13 @@ type Loaded = Confirmations & { tile: TileKey | null };
 const COPY: Record<TileKey, { label: string; note: string; column: string; hint?: string }> = {
   waiting: {
     label: "Waiting for an answer",
-    note: "Message delivered, no button tapped yet",
+    note: "Message delivered, no answer yet",
     column: "Sent",
   },
-  edit: { label: "Wants a change", note: "Tapped Edit", column: "Answered" },
+  edit: { label: "Wants a change", note: "Asked for a change, not shipped yet", column: "Answered" },
   cancelled: {
     label: "Asked to cancel",
-    note: "Tapped Cancel, still open in Shopify",
+    note: "Asked to cancel, still open in Shopify",
     column: "Answered",
     hint: "Marked here only. The order itself is cancelled in Shopify.",
   },
@@ -81,7 +84,11 @@ const COPY: Record<TileKey, { label: string; note: string; column: string; hint?
     note: "The number has no WhatsApp: call instead",
     column: "Phone",
   },
-  confirmed: { label: "Confirmed", note: "Tapped Confirm", column: "Answered" },
+  confirmed: {
+    label: "Confirmed",
+    note: "In WhatsApp, the Inbox or tagged in Shopify",
+    column: "Answered",
+  },
   awaiting_payment: {
     label: "Waiting for payment",
     note: "International: payment link sent, not paid yet",
@@ -378,12 +385,21 @@ export function InboxConfirmations() {
           {TILES.map((tile) => {
             const count = tab.tiles[tile] ?? 0;
             const copy = COPY[tile];
+            const settled = tab.done?.[tile] ?? 0;
+            // What left this card because Shopify already settled it (ADR 0063).
+            const done = settled > 0 && (
+              <span className="ops-tile__note ops-muted">
+                {/* An unpaid order that shipped stays on its card (ADR 0062). */}
+                {settled} already {tile === "awaiting_payment" ? "cancelled" : "shipped or cancelled"}
+              </span>
+            );
             if (count === 0) {
               return (
                 <div key={tile} className="ops-tile ops-tile--zero">
                   <span className="ops-tile__label">{copy.label}</span>
                   <span className="ops-tile__value">0</span>
                   <span className="ops-tile__note">{copy.note}</span>
+                  {done}
                 </div>
               );
             }
@@ -400,6 +416,7 @@ export function InboxConfirmations() {
                 <span className="ops-tile__label">{copy.label}</span>
                 <span className="ops-tile__value">{count}</span>
                 <span className="ops-tile__note">{copy.note}</span>
+                {done}
                 {!narrow && (
                   <span className="ops-tile__more">
                     {isOpen ? "Hide orders" : "Show orders"}

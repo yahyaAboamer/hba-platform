@@ -201,6 +201,7 @@ def _record_answer(
     if row.answered_at is None or at >= row.answered_at:
         row.answer = answer
         row.answered_at = at
+        row.answered_in = "whatsapp"
     row.conversation_id = conversation.id
     row.updated_at = utcnow()
     db.flush()

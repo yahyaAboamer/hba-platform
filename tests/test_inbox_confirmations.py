@@ -261,7 +261,8 @@ def test_an_order_already_decided_is_not_queued_again(db):
     order = _indexed(db)
     confirm_order(db, "5001", client=_shopify(_order()))
     assert queue_if_new(db, order) is False
-    assert _jobs(db) == []
+    # No second confirmation. The change is read back for its tag (ADR 0063).
+    assert _jobs(db) == [("inbox_read_tags", "5001", "inbox_read_tags:5001")]
 
 
 def test_an_old_order_being_resynced_queues_nothing(db):
@@ -289,7 +290,11 @@ def test_the_sweep_finds_recent_orders_with_nothing_on_record(db):
 
     assert unconfirmed_recent(db) == ["5001"]
     confirmations._handle_confirm_sweep(db, {})
-    assert _jobs(db) == [("inbox_confirm_order", "5001", "inbox_confirm_order:5001")]
+    # 5002 is decided and its tags never read, so it is read (ADR 0063).
+    assert _jobs(db) == [
+        ("inbox_confirm_order", "5001", "inbox_confirm_order:5001"),
+        ("inbox_read_tags", "5002", "inbox_read_tags:5002"),
+    ]
 
 
 def test_the_reconciliation_sweep_queues_the_confirmation_sweep(db):

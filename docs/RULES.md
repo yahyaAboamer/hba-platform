@@ -198,6 +198,13 @@ payroll without touching a maintainer screen.
     not guessed at. The one exception is a payment request (below), which
     reads a foreign number with the shipping country's calling code.
   - An order gets one confirmation, and a paid order gets none.
+- **An answer tagged in Shopify counts** (ADR 0063).
+  - When exactly one of *Confirmed*, *Edit* or *Cancelled* is on an order in
+    Shopify, that is the order's answer, recorded as given in Shopify. Two at
+    once are left alone. Reading a tag never writes one back.
+  - Inbox → Confirmations' action cards count only orders still open in
+    Shopify: not cancelled and not shipped. Under each card, one line says
+    how many already were. *Confirmed* and *Paid by link* count every order.
 - **An international order is paid before it ships** (ADR 0062).
   - An order shipped outside Egypt that still owes money gets a WhatsApp
     payment request with Shopify's own payment link, instead of the

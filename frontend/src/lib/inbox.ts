@@ -107,6 +107,11 @@ export type ChatOrder = {
   tag: string | null;
   why: string | null;
   can_send_again: boolean;
+  /** The platform's tags as Shopify really has them, once read (ADR 0063). */
+  shopify_tags?: string | null;
+  tags_read_at?: string | null;
+  /** Where the answer was given: "whatsapp", "inbox" or "shopify". */
+  answered_in?: string | null;
   /** "payment" for an unpaid international order's payment link (ADR 0062). */
   kind?: "confirmation" | "payment";
   country?: string | null;
