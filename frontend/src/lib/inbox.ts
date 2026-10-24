@@ -133,7 +133,12 @@ export type ChatMedia = {
   size_bytes: number | null;
   /** Only once our own copy is kept. */
   url: string | null;
+  /** Not kept, and WhatsApp still holds it: staff may ask for it again. */
+  can_try_again?: boolean;
 };
+
+/** What asking WhatsApp again for a file came to. */
+export type TriedAgain = Pick<ChatMedia, "state" | "url" | "can_try_again"> & { problem: string | null };
 
 export type ChatMessage = {
   id: number;

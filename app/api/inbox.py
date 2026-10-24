@@ -25,6 +25,7 @@ from app.api.deps import require_permission
 from app.core.permissions import Permission
 from app.db import get_session
 from app.models.identity import UserAccount
+from app.models.inbox import InboxMessage
 from app.services.inbox import chats, connection, health, media, outbound, sending
 from app.services.inbox.meta import MetaClient, MetaError
 
@@ -191,6 +192,29 @@ def file(media_id: int, db: Session = Depends(get_session)) -> Response:
             # no-store, which is right for a customer's file too.
         },
     )
+
+
+@router.post("/media/{media_id}/try-again")
+def try_file_again(media_id: int, db: Session = Depends(get_session)) -> dict:
+    """Ask WhatsApp again for one of her files that was not kept.
+
+    Done now rather than queued, so whoever asked sees the photo or the
+    reason it still cannot be copied.
+    """
+    try:
+        found, problem = media.try_again(db, media_id)
+    except media.Unavailable as exc:
+        raise HTTPException(422, str(exc)) from None
+    except LookupError as exc:
+        raise HTTPException(404, str(exc)) from None
+    db.commit()
+    message = db.get(InboxMessage, found.message_id)
+    return {
+        "state": found.state,
+        "url": f"/api/inbox/media/{found.id}" if found.state == "stored" else None,
+        "can_try_again": media.can_try_again(found, message),
+        "problem": problem,
+    }
 
 
 @router.post("/conversations/{conversation_id}/media")

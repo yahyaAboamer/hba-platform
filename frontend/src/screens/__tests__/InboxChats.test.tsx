@@ -659,6 +659,47 @@ describe("an open chat", () => {
     expect(screen.getByText("receipt.pdf").textContent).toContain("No longer available");
   });
 
+  it("says a photo that could not be copied was not kept, and fetches it again on Try again", async () => {
+    serve({
+      messages: [
+        message(1, {
+          kind: "image",
+          body: "Is it in stock?",
+          media: { id: 578, state: "failed", mime_type: "image/jpeg", filename: null, size_bytes: 40700, url: null, can_try_again: true },
+        }),
+      ],
+      post: (url) =>
+        url.endsWith("/media/578/try-again")
+          ? [200, { state: "stored", url: "/api/inbox/media/578", can_try_again: false, problem: null }]
+          : [200, {}],
+    });
+    show("/inbox/chats/12");
+
+    expect(await screen.findByText(/Photo could not be copied/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+    expect(await screen.findByRole("button", { name: "Open photo" })).toBeTruthy();
+    expect(posts().map((call) => call.url)).toContain("/api/inbox/media/578/try-again");
+  });
+
+  it("says why when a photo still cannot be fetched", async () => {
+    serve({
+      messages: [
+        message(1, {
+          kind: "image",
+          body: null,
+          media: { id: 578, state: "failed", mime_type: "image/jpeg", filename: null, size_bytes: null, url: null, can_try_again: true },
+        }),
+      ],
+      post: () => [200, { state: "failed", url: null, can_try_again: true, problem: "WhatsApp did not answer" }],
+    });
+    show("/inbox/chats/12");
+
+    fireEvent.click(await screen.findByRole("button", { name: "Try again" }));
+    expect((await screen.findByRole("alert")).textContent).toBe("WhatsApp did not answer");
+    expect(screen.getByText(/Photo could not be copied/)).toBeTruthy();
+  });
+
   it("searches inside the chat, reaching a match above what is loaded", async () => {
     serve({
       messages: [message(5, { body: "Thanks" }), message(6, { body: "Is the Beige one in stock?" })],

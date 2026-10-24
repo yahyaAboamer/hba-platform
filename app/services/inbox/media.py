@@ -6,6 +6,11 @@ so the callback that brings a message queues its file to be fetched from
 Meta and put in our own bucket. Until then the chat shows it as waiting; if
 WhatsApp no longer has it, as gone.
 
+**A copy that fails is tried again, and says why.** One refusal - from Meta
+or from the bucket - is not taken as final: the job tries again, and only its
+last try marks the file ``failed``, with the reason in the job and the log.
+Staff can ask for it again from the chat while WhatsApp still holds it.
+
 **Served only to someone signed in who holds the inbox**, and never straight
 from the bucket: the browser asks this server, which checks who is asking.
 
@@ -20,16 +25,23 @@ numbers of ours, and no name or phone.
 
 import hashlib
 import logging
+from datetime import timedelta
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.businesstime import utcnow
 from app.models.inbox import InboxConversation, InboxMedia, InboxMessage
+from app.models.integration import BackgroundJob
 from app.services.inbox import connection, outbound, storage
 from app.services.inbox.meta import MetaClient, MetaError
-from app.services.jobs import JobKind, PermanentFailure, enqueue
+from app.services.jobs import MAX_ATTEMPTS, JobKind, JobStatus, PermanentFailure, enqueue
 from app.worker import register_handler
 
 logger = logging.getLogger(__name__)
+
+#: How long WhatsApp holds a customer's file. Past this, asking again is no use.
+HELD_BY_WHATSAPP = timedelta(days=7)
 
 #: The largest file copied from a customer. WhatsApp allows a document of
 #: 100 MB; this server holds a file in memory while it copies it, and is small.
@@ -84,6 +96,10 @@ class NotSendable(ValueError):
     """Why a file cannot be sent. The text is safe to show."""
 
 
+class CopyFailed(RuntimeError):
+    """One try at copying a customer's file failed. The text is safe to show."""
+
+
 def mime_of(raw: object) -> str:
     """``audio/ogg; codecs=opus`` -> ``audio/ogg``."""
     return str(raw or "").split(";")[0].strip().lower()
@@ -106,20 +122,30 @@ def queue_fetch(db: Session, media_id: int) -> None:
     )
 
 
+def _not_this_time(media: InboxMedia, reason: str, last_try: bool, cause: Exception) -> InboxMedia:
+    """A try that did not copy the file: ``failed`` on the last, else again."""
+    if not last_try:
+        raise CopyFailed(reason) from cause
+    logger.warning("inbox file %s could not be copied: %s", media.id, reason)
+    media.state = "failed"
+    return media
+
+
 def fetch(
     db: Session,
     media_id: int,
     *,
     client: MetaClient | None = None,
     store: storage.Bucket | None = None,
+    last_try: bool = False,
 ) -> InboxMedia | None:
     """Copy one waiting file from Meta into the bucket.
 
-    A file Meta no longer has becomes ``gone``, and one that cannot be kept -
-    too large, or refused for good - ``failed``. Anything that might pass on
-    another try raises, so the job is tried again while Meta still has it.
-    A server with no bucket, or no readable WhatsApp keys, leaves the file
-    waiting and does nothing.
+    A file Meta no longer has becomes ``gone``, and one too large to keep
+    ``failed``. Any other refusal raises ``CopyFailed``, so the job is tried
+    again while Meta still has it; only on ``last_try`` does it become
+    ``failed``. A server with no bucket, or no readable WhatsApp keys, leaves
+    the file waiting and does nothing.
     """
     media = db.get(InboxMedia, media_id)
     if media is None or media.state != "pending" or not media.wa_media_id:
@@ -135,6 +161,7 @@ def fetch(
         try:
             info = client.media_info(media.wa_media_id)
             if info.size_bytes and info.size_bytes > INBOUND_MAX_BYTES:
+                logger.warning("inbox file %s is too large to keep", media.id)
                 media.state = "failed"
                 return media
             content = client.download(info.url, max_bytes=INBOUND_MAX_BYTES)
@@ -142,10 +169,7 @@ def fetch(
             if exc.kind == "gone":
                 media.state = "gone"
                 return media
-            if exc.retryable or exc.kind == "auth":
-                raise
-            media.state = "failed"
-            return media
+            return _not_this_time(media, str(exc), last_try, exc)
 
         media.mime_type = mime_of(info.mime_type or media.mime_type) or None
         media.size_bytes = len(content)
@@ -155,10 +179,7 @@ def fetch(
         try:
             store.put(key, content, media.mime_type or "application/octet-stream")
         except storage.StorageError as exc:
-            if exc.retryable:
-                raise
-            media.state = "failed"
-            return media
+            return _not_this_time(media, str(exc), last_try, exc)
         media.storage_key = key
         media.state = "stored"
         return media
@@ -177,7 +198,62 @@ def _handle_fetch_media(db: Session, payload: dict) -> None:
         raise PermanentFailure(
             f"{JobKind.INBOX_FETCH_MEDIA} requires a media_id; got payload keys {sorted(payload)!r}"
         )
-    fetch(db, media_id)
+    # The job's own count of tries: the last one marks the file failed rather
+    # than leaving it waiting for good.
+    job = db.scalar(
+        select(BackgroundJob).where(
+            BackgroundJob.dedupe_key == f"{JobKind.INBOX_FETCH_MEDIA}:{media_id}",
+            BackgroundJob.status == JobStatus.RUNNING,
+        )
+    )
+    fetch(db, media_id, last_try=job is not None and job.attempts >= MAX_ATTEMPTS - 1)
+
+
+def can_try_again(media: InboxMedia | None, message: InboxMessage) -> bool:
+    """Whether staff may ask WhatsApp for a file again: one of hers that was
+    not kept, while WhatsApp still holds it."""
+    return (
+        media is not None
+        and media.state in ("failed", "gone")
+        and bool(media.wa_media_id)
+        and message.occurred_at is not None
+        and utcnow() - message.occurred_at < HELD_BY_WHATSAPP
+    )
+
+
+def try_again(
+    db: Session,
+    media_id: int,
+    *,
+    client: MetaClient | None = None,
+    store: storage.Bucket | None = None,
+) -> tuple[InboxMedia, str | None]:
+    """Ask WhatsApp for a file that was not kept, now, and say why if it fails."""
+    media = db.get(InboxMedia, media_id)
+    message = db.get(InboxMessage, media.message_id) if media is not None else None
+    if media is None or message is None:
+        raise LookupError("No such file.")
+    if not can_try_again(media, message):
+        raise Unavailable(
+            {
+                "stored": "This file is already kept.",
+                "pending": "This file is already being fetched.",
+            }.get(media.state, "WhatsApp keeps a file for 7 days; this one can no longer be fetched.")
+        )
+    media.state = "pending"
+    try:
+        fetch(db, media.id, client=client, store=store)
+    except CopyFailed as exc:
+        logger.warning("inbox file %s could not be copied: %s", media.id, exc)
+        media.state = "failed"
+        db.flush()
+        return media, str(exc)
+    if media.state == "gone":
+        return media, "WhatsApp no longer has this file."
+    if media.state == "pending":
+        # No bucket or no WhatsApp keys here: the job picks it up once there are.
+        queue_fetch(db, media.id)
+    return media, None
 
 
 # ── Handing a file to the page ────────────────────────────────────────────────

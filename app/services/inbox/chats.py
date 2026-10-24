@@ -28,6 +28,7 @@ from app.models.orders import OrderIndex
 from app.services.audit import record_audit
 from app.services.inbox import outbound, payments, sending, tags
 from app.services.inbox.events import ANSWERS, _TAP
+from app.services.inbox.media import can_try_again
 from app.services.inbox.meta import MetaClient
 from app.services.stale import admin_url
 
@@ -301,6 +302,7 @@ def describe_message(
             "filename": media.filename,
             "size_bytes": media.size_bytes,
             "url": f"/api/inbox/media/{media.id}" if media.state == "stored" else None,
+            "can_try_again": can_try_again(media, message),
         }
         if media is not None
         else None,

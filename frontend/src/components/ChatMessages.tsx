@@ -2,8 +2,9 @@ import { Fragment, useEffect, useRef, useState } from "react";
 
 import { OpsIcon, clockTime } from "./OpsSource";
 import { InboxIcon } from "./InboxIcon";
+import { ApiError, api } from "../lib/api";
 import { dayKey, dayMark } from "../lib/inbox";
-import type { ChatMessage, ChatOrder } from "../lib/inbox";
+import type { ChatMessage, ChatOrder, TriedAgain } from "../lib/inbox";
 
 /**
  * A chat's messages, oldest first (ADR 0059; the approved mockup
@@ -141,19 +142,49 @@ function PhotoViewer({ url, words, onClose }: { url: string; words: string; onCl
 
 function Media({ message, customer }: { message: ChatMessage; customer: string }) {
   const [viewing, setViewing] = useState(false);
-  const media = message.media;
+  // What asking WhatsApp again came to, laid over what the chat last said.
+  const [tried, setTried] = useState<TriedAgain | null>(null);
+  const [asking, setAsking] = useState(false);
+  const media = message.media && tried ? { ...message.media, ...tried } : message.media;
   const what = WHAT[message.kind] ?? "File";
   const isFile = message.kind === "document";
 
+  async function tryAgain() {
+    if (!media) return;
+    setAsking(true);
+    try {
+      setTried(await api.post<TriedAgain>(`/api/inbox/media/${media.id}/try-again`, {}));
+    } catch (error) {
+      setTried({
+        state: media.state,
+        url: null,
+        can_try_again: false,
+        problem: error instanceof ApiError ? error.message : `The ${what.toLowerCase()} could not be fetched. Try again later.`,
+      });
+    } finally {
+      setAsking(false);
+    }
+  }
+
   if (!media || !media.url || media.state !== "stored") {
-    const waiting = media?.state === "pending";
+    const state = media?.state;
+    const again = media?.can_try_again ? (
+      <button type="button" className="inbox-again" onClick={() => void tryAgain()} disabled={asking}>
+        {asking ? "Fetching…" : "Try again"}
+      </button>
+    ) : null;
+    const problem = tried?.problem ? <small role="alert">{tried.problem}</small> : null;
     if (isFile) {
       return (
         <div className="inbox-file">
           <InboxIcon name="file" />
           <span>
             {media?.filename || "File"}
-            <small>{waiting ? "Being fetched…" : "No longer available"}</small>
+            <small>
+              {state === "pending" ? "Being fetched…" : state === "failed" ? "Could not be copied" : "No longer available"}
+            </small>
+            {problem}
+            {again}
           </span>
         </div>
       );
@@ -161,7 +192,15 @@ function Media({ message, customer }: { message: ChatMessage; customer: string }
     return (
       <div className="inbox-gone">
         <InboxIcon name={message.kind === "audio" ? "mic" : "image"} />
-        {waiting ? `${what} is being fetched…` : `${what} no longer available`}
+        <span>
+          {state === "pending"
+            ? `${what} is being fetched…`
+            : state === "failed"
+              ? `${what} could not be copied`
+              : `${what} no longer available`}
+          {problem}
+          {again}
+        </span>
       </div>
     );
   }

@@ -102,16 +102,18 @@ def _chat(db, *, wrote_ago=timedelta(minutes=5)) -> InboxConversation:
     return conversation
 
 
-def _waiting(db, *, mime="image/jpeg", filename=None, state="pending", wa_media_id="9001") -> InboxMedia:
+def _waiting(db, *, mime="image/jpeg", filename=None, state="pending", wa_media_id="9001",
+             sent_ago=timedelta(0)) -> InboxMedia:
     conversation = _chat(db)
     message = InboxMessage(
         conversation_id=conversation.id, direction="in", kind="image", wa_message_id="wamid.M",
-        status="received", origin="customer", occurred_at=utcnow(),
+        status="received", origin="customer", occurred_at=utcnow() - sent_ago,
     )
     db.add(message)
     db.flush()
     file = InboxMedia(message_id=message.id, wa_media_id=wa_media_id, mime_type=mime,
-                      filename=filename, state=state)
+                      filename=filename, state=state,
+                      storage_key=f"inbox/{conversation.id}/{message.id}/kept" if state == "stored" else None)
     db.add(file)
     db.flush()
     return file
@@ -159,7 +161,7 @@ def test_a_file_too_large_to_keep_is_not_fetched(db, connected):
 def test_when_whatsapp_does_not_answer_the_job_is_tried_again(db, connected):
     """Not marked failed: WhatsApp still has the file for 7 days."""
     file = _waiting(db)
-    with pytest.raises(MetaError):
+    with pytest.raises(media.CopyFailed, match="WhatsApp did not answer"):
         media.fetch(db, file.id, client=_meta(network_down=True), store=Store())
     assert file.state == "pending"
 
@@ -167,15 +169,118 @@ def test_when_whatsapp_does_not_answer_the_job_is_tried_again(db, connected):
 def test_when_the_bucket_does_not_answer_the_job_is_tried_again(db, connected):
     file = _waiting(db)
     down = Store(fail=StorageError("The file store did not answer.", retryable=True))
-    with pytest.raises(StorageError):
+    with pytest.raises(media.CopyFailed, match="did not answer"):
         media.fetch(db, file.id, client=_meta(), store=down)
     assert file.state == "pending"
 
 
-def test_a_bucket_that_refuses_for_good_fails_the_file(db, connected):
+@pytest.mark.parametrize(
+    ("client_", "store_"),
+    [
+        # Meta refusing in a way it does not explain (photo 578, 22 October).
+        (lambda: _meta(info_status=400, info_code=None), Store),
+        (lambda: _meta(info_status=401, info_code=190), Store),
+        (_meta, lambda: Store(fail=StorageError("refused (403)"))),
+    ],
+)
+def test_one_refusal_is_not_final_the_last_try_is(db, connected, client_, store_):
+    """A photo used to be marked failed on its first refusal, with no reason
+    kept and no second try. Now each try says why, and only the last gives up."""
     file = _waiting(db)
-    media.fetch(db, file.id, client=_meta(), store=Store(fail=StorageError("refused (403)")))
+    with pytest.raises(media.CopyFailed) as refused:
+        media.fetch(db, file.id, client=client_(), store=store_())
+    assert file.state == "pending"
+    assert str(refused.value)
+
+    media.fetch(db, file.id, client=client_(), store=store_(), last_try=True)
     assert file.state == "failed"
+
+
+def test_the_jobs_last_try_is_the_one_that_gives_up(db, connected, monkeypatch):
+    from app.models.integration import BackgroundJob
+    from app.services.jobs import MAX_ATTEMPTS, JobKind, JobStatus
+
+    file = _waiting(db)
+    media.queue_fetch(db, file.id)
+    job = db.query(BackgroundJob).filter_by(dedupe_key=f"{JobKind.INBOX_FETCH_MEDIA}:{file.id}").one()
+    seen: list[bool] = []
+    monkeypatch.setattr(media, "fetch", lambda db_, media_id, **kw: seen.append(kw["last_try"]))
+
+    job.status = JobStatus.RUNNING
+    db.flush()
+    media._handle_fetch_media(db, {"media_id": file.id})
+    job.attempts = MAX_ATTEMPTS - 1
+    db.flush()
+    media._handle_fetch_media(db, {"media_id": file.id})
+    assert seen == [False, True]
+
+
+# ── Asking for a file again ───────────────────────────────────────────────────
+
+
+def test_a_photo_that_failed_is_copied_when_asked_again(db, connected):
+    file = _waiting(db, state="failed", sent_ago=timedelta(days=2))
+    found, problem = media.try_again(db, file.id, client=_meta(), store=Store())
+    assert (found.state, problem) == ("stored", None)
+    assert found.storage_key
+
+
+def test_asked_again_and_refused_again_it_says_why(db, connected):
+    file = _waiting(db, state="failed")
+    found, problem = media.try_again(db, file.id, client=_meta(info_status=400), store=Store())
+    assert found.state == "failed"
+    assert problem.startswith("WhatsApp refused the request")
+
+
+def test_asked_again_and_still_gone_it_says_so(db, connected):
+    file = _waiting(db, state="gone", sent_ago=timedelta(days=1))
+    found, problem = media.try_again(db, file.id, client=_meta(info_status=400, info_code=100), store=Store())
+    assert (found.state, problem) == ("gone", "WhatsApp no longer has this file.")
+
+
+@pytest.mark.parametrize(
+    ("state", "sent_ago", "words"),
+    [
+        ("stored", timedelta(hours=1), "already kept"),
+        ("pending", timedelta(hours=1), "already being fetched"),
+        ("gone", timedelta(days=8), "7 days"),
+        ("failed", timedelta(days=8), "7 days"),
+    ],
+)
+def test_only_a_file_whatsapp_still_holds_can_be_asked_for_again(db, connected, state, sent_ago, words):
+    asked: list = []
+    file = _waiting(db, state=state, sent_ago=sent_ago)
+    with pytest.raises(media.Unavailable, match=words):
+        media.try_again(db, file.id, client=_meta(asked=asked), store=Store())
+    assert asked == []
+    assert file.state == state
+    with pytest.raises(LookupError):
+        media.try_again(db, 987654, client=_meta(asked=asked), store=Store())
+
+
+def test_the_chat_says_which_files_can_be_asked_for_again(db):
+    from app.services.inbox.chats import describe_message
+
+    conversation = _chat(db)
+    cases = [
+        ("failed", timedelta(days=1), "9001", True),
+        ("gone", timedelta(days=1), "9002", True),
+        ("gone", timedelta(days=30), "9003", False),
+        ("failed", timedelta(hours=1), None, False),  # one of ours: WhatsApp has no copy to give
+        ("stored", timedelta(hours=1), "9004", False),
+    ]
+    for number, (state, sent_ago, wa_media_id, expected) in enumerate(cases):
+        message = InboxMessage(
+            conversation_id=conversation.id, direction="in", kind="image", wa_message_id=f"wamid.C{number}",
+            status="received", origin="customer", occurred_at=utcnow() - sent_ago,
+        )
+        db.add(message)
+        db.flush()
+        file = InboxMedia(message_id=message.id, wa_media_id=wa_media_id, mime_type="image/jpeg", state=state,
+                          storage_key="inbox/kept" if state == "stored" else None)
+        db.add(file)
+        db.flush()
+        assert describe_message(message, None, file)["media"]["can_try_again"] is expected
 
 
 def test_a_server_with_no_bucket_leaves_the_file_waiting(db, connected, monkeypatch):
@@ -393,6 +498,14 @@ def test_a_file_that_is_not_ready_is_a_404_in_words(client):
     response = client.get(f"/api/inbox/media/{file_id}")
     assert response.status_code == 404
     assert "not ready yet" in response.json()["detail"]
+
+
+def test_asking_for_a_file_again_answers_in_words(client):
+    file_id, _, _ = _committed_file("image/jpeg", state="stored")
+    kept = client.post(f"/api/inbox/media/{file_id}/try-again")
+    assert kept.status_code == 422
+    assert "already kept" in kept.json()["detail"]
+    assert client.post("/api/inbox/media/987654/try-again").status_code == 404
 
 
 def test_a_file_is_only_for_someone_who_holds_the_inbox(client, fresh_database):
