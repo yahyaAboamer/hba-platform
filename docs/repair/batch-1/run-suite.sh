@@ -60,6 +60,7 @@ OUT="${OUT_DIR:-${CLAUDE_JOB_DIR:-/tmp}}"
 LOG="$OUT/suite-log.txt"
 ONE="$OUT/one.txt"
 TODO="$OUT/todo.txt"
+PYTHON="${PYTHON:-.venv/Scripts/python.exe}"
 DB="${DATABASE_URL:-postgresql+psycopg://hba:hba@127.0.0.1:5433/hba_platform_test}"
 REV="${REV:-$(git rev-parse --short HEAD)}"
 BUDGET="${1:-540}"
@@ -74,7 +75,7 @@ ls tests/test_*.py > "$TODO"
 # deadlocks that read exactly like a regression in whatever you last changed.
 # That cost an hour on 10 September and produced three phantom failures on 20
 # September.
-DATABASE_URL="$DB" .venv/Scripts/python.exe - <<'PY'
+DATABASE_URL="$DB" "$PYTHON" - <<'PY'
 import sys
 
 from sqlalchemy import create_engine, text
@@ -155,7 +156,7 @@ while read -r f; do
   grep -q "^PASS $REV $f " "$LOG" && continue
   now=$(date +%s)
   [ $((now - started)) -ge "$BUDGET" ] && break
-  DATABASE_URL="$DB" .venv/Scripts/python.exe -m pytest -q --color=no \
+  DATABASE_URL="$DB" "$PYTHON" -m pytest -q --color=no \
     -p no:cacheprovider "$f" > "$ONE" 2>&1
   code=$?
   [ "$code" = 0 ] && state=PASS || state=FAIL
