@@ -7,7 +7,8 @@
 ## Context
 
 Production already runs, as an app ChatGPT built and hosts:
-`https://hba-production-os.yahianady.chatgpt.site/`, on the owner's ChatGPT
+a ChatGPT-hosted address the owner holds (deliberately not written here while
+the site answers without sign-in), on the owner's ChatGPT
 account. It was inspected read-only on 25 October 2026; nothing was signed in
 to or changed.
 
