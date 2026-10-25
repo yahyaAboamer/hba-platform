@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from app.core.businesstime import utcnow
 from app.core.password_quality import password_problem
 from app.core.passwords import hash_password
-from app.core.permissions import VALID_ROLES
+from app.core.permissions import INVITATION_BRINGS, VALID_ROLES
 from app.models.affiliates import AffiliateProfile
 from app.models.identity import Invitation, RoleAssignment, UserAccount
 from app.services.staff import assert_role_free
@@ -187,13 +187,18 @@ def accept_invitation(
     )
     db.add(user)
     db.flush()
-    db.add(
-        RoleAssignment(
-            user_account_id=user.id,
-            role=invitation.role,
-            granted_by=invitation.invited_by,
+    # The role invited to, and any it brings with it (`INVITATION_BRINGS`):
+    # the operations manager's Inbox, which his role alone granted before
+    # ADR 0067. Granted by the same person, in the same transaction.
+    for role in (invitation.role, *INVITATION_BRINGS.get(invitation.role, ())):
+        db.add(
+            RoleAssignment(
+                user_account_id=user.id,
+                role=role,
+                granted_by=invitation.invited_by,
+            )
         )
-    )
+    db.flush()
     accepted_at = utcnow()
     invitation.accepted_at = accepted_at
 

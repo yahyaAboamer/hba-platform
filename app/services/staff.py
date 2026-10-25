@@ -3,9 +3,13 @@
 Distinct from `app/services/affiliates.py`: a model reaches their own portal by
 owning an `affiliate_profile`, never by holding a role here (§6.1, ADR 0006).
 This module is the roster of staff - who has access, what they may do, and
-the three things a person actually needs to do about that day to day: change
-somebody's role, suspend an account gone wrong, and withdraw an invitation
-sent by mistake.
+the things a person actually needs to do about that day to day: give somebody
+a role or take one away, suspend an account gone wrong, and withdraw an
+invitation sent by mistake.
+
+**A person may hold several roles** (ADR 0067), so giving and taking are two
+separate actions, each audited. Changing somebody's job is taking one role
+and giving another, and each step is held to the same rules.
 
 `app/core/permissions.py` is explicit that roles are not composable through
 the interface, and that the flexibility actually needed is assigning a person
@@ -18,14 +22,21 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.businesstime import utcnow
-from app.core.permissions import VALID_ROLES, can_grant
+from app.core.permissions import (
+    GRANT_REFUSED,
+    MODEL_ROLE,
+    VALID_ROLES,
+    can_grant,
+    sorted_roles,
+)
 from app.models.identity import Invitation, RoleAssignment, UserAccount
+from app.services.access import live_roles, live_roles_by_account
 from app.services.audit import record_audit
 
-#: 'affiliate' is the no-permission default a person falls back to when no
-#: assignment exists at all (app/api/deps.py, active_role) - nobody is
-#: deliberately given it, so it is not offered as a target here.
-ASSIGNABLE_ROLES = frozenset(VALID_ROLES - {"affiliate"})
+#: A model's role grants nothing and makes nobody staff; a model holds it by
+#: accepting her invitation, and reaches her portal by owning her record. It
+#: is never given or taken here.
+ASSIGNABLE_ROLES = frozenset(VALID_ROLES - {MODEL_ROLE})
 
 #: Refused when somebody acts on their own row. Another admin does it.
 OWN_ACCOUNT = "You cannot change your own access. Another admin can."
@@ -85,11 +96,12 @@ def assert_role_free(
         )
 
 
-def invitable_roles(actor_role: str) -> list[str]:
-    """The staff roles this person may invite somebody to - never more than
-    they hold themselves (`can_grant`). The invite form offers these and no
-    others, so a refusal is not the first the person hears of it."""
-    return sorted(role for role in ASSIGNABLE_ROLES if can_grant(actor_role, role))
+def invitable_roles(actor_roles: frozenset[str]) -> list[str]:
+    """The staff roles this person may give somebody - never more than they
+    hold themselves, all their roles together (`can_grant`). The invite form
+    and *Add access* offer these and no others, so a refusal is not the first
+    the person hears of it."""
+    return sorted(role for role in ASSIGNABLE_ROLES if can_grant(actor_roles, role))
 
 
 def list_staff(db: Session) -> list[dict]:
@@ -105,12 +117,10 @@ def list_staff(db: Session) -> list[dict]:
     contradicting itself. They belong on Affiliates, which is where their
     status means what it says.
     """
-    from app.api.deps import active_role  # avoids a module-level import cycle
-
     account_ids = list(
         db.scalars(
             select(RoleAssignment.user_account_id)
-            .where(RoleAssignment.role != "affiliate")
+            .where(RoleAssignment.role != MODEL_ROLE)
             .distinct()
         )
     )
@@ -122,12 +132,15 @@ def list_staff(db: Session) -> list[dict]:
         .where(UserAccount.id.in_(account_ids))
         .order_by(UserAccount.display_name, UserAccount.email)
     )
+    held = live_roles_by_account(db, account_ids)
     return [
         {
             "id": account.id,
             "email": account.email,
             "display_name": account.display_name,
-            "role": active_role(db, account),
+            # Every staff role held now, widest first (ADR 0067). A model's
+            # role grants nothing and is not staff access, so it is left out.
+            "roles": sorted_roles(held[account.id] - {MODEL_ROLE}),
             "status": account.status,
             "last_login_at": account.last_login_at,
             "created_at": account.created_at,
@@ -225,61 +238,124 @@ def _assert_leaves_an_admin(db: Session, user: UserAccount) -> None:
         )
 
 
-def change_role(
-    db: Session,
-    user: UserAccount,
-    new_role: str,
-    *,
-    actor_id: int | None,
-    actor_email: str | None,
-) -> RoleAssignment:
-    """Move an account onto a new role, revoking the one it holds now.
+def _name(user: UserAccount) -> str:
+    return user.display_name or user.email
 
-    A new row rather than an edit to the old one - `role_assignment` exists
-    precisely so "what access did they have on this date" survives a later
-    change, the same reasoning that makes a rate change a new compensation
-    period rather than an edit (Phase 3).
-    """
-    from app.api.deps import active_role
 
-    if new_role not in ASSIGNABLE_ROLES:
-        raise ValueError(f"Not an assignable role: {new_role!r}")
+def _refuse_own_account(user: UserAccount, actor_id: int | None) -> None:
     # Nobody changes their own access - one mis-click demoting yourself locks
     # you out of the very screen that would undo it (Settings audit, T2).
     if actor_id is not None and actor_id == user.id:
         raise ValueError(OWN_ACCOUNT)
 
-    before = active_role(db, user)
-    if before == new_role:
-        raise ValueError(f"{user.display_name or user.email} already holds {new_role}")
-    assert_role_free(db, new_role, for_user_id=user.id)
 
-    if before == "admin" and user.status == "active":
-        _assert_leaves_an_admin(db, user)
+def give_role(
+    db: Session,
+    user: UserAccount,
+    role: str,
+    *,
+    actor_roles: frozenset[str],
+    actor_id: int | None,
+    actor_email: str | None,
+) -> RoleAssignment:
+    """Give an account one more role, keeping every role it holds (ADR 0067).
 
-    live = db.scalar(
-        select(RoleAssignment)
-        .where(RoleAssignment.user_account_id == user.id)
-        .where(RoleAssignment.revoked_at.is_(None))
-        .order_by(RoleAssignment.id.desc())
-    )
-    if live is not None:
-        live.revoked_at = utcnow()
+    The rules that held when a role could only be swapped still hold: nobody
+    changes their own access; nobody gives access they do not hold, all their
+    roles together (`can_grant`); there is one operations manager at a time.
+    A role already held is refused here with the reason, and by the database's
+    one-live-role-per-person index when two requests race.
+    """
+    if role not in ASSIGNABLE_ROLES:
+        raise ValueError(f"Not an assignable role: {role!r}")
+    _refuse_own_account(user, actor_id)
+    if not can_grant(actor_roles, role):
+        raise ValueError(GRANT_REFUSED)
 
-    created = RoleAssignment(user_account_id=user.id, role=new_role, granted_by=actor_id)
+    before = live_roles(db, user.id)
+    if role in before:
+        raise ValueError(f"{_name(user)} already holds this access")
+    assert_role_free(db, role, for_user_id=user.id)
+
+    created = RoleAssignment(user_account_id=user.id, role=role, granted_by=actor_id)
     db.add(created)
     db.flush()
 
     record_audit(
         db,
-        action="staff.role_changed",
+        action="staff.role_given",
         subject=f"user:{user.id}",
         actor_id=actor_id,
         actor_email=actor_email,
-        before={"role": before},
-        after={"role": new_role},
+        before={"roles": sorted_roles(before)},
+        after={"role": role, "roles": sorted_roles(before | {role})},
     )
     return created
+
+
+def remove_role(
+    db: Session,
+    user: UserAccount,
+    role: str,
+    *,
+    actor_roles: frozenset[str],
+    actor_id: int | None,
+    actor_email: str | None,
+) -> RoleAssignment:
+    """Take one role from an account, leaving the rest (ADR 0067).
+
+    Revoked, never deleted - `role_assignment` exists precisely so "what
+    access did they have on this date" survives a later change.
+
+    Held to the same rules as giving: not your own access, and not a role you
+    could not have given (taking access away is the mirror of granting it, as
+    withdrawing an invitation is). The last active admin cannot lose admin.
+
+    **The last staff role cannot be taken this way.** An account left holding
+    nothing would be neither staff nor a model - it could reach no screen, yet
+    it could apply to become a model. Suspending is how somebody loses all
+    their access, and the refusal says so.
+    """
+    if role not in ASSIGNABLE_ROLES:
+        raise ValueError(f"Not an assignable role: {role!r}")
+    _refuse_own_account(user, actor_id)
+    if not can_grant(actor_roles, role):
+        raise ValueError(GRANT_REFUSED)
+
+    live = db.scalar(
+        select(RoleAssignment)
+        .where(
+            RoleAssignment.user_account_id == user.id,
+            RoleAssignment.role == role,
+            RoleAssignment.revoked_at.is_(None),
+        )
+        .with_for_update()
+    )
+    if live is None:
+        raise ValueError(f"{_name(user)} does not hold this access")
+
+    before = live_roles(db, user.id)
+    if not (before - {role, MODEL_ROLE}):
+        raise ValueError(
+            f"This is the only access {_name(user)} has. Give them other access "
+            "first, or suspend the account."
+        )
+    if role == "admin" and user.status == "active":
+        _assert_leaves_an_admin(db, user)
+
+    live.revoked_at = utcnow()
+    db.flush()
+
+    record_audit(
+        db,
+        action="staff.role_removed",
+        subject=f"user:{user.id}",
+        actor_id=actor_id,
+        actor_email=actor_email,
+        before={"roles": sorted_roles(before)},
+        after={"role": role, "roles": sorted_roles(before - {role})},
+    )
+    return live
 
 
 def suspend_staff(
@@ -297,8 +373,6 @@ def suspend_staff(
     refused on its very next call rather than left to run until its session
     happens to expire.
     """
-    from app.api.deps import active_role
-
     if not str(reason or "").strip():
         raise ValueError("Suspending an account needs a written reason")
     if actor_id is not None and actor_id == user.id:
@@ -306,7 +380,7 @@ def suspend_staff(
     if user.status == "suspended":
         raise ValueError(f"{user.display_name or user.email} is already suspended")
 
-    if active_role(db, user) == "admin":
+    if "admin" in live_roles(db, user.id):
         _assert_leaves_an_admin(db, user)
 
     before_status = user.status

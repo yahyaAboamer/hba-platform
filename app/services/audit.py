@@ -99,6 +99,45 @@ def mask_sensitive(payload: Any, _depth: int = 0) -> Any:
     return payload
 
 
+#: Which department an entry belongs to, by the start of its action (ADR 0067,
+#: decision 7). Reading the trail by department is Phase 2; writing it starts
+#: now, so the entries from here on carry it. A test walks the source so every
+#: action the platform records is either here or in `PLATFORM_WIDE`.
+DEPARTMENTS: dict[str, tuple[str, ...]] = {
+    "inbox": ("inbox.",),
+    "operations": ("order_ops.", "ops.", "operations."),
+    # The affiliate programme end to end: models, their codes and parcels,
+    # targets, terms, and the money that follows from them.
+    "affiliates": (
+        "affiliate.",
+        "application.",
+        "code.",
+        "parcel.",
+        "portal.",
+        "target.",
+        "compensation.",
+        "policy_version.",
+        "payroll.",
+        "payment.",
+        "adjustment.",
+        "payout_destination.",
+    ),
+}
+
+#: Actions that belong to no one department: who may sign in and with what
+#: access, and the platform's own connections. Left without a department, so
+#: only the owner reads them once the trail is read by department.
+PLATFORM_WIDE: tuple[str, ...] = ("auth.", "invitation.", "staff.", "shopify.")
+
+
+def department_of(action: str) -> str | None:
+    """The department an action belongs to, or `None` for the platform's own."""
+    for department, prefixes in DEPARTMENTS.items():
+        if action.startswith(prefixes):
+            return department
+    return None
+
+
 def record_audit(
     db: Session,
     *,
@@ -111,9 +150,14 @@ def record_audit(
     reason: str | None = None,
     ip_address: str | None = None,
 ) -> AuditEvent:
-    """Stage an audit event. The caller commits it with the change it describes."""
+    """Stage an audit event. The caller commits it with the change it describes.
+
+    Its department is read from the action (`department_of`), so no caller
+    has to remember to say it.
+    """
     event = AuditEvent(
         action=action,
+        department=department_of(action),
         subject=subject,
         actor_id=actor_id,
         actor_email=actor_email,
@@ -135,6 +179,8 @@ KINDS: dict[str, tuple[str, ...]] = {
         "auth.",
         "invitation.",
         "staff.role_changed",
+        "staff.role_given",
+        "staff.role_removed",
         "staff.suspended",
         "staff.reactivated",
     ),

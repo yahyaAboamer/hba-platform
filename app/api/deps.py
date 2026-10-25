@@ -10,10 +10,16 @@ from fastapi import Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.permissions import has_permission, permissions_for
+from app.core.permissions import (
+    has_permission,
+    is_staff,
+    permissions_of_roles,
+    sorted_roles,
+)
 from app.db import get_session
 from app.models.affiliates import AffiliateProfile, AffiliateStatus
-from app.models.identity import RoleAssignment, UserAccount
+from app.models.identity import UserAccount
+from app.services.access import live_roles
 from app.services.auth import resolve_session
 
 SESSION_COOKIE = "hba_session"
@@ -28,23 +34,29 @@ CSRF_HEADER = "x-csrf-token"
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
 
-def active_role(db: Session, user: UserAccount) -> str:
-    """The role a user currently holds.
+def roles_of(db: Session, user: UserAccount) -> frozenset[str]:
+    """Every role a person holds now (ADR 0067).
 
-    Revoked assignments are ignored. An account with no live assignment gets
-    'affiliate', which grants no staff permission at all — failing closed
-    rather than open if an assignment is ever missing.
+    Revoked assignments are ignored. A person may hold several, and what they
+    may do is everything those grant together (`permissions_of`). An account
+    with no live assignment holds nothing, which grants no staff permission
+    at all - failing closed rather than open if an assignment is ever missing.
     """
-    role = db.scalar(
-        select(RoleAssignment.role)
-        .where(
-            RoleAssignment.user_account_id == user.id,
-            RoleAssignment.revoked_at.is_(None),
-        )
-        .order_by(RoleAssignment.id.desc())
-        .limit(1)
-    )
-    return role or "affiliate"
+    return live_roles(db, user.id)
+
+
+def permissions_of(db: Session, user: UserAccount) -> frozenset[str]:
+    """Everything a person may do: the union of what their live roles grant."""
+    return permissions_of_roles(roles_of(db, user))
+
+
+def holds(db: Session, user: UserAccount, permission: str) -> bool:
+    """Whether a person's roles, together, grant one permission.
+
+    Through `has_permission`, so a misspelt permission raises rather than
+    quietly answering no.
+    """
+    return has_permission(roles_of(db, user), permission)
 
 
 def current_user(request: Request, db: Session = Depends(get_session)) -> UserAccount:
@@ -79,23 +91,30 @@ def require_permission(permission: str):
     def dependency(
         user: UserAccount = Depends(current_user), db: Session = Depends(get_session)
     ) -> UserAccount:
-        if not has_permission(active_role(db, user), permission):
+        if not holds(db, user, permission):
             raise HTTPException(403, f"Permission required: {permission}")
         return user
 
+    # Named on the dependency so a test can read, from the routes themselves,
+    # which permission each one asks for (tests/test_several_roles.py).
+    dependency.permission = permission  # type: ignore[attr-defined]
     return dependency
 
 
 def require_staff(
     user: UserAccount = Depends(current_user), db: Session = Depends(get_session)
 ) -> UserAccount:
-    """Any member of staff, whatever their role - never a model.
+    """Any member of staff, whatever their roles - never a model.
+
+    Staff means holding any role but a model's (ADR 0067). A model is never
+    recognised here by a role: she reaches her own things through
+    `current_affiliate`, by owning the record.
 
     For what belongs to the person rather than to a permission, such as their
     own theme: the operations manager holds no affiliate permission and still
     chooses dark or light (ADR 0057).
     """
-    if active_role(db, user) == "affiliate":
+    if not is_staff(roles_of(db, user)):
         raise HTTPException(403, "Staff only")
     return user
 
@@ -134,19 +153,40 @@ def client_address(request: Request) -> str | None:
     return peer
 
 
+def owns_a_profile(db: Session, user: UserAccount) -> bool:
+    """Whether this account owns a model's record - what makes it a model
+    (ADR 0006, ADR 0067 decision 2), whatever roles it holds."""
+    return (
+        db.scalar(
+            select(AffiliateProfile.id)
+            .where(AffiliateProfile.user_account_id == user.id)
+            .limit(1)
+        )
+        is not None
+    )
+
+
 def actor_payload(db: Session, user: UserAccount) -> dict:
-    """The caller's own details, safe to return to them."""
+    """The caller's own details, safe to return to them.
+
+    `roles` is every live role, widest first, for naming the person; the
+    screens decide what to show from the permissions and from `is_staff` and
+    `is_model`, never from a role's name (ADR 0067, decision 9).
+    """
+    roles = roles_of(db, user)
     return {
         "id": user.id,
         "email": user.email,
         "display_name": user.display_name,
-        "role": active_role(db, user),
+        "roles": sorted_roles(roles),
+        "is_staff": is_staff(roles),
+        "is_model": owns_a_profile(db, user),
     }
 
 
 def permission_list(db: Session, user: UserAccount) -> list[str]:
     """Everything the caller may do, so the interface can render accordingly."""
-    return sorted(permissions_for(active_role(db, user)))
+    return sorted(permissions_of(db, user))
 
 
 def current_affiliate(

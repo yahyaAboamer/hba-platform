@@ -56,6 +56,18 @@ def _demote_to(role: str) -> None:
     with engine.begin() as connection:
         connection.execute(text("UPDATE role_assignment SET role = :r"), {"r": role})
 
+    # The operations manager *person* holds the Inbox as a second assignment
+    # since ADR 0067 (migration c3e7a1f90019 gave it to whoever held the role).
+    if role == "operations_manager":
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "INSERT INTO role_assignment (user_account_id, role) "
+                    "SELECT user_account_id, 'customer_service' FROM role_assignment "
+                    "WHERE role = 'operations_manager' AND revoked_at IS NULL"
+                )
+            )
+
 
 # ── Reading ───────────────────────────────────────────────────────────────────
 

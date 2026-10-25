@@ -54,7 +54,9 @@ def test_status_reports_setup_is_required_before_any_account(client):
 
 def test_bootstrap_creates_the_first_admin(client):
     body = _bootstrap(client)
-    assert body["actor"]["role"] == "admin"
+    assert body["actor"]["roles"] == ["admin"]
+    assert body["actor"]["is_staff"] is True
+    assert body["actor"]["is_model"] is False
     assert body["actor"]["email"] == "owner@example.com"
     assert body["csrf"]
 
@@ -340,7 +342,7 @@ def test_accepting_an_invitation_creates_a_working_account(client):
         },
     )
     assert accepted.status_code == 201
-    assert accepted.json()["actor"]["role"] == "content_manager"
+    assert accepted.json()["actor"]["roles"] == ["content_manager"]
 
 
 def test_the_invited_role_gets_exactly_its_permissions(client):

@@ -5,8 +5,9 @@ owning an `affiliate_profile`, never by holding a role here (§6.1). This is
 the one screen `settings.manage` and `invitations.send` were defined for and
 had no UI outlet until now (app/core/permissions.py).
 
-Listing the roster and changing what somebody holds are gated on
-`settings.manage` alone, which today only `admin` grants. Revoking an
+Listing the roster, and giving or taking somebody's roles, are gated on
+`settings.manage` alone, which today only `admin` grants. A person may hold
+several roles (ADR 0067), so giving one and taking one are two actions. Revoking an
 invitation is gated on `invitations.send` instead - the mirror of the action
 that creates one, so whoever may send an invitation may also withdraw it
 without needing the broader permission.
@@ -14,12 +15,20 @@ without needing the broader permission.
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.deps import active_role, client_address, require_permission, require_staff
+from app.api.deps import client_address, holds, require_permission, require_staff, roles_of
 from app.config import settings
 from app.core.businesstime import utcnow
-from app.core.permissions import GRANT_REFUSED, Permission, can_grant, has_permission
+from app.core.permissions import (
+    GRANT_REFUSED,
+    MODEL_ROLE,
+    Permission,
+    can_invite,
+    permissions_for,
+    sorted_roles,
+)
 from app.db import get_session
 from app.models.identity import Invitation, UserAccount
 from app.services.audit import record_audit
@@ -27,11 +36,12 @@ from app.services.invitations import create_invitation
 from app.services.notifications import invitation_link, invitation_sent
 from app.services.staff import (
     ASSIGNABLE_ROLES,
-    change_role,
+    give_role,
     invitable_roles,
     list_pending_invitations,
     list_staff,
     reactivate_staff,
+    remove_role,
     revoke_invitation,
     suspend_staff,
 )
@@ -71,7 +81,7 @@ def _may_act_on(db: Session, actor: UserAccount, invitation: Invitation) -> None
     same rule as sending one (`can_grant`). Without this an affiliate manager
     could resend a pending *admin* invitation and set that account's password
     themselves."""
-    if not can_grant(active_role(db, actor), invitation.role):
+    if not can_invite(roles_of(db, actor), invitation.role):
         raise HTTPException(403, GRANT_REFUSED)
 
 
@@ -112,7 +122,9 @@ def roster(
             )
         ],
         "assignable_roles": sorted(ASSIGNABLE_ROLES),
-        "invitable_roles": invitable_roles(active_role(db, _actor)),
+        #: What *Add access* and the invite form offer: only roles this person
+        #: may give, all their own roles together (ADR 0067).
+        "invitable_roles": invitable_roles(roles_of(db, _actor)),
         #: What each role grants, from `ROLES` itself, so the screen's
         #: "What can each access do?" can never disagree with the server (T4).
         "role_permissions": _role_permissions(),
@@ -120,8 +132,6 @@ def roster(
 
 
 def _role_permissions() -> dict[str, list[str]]:
-    from app.core.permissions import permissions_for
-
     return {role: sorted(permissions_for(role)) for role in sorted(ASSIGNABLE_ROLES)}
 
 
@@ -137,7 +147,7 @@ def staff_invitations(
     manager. They used to get the invite form and nothing else: no list of what
     they had sent, so nothing to resend or withdraw (Settings audit, X2).
     """
-    role = active_role(db, actor)
+    held = roles_of(db, actor)
     now = utcnow()
     return {
         "invitations": [
@@ -145,29 +155,72 @@ def staff_invitations(
             for invitation in list_pending_invitations(
                 db, exclude_roles=("affiliate",), current_only=True
             )
-            if can_grant(role, invitation.role)
+            if can_invite(held, invitation.role)
         ],
-        "invitable_roles": invitable_roles(role),
+        "invitable_roles": invitable_roles(held),
         "role_permissions": _role_permissions(),
     }
 
 
-@router.post("/{user_id}/role")
-def set_role(
+@router.post("/{user_id}/roles", status_code=201)
+def give_access(
     user_id: int,
     body: RoleBody,
     actor: UserAccount = Depends(require_permission(Permission.SETTINGS_MANAGE)),
     db: Session = Depends(get_session),
 ) -> dict:
+    """Settings → Team and access, *Add access*: one more role, keeping the
+    rest (ADR 0067)."""
     user = _user_or_404(db, user_id)
     try:
-        change_role(db, user, body.role, actor_id=actor.id, actor_email=actor.email)
+        give_role(
+            db,
+            user,
+            body.role,
+            actor_roles=roles_of(db, actor),
+            actor_id=actor.id,
+            actor_email=actor.email,
+        )
+        db.commit()
+    except IntegrityError as exc:
+        # Two presses racing past the check: the one-live-role-per-person
+        # index, or the one-operations-manager index, refused the second.
+        db.rollback()
+        raise HTTPException(409, "This access was given a moment ago.") from exc
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(400, str(exc)) from exc
+    return {"id": user.id, "roles": _roles_now(db, user)}
+
+
+@router.post("/{user_id}/roles/{role}/remove")
+def remove_access(
+    user_id: int,
+    role: str,
+    actor: UserAccount = Depends(require_permission(Permission.SETTINGS_MANAGE)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Settings → Team and access: take one role away, leaving the rest."""
+    user = _user_or_404(db, user_id)
+    try:
+        remove_role(
+            db,
+            user,
+            role,
+            actor_roles=roles_of(db, actor),
+            actor_id=actor.id,
+            actor_email=actor.email,
+        )
     except ValueError as exc:
         db.rollback()
         raise HTTPException(400, str(exc)) from exc
 
     db.commit()
-    return {"id": user.id, "role": body.role}
+    return {"id": user.id, "roles": _roles_now(db, user)}
+
+
+def _roles_now(db: Session, user: UserAccount) -> list[str]:
+    return sorted_roles(roles_of(db, user) - {MODEL_ROLE})
 
 
 @router.post("/{user_id}/suspend")
@@ -299,7 +352,7 @@ def _preferences_body(db: Session, actor: UserAccount) -> dict:
     # The switches belong to the affiliate side - Home's notices, the weekly
     # targets reminder. The operations manager keeps his theme and is offered
     # none of them (ADR 0057).
-    if not has_permission(active_role(db, actor), Permission.AFFILIATES_VIEW):
+    if not holds(db, actor, Permission.AFFILIATES_VIEW):
         return {
             "preferences": {},
             "labels": {},

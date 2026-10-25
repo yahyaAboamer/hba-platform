@@ -21,7 +21,12 @@ const ADMIN_PERMISSIONS = [
 
 function session(role: string, permissions: string[]) {
   return {
-    actor: { id: 7, email: "someone@example.com", display_name: "Amr", role },
+    // ADR 0067: the roles are for naming the person; where they land is
+    // decided by `permissions` alone.
+    actor: {
+      id: 7, email: "someone@example.com", display_name: "Amr",
+      roles: role.split("+"), is_staff: role !== "affiliate", is_model: role === "affiliate",
+    },
     permissions,
     platform: PLATFORM,
   };

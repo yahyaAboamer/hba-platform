@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from app.core.businesstime import business_month, utcnow
 from app.core.periods import PLATFORM_START_MONTH
 from app.core.passwords import hash_password
-from app.core.permissions import can_grant
+from app.core.permissions import MODEL_ROLE, can_grant
 from app.models.affiliates import (
     VALID_KINDS,
     VALID_STATUSES,
@@ -24,7 +24,8 @@ from app.models.affiliates import (
 )
 from app.models.codes import DiscountCodePeriod
 from app.models.compensation import CompensationPeriod
-from app.models.identity import RoleAssignment, UserAccount
+from app.models.identity import UserAccount
+from app.services.access import live_roles
 from app.services.audit import record_audit
 from app.services.codes import close_codes_for, verified_codes_for
 
@@ -44,20 +45,6 @@ class StaffAccountProtected(Exception):
     """
 
 
-def _live_role(db: Session, user_account_id: int) -> str:
-    """The role an account holds now, read as `app.api.deps.active_role` reads it."""
-    role = db.scalar(
-        select(RoleAssignment.role)
-        .where(
-            RoleAssignment.user_account_id == user_account_id,
-            RoleAssignment.revoked_at.is_(None),
-        )
-        .order_by(RoleAssignment.id.desc())
-        .limit(1)
-    )
-    return role or "affiliate"
-
-
 def _refuse_unless_actor_holds(
     db: Session, actor_id: int | None, user_account_id: int
 ) -> None:
@@ -68,11 +55,12 @@ def _refuse_unless_actor_holds(
     `can_grant` applies: only an account whose access the actor holds in full.
     Found by the security audit of 7 October 2026.
     """
-    target = _live_role(db, user_account_id)
-    if target == "affiliate":
-        return
-    actor = _live_role(db, actor_id) if actor_id is not None else "affiliate"
-    if not can_grant(actor, target):
+    # Every role the account holds, against everything the actor holds
+    # together (ADR 0067). A model's role grants nothing, so an account that
+    # holds only that - or nothing - is anybody's to manage.
+    target = live_roles(db, user_account_id)
+    actor = live_roles(db, actor_id) if actor_id is not None else frozenset()
+    if not all(can_grant(actor, role) for role in target if role != MODEL_ROLE):
         raise StaffAccountProtected(STAFF_ACCOUNT_REFUSED)
 
 

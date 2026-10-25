@@ -15,7 +15,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.deps import active_role, current_user
+from app.api.deps import current_user, roles_of
+from app.core.permissions import is_staff
 from app.db import get_session
 from app.models.identity import UserAccount
 from app.services.applications import (
@@ -65,11 +66,12 @@ def _applicant(
 ) -> UserAccount:
     """A signed-in account that may apply.
 
-    Staff are refused: an administrator has no affiliate record to create and
+    Staff are refused - anybody holding any role but a model's (ADR 0067):
+    an administrator has no affiliate record to create and
     letting them make one would produce a profile whose owner is the person who
     approves it.
     """
-    if active_role(db, user) != "affiliate":
+    if is_staff(roles_of(db, user)):
         raise HTTPException(403, "This account is not an affiliate")
     return user
 

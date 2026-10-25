@@ -4,7 +4,7 @@ import { BrowserRouter, Link, Navigate, Route, Routes } from "react-router-dom";
 import { InboxLayout } from "./components/InboxLayout";
 import { Layout } from "./components/Layout";
 import { OperationsLayout } from "./components/OperationsLayout";
-import { api, can, currentUser } from "./lib/api";
+import { api, can, currentUser, deskFor } from "./lib/api";
 import type { Session } from "./lib/api";
 import { AcceptInvitation } from "./screens/AcceptInvitation";
 import { ResetPassword } from "./screens/ResetPassword";
@@ -116,6 +116,10 @@ export default function App() {
     return <PortalPreviewFrame affiliateId={previewed} session={session} />;
   }
 
+  // ADR 0067: the screens a person gets follow from what they may do, never
+  // from a role's name, so a person holding two roles gets both.
+  const desk = session ? deskFor(session) : null;
+
   return (
     <BrowserRouter>
       <Routes>
@@ -146,15 +150,15 @@ export default function App() {
           element={<ResetPassword onSignedIn={setSession} />}
         />
         {/*
-         * §6.1. The split is on **what the session is**, not on what it may
-         * do. A model holds no staff permission at all, so every admin route
-         * would refuse them - but a sidebar full of things that refuse you is a
+         * §6.1. Somebody holding no staff permission at all - a model, or
+         * somebody invited to become one - gets her portal. Every admin route
+         * would refuse her, and a sidebar full of things that refuse you is a
          * sidebar that teaches you the tool is broken. Before this, a model
          * signing in landed on the maintainer's Overview and a 403.
          */}
-        {session && session.actor.role === "affiliate" ? (
+        {session && desk === "portal" ? (
           <Route path="*" element={<AffiliatePortal session={session} />} />
-        ) : session && session.actor.role === "operations_manager" ? (
+        ) : session && desk === "operations" ? (
           /*
            * ADR 0057: Operations and nothing else. Any other address - the
            * root after signing in or accepting an invitation, an old bookmark
@@ -162,11 +166,11 @@ export default function App() {
            */
           <>
             {operationsRoutes(session)}
-            {/* ADR 0059: he holds the Inbox as well, and nothing more. */}
+            {/* ADR 0059: the Inbox too, for whoever holds it. */}
             {can(session, "inbox.use") && inboxRoutes(session)}
             <Route path="*" element={<Navigate to="/operations/shopify" replace />} />
           </>
-        ) : session && session.actor.role === "customer_service" ? (
+        ) : session && desk === "inbox" ? (
           /*
            * ADR 0059: the Inbox and nothing else. Any other address lands on
            * Chats, as the operations manager's lands on Shopify.

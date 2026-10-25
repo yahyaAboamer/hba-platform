@@ -22,8 +22,8 @@ const PERMISSIONS = {
 
 const ROSTER = {
   staff: [
-    { id: 1, email: "owner@hbawear.store", display_name: "Yahya", role: "admin", status: "active", last_login_at: null, created_at: null },
-    { id: 2, email: "mona@hbawear.store", display_name: "Mona", role: "content_manager", status: "active", last_login_at: null, created_at: null },
+    { id: 1, email: "owner@hbawear.store", display_name: "Yahya", roles: ["admin"], status: "active", last_login_at: null, created_at: null },
+    { id: 2, email: "mona@hbawear.store", display_name: "Mona", roles: ["content_manager"], status: "active", last_login_at: null, created_at: null },
   ],
   invitations: [],
   assignable_roles: ["admin", "affiliate_manager", "content_manager"],
@@ -33,7 +33,7 @@ const ROSTER = {
 
 function session(role: keyof typeof PERMISSIONS): Session {
   return {
-    actor: { id: 1, email: "owner@hbawear.store", display_name: "Yahya", role },
+    actor: { id: 1, email: "owner@hbawear.store", display_name: "Yahya", roles: [role], is_staff: true, is_model: false },
     permissions: PERMISSIONS[role],
     platform: { go_live_month: "2026-10" },
   } as unknown as Session;
@@ -74,13 +74,79 @@ describe("Settings → Team", () => {
     expect(screen.getByRole("button", { name: "More for Mona" })).toBeTruthy();
   });
 
-  it("asks before changing somebody's access, and says what they gain", async () => {
+  it("asks before giving somebody access, and says what they gain", async () => {
     renderAt("admin", "team");
-    fireEvent.change(await screen.findByLabelText("Access for Mona"), { target: { value: "admin" } });
+    fireEvent.change(await screen.findByLabelText("Add access for Mona"), { target: { value: "admin" } });
     const dialog = await screen.findByRole("dialog");
     expect(dialog.textContent).toContain("Make Mona an admin?");
     expect(dialog.textContent).toContain("record payments and reopen approved months");
-    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/role"))).toBe(false);
+    expect(dialog.textContent).toContain("Keeps: Content manager.");
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/roles"))).toBe(false);
+  });
+
+  it("lists every role a person holds, and adds one beside the rest", async () => {
+    const roster = {
+      ...ROSTER,
+      staff: [ROSTER.staff[0], { ...ROSTER.staff[1], roles: ["content_manager", "customer_service"] }],
+      invitable_roles: [...ROSTER.invitable_roles, "customer_service"],
+      role_permissions: { ...PERMISSIONS, customer_service: ["inbox.use"] },
+    };
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      if (init?.method === "POST") return reply(201, { id: 2, roles: ["affiliate_manager", "content_manager", "customer_service"] });
+      if (url.includes("/api/staff/invitations")) return reply(200, { invitations: [], invitable_roles: roster.invitable_roles, role_permissions: roster.role_permissions });
+      if (url.includes("/api/staff")) return reply(200, roster);
+      return reply(200, {});
+    });
+    renderAt("admin", "team");
+
+    const held = await screen.findByRole("list", { name: "Access for Mona" });
+    expect(within(held).getAllByRole("listitem").map((item) => item.firstChild?.textContent))
+      .toEqual(["Content manager", "Customer service"]);
+    // Add access offers only what is not held yet.
+    const add = screen.getByLabelText("Add access for Mona");
+    expect(within(add).getAllByRole("option").map((option) => option.textContent))
+      .toEqual(["Add access…", "Admin", "Affiliate manager"]);
+
+    fireEvent.change(add, { target: { value: "affiliate_manager" } });
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog.textContent).toContain("Give Mona Affiliate manager access?");
+    expect(dialog.textContent).toContain("Keeps: Content manager and Customer service.");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Add access" }));
+    await waitFor(() => expect(fetchMock.mock.calls.some(([url, init]) =>
+      String(url).endsWith("/api/staff/2/roles") && (init as RequestInit)?.method === "POST"
+      && (init as RequestInit).body === JSON.stringify({ role: "affiliate_manager" }))).toBe(true));
+  });
+
+  it("removes one role, and says what goes", async () => {
+    const roster = {
+      ...ROSTER,
+      staff: [ROSTER.staff[0], { ...ROSTER.staff[1], roles: ["content_manager", "customer_service"] }],
+      invitable_roles: [...ROSTER.invitable_roles, "customer_service"],
+      role_permissions: { ...PERMISSIONS, customer_service: ["inbox.use"] },
+    };
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      if (init?.method === "POST") return reply(200, { id: 2, roles: ["content_manager"] });
+      if (url.includes("/api/staff/invitations")) return reply(200, { invitations: [], invitable_roles: roster.invitable_roles, role_permissions: roster.role_permissions });
+      if (url.includes("/api/staff")) return reply(200, roster);
+      return reply(200, {});
+    });
+    renderAt("admin", "team");
+
+    fireEvent.click(await screen.findByRole("button", { name: "Remove Customer service from Mona" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog.textContent).toContain("Take Customer service access from Mona?");
+    expect(dialog.textContent).toContain("Can no longer: read and answer customers in the inbox");
+    expect(dialog.textContent).toContain("Keeps: Content manager.");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Remove access" }));
+    await waitFor(() => expect(fetchMock.mock.calls.some(([url, init]) =>
+      String(url).endsWith("/api/staff/2/roles/customer_service/remove")
+      && (init as RequestInit)?.method === "POST")).toBe(true));
+  });
+
+  it("does not offer to remove somebody's only role", async () => {
+    renderAt("admin", "team");
+    const held = await screen.findByRole("list", { name: "Access for Mona" });
+    expect(within(held).queryByRole("button")).toBeNull();
   });
 
   it("offers an affiliate manager only the access they hold", async () => {
@@ -96,7 +162,7 @@ describe("Settings → the rail", () => {
     const permissions = { ...PERMISSIONS, operations_manager: ["order_ops.view"] };
     const roster = {
       ...ROSTER,
-      staff: [...ROSTER.staff, { id: 3, email: "amr@hbawear.store", display_name: "Amr", role: "operations_manager", status: "active", last_login_at: null, created_at: null }],
+      staff: [...ROSTER.staff, { id: 3, email: "amr@hbawear.store", display_name: "Amr", roles: ["operations_manager"], status: "active", last_login_at: null, created_at: null }],
       assignable_roles: [...ROSTER.assignable_roles, "operations_manager"],
       invitable_roles: [...ROSTER.invitable_roles, "operations_manager"],
       role_permissions: permissions,

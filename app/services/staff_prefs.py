@@ -123,15 +123,17 @@ def reminder_recipients(db: Session) -> list[UserAccount]:
         select(UserAccount, RoleAssignment.role)
         .join(RoleAssignment, RoleAssignment.user_account_id == UserAccount.id)
         .where(UserAccount.status == "active", RoleAssignment.revoked_at.is_(None))
-        .order_by(UserAccount.id, RoleAssignment.id.desc())
+        .order_by(UserAccount.id)
     ).all()
-    seen: set[int] = set()
-    recipients = []
+    # Everything each person's live roles grant together (ADR 0067).
+    accounts: dict[int, UserAccount] = {}
+    held: dict[int, set[str]] = {}
     for account, role in rows:
-        if account.id in seen:
-            continue  # the newest live assignment is the role, as `active_role`
-        seen.add(account.id)
-        if not has_permission(role, Permission.TARGETS_RECORD):
+        accounts[account.id] = account
+        held.setdefault(account.id, set()).add(role)
+    recipients = []
+    for account_id, account in accounts.items():
+        if not has_permission(held[account_id], Permission.TARGETS_RECORD):
             continue
         if preferences_for(db, account.id)["weekly_targets_reminder"]:
             recipients.append(account)

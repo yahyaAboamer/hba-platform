@@ -260,7 +260,16 @@ export type Actor = {
   id: number;
   email: string;
   display_name: string | null;
-  role: string;
+  /**
+   * Every role held now, widest first (ADR 0067: a person may hold several).
+   * For naming the person only - what a screen shows is decided by
+   * `permissions`, never by a role's name.
+   */
+  roles: string[];
+  /** Holds any staff role. */
+  is_staff: boolean;
+  /** Owns a model's record: what makes somebody a model (ADR 0006). */
+  is_model: boolean;
 };
 
 /** Where the platform is in time, decided by the server and not the browser. */
@@ -296,6 +305,38 @@ export type Session = {
  */
 export function can(session: Session | null, permission: string): boolean {
   return session?.permissions.includes(permission) ?? false;
+}
+
+/**
+ * The words under a person's name: the role they are known by, the widest
+ * they hold (the server lists them widest first). Words only - nothing is
+ * decided by it.
+ */
+export function roleLabel(actor: Actor): string {
+  return (actor.roles[0] ?? "").replace(/_/g, " ");
+}
+
+/**
+ * Which set of screens a person gets (ADR 0067, decision 9), asked of what
+ * they may do and never of a role's name:
+ *
+ * - **portal**: no staff permission at all - a model, who reaches her portal
+ *   by owning her record (`is_model`), or somebody invited to become one who
+ *   has not applied yet;
+ * - **operations**: Operations without the affiliate side (ADR 0057), with
+ *   the Inbox too when they hold it;
+ * - **inbox**: the Inbox and nothing else (ADR 0059);
+ * - **affiliates**: everyone else - the affiliate dashboard, with Operations
+ *   and the Inbox beside it for whoever holds them.
+ */
+export type Desk = "portal" | "operations" | "inbox" | "affiliates";
+
+export function deskFor(session: Session): Desk {
+  if (session.permissions.length === 0) return "portal";
+  if (can(session, "affiliates.view")) return "affiliates";
+  if (can(session, "order_ops.view")) return "operations";
+  if (can(session, "inbox.use")) return "inbox";
+  return "affiliates";
 }
 
 export async function currentUser(): Promise<Session | null> {

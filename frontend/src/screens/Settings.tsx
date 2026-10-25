@@ -28,7 +28,8 @@ type StaffRow = {
   id: number;
   email: string;
   display_name: string | null;
-  role: string;
+  /** Every staff role held now, widest first (ADR 0067: several per person). */
+  roles: string[];
   status: "invited" | "active" | "suspended";
   last_login_at: string | null;
   created_at: string | null;
@@ -47,7 +48,8 @@ type Roster = {
   staff: StaffRow[];
   invitations: InvitationRow[];
   assignable_roles: string[];
-  /** Only access the signed-in person holds themselves (`can_grant`). */
+  /** Only access the signed-in person holds themselves, all their roles
+   *  together (`can_grant`). What *Add access* and the invite form offer. */
   invitable_roles: string[];
   /** What each role grants, from the server's own list (T4). */
   role_permissions: Record<string, string[]>;
@@ -78,6 +80,18 @@ const ROLE_LABEL: Record<string, string> = {
 };
 
 const roleWords = (role: string) => ROLE_LABEL[role] ?? role;
+
+/** Several roles in words: *Content manager and Customer service*. */
+const rolesWords = (roles: string[]) => {
+  const words = roles.map(roleWords);
+  return words.length <= 1 ? (words[0] ?? "no access")
+    : `${words.slice(0, -1).join(", ")} and ${words[words.length - 1]}`;
+};
+
+/** Everything a set of roles grants together, as the server reads it. */
+function grantedBy(roles: string[], rolePermissions: Record<string, string[]> | undefined): string[] {
+  return [...new Set(roles.flatMap((role) => rolePermissions?.[role] ?? []))];
+}
 
 /**
  * *What can each access do?* (Settings audit T4), in plain words. A role has a
@@ -317,7 +331,8 @@ function lastSeen(iso: string | null): string {
 const STATE_ORDER: Record<string, number> = { active: 0, invited: 1, suspended: 2 };
 
 type Pending =
-  | { kind: "role"; row: StaffRow; role: string }
+  | { kind: "give"; row: StaffRow; role: string }
+  | { kind: "remove"; row: StaffRow; role: string }
   | { kind: "suspend"; row: StaffRow }
   | { kind: "reactivate"; row: StaffRow };
 
@@ -352,22 +367,37 @@ function RosterPanel({ session }: { session: Session }) {
 
   function dialogFor(action: Pending) {
     const name = action.row.display_name || action.row.email;
-    if (action.kind === "role") {
-      const before = roster?.role_permissions[action.row.role];
-      const after = roster?.role_permissions[action.role];
+    if (action.kind === "give" || action.kind === "remove") {
+      // ADR 0067: a person holds several roles, and may do everything they
+      // grant together - so what changes is read from all of them.
+      const giving = action.kind === "give";
+      // Asked of what the role grants, not its name: the access that can
+      // change everybody else's is the one worth a sterner question.
+      const toAdmin = giving && (roster?.role_permissions[action.role] ?? []).includes("settings.manage");
+      const afterRoles = giving
+        ? [...action.row.roles, action.role]
+        : action.row.roles.filter((role) => role !== action.role);
+      const before = grantedBy(action.row.roles, roster?.role_permissions);
+      const after = grantedBy(afterRoles, roster?.role_permissions);
       const gains = ACCESS_LINES.filter(([, line]) => holds(after, line) && !holds(before, line)).map(([words]) => words);
       const loses = ACCESS_LINES.filter(([, line]) => holds(before, line) && !holds(after, line)).map(([words]) => words);
       return <ConfirmDialog
-        title={action.role === "admin" ? `Make ${name} an admin?` : `Change ${name} to ${roleWords(action.role)}?`}
+        title={giving
+          ? (toAdmin ? `Make ${name} an admin?` : `Give ${name} ${roleWords(action.role)} access?`)
+          : `Take ${roleWords(action.role)} access from ${name}?`}
         effects={[
           ...gains.map((line) => `Can now: ${line.charAt(0).toLowerCase()}${line.slice(1)}`),
           ...loses.map((line) => `Can no longer: ${line.charAt(0).toLowerCase()}${line.slice(1)}`),
+          `Keeps: ${rolesWords(giving ? action.row.roles : afterRoles)}.`,
           "Takes effect on their very next click.",
         ]}
-        confirm={action.role === "admin" ? "Make admin" : "Change access"}
+        confirm={giving ? (toAdmin ? "Make admin" : "Add access") : "Remove access"}
+        danger={!giving}
         onCancel={() => setPending(null)}
         onConfirm={async () => {
-          await api.post(`/api/staff/${action.row.id}/role`, { role: action.role });
+          await (giving
+            ? api.post(`/api/staff/${action.row.id}/roles`, { role: action.role })
+            : api.post(`/api/staff/${action.row.id}/roles/${encodeURIComponent(action.role)}/remove`));
           setPending(null);
           load();
         }} />;
@@ -389,7 +419,7 @@ function RosterPanel({ session }: { session: Session }) {
     }
     return <ConfirmDialog
       title={`Reactivate ${name}?`}
-      effects={[`They can sign in again, as ${roleWords(action.row.role)}.`]}
+      effects={[`They can sign in again, as ${rolesWords(action.row.roles)}.`]}
       confirm="Reactivate"
       onCancel={() => setPending(null)}
       onConfirm={async () => {
@@ -420,7 +450,14 @@ function RosterPanel({ session }: { session: Session }) {
               {staff.map((row) => {
                 const you = row.id === session.actor.id;
                 const name = row.display_name || row.email;
-                const changeable = !you && roster.assignable_roles.includes(row.role) && row.status !== "suspended";
+                const changeable = !you && row.status !== "suspended";
+                // *Add access* offers only what this person may give
+                // (`can_grant`), and nothing already held.
+                const addable = roster.invitable_roles.filter((role) => !row.roles.includes(role));
+                // The last role is not taken here: suspending is how somebody
+                // loses all their access.
+                const removable = (role: string) =>
+                  row.roles.length > 1 && roster.invitable_roles.includes(role);
                 return (
                   <tr key={row.id} className={row.status === "suspended" ? "settings__row--off" : undefined}>
                     <td>
@@ -429,18 +466,29 @@ function RosterPanel({ session }: { session: Session }) {
                       <span className="settings__email">{row.email}</span>
                     </td>
                     <td className="settings__access">
-                      {changeable ? (
-                        <select className="input settings__role-select" value={row.role}
-                          aria-label={`Access for ${name}`}
-                          onChange={(event) => setPending({ kind: "role", row, role: event.target.value })}>
-                          {roster.assignable_roles.map((role) => <option key={role} value={role}>{roleWords(role)}</option>)}
+                      <ul className="settings__roles" aria-label={`Access for ${name}`}>
+                        {row.roles.map((role) => (
+                          <li key={role} className="settings__role">
+                            {roleWords(role)}
+                            {changeable && removable(role) && (
+                              <button type="button" className="settings__link-button"
+                                aria-label={`Remove ${roleWords(role)} from ${name}`}
+                                onClick={() => setPending({ kind: "remove", row, role })}>Remove</button>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                      {changeable && addable.length > 0 && (
+                        <select className="input settings__role-select settings__add-access" value=""
+                          aria-label={`Add access for ${name}`}
+                          onChange={(event) => {
+                            if (event.target.value) setPending({ kind: "give", row, role: event.target.value });
+                          }}>
+                          <option value="">Add access…</option>
+                          {addable.map((role) => <option key={role} value={role}>{roleWords(role)}</option>)}
                         </select>
-                      ) : (
-                        <>
-                          {roleWords(row.role)}
-                          {you && <span className="settings__email">Another admin changes yours</span>}
-                        </>
                       )}
+                      {you && <span className="settings__email">Another admin changes yours</span>}
                     </td>
                     <td className="settings__seen">{lastSeen(row.last_login_at)}</td>
                     <td className="settings__state">
