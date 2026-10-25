@@ -21,6 +21,7 @@ from app.api import (
     applications,
     audit,
     auth,
+    client_config,
     earnings,
     health,
     inbox,
@@ -37,6 +38,7 @@ from app.api import (
     webhooks,
 )
 from app.config import settings
+from app.core.observability import init_observability
 from app.worker import worker_loop
 
 # Imported for the side effect of registering its job handlers with the
@@ -88,6 +90,10 @@ async def lifespan(_app: FastAPI):
             with contextlib.suppress(asyncio.CancelledError):
                 await task
 
+
+# Before the app is built: the FastAPI integration wraps route handlers as they
+# are registered. Does nothing at all without SENTRY_DSN.
+init_observability(settings)
 
 app = FastAPI(
     title="HBA Platform",
@@ -144,6 +150,7 @@ async def security_headers(request: Request, call_next):
 
 # API routes are registered before the catch-all below, so they always win.
 app.include_router(health.router)
+app.include_router(client_config.router)
 app.include_router(auth.router)
 app.include_router(webhooks.router)
 app.include_router(operations.router)
