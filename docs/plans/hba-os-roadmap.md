@@ -36,30 +36,30 @@ Batch 1.2 waits for them.
 |---|---|
 | Repository visibility | Deferred: public until the GitHub upgrade, then private |
 | Production site requires sign-in | Deferred: the owner retires the ChatGPT site once Production moves in |
-| Release gates: restored-copy reconciliation and migration rehearsal | **Blocked by owner**: need an authorised restored copy; Batch 1.2 waits for them |
+| Release gates: restored-copy reconciliation and migration rehearsal | Completed 25 October (see the progress file); rerun the reconciliation after the first payroll approval |
 
 **Batch 1.1 — Safety net** (PR #125)
 
 | Task | Status |
 |---|---|
-| CI on every pull request | In progress: the file was invalid and is fixed; first real run going |
+| CI on every pull request | Completed (first full run 9m43s; limits set from it) |
 | Server error alerts | Completed in code; dormant until deployed |
 | Browser error alerts | Completed in code |
 | Health checks answer HEAD (the UptimeRobot 405) | Completed in code; takes effect when deployed |
 | A failed job's log line carries no customer data | Completed in code |
 | Sentry account and Railway variables | Completed: verified in Railway (both DSNs, EU, all three places) |
 | UptimeRobot monitor | Completed by the owner; reads down until the HEAD fix is deployed |
-| Merge PR #125 | **Blocked by owner**: go-ahead (merging deploys staging) |
-| Deploy to production | **Blocked by owner**: a separate go-ahead |
+| Merge PR #125 | Completed (`a2ae261`, 25 October) |
+| Deploy to production | Completed (`a2ae261`; Sentry live in both, HEAD answers 200) |
 | After deploying: a test alert from staging, the monitor green | Pending |
-| Narrow CI's time limits from the first measured run | Pending |
+| Narrow CI's time limits from the first measured run | Completed |
 | Branch protection requiring CI | Deferred: after the GitHub upgrade |
 
 **Batch 1.2 — Several roles per person** (ADR 0067)
 
 | Task | Status |
 |---|---|
-| Roles held together, add and remove, the operations manager's access moved without change, audit tagged by department | Pending: after the release gates |
+| Roles held together, add and remove, the operations manager's access moved without change, audit tagged by department | Pending: unblocked (the release gates passed) |
 
 **Batch 1.3 — HBA OS two-step sign-in, devices, suspending** (ADR 0067)
 
