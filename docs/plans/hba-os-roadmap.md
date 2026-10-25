@@ -59,7 +59,7 @@ Batch 1.2 waits for them.
 
 | Task | Status |
 |---|---|
-| Roles held together, add and remove, the operations manager's access moved without change, audit tagged by department | Pending: unblocked (the release gates passed) |
+| Roles held together, add and remove, the operations manager's access moved without change, audit tagged by department | In progress: built and tested on `phase-1/batch-2`; merge and deploy wait for the owner |
 
 **Batch 1.3 — HBA OS two-step sign-in, devices, suspending** (ADR 0067)
 

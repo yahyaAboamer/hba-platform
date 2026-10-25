@@ -254,7 +254,7 @@ payroll without touching a maintainer screen.
   code writes it; other departments read through its functions. New tables
   carry their department's prefix. Customer details still live only in the
   inbox's tables.
-- **A person may hold several roles** (ADR 0067; decided, not built yet). What
+- **A person may hold several roles** (ADR 0067; built, except two-step sign-in, which is decided and not built yet). What
   they may do is everything their live roles grant together; roles stay
   defined in code. Screens ask about permissions, never role names. Money is
   created, approved and paid under three separate permissions, and only the
