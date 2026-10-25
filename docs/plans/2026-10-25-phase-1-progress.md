@@ -10,7 +10,7 @@ redoing finished work. Newest facts first within each section.
 |---|---|
 | **Branch** | `phase-1/batch-1`, cut from `claude/hba-erp-architecture-55746a` (which holds ADRs 0065–0069, the two mockups and the plan) |
 | **Base** | `origin/main` = `origin/production` = `c82785d` (checked 25 October 2026) |
-| **Pull request** | not opened yet |
+| **Pull request** | https://github.com/yahyaAboamer/hba-platform/pull/125 into `main`, opened 25 October; first CI run not yet read. **Next on resume:** read its checks, fix anything red, record the backend job's duration here, then narrow the CI time limits. |
 | **Merged / deployed** | nothing; neither is allowed without the owner's word for each |
 
 ## Batch 1 — the safety net
