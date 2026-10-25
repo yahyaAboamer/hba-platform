@@ -53,6 +53,39 @@ Nothing in it is secret: a browser DSN is public by design.
 - `ANOMALY job_gave_up` no longer logs the payload or error text (`9b00440`).
 - The account-level 2FA list is now a recommendation outside the roadmap.
 
+## 25 October, night: Batch 1 shipped, release gates rehearsed
+
+- **Merged and deployed** (owner's go-ahead): PR #125 as `a2ae261`; `main` and
+  `production` both there. Both sites answered HEAD 200 about 80 s later;
+  `/api/client-config` reports `production` / `staging` and release `a2ae261`.
+- **Release gates, on production's dump of 25 October 00:04 UTC** (24.6 MB,
+  Postgres 18.6; 30 nightly dumps in the bucket), restored into a throwaway
+  local database with the owner's authorisation, then deleted with the dump:
+  - *Restore:* `--exit-on-error`, clean. Schema `a6c9e3f70018` = code head.
+    19 profiles, 7,077 attributed orders, 15,713 orders, 597 audit entries,
+    24 accounts; **no payment, payroll month or snapshot yet**.
+  - *Protections:* 18 triggers; a real UPDATE and DELETE on `audit_event` are
+    refused. The runbook's `WHERE false` probe could not show this; corrected.
+  - *Reconciliation* (`docs/repair/batch-1/reconcile.py`, read-only): every
+    figure zero, because no month has been approved yet. Clean but untested on
+    real payroll; **rerun after the first approval.**
+  - *Migration rehearsal*, head back to before `a6b1c4e20006` (17 steps) and
+    forward: the newest step rolls back and forward cleanly. Deeper, three
+    guards refuse on real data, each by design and each undone completely:
+    a payment request exists (ADR 0062's step); a `customer_service` holder
+    exists (that role's step, a check-constraint failure); declined profiles
+    exist (`a6b1c4e20006` itself). With those rows set aside in the copy, 16 of
+    17 steps ran. Upgrading back left every count and trigger unchanged.
+    **So a code rollback past ADR 0062 is not available while that data
+    exists; the way back from there is this restore.**
+  - *`SETTINGS_ENCRYPTION_KEY` cases* on the copy's real saved WhatsApp and
+    Shopify-tag secrets: missing, malformed and wrong key all leave the secret
+    unused, describe the problem, and raise nothing. The right key is proven
+    by production using those secrets.
+- **Worth knowing:** production runs Postgres 18.6; local tests and CI use 17.
+- Throwaway databases `hba_batch1`, `hba_batch1_ci` and `hba_restore_check`
+  dropped.
+
 ## Owner decisions and actions
 
 | Item | State |

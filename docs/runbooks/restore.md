@@ -5,11 +5,12 @@ nothing described how to get one back. A backup nobody can restore is a file,
 not a safety net — and the moment somebody needs this is the worst moment to
 work it out.
 
-> **This procedure has been written and not rehearsed.** Rehearsing it needs
-> the real bucket credentials and an isolated database, both of which are the
-> owner's to provide. Until somebody has run it end to end, treat every step
-> here as *believed* rather than *proven*, and do the rehearsal on a day when
-> nothing is on fire.
+> **Rehearsed end to end on 25 October 2026**, with the owner's authorisation:
+> production's dump of that night (Postgres 18.6, 24.6 MB) restored with the
+> local test server's `pg_restore` 17 into a throwaway database, checked,
+> reconciled, migrations rolled back and forward, then deleted. The record is
+> in `docs/plans/2026-10-25-phase-1-progress.md`. One step below was wrong and
+> is corrected: the protection probe.
 
 ---
 
@@ -88,12 +89,18 @@ Then confirm the protections came back with the data — a restore that lost the
 append-only triggers would let a later mistake erase a trail:
 
 ```sql
-UPDATE audit_event SET action = 'probe' WHERE false;
+BEGIN;
+UPDATE audit_event SET action = 'probe' WHERE id = (SELECT min(id) FROM audit_event);
+ROLLBACK;
 ```
 
-It must raise `append-only table: audit_event cannot be modified by update`.
-A silent success means the triggers did not restore and the database is not
-safe to promote.
+It must raise `audit_event is append-only; UPDATE is not permitted`. The
+guards are **row** triggers, so the probe must touch a real row: the earlier
+`WHERE false` version matches nothing, fires nothing and reports `UPDATE 0`
+whether the triggers came back or not (found in the 25 October rehearsal).
+Also list them: `select count(*) from pg_trigger where not tgisinternal;` was
+18 on that restore. A silent success means the triggers did not restore and the
+database is not safe to promote.
 
 ## If the schema is older than the code
 
