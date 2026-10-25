@@ -20,6 +20,27 @@ def test_ready_reports_database_and_configuration():
     assert "configuration" in body["checks"]
 
 
+@pytest.mark.parametrize("path", ["/api/health/live", "/api/health/ready"])
+def test_health_answers_head_as_well_as_get(path):
+    """UptimeRobot asks with HEAD. A 405 there read as the platform being down
+    while it was serving normally (25 October 2026)."""
+    response = client.head(path)
+    assert response.status_code == 200
+    assert response.content == b""
+
+
+def test_readiness_answers_head_with_503_when_the_database_is_unreachable(monkeypatch):
+    """HEAD carries the same verdict as GET: a broken database is a 503."""
+    import app.api.health as health
+
+    class Refuses:
+        def connect(self):
+            raise OSError("no route to host")
+
+    monkeypatch.setattr(health, "engine", Refuses())
+    assert client.head("/api/health/ready").status_code == 503
+
+
 def test_production_hides_api_docs():
     # Docs must be disabled in production; verified via the app's own config.
     from app.config import Settings
