@@ -50,7 +50,6 @@ jobs:
       # (no .env file exists here and the tests pass on the defaults).
       DATABASE_URL: postgresql+psycopg://hba:hba@127.0.0.1:5433/hba_platform_test
       PYTHON: python
-      OUT_DIR: ${{ runner.temp }}/suite
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -96,6 +95,11 @@ jobs:
       # non-zero exit. The budget is above the whole suite so one call
       # finishes; if it ever does not, exit 4 turns the job red.
       - name: Backend suite
+        # Step level, not job level: GitHub allows the `runner` context only
+        # inside a step (a job-level use made the whole file invalid, and every
+        # push failed in under a second without running anything).
+        env:
+          OUT_DIR: ${{ runner.temp }}/suite
         run: bash docs/repair/batch-1/run-suite.sh 3300
 
       - name: Upload the suite log
