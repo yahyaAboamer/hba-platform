@@ -385,6 +385,23 @@ def test_giving_up_on_a_job_is_reported(db, caplog):
     assert caplog.text.count(Anomaly.JOB_GAVE_UP) == 1, "reported once, not per attempt"
 
 
+def test_giving_up_logs_neither_the_payload_nor_the_error(db, caplog):
+    """Both can name a customer; the log line carries kind, id and attempts."""
+    enqueue(db, "inbox_send", {"phone": "201005550188"})
+    db.flush()
+
+    with caplog.at_level(logging.WARNING, logger="hba.anomaly"):
+        job = lease_job(db, worker_id="w")
+        fail_job(db, job, "refused for customer@example.com", give_up=True)
+        db.flush()
+
+    assert Anomaly.JOB_GAVE_UP in caplog.text
+    assert "inbox_send" in caplog.text
+    assert "201005550188" not in caplog.text
+    assert "customer@example.com" not in caplog.text
+    assert job.last_error == "refused for customer@example.com", "the row keeps it"
+
+
 def test_a_retry_that_will_happen_again_is_not_reported_as_giving_up(db, caplog):
     with caplog.at_level(logging.WARNING, logger="hba.anomaly"):
         enqueue(db, "sync_order", {"order_id": "78"})
