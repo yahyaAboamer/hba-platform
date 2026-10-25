@@ -404,13 +404,16 @@ def fail_job(
     if job.attempts >= MAX_ATTEMPTS:
         job.status = JobStatus.FAILED
         job.finished_at = utcnow()
+        # Kind, id and attempts only. The payload and the error text can name
+        # a customer (a phone, an address, a provider's reply quoting an
+        # email), and a log line is copied wherever the logs go; signals.py
+        # asks that no customer detail is ever passed. The error stays on the
+        # job's own row, for whoever opens it.
         report(
             Anomaly.JOB_GAVE_UP,
             job_id=job.id,
             kind=job.kind,
             attempts=job.attempts,
-            payload=job.payload,
-            last_error=job.last_error[:200],
         )
         return
 

@@ -31,6 +31,7 @@ from typing import Callable
 from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.core.observability import report_job_failed_for_good
 from app.core.signals import Anomaly, report
 from app.db import SessionLocal
 from app.models.integration import BackgroundJob
@@ -38,6 +39,7 @@ from app.services.jobs import (
     INBOX_WORK,
     LEASE_SECONDS,
     OPERATIONS_READS,
+    JobStatus,
     PermanentFailure,
     complete_job,
     fail_job,
@@ -99,7 +101,15 @@ def _record_failure(db: Session, job_id: int, message: str, *, give_up: bool) ->
     if job is None:  # pragma: no cover - only if something deleted it mid-flight
         return
     fail_job(db, job, message, give_up=give_up)
+    failed_for_good = job.status == JobStatus.FAILED
+    kind, attempts = job.kind, job.attempts
     db.commit()
+    if failed_for_good:
+        # A PermanentFailure, no handler, or the last of MAX_ATTEMPTS: one
+        # alert, sent once the failure is recorded. A retry is not one. Kind,
+        # id and attempts only - the payload and the error text can name a
+        # customer.
+        report_job_failed_for_good(job_id=job_id, kind=kind, attempts=attempts)
 
 
 def run_one(

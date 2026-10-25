@@ -35,6 +35,13 @@ in place, and so is the sentence here that it replaced.
 | **Affiliate portal** (`.affiliate`) | Models on phones | Dark by default, denser, phone-shaped |
 | **Operations** (ADR 0057) | The one operations manager, and the admin | Laptop-first, usable on a phone. Its own shell, built from the owner-approved mockup (`docs/design/operations-dashboard-2026-10-03.html`), because no approved export draws it. Same tokens and palette as the maintainer's tool. |
 | **Inbox** (ADR 0059, being built) | Customer service, the operations manager, and the admin | Laptop-first, usable on a phone. Its own shell, built from the owner-approved mockup (`docs/design/whatsapp-inbox-2026-10-11.html`). Same tokens and palette. |
+| **Production** (ADR 0069, decided, not built yet) | The production team, its suppliers through the supplier portal, and the owner | **Its own look, exactly as the app the owner approved**: dark, its own green, its own typeface and sidebar. The one department that does not use HBA's tokens, by the owner's decision. Not restyled either way without a new ADR. |
+
+**Decided, not built yet: one frame for every department (ADR 0068)**, from
+the owner-approved mockup `docs/design/hba-os-shell-2026-10-25.html`. One
+sidebar lists the departments a person holds and replaces the dashboard switch
+and Operations' and the Inbox's own shells; their screens inside do not change.
+Until it is built, the rows above describe what runs.
 
 **One palette across both, since ADR 0039** — HBA green, both themes, defined
 once in `tokens.css` with the accent alone in `accent.css`. `portal.css` is
@@ -241,6 +248,23 @@ payroll without touching a maintainer screen.
   one that changes a month before it. The latest arrangement runs on until further notice, so
   each new month takes the terms of the month before it. An approved month
   still cannot change.
+- **One application and one database, arranged by department** (ADR 0065,
+  ADR 0066; decided, not built yet). No department becomes a separate
+  service, app or database. Every table belongs to one department and only its
+  code writes it; other departments read through its functions. New tables
+  carry their department's prefix. Customer details still live only in the
+  inbox's tables.
+- **A person may hold several roles** (ADR 0067; decided, not built yet). What
+  they may do is everything their live roles grant together; roles stay
+  defined in code. Screens ask about permissions, never role names. Money is
+  created, approved and paid under three separate permissions, and only the
+  owner holds all three. Two-step sign-in is required for the owner and anyone
+  who approves or pays money.
+- **Production keeps its own look and changes only in this repository once it
+  has moved** (ADR 0069; decided, not built yet). Its data belongs to the
+  Production department in HBA's database; its sign-in is HBA's; suppliers
+  reach only the work assigned to them. Its costing and payments record no
+  money until a separate decision brings them under the money rules.
 - **Three compensation types, not one.** `commission`,
   `fixed_plus_commission` (**both** are paid — the one most often got wrong),
   `base_guarantee` (`max(commission, base)`, only where targets were met *and*
@@ -248,7 +272,7 @@ payroll without touching a maintainer screen.
 
 ## Where the reasoning lives
 
-- **`docs/adr/`** — 42 ADRs. The index is generated from the files. 0014 is
+- **`docs/adr/`** — 69 ADRs, indexed by hand in `docs/adr/README.md`. 0014 is
   superseded by 0036; 0027 is amended by 0038; **0035 is amended by 0041**, in
   one clause — a *write-off* closes a debt and a *credit* does not.
 - **`docs/limits.md`** — every failure met, what it looked like from outside,

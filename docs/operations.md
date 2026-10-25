@@ -360,6 +360,24 @@ expect a brief restart.
   `integration.webhook_rejected` anomaly, while a working one returns **200**.
   After rotating it, check the logs for 401s before assuming it took.
 
+### Error alerts (Sentry, EU region)
+
+Set up by the owner: [`runbooks/monitoring-and-account-security.md`](runbooks/monitoring-and-account-security.md),
+section 1. What may be sent is fixed in `app/core/observability.py` and tested
+in `tests/test_observability.py`.
+
+| Variable | What it does |
+|---|---|
+| `SENTRY_DSN` | The backend's project. **Blank sends nothing**: the SDK is never started. |
+| `SENTRY_FRONTEND_DSN` | The browser's project, handed out by `GET /api/client-config` (no sign-in; a browser DSN is public by design). Blank: the browser reports nothing. |
+| `SENTRY_ENVIRONMENT` | Optional. What alerts call this deployment. Blank falls back to `RAILWAY_ENVIRONMENT_NAME`, then `APP_ENV` — never `APP_ENV` first, because staging runs with `APP_ENV=production`. |
+| `RAILWAY_ENVIRONMENT_NAME`, `RAILWAY_GIT_COMMIT_SHA` | Set by Railway itself; never type them. The environment's name, and the commit each alert names as its release. |
+
+An alert is an unhandled exception in a request, a logged error (the worker
+loop failing included), or a background job that fails for good — one alert
+per job, carrying its kind, id and attempts but never its payload. Retries
+are not alerts, and neither are `ANOMALY` lines.
+
 ## Backups
 
 A `db-backup-<environment>` service in each environment dumps its own

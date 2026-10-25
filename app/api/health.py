@@ -9,12 +9,18 @@ from app.db import engine
 router = APIRouter()
 
 
-@router.get("/api/health/live")
+# **GET and HEAD, both.** An outside uptime checker (UptimeRobot) asks with
+# HEAD by default, and a FastAPI route answers only the methods it declares:
+# with GET alone, every HEAD got 405 and a healthy platform was reported down
+# (found 25 October 2026, against production and staging alike). The answer to
+# HEAD is the same status code with no body, so the 503 below still reaches
+# whoever asks.
+@router.api_route("/api/health/live", methods=["GET", "HEAD"])
 def live() -> dict:
     return {"status": "ok"}
 
 
-@router.get("/api/health/ready")
+@router.api_route("/api/health/ready", methods=["GET", "HEAD"])
 def ready(response: Response) -> dict:
     checks: dict = {}
     try:

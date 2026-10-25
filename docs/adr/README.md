@@ -101,7 +101,14 @@ what was chosen.
 | [0059](0059-order-confirmation-and-the-customer-inbox-move-into-the-platform.md) | Order confirmation and the customer inbox move into the platform, which now holds customer chats and writes order tags | Accepted, being built; narrows 0015, amends 0057 |
 | [0060](0060-a-gift-sent-to-a-number-not-on-her-profile-is-shown-and-staff-say-whose-it-is.md) | A gift sent to a number not on her profile is shown, and staff say whose it is | Accepted; amends W03 and W12 |
 | [0061](0061-a-product-can-be-assigned-to-a-model-by-hand.md) | A product can be assigned to a model by hand | Accepted; amends D05 and W02 |
+| [0062](0062-an-unpaid-international-order-is-sent-a-payment-link-on-whatsapp.md) | An unpaid international order is sent a payment link on WhatsApp | Accepted |
+| [0063](0063-an-answer-tagged-in-shopify-counts-and-the-cards-count-open-orders.md) | An answer tagged in Shopify counts, and the cards count open orders | Accepted |
 | [0064](0064-staff-can-look-at-a-models-portal-read-only.md) | Staff can look at a model's portal, read only | Accepted; builds on 0006 |
+| [0065](0065-one-application-arranged-by-department.md) | One application, arranged by department | Accepted, not built yet |
+| [0066](0066-one-database-each-table-belongs-to-one-department.md) | One database; each table belongs to one department | Accepted, not built yet |
+| [0067](0067-several-roles-per-person-access-by-department.md) | Several roles per person, and access set per department | Accepted, not built yet; builds on 0007, amends 0057 and 0059 |
+| [0068](0068-one-frame-for-every-department.md) | One frame for every department | Accepted, not built yet; amends 0057 and 0059 |
+| [0069](0069-production-keeps-its-own-look-and-its-data-moves-into-hba.md) | Production keeps its own look, and its data moves into HBA's database | Accepted, not built yet; an owner's exception to 0039 and 0068 |
 
 **0014 is superseded by 0036** and **0038 by 0039**. **0027 keeps its
 principle and loses its mechanism to 0039**: an agreed figure is still set

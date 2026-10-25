@@ -29,6 +29,11 @@ dependencies = [
     # value that was tampered with fails to decrypt rather than decrypting
     # to something else.
     "cryptography>=43,<46",
+    # Error alerts (Phase 1, batch 1): an unhandled exception, or a background
+    # job that fails for good, reaches the maintainer as a grouped issue with
+    # the deployed commit. Off until SENTRY_DSN is set; what it may send is
+    # decided in app/core/observability.py and tested there.
+    "sentry-sdk[fastapi]>=2.71,<3",
 ]
 
 # Without this, setuptools flat-layout discovery sees app/, frontend/ and

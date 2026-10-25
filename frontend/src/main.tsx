@@ -30,6 +30,10 @@ import "./screens/Overview.css";
 import "./screens/Affiliates.css";
 import "./screens/AffiliateDetail.css";
 import App from "./App";
+import { initErrorTracking } from "./lib/errorTracking";
+
+// Fire and forget: the first render does not wait for it, and it cannot throw.
+void initErrorTracking();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

@@ -193,6 +193,23 @@ class Settings(BaseSettings):
     # between a webhook arriving and its order syncing at two seconds.
     worker_poll_seconds: float = 2.0
 
+    # Error alerts (Phase 1, batch 1; app/core/observability.py). Sentry, EU
+    # region. **Blank sends nothing**: with no DSN the SDK is never started,
+    # so a development machine and the test suite report to nobody.
+    sentry_dsn: str = ""
+    #: The browser's own DSN, handed to the frontend by /api/client-config. A
+    #: browser DSN is public by design: it can submit errors, not read them.
+    sentry_frontend_dsn: str = ""
+    #: What every alert calls this deployment. Explicit, because staging runs
+    #: with APP_ENV=production (for secure cookies) and would otherwise be
+    #: indistinguishable from production; blank falls back to Railway's
+    #: environment name, then to APP_ENV.
+    sentry_environment: str = ""
+    #: Set by Railway itself, never by hand: the environment's name and the
+    #: commit being deployed, so an alert says "since which deploy".
+    railway_environment_name: str = ""
+    railway_git_commit_sha: str = ""
+
     @field_validator("database_url")
     @classmethod
     def _use_psycopg3(cls, value: str) -> str:
