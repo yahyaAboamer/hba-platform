@@ -1,5 +1,8 @@
 # Phase 1 — progress and checkpoint
 
+**The overall picture is `docs/plans/hba-os-roadmap.md`**; this file is the
+working checkpoint of the batch in flight.
+
 The working state of `docs/plans/2026-10-25-phase-1-foundations.md`. Updated
 at each milestone, so that a restarted session resumes from here instead of
 redoing finished work. Newest facts first within each section.
