@@ -29,6 +29,27 @@ sign-in needed, returns `{"sentry_dsn": str | null, "environment": str | null,
 "release": str | null}`. The DSN is the frontend project's (`SENTRY_FRONTEND_DSN`).
 Nothing in it is secret: a browser DSN is public by design.
 
+## 25 October, later: verified and fixed
+
+- **UptimeRobot showed production down while it was up.** Its HTTP monitor
+  asks `https://affiliate.hbawear.store/api/health/ready` with **HEAD**; the
+  route declared GET only, so HEAD got 405 (`Allow: GET`) on the custom
+  domain, the Railway production address and staging alike. Fixed in
+  `1c0a9fc` (GET and HEAD, tested); it shows green once deployed.
+- **CI had never run.** `${{ runner.temp }}` at job level made `ci.yml`
+  invalid, so each push failed instantly and the PR had no checks. Fixed in
+  `48d32f5`; `actionlint` 1.7.12 is clean.
+- **Sentry in Railway, checked without printing a value:** `SENTRY_DSN` and
+  `SENTRY_FRONTEND_DSN` are set on `hba-platform` (production and staging)
+  and `hba-platform-staging`, all EU (`*.de.sentry.io`), backend and frontend
+  different. `RAILWAY_ENVIRONMENT_NAME` reads `production` and `staging`.
+  `/api/client-config` is 404 on production until the merge is deployed.
+- **The Production ChatGPT site still answers signed out** (200, 114,825
+  bytes). With the repository public again, its address was removed from
+  ADR 0069 (`22eb6a5`); earlier commits on this branch still hold it.
+- `ANOMALY job_gave_up` no longer logs the payload or error text (`9b00440`).
+- The account-level 2FA list is now a recommendation outside the roadmap.
+
 ## Owner decisions and actions
 
 | Item | State |
