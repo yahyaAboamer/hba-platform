@@ -34,21 +34,21 @@ before anything leaves the platform.
    When asked about alerts, choose to be alerted on every new issue, by email.
 7. Open each project → *Settings* → *Client Keys (DSN)* and copy its DSN, the
    address that starts `https://`.
-8. In Railway (workspace `HBA_Server`, project `hba-platform`), add two
-   variables to **both** services, `hba-platform` (production) and
-   `hba-platform-staging` (staging):
+8. In Railway (workspace `HBA_Server`, project `hba-platform`), the values are
+   typed on the original service, `hba-platform`, once in each environment.
+   The staging service only refers to them, as all its variables do
+   (`docs/operations.md`, ADR 0034).
 
-   | Variable | Value |
-   |---|---|
-   | `SENTRY_DSN` | the backend project's DSN |
-   | `SENTRY_FRONTEND_DSN` | the frontend project's DSN |
+   | Service | Environment | Add |
+   |---|---|---|
+   | `hba-platform` | `production` | `SENTRY_DSN` = the backend project's DSN; `SENTRY_FRONTEND_DSN` = the frontend project's DSN |
+   | `hba-platform` | `staging` | the same two, with the same values |
+   | `hba-platform-staging` | `staging` | `SENTRY_DSN` = `${{hba-platform.SENTRY_DSN}}`; `SENTRY_FRONTEND_DSN` = `${{hba-platform.SENTRY_FRONTEND_DSN}}`, typed exactly like that, as references |
 
-   On staging you can use references to production's values, as the other
-   variables there already do (`${{hba-platform.SENTRY_DSN}}`, ADR 0034).
    Staging and production are told apart automatically, from Railway's own
-   environment name. Adding a variable restarts that service, so choose the
-   moment. Until Batch 1's code is merged and deployed, the variables are simply
-   ignored.
+   environment name, so the same DSNs serve both. Adding a variable restarts the
+   running service, so choose the moment. Until Batch 1's code is merged and
+   deployed, the variables are simply ignored.
 
 **What the engineers need from you:** nothing secret. A DSN is not a password
 (the browser one is public by design), but there is no need to send it; you set
