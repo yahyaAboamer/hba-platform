@@ -26,10 +26,10 @@ jobs:
   backend:
     name: backend
     runs-on: ubuntu-latest
-    # Set wide for the first run, whose length has not been measured yet (two
-    # files took 80 s on the owner's machine). Narrow both this and the budget
-    # below once docs/plans/2026-10-25-phase-1-progress.md records a real run.
-    timeout-minutes: 60
+    # The first full run took 9m43s (25 October 2026). Twice that, so a slow
+    # runner passes and a hung one is stopped; the suite's own budget (18 min)
+    # ends first, and an unfinished suite is red, never green.
+    timeout-minutes: 20
     services:
       postgres:
         image: postgres:17-alpine
@@ -100,7 +100,7 @@ jobs:
         # push failed in under a second without running anything).
         env:
           OUT_DIR: ${{ runner.temp }}/suite
-        run: bash docs/repair/batch-1/run-suite.sh 3300
+        run: bash docs/repair/batch-1/run-suite.sh 1080
 
       - name: Upload the suite log
         if: failure()

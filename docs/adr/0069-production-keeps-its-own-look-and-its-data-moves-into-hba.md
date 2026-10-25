@@ -66,7 +66,8 @@ this departs from one consistent look.
    Because Production has a full sidebar of its own, how HBA's frame sits
    around it (the recommendation: HBA's sidebar narrows to a strip of
    department icons while Production is open) is drawn as a mockup and
-   approved by the owner before it is built.
+   approved by the owner before it is built. **Approved 25 October 2026**
+   (`docs/design/hba-os-production-frame-2026-10-25.html`).
 6. **Until the move is done**, the Production item opens the existing site in
    a new tab. The move is complete when every screen has been checked side by
    side against the live site, the data has been moved and reconciled count by

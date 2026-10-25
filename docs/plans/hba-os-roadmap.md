@@ -25,7 +25,7 @@ Batch 1.2 waits for them.
 | Architecture proposal | Completed |
 | ADRs 0065–0069 | Completed (on PR #125, not merged) |
 | HBA OS shell mockup | Completed (approved 25 October) |
-| Production-frame mockup | **Blocked by owner**: awaiting approval |
+| Production-frame mockup | Completed (approved 25 October) |
 | Accounting: build or buy | Deferred: decided before Finance |
 
 ## Phase 1 — Foundations
@@ -35,7 +35,7 @@ Batch 1.2 waits for them.
 | Task | Status |
 |---|---|
 | Repository visibility | Deferred: public until the GitHub upgrade, then private |
-| Production site requires sign-in | **Blocked by owner**: still open on 25 October (answers signed-out requests with all its data) |
+| Production site requires sign-in | Deferred: the owner retires the ChatGPT site once Production moves in |
 | Release gates: restored-copy reconciliation and migration rehearsal | **Blocked by owner**: need an authorised restored copy; Batch 1.2 waits for them |
 
 **Batch 1.1 — Safety net** (PR #125)
@@ -96,9 +96,9 @@ Batch 1.2 waits for them.
 
 | Task | Status |
 |---|---|
-| Site requires sign-in | **Blocked by owner** (as Batch 1.0) |
+| Site requires sign-in | Deferred: the owner retires the site once Production moves in |
 | Source code, data and files exported from ChatGPT | **Blocked by owner** |
-| Production-frame mockup approved | **Blocked by owner** (as Batch 0.1) |
+| Production-frame mockup approved | Completed |
 | Read the exported code in full | Pending: after the export |
 | The platform answers Production's five requests; data into HBA's database | Pending: after Batch 1.2 |
 | HBA sign-in for the team, supplier accounts | Pending: after Batch 1.2 |
