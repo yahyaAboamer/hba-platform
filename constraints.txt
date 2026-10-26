@@ -41,9 +41,11 @@ pycparser==3.0
 pydantic==2.13.4
 pydantic-settings==2.15.0
 pydantic_core==2.46.4
+pyotp==2.10.0
 python-dotenv==1.2.3
 python-multipart==0.0.32
 PyYAML==6.0.3
+segno==1.6.6
 sentry-sdk==2.71.0
 SQLAlchemy==2.0.52
 starlette==1.6.0

@@ -1,0 +1,32 @@
+/* Two-step sign-in: set-up steps, shared by the forced screen and Settings. */
+.twostep__step { display: flex; flex-direction: column; gap: 14px; }
+.twostep__title { margin: 0; font-size: 16px; font-weight: 600; outline: none; }
+.twostep__lead, .twostep__hint { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--quiet); }
+.twostep__qr { align-self: flex-start; padding: 8px; border-radius: 12px; background: #fff; }
+.twostep__secret { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.twostep__secret-label { font-size: 13px; color: var(--quiet); }
+.twostep__secret code { font-size: 15px; letter-spacing: .04em; overflow-wrap: anywhere; }
+.twostep__form { display: flex; flex-direction: column; gap: 12px; }
+.twostep__code { letter-spacing: .12em; }
+.twostep__acts { display: flex; flex-wrap: wrap; gap: 8px; }
+.twostep__codes {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px;
+  margin: 0; padding: 12px; list-style: none; border-radius: var(--radius); background: var(--surface);
+}
+.twostep__codes code { font-size: 14px; }
+
+/* Settings panels: a row per device, and the on/off line. */
+.twostep__row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 12px 16px; border-top: 1px solid var(--rule); }
+.twostep__row small { display: block; margin-top: 2px; font-size: 12px; color: var(--faint); }
+.twostep__panel-body { display: flex; flex-direction: column; gap: 12px; padding: 12px 16px 16px; }
+.twostep__state { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.twostep__on { color: var(--accent); }
+.twostep__off { color: var(--faint); }
+.twostep__lock { width: 14px; height: 14px; margin-left: 6px; vertical-align: -2px; color: var(--accent); }
+.twostep__strip {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px;
+  margin-top: 12px; padding: 12px 16px; border-radius: var(--radius);
+  border: 1px solid var(--refused); color: var(--ink); font-size: 13.5px;
+}
+.twostep__strip p { margin: 0; flex: 1 1 320px; }
+.twostep__sign-out { align-self: flex-start; }

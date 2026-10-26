@@ -21,6 +21,8 @@ from app.models.affiliates import AffiliateProfile, AffiliateStatus
 from app.models.identity import UserAccount
 from app.services.access import live_roles
 from app.services.auth import resolve_session
+from app.services.two_step import must_set_up
+from app.services.two_step import status as two_step_status
 
 SESSION_COOKIE = "hba_session"
 
@@ -59,8 +61,16 @@ def holds(db: Session, user: UserAccount, permission: str) -> bool:
     return has_permission(roles_of(db, user), permission)
 
 
-def current_user(request: Request, db: Session = Depends(get_session)) -> UserAccount:
-    """Resolve the caller, or refuse the request.
+#: What every other call answers while somebody who must use two-step
+#: sign-in has not set it up. The screen shows it as it is.
+SET_UP_TWO_STEP_FIRST = "Set up two-step sign-in to continue."
+
+
+def signed_in(request: Request, db: Session = Depends(get_session)) -> UserAccount:
+    """Resolve the caller, or refuse the request - **without** the two-step
+    gate. Only for what somebody who must still set two-step sign-in up has to
+    reach to do it: `/api/auth/me` and `/api/auth/two-step*`. Everything else
+    uses `current_user`.
 
     On unsafe methods a CSRF header is mandatory. Its absence is rejected
     before the session is even looked up, so a cross-site form post cannot act
@@ -77,6 +87,24 @@ def current_user(request: Request, db: Session = Depends(get_session)) -> UserAc
     if user is None:
         raise HTTPException(401, "Authentication required")
     request.state.user = user
+    return user
+
+
+def current_user(
+    user: UserAccount = Depends(signed_in), db: Session = Depends(get_session)
+) -> UserAccount:
+    """The signed-in caller, held to the two-step gate (ADR 0067, decision 5).
+
+    While `TWO_STEP_ENFORCED` is on, somebody who must use two-step sign-in and
+    has not set it up is refused here, on every call but the few that set it
+    up (`signed_in`). **One gate, where every session already passes**, so it
+    covers alike a sign-in, an accepted invitation, the very first account,
+    and a session that was already open on the day it was switched on - and a
+    route added later is behind it without anybody remembering to put it
+    there. Signing out and the public calls do not resolve a person at all.
+    """
+    if must_set_up(db, user):
+        raise HTTPException(403, SET_UP_TWO_STEP_FIRST)
     return user
 
 
@@ -181,6 +209,9 @@ def actor_payload(db: Session, user: UserAccount) -> dict:
         "roles": sorted_roles(roles),
         "is_staff": is_staff(roles),
         "is_model": owns_a_profile(db, user),
+        #: On, required for this person's access, and - while the owner's
+        #: switch is on - whether setting it up is all they may do.
+        "two_step": two_step_status(db, user),
     }
 
 

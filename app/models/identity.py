@@ -18,12 +18,14 @@ of write, whatever the calling code believes.
 from datetime import datetime
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
     Index,
     String,
+    Text,
     UniqueConstraint,
     text,
 )
@@ -252,5 +254,98 @@ class StaffPreference(Base):
     key: Mapped[str] = mapped_column(String(40), nullable=False)
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+
+
+# ── Two-step sign-in (ADR 0067, decision 5; Phase 1 batch 3) ─────────────────
+
+
+class TwoStepSecret(Base):
+    """A person's authenticator-app secret, one per account.
+
+    **Encrypted, never stored readable.** The secret is what makes the codes,
+    so a copy of it is a copy of the person's phone; it is kept with the same
+    Fernet key as the other secrets saved from Settings
+    (`app/core/secrets.py`). A database that leaks without the key leaks
+    nothing anybody can make codes from.
+
+    A row with no `enabled_at` is one being set up: the QR code has been shown
+    and no code has confirmed it yet. It turns nothing on, and starting again
+    replaces it.
+    """
+
+    __tablename__ = "two_step_secret"
+    __table_args__ = (
+        UniqueConstraint("user_account_id", name="two_step_secret_one_per_account"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_account_id: Mapped[int] = mapped_column(
+        ForeignKey("user_account.id", ondelete="CASCADE"), nullable=False
+    )
+    #: Fernet ciphertext of the base32 secret. There is deliberately no column
+    #: that could hold it readable.
+    secret_encrypted: Mapped[str] = mapped_column(Text, nullable=False)
+    #: When a code confirmed it, which is when it was turned on. Empty while
+    #: it is still being set up.
+    enabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    #: The last 30-second step a code was accepted for. **A code works once**:
+    #: a step at or before this one is refused, so a code read over somebody's
+    #: shoulder, or replayed from a captured request, does not work again.
+    last_used_step: Mapped[int | None] = mapped_column(BigInteger)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+
+
+class RecoveryCode(Base):
+    """One of the ten one-time codes for a lost phone.
+
+    Shown once, when they are made, and stored only as a salted, slow hash:
+    whoever reads this table cannot sign in with what they read. Spent ones
+    are kept with the time they were used rather than deleted, so "how many
+    are left" and "when was one last used" can both be answered.
+    """
+
+    __tablename__ = "recovery_code"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_account_id: Mapped[int] = mapped_column(
+        ForeignKey("user_account.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    #: `pbkdf2_sha256$<iterations>$<salt>$<hash>` (`app/services/two_step.py`).
+    code_hash: Mapped[str] = mapped_column(String(200), nullable=False)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+
+
+class PendingSignIn(Base):
+    """The half-way point of a two-step sign-in: the password was right, and
+    a code is still owed.
+
+    **Not a session.** It opens nothing; the only thing it can be exchanged for
+    is a session, and only together with a code. Short-lived and single-use,
+    and only its hash is stored, like every other token here - a leaked
+    database cannot finish somebody's sign-in.
+    """
+
+    __tablename__ = "pending_sign_in"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_account_id: Mapped[int] = mapped_column(
+        ForeignKey("user_account.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    #: Set when it is exchanged for a session, or cancelled (a password reset,
+    #: a suspension). Either way it never works again.
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    #: Where the password was typed. Not shown to anybody; kept because a
+    #: right password followed by wrong codes is worth being able to trace.
+    ip_address: Mapped[str | None] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )

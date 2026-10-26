@@ -13,6 +13,7 @@ class Settings(BaseSettings):
         "smtp_use_tls",
         "smtp_timeout_seconds",
         "shopify_timeout_seconds",
+        "two_step_enforced",
         mode="before",
     )
     @classmethod
@@ -46,6 +47,13 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://hba:hba@127.0.0.1:5433/hba_platform"
     app_env: str = "development"
     session_hours: int = 12
+    #: **Whether two-step sign-in is enforced** (ADR 0067, decision 5). Off
+    #: unless set: the rollout is the owner's call, and the people who must
+    #: use it set it up on the day it is switched on. While off nobody is
+    #: forced, and the screen still says who it is required for. While on,
+    #: somebody who must use it and has not set it up reaches nothing but
+    #: setting it up (`app/api/deps.py`, `current_user`).
+    two_step_enforced: bool = False
     db_connect_timeout_seconds: int = 5
 
     # §11.2. The first month the platform is responsible for paying. Everything

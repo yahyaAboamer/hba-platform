@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.core.businesstime import utcnow
 from app.core.passwords import hash_password, verify_password
+from app.core.user_agent import device_label
 from app.models.identity import AuthSession, UserAccount
 
 TOKEN_BYTES = 32
@@ -128,6 +129,71 @@ def revoke_session(db: Session, token: str) -> bool:
     return True
 
 
+def session_for_token(db: Session, token: str) -> AuthSession | None:
+    """The session row a cookie names, live or not - or None."""
+    if not token:
+        return None
+    return db.scalar(select(AuthSession).where(AuthSession.token_hash == _hash(token)))
+
+
+def live_sessions(db: Session, user_id: int) -> list[AuthSession]:
+    """Every session of an account that still works, last seen first."""
+    return list(
+        db.scalars(
+            select(AuthSession)
+            .where(
+                AuthSession.user_account_id == user_id,
+                AuthSession.revoked_at.is_(None),
+                AuthSession.expires_at > utcnow(),
+            )
+            .order_by(AuthSession.last_seen_at.desc(), AuthSession.id.desc())
+        )
+    )
+
+
+def session_rows(sessions: list[AuthSession], current_id: int | None) -> list[dict]:
+    """Each live session as *Signed in on* shows it (ADR 0067, decision 6).
+    The browser is worked out from the stored header; where an address is, is
+    never looked up."""
+    return [
+        {
+            "id": row.id,
+            "device": device_label(row.user_agent),
+            "ip_address": row.ip_address,
+            "created_at": row.created_at.isoformat(),
+            "last_seen_at": row.last_seen_at.isoformat(),
+            "current": current_id is not None and row.id == current_id,
+        }
+        for row in sessions
+    ]
+
+
+def revoke_session_by_id(db: Session, user_id: int, session_id: int) -> bool:
+    """End one live session **of this account**. False when there is no such
+    live session belonging to it - somebody else's reads as not there."""
+    row = db.scalar(
+        select(AuthSession).where(
+            AuthSession.id == session_id,
+            AuthSession.user_account_id == user_id,
+            AuthSession.revoked_at.is_(None),
+            AuthSession.expires_at > utcnow(),
+        )
+    )
+    if row is None:
+        return False
+    row.revoked_at = utcnow()
+    return True
+
+
+def revoke_other_sessions(db: Session, user_id: int, keep_id: int | None) -> int:
+    """Every live session of an account but one. Returns how many ended."""
+    rows = [row for row in live_sessions(db, user_id) if row.id != keep_id]
+    now = utcnow()
+    for row in rows:
+        row.revoked_at = now
+    return len(rows)
+
+
 def revoke_all_sessions(db: Session, user_id: int) -> int:
     """Revoke every live session for an account. Returns how many were ended."""
     rows = db.scalars(
@@ -142,8 +208,15 @@ def revoke_all_sessions(db: Session, user_id: int) -> int:
     return len(rows)
 
 
-def authenticate(db: Session, email: str, password: str) -> UserAccount | None:
-    """Verify an email and password, returning the account or None."""
+def authenticate(
+    db: Session, email: str, password: str, *, record_login: bool = True
+) -> UserAccount | None:
+    """Verify an email and password, returning the account or None.
+
+    `record_login=False` leaves *last signed in* alone: sign-in passes it,
+    because with two-step sign-in on the right password is only half of it,
+    and the time is written once a session is actually issued.
+    """
     if not email:
         return None
     user = db.scalar(
@@ -157,7 +230,8 @@ def authenticate(db: Session, email: str, password: str) -> UserAccount | None:
         return None
     if not verify_password(password or "", user.password_hash):
         return None
-    user.last_login_at = utcnow()
+    if record_login:
+        user.last_login_at = utcnow()
     return user
 
 

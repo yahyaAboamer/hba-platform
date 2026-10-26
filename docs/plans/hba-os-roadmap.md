@@ -2,7 +2,7 @@
 
 **The one place to see how everything fits.** One hierarchy only: Phase →
 Batch → Task → Status. Statuses: **Completed**, **In progress**, **Blocked by
-owner**, **Pending**, **Deferred**. Updated 25 October 2026.
+owner**, **Pending**, **Deferred**. Updated 26 October 2026.
 
 Sources: ADRs 0065–0069 (the architecture), `2026-10-25-phase-1-foundations.md`
 (Phase 1 in detail). The batch in flight keeps its working checkpoint in
@@ -11,8 +11,8 @@ Sources: ADRs 0065–0069 (the architecture), `2026-10-25-phase-1-foundations.md
 **Not in this roadmap, with plans of their own:** the Inbox switch-over
 (`2026-10-11-whatsapp-inbox-and-order-confirmation.md`; its "phases 0–8" are the
 Inbox's own, unrelated to these) and the audit repair's release gates
-(`2026-10-11-continuation-handoff.md`). The release gates matter here because
-Batch 1.2 waits for them.
+(`2026-10-11-continuation-handoff.md`). The release gates were rehearsed on
+production's backup on 25 October; the reconciliation is rerun after the first payroll approval.
 
 ---
 
@@ -59,13 +59,13 @@ Batch 1.2 waits for them.
 
 | Task | Status |
 |---|---|
-| Roles held together, add and remove, the operations manager's access moved without change, audit tagged by department | In progress: built and tested on `phase-1/batch-2`; merge and deploy wait for the owner |
+| Roles held together, add and remove, the operations manager's access moved without change, audit tagged by department | Completed: PR #127, deployed to staging and production as `ef266a2` on 26 October; role migration checked on both, and a read-only browser check of production passed |
 
 **Batch 1.3 — HBA OS two-step sign-in, devices, suspending** (ADR 0067)
 
 | Task | Status |
 |---|---|
-| Authenticator codes for the owner and money roles, recovery codes, signed-in devices, suspend | Pending: after Batch 1.2 |
+| Authenticator codes for the owner and money roles, recovery codes, signed-in devices, suspend | In progress: on `phase-1/batch-3`, started 26 October |
 
 **Batch 1.4 — Department folders** (ADR 0065)
 
