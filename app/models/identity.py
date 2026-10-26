@@ -76,7 +76,8 @@ class UserAccount(Base):
 
 
 class RoleAssignment(Base):
-    """Which role a person holds, and who granted it.
+    """Which role a person holds, and who granted it. A person may hold
+    several at once; what they may do is all of them together (ADR 0067).
 
     Assignments are revoked rather than deleted, so the audit trail can always
     answer what access someone had at the time they did something.
@@ -92,6 +93,15 @@ class RoleAssignment(Base):
             "role",
             unique=True,
             postgresql_where=text("role = 'operations_manager' AND revoked_at IS NULL"),
+        ),
+        # A person may hold several roles (ADR 0067), but never the same one
+        # twice at once: a second live row would make removing it ambiguous.
+        Index(
+            "role_assignment_one_live_role_per_person",
+            "user_account_id",
+            "role",
+            unique=True,
+            postgresql_where=text("revoked_at IS NULL"),
         ),
     )
 

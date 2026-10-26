@@ -1,6 +1,6 @@
 # 0067. Several roles per person, and access set per department
 
-**Status:** Accepted — owner, 25 October 2026, with the approved mockup `docs/design/hba-os-shell-2026-10-25.html` (frame 5). **Not built yet.**
+**Status:** Accepted — owner, 25 October 2026, with the approved mockup `docs/design/hba-os-shell-2026-10-25.html` (frame 5). **Decisions 1–3 and 7–9 built** (Phase 1, batch 1.2, migration `c3e7a1f90019`); decisions 4–6 (two-step sign-in, devices, suspending) are batch 1.3. Accepting an operations-manager invitation gives both of his assignments, so no one's access changed.
 **Date:** 2026-10-25
 **Builds on:** ADR 0007 (permissions in code), ADR 0006 (identity rooted in user_account). **Amends:** ADR 0057 and ADR 0059 in how the operations manager's access is made up, not in what it is.
 

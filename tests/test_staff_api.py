@@ -111,50 +111,97 @@ def test_a_role_never_assigned_here_never_appears(client):
     assert "affiliate" not in body["assignable_roles"]
 
 
-# ── Changing a role ──────────────────────────────────────────────────────────
+# ── Giving and taking a role (ADR 0067) ─────────────────────────────────────
 
 
-def test_changing_a_role_writes_a_new_assignment_not_an_edit(client):
-    sara = _second_staff_account("content_manager")
-
-    response = client.post(f"/api/staff/{sara}/role", json={"role": "affiliate_manager"})
-
-    assert response.status_code == 200, response.text
+def _assignments(user_id: int) -> list[tuple[str, bool]]:
     with engine.connect() as connection:
         rows = connection.execute(
             text(
                 "SELECT role, revoked_at IS NOT NULL AS revoked FROM role_assignment "
                 "WHERE user_account_id = :u ORDER BY id"
             ),
-            {"u": sara},
+            {"u": user_id},
         ).all()
-    assert [tuple(r) for r in rows] == [
+    return [tuple(r) for r in rows]
+
+
+def test_giving_a_role_adds_an_assignment_and_keeps_the_rest(client):
+    sara = _second_staff_account("content_manager")
+
+    response = client.post(f"/api/staff/{sara}/roles", json={"role": "customer_service"})
+
+    assert response.status_code == 201, response.text
+    assert response.json()["roles"] == ["content_manager", "customer_service"]
+    assert _assignments(sara) == [
+        ("content_manager", False),
+        ("customer_service", False),
+    ]
+    assert "staff.role_given" in _audit_actions()
+    row = next(r for r in client.get("/api/staff").json()["staff"] if r["id"] == sara)
+    assert row["roles"] == ["content_manager", "customer_service"]
+
+
+def test_taking_a_role_revokes_it_and_never_deletes_it(client):
+    sara = _second_staff_account("content_manager")
+    client.post(f"/api/staff/{sara}/roles", json={"role": "affiliate_manager"})
+
+    response = client.post(f"/api/staff/{sara}/roles/content_manager/remove")
+
+    assert response.status_code == 200, response.text
+    assert response.json()["roles"] == ["affiliate_manager"]
+    assert _assignments(sara) == [
         ("content_manager", True),
         ("affiliate_manager", False),
     ]
-    assert "staff.role_changed" in _audit_actions()
+    assert "staff.role_removed" in _audit_actions()
+
+
+def test_a_role_already_held_is_refused(client):
+    sara = _second_staff_account("content_manager")
+    response = client.post(f"/api/staff/{sara}/roles", json={"role": "content_manager"})
+    assert response.status_code == 400
+    assert "already holds" in response.json()["detail"]
+    assert _assignments(sara) == [("content_manager", False)]
+
+
+def test_a_role_not_held_cannot_be_taken(client):
+    sara = _second_staff_account("content_manager")
+    response = client.post(f"/api/staff/{sara}/roles/affiliate_manager/remove")
+    assert response.status_code == 400
+
+
+def test_the_last_staff_role_is_not_taken_suspending_is(client):
+    """An account left holding nothing would be neither staff nor a model, and
+    could apply to become one. Suspending is how all access goes."""
+    sara = _second_staff_account("content_manager")
+    response = client.post(f"/api/staff/{sara}/roles/content_manager/remove")
+    assert response.status_code == 400
+    assert "suspend" in response.json()["detail"]
+    assert _assignments(sara) == [("content_manager", False)]
 
 
 def test_an_unassignable_role_is_refused(client):
     sara = _second_staff_account("content_manager")
-    response = client.post(f"/api/staff/{sara}/role", json={"role": "affiliate"})
-    assert response.status_code == 400
+    assert client.post(f"/api/staff/{sara}/roles", json={"role": "affiliate"}).status_code == 400
+    assert client.post(f"/api/staff/{sara}/roles", json={"role": "wizard"}).status_code == 400
 
 
 def test_nobody_changes_their_own_access(client):
     """Settings audit T2. One mis-click demoting yourself locks you out of the
     screen that would undo it - with a second admin present, nothing else
-    stopped it. Another admin changes yours."""
+    stopped it. Another admin changes yours. Giving yourself more is refused
+    for the same reason it always was: nobody acts on their own access."""
     _second_staff_account("admin")
     body = client.get("/api/staff").json()
     owner_id = next(r["id"] for r in body["staff"] if r["email"] == "owner@example.com")
 
-    response = client.post(
-        f"/api/staff/{owner_id}/role", json={"role": "content_manager"}
-    )
+    taken = client.post(f"/api/staff/{owner_id}/roles/admin/remove")
+    given = client.post(f"/api/staff/{owner_id}/roles", json={"role": "content_manager"})
 
-    assert response.status_code == 400
-    assert "your own access" in response.json()["detail"]
+    for response in (taken, given):
+        assert response.status_code == 400
+        assert "your own access" in response.json()["detail"]
 
 
 def test_the_last_admin_guard_still_holds_below_the_api(client):
@@ -163,22 +210,68 @@ def test_the_last_admin_guard_still_holds_below_the_api(client):
     from sqlalchemy.orm import Session as OrmSession
 
     from app.models.identity import UserAccount
-    from app.services.staff import change_role
+    from app.services.staff import give_role, remove_role
 
     with OrmSession(engine) as db:
         owner = db.query(UserAccount).filter_by(email="owner@example.com").one()
+        give_role(
+            db, owner, "content_manager",
+            actor_roles=frozenset({"admin"}), actor_id=None, actor_email=None,
+        )
         with pytest.raises(ValueError, match="only active admin"):
-            change_role(db, owner, "content_manager", actor_id=None, actor_email=None)
+            remove_role(
+                db, owner, "admin",
+                actor_roles=frozenset({"admin"}), actor_id=None, actor_email=None,
+            )
         db.rollback()
 
 
-def test_a_second_admin_can_be_demoted(client):
+def test_a_second_admin_can_lose_admin(client):
     """The guard is about the *count*, not about touching an admin at all."""
     sara = _second_staff_account("admin")
+    client.post(f"/api/staff/{sara}/roles", json={"role": "content_manager"})
 
-    response = client.post(f"/api/staff/{sara}/role", json={"role": "content_manager"})
+    response = client.post(f"/api/staff/{sara}/roles/admin/remove")
 
     assert response.status_code == 200, response.text
+    assert response.json()["roles"] == ["content_manager"]
+
+
+def test_nobody_gives_or_takes_a_role_they_do_not_hold(db):
+    """`can_grant`, against everything the actor holds together. Over HTTP
+    only an admin may change access today, so the rule is pinned below it."""
+    from app.models.identity import RoleAssignment, UserAccount
+    from app.services.staff import give_role, remove_role
+
+    sara = UserAccount(email="sara2@example.com", password_hash="x", status="active")
+    db.add(sara)
+    db.flush()
+    db.add(RoleAssignment(user_account_id=sara.id, role="content_manager"))
+    db.add(RoleAssignment(user_account_id=sara.id, role="customer_service"))
+    db.flush()
+    boda = frozenset({"affiliate_manager"})
+    with pytest.raises(ValueError, match="access you hold yourself"):
+        give_role(db, sara, "admin", actor_roles=boda, actor_id=None, actor_email=None)
+    with pytest.raises(ValueError, match="access you hold yourself"):
+        remove_role(
+            db, sara, "customer_service", actor_roles=boda, actor_id=None, actor_email=None
+        )
+    # Two roles together may give what each alone may not.
+    both = frozenset({"affiliate_manager", "customer_service"})
+    remove_role(db, sara, "customer_service", actor_roles=both, actor_id=None, actor_email=None)
+
+
+def test_only_settings_manage_may_give_or_take(client):
+    sara = _second_staff_account("content_manager")
+    _demote_to("affiliate_manager")
+    assert client.post(f"/api/staff/{sara}/roles", json={"role": "customer_service"}).status_code == 403
+    assert client.post(f"/api/staff/{sara}/roles/content_manager/remove").status_code == 403
+
+
+def test_the_old_replace_the_role_address_is_gone(client):
+    sara = _second_staff_account("content_manager")
+    response = client.post(f"/api/staff/{sara}/role", json={"role": "affiliate_manager"})
+    assert response.status_code in (404, 405)
 
 
 # ── Suspending and reactivating ─────────────────────────────────────────────
@@ -459,8 +552,9 @@ def test_the_roster_says_what_each_access_can_do(client):
         "operations_manager",
     }
     assert body["content_manager"] == sorted(permissions_for("content_manager"))
-    # ADR 0059: he holds the inbox as well as Operations.
-    assert body["operations_manager"] == ["inbox.use", "order_ops.view"]
+    # ADR 0067: the role is Operations alone; he holds the inbox (ADR 0059)
+    # as a second assignment, customer service.
+    assert body["operations_manager"] == ["order_ops.view"]
     assert body["customer_service"] == ["inbox.use"]
     assert "payments.record" in body["admin"]
     assert "payments.record" not in body["affiliate_manager"]

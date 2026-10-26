@@ -16,7 +16,9 @@ from app.db import engine
 from app.main import app
 from app.models.identity import RoleAssignment, UserAccount
 from app.services.invitations import accept_invitation, create_invitation
-from app.services.staff import change_role
+from app.services.staff import give_role, remove_role
+
+ADMIN = frozenset({"admin"})
 
 PASSWORD = "quiet-harbour-lantern"
 BOOTSTRAP = {
@@ -68,21 +70,28 @@ def test_nobody_is_moved_onto_the_role_while_it_is_held(db):
     _account(db, "amr@example.com", "operations_manager", "Amr")
     sara = _account(db, "sara@example.com", "content_manager", "Sara")
     with pytest.raises(ValueError, match="already has an operations manager: Amr"):
-        change_role(db, sara, "operations_manager", actor_id=None, actor_email=None)
+        give_role(
+            db, sara, "operations_manager", actor_roles=ADMIN, actor_id=None, actor_email=None
+        )
 
 
 def test_nobody_is_moved_onto_the_role_while_an_invitation_is_open(db):
     create_invitation(db, "pending@example.com", "operations_manager", None)
     sara = _account(db, "sara@example.com", "content_manager", "Sara")
     with pytest.raises(ValueError, match="pending@example.com"):
-        change_role(db, sara, "operations_manager", actor_id=None, actor_email=None)
+        give_role(
+            db, sara, "operations_manager", actor_roles=ADMIN, actor_id=None, actor_email=None
+        )
 
 
 def test_the_holder_can_be_moved_off_and_another_moved_on(db):
     amr = _account(db, "amr@example.com", "operations_manager", "Amr")
     sara = _account(db, "sara@example.com", "content_manager", "Sara")
-    change_role(db, amr, "content_manager", actor_id=None, actor_email=None)
-    change_role(db, sara, "operations_manager", actor_id=None, actor_email=None)
+    give_role(db, amr, "content_manager", actor_roles=ADMIN, actor_id=None, actor_email=None)
+    remove_role(
+        db, amr, "operations_manager", actor_roles=ADMIN, actor_id=None, actor_email=None
+    )
+    give_role(db, sara, "operations_manager", actor_roles=ADMIN, actor_id=None, actor_email=None)
 
 
 def test_the_open_invitation_itself_can_be_accepted(db):
@@ -90,10 +99,47 @@ def test_the_open_invitation_itself_can_be_accepted(db):
     db.flush()
     user = accept_invitation(db, token, PASSWORD, "Amr")
     db.flush()
-    role = db.scalar(
-        select(RoleAssignment.role).where(RoleAssignment.user_account_id == user.id)
+    roles = set(
+        db.scalars(
+            select(RoleAssignment.role).where(RoleAssignment.user_account_id == user.id)
+        )
     )
-    assert role == "operations_manager"
+    # ADR 0067: his Inbox (ADR 0059) comes with the invitation, as a second
+    # assignment, so he holds exactly what the role alone used to give.
+    assert roles == {"operations_manager", "customer_service"}
+
+
+def test_an_operations_manager_invitation_brings_the_inbox_from_the_inviter(db):
+    owner = _account(db, "owner2@example.com", "admin", "Owner")
+    token, _ = create_invitation(db, "amr@example.com", "operations_manager", owner.id)
+    db.flush()
+    user = accept_invitation(db, token, PASSWORD, "Amr")
+    db.flush()
+    rows = db.execute(
+        select(RoleAssignment.role, RoleAssignment.granted_by, RoleAssignment.revoked_at)
+        .where(RoleAssignment.user_account_id == user.id)
+        .order_by(RoleAssignment.id)
+    ).all()
+    assert [tuple(r) for r in rows] == [
+        ("operations_manager", owner.id, None),
+        ("customer_service", owner.id, None),
+    ]
+
+
+@pytest.mark.parametrize(
+    "role", ["admin", "affiliate_manager", "content_manager", "customer_service", "affiliate"]
+)
+def test_no_other_invitation_brings_anything(db, role):
+    token, _ = create_invitation(db, f"{role}@example.com", role, None)
+    db.flush()
+    user = accept_invitation(db, token, PASSWORD, "Someone")
+    db.flush()
+    roles = list(
+        db.scalars(
+            select(RoleAssignment.role).where(RoleAssignment.user_account_id == user.id)
+        )
+    )
+    assert roles == [role]
 
 
 def test_accepting_is_refused_if_the_role_was_taken_meanwhile(db):
@@ -127,6 +173,52 @@ def _demote_to(role: str) -> None:
 
 def _invite(client, email: str, role: str = "operations_manager"):
     return client.post("/api/auth/invitations", json={"email": email, "role": role})
+
+
+def test_an_accepted_operations_manager_reaches_operations_and_the_inbox(client):
+    """Accepting his invitation, over HTTP, as he would: both dashboards open,
+    the affiliate side does not, and the trail records both roles."""
+    invite = _invite(client, "amr@example.com")
+    assert invite.status_code == 201
+    client.cookies.clear()
+    accepted = client.post(
+        "/api/auth/invitations/accept",
+        json={"token": invite.json()["token"], "display_name": "Amr", "password": PASSWORD},
+    )
+    assert accepted.status_code == 201, accepted.text
+    assert accepted.json()["actor"]["roles"] == ["operations_manager", "customer_service"]
+    headers = {"X-CSRF-Token": accepted.json()["csrf"]}
+
+    me = client.get("/api/auth/me", headers=headers).json()
+    assert sorted(me["permissions"]) == ["inbox.use", "order_ops.view"]
+    assert client.get("/api/order-ops/shopify", headers=headers).status_code == 200
+    assert client.get("/api/inbox/conversations", headers=headers).status_code == 200
+    assert client.get("/api/affiliates", headers=headers).status_code == 403
+    assert client.get("/api/staff", headers=headers).status_code == 403
+
+    with engine.connect() as connection:
+        after = connection.execute(
+            text("SELECT after_json FROM audit_event WHERE action = 'invitation.accept'")
+        ).scalar_one()
+    assert after["roles"] == ["operations_manager", "customer_service"]
+
+
+def test_his_inbox_can_still_be_taken_and_given_back_on_its_own(client):
+    """Add access and Remove still act on one role at a time."""
+    invite = _invite(client, "amr@example.com")
+    with TestClient(app) as other:
+        accepted = other.post(
+            "/api/auth/invitations/accept",
+            json={"token": invite.json()["token"], "display_name": "Amr", "password": PASSWORD},
+        )
+    amr = accepted.json()["actor"]["id"]
+
+    taken = client.post(f"/api/staff/{amr}/roles/customer_service/remove")
+    assert taken.status_code == 200, taken.text
+    assert taken.json()["roles"] == ["operations_manager"]
+    given = client.post(f"/api/staff/{amr}/roles", json={"role": "customer_service"})
+    assert given.status_code == 201, given.text
+    assert given.json()["roles"] == ["operations_manager", "customer_service"]
 
 
 def test_a_second_operations_manager_is_refused_with_the_reason(client):

@@ -10,19 +10,25 @@ from sqlalchemy.orm import Session
 from app.api.deps import (
     CSRF_COOKIE,
     SESSION_COOKIE,
-    active_role,
     actor_payload,
     client_address,
     current_user,
     permission_list,
     require_permission,
+    roles_of,
 )
 from app.config import settings
 from app.core.businesstime import utcnow
 from app.core.password_quality import password_problem, password_strength
 from app.core.passwords import MINIMUM_PASSWORD_LENGTH, hash_password
 from app.core.periods import PLATFORM_START_MONTH
-from app.core.permissions import GRANT_REFUSED, VALID_ROLES, Permission, can_grant
+from app.core.permissions import (
+    GRANT_REFUSED,
+    VALID_ROLES,
+    Permission,
+    can_invite,
+    sorted_roles,
+)
 from app.core import throttle
 from app.db import get_session
 from app.models.identity import Invitation, RoleAssignment, UserAccount
@@ -403,8 +409,9 @@ def invite(
     if body.role not in VALID_ROLES:
         raise HTTPException(422, f"Unknown role: {body.role}")
     # An invitation is a grant: nobody may give access they do not hold.
-    role = active_role(db, actor)
-    if not can_grant(role, body.role):
+    # Against everything the inviter holds together (ADR 0067).
+    held = roles_of(db, actor)
+    if not can_invite(held, body.role):
         raise HTTPException(403, GRANT_REFUSED)
     # Inviting replaces any live invitation for the address, so it must not
     # be a way to cancel one for access this person could not have given.
@@ -415,7 +422,7 @@ def invite(
             Invitation.expires_at > utcnow(),
         )
     ).all()
-    if any(not can_grant(role, other) for other in live):
+    if any(not can_invite(held, other) for other in live):
         raise HTTPException(
             403,
             "This address already has a live invitation that only somebody with "
@@ -680,7 +687,9 @@ def accept(
         subject=f"user:{user.id}",
         actor_id=user.id,
         actor_email=user.email,
-        after={"email": user.email},
+        # Every role the acceptance gave, so the trail shows the Inbox an
+        # operations manager's invitation brings with it (ADR 0067).
+        after={"email": user.email, "roles": sorted_roles(roles_of(db, user))},
         ip_address=_client_ip(request),
     )
     db.commit()

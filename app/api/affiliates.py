@@ -26,10 +26,10 @@ from app.services.audit import record_audit
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.deps import active_role, require_permission
+from app.api.deps import holds, require_permission
 from app.core.businesstime import business_month, month_add, parse_month, utcnow
 from app.core.periods import OPEN_ENDED, PLATFORM_START_MONTH
-from app.core.permissions import Permission, has_permission
+from app.core.permissions import Permission
 from app.db import get_session
 from app.models.affiliates import AffiliateProfile, AffiliateStatus
 from app.models.identity import UserAccount
@@ -400,12 +400,16 @@ def list_affiliates_route(
 
     # She accepted her invitation and made an account, and has not applied:
     # no longer an invitation, not yet a profile - so she was on neither list.
+    # Not staff: a person may hold several roles (ADR 0067), and one given a
+    # staff role is no longer somebody waiting to apply.
     joined = db.execute(
         text(
             "SELECT u.id, u.email, u.display_name, u.created_at FROM user_account u "
             "JOIN role_assignment r ON r.user_account_id = u.id AND r.role = 'affiliate' "
             "AND r.revoked_at IS NULL "
             "WHERE u.status = 'active' "
+            "AND NOT EXISTS (SELECT 1 FROM role_assignment s WHERE s.user_account_id = u.id "
+            "AND s.role <> 'affiliate' AND s.revoked_at IS NULL) "
             "AND NOT EXISTS (SELECT 1 FROM affiliate_profile p WHERE p.user_account_id = u.id) "
             "ORDER BY u.created_at DESC"
         )
@@ -619,7 +623,7 @@ def get_affiliate_route(
         db,
         affiliate,
         month,
-        may_pay=has_permission(active_role(db, actor), Permission.PAYMENTS_RECORD),
+        may_pay=holds(db, actor, Permission.PAYMENTS_RECORD),
     )
 
 
@@ -641,10 +645,13 @@ def remind_to_apply_route(
     has_profile = account is not None and db.scalar(
         select(Profile.id).where(Profile.user_account_id == account.id)
     ) is not None
+    # Holds the model's role and no staff role (ADR 0067: several per person).
     is_model = account is not None and db.execute(
         text(
             "SELECT EXISTS (SELECT 1 FROM role_assignment "
-            "WHERE user_account_id = :id AND role = 'affiliate' AND revoked_at IS NULL)"
+            "WHERE user_account_id = :id AND role = 'affiliate' AND revoked_at IS NULL) "
+            "AND NOT EXISTS (SELECT 1 FROM role_assignment "
+            "WHERE user_account_id = :id AND role <> 'affiliate' AND revoked_at IS NULL)"
         ),
         {"id": account.id},
     ).scalar_one()

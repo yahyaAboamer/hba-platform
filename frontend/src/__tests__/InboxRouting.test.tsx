@@ -21,7 +21,12 @@ const ADMIN_PERMISSIONS = [
 
 function session(role: string, permissions: string[]) {
   return {
-    actor: { id: 7, email: "someone@example.com", display_name: "Mariam", role },
+    // ADR 0067: the roles are for naming the person; where they land is
+    // decided by `permissions` alone.
+    actor: {
+      id: 7, email: "someone@example.com", display_name: "Mariam",
+      roles: role.split("+"), is_staff: role !== "affiliate", is_model: role === "affiliate",
+    },
     permissions,
     platform: PLATFORM,
   };
@@ -129,7 +134,7 @@ describe("customer service", () => {
 describe("the operations manager", () => {
   it("switches between Operations and the Inbox, and no further", async () => {
     window.history.pushState({}, "", "/operations/whatsapp");
-    serve(session("operations_manager", ["order_ops.view", "inbox.use"]));
+    serve(session("operations_manager+customer_service", ["order_ops.view", "inbox.use"]));
     render(<App />);
 
     const switcher = await screen.findByRole("group", { name: "Dashboard" });
@@ -140,7 +145,7 @@ describe("the operations manager", () => {
 
   it("has WhatsApp as Operations' fourth tab", async () => {
     window.history.pushState({}, "", "/operations/whatsapp");
-    serve(session("operations_manager", ["order_ops.view", "inbox.use"]));
+    serve(session("operations_manager+customer_service", ["order_ops.view", "inbox.use"]));
     render(<App />);
 
     expect(await screen.findByRole("heading", { name: "WhatsApp" })).toBeTruthy();
@@ -152,7 +157,7 @@ describe("the operations manager", () => {
 
   it("reaches the Inbox, and can switch back", async () => {
     window.history.pushState({}, "", "/inbox/confirmations");
-    serve(session("operations_manager", ["order_ops.view", "inbox.use"]));
+    serve(session("operations_manager+customer_service", ["order_ops.view", "inbox.use"]));
     render(<App />);
 
     expect(await screen.findByRole("heading", { name: "Confirmations" })).toBeTruthy();

@@ -214,6 +214,8 @@ def sentence(event: AuditEvent, names: _Names) -> str:
         "inbox.answer_set": f"Marked order {a.get('order') or '?'} as {_ANSWER.get(a.get('answer'), 'answered')}",
         "staff.preference_changed": f"Turned {'on' if a.get('on') else 'off'} “{a.get('switch')}” for themselves",
         "staff.role_changed": f"Changed {who}'s access to {_ROLE.get(a.get('role'), a.get('role'))}",
+        "staff.role_given": f"Gave {who} {_ROLE.get(a.get('role'), a.get('role'))} access",
+        "staff.role_removed": f"Took {_ROLE.get(a.get('role'), a.get('role'))} access from {who}",
         "staff.suspended": f"Suspended {who}'s access",
         "staff.reactivated": f"Restored {who}'s access",
         "target.requirements_set": f"Set {who}'s content targets for {month}",

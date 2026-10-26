@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet } from "react-router-dom";
 
-import { api, signOutAndLeave } from "../lib/api";
+import { api, roleLabel, signOutAndLeave } from "../lib/api";
 import type { Session } from "../lib/api";
 import { DashboardSwitch } from "./DashboardSwitch";
 import { useMaintainerTheme } from "./useMaintainerTheme";
@@ -98,7 +98,7 @@ export function Layout({ session }: { session: Session }) {
             <span className="layout__avatar">{(session.actor.display_name || session.actor.email).charAt(0).toUpperCase()}</span>
             <span className="layout__identity">
               <span className="layout__email">{session.actor.display_name || session.actor.email}</span>
-              <span className="layout__brand-role">{session.actor.role.replace(/_/g, " ")}</span>
+              <span className="layout__brand-role">{roleLabel(session.actor)}</span>
             </span><span aria-hidden="true">▾</span>
           </button>
           {accountOpen && <div id="admin-account-menu" className="layout__account-menu">

@@ -376,6 +376,12 @@
 /* ── Team, measured off the export's Settings (lines 606–647) ──────────── */
 
 .settings__access { width: 170px; }
+/* ADR 0067: a person may hold several roles - one line each, with Remove
+   beside it, and *Add access* under them. */
+.settings__roles { margin: 0; padding: 0; list-style: none; }
+.settings__role { display: flex; gap: 8px; align-items: baseline; }
+.settings__role + .settings__role { margin-top: 3px; }
+.settings__add-access { margin-top: 6px; }
 .settings__state { width: 90px; font-size: 12.5px; }
 .settings__table .settings__action { width: 1%; white-space: nowrap; }
 

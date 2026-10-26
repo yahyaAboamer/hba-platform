@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 import { Link, NavLink } from "react-router-dom";
 
-import { api, signOutAndLeave } from "../lib/api";
+import { api, roleLabel, signOutAndLeave } from "../lib/api";
 import type { Session } from "../lib/api";
 import { pickMaintainerChoice, storedMaintainerChoice } from "../lib/theme";
 import type { ThemeChoice } from "../lib/theme";
@@ -119,7 +119,7 @@ export function SideShell({
             <span className="layout__avatar">{who.charAt(0).toUpperCase()}</span>
             <span className="layout__identity">
               <span className="layout__email">{who}</span>
-              <span className="layout__brand-role">{session.actor.role.replace(/_/g, " ")}</span>
+              <span className="layout__brand-role">{roleLabel(session.actor)}</span>
             </span>
             <span aria-hidden="true">▾</span>
           </button>

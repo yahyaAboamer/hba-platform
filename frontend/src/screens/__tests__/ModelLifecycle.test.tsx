@@ -7,7 +7,7 @@ import { ModelLifecycle } from "../ModelLifecycle";
 
 /** ADR 0052: what each status offers on her profile, and to whom. */
 const session = (permissions: string[]): Session =>
-  ({ actor: { id: 1, email: "o@example.com", role: "admin" }, permissions, platform: {} }) as unknown as Session;
+  ({ actor: { id: 1, email: "o@example.com", roles: ["admin"], is_staff: true, is_model: false }, permissions, platform: {} }) as unknown as Session;
 
 const admin = session(["affiliates.manage", "affiliates.erase"]);
 const manager = session(["affiliates.manage"]);

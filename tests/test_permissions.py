@@ -19,6 +19,7 @@ from app.core.permissions import (
     Permission,
     has_permission,
     permissions_for,
+    permissions_of_roles,
 )
 
 
@@ -196,13 +197,23 @@ def test_the_six_expected_roles_exist_and_no_others():
 # ── operations_manager (ADR 0057, and the inbox from ADR 0059) ────────────────
 
 
-def test_operations_manager_holds_the_operations_dashboard_and_the_inbox():
-    assert ROLES["operations_manager"] == {Permission.ORDER_OPS_VIEW, Permission.INBOX_USE}
+def test_operations_manager_holds_the_operations_dashboard_alone():
+    """ADR 0067: his Inbox (ADR 0059) is a second assignment, customer
+    service, not part of this role - migration c3e7a1f90019 moved it."""
+    assert ROLES["operations_manager"] == {Permission.ORDER_OPS_VIEW}
 
 
 def test_operations_manager_sees_nothing_of_the_affiliate_side():
-    for permission in ALL_PERMISSIONS - {Permission.ORDER_OPS_VIEW, Permission.INBOX_USE}:
+    for permission in ALL_PERMISSIONS - {Permission.ORDER_OPS_VIEW}:
         assert has_permission("operations_manager", permission) is False
+
+
+def test_the_operations_manager_person_holds_operations_and_the_inbox():
+    """What he may do is both his roles together, exactly as before."""
+    held = {"operations_manager", "customer_service"}
+    assert permissions_of_roles(held) == {Permission.ORDER_OPS_VIEW, Permission.INBOX_USE}
+    for permission in ALL_PERMISSIONS - {Permission.ORDER_OPS_VIEW, Permission.INBOX_USE}:
+        assert has_permission(held, permission) is False
 
 
 # ── customer_service (ADR 0059) ───────────────────────────────────────────────

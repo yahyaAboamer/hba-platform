@@ -277,10 +277,9 @@ def outstanding(
     # The same check the route guards make, through the same two functions -
     # a second reading of "may this person pay" is a second answer waiting to
     # disagree with the first.
-    from app.api.deps import active_role
-    from app.core.permissions import has_permission
+    from app.api.deps import holds
 
-    may_pay = has_permission(active_role(db, actor), Permission.PAYMENTS_RECORD)
+    may_pay = holds(db, actor, Permission.PAYMENTS_RECORD)
     rows = [
         _render_balance(
             db,

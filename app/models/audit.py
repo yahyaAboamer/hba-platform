@@ -36,6 +36,11 @@ class AuditEvent(Base):
     after_json: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     reason: Mapped[str | None] = mapped_column(Text)
     ip_address: Mapped[str | None] = mapped_column(String(64))
+    #: The department the entry belongs to (ADR 0067, decision 7), set by
+    #: `record_audit` from the action's prefix. Empty for what belongs to the
+    #: whole platform - signing in, staff access, Settings - and for every
+    #: entry from before the column existed, which stays as it was written.
+    department: Mapped[str | None] = mapped_column(String(20))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()"), index=True
     )
