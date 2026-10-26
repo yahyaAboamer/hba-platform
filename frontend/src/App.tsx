@@ -114,7 +114,7 @@ export default function App() {
   // Batch 1.3: while their access needs two-step sign-in and it is not on,
   // there is nothing to show but its set-up - the server refuses every other
   // call, so a desk would only be a page of errors.
-  if (session?.two_step?.must_set_up) {
+  if (session?.actor.two_step?.must_set_up) {
     return (
       <TwoStepRequired
         onDone={() => {

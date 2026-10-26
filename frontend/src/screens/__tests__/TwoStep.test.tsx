@@ -29,10 +29,14 @@ const ADMIN_PERMISSIONS = [
 ];
 
 const ME = {
-  actor: { id: 1, email: "owner@hbawear.store", display_name: "Yahya", roles: ["admin"], is_staff: true, is_model: false },
+  // Where the server really sends it: inside `actor` (found on production,
+  // 26 October - the screens read it from the top and never saw it).
+  actor: {
+    id: 1, email: "owner@hbawear.store", display_name: "Yahya", roles: ["admin"], is_staff: true, is_model: false,
+    two_step: { enabled: true, required: true, must_set_up: false },
+  },
   permissions: ADMIN_PERMISSIONS,
   platform: { working_month: "2026-10", go_live_month: "2026-10", start_month: "2026-01" },
-  two_step: { enabled: true, required: true, must_set_up: false },
 } as unknown as Session;
 
 type Call = { url: string; method: string; body: unknown };
@@ -222,7 +226,7 @@ function twoStepRoutes() {
 
 describe("When two-step sign-in is required and not on yet", () => {
   it("shows only the set-up, never the desk", async () => {
-    const must = { ...ME, two_step: { enabled: false, required: true, must_set_up: true } };
+    const must = { ...ME, actor: { ...ME.actor, two_step: { enabled: false, required: true, must_set_up: true } } };
     const base = twoStepRoutes();
     routes = (url, method) => {
       if (url === "/api/auth/me") return reply(200, must);
