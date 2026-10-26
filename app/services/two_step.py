@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import io
 import re
 import secrets
 import time
@@ -199,11 +200,18 @@ def _qr_svg(uri: str) -> str:
 
     Sized by its `viewBox` so the screen decides how large it is, and on white
     so it scans in the dark theme too.
+
+    **Written with its namespace.** The screen shows it as an image, and a
+    browser draws an SVG image only if it says `xmlns`; `svg_inline` leaves
+    that out, and the QR showed as a broken picture on staging (27 October).
     """
-    return segno.make(uri, error="m").svg_inline(
+    out = io.BytesIO()
+    segno.make(uri, error="m").save(
+        out, kind="svg", xmldecl=False, svgns=True, nl=False,
         scale=1, border=4, omitsize=True, dark="#000", light="#fff",
         title="QR code for your authenticator app",
     )
+    return out.getvalue().decode("utf-8")
 
 
 def begin_setup(db: Session, user: UserAccount) -> dict:

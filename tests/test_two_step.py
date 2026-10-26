@@ -232,6 +232,8 @@ def test_starting_shows_a_secret_a_link_and_a_qr_code_made_here(client):
     assert "issuer=HBA" in body["otpauth_uri"]
     assert f"secret={body['secret']}" in body["otpauth_uri"]
     assert body["qr_svg"].startswith("<svg") and "viewBox" in body["qr_svg"]
+    # Shown as an image, which a browser draws only with the namespace.
+    assert 'xmlns="http://www.w3.org/2000/svg"' in body["qr_svg"]
     # Nothing is on until a code confirms it.
     assert client.get("/api/auth/two-step").json()["enabled"] is False
 

@@ -270,6 +270,11 @@ export type Actor = {
   is_staff: boolean;
   /** Owns a model's record: what makes somebody a model (ADR 0006). */
   is_model: boolean;
+  /**
+   * Two-step sign-in for this account (Batch 1.3), sent inside `actor` by
+   * the server. Optional only so an older answer still reads.
+   */
+  two_step?: TwoStepState;
 };
 
 /** Where the platform is in time, decided by the server and not the browser. */
@@ -291,11 +296,6 @@ export type Session = {
   /** §6.5 and §5.1. What this account may do, from the server. */
   permissions: string[];
   platform: Platform;
-  /**
-   * Two-step sign-in for this account (Batch 1.3). Optional only so an older
-   * answer still reads; the server always sends it.
-   */
-  two_step?: TwoStepState;
 };
 
 export type TwoStepState = {
