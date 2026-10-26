@@ -1,4 +1,5 @@
-"""How often somebody may try a password, or ask for a reset email.
+"""How often somebody may try a password or a two-step code, or ask for a
+reset email.
 
 Added by the security audit of October 2026: nothing limited either.
 
@@ -120,6 +121,39 @@ RESET_PER_ACCOUNT = Throttle(limit=5, window=60 * 60)
 #: the signed-in account, which only that account's sessions can reach.
 PASSWORD_RECHECK = Throttle(limit=5, window=15 * 60)
 
+#: Codes tried at the second step of signing in, for one account from one
+#: address. **Only somebody who already typed the right password gets here** -
+#: the code is asked for only after it - so a stranger without the password
+#: cannot touch either code limit, and cannot use them to lock anybody out.
+#: About one wrong code a minute is plenty for a person and makes guessing a
+#: six-digit code hopeless.
+TWO_STEP_PER_PAIR = Throttle(limit=5, window=15 * 60)
+
+#: Codes tried for one account from anywhere. Higher than the pair limit, so
+#: only somebody holding the password *and* trying from several addresses
+#: meets it; a completed password reset clears it, as it clears the password
+#: limits, so the owner of the account can always get back in.
+TWO_STEP_PER_ACCOUNT = Throttle(limit=15, window=15 * 60)
+
+#: Codes typed by somebody already signed in - confirming a new secret,
+#: renewing recovery codes, turning two-step off, the owner's reset of
+#: somebody else's. Keyed on the signed-in account, which only that account's
+#: sessions can reach, as `PASSWORD_RECHECK` is.
+TWO_STEP_RECHECK = Throttle(limit=5, window=15 * 60)
+
+#: Wrong codes for one account in a day, wherever they were typed: the second
+#: step of signing in and every signed-in check alike. The limits above pause
+#: for fifteen minutes and then let guessing resume; this is the ceiling over
+#: all of them, so somebody holding the password cannot keep guessing for
+#: weeks at the short limits' pace. A right code takes its attempt back, so
+#: only wrong ones are counted.
+#:
+#: **Not cleared by a password reset**, which proves only the mailbox - the
+#: thing the code exists to be more than. Cleared only by the owner's audited
+#: reset of that person's two-step sign-in (`app/api/staff.py`), or by a
+#: deploy, like every limit here.
+TWO_STEP_PER_DAY = Throttle(limit=50, window=24 * 60 * 60)
+
 ALL = (
     LOGIN_PER_PAIR,
     LOGIN_PER_ACCOUNT,
@@ -128,6 +162,10 @@ ALL = (
     RESET_PER_SOURCE,
     RESET_PER_ACCOUNT,
     PASSWORD_RECHECK,
+    TWO_STEP_PER_PAIR,
+    TWO_STEP_PER_ACCOUNT,
+    TWO_STEP_RECHECK,
+    TWO_STEP_PER_DAY,
 )
 
 

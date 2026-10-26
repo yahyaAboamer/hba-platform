@@ -10,6 +10,7 @@ import {
   requestPasswordReset,
 } from "../lib/api";
 import type { Session } from "../lib/api";
+import { CodeStep } from "./SignIn";
 
 /**
  * Getting back in when the password is gone.
@@ -26,7 +27,7 @@ import type { Session } from "../lib/api";
 export function ResetPassword({
   onSignedIn,
 }: {
-  onSignedIn: (session: Session) => void;
+  onSignedIn: (session: Session, notice?: string) => void;
 }) {
   const [params] = useSearchParams();
   const navigate = useNavigate();
@@ -111,7 +112,7 @@ function UseTheLink({
   navigate,
 }: {
   token: string;
-  onSignedIn: (session: Session) => void;
+  onSignedIn: (session: Session, notice?: string) => void;
   navigate: ReturnType<typeof useNavigate>;
 }) {
   const [account, setAccount] = useState<string | null>(null);
@@ -122,6 +123,8 @@ function UseTheLink({
   const [passwordProblem, setPasswordProblem] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
+  // The password is changed, and two-step sign-in still asks for its code.
+  const [pending, setPending] = useState<string | null>(null);
 
   const tooShort = password.length < MINIMUM_PASSWORD;
 
@@ -152,7 +155,13 @@ function UseTheLink({
     setWorking(true);
     setError(null);
     try {
-      onSignedIn(await completePasswordReset(token, password));
+      const result = await completePasswordReset(token, password);
+      if (result.kind === "code") {
+        setPending(result.pending);
+        setPassword("");
+        return;
+      }
+      onSignedIn(result.session);
       navigate("/", { replace: true });
     } catch (caught) {
       setError(
@@ -163,6 +172,21 @@ function UseTheLink({
     } finally {
       setWorking(false);
     }
+  }
+
+  if (pending !== null) {
+    return (
+      <CodeStep
+        pending={pending}
+        onSignedIn={(session, notice) => {
+          onSignedIn(session, notice);
+          navigate("/", { replace: true });
+        }}
+        // The link is spent and the password already changed: the way on is
+        // the ordinary sign-in, with the new password.
+        onStartOver={() => navigate("/sign-in", { replace: true })}
+      />
+    );
   }
 
   if (checking) {

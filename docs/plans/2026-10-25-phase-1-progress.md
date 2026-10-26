@@ -11,10 +11,34 @@ redoing finished work. Newest facts first within each section.
 
 | | |
 |---|---|
-| **Branch** | `phase-1/batch-1`, cut from `claude/hba-erp-architecture-55746a` (which holds ADRs 0065–0069, the two mockups and the plan) |
-| **Base** | `origin/main` = `origin/production` = `c82785d` (checked 25 October 2026) |
-| **Pull request** | https://github.com/yahyaAboamer/hba-platform/pull/125 into `main`, opened 25 October; first CI run not yet read. **Next on resume:** read its checks, fix anything red, record the backend job's duration here, then narrow the CI time limits. |
-| **Merged / deployed** | nothing; neither is allowed without the owner's word for each |
+| **Batch in flight** | 1.3 — two-step sign-in, signed-in devices, suspending (ADR 0067, decisions 4–6) |
+| **Branch** | `phase-1/batch-3`, cut from `origin/main` at `ef266a2` on 26 October 2026 |
+| **Base** | `origin/main` = `origin/production` = `ef266a2` (checked 26 October 2026) |
+| **Shipped so far** | Batch 1.0/1.1 (PR #125, `a2ae261`), release gates (PR #126), Batch 1.2 (PR #127, `ef266a2`); all deployed to staging and production |
+| **Merged / deployed (1.3)** | nothing; neither is allowed without the owner's word for each |
+
+## Batch 1.3 — decisions taken while building
+
+- **One API contract first**, so backend and frontend were built side by side:
+  the pending sign-in token, `/api/auth/login/two-step`, `/api/auth/two-step*`,
+  `/api/auth/sessions*`, the owner's `/api/staff/{id}/sessions*` and
+  `/two-step/reset`, `two_step` in the session payload.
+- **The requirement has a switch, `TWO_STEP_ENFORCED`, off by default.** The
+  plan makes the rollout the owner's call; until it is on, nobody is forced,
+  and the screens still say who it will be required for.
+- **One gate instead of a special sign-in path:** a person who must set it up
+  and has not can reach only `/me`, the two-step endpoints and sign-out. That
+  covers sign-in, invitation acceptance and sessions already open on the day it
+  is switched on.
+- **Suspending now removes every role and ends every session**, in one audit
+  entry; bringing someone back gives no access until *Add access* is used.
+
+| Workstream | Who | State |
+|---|---|---|
+| Backend: models, migration, TOTP, recovery codes, pending token, gate, devices, owner reset, suspend | subagent, Opus, high | **done**; whole suite 120/120 files, 3,239 tests |
+| Frontend: sign-in code step, forced set-up, Settings → My preferences panels, Team lock icon, devices dialog, reset, suspend copy | subagent, Sonnet, medium | **done**; `npm test` 860/860, build passes |
+| Review, security review, whole suite, build | orchestrator + Opus security reviewer | **done.** No critical finding. Fixed: a reset no longer clears the code limits (H1); a 24-hour cap of 50 wrong six-digit codes (M1) that recovery codes skip, so a stolen password cannot keep the owner out; set-up asks for the password (M2); last-admin race locked (L1); no key wording before sign-in (L2); spent pending rows purged (L3); fresh reads under locks (L4). Also: a password reset asks for the code when two-step is on; a former member of staff can never apply as a model. **Not done:** an email when the password was right but the code wrong; an owner reset that also ends that person's sessions (L5). |
+| Push, PR, CI | orchestrator | not started |
 
 ## Batch 1 — the safety net
 

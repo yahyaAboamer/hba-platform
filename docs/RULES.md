@@ -254,12 +254,16 @@ payroll without touching a maintainer screen.
   code writes it; other departments read through its functions. New tables
   carry their department's prefix. Customer details still live only in the
   inbox's tables.
-- **A person may hold several roles** (ADR 0067; built, except two-step sign-in, which is decided and not built yet). What
+- **A person may hold several roles** (ADR 0067; built). What
   they may do is everything their live roles grant together; roles stay
   defined in code. Screens ask about permissions, never role names. Money is
   created, approved and paid under three separate permissions, and only the
   owner holds all three. Two-step sign-in is required for the owner and anyone
-  who approves or pays money.
+  who approves or pays money, once `TWO_STEP_ENFORCED` is on (the owner's
+  call; off until then); a password reset still asks for the code.
+  Suspending someone removes every staff role and ends every session in one
+  audited step; bringing them back gives no access, and a former member of
+  staff can never apply as a model.
 - **Production keeps its own look and changes only in this repository once it
   has moved** (ADR 0069; decided, not built yet). Its data belongs to the
   Production department in HBA's database; its sign-in is HBA's; suppliers

@@ -894,3 +894,7 @@
   .settings__pending li { flex-wrap: wrap; }
   .settings__pending-who { flex-basis: 100%; }
 }
+
+/* Devices: a list, with no bullets, inside a panel or a dialog. */
+.settings__devices { margin: 0; padding: 0; list-style: none; }
+.settings__explain-line { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--quiet); }

@@ -8,8 +8,9 @@ import type { ThemeChoice } from "../lib/theme";
 
 import { MonthPicker } from "../components/MonthPicker";
 import { PolicyText } from "../components/PolicyText";
-import { api, can } from "../lib/api";
-import type { Session } from "../lib/api";
+import { api, can, devices, twoStep } from "../lib/api";
+import type { DeviceSession, Session, TwoStepStatus } from "../lib/api";
+import { CodeForm, RecoveryCodes, TwoStepSetup } from "../components/TwoStepSetup";
 import { currentMonth, formatMonth, monthAdd, monthsBetween } from "../lib/money";
 import { DataPanel, longWhen } from "./DataPanel";
 import "./ModelLifecycle.css";
@@ -31,6 +32,8 @@ type StaffRow = {
   /** Every staff role held now, widest first (ADR 0067: several per person). */
   roles: string[];
   status: "invited" | "active" | "suspended";
+  /** Two-step sign-in is on for them (Batch 1.3). */
+  two_step_enabled?: boolean;
   last_login_at: string | null;
   created_at: string | null;
 };
@@ -309,6 +312,133 @@ function ConfirmDialog({
   );
 }
 
+/**
+ * A modal for the dialogs that hold more than a yes or no (a list of devices,
+ * a field for a code). Focus goes in on opening and back on closing, Escape
+ * closes, and Tab stays inside - as `ConfirmDialog` does.
+ */
+function DialogFrame({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const opener = document.activeElement as HTMLElement | null;
+    const first = dialogRef.current?.querySelector<HTMLElement>("input, button:not([disabled])");
+    first?.focus();
+    return () => { opener?.focus?.(); };
+  }, []);
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+      if (event.key !== "Tab" || !dialogRef.current) return;
+      const stops = Array.from(dialogRef.current.querySelectorAll<HTMLElement>("button:not([disabled]), input, textarea"));
+      if (stops.length === 0) return;
+      const first = stops[0];
+      const last = stops[stops.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  return (
+    <div className="lifecycle__layer">
+      <button type="button" className="lifecycle__scrim" aria-hidden="true" tabIndex={-1} onClick={onClose} />
+      <div ref={dialogRef} className="lifecycle__dialog" role="dialog" aria-modal="true" aria-labelledby="settings-frame-title">
+        <h2 id="settings-frame-title" className="lifecycle__title">{title}</h2>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// ── Where somebody is signed in ─────────────────────────────────────────────
+
+/** *Active now*, or when they were last seen. */
+function seenWords(iso: string): string {
+  if (Date.now() - new Date(iso).getTime() < 5 * 60_000) return "Active now";
+  return `Last seen ${lastSeen(iso).replace(/^Today, /, "today at ")}`;
+}
+
+/** One device: what it is, the address it came from, and when it was last used. */
+function DeviceLine({ device, action }: { device: DeviceSession; action?: React.ReactNode }) {
+  return (
+    <li className="twostep__row">
+      <span>
+        {device.device}{device.current && <span className="settings__you">This device</span>}
+        <small>{[device.ip_address, seenWords(device.last_seen_at)].filter(Boolean).join(" · ")}</small>
+      </span>
+      {action}
+    </li>
+  );
+}
+
+function DevicesDialog({ row, onClose, onChanged }: { row: StaffRow; onClose: () => void; onChanged: () => void }) {
+  const name = row.display_name || row.email;
+  const [list, setList] = useState<DeviceSession[] | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+  const [working, setWorking] = useState(false);
+
+  const load = useCallback(() => {
+    devices.of(row.id).then((body) => setList(body.sessions))
+      .catch((caught) => setProblem(caught instanceof Error ? caught.message : "Could not load this."));
+  }, [row.id]);
+  useEffect(load, [load]);
+
+  async function endAll() {
+    setWorking(true);
+    setProblem(null);
+    try {
+      await devices.endAllOf(row.id);
+      setList([]);
+      onChanged();
+    } catch (caught) {
+      setProblem(caught instanceof Error ? caught.message : "That did not go through.");
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  return (
+    <DialogFrame title={`${name} is signed in on`} onClose={onClose}>
+      {problem && <p className="notice notice--refused" role="alert">{problem}</p>}
+      {list === null && !problem && <p className="empty">Loading…</p>}
+      {list && list.length === 0 && <p className="empty">Not signed in anywhere.</p>}
+      {list && list.length > 0 && <ul className="settings__devices" aria-label={`Devices for ${name}`}>
+        {list.map((device) => <DeviceLine key={device.id} device={device} />)}
+      </ul>}
+      <div className="lifecycle__acts">
+        <button type="button" className="button" onClick={onClose}>Close</button>
+        <button type="button" className="button lifecycle__danger" onClick={endAll}
+          disabled={working || !list || list.length === 0}>
+          {working ? "Working…" : "Sign out of every device"}
+        </button>
+      </div>
+    </DialogFrame>
+  );
+}
+
+function ResetTwoStepDialog({ row, onClose, onDone }: { row: StaffRow; onClose: () => void; onDone: () => void }) {
+  const name = row.display_name || row.email;
+  return (
+    <DialogFrame title={`Reset two-step sign-in for ${name}?`} onClose={onClose}>
+      <ul className="lifecycle__effects">
+        <li>Turns off {name}&apos;s two-step sign-in and their recovery codes.</li>
+        <li>It lets {name} set it up again, on a new phone, the next time they sign in.</li>
+        <li>This asks for your own code, so it is you who is doing it.</li>
+      </ul>
+      <CodeForm
+        label="Your own 6-digit code"
+        action="Reset two-step sign-in"
+        danger
+        onCancel={onClose}
+        onSubmit={async (code) => {
+          await devices.resetTwoStepOf(row.id, code);
+          onDone();
+        }}
+      />
+    </DialogFrame>
+  );
+}
+
 // ── Team ──────────────────────────────────────────────────────────────────
 
 /** *Today, 14:31*, *Yesterday*, *3 August*, or *Never*. In Cairo. */
@@ -334,7 +464,9 @@ type Pending =
   | { kind: "give"; row: StaffRow; role: string }
   | { kind: "remove"; row: StaffRow; role: string }
   | { kind: "suspend"; row: StaffRow }
-  | { kind: "reactivate"; row: StaffRow };
+  | { kind: "reactivate"; row: StaffRow }
+  | { kind: "devices"; row: StaffRow }
+  | { kind: "reset"; row: StaffRow };
 
 function RosterPanel({ session }: { session: Session }) {
   const [roster, setRoster] = useState<Roster | null>(null);
@@ -367,6 +499,13 @@ function RosterPanel({ session }: { session: Session }) {
 
   function dialogFor(action: Pending) {
     const name = action.row.display_name || action.row.email;
+    if (action.kind === "devices") {
+      return <DevicesDialog row={action.row} onClose={() => setPending(null)} onChanged={load} />;
+    }
+    if (action.kind === "reset") {
+      return <ResetTwoStepDialog row={action.row} onClose={() => setPending(null)}
+        onDone={() => { setPending(null); load(); }} />;
+    }
     if (action.kind === "give" || action.kind === "remove") {
       // ADR 0067: a person holds several roles, and may do everything they
       // grant together - so what changes is read from all of them.
@@ -406,8 +545,8 @@ function RosterPanel({ session }: { session: Session }) {
       return <ConfirmDialog
         title={`Suspend ${name}?`}
         effects={[
-          "Signed out at once, on every device - an open tab is refused on its next click.",
-          "Nothing they did is removed. Reactivate brings them back as they were.",
+          "Removes every department and signs out every device at once.",
+          `The record of what ${name} did stays.`,
         ]}
         confirm="Suspend" danger needsReason
         onCancel={() => setPending(null)}
@@ -419,7 +558,7 @@ function RosterPanel({ session }: { session: Session }) {
     }
     return <ConfirmDialog
       title={`Reactivate ${name}?`}
-      effects={[`They can sign in again, as ${rolesWords(action.row.roles)}.`]}
+      effects={[`Reactivating ${name} gives no access. Add it again with Add access.`]}
       confirm="Reactivate"
       onCancel={() => setPending(null)}
       onConfirm={async () => {
@@ -462,6 +601,12 @@ function RosterPanel({ session }: { session: Session }) {
                   <tr key={row.id} className={row.status === "suspended" ? "settings__row--off" : undefined}>
                     <td>
                       {name}
+                      {row.two_step_enabled && (
+                        <svg className="twostep__lock" role="img" aria-label="Two-step sign-in on" viewBox="0 0 24 24"
+                          fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" />
+                        </svg>
+                      )}
                       {you && <span className="settings__you">You</span>}
                       <span className="settings__email">{row.email}</span>
                     </td>
@@ -504,17 +649,29 @@ function RosterPanel({ session }: { session: Session }) {
                             onClick={() => setMenu(menu === row.id ? null : row.id)}>⋯</button>
                           {menu === row.id && (
                             <span className="settings__menu">
+                              <button type="button" autoFocus
+                                onClick={() => { setMenu(null); setPending({ kind: "devices", row }); }}>
+                                Signed in on…
+                                <small>See where, and sign them out</small>
+                              </button>
+                              {row.two_step_enabled && (
+                                <button type="button"
+                                  onClick={() => { setMenu(null); setPending({ kind: "reset", row }); }}>
+                                  Reset two-step sign-in…
+                                  <small>Lets them set it up again</small>
+                                </button>
+                              )}
                               {row.status === "suspended" ? (
-                                <button type="button" autoFocus
+                                <button type="button"
                                   onClick={() => { setMenu(null); setPending({ kind: "reactivate", row }); }}>
                                   Reactivate
-                                  <small>They can sign in again</small>
+                                  <small>They can sign in again, with no access</small>
                                 </button>
                               ) : (
-                                <button type="button" autoFocus className="settings__menu-danger"
+                                <button type="button" className="settings__menu-danger"
                                   onClick={() => { setMenu(null); setPending({ kind: "suspend", row }); }}>
                                   Suspend…
-                                  <small>Signs them out at once</small>
+                                  <small>Removes every department and signs them out</small>
                                 </button>
                               )}
                             </span>
@@ -1402,7 +1559,118 @@ function AppearancePanel() {
     </section>
     {error && <p className="notice notice--refused" role="alert">{error}</p>}
     <PreferenceSwitches />
+    <TwoStepPanel />
+    <DevicesPanel />
   </>;
+}
+
+type TwoStepMode = "idle" | "setup" | "renew" | "off" | "codes";
+
+/**
+ * Two-step sign-in for the signed-in person. Setting up, new recovery codes
+ * and turning off each ask for a code, so a borrowed laptop cannot change it.
+ * Turning off is not offered when their access needs it.
+ */
+function TwoStepPanel() {
+  const [status, setStatus] = useState<TwoStepStatus | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [mode, setMode] = useState<TwoStepMode>("idle");
+  // Held only while they are on screen; cleared as soon as they are saved.
+  const [codes, setCodes] = useState<string[] | null>(null);
+
+  const load = useCallback(() => {
+    twoStep.status().then(setStatus)
+      .catch((caught) => setError(caught instanceof Error ? caught.message : "Could not load this."));
+  }, []);
+  useEffect(load, [load]);
+
+  const finish = () => { setCodes(null); setMode("idle"); load(); };
+
+  return (
+    <section className="panel" aria-labelledby="twostep-title">
+      <div className="panel__head">
+        <h2 className="panel__title" id="twostep-title">Two-step sign-in</h2>
+        {status && <span className={`pill ${status.enabled ? "twostep__on" : "twostep__off"}`}>{status.enabled ? "On" : "Off"}</span>}
+      </div>
+      <div className="twostep__panel-body">
+        {error && <p className="notice notice--refused" role="alert">{error}</p>}
+        {status && mode === "idle" && <>
+          <p className="settings__explain-line">
+            {status.required && <b>Required for your access. </b>}
+            {status.enabled
+              ? `Signing in asks for a code from your phone. ${status.recovery_codes_left} recovery ${status.recovery_codes_left === 1 ? "code" : "codes"} left.`
+              : "Signing in asks for a code from your phone, as well as your password."}
+          </p>
+          <div className="twostep__acts">
+            {!status.enabled && <button type="button" className="button button--primary" onClick={() => setMode("setup")}>Set up two-step sign-in</button>}
+            {status.enabled && <button type="button" className="button" onClick={() => setMode("renew")}>New recovery codes</button>}
+            {status.enabled && !status.required && <button type="button" className="button lifecycle__danger" onClick={() => setMode("off")}>Turn off</button>}
+          </div>
+        </>}
+        {mode === "setup" && <TwoStepSetup onDone={finish} onCancel={() => setMode("idle")} />}
+        {mode === "renew" && <CodeForm
+          label="6-digit code"
+          hint="Your old recovery codes stop working."
+          action="Make new recovery codes"
+          onCancel={() => setMode("idle")}
+          onSubmit={async (code) => { setCodes((await twoStep.newRecoveryCodes(code)).recovery_codes); setMode("codes"); }} />}
+        {mode === "codes" && codes && <RecoveryCodes codes={codes} onSaved={finish} />}
+        {mode === "off" && <CodeForm
+          label="6-digit code"
+          action="Turn off two-step sign-in"
+          danger
+          onCancel={() => setMode("idle")}
+          onSubmit={async (code) => { await twoStep.turnOff(code); finish(); }} />}
+      </div>
+    </section>
+  );
+}
+
+/** Where this account is signed in, with a way to end any of it. */
+function DevicesPanel() {
+  const [list, setList] = useState<DeviceSession[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [working, setWorking] = useState<number | "others" | null>(null);
+
+  const load = useCallback(() => {
+    devices.mine().then((body) => setList(body.sessions))
+      .catch((caught) => setError(caught instanceof Error ? caught.message : "Could not load this."));
+  }, []);
+  useEffect(load, [load]);
+
+  async function end(which: number | "others") {
+    setWorking(which);
+    setError(null);
+    try {
+      await (which === "others" ? devices.endOthers() : devices.endOne(which));
+      load();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "That did not go through.");
+    } finally {
+      setWorking(null);
+    }
+  }
+
+  const others = (list ?? []).filter((device) => !device.current);
+  return (
+    <section className="panel" aria-labelledby="devices-title">
+      <div className="panel__head"><h2 className="panel__title" id="devices-title">Signed in on</h2></div>
+      {error && <p className="notice notice--refused" role="alert">{error}</p>}
+      {list === null && !error && <p className="empty">Loading…</p>}
+      {list && <ul className="settings__devices" aria-label="Devices">
+        {list.map((device) => <DeviceLine key={device.id} device={device} action={device.current ? undefined :
+          <button type="button" className="button button--row" disabled={working !== null}
+            aria-label={`Sign out ${device.device}`} onClick={() => end(device.id)}>Sign out</button>} />)}
+      </ul>}
+      {others.length > 0 && <div className="twostep__panel-body">
+        <div className="twostep__acts">
+          <button type="button" className="button" disabled={working !== null} onClick={() => end("others")}>
+            Sign out of every other device
+          </button>
+        </div>
+      </div>}
+    </section>
+  );
 }
 
 type Preferences = {

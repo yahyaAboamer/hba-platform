@@ -34,6 +34,12 @@ dependencies = [
     # the deployed commit. Off until SENTRY_DSN is set; what it may send is
     # decided in app/core/observability.py and tested there.
     "sentry-sdk[fastapi]>=2.71,<3",
+    # Two-step sign-in (ADR 0067, decision 5; Phase 1 batch 3). pyotp makes
+    # and checks the six-digit authenticator codes (RFC 6238); segno draws the
+    # QR code to scan as an SVG on the server. Both pure Python, neither has a
+    # dependency of its own, and neither touches the network.
+    "pyotp>=2.9,<3",
+    "segno>=1.6,<2",
 ]
 
 # Without this, setuptools flat-layout discovery sees app/, frontend/ and

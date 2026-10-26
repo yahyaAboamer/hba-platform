@@ -33,6 +33,7 @@ import { Payroll } from "./screens/Payroll";
 import { PayrollApprove } from "./screens/PayrollApprove";
 import { Settings } from "./screens/Settings";
 import { SignIn } from "./screens/SignIn";
+import { TwoStepRequired } from "./screens/TwoStepRequired";
 import { Targets } from "./screens/Targets";
 
 /**
@@ -69,6 +70,8 @@ export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [checking, setChecking] = useState(true);
   const [needsSetup, setNeedsSetup] = useState(false);
+  // Said once, after signing in with a recovery code (see SignIn).
+  const [signInNotice, setSignInNotice] = useState<string | null>(null);
 
   useEffect(() => {
     currentUser()
@@ -108,6 +111,19 @@ export default function App() {
     );
   }
 
+  // Batch 1.3: while their access needs two-step sign-in and it is not on,
+  // there is nothing to show but its set-up - the server refuses every other
+  // call, so a desk would only be a page of errors.
+  if (session?.two_step?.must_set_up) {
+    return (
+      <TwoStepRequired
+        onDone={() => {
+          currentUser().then(setSession).catch(() => setSession(null));
+        }}
+      />
+    );
+  }
+
   // ADR 0064: the frame inside "View her portal". Her portal is decided before
   // the router, because it brings a router of its own - and only for somebody
   // who may open her profile; anybody else falls through to the routes below.
@@ -122,11 +138,28 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      {session && signInNotice && (
+        <p className="notice notice--settled" role="status">
+          {signInNotice}{" "}
+          <button type="button" className="settings__link-button" onClick={() => setSignInNotice(null)}>
+            Dismiss
+          </button>
+        </p>
+      )}
       <Routes>
         <Route
           path="/sign-in"
           element={
-            session ? <Navigate to="/" replace /> : <SignIn onSignedIn={setSession} />
+            session ? (
+              <Navigate to="/" replace />
+            ) : (
+              <SignIn
+                onSignedIn={(signedIn, notice) => {
+                  setSignInNotice(notice ?? null);
+                  setSession(signedIn);
+                }}
+              />
+            )
           }
         />
         {/*
@@ -147,7 +180,14 @@ export default function App() {
          */}
         <Route
           path="/reset-password"
-          element={<ResetPassword onSignedIn={setSession} />}
+          element={
+            <ResetPassword
+              onSignedIn={(signedIn, notice) => {
+                setSignInNotice(notice ?? null);
+                setSession(signedIn);
+              }}
+            />
+          }
         />
         {/*
          * §6.1. Somebody holding no staff permission at all - a model, or

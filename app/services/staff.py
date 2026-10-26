@@ -32,6 +32,8 @@ from app.core.permissions import (
 from app.models.identity import Invitation, RoleAssignment, UserAccount
 from app.services.access import live_roles, live_roles_by_account
 from app.services.audit import record_audit
+from app.services.auth import revoke_all_sessions
+from app.services.two_step import cancel_pending, enabled_account_ids
 
 #: A model's role grants nothing and makes nobody staff; a model holds it by
 #: accepting her invitation, and reaches her portal by owning her record. It
@@ -133,6 +135,7 @@ def list_staff(db: Session) -> list[dict]:
         .order_by(UserAccount.display_name, UserAccount.email)
     )
     held = live_roles_by_account(db, account_ids)
+    with_two_step = enabled_account_ids(db, account_ids)
     return [
         {
             "id": account.id,
@@ -142,6 +145,8 @@ def list_staff(db: Session) -> list[dict]:
             # role grants nothing and is not staff access, so it is left out.
             "roles": sorted_roles(held[account.id] - {MODEL_ROLE}),
             "status": account.status,
+            #: The lock beside a name on Team and access (ADR 0067).
+            "two_step_enabled": account.id in with_two_step,
             "last_login_at": account.last_login_at,
             "created_at": account.created_at,
         }
@@ -211,6 +216,21 @@ def list_pending_invitations(
 
 
 def _admin_count(db: Session, *, excluding: int | None = None) -> int:
+    """Active admins other than `excluding`, counted **under lock**.
+
+    Every live admin assignment is locked first (`FOR UPDATE`, in id order so
+    two callers queue rather than deadlock). Without it two admins suspending
+    each other at the same moment would each count the other as the admin
+    left behind, and both would go - the platform with nobody able to
+    administer it. With it the second waits for the first to commit, then
+    re-reads, sees the first one's assignment revoked, and is refused.
+    """
+    db.execute(
+        select(RoleAssignment.id)
+        .where(RoleAssignment.role == "admin", RoleAssignment.revoked_at.is_(None))
+        .order_by(RoleAssignment.id)
+        .with_for_update()
+    ).all()
     query = (
         select(RoleAssignment.user_account_id)
         .join(UserAccount, UserAccount.id == RoleAssignment.user_account_id)
@@ -343,8 +363,7 @@ def remove_role(
     if role == "admin" and user.status == "active":
         _assert_leaves_an_admin(db, user)
 
-    live.revoked_at = utcnow()
-    db.flush()
+    _revoke(db, [live])
 
     record_audit(
         db,
@@ -358,6 +377,17 @@ def remove_role(
     return live
 
 
+def _revoke(db: Session, assignments: list[RoleAssignment]) -> None:
+    """Revoke role assignments - **the one way access is taken away**, for
+    removing one role and for suspending alike, so the trail reads the same
+    whichever did it. Revoked, never deleted: `role_assignment` exists so that
+    "what access did they have on this date" survives a later change."""
+    now = utcnow()
+    for assignment in assignments:
+        assignment.revoked_at = now
+    db.flush()
+
+
 def suspend_staff(
     db: Session,
     user: UserAccount,
@@ -365,13 +395,23 @@ def suspend_staff(
     reason: str,
     actor_id: int | None,
     actor_email: str | None,
-) -> UserAccount:
-    """Lock an account out without deleting anything it has done.
+) -> int:
+    """Lock an account out without deleting anything it has done. Returns how
+    many sessions it ended.
+
+    **One action, one entry** (ADR 0067, decision 6): the status, every staff
+    role and every session go together, and the trail records them as one
+    `staff.suspended` with the roles held before. Bringing somebody back is
+    then a deliberate act - reactivating gives no access back, and each role
+    is given again with *Add access*.
+
+    **A model's own role stays.** It grants nothing and is never given or
+    taken here (`ASSIGNABLE_ROLES`); her portal is reached by owning her
+    record, and a suspended account reaches nothing at all.
 
     **Takes effect immediately, not at next sign-in** - `resolve_session`
-    checks `status` on every request (app/services/auth.py), so an open tab is
-    refused on its very next call rather than left to run until its session
-    happens to expire.
+    checks `status` on every request (app/services/auth.py), and every session
+    is ended besides, so an open tab is refused on its very next call.
     """
     if not str(reason or "").strip():
         raise ValueError("Suspending an account needs a written reason")
@@ -383,8 +423,27 @@ def suspend_staff(
     if "admin" in live_roles(db, user.id):
         _assert_leaves_an_admin(db, user)
 
+    held = list(
+        db.scalars(
+            select(RoleAssignment)
+            .where(
+                RoleAssignment.user_account_id == user.id,
+                RoleAssignment.revoked_at.is_(None),
+                RoleAssignment.role != MODEL_ROLE,
+            )
+            .order_by(RoleAssignment.id)
+            .with_for_update()
+        )
+    )
     before_status = user.status
+    before_roles = sorted_roles(a.role for a in held)
+
     user.status = "suspended"
+    _revoke(db, held)
+    ended = revoke_all_sessions(db, user.id)
+    # A sign-in half done (the password typed, the code still owed) must not
+    # be finished either.
+    cancel_pending(db, user.id)
 
     record_audit(
         db,
@@ -392,11 +451,11 @@ def suspend_staff(
         subject=f"user:{user.id}",
         actor_id=actor_id,
         actor_email=actor_email,
-        before={"status": before_status},
-        after={"status": "suspended"},
+        before={"status": before_status, "roles": before_roles},
+        after={"status": "suspended", "roles": [], "sessions_ended": ended},
         reason=reason.strip(),
     )
-    return user
+    return ended
 
 
 def reactivate_staff(
@@ -407,7 +466,11 @@ def reactivate_staff(
     actor_email: str | None,
 ) -> UserAccount:
     """Reverse a suspension. No reason required - a suspension is the act that
-    needs explaining; undoing one needs only doing."""
+    needs explaining; undoing one needs only doing.
+
+    **No access comes back with it** (ADR 0067, decision 6). Suspending took
+    every role; the person can sign in again and reaches nothing until each
+    role is given again, deliberately, with *Add access*."""
     if user.status != "suspended":
         raise ValueError(f"{user.display_name or user.email} is not suspended")
 

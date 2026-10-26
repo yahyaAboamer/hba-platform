@@ -291,6 +291,19 @@ export type Session = {
   /** §6.5 and §5.1. What this account may do, from the server. */
   permissions: string[];
   platform: Platform;
+  /**
+   * Two-step sign-in for this account (Batch 1.3). Optional only so an older
+   * answer still reads; the server always sends it.
+   */
+  two_step?: TwoStepState;
+};
+
+export type TwoStepState = {
+  enabled: boolean;
+  /** Their access needs it (an admin, or somebody who approves or pays). */
+  required: boolean;
+  /** Required, not on yet, and the owner has switched enforcing on. */
+  must_set_up: boolean;
 };
 
 /**
@@ -348,15 +361,18 @@ export async function currentUser(): Promise<Session | null> {
   }
 }
 
-export async function signIn(
-  email: string,
-  password: string,
-): Promise<Session> {
-  const result = await api.post<{ csrf: string; actor: Actor }>(
-    "/api/auth/login",
-    { email, password },
-  );
-  rememberToken(result.csrf);
+/**
+ * What the password step answered: a session, or "now the code".
+ *
+ * `pending` is the one-use token the second step hands back; it is never
+ * stored, only kept in the sign-in screen's state for five minutes.
+ */
+export type SignInResult =
+  | { kind: "session"; session: Session }
+  | { kind: "code"; pending: string; expiresIn: number };
+
+async function sessionAfterLogin(csrf: string): Promise<Session> {
+  rememberToken(csrf);
   // Login returns the actor; `me` also returns the permissions. Asking once
   // more keeps one source of truth for what this account may do, rather than
   // two shapes that can disagree.
@@ -366,6 +382,83 @@ export async function signIn(
   }
   return session;
 }
+
+export async function signIn(
+  email: string,
+  password: string,
+): Promise<SignInResult> {
+  const result = await api.post<
+    | { csrf: string; actor: Actor }
+    | { two_step: "code"; pending: string; expires_in: number }
+  >("/api/auth/login", { email, password });
+  if ("two_step" in result) {
+    return { kind: "code", pending: result.pending, expiresIn: result.expires_in };
+  }
+  return { kind: "session", session: await sessionAfterLogin(result.csrf) };
+}
+
+/** The second step: an authenticator code or a recovery code. */
+export async function signInWithCode(
+  pending: string,
+  code: string,
+): Promise<{ session: Session; recoveryCodesLeft: number | null }> {
+  const result = await api.post<{
+    csrf: string;
+    actor: Actor;
+    recovery_codes_left?: number;
+  }>("/api/auth/login/two-step", { pending, code });
+  return {
+    session: await sessionAfterLogin(result.csrf),
+    recoveryCodesLeft: result.recovery_codes_left ?? null,
+  };
+}
+
+// ── Two-step sign-in, and where somebody is signed in (Batch 1.3) ──────────
+
+export type TwoStepStatus = TwoStepState & {
+  enabled_at: string | null;
+  recovery_codes_left: number;
+};
+
+export type TwoStepStart = {
+  secret: string;
+  otpauth_uri: string;
+  /** Server-made SVG; shown as an image, never inserted as markup. */
+  qr_svg: string;
+};
+
+export type DeviceSession = {
+  id: number;
+  device: string;
+  ip_address: string | null;
+  created_at: string;
+  last_seen_at: string;
+  current: boolean;
+};
+
+export const twoStep = {
+  status: () => api.get<TwoStepStatus>("/api/auth/two-step"),
+  start: (password: string) =>
+    api.post<TwoStepStart>("/api/auth/two-step/start", { password }),
+  confirm: (code: string) =>
+    api.post<{ recovery_codes: string[] }>("/api/auth/two-step/confirm", { code }),
+  newRecoveryCodes: (code: string) =>
+    api.post<{ recovery_codes: string[] }>("/api/auth/two-step/recovery-codes", { code }),
+  turnOff: (code: string) =>
+    api.post<{ enabled: false }>("/api/auth/two-step/turn-off", { code }),
+};
+
+export const devices = {
+  mine: () => api.get<{ sessions: DeviceSession[] }>("/api/auth/sessions"),
+  endOne: (id: number) => api.post<{ ended: boolean }>(`/api/auth/sessions/${id}/end`),
+  endOthers: () => api.post<{ ended: number }>("/api/auth/sessions/end-others"),
+  of: (staffId: number) =>
+    api.get<{ sessions: DeviceSession[] }>(`/api/staff/${staffId}/sessions`),
+  endAllOf: (staffId: number) =>
+    api.post<{ ended: number }>(`/api/staff/${staffId}/sessions/end-all`),
+  resetTwoStepOf: (staffId: number, code: string) =>
+    api.post<{ enabled: false }>(`/api/staff/${staffId}/two-step/reset`, { code }),
+};
 
 /**
  * Turn an invitation into an account, and sign the new person straight in.
@@ -427,18 +520,23 @@ export async function previewPasswordReset(
 export async function completePasswordReset(
   token: string,
   password: string,
-): Promise<Session> {
-  const result = await api.post<{ csrf: string; actor: Actor }>(
-    "/api/auth/password-reset",
-    { token, password },
-  );
+): Promise<SignInResult> {
+  // Somebody with two-step on is not signed in by a reset: the code is still
+  // asked, as at sign-in, or reading the mailbox would be enough.
+  const result = await api.post<
+    | { csrf: string; actor: Actor }
+    | { two_step: "code"; pending: string; expires_in: number }
+  >("/api/auth/password-reset", { token, password });
+  if ("two_step" in result) {
+    return { kind: "code", pending: result.pending, expiresIn: result.expires_in };
+  }
   rememberToken(result.csrf);
 
   const session = await currentUser();
   if (session === null) {
     throw new ApiError(401, "Password changed, but the session did not stick.");
   }
-  return session;
+  return { kind: "session", session };
 }
 
 export async function acceptInvitation(

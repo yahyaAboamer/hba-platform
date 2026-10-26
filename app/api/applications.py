@@ -12,13 +12,14 @@ for them to apply as.
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps import current_user, roles_of
-from app.core.permissions import is_staff
+from app.core.permissions import MODEL_ROLE, is_staff
 from app.db import get_session
-from app.models.identity import UserAccount
+from app.models.identity import RoleAssignment, UserAccount
 from app.services.applications import (
     REQUIRED_PAYOUT_FIELDS,
     existing_application,
@@ -70,8 +71,20 @@ def _applicant(
     an administrator has no affiliate record to create and
     letting them make one would produce a profile whose owner is the person who
     approves it.
+
+    **Once staff, never an applicant.** Suspending removes every role and
+    reactivating gives none back (ADR 0067, decision 6), so a former member of
+    staff can hold no live role at all; counting only live roles would let
+    that account apply. Revoked assignments are kept, so they answer it.
     """
-    if is_staff(roles_of(db, user)):
+    if is_staff(roles_of(db, user)) or db.scalar(
+        select(RoleAssignment.id)
+        .where(
+            RoleAssignment.user_account_id == user.id,
+            RoleAssignment.role != MODEL_ROLE,
+        )
+        .limit(1)
+    ):
         raise HTTPException(403, "This account is not an affiliate")
     return user
 

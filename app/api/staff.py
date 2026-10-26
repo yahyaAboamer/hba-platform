@@ -19,6 +19,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps import client_address, holds, require_permission, require_staff, roles_of
+from app.core import throttle
 from app.config import settings
 from app.core.businesstime import utcnow
 from app.core.permissions import (
@@ -31,7 +32,9 @@ from app.core.permissions import (
 )
 from app.db import get_session
 from app.models.identity import Invitation, UserAccount
+from app.services import two_step
 from app.services.audit import record_audit
+from app.services.auth import live_sessions, revoke_all_sessions, session_rows
 from app.services.invitations import create_invitation
 from app.services.notifications import invitation_link, invitation_sent
 from app.services.staff import (
@@ -230,9 +233,12 @@ def suspend(
     actor: UserAccount = Depends(require_permission(Permission.SETTINGS_MANAGE)),
     db: Session = Depends(get_session),
 ) -> dict:
+    """Settings → Team and access, the danger strip: every role and every
+    session go at once, in one transaction and one audit entry (ADR 0067,
+    decision 6). The record of what the person did stays."""
     user = _user_or_404(db, user_id)
     try:
-        suspend_staff(
+        ended = suspend_staff(
             db, user, reason=body.reason, actor_id=actor.id, actor_email=actor.email
         )
     except ValueError as exc:
@@ -240,7 +246,12 @@ def suspend(
         raise HTTPException(400, str(exc)) from exc
 
     db.commit()
-    return {"id": user.id, "status": "suspended"}
+    return {
+        "id": user.id,
+        "status": "suspended",
+        "roles": _roles_now(db, user),
+        "sessions_ended": ended,
+    }
 
 
 @router.post("/{user_id}/reactivate")
@@ -249,6 +260,8 @@ def reactivate(
     actor: UserAccount = Depends(require_permission(Permission.SETTINGS_MANAGE)),
     db: Session = Depends(get_session),
 ) -> dict:
+    """Lets the person sign in again, holding nothing: access is given back
+    deliberately, one role at a time, with *Add access*."""
     user = _user_or_404(db, user_id)
     try:
         reactivate_staff(db, user, actor_id=actor.id, actor_email=actor.email)
@@ -257,7 +270,129 @@ def reactivate(
         raise HTTPException(400, str(exc)) from exc
 
     db.commit()
-    return {"id": user.id, "status": "active"}
+    return {"id": user.id, "status": "active", "roles": _roles_now(db, user)}
+
+
+# ── The owner, for somebody else: their devices and their two-step ───────────
+
+
+@router.get("/{user_id}/sessions")
+def their_sessions(
+    user_id: int,
+    _actor: UserAccount = Depends(require_permission(Permission.SETTINGS_MANAGE)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """*Signed in on*, for anybody, on their page. None of these is the
+    owner's own browser, so `current` is always false."""
+    user = _user_or_404(db, user_id)
+    return {"sessions": session_rows(live_sessions(db, user.id), None)}
+
+
+@router.post("/{user_id}/sessions/end-all")
+def end_their_sessions(
+    user_id: int,
+    request: Request,
+    actor: UserAccount = Depends(require_permission(Permission.SETTINGS_MANAGE)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Sign somebody out everywhere. Their access stays as it is - this is
+    for a lost laptop, not for taking anything away (that is suspending)."""
+    user = _user_or_404(db, user_id)
+    ended = revoke_all_sessions(db, user.id)
+    record_audit(
+        db,
+        action="auth.sessions.ended",
+        subject=f"user:{user.id}",
+        actor_id=actor.id,
+        actor_email=actor.email,
+        after={"ended": ended, "by_owner": True},
+        ip_address=client_address(request),
+    )
+    db.commit()
+    return {"ended": ended}
+
+
+class OwnCodeBody(BaseModel):
+    code: str = Field(min_length=1, max_length=40)
+
+
+#: Refused when the owner has no two-step sign-in of their own to prove it.
+OWNER_NEEDS_TWO_STEP = "Turn on your own two-step sign-in first."
+
+
+@router.post("/{user_id}/two-step/reset")
+def reset_their_two_step(
+    user_id: int,
+    body: OwnCodeBody,
+    request: Request,
+    actor: UserAccount = Depends(require_permission(Permission.SETTINGS_MANAGE)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Take somebody's two-step sign-in off, for a lost phone (ADR 0067).
+
+    **The owner proves it is them first**, with a code from their own app -
+    not a recovery code: an open session left on a desk must not be enough to
+    strip somebody else's second step. Never on yourself; turning your own off
+    asks for your own code at `/api/auth/two-step/turn-off`, and is refused if
+    your access needs it. Audited with the person as subject and the owner as
+    actor. Their sessions are left alone; *End all* is beside it.
+    """
+    user = _user_or_404(db, user_id)
+    if user.id == actor.id:
+        raise HTTPException(
+            400, "This is your own account. Turn your own two-step sign-in off in Settings → Me."
+        )
+    if not two_step.is_enabled(db, actor.id):
+        raise HTTPException(409, OWNER_NEEDS_TWO_STEP)
+    if not two_step.is_enabled(db, user.id):
+        raise HTTPException(
+            409, f"Two-step sign-in is not on for {user.display_name or user.email}."
+        )
+
+    # The owner's own code counts against the owner's limits, the day's
+    # ceiling included, as any code typed while signed in does.
+    key = f"user:{actor.id}"
+    wait = throttle.acquire_all(
+        [(throttle.TWO_STEP_PER_DAY, key), (throttle.TWO_STEP_RECHECK, key)]
+    )
+    if wait:
+        raise HTTPException(
+            429, throttle.try_again_message(wait), headers={"Retry-After": str(wait)}
+        )
+    try:
+        accepted = two_step.check_authenticator_code(db, actor.id, body.code)
+    except two_step.KeyUnavailable as exc:
+        db.rollback()
+        throttle.TWO_STEP_RECHECK.release(key)
+        throttle.TWO_STEP_PER_DAY.release(key)
+        raise HTTPException(503, str(exc)) from None
+    if not accepted:
+        db.rollback()
+        raise HTTPException(
+            400, "That code did not work. Check the time on your phone and try again."
+        )
+    throttle.TWO_STEP_PER_DAY.release(key)
+    throttle.TWO_STEP_RECHECK.clear(key)
+
+    two_step.turn_off(db, user.id)
+    # The one thing that lifts the person's day of wrong codes: the owner,
+    # having proved it is them, starting that person's second step afresh -
+    # audited just below.
+    subject = f"user:{user.id}"
+    throttle.TWO_STEP_PER_DAY.clear(subject)
+    throttle.TWO_STEP_PER_ACCOUNT.clear(subject)
+    record_audit(
+        db,
+        action="auth.two_step.reset",
+        subject=f"user:{user.id}",
+        actor_id=actor.id,
+        actor_email=actor.email,
+        before={"enabled": True},
+        after={"enabled": False},
+        ip_address=client_address(request),
+    )
+    db.commit()
+    return {"enabled": False}
 
 
 @router.post("/invitations/{invitation_id}/revoke")

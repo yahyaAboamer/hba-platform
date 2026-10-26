@@ -16,6 +16,7 @@ from app.api.deps import (
     permission_list,
     require_permission,
     roles_of,
+    signed_in,
 )
 from app.config import settings
 from app.core.businesstime import utcnow
@@ -33,13 +34,19 @@ from app.core import throttle
 from app.db import get_session
 from app.models.identity import Invitation, RoleAssignment, UserAccount
 from app.services.audit import record_audit
+from app.services import two_step
 from app.services.auth import (
     authenticate,
     ensure_csrf,
     issue_session,
+    live_sessions,
     resolve_session,
     revoke_all_sessions,
+    revoke_other_sessions,
     revoke_session,
+    revoke_session_by_id,
+    session_for_token,
+    session_rows,
 )
 from app.services.invitations import (
     accept_invitation,
@@ -275,7 +282,7 @@ def login(
     if wait:
         raise _paused(wait)
 
-    user = authenticate(db, str(body.email), body.password)
+    user = authenticate(db, str(body.email), body.password, record_login=False)
     if user is None:
         # One message for both causes. Distinguishing them would confirm which
         # email addresses have accounts.
@@ -286,6 +293,40 @@ def login(
         throttle.LOGIN_PER_PAIR.clear(f"{email}|{source}")
         throttle.LOGIN_PER_SOURCE.release(source)
 
+    if two_step.is_enabled(db, user.id):
+        # Half of it. **No session and no cookie**: the token returned is good
+        # only for exchanging, with a code, at `/login/two-step` - for five
+        # minutes and once. Not audited as a sign-in, because it is not one.
+        pending = two_step.start_pending(db, user.id, _client_ip(request))
+        db.commit()
+        return _code_owed(pending)
+
+    return _sign_in(db, request, response, user)
+
+
+def _code_owed(pending: str) -> dict:
+    """The answer to a right password when a code is still owed."""
+    return {
+        "two_step": "code",
+        "pending": pending,
+        "expires_in": two_step.PENDING_SECONDS,
+    }
+
+
+def _sign_in(
+    db: Session,
+    request: Request,
+    response: Response,
+    user: UserAccount,
+    *,
+    after: dict | None = None,
+) -> dict:
+    """Issue the session, record the sign-in, set both cookies.
+
+    `auth.login` is written here and only here, once a session actually
+    exists - a right password still waiting on its code is not a sign-in.
+    """
+    user.last_login_at = utcnow()
     token, csrf, _ = issue_session(
         db, user.id, _client_ip(request), request.headers.get("user-agent")
     )
@@ -295,11 +336,128 @@ def login(
         subject=f"user:{user.id}",
         actor_id=user.id,
         actor_email=user.email,
+        after=after,
         ip_address=_client_ip(request),
     )
     db.commit()
     _set_cookie(response, token, csrf)
     return {"actor": actor_payload(db, user), "csrf": csrf}
+
+
+#: The words of the two-step refusals. The screens show them as they are.
+SIGN_IN_TOO_SLOW = "Sign-in took too long. Start again."
+CODE_DID_NOT_WORK = "That code did not work."
+CODE_DID_NOT_WORK_CHECK_TIME = (
+    "That code did not work. Check the time on your phone and try again."
+)
+TWO_STEP_UNAVAILABLE = "Two-step sign-in is unavailable right now. Try again shortly."
+#: The words of the password re-check, as before a payout destination changes
+#: (`app/api/affiliate_self.py`).
+PASSWORD_NOT_RIGHT = "That password is not right"
+REQUIRED_CANNOT_TURN_OFF = (
+    "Your access needs two-step sign-in. If you lost your phone, the owner can reset it."
+)
+
+
+class TwoStepLoginBody(BaseModel):
+    pending: str = Field(min_length=1, max_length=200)
+    code: str = Field(min_length=1, max_length=40)
+
+
+@router.post("/login/two-step")
+def login_two_step(
+    body: TwoStepLoginBody,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_session),
+) -> dict:
+    """The second step: the pending token from `/login` and a code - from the
+    authenticator app, or one of the recovery codes.
+
+    **A wrong code leaves the pending sign-in usable** until it expires or the
+    limits stop it, so a mistyped digit does not send somebody back to the
+    password. Guessing is limited per account and per account-and-address
+    (`throttle.TWO_STEP_*`), and only somebody who typed the right password
+    ever reaches it.
+
+    Expired, already used and unknown all read alike (410): the person's next
+    move is the same, and nothing here says which tokens ever existed.
+    """
+    pending = two_step.live_pending(db, body.pending)
+    if pending is None:
+        raise HTTPException(410, SIGN_IN_TOO_SLOW)
+    user = db.get(UserAccount, pending.user_account_id)
+    if user is None or user.status != "active" or not two_step.is_enabled(db, user.id):
+        # Suspended, or two-step reset, since the password was typed: the
+        # sign-in it was part of is over. Starting again is the right answer
+        # in every case.
+        pending.used_at = utcnow()
+        db.commit()
+        raise HTTPException(410, SIGN_IN_TOO_SLOW)
+
+    # Counted before the code is checked, and the right code is refused while
+    # paused - the same reasoning as the password's.
+    account = f"user:{user.id}"
+    source = _source(request)
+    short = [(throttle.TWO_STEP_PER_ACCOUNT, account)]
+    if source is not None:
+        short.append((throttle.TWO_STEP_PER_PAIR, f"{account}|{source}"))
+    # **The day's ceiling holds six digits only.** Somebody who already has
+    # the password could otherwise spend the owner's fifty and keep them out
+    # for a day, with nobody able to lift it (an owner cannot reset their
+    # own). A recovery code is 50 bits - not guessable at the short limits in
+    # any lifetime - so it stays the way in when the ceiling is reached.
+    daily = (
+        [(throttle.TWO_STEP_PER_DAY, account)]
+        if two_step.is_authenticator_code(body.code)
+        else []
+    )
+    checks = daily + short
+    wait = throttle.acquire_all(checks)
+    if wait:
+        raise _paused(wait)
+
+    try:
+        used = two_step.check_code(db, user.id, body.code)
+    except two_step.KeyUnavailable:
+        # The server cannot read the secret: the code was never judged, so
+        # it does not count against them. A recovery code still works.
+        #
+        # **Generic words here**: this person is not signed in yet, and why
+        # the server's key cannot be used is the owner's business, not
+        # theirs. The signed-in `/two-step/start` still says it exactly.
+        db.rollback()
+        for limit, key in checks:
+            limit.release(key)
+        raise HTTPException(503, TWO_STEP_UNAVAILABLE) from None
+    if used is None:
+        db.rollback()
+        raise HTTPException(401, CODE_DID_NOT_WORK)
+
+    # Right, so the day's count takes its attempt back - it counts wrong
+    # codes only - and the short limits start afresh.
+    for limit, key in daily:
+        limit.release(key)
+    for limit, key in short:
+        limit.clear(key)
+    pending.used_at = utcnow()
+
+    left = None
+    if used == "recovery":
+        left = two_step.recovery_codes_left(db, user.id)
+        record_audit(
+            db,
+            action="auth.two_step.recovery_used",
+            subject=f"user:{user.id}",
+            actor_id=user.id,
+            actor_email=user.email,
+            after={"recovery_codes_left": left},
+            ip_address=_client_ip(request),
+        )
+    payload = _sign_in(db, request, response, user, after={"two_step": used})
+    if left is not None:
+        payload["recovery_codes_left"] = left
+    return payload
 
 
 @router.post("/logout")
@@ -355,7 +513,9 @@ def logout(
 def me(
     request: Request,
     response: Response,
-    user: UserAccount = Depends(current_user),
+    # Not behind the two-step gate: somebody who must set it up still needs
+    # to know who they are, and the screen reads `two_step` from here.
+    user: UserAccount = Depends(signed_in),
     db: Session = Depends(get_session),
 ) -> dict:
     """Who is signed in, and what they may do.
@@ -612,6 +772,8 @@ def complete_password_reset(
         raise HTTPException(422, str(exc)) from exc
 
     ended = revoke_all_sessions(db, account.id)
+    # A sign-in half done with the old password must not be finished either.
+    two_step.cancel_pending(db, account.id)
     # They have just proved they own the address, so a pause from somebody
     # else's guessing must not keep them out.
     owner = account.email.strip().lower()
@@ -620,9 +782,9 @@ def complete_password_reset(
     if source is not None:
         throttle.LOGIN_PER_PAIR.clear(f"{owner}|{source}")
     throttle.PASSWORD_RECHECK.clear(f"user:{account.id}")
-    token, csrf, _ = issue_session(
-        db, account.id, _client_ip(request), request.headers.get("user-agent")
-    )
+    # **The code limits are not cleared.** A reset proves the mailbox, which
+    # is exactly what the second step must be more than: clearing them here
+    # would give whoever reads the mail a fresh round of guesses per reset.
     record_audit(
         db,
         action="auth.password_reset",
@@ -631,6 +793,21 @@ def complete_password_reset(
         actor_email=account.email,
         after={"sessions_ended": ended},
         ip_address=_client_ip(request),
+    )
+
+    if two_step.is_enabled(db, account.id):
+        # **A reset link is not the second step.** It proves somebody can read
+        # the mailbox - the one thing the password already stands for, since
+        # the mailbox is where a password is reset from. Signing straight in
+        # here would make two-step sign-in worth no more than the email
+        # account, so somebody who has it on is asked for their code, exactly
+        # as at sign-in, with the new password already set.
+        pending = two_step.start_pending(db, account.id, _client_ip(request))
+        db.commit()
+        return _code_owed(pending)
+
+    token, csrf, _ = issue_session(
+        db, account.id, _client_ip(request), request.headers.get("user-agent")
     )
     db.commit()
     _set_cookie(response, token, csrf)
@@ -695,3 +872,262 @@ def accept(
     db.commit()
     _set_cookie(response, token, csrf)
     return {"actor": actor_payload(db, user), "csrf": csrf}
+
+
+# ── Two-step sign-in for the signed-in person (ADR 0067, decision 5) ─────────
+#
+# Behind `signed_in`, not `current_user`: these are what somebody who must set
+# two-step sign-in up is allowed to reach while the gate holds everything else.
+# Every change asks for a code first, limited per account
+# (`throttle.TWO_STEP_RECHECK`), so an unattended open session cannot quietly
+# turn it off or read out fresh recovery codes.
+
+
+class CodeBody(BaseModel):
+    code: str = Field(min_length=1, max_length=40)
+
+
+def _recheck(user: UserAccount) -> str:
+    """Count one code typed by a signed-in person, against their short limit
+    and their day's ceiling (`throttle.TWO_STEP_PER_DAY`) together."""
+    key = f"user:{user.id}"
+    wait = throttle.acquire_all(
+        [(throttle.TWO_STEP_PER_DAY, key), (throttle.TWO_STEP_RECHECK, key)]
+    )
+    if wait:
+        raise _paused(wait)
+    return key
+
+
+def _recheck_not_judged(key: str) -> None:
+    """The code was never judged (no key to read it with, nothing to check it
+    against): take the attempt back from both limits."""
+    throttle.TWO_STEP_RECHECK.release(key)
+    throttle.TWO_STEP_PER_DAY.release(key)
+
+
+def _recheck_passed(key: str) -> None:
+    """A right code: the day counts wrong ones only, the short limit restarts."""
+    throttle.TWO_STEP_PER_DAY.release(key)
+    throttle.TWO_STEP_RECHECK.clear(key)
+
+
+def _key_unavailable(db: Session, exc: Exception) -> HTTPException:
+    db.rollback()
+    return HTTPException(503, str(exc))
+
+
+def _two_step_body(db: Session, user: UserAccount) -> dict:
+    when = two_step.enabled_at(db, user.id)
+    return {
+        **two_step.status(db, user),
+        "enabled_at": when.isoformat() if when else None,
+        "recovery_codes_left": two_step.recovery_codes_left(db, user.id),
+    }
+
+
+def _audit_self(
+    db: Session, request: Request, action: str, user: UserAccount, after: dict | None = None
+) -> None:
+    record_audit(
+        db,
+        action=action,
+        subject=f"user:{user.id}",
+        actor_id=user.id,
+        actor_email=user.email,
+        after=after,
+        ip_address=_client_ip(request),
+    )
+
+
+@router.get("/two-step")
+def my_two_step(
+    user: UserAccount = Depends(signed_in), db: Session = Depends(get_session)
+) -> dict:
+    return _two_step_body(db, user)
+
+
+class PasswordBody(BaseModel):
+    password: str = Field(min_length=1, max_length=256)
+
+
+@router.post("/two-step/start")
+def start_two_step(
+    body: PasswordBody,
+    user: UserAccount = Depends(signed_in),
+    db: Session = Depends(get_session),
+) -> dict:
+    """A new secret, as a QR code and as text. Nothing is on until a code
+    from it is confirmed; starting again replaces it.
+
+    **Asks for the password again first**, as changing where a model is paid
+    does. Whoever finds a session left open must not be able to put their own
+    phone on somebody's account - and once it is on, a person whose access
+    needs it cannot take it off again.
+    """
+    recheck = f"user:{user.id}"
+    wait = throttle.PASSWORD_RECHECK.acquire(recheck)
+    if wait:
+        raise _paused(wait)
+    if authenticate(db, user.email, body.password, record_login=False) is None:
+        raise HTTPException(400, PASSWORD_NOT_RIGHT)
+    throttle.PASSWORD_RECHECK.clear(recheck)
+
+    try:
+        shown = two_step.begin_setup(db, user)
+    except two_step.AlreadyOn as exc:
+        db.rollback()
+        raise HTTPException(409, str(exc)) from None
+    except two_step.KeyUnavailable as exc:
+        raise _key_unavailable(db, exc) from None
+    db.commit()
+    return shown
+
+
+@router.post("/two-step/confirm")
+def confirm_two_step(
+    body: CodeBody,
+    request: Request,
+    user: UserAccount = Depends(signed_in),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Turn it on with one code, and hand out the ten recovery codes - the
+    only time they are ever readable."""
+    key = _recheck(user)
+    try:
+        codes = two_step.confirm_setup(db, user, body.code)
+    except (two_step.AlreadyOn, two_step.NotStarted) as exc:
+        db.rollback()
+        _recheck_not_judged(key)
+        raise HTTPException(409, str(exc)) from None
+    except two_step.KeyUnavailable as exc:
+        _recheck_not_judged(key)
+        raise _key_unavailable(db, exc) from None
+    if codes is None:
+        db.rollback()
+        raise HTTPException(400, CODE_DID_NOT_WORK_CHECK_TIME)
+    _recheck_passed(key)
+    _audit_self(db, request, "auth.two_step.enabled", user)
+    db.commit()
+    return {"recovery_codes": codes}
+
+
+def _require_on(db: Session, user: UserAccount) -> None:
+    if not two_step.is_enabled(db, user.id):
+        raise HTTPException(409, "Two-step sign-in is not on.")
+
+
+def _check_own_code(db: Session, user: UserAccount, code: str) -> str:
+    """An authenticator or recovery code of the signed-in person's own, or
+    refuse. Returns which it was."""
+    key = _recheck(user)
+    try:
+        used = two_step.check_code(db, user.id, code)
+    except two_step.KeyUnavailable as exc:
+        _recheck_not_judged(key)
+        raise _key_unavailable(db, exc) from None
+    if used is None:
+        db.rollback()
+        raise HTTPException(400, CODE_DID_NOT_WORK_CHECK_TIME)
+    _recheck_passed(key)
+    return used
+
+
+@router.post("/two-step/recovery-codes")
+def renew_recovery_codes(
+    body: CodeBody,
+    request: Request,
+    user: UserAccount = Depends(signed_in),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Ten new recovery codes. Every earlier one, used or not, stops working."""
+    _require_on(db, user)
+    used = _check_own_code(db, user, body.code)
+    codes = two_step.new_recovery_codes(db, user.id)
+    _audit_self(db, request, "auth.two_step.recovery_renewed", user, {"with": used})
+    db.commit()
+    return {"recovery_codes": codes}
+
+
+@router.post("/two-step/turn-off")
+def turn_off_two_step(
+    body: CodeBody,
+    request: Request,
+    user: UserAccount = Depends(signed_in),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Turn it off, with a code. **Refused to anybody whose access needs it**,
+    whether or not the owner's switch is on yet: a person who handles money
+    does not get to opt out. A lost phone is the owner's reset."""
+    if two_step.is_required(roles_of(db, user)):
+        raise HTTPException(403, REQUIRED_CANNOT_TURN_OFF)
+    if not two_step.is_enabled(db, user.id):
+        # Nothing on to turn off. A setup never confirmed is dropped.
+        two_step.turn_off(db, user.id)
+        db.commit()
+        return {"enabled": False}
+    used = _check_own_code(db, user, body.code)
+    two_step.turn_off(db, user.id)
+    _audit_self(db, request, "auth.two_step.turned_off", user, {"with": used})
+    db.commit()
+    return {"enabled": False}
+
+
+# ── Signed in on (ADR 0067, decision 6) ──────────────────────────────────────
+
+
+def _current_session_id(db: Session, request: Request) -> int | None:
+    row = session_for_token(db, request.cookies.get(SESSION_COOKIE, ""))
+    return row.id if row is not None else None
+
+
+@router.get("/sessions")
+def my_sessions(
+    request: Request,
+    user: UserAccount = Depends(current_user),
+    db: Session = Depends(get_session),
+) -> dict:
+    return {
+        "sessions": session_rows(
+            live_sessions(db, user.id), _current_session_id(db, request)
+        )
+    }
+
+
+@router.post("/sessions/end-others")
+def end_my_other_sessions(
+    request: Request,
+    user: UserAccount = Depends(current_user),
+    db: Session = Depends(get_session),
+) -> dict:
+    """*Sign out everywhere else*: every live session but this one."""
+    ended = revoke_other_sessions(db, user.id, _current_session_id(db, request))
+    if ended:
+        _audit_self(
+            db, request, "auth.sessions.ended", user, {"ended": ended, "kept_current": True}
+        )
+    db.commit()
+    return {"ended": ended}
+
+
+@router.post("/sessions/{session_id}/end")
+def end_my_session(
+    session_id: int,
+    request: Request,
+    response: Response,
+    user: UserAccount = Depends(current_user),
+    db: Session = Depends(get_session),
+) -> dict:
+    """End one of **your own** sessions. Anybody else's, or one already over,
+    is 404 - the same answer, so this says nothing about other people's."""
+    if not revoke_session_by_id(db, user.id, session_id):
+        raise HTTPException(404, "No such session")
+    _audit_self(
+        db, request, "auth.sessions.ended", user, {"ended": 1, "session_id": session_id}
+    )
+    db.commit()
+    if session_id == _current_session_id(db, request):
+        # The one in use: this browser is signed out, so its cookies go too.
+        response.delete_cookie(SESSION_COOKIE, path="/")
+        response.delete_cookie(CSRF_COOKIE, path="/")
+    return {"ended": True}
