@@ -65,7 +65,7 @@ production's backup on 25 October; the reconciliation is rerun after the first p
 
 | Task | Status |
 |---|---|
-| Authenticator codes for the owner and money roles, recovery codes, signed-in devices, suspend | In progress: on `phase-1/batch-3`, started 26 October |
+| Authenticator codes for the owner and money roles, recovery codes, signed-in devices, suspend | In progress: authenticator version, devices and suspending live since 26–27 October (PRs #128, #129); on 27 October the owner changed the second step to an email code on a new browser for money roles and an authenticator for the owner only, with browsers remembered for 30 days (ADR 0067 decision 5 amended; `phase-1/batch-3b`). Enforcement (`TWO_STEP_ENFORCED`) stays off until the owner switches it on |
 
 **Batch 1.4 — Department folders** (ADR 0065)
 

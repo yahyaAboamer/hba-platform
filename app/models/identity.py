@@ -24,6 +24,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Index,
+    Integer,
     String,
     Text,
     UniqueConstraint,
@@ -62,6 +63,11 @@ class UserAccount(Base):
     #: A staff member's theme for the admin tool, on the account so it follows
     #: them between devices (Settings audit P1). `None` is the dark default.
     maintainer_theme: Mapped[str | None] = mapped_column(String(6))
+    #: When this person turned on **codes by email** for a new browser (ADR
+    #: 0067, decision 5 as amended 27 October 2026). Empty means off. Only
+    #: the choice is kept here; somebody whose access needs email codes is
+    #: asked for one whatever this says, while the owner's switch is on.
+    two_step_email_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )
@@ -333,6 +339,12 @@ class PendingSignIn(Base):
     """
 
     __tablename__ = "pending_sign_in"
+    __table_args__ = (
+        CheckConstraint(
+            "method IS NULL OR method IN ('authenticator', 'email')",
+            name="pending_sign_in_method_valid",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_account_id: Mapped[int] = mapped_column(
@@ -346,6 +358,67 @@ class PendingSignIn(Base):
     #: Where the password was typed. Not shown to anybody; kept because a
     #: right password followed by wrong codes is worth being able to trace.
     ip_address: Mapped[str | None] = mapped_column(String(64))
+    #: Which code is owed: `authenticator` (or a recovery code) or `email`.
+    #: Empty only on rows made before email codes existed, which were all
+    #: authenticator sign-ins.
+    method: Mapped[str | None] = mapped_column(String(20))
+    #: The emailed code, as HMAC-SHA256 keyed by the **raw** pending token -
+    #: which only the browser holds. Six digits are a million guesses, so a
+    #: plain hash would be undone from a copy of this table in a moment; keyed
+    #: by a token the table does not contain, the copy is no help.
+    email_code_hash: Mapped[str | None] = mapped_column(String(64))
+    #: When the current code was sent, for the once-a-minute resend limit.
+    email_code_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    #: How many codes this sign-in has sent, for the five-per-sign-in limit.
+    email_codes_sent: Mapped[int | None] = mapped_column(Integer)
+    #: Wrong codes typed for this sign-in. At ten it stops working, so going
+    #: on needs the password again - and, for an emailed code, a new email
+    #: the owner of the inbox sees.
+    wrong_codes: Mapped[int | None] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )
+
+
+class TrustedBrowser(Base):
+    """A browser somebody chose to remember for 30 days (ADR 0067, decision 5
+    as amended): on it, the right password is enough and no code is asked.
+
+    **Never instead of the password.** It only skips the second step, only
+    for the account that remembered it, and only while it is live. The cookie
+    holds a random token; only its hash is here, so a copy of this table
+    remembers nobody's browser.
+
+    Forgotten - `revoked_at` set, never deleted, so *when* survives - on a
+    password reset, a suspension, the owner's reset of the person's two-step,
+    turning two-step off, *sign out everywhere else*, and by hand.
+    """
+
+    __tablename__ = "trusted_browser"
+    __table_args__ = (
+        CheckConstraint(
+            "method IN ('authenticator', 'email')", name="trusted_browser_method_valid"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_account_id: Mapped[int] = mapped_column(
+        ForeignKey("user_account.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    last_used_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    #: The header it was remembered with, named for people as "Chrome on
+    #: Windows" (`app/core/user_agent.py`). Truncated, never trusted.
+    user_agent: Mapped[str | None] = mapped_column(String(400))
+    ip_address: Mapped[str | None] = mapped_column(String(64))
+    #: Which code proved this browser. One proved by an emailed code skips the
+    #: step only while email is still what the person would be asked for: not
+    #: once they have the app on, and never for the owner.
+    method: Mapped[str] = mapped_column(String(20), nullable=False)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

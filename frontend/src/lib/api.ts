@@ -304,7 +304,15 @@ export type TwoStepState = {
   required: boolean;
   /** Required, not on yet, and the owner has switched enforcing on. */
   must_set_up: boolean;
+  /** What a new browser will be asked for, or null: nothing. */
+  method?: TwoStepMethod | null;
+  /** Codes by email are on (chosen, or required for their access). */
+  email_on?: boolean;
+  /** What their access requires, while enforcing is on. */
+  required_method?: TwoStepMethod | null;
 };
+
+export type TwoStepMethod = "authenticator" | "email";
 
 /**
  * Whether this account may do something.
@@ -367,9 +375,35 @@ export async function currentUser(): Promise<Session | null> {
  * `pending` is the one-use token the second step hands back; it is never
  * stored, only kept in the sign-in screen's state for five minutes.
  */
-export type SignInResult =
-  | { kind: "session"; session: Session }
-  | { kind: "code"; pending: string; expiresIn: number };
+export type CodeAnswer = {
+  kind: "code";
+  pending: string;
+  expiresIn: number;
+  /** Where the code comes from. */
+  method: TwoStepMethod;
+  /** The masked address an email code went to. */
+  sentTo: string | null;
+};
+
+export type SignInResult = { kind: "session"; session: Session } | CodeAnswer;
+
+type CodeWire = {
+  two_step: "code";
+  pending: string;
+  expires_in: number;
+  method?: TwoStepMethod;
+  sent_to?: string | null;
+};
+
+function codeAnswer(result: CodeWire): CodeAnswer {
+  return {
+    kind: "code",
+    pending: result.pending,
+    expiresIn: result.expires_in,
+    method: result.method ?? "authenticator",
+    sentTo: result.sent_to ?? null,
+  };
+}
 
 async function sessionAfterLogin(csrf: string): Promise<Session> {
   rememberToken(csrf);
@@ -389,28 +423,34 @@ export async function signIn(
 ): Promise<SignInResult> {
   const result = await api.post<
     | { csrf: string; actor: Actor }
-    | { two_step: "code"; pending: string; expires_in: number }
+    | CodeWire
   >("/api/auth/login", { email, password });
-  if ("two_step" in result) {
-    return { kind: "code", pending: result.pending, expiresIn: result.expires_in };
-  }
+  if ("two_step" in result) return codeAnswer(result);
   return { kind: "session", session: await sessionAfterLogin(result.csrf) };
 }
 
-/** The second step: an authenticator code or a recovery code. */
+/** The second step: the emailed or authenticator code, or a recovery code. */
 export async function signInWithCode(
   pending: string,
   code: string,
+  remember = false,
 ): Promise<{ session: Session; recoveryCodesLeft: number | null }> {
   const result = await api.post<{
     csrf: string;
     actor: Actor;
     recovery_codes_left?: number;
-  }>("/api/auth/login/two-step", { pending, code });
+  }>("/api/auth/login/two-step", { pending, code, remember });
   return {
     session: await sessionAfterLogin(result.csrf),
     recoveryCodesLeft: result.recovery_codes_left ?? null,
   };
+}
+
+/** A fresh emailed code; the old one stops working. */
+export async function resendSignInCode(
+  pending: string,
+): Promise<{ sent_to: string; expires_in: number }> {
+  return api.post("/api/auth/login/resend", { pending });
 }
 
 // ── Two-step sign-in, and where somebody is signed in (Batch 1.3) ──────────
@@ -425,6 +465,16 @@ export type TwoStepStart = {
   otpauth_uri: string;
   /** Server-made SVG; shown as an image, never inserted as markup. */
   qr_svg: string;
+};
+
+export type TrustedBrowser = {
+  id: number;
+  device: string;
+  ip_address: string | null;
+  created_at: string;
+  last_used_at: string | null;
+  expires_at: string;
+  current: boolean;
 };
 
 export type DeviceSession = {
@@ -446,6 +496,17 @@ export const twoStep = {
     api.post<{ recovery_codes: string[] }>("/api/auth/two-step/recovery-codes", { code }),
   turnOff: (code: string) =>
     api.post<{ enabled: false }>("/api/auth/two-step/turn-off", { code }),
+  /** Codes by email, for staff whose access does not require them. */
+  setEmail: (on: boolean, password: string) =>
+    api.post<TwoStepStatus>("/api/auth/two-step/email", { on, password }),
+};
+
+export const trustedBrowsers = {
+  mine: () => api.get<{ browsers: TrustedBrowser[] }>("/api/auth/trusted-browsers"),
+  forget: (id: number) => api.post<unknown>(`/api/auth/trusted-browsers/${id}/forget`),
+  forgetAll: () => api.post<unknown>("/api/auth/trusted-browsers/forget-all"),
+  of: (staffId: number) =>
+    api.get<{ browsers: TrustedBrowser[] }>(`/api/staff/${staffId}/trusted-browsers`),
 };
 
 export const devices = {
@@ -525,11 +586,9 @@ export async function completePasswordReset(
   // asked, as at sign-in, or reading the mailbox would be enough.
   const result = await api.post<
     | { csrf: string; actor: Actor }
-    | { two_step: "code"; pending: string; expires_in: number }
+    | CodeWire
   >("/api/auth/password-reset", { token, password });
-  if ("two_step" in result) {
-    return { kind: "code", pending: result.pending, expiresIn: result.expires_in };
-  }
+  if ("two_step" in result) return codeAnswer(result);
   rememberToken(result.csrf);
 
   const session = await currentUser();

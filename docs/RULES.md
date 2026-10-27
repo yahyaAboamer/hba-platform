@@ -258,9 +258,12 @@ payroll without touching a maintainer screen.
   they may do is everything their live roles grant together; roles stay
   defined in code. Screens ask about permissions, never role names. Money is
   created, approved and paid under three separate permissions, and only the
-  owner holds all three. Two-step sign-in is required for the owner and anyone
-  who approves or pays money, once `TWO_STEP_ENFORCED` is on (the owner's
-  call; off until then); a password reset still asks for the code.
+  owner holds all three. Two-step sign-in is asked on a new browser only (a
+  browser can be remembered for 30 days): the owner gives an authenticator
+  app's code, anyone else who approves or pays money a code sent by email;
+  other staff may opt in, models are never asked. Required once
+  `TWO_STEP_ENFORCED` is on (the owner's call; off until then). A password
+  reset asks for the code only of somebody using an authenticator.
   Suspending someone removes every staff role and ends every session in one
   audited step; bringing them back gives no access, and a former member of
   staff can never apply as a model.

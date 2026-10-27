@@ -1,6 +1,6 @@
 # 0067. Several roles per person, and access set per department
 
-**Status:** Accepted — owner, 25 October 2026, with the approved mockup `docs/design/hba-os-shell-2026-10-25.html` (frame 5). **Decisions 1–3 and 7–9 built** (Phase 1, batch 1.2, migration `c3e7a1f90019`); **decisions 4–6 built** (batch 1.3, migration `d5a2c8e40020`), with the requirement behind `TWO_STEP_ENFORCED`, off until the owner switches it on. Accepting an operations-manager invitation gives both of his assignments, so no one's access changed.
+**Status:** Accepted — owner, 25 October 2026, with the approved mockup `docs/design/hba-os-shell-2026-10-25.html` (frame 5). **Decisions 1–3 and 7–9 built** (Phase 1, batch 1.2, migration `c3e7a1f90019`); **decisions 4–6 built** (batch 1.3, migration `d5a2c8e40020`; decision 5 amended 27 October for email codes and remembered browsers, batch 1.3b), with the requirement behind `TWO_STEP_ENFORCED`, off until the owner switches it on. Accepting an operations-manager invitation gives both of his assignments, so no one's access changed.
 **Date:** 2026-10-25
 **Builds on:** ADR 0007 (permissions in code), ADR 0006 (identity rooted in user_account). **Amends:** ADR 0057 and ADR 0059 in how the operations manager's access is made up, not in what it is.
 
@@ -54,10 +54,24 @@ Three more gaps matter once more people hold money and customer data:
    no role but the owner's holds all three.** Today's split (approving payroll
    is not recording a payment) becomes the rule for every department that
    handles money.
-5. **Two-step sign-in, with an authenticator app**, is required for the owner
-   and for anyone who can approve or pay money, and available to everyone
-   else. Losing the phone is recovered with one-time recovery codes, or by the
-   owner resetting it, which is audited.
+5. **Two-step sign-in on a new browser** (amended by the owner, 27 October
+   2026, after trying the authenticator on staging). A browser can be
+   remembered for 30 days; on a remembered browser the password is enough,
+   for everyone. On a new browser:
+   - **the owner** gives a code from an **authenticator app** (or a recovery
+     code). Losing the phone is recovered with a recovery code; the owner
+     cannot reset their own.
+   - **anyone else who can approve or pay money** gives a **code sent by
+     email**, which needs nothing installed.
+   - **other staff** may turn on either; **models** are never asked.
+
+   Required only once `TWO_STEP_ENFORCED` is switched on, which is the
+   owner's call. *Why email for most people:* the owner found an app a
+   barrier, and on this platform an email code loses little - "Forgot
+   password" already trusts the same mailbox, so a stolen mailbox opens the
+   account either way. It still stops the commonest attack, a leaked or
+   reused password. The owner keeps the app because the owner's account is
+   the one that can do everything.
 6. **Each person can see where they are signed in and sign out everywhere.**
    The owner can do the same for anyone, and **suspending** someone removes
    every role and ends every session in one action.
@@ -78,9 +92,12 @@ Three more gaps matter once more people hold money and customer data:
 - A person with many roles can collect more access than anyone intended.
   Team and access shows, in words, what a person's levels give them (the
   approved mockup's *What this gives* line), so it can be read at a glance.
-- Two-step sign-in adds a step for the people who handle money, and a
-  recovery path that must itself be safe: the owner's reset is audited, and
-  recovery codes are shown once and stored only as hashes.
+- Two-step sign-in adds a step for the people who handle money, only on a
+  new browser, and a recovery path that must itself be safe: the owner's
+  reset is audited, recovery codes are shown once and stored only as hashes,
+  an emailed code is stored only as a hash and works for ten minutes, and a
+  remembered browser is forgotten on a password reset, a suspension, an
+  owner's reset and *sign out everywhere*.
 - An entry's department has to be set by the code that writes it. Older entries
   have none and stay visible only to the owner.
 

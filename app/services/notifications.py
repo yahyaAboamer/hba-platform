@@ -62,6 +62,10 @@ MAX_ATTEMPTS = 5
 #: wall of text cannot make recording the failure fail.
 MAX_ERROR = 500
 
+#: How long an emailed sign-in code works (`app/services/two_step.py`). One
+#: still queued after that is not sent.
+SIGN_IN_CODE_MINUTES = 10
+
 
 class Event:
     """§16's table, as identifiers."""
@@ -76,6 +80,9 @@ class Event:
     PAYMENT_RECORDED = "payment.recorded"
     DESTINATION_CHANGED = "destination.changed"
     PASSWORD_RESET = "password.reset"
+    #: The six-digit code for signing in on a new browser (ADR 0067,
+    #: decision 5 as amended 27 October 2026).
+    SIGN_IN_CODE = "sign_in.code"
     #: Settings → Appearance's weekly reminder, to a member of staff.
     TARGETS_REMINDER = "targets.weekly_reminder"
 
@@ -201,6 +208,27 @@ def password_reset_requested(
             "email": account.email,
             "name": account.display_name or "",
             "_secret": {"token": token},
+        },
+    )
+
+
+def sign_in_code(db: Session, account, code: str) -> NotificationOutbox | None:
+    """The code for signing in on a new browser, to the account's address.
+
+    **The code is a credential for ten minutes**, so it travels in `_secret`
+    and is erased the moment the mail goes out (`_forget_secrets`), exactly as
+    a reset link is. The pending sign-in keeps only a keyed hash of it.
+    """
+    return queue(
+        db,
+        event=Event.SIGN_IN_CODE,
+        recipient_email=account.email,
+        recipient_name=account.display_name,
+        subject_ref=f"user:{account.id}",
+        payload={
+            "email": account.email,
+            "name": account.display_name or "",
+            "_secret": {"code": code},
         },
     )
 
@@ -632,6 +660,24 @@ def render(event: str, payload: dict) -> Message | None:
             action="Choose a new password",
         )
 
+    if event == Event.SIGN_IN_CODE:
+        # The code is the whole email: nothing above it to read past, and no
+        # link - a link in a sign-in email is what a fake one looks like.
+        code = (payload.get("_secret") or {}).get("code", "")
+        return Message(
+            to_address=payload["email"],
+            to_name=name or None,
+            subject="Your HBA sign-in code",
+            body=(
+                f"Hi {first},\n\n"
+                "Your code to sign in to HBA:\n\n"
+                f"{code}\n\n"
+                "It works for 10 minutes. If you did not just try to sign in, "
+                "change your password."
+                + _sign_off()
+            ),
+        )
+
     if event == Event.APPLICATION_SUBMITTED:
         return Message(
             to_address=payload["email"],
@@ -913,6 +959,17 @@ def send_notification(db: Session, payload: dict) -> None:
         raise PermanentFailure(f"Notification {outbox_id} no longer exists")
 
     if row.state != NotificationState.PENDING:
+        return
+
+    if row.event == Event.SIGN_IN_CODE and row.created_at <= utcnow() - timedelta(
+        minutes=SIGN_IN_CODE_MINUTES
+    ):
+        # A code that could not go out in time no longer works: sending it
+        # late would only arrive as a code that fails. Never sent, and the
+        # code is dropped from the row like any other ending.
+        row.state = NotificationState.FAILED
+        row.last_error = "Not sent: the sign-in code had already expired."
+        _forget_secrets(row)
         return
 
     message = render(row.event, dict(row.payload or {}))

@@ -102,7 +102,7 @@ describe("Sign in", () => {
     fireEvent.change(field, { target: { value: "123 456" } });
     fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
     await waitFor(() => expect(onSignedIn).toHaveBeenCalledWith(ME, undefined));
-    expect(called("POST", "/api/auth/login/two-step")?.body).toEqual({ pending: "tok", code: "123 456" });
+    expect(called("POST", "/api/auth/login/two-step")?.body).toEqual({ pending: "tok", code: "123 456", remember: true });
   });
 
   it("says a wrong code did not work, and stays on the code step", async () => {
@@ -161,7 +161,7 @@ describe("Sign in", () => {
 
     await waitFor(() => expect(onSignedIn).toHaveBeenCalled());
     expect(onSignedIn.mock.calls[0][1]).toContain("7 left");
-    expect(called("POST", "/api/auth/login/two-step")?.body).toEqual({ pending: "tok", code: "abcde-fghjk" });
+    expect(called("POST", "/api/auth/login/two-step")?.body).toEqual({ pending: "tok", code: "abcde-fghjk", remember: true });
   });
 
   it("goes back to the email and password step on request", async () => {
@@ -202,7 +202,7 @@ describe("Password reset with two-step on", () => {
     fireEvent.change(field, { target: { value: "123456" } });
     fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
     await waitFor(() => expect(onSignedIn).toHaveBeenCalledWith(ME, undefined));
-    expect(called("POST", "/api/auth/login/two-step")?.body).toEqual({ pending: "tok", code: "123456" });
+    expect(called("POST", "/api/auth/login/two-step")?.body).toEqual({ pending: "tok", code: "123456", remember: true });
   });
 });
 
@@ -298,7 +298,7 @@ describe("Settings → My preferences", () => {
     renderSettings("appearance");
 
     const panel = (await screen.findByRole("heading", { name: "Two-step sign-in" })).closest("section")!;
-    await within(panel).findByText("On");
+    await within(panel).findByText("Authenticator app");
     fireEvent.click(within(panel).getByRole("button", { name: "New recovery codes" }));
     fireEvent.change(within(panel).getByLabelText("6-digit code"), { target: { value: "123456" } });
     fireEvent.click(within(panel).getByRole("button", { name: "Make new recovery codes" }));
