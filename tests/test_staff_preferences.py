@@ -12,9 +12,9 @@ from sqlalchemy import text
 from app.core.passwords import hash_password
 from app.db import SessionLocal, engine
 from app.main import app
-from app.services.jobs import JobKind
-from app.services.notifications import Event, render
-from app.services.schedule import SCHEDULE
+from app.shared.services.jobs import JobKind
+from app.shared.services.notifications import Event, render
+from app.shared.services.schedule import SCHEDULE
 from app.worker import HANDLERS
 
 BOOTSTRAP = {"email": "owner@example.com", "display_name": "Yahya Owner", "password": "quiet-harbour-lantern"}
@@ -80,7 +80,7 @@ def test_it_is_this_accounts_switch_and_nobody_elses(client):
     client.put(URL, json={"key": "weekly_targets_reminder", "enabled": False})
     other = _staff("nour@example.com", "affiliate_manager")
     with SessionLocal() as db:
-        from app.services.staff_prefs import preferences_for
+        from app.shared.services.staff_prefs import preferences_for
         assert preferences_for(db, other)["weekly_targets_reminder"] is True
 
 
@@ -125,8 +125,8 @@ def test_the_reminder_goes_to_staff_who_record_targets_and_want_it(client):
     muted = _staff("hazem@example.com", "content_manager")  # records targets, turned off
     _staff("gone@example.com", "affiliate")               # not staff
     with SessionLocal() as db:
-        from app.models.identity import UserAccount
-        from app.services.staff_prefs import set_preference
+        from app.shared.models.identity import UserAccount
+        from app.shared.services.staff_prefs import set_preference
         set_preference(db, db.get(UserAccount, muted), "weekly_targets_reminder", False)
         db.commit()
 

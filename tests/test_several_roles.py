@@ -24,7 +24,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session as OrmSession
 
-from app.api.deps import permissions_of, roles_of
+from app.shared.api.deps import permissions_of, roles_of
 from app.core.businesstime import utcnow
 from app.core.passwords import hash_password
 from app.core.permissions import (
@@ -37,8 +37,8 @@ from app.core.permissions import (
 )
 from app.db import engine
 from app.main import app
-from app.models.identity import RoleAssignment, UserAccount
-from app.services.audit import DEPARTMENTS, PLATFORM_WIDE, department_of, record_audit
+from app.shared.models.identity import RoleAssignment, UserAccount
+from app.shared.services.audit import DEPARTMENTS, PLATFORM_WIDE, department_of, record_audit
 
 #: The revision before several roles. Downgrading to it is the old schema.
 BEFORE_REVISION = "a6c9e3f70018"
@@ -178,7 +178,7 @@ def test_a_revoked_role_can_be_given_again(db):
 
 
 def test_the_service_refuses_the_same_role_twice_with_the_reason(db):
-    from app.services.staff import give_role
+    from app.shared.services.staff import give_role
 
     nour = _person(db, "nour@example.com", "customer_service")
     with pytest.raises(ValueError, match="already holds"):
@@ -189,8 +189,8 @@ def test_the_service_refuses_the_same_role_twice_with_the_reason(db):
 
 
 def test_giving_and_taking_are_audited_with_every_role_before_and_after(db):
-    from app.models.audit import AuditEvent
-    from app.services.staff import give_role, remove_role
+    from app.shared.models.audit import AuditEvent
+    from app.shared.services.staff import give_role, remove_role
 
     nour = _person(db, "nour@example.com", "content_manager")
     admin = frozenset({"admin"})
@@ -216,7 +216,7 @@ def test_giving_and_taking_are_audited_with_every_role_before_and_after(db):
 
 
 def test_the_last_admin_cannot_lose_admin_even_holding_another_role(db):
-    from app.services.staff import remove_role
+    from app.shared.services.staff import remove_role
 
     owner = _person(db, "owner@example.com", "admin", "customer_service")
     with pytest.raises(ValueError, match="only active admin"):
@@ -227,7 +227,7 @@ def test_the_last_admin_cannot_lose_admin_even_holding_another_role(db):
 
 
 def test_nobody_gives_themselves_a_role(db):
-    from app.services.staff import give_role
+    from app.shared.services.staff import give_role
 
     owner = _person(db, "owner@example.com", "admin")
     with pytest.raises(ValueError, match="your own access"):

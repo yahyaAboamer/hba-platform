@@ -15,19 +15,19 @@ import pytest
 
 from app.core.money import format_egp
 from app.core.passwords import hash_password
-from app.models.affiliates import AccountKind
-from app.models.attributed_orders import AttributedOrder, CommissionState
-from app.models.compensation import CompensationType
-from app.models.identity import UserAccount
-from app.models.orders import OrderIndex
-from app.services.affiliates import create_affiliate
-from app.services.commission.calculate import (
+from app.modules.affiliates.models.affiliates import AccountKind
+from app.modules.affiliates.models.attributed_orders import AttributedOrder, CommissionState
+from app.modules.affiliates.models.compensation import CompensationType
+from app.shared.models.identity import UserAccount
+from app.shared.models.orders import OrderIndex
+from app.modules.affiliates.services.affiliates import create_affiliate
+from app.modules.affiliates.services.commission.calculate import (
     NO_TARGET,
     NO_TERMS,
     TARGETS_UNVERIFIED,
     calculate_month,
 )
-from app.services.compensation import set_terms
+from app.modules.affiliates.services.compensation import set_terms
 
 MONTH = "2026-04"
 
@@ -429,7 +429,7 @@ def test_a_house_account_has_real_sales_and_is_owed_nothing(db):
 
 
 def _target(db, affiliate, *, required=(8, 5), actual=None, verified=False):
-    from app.services.targets import record_actuals, set_requirements, verify
+    from app.modules.affiliates.services.targets import record_actuals, set_requirements, verify
 
     target = set_requirements(
         db, affiliate, MONTH, videos=required[0], stories=required[1]
@@ -615,7 +615,7 @@ def test_re_recording_actuals_re_blocks_the_month(db):
     """A correction clears the verification, so the guarantee stops applying
     until somebody confirms the new numbers. That is the point of clearing it.
     """
-    from app.services.targets import record_actuals
+    from app.modules.affiliates.services.targets import record_actuals
 
     affiliate = _affiliate(db)
     _guaranteed(db, affiliate)
@@ -643,7 +643,7 @@ def test_another_months_target_does_not_decide_this_one(db):
     """Each month stands alone. April's guarantee must not turn on May's
     posting.
     """
-    from app.services.targets import record_actuals, set_requirements, verify
+    from app.modules.affiliates.services.targets import record_actuals, set_requirements, verify
 
     affiliate = _affiliate(db)
     _guaranteed(db, affiliate)

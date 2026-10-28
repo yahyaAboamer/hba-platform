@@ -13,8 +13,8 @@ from sqlalchemy import text
 
 from app.db import SessionLocal, engine
 from app.main import app
-from app.services.jobs import JobKind
-from app.services.shopify.client import ShopifyClient
+from app.shared.services.jobs import JobKind
+from app.shared.services.shopify.client import ShopifyClient
 from app.worker import run_one
 
 BOOTSTRAP = {"email": "owner@example.com", "display_name": "Owner", "password": "quiet-harbour-lantern"}
@@ -74,7 +74,7 @@ def _shopify(monkeypatch, *, status: int = 200, requests: list | None = None):
         shop.retry_base_seconds = 0
         return shop
 
-    monkeypatch.setattr("app.services.shopify.sync.build_client", build)
+    monkeypatch.setattr("app.shared.services.shopify.sync.build_client", build)
 
 
 def _work():
@@ -192,7 +192,7 @@ def test_a_click_while_one_is_running_joins_it(client, monkeypatch):
 
 
 def test_the_scheduled_sweep_is_brought_forward_not_duplicated(client, monkeypatch):
-    from app.services.schedule import ensure_scheduled
+    from app.shared.services.schedule import ensure_scheduled
 
     _shopify(monkeypatch)
     with SessionLocal() as db:

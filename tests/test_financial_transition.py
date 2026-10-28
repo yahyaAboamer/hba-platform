@@ -38,17 +38,17 @@ from datetime import datetime, timezone
 import pytest
 
 from app.core.passwords import hash_password
-from app.models.affiliates import AccountKind
-from app.models.attributed_orders import AttributedOrder, CommissionState
-from app.models.compensation import CompensationType
-from app.models.identity import UserAccount
-from app.models.orders import OrderIndex
-from app.services.affiliates import create_affiliate
-from app.services.codes import register_code
-from app.services.commission.calculate import calculate_month
-from app.services.compensation import set_terms
-from app.services.corrections import correction_for, open_corrections
-from app.services.payroll import (
+from app.modules.affiliates.models.affiliates import AccountKind
+from app.modules.affiliates.models.attributed_orders import AttributedOrder, CommissionState
+from app.modules.affiliates.models.compensation import CompensationType
+from app.shared.models.identity import UserAccount
+from app.shared.models.orders import OrderIndex
+from app.modules.affiliates.services.affiliates import create_affiliate
+from app.modules.affiliates.services.codes import register_code
+from app.modules.affiliates.services.commission.calculate import calculate_month
+from app.modules.affiliates.services.compensation import set_terms
+from app.modules.affiliates.services.corrections import correction_for, open_corrections
+from app.modules.affiliates.services.payroll import (
     DELIVERED_ONLY,
     PENDING_INCLUSIVE,
     approve_month,
@@ -56,7 +56,7 @@ from app.services.payroll import (
     counted_in_snapshot,
     policy_of,
 )
-from app.services.portal import my_month, my_year
+from app.modules.affiliates.services.portal import my_month, my_year
 from tests.support_policy import approved_before_the_switch
 
 AUGUST = "2026-08"
@@ -73,7 +73,7 @@ def _go_live(monkeypatch):
 @pytest.fixture(autouse=True)
 def _working_month(monkeypatch):
     monkeypatch.setattr(
-        "app.services.portal.working_month", lambda: SEPTEMBER, raising=True
+        "app.modules.affiliates.services.portal.working_month", lambda: SEPTEMBER, raising=True
     )
 
 
@@ -449,9 +449,9 @@ def test_the_year_chart_follows_the_month_it_draws(db):
 def test_the_destination_month_keeps_its_own_sales(db):
     """F13. A deduction carried into September reduces what September pays,
     never what September sold."""
-    from app.models.payments import AdjustmentType
-    from app.services.corrections import resolve
-    from app.services.payments import record_payment
+    from app.modules.affiliates.models.payments import AdjustmentType
+    from app.modules.affiliates.services.corrections import resolve
+    from app.modules.affiliates.services.payments import record_payment
 
     affiliate = _model(db)
     _order(db, affiliate, "1", 2_000_000)

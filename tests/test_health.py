@@ -31,7 +31,7 @@ def test_health_answers_head_as_well_as_get(path):
 
 def test_readiness_answers_head_with_503_when_the_database_is_unreachable(monkeypatch):
     """HEAD carries the same verdict as GET: a broken database is a 503."""
-    import app.api.health as health
+    import app.shared.api.health as health
 
     class Refuses:
         def connect(self):
@@ -154,7 +154,7 @@ def test_readiness_answers_503_when_the_database_is_unreachable(monkeypatch):
     across the Amsterdam migration saw an unbroken run of 200s and could not
     have reported an outage if there had been one (ADR 0031).
     """
-    import app.api.health as health
+    import app.shared.api.health as health
 
     class Refuses:
         def connect(self):

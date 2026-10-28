@@ -11,10 +11,10 @@ from sqlalchemy.exc import DatabaseError, IntegrityError
 
 from app.core.businesstime import utcnow
 from app.core.passwords import hash_password
-from app.models.codes import DiscountCodePeriod
-from app.models.identity import UserAccount
-from app.services.affiliates import create_affiliate
-from app.services.codes import (
+from app.modules.affiliates.models.codes import DiscountCodePeriod
+from app.shared.models.identity import UserAccount
+from app.modules.affiliates.services.affiliates import create_affiliate
+from app.modules.affiliates.services.codes import (
     close_codes_for,
     codes_for,
     owner_of,
@@ -392,7 +392,7 @@ def test_codes_with_status_says_whether_shopify_confirmed_each_one(db):
     exists on Shopify at all - so if it was mistyped, no order will ever carry
     it, and nothing looks wrong (docs/limits.md).
     """
-    from app.services.codes import codes_with_status
+    from app.modules.affiliates.services.codes import codes_with_status
 
     nour = _affiliate(db)
     register_code(db, nour, "SEEN", "2026-01", verified_at=utcnow())
@@ -413,7 +413,7 @@ def test_codes_for_and_codes_with_status_agree(db):
     Two copies of that filter would eventually disagree, and the way anybody
     would find out is a model paid for somebody else's orders.
     """
-    from app.services.codes import codes_with_status
+    from app.modules.affiliates.services.codes import codes_with_status
 
     nour = _affiliate(db)
     register_code(db, nour, "KEPT", "2026-01")

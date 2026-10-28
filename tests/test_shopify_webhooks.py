@@ -22,7 +22,7 @@ from sqlalchemy import text
 from app.core.signals import Anomaly
 from app.db import engine
 from app.main import app
-from app.services.shopify.webhooks import MAX_BODY_BYTES, verify_shopify_hmac
+from app.shared.services.shopify.webhooks import MAX_BODY_BYTES, verify_shopify_hmac
 
 SECRET = "test-webhook-secret"
 

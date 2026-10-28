@@ -14,7 +14,7 @@ from sqlalchemy import text
 
 from app.db import engine
 from app.main import app
-from app.services.shopify.client import REQUIRED_SCOPES, ShopifyError
+from app.shared.services.shopify.client import REQUIRED_SCOPES, ShopifyError
 
 BOOTSTRAP = {"email": "owner@example.com", "display_name": "Owner", "password": "quiet-harbour-lantern"}
 SECRET = "shpss_the-real-secret-9f3a7c21"
@@ -47,7 +47,7 @@ def _shopify(monkeypatch, *, answers=True, scopes=REQUIRED_SCOPES, seen=None):
             raise ShopifyError("Shopify rejected the credentials (401)")
         return "HBA Wear", set(scopes)
 
-    monkeypatch.setattr("app.services.shopify.connection.check", check)
+    monkeypatch.setattr("app.shared.services.shopify.connection.check", check)
 
 
 def _stored():
@@ -88,7 +88,7 @@ def test_the_saved_connection_is_the_one_every_client_uses(client, monkeypatch):
     _shopify(monkeypatch)
     client.put(URL, json=FORM)
 
-    from app.services.shopify.sync import build_client
+    from app.shared.services.shopify.sync import build_client
 
     built = build_client()
     assert built.shop_domain == "hbawear.myshopify.com"

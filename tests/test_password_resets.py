@@ -13,8 +13,8 @@ from sqlalchemy import select
 
 from app.core.businesstime import utcnow
 from app.core.passwords import hash_password, verify_password
-from app.models.identity import PasswordReset, UserAccount
-from app.services.password_resets import (
+from app.shared.models.identity import PasswordReset, UserAccount
+from app.shared.services.password_resets import (
     complete_reset,
     preview_reset,
     request_reset,

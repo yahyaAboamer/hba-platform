@@ -15,16 +15,16 @@ from datetime import datetime, timezone
 import pytest
 
 from app.core.passwords import hash_password
-from app.models.affiliates import AccountKind
-from app.models.attributed_orders import AttributedOrder, CommissionState
-from app.models.compensation import CompensationType
-from app.models.identity import UserAccount
-from app.models.orders import OrderIndex
-from app.services.affiliates import create_affiliate
-from app.services.codes import register_code
-from app.services.compensation import set_terms
-from app.services.payments import balance_for, record_payment
-from app.services.payroll import approve_month, is_historical
+from app.modules.affiliates.models.affiliates import AccountKind
+from app.modules.affiliates.models.attributed_orders import AttributedOrder, CommissionState
+from app.modules.affiliates.models.compensation import CompensationType
+from app.shared.models.identity import UserAccount
+from app.shared.models.orders import OrderIndex
+from app.modules.affiliates.services.affiliates import create_affiliate
+from app.modules.affiliates.services.codes import register_code
+from app.modules.affiliates.services.compensation import set_terms
+from app.modules.affiliates.services.payments import balance_for, record_payment
+from app.modules.affiliates.services.payroll import approve_month, is_historical
 
 BEFORE = "2026-03"
 AFTER = "2026-09"
@@ -43,7 +43,7 @@ def _go_live(monkeypatch):
 @pytest.fixture(autouse=True)
 def _working_month(monkeypatch):
     monkeypatch.setattr(
-        "app.services.portal.working_month", lambda: AFTER, raising=True
+        "app.modules.affiliates.services.portal.working_month", lambda: AFTER, raising=True
     )
 
 
@@ -170,7 +170,7 @@ def test_reading_readiness_twice_says_the_same_thing_and_writes_nothing(db):
     is stored, so asking twice cannot drift and a dry run cannot become a
     commitment by accident.
     """
-    from app.services.setup import setup_readiness
+    from app.modules.affiliates.services.setup import setup_readiness
 
     affiliate = _model(db)
     _order(db, affiliate, "1", 2_000_000, BEFORE)
@@ -245,7 +245,7 @@ def test_a_model_from_before_2026_sees_history_back_to_january(db):
     Not earlier: there are no orders indexed before January, so an offered
     month would be an empty screen with nothing to explain it.
     """
-    from app.services.portal import months_for
+    from app.modules.affiliates.services.portal import months_for
 
     affiliate = _model(db)
     affiliate.collaboration_start_month = "2025-04"
@@ -265,7 +265,7 @@ def test_a_model_who_started_later_sees_only_her_own_months(db):
     empty screen with no way to tell whether that means nothing happened or
     something is broken.
     """
-    from app.services.portal import months_for
+    from app.modules.affiliates.services.portal import months_for
 
     affiliate = _model(db)
     affiliate.collaboration_start_month = "2026-06"

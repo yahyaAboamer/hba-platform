@@ -31,7 +31,7 @@ from app.core.observability import (
 )
 from app.core.signals import Anomaly, report
 from app.db import SessionLocal
-from app.services.jobs import MAX_ATTEMPTS, PermanentFailure, enqueue
+from app.shared.services.jobs import MAX_ATTEMPTS, PermanentFailure, enqueue
 from app.worker import HANDLERS, register_handler, run_one
 
 #: Shaped like an EU-region DSN. Never contacted: the transport below is used.
@@ -337,7 +337,7 @@ def test_a_subprocess_breadcrumb_is_dropped():
 
 
 def test_a_log_line_keeps_its_template_and_numbers_only(sentry):
-    log = logging.getLogger("app.services.inbox.payments")
+    log = logging.getLogger("app.modules.inbox.services.payments")
     log.warning("order %s: invoice email not sent: %s", 4512, "550 customer@example.com rejected")
     sentry_sdk.capture_message("look at the breadcrumbs")
 

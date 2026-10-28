@@ -8,7 +8,7 @@ import json
 import httpx
 import pytest
 
-from app.services.inbox.meta import (
+from app.modules.inbox.services.meta import (
     MetaClient,
     MetaError,
     is_meta_media_url,

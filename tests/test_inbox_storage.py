@@ -8,8 +8,8 @@ import hashlib
 import httpx
 import pytest
 
-from app.services.inbox import storage
-from app.services.inbox.storage import Bucket, NotConfigured, StorageError, sign
+from app.modules.inbox.services import storage
+from app.modules.inbox.services.storage import Bucket, NotConfigured, StorageError, sign
 
 ACCESS = "made-up-access-key-id"
 SECRET = "made-up-secret-access-key-0000"

@@ -14,14 +14,14 @@ Shopify read uses, for the same reason.
 from datetime import datetime, timezone
 
 from app.core.passwords import hash_password
-from app.models.attributed_orders import AttributedOrder, CommissionState
-from app.models.identity import UserAccount
-from app.services.affiliates import create_affiliate
-from app.services.codes import register_code
-from app.services.performance import best_sellers_for
-from app.services.shopify.catalogue import upsert_line_items
-from app.services.shopify.fulfilment import DELIVERED, FAILED, IN_FLIGHT
-from app.services.shopify.normalise import upsert_order_index
+from app.modules.affiliates.models.attributed_orders import AttributedOrder, CommissionState
+from app.shared.models.identity import UserAccount
+from app.modules.affiliates.services.affiliates import create_affiliate
+from app.modules.affiliates.services.codes import register_code
+from app.modules.affiliates.services.performance import best_sellers_for
+from app.shared.services.shopify.catalogue import upsert_line_items
+from app.shared.services.shopify.fulfilment import DELIVERED, FAILED, IN_FLIGHT
+from app.shared.services.shopify.normalise import upsert_order_index
 
 
 def _model(db, name="Nour", code="NOUR10"):

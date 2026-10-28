@@ -18,13 +18,13 @@ from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
 
 from app.core.passwords import hash_password
-from app.models.affiliates import AccountKind
-from app.models.audit import AuditEvent
-from app.models.identity import UserAccount
-from app.models.targets import MonthlyTarget
-from app.services.affiliates import create_affiliate
-from app.services.compensation import set_terms
-from app.services.targets import (
+from app.modules.affiliates.models.affiliates import AccountKind
+from app.shared.models.audit import AuditEvent
+from app.shared.models.identity import UserAccount
+from app.modules.affiliates.models.targets import MonthlyTarget
+from app.modules.affiliates.services.affiliates import create_affiliate
+from app.modules.affiliates.services.compensation import set_terms
+from app.modules.affiliates.services.targets import (
     get_target,
     record_actuals,
     set_requirements,
@@ -423,8 +423,8 @@ def test_the_grid_says_whose_pay_a_target_decides(db):
     and §11.3 blocks payroll on exactly one of these kinds. Warning about the
     other three is a false alarm on every model, every month.
     """
-    from app.api.targets import _arrangement
-    from app.models.compensation import CompensationType
+    from app.modules.affiliates.api.targets import _arrangement
+    from app.modules.affiliates.models.compensation import CompensationType
 
     guaranteed = _affiliate(db, "Sara")
     set_terms(
@@ -454,7 +454,7 @@ def test_the_grid_says_whose_pay_a_target_decides(db):
 
 def test_a_model_with_no_terms_has_no_target_deciding_anything(db):
     """No arrangement means nothing is calculable from their target either."""
-    from app.api.targets import _arrangement
+    from app.modules.affiliates.api.targets import _arrangement
 
     nobody = _affiliate(db, "Habiba")
     db.flush()
@@ -480,7 +480,7 @@ def test_a_month_before_the_platform_records_an_outcome(db, _go_live):
     """ADR 0036. The old dashboard kept whether March was met, and nothing
     else. That answer, by itself, is the whole record.
     """
-    from app.services.targets import record_outcome
+    from app.modules.affiliates.services.targets import record_outcome
 
     affiliate = _affiliate(db)
 
@@ -498,7 +498,7 @@ def test_a_missed_outcome_is_achieved_false_not_unknown(db, _go_live):
     """The distinction §11.3 turns on. *Missed* pays the commission and lets
     the month approve; *nobody looked* blocks it. An outcome always answers.
     """
-    from app.services.targets import record_outcome
+    from app.modules.affiliates.services.targets import record_outcome
 
     affiliate = _affiliate(db)
 
@@ -517,7 +517,7 @@ def test_recording_an_outcome_verifies_it_in_the_same_act(db, _go_live):
     would mean a second pass through a screen built around counts for every
     guarantee month of every model.
     """
-    from app.services.targets import record_outcome
+    from app.modules.affiliates.services.targets import record_outcome
 
     affiliate = _affiliate(db)
 
@@ -533,7 +533,7 @@ def test_an_outcome_is_refused_for_a_month_that_can_still_be_paid(db, _go_live):
     Allowed after go-live, somebody could unlock a base guarantee by asserting
     it - no counts, no second person, and a real payment at the end of it.
     """
-    from app.services.targets import record_outcome
+    from app.modules.affiliates.services.targets import record_outcome
 
     affiliate = _affiliate(db)
 
@@ -546,7 +546,7 @@ def test_an_outcome_is_refused_when_nobody_has_set_a_go_live_month(db, monkeypat
     would qualify.
     """
     from app.config import settings
-    from app.services.targets import record_outcome
+    from app.modules.affiliates.services.targets import record_outcome
 
     monkeypatch.setattr(settings, "go_live_month", "", raising=False)
     affiliate = _affiliate(db)
@@ -560,7 +560,7 @@ def test_an_outcome_never_overwrites_counts_somebody_recorded(db, _go_live):
     trouble to record. Clearing those to store a one-word summary of them
     destroys the better record.
     """
-    from app.services.targets import record_outcome
+    from app.modules.affiliates.services.targets import record_outcome
 
     affiliate = _affiliate(db)
     target = _target(db, affiliate, month=BEFORE)
@@ -577,7 +577,7 @@ def test_an_outcome_replaces_a_requirement_nothing_was_ever_measured_against(
     place it would sit beside an outcome it was never compared against, which
     is the mixture the check constraint refuses.
     """
-    from app.services.targets import record_outcome
+    from app.modules.affiliates.services.targets import record_outcome
 
     affiliate = _affiliate(db)
     _target(db, affiliate, month=BEFORE)
@@ -592,7 +592,7 @@ def test_counts_are_refused_on_a_backfilled_month(db, _go_live):
     """ADR 0036. The counts were never kept, and typing some in now would
     invent evidence for a figure that decides money.
     """
-    from app.services.targets import record_outcome
+    from app.modules.affiliates.services.targets import record_outcome
 
     affiliate = _affiliate(db)
     record_outcome(db, affiliate, BEFORE, outcome="met")
@@ -607,7 +607,7 @@ def test_the_database_refuses_a_row_holding_counts_and_an_outcome(db, _go_live):
     A row with a requirement of 8 and an outcome of *met* asks "met against
     what?" of every screen that reads it, and has no answer.
     """
-    from app.services.targets import record_outcome
+    from app.modules.affiliates.services.targets import record_outcome
 
     affiliate = _affiliate(db)
     target = record_outcome(db, affiliate, BEFORE, outcome="met")
@@ -623,7 +623,7 @@ def test_the_database_refuses_a_row_holding_counts_and_an_outcome(db, _go_live):
 
 
 def test_an_outcome_is_either_met_or_missed(db, _go_live):
-    from app.services.targets import record_outcome
+    from app.modules.affiliates.services.targets import record_outcome
 
     affiliate = _affiliate(db)
 
@@ -639,8 +639,8 @@ def test_an_outcome_is_refused_once_the_month_is_approved(db, _go_live):
     the danger. Every screen would then say a guarantee applied to a month
     calculated without it.
     """
-    from app.services.payroll import approve_month
-    from app.services.targets import record_outcome
+    from app.modules.affiliates.services.payroll import approve_month
+    from app.modules.affiliates.services.targets import record_outcome
 
     affiliate = _affiliate(db)
     set_terms(
@@ -675,10 +675,10 @@ def test_a_targets_history_costs_the_same_number_of_queries_however_long_it_is(
     """
     from sqlalchemy import event
 
-    from app.services.portal import my_targets
+    from app.modules.affiliates.services.portal import my_targets
 
     monkeypatch.setattr(
-        "app.services.portal.working_month", lambda: "2026-12", raising=True
+        "app.modules.affiliates.services.portal.working_month", lambda: "2026-12", raising=True
     )
 
     affiliate = _affiliate(db)
@@ -724,10 +724,10 @@ def test_an_open_ended_guarantee_does_not_reach_past_the_months_she_can_see(
     months to decide nothing, and every one of them would be a month she cannot
     open.
     """
-    from app.services.portal import my_targets
+    from app.modules.affiliates.services.portal import my_targets
 
     monkeypatch.setattr(
-        "app.services.portal.working_month", lambda: "2026-04", raising=True
+        "app.modules.affiliates.services.portal.working_month", lambda: "2026-04", raising=True
     )
 
     affiliate = _affiliate(db)

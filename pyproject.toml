@@ -51,7 +51,75 @@ dependencies = [
 include = ["app*"]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.3,<9", "httpx2>=2.9,<3"]
+dev = ["pytest>=8.3,<9", "httpx2>=2.9,<3", "import-linter>=2.15,<3"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+# One rule, written once per department (ADR 0065; Phase 1, batch 4): a
+# department imports app.core, app.shared and another department's `public`
+# only - never its api, models or services. CI runs `lint-imports`.
+#
+# Direct imports only. A department may reach another through app.shared
+# today (shared notifications read affiliate payroll, for one); that is the
+# shared plumbing's debt, not a department's, and it is not checked here.
+#
+# ignore_imports lists the crossings that existed on the day of the move, each
+# with the reason. The list only shrinks: an entry that no longer matches an
+# import is an error, so a crossing that is fixed must be deleted here too.
+#
+# Production (ADR 0069) is empty. When it gains api, models or services, add
+# them to the other three contracts' forbidden_modules.
+[tool.importlinter]
+root_packages = ["app"]
+
+[[tool.importlinter.contracts]]
+name = "Inbox calls other departments only through their public"
+type = "forbidden"
+source_modules = ["app.modules.inbox"]
+forbidden_modules = [
+    "app.modules.affiliates.api", "app.modules.affiliates.models", "app.modules.affiliates.services",
+    "app.modules.operations.api", "app.modules.operations.models", "app.modules.operations.services",
+]
+allow_indirect_imports = true
+ignore_imports = [
+    # The Inbox health card "waiting" counts days the way Operations' Shopify
+    # tab does (ADR 0059, point 18), by calling its waiting_days.
+    "app.modules.inbox.services.health -> app.modules.operations.services.shopify",
+]
+
+[[tool.importlinter.contracts]]
+name = "Operations calls other departments only through their public"
+type = "forbidden"
+source_modules = ["app.modules.operations"]
+forbidden_modules = [
+    "app.modules.affiliates.api", "app.modules.affiliates.models", "app.modules.affiliates.services",
+    "app.modules.inbox.api", "app.modules.inbox.models", "app.modules.inbox.services",
+]
+allow_indirect_imports = true
+ignore_imports = [
+    # Operations shows the order-confirmation tab (ADR 0059, point 18), whose
+    # figures Inbox computes in health.summary.
+    "app.modules.operations.api -> app.modules.inbox.services.health",
+]
+
+[[tool.importlinter.contracts]]
+name = "Affiliates calls other departments only through their public"
+type = "forbidden"
+source_modules = ["app.modules.affiliates"]
+forbidden_modules = [
+    "app.modules.inbox.api", "app.modules.inbox.models", "app.modules.inbox.services",
+    "app.modules.operations.api", "app.modules.operations.models", "app.modules.operations.services",
+]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "Production calls other departments only through their public"
+type = "forbidden"
+source_modules = ["app.modules.production"]
+forbidden_modules = [
+    "app.modules.affiliates.api", "app.modules.affiliates.models", "app.modules.affiliates.services",
+    "app.modules.inbox.api", "app.modules.inbox.models", "app.modules.inbox.services",
+    "app.modules.operations.api", "app.modules.operations.models", "app.modules.operations.services",
+]
+allow_indirect_imports = true

@@ -12,19 +12,19 @@ from cryptography.fernet import Fernet
 from sqlalchemy import select, text
 
 from app.core.businesstime import utcnow
-from app.models.audit import AuditEvent
-from app.models.identity import UserAccount
-from app.models.inbox import (
+from app.shared.models.audit import AuditEvent
+from app.shared.models.identity import UserAccount
+from app.modules.inbox.models import (
     InboxConversation,
     InboxMedia,
     InboxMessage,
     MetaWebhookEvent,
     OrderConfirmation,
 )
-from app.models.integration import BackgroundJob
-from app.services.inbox import chats, connection, health, sending
-from app.services.inbox.meta import MetaClient, NumberInfo
-from app.services.inbox.outbound import NotSent
+from app.shared.models.integration import BackgroundJob
+from app.modules.inbox.services import chats, connection, health, sending
+from app.modules.inbox.services.meta import MetaClient, NumberInfo
+from app.modules.inbox.services.outbound import NotSent
 
 NOW = utcnow()
 

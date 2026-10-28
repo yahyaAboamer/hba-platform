@@ -18,13 +18,13 @@ from datetime import datetime, timezone
 from sqlalchemy import text
 
 from app.core.passwords import hash_password
-from app.models.attributed_orders import AttributedOrder, CommissionState
-from app.models.identity import UserAccount
-from app.services.affiliates import create_affiliate
-from app.services.codes import register_code
-from app.services.commission.base import base_for_order
-from app.services.shopify.catalogue import frozen_lines
-from app.services.shopify.fulfilment import (
+from app.modules.affiliates.models.attributed_orders import AttributedOrder, CommissionState
+from app.shared.models.identity import UserAccount
+from app.modules.affiliates.services.affiliates import create_affiliate
+from app.modules.affiliates.services.codes import register_code
+from app.modules.affiliates.services.commission.base import base_for_order
+from app.shared.services.shopify.catalogue import frozen_lines
+from app.shared.services.shopify.fulfilment import (
     DELIVERED,
     FAILED,
     IN_FLIGHT,
@@ -32,8 +32,8 @@ from app.services.shopify.fulfilment import (
     paid_by_delivery,
     summarise_fulfilments,
 )
-from app.services.shopify.normalise import normalise_order, upsert_order_index
-from app.services.stale import (
+from app.shared.services.shopify.normalise import normalise_order, upsert_order_index
+from app.shared.services.stale import (
     COURIER_SILENT,
     NO_TRACKING,
     OTHER_COURIER,

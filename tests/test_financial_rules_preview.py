@@ -10,20 +10,20 @@ from sqlalchemy import func, select
 
 from app.config import settings
 from app.core.passwords import hash_password
-from app.models.attributed_orders import AttributedOrder
-from app.models.identity import UserAccount
-from app.models.orders import OrderIndex
-from app.models.payroll import PayrollSnapshot
-from app.services.affiliates import create_affiliate
-from app.services.codes import register_code
-from app.services.commission.attribute import attribute_order
-from app.services.commission.calculate import calculate_month
-from app.services.commission.preview import preview_month
-from app.services.commission.source import source_order
-from app.services.compensation import set_terms
-from app.services.payroll import approve_month, content_hash
-from app.services.payments import record_payment
-from app.services.targets import record_actuals, set_requirements, verify
+from app.modules.affiliates.models.attributed_orders import AttributedOrder
+from app.shared.models.identity import UserAccount
+from app.shared.models.orders import OrderIndex
+from app.modules.affiliates.models.payroll import PayrollSnapshot
+from app.modules.affiliates.services.affiliates import create_affiliate
+from app.modules.affiliates.services.codes import register_code
+from app.modules.affiliates.services.commission.attribute import attribute_order
+from app.modules.affiliates.services.commission.calculate import calculate_month
+from app.modules.affiliates.services.commission.preview import preview_month
+from app.modules.affiliates.services.commission.source import source_order
+from app.modules.affiliates.services.compensation import set_terms
+from app.modules.affiliates.services.payroll import approve_month, content_hash
+from app.modules.affiliates.services.payments import record_payment
+from app.modules.affiliates.services.targets import record_actuals, set_requirements, verify
 from tests.support_policy import approved_before_the_switch
 
 MONTH = "2026-04"

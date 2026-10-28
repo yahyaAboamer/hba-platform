@@ -13,11 +13,11 @@ import pytest
 from sqlalchemy import text
 
 from app.core.signals import Anomaly
-from app.models.orders import OrderIndex
-from app.services.jobs import JobKind, JobStatus, PermanentFailure, enqueue, lease_job
-from app.services.reconcile import MAX_PAGES, PAGE_SIZE, reconcile_recent
-from app.services.schedule import SCHEDULE, ensure_scheduled
-from app.services.shopify.client import ShopifyClient
+from app.shared.models.orders import OrderIndex
+from app.shared.services.jobs import JobKind, JobStatus, PermanentFailure, enqueue, lease_job
+from app.shared.services.reconcile import MAX_PAGES, PAGE_SIZE, reconcile_recent
+from app.shared.services.schedule import SCHEDULE, ensure_scheduled
+from app.shared.services.shopify.client import ShopifyClient
 
 
 def _node(order_id: str) -> dict:
@@ -164,20 +164,20 @@ def test_the_page_size_is_not_absurd():
 
 
 def test_reconciliation_without_credentials_fails_permanently(db, monkeypatch):
-    from app.services.shopify.client import ShopifyNotConfigured
+    from app.shared.services.shopify.client import ShopifyNotConfigured
     from app.worker import HANDLERS
 
     def unconfigured():
         raise ShopifyNotConfigured("SHOPIFY_SHOP_DOMAIN is not set")
 
-    monkeypatch.setattr("app.services.shopify.sync.build_client", unconfigured)
+    monkeypatch.setattr("app.shared.services.shopify.sync.build_client", unconfigured)
 
     with pytest.raises(PermanentFailure):
         HANDLERS[JobKind.RECONCILE](db, {})
 
 
 def test_the_prune_handler_removes_old_succeeded_jobs(db):
-    from app.services.jobs import complete_job
+    from app.shared.services.jobs import complete_job
     from app.worker import HANDLERS
 
     enqueue(db, JobKind.SYNC_ORDER, {})
@@ -243,7 +243,7 @@ def test_a_running_job_still_counts_as_outstanding(db):
 
 def test_a_finished_job_frees_the_slot_for_the_next_one(db):
     """The recurrence itself: one finishes, the next is queued."""
-    from app.services.jobs import complete_job
+    from app.shared.services.jobs import complete_job
 
     ensure_scheduled(db)
     db.flush()

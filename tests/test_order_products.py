@@ -10,20 +10,20 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 
 from app.core.passwords import hash_password
-from app.models.affiliates import AccountKind
-from app.models.attributed_orders import AttributedOrder, CommissionState
-from app.models.catalogue import OrderLineItem
-from app.models.compensation import CompensationType
-from app.models.identity import UserAccount
-from app.models.integration import BackgroundJob
-from app.models.orders import OrderIndex
-from app.services.affiliates import create_affiliate
-from app.services.codes import register_code
-from app.services.commission.attribute import attribute_order
-from app.services.compensation import set_terms
-from app.services.jobs import JobKind
-from app.services.portal import describe_variant, my_orders
-from app.services.recipients import _handle_fill_line_items, orders_missing_line_items
+from app.modules.affiliates.models.affiliates import AccountKind
+from app.modules.affiliates.models.attributed_orders import AttributedOrder, CommissionState
+from app.shared.models.catalogue import OrderLineItem
+from app.modules.affiliates.models.compensation import CompensationType
+from app.shared.models.identity import UserAccount
+from app.shared.models.integration import BackgroundJob
+from app.shared.models.orders import OrderIndex
+from app.modules.affiliates.services.affiliates import create_affiliate
+from app.modules.affiliates.services.codes import register_code
+from app.modules.affiliates.services.commission.attribute import attribute_order
+from app.modules.affiliates.services.compensation import set_terms
+from app.shared.services.jobs import JobKind
+from app.modules.affiliates.services.portal import describe_variant, my_orders
+from app.modules.affiliates.services.recipients import _handle_fill_line_items, orders_missing_line_items
 
 AUGUST = "2026-08"
 

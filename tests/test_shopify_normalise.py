@@ -6,7 +6,7 @@ and timezone rules are enforced here and tested here.
 
 import pytest
 
-from app.services.shopify.normalise import money_to_piastres, normalise_order
+from app.shared.services.shopify.normalise import money_to_piastres, normalise_order
 
 
 def _node(**overrides) -> dict:

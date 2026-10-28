@@ -15,10 +15,10 @@ from sqlalchemy import text
 
 from app.core.businesstime import utcnow
 from app.db import SessionLocal
-from app.models.inbox import InboxConversation, InboxMessage, OrderConfirmation
-from app.services.inbox import connection, outbound, sending
-from app.services.inbox.meta import MetaClient, NumberInfo
-from app.services.inbox.outbound import (
+from app.modules.inbox.models import InboxConversation, InboxMessage, OrderConfirmation
+from app.modules.inbox.services import connection, outbound, sending
+from app.modules.inbox.services.meta import MetaClient, NumberInfo
+from app.modules.inbox.services.outbound import (
     INTERRUPTED,
     MAX_ATTEMPTS,
     NotSent,
@@ -28,7 +28,7 @@ from app.services.inbox.outbound import (
     send_text,
     window_open,
 )
-from app.services.jobs import PermanentFailure
+from app.shared.services.jobs import PermanentFailure
 
 HER = "201005550188"
 TOKEN = "EAAG-made-up-access-key-0000a1b2"
@@ -184,7 +184,7 @@ def test_a_message_whatsapp_refuses_is_shown_as_failed_with_the_reason(db, may_s
 
 
 def test_an_automatic_message_whatsapp_did_not_answer_is_left_for_the_job_to_retry(db, may_send):
-    from app.services.inbox.meta import MetaError
+    from app.modules.inbox.services.meta import MetaError
 
     with pytest.raises(MetaError):
         send_text(db, _conversation(db), "Hello", origin="automatic", client=_meta([], fail_network=True))

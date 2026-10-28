@@ -18,7 +18,7 @@ import logging
 
 import pytest
 
-from app.services.shopify.fulfilment import (
+from app.shared.services.shopify.fulfilment import (
     DELIVERED,
     NO_RETURN,
     RETURN_ACTIVITY_STATUSES,
@@ -33,7 +33,7 @@ from app.services.shopify.fulfilment import (
     derive_refunds,
     derive_return,
 )
-from app.services.shopify.normalise import normalise_order
+from app.shared.services.shopify.normalise import normalise_order
 
 
 def _fulfilment(status, delivered_at=None):

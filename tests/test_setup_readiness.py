@@ -12,12 +12,12 @@ import pytest
 from sqlalchemy import text
 
 from app.core.passwords import hash_password
-from app.models.affiliates import AffiliateProfile
-from app.models.compensation import CompensationType
-from app.models.identity import UserAccount
-from app.services.affiliates import create_affiliate, set_collaboration_start
-from app.services.compensation import set_terms
-from app.services.setup import (
+from app.modules.affiliates.models.affiliates import AffiliateProfile
+from app.modules.affiliates.models.compensation import CompensationType
+from app.shared.models.identity import UserAccount
+from app.modules.affiliates.services.affiliates import create_affiliate, set_collaboration_start
+from app.modules.affiliates.services.compensation import set_terms
+from app.modules.affiliates.services.setup import (
     NO_TARGET_OUTCOME,
     NO_TERMS,
     TARGET_NOT_VERIFIED,
@@ -64,8 +64,8 @@ def _order(db, affiliate, order_id, *, month):
     """One attributed order, which is what a derived start month reads."""
     from datetime import datetime, timezone
 
-    from app.models.attributed_orders import AttributedOrder
-    from app.models.orders import OrderIndex
+    from app.modules.affiliates.models.attributed_orders import AttributedOrder
+    from app.shared.models.orders import OrderIndex
 
     db.add(
         OrderIndex(
@@ -438,7 +438,7 @@ def test_a_gap_in_the_middle_is_not_covered_from_the_start(db):
     month is January, her start is January, and the old column said *Covered
     from the start* - while April and May could not be calculated at all.
     """
-    from app.services.setup import roster_readiness
+    from app.modules.affiliates.services.setup import roster_readiness
 
     affiliate = _model(db, start="2026-01")
     set_terms(
@@ -469,7 +469,7 @@ def test_a_gap_in_the_middle_is_not_covered_from_the_start(db):
 
 def test_a_guaranteed_month_without_an_outcome_blocks_it_too(db):
     """A09, F06. Missing terms is not the only thing that stops a figure."""
-    from app.services.setup import roster_readiness
+    from app.modules.affiliates.services.setup import roster_readiness
 
     affiliate = _model(db, start="2026-09")
     set_terms(
@@ -492,7 +492,7 @@ def test_a_guaranteed_month_without_an_outcome_blocks_it_too(db):
 
 def test_every_month_covered_is_reported_ready(db):
     """A09. And the happy case still reads as one."""
-    from app.services.setup import roster_readiness
+    from app.modules.affiliates.services.setup import roster_readiness
 
     affiliate = _model(db, start="2026-07")
     set_terms(
@@ -525,7 +525,7 @@ def test_a_model_with_no_recorded_start_is_judged_on_her_orders(db):
     eligible months derived from her orders, and she can be perfectly ready
     across all of them.
     """
-    from app.services.setup import roster_readiness
+    from app.modules.affiliates.services.setup import roster_readiness
 
     affiliate = _model(db, start=None)
     _order(db, affiliate, "aug", month="2026-08")
@@ -548,7 +548,7 @@ def test_a_model_with_no_recorded_start_is_judged_on_her_orders(db):
 
 def test_the_roster_answers_for_everybody_in_one_pass(db):
     """A09. Set-wise, because this is the screen with all of them on it."""
-    from app.services.setup import roster_readiness
+    from app.modules.affiliates.services.setup import roster_readiness
 
     ready = _model(db, start="2026-09", name="Ready", email="ready@example.com")
     set_terms(

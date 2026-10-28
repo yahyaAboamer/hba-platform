@@ -10,10 +10,10 @@ from sqlalchemy import text
 from sqlalchemy.exc import DatabaseError, IntegrityError
 
 from app.core.passwords import hash_password
-from app.models.compensation import CompensationPeriod, CompensationType
-from app.models.identity import UserAccount
-from app.services.affiliates import create_affiliate
-from app.services.compensation import (
+from app.modules.affiliates.models.compensation import CompensationPeriod, CompensationType
+from app.shared.models.identity import UserAccount
+from app.modules.affiliates.services.affiliates import create_affiliate
+from app.modules.affiliates.services.compensation import (
     close_terms,
     set_terms,
     terms_for,
@@ -34,7 +34,7 @@ def _affiliate(db, name="Nour"):
 
 def _approved_month(db, affiliate, month):
     """A month already agreed and paid, which nothing may retroactively change."""
-    from app.models.payroll import CalculationState, PayrollMonth
+    from app.modules.affiliates.models.payroll import CalculationState, PayrollMonth
 
     row = PayrollMonth(affiliate_id=affiliate.id, month=month)
     row.calculation_state = CalculationState.APPROVED
@@ -912,7 +912,7 @@ def test_rewriting_the_history_keeps_an_unmentioned_customer_discount(db):
     wiped by the next change of rate. Not mentioning it now keeps it; saying
     it explicitly, even as nothing, still replaces it.
     """
-    from app.services.compensation import all_terms, replace_pay_history
+    from app.modules.affiliates.services.compensation import all_terms, replace_pay_history
 
     nour = _affiliate(db)
     set_terms(

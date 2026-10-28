@@ -17,14 +17,14 @@ import pytest
 from sqlalchemy import event
 
 from app.core.passwords import hash_password
-from app.models.affiliates import AccountKind
-from app.models.attributed_orders import AttributedOrder, CommissionState
-from app.models.compensation import CompensationType
-from app.models.identity import UserAccount
-from app.models.orders import OrderIndex
-from app.services.affiliates import create_affiliate
-from app.services.codes import register_code
-from app.services.compensation import set_terms
+from app.modules.affiliates.models.affiliates import AccountKind
+from app.modules.affiliates.models.attributed_orders import AttributedOrder, CommissionState
+from app.modules.affiliates.models.compensation import CompensationType
+from app.shared.models.identity import UserAccount
+from app.shared.models.orders import OrderIndex
+from app.modules.affiliates.services.affiliates import create_affiliate
+from app.modules.affiliates.services.codes import register_code
+from app.modules.affiliates.services.compensation import set_terms
 
 MONTHS = ["2026-0{}".format(n) for n in range(1, 9)]
 WORKING = "2026-08"
@@ -40,7 +40,7 @@ def _go_live(monkeypatch):
 @pytest.fixture(autouse=True)
 def _working_month(monkeypatch):
     monkeypatch.setattr(
-        "app.services.portal.working_month", lambda: WORKING, raising=True
+        "app.modules.affiliates.services.portal.working_month", lambda: WORKING, raising=True
     )
 
 
@@ -124,7 +124,7 @@ def test_the_correction_scan_does_not_cost_a_calculation_per_month_per_model(db)
     are a small and knowable set. Walking the unapproved ones is work whose
     answer is always `None`.
     """
-    from app.services.corrections import open_corrections
+    from app.modules.affiliates.services.corrections import open_corrections
 
     affiliate = _model(db, "Nour")
     for index, month in enumerate(MONTHS):
@@ -165,8 +165,8 @@ def test_an_approved_history_costs_a_calculation_for_every_month_of_it(db):
     a second, so the number is pinned here instead, where it fails loudly if it
     gets materially worse before somebody does that work.
     """
-    from app.services.corrections import open_corrections
-    from app.services.payroll import approve_month
+    from app.modules.affiliates.services.corrections import open_corrections
+    from app.modules.affiliates.services.payroll import approve_month
 
     affiliate = _model(db, "Sara")
     for index, month in enumerate(MONTHS):

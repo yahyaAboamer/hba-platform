@@ -17,8 +17,8 @@ from sqlalchemy import text
 from app.core.signals import Anomaly
 from app.db import SessionLocal, engine
 from app.main import app
-from app.services.inbox import connection
-from app.services.inbox.meta import NumberInfo
+from app.modules.inbox.services import connection
+from app.modules.inbox.services.meta import NumberInfo
 
 APP_SECRET = "made-up-app-secret-000000009f3c"
 CHECK_WORD = "made-up-check-word-0001"
@@ -193,7 +193,7 @@ def test_with_whatsapp_not_connected_everything_is_refused(unconnected):
 
 
 def test_an_oversized_body_is_refused_before_it_is_read(client):
-    from app.api.webhooks import META_MAX_BODY_BYTES
+    from app.shared.api.webhooks import META_MAX_BODY_BYTES
 
     body = b"x" * (META_MAX_BODY_BYTES + 1)
     response = client.post(URL, content=body, headers={"X-Hub-Signature-256": _sign(body)})

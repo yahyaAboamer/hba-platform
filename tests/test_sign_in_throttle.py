@@ -36,7 +36,7 @@ def mailed(monkeypatch):
     """The reset links that would have been emailed, in order."""
     tokens: list[str] = []
     monkeypatch.setattr(
-        "app.api.auth.password_reset_requested",
+        "app.shared.api.auth.password_reset_requested",
         lambda db, account, token: tokens.append(token),
     )
     return tokens
@@ -134,7 +134,7 @@ def test_a_proxy_address_does_not_pool_every_visitor(client):
 def test_an_unknown_address_costs_a_full_password_check(client, monkeypatch):
     """It used to return before hashing anything, so it answered quickly and
     the speed said the address had no account."""
-    from app.services import auth
+    from app.shared.services import auth
 
     checked = []
     real = auth.verify_password

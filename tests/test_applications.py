@@ -8,11 +8,11 @@ import pytest
 from sqlalchemy import select
 
 from app.core.passwords import hash_password
-from app.models.affiliates import AffiliateProfile, AffiliateStatus
-from app.models.codes import DiscountCodePeriod
-from app.models.identity import UserAccount
-from app.models.payouts import PayoutDestination, PayoutMethod
-from app.services.applications import submit_application
+from app.modules.affiliates.models.affiliates import AffiliateProfile, AffiliateStatus
+from app.modules.affiliates.models.codes import DiscountCodePeriod
+from app.shared.models.identity import UserAccount
+from app.modules.affiliates.models.payouts import PayoutDestination, PayoutMethod
+from app.modules.affiliates.services.applications import submit_application
 
 INSTAPAY = {
     "instapay_address_url": "https://ipn.eg/S/nour.mahmoud/instapay/8Xk2Qp",
@@ -226,7 +226,7 @@ def test_the_application_cannot_express_what_they_are_paid(db):
 
 def test_applying_never_sets_compensation_terms(db):
     """The profile exists and is worth nothing until a maintainer says so."""
-    from app.services.compensation import terms_for
+    from app.modules.affiliates.services.compensation import terms_for
 
     account = _account(db)
     affiliate = _apply(db, account)
@@ -358,7 +358,7 @@ def test_without_abroad_a_method_is_still_required(db):
 def test_saving_a_destination_later_ends_the_abroad_arrangement(db):
     """Once the platform can pay her itself, admin must stop arranging it by
     hand - the flag goes the moment a destination exists."""
-    from app.services.payouts import set_destination
+    from app.modules.affiliates.services.payouts import set_destination
 
     account = _account(db)
     affiliate = _apply(db, account, payout_method=None, payout_fields={}, abroad=True)

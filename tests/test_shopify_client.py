@@ -8,7 +8,7 @@ handling part of the transport rather than configuration.
 import httpx
 import pytest
 
-from app.services.shopify.client import (
+from app.shared.services.shopify.client import (
     REQUIRED_SCOPES,
     ShopifyClient,
     ShopifyError,

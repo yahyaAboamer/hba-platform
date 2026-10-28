@@ -18,20 +18,20 @@ from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError, IntegrityError
 
 from app.core.passwords import hash_password
-from app.models.affiliates import AccountKind
-from app.models.attributed_orders import AttributedOrder, CommissionState
-from app.models.compensation import CompensationType
-from app.models.identity import UserAccount
-from app.models.orders import OrderIndex
-from app.models.payments import (
+from app.modules.affiliates.models.affiliates import AccountKind
+from app.modules.affiliates.models.attributed_orders import AttributedOrder, CommissionState
+from app.modules.affiliates.models.compensation import CompensationType
+from app.shared.models.identity import UserAccount
+from app.shared.models.orders import OrderIndex
+from app.modules.affiliates.models.payments import (
     AdjustmentType,
     PaymentAllocation,
     PaymentTransaction,
     PayrollAdjustment,
 )
-from app.services.affiliates import create_affiliate
-from app.services.compensation import set_terms
-from app.services.payments import (
+from app.modules.affiliates.services.affiliates import create_affiliate
+from app.modules.affiliates.services.compensation import set_terms
+from app.modules.affiliates.services.payments import (
     allocate,
     adjust,
     balance_due,
@@ -39,9 +39,9 @@ from app.services.payments import (
     payments_for,
     record_payment,
 )
-from app.services.payments_state import SettlementState
-from app.services.payouts import set_destination
-from app.services.payroll import approve_month, get_month, reopen_month
+from app.modules.affiliates.services.payments_state import SettlementState
+from app.modules.affiliates.services.payouts import set_destination
+from app.modules.affiliates.services.payroll import approve_month, get_month, reopen_month
 
 AUGUST = "2026-08"
 SEPTEMBER = "2026-09"
@@ -613,7 +613,7 @@ def test_a_credit_opens_the_month_it_lands_on(db):
     write-off as the only way out - money absorbed that should have carried
     forward.
     """
-    from app.services.payments import adjust
+    from app.modules.affiliates.services.payments import adjust
 
     affiliate = _affiliate(db)
     _owed(db, affiliate, AUGUST)
@@ -643,7 +643,7 @@ def test_a_credit_waits_on_a_draft_month_and_applies_when_it_is_approved(db):
     Until then there is no figure to reduce, and reporting one would be
     inventing an obligation nobody has approved.
     """
-    from app.services.payments import adjust
+    from app.modules.affiliates.services.payments import adjust
 
     affiliate = _affiliate(db)
     _owed(db, affiliate, AUGUST)
@@ -681,8 +681,8 @@ def test_a_month_opened_only_to_receive_a_credit_is_not_reported_as_forgotten(db
     against one, so raising it would be noise on the one warning that has to be
     believed.
     """
-    from app.services.payments import adjust
-    from app.services.payroll import months_left_reopened
+    from app.modules.affiliates.services.payments import adjust
+    from app.modules.affiliates.services.payroll import months_left_reopened
 
     affiliate = _affiliate(db)
     _owed(db, affiliate, AUGUST)

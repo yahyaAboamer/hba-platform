@@ -13,8 +13,8 @@ from sqlalchemy.exc import DatabaseError
 
 from app.core.businesstime import utcnow
 from app.core.signals import Anomaly
-from app.models.integration import IntegrationEvent
-from app.services.jobs import (
+from app.shared.models.integration import IntegrationEvent
+from app.shared.services.jobs import (
     ERROR_LIMIT,
     MAX_ATTEMPTS,
     JobStatus,

@@ -11,11 +11,11 @@ import pytest
 from cryptography.fernet import Fernet
 from sqlalchemy import text
 
-from app.models.inbox import OrderConfirmation
-from app.services.inbox import connection, tags
-from app.services.inbox.tags import ALL_TAGS, apply_tags, queue_tags, wanted_tag
-from app.services.jobs import PermanentFailure
-from app.services.shopify.client import ShopifyClient, ShopifyError
+from app.modules.inbox.models import OrderConfirmation
+from app.modules.inbox.services import connection, tags
+from app.modules.inbox.services.tags import ALL_TAGS, apply_tags, queue_tags, wanted_tag
+from app.shared.services.jobs import PermanentFailure
+from app.shared.services.shopify.client import ShopifyClient, ShopifyError
 
 
 def _row(db, order_id="5001", state="sent", answer=None) -> OrderConfirmation:

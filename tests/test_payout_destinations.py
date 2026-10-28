@@ -14,10 +14,10 @@ from sqlalchemy import select, text
 from sqlalchemy.exc import DatabaseError
 
 from app.core.passwords import hash_password
-from app.models.identity import UserAccount
-from app.models.payouts import PayoutDestination, PayoutMethod
-from app.services.affiliates import create_affiliate
-from app.services.payouts import (
+from app.shared.models.identity import UserAccount
+from app.modules.affiliates.models.payouts import PayoutDestination, PayoutMethod
+from app.modules.affiliates.services.affiliates import create_affiliate
+from app.modules.affiliates.services.payouts import (
     VISIBLE_TAIL,
     current_destination,
     destination_history,
@@ -422,7 +422,7 @@ def test_a_bank_payout_reveals_the_number_the_payer_has_to_type(db):
     the masking rule as absolute made the payment screen impossible rather
     than safe.
     """
-    from app.services.payouts import reveal_destination
+    from app.modules.affiliates.services.payouts import reveal_destination
 
     nour = _affiliate(db)
     set_destination(
@@ -449,7 +449,7 @@ def test_revealing_returns_only_what_that_method_needs(db):
     """A wallet payout does not hand back a bank number that happens to sit on
     the same row.
     """
-    from app.services.payouts import reveal_destination
+    from app.modules.affiliates.services.payouts import reveal_destination
 
     nour = _affiliate(db)
     set_destination(
@@ -480,7 +480,7 @@ def test_revealing_is_recorded_without_the_value(db):
 
     from sqlalchemy import text
 
-    from app.services.payouts import reveal_destination
+    from app.modules.affiliates.services.payouts import reveal_destination
 
     nour = _affiliate(db)
     set_destination(
@@ -515,7 +515,7 @@ def test_revealing_is_recorded_without_the_value(db):
 
 
 def test_revealing_a_destination_that_does_not_exist_is_refused(db):
-    from app.services.payouts import reveal_destination
+    from app.modules.affiliates.services.payouts import reveal_destination
 
     nour = _affiliate(db)
     db.flush()
@@ -532,7 +532,7 @@ def test_an_instapay_reveal_carries_the_number_as_well_as_the_link(db):
     desktop work - so the machine where the fallback matters most is the one
     the link serves worst.
     """
-    from app.services.payouts import reveal_destination
+    from app.modules.affiliates.services.payouts import reveal_destination
 
     nour = _affiliate(db)
     _instapay(db, nour, url=INSTAPAY_URL, phone="01001234567")
@@ -551,7 +551,7 @@ def test_an_instapay_reveal_without_a_number_still_gives_the_link(db):
     """The number is a fallback, not a precondition. Somebody who registered
     before it was collected can still be paid.
     """
-    from app.services.payouts import reveal_destination
+    from app.modules.affiliates.services.payouts import reveal_destination
 
     nour = _affiliate(db)
     set_destination(
@@ -575,7 +575,7 @@ def test_a_phone_number_in_the_link_field_is_refused(db):
     other on the form. Mixed up, nothing errors at the time - it surfaces at
     month end when somebody tries to pay them and the button opens nothing.
     """
-    from app.services.payouts import normalise_instapay_address
+    from app.modules.affiliates.services.payouts import normalise_instapay_address
 
     with pytest.raises(ValueError, match="looks like a phone number"):
         normalise_instapay_address("01001234567")
@@ -583,7 +583,7 @@ def test_a_phone_number_in_the_link_field_is_refused(db):
 
 def test_a_link_to_somewhere_else_is_refused(db):
     """A URL anywhere but ipn.eg cannot open InstaPay, whatever else it is."""
-    from app.services.payouts import normalise_instapay_address
+    from app.modules.affiliates.services.payouts import normalise_instapay_address
 
     with pytest.raises(ValueError, match="points at"):
         normalise_instapay_address("https://facebook.com/nour")
@@ -591,14 +591,14 @@ def test_a_link_to_somewhere_else_is_refused(db):
 
 def test_a_lookalike_domain_is_refused(db):
     """`notipn.eg` ends with the right letters and is not the right host."""
-    from app.services.payouts import normalise_instapay_address
+    from app.modules.affiliates.services.payouts import normalise_instapay_address
 
     with pytest.raises(ValueError, match="points at"):
         normalise_instapay_address("https://notipn.eg/nour")
 
 
 def test_a_subdomain_of_instapay_is_accepted(db):
-    from app.services.payouts import normalise_instapay_address
+    from app.modules.affiliates.services.payouts import normalise_instapay_address
 
     assert (
         normalise_instapay_address("https://app.ipn.eg/S/nour")
@@ -609,7 +609,7 @@ def test_a_subdomain_of_instapay_is_accepted(db):
 def test_a_missing_scheme_is_added_rather_than_refused(db):
     """Somebody typing it by hand omits https:// far more often than they mean
     a different site."""
-    from app.services.payouts import normalise_instapay_address
+    from app.modules.affiliates.services.payouts import normalise_instapay_address
 
     assert normalise_instapay_address("ipn.eg/S/nour") == "https://ipn.eg/S/nour"
 
@@ -619,7 +619,7 @@ def test_the_path_is_not_second_guessed(db):
     one because its path looks unfamiliar would stop a model joining at all,
     which is far worse than accepting an odd-looking ipn.eg link.
     """
-    from app.services.payouts import normalise_instapay_address
+    from app.modules.affiliates.services.payouts import normalise_instapay_address
 
     for address in (
         "https://ipn.eg/S/nour.mahmoud/instapay/8Xk2Qp",
@@ -655,13 +655,13 @@ def test_the_check_applies_wherever_a_destination_is_written(db):
 
 
 def _queued(db):
-    from app.models.notifications import NotificationOutbox
+    from app.shared.models.notifications import NotificationOutbox
 
     return list(db.scalars(select(NotificationOutbox)))
 
 
 def test_a_maintainer_moving_the_money_tells_the_model(db):
-    from app.services.notifications import Event
+    from app.shared.services.notifications import Event
 
     nour = _affiliate(db)
     _instapay(db, nour)
@@ -687,7 +687,7 @@ def test_a_maintainer_moving_the_money_tells_the_model(db):
 
 def test_a_model_changing_it_themselves_is_not_emailed_about_it(db):
     """They just did it. Telling them would train them to ignore the warning."""
-    from app.services.notifications import Event
+    from app.shared.services.notifications import Event
 
     nour = _affiliate(db)
     _instapay(db, nour)
@@ -709,7 +709,7 @@ def test_a_model_changing_it_themselves_is_not_emailed_about_it(db):
 
 def test_the_first_destination_is_not_a_change(db):
     """Setting one while applying is not somebody moving your money."""
-    from app.services.notifications import Event
+    from app.shared.services.notifications import Event
 
     nour = _affiliate(db)
     _instapay(db, nour)
@@ -902,7 +902,7 @@ def test_an_instapay_address_must_be_an_https_link(db, address):
     """Staff open this link from the payment screen, so only https is kept.
     The host check alone let any scheme through that named ipn.eg (security
     audit, October 2026)."""
-    from app.services.payouts import normalise_instapay_address
+    from app.modules.affiliates.services.payouts import normalise_instapay_address
 
     with pytest.raises(ValueError, match="https://"):
         normalise_instapay_address(address)

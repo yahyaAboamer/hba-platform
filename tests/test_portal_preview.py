@@ -38,7 +38,7 @@ def _go_live(monkeypatch):
 @pytest.fixture(autouse=True)
 def _working_month(monkeypatch):
     monkeypatch.setattr(
-        "app.services.portal.working_month", lambda: SEPTEMBER, raising=True
+        "app.modules.affiliates.services.portal.working_month", lambda: SEPTEMBER, raising=True
     )
 
 
@@ -179,7 +179,7 @@ def test_a_look_is_audited_under_the_staff_member_and_never_as_her(admin):
 
 
 def test_the_audit_screen_says_it_in_words():
-    from app.services.audit_words import _Names, sentence
+    from app.shared.services.audit_words import _Names, sentence
 
     names = _Names.__new__(_Names)
     names.affiliates = {6: "Nour Hassan"}
@@ -202,7 +202,7 @@ def test_her_payout_details_stay_shortened_in_the_preview(admin):
 
 
 def test_the_preview_router_offers_no_write_at_all():
-    from app.api.portal_preview import router
+    from app.modules.affiliates.api.portal_preview import router
 
     writable = [
         (sorted(route.methods), route.path)
@@ -213,7 +213,7 @@ def test_the_preview_router_offers_no_write_at_all():
 
 
 def test_every_preview_route_is_behind_the_staff_permission():
-    from app.api.portal_preview import GUARD, router
+    from app.modules.affiliates.api.portal_preview import GUARD, router
 
     def calls(dependant):
         for dependency in dependant.dependencies:

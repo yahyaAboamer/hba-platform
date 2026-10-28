@@ -16,9 +16,9 @@ from sqlalchemy import select, text
 
 from app.db import SessionLocal, engine
 from app.main import app
-from app.models.order_ops import OpsIntegrationKey
-from app.services.order_ops import bosta, connections, estebdal
-from app.services.order_ops.polling import KeyRefused, SourceUnavailable
+from app.modules.operations.models import OpsIntegrationKey
+from app.modules.operations.services import bosta, connections, estebdal
+from app.modules.operations.services.polling import KeyRefused, SourceUnavailable
 
 BOSTA_KEY = "bosta-read-only-key-0000a1b2"
 ESTEBDAL_KEY = "estebdal-key-00000000009f3c"

@@ -7,9 +7,9 @@ import io
 import json
 from datetime import datetime, timedelta, timezone
 
-from app.models.inbox import OrderConfirmation
-from app.services.inbox import shadow
-from app.services.inbox.confirmations import BAD_PHONE, PAID
+from app.modules.inbox.models import OrderConfirmation
+from app.modules.inbox.services import shadow
+from app.modules.inbox.services.confirmations import BAD_PHONE, PAID
 
 DAY = datetime(2026, 10, 12, tzinfo=timezone.utc)
 

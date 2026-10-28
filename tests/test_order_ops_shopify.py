@@ -15,17 +15,17 @@ from sqlalchemy import func, select, text
 from app.core.businesstime import BUSINESS_TIMEZONE, utcnow
 from app.db import engine
 from app.main import app
-from app.models.order_ops import OpsShopifyOrder
-from app.services.jobs import JobKind
-from app.services.order_ops import shopify
-from app.services.order_ops.freshness import record_failure, record_not_connected, record_success
-from app.services.order_ops.polling import (
+from app.modules.operations.models import OpsShopifyOrder
+from app.shared.services.jobs import JobKind
+from app.modules.operations.services import shopify
+from app.modules.operations.services.freshness import record_failure, record_not_connected, record_success
+from app.modules.operations.services.polling import (
     KeyRefused,
     NotConnected,
     PermanentlyUnavailable,
     SourceUnavailable,
 )
-from app.services.shopify.client import ShopifyClient, ShopifyNotConfigured
+from app.shared.services.shopify.client import ShopifyClient, ShopifyNotConfigured
 
 # ── Which card an order counts on ─────────────────────────────────────────────
 
@@ -182,7 +182,7 @@ def test_a_failed_read_leaves_the_last_set_in_place(db):
 
 
 def test_no_shopify_connection_is_not_connected(db, monkeypatch):
-    from app.services.shopify import connection
+    from app.shared.services.shopify import connection
 
     def refuse(_effective):
         raise ShopifyNotConfigured("not configured")
@@ -194,7 +194,7 @@ def test_no_shopify_connection_is_not_connected(db, monkeypatch):
 
 def test_the_read_is_scheduled_every_five_minutes_with_its_handler():
     import app.main  # noqa: F401 - registers the handlers
-    from app.services.schedule import SCHEDULE
+    from app.shared.services.schedule import SCHEDULE
     from app.worker import HANDLERS
 
     assert SCHEDULE[JobKind.ORDER_OPS_SHOPIFY][0] == timedelta(minutes=5)

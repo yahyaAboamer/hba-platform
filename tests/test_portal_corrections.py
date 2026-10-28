@@ -15,16 +15,16 @@ from datetime import datetime, timezone
 import pytest
 
 from app.core.passwords import hash_password
-from app.models.attributed_orders import AttributedOrder, CommissionState
-from app.models.compensation import CompensationType
-from app.models.identity import UserAccount
-from app.models.orders import OrderIndex
-from app.models.payments import AdjustmentType
-from app.services.affiliates import create_affiliate
-from app.services.compensation import set_terms
-from app.services.payments import adjust, record_payment
-from app.services.payroll import approve_month, reopen_month
-from app.services.portal import my_month
+from app.modules.affiliates.models.attributed_orders import AttributedOrder, CommissionState
+from app.modules.affiliates.models.compensation import CompensationType
+from app.shared.models.identity import UserAccount
+from app.shared.models.orders import OrderIndex
+from app.modules.affiliates.models.payments import AdjustmentType
+from app.modules.affiliates.services.affiliates import create_affiliate
+from app.modules.affiliates.services.compensation import set_terms
+from app.modules.affiliates.services.payments import adjust, record_payment
+from app.modules.affiliates.services.payroll import approve_month, reopen_month
+from app.modules.affiliates.services.portal import my_month
 
 MAY = "2026-05"
 JULY = "2026-07"

@@ -14,15 +14,15 @@ from datetime import date, datetime, timezone
 import pytest
 
 from app.core.passwords import hash_password
-from app.models.affiliates import AccountKind
-from app.models.attributed_orders import AttributedOrder, CommissionState
-from app.models.compensation import CompensationType
-from app.models.identity import UserAccount
-from app.models.orders import OrderIndex
-from app.services.affiliates import create_affiliate
-from app.services.codes import register_code
-from app.services.compensation import set_terms
-from app.services.pace import (
+from app.modules.affiliates.models.affiliates import AccountKind
+from app.modules.affiliates.models.attributed_orders import AttributedOrder, CommissionState
+from app.modules.affiliates.models.compensation import CompensationType
+from app.shared.models.identity import UserAccount
+from app.shared.models.orders import OrderIndex
+from app.modules.affiliates.services.affiliates import create_affiliate
+from app.modules.affiliates.services.codes import register_code
+from app.modules.affiliates.services.compensation import set_terms
+from app.modules.affiliates.services.pace import (
     BEHIND,
     NO_TARGET,
     NOT_RECORDED,
@@ -32,9 +32,9 @@ from app.services.pace import (
     pace_for,
     week_bounds,
 )
-from app.services.performance import month_performance, rank, uses_for
-from app.services.shopify.fulfilment import DELIVERED, FAILED, IN_FLIGHT
-from app.services.targets import get_target, record_actuals, set_requirements
+from app.modules.affiliates.services.performance import month_performance, rank, uses_for
+from app.shared.services.shopify.fulfilment import DELIVERED, FAILED, IN_FLIGHT
+from app.modules.affiliates.services.targets import get_target, record_actuals, set_requirements
 
 AUGUST = "2026-08"
 
@@ -367,7 +367,7 @@ def test_setting_a_year_writes_every_month_of_it(db):
     fixed along all year.* Setting them is normally a year-wide act; varying
     one month is the exception you opt out into.
     """
-    from app.services.targets import set_requirements_for_year
+    from app.modules.affiliates.services.targets import set_requirements_for_year
 
     affiliate = _model(db, "Nour")
 
@@ -390,7 +390,7 @@ def test_a_year_includes_months_already_gone(db):
     implicit: a month that was already counted can change what it means. March
     was achieved at four of four; after the year is raised to eight it is not.
     """
-    from app.services.targets import set_requirements_for_year
+    from app.modules.affiliates.services.targets import set_requirements_for_year
 
     affiliate = _model(db, "Nour")
     march = set_requirements(db, affiliate, "2026-03", videos=2, stories=2)
@@ -412,8 +412,8 @@ def test_an_agreed_month_is_left_alone_and_named(db, monkeypatch):
     refusing the whole year instead would make this unusable by December.
     """
     from app.config import settings
-    from app.services.payroll import approve_month
-    from app.services.targets import ALREADY_AGREED, set_requirements_for_year
+    from app.modules.affiliates.services.payroll import approve_month
+    from app.modules.affiliates.services.targets import ALREADY_AGREED, set_requirements_for_year
 
     monkeypatch.setattr(settings, "go_live_month", "2026-01", raising=False)
 
@@ -438,7 +438,7 @@ def test_counts_are_never_written_across_a_year(db):
     """What she produced is a fact about one month. Only the requirement is
     fixed across the year; recording is per month and stays that way.
     """
-    from app.services.targets import set_requirements_for_year
+    from app.modules.affiliates.services.targets import set_requirements_for_year
 
     affiliate = _model(db, "Nour")
     august = set_requirements(db, affiliate, AUGUST, videos=4, stories=4)
@@ -456,7 +456,7 @@ def test_counts_are_never_written_across_a_year(db):
 
 def test_her_home_carries_how_often_her_code_was_used(db):
     """M01 puts code uses on Home beside her earnings and sales."""
-    from app.services.portal import my_month
+    from app.modules.affiliates.services.portal import my_month
 
     affiliate = _model(db, "Nour")
     _order(db, affiliate, "1", 100_000, delivery=DELIVERED, state=CommissionState.EARNED)
@@ -473,7 +473,7 @@ def test_uses_on_home_is_not_the_sum_of_the_counts_beside_it(db):
     door, are both `void`, pay nothing, and are both uses. Adding earned and
     pending would miss them.
     """
-    from app.services.portal import my_month
+    from app.modules.affiliates.services.portal import my_month
 
     affiliate = _model(db, "Nour")
     _order(db, affiliate, "kept", 100_000, delivery=DELIVERED,
@@ -494,7 +494,7 @@ def test_a_month_with_nothing_in_it_reports_no_uses_rather_than_breaking(db):
     """M01: empty values are not NaN and missing facts are not zero-by-accident.
     Nothing used her code, which is a real answer and reads as one.
     """
-    from app.services.portal import my_month
+    from app.modules.affiliates.services.portal import my_month
 
     affiliate = _model(db, "Nour")
 
@@ -506,8 +506,8 @@ def test_a_month_with_nothing_in_it_reports_no_uses_rather_than_breaking(db):
 
 def test_an_order_carries_what_was_in_it(db):
     """Owner, 11 September 2026: the Orders screen lists an order's contents."""
-    from app.models.catalogue import OrderLineItem
-    from app.services.portal import my_orders
+    from app.shared.models.catalogue import OrderLineItem
+    from app.modules.affiliates.services.portal import my_orders
 
     affiliate = _model(db, "Nour")
     _order(db, affiliate, "1", 100_000, delivery=DELIVERED,
@@ -550,7 +550,7 @@ def test_an_order_nobody_read_says_so_rather_than_looking_empty(db):
     empty list here means *not recorded*, and the screen says exactly that
     rather than implying somebody bought nothing.
     """
-    from app.services.portal import my_orders
+    from app.modules.affiliates.services.portal import my_orders
 
     affiliate = _model(db, "Nour")
     _order(db, affiliate, "1", 100_000, delivery=DELIVERED,
@@ -565,7 +565,7 @@ def test_reading_a_month_of_contents_costs_one_query(db):
     """
     from sqlalchemy import event
 
-    from app.services.portal import my_orders
+    from app.modules.affiliates.services.portal import my_orders
 
     affiliate = _model(db, "Nour")
     for index in range(6):

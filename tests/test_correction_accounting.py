@@ -39,19 +39,19 @@ from datetime import datetime, timezone
 import pytest
 
 from app.core.passwords import hash_password
-from app.models.affiliates import AccountKind
-from app.models.attributed_orders import AttributedOrder, CommissionState
-from app.models.compensation import CompensationType
-from app.models.identity import UserAccount
-from app.models.orders import OrderIndex
-from app.models.payments import AdjustmentType, PayrollAdjustment
-from app.services.affiliates import create_affiliate
-from app.services.codes import register_code
-from app.services.compensation import set_terms
-from app.services.corrections import correction_for, resolve
-from app.services.payments import balance_for, credited_into, record_payment
-from app.services.payroll import approve_month, get_month
-from app.services.targets import record_actuals, set_requirements, verify
+from app.modules.affiliates.models.affiliates import AccountKind
+from app.modules.affiliates.models.attributed_orders import AttributedOrder, CommissionState
+from app.modules.affiliates.models.compensation import CompensationType
+from app.shared.models.identity import UserAccount
+from app.shared.models.orders import OrderIndex
+from app.modules.affiliates.models.payments import AdjustmentType, PayrollAdjustment
+from app.modules.affiliates.services.affiliates import create_affiliate
+from app.modules.affiliates.services.codes import register_code
+from app.modules.affiliates.services.compensation import set_terms
+from app.modules.affiliates.services.corrections import correction_for, resolve
+from app.modules.affiliates.services.payments import balance_for, credited_into, record_payment
+from app.modules.affiliates.services.payroll import approve_month, get_month
+from app.modules.affiliates.services.targets import record_actuals, set_requirements, verify
 
 JUNE = "2026-06"
 JULY = "2026-07"
@@ -127,7 +127,7 @@ def _fail(db, order_id):
 
 def _adjustments(db, affiliate, kind):
     """Every adjustment of one kind, as (source month, destination, amount)."""
-    from app.models.payroll import PayrollMonth
+    from app.modules.affiliates.models.payroll import PayrollMonth
 
     months = {
         row.id: row.month
@@ -255,7 +255,7 @@ def test_a_second_release_pass_gives_nothing_back_twice(db):
     The helper is called again with the month already agreed and already
     released. There is nothing left over-applied, so it must find nothing.
     """
-    from app.services.payroll import _release_deductions_the_month_cannot_take
+    from app.modules.affiliates.services.payroll import _release_deductions_the_month_cannot_take
 
     affiliate = _model(db)
     snapshot = _source_overpaid_twice(
@@ -500,7 +500,7 @@ def test_an_overpaid_month_is_still_closed_by_its_adjustment(db):
     assert balance_for(db, affiliate, AUGUST)["balance_piastres"] == -50_000
 
     _order(db, affiliate, "sep-1", 5_000_000, month=SEPTEMBER)
-    from app.services.payments import adjust
+    from app.modules.affiliates.services.payments import adjust
 
     adjust(
         db,
@@ -624,7 +624,7 @@ def test_a_released_carry_reopens_an_overpaid_month_too(db):
     assert balance_for(db, affiliate, AUGUST)["balance_piastres"] == -50_000
 
     _order(db, affiliate, "oct-1", 500_000, month=OCTOBER)
-    from app.services.payments import adjust
+    from app.modules.affiliates.services.payments import adjust
 
     adjust(
         db,

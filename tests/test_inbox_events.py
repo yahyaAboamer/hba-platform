@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from app.core.businesstime import utcnow
-from app.models.inbox import (
+from app.modules.inbox.models import (
     InboxConnection,
     InboxConversation,
     InboxMedia,
@@ -17,9 +17,9 @@ from app.models.inbox import (
     MetaWebhookEvent,
     OrderConfirmation,
 )
-from app.services.inbox import events
-from app.services.inbox.events import apply_event
-from app.services.jobs import PermanentFailure
+from app.modules.inbox.services import events
+from app.modules.inbox.services.events import apply_event
+from app.shared.services.jobs import PermanentFailure
 
 NUMBER_ID = "100200300400500"
 HER = "201005550188"

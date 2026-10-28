@@ -25,7 +25,7 @@ from sqlalchemy import text
 from app.core.passwords import hash_password
 from app.db import engine
 from app.main import app
-from app.models.payouts import PayoutMethod
+from app.modules.affiliates.models.payouts import PayoutMethod
 from tests.support_policy import approved_before_the_switch
 
 #: Where their money goes, so a payment can freeze a masked copy of it.
@@ -57,7 +57,7 @@ def _working_month(monkeypatch):
     that read the real clock would offer a different list every September.
     """
     monkeypatch.setattr(
-        "app.services.portal.working_month", lambda: SEPTEMBER, raising=True
+        "app.modules.affiliates.services.portal.working_month", lambda: SEPTEMBER, raising=True
     )
 
 
@@ -1150,7 +1150,7 @@ def test_nothing_about_a_target_can_be_changed_from_their_side(admin):
     """§6.5. They see what was recorded; recording is HBA's, and the portal
     offers no route that would let them touch it.
     """
-    from app.api.affiliate_self import router
+    from app.modules.affiliates.api.affiliate_self import router
 
     writable = [
         route.path
@@ -1436,7 +1436,7 @@ def test_a_month_that_has_not_started_says_so(admin, monkeypatch):
     """
     from datetime import datetime, timezone
 
-    import app.services.portal as portal
+    import app.modules.affiliates.services.portal as portal
 
     affiliate = _affiliate(admin)
     _terms(admin, affiliate["id"])
@@ -2335,8 +2335,8 @@ def _backfilled(admin, monkeypatch, *, base=500_000, rate_bp=1000, outcome=None)
     """
     from app.config import settings
     from app.db import SessionLocal
-    from app.services.affiliates import get_affiliate
-    from app.services.targets import record_outcome
+    from app.modules.affiliates.services.affiliates import get_affiliate
+    from app.modules.affiliates.services.targets import record_outcome
 
     monkeypatch.setattr(settings, "go_live_month", "2026-01", raising=False)
     affiliate = _affiliate(admin)

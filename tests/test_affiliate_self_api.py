@@ -12,7 +12,7 @@ from sqlalchemy import text
 
 from app.db import engine
 from app.main import app
-from app.models.payouts import PayoutMethod
+from app.modules.affiliates.models.payouts import PayoutMethod
 
 BOOTSTRAP = {
     "email": "owner@example.com",
@@ -430,7 +430,7 @@ def test_turning_one_off_stops_exactly_one_message(admin):
     A switch that muted more than it named would be worse than no switch: the
     model would stop hearing about being paid and have no way to know why.
     """
-    from app.models.notifications import NotificationOutbox
+    from app.shared.models.notifications import NotificationOutbox
     from app.db import engine
     from sqlalchemy import text as sql
 

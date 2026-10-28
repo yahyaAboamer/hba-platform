@@ -13,15 +13,15 @@ import httpx
 import pytest
 
 from app.core.signals import Anomaly
-from app.models.orders import OrderIndex
-from app.services.jobs import PermanentFailure
-from app.services.shopify.client import (
+from app.shared.models.orders import OrderIndex
+from app.shared.services.jobs import PermanentFailure
+from app.shared.services.shopify.client import (
     ShopifyClient,
     ShopifyError,
     ShopifyMissingScope,
     ShopifyNotConfigured,
 )
-from app.services.shopify.sync import build_client, order_gid, sync_one_order
+from app.shared.services.shopify.sync import build_client, order_gid, sync_one_order
 
 ORDER_NODE = {
     "id": "gid://shopify/Order/5123456789",
@@ -229,7 +229,7 @@ def test_starting_the_application_registers_the_handler():
     """
     probe = (
         "import app.main;"
-        "from app.api.webhooks import SYNC_ORDER;"
+        "from app.shared.api.webhooks import SYNC_ORDER;"
         "from app.worker import HANDLERS;"
         "assert SYNC_ORDER in HANDLERS, SYNC_ORDER;"
         "print('registered')"
@@ -253,7 +253,7 @@ def test_the_handler_syncs_the_order_in_its_payload(db, monkeypatch):
     def fake_sync(session, order_id, client=None):
         seen.append(order_id)
 
-    monkeypatch.setattr("app.services.shopify.sync.sync_one_order", fake_sync)
+    monkeypatch.setattr("app.shared.services.shopify.sync.sync_one_order", fake_sync)
 
     from app.worker import HANDLERS
 

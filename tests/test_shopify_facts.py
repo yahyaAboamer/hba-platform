@@ -14,8 +14,8 @@ import json
 import httpx
 import pytest
 
-from app.services.shopify.client import ShopifyClient
-from app.services.shopify.facts import (
+from app.shared.services.shopify.client import ShopifyClient
+from app.shared.services.shopify.facts import (
     DELIVERED_STATUSES,
     MAX_SAMPLE,
     NOT_DELIVERIES,

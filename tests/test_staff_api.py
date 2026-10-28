@@ -209,8 +209,8 @@ def test_the_last_admin_guard_still_holds_below_the_api(client):
     anyway: it is the lock that matters if a second route ever changes roles."""
     from sqlalchemy.orm import Session as OrmSession
 
-    from app.models.identity import UserAccount
-    from app.services.staff import give_role, remove_role
+    from app.shared.models.identity import UserAccount
+    from app.shared.services.staff import give_role, remove_role
 
     with OrmSession(engine) as db:
         owner = db.query(UserAccount).filter_by(email="owner@example.com").one()
@@ -240,8 +240,8 @@ def test_a_second_admin_can_lose_admin(client):
 def test_nobody_gives_or_takes_a_role_they_do_not_hold(db):
     """`can_grant`, against everything the actor holds together. Over HTTP
     only an admin may change access today, so the rule is pinned below it."""
-    from app.models.identity import RoleAssignment, UserAccount
-    from app.services.staff import give_role, remove_role
+    from app.shared.models.identity import RoleAssignment, UserAccount
+    from app.shared.services.staff import give_role, remove_role
 
     sara = UserAccount(email="sara2@example.com", password_hash="x", status="active")
     db.add(sara)

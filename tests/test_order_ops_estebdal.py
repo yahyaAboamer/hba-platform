@@ -16,11 +16,11 @@ from sqlalchemy import func, inspect, select, text
 from app.core.businesstime import BUSINESS_TIMEZONE, utcnow
 from app.db import SessionLocal, engine
 from app.main import app
-from app.models.order_ops import OpsEstebdalReturn
-from app.services.jobs import JobKind
-from app.services.order_ops import estebdal
-from app.services.order_ops.freshness import record_success
-from app.services.order_ops.polling import KeyRefused, NotConnected, SourceUnavailable
+from app.modules.operations.models import OpsEstebdalReturn
+from app.shared.services.jobs import JobKind
+from app.modules.operations.services import estebdal
+from app.modules.operations.services.freshness import record_success
+from app.modules.operations.services.polling import KeyRefused, NotConnected, SourceUnavailable
 
 
 def _request(number: str, date: str = "2026-10-06T09:01:25.120Z", status: str = "Needs Review"):
@@ -179,8 +179,8 @@ def test_a_failed_read_leaves_the_last_set_in_place(db):
 
 def test_the_read_is_scheduled_every_five_minutes_in_the_operations_lane():
     import app.main  # noqa: F401 - registers the handlers
-    from app.services.jobs import OPERATIONS_READS
-    from app.services.schedule import SCHEDULE
+    from app.shared.services.jobs import OPERATIONS_READS
+    from app.shared.services.schedule import SCHEDULE
     from app.worker import HANDLERS
 
     assert SCHEDULE[JobKind.ORDER_OPS_ESTEBDAL][0] == timedelta(minutes=5)

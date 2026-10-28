@@ -9,8 +9,8 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
-from app.models.payroll import PolicyVersion
-from app.services.policy import (
+from app.modules.affiliates.models.payroll import PolicyVersion
+from app.modules.affiliates.services.policy import (
     active_policy_for,
     create_policy_version,
     get_policy_version,

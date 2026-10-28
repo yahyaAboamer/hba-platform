@@ -11,23 +11,23 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
 from app.core.passwords import hash_password
-from app.models.affiliates import AffiliateProfile
-from app.models.attributed_orders import AttributedOrder, CommissionState
-from app.models.identity import UserAccount
-from app.services.affiliates import (
+from app.modules.affiliates.models.affiliates import AffiliateProfile
+from app.modules.affiliates.models.attributed_orders import AttributedOrder, CommissionState
+from app.shared.models.identity import UserAccount
+from app.modules.affiliates.services.affiliates import (
     create_affiliate,
     set_collaboration_start,
     update_measurements,
 )
-from app.services.portal import months_for
+from app.modules.affiliates.services.portal import months_for
 
 
 @pytest.fixture(autouse=True)
 def _working_month(monkeypatch):
     """Pin the clock. A month list that changes with the calendar is a test
     that passes until October."""
-    monkeypatch.setattr("app.services.payroll.working_month", lambda: "2026-06")
-    monkeypatch.setattr("app.services.portal.working_month", lambda: "2026-06")
+    monkeypatch.setattr("app.modules.affiliates.services.payroll.working_month", lambda: "2026-06")
+    monkeypatch.setattr("app.modules.affiliates.services.portal.working_month", lambda: "2026-06")
 
 
 def _affiliate(db, name="Nour", email="nour@example.com") -> AffiliateProfile:

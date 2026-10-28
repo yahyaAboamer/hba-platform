@@ -1,0 +1,664 @@
+"""Payroll over HTTP: run a month, see what blocks it, agree it.
+
+§11. The endpoints behind month-end.
+
+## Approval can be previewed, and the preview runs the same code
+
+§11.3 requires seeing every model, amount and blocker **before** committing. The
+honest way to do that is a flag on the same endpoint, so the preview and the
+commit compute identically — a separate preview path is a second implementation
+that can drift, and it drifts silently because nobody compares them.
+
+## Approving, and why nothing here reopens
+
+`payroll.approve` agrees an open month. Reopening one (`payroll.reopen`) was
+retired in 05B and its route removed in batch J: what changes after an
+agreement is a correction recorded against it (05C). Months reopened before
+then are still read, by `/{month}/reopened` and the audit trail.
+
+## Bulk approval is all-or-nothing per model, not per run
+
+One model failing does not stop the others — twenty months are twenty separate
+obligations, and refusing them all because Nour's target is unverified would
+make month-end hostage to a single row. What each model got is reported
+individually.
+"""
+
+from decimal import ROUND_HALF_UP, Decimal
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.shared.api.deps import require_permission
+from app.core.businesstime import parse_month
+from app.core.money import format_egp
+from app.core.permissions import Permission
+from app.db import get_session
+from app.modules.affiliates.models.affiliates import AffiliateProfile
+from app.modules.affiliates.models.attributed_orders import AttributedOrder
+from app.shared.models.identity import UserAccount
+from app.modules.affiliates.services.affiliates import list_affiliates
+from app.modules.affiliates.services.commission.calculate import counted_sales_from
+from app.modules.affiliates.services.payroll import (
+    SOURCE_MOVED,
+    SourceMoved,
+    approve_month,
+    blockers_for,
+    carried_into,
+    carry_forward_summary,
+    get_month,
+    is_historical,
+    deductions_landing_on,
+    months_left_reopened,
+    policy_of,
+    reconciliation_for,
+    snapshots_for,
+    source_version,
+)
+
+router = APIRouter(prefix="/api/payroll")
+
+
+class ApproveBody(BaseModel):
+    affiliate_ids: list[int]
+    #: §11.3. Compute exactly what would happen and write nothing.
+    preview: bool = True
+    #: 05B. What each model's month looked like in the preview the operator
+    #: read, keyed by affiliate id.
+    #:
+    #: **Required to commit, and its absence is not agreement.** A caller that
+    #: sends nothing has not been taught to check, and this route turns a
+    #: working number into a debt - so a commit without one is refused rather
+    #: than waved through. Ignored on a preview, which writes nothing.
+    source_versions: dict[int, str] | None = None
+
+
+def _source_version_for(
+    db: Session, affiliate: AffiliateProfile, month: str, calculation
+) -> str:
+    """The fingerprint of what this month is currently computed from.
+
+    Reads the same two order sets `approve_month` reads, so the string the
+    preview hands out is the string the commit recomputes. Any cheaper
+    stand-in - a timestamp, a row count - would agree when the month had
+    changed, which is the one case it exists for.
+    """
+    orders = list(
+        db.scalars(
+            select(AttributedOrder)
+            .where(AttributedOrder.affiliate_id == affiliate.id)
+            .where(AttributedOrder.business_month == month)
+            .order_by(AttributedOrder.shopify_order_id)
+        )
+    )
+    return source_version(
+        calculation,
+        orders,
+        carried_into(db, affiliate, month),
+        # R1. The same facts approval will check against, deductions included -
+        # a preview that omitted them would hand out a fingerprint the commit
+        # could never match.
+        deductions_landing_on(db, affiliate, month),
+    )
+
+
+def _month_or_400(month: str) -> str:
+    try:
+        return parse_month(month)
+    except ValueError as exc:
+        raise HTTPException(400, "A month looks like 2026-04") from exc
+
+
+def _affiliate_or_404(db: Session, affiliate_id: int) -> AffiliateProfile:
+    affiliate = db.get(AffiliateProfile, affiliate_id)
+    if affiliate is None:
+        raise HTTPException(404, "No such affiliate")
+    return affiliate
+
+
+def _display_piastres(exact: Decimal | str) -> int:
+    """A fractional-piastre figure as whole piastres, **for reading only**.
+
+    `Decimal`, never `float`. `round(float(x))` is the habit this codebase
+    exists to avoid: it works until the one figure sitting on a boundary, and
+    that figure is somebody's pay (ADR 0002).
+
+    The payout itself is rounded once, on the total (ADR 0004). This rounds a
+    line so it can be shown beside the others; the two are not the same
+    operation and the total is never assembled from these.
+    """
+    return int(Decimal(exact).quantize(Decimal(1), rounding=ROUND_HALF_UP))
+
+
+def _before_she_started(db: Session, affiliate: AffiliateProfile, month: str) -> bool:
+    """A month before she started is not hers, so she is not listed in it
+    (owner, 1 October 2026).
+
+    The payments desk's rule (`payments.on_the_desk`), so the two screens list
+    the same people: her recorded start, else her first order. An unknown
+    start is not a no - she stays, because she is the one to set up.
+    """
+    from app.modules.affiliates.services.setup import collaboration_from
+
+    first = collaboration_from(db, affiliate)
+    return first is not None and first > month
+
+
+def _row(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
+    """One model's month: the figure, what blocks it, and what it carries.
+
+    **The same shape for every month, including the ones before go-live**
+    (ADR 0036). Those used to return a sales-only row with no commission and
+    no blockers, which also meant no way to approve them - and the whole of
+    task #17 is that they are approved like any other month, so a model's
+    March reads like her August.
+
+    They differ in one thing, and it is not on this row: what they are worth
+    is never *owed*. `balance_for` says so, structurally, and no amount of
+    approving changes it.
+    """
+    blockers, calculation = blockers_for(db, affiliate, month)
+    payroll_month = get_month(db, affiliate, month)
+    snapshot = payroll_month.active_snapshot if payroll_month else None
+
+    return {
+        "affiliate_id": affiliate.id,
+        "name": affiliate.name,
+        "month": month,
+        "calculation_state": (
+            payroll_month.calculation_state if payroll_month else "draft"
+        ),
+        "orders": {
+            "earned": calculation.earned_orders,
+            "pending": calculation.pending_orders,
+            "void": calculation.void_orders,
+        },
+        # What it would come to if calculated right now. For an approved month
+        # this is **not** what was agreed: an order settling after approval
+        # changes the calculation and never the obligation (§11.4).
+        "obligation_piastres": calculation.payout_piastres,
+        "obligation": format_egp(calculation.payout_piastres),
+        # What was actually agreed, or null if nothing has been. A screen
+        # showing the recalculated figure under the word "approved" would be
+        # presenting a working number as a debt.
+        "approved_obligation_piastres": (
+            snapshot.approved_obligation_piastres if snapshot else None
+        ),
+        "approved_obligation": (
+            format_egp(snapshot.approved_obligation_piastres) if snapshot else None
+        ),
+        "exact_unrounded_piastres": str(calculation.exact_unrounded_piastres),
+        # §11.4. Orders from earlier approved months that this one is paying,
+        # each at **its own** month's rate - the common path, not an edge case.
+        # Both figures are given: the sales carried, and what they are worth.
+        # A line that showed only sales would read as roughly ten times the
+        # money it actually adds.
+        "carried_forward": [
+            {
+                "from_month": line["from_month"],
+                "orders": line["orders"],
+                "base_piastres": line["base_piastres"],
+                "commission_rate_bp": line["commission_rate_bp"],
+                "commission_piastres": _display_piastres(line["commission_piastres"]),
+            }
+            for line in calculation.carried_lines
+        ],
+        "carried_piastres": _display_piastres(calculation.carried_piastres),
+        "blockers": blockers,
+        "is_payable": not blockers,
+        "version": snapshot.version if snapshot else None,
+        # 05B. **Something behind an agreed month has moved since it was
+        # agreed** - an order refused on delivery, a target recorded, a rate
+        # corrected.
+        #
+        # Reported and nothing else. The agreed figure does not follow it and
+        # the payment instruction does not quietly change: money owed under an
+        # agreement is owed until somebody decides otherwise, and a total that
+        # drifts under the word "agreed" is the failure §11.1 is about.
+        #
+        # What to *do* about it is a correction, which is 05C's subject. This
+        # is the flag that stops it being invisible until then - the old
+        # answer was that nobody found out at all.
+        "source_changed_since_approval": (
+            bool(snapshot)
+            and snapshot.payload_json.get("source_version") is not None
+            and snapshot.payload_json.get("source_version")
+            != _source_version_for(db, affiliate, month, calculation)
+        ),
+        # ADR 0036. Approvable, and never payable. The screen needs both
+        # facts: it offers approval, and it must not offer to send money.
+        "settled_outside": is_historical(month),
+    }
+
+
+@router.get("/{month}")
+def payroll_month_view(
+    month: str,
+    include_archived: bool = False,
+    _actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_VIEW)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Every model for one month, with what stands in each one's way."""
+    month = _month_or_400(month)
+    rows = [
+        _row(db, affiliate, month)
+        for affiliate in list_affiliates(db, include_archived=include_archived)
+        if not _before_she_started(db, affiliate, month)
+    ]
+    payable = [row for row in rows if row.get("is_payable")]
+
+    return {
+        "month": month,
+        # ADR 0036. Approvable like any other month, and never payable. The
+        # screen says so once, at the top, rather than on twenty-one rows.
+        "settled_outside": is_historical(month),
+        "affiliates": rows,
+        "totals": {
+            "affiliates": len(rows),
+            "payable_affiliates": len(payable),
+            "blocked_affiliates": len(rows) - len(payable),
+            "obligation_piastres": sum(
+                row["obligation_piastres"] for row in payable
+            ),
+            "obligation": format_egp(
+                sum(row["obligation_piastres"] for row in payable)
+            ),
+        },
+    }
+
+
+@router.get("/{month}/statement/{affiliate_id}")
+def statement(
+    month: str,
+    affiliate_id: int,
+    _actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_VIEW)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """One model's month as the approved payment view lays it out.
+
+    Counted sales, the commission at its rate, a fixed salary, what a
+    guarantee added, and the total they come to - the lines the export draws
+    above *Approved amount* or *Estimated amount*.
+
+    **An agreed month is read from its snapshot, never recalculated.** Once a
+    month is approved every figure here comes out of the frozen payload, so a
+    later order failing cannot move a number that sits under the word
+    *Approved*. Only a month nobody has agreed is worked out live, and that
+    one is labelled an estimate and carries the fingerprint an approval must
+    hand back (05B).
+
+    The lines are carved out of the rounded total by the same `_attribute`
+    Home uses, so they always add up to it - commission is whatever remains
+    after the exact salary and the exact top-up, carried orders included.
+    """
+    from types import SimpleNamespace
+
+    from app.modules.affiliates.services.overview import _attribute
+
+    month = _month_or_400(month)
+    affiliate = _affiliate_or_404(db, affiliate_id)
+    blockers, calculation = blockers_for(db, affiliate, month)
+    payroll_month = get_month(db, affiliate, month)
+    snapshot = payroll_month.active_snapshot if payroll_month else None
+    historical = is_historical(month)
+
+    if snapshot is not None:
+        frozen = snapshot.payload_json
+        source = SimpleNamespace(
+            payout_piastres=snapshot.approved_obligation_piastres,
+            compensation_type=frozen.get("compensation_type"),
+            fixed_piastres=int(frozen.get("fixed_piastres") or 0),
+            guarantee_applied=bool(frozen.get("guarantee_applied")),
+            commission_piastres=Decimal(str(frozen.get("commission_piastres") or "0")),
+        )
+        # The sales the approved commission was worked out on, under the rule
+        # that approved it: delivered and pending since F02, delivered only on
+        # a month agreed before the switch. Reading the delivered total alone
+        # would print a line that does not add up to the figure above it.
+        counted = counted_sales_from(frozen, policy_of(snapshot))
+        rate = frozen.get("commission_rate_bp")
+        base_amount = int(frozen.get("base_amount_piastres") or 0)
+        carried = _display_piastres(str(frozen.get("carried_piastres") or "0"))
+        target_known = frozen.get("target_achieved") is not None
+        basis = "settled_outside" if historical else "approved"
+        shown_blockers: list[str] = []
+        fingerprint = None
+    else:
+        source = calculation
+        # Live, so the live rule by construction.
+        counted = calculation.earned_base_piastres + calculation.pending_base_piastres
+        rate = calculation.commission_rate_bp
+        base_amount = calculation.base_amount_piastres
+        carried = _display_piastres(calculation.carried_piastres)
+        target_known = calculation.target_achieved is not None
+        basis = "settled_outside" if historical else "estimate"
+        shown_blockers = blockers
+        fingerprint = (
+            None if historical else _source_version_for(db, affiliate, month, calculation)
+        )
+
+    parts = _attribute(source)
+
+    return {
+        "affiliate_id": affiliate.id,
+        "name": affiliate.name,
+        "month": month,
+        "basis": basis,
+        # The rule the counted sales were counted under: the snapshot's own,
+        # so a month agreed delivered-only says so; `None` on a live estimate,
+        # which is the live rule by construction.
+        "policy": policy_of(snapshot) if snapshot is not None else None,
+        "version": snapshot.version if snapshot else None,
+        "approved_at": snapshot.approved_at.isoformat() if snapshot else None,
+        "compensation_type": source.compensation_type,
+        "commission_rate_bp": rate,
+        "counted_sales_piastres": counted,
+        "commission_piastres": parts.commission_piastres,
+        "fixed_piastres": parts.fixed_piastres,
+        "guarantee_top_up_piastres": parts.guarantee_top_up_piastres,
+        "carried_piastres": carried,
+        "total_piastres": parts.payout_piastres,
+        "total": format_egp(parts.payout_piastres),
+        "guarantee": {
+            "base_amount_piastres": base_amount,
+            "target_known": target_known,
+        },
+        "blockers": shown_blockers,
+        # Handed back on *Approve this month*, exactly as the batch approval
+        # screen hands back its preview's - so a month that moved while this
+        # page was open is refused rather than agreed at a figure nobody saw.
+        "source_version": fingerprint,
+    }
+
+
+@router.post("/{month}/approve")
+def approve(
+    month: str,
+    body: ApproveBody,
+    actor: UserAccount = Depends(require_permission(Permission.PAYROLL_APPROVE)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Agree what a month is worth, for one model or many.
+
+    **Defaults to a preview** (§11.3). Committing is the deliberate act, so it
+    is the one that has to be asked for - a default that writes is a default
+    that eventually writes by accident.
+    """
+    month = _month_or_400(month)
+    # 05B. **Absence is not agreement.** A commit that carries no record of
+    # what was on the screen is a commit from a caller that has not been taught
+    # to check, and this route turns a working number into a debt. Refused
+    # whole rather than per model: a request shaped this way is a client that
+    # needs fixing, not a month that needs reloading.
+    if not body.preview and body.source_versions is None:
+        raise HTTPException(
+            400,
+            "Agreeing a month needs the figures the preview handed you. "
+            "Reload the month and try again.",
+        )
+    results = []
+
+    for affiliate_id in body.affiliate_ids:
+        affiliate = _affiliate_or_404(db, affiliate_id)
+        blockers, calculation = blockers_for(db, affiliate, month)
+        seen = _source_version_for(db, affiliate, month, calculation)
+
+        outcome = {
+            "affiliate_id": affiliate.id,
+            "name": affiliate.name,
+            "obligation_piastres": calculation.payout_piastres,
+            "obligation": format_egp(calculation.payout_piastres),
+            "blockers": blockers,
+            "approved": False,
+            "version": None,
+            # Handed out with the preview and handed back on the commit.
+            "source_version": seen,
+            "stale": False,
+        }
+
+        if not blockers and not body.preview:
+            expected = (body.source_versions or {}).get(affiliate.id)
+            try:
+                snapshot = approve_month(
+                    db,
+                    affiliate,
+                    month,
+                    actor_id=actor.id,
+                    actor_email=actor.email,
+                    expected_source_version=expected,
+                )
+            except SourceMoved as moved:
+                # **Refused for this model, and the rest of the run stands.**
+                # Payroll is agreed for twenty people in one act; one model's
+                # month moving is not a reason to refuse the other nineteen,
+                # and re-running the whole batch to pick them up is how
+                # somebody ends up approving in a hurry.
+                outcome["stale"] = True
+                outcome["blockers"] = [*blockers, SOURCE_MOVED]
+                outcome["note"] = str(moved)
+                results.append(outcome)
+                continue
+            outcome["approved"] = True
+            outcome["version"] = snapshot.version
+            outcome["obligation_piastres"] = snapshot.approved_obligation_piastres
+            outcome["obligation"] = format_egp(snapshot.approved_obligation_piastres)
+            outcome["source_version"] = snapshot.payload_json.get("source_version")
+
+        results.append(outcome)
+
+    if not body.preview:
+        db.commit()
+
+    approved = [row for row in results if row["approved"]]
+    return {
+        "month": month,
+        "preview": body.preview,
+        "results": results,
+        "totals": {
+            "approved": len(approved),
+            "blocked": len([row for row in results if row["blockers"]]),
+            "obligation_piastres": sum(row["obligation_piastres"] for row in approved),
+        },
+    }
+
+
+@router.get("/{month}/reopened")
+def stuck_reopened(
+    month: str,
+    _actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_VIEW)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Months reopened and never re-approved (§11.5).
+
+    **The dangerous state is not reopening; it is forgetting.** A month in draft
+    with payments already made against a superseded snapshot is a balance
+    nobody is watching.
+    """
+    month = _month_or_400(month)
+    return {
+        "month": month,
+        "left_reopened": [
+            {
+                "affiliate_id": row.affiliate_id,
+                "name": row.affiliate.name,
+                "month": row.month,
+            }
+            for row in months_left_reopened(db, month)
+        ],
+    }
+
+
+@router.get("/{month}/summary")
+def month_summary_view(
+    month: str,
+    _actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_VIEW)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """The owner's whole month in one answer. A01, Phase 07B.
+
+    **The breakdown is computed here, never in the browser.** Three components
+    assembled from a payload would be a second implementation of what a month
+    is worth, and it would disagree with the payroll screen the first time
+    somebody rounded differently — on the screen whose job is to say how much
+    money to find.
+    """
+    from app.modules.affiliates.services.overview import month_summary
+
+    month = _month_or_400(month)
+    found = month_summary(db, month)
+
+    return {
+        "month": found.month,
+        "active_models": found.active_models,
+        "sales_piastres": found.sales_piastres,
+        "sales": format_egp(found.sales_piastres),
+        "ready": found.ready,
+        "blocked": found.blocked,
+        # Every part, and the total they add to. Given together so a screen
+        # never has to sum them and cannot report a different total.
+        "expected": {
+            "payout_piastres": found.breakdown.payout_piastres,
+            "payout": format_egp(found.breakdown.payout_piastres),
+            "commission_piastres": found.breakdown.commission_piastres,
+            "commission": format_egp(found.breakdown.commission_piastres),
+            "fixed_piastres": found.breakdown.fixed_piastres,
+            "fixed": format_egp(found.breakdown.fixed_piastres),
+            "guarantee_top_up_piastres": found.breakdown.guarantee_top_up_piastres,
+            "guarantee_top_up": format_egp(
+                found.breakdown.guarantee_top_up_piastres
+            ),
+        },
+        # A01's content progress needing review, by why. Two of the three are
+        # HBA's own work rather than a verdict on anybody (D08).
+        "selling_models": found.selling_models,
+        "needs_review": found.needs_review,
+        # The same question answered by name rather than by count, so the
+        # panel can be acted on without opening Targets to find out who.
+        "content": found.content,
+        "top": [
+            {**row, "sales": format_egp(row["sales_piastres"])}
+            for row in found.top
+        ],
+        # January to this month, one figure each, for the chart the approved
+        # Home draws under everything else. Formatted here like every other
+        # figure on this payload, so no browser ever divides by a hundred.
+        "year": [
+            {**row, "sales": format_egp(row["sales_piastres"])}
+            for row in found.year
+        ],
+    }
+
+
+# ── A09: finishing the months that happened before the platform ───────────────
+
+
+def _render_historical(result: dict) -> dict:
+    """One shape for both the dry run and the run, plus the sentence.
+
+    The result line is written here rather than in the browser for the reason
+    every figure is: it states what was done to somebody's money, and a second
+    copy of it in TypeScript is a second thing to get wrong when the rule
+    changes.
+    """
+    from app.core.money import format_egp
+
+    from app.modules.affiliates.services.payroll import go_live_month
+    from app.modules.affiliates.services.portal import _month_words
+
+    def months(count: int) -> str:
+        return f"{count} month" if count == 1 else f"{count} months"
+
+    totals = result["totals"]
+    done = totals.get("approved")
+    # **The boundary, named.** Everything here stops at go-live, and the
+    # readiness column above it counts *every* eligible month - so the two
+    # legitimately disagree about a model whose live month is also unready,
+    # and a reader who is not told where the line falls reads that as a bug.
+    live = go_live_month()
+    before = f" before {_month_words(live)}" if live else ""
+    from app.config import settings
+
+    unlocked = settings.historical_finalisation_unlocked
+    if done is None:
+        # "Can be finalised now" sat directly under "Finalising is locked" on
+        # every environment still locked (Settings audit H4). Ready is the
+        # fact; whether it may be acted on is said by the lock, once.
+        line = (
+            f"{months(totals['ready'])}{before} can be finalised now."
+            if unlocked
+            else f"{months(totals['ready'])}{before} are ready."
+            if totals["ready"] != 1
+            else f"1 month{before} is ready."
+        )
+        if not totals["ready"] and not totals["blocked"]:
+            line = f"No month{before} is waiting to be finalised."
+    else:
+        line = (
+            f"{months(done)}{before} finalised from "
+            f"{_month_words(result['from_month']) if result['from_month'] else 'the start'}"
+            " using each model's "
+            "recorded terms. No payments or receipts were created; a month "
+            "with no imported transfer still has none."
+        )
+    if totals["blocked"]:
+        verb = "needs" if totals["blocked"] == 1 else "need"
+        line += (
+            f" {totals['blocked']} still {verb} information HBA has not "
+            "recorded yet."
+        )
+    return {
+        **result,
+        #: A09. Whether finalising is permitted on this environment at all.
+        #: The review is always available - it is how the gaps are found.
+        "finalisation_unlocked": unlocked,
+        "summary": line,
+        "approved_total": format_egp(
+            sum(row.get("obligation_piastres", 0) for row in result.get("approved", []))
+        ),
+    }
+
+
+@router.get("/historical/review")
+def review_historical_route(
+    _actor: UserAccount = Depends(require_permission(Permission.PAYROLL_APPROVE)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """What finalising the pre-platform months would do. Reads only.
+
+    Separated from the act deliberately: A09 is as much about *what is still
+    missing* as about what can be finished, and a screen that could only find
+    that out by doing something is a screen nobody presses.
+    """
+    from app.modules.affiliates.services.historical import historical_review
+
+    return _render_historical(historical_review(db))
+
+
+@router.post("/historical/finalise")
+def finalise_historical_route(
+    actor: UserAccount = Depends(require_permission(Permission.PAYROLL_APPROVE)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Approve every pre-platform month that can be calculated. Idempotent.
+
+    Gated on `payroll.approve` because that is exactly what it does, twenty
+    times over. Nothing else about it is new: each month goes through the same
+    `approve_month` as any other, and ADR 0036 already makes the result
+    unpayable.
+    """
+    from app.modules.affiliates.services.historical import FinalisationLocked, finalise_historical
+
+    try:
+        result = finalise_historical(
+            db, actor_id=actor.id, actor_email=actor.email
+        )
+    except FinalisationLocked as locked:
+        # 409, not 403: the account is allowed, the platform is not ready.
+        # A09 - the history itself has to be checked first, and no permission
+        # substitutes for that.
+        db.rollback()
+        raise HTTPException(409, str(locked)) from locked
+    db.commit()
+    return _render_historical(result)

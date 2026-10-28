@@ -13,7 +13,7 @@ first, which is a thing nobody at HBA can observe.
 
 import pytest
 
-from app.services.commission.base import base_for_order, commission_base
+from app.modules.affiliates.services.commission.base import base_for_order, commission_base
 
 #: #29115, in piastres. EGP 1,157 paid, EGP 95 of it shipping, no tax.
 PAID = 115_700

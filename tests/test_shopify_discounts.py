@@ -8,8 +8,8 @@ missing.
 import httpx
 import pytest
 
-from app.services.shopify.client import ShopifyClient, ShopifyMissingScope
-from app.services.shopify.discounts import verify_discount_code
+from app.shared.services.shopify.client import ShopifyClient, ShopifyMissingScope
+from app.shared.services.shopify.discounts import verify_discount_code
 
 PERCENTAGE_NODE = {
     "id": "gid://shopify/DiscountCodeNode/1",

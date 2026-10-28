@@ -14,7 +14,7 @@ from sqlalchemy import text
 
 from app.db import engine
 from app.main import app
-from app.services.audit import KINDS, kind_of
+from app.shared.services.audit import KINDS, kind_of
 
 BOOTSTRAP = {
     "email": "owner@example.com",
