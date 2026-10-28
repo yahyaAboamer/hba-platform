@@ -154,6 +154,15 @@ TWO_STEP_RECHECK = Throttle(limit=5, window=15 * 60)
 #: deploy, like every limit here.
 TWO_STEP_PER_DAY = Throttle(limit=50, window=24 * 60 * 60)
 
+#: Sign-in codes emailed to one account - the first of each sign-in and every
+#: resend alike - in a quarter of an hour, and in a day. **Never taken back**:
+#: each one is an email that arrived. Only somebody holding the password can
+#: make the platform send one, so these stop that person filling the inbox
+#: rather than anybody guessing; the person's own sign-in meets them only
+#: after five sign-ins in fifteen minutes, or twenty in a day.
+SIGN_IN_CODE_SENDS = Throttle(limit=5, window=15 * 60)
+SIGN_IN_CODE_SENDS_DAY = Throttle(limit=20, window=24 * 60 * 60)
+
 ALL = (
     LOGIN_PER_PAIR,
     LOGIN_PER_ACCOUNT,
@@ -166,6 +175,8 @@ ALL = (
     TWO_STEP_PER_ACCOUNT,
     TWO_STEP_RECHECK,
     TWO_STEP_PER_DAY,
+    SIGN_IN_CODE_SENDS,
+    SIGN_IN_CODE_SENDS_DAY,
 )
 
 

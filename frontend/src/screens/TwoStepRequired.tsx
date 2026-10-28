@@ -11,7 +11,8 @@ export function TwoStepRequired({ onDone }: { onDone: () => void }) {
   return (
     <AuthShell eyebrow="Required for your access" title="Set up two-step sign-in">
       <p className="auth__lead">
-        Your access needs a second step when you sign in. It takes a minute and a phone.
+        Your access needs an authenticator app. It means a stolen password is not enough to get in
+        from a new browser. It takes a minute and a phone.
       </p>
       <TwoStepSetup onDone={onDone} />
       <button type="button" className="auth__link twostep__sign-out" onClick={() => void signOutAndLeave()}>

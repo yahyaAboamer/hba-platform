@@ -28,13 +28,14 @@ from app.core.permissions import (
     VALID_ROLES,
     Permission,
     can_invite,
+    is_staff,
     sorted_roles,
 )
 from app.core import throttle
 from app.db import get_session
 from app.models.identity import Invitation, RoleAssignment, UserAccount
 from app.services.audit import record_audit
-from app.services import two_step
+from app.services import trusted_browsers, two_step
 from app.services.auth import (
     authenticate,
     ensure_csrf,
@@ -57,6 +58,7 @@ from app.services.notifications import (
     invitation_link,
     invitation_sent,
     password_reset_requested,
+    sign_in_code,
 )
 from app.services.password_resets import (
     complete_reset,
@@ -293,24 +295,88 @@ def login(
         throttle.LOGIN_PER_PAIR.clear(f"{email}|{source}")
         throttle.LOGIN_PER_SOURCE.release(source)
 
-    if two_step.is_enabled(db, user.id):
-        # Half of it. **No session and no cookie**: the token returned is good
-        # only for exchanging, with a code, at `/login/two-step` - for five
-        # minutes and once. Not audited as a sign-in, because it is not one.
-        pending = two_step.start_pending(db, user.id, _client_ip(request))
-        db.commit()
-        return _code_owed(pending)
+    roles = roles_of(db, user)
+    method = two_step.sign_in_method(db, user, roles)
+    if method is None:
+        return _sign_in(db, request, response, user)
+    # A browser this account remembered skips the code - never the password,
+    # and never for anybody else's account (ADR 0067, decision 5).
+    if trusted_browsers.use(
+        db,
+        user.id,
+        request.cookies.get(trusted_browsers.COOKIE),
+        method_now=method,
+        roles=roles,
+    ):
+        return _sign_in(db, request, response, user, after={"remembered_browser": True})
+    return _code_owed(db, request, user, method)
 
-    return _sign_in(db, request, response, user)
+
+def _count_code_email(user: UserAccount) -> None:
+    """Count one sign-in code email against the account's send limits, or
+    refuse before anything is written or sent."""
+    key = f"user:{user.id}"
+    wait = throttle.acquire_all(
+        [(throttle.SIGN_IN_CODE_SENDS, key), (throttle.SIGN_IN_CODE_SENDS_DAY, key)]
+    )
+    if wait:
+        raise _paused(wait)
 
 
-def _code_owed(pending: str) -> dict:
-    """The answer to a right password when a code is still owed."""
-    return {
+def _code_owed(db: Session, request: Request, user: UserAccount, method: str) -> dict:
+    """Half of it: the password was right and a code is owed. **No session
+    and no cookie** - the token returned is good only for exchanging, with a
+    code, at `/login/two-step`, once. Not audited as a sign-in, because it is
+    not one.
+
+    For an emailed code the code is made and queued here, in this
+    transaction, and only a keyed hash of it is kept.
+    """
+    if method == two_step.METHOD_EMAIL:
+        # Before the sign-in exists: past the limit there is no pending row
+        # and no email.
+        _count_code_email(user)
+    pending = two_step.start_pending(db, user.id, _client_ip(request), method)
+    answer = {
         "two_step": "code",
+        "method": method,
         "pending": pending,
-        "expires_in": two_step.PENDING_SECONDS,
+        "expires_in": two_step.pending_seconds(method),
     }
+    if method == two_step.METHOD_EMAIL:
+        row = two_step.live_pending(db, pending)
+        sign_in_code(db, user, two_step.new_email_code(db, row, pending))
+        answer["sent_to"] = two_step.masked_address(user.email)
+    db.commit()
+    return answer
+
+
+def _set_trusted_cookie(response: Response, token: str) -> None:
+    """`hba_trusted`: HttpOnly, SameSite=Lax, Secure as the session cookie
+    is, the whole site, 30 days - the life of the row it names."""
+    response.set_cookie(
+        trusted_browsers.COOKIE,
+        token,
+        max_age=trusted_browsers.DAYS * 24 * 3600,
+        secure=settings.is_production,
+        httponly=True,
+        samesite="lax",
+        path="/",
+    )
+
+
+def _drop_trusted_cookie(response: Response) -> None:
+    response.delete_cookie(trusted_browsers.COOKIE, path="/")
+
+
+def _this_browser(db: Session, request: Request, user_id: int) -> int | None:
+    """The remembered-browser row this request's cookie names for this
+    account, if it is live."""
+    row = trusted_browsers.live_for(db, user_id, request.cookies.get(trusted_browsers.COOKIE))
+    return row.id if row is not None else None
+
+
+forget_browsers = trusted_browsers.forget_audited
 
 
 def _sign_in(
@@ -351,6 +417,8 @@ CODE_DID_NOT_WORK_CHECK_TIME = (
     "That code did not work. Check the time on your phone and try again."
 )
 TWO_STEP_UNAVAILABLE = "Two-step sign-in is unavailable right now. Try again shortly."
+#: The tenth wrong code for one sign-in ends it.
+TOO_MANY_WRONG_CODES = "Too many wrong codes. Start again."
 #: The words of the password re-check, as before a payout destination changes
 #: (`app/api/affiliate_self.py`).
 PASSWORD_NOT_RIGHT = "That password is not right"
@@ -362,6 +430,9 @@ REQUIRED_CANNOT_TURN_OFF = (
 class TwoStepLoginBody(BaseModel):
     pending: str = Field(min_length=1, max_length=200)
     code: str = Field(min_length=1, max_length=40)
+    #: *Remember this browser for 30 days*. The screen ticks it by default;
+    #: absent means no.
+    remember: bool = False
 
 
 @router.post("/login/two-step")
@@ -387,7 +458,12 @@ def login_two_step(
     if pending is None:
         raise HTTPException(410, SIGN_IN_TOO_SLOW)
     user = db.get(UserAccount, pending.user_account_id)
-    if user is None or user.status != "active" or not two_step.is_enabled(db, user.id):
+    by_email = pending.method == two_step.METHOD_EMAIL
+    if (
+        user is None
+        or user.status != "active"
+        or (not by_email and not two_step.is_enabled(db, user.id))
+    ):
         # Suspended, or two-step reset, since the password was typed: the
         # sign-in it was part of is over. Starting again is the right answer
         # in every case.
@@ -402,7 +478,8 @@ def login_two_step(
     short = [(throttle.TWO_STEP_PER_ACCOUNT, account)]
     if source is not None:
         short.append((throttle.TWO_STEP_PER_PAIR, f"{account}|{source}"))
-    # **The day's ceiling holds six digits only.** Somebody who already has
+    # **The day's ceiling holds six digits only** - an emailed code is six
+    # digits too, so it counts. Somebody who already has
     # the password could otherwise spend the owner's fifty and keep them out
     # for a day, with nobody able to lift it (an owner cannot reset their
     # own). A recovery code is 50 bits - not guessable at the short limits in
@@ -418,7 +495,15 @@ def login_two_step(
         raise _paused(wait)
 
     try:
-        used = two_step.check_code(db, user.id, body.code)
+        if by_email:
+            # Only the emailed code: a recovery code belongs to the app.
+            used = (
+                "email"
+                if two_step.check_email_code(pending, body.pending, body.code)
+                else None
+            )
+        else:
+            used = two_step.check_code(db, user.id, body.code)
     except two_step.KeyUnavailable:
         # The server cannot read the secret: the code was never judged, so
         # it does not count against them. A recovery code still works.
@@ -431,7 +516,13 @@ def login_two_step(
             limit.release(key)
         raise HTTPException(503, TWO_STEP_UNAVAILABLE) from None
     if used is None:
-        db.rollback()
+        # Counted against this sign-in as well as the limits above; the
+        # tenth ends it (nothing else was changed by a wrong code, so this
+        # commit writes only the count).
+        ended = two_step.count_wrong_code(pending)
+        db.commit()
+        if ended:
+            raise HTTPException(410, TOO_MANY_WRONG_CODES)
         raise HTTPException(401, CODE_DID_NOT_WORK)
 
     # Right, so the day's count takes its attempt back - it counts wrong
@@ -454,10 +545,67 @@ def login_two_step(
             after={"recovery_codes_left": left},
             ip_address=_client_ip(request),
         )
-    payload = _sign_in(db, request, response, user, after={"two_step": used})
+    after = {"two_step": used}
+    remembered = None
+    if body.remember:
+        remembered = trusted_browsers.remember(
+            db,
+            user.id,
+            request.headers.get("user-agent"),
+            _client_ip(request),
+            # A recovery code belongs to the app.
+            two_step.METHOD_EMAIL if used == "email" else two_step.METHOD_AUTHENTICATOR,
+        )
+        after["remembered"] = True
+    payload = _sign_in(db, request, response, user, after=after)
+    if remembered is not None:
+        _set_trusted_cookie(response, remembered)
     if left is not None:
         payload["recovery_codes_left"] = left
     return payload
+
+
+class ResendBody(BaseModel):
+    pending: str = Field(min_length=1, max_length=200)
+
+
+#: Refused when a sign-in waiting on the app is asked to email a code.
+NOT_AN_EMAIL_SIGN_IN = "This sign-in does not use a code by email."
+#: Refused after the fifth code for one sign-in.
+NO_MORE_CODES = "That is as many codes as one sign-in can send. Start again."
+
+
+@router.post("/login/resend")
+def resend_sign_in_code(
+    body: ResendBody,
+    request: Request,
+    db: Session = Depends(get_session),
+) -> dict:
+    """*Send a new code*: the old one stops working. Once a minute, five per
+    sign-in; the sign-in then has ten minutes from the new code."""
+    pending = two_step.live_pending(db, body.pending)
+    if pending is None:
+        raise HTTPException(410, SIGN_IN_TOO_SLOW)
+    user = db.get(UserAccount, pending.user_account_id)
+    if user is None or user.status != "active":
+        pending.used_at = utcnow()
+        db.commit()
+        raise HTTPException(410, SIGN_IN_TOO_SLOW)
+    if pending.method != two_step.METHOD_EMAIL:
+        raise HTTPException(409, NOT_AN_EMAIL_SIGN_IN)
+    waiting = two_step.resend_wait(pending)
+    if waiting is not None:
+        why, seconds = waiting
+        detail = NO_MORE_CODES if why == "spent" else throttle.try_again_message(seconds)
+        raise HTTPException(429, detail, headers={"Retry-After": str(seconds)})
+    _count_code_email(user)
+    sign_in_code(db, user, two_step.new_email_code(db, pending, body.pending))
+    db.commit()
+    return {
+        "sent_to": two_step.masked_address(user.email),
+        # Ten minutes, or less once the sign-in nears its twenty.
+        "expires_in": max(1, int((pending.expires_at - utcnow()).total_seconds())),
+    }
 
 
 @router.post("/logout")
@@ -794,17 +942,23 @@ def complete_password_reset(
         after={"sessions_ended": ended},
         ip_address=_client_ip(request),
     )
+    # Every remembered browser too: if the password was somebody else's, so
+    # may a remembered browser be.
+    forget_browsers(
+        db, account, actor=account, why="password_reset", ip_address=_client_ip(request)
+    )
 
     if two_step.is_enabled(db, account.id):
-        # **A reset link is not the second step.** It proves somebody can read
-        # the mailbox - the one thing the password already stands for, since
-        # the mailbox is where a password is reset from. Signing straight in
-        # here would make two-step sign-in worth no more than the email
-        # account, so somebody who has it on is asked for their code, exactly
-        # as at sign-in, with the new password already set.
-        pending = two_step.start_pending(db, account.id, _client_ip(request))
-        db.commit()
-        return _code_owed(pending)
+        # **A reset link is not the app's code.** It proves somebody can read
+        # the mailbox; for somebody whose second step is the app, signing
+        # straight in here would make it worth no more than the email
+        # account, so they are asked for their code, exactly as at sign-in,
+        # with the new password already set.
+        #
+        # For somebody whose second step *is* the mailbox (a code by email),
+        # the reset link has just proved exactly that, so they are signed in
+        # below as before (ADR 0067, decision 5 as amended).
+        return _code_owed(db, request, account, two_step.METHOD_AUTHENTICATOR)
 
     token, csrf, _ = issue_session(
         db, account.id, _client_ip(request), request.headers.get("user-agent")
@@ -951,6 +1105,31 @@ class PasswordBody(BaseModel):
     password: str = Field(min_length=1, max_length=256)
 
 
+#: Refused to an account that is only a model's: models are never asked for
+#: a second step and cannot turn one on (ADR 0067, decision 5).
+STAFF_ONLY = "Two-step sign-in is for staff accounts."
+#: Refused when somebody whose access needs email codes tries to turn them off.
+EMAIL_REQUIRED_CANNOT_TURN_OFF = (
+    "Your access needs a code by email on a new browser, so it cannot be turned off."
+)
+
+
+def _staff_only(db: Session, user: UserAccount) -> None:
+    if not is_staff(roles_of(db, user)):
+        raise HTTPException(403, STAFF_ONLY)
+
+
+def _password_again(db: Session, user: UserAccount, password: str) -> None:
+    """The password re-check, as before a payout destination changes."""
+    recheck = f"user:{user.id}"
+    wait = throttle.PASSWORD_RECHECK.acquire(recheck)
+    if wait:
+        raise _paused(wait)
+    if authenticate(db, user.email, password, record_login=False) is None:
+        raise HTTPException(400, PASSWORD_NOT_RIGHT)
+    throttle.PASSWORD_RECHECK.clear(recheck)
+
+
 @router.post("/two-step/start")
 def start_two_step(
     body: PasswordBody,
@@ -965,13 +1144,8 @@ def start_two_step(
     phone on somebody's account - and once it is on, a person whose access
     needs it cannot take it off again.
     """
-    recheck = f"user:{user.id}"
-    wait = throttle.PASSWORD_RECHECK.acquire(recheck)
-    if wait:
-        raise _paused(wait)
-    if authenticate(db, user.email, body.password, record_login=False) is None:
-        raise HTTPException(400, PASSWORD_NOT_RIGHT)
-    throttle.PASSWORD_RECHECK.clear(recheck)
+    _staff_only(db, user)
+    _password_again(db, user, body.password)
 
     try:
         shown = two_step.begin_setup(db, user)
@@ -1056,10 +1230,11 @@ def turn_off_two_step(
     user: UserAccount = Depends(signed_in),
     db: Session = Depends(get_session),
 ) -> dict:
-    """Turn it off, with a code. **Refused to anybody whose access needs it**,
-    whether or not the owner's switch is on yet: a person who handles money
-    does not get to opt out. A lost phone is the owner's reset."""
-    if two_step.is_required(roles_of(db, user)):
+    """Turn the app off, with a code. **Refused to the owner**, whose access
+    needs it whether or not the switch is on yet. Somebody whose access needs
+    a code by email may turn the app off: a new browser then emails them a
+    code instead. Every remembered browser is forgotten."""
+    if two_step.required_method(roles_of(db, user)) == two_step.METHOD_AUTHENTICATOR:
         raise HTTPException(403, REQUIRED_CANNOT_TURN_OFF)
     if not two_step.is_enabled(db, user.id):
         # Nothing on to turn off. A setup never confirmed is dropped.
@@ -1069,8 +1244,46 @@ def turn_off_two_step(
     used = _check_own_code(db, user, body.code)
     two_step.turn_off(db, user.id)
     _audit_self(db, request, "auth.two_step.turned_off", user, {"with": used})
+    forget_browsers(db, user, actor=user, why="turned_off", ip_address=_client_ip(request))
     db.commit()
     return {"enabled": False}
+
+
+class EmailCodesBody(BaseModel):
+    on: bool
+    password: str = Field(min_length=1, max_length=256)
+
+
+@router.post("/two-step/email")
+def email_codes(
+    body: EmailCodesBody,
+    request: Request,
+    user: UserAccount = Depends(signed_in),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Turn codes by email on or off for yourself, with your password.
+
+    Staff only. Turning them off is refused to whoever's access needs them;
+    turning them off forgets every remembered browser, as turning the app off
+    does. Answers what `GET /two-step` answers.
+    """
+    _staff_only(db, user)
+    _password_again(db, user, body.password)
+    if body.on:
+        if user.two_step_email_at is None:
+            user.two_step_email_at = utcnow()
+            _audit_self(db, request, "auth.two_step.email_on", user)
+    else:
+        if two_step.required_method(roles_of(db, user)) == two_step.METHOD_EMAIL:
+            raise HTTPException(403, EMAIL_REQUIRED_CANNOT_TURN_OFF)
+        if user.two_step_email_at is not None:
+            user.two_step_email_at = None
+            _audit_self(db, request, "auth.two_step.email_off", user)
+            forget_browsers(
+                db, user, actor=user, why="turned_off", ip_address=_client_ip(request)
+            )
+    db.commit()
+    return _two_step_body(db, user)
 
 
 # ── Signed in on (ADR 0067, decision 6) ──────────────────────────────────────
@@ -1100,12 +1313,21 @@ def end_my_other_sessions(
     user: UserAccount = Depends(current_user),
     db: Session = Depends(get_session),
 ) -> dict:
-    """*Sign out everywhere else*: every live session but this one."""
+    """*Sign out everywhere else*: every live session but this one, and every
+    remembered browser but this one."""
     ended = revoke_other_sessions(db, user.id, _current_session_id(db, request))
     if ended:
         _audit_self(
             db, request, "auth.sessions.ended", user, {"ended": ended, "kept_current": True}
         )
+    forget_browsers(
+        db,
+        user,
+        actor=user,
+        why="signed_out_elsewhere",
+        ip_address=_client_ip(request),
+        keep_id=_this_browser(db, request, user.id),
+    )
     db.commit()
     return {"ended": ended}
 
@@ -1131,3 +1353,64 @@ def end_my_session(
         response.delete_cookie(SESSION_COOKIE, path="/")
         response.delete_cookie(CSRF_COOKIE, path="/")
     return {"ended": True}
+
+
+# ── Remembered browsers (ADR 0067, decision 5 as amended) ────────────────────
+
+
+@router.get("/trusted-browsers")
+def my_trusted_browsers(
+    request: Request,
+    user: UserAccount = Depends(current_user),
+    db: Session = Depends(get_session),
+) -> dict:
+    return {
+        "browsers": trusted_browsers.rows(
+            trusted_browsers.live_rows(db, user.id), _this_browser(db, request, user.id)
+        )
+    }
+
+
+@router.post("/trusted-browsers/forget-all")
+def forget_my_trusted_browsers(
+    request: Request,
+    response: Response,
+    user: UserAccount = Depends(current_user),
+    db: Session = Depends(get_session),
+) -> dict:
+    """*Forget every browser*, this one included: the next sign-in anywhere
+    asks for a code."""
+    forgotten = forget_browsers(
+        db, user, actor=user, why="by_hand", ip_address=_client_ip(request)
+    )
+    db.commit()
+    _drop_trusted_cookie(response)
+    return {"forgotten": forgotten}
+
+
+@router.post("/trusted-browsers/{browser_id}/forget")
+def forget_my_trusted_browser(
+    browser_id: int,
+    request: Request,
+    response: Response,
+    user: UserAccount = Depends(current_user),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Forget one of **your own** remembered browsers. Anybody else's, or one
+    already forgotten or expired, is 404."""
+    current = _this_browser(db, request, user.id)
+    if not trusted_browsers.forget_one(db, user.id, browser_id):
+        raise HTTPException(404, "No such browser")
+    record_audit(
+        db,
+        action="auth.trusted_browser.forgotten",
+        subject=f"user:{user.id}",
+        actor_id=user.id,
+        actor_email=user.email,
+        after={"forgotten": 1, "why": "by_hand", "browser_id": browser_id},
+        ip_address=_client_ip(request),
+    )
+    db.commit()
+    if browser_id == current:
+        _drop_trusted_cookie(response)
+    return {"forgotten": True}

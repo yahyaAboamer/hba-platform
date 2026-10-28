@@ -33,7 +33,8 @@ from app.models.identity import Invitation, RoleAssignment, UserAccount
 from app.services.access import live_roles, live_roles_by_account
 from app.services.audit import record_audit
 from app.services.auth import revoke_all_sessions
-from app.services.two_step import cancel_pending, enabled_account_ids
+from app.services.trusted_browsers import forget_all as forget_trusted_browsers
+from app.services.two_step import cancel_pending, enabled_account_ids, method_from
 
 #: A model's role grants nothing and makes nobody staff; a model holds it by
 #: accepting her invitation, and reaches her portal by owning her record. It
@@ -129,13 +130,25 @@ def list_staff(db: Session) -> list[dict]:
     if not account_ids:
         return []
 
-    accounts = db.scalars(
-        select(UserAccount)
-        .where(UserAccount.id.in_(account_ids))
-        .order_by(UserAccount.display_name, UserAccount.email)
+    accounts = list(
+        db.scalars(
+            select(UserAccount)
+            .where(UserAccount.id.in_(account_ids))
+            .order_by(UserAccount.display_name, UserAccount.email)
+        )
     )
     held = live_roles_by_account(db, account_ids)
     with_two_step = enabled_account_ids(db, account_ids)
+    # What a new browser would ask each of them: the app if it is on, else a
+    # code by email if that applies to them, else nothing.
+    methods = {
+        account.id: method_from(
+            account.id in with_two_step,
+            held[account.id],
+            account.two_step_email_at is not None,
+        )
+        for account in accounts
+    }
     return [
         {
             "id": account.id,
@@ -145,8 +158,11 @@ def list_staff(db: Session) -> list[dict]:
             # role grants nothing and is not staff access, so it is left out.
             "roles": sorted_roles(held[account.id] - {MODEL_ROLE}),
             "status": account.status,
-            #: The lock beside a name on Team and access (ADR 0067).
-            "two_step_enabled": account.id in with_two_step,
+            #: The lock beside a name on Team and access (ADR 0067): on when a
+            #: new browser asks them for a code of either kind, and which.
+            "two_step_enabled": methods[account.id] is not None,
+            "two_step_method": methods[account.id],
+            "two_step_email_on": account.two_step_email_at is not None,
             "last_login_at": account.last_login_at,
             "created_at": account.created_at,
         }
@@ -301,6 +317,11 @@ def give_role(
     db.add(created)
     db.flush()
 
+    after = {"role": role, "roles": sorted_roles(before | {role})}
+    if role == "admin":
+        # The owner's second step is the app. A browser remembered on an
+        # emailed code would otherwise go on skipping it for the new owner.
+        after["browsers_forgotten"] = forget_trusted_browsers(db, user.id)
     record_audit(
         db,
         action="staff.role_given",
@@ -308,7 +329,7 @@ def give_role(
         actor_id=actor_id,
         actor_email=actor_email,
         before={"roles": sorted_roles(before)},
-        after={"role": role, "roles": sorted_roles(before | {role})},
+        after=after,
     )
     return created
 
@@ -442,8 +463,9 @@ def suspend_staff(
     _revoke(db, held)
     ended = revoke_all_sessions(db, user.id)
     # A sign-in half done (the password typed, the code still owed) must not
-    # be finished either.
+    # be finished either, nor a remembered browser skip the code later.
     cancel_pending(db, user.id)
+    forgotten = forget_trusted_browsers(db, user.id)
 
     record_audit(
         db,
@@ -452,7 +474,12 @@ def suspend_staff(
         actor_id=actor_id,
         actor_email=actor_email,
         before={"status": before_status, "roles": before_roles},
-        after={"status": "suspended", "roles": [], "sessions_ended": ended},
+        after={
+            "status": "suspended",
+            "roles": [],
+            "sessions_ended": ended,
+            "browsers_forgotten": forgotten,
+        },
         reason=reason.strip(),
     )
     return ended

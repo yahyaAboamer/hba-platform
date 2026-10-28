@@ -9,7 +9,7 @@ import {
   previewPasswordReset,
   requestPasswordReset,
 } from "../lib/api";
-import type { Session } from "../lib/api";
+import type { CodeAnswer, Session } from "../lib/api";
 import { CodeStep } from "./SignIn";
 
 /**
@@ -124,7 +124,7 @@ function UseTheLink({
   const [error, setError] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
   // The password is changed, and two-step sign-in still asks for its code.
-  const [pending, setPending] = useState<string | null>(null);
+  const [pending, setPending] = useState<CodeAnswer | null>(null);
 
   const tooShort = password.length < MINIMUM_PASSWORD;
 
@@ -157,7 +157,7 @@ function UseTheLink({
     try {
       const result = await completePasswordReset(token, password);
       if (result.kind === "code") {
-        setPending(result.pending);
+        setPending(result);
         setPassword("");
         return;
       }
@@ -177,7 +177,9 @@ function UseTheLink({
   if (pending !== null) {
     return (
       <CodeStep
-        pending={pending}
+        pending={pending.pending}
+        method={pending.method}
+        sentTo={pending.sentTo}
         onSignedIn={(session, notice) => {
           onSignedIn(session, notice);
           navigate("/", { replace: true });

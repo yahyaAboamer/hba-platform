@@ -272,14 +272,18 @@ def test_confirming_turns_it_on_and_shows_ten_codes_once(client):
 
 
 def test_the_session_payload_says_on_required_and_made_to(client, monkeypatch):
+    # Batch 1.3b: the owner's requirement is the app; nothing is asked of a
+    # new browser until it is on.
     assert client.get("/api/auth/me").json()["actor"]["two_step"] == {
         "enabled": False, "required": True, "must_set_up": False,
+        "method": None, "email_on": False, "required_method": "authenticator",
     }
     monkeypatch.setattr(settings, "two_step_enforced", True, raising=False)
     assert client.get("/api/auth/me").json()["actor"]["two_step"]["must_set_up"] is True
     _turn_on(client)
     assert client.get("/api/auth/me").json()["actor"]["two_step"] == {
         "enabled": True, "required": True, "must_set_up": False,
+        "method": "authenticator", "email_on": False, "required_method": "authenticator",
     }
 
 
@@ -306,8 +310,9 @@ def test_the_password_alone_opens_nothing_when_two_step_is_on(client):
     response = client.post("/api/auth/login", json={"email": OWNER["email"], "password": PASSWORD})
     assert response.status_code == 200
     body = response.json()
-    assert set(body) == {"two_step", "pending", "expires_in"}
+    assert set(body) == {"two_step", "method", "pending", "expires_in"}
     assert body["two_step"] == "code" and body["expires_in"] == 300
+    assert body["method"] == "authenticator"
     assert "set-cookie" not in response.headers
     assert _session_count(owner, live=False) == sessions_before
     assert len(_audit("auth.login")) == logins_before
@@ -544,18 +549,28 @@ def test_the_gate_holds_nobody_whose_access_does_not_need_it(client, monkeypatch
         _sign_in(mona, "mona@example.com")
         assert mona.get("/api/auth/me").json()["actor"]["two_step"] == {
             "enabled": False, "required": False, "must_set_up": False,
+            "method": None, "email_on": False, "required_method": None,
         }
         assert mona.get("/api/inbox/conversations").status_code != 403
         assert mona.get("/api/auth/sessions").status_code == 200
 
 
-def test_the_gate_covers_an_affiliate_manager_signed_in_before_it_was_switched_on(client, monkeypatch):
+def test_the_gate_covers_the_owner_signed_in_before_it_was_switched_on(client, monkeypatch):
+    assert client.get("/api/affiliates").status_code == 200
+    monkeypatch.setattr(settings, "two_step_enforced", True, raising=False)
+    assert client.get("/api/affiliates").status_code == 403
+
+
+def test_the_gate_no_longer_holds_an_affiliate_manager(client, monkeypatch):
+    """Batch 1.3b: her second step is a code by email - nothing to set up."""
     _person("boda@example.com", "affiliate_manager", name="Boda")
     with TestClient(app) as boda:
         _sign_in(boda, "boda@example.com")
-        assert boda.get("/api/affiliates").status_code == 200
         monkeypatch.setattr(settings, "two_step_enforced", True, raising=False)
-        assert boda.get("/api/affiliates").status_code == 403
+        assert boda.get("/api/affiliates").status_code == 200
+        state = boda.get("/api/auth/me").json()["actor"]["two_step"]
+        assert state["must_set_up"] is False
+        assert state["required_method"] == "email" and state["method"] == "email"
 
 
 # ── Turning it off, renewing codes ────────────────────────────────────────────
@@ -582,6 +597,7 @@ def test_somebody_who_may_turn_it_off_does_so_with_a_code(client):
         assert done.status_code == 200 and done.json() == {"enabled": False}
         assert sara.get("/api/auth/two-step").json() == {
             "enabled": False, "required": False, "must_set_up": False,
+            "method": None, "email_on": False, "required_method": None,
             "enabled_at": None, "recovery_codes_left": 0,
         }
     assert [e["action"] for e in _audit("auth.two_step.turned_off")] == ["auth.two_step.turned_off"]
@@ -797,7 +813,9 @@ def test_suspending_ends_every_session_and_takes_every_role_in_one_entry(client)
     assert entries[0]["before_json"] == {
         "status": "active", "roles": ["content_manager", "customer_service"],
     }
-    assert entries[0]["after_json"] == {"status": "suspended", "roles": [], "sessions_ended": 2}
+    assert entries[0]["after_json"] == {
+        "status": "suspended", "roles": [], "sessions_ended": 2, "browsers_forgotten": 0,
+    }
 
     row = next(r for r in client.get("/api/staff").json()["staff"] if r["id"] == sara)
     assert row["status"] == "suspended" and row["roles"] == []

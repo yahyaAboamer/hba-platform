@@ -106,6 +106,52 @@ export function CodeForm({
   );
 }
 
+/** The password, asked again before something that changes how signing in works. */
+export function PasswordForm({
+  lead,
+  action,
+  onSubmit,
+  onCancel,
+}: {
+  lead: string;
+  action: string;
+  onSubmit: (password: string) => Promise<void>;
+  onCancel?: () => void;
+}) {
+  const [password, setPassword] = useState("");
+  const [working, setWorking] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setWorking(true);
+    setProblem(null);
+    try {
+      await onSubmit(password);
+    } catch (caught) {
+      setProblem(problemWords(caught, "That did not go through."));
+    } finally {
+      // Not kept: it was only for this one call.
+      setPassword("");
+      setWorking(false);
+    }
+  }
+
+  return (
+    <form className="twostep__form" onSubmit={submit}>
+      <p className="twostep__lead">{lead}</p>
+      <PasswordField value={password} onChange={setPassword} advise={false} />
+      {problem && <p className="notice notice--refused" role="alert">{problem}</p>}
+      <div className="twostep__acts">
+        {onCancel && <button type="button" className="button" onClick={onCancel} disabled={working}>Cancel</button>}
+        <button type="submit" className="button button--primary" disabled={working || password === ""}>
+          {working ? "Checking…" : action}
+        </button>
+      </div>
+    </form>
+  );
+}
+
 /**
  * The ten recovery codes, shown once. They live in this component's state and
  * nowhere else; finishing hands control back and they are gone.

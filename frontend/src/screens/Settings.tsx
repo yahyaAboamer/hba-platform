@@ -8,9 +8,9 @@ import type { ThemeChoice } from "../lib/theme";
 
 import { MonthPicker } from "../components/MonthPicker";
 import { PolicyText } from "../components/PolicyText";
-import { api, can, devices, twoStep } from "../lib/api";
-import type { DeviceSession, Session, TwoStepStatus } from "../lib/api";
-import { CodeForm, RecoveryCodes, TwoStepSetup } from "../components/TwoStepSetup";
+import { api, can, devices, trustedBrowsers, twoStep } from "../lib/api";
+import type { DeviceSession, Session, TrustedBrowser, TwoStepStatus } from "../lib/api";
+import { CodeForm, PasswordForm, RecoveryCodes, TwoStepSetup } from "../components/TwoStepSetup";
 import { currentMonth, formatMonth, monthAdd, monthsBetween } from "../lib/money";
 import { DataPanel, longWhen } from "./DataPanel";
 import "./ModelLifecycle.css";
@@ -34,6 +34,8 @@ type StaffRow = {
   status: "invited" | "active" | "suspended";
   /** Two-step sign-in is on for them (Batch 1.3). */
   two_step_enabled?: boolean;
+  /** Which kind: an authenticator app, or codes by email (Batch 1.3b). */
+  two_step_method?: "authenticator" | "email" | null;
   last_login_at: string | null;
   created_at: string | null;
 };
@@ -371,13 +373,31 @@ function DeviceLine({ device, action }: { device: DeviceSession; action?: React.
   );
 }
 
+const dayWords = (iso: string) =>
+  new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Cairo", day: "numeric", month: "long" }).format(new Date(iso));
+
+/** One remembered browser: what it is, and until when it skips the code. */
+function BrowserLine({ browser, action }: { browser: TrustedBrowser; action?: React.ReactNode }) {
+  return (
+    <li className="twostep__row">
+      <span>
+        {browser.device}{browser.current && <span className="settings__you">This browser</span>}
+        <small>{[browser.ip_address, `Remembered until ${dayWords(browser.expires_at)}`].filter(Boolean).join(" · ")}</small>
+      </span>
+      {action}
+    </li>
+  );
+}
+
 function DevicesDialog({ row, onClose, onChanged }: { row: StaffRow; onClose: () => void; onChanged: () => void }) {
   const name = row.display_name || row.email;
   const [list, setList] = useState<DeviceSession[] | null>(null);
+  const [remembered, setRemembered] = useState<TrustedBrowser[]>([]);
   const [problem, setProblem] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
 
   const load = useCallback(() => {
+    trustedBrowsers.of(row.id).then((body) => setRemembered(body.browsers)).catch(() => undefined);
     devices.of(row.id).then((body) => setList(body.sessions))
       .catch((caught) => setProblem(caught instanceof Error ? caught.message : "Could not load this."));
   }, [row.id]);
@@ -389,6 +409,7 @@ function DevicesDialog({ row, onClose, onChanged }: { row: StaffRow; onClose: ()
     try {
       await devices.endAllOf(row.id);
       setList([]);
+      setRemembered([]);
       onChanged();
     } catch (caught) {
       setProblem(caught instanceof Error ? caught.message : "That did not go through.");
@@ -405,10 +426,16 @@ function DevicesDialog({ row, onClose, onChanged }: { row: StaffRow; onClose: ()
       {list && list.length > 0 && <ul className="settings__devices" aria-label={`Devices for ${name}`}>
         {list.map((device) => <DeviceLine key={device.id} device={device} />)}
       </ul>}
+      {remembered.length > 0 && <>
+        <h3 className="twostep__sub">Remembered browsers</h3>
+        <ul className="settings__devices" aria-label={`Remembered browsers for ${name}`}>
+          {remembered.map((browser) => <BrowserLine key={browser.id} browser={browser} />)}
+        </ul>
+      </>}
       <div className="lifecycle__acts">
         <button type="button" className="button" onClick={onClose}>Close</button>
         <button type="button" className="button lifecycle__danger" onClick={endAll}
-          disabled={working || !list || list.length === 0}>
+          disabled={working || !list || (list.length === 0 && remembered.length === 0)}>
           {working ? "Working…" : "Sign out of every device"}
         </button>
       </div>
@@ -602,7 +629,10 @@ function RosterPanel({ session }: { session: Session }) {
                     <td>
                       {name}
                       {row.two_step_enabled && (
-                        <svg className="twostep__lock" role="img" aria-label="Two-step sign-in on" viewBox="0 0 24 24"
+                        <svg className="twostep__lock" role="img"
+                          aria-label={row.two_step_method === "email" ? "Two-step sign-in on, code by email"
+                            : row.two_step_method === "authenticator" ? "Two-step sign-in on, authenticator app"
+                            : "Two-step sign-in on"} viewBox="0 0 24 24"
                           fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                           <rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" />
                         </svg>
@@ -654,7 +684,7 @@ function RosterPanel({ session }: { session: Session }) {
                                 Signed in on…
                                 <small>See where, and sign them out</small>
                               </button>
-                              {row.two_step_enabled && (
+                              {row.two_step_enabled && row.two_step_method !== "email" && (
                                 <button type="button"
                                   onClick={() => { setMenu(null); setPending({ kind: "reset", row }); }}>
                                   Reset two-step sign-in…
@@ -1564,12 +1594,14 @@ function AppearancePanel() {
   </>;
 }
 
-type TwoStepMode = "idle" | "setup" | "renew" | "off" | "codes";
+type TwoStepMode = "idle" | "setup" | "renew" | "off" | "codes" | "email";
 
 /**
- * Two-step sign-in for the signed-in person. Setting up, new recovery codes
- * and turning off each ask for a code, so a borrowed laptop cannot change it.
- * Turning off is not offered when their access needs it.
+ * Two-step sign-in for the signed-in person, and which kind applies to them:
+ * an authenticator app (the owner), a code by email (whoever approves or pays
+ * money, or anybody who chooses it), or nothing. A new browser is asked; a
+ * remembered one is not. Changing it asks for a code or the password, so a
+ * borrowed laptop cannot.
  */
 function TwoStepPanel() {
   const [status, setStatus] = useState<TwoStepStatus | null>(null);
@@ -1586,27 +1618,53 @@ function TwoStepPanel() {
 
   const finish = () => { setCodes(null); setMode("idle"); load(); };
 
+  // An older answer that says "required" and nothing more meant the owner's.
+  const requiredMethod = status?.required ? (status.required_method ?? "authenticator") : null;
+  const emailOn = status?.email_on ?? false;
+  const anyOn = status ? (status.method != null || status.enabled || emailOn || requiredMethod === "email") : false;
+
   return (
     <section className="panel" aria-labelledby="twostep-title">
       <div className="panel__head">
         <h2 className="panel__title" id="twostep-title">Two-step sign-in</h2>
-        {status && <span className={`pill ${status.enabled ? "twostep__on" : "twostep__off"}`}>{status.enabled ? "On" : "Off"}</span>}
+        {status && <span className={`pill ${anyOn ? "twostep__on" : "twostep__off"}`}>{anyOn ? "On" : "Off"}</span>}
       </div>
       <div className="twostep__panel-body">
         {error && <p className="notice notice--refused" role="alert">{error}</p>}
         {status && mode === "idle" && <>
           <p className="settings__explain-line">
-            {status.required && <b>Required for your access. </b>}
-            {status.enabled
-              ? `Signing in asks for a code from your phone. ${status.recovery_codes_left} recovery ${status.recovery_codes_left === 1 ? "code" : "codes"} left.`
-              : "Signing in asks for a code from your phone, as well as your password."}
+            {requiredMethod
+              ? <><b>Required for your access: a code {requiredMethod === "email" ? "by email" : "from an authenticator app"} on a new browser.</b>{" "}</>
+              : "On a browser you have not used before, signing in asks for a code as well as your password. "}
+            {status.enabled && `${status.recovery_codes_left} recovery ${status.recovery_codes_left === 1 ? "code" : "codes"} left.`}
           </p>
-          <div className="twostep__acts">
-            {!status.enabled && <button type="button" className="button button--primary" onClick={() => setMode("setup")}>Set up two-step sign-in</button>}
-            {status.enabled && <button type="button" className="button" onClick={() => setMode("renew")}>New recovery codes</button>}
-            {status.enabled && !status.required && <button type="button" className="button lifecycle__danger" onClick={() => setMode("off")}>Turn off</button>}
+
+          {requiredMethod !== "authenticator" && (
+            <div className="twostep__state">
+              <button type="button" role="switch" aria-checked={emailOn || requiredMethod === "email"} aria-label="Code by email"
+                disabled={requiredMethod === "email"} className="settings__switch twostep__switch"
+                onClick={() => setMode("email")}>
+                <span className="settings__switch-words">Code by email
+                  <small>{requiredMethod === "email" ? "Required for your access" : "We email a 6-digit code to your address"}</small></span>
+                <span className={`settings__track${emailOn || requiredMethod === "email" ? " settings__track--on" : ""}`} aria-hidden="true"><span /></span>
+              </button>
+            </div>
+          )}
+
+          <div className="twostep__state">
+            <span>Authenticator app <small className="twostep__hint">{status.enabled ? "On" : "Off"}</small></span>
+            <span className="twostep__acts">
+              {!status.enabled && <button type="button" className="button" onClick={() => setMode("setup")}>Set up two-step sign-in</button>}
+              {status.enabled && <button type="button" className="button" onClick={() => setMode("renew")}>New recovery codes</button>}
+              {status.enabled && requiredMethod !== "authenticator" && <button type="button" className="button lifecycle__danger" onClick={() => setMode("off")}>Turn off</button>}
+            </span>
           </div>
         </>}
+        {mode === "email" && <PasswordForm
+          lead={emailOn ? "Enter your password to stop getting codes by email." : "Enter your password to get a code by email on a new browser."}
+          action={emailOn ? "Turn off" : "Turn on"}
+          onCancel={() => setMode("idle")}
+          onSubmit={async (password) => { await twoStep.setEmail(!emailOn, password); finish(); }} />}
         {mode === "setup" && <TwoStepSetup onDone={finish} onCancel={() => setMode("idle")} />}
         {mode === "renew" && <CodeForm
           label="6-digit code"
@@ -1630,9 +1688,11 @@ function TwoStepPanel() {
 function DevicesPanel() {
   const [list, setList] = useState<DeviceSession[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [working, setWorking] = useState<number | "others" | null>(null);
+  const [working, setWorking] = useState<number | "others" | "browser" | null>(null);
+  const [remembered, setRemembered] = useState<TrustedBrowser[]>([]);
 
   const load = useCallback(() => {
+    trustedBrowsers.mine().then((body) => setRemembered(body.browsers)).catch(() => undefined);
     devices.mine().then((body) => setList(body.sessions))
       .catch((caught) => setError(caught instanceof Error ? caught.message : "Could not load this."));
   }, []);
@@ -1643,6 +1703,19 @@ function DevicesPanel() {
     setError(null);
     try {
       await (which === "others" ? devices.endOthers() : devices.endOne(which));
+      load();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "That did not go through.");
+    } finally {
+      setWorking(null);
+    }
+  }
+
+  async function forget(which: number | "all") {
+    setWorking("browser");
+    setError(null);
+    try {
+      await (which === "all" ? trustedBrowsers.forgetAll() : trustedBrowsers.forget(which));
       load();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "That did not go through.");
@@ -1669,6 +1742,21 @@ function DevicesPanel() {
           </button>
         </div>
       </div>}
+      {remembered.length > 0 && <>
+        <h3 className="twostep__sub">Remembered browsers</h3>
+        <ul className="settings__devices" aria-label="Remembered browsers">
+          {remembered.map((browser) => <BrowserLine key={browser.id} browser={browser} action={
+            <button type="button" className="button button--row" disabled={working !== null}
+              aria-label={`Forget ${browser.device}`} onClick={() => forget(browser.id)}>Forget</button>} />)}
+        </ul>
+        <div className="twostep__panel-body">
+          <div className="twostep__acts">
+            <button type="button" className="button" disabled={working !== null} onClick={() => forget("all")}>
+              Forget every browser
+            </button>
+          </div>
+        </div>
+      </>}
     </section>
   );
 }

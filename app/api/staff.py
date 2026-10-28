@@ -32,7 +32,7 @@ from app.core.permissions import (
 )
 from app.db import get_session
 from app.models.identity import Invitation, UserAccount
-from app.services import two_step
+from app.services import trusted_browsers, two_step
 from app.services.audit import record_audit
 from app.services.auth import live_sessions, revoke_all_sessions, session_rows
 from app.services.invitations import create_invitation
@@ -308,8 +308,24 @@ def end_their_sessions(
         after={"ended": ended, "by_owner": True},
         ip_address=client_address(request),
     )
+    # Their remembered browsers too: a lost laptop must ask for a code.
+    trusted_browsers.forget_audited(
+        db, user, actor=actor, why="ended_by_owner", ip_address=client_address(request)
+    )
     db.commit()
     return {"ended": ended}
+
+
+@router.get("/{user_id}/trusted-browsers")
+def their_trusted_browsers(
+    user_id: int,
+    _actor: UserAccount = Depends(require_permission(Permission.SETTINGS_MANAGE)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Somebody's remembered browsers, on their page. None is the owner's
+    own, so `current` is always false."""
+    user = _user_or_404(db, user_id)
+    return {"browsers": trusted_browsers.rows(trusted_browsers.live_rows(db, user.id), None)}
 
 
 class OwnCodeBody(BaseModel):
@@ -390,6 +406,10 @@ def reset_their_two_step(
         before={"enabled": True},
         after={"enabled": False},
         ip_address=client_address(request),
+    )
+    # Their remembered browsers too: whoever has the lost phone may have one.
+    trusted_browsers.forget_audited(
+        db, user, actor=actor, why="two_step_reset", ip_address=client_address(request)
     )
     db.commit()
     return {"enabled": False}
