@@ -7,7 +7,8 @@ Stack: FastAPI + SQLAlchemy + Postgres, React + Vite, Railway.
 ## Sources of truth
 
 - **Rules:** `docs/RULES.md`. Read before changing anything involving money. Do not restate rules here.
-- **Current work / branch / next steps:** `docs/plans/2026-10-11-continuation-handoff.md`. It supersedes older handoffs.
+- **Current work / branch / next steps:** `docs/plans/2026-10-28-continuation-handoff.md`. It supersedes older handoffs.
+- **The whole plan (Phase → Batch → Task → Status):** `docs/plans/hba-os-roadmap.md`.
 - **Screen parity state:** `docs/redesign/parity/SCREEN_MATRIX.md`.
 - **Current visual repair evidence / decisions:** `docs/repair/batch-2/visual/CHECKLIST.md`.
 - **Archived historical captures / private local evidence:** `docs/cleanup/archive-index.md`. Completed batch evidence is stored in verified local ZIPs outside the repository; retain those ZIPs separately when transferring the checkout.
@@ -15,7 +16,7 @@ Stack: FastAPI + SQLAlchemy + Postgres, React + Vite, Railway.
 
 ## Current operating mode
 
-This is an **audit repair** on `repair/batch-2`.
+HBA OS Phase 1 (see the roadmap); each batch on its own branch and pull request.
 
 - **Do not merge unless explicitly authorised.**
 - **Do not deploy unless separately and explicitly authorised.** Merge and deploy are different permissions.
