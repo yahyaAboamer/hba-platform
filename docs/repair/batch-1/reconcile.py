@@ -44,11 +44,11 @@ from sqlalchemy import select, text
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..")))
 
 from app.db import SessionLocal  # noqa: E402
-from app.models.affiliates import AffiliateProfile  # noqa: E402
-from app.models.attributed_orders import AttributedOrder  # noqa: E402
-from app.models.payroll import CalculationState, PayrollMonth  # noqa: E402
-from app.services.corrections import correction_for  # noqa: E402
-from app.services.payroll import (  # noqa: E402
+from app.modules.affiliates.models.affiliates import AffiliateProfile  # noqa: E402
+from app.modules.affiliates.models.attributed_orders import AttributedOrder  # noqa: E402
+from app.modules.affiliates.models.payroll import CalculationState, PayrollMonth  # noqa: E402
+from app.modules.affiliates.services.corrections import correction_for  # noqa: E402
+from app.modules.affiliates.services.payroll import (  # noqa: E402
     PENDING_INCLUSIVE,
     counted_in_snapshot,
     policy_of,

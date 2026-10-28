@@ -25,12 +25,12 @@ from decimal import Decimal
 from types import SimpleNamespace as NS
 from unittest.mock import MagicMock, patch
 
-from app.models.affiliates import AccountKind
-from app.models.attributed_orders import CommissionState
-from app.models.compensation import CompensationType
-from app.services import corrections
-from app.services.commission import calculate as calc
-from app.services.commission.source import SourceOrder
+from app.modules.affiliates.models.affiliates import AccountKind
+from app.modules.affiliates.models.attributed_orders import CommissionState
+from app.modules.affiliates.models.compensation import CompensationType
+from app.modules.affiliates.services import corrections
+from app.modules.affiliates.services.commission import calculate as calc
+from app.modules.affiliates.services.commission.source import SourceOrder
 
 results = {}
 affiliate = NS(id=1, name="Audit fixture", account_kind=AccountKind.MODEL)
@@ -80,8 +80,8 @@ with patch.object(corrections, "is_historical", return_value=False), \
         patch.object(corrections, "calculate_month", return_value=NS(payout_piastres=170_000)), \
         patch.object(corrections, "source_version", return_value="changed-again"), \
         patch.object(corrections, "carried_into", return_value=[]), \
-        patch("app.services.payments.allocated_to", return_value=200_000), \
-        patch("app.services.portal.months_for", return_value=["2026-09"]):
+        patch("app.modules.affiliates.services.payments.allocated_to", return_value=200_000), \
+        patch("app.modules.affiliates.services.portal.months_for", return_value=["2026-09"]):
     correction = corrections.correction_for(db, affiliate, "2026-09")
     open_rows = corrections.open_corrections(db, affiliate)
 
@@ -108,8 +108,8 @@ with patch.object(corrections, "is_historical", return_value=False), \
         patch.object(corrections, "calculate_month", return_value=NS(payout_piastres=180_000)), \
         patch.object(corrections, "source_version", return_value="changed"), \
         patch.object(corrections, "carried_into", return_value=[]), \
-        patch("app.services.payments.allocated_to", return_value=0), \
-        patch("app.services.portal.months_for", return_value=["2026-09"]):
+        patch("app.modules.affiliates.services.payments.allocated_to", return_value=0), \
+        patch("app.modules.affiliates.services.portal.months_for", return_value=["2026-09"]):
     correction = corrections.correction_for(db, affiliate, "2026-09")
     open_rows = corrections.open_corrections(db, affiliate)
 
@@ -137,7 +137,7 @@ partial = NS(
 )
 with patch.object(corrections, "correction_for", return_value=partial), \
         patch.object(corrections, "capacity_of", return_value=10_000), \
-        patch("app.services.payments.adjust") as adjust:
+        patch("app.modules.affiliates.services.payments.adjust") as adjust:
     corrections.resolve(
         db,
         affiliate,

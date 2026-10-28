@@ -44,20 +44,20 @@ from app.config import settings  # noqa: E402
 from app.core.businesstime import month_add  # noqa: E402
 from app.core.passwords import hash_password  # noqa: E402
 from app.db import SessionLocal, engine  # noqa: E402
-from app.models.affiliates import AccountKind, AffiliateStatus  # noqa: E402
-from app.models.attributed_orders import AttributedOrder, CommissionState  # noqa: E402
-from app.models.catalogue import OrderLineItem, Product, ProductVariant  # noqa: E402
-from app.models.compensation import CompensationType  # noqa: E402
-from app.models.identity import UserAccount  # noqa: E402
-from app.models.orders import OrderIndex  # noqa: E402
-from app.services.affiliates import create_affiliate  # noqa: E402
-from app.services.codes import register_code  # noqa: E402
-from app.services.compensation import set_terms  # noqa: E402
-from app.services.payments import record_payment  # noqa: E402
-from app.services.payouts import set_destination  # noqa: E402
-from app.services.payroll import approve_month, working_month  # noqa: E402
-from app.services.shopify.fulfilment import DELIVERED, IN_FLIGHT  # noqa: E402
-from app.services.targets import (  # noqa: E402
+from app.modules.affiliates.models.affiliates import AccountKind, AffiliateStatus  # noqa: E402
+from app.modules.affiliates.models.attributed_orders import AttributedOrder, CommissionState  # noqa: E402
+from app.shared.models.catalogue import OrderLineItem, Product, ProductVariant  # noqa: E402
+from app.modules.affiliates.models.compensation import CompensationType  # noqa: E402
+from app.shared.models.identity import UserAccount  # noqa: E402
+from app.shared.models.orders import OrderIndex  # noqa: E402
+from app.modules.affiliates.services.affiliates import create_affiliate  # noqa: E402
+from app.modules.affiliates.services.codes import register_code  # noqa: E402
+from app.modules.affiliates.services.compensation import set_terms  # noqa: E402
+from app.modules.affiliates.services.payments import record_payment  # noqa: E402
+from app.modules.affiliates.services.payouts import set_destination  # noqa: E402
+from app.modules.affiliates.services.payroll import approve_month, working_month  # noqa: E402
+from app.shared.services.shopify.fulfilment import DELIVERED, IN_FLIGHT  # noqa: E402
+from app.modules.affiliates.services.targets import (  # noqa: E402
     get_target,
     record_actuals,
     record_outcome,
@@ -250,10 +250,10 @@ def populated_states(db, owner_id: int, made: dict, now) -> None:
     """
     from datetime import timedelta
 
-    from app.models.identity import Invitation
-    from app.models.integration import IntegrationEvent
-    from app.models.promotions import FeatureRequest
-    from app.models.shipments import Classification, ModelShipment
+    from app.shared.models.identity import Invitation
+    from app.shared.models.integration import IntegrationEvent
+    from app.modules.affiliates.models.promotions import FeatureRequest
+    from app.modules.affiliates.models.shipments import Classification, ModelShipment
 
     # ── Models → Invitations: the export's three states ──────────────────────
     #
@@ -494,7 +494,7 @@ def main() -> None:
                           state=CommissionState.PENDING,
                           products=PRODUCTS[(index + step) % 6:(index + step) % 6 + 1])
             # Targets: a requirement every live month, an outcome before go-live.
-            from app.services.payroll import is_historical
+            from app.modules.affiliates.services.payroll import is_historical
 
             if is_historical(month):
                 if any(k == GUARANTEE_KIND for _s, k, _e in terms):

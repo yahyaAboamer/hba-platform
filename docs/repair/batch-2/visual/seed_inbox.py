@@ -38,8 +38,8 @@ from sqlalchemy import select, text  # noqa: E402
 from app.config import settings  # noqa: E402
 from app.core.passwords import hash_password  # noqa: E402
 from app.db import SessionLocal, engine  # noqa: E402
-from app.models.identity import UserAccount  # noqa: E402
-from app.models.inbox import (  # noqa: E402
+from app.shared.models.identity import UserAccount  # noqa: E402
+from app.modules.inbox.models import (  # noqa: E402
     InboxConnection,
     InboxConversation,
     InboxMedia,
