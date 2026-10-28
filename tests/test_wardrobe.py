@@ -11,11 +11,11 @@ import pytest
 from sqlalchemy import text
 
 from app.core.passwords import hash_password
-from app.models.identity import UserAccount
-from app.models.orders import OrderIndex
-from app.models.shipments import Classification, ModelShipment
-from app.services.affiliates import create_affiliate
-from app.services.wardrobe import (
+from app.shared.models.identity import UserAccount
+from app.shared.models.orders import OrderIndex
+from app.modules.affiliates.models.shipments import Classification, ModelShipment
+from app.modules.affiliates.services.affiliates import create_affiliate
+from app.modules.affiliates.services.wardrobe import (
     FAILED,
     PROCESSING,
     RECEIVED,
@@ -402,7 +402,7 @@ def test_something_she_bought_does_not_make_her_eligible(db):
 
 
 def _request(db, product_id, message="Wear it with the trousers.", visible=True):
-    from app.services.wardrobe import set_feature_request
+    from app.modules.affiliates.services.wardrobe import set_feature_request
 
     set_feature_request(db, product_id, message=message, visible=visible)
     db.flush()
@@ -415,7 +415,7 @@ def test_a_request_reaches_only_a_model_who_has_the_product(db):
     through the API, which is the difference between hiding something and not
     sending it.
     """
-    from app.services.wardrobe import eligible_requests
+    from app.modules.affiliates.services.wardrobe import eligible_requests
 
     has = _model(db, name="Aya", email="aya@example.com")
     hasnt = _model(db, name="Dina", email="dina@example.com")
@@ -428,7 +428,7 @@ def test_a_request_reaches_only_a_model_who_has_the_product(db):
 
 
 def test_a_hidden_request_reaches_nobody(db):
-    from app.services.wardrobe import eligible_requests
+    from app.modules.affiliates.services.wardrobe import eligible_requests
 
     affiliate = _model(db)
     _product(db, PANTS, "Wide-leg trousers")
@@ -443,7 +443,7 @@ def test_a_failed_only_model_drops_out_and_a_replacement_puts_her_back(db):
 
     Nothing is stored, so nobody has to re-run anything when a parcel moves.
     """
-    from app.services.wardrobe import eligible_requests
+    from app.modules.affiliates.services.wardrobe import eligible_requests
 
     affiliate = _model(db)
     _product(db, PANTS, "Wide-leg trousers")
@@ -465,7 +465,7 @@ def test_hiding_a_request_keeps_its_wording_and_removing_does_not(db):
     A request being paused is not one that was withdrawn, and collapsing them
     would lose a paragraph somebody wrote.
     """
-    from app.services.wardrobe import (
+    from app.modules.affiliates.services.wardrobe import (
         feature_request_for,
         remove_feature_request,
         set_feature_request,
@@ -494,7 +494,7 @@ def test_a_request_may_be_written_with_nothing_to_say(db):
     Kept rather than deleted, pointing the other way, so the change is visible
     to anybody who wonders whether the old rule was lost by accident.
     """
-    from app.services.wardrobe import set_feature_request
+    from app.modules.affiliates.services.wardrobe import set_feature_request
 
     _product(db, PANTS, "Wide-leg trousers")
 
@@ -506,7 +506,7 @@ def test_a_request_may_be_written_with_nothing_to_say(db):
 
 def test_something_she_bought_does_not_make_a_request_visible_to_her(db):
     """D05's one consequence here, and it needs no second rule."""
-    from app.services.wardrobe import eligible_requests
+    from app.modules.affiliates.services.wardrobe import eligible_requests
 
     affiliate = _model(db)
     _product(db, PANTS, "Wide-leg trousers")
@@ -535,7 +535,7 @@ def test_something_she_bought_does_not_make_a_request_visible_to_her(db):
 def test_a_shopify_image_is_asked_for_at_the_size_it_is_drawn(db):
     """A product photograph is commonly 2000px. Sixty of those is tens of
     megabytes to draw a page of thumbnails, and Shopify resizes on request."""
-    from app.services.wardrobe import THUMBNAIL_WIDTH, thumbnail
+    from app.modules.affiliates.services.wardrobe import THUMBNAIL_WIDTH, thumbnail
 
     assert thumbnail("https://cdn.shopify.com/s/files/1/x.jpg") == (
         f"https://cdn.shopify.com/s/files/1/x.jpg?width={THUMBNAIL_WIDTH}"
@@ -543,14 +543,14 @@ def test_a_shopify_image_is_asked_for_at_the_size_it_is_drawn(db):
 
 
 def test_an_image_that_already_has_a_width_is_left_alone(db):
-    from app.services.wardrobe import thumbnail
+    from app.modules.affiliates.services.wardrobe import thumbnail
 
     already = "https://cdn.shopify.com/s/files/1/x.jpg?width=800"
     assert thumbnail(already) == already
 
 
 def test_a_url_with_a_query_keeps_it(db):
-    from app.services.wardrobe import THUMBNAIL_WIDTH, thumbnail
+    from app.modules.affiliates.services.wardrobe import THUMBNAIL_WIDTH, thumbnail
 
     assert thumbnail("https://cdn.shopify.com/x.jpg?v=2") == (
         f"https://cdn.shopify.com/x.jpg?v=2&width={THUMBNAIL_WIDTH}"
@@ -560,7 +560,7 @@ def test_a_url_with_a_query_keeps_it(db):
 def test_a_foreign_host_is_never_rewritten(db):
     """Guessing at another host's resizing scheme produces a broken image
     rather than a smaller one."""
-    from app.services.wardrobe import thumbnail
+    from app.modules.affiliates.services.wardrobe import thumbnail
 
     other = "https://images.example.com/x.jpg"
     assert thumbnail(other) == other
@@ -651,7 +651,7 @@ def test_a_product_can_be_featured_on_its_picture_alone(db):
     Requiring one meant featuring ten products for a campaign was ten
     identical sentences nobody reads.
     """
-    from app.services.wardrobe import set_feature_request
+    from app.modules.affiliates.services.wardrobe import set_feature_request
 
     request = set_feature_request(db, "gid://shopify/Product/1", visible=True)
 
@@ -665,7 +665,7 @@ def test_a_note_can_be_taken_back(db):
     Refusing an empty string would mean a sentence typed once could never be
     removed - the same trap as the old refusal, from the other side.
     """
-    from app.services.wardrobe import set_feature_request
+    from app.modules.affiliates.services.wardrobe import set_feature_request
 
     set_feature_request(db, "gid://shopify/Product/1", visible=True, message="Before Thursday")
     cleared = set_feature_request(db, "gid://shopify/Product/1", visible=True, message="   ")
@@ -675,7 +675,7 @@ def test_a_note_can_be_taken_back(db):
 
 def test_a_note_is_kept_when_one_is_written(db):
     """Optional is not ignored."""
-    from app.services.wardrobe import set_feature_request
+    from app.modules.affiliates.services.wardrobe import set_feature_request
 
     request = set_feature_request(
         db, "gid://shopify/Product/1", visible=True, message="  Mention the shade  "
@@ -693,7 +693,7 @@ def test_coverage_counts_models_not_parcels(db):
     Two of the same thing sent to one model is one model covered. Counting
     shipments would overstate reach on exactly the products HBA sends most.
     """
-    from app.services.wardrobe import coverage_for
+    from app.modules.affiliates.services.wardrobe import coverage_for
 
     one = _model(db)
     _product(db, PANTS, "Wide-leg trousers")
@@ -705,7 +705,7 @@ def test_coverage_counts_models_not_parcels(db):
 
 
 def test_coverage_counts_each_model_who_has_one(db):
-    from app.services.wardrobe import coverage_for
+    from app.modules.affiliates.services.wardrobe import coverage_for
 
     one = _model(db)
     two = _model(db, name="Salma", email="salma@example.com")
@@ -719,7 +719,7 @@ def test_coverage_counts_each_model_who_has_one(db):
 
 def test_a_product_nobody_has_is_absent_rather_than_zero(db):
     """The caller decides how to say *nobody*; the query does not invent a row."""
-    from app.services.wardrobe import coverage_for
+    from app.modules.affiliates.services.wardrobe import coverage_for
 
     _product(db, PANTS, "Wide-leg trousers")
     db.flush()

@@ -4,8 +4,8 @@ from datetime import timedelta
 
 from sqlalchemy import select, text
 
-from app.models.orders import OrderIndex
-from app.services.shopify.normalise import normalise_order, upsert_order_index
+from app.shared.models.orders import OrderIndex
+from app.shared.services.shopify.normalise import normalise_order, upsert_order_index
 
 
 def _node(order_id="5123456789", **overrides) -> dict:

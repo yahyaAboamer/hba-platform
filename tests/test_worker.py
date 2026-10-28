@@ -12,7 +12,7 @@ from sqlalchemy import text
 
 from app.core.signals import Anomaly
 from app.db import SessionLocal
-from app.services.jobs import MAX_ATTEMPTS, JobStatus, PermanentFailure, enqueue
+from app.shared.services.jobs import MAX_ATTEMPTS, JobStatus, PermanentFailure, enqueue
 from app.worker import HANDLERS, register_handler, run_one, worker_identity
 
 
@@ -411,7 +411,7 @@ def _due_now(session, kind, seconds_ago):
 def test_an_operations_read_is_not_kept_waiting_by_a_backlog(session):
     """Staging, 6 October: 500 line-item reads queued a minute earlier held a
     Shopify read back 4.5 minutes. In its own lane it goes first."""
-    from app.services.jobs import OPERATIONS_READS, JobKind, lease_job
+    from app.shared.services.jobs import OPERATIONS_READS, JobKind, lease_job
 
     for n in range(5):
         _due_now(session, f"backlog_{n}", seconds_ago=120)
@@ -423,7 +423,7 @@ def test_an_operations_read_is_not_kept_waiting_by_a_backlog(session):
 
 
 def test_the_main_lane_never_takes_an_operations_read(session):
-    from app.services.jobs import OPERATIONS_READS, JobKind, lease_job
+    from app.shared.services.jobs import OPERATIONS_READS, JobKind, lease_job
 
     _due_now(session, JobKind.ORDER_OPS_SHOPIFY, seconds_ago=600)
     other_id = _due_now(session, "backlog", seconds_ago=60)
@@ -437,17 +437,17 @@ def test_the_main_lane_never_takes_an_operations_read(session):
 
 
 def test_the_operations_lane_takes_nothing_else(session):
-    from app.services.jobs import OPERATIONS_READS, lease_job
+    from app.shared.services.jobs import OPERATIONS_READS, lease_job
 
     _due_now(session, "backlog", seconds_ago=60)
     assert lease_job(session, "w/operations", only=OPERATIONS_READS) is None
 
 
 def test_between_them_the_lanes_take_every_kind_and_only_one_tops_up():
-    from app.services.jobs import OPERATIONS_READS, JobKind
+    from app.shared.services.jobs import OPERATIONS_READS, JobKind
     from app.worker import LANES
 
-    from app.services.jobs import INBOX_WORK
+    from app.shared.services.jobs import INBOX_WORK
 
     assert LANES["operations"]["only"] == OPERATIONS_READS
     assert LANES["inbox"]["only"] == INBOX_WORK

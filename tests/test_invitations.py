@@ -12,8 +12,8 @@ import pytest
 from app.core.businesstime import utcnow
 from app.core.passwords import hash_password, verify_password
 from app.core.permissions import VALID_ROLES
-from app.models.identity import UserAccount
-from app.services.invitations import accept_invitation, create_invitation
+from app.shared.models.identity import UserAccount
+from app.shared.services.invitations import accept_invitation, create_invitation
 
 PASSWORD = "quiet-harbour-lantern"
 
@@ -213,7 +213,7 @@ def test_display_name_is_optional(db):
 
 
 def test_a_live_link_previews_the_address_it_belongs_to(db):
-    from app.services.invitations import preview_invitation
+    from app.shared.services.invitations import preview_invitation
 
     admin = _admin(db)
     token, _ = create_invitation(db, "nour@example.com", "affiliate", admin.id)
@@ -224,7 +224,7 @@ def test_a_live_link_previews_the_address_it_belongs_to(db):
 
 def test_previewing_does_not_consume_the_link(db):
     """Looking must not spend it - the page loads before anybody fills it in."""
-    from app.services.invitations import preview_invitation
+    from app.shared.services.invitations import preview_invitation
 
     admin = _admin(db)
     token, invitation = create_invitation(db, "nour@example.com", "affiliate", admin.id)
@@ -236,7 +236,7 @@ def test_previewing_does_not_consume_the_link(db):
 
 
 def test_an_expired_link_previews_as_expired(db):
-    from app.services.invitations import preview_invitation
+    from app.shared.services.invitations import preview_invitation
 
     admin = _admin(db)
     token, invitation = create_invitation(db, "nour@example.com", "affiliate", admin.id)
@@ -249,7 +249,7 @@ def test_an_expired_link_previews_as_expired(db):
 
 
 def test_a_used_link_previews_as_used(db):
-    from app.services.invitations import preview_invitation
+    from app.shared.services.invitations import preview_invitation
 
     admin = _admin(db)
     token, _ = create_invitation(db, "nour@example.com", "affiliate", admin.id)
@@ -262,7 +262,7 @@ def test_a_used_link_previews_as_used(db):
 
 
 def test_a_made_up_token_previews_as_invalid(db):
-    from app.services.invitations import preview_invitation
+    from app.shared.services.invitations import preview_invitation
 
     with pytest.raises(ValueError):
         preview_invitation(db, "not-a-real-token")
@@ -271,7 +271,7 @@ def test_a_made_up_token_previews_as_invalid(db):
 def test_preview_and_accept_agree_on_the_wording(db):
     """One set of checks, so the page cannot say a link is fine and then have
     it refused a moment later."""
-    from app.services.invitations import preview_invitation
+    from app.shared.services.invitations import preview_invitation
 
     admin = _admin(db)
     token, invitation = create_invitation(db, "nour@example.com", "affiliate", admin.id)
@@ -328,7 +328,7 @@ def test_an_address_that_now_has_an_account_is_not_pending(db):
     invitation actually used is marked accepted, so filtering on the *account*
     clears the ones already on file too - no migration, nothing deleted.
     """
-    from app.services.staff import list_pending_invitations
+    from app.shared.services.staff import list_pending_invitations
 
     admin = _admin(db)
     create_invitation(db, "nour@example.com", "affiliate", admin.id)
@@ -344,7 +344,7 @@ def test_an_address_that_now_has_an_account_is_not_pending(db):
 
 
 def test_somebody_still_waiting_is_still_listed(db):
-    from app.services.staff import list_pending_invitations
+    from app.shared.services.staff import list_pending_invitations
 
     admin = _admin(db)
     create_invitation(db, "waiting@example.com", "affiliate", admin.id)
@@ -361,7 +361,7 @@ def test_somebody_still_waiting_is_still_listed(db):
 
 
 def test_withdrawing_records_that_it_was_deliberate(db):
-    from app.services.staff import revoke_invitation
+    from app.shared.services.staff import revoke_invitation
 
     admin = _admin(db)
     _, invitation = create_invitation(db, "nour@example.com", "affiliate", admin.id)
@@ -387,7 +387,7 @@ def test_invitations_are_listed_newest_first(db):
     """The one somebody just sent is the one they are looking for, and it sat
     at the bottom under every dead one above it.
     """
-    from app.services.staff import list_pending_invitations
+    from app.shared.services.staff import list_pending_invitations
 
     admin = _admin(db)
     create_invitation(db, "first@example.com", "affiliate", admin.id)

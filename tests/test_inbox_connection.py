@@ -12,11 +12,11 @@ import pytest
 from cryptography.fernet import Fernet
 from sqlalchemy import select
 
-from app.models.audit import AuditEvent
-from app.models.inbox import InboxConnection, ShopifyTagsConnection
-from app.services.inbox import connection, sending
-from app.services.inbox.meta import MetaError, NumberInfo
-from app.services.shopify.client import ShopifyError
+from app.shared.models.audit import AuditEvent
+from app.modules.inbox.models import InboxConnection, ShopifyTagsConnection
+from app.modules.inbox.services import connection, sending
+from app.modules.inbox.services.meta import MetaError, NumberInfo
+from app.shared.services.shopify.client import ShopifyError
 
 ACCESS = "EAAG-made-up-access-key-0000a1b2"
 APP_SECRET = "made-up-app-secret-000000009f3c"

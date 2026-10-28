@@ -10,19 +10,19 @@ import pytest
 from sqlalchemy import select, text
 
 from app.core.passwords import hash_password
-from app.models.audit import AuditEvent
-from app.models.identity import UserAccount
-from app.models.orders import OrderIndex
-from app.models.shipments import ModelShipment
-from app.services.affiliates import archive_affiliate, create_affiliate, create_house_account
-from app.services.gifts import (
+from app.shared.models.audit import AuditEvent
+from app.shared.models.identity import UserAccount
+from app.shared.models.orders import OrderIndex
+from app.modules.affiliates.models.shipments import ModelShipment
+from app.modules.affiliates.services.affiliates import archive_affiliate, create_affiliate, create_house_account
+from app.modules.affiliates.services.gifts import (
     ParcelRefused,
     assign_gift,
     dismiss_gift,
     unclaimed_gifts,
 )
-from app.services.jobs import JobKind
-from app.services.recipients import (
+from app.shared.services.jobs import JobKind
+from app.modules.affiliates.services.recipients import (
     ASSIGNED,
     NOT_A_MODEL,
     match_recipient,
@@ -319,7 +319,7 @@ def test_the_routes_need_a_signed_in_admin_and_work_for_one(fresh_database, monk
 
     from app.db import SessionLocal
     from app.main import app
-    from app.services.shopify import sync
+    from app.shared.services.shopify import sync
 
     def no_shop():
         raise RuntimeError("not connected")

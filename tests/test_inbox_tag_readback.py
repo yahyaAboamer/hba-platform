@@ -12,12 +12,12 @@ import pytest
 from sqlalchemy import text
 
 from app.core.businesstime import utcnow
-from app.models.inbox import OrderConfirmation
-from app.models.orders import OrderIndex
-from app.services.inbox import chats, tags
-from app.services.inbox.confirmations import queue_if_new
-from app.services.jobs import INBOX_WORK, JobKind, enqueue
-from app.services.shopify.client import ShopifyClient
+from app.modules.inbox.models import OrderConfirmation
+from app.shared.models.orders import OrderIndex
+from app.modules.inbox.services import chats, tags
+from app.modules.inbox.services.confirmations import queue_if_new
+from app.shared.services.jobs import INBOX_WORK, JobKind, enqueue
+from app.shared.services.shopify.client import ShopifyClient
 
 CONFIRMED = tags.ANSWER_TAGS["confirmed"]
 EDIT = tags.ANSWER_TAGS["edit"]

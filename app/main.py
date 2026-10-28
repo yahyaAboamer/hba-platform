@@ -15,50 +15,52 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api import (
+from app.config import settings
+from app.modules.affiliates.api import (
     affiliate_self,
     affiliates,
     applications,
-    audit,
-    auth,
-    client_config,
     earnings,
-    health,
-    inbox,
     operations,
-    order_ops,
     orders,
     payments,
     payroll,
     policy,
     portal_preview,
     products,
-    staff,
     targets,
+)
+from app.modules.inbox import api as inbox
+from app.modules.operations import api as order_ops
+from app.shared.api import (
+    audit,
+    auth,
+    client_config,
+    health,
+    staff,
     webhooks,
 )
-from app.config import settings
 from app.core.observability import init_observability
 from app.worker import worker_loop
 
 # Imported for the side effect of registering its job handlers with the
 # worker. Without this the worker leases shopify_sync_order jobs, finds no
 # handler, and fails every one of them.
-from app.services import notifications as _notifications  # noqa: F401  (registers handlers)
-from app.services import reconcile as _reconcile  # noqa: F401  (registers handlers)
-from app.services import staff_prefs as _staff_prefs  # noqa: F401  (registers handlers)
-from app.services.commission import backfill as _backfill  # noqa: F401  (registers handlers)
-from app.services.inbox import confirmations as _inbox_confirmations  # noqa: F401  (registers handlers)
-from app.services.inbox import events as _inbox_events  # noqa: F401  (registers handlers)
-from app.services.inbox import media as _inbox_media  # noqa: F401  (registers handlers)
-from app.services.inbox import outbound as _inbox_outbound  # noqa: F401  (registers handlers)
-from app.services.inbox import payments as _inbox_payments  # noqa: F401  (registers handlers)
-from app.services.inbox import tags as _inbox_tags  # noqa: F401  (registers handlers)
-from app.services.order_ops import bosta as _order_ops_bosta  # noqa: F401  (registers handlers)
-from app.services.order_ops import estebdal as _order_ops_estebdal  # noqa: F401  (registers handlers)
-from app.services.order_ops import shopify as _order_ops_shopify  # noqa: F401  (registers handlers)
-from app.services.shopify import bulk as _shopify_bulk  # noqa: F401  (registers handlers)
-from app.services.shopify import sync as _shopify_sync  # noqa: F401  (registers handlers)
+from app.shared.services import notifications as _notifications  # noqa: F401  (registers handlers)
+from app.shared.services import reconcile as _reconcile  # noqa: F401  (registers handlers)
+from app.shared.services import staff_prefs as _staff_prefs  # noqa: F401  (registers handlers)
+from app.modules.affiliates.services.commission import backfill as _backfill  # noqa: F401  (registers handlers)
+from app.modules.inbox.services import confirmations as _inbox_confirmations  # noqa: F401  (registers handlers)
+from app.modules.inbox.services import events as _inbox_events  # noqa: F401  (registers handlers)
+from app.modules.inbox.services import media as _inbox_media  # noqa: F401  (registers handlers)
+from app.modules.inbox.services import outbound as _inbox_outbound  # noqa: F401  (registers handlers)
+from app.modules.inbox.services import payments as _inbox_payments  # noqa: F401  (registers handlers)
+from app.modules.inbox.services import tags as _inbox_tags  # noqa: F401  (registers handlers)
+from app.modules.operations.services import bosta as _order_ops_bosta  # noqa: F401  (registers handlers)
+from app.modules.operations.services import estebdal as _order_ops_estebdal  # noqa: F401  (registers handlers)
+from app.modules.operations.services import shopify as _order_ops_shopify  # noqa: F401  (registers handlers)
+from app.shared.services.shopify import bulk as _shopify_bulk  # noqa: F401  (registers handlers)
+from app.shared.services.shopify import sync as _shopify_sync  # noqa: F401  (registers handlers)
 
 WEB_DIR = Path(__file__).resolve().parent / "web"
 

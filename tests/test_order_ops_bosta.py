@@ -18,11 +18,11 @@ from sqlalchemy import inspect, select, text
 from app.core.businesstime import BUSINESS_TIMEZONE, utcnow
 from app.db import SessionLocal, engine
 from app.main import app
-from app.models.order_ops import OpsBostaDelivery, OpsBostaSync
-from app.services.jobs import OPERATIONS_READS, JobKind
-from app.services.order_ops import bosta
-from app.services.order_ops.freshness import record_success
-from app.services.order_ops.polling import KeyRefused, NotConnected, SourceUnavailable
+from app.modules.operations.models import OpsBostaDelivery, OpsBostaSync
+from app.shared.services.jobs import OPERATIONS_READS, JobKind
+from app.modules.operations.services import bosta
+from app.modules.operations.services.freshness import record_success
+from app.modules.operations.services.polling import KeyRefused, NotConnected, SourceUnavailable
 
 UTC = timezone.utc
 
@@ -334,7 +334,7 @@ def test_more_changes_than_one_read_takes_reads_history_again(db, monkeypatch):
 
 def test_the_read_is_scheduled_every_five_minutes_in_the_operations_lane():
     import app.main  # noqa: F401 - registers the handlers
-    from app.services.schedule import SCHEDULE
+    from app.shared.services.schedule import SCHEDULE
     from app.worker import HANDLERS
 
     assert SCHEDULE[JobKind.ORDER_OPS_BOSTA][0] == timedelta(minutes=5)

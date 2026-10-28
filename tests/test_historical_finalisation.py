@@ -27,18 +27,18 @@ from datetime import datetime, timezone
 import pytest
 
 from app.core.passwords import hash_password
-from app.models.affiliates import AccountKind
-from app.models.attributed_orders import AttributedOrder
-from app.models.compensation import CompensationType
-from app.models.identity import UserAccount
-from app.models.orders import OrderIndex
-from app.models.payments import PaymentTransaction, PayrollAdjustment
-from app.services.affiliates import create_affiliate, set_collaboration_start
-from app.services.codes import register_code
-from app.services.compensation import set_terms
-from app.services.historical import finalise_historical, historical_review
-from app.services.payroll import get_month
-from app.services.targets import record_outcome
+from app.modules.affiliates.models.affiliates import AccountKind
+from app.modules.affiliates.models.attributed_orders import AttributedOrder
+from app.modules.affiliates.models.compensation import CompensationType
+from app.shared.models.identity import UserAccount
+from app.shared.models.orders import OrderIndex
+from app.modules.affiliates.models.payments import PaymentTransaction, PayrollAdjustment
+from app.modules.affiliates.services.affiliates import create_affiliate, set_collaboration_start
+from app.modules.affiliates.services.codes import register_code
+from app.modules.affiliates.services.compensation import set_terms
+from app.modules.affiliates.services.historical import finalise_historical, historical_review
+from app.modules.affiliates.services.payroll import get_month
+from app.modules.affiliates.services.targets import record_outcome
 
 #: Everything before this was settled outside the platform (ADR 0036).
 GO_LIVE = "2026-05"
@@ -224,7 +224,7 @@ def test_no_payment_receipt_or_adjustment_is_created(db, unlocked):
     assert db.scalar(select(func.count()).select_from(PaymentTransaction)) == 0
     assert db.scalar(select(func.count()).select_from(PayrollAdjustment)) == 0
     # And ADR 0036's guarantee holds on the other side: nothing is owed.
-    from app.services.payments import balance_for
+    from app.modules.affiliates.services.payments import balance_for
 
     assert balance_for(db, affiliate, "2026-03")["balance_piastres"] == 0
 
@@ -237,7 +237,7 @@ def test_it_sends_no_month_closed_notice(db, unlocked):
     """
     from sqlalchemy import func, select
 
-    from app.models.notifications import NotificationOutbox
+    from app.shared.models.notifications import NotificationOutbox
 
     affiliate = _model(db)
     _order(db, affiliate, "mar", 1_000_000, month="2026-03")
@@ -348,7 +348,7 @@ def test_finalising_is_locked_until_the_history_is_checked(db):
     about itself: that the recorded starts, terms and outcomes match what HBA
     agreed, and that the import for those months is complete.
     """
-    from app.services.historical import FinalisationLocked
+    from app.modules.affiliates.services.historical import FinalisationLocked
 
     affiliate = _model(db)
     _order(db, affiliate, "mar", 1_000_000, month="2026-03")

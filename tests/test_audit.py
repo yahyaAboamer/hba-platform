@@ -11,9 +11,9 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import DatabaseError
 
-from app.models.audit import AuditEvent
-from app.models.identity import UserAccount
-from app.services.audit import SENSITIVE_FIELDS, mask_sensitive, record_audit
+from app.shared.models.audit import AuditEvent
+from app.shared.models.identity import UserAccount
+from app.shared.services.audit import SENSITIVE_FIELDS, mask_sensitive, record_audit
 
 
 def _actor(db, email="actor@example.com"):

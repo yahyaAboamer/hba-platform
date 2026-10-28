@@ -4,9 +4,9 @@ A fake Shopify stands in for the real one; nothing here reaches a shop.
 """
 from datetime import datetime, timezone
 
-from app.models.orders import OrderIndex
-from app.services.shopify.client import ShopifyError
-from app.services.shopify.completeness import compare, render
+from app.shared.models.orders import OrderIndex
+from app.shared.services.shopify.client import ShopifyError
+from app.shared.services.shopify.completeness import compare, render
 
 START = datetime(2026, 1, 1, tzinfo=timezone.utc)
 END = datetime(2026, 9, 1, tzinfo=timezone.utc)

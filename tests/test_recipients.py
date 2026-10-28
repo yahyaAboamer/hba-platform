@@ -9,12 +9,12 @@ import pytest
 from sqlalchemy import select, text
 
 from app.core.passwords import hash_password
-from app.models.affiliates import AccountKind, AffiliateProfile
-from app.models.identity import UserAccount
-from app.models.orders import OrderIndex
-from app.models.shipments import Classification, ModelShipment
-from app.services.affiliates import create_affiliate, create_house_account
-from app.services.recipients import (
+from app.modules.affiliates.models.affiliates import AccountKind, AffiliateProfile
+from app.shared.models.identity import UserAccount
+from app.shared.models.orders import OrderIndex
+from app.modules.affiliates.models.shipments import Classification, ModelShipment
+from app.modules.affiliates.services.affiliates import create_affiliate, create_house_account
+from app.modules.affiliates.services.recipients import (
     AMBIGUOUS,
     NO_MATCH,
     NO_PHONE,
@@ -351,7 +351,7 @@ def test_a_phone_that_cannot_normalise_is_refused_when_it_is_saved(db):
     that can never be attached to her, and the failure would otherwise surface
     weeks later as an empty wardrobe.
     """
-    from app.services.affiliates import update_shipping_address
+    from app.modules.affiliates.services.affiliates import update_shipping_address
 
     affiliate = _model(db)
 
@@ -363,7 +363,7 @@ def test_a_phone_that_cannot_normalise_is_refused_when_it_is_saved(db):
 
 def test_only_the_fields_supplied_are_touched(db):
     """A form that edits one line must not blank the rest."""
-    from app.services.affiliates import update_shipping_address
+    from app.modules.affiliates.services.affiliates import update_shipping_address
 
     affiliate = _model(db)
     update_shipping_address(
@@ -385,7 +385,7 @@ def test_only_the_fields_supplied_are_touched(db):
 
 def test_an_empty_string_clears_a_line(db):
     """A second address line that no longer applies should be removable."""
-    from app.services.affiliates import update_shipping_address
+    from app.modules.affiliates.services.affiliates import update_shipping_address
 
     affiliate = _model(db)
     update_shipping_address(
@@ -405,7 +405,7 @@ def test_the_audit_says_which_side_changed_it_and_not_what_to(db):
     """"Who changed the address a parcel then went to" is a question that gets
     asked exactly once, urgently. The values live on the profile; the trail
     only has to say which fields moved and who moved them."""
-    from app.services.affiliates import update_shipping_address
+    from app.modules.affiliates.services.affiliates import update_shipping_address
 
     affiliate = _model(db)
     update_shipping_address(
@@ -468,8 +468,8 @@ def _queued(db, kind):
 
 def test_a_matched_parcel_queues_a_read_of_what_was_in_it(db):
     """The piece that turns an empty wardrobe into a real one."""
-    from app.services.jobs import JobKind
-    from app.services.recipients import match_one_order
+    from app.shared.services.jobs import JobKind
+    from app.modules.affiliates.services.recipients import match_one_order
 
     _model(db)
     order = _order(db, "4001")
@@ -484,8 +484,8 @@ def test_an_unmatched_parcel_queues_nothing(db):
     """**Only matched ones.** Reading every line of every order in the shop to
     build twenty wardrobes is the wrong trade, and the great majority of the
     shop's orders are customers."""
-    from app.services.jobs import JobKind
-    from app.services.recipients import match_one_order
+    from app.shared.services.jobs import JobKind
+    from app.modules.affiliates.services.recipients import match_one_order
 
     _model(db)
     order = _order(db, "4002")
@@ -498,8 +498,8 @@ def test_an_unmatched_parcel_queues_nothing(db):
 
 def test_matching_one_order_twice_queues_one_read(db):
     """A webhook, a sweep and a backfill all reach this."""
-    from app.services.jobs import JobKind
-    from app.services.recipients import match_one_order
+    from app.shared.services.jobs import JobKind
+    from app.modules.affiliates.services.recipients import match_one_order
 
     _model(db)
     order = _order(db, "4003")
@@ -520,8 +520,8 @@ def test_a_live_order_is_matched_after_it_is_indexed(db, monkeypatch):
     protected Shopify field, and a denial of that field must never be able to
     stop an order being indexed.
     """
-    from app.services.jobs import JobKind
-    from app.services.shopify import sync
+    from app.shared.services.jobs import JobKind
+    from app.shared.services.shopify import sync
 
     order = _order(db, "4004")
     monkeypatch.setattr(sync, "sync_one_order", lambda db_, order_id: order)
@@ -535,8 +535,8 @@ def test_a_live_order_is_matched_after_it_is_indexed(db, monkeypatch):
 def test_an_order_shopify_no_longer_has_queues_no_match(db, monkeypatch):
     """`sync_one_order` returns None for an order deleted between the webhook
     firing and the job running. Not an error, and not something to match."""
-    from app.services.jobs import JobKind
-    from app.services.shopify import sync
+    from app.shared.services.jobs import JobKind
+    from app.shared.services.shopify import sync
 
     monkeypatch.setattr(sync, "sync_one_order", lambda db_, order_id: None)
 

@@ -8,8 +8,8 @@ import re
 from pathlib import Path
 from types import SimpleNamespace
 
-from app.services import audit_words
-from app.services.audit_words import _Names, sentence
+from app.shared.services import audit_words
+from app.shared.services.audit_words import _Names, sentence
 
 APP = Path(__file__).resolve().parents[1] / "app"
 

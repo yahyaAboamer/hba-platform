@@ -22,16 +22,16 @@ import pytest
 from sqlalchemy import select
 
 from app.core.passwords import hash_password
-from app.models.affiliates import AccountKind
-from app.models.attributed_orders import AttributedOrder, CommissionState
-from app.models.compensation import CompensationType
-from app.models.identity import UserAccount
-from app.models.orders import OrderIndex
-from app.services.affiliates import create_affiliate
-from app.services.codes import register_code
-from app.services.compensation import set_terms
-from app.models.payments import AdjustmentType
-from app.services.corrections import (
+from app.modules.affiliates.models.affiliates import AccountKind
+from app.modules.affiliates.models.attributed_orders import AttributedOrder, CommissionState
+from app.modules.affiliates.models.compensation import CompensationType
+from app.shared.models.identity import UserAccount
+from app.shared.models.orders import OrderIndex
+from app.modules.affiliates.services.affiliates import create_affiliate
+from app.modules.affiliates.services.codes import register_code
+from app.modules.affiliates.services.compensation import set_terms
+from app.modules.affiliates.models.payments import AdjustmentType
+from app.modules.affiliates.services.corrections import (
     NOTHING_TO_CORRECT,
     OVERPAID,
     UNDERPAID,
@@ -42,8 +42,8 @@ from app.services.corrections import (
     outstanding_piastres,
     resolve,
 )
-from app.services.payments import balance_for, record_payment
-from app.services.payroll import (
+from app.modules.affiliates.services.payments import balance_for, record_payment
+from app.modules.affiliates.services.payroll import (
     SourceMoved,
     approve_month,
     blockers_for,
@@ -51,7 +51,7 @@ from app.services.payroll import (
     deductions_landing_on,
     source_version,
 )
-from app.services.targets import record_actuals, set_requirements, verify
+from app.modules.affiliates.services.targets import record_actuals, set_requirements, verify
 
 AUGUST = "2026-08"
 SEPTEMBER = "2026-09"
@@ -67,7 +67,7 @@ def _go_live(monkeypatch):
 @pytest.fixture(autouse=True)
 def _working_month(monkeypatch):
     monkeypatch.setattr(
-        "app.services.portal.working_month", lambda: SEPTEMBER, raising=True
+        "app.modules.affiliates.services.portal.working_month", lambda: SEPTEMBER, raising=True
     )
 
 
@@ -193,7 +193,7 @@ def test_a_month_agreed_before_the_fingerprint_existed_reports_nothing(
     # edited afterwards - `payroll_snapshot` is append-only and the database
     # refuses it, which is the guard working.
     monkeypatch.setattr(
-        "app.services.payroll.source_version", lambda *_args, **_kw: None
+        "app.modules.affiliates.services.payroll.source_version", lambda *_args, **_kw: None
     )
 
     affiliate = _model(db)
@@ -524,7 +524,7 @@ def test_a_whole_month_can_be_consumed_including_below_a_guarantee(db):
         destination_month=SEPTEMBER,
     )
 
-    from app.services.payments import balance_for
+    from app.modules.affiliates.services.payments import balance_for
 
     # Nothing to send her for September, and she qualified for her guarantee
     # in it. D04 says that is the right answer; the screens have to say why.
@@ -720,7 +720,7 @@ def test_resolving_a_correction_leaves_the_agreement_and_the_transfer_alone(db):
     hash and the payment row are all read before and after, and none of them
     may move.
     """
-    from app.models.payments import PaymentTransaction
+    from app.modules.affiliates.models.payments import PaymentTransaction
 
     affiliate = _model(db)
     _order(db, affiliate, "1", 2_000_000)
@@ -1201,7 +1201,7 @@ def test_a_month_swallowed_by_a_correction_explains_itself_to_her(db):
     cannot check*), and asserted here rather than in the browser, because a
     sentence the browser assembles is one no test can hold to account.
     """
-    from app.services.portal import my_month
+    from app.modules.affiliates.services.portal import my_month
 
     affiliate = _model(db)
     _order(db, affiliate, "1", 2_000_000)
@@ -1236,7 +1236,7 @@ def test_the_month_the_overpayment_came_from_still_reads_as_agreed(db):
     under the word "agreed" would present a working number as a debt, which is
     what the whole snapshot design exists to prevent.
     """
-    from app.services.portal import my_month
+    from app.modules.affiliates.services.portal import my_month
 
     affiliate = _model(db)
     _order(db, affiliate, "1", 2_000_000)
@@ -1329,7 +1329,7 @@ def test_the_outstanding_total_can_reuse_a_list_it_is_given(db):
 
 def _home_corrections(db):
     """The correction notices on Home, as the API returns them."""
-    from app.api.operations import attention
+    from app.modules.affiliates.api.operations import attention
 
     return [row for row in attention(_actor=None, db=db)["items"] if row["key"].startswith("correction:")]
 

@@ -1,0 +1,305 @@
+"""The order index, over HTTP. Read-only.
+
+No money decision lives here. `attributed_order` and `payroll_snapshot` already
+decided what an order is worth and who it is paid by; this reads those
+decisions rather than making any. That is the whole reason this screen needs
+no permission beyond `affiliates.view` - it cannot change what anybody is owed.
+
+**Why a screen for this at all**, when every figure already appears somewhere
+on Affiliates, Payroll or Payments: those three answer "what does they earn"
+and this answers "why does this *order* read the way it does" - whose code it
+carried, whether Shopify has said it arrived, which payroll actually paid it.
+That is the question support ends up asking about one order at a time, and it
+needs the order as the unit, not the model or the month.
+"""
+
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.shared.api.deps import require_permission
+from app.core.businesstime import parse_month
+from app.core.money import format_egp
+from app.core.permissions import Permission
+from app.db import get_session
+from app.modules.affiliates.models.affiliates import AffiliateProfile
+from app.modules.affiliates.models.attributed_orders import AttributedOrder
+from app.shared.models.identity import UserAccount
+from app.shared.models.orders import OrderIndex
+from app.modules.affiliates.services.attribution import AttributionOutcome, resolve_order
+from app.modules.affiliates.services.commission.state import order_status
+
+router = APIRouter(prefix="/api/orders")
+
+
+def _month_or_400(month: str) -> str:
+    try:
+        return parse_month(month)
+    except ValueError as exc:
+        raise HTTPException(400, "A month looks like 2026-04") from exc
+
+
+def _render(db: Session, order: OrderIndex, names: dict[int, str]) -> dict:
+    """One order: whose it is, what it is worth, and what happened to it.
+
+    Attribution is **re-resolved** here rather than read off `attributed_order`
+    alone, because an unattributed or held order has no row there at all - the
+    screen has to be able to show those states too, not only the ones that
+    already have money attached.
+
+    One `resolve_order` call per order rather than a batched query: HBA's
+    entire order history is a few hundred rows (§10.2 - the index exists
+    precisely because it is cheap to keep all of them), so a per-order lookup
+    against a few dozen registered codes costs nothing measurable. Worth
+    revisiting only if that scale changes by an order of magnitude (ADR 0019).
+    """
+    attributed = db.get(AttributedOrder, order.shopify_order_id)
+    decision = resolve_order(db, order)
+
+    base = {
+        "shopify_order_id": order.shopify_order_id,
+        "order_number": order.order_number,
+        "placed_at": order.placed_at.isoformat(),
+        "business_month": order.business_month,
+        "discount_codes": order.discount_codes,
+        "total_piastres": order.total_piastres,
+        "total": format_egp(order.total_piastres),
+        "delivery_state": order.delivery_state,
+        "delivery_status": order.delivery_status,
+        "cancelled": order.cancelled_at is not None,
+        # What happened to it, derived from the counting state where there is
+        # one: a delivered order later cancelled or refunded still counts and
+        # still reads *Delivered* (F04), and only a courier's failure reads
+        # *Failed delivery*.
+        "status": order_status(
+            state=attributed.commission_state if attributed is not None else None,
+            delivery_state=order.delivery_state,
+            cancelled_at=order.cancelled_at,
+            financial_status=order.financial_status,
+        ),
+    }
+
+    if decision.outcome == AttributionOutcome.HELD:
+        return {
+            **base,
+            "outcome": "held",
+            "affiliate_id": None,
+            "affiliate_name": None,
+            "matched_codes": decision.matched_codes,
+            "commission_state": None,
+            "base_piastres": None,
+            "is_carried": False,
+            "paid_in_month": None,
+        }
+
+    if decision.outcome == AttributionOutcome.UNATTRIBUTED or attributed is None:
+        return {
+            **base,
+            "outcome": "unattributed",
+            "affiliate_id": None,
+            "affiliate_name": None,
+            "matched_codes": [],
+            "commission_state": None,
+            "base_piastres": None,
+            "is_carried": False,
+            "paid_in_month": None,
+        }
+
+    settled_month = (
+        _snapshot_month(db, attributed.settled_in_snapshot_id)
+        if attributed.settled_in_snapshot_id is not None
+        else None
+    )
+
+    return {
+        **base,
+        "outcome": "attributed",
+        "affiliate_id": attributed.affiliate_id,
+        "affiliate_name": names.get(attributed.affiliate_id, "—"),
+        "matched_codes": decision.matched_codes,
+        "commission_state": attributed.commission_state,
+        "base_piastres": attributed.commission_base_piastres,
+        "base": format_egp(attributed.commission_base_piastres),
+        # §11.4. An order is "carried" once something other than its own
+        # month's payroll is what actually paid it - the fact a model's own
+        # arithmetic depends on and this screen exists partly to surface.
+        "is_carried": settled_month is not None and settled_month != order.business_month,
+        "paid_in_month": settled_month,
+    }
+
+
+def _snapshot_month(db: Session, snapshot_id: int) -> str | None:
+    from app.modules.affiliates.models.payroll import PayrollMonth, PayrollSnapshot
+
+    return db.scalar(
+        select(PayrollMonth.month)
+        .join(PayrollSnapshot, PayrollSnapshot.payroll_month_id == PayrollMonth.id)
+        .where(PayrollSnapshot.id == snapshot_id)
+    )
+
+
+@router.get("/{month}")
+def orders_for_month(
+    month: str,
+    _actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_VIEW)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Every order placed in this business month, whoever it belongs to.
+
+    Ordered newest first - the common reason to open this screen is "what just
+    happened", not "what happened at the start of the month".
+    """
+    month = _month_or_400(month)
+    orders = list(
+        db.scalars(
+            select(OrderIndex)
+            .where(OrderIndex.business_month == month)
+            .order_by(OrderIndex.placed_at.desc())
+        )
+    )
+    names = {a.id: a.name for a in db.scalars(select(AffiliateProfile))}
+    rows = [_render(db, order, names) for order in orders]
+
+    held = [row for row in rows if row["outcome"] == "held"]
+    unattributed = [row for row in rows if row["outcome"] == "unattributed"]
+    carried = [row for row in rows if row["is_carried"]]
+    # The approved list heads itself *N orders - EGP X counted*. Counted means
+    # what did not fail or get cancelled: a failed parcel was never sales, and
+    # summing it into the line above the list would say otherwise. Added up
+    # here, because nothing about money is added up in a browser.
+    counted = sum(
+        row["total_piastres"]
+        for row in rows
+        if not row["cancelled"] and row["delivery_state"] != "failed"
+    )
+
+    return {
+        "month": month,
+        "orders": rows,
+        "totals": {
+            "orders": len(rows),
+            "held": len(held),
+            "unattributed": len(unattributed),
+            "carried": len(carried),
+            "counted_piastres": counted,
+            "counted": format_egp(counted),
+        },
+    }
+
+
+@router.get("/detail/{shopify_order_id}")
+def order_detail(
+    shopify_order_id: str,
+    _actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_VIEW)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """One order, opened: whose it is, what it earned, and what was in it.
+
+    The approved dashboard opens an order from the list into its own view -
+    the model and code, when it was placed, its net sales, **the commission
+    it was worth**, which month it counts towards, and its product lines.
+    None of that had a screen here; the list carried a *Base* and a *Paid by*
+    column instead, which answered half of it on every row at once.
+
+    The commission is the same per-order figure a model sees on her own
+    orders (`_order_commission`, `month_rule`): the rate of the month the
+    order belongs to - its snapshot's, once agreed - counted delivered and
+    pending under the live rule (ADR 0040), and `None` for a void order, one
+    its month's agreement did not count, or a month with no rate.
+    """
+    from app.shared.models.catalogue import OrderLineItem
+    from app.modules.affiliates.services.portal import (
+        _order_commission,
+        counts_towards,
+        month_rule,
+        net_sales_of,
+    )
+
+    order = db.get(OrderIndex, shopify_order_id)
+    if order is None:
+        raise HTTPException(404, "No such order")
+
+    names = {a.id: a.name for a in db.scalars(select(AffiliateProfile))}
+    row = _render(db, order, names)
+
+    commission = None
+    rate_missing = False
+    net_sales = None
+    towards = None
+    if row["outcome"] == "attributed" and row["affiliate_id"] is not None:
+        affiliate = db.get(AffiliateProfile, row["affiliate_id"])
+        attributed = db.get(AttributedOrder, order.shopify_order_id)
+        rate_bp, counted, snapshot = month_rule(db, affiliate, order.business_month)
+        rate_missing = rate_bp is None
+        # The same two decisions her own row carries, so the two views of
+        # one order cannot disagree (`net_sales_of`, `counts_towards`).
+        net_sales = net_sales_of(attributed, order)
+        towards = counts_towards(
+            attributed,
+            counted,
+            snapshot,
+            row["paid_in_month"] if row["is_carried"] else None,
+        )
+        commission = (
+            # The approved order view prints EGP 0.00 for an order that did
+            # not count: it earned nothing, which is a figure, not a gap.
+            0
+            if row["commission_state"] == "void"
+            else _order_commission(
+                row["base_piastres"] or 0, rate_bp, row["commission_state"], counted
+            )
+        )
+
+    lines = [
+        {
+            "title": line.title,
+            "variant": line.variant_title,
+            "quantity": line.quantity,
+            "total_piastres": line.discounted_total_piastres,
+            "total": format_egp(line.discounted_total_piastres),
+        }
+        for line in db.scalars(
+            select(OrderLineItem)
+            .where(OrderLineItem.shopify_order_id == order.shopify_order_id)
+            # ADR 0051: the products as delivered, not the exchange's.
+            .where(OrderLineItem.after_delivery.is_not(True))
+            .order_by(OrderLineItem.title)
+        )
+    ]
+
+    return {
+        **row,
+        "commission_piastres": commission,
+        "commission": format_egp(commission) if commission is not None else None,
+        # No rate for the month: *not available*, which is not the same as a
+        # figure it did not earn.
+        "rate_missing": rate_missing,
+        "net_sales": net_sales,
+        "counts_towards": towards,
+        "lines": lines,
+    }
+
+
+@router.get("/lookup/{order_number}")
+def find_order(
+    order_number: str,
+    _actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_VIEW)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """One order, by its Shopify order number - #2001, or 2001, either works.
+
+    The month grid is for browsing; this is for the actual support question,
+    which arrives as an order number, never as a month.
+    """
+    needle = order_number.strip().lstrip("#")
+    if not needle:
+        raise HTTPException(400, "Give an order number")
+
+    order = db.scalar(
+        select(OrderIndex).where(OrderIndex.order_number.ilike(f"%{needle}"))
+    )
+    if order is None:
+        raise HTTPException(404, f"No order matches {order_number!r}")
+
+    names = {a.id: a.name for a in db.scalars(select(AffiliateProfile))}
+    return _render(db, order, names)

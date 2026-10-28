@@ -25,8 +25,8 @@ from sqlalchemy import text  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 
 from app.db import engine  # noqa: E402
-from app.services.shopify.completeness import compare, render  # noqa: E402
-from app.services.shopify.sync import build_client  # noqa: E402
+from app.shared.services.shopify.completeness import compare, render  # noqa: E402
+from app.shared.services.shopify.sync import build_client  # noqa: E402
 
 
 def main() -> None:

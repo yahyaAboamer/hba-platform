@@ -13,21 +13,21 @@ from cryptography.fernet import Fernet
 from sqlalchemy import select, text
 
 from app.core.businesstime import utcnow
-from app.models.inbox import InboxMessage, OrderConfirmation
-from app.models.orders import OrderIndex
-from app.services.inbox import chats, connection, payments, tags
-from app.services.inbox.confirmations import (
+from app.modules.inbox.models import InboxMessage, OrderConfirmation
+from app.shared.models.orders import OrderIndex
+from app.modules.inbox.services import chats, connection, payments, tags
+from app.modules.inbox.services.confirmations import (
     BAD_FOREIGN_PHONE,
     PAID,
     confirm_order,
     decide,
     queue_if_new,
 )
-from app.services.inbox.meta import MetaClient, NumberInfo
-from app.services.inbox.outbound import send_confirmation
-from app.services.inbox.sending import international_mobile
-from app.services.jobs import INBOX_WORK, JobKind
-from app.services.shopify.client import ShopifyClient
+from app.modules.inbox.services.meta import MetaClient, NumberInfo
+from app.modules.inbox.services.outbound import send_confirmation
+from app.modules.inbox.services.sending import international_mobile
+from app.shared.services.jobs import INBOX_WORK, JobKind
+from app.shared.services.shopify.client import ShopifyClient
 
 BASE = "https://hbawear.store/72695906535/order_payment/"
 SECRET_PART = "9100200300400?secret=made0up0secret0000000000000000a1"

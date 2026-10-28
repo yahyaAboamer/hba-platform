@@ -14,9 +14,9 @@ from sqlalchemy import select, text
 from app.core.businesstime import utcnow
 from app.db import engine
 from app.main import app
-from app.models.identity import RoleAssignment, UserAccount
-from app.services.invitations import accept_invitation, create_invitation
-from app.services.staff import give_role, remove_role
+from app.shared.models.identity import RoleAssignment, UserAccount
+from app.shared.services.invitations import accept_invitation, create_invitation
+from app.shared.services.staff import give_role, remove_role
 
 ADMIN = frozenset({"admin"})
 

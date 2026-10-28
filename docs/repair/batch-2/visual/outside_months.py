@@ -11,10 +11,10 @@ widened on speculation. It writes nothing.
 from sqlalchemy import func, select
 
 from app.db import SessionLocal
-from app.models.affiliates import AffiliateProfile
-from app.models.attributed_orders import AttributedOrder
-from app.models.payroll import PayrollMonth
-from app.services.portal import months_for
+from app.modules.affiliates.models.affiliates import AffiliateProfile
+from app.modules.affiliates.models.attributed_orders import AttributedOrder
+from app.modules.affiliates.models.payroll import PayrollMonth
+from app.modules.affiliates.services.portal import months_for
 
 with SessionLocal() as db:
     found = 0

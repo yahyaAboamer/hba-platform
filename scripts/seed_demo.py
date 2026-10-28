@@ -36,17 +36,17 @@ from sqlalchemy import text  # noqa: E402
 from app.config import settings  # noqa: E402
 from app.core.passwords import hash_password  # noqa: E402
 from app.db import SessionLocal, engine  # noqa: E402
-from app.models.affiliates import AccountKind, AffiliateStatus  # noqa: E402
-from app.models.attributed_orders import AttributedOrder, CommissionState  # noqa: E402
-from app.models.compensation import CompensationType  # noqa: E402
-from app.models.identity import UserAccount  # noqa: E402
-from app.models.orders import OrderIndex  # noqa: E402
-from app.services.affiliates import create_affiliate  # noqa: E402
-from app.services.codes import register_code  # noqa: E402
-from app.services.compensation import set_terms  # noqa: E402
-from app.services.payouts import set_destination  # noqa: E402
-from app.services.shopify.fulfilment import DELIVERED, IN_FLIGHT  # noqa: E402
-from app.services.targets import set_requirements  # noqa: E402
+from app.modules.affiliates.models.affiliates import AccountKind, AffiliateStatus  # noqa: E402
+from app.modules.affiliates.models.attributed_orders import AttributedOrder, CommissionState  # noqa: E402
+from app.modules.affiliates.models.compensation import CompensationType  # noqa: E402
+from app.shared.models.identity import UserAccount  # noqa: E402
+from app.shared.models.orders import OrderIndex  # noqa: E402
+from app.modules.affiliates.services.affiliates import create_affiliate  # noqa: E402
+from app.modules.affiliates.services.codes import register_code  # noqa: E402
+from app.modules.affiliates.services.compensation import set_terms  # noqa: E402
+from app.modules.affiliates.services.payouts import set_destination  # noqa: E402
+from app.shared.services.shopify.fulfilment import DELIVERED, IN_FLIGHT  # noqa: E402
+from app.modules.affiliates.services.targets import set_requirements  # noqa: E402
 
 MONTH = "2026-09"
 PASSWORD = "a-long-enough-password"

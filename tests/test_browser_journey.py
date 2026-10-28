@@ -250,7 +250,7 @@ def test_an_invitation_always_queues_a_notification(browser):
     owed, and a platform with no credentials still owes it.
     """
     from app.db import SessionLocal
-    from app.models.notifications import NotificationOutbox
+    from app.shared.models.notifications import NotificationOutbox
 
     _sign_up(browser)
     browser.post(

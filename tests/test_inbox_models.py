@@ -10,8 +10,8 @@ from sqlalchemy.exc import IntegrityError
 
 from app.core.businesstime import utcnow
 from app.db import engine
-from app.models.identity import RoleAssignment, UserAccount
-from app.models.inbox import (
+from app.shared.models.identity import RoleAssignment, UserAccount
+from app.modules.inbox.models import (
     InboxConnection,
     InboxConversation,
     InboxMedia,

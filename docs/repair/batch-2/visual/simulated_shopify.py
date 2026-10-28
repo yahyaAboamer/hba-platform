@@ -87,8 +87,8 @@ def _answer(request: httpx.Request) -> httpx.Response:
 
 
 def main() -> None:
-    import app.services.shopify.sync as sync
-    from app.services.shopify.client import ShopifyClient
+    import app.shared.services.shopify.sync as sync
+    from app.shared.services.shopify.client import ShopifyClient
 
     def build_client() -> ShopifyClient:
         client = ShopifyClient(

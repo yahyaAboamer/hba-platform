@@ -17,15 +17,15 @@ from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError, IntegrityError
 
 from app.core.passwords import hash_password
-from app.models.affiliates import AccountKind
-from app.models.attributed_orders import (
+from app.modules.affiliates.models.affiliates import AccountKind
+from app.modules.affiliates.models.attributed_orders import (
     VALID_COMMISSION_STATES,
     AttributedOrder,
     CommissionState,
 )
-from app.models.identity import UserAccount
-from app.models.orders import OrderIndex
-from app.services.affiliates import create_affiliate
+from app.shared.models.identity import UserAccount
+from app.shared.models.orders import OrderIndex
+from app.modules.affiliates.services.affiliates import create_affiliate
 
 
 def _affiliate(db, name="Nour", kind=AccountKind.MODEL):

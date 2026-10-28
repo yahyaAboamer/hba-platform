@@ -15,7 +15,7 @@ from sqlalchemy import text
 
 from app.db import engine
 from app.main import app
-from app.models.payouts import PayoutMethod
+from app.modules.affiliates.models.payouts import PayoutMethod
 
 BOOTSTRAP = {
     "email": "owner@example.com",
@@ -174,7 +174,7 @@ def test_money_terms_sent_with_an_application_are_ignored(admin):
     than applied - proven here rather than trusted, because "the form does not
     show it" is not a control.
     """
-    from app.services.compensation import terms_for
+    from app.modules.affiliates.services.compensation import terms_for
 
     token = _invite(admin, "nour@example.com")
     model = _accept(token, "Nour")

@@ -12,18 +12,18 @@ Three things this file holds:
 from datetime import date, datetime, timezone
 
 from app.core.passwords import hash_password
-from app.models.affiliates import AccountKind
-from app.models.attributed_orders import AttributedOrder, CommissionState
-from app.models.compensation import CompensationType
-from app.models.identity import UserAccount
-from app.models.orders import OrderIndex
-from app.services.affiliates import create_affiliate
-from app.services.codes import register_code
-from app.services.compensation import set_terms
-from app.services.home import comparison, order_outcomes, sales_through, share_link
-from app.services.performance import uses_for
-from app.services.portal import my_month
-from app.services.shopify.fulfilment import DELIVERED, FAILED, IN_FLIGHT
+from app.modules.affiliates.models.affiliates import AccountKind
+from app.modules.affiliates.models.attributed_orders import AttributedOrder, CommissionState
+from app.modules.affiliates.models.compensation import CompensationType
+from app.shared.models.identity import UserAccount
+from app.shared.models.orders import OrderIndex
+from app.modules.affiliates.services.affiliates import create_affiliate
+from app.modules.affiliates.services.codes import register_code
+from app.modules.affiliates.services.compensation import set_terms
+from app.modules.affiliates.services.home import comparison, order_outcomes, sales_through, share_link
+from app.modules.affiliates.services.performance import uses_for
+from app.modules.affiliates.services.portal import my_month
+from app.shared.services.shopify.fulfilment import DELIVERED, FAILED, IN_FLIGHT
 
 SEPTEMBER = "2026-09"
 AUGUST = "2026-08"

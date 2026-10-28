@@ -27,18 +27,18 @@ import pytest
 
 from app.core.passwords import hash_password
 from app.db import SessionLocal
-from app.models.affiliates import AccountKind
-from app.models.attributed_orders import AttributedOrder, CommissionState
-from app.models.compensation import CompensationType
-from app.models.identity import UserAccount
-from app.models.orders import OrderIndex
-from app.models.payments import AdjustmentType, PayrollAdjustment
-from app.services.affiliates import create_affiliate
-from app.services.codes import register_code
-from app.services.compensation import set_terms
-from app.services.corrections import correction_for, resolve
-from app.services.payments import balance_for, record_payment
-from app.services.payroll import approve_month
+from app.modules.affiliates.models.affiliates import AccountKind
+from app.modules.affiliates.models.attributed_orders import AttributedOrder, CommissionState
+from app.modules.affiliates.models.compensation import CompensationType
+from app.shared.models.identity import UserAccount
+from app.shared.models.orders import OrderIndex
+from app.modules.affiliates.models.payments import AdjustmentType, PayrollAdjustment
+from app.modules.affiliates.services.affiliates import create_affiliate
+from app.modules.affiliates.services.codes import register_code
+from app.modules.affiliates.services.compensation import set_terms
+from app.modules.affiliates.services.corrections import correction_for, resolve
+from app.modules.affiliates.services.payments import balance_for, record_payment
+from app.modules.affiliates.services.payroll import approve_month
 
 AUGUST = "2026-08"
 SEPTEMBER = "2026-09"
@@ -55,7 +55,7 @@ def _go_live(monkeypatch):
 @pytest.fixture(autouse=True)
 def _working_month(monkeypatch):
     monkeypatch.setattr(
-        "app.services.portal.working_month", lambda: SEPTEMBER, raising=True
+        "app.modules.affiliates.services.portal.working_month", lambda: SEPTEMBER, raising=True
     )
 
 
@@ -176,7 +176,7 @@ def _hold_one_thread_at_the_gate(monkeypatch, *, thread_name, until):
     An event, not a sleep: nothing here is timing-dependent, and the other
     session has genuinely committed before this one moves.
     """
-    from app.services import money_gate
+    from app.modules.affiliates.services import money_gate
 
     real = money_gate.hold_money_gate
 
@@ -232,7 +232,7 @@ def test_two_sessions_resolving_one_correction_recover_it_once(committed):
     act on it as far as any check can tell. Exactly one recovery may exist
     afterwards, and September must be reduced once.
     """
-    from app.models.affiliates import AffiliateProfile
+    from app.modules.affiliates.models.affiliates import AffiliateProfile
 
     def work(index, session):
         affiliate = session.get(AffiliateProfile, committed)
@@ -257,7 +257,7 @@ def test_two_sessions_resolving_one_correction_recover_it_once(committed):
 
     session = SessionLocal()
     try:
-        from app.models.affiliates import AffiliateProfile as Profile
+        from app.modules.affiliates.models.affiliates import AffiliateProfile as Profile
 
         affiliate = session.get(Profile, committed)
         assert correction_for(session, affiliate, AUGUST).outstanding_piastres == 0
@@ -275,7 +275,7 @@ def test_a_retry_with_the_same_key_returns_the_first_recovery(committed):
     when it retries a request whose answer it never saw. One decision, one
     row, and both callers are told about the same one.
     """
-    from app.models.affiliates import AffiliateProfile
+    from app.modules.affiliates.models.affiliates import AffiliateProfile
 
     key = f"retry-{uuid.uuid4()}"
 
@@ -313,8 +313,8 @@ def test_a_key_reused_for_a_different_decision_is_refused(committed):
     reported for a request that asked for an absorb, or for a different month
     entirely.
     """
-    from app.models.affiliates import AffiliateProfile
-    from app.services.payments import OperationKeyReused
+    from app.modules.affiliates.models.affiliates import AffiliateProfile
+    from app.modules.affiliates.services.payments import OperationKeyReused
 
     key = f"reused-{uuid.uuid4()}"
     session = SessionLocal()
@@ -380,8 +380,8 @@ def test_a_colliding_key_leaves_the_session_able_to_answer(committed):
     the only way to reach the collision is for both sessions to get past a
     check that is designed to stop them.
     """
-    from app.models.affiliates import AffiliateProfile
-    from app.services import payments
+    from app.modules.affiliates.models.affiliates import AffiliateProfile
+    from app.modules.affiliates.services import payments
 
     key = f"collide-{uuid.uuid4()}"
     passed_the_check = threading.Barrier(2, timeout=30)
@@ -447,9 +447,9 @@ def test_a_colliding_key_for_a_different_decision_is_refused(committed):
     """
     from sqlalchemy import select as sa_select
 
-    from app.models.affiliates import AffiliateProfile
-    from app.services import payments
-    from app.services.payments import OperationKeyReused
+    from app.modules.affiliates.models.affiliates import AffiliateProfile
+    from app.modules.affiliates.services import payments
+    from app.modules.affiliates.services.payments import OperationKeyReused
 
     key = f"mismatch-{uuid.uuid4()}"
     passed_the_check = threading.Barrier(2, timeout=30)
@@ -523,7 +523,7 @@ def test_two_corrections_cannot_both_spend_one_destination(fresh_database):
     which is worth EGP 150. The two together are more than it has, and the
     ledger must not end up recording EGP 200 applied to a EGP 150 month.
     """
-    from app.models.affiliates import AffiliateProfile
+    from app.modules.affiliates.models.affiliates import AffiliateProfile
 
     session = SessionLocal()
     try:
@@ -614,9 +614,9 @@ def carried_into_october(fresh_database):
 
 def _october(affiliate_id):
     """What October ended up at: its snapshot's evidence and its ledger."""
-    from app.models.affiliates import AffiliateProfile
-    from app.services.payments import credited_into
-    from app.services.payroll import get_month
+    from app.modules.affiliates.models.affiliates import AffiliateProfile
+    from app.modules.affiliates.services.payments import credited_into
+    from app.modules.affiliates.services.payroll import get_month
 
     session = SessionLocal()
     try:
@@ -660,7 +660,7 @@ def test_a_carry_landing_during_an_approval_is_part_of_what_is_agreed(
     ledger in which EGP 2,000 did. Two records of one month, disagreeing, with
     the statement rendered from the one that is wrong.
     """
-    from app.models.affiliates import AffiliateProfile
+    from app.modules.affiliates.models.affiliates import AffiliateProfile
 
     carried = threading.Event()
     _hold_one_thread_at_the_gate(monkeypatch, thread_name="approver", until=carried)
@@ -707,7 +707,7 @@ def test_an_approval_and_a_carry_racing_leave_one_consistent_month(
     ledger, and every piastre of the correction is either applied or still
     open. Nothing may be applied twice and nothing may go missing.
     """
-    from app.models.affiliates import AffiliateProfile
+    from app.modules.affiliates.models.affiliates import AffiliateProfile
 
     def work(index, session):
         affiliate = session.get(AffiliateProfile, carried_into_october)
@@ -747,9 +747,9 @@ def test_two_carries_and_an_approval_cannot_overdraw_the_month(fresh_database):
     has. However the three interleave, September may absorb at most what it is
     worth, and what it cannot take stays open against the month it came from.
     """
-    from app.models.affiliates import AffiliateProfile
-    from app.services.payments import credited_into
-    from app.services.payroll import get_month
+    from app.modules.affiliates.models.affiliates import AffiliateProfile
+    from app.modules.affiliates.services.payments import credited_into
+    from app.modules.affiliates.services.payroll import get_month
 
     session = SessionLocal()
     try:
@@ -830,10 +830,10 @@ def test_a_release_and_a_decision_on_the_same_source_settle_it_once(fresh_databa
     decisions and both may stand; what must not happen is August ending up
     settled for more or less than the one EGP 2,000 it was ever short.
     """
-    from app.models.affiliates import AffiliateProfile
-    from app.services.corrections import _resolved_so_far
-    from app.services.payments import credited_into
-    from app.services.payroll import get_month
+    from app.modules.affiliates.models.affiliates import AffiliateProfile
+    from app.modules.affiliates.services.corrections import _resolved_so_far
+    from app.modules.affiliates.services.payments import credited_into
+    from app.modules.affiliates.services.payroll import get_month
 
     session = SessionLocal()
     try:

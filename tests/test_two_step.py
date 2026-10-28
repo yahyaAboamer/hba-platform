@@ -30,8 +30,8 @@ from app.core.passwords import hash_password
 from app.core.user_agent import device_label
 from app.db import engine
 from app.main import app
-from app.models.identity import RoleAssignment, UserAccount
-from app.services import two_step
+from app.shared.models.identity import RoleAssignment, UserAccount
+from app.shared.services import two_step
 
 PASSWORD = "quiet-harbour-lantern"
 OWNER = {"email": "owner@example.com", "display_name": "Owner", "password": PASSWORD}
@@ -484,7 +484,7 @@ def test_a_stranger_without_the_password_cannot_reach_the_code_limits(client):
 
 def test_a_password_reset_asks_for_the_code_when_two_step_is_on(client):
     """A reset link proves the mailbox, not the phone."""
-    from app.services.password_resets import request_reset
+    from app.shared.services.password_resets import request_reset
 
     secret, _ = _turn_on(client)
     from app.db import SessionLocal
@@ -838,7 +838,7 @@ def test_reactivating_gives_no_role_back(client):
 
 
 def test_the_last_admin_still_cannot_be_suspended(db):
-    from app.services.staff import suspend_staff
+    from app.shared.services.staff import suspend_staff
 
     owner = UserAccount(email="solo@example.com", password_hash="x", status="active")
     db.add(owner)
@@ -892,7 +892,7 @@ def test_no_secret_code_or_token_reaches_the_audit_trail(client):
 
 def _reset_password(client: TestClient, new_password: str) -> dict:
     from app.db import SessionLocal
-    from app.services.password_resets import request_reset
+    from app.shared.services.password_resets import request_reset
 
     with SessionLocal() as session:
         token, _account = request_reset(session, OWNER["email"])
@@ -1089,7 +1089,7 @@ def test_two_admins_suspending_each_other_cannot_both_go(fresh_database):
     from sqlalchemy.exc import OperationalError
     from sqlalchemy.orm import Session as OrmSession
 
-    from app.services.staff import suspend_staff
+    from app.shared.services.staff import suspend_staff
 
     a = _person("a@example.com", "admin", name="A")
     b = _person("b@example.com", "admin", name="B")

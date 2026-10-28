@@ -16,12 +16,12 @@ import pytest
 from sqlalchemy import text
 
 from app.core.passwords import hash_password
-from app.models.affiliates import AccountKind
-from app.models.identity import UserAccount
-from app.models.orders import OrderIndex
-from app.services.affiliates import create_affiliate
-from app.services.attribution import AttributionOutcome, resolve, resolve_order
-from app.services.codes import register_code
+from app.modules.affiliates.models.affiliates import AccountKind
+from app.shared.models.identity import UserAccount
+from app.shared.models.orders import OrderIndex
+from app.modules.affiliates.services.affiliates import create_affiliate
+from app.modules.affiliates.services.attribution import AttributionOutcome, resolve, resolve_order
+from app.modules.affiliates.services.codes import register_code
 
 
 def _affiliate(db, name="Nour", kind=AccountKind.MODEL):

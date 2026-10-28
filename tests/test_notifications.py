@@ -19,11 +19,11 @@ import pytest
 from sqlalchemy import select
 
 from app.core.passwords import hash_password
-from app.models.affiliates import AccountKind, AffiliateProfile, AffiliateStatus
-from app.models.identity import UserAccount
-from app.models.notifications import NotificationOutbox, NotificationState
-from app.services import mail
-from app.services.notifications import (
+from app.modules.affiliates.models.affiliates import AccountKind, AffiliateProfile, AffiliateStatus
+from app.shared.models.identity import UserAccount
+from app.shared.models.notifications import NotificationOutbox, NotificationState
+from app.shared.services import mail
+from app.shared.services.notifications import (
     Event,
     application_approved,
     month_in_words,
@@ -83,7 +83,7 @@ def test_the_sending_job_is_queued_in_the_same_transaction(db, affiliate):
     """A row saying an email is owed, and no work to deliver it, is a queue
     that never drains.
     """
-    from app.models.integration import BackgroundJob
+    from app.shared.models.integration import BackgroundJob
 
     row = queue(
         db,
@@ -133,7 +133,7 @@ def test_no_payout_detail_reaches_an_email(db, affiliate, monkeypatch):
     number ends up sitting in an inbox that gets forwarded.
     """
     from app.config import settings
-    from app.services.notifications import destination_changed
+    from app.shared.services.notifications import destination_changed
 
     monkeypatch.setattr(settings, "maintainer_email", "owner@example.com")
     destination_changed(
@@ -249,7 +249,7 @@ def test_a_sent_notification_is_never_sent_twice(db, affiliate, monkeypatch):
     """
     sends = []
     monkeypatch.setattr(
-        "app.services.notifications.send", lambda message: sends.append(message) or True
+        "app.shared.services.notifications.send", lambda message: sends.append(message) or True
     )
 
     row = queue(
@@ -275,7 +275,7 @@ def test_a_refused_address_is_not_retried(db, affiliate, monkeypatch):
     def refuse(message):
         raise mail.MailRefused("550 no such user")
 
-    monkeypatch.setattr("app.services.notifications.send", refuse)
+    monkeypatch.setattr("app.shared.services.notifications.send", refuse)
 
     row = queue(
         db,
@@ -299,12 +299,12 @@ def test_a_timeout_is_recorded_on_the_row_and_retried(db, affiliate, monkeypatch
     while the retry budget lived on the job, and an email nobody will receive
     would be invisible from the one table that tracks them.
     """
-    from app.models.integration import BackgroundJob
+    from app.shared.models.integration import BackgroundJob
 
     def timeout(message):
         raise TimeoutError("the mail server did not answer")
 
-    monkeypatch.setattr("app.services.notifications.send", timeout)
+    monkeypatch.setattr("app.shared.services.notifications.send", timeout)
 
     row = queue(
         db,
@@ -333,7 +333,7 @@ def test_it_gives_up_after_the_last_attempt(db, affiliate, monkeypatch):
     def timeout(message):
         raise TimeoutError("still nothing")
 
-    monkeypatch.setattr("app.services.notifications.send", timeout)
+    monkeypatch.setattr("app.shared.services.notifications.send", timeout)
 
     row = queue(
         db,
@@ -355,7 +355,7 @@ def test_a_missing_template_fails_the_job_rather_than_the_row(db, affiliate):
     """A code failure, not a delivery one. It belongs in the failed-jobs view
     where somebody looks for a broken deploy.
     """
-    from app.services.jobs import PermanentFailure
+    from app.shared.services.jobs import PermanentFailure
 
     row = queue(
         db,
@@ -422,14 +422,14 @@ def test_the_token_is_erased_from_the_outbox_once_sent(db, monkeypatch):
     hashing was protecting against.
     """
     from app.config import settings
-    from app.services.notifications import invitation_sent
+    from app.shared.services.notifications import invitation_sent
 
     # Without a base URL there is no link, and therefore no token in the body -
     # which is the correct behaviour and not what this test is about.
     monkeypatch.setattr(settings, "public_base_url", "https://pay.example.com")
     sent = []
     monkeypatch.setattr(
-        "app.services.notifications.send", lambda message: sent.append(message) or True
+        "app.shared.services.notifications.send", lambda message: sent.append(message) or True
     )
 
     invitation_sent(db, "someone@example.com", "a-real-looking-token", "affiliate")
@@ -451,7 +451,7 @@ def test_the_token_is_erased_even_when_the_email_never_goes(db):
     This is the state a development machine and the test suite are in
     permanently, so it is the path most likely to accumulate them.
     """
-    from app.services.notifications import invitation_sent
+    from app.shared.services.notifications import invitation_sent
 
     invitation_sent(db, "someone@example.com", "a-real-looking-token", "affiliate")
     db.flush()
@@ -467,9 +467,9 @@ def test_the_token_is_erased_when_the_address_is_refused(db, monkeypatch):
     def refuse(message):
         raise mail.MailRefused("550 no such user")
 
-    monkeypatch.setattr("app.services.notifications.send", refuse)
+    monkeypatch.setattr("app.shared.services.notifications.send", refuse)
 
-    from app.services.notifications import invitation_sent
+    from app.shared.services.notifications import invitation_sent
 
     invitation_sent(db, "wrong@example.com", "a-real-looking-token", "affiliate")
     db.flush()
@@ -486,9 +486,9 @@ def test_a_retry_keeps_the_token_because_it_still_needs_it(db, monkeypatch):
     def timeout(message):
         raise TimeoutError("no answer")
 
-    monkeypatch.setattr("app.services.notifications.send", timeout)
+    monkeypatch.setattr("app.shared.services.notifications.send", timeout)
 
-    from app.services.notifications import invitation_sent
+    from app.shared.services.notifications import invitation_sent
 
     invitation_sent(db, "someone@example.com", "a-real-looking-token", "affiliate")
     db.flush()
@@ -543,7 +543,7 @@ def test_the_branded_invitation_keeps_every_word_of_its_first_sentence(monkeypat
     plain-text sign-off by replacing every "\\n\\nHBA Aesthetics" in the body,
     and the invitation's first sentence began with exactly that. Only the
     sign-off at the very end may go."""
-    from app.services.mail_branding import wrap
+    from app.shared.services.mail_branding import wrap
 
     body = "Hi Sara,\n\nHBA Aesthetics has set up an account for you.\n\nHBA Aesthetics"
     rendered = wrap(body)
@@ -555,7 +555,7 @@ def test_the_branded_invitation_keeps_every_word_of_its_first_sentence(monkeypat
 
 def test_the_button_says_what_it_does(monkeypatch):
     from app.config import settings
-    from app.services.mail_branding import wrap
+    from app.shared.services.mail_branding import wrap
 
     monkeypatch.setattr(settings, "public_base_url", "https://example.test")
     rendered = wrap("Choose it here:\nhttps://example.test/x", "Choose my password")
@@ -610,7 +610,7 @@ def test_the_registered_handler_is_the_one_that_sends(fresh_database):
     wiring.
     """
     import app.main  # noqa: F401  - importing is what registers the handlers
-    from app.services.notifications import JOB_KIND, send_notification
+    from app.shared.services.notifications import JOB_KIND, send_notification
     from app.worker import HANDLERS
 
     assert HANDLERS[JOB_KIND] is send_notification
@@ -626,13 +626,13 @@ def test_a_queued_email_is_sent_by_the_worker(fresh_database, monkeypatch):
     """
     import app.main  # noqa: F401
     from app.db import SessionLocal
-    from app.models.notifications import NotificationOutbox, NotificationState
-    from app.services.notifications import Event, queue
+    from app.shared.models.notifications import NotificationOutbox, NotificationState
+    from app.shared.services.notifications import Event, queue
     from app.worker import run_one
 
     sent = []
     monkeypatch.setattr(
-        "app.services.notifications.send", lambda message: sent.append(message) or True
+        "app.shared.services.notifications.send", lambda message: sent.append(message) or True
     )
 
     with SessionLocal() as session:
@@ -660,14 +660,14 @@ def test_the_worker_does_not_leave_a_token_behind(fresh_database, monkeypatch):
     import app.main  # noqa: F401
     from app.config import settings
     from app.db import SessionLocal
-    from app.models.notifications import NotificationOutbox
-    from app.services.notifications import invitation_sent
+    from app.shared.models.notifications import NotificationOutbox
+    from app.shared.services.notifications import invitation_sent
     from app.worker import run_one
 
     monkeypatch.setattr(settings, "public_base_url", "https://pay.example.com")
     sent = []
     monkeypatch.setattr(
-        "app.services.notifications.send", lambda message: sent.append(message) or True
+        "app.shared.services.notifications.send", lambda message: sent.append(message) or True
     )
 
     with SessionLocal() as session:
@@ -696,7 +696,7 @@ def test_smtp_is_only_used_when_nothing_better_is_configured(monkeypatch):
     guaranteed and silent failure.
     """
     from app.config import settings
-    from app.services.mail import MailProvider, transport
+    from app.shared.services.mail import MailProvider, transport
 
     monkeypatch.setattr(settings, "resend_api_key", "", raising=False)
     monkeypatch.setattr(settings, "brevo_api_key", "", raising=False)
@@ -731,7 +731,7 @@ def test_a_provider_that_refuses_is_not_retried(monkeypatch):
     import httpx
 
     from app.config import settings
-    from app.services import mail
+    from app.shared.services import mail
 
     monkeypatch.setattr(settings, "brevo_api_key", "a-key", raising=False)
     monkeypatch.setattr(settings, "resend_api_key", "", raising=False)
@@ -759,7 +759,7 @@ def test_a_provider_that_is_unreachable_is_retried(monkeypatch):
     import httpx
 
     from app.config import settings
-    from app.services import mail
+    from app.shared.services import mail
 
     monkeypatch.setattr(settings, "brevo_api_key", "a-key", raising=False)
     monkeypatch.setattr(settings, "resend_api_key", "", raising=False)
@@ -787,7 +787,7 @@ def test_the_message_reaches_the_provider_intact(monkeypatch):
     import httpx
 
     from app.config import settings
-    from app.services import mail
+    from app.shared.services import mail
 
     monkeypatch.setattr(settings, "brevo_api_key", "a-key", raising=False)
     monkeypatch.setattr(settings, "resend_api_key", "", raising=False)
@@ -832,7 +832,7 @@ def test_the_message_reaches_the_provider_intact(monkeypatch):
 
 
 def test_the_html_carries_the_same_words_as_the_text(monkeypatch):
-    from app.services.mail_branding import wrap
+    from app.shared.services.mail_branding import wrap
 
     body = "Hi Nour,\n\nSeptember is closed and agreed at EGP 280.00."
     rendered = wrap(body)
@@ -845,7 +845,7 @@ def test_a_link_becomes_a_button_and_stays_copyable(monkeypatch):
     """A button cannot be forwarded to a laptop or read out over the phone,
     and a client that refuses to render it still needs the address."""
     from app.config import settings
-    from app.services.mail_branding import wrap
+    from app.shared.services.mail_branding import wrap
 
     monkeypatch.setattr(settings, "public_base_url", "https://example.test")
     rendered = wrap("Open this:\nhttps://example.test/accept-invitation?token=x")
@@ -857,7 +857,7 @@ def test_a_link_becomes_a_button_and_stays_copyable(monkeypatch):
 
 def test_the_words_are_escaped(monkeypatch):
     """A model's name is data. `Nour <script>` must arrive as text."""
-    from app.services.mail_branding import wrap
+    from app.shared.services.mail_branding import wrap
 
     rendered = wrap("Hi Nour <script>alert(1)</script>,\n\nSomething happened.")
 
@@ -869,7 +869,7 @@ def test_an_email_survives_the_platform_not_knowing_its_address(monkeypatch):
     """Same condition that leaves invitation links empty. An email with no
     logo is fine; one with a broken image is not."""
     from app.config import settings
-    from app.services.mail_branding import wrap
+    from app.shared.services.mail_branding import wrap
 
     monkeypatch.setattr(settings, "public_base_url", "")
     rendered = wrap("Hi Nour,\n\nSomething happened.")
@@ -882,7 +882,7 @@ def test_an_email_survives_the_platform_not_knowing_its_address(monkeypatch):
 def test_the_signature_is_not_printed_twice(monkeypatch):
     """The templates end with a plain-text sign-off written for text. The HTML
     has a signature block of its own."""
-    from app.services.mail_branding import wrap
+    from app.shared.services.mail_branding import wrap
 
     rendered = wrap("Hi Nour,\n\nSomething happened.\n\nHBA Aesthetics")
 
@@ -905,9 +905,9 @@ class _Transaction:
 
 
 def test_turning_off_one_message_leaves_the_other_alone(db, affiliate):
-    from app.models.notifications import NotificationKind
-    from app.services.notification_prefs import set_preference
-    from app.services.notifications import payment_recorded
+    from app.shared.models.notifications import NotificationKind
+    from app.shared.services.notification_prefs import set_preference
+    from app.shared.services.notifications import payment_recorded
 
     set_preference(
         db, affiliate, kind=NotificationKind.PAYMENT_SENT, enabled=False
@@ -935,7 +935,7 @@ def test_a_model_who_never_opened_the_screen_still_hears(db, affiliate):
     anybody the seeding misses, and nobody finds out until a month closes in
     silence.
     """
-    from app.services.notifications import payment_recorded
+    from app.shared.services.notifications import payment_recorded
 
     payment_recorded(db, affiliate, _Transaction())
     db.flush()
@@ -950,7 +950,7 @@ def test_security_mail_is_not_something_a_model_can_mute(db, affiliate):
     your money goes are not news, they are security. There is no switch for
     them, and `GATED_BY` is the list that says so.
     """
-    from app.services.notification_prefs import GATED_BY
+    from app.shared.services.notification_prefs import GATED_BY
 
     assert set(GATED_BY) == {Event.MONTH_APPROVED, Event.PAYMENT_RECORDED}
 

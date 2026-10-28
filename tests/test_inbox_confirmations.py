@@ -12,10 +12,10 @@ import pytest
 from sqlalchemy import select, text
 
 from app.core.businesstime import utcnow
-from app.models.inbox import OrderConfirmation
-from app.models.orders import OrderIndex
-from app.services.inbox import confirmations
-from app.services.inbox.confirmations import (
+from app.modules.inbox.models import OrderConfirmation
+from app.shared.models.orders import OrderIndex
+from app.modules.inbox.services import confirmations
+from app.modules.inbox.services.confirmations import (
     BAD_PHONE,
     CANCELLED,
     NO_PHONE,
@@ -27,8 +27,8 @@ from app.services.inbox.confirmations import (
     queue_if_new,
     unconfirmed_recent,
 )
-from app.services.jobs import INBOX_WORK, JobKind, PermanentFailure
-from app.services.shopify.client import ShopifyClient, ShopifyNotConfigured
+from app.shared.services.jobs import INBOX_WORK, JobKind, PermanentFailure
+from app.shared.services.shopify.client import ShopifyClient, ShopifyNotConfigured
 
 COD = ["Cash on Delivery (COD)"]
 CARD = ["Paymob - Native Checkout for Debit/Credit Cards"]
@@ -273,7 +273,7 @@ def test_an_old_order_being_resynced_queues_nothing(db):
 
 def test_syncing_an_order_queues_its_confirmation(db, monkeypatch):
     """The live path: a webhook's order is indexed, then considered."""
-    from app.services.shopify import sync
+    from app.shared.services.shopify import sync
 
     order = _indexed(db)
     monkeypatch.setattr(sync, "sync_one_order", lambda db_, order_id: order)
@@ -298,7 +298,7 @@ def test_the_sweep_finds_recent_orders_with_nothing_on_record(db):
 
 
 def test_the_reconciliation_sweep_queues_the_confirmation_sweep(db):
-    from app.services.reconcile import _queue_confirmations
+    from app.shared.services.reconcile import _queue_confirmations
 
     _queue_confirmations(db)
     _queue_confirmations(db)
@@ -337,7 +337,7 @@ def test_switched_off_an_indexed_order_queues_nothing(db, switched_off):
 
 
 def test_switched_off_the_sweeps_queue_nothing(db, switched_off):
-    from app.services.reconcile import _queue_confirmations
+    from app.shared.services.reconcile import _queue_confirmations
 
     _indexed(db)
     _queue_confirmations(db)
@@ -380,8 +380,8 @@ def may_message_customers(db, monkeypatch):
     """WhatsApp connected, sending on, and the server told it may."""
     from cryptography.fernet import Fernet
 
-    from app.services.inbox import connection
-    from app.services.inbox.meta import NumberInfo
+    from app.modules.inbox.services import connection
+    from app.modules.inbox.services.meta import NumberInfo
 
     monkeypatch.setattr(
         "app.config.settings.settings_encryption_key", Fernet.generate_key().decode()
@@ -418,11 +418,11 @@ def test_an_order_recorded_as_would_send_is_never_sent_later(db, monkeypatch):
     confirm_order(db, "5001", client=_shopify(_order()))
     assert db.query(OrderConfirmation).one().state == "would_send"
 
-    from app.services.inbox.outbound import send_confirmation
+    from app.modules.inbox.services.outbound import send_confirmation
 
     def never(*args, **kwargs):
         raise AssertionError("an order that was only recorded must not be sent")
 
-    monkeypatch.setattr("app.services.inbox.outbound._client", never)
+    monkeypatch.setattr("app.modules.inbox.services.outbound._client", never)
     send_confirmation(db, "5001", claim=never)
     assert db.query(OrderConfirmation).one().state == "would_send"

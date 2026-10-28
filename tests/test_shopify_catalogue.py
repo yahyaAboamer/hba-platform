@@ -12,8 +12,8 @@ fake below is one; the real one is covered by `test_shopify_client.py`.
 import pytest
 from sqlalchemy import select, text
 
-from app.models.catalogue import OrderLineItem, Product, ProductStatus, ProductVariant
-from app.services.shopify.catalogue import (
+from app.shared.models.catalogue import OrderLineItem, Product, ProductStatus, ProductVariant
+from app.shared.services.shopify.catalogue import (
     normalise_line_item,
     normalise_product,
     normalise_variants,
@@ -115,7 +115,7 @@ class FakeClient:
     def require_scope(self, scope):
         self.scopes_required.append(scope)
         if self.missing_scope:
-            from app.services.shopify.client import ShopifyMissingScope
+            from app.shared.services.shopify.client import ShopifyMissingScope
 
             raise ShopifyMissingScope(f"missing {scope}")
 
@@ -427,7 +427,7 @@ def test_a_malformed_product_is_counted_rather_than_swallowed(db):
 def test_the_walk_refuses_early_without_the_scope(db):
     """Without this the first page returns an access error and the walk reports
     "0 products", which is indistinguishable from an empty shop."""
-    from app.services.shopify.client import ShopifyMissingScope
+    from app.shared.services.shopify.client import ShopifyMissingScope
 
     client = FakeClient(missing_scope=True)
 
@@ -460,7 +460,7 @@ def test_an_exchange_line_is_marked_after_delivery(db):
     """ADR 0051, #29499's shape: the jersey was delivered, a return was opened,
     and E-stebdal added the replacement as a new line shipped days later. The
     order is frozen with the jersey; the replacement is marked, not deleted."""
-    from app.models.catalogue import OrderLineItem
+    from app.shared.models.catalogue import OrderLineItem
 
     order_id = _order_row(db)
 
@@ -605,7 +605,7 @@ def test_a_cancelled_fulfilment_ships_nothing(db):
 
 
 def test_an_order_without_a_return_has_no_exchange_lines(db):
-    from app.models.catalogue import OrderLineItem
+    from app.shared.models.catalogue import OrderLineItem
 
     order_id = _order_row(db)
     client = FakeClient(

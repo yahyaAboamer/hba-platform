@@ -9,11 +9,11 @@ import pytest
 from sqlalchemy import select
 
 from app.core.businesstime import utcnow
-from app.models.inbox import InboxConversation, InboxMedia, InboxMessage, OrderConfirmation
-from app.models.integration import BackgroundJob
-from app.services.jobs import JobKind
-from app.services.inbox import chats, importer
-from app.services.inbox.importer import OldMessage, OldOrder, OldSend
+from app.modules.inbox.models import InboxConversation, InboxMedia, InboxMessage, OrderConfirmation
+from app.shared.models.integration import BackgroundJob
+from app.shared.services.jobs import JobKind
+from app.modules.inbox.services import chats, importer
+from app.modules.inbox.services.importer import OldMessage, OldOrder, OldSend
 
 NOW = utcnow()
 NOUR = "201005550188"

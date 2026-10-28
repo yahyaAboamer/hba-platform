@@ -15,17 +15,17 @@ from datetime import datetime, timezone
 import pytest
 
 from app.core.passwords import hash_password
-from app.models.affiliates import AccountKind
-from app.models.attributed_orders import AttributedOrder, CommissionState
-from app.models.compensation import CompensationType
-from app.models.identity import UserAccount
-from app.models.orders import OrderIndex
-from app.services.affiliates import create_affiliate
-from app.services.codes import register_code
-from app.services.compensation import set_terms
-from app.services.overview import month_summary
-from app.services.shopify.fulfilment import DELIVERED
-from app.services.targets import record_actuals, set_requirements, verify
+from app.modules.affiliates.models.affiliates import AccountKind
+from app.modules.affiliates.models.attributed_orders import AttributedOrder, CommissionState
+from app.modules.affiliates.models.compensation import CompensationType
+from app.shared.models.identity import UserAccount
+from app.shared.models.orders import OrderIndex
+from app.modules.affiliates.services.affiliates import create_affiliate
+from app.modules.affiliates.services.codes import register_code
+from app.modules.affiliates.services.compensation import set_terms
+from app.modules.affiliates.services.overview import month_summary
+from app.shared.services.shopify.fulfilment import DELIVERED
+from app.modules.affiliates.services.targets import record_actuals, set_requirements, verify
 
 AUGUST = "2026-08"
 
@@ -40,7 +40,7 @@ def _go_live(monkeypatch):
 @pytest.fixture(autouse=True)
 def _working_month(monkeypatch):
     monkeypatch.setattr(
-        "app.services.portal.working_month", lambda: AUGUST, raising=True
+        "app.modules.affiliates.services.portal.working_month", lambda: AUGUST, raising=True
     )
 
 
@@ -293,7 +293,7 @@ def test_content_needing_review_is_counted_by_why(db):
 
 def _line(db, order_id, *, product_id, title, quantity, paid, listed=None):
     """A line on an order, with what was actually paid for it."""
-    from app.models.catalogue import OrderLineItem
+    from app.shared.models.catalogue import OrderLineItem
 
     db.add(
         OrderLineItem(
@@ -314,7 +314,7 @@ def test_products_are_ranked_by_what_was_actually_paid(db):
     credit the shop with money it never took - on a ten per cent code that is a
     ten per cent lie on every row.
     """
-    from app.services.performance import top_products
+    from app.modules.affiliates.services.performance import top_products
 
     affiliate = _model(db, "Nour")
     _order(db, affiliate, "1", 1_000_000)
@@ -331,7 +331,7 @@ def test_products_are_ranked_by_what_was_actually_paid(db):
 
 
 def test_quantities_are_counted(db):
-    from app.services.performance import top_products
+    from app.modules.affiliates.services.performance import top_products
 
     affiliate = _model(db, "Nour")
     _order(db, affiliate, "1", 1_000_000)
@@ -347,7 +347,7 @@ def test_a_renamed_product_is_still_one_product(db):
     """Grouped by the stable id, never by the name. A product renamed between
     two orders is the same product, and two products can share a name.
     """
-    from app.services.performance import top_products
+    from app.modules.affiliates.services.performance import top_products
 
     affiliate = _model(db, "Nour")
     _order(db, affiliate, "1", 1_000_000)
@@ -372,7 +372,7 @@ def test_only_counted_orders_sell_anything(db):
     product list that still left it out would disagree with the money on the
     screen beside it.
     """
-    from app.services.performance import top_products
+    from app.modules.affiliates.services.performance import top_products
 
     affiliate = _model(db, "Nour")
     _order(db, affiliate, "1", 1_000_000)
@@ -415,7 +415,7 @@ def test_a_product_deleted_from_shopify_is_reported_not_dropped(db):
     """It has no id to group by, and dropping it would make this screen's
     total disagree with the sales figures beside it.
     """
-    from app.services.performance import top_products
+    from app.modules.affiliates.services.performance import top_products
 
     affiliate = _model(db, "Nour")
     _order(db, affiliate, "1", 1_000_000)
@@ -435,7 +435,7 @@ def test_selling_a_product_does_not_require_owning_it(db):
     keep: selling through a code, owning something from the wardrobe and being
     asked to feature it are three different things. She never received this.
     """
-    from app.services.performance import top_products
+    from app.modules.affiliates.services.performance import top_products
 
     affiliate = _model(db, "Nour")
     _order(db, affiliate, "1", 1_000_000)
@@ -596,7 +596,7 @@ def test_the_year_runs_january_to_the_month_being_looked_at(db):
     and a chart that starts in the middle of last year answers a question
     nobody asked while hiding the one people do — how this year is going.
     """
-    from app.services.overview import sales_by_month
+    from app.modules.affiliates.services.overview import sales_by_month
 
     model = _model(db, "Nour", compensation_type=CompensationType.COMMISSION,
                    commission_rate_bp=1000)
@@ -612,7 +612,7 @@ def test_the_year_runs_january_to_the_month_being_looked_at(db):
 
 def test_a_month_with_no_orders_is_a_zero_rather_than_a_gap(db):
     """A chart that drops an empty month draws it as though it never was."""
-    from app.services.overview import sales_by_month
+    from app.modules.affiliates.services.overview import sales_by_month
 
     model = _model(db, "Nour", compensation_type=CompensationType.COMMISSION,
                    commission_rate_bp=1000)
@@ -626,7 +626,7 @@ def test_a_month_with_no_orders_is_a_zero_rather_than_a_gap(db):
 
 def test_the_year_counts_generated_sales_and_not_a_house_code(db):
     """*Sales generated by models.* A house code has sales and no model."""
-    from app.services.overview import sales_by_month
+    from app.modules.affiliates.services.overview import sales_by_month
 
     model = _model(db, "Nour", compensation_type=CompensationType.COMMISSION,
                    commission_rate_bp=1000)
@@ -646,7 +646,7 @@ def test_the_year_matches_the_figure_on_the_sales_card(db):
     generated in this month* — and a reader who saw them disagree would be
     right to stop trusting both.
     """
-    from app.services.overview import sales_by_month
+    from app.modules.affiliates.services.overview import sales_by_month
 
     model = _model(db, "Nour", compensation_type=CompensationType.COMMISSION,
                    commission_rate_bp=1000)

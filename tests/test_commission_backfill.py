@@ -16,20 +16,20 @@ from datetime import datetime, timezone
 import pytest
 
 from app.core.passwords import hash_password
-from app.models.affiliates import AccountKind
-from app.models.attributed_orders import AttributedOrder
-from app.models.identity import UserAccount
-from app.models.integration import BackgroundJob
-from app.models.orders import OrderIndex
-from app.services.affiliates import create_affiliate
-from app.services.codes import register_code
-from app.services.commission.backfill import (
+from app.modules.affiliates.models.affiliates import AccountKind
+from app.modules.affiliates.models.attributed_orders import AttributedOrder
+from app.shared.models.identity import UserAccount
+from app.shared.models.integration import BackgroundJob
+from app.shared.models.orders import OrderIndex
+from app.modules.affiliates.services.affiliates import create_affiliate
+from app.modules.affiliates.services.codes import register_code
+from app.modules.affiliates.services.commission.backfill import (
     MAX_ORDERS_PER_RUN,
     backfill_code,
     orders_awaiting_attachment,
 )
-from app.services.jobs import JobKind
-from app.services.shopify.fulfilment import DELIVERED
+from app.shared.services.jobs import JobKind
+from app.shared.services.shopify.fulfilment import DELIVERED
 
 PAID = 115_700
 SHIPPING = 9_500
@@ -267,7 +267,7 @@ def test_asking_twice_queues_one_backfill(db):
     should do the work once. Deduplicated on code and period, so a genuinely
     different period still gets its own.
     """
-    from app.services.commission.backfill import queue_backfill
+    from app.modules.affiliates.services.commission.backfill import queue_backfill
 
     affiliate = _affiliate(db, code="NOUR10")
     db.query(BackgroundJob).delete()
@@ -287,7 +287,7 @@ def test_correcting_a_mistyped_code_backfills_the_real_one(db):
     """The corrected code is a different code with its own history. A typo
     fixed on Monday must not leave the real code's orders orphaned.
     """
-    from app.services.codes import replace_code
+    from app.modules.affiliates.services.codes import replace_code
 
     affiliate = _affiliate(db)
     period = register_code(db, affiliate, "NOUR1O", "2026-01")
@@ -305,7 +305,7 @@ def test_correcting_a_mistyped_code_backfills_the_real_one(db):
 
 
 def test_the_handler_does_the_work(db):
-    from app.services.commission.backfill import _handle_backfill
+    from app.modules.affiliates.services.commission.backfill import _handle_backfill
 
     _affiliate(db, code="NOUR10")
     _order(db, "3020")
@@ -319,8 +319,8 @@ def test_a_handler_missing_its_payload_fails_permanently(db):
     """Retrying will not supply a code. Four more identical failures over eight
     minutes buy nothing and bury the line that explains the problem.
     """
-    from app.services.commission.backfill import _handle_backfill
-    from app.services.jobs import PermanentFailure
+    from app.modules.affiliates.services.commission.backfill import _handle_backfill
+    from app.shared.services.jobs import PermanentFailure
 
     with pytest.raises(PermanentFailure):
         _handle_backfill(db, {"start_month": "2026-01"})
@@ -333,7 +333,7 @@ def test_a_long_backfill_queues_its_own_continuation(db):
     """Queued inside the transaction that recorded this batch, so a crash
     re-runs the batch rather than losing the rest.
     """
-    from app.services.commission.backfill import MAX_ORDERS_PER_RUN, _handle_backfill
+    from app.modules.affiliates.services.commission.backfill import MAX_ORDERS_PER_RUN, _handle_backfill
 
     _affiliate(db, code="NOUR10")
     for index in range(3):
@@ -341,7 +341,7 @@ def test_a_long_backfill_queues_its_own_continuation(db):
     db.query(BackgroundJob).delete()
     db.flush()
 
-    import app.services.commission.backfill as backfill_module
+    import app.modules.affiliates.services.commission.backfill as backfill_module
 
     original = backfill_module.MAX_ORDERS_PER_RUN
     backfill_module.MAX_ORDERS_PER_RUN = 2
@@ -367,7 +367,7 @@ def test_a_long_backfill_queues_its_own_continuation(db):
 
 @pytest.fixture()
 def small_batches():
-    import app.services.commission.backfill as backfill_module
+    import app.modules.affiliates.services.commission.backfill as backfill_module
 
     original = backfill_module.MAX_ORDERS_PER_RUN
     backfill_module.MAX_ORDERS_PER_RUN = 2
@@ -433,7 +433,7 @@ def test_an_order_held_for_a_person_does_not_stop_the_rest(fresh_database, small
 
 
 def test_the_hourly_sweep_finds_a_code_with_orders_belonging_to_nobody(db):
-    from app.services.commission.backfill import codes_with_orphans
+    from app.modules.affiliates.services.commission.backfill import codes_with_orphans
 
     nour = _affiliate(db, code="NOUR10")
     _affiliate(db, name="Sara", code="SARA10")
@@ -459,7 +459,7 @@ def test_the_sweep_repairs_a_code_whose_backfill_stopped(fresh_database):
     backfill long since finished. The sweep queues it again and it completes.
     """
     from app.db import SessionLocal
-    from app.services.jobs import enqueue
+    from app.shared.services.jobs import enqueue
 
     with SessionLocal() as db:
         affiliate = _affiliate(db, code="NOUR10")
@@ -478,6 +478,6 @@ def test_the_sweep_repairs_a_code_whose_backfill_stopped(fresh_database):
 
 
 def test_the_sweep_is_on_the_schedule():
-    from app.services.schedule import SCHEDULE
+    from app.shared.services.schedule import SCHEDULE
 
     assert JobKind.ATTACH_ORPHANS in SCHEDULE

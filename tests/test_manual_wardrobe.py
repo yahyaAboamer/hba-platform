@@ -10,11 +10,11 @@ from fastapi.testclient import TestClient
 from sqlalchemy import func, select, text
 
 from app.core.passwords import hash_password
-from app.models.audit import AuditEvent
-from app.models.identity import UserAccount
-from app.models.shipments import ManualWardrobeItem, ModelShipment
-from app.services.affiliates import create_affiliate, create_house_account
-from app.services.wardrobe import (
+from app.shared.models.audit import AuditEvent
+from app.shared.models.identity import UserAccount
+from app.modules.affiliates.models.shipments import ManualWardrobeItem, ModelShipment
+from app.modules.affiliates.services.affiliates import create_affiliate, create_house_account
+from app.modules.affiliates.services.wardrobe import (
     AssignmentRefused,
     assign_by_hand,
     coverage_for,

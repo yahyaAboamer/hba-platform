@@ -9,9 +9,9 @@ from sqlalchemy import text
 from sqlalchemy.exc import DatabaseError, IntegrityError
 
 from app.core.passwords import hash_password
-from app.models.affiliates import AccountKind, AffiliateProfile, AffiliateStatus
-from app.models.identity import UserAccount
-from app.services.affiliates import (
+from app.modules.affiliates.models.affiliates import AccountKind, AffiliateProfile, AffiliateStatus
+from app.shared.models.identity import UserAccount
+from app.modules.affiliates.services.affiliates import (
     archive_affiliate,
     create_affiliate,
     create_house_account,
@@ -19,7 +19,7 @@ from app.services.affiliates import (
     list_affiliates,
     set_status,
 )
-from app.services.codes import owner_of, register_code
+from app.modules.affiliates.services.codes import owner_of, register_code
 
 
 def _account(db, email="nour@example.com") -> UserAccount:
@@ -237,8 +237,8 @@ def _verified_code(db, affiliate, code="NOUR10"):
 
 def _terms(db, affiliate):
     """Pay terms from January, open-ended - approval needs them (ADR 0052)."""
-    from app.models.compensation import CompensationType
-    from app.services.compensation import set_terms
+    from app.modules.affiliates.models.compensation import CompensationType
+    from app.modules.affiliates.services.compensation import set_terms
 
     set_terms(
         db,
@@ -505,9 +505,9 @@ def test_readiness_reports_a_confirmed_code_and_terms_separately(db):
     """
     from datetime import datetime, timezone
 
-    from app.models.compensation import CompensationType
-    from app.services.affiliates import readiness
-    from app.services.compensation import set_terms
+    from app.modules.affiliates.models.compensation import CompensationType
+    from app.modules.affiliates.services.affiliates import readiness
+    from app.modules.affiliates.services.compensation import set_terms
 
     ready = create_affiliate(db, user_account_id=_account(db).id, name="Ready")
     register_code(
@@ -551,8 +551,8 @@ def test_readiness_is_asked_of_one_month_at_a_time(db):
     """A code that ended in February does not make March ready."""
     from datetime import datetime, timezone
 
-    from app.services.affiliates import readiness
-    from app.services.codes import register_code
+    from app.modules.affiliates.services.affiliates import readiness
+    from app.modules.affiliates.services.codes import register_code
 
     nour = create_affiliate(db, user_account_id=_account(db).id, name="Nour")
     register_code(

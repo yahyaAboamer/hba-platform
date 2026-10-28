@@ -10,7 +10,7 @@ from sqlalchemy import text
 from app.core.businesstime import utcnow
 from app.db import SessionLocal, engine
 from app.main import app
-from app.models.inbox import InboxConversation, InboxMessage, OrderConfirmation
+from app.modules.inbox.models import InboxConversation, InboxMessage, OrderConfirmation
 
 BOOTSTRAP = {
     "email": "owner@example.com",

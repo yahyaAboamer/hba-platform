@@ -12,11 +12,11 @@ cases" test passes when three of the four checks are deleted.
 import pytest
 from sqlalchemy import text
 
-from app.api.deps import current_affiliate
+from app.shared.api.deps import current_affiliate
 from app.core.passwords import hash_password
-from app.models.affiliates import AffiliateStatus
-from app.models.identity import UserAccount
-from app.services.affiliates import create_affiliate
+from app.modules.affiliates.models.affiliates import AffiliateStatus
+from app.shared.models.identity import UserAccount
+from app.modules.affiliates.services.affiliates import create_affiliate
 from fastapi import HTTPException
 
 

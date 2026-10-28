@@ -17,18 +17,18 @@ from sqlalchemy import select, text
 
 from app.core.passwords import hash_password
 from app.db import engine
-from app.services.payroll import SOURCE_MOVED
+from app.modules.affiliates.services.payroll import SOURCE_MOVED
 from app.main import app
-from app.models.affiliates import AccountKind
-from app.models.attributed_orders import AttributedOrder, CommissionState
-from app.models.compensation import CompensationType
-from app.models.identity import UserAccount
-from app.models.orders import OrderIndex
-from app.models.payroll import CalculationState
-from app.services.affiliates import create_affiliate
-from app.services.audit import AuditEvent
-from app.services.compensation import set_terms
-from app.services.payroll import (
+from app.modules.affiliates.models.affiliates import AccountKind
+from app.modules.affiliates.models.attributed_orders import AttributedOrder, CommissionState
+from app.modules.affiliates.models.compensation import CompensationType
+from app.shared.models.identity import UserAccount
+from app.shared.models.orders import OrderIndex
+from app.modules.affiliates.models.payroll import CalculationState
+from app.modules.affiliates.services.affiliates import create_affiliate
+from app.shared.services.audit import AuditEvent
+from app.modules.affiliates.services.compensation import set_terms
+from app.modules.affiliates.services.payroll import (
     NO_GO_LIVE_MONTH,
     approve_month,
     blockers_for,
@@ -457,8 +457,8 @@ def test_a_month_before_go_live_can_never_be_paid(db, monkeypatch):
     a real figure, and nothing about it is ever *owed*.
     """
     from app.config import settings
-    from app.services.payments import balance_for
-    from app.services.payments_state import SettlementState
+    from app.modules.affiliates.services.payments import balance_for
+    from app.modules.affiliates.services.payments_state import SettlementState
 
     monkeypatch.setattr(settings, "go_live_month", "2026-09", raising=False)
     affiliate = _affiliate(db)
@@ -478,7 +478,7 @@ def test_approving_a_month_before_go_live_announces_nothing(db, monkeypatch):
     before the platform existed. Every one would read as money on its way.
     """
     from app.config import settings
-    from app.models.notifications import NotificationOutbox
+    from app.shared.models.notifications import NotificationOutbox
 
     monkeypatch.setattr(settings, "go_live_month", "2026-09", raising=False)
     affiliate = _affiliate(db)
@@ -495,7 +495,7 @@ def test_approving_a_live_month_still_announces_it(db, monkeypatch):
     unnoticed into silence on the months that matter.
     """
     from app.config import settings
-    from app.models.notifications import NotificationOutbox
+    from app.shared.models.notifications import NotificationOutbox
 
     monkeypatch.setattr(settings, "go_live_month", "2026-08", raising=False)
     affiliate = _affiliate(db)
@@ -730,8 +730,8 @@ def test_a_month_left_reopened_is_visible_over_http(client):
     through the service, because the route that used to do it is retired.
     """
     from app.db import SessionLocal
-    from app.models.affiliates import AffiliateProfile
-    from app.services.payroll import reopen_month
+    from app.modules.affiliates.models.affiliates import AffiliateProfile
+    from app.modules.affiliates.services.payroll import reopen_month
 
     affiliate = _api_affiliate(client)
     _api_order(affiliate["id"], "1", 200_000)
@@ -786,7 +786,7 @@ def test_a_carried_order_is_paid_by_the_month_that_carries_it(db):
     """§11.4's whole point. Until this, carry-forward found the orders,
     labelled them on the next month's row, and paid none of them.
     """
-    from app.services.commission.calculate import calculate_month
+    from app.modules.affiliates.services.commission.calculate import calculate_month
 
     affiliate = _affiliate(db)
     _order(db, affiliate, "paid", 200_000)
@@ -808,8 +808,8 @@ def test_a_carried_order_is_paid_at_its_own_months_rate(db):
     """§9.5. A rate change in September must not rewrite what August was worth,
     and that holds just as firmly when September is the month doing the paying.
     """
-    from app.services.commission.calculate import calculate_month
-    from app.services.compensation import close_terms, terms_for
+    from app.modules.affiliates.services.commission.calculate import calculate_month
+    from app.modules.affiliates.services.compensation import close_terms, terms_for
 
     affiliate = _affiliate(db)
     close_terms(db, terms_for(db, affiliate, AUGUST), end_month=AUGUST)
@@ -840,7 +840,7 @@ def test_a_carried_order_is_not_paid_twice(db):
     that an order has been paid, so without this it would be offered to every
     later month for ever.
     """
-    from app.services.commission.calculate import calculate_month
+    from app.modules.affiliates.services.commission.calculate import calculate_month
 
     affiliate = _affiliate(db)
     _order(db, affiliate, "paid", 200_000)
@@ -866,9 +866,9 @@ def test_carried_money_sits_on_top_of_a_guarantee_not_inside_it(db):
     Comparing it against the floor would let a late August order be swallowed
     by a September guarantee they were going to receive anyway.
     """
-    from app.services.commission.calculate import calculate_month
-    from app.services.compensation import close_terms, terms_for
-    from app.services.targets import record_actuals, set_requirements, verify
+    from app.modules.affiliates.services.commission.calculate import calculate_month
+    from app.modules.affiliates.services.compensation import close_terms, terms_for
+    from app.modules.affiliates.services.targets import record_actuals, set_requirements, verify
 
     affiliate = _affiliate(db)
     close_terms(db, terms_for(db, affiliate, AUGUST), end_month="2026-07")
@@ -913,7 +913,7 @@ def test_a_carried_month_with_no_terms_blocks_rather_than_guesses(db):
     Three lines to turn a quiet wrong number into a refusal is the trade ADR
     0019 asks for, not defence in depth over a closed hole.
     """
-    from app.services.commission.calculate import (
+    from app.modules.affiliates.services.commission.calculate import (
         NO_TERMS_FOR_CARRIED,
         calculate_month,
     )
@@ -945,7 +945,7 @@ def test_reopening_a_month_reclaims_an_order_the_next_month_has_not_paid(db):
     Reopening August un-approves it, and an order only counts as *carried*
     while its own month is closed. It returns to August on its own.
     """
-    from app.services.commission.calculate import calculate_month
+    from app.modules.affiliates.services.commission.calculate import calculate_month
 
     affiliate = _affiliate(db)
     _order(db, affiliate, "paid", 200_000)
@@ -971,7 +971,7 @@ def test_reopening_a_month_leaves_an_order_the_next_month_has_paid(db):
     Without that, re-approving August would agree commission September had
     already paid, and the model would be paid for the same order twice.
     """
-    from app.services.commission.calculate import calculate_month
+    from app.modules.affiliates.services.commission.calculate import calculate_month
 
     affiliate = _affiliate(db)
     _order(db, affiliate, "paid", 200_000)
@@ -1001,7 +1001,7 @@ def test_an_approved_month_still_reports_its_own_settled_orders(db):
     order. Excluding all of them would make a month's figure collapse to zero
     the moment it was approved.
     """
-    from app.services.commission.calculate import calculate_month
+    from app.modules.affiliates.services.commission.calculate import calculate_month
 
     affiliate = _affiliate(db)
     _order(db, affiliate, "paid", 200_000)

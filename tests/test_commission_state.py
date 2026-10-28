@@ -15,14 +15,14 @@ from datetime import datetime, timezone
 
 import pytest
 
-from app.models.attributed_orders import CommissionState
-from app.services.commission.state import (
+from app.modules.affiliates.models.attributed_orders import CommissionState
+from app.modules.affiliates.services.commission.state import (
     commission_state,
     counts_toward_payout,
     is_final,
     order_status,
 )
-from app.services.shopify.fulfilment import DELIVERED, FAILED, IN_FLIGHT
+from app.shared.services.shopify.fulfilment import DELIVERED, FAILED, IN_FLIGHT
 
 NOW = datetime(2026, 8, 25, 12, 0, tzinfo=timezone.utc)
 

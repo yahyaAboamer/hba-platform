@@ -28,7 +28,7 @@ from app.core import throttle
 from app.core.passwords import hash_password
 from app.db import SessionLocal, engine
 from app.main import app
-from app.services import two_step
+from app.shared.services import two_step
 
 PASSWORD = "quiet-harbour-lantern"
 OWNER = {"email": "owner@example.com", "display_name": "Owner", "password": PASSWORD}
@@ -380,8 +380,8 @@ def test_emailed_codes_count_toward_the_days_cap(boda):
 
 
 def test_the_outbox_forgets_the_code_once_the_email_has_gone(boda):
-    from app.models.notifications import NotificationOutbox
-    from app.services.notifications import send_notification
+    from app.shared.models.notifications import NotificationOutbox
+    from app.shared.services.notifications import send_notification
 
     _login(boda, "boda@example.com")
     code = _last_emailed_code()
@@ -404,7 +404,7 @@ def test_the_outbox_forgets_the_code_once_the_email_has_gone(boda):
 
 
 def test_the_email_says_the_code_and_how_long_it_lasts():
-    from app.services.notifications import Event, render
+    from app.shared.services.notifications import Event, render
 
     message = render(
         Event.SIGN_IN_CODE,
@@ -514,7 +514,7 @@ def test_sign_out_everywhere_else_forgets_every_other_browser(boda):
 
 
 def test_a_password_reset_signs_an_email_person_in_and_forgets_their_browsers(boda):
-    from app.services.password_resets import request_reset
+    from app.shared.services.password_resets import request_reset
 
     boda_id = _id("boda@example.com")
     _email_sign_in(boda, "boda@example.com", remember=True)
@@ -533,7 +533,7 @@ def test_a_password_reset_signs_an_email_person_in_and_forgets_their_browsers(bo
 
 
 def test_a_password_reset_asks_an_app_person_for_the_code(client):
-    from app.services.password_resets import request_reset
+    from app.shared.services.password_resets import request_reset
 
     secret = _turn_on_app(client)
     with SessionLocal() as db:
@@ -765,8 +765,8 @@ def test_a_code_email_queued_too_long_is_never_sent(boda):
     """L3: a code that has stopped working is not delivered late."""
     from sqlalchemy import select
 
-    from app.models.notifications import NotificationOutbox, NotificationState
-    from app.services.notifications import send_notification
+    from app.shared.models.notifications import NotificationOutbox, NotificationState
+    from app.shared.services.notifications import send_notification
 
     _login(boda, "boda@example.com")
     code = _last_emailed_code()

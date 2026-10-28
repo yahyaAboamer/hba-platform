@@ -18,13 +18,13 @@ three produces a row no real legacy month can be.
 from contextlib import contextmanager
 from functools import partial
 
-from app.models.attributed_orders import CommissionState
-from app.services.commission.calculate import DELIVERED_ONLY
+from app.modules.affiliates.models.attributed_orders import CommissionState
+from app.modules.affiliates.services.commission.calculate import DELIVERED_ONLY
 
 
 @contextmanager
 def approved_before_the_switch():
-    from app.services import payroll
+    from app.modules.affiliates.services import payroll
 
     payload, counted = payroll._payload, payroll.COUNTED_STATES
     calculate = payroll.calculate_month

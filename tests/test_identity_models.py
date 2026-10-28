@@ -12,7 +12,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.core.businesstime import utcnow
 from app.core.permissions import VALID_ROLES
-from app.models.identity import AuthSession, Invitation, RoleAssignment, UserAccount
+from app.shared.models.identity import AuthSession, Invitation, RoleAssignment, UserAccount
 
 
 def _user(db, email="user@example.com", status="active"):

@@ -18,21 +18,21 @@ import json
 from sqlalchemy import text
 
 from app.core.passwords import hash_password
-from app.models.identity import UserAccount
-from app.models.shipments import Classification, ModelShipment
-from app.services.affiliates import (
+from app.shared.models.identity import UserAccount
+from app.modules.affiliates.models.shipments import Classification, ModelShipment
+from app.modules.affiliates.services.affiliates import (
     archive_affiliate,
     create_affiliate,
     update_shipping_address,
 )
-from app.services.jobs import JobKind
-from app.services.recipients import (
+from app.shared.services.jobs import JobKind
+from app.modules.affiliates.services.recipients import (
     AMBIGUOUS,
     match_recipient,
     orders_missing_line_items,
     rematch_for,
 )
-from app.services.wardrobe import wardrobe_for
+from app.modules.affiliates.services.wardrobe import wardrobe_for
 
 # The shape of a real Egyptian mobile; not anybody's.
 MAZENS = "01100000441"
@@ -257,10 +257,10 @@ def test_lines_read_before_exchanges_were_asked_about_are_read_again(db):
 def test_the_sweep_queues_a_match_of_its_window(db, monkeypatch):
     """Queued rather than run: a refused shipping phone then fails the match
     job, visibly, and never the sweep that indexed the orders."""
-    from app.services import reconcile
+    from app.shared.services import reconcile
 
     monkeypatch.setattr(reconcile, "reconcile_recent", lambda db, client, since_hours: 0)
-    monkeypatch.setattr("app.services.shopify.sync.build_client", lambda: object())
+    monkeypatch.setattr("app.shared.services.shopify.sync.build_client", lambda: object())
 
     reconcile._handle_reconcile(db, {"since_hours": 48})
     reconcile._handle_reconcile(db, {"since_hours": 48})
@@ -271,7 +271,7 @@ def test_the_sweep_queues_a_match_of_its_window(db, monkeypatch):
 
 
 def test_the_match_job_reads_the_window_it_was_given(db, monkeypatch):
-    from app.services import recipients
+    from app.modules.affiliates.services import recipients
 
     seen = []
     monkeypatch.setattr(
@@ -284,7 +284,7 @@ def test_the_match_job_reads_the_window_it_was_given(db, monkeypatch):
         def require_scope(self, scope):
             pass
 
-    monkeypatch.setattr("app.services.shopify.sync.build_client", lambda: Client())
+    monkeypatch.setattr("app.shared.services.shopify.sync.build_client", lambda: Client())
 
     recipients._handle_scan_recipients(db, {"since": "2026-09-26T00:00:00Z", "field": "updated_at"})
     recipients._handle_scan_recipients(db, {"since": "2026-01-01"})
@@ -296,7 +296,7 @@ def test_the_match_job_reads_the_window_it_was_given(db, monkeypatch):
 
 
 def test_every_undelivered_order_is_queued_for_a_fresh_read(db):
-    from app.services.reconcile import _handle_resync_in_flight
+    from app.shared.services.reconcile import _handle_resync_in_flight
 
     _order(db, "22369", delivery="in_flight")
     _order(db, "26091", delivery=None)
@@ -311,7 +311,7 @@ def test_every_undelivered_order_is_queued_for_a_fresh_read(db):
 
 def test_the_resync_is_scheduled_and_handled():
     import app.main  # noqa: F401 - registers the handlers, as the app does
-    from app.services.schedule import SCHEDULE
+    from app.shared.services.schedule import SCHEDULE
     from app.worker import HANDLERS
 
     assert JobKind.RESYNC_IN_FLIGHT in SCHEDULE

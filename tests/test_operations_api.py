@@ -11,7 +11,7 @@ from sqlalchemy import select, text
 
 from app.db import engine
 from app.main import app
-from app.services.jobs import JobKind
+from app.shared.services.jobs import JobKind
 
 BOOTSTRAP = {
     "email": "owner@example.com",
@@ -192,7 +192,7 @@ def test_sync_status_reports_the_recurring_schedule(client):
 
 def test_a_scheduled_sweep_shows_as_scheduled(client):
     from app.db import SessionLocal
-    from app.services.schedule import ensure_scheduled
+    from app.shared.services.schedule import ensure_scheduled
 
     with SessionLocal() as session:
         ensure_scheduled(session)
@@ -337,7 +337,7 @@ def _stub_shopify(monkeypatch, node=None, error=None):
     """Point the endpoint at a fake Shopify rather than the real shop."""
     import httpx
 
-    from app.services.shopify.client import ShopifyClient
+    from app.shared.services.shopify.client import ShopifyClient
 
     def handler(request: httpx.Request) -> httpx.Response:
         if error is not None:
@@ -349,7 +349,7 @@ def _stub_shopify(monkeypatch, node=None, error=None):
         access_token="t",
         transport=httpx.MockTransport(handler),
     )
-    monkeypatch.setattr("app.services.shopify.sync.build_client", lambda: client)
+    monkeypatch.setattr("app.shared.services.shopify.sync.build_client", lambda: client)
 
 
 ACTIVE_CODE = {
@@ -410,12 +410,12 @@ def test_an_ungranted_scope_says_so_instead_of_blaming_the_network(
 
 
 def test_an_unconfigured_shopify_is_reported_as_unavailable(client, monkeypatch):
-    from app.services.shopify.client import ShopifyNotConfigured
+    from app.shared.services.shopify.client import ShopifyNotConfigured
 
     def unconfigured():
         raise ShopifyNotConfigured("Shopify is not configured: set SHOPIFY_SHOP_DOMAIN")
 
-    monkeypatch.setattr("app.services.shopify.sync.build_client", unconfigured)
+    monkeypatch.setattr("app.shared.services.shopify.sync.build_client", unconfigured)
     response = client.post("/api/operations/verify-code", json={"code": "X"})
 
     assert response.status_code == 503
@@ -433,7 +433,7 @@ def test_a_shopify_outage_is_reported_as_a_gateway_failure(client, monkeypatch):
 def test_an_empty_code_is_refused_before_reaching_shopify(client, monkeypatch):
     called = []
     monkeypatch.setattr(
-        "app.services.shopify.sync.build_client",
+        "app.shared.services.shopify.sync.build_client",
         lambda: called.append(1),
     )
     assert client.post("/api/operations/verify-code", json={"code": ""}).status_code == 422
@@ -456,7 +456,7 @@ def _stub_client(monkeypatch, granted: set[str]):
     """A client reporting exactly the scopes Shopify would have returned."""
     import httpx
 
-    from app.services.shopify.client import ShopifyClient
+    from app.shared.services.shopify.client import ShopifyClient
 
     client = ShopifyClient(
         shop_domain="s.myshopify.com",
@@ -464,7 +464,7 @@ def _stub_client(monkeypatch, granted: set[str]):
         transport=httpx.MockTransport(lambda r: httpx.Response(200, json={"data": {}})),
     )
     client._granted_scopes = set(granted)
-    monkeypatch.setattr("app.services.shopify.sync.build_client", lambda: client)
+    monkeypatch.setattr("app.shared.services.shopify.sync.build_client", lambda: client)
     return client
 
 
@@ -525,12 +525,12 @@ def test_scopes_requires_authentication(anonymous):
 
 
 def test_scopes_reports_an_unconfigured_shopify_clearly(client, monkeypatch):
-    from app.services.shopify.client import ShopifyNotConfigured
+    from app.shared.services.shopify.client import ShopifyNotConfigured
 
     def unconfigured():
         raise ShopifyNotConfigured("Shopify is not configured: set SHOPIFY_SHOP_DOMAIN")
 
-    monkeypatch.setattr("app.services.shopify.sync.build_client", unconfigured)
+    monkeypatch.setattr("app.shared.services.shopify.sync.build_client", unconfigured)
     assert client.get("/api/operations/shopify-scopes").status_code == 503
 
 
@@ -647,10 +647,10 @@ def test_order_facts_reports_whether_delivery_ever_landed(client, monkeypatch):
             )
 
     monkeypatch.setattr(
-        "app.services.shopify.facts.probe_order_facts",
+        "app.shared.services.shopify.facts.probe_order_facts",
         lambda client, sample_size=50: {"sample_size": sample_size, "facts": []},
     )
-    monkeypatch.setattr("app.services.shopify.sync.build_client", lambda: object())
+    monkeypatch.setattr("app.shared.services.shopify.sync.build_client", lambda: object())
 
     body = client.get("/api/operations/order-facts").json()
 
@@ -696,7 +696,7 @@ def test_a_failed_email_is_visible_nowhere_else(client, monkeypatch):
     month is approved, the payment is recorded, every figure is right.
     """
     from app.db import SessionLocal
-    from app.models.notifications import NotificationOutbox, NotificationState
+    from app.shared.models.notifications import NotificationOutbox, NotificationState
 
     with SessionLocal() as session:
         session.add(
@@ -725,7 +725,7 @@ def test_the_view_never_returns_a_notification_payload(client):
     who never heard, not what would have been in the message.
     """
     from app.db import SessionLocal
-    from app.models.notifications import NotificationOutbox, NotificationState
+    from app.shared.models.notifications import NotificationOutbox, NotificationState
 
     with SessionLocal() as session:
         session.add(
@@ -804,7 +804,7 @@ def test_an_undelivered_email_is_reported(client, monkeypatch):
     """A model who was never told is invisible from every other screen."""
     from app.config import settings
     from app.db import SessionLocal
-    from app.models.notifications import NotificationOutbox, NotificationState
+    from app.shared.models.notifications import NotificationOutbox, NotificationState
 
     monkeypatch.setattr(settings, "go_live_month", "2026-09", raising=False)
     monkeypatch.setattr(settings, "smtp_host", "smtp.example.com", raising=False)
@@ -875,7 +875,7 @@ def test_failed_emails_can_be_sent_again(client, monkeypatch):
     """
     from app.config import settings
     from app.db import SessionLocal
-    from app.models.notifications import NotificationOutbox, NotificationState
+    from app.shared.models.notifications import NotificationOutbox, NotificationState
 
     monkeypatch.setattr(settings, "go_live_month", "2026-09", raising=False)
 
@@ -931,9 +931,9 @@ def test_the_models_count_is_the_ones_waiting_to_be_approved(client):
     """
     from app.core.passwords import hash_password
     from app.db import SessionLocal
-    from app.models.affiliates import AccountKind, AffiliateStatus
-    from app.models.identity import UserAccount
-    from app.services.affiliates import create_affiliate
+    from app.modules.affiliates.models.affiliates import AccountKind, AffiliateStatus
+    from app.shared.models.identity import UserAccount
+    from app.modules.affiliates.services.affiliates import create_affiliate
 
     def _person(session, name: str):
         account = UserAccount(
@@ -1003,8 +1003,8 @@ def test_home_says_when_applications_are_waiting(client):
     """
     from app.core.passwords import hash_password
     from app.db import SessionLocal
-    from app.models.identity import UserAccount
-    from app.services.affiliates import create_affiliate
+    from app.shared.models.identity import UserAccount
+    from app.modules.affiliates.services.affiliates import create_affiliate
 
     with SessionLocal() as session:
         for name in ("Habiba", "Karim"):

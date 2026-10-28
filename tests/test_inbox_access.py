@@ -10,12 +10,12 @@ from fastapi import APIRouter
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
-from app.api import inbox
+from app.modules.inbox import api as inbox
 from app.db import engine
 from app.main import app
-from app.services.inbox import connection
-from app.services.inbox.meta import NumberInfo
-from app.services.invitations import create_invitation
+from app.modules.inbox.services import connection
+from app.modules.inbox.services.meta import NumberInfo
+from app.shared.services.invitations import create_invitation
 
 BOOTSTRAP = {
     "email": "owner@example.com",

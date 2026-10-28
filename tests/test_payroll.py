@@ -15,17 +15,17 @@ from sqlalchemy import select, text
 from sqlalchemy.exc import DBAPIError, IntegrityError
 
 from app.core.passwords import hash_password
-from app.models.affiliates import AccountKind
-from app.models.attributed_orders import AttributedOrder, CommissionState
-from app.models.compensation import CompensationType
-from app.models.identity import UserAccount
-from app.models.orders import OrderIndex
-from app.models.payroll import CalculationState, PayrollMonth, PayrollSnapshot
-from app.services.affiliates import create_affiliate
-from app.services.codes import register_code
-from app.services.commission.calculate import NO_TERMS
-from app.services.compensation import set_terms
-from app.services.payroll import (
+from app.modules.affiliates.models.affiliates import AccountKind
+from app.modules.affiliates.models.attributed_orders import AttributedOrder, CommissionState
+from app.modules.affiliates.models.compensation import CompensationType
+from app.shared.models.identity import UserAccount
+from app.shared.models.orders import OrderIndex
+from app.modules.affiliates.models.payroll import CalculationState, PayrollMonth, PayrollSnapshot
+from app.modules.affiliates.services.affiliates import create_affiliate
+from app.modules.affiliates.services.codes import register_code
+from app.modules.affiliates.services.commission.calculate import NO_TERMS
+from app.modules.affiliates.services.compensation import set_terms
+from app.modules.affiliates.services.payroll import (
     ALREADY_APPROVED,
     SourceMoved,
     HOUSE_ACCOUNT,
@@ -37,7 +37,7 @@ from app.services.payroll import (
     open_month,
     snapshots_for,
 )
-from app.services.targets import record_actuals, set_requirements, verify
+from app.modules.affiliates.services.targets import record_actuals, set_requirements, verify
 
 MONTH = "2026-04"
 
@@ -176,7 +176,7 @@ def test_the_month_points_at_the_version_in_force(db):
 
 
 def test_approving_stamps_the_policy_in_force(db):
-    from app.services.policy import create_policy_version
+    from app.modules.affiliates.services.policy import create_policy_version
 
     policy = create_policy_version(db, effective_month="2026-01", summary_markdown="x")
     db.flush()
@@ -189,7 +189,7 @@ def test_approving_stamps_the_policy_in_force(db):
 
 def test_a_later_policy_never_touches_an_earlier_snapshot(db):
     """Frozen at approval, not re-resolved - the whole point of freezing it."""
-    from app.services.policy import create_policy_version
+    from app.modules.affiliates.services.policy import create_policy_version
 
     v1 = create_policy_version(db, effective_month="2026-01", summary_markdown="x")
     db.flush()
@@ -545,7 +545,7 @@ def test_ending_terms_after_an_approved_month_is_allowed(db):
     """Ending is not correcting. Closing a period in August does not change
     what April was worth - April was on those terms and still says so.
     """
-    from app.services.compensation import close_terms
+    from app.modules.affiliates.services.compensation import close_terms
 
     affiliate = _affiliate(db)
     terms = _terms(db, affiliate)
@@ -561,7 +561,7 @@ def test_ending_terms_before_an_approved_month_is_refused(db):
     """That would leave an approved month with no terms at all, and it would be
     incalculable if it were ever reopened.
     """
-    from app.services.compensation import close_terms
+    from app.modules.affiliates.services.compensation import close_terms
 
     affiliate = _affiliate(db)
     terms = _terms(db, affiliate)
@@ -613,7 +613,7 @@ def test_a_target_for_an_unapproved_month_is_still_editable(db):
 def test_working_month_is_this_month_once_the_platform_is_live(monkeypatch):
     from app.config import settings
     from app.core.businesstime import business_month, utcnow
-    from app.services.payroll import working_month
+    from app.modules.affiliates.services.payroll import working_month
 
     monkeypatch.setattr(settings, "go_live_month", "2026-01", raising=False)
 
@@ -627,7 +627,7 @@ def test_working_month_is_the_go_live_month_before_the_platform_starts(monkeypat
     rather than as a month the platform was never responsible for.
     """
     from app.config import settings
-    from app.services.payroll import working_month
+    from app.modules.affiliates.services.payroll import working_month
 
     monkeypatch.setattr(settings, "go_live_month", "2099-06", raising=False)
 
@@ -637,7 +637,7 @@ def test_working_month_is_the_go_live_month_before_the_platform_starts(monkeypat
 def test_working_month_falls_back_to_this_month_with_no_go_live(monkeypatch):
     from app.config import settings
     from app.core.businesstime import business_month, utcnow
-    from app.services.payroll import working_month
+    from app.modules.affiliates.services.payroll import working_month
 
     monkeypatch.setattr(settings, "go_live_month", "", raising=False)
 
@@ -651,7 +651,7 @@ def test_an_approved_row_reports_what_was_agreed_and_what_it_would_be_now(db):
     obligation (§11.4). A screen showing the recalculated figure under the word
     "approved" would present a working number as a debt.
     """
-    from app.api.payroll import _row
+    from app.modules.affiliates.api.payroll import _row
 
     nour = _affiliate(db)
     _terms(db, nour)
@@ -678,7 +678,7 @@ def test_an_approved_row_reports_what_was_agreed_and_what_it_would_be_now(db):
 
 def _seen(db, affiliate, month=MONTH):
     """The fingerprint a preview would hand out for this month."""
-    from app.services.payroll import blockers_for, carried_into, source_version
+    from app.modules.affiliates.services.payroll import blockers_for, carried_into, source_version
 
     _, calculation = blockers_for(db, affiliate, month)
     orders = list(
@@ -753,7 +753,7 @@ def test_a_recorded_target_moves_the_fingerprint_without_moving_the_money(db):
     the target is still part of what was agreed, because the same model may be
     on a guarantee next month and the evidence is read the same way.
     """
-    from app.services.targets import record_actuals, set_requirements
+    from app.modules.affiliates.services.targets import record_actuals, set_requirements
 
     affiliate = _ready(db)
     before = _seen(db, affiliate)
@@ -792,7 +792,7 @@ def test_a_concurrent_approval_is_answered_rather_than_crashing(db, monkeypatch)
     The race is frozen here by stopping the version read from seeing what the
     other person already committed, which is precisely what a stale read is.
     """
-    from app.services import payroll as service
+    from app.modules.affiliates.services import payroll as service
 
     affiliate = _ready(db)
     approve_month(db, affiliate, MONTH)

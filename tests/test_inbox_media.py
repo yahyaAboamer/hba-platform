@@ -15,12 +15,12 @@ from sqlalchemy import text
 from app.core.businesstime import utcnow
 from app.db import SessionLocal
 from app.main import app
-from app.models.identity import UserAccount
-from app.models.inbox import InboxConversation, InboxMedia, InboxMessage
-from app.services.inbox import connection, media, sending, storage
-from app.services.inbox.meta import MetaClient, MetaError, NumberInfo
-from app.services.inbox.outbound import NotSent
-from app.services.inbox.storage import StorageError
+from app.shared.models.identity import UserAccount
+from app.modules.inbox.models import InboxConversation, InboxMedia, InboxMessage
+from app.modules.inbox.services import connection, media, sending, storage
+from app.modules.inbox.services.meta import MetaClient, MetaError, NumberInfo
+from app.modules.inbox.services.outbound import NotSent
+from app.modules.inbox.services.storage import StorageError
 
 TOKEN = "EAAG-made-up-access-key-0000a1b2"
 NUMBER_ID = "100200300400500"
@@ -197,8 +197,8 @@ def test_one_refusal_is_not_final_the_last_try_is(db, connected, client_, store_
 
 
 def test_the_jobs_last_try_is_the_one_that_gives_up(db, connected, monkeypatch):
-    from app.models.integration import BackgroundJob
-    from app.services.jobs import MAX_ATTEMPTS, JobKind, JobStatus
+    from app.shared.models.integration import BackgroundJob
+    from app.shared.services.jobs import MAX_ATTEMPTS, JobKind, JobStatus
 
     file = _waiting(db)
     media.queue_fetch(db, file.id)
@@ -259,7 +259,7 @@ def test_only_a_file_whatsapp_still_holds_can_be_asked_for_again(db, connected, 
 
 
 def test_the_chat_says_which_files_can_be_asked_for_again(db):
-    from app.services.inbox.chats import describe_message
+    from app.modules.inbox.services.chats import describe_message
 
     conversation = _chat(db)
     cases = [
@@ -301,7 +301,7 @@ def test_a_file_already_dealt_with_is_not_fetched_again(db, connected):
 
 
 def test_a_customers_file_arriving_queues_its_copy(db, connected):
-    from app.services.inbox.events import apply_event
+    from app.modules.inbox.services.events import apply_event
 
     apply_event(db, {"entry": [{"changes": [{"field": "messages", "value": {
         "metadata": {"phone_number_id": NUMBER_ID},

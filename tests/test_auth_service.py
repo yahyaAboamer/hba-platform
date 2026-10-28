@@ -9,8 +9,8 @@ from datetime import timedelta
 
 from app.core.businesstime import utcnow
 from app.core.passwords import hash_password
-from app.models.identity import UserAccount
-from app.services.auth import authenticate, issue_session, resolve_session, revoke_session
+from app.shared.models.identity import UserAccount
+from app.shared.services.auth import authenticate, issue_session, resolve_session, revoke_session
 
 PASSWORD = "quiet-harbour-lantern"
 

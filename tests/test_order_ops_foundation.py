@@ -15,12 +15,12 @@ from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
-from app.api import order_ops
+from app.modules.operations import api as order_ops
 from app.core.businesstime import utcnow
 from app.db import SessionLocal, engine
 from app.main import app
-from app.services.jobs import JobStatus, PermanentFailure, enqueue
-from app.services.order_ops.freshness import (
+from app.shared.services.jobs import JobStatus, PermanentFailure, enqueue
+from app.modules.operations.services.freshness import (
     FRESH_FOR,
     State,
     describe,
@@ -28,7 +28,7 @@ from app.services.order_ops.freshness import (
     record_not_connected,
     record_success,
 )
-from app.services.order_ops.polling import (
+from app.modules.operations.services.polling import (
     POLL_EVERY,
     KeyRefused,
     NotConnected,

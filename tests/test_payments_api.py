@@ -21,7 +21,7 @@ from sqlalchemy import text
 from app.core.passwords import hash_password
 from app.db import engine
 from app.main import app
-from app.services.proof import MAX_UPLOAD_BYTES, ProofRejected, sanitise
+from app.modules.affiliates.services.proof import MAX_UPLOAD_BYTES, ProofRejected, sanitise
 
 BOOTSTRAP = {
     "email": "owner@example.com",
@@ -1122,8 +1122,8 @@ def test_the_pay_screen_carries_every_version_of_a_reopened_month(client):
     # did. What is being tested is the pay screen carrying **every** version of
     # such a month, which is exactly as true now as it was then.
     from app.db import SessionLocal
-    from app.models.affiliates import AffiliateProfile
-    from app.services.payroll import reopen_month
+    from app.modules.affiliates.models.affiliates import AffiliateProfile
+    from app.modules.affiliates.services.payroll import reopen_month
 
     with SessionLocal() as session:
         reopen_month(
@@ -1490,7 +1490,7 @@ def test_the_sidebar_badge_counts_the_people_the_desk_lists(client):
             {"id": applied["id"]},
         )
 
-    from app.services.payroll import working_month
+    from app.modules.affiliates.services.payroll import working_month
 
     desk = client.get(f"/api/payments/{working_month()}").json()["affiliates"]
     awaiting = sum(1 for row in desk if row["state"] == "not_approved")

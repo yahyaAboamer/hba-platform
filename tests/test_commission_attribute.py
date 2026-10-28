@@ -15,15 +15,15 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from app.core.passwords import hash_password
-from app.models.affiliates import AccountKind
-from app.models.attributed_orders import AttributedOrder, CommissionState
-from app.models.identity import UserAccount
-from app.models.orders import OrderIndex
-from app.services.affiliates import create_affiliate
-from app.services.codes import register_code
-from app.services.commission.attribute import attribute_order
-from app.services.shopify.fulfilment import DELIVERED, FAILED, IN_FLIGHT
-from app.services.shopify.normalise import upsert_order_index
+from app.modules.affiliates.models.affiliates import AccountKind
+from app.modules.affiliates.models.attributed_orders import AttributedOrder, CommissionState
+from app.shared.models.identity import UserAccount
+from app.shared.models.orders import OrderIndex
+from app.modules.affiliates.services.affiliates import create_affiliate
+from app.modules.affiliates.services.codes import register_code
+from app.modules.affiliates.services.commission.attribute import attribute_order
+from app.shared.services.shopify.fulfilment import DELIVERED, FAILED, IN_FLIGHT
+from app.shared.services.shopify.normalise import upsert_order_index
 
 NOW = datetime(2026, 8, 25, 12, 0, tzinfo=timezone.utc)
 
@@ -196,7 +196,7 @@ def test_an_order_is_never_moved_to_another_model(db, caplog):
 
     # The code is handed to Sara for the same month - a registration mistake.
     sara = _affiliate(db, "Sara", None)
-    from app.models.codes import DiscountCodePeriod
+    from app.modules.affiliates.models.codes import DiscountCodePeriod
 
     db.query(DiscountCodePeriod).filter_by(code="NOUR10").update(
         {"affiliate_id": sara.id}

@@ -34,8 +34,8 @@ from app.config import settings
 from app.core.observability import report_job_failed_for_good
 from app.core.signals import Anomaly, report
 from app.db import SessionLocal
-from app.models.integration import BackgroundJob
-from app.services.jobs import (
+from app.shared.models.integration import BackgroundJob
+from app.shared.services.jobs import (
     INBOX_WORK,
     LEASE_SECONDS,
     OPERATIONS_READS,
@@ -167,7 +167,7 @@ def run_one(
 
 
 #: How often to top up recurring work. Not the schedule itself - the intervals
-#: live in app.services.schedule - just how often we bother looking.
+#: live in app.shared.services.schedule - just how often we bother looking.
 SCHEDULE_CHECK_SECONDS = 60
 
 
@@ -181,7 +181,7 @@ def top_up_schedule(
     Imported inside the function to keep the import graph acyclic: the schedule
     names job kinds, whose handlers import this module to register themselves.
     """
-    from app.services.schedule import ensure_scheduled
+    from app.shared.services.schedule import ensure_scheduled
 
     queued = ensure_scheduled(db, only=only, exclude=exclude)
     db.commit()

@@ -99,8 +99,8 @@ def _shopify(monkeypatch):
             "starts_at": state["starts_at"],
         }
 
-    monkeypatch.setattr("app.api.affiliates.verify_discount_code", fake_verify)
-    monkeypatch.setattr("app.services.shopify.sync.build_client", lambda: object())
+    monkeypatch.setattr("app.modules.affiliates.api.affiliates.verify_discount_code", fake_verify)
+    monkeypatch.setattr("app.shared.services.shopify.sync.build_client", lambda: object())
     return state
 
 
@@ -362,8 +362,8 @@ def _give_code(affiliate_id, code="NOUR10", *, verified=True, created_at=None) -
     from sqlalchemy.orm import Session as OrmSession
 
     from app.core.businesstime import utcnow
-    from app.models.affiliates import AffiliateProfile
-    from app.services.codes import register_code, start_month_for
+    from app.modules.affiliates.models.affiliates import AffiliateProfile
+    from app.modules.affiliates.services.codes import register_code, start_month_for
 
     with OrmSession(engine) as db:
         affiliate = db.get(AffiliateProfile, affiliate_id)
@@ -1917,7 +1917,7 @@ def test_the_profile_offers_her_months_not_the_platforms(client):
     """The export's profile month control lists only the months the model was
     with HBA (`mMonthOptions` / `started`). The server says which, by the rule
     her own portal uses, so the owner and the model see the same months."""
-    from app.services.payroll import working_month
+    from app.modules.affiliates.services.payroll import working_month
 
     affiliate = _register(client)
     _joined(client, affiliate, "2026-03")
@@ -2308,8 +2308,8 @@ def test_the_terms_reaching_this_month_run_on_into_the_next(client):
     until further notice."""
     from app.core.businesstime import month_add
     from app.db import SessionLocal
-    from app.models.affiliates import AffiliateProfile
-    from app.services.compensation import terms_for
+    from app.modules.affiliates.models.affiliates import AffiliateProfile
+    from app.modules.affiliates.services.compensation import terms_for
 
     affiliate = _register(client)
     working = client.get(f"/api/affiliates/{affiliate['id']}/pay-history").json()["working_month"]

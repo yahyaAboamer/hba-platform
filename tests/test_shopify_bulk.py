@@ -12,15 +12,15 @@ import pytest
 from sqlalchemy import text
 
 from app.core.signals import Anomaly
-from app.models.orders import OrderIndex
-from app.services.jobs import JobKind, PermanentFailure
-from app.services.shopify.bulk import (
+from app.shared.models.orders import OrderIndex
+from app.shared.services.jobs import JobKind, PermanentFailure
+from app.shared.services.shopify.bulk import (
     MAX_POLLS,
     ingest_jsonl,
     poll_bulk_operation,
     start_bulk_import,
 )
-from app.services.shopify.client import ShopifyClient, ShopifyError
+from app.shared.services.shopify.client import ShopifyClient, ShopifyError
 
 
 def _client(responses):
@@ -225,12 +225,12 @@ def test_business_months_are_assigned_during_import(db):
 
 
 def _run_handler(db, payload, monkeypatch, *, client=None, operation=None, lines=None):
-    from app.services.shopify import bulk
+    from app.shared.services.shopify import bulk
     from app.worker import HANDLERS
 
     monkeypatch.setattr(bulk, "build_client", lambda: client, raising=False)
     monkeypatch.setattr(
-        "app.services.shopify.sync.build_client", lambda: client, raising=True
+        "app.shared.services.shopify.sync.build_client", lambda: client, raising=True
     )
     if operation is not None:
         monkeypatch.setattr(bulk, "poll_bulk_operation", lambda _c: operation)
@@ -280,7 +280,7 @@ def test_the_reschedule_is_not_absorbed_by_its_own_running_job(db, monkeypatch):
     absorbed, and the import would stall forever - with every job succeeding
     and nothing reporting a failure.
     """
-    from app.services.jobs import enqueue, lease_job
+    from app.shared.services.jobs import enqueue, lease_job
 
     enqueue(db, JobKind.BULK_IMPORT, {"since": "2026-01-01"}, dedupe_key=JobKind.BULK_IMPORT)
     db.flush()
