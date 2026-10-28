@@ -2,7 +2,7 @@
 
 **The one place to see how everything fits.** One hierarchy only: Phase →
 Batch → Task → Status. Statuses: **Completed**, **In progress**, **Blocked by
-owner**, **Pending**, **Deferred**. Updated 26 October 2026.
+owner**, **Pending**, **Deferred**. Updated 28 October 2026.
 
 Sources: ADRs 0065–0069 (the architecture), `2026-10-25-phase-1-foundations.md`
 (Phase 1 in detail). The batch in flight keeps its working checkpoint in
@@ -71,7 +71,7 @@ production's backup on 25 October; the reconciliation is rerun after the first p
 
 | Task | Status |
 |---|---|
-| Move code into `app/modules/…`, import check in CI | Pending: when no other branch is open (`feature/whatsapp-inbox` is) |
+| Move code into `app/modules/…`, import check in CI | Completed: PR #132, deployed to staging and production as `ce1ab52` on 28 October; behaviour proven unchanged (OpenAPI, tables, jobs, whole suite) |
 
 ## Phase 2 — One frame for every department (ADR 0068)
 
@@ -79,7 +79,7 @@ production's backup on 25 October; the reconciliation is rerun after the first p
 
 | Task | Status |
 |---|---|
-| Departments declared once; the sidebar; department addresses with redirects; Today; Team and access by department; Settings split; the phone layout | Pending: after Batch 1.2 |
+| Departments declared once; the sidebar; department addresses with redirects; Today; Team and access by department; Settings split; the phone layout | Pending: next. Write its plan file first and get the owner's word |
 
 ## Phase 3 — Shared records (ADRs 0066, 0068)
 
