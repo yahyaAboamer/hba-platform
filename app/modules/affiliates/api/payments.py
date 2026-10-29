@@ -773,3 +773,102 @@ def resolve_correction(
         "source_month": body.month,
         "destination_month": body.destination_month,
     }
+
+
+# -- Bonuses (ADR 0070) -------------------------------------------------------
+
+
+class BonusBody(BaseModel):
+    month: str
+    amount_piastres: int = Field(gt=0)
+    #: Optional, and for staff only. Never sent to her portal.
+    reason: str | None = Field(default=None, max_length=500)
+    operation_key: str | None = Field(default=None, min_length=8, max_length=80)
+
+
+@router.get("/affiliates/{affiliate_id}/bonuses")
+def list_bonuses(
+    affiliate_id: int,
+    _actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_VIEW)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Every bonus she has had, with the reasons. Staff only."""
+    from app.modules.affiliates.services.bonuses import bonuses_for
+
+    affiliate = _affiliate_or_404(db, affiliate_id)
+    return {"name": affiliate.name, "bonuses": bonuses_for(db, affiliate)}
+
+
+@router.post("/affiliates/{affiliate_id}/bonuses", status_code=201)
+def create_bonus(
+    affiliate_id: int,
+    body: BonusBody,
+    actor: UserAccount = Depends(require_permission(Permission.PAYROLL_BONUS)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Add a bonus to a month nobody has agreed yet."""
+    from app.modules.affiliates.services.bonuses import add_bonus
+
+    affiliate = _affiliate_or_404(db, affiliate_id)
+    month = _month_or_400(body.month)
+    try:
+        bonus = add_bonus(
+            db,
+            affiliate,
+            month=month,
+            amount_piastres=body.amount_piastres,
+            reason=body.reason,
+            operation_key=body.operation_key,
+            actor_id=actor.id,
+            actor_email=actor.email,
+        )
+    except PermissionError as exc:
+        db.rollback()
+        raise HTTPException(403, str(exc)) from exc
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(409, str(exc)) from exc
+    except IntegrityError as exc:
+        # Two copies of one request racing past the operation-key read: the
+        # constraint holds, and the second is told to look again.
+        db.rollback()
+        raise HTTPException(409, "That bonus is already being added. Reload.") from exc
+
+    db.commit()
+    return {
+        "id": bonus.id,
+        "month": month,
+        "amount_piastres": int(bonus.amount_piastres),
+        "amount": format_egp(int(bonus.amount_piastres)),
+    }
+
+
+# A POST, not a DELETE: nothing about money is removed (`api.del` in the
+# frontend says the same) - the row stays, marked withdrawn.
+@router.post("/affiliates/{affiliate_id}/bonuses/{bonus_id}/withdraw")
+def withdraw_bonus_route(
+    affiliate_id: int,
+    bonus_id: int,
+    actor: UserAccount = Depends(require_permission(Permission.PAYROLL_BONUS)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Withdraw a bonus while its month is still unagreed. The row is kept."""
+    from app.modules.affiliates.services.bonuses import withdraw_bonus
+
+    affiliate = _affiliate_or_404(db, affiliate_id)
+    try:
+        bonus = withdraw_bonus(
+            db, affiliate, bonus_id, actor_id=actor.id, actor_email=actor.email
+        )
+    except LookupError as exc:
+        db.rollback()
+        raise HTTPException(404, str(exc)) from exc
+    except PermissionError as exc:
+        db.rollback()
+        raise HTTPException(403, str(exc)) from exc
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(409, str(exc)) from exc
+
+    db.commit()
+    return {"id": bonus.id, "withdrawn": True}

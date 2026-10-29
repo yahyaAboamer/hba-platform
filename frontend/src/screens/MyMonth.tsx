@@ -372,6 +372,17 @@ function Hero({
             {rate !== null && <> · {rate / 100}% commission</>}
           </span>
         )}
+        {/*
+         * ADR 0070, the owner's ask: her month says a bonus was added. Already
+         * in the figure above, so it reads as *included*, never as more to
+         * come - and on its own line, so the salary and commission tiles
+         * still say what they say.
+         */}
+        {body.bonus && !noFigure && (
+          <span className="home__bonus">
+            Includes a bonus of <strong>{body.bonus.amount}</strong> from HBA
+          </span>
+        )}
       </div>
 
       {compare && (

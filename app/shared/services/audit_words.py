@@ -203,6 +203,8 @@ def sentence(event: AuditEvent, names: _Names) -> str:
         "payout_destination.revealed": f"Revealed {who}'s full payment details",
         "payroll.approved": f"Approved {who}'s {month or 'month'} at {_egp(a.get('obligation_piastres'))}",
         "payroll.reopened": f"Reopened {who}'s {month or 'month'}",
+        "payroll.bonus_added": f"Added a bonus of {_egp(a.get('amount_piastres'))} to {who}'s {month or 'month'}",
+        "payroll.bonus_withdrawn": f"Withdrew the bonus of {_egp(a.get('amount_piastres'))} from {who}'s {month or 'month'}",
         "portal.previewed": f"Looked at {who}'s portal (read only)",
         "policy_version.created":f"Put a new commission policy in force from {_month(a.get('effective_month'))}",
         "shopify.connection_updated": "Updated the Shopify connection",

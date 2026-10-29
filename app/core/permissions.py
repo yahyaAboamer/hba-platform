@@ -35,6 +35,10 @@ class Permission:
     PAYROLL_APPROVE = "payroll.approve"
     PAYROLL_REOPEN = "payroll.reopen"
     PAYMENTS_RECORD = "payments.record"
+    #: Adding a bonus to a month nobody has agreed yet, or withdrawing one
+    #: (ADR 0070). Admin and the affiliate manager; a finance role gets it
+    #: when there is one.
+    PAYROLL_BONUS = "payroll.bonus"
     INVITATIONS_SEND = "invitations.send"
     AUDIT_VIEW = "audit.view"
     SETTINGS_MANAGE = "settings.manage"
@@ -65,6 +69,7 @@ ROLES: dict[str, frozenset[str]] = {
             Permission.TARGETS_VERIFY,
             Permission.TARGETS_RECORD,
             Permission.PAYROLL_APPROVE,
+            Permission.PAYROLL_BONUS,
             Permission.INVITATIONS_SEND,
             Permission.AUDIT_VIEW,
         }

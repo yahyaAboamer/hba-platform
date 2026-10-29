@@ -1,0 +1,87 @@
+/* Bonuses HBA added to a model's months. ADR 0070.
+
+   The same reading order as the corrections panel beside it: the month and
+   its story on the left, the money on the right, the action last. */
+
+.bonuses__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--rule);
+  background: var(--elev);
+}
+
+.bonuses__fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--space-3);
+  max-width: 480px;
+}
+
+.bonuses__reason {
+  width: 100%;
+  font: inherit;
+  resize: vertical;
+}
+
+.bonuses__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.bonuses__list {
+  margin: 0;
+  padding: var(--space-2) var(--space-4) var(--space-3);
+  list-style: none;
+}
+
+.bonuses__row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-4);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.bonuses__row:last-child {
+  border-bottom: 0;
+}
+
+/* Kept on the record, and visibly not paid. */
+.bonuses__row--withdrawn .bonuses__amount {
+  text-decoration: line-through;
+}
+
+.bonuses__facts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 1;
+  min-width: 0;
+}
+
+.bonuses__month {
+  font-weight: 600;
+}
+
+.bonuses__why {
+  font-size: var(--text-sm);
+  color: var(--quiet);
+  overflow-wrap: anywhere;
+}
+
+.bonuses__amount {
+  white-space: nowrap;
+}
+
+.bonuses__foot {
+  padding: 0 var(--space-4) var(--space-4);
+}
+
+@media (max-width: 560px) {
+  .bonuses__row {
+    flex-wrap: wrap;
+  }
+}

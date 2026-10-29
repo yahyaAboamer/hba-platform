@@ -255,6 +255,12 @@ export type MyEarnings = {
     commission_piastres: number;
     commission: string;
   } | null;
+  /**
+   * ADR 0070. Bonuses HBA added to this month, together - already inside
+   * `amount_piastres`. The amount only: the reason is for staff and never
+   * reaches the portal.
+   */
+  bonus: { piastres: number; amount: string } | null;
   makeup: MakeupLine[];
   carried_in: {
     from_month: string;

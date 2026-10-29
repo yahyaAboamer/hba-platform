@@ -206,6 +206,9 @@ def _row(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
             for line in calculation.carried_lines
         ],
         "carried_piastres": _display_piastres(calculation.carried_piastres),
+        # ADR 0070. Already inside the figure above; named so a reviewer
+        # agreeing it can see why it is higher than the orders explain.
+        "bonus_piastres": calculation.bonus_piastres,
         "blockers": blockers,
         "is_payable": not blockers,
         "version": snapshot.version if snapshot else None,
@@ -312,6 +315,8 @@ def statement(
             fixed_piastres=int(frozen.get("fixed_piastres") or 0),
             guarantee_applied=bool(frozen.get("guarantee_applied")),
             commission_piastres=Decimal(str(frozen.get("commission_piastres") or "0")),
+            # ADR 0070. Absent on every snapshot agreed before bonuses existed.
+            bonus_piastres=int(frozen.get("bonus_piastres") or 0),
         )
         # The sales the approved commission was worked out on, under the rule
         # that approved it: delivered and pending since F02, delivered only on
@@ -358,6 +363,7 @@ def statement(
         "commission_piastres": parts.commission_piastres,
         "fixed_piastres": parts.fixed_piastres,
         "guarantee_top_up_piastres": parts.guarantee_top_up_piastres,
+        "bonus_piastres": parts.bonus_piastres,
         "carried_piastres": carried,
         "total_piastres": parts.payout_piastres,
         "total": format_egp(parts.payout_piastres),
@@ -529,6 +535,9 @@ def month_summary_view(
             "guarantee_top_up": format_egp(
                 found.breakdown.guarantee_top_up_piastres
             ),
+            # ADR 0070. One of the parts, so the parts still add up.
+            "bonus_piastres": found.breakdown.bonus_piastres,
+            "bonus": format_egp(found.breakdown.bonus_piastres),
         },
         # A01's content progress needing review, by why. Two of the three are
         # HBA's own work rather than a verdict on anybody (D08).

@@ -296,3 +296,81 @@ class PayrollSnapshot(Base):
             f"<PayrollSnapshot month={self.payroll_month_id} v{self.version} "
             f"{self.approved_obligation_piastres}p>"
         )
+
+
+class PayrollBonus(Base):
+    """Money HBA chose to add to one of a model's months (ADR 0070).
+
+    **Not an adjustment.** `payroll_adjustment` settles a difference against
+    an agreed month - money that moved and should not have, or should have and
+    did not - and its rows are read by the correction arithmetic. A bonus is
+    neither: it is a decision to pay more, made before the month is agreed, and
+    the month's calculation adds it on top of everything else. Putting it in
+    that table would put it in front of `adjusted_against` and every reader
+    that sums credits.
+
+    **Only on a month nobody has agreed.** Approval freezes the bonuses with
+    the figure, exactly as it freezes deductions; after that the row cannot be
+    added to or withdrawn from without reopening the month, which is what
+    keeps an agreed month's money read from its snapshot.
+
+    **Withdrawn, never deleted.** A bonus taken back before approval keeps its
+    row with who withdrew it and when, so the record of what was offered and
+    taken back survives - the audit trail says the same, but a row is what a
+    later question reads first.
+
+    `reason` is staff-only. Nothing on the model's side of the platform reads
+    it, and the portal's payloads are built without it.
+    """
+
+    __tablename__ = "payroll_bonus"
+    __table_args__ = (
+        CheckConstraint("amount_piastres > 0", name="payroll_bonus_amount_positive"),
+        # Whole pounds, like every payout (ADR 0004): a bonus of EGP 500.50
+        # would be rounded away by the total it is added to.
+        CheckConstraint(
+            "amount_piastres % 100 = 0", name="payroll_bonus_whole_pounds"
+        ),
+        # One decision, one row, however many times the request arrives - the
+        # same guarantee `payroll_adjustment` and `payment_transaction` have.
+        UniqueConstraint("operation_key", name="payroll_bonus_operation_key_unique"),
+        Index("payroll_bonus_month_idx", "payroll_month_id"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    #: The month it is paid with. RESTRICT: this row is part of what a month
+    #: is worth.
+    payroll_month_id: Mapped[int] = mapped_column(
+        ForeignKey("payroll_month.id", ondelete="RESTRICT"), nullable=False
+    )
+
+    amount_piastres: Mapped[int] = mapped_column(BigInteger, nullable=False)
+
+    #: Optional, and **for staff only** (owner, 29 October 2026).
+    reason: Mapped[str | None] = mapped_column(Text)
+
+    operation_key: Mapped[str | None] = mapped_column(String(80))
+
+    created_by: Mapped[int | None] = mapped_column(
+        ForeignKey("user_account.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+
+    withdrawn_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    withdrawn_by: Mapped[int | None] = mapped_column(
+        ForeignKey("user_account.id", ondelete="SET NULL")
+    )
+
+    payroll_month = relationship(
+        "PayrollMonth", foreign_keys=[payroll_month_id], lazy="joined"
+    )
+
+    @property
+    def is_live(self) -> bool:
+        return self.withdrawn_at is None
+
+    def __repr__(self) -> str:
+        return f"<PayrollBonus month={self.payroll_month_id} {self.amount_piastres}p>"

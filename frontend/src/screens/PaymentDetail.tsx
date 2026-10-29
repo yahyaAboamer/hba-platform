@@ -47,6 +47,8 @@ type Statement = {
   commission_piastres: number;
   fixed_piastres: number;
   guarantee_top_up_piastres: number;
+  /** ADR 0070. Bonuses HBA added, one of the parts the total is made of. */
+  bonus_piastres: number;
   carried_piastres: number;
   total_piastres: number;
   guarantee: { base_amount_piastres: number; target_known: boolean };
@@ -348,6 +350,9 @@ export function PaymentDetail({ session }: { session: Session }) {
                   tone="quiet"
                 />
               ))}
+            {statement.bonus_piastres > 0 && (
+              <StatementLine label="Bonus" detail="Added by HBA on top of her pay" piastres={statement.bonus_piastres} tone="lift" />
+            )}
             <div className="pay-detail__total">
               <span>{totalLabel}</span>
               <Money piastres={statement.total_piastres} kind="agreed" />

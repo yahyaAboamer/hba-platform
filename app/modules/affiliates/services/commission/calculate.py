@@ -261,6 +261,13 @@ class MonthCalculation:
     #: they were on back then.
     carried_without_terms: list[str] = field(default_factory=list)
 
+    #: ADR 0070. Bonuses HBA added to this month, added on top of everything
+    #: else after the guarantee comparison. Each line is its id and amount and
+    #: **never its reason**, which is for staff: these lines are frozen into
+    #: the snapshot and read by her portal.
+    bonus_piastres: int = 0
+    bonus_lines: list[dict] = field(default_factory=list)
+
     #: Empty means the figure can be approved as it stands.
     blockers: list[str] = field(default_factory=list)
 
@@ -499,6 +506,14 @@ def _calculate(
     if carried["months_without_terms"]:
         blockers.append(NO_TERMS_FOR_CARRIED)
 
+    # ADR 0070. Read in the preview too: a bonus is a decision about the
+    # month, not a fact about its orders, and both entry points must agree on
+    # what the month is worth.
+    from app.modules.affiliates.services.bonuses import bonus_lines_for
+
+    bonus_lines = bonus_lines_for(db, affiliate, month)
+    bonus = sum(line["amount_piastres"] for line in bonus_lines)
+
     terms = terms_for(db, affiliate, month)
     if terms is None:
         # Sales are still real and still worth reporting; what they are owed is
@@ -521,6 +536,8 @@ def _calculate(
             carried_piastres=carried["exact"],
             carried_lines=carried["lines"],
             carried_without_terms=carried["months_without_terms"],
+            bonus_piastres=bonus,
+            bonus_lines=bonus_lines,
             blockers=blockers,
         )
 
@@ -576,6 +593,11 @@ def _calculate(
     # earlier month is not this month's work. Rounding still happens once, on
     # the total (ADR 0004).
     exact = exact + carried["exact"]
+    # ADR 0070. The same place, for the same reason: a bonus added inside the
+    # comparison would be swallowed by a guaranteed minimum for exactly the
+    # model who earned least. Whole pounds, so rounding the total once still
+    # gives every pound of it.
+    exact = exact + bonus
 
     payout = 0 if is_house else round_half_up_to_pounds(exact)
 
@@ -603,5 +625,7 @@ def _calculate(
         carried_piastres=carried["exact"],
         carried_lines=carried["lines"],
         carried_without_terms=carried["months_without_terms"],
+        bonus_piastres=bonus,
+        bonus_lines=bonus_lines,
         blockers=blockers,
     )
