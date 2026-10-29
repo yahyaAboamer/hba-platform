@@ -5,6 +5,7 @@ import { ContactForm } from "../components/ContactForm";
 import { MonthPicker } from "../components/MonthPicker";
 import { Money } from "../components/Money";
 import { Corrections } from "../components/Corrections";
+import { Bonuses } from "../components/Bonuses";
 import { FinancialRulesPreview } from "../components/FinancialRulesPreview";
 import { api, can } from "../lib/api";
 import { DestinationDetails } from "../components/DestinationDetails";
@@ -230,6 +231,8 @@ export function AffiliateDetail({ session }: { session: Session }) {
     null,
   );
   const [working, setWorking] = useState<string | null>(null);
+  /** The page head's *Add bonus* asked for the form (ADR 0070). */
+  const [bonusAsked, setBonusAsked] = useState(false);
   const [correction, setCorrection] = useState("");
   /** A confirmed code on a waiting application, opened to be changed (ADR 0058). */
   const [changingCode, setChangingCode] = useState(false);
@@ -538,6 +541,25 @@ export function AffiliateDetail({ session }: { session: Session }) {
           <Link className="button" to={`/affiliates/${detail.id}/portal`}>
             View her portal
           </Link>
+        )}
+        {/* ADR 0070, the owner's ask: a bonus from every model's page. It
+         *  opens the form on Payments, where her months and bonuses are. */}
+        {!house && can(session, "payroll.bonus") && (
+          <button
+            type="button"
+            className="button button--primary"
+            onClick={() => {
+              setQuery((previous) => {
+                const next = new URLSearchParams(previous);
+                next.set("section", "payments");
+                next.set("month", month);
+                return next;
+              });
+              setBonusAsked(true);
+            }}
+          >
+            Add bonus
+          </button>
         )}
       </div>
 
@@ -1385,6 +1407,18 @@ export function AffiliateDetail({ session }: { session: Session }) {
             </Link>
           </p>
         </div>
+          {id && !house && (
+            <Bonuses
+              key={`bonus-${id}`}
+              affiliateId={id}
+              name={detail.name}
+              month={month}
+              session={session}
+              open={bonusAsked}
+              onOpened={() => setBonusAsked(false)}
+              onChanged={load}
+            />
+          )}
           {id && <Corrections key={`fix-${id}`} affiliateId={id} session={session} />}
           {id && <FinancialRulesPreview key={`${id}-${month}`} affiliateId={id} currentMonth={detail.current_month}
             firstMonth={detail.collaboration_start_month && detail.collaboration_start_month > detail.platform_start_month ? detail.collaboration_start_month : detail.platform_start_month} />}

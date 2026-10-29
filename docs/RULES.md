@@ -96,8 +96,15 @@ payroll without touching a maintainer screen.
   sending the rest* and still reduces a balance, which is the opposite of HBA
   taking a loss. Absorbing takes the whole remaining difference, so carry what
   is recoverable first.
+- **A bonus is added on top, only to a month nobody has agreed** (ADR 0070).
+  Its own table (`payroll_bonus`), never an adjustment. Added after the
+  guaranteed-minimum comparison, like carried orders, so a floor never
+  swallows it; frozen with the month at approval, and withdrawn (kept, marked)
+  only while the month is open. Whole pounds. **Its reason is for staff
+  only** - the calculation and snapshot carry the amount and never the reason.
+  Admin and the affiliate manager hold `payroll.bonus`.
 - **One gate in front of every writer of a model's money**
-  (`app/services/money_gate.py`). `approve_month`, `corrections.resolve` and
+  (`app/services/money_gate.py`). `approve_month`, `corrections.resolve`, the bonus writers and
   `record_payment` all take it **before reading anything they decide on**, not
   before writing. It locks the *affiliate* row rather than a month because
   approval and `resolve` need the same two month rows in opposite orders, and

@@ -68,6 +68,18 @@ ROLES_BEFORE: dict[str, frozenset[str]] = {
     "affiliate": frozenset(),
 }
 
+#: Permissions given **after** that day, each by its own decision, written out
+#: for the same reason `ROLES_BEFORE` is. What the migration must not change is
+#: the 25 October roles plus exactly these.
+GRANTED_SINCE: dict[str, frozenset[str]] = {
+    # ADR 0070: adding a bonus (owner, 29 October 2026).
+    "affiliate_manager": frozenset({P.PAYROLL_BONUS}),
+}
+
+
+def _expected(role: str) -> frozenset[str]:
+    return ROLES_BEFORE[role] | GRANTED_SINCE.get(role, frozenset())
+
 
 def test_the_snapshot_covers_every_role_there_is():
     """A role added later needs its own before-and-after; this says so."""
@@ -77,7 +89,7 @@ def test_the_snapshot_covers_every_role_there_is():
         if role == "operations_manager":
             assert ROLES[role] == granted - {P.INBOX_USE}
         else:
-            assert ROLES[role] == granted, role
+            assert ROLES[role] == _expected(role), role
 
 
 # ── The union ─────────────────────────────────────────────────────────────────
@@ -419,7 +431,7 @@ def test_the_migration_moves_the_inbox_and_changes_nobodys_access(old_schema):
         after_roles = {email: roles_of(db, accounts[email]) for email in PEOPLE}
         after = {email: permissions_of(db, accounts[email]) for email in PEOPLE}
     for email, role in PEOPLE.items():
-        assert after[email] == ROLES_BEFORE[role], email
+        assert after[email] == _expected(role), email
         assert is_staff(after_roles[email]) == (role != "affiliate"), email
 
     # Every route the platform serves gives each of them the same answer.
@@ -429,7 +441,7 @@ def test_the_migration_moves_the_inbox_and_changes_nobodys_access(old_schema):
     for email, role in PEOPLE.items():
         for model in (False, True):
             for route, gates in routes:
-                was = _allowed(gates, ROLES_BEFORE[role], role != "affiliate", model)
+                was = _allowed(gates, _expected(role), role != "affiliate", model)
                 now = _allowed(gates, after[email], is_staff(after_roles[email]), model)
                 assert was == now, (email, model, route.methods, route.path)
 
@@ -478,11 +490,11 @@ def _probe_over_http() -> None:
             assert signed_in.status_code == 200, (email, signed_in.text)
             headers = {"X-CSRF-Token": signed_in.json()["csrf"]}
             me = client.get("/api/auth/me", headers=headers).json()
-            assert sorted(me["permissions"]) == sorted(ROLES_BEFORE[role]), email
+            assert sorted(me["permissions"]) == sorted(_expected(role)), email
             assert me["actor"]["is_staff"] == (role != "affiliate"), email
             assert me["actor"]["is_model"] is False, email
             for path, gates in PROBES.items():
-                expected = _allowed(gates, ROLES_BEFORE[role], role != "affiliate", False)
+                expected = _allowed(gates, _expected(role), role != "affiliate", False)
                 status = client.get(path, headers=headers).status_code
                 assert (status != 403) == expected, (email, path, status)
                 assert status != 500, (email, path)

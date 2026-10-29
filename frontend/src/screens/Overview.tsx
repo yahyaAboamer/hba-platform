@@ -83,6 +83,8 @@ type Summary = {
     commission_piastres: number;
     fixed_piastres: number;
     guarantee_top_up_piastres: number;
+    /** ADR 0070. Bonuses added to the month, so the parts still add up. */
+    bonus_piastres: number;
   };
   /** Keyed by why: `no_target`, `not_recorded_this_week`, `behind`. */
   selling_models: number;
@@ -342,6 +344,7 @@ export function Overview({ session }: { session: Session }) {
                 <div><dt>Fixed salary</dt><dd><Money piastres={summary.expected.fixed_piastres} /></dd></div>
                 <div><dt>Commission</dt><dd><Money piastres={summary.expected.commission_piastres} /></dd></div>
                 {summary.expected.guarantee_top_up_piastres > 0 && <div className="overview__parts--lift"><dt>Guarantee top-ups</dt><dd><Money piastres={summary.expected.guarantee_top_up_piastres} /></dd></div>}
+                {summary.expected.bonus_piastres > 0 && <div className="overview__parts--lift"><dt>Bonuses</dt><dd><Money piastres={summary.expected.bonus_piastres} /></dd></div>}
               </dl>
             </>}
             <Link className="control-font" to={`/payments?month=${month}`}>Open {formatMonth(month)} in Payments →</Link>

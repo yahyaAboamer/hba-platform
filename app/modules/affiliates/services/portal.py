@@ -534,6 +534,12 @@ def _makeup(figures: dict, total_piastres: int, policy: str = PENDING_INCLUSIVE)
             }
         )
 
+    # ADR 0070. One line for the month's bonuses together - the amount, never
+    # the reason, which is for staff and is not in `figures` to begin with.
+    bonus = int(figures.get("bonus_piastres") or 0)
+    if bonus:
+        lines.append({"label": "Bonus from HBA", "piastres": bonus, "detail": None})
+
     difference = total_piastres - sum(line["piastres"] for line in lines)
     if difference:
         lines.append(
@@ -564,7 +570,8 @@ def _split(figures: dict, total: int) -> dict | None:
     if figures.get("compensation_type") != CompensationType.FIXED_PLUS_COMMISSION:
         return None
     salary = int(figures.get("fixed_piastres") or 0)
-    commission = total - salary
+    # ADR 0070. A bonus is neither half; the hero names it on its own line.
+    commission = total - salary - int(figures.get("bonus_piastres") or 0)
     return {
         "salary_piastres": salary,
         "salary": format_egp(salary),
@@ -600,7 +607,10 @@ def _guarantee(figures: dict, total: int) -> dict | None:
     # it did, this month's own commission: the one it replaced, the same
     # figure "See how it adds up" names.
     commission = (
-        _display_piastres(figures.get("commission_piastres") or 0) if applied else total
+        _display_piastres(figures.get("commission_piastres") or 0)
+        if applied
+        # ADR 0070. The bonus is not commission; it has its own line.
+        else total - int(figures.get("bonus_piastres") or 0)
     )
     return {
         "piastres": amount,
@@ -734,6 +744,7 @@ def my_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
             "amount_piastres": None,
             "amount": None,
             "split": None,
+            "bonus": None,
             "makeup": [],
             "carried_in": [],
             "carried_out": [],
@@ -858,6 +869,16 @@ def my_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
         "amount_piastres": total,
         "amount": format_egp(total),
         "split": _split(figures, total),
+        # ADR 0070. Already inside `amount`; said on its own so she can see a
+        # bonus was added. Amount only - the reason is for staff.
+        "bonus": (
+            {
+                "piastres": int(figures.get("bonus_piastres") or 0),
+                "amount": format_egp(int(figures.get("bonus_piastres") or 0)),
+            }
+            if figures.get("bonus_piastres") and total is not None
+            else None
+        ),
         "makeup": _makeup(
             figures, total, policy_of(snapshot) if agreed else PENDING_INCLUSIVE
         ),

@@ -378,6 +378,11 @@ def source_version(
     # moved* answer keeps working for them.
     if deductions:
         facts["deductions"] = deductions
+    # ADR 0070. A bonus added or withdrawn between the preview and the commit
+    # changes what is agreed. Added only when there is one, for the same
+    # reason as the deductions above.
+    if calculation.bonus_lines:
+        facts["bonuses"] = calculation.bonus_lines
     return content_hash(facts)[:16]
 
 

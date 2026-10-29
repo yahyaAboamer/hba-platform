@@ -63,6 +63,9 @@ class Breakdown:
     commission_piastres: int = 0
     fixed_piastres: int = 0
     guarantee_top_up_piastres: int = 0
+    #: ADR 0070. Taken out first: it is exact, whole pounds, and on top of
+    #: everything else, so nothing else may be mistaken for it.
+    bonus_piastres: int = 0
 
 
 @dataclass
@@ -105,7 +108,12 @@ def _attribute(calculation) -> Breakdown:
     be subtracted safely; the commission is whatever remains, which is what
     makes the three add up to the figure the payroll screen shows.
     """
-    payout = calculation.payout_piastres
+    total = calculation.payout_piastres
+    # ADR 0070. A bonus sits on top of the guarantee comparison, so the parts
+    # below are carved from what is left once it is set aside - otherwise a
+    # guaranteed-minimum month would report the bonus as a bigger top-up.
+    bonus = min(int(getattr(calculation, "bonus_piastres", 0) or 0), total)
+    payout = total - bonus
     fixed = 0
     top_up = 0
 
@@ -131,10 +139,11 @@ def _attribute(calculation) -> Breakdown:
             top_up = max(payout - earned, 0)
 
     return Breakdown(
-        payout_piastres=payout,
+        payout_piastres=total,
         fixed_piastres=fixed,
         guarantee_top_up_piastres=top_up,
         commission_piastres=max(payout - fixed - top_up, 0),
+        bonus_piastres=bonus,
     )
 
 
@@ -182,6 +191,7 @@ def month_summary(db: Session, month: str) -> Summary:
             summary.breakdown.guarantee_top_up_piastres += (
                 part.guarantee_top_up_piastres
             )
+            summary.breakdown.bonus_piastres += part.bonus_piastres
 
         state = pace_for(db, affiliate, month).state
         if state in NEEDS_REVIEW:

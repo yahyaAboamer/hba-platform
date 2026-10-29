@@ -158,6 +158,23 @@ a.home__card:hover {
   font-weight: 600;
 }
 
+/* ADR 0070. A bonus HBA added, already inside the figure above. The accent
+   tint marks it as good news without making it louder than the figure. */
+.home__bonus {
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--accent-soft);
+}
+
+.home__bonus strong {
+  font-weight: 600;
+  color: var(--accent-lift);
+}
+
 /* Salary plus commission: what the total is made of, side by side. Only the
    commission grows as she sells, so only it carries the accent. */
 .home__split {
