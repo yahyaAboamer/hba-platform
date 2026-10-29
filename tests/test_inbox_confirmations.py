@@ -212,6 +212,78 @@ def test_why_there_is_no_message_is_kept_with_the_order(db):
     assert (row.state, row.last_error) == ("not_needed", PAID)
 
 
+def test_a_number_with_the_zero_kept_after_the_country_code_is_still_messaged():
+    """Order #31857: Shopify's page shows +20 10 09156440; its API returned
+    +2001009156440, and the order was refused as having no readable number."""
+    decision = decide(
+        _order(customer={"firstName": "Hosny", "phone": None}, shippingAddress={"phone": "+2001009156440"})
+    )
+    assert (decision.state, decision.phone) == ("would_send", "201009156440")
+
+
+def test_an_order_decided_with_no_readable_number_is_reported(db, caplog):
+    import logging
+
+    node = _order(customer={"firstName": "Nour", "phone": None}, shippingAddress={"phone": "12345"})
+    with caplog.at_level(logging.WARNING, logger="hba.anomaly"):
+        row = confirm_order(db, "5004", client=_shopify(node))
+    assert row.state == "bad_phone"
+    assert "ANOMALY order_not_messaged" in caplog.text
+    assert "#31044" in caplog.text
+    assert "12345" not in caplog.text
+
+
+def test_an_order_with_nothing_wrong_is_not_reported_as_not_messaged(db, caplog):
+    import logging
+
+    with caplog.at_level(logging.WARNING, logger="hba.anomaly"):
+        confirm_order(db, "5005", client=_shopify(_order()))
+    assert "order_not_messaged" not in caplog.text
+
+
+def _silent(db, order_id, name, *, placed_ago, state, **changes):
+    placed = utcnow() - placed_ago
+    row = OrderConfirmation(
+        shopify_order_id=order_id, order_name=name, state=state, placed_at=placed, **changes
+    )
+    db.add(row)
+    db.flush()
+    return row
+
+
+def test_the_sweep_names_orders_that_should_carry_a_tag_and_do_not(db, caplog):
+    import logging
+
+    ago = timedelta(hours=2)
+    _silent(db, "6001", "#1", placed_ago=ago, state="bad_phone")
+    _silent(db, "6002", "#2", placed_ago=ago, state="failed")
+    _silent(db, "6003", "#3", placed_ago=ago, state="pending")
+    _silent(
+        db, "6004", "#4", placed_ago=ago, state="sent",
+        sent_at=utcnow() - ago, tags_read_at=utcnow() - timedelta(hours=1),
+    )
+    with caplog.at_level(logging.WARNING, logger="hba.anomaly"):
+        confirmations._handle_confirm_sweep(db, {})
+    assert "ANOMALY orders_untagged" in caplog.text
+    assert "count=4" in caplog.text
+
+
+def test_the_sweep_leaves_settled_recent_and_old_orders_alone(db, caplog):
+    import logging
+
+    _silent(db, "6101", "#10", placed_ago=timedelta(hours=2), state="not_needed")
+    _silent(db, "6102", "#11", placed_ago=timedelta(hours=2), state="no_whatsapp")
+    _silent(db, "6103", "#12", placed_ago=timedelta(minutes=5), state="bad_phone")
+    _silent(db, "6104", "#13", placed_ago=timedelta(days=3), state="bad_phone")
+    _silent(
+        db, "6105", "#14", placed_ago=timedelta(hours=2), state="sent",
+        sent_at=utcnow() - timedelta(hours=2), tags_read_at=utcnow(), shopify_tags="WA Sent 📤",
+    )
+    with caplog.at_level(logging.WARNING, logger="hba.anomaly"):
+        confirmations._handle_confirm_sweep(db, {})
+    assert "orders_untagged" not in caplog.text
+
+
 def test_an_old_order_is_never_considered(db):
     """A re-sync of last month's orders must not produce a confirmation."""
     old = _order(createdAt=_iso(utcnow() - timedelta(hours=49)))

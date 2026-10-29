@@ -43,6 +43,11 @@ def egyptian_mobile(raw: object) -> str | None:
         digits = "20" + digits[1:]
     elif len(digits) == 10 and digits.startswith("1"):
         digits = "20" + digits
+    # The 0 of 010... kept after the country code: +20 0100... Shopify's page
+    # shows such a number tidied, but its API returns it as typed. Only a
+    # mobile gets this; the same slip on any other number stays refused.
+    if digits.startswith("200") and _EGYPTIAN_MOBILE.fullmatch("20" + digits[3:]):
+        digits = "20" + digits[3:]
     return digits if _EGYPTIAN_MOBILE.fullmatch(digits) else None
 
 

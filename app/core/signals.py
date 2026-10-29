@@ -115,6 +115,15 @@ class Anomaly:
     #: Expected in ordinary operation; a flood of it means a sender is looping.
     WORK_DEDUPLICATED = "work_deduplicated"
 
+    #: A cash-on-delivery order was decided with no message to send: no phone
+    #: number, or one that could not be read. Somebody has to call her.
+    ORDER_NOT_MESSAGED = "order_not_messaged"
+
+    #: Orders older than half an hour that carry no confirmation tag in
+    #: Shopify, whatever the reason. The catch-all for what nothing above
+    #: names: a stuck send, a tag that never landed, a state nobody expected.
+    ORDERS_UNTAGGED = "orders_untagged"
+
 
 def report(anomaly: str, **context: Any) -> None:
     """Record that something was prevented. Never raises.

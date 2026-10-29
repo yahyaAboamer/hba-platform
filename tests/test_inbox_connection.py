@@ -235,6 +235,13 @@ def test_replacing_a_key_keeps_the_switch_but_a_different_number_resets_it(db, p
         ("201005550188", "201005550188"),
         ("1005550188", "201005550188"),
         ("01505550188", "201505550188"),
+        # The 0 of 010... kept after +20 (order #31857): Shopify's own page
+        # shows it tidied, its API returns it as typed.
+        ("+2001009156440", "201009156440"),
+        ("+20 0100 555 0188", "201005550188"),
+        ("00200100 555 0188", "201005550188"),
+        ("2001005550188", "201005550188"),
+        ("+200225550188", None),   # the same slip on a landline stays refused
         ("0225550188", None),      # a Cairo landline
         ("0100555018", None),      # one digit short
         ("010055501888", None),    # one digit long
