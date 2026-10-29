@@ -358,3 +358,20 @@ def test_the_audit_trail_says_what_happened_in_words(admin):
         ("payroll.bonus_added", REASON, "affiliates"),
         ("payroll.bonus_withdrawn", None, "affiliates"),
     ]
+
+
+def test_nobody_adds_a_bonus_to_their_own_profile(admin):
+    """A member of staff may also be a model (ADR 0067). A bonus is money they
+    could otherwise pay themselves."""
+    with engine.connect() as connection:
+        owner = connection.execute(
+            text("SELECT id FROM user_account WHERE email = 'owner@example.com'")
+        ).scalar_one()
+    response = admin.post("/api/affiliates", json={"user_account_id": owner, "name": "Owner"})
+    assert response.status_code == 201, response.text
+    own = response.json()
+
+    refused = _bonus(admin, own["id"])
+
+    assert refused.status_code == 403
+    assert "your own profile" in refused.json()["detail"]

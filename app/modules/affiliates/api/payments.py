@@ -822,6 +822,9 @@ def create_bonus(
             actor_id=actor.id,
             actor_email=actor.email,
         )
+    except PermissionError as exc:
+        db.rollback()
+        raise HTTPException(403, str(exc)) from exc
     except ValueError as exc:
         db.rollback()
         raise HTTPException(409, str(exc)) from exc
@@ -860,6 +863,9 @@ def withdraw_bonus_route(
     except LookupError as exc:
         db.rollback()
         raise HTTPException(404, str(exc)) from exc
+    except PermissionError as exc:
+        db.rollback()
+        raise HTTPException(403, str(exc)) from exc
     except ValueError as exc:
         db.rollback()
         raise HTTPException(409, str(exc)) from exc

@@ -75,6 +75,16 @@ def bonus_lines_for(db: Session, affiliate: AffiliateProfile, month: str) -> lis
     ]
 
 
+def _refuse_self(affiliate: AffiliateProfile, actor_id: int | None) -> None:
+    """Nobody adds a bonus to, or takes one from, their own profile.
+
+    A member of staff may also hold a model profile (ADR 0067), and a bonus is
+    money they could otherwise pay themselves.
+    """
+    if actor_id is not None and affiliate.user_account_id == actor_id:
+        raise PermissionError("You cannot add or withdraw a bonus on your own profile.")
+
+
 def _refuse_unless_open(db: Session, affiliate: AffiliateProfile, month: str) -> None:
     """Why this month cannot take a bonus, as a sentence, or nothing."""
     from app.modules.affiliates.services.payroll import get_month, is_historical, working_month
@@ -115,6 +125,7 @@ def add_bonus(
     from app.modules.affiliates.services.payroll import open_month
 
     month = parse_month(month)
+    _refuse_self(affiliate, actor_id)
     if isinstance(amount_piastres, bool) or not isinstance(amount_piastres, int):
         raise ValueError("A bonus is an amount in piastres.")
     if amount_piastres <= 0:
@@ -189,6 +200,7 @@ def withdraw_bonus(
     """Take a bonus back, while its month is still unagreed. Takes the gate."""
     from app.modules.affiliates.services.money_gate import hold_money_gate
 
+    _refuse_self(affiliate, actor_id)
     hold_money_gate(db, affiliate)
 
     bonus = db.get(PayrollBonus, bonus_id)

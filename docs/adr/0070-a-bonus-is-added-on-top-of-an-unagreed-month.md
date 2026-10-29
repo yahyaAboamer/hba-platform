@@ -53,6 +53,8 @@ department, roadmap batch 4.2).
    admin (every permission) and the affiliate manager. A finance role is given
    it when one is created. Anybody who can see a model can see her bonuses
    and their reasons.
+   **Nobody adds or withdraws a bonus on their own profile** - a member of
+   staff may also hold a model profile (ADR 0067), and the server refuses it.
 8. **Whole pounds, at most EGP 100,000** for one bonus. Payouts round to the
    pound once (ADR 0004), so a fraction would be rounded away; the ceiling
    catches three extra zeros.
