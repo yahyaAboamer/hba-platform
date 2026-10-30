@@ -104,11 +104,13 @@ def _message(db, conversation, at, *, direction="in", kind="text", **fields) -> 
     return message
 
 
-def _confirmation(db, order_id, conversation=None, *, state="sent", answer=None, answered_at=None):
+def _confirmation(
+    db, order_id, conversation=None, *, state="sent", answer=None, answered_at=None, placed_at=None
+):
     row = OrderConfirmation(
         shopify_order_id=order_id, order_name=f"#{order_id}", state=state, answer=answer,
         answered_at=answered_at, conversation_id=conversation.id if conversation else None,
-        phone="201005550188", customer_name="Nour", total_text="1450.00", placed_at=NOW,
+        phone="201005550188", customer_name="Nour", total_text="1450.00", placed_at=placed_at or NOW,
     )
     db.add(row)
     db.flush()
@@ -337,23 +339,41 @@ def test_one_customer_waiting_and_not_yet_late(db):
 
 
 def test_customers_who_asked_for_a_change(db):
+    """Confirmations' *Change* card as it opens: the last 7 days' orders whose
+    customer answered Change and that Shopify has not shipped or cancelled."""
     _connected(db)
-    now = _cairo(2026, 10, 25, 12, 0)
-    asked = _chat(db, "201005550101")
-    _confirmation(db, "7001", asked, answer="edit", answered_at=_cairo(2026, 10, 24, 10, 5))
-    also = _chat(db, "201005550102")
-    _confirmation(db, "7002", also, answer="edit", answered_at=_cairo(2026, 10, 25, 9, 0))
-    # Her latest order was confirmed: the older change no longer counts.
-    settled = _chat(db, "201005550103")
-    _confirmation(db, "7003", settled, answer="edit", answered_at=_cairo(2026, 10, 20, 9, 0))
-    _confirmation(db, "7004", settled, answer="confirmed", answered_at=_cairo(2026, 10, 25, 9, 0))
-    body = today_body(db, _person(db, "cs@example.com", "customer_service"), now)
+    first = NOW - timedelta(hours=26)
+    _confirmation(db, "7001", _chat(db, "201005550101"), answer="edit", answered_at=first)
+    _confirmation(db, "7002", _chat(db, "201005550102"), answer="edit", answered_at=NOW - timedelta(hours=3))
+    # Placed ten days ago: no longer on the card, however it was answered.
+    _confirmation(
+        db, "7003", _chat(db, "201005550103"), answer="edit",
+        answered_at=NOW - timedelta(days=10), placed_at=NOW - timedelta(days=10),
+    )
+    # Shipped since: Shopify settled it, so it left the card.
+    _confirmation(db, "7004", _chat(db, "201005550104"), answer="edit", answered_at=NOW - timedelta(hours=5))
+    _indexed(db, "7004", NOW, fulfillment_status="fulfilled")
+    body = today_body(db, _person(db, "cs@example.com", "customer_service"), NOW)
 
     item = next(i for i in body["items"] if i["key"] == "inbox.wants_a_change")
     assert item["what"] == "2 customers asked to change their order"
     assert item["detail"] == "They answered Change on the confirmation message"
-    assert _at(item["since"]) == _cairo(2026, 10, 24, 10, 5)
+    assert item["go"] == {"label": "Open", "to": "/inbox/confirmations?card=edit"}
+    assert _at(item["since"]) == first
     assert item["when"] == "since" and item["late"] is True
+
+
+def test_a_change_dealt_with_long_ago_is_not_waiting(db):
+    """Chats' *Wants a change* view keeps a chat whose latest answer was ever
+    Change; Today does not count it once the order has left the card."""
+    _connected(db)
+    _confirmation(
+        db, "7101", _chat(db, "201005550111"), answer="edit",
+        answered_at=NOW - timedelta(days=40), placed_at=NOW - timedelta(days=40),
+    )
+    body = today_body(db, _person(db, "cs@example.com", "customer_service"), NOW)
+
+    assert "inbox.wants_a_change" not in {i["key"] for i in body["items"]}
 
 
 def test_whatsapp_gone_quiet_is_broken(db):
@@ -609,11 +629,13 @@ def test_today_and_each_screen_give_the_same_number(owner, monkeypatch):
     body = owner.get("/api/today").json()
     items = {item["key"]: item for item in body["items"]}
 
-    # Chats: its Unread and Wants a change views.
+    # Chats: its Unread view. Confirmations: its Change card.
     chips = owner.get("/api/inbox/conversations").json()["counts"]
     assert body["counts"]["chats_unread"] == chips["unread"] == 3
     assert items["inbox.waiting_for_reply"]["what"].startswith(f"{chips['unread']} customers")
-    assert items["inbox.wants_a_change"]["what"].startswith(f"{chips['edit']} customers")
+    card = owner.get("/api/inbox/confirmations").json()["tiles"]["edit"]
+    assert card == 2
+    assert items["inbox.wants_a_change"]["what"].startswith(f"{card} customers")
 
     # Shopify: the bosta_sync_failed card.
     card = next(

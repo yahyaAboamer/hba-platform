@@ -1,8 +1,9 @@
 """What the Inbox says is waiting, for Today (Phase 2, batch 2.2).
 
-Only for somebody holding ``inbox.use``. The counts are Chats' own
-(``chats.counts``: its *Unread* and *Wants a change* views), and WhatsApp's
-state is the Inbox heading's (``health.pulse``).
+Only for somebody holding ``inbox.use``. Customers waiting for a reply are
+Chats' *Unread* (``chats.counts``); changes asked for are Confirmations'
+*Change* card (``chats.changes_asked``); WhatsApp's state is the Inbox
+heading's (``health.pulse``).
 """
 
 from datetime import datetime, timedelta
@@ -51,9 +52,12 @@ def look(db: Session, permissions: frozenset[str], now: datetime) -> Look:
             )
         )
 
-    edit = counted["edit"]
+    # Confirmations' *Change* card, not Chats' *Wants a change* view: the
+    # view keeps every chat whose latest answer was ever Change, however long
+    # ago it was dealt with (100 on production on 30 October, when the card
+    # said 3). The card counts the last 7 days' orders still open in Shopify.
+    edit, oldest = chats.changes_asked(db, now=now)
     if edit:
-        oldest = chats.oldest_edit_answer_at(db)
         found.items.append(
             Item(
                 key="inbox.wants_a_change",
@@ -65,9 +69,7 @@ def look(db: Session, permissions: frozenset[str], now: datetime) -> Look:
                 ),
                 detail="They answered Change on the confirmation message",
                 go_label="Open",
-                # Chats chooses its view by a click, not by its address, so
-                # this opens Chats (no new screen behaviour in 2.2).
-                go_to="/inbox/chats",
+                go_to="/inbox/confirmations?card=edit",
                 late=oldest is not None and now - oldest > CHANGE_LATE_AFTER,
                 since=oldest,
                 when=SINCE if oldest else None,
