@@ -75,11 +75,16 @@ production's backup on 25 October; the reconciliation is rerun after the first p
 
 ## Phase 2 — One frame for every department (ADR 0068)
 
-**Batch 2.1 — The frame**
+Plan: `2026-10-30-phase-2-frame.md`, approved by the owner on 30 October with
+every recommended choice.
 
-| Task | Status |
-|---|---|
-| Departments declared once; the sidebar; department addresses with redirects; Today; Team and access by department; Settings split; the phone layout | Pending: next. Write its plan file first and get the owner's word |
+| Batch | Task | Status |
+|---|---|---|
+| 2.0 | Frontend department folders (moves only) | In progress: the built bundle is byte-identical to `main`'s |
+| 2.1 | Departments declared once; the sidebar; the phone layout; department addresses with redirects | Pending |
+| 2.2 | Today, and the sidebar's numbers from the same source | Pending |
+| 2.3 | Settings split: Me, Integrations, Company; department settings into their departments; the activity log by department | Pending |
+| 2.4 | Team and access by department | Pending |
 
 ## Phase 3 — Shared records (ADRs 0066, 0068)
 
