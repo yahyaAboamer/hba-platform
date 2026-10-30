@@ -240,24 +240,6 @@ def oldest_unread_at(db: Session) -> datetime | None:
     return db.scalar(select(func.min(ranked.c.occurred_at)).where(ranked.c.place <= ranked.c.unread))
 
 
-def oldest_edit_answer_at(db: Session) -> datetime | None:
-    """When the longest-waiting of the chats in *Wants a change* (``counts``'
-    ``edit``) answered Change on her latest order."""
-    # Each chat's latest order, as `_latest_answer` picks it, in one pass.
-    latest = (
-        select(OrderConfirmation.answer, OrderConfirmation.answered_at)
-        .where(OrderConfirmation.conversation_id.is_not(None))
-        .distinct(OrderConfirmation.conversation_id)
-        .order_by(
-            OrderConfirmation.conversation_id,
-            OrderConfirmation.created_at.desc(),
-            OrderConfirmation.id.desc(),
-        )
-        .subquery()
-    )
-    return db.scalar(select(func.min(latest.c.answered_at)).where(latest.c.answer == "edit"))
-
-
 # ── One chat ──────────────────────────────────────────────────────────────────
 
 
@@ -749,6 +731,34 @@ def _count(db: Session, *where) -> int:
     return db.scalar(select(func.count()).select_from(OrderConfirmation).where(*where)) or 0
 
 
+def _recent(days: int, now: datetime | None = None):
+    """The orders a Confirmations card looks at: placed in the last ``days``."""
+    since = (now or utcnow()) - timedelta(days=max(1, min(days, 90)))
+    return and_(OrderConfirmation.placed_at >= since, OrderConfirmation.state != "not_needed")
+
+
+def _card_settled(name: str):
+    return _settled(shipped_counts=name != "awaiting_payment")
+
+
+def _card_open(name: str):
+    """An action card counts only what Shopify has not settled yet."""
+    return ~_card_settled(name) if name in ACTION_TILES else and_(true())
+
+
+def changes_asked(
+    db: Session, days: int = 7, now: datetime | None = None
+) -> tuple[int, datetime | None]:
+    """The Confirmations screen's *Change* card as it opens (the last ``days``,
+    orders still open in Shopify): how many, and when the earliest of them
+    answered. Today counts this, so the two cannot disagree."""
+    where = (_recent(days, now), _tile("edit"), _card_open("edit"))
+    count, oldest = db.execute(
+        select(func.count(), func.min(OrderConfirmation.answered_at)).where(*where)
+    ).one()
+    return count or 0, oldest
+
+
 def confirmations(db: Session, *, tile: str | None = None, days: int = 7) -> dict:
     """Where each cash-on-delivery order's confirmation stands, and each
     unpaid international order's payment request (ADR 0062).
@@ -761,26 +771,20 @@ def confirmations(db: Session, *, tile: str | None = None, days: int = 7) -> dic
     """
     if tile is not None and tile not in TILES:
         raise Refused("That is not one of the Confirmations cards.")
-    since = utcnow() - timedelta(days=max(1, min(days, 90)))
-    recent = and_(OrderConfirmation.placed_at >= since, OrderConfirmation.state != "not_needed")
-    def settled(name: str):
-        return _settled(shipped_counts=name != "awaiting_payment")
-
-    def still_open(name: str):
-        return ~settled(name) if name in ACTION_TILES else and_(true())
+    recent = _recent(days)
 
     body: dict[str, Any] = {
         "days": days,
         "total": _count(db, recent),
-        "tiles": {name: _count(db, recent, _tile(name), still_open(name)) for name in TILES},
+        "tiles": {name: _count(db, recent, _tile(name), _card_open(name)) for name in TILES},
         # What left each action card because Shopify already settled it.
-        "done": {name: _count(db, recent, _tile(name), settled(name)) for name in ACTION_TILES},
+        "done": {name: _count(db, recent, _tile(name), _card_settled(name)) for name in ACTION_TILES},
         "orders": None,
     }
     if tile is not None:
         rows = db.scalars(
             select(OrderConfirmation)
-            .where(recent, _tile(tile), still_open(tile))
+            .where(recent, _tile(tile), _card_open(tile))
             .order_by(OrderConfirmation.placed_at.desc())
             .limit(200)
         ).all()

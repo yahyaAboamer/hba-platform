@@ -351,9 +351,14 @@ as the Inbox's count is now.
   During a running month that is everyone on the desk, because the app lets a
   month be approved before it ends. Whether Today should count only ended
   months is the owner's to decide.
-- **Not addressable yet:** Chats' *Wants a change* view and the Shopify tab's
-  *never reached Bosta* card open on a click, so those rows open the screen,
-  not the view.
+- **Changes asked for** count Confirmations' *Change* card as it opens (the
+  last 7 days' orders still open in Shopify), and the row opens that card
+  (`/inbox/confirmations?card=edit`). *Corrected after the production check
+  on 30 October:* Chats' *Wants a change* view, which the correction above
+  named, keeps every chat whose latest answer was ever Change; it said 100
+  where the card said 3.
+- **Not addressable yet:** the Shopify tab's *never reached Bosta* card opens
+  on a click, so that row opens the tab.
 - **A failed refresh** keeps the last reading with its time ("Could not
   refresh · Updated 3 minutes ago") rather than blanking the page and badges.
 
