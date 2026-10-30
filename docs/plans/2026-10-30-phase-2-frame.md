@@ -346,11 +346,14 @@ as the Inbox's count is now.
 - **Applications** count every pending profile, house accounts included, as
   the Models screen's Applications segment does; the old sidebar count now
   uses the same function.
-- **Payments waiting for approval** count the month the Payments screen opens
-  on, for whoever may approve; the sidebar badge now uses that month too.
-  During a running month that is everyone on the desk, because the app lets a
-  month be approved before it ends. Whether Today should count only ended
-  months is the owner's to decide.
+- **Payments waiting for approval** count **only months that have ended**
+  (the owner's word, 30 October): one row per ended month from go-live that
+  still has somebody *Awaiting approval*, oldest first, each opening that
+  month's Payments screen, for whoever may approve; the sidebar badge adds
+  them up. The running month is never counted: the app lets a month be
+  approved before it ends, so it said everyone on the desk was waiting, all
+  month. A month nobody on its desk can be waiting in is skipped by one
+  query; the others are counted as the Payments screen counts them.
 - **Changes asked for** count Confirmations' *Change* card as it opens (the
   last 7 days' orders still open in Shopify), and the row opens that card
   (`/inbox/confirmations?card=edit`). *Corrected after the production check

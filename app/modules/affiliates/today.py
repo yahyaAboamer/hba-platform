@@ -6,8 +6,9 @@ acts on it. Every number is the screen's own:
 - applications: the Models screen's *Applications* segment
   (``applications.waiting_applications``, also the sidebar's badge);
 - targets not set: the Targets grid's roster (``targets.targets_not_set``);
-- payments: the Payments screen's *Awaiting approval*, on the month that screen
-  opens on (``payments.awaiting_approval`` on ``working_month()``).
+- payments: the Payments screen's *Awaiting approval*, on each month that has
+  ended and still has somebody waiting (``payments.ended_months_awaiting_approval``,
+  which counts with ``awaiting_approval``).
 """
 
 from datetime import date, datetime, timedelta
@@ -17,8 +18,7 @@ from sqlalchemy.orm import Session
 from app.core.businesstime import at_words, business_date, business_month, month_add, month_name, month_words
 from app.core.permissions import Permission
 from app.modules.affiliates.services.applications import waiting_applications
-from app.modules.affiliates.services.payments import awaiting_approval
-from app.modules.affiliates.services.payroll import working_month
+from app.modules.affiliates.services.payments import ended_months_awaiting_approval
 from app.modules.affiliates.services.targets import targets_not_set
 from app.shared.services.today import DEADLINE, ELAPSED, Item, Look
 
@@ -80,7 +80,7 @@ def _targets(db: Session, now: datetime) -> Item | None:
 
 def _payments(n: int, month: str) -> Item:
     return Item(
-        key="affiliates.payments_awaiting_approval",
+        key=f"affiliates.payments_awaiting_approval.{month}",
         department=DEPARTMENT,
         what="1 payment waiting for approval" if n == 1 else f"{n} payments waiting for approval",
         detail=month_words(month),
@@ -105,9 +105,9 @@ def look(db: Session, permissions: frozenset[str], now: datetime) -> Look:
         if item is not None:
             found.items.append(item)
 
-    month = working_month()
-    payments = awaiting_approval(db, month)
-    found.counts["payments_awaiting_approval"] = payments
-    if payments and Permission.PAYROLL_APPROVE in permissions:
-        found.items.append(_payments(payments, month))
+    # Only months that have ended: one row each, oldest first; the badge adds them.
+    waiting = ended_months_awaiting_approval(db, now)
+    found.counts["payments_awaiting_approval"] = sum(count for _, count in waiting)
+    if Permission.PAYROLL_APPROVE in permissions:
+        found.items.extend(_payments(count, month) for month, count in waiting)
     return found

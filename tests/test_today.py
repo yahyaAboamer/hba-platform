@@ -36,6 +36,17 @@ from app.shared.services import order_week
 
 NOW = utcnow()
 PASSWORD = "quiet-harbour-lantern"
+#: Go-live is last month in these tests, so exactly one month has ended that
+#: payments can wait in (only ended months count, owner's word, 30 October).
+LAST_MONTH = month_add(business_month(NOW), -1)
+PAYMENTS_KEY = f"affiliates.payments_awaiting_approval.{LAST_MONTH}"
+
+
+@pytest.fixture(autouse=True)
+def _go_live_last_month(monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "go_live_month", LAST_MONTH, raising=False)
 
 
 def _cairo(year, month, day, hour=12, minute=0) -> datetime:
@@ -213,7 +224,7 @@ def test_the_affiliate_manager_sees_no_inbox_or_operations(everything):
     assert body["departments"] == ["affiliates"]
     assert _departments(body) == {"affiliates"}
     assert "affiliates.applications" in _keys(body)
-    assert "affiliates.payments_awaiting_approval" in _keys(body)
+    assert PAYMENTS_KEY in _keys(body)
     assert body["orders"] is None
 
 
@@ -222,7 +233,7 @@ def test_the_content_manager_gets_no_payments_item(everything):
     body = today_body(db, _person(db, "content@example.com", "content_manager"), NOW)
 
     assert "affiliates.applications" in _keys(body)
-    assert "affiliates.payments_awaiting_approval" not in _keys(body)
+    assert PAYMENTS_KEY not in _keys(body)
     # The sidebar's Payments number stays, as /api/operations/counts gave it.
     assert "payments_awaiting_approval" in body["counts"]
 
@@ -442,18 +453,64 @@ def test_targets_set_for_some_and_late_near_the_month(db):
     assert item["late"] is True
 
 
-def test_payments_waiting_for_approval_on_the_payments_month(db):
-    from app.modules.affiliates.services.payroll import working_month
-
+def test_payments_waiting_for_approval_in_months_that_have_ended(db):
+    """Only ended months (owner, 30 October): the running month can be
+    approved early, so counting it said everyone was waiting all month."""
     _model(db, "Nour")
     body = today_body(db, _person(db, "am@example.com", "affiliate_manager"), NOW)
 
-    item = next(i for i in body["items"] if i["key"] == "affiliates.payments_awaiting_approval")
-    month = working_month()
+    payments = [i for i in body["items"] if i["key"].startswith("affiliates.payments_awaiting_approval")]
+    assert [i["key"] for i in payments] == [PAYMENTS_KEY]
+    item = payments[0]
     assert item["what"] == "1 payment waiting for approval"
-    assert item["go"]["to"] == f"/affiliates/payments?month={month}"
+    assert item["go"]["to"] == f"/affiliates/payments?month={LAST_MONTH}"
     assert item["when"] is None and item["since"] is None
     assert body["counts"]["payments_awaiting_approval"] == 1
+
+
+def test_one_row_for_each_ended_month_oldest_first(db, monkeypatch):
+    from app.config import settings
+
+    first = month_add(LAST_MONTH, -1)
+    monkeypatch.setattr(settings, "go_live_month", first, raising=False)
+    _model(db, "Nour")
+    body = today_body(db, _person(db, "am@example.com", "affiliate_manager"), NOW)
+
+    payments = [i["key"] for i in body["items"] if i["key"].startswith("affiliates.payments_awaiting_approval")]
+    assert payments == [f"affiliates.payments_awaiting_approval.{first}", PAYMENTS_KEY]
+    assert body["counts"]["payments_awaiting_approval"] == 2
+
+
+def test_the_running_month_is_never_counted(db, monkeypatch):
+    """Go-live this month: nothing has ended, so nothing waits, and the badge
+    says 0 rather than everyone on the desk."""
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "go_live_month", business_month(NOW), raising=False)
+    _model(db, "Nour")
+    body = today_body(db, _person(db, "am@example.com", "affiliate_manager"), NOW)
+
+    assert not [i for i in body["items"] if i["key"].startswith("affiliates.payments_awaiting_approval")]
+    assert body["counts"]["payments_awaiting_approval"] == 0
+
+
+def test_a_month_agreed_for_everybody_is_skipped_without_counting(db, monkeypatch):
+    """The cheap question skips a month nobody can be waiting in; the screen's
+    own count runs only where somebody might be."""
+    from app.modules.affiliates.services import payments as payments_service
+
+    counted = []
+    real = payments_service.awaiting_approval
+    monkeypatch.setattr(
+        payments_service, "awaiting_approval", lambda db, month: counted.append(month) or real(db, month)
+    )
+    # Nobody on the desk at all: nothing to count.
+    assert payments_service.ended_months_awaiting_approval(db, NOW) == []
+    assert counted == []
+    # Somebody without an agreed figure: counted the screen's way.
+    _model(db, "Nour")
+    assert payments_service.ended_months_awaiting_approval(db, NOW) == [(LAST_MONTH, 1)]
+    assert counted == [LAST_MONTH]
 
 
 # ── The order of the list ─────────────────────────────────────────────────────
@@ -480,7 +537,7 @@ def test_broken_first_then_the_longest_waiting(db):
         "inbox.waiting_for_reply",
         # Then those with no time, in department order.
         "affiliates.targets_not_set",
-        "affiliates.payments_awaiting_approval",
+        PAYMENTS_KEY,
     ]
 
 
@@ -649,13 +706,12 @@ def test_today_and_each_screen_give_the_same_number(owner, monkeypatch):
     assert body["counts"]["models_awaiting_approval"] == segment == 2
     assert items["affiliates.applications"]["what"].startswith(f"{segment} model")
 
-    # Payments: Awaiting approval on the month the screen opens on.
-    from app.modules.affiliates.services.payroll import working_month
-
-    desk = owner.get(f"/api/payments/{working_month()}").json()["affiliates"]
+    # Payments: Awaiting approval on the month that has ended, as its own
+    # Payments screen (the address Today's button opens) counts it.
+    desk = owner.get(f"/api/payments/{LAST_MONTH}").json()["affiliates"]
     not_approved = sum(1 for row in desk if row["state"] == "not_approved")
     assert body["counts"]["payments_awaiting_approval"] == not_approved
-    assert items["affiliates.payments_awaiting_approval"]["what"].startswith(f"{not_approved} payment")
+    assert items[PAYMENTS_KEY]["what"].startswith(f"{not_approved} payment")
 
     # The sidebar's old numbers agree too.
     counts = owner.get("/api/operations/counts").json()
