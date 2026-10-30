@@ -12,7 +12,6 @@ from sqlalchemy.orm import Session
 from app.core.businesstime import at_words, clock_words
 from app.core.permissions import Permission
 from app.modules.inbox.services import chats, health
-from app.shared.models.identity import UserAccount
 from app.shared.services.today import ELAPSED, SINCE, Item, Look
 
 DEPARTMENT = "inbox"
@@ -112,10 +111,3 @@ def look(db: Session, permissions: frozenset[str], now: datetime) -> Look:
             )
         )
     return found
-
-
-def waiting(db: Session, user: UserAccount, now: datetime) -> list[Item]:
-    """What waits in the Inbox for this person; nothing if they do not hold it."""
-    from app.shared.api.deps import permissions_of
-
-    return look(db, permissions_of(db, user), now).items

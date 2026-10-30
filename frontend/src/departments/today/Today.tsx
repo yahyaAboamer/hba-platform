@@ -99,7 +99,8 @@ function Row({ item, now }: { item: TodayItem; now: number }) {
       <span className="wait__what">
         {item.what}
         <small>
-          <span className="wait__from">{name}</span> · {item.detail}
+          <span className="wait__from">{name}</span>
+          {item.detail && ` · ${item.detail}`}
         </small>
       </span>
       <span className={item.late ? "wait__when wait__when--late" : "wait__when"}>{when}</span>
@@ -162,7 +163,14 @@ export function ordersSentence(orders: TodayOrders): string {
   return `${orders.placed} ${orders.placed === 1 ? "order" : "orders"}: ${stages.join(", ")}`;
 }
 
-function OrdersPanel({ orders }: { orders: TodayOrders }) {
+/** "09:38" today, "yesterday 09:38", "26 Oct" before that: an old reading says it is old. */
+export function asOf(iso: string, now: number): string {
+  const days = dayNumber(now) - dayNumber(iso);
+  if (days <= 0) return clockTime(iso);
+  return days === 1 ? `yesterday ${clockTime(iso)}` : dayMonth(iso);
+}
+
+function OrdersPanel({ orders, now }: { orders: TodayOrders; now: number }) {
   return (
     <section className="panel" aria-labelledby="flow-title">
       <div className="panel__head">
@@ -182,7 +190,7 @@ function OrdersPanel({ orders }: { orders: TodayOrders }) {
             {orders.rows.map((row) => {
               const source =
                 row.key === "with_bosta" && orders.bosta_as_of
-                  ? `${row.department} · as of ${clockTime(orders.bosta_as_of)}`
+                  ? `${row.department} · as of ${asOf(orders.bosta_as_of, now)}`
                   : row.department;
               return (
                 <tr key={row.key}>
@@ -229,15 +237,16 @@ export function Today() {
   const { body, readAt, failed } = useToday();
   const now = useNow();
   const narrow = useIsNarrow();
-  const sub = body ? `${headingDate(now)} · ${waitingSentence(body.items.length)}` : headingDate(now);
+  // "Nothing is waiting" is not said while a department could not be read.
+  const sub =
+    body && !(body.items.length === 0 && (body.unread ?? []).length > 0)
+      ? `${headingDate(now)} · ${waitingSentence(body.items.length)}`
+      : headingDate(now);
 
   const minutes = readAt === null ? 0 : Math.floor((now - readAt) / 60_000);
-  const updated =
-    readAt === null
-      ? null
-      : minutes < 1
-        ? "Updated just now"
-        : `Updated ${age(new Date(readAt).toISOString(), now)} ago`;
+  const readAgo = readAt === null ? null : minutes < 1 ? "just now" : `${age(new Date(readAt).toISOString(), now)} ago`;
+  // A refresh that failed after an earlier read keeps that read, and says so.
+  const updated = readAgo === null ? null : failed ? `Could not refresh · Updated ${readAgo}` : `Updated ${readAgo}`;
 
   const held = body ? listOf(body.departments.map((key) => departmentOf(key)?.name ?? key)) : "";
 
@@ -268,7 +277,7 @@ export function Today() {
         <h1 className="visually-hidden">Today</h1>
         <p className="psub">{sub}</p>
         {body ? list : <div className="panel">{list}</div>}
-        {body?.orders && <OrdersPanel orders={body.orders} />}
+        {body?.orders && <OrdersPanel orders={body.orders} now={now} />}
       </div>
     );
   }
@@ -295,7 +304,7 @@ export function Today() {
           </div>
           {list}
         </section>
-        {body?.orders && <OrdersPanel orders={body.orders} />}
+        {body?.orders && <OrdersPanel orders={body.orders} now={now} />}
       </div>
     </>
   );

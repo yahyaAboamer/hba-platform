@@ -13,7 +13,6 @@ from app.core.businesstime import at_words, clock_words
 from app.core.permissions import Permission
 from app.modules.operations.services import shopify
 from app.modules.operations.services.freshness import SOURCES, State, describe, has_numbers
-from app.shared.models.identity import UserAccount
 from app.shared.services.today import SINCE, ELAPSED, Item, Look
 
 DEPARTMENT = "operations"
@@ -95,10 +94,3 @@ def look(db: Session, permissions: frozenset[str], now: datetime) -> Look:
                 )
             )
     return found
-
-
-def waiting(db: Session, user: UserAccount, now: datetime) -> list[Item]:
-    """What waits in Operations for this person; nothing if they do not hold it."""
-    from app.shared.api.deps import permissions_of
-
-    return look(db, permissions_of(db, user), now).items

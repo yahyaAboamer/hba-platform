@@ -58,11 +58,14 @@ def where_it_is(
         or order.delivery_state == "failed"
         or order.return_activity
         or order.return_open
-        or answer == "cancelled"
     ):
         return "cancelled"
     if order.delivery_state == "delivered":
         return "delivered"
+    # After delivered: a customer who answered Cancel and then took the parcel
+    # was delivered. Until then the answer counts as the cancellation.
+    if answer == "cancelled":
+        return "cancelled"
     if on_bosta or str(order.fulfillment_status or "").lower() == "fulfilled":
         return "with_bosta"
     if answer == "edit" or (state == "sent" and answer is None):

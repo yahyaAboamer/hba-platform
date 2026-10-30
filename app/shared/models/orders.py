@@ -32,6 +32,8 @@ class OrderIndex(Base):
     __tablename__ = "order_index"
     __table_args__ = (
         Index("order_index_business_month_idx", "business_month"),
+        # The last seven days' orders (Today's orders panel).
+        Index("order_index_placed_at_idx", "placed_at"),
         # GIN over the code array. "Which orders used NOUR10?" is the question
         # this table exists to answer, and a btree cannot answer it.
         Index(

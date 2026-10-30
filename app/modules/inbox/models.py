@@ -230,6 +230,9 @@ class OrderConfirmation(Base):
             postgresql_where=text("state = 'pending'"),
         ),
         Index("order_confirmation_state_placed", "state", "placed_at"),
+        # A conversation's latest answer: Chats' "Wants a change" and Today
+        # ask it of every conversation, Today every 30 seconds.
+        Index("order_confirmation_conversation_latest", "conversation_id", "created_at", "id"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)

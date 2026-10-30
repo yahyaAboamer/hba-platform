@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import App from "../App";
 import { startFor } from "../departments";
-import { headingDate, ordersSentence, waitingSentence, weekRange, whenText } from "../departments/today/Today";
+import { asOf, headingDate, ordersSentence, waitingSentence, weekRange, whenText } from "../departments/today/Today";
 import type { TodayItem, TodayOrders } from "../departments/today/types";
 import { asked, serve, sessionOf } from "./frameHarness";
 import type { Answers, Kind } from "./frameHarness";
@@ -177,7 +177,7 @@ describe("who has Today and where they start", () => {
 
     const today = screen.getByRole("link", { name: /^Today/ });
     await waitFor(() => expect(today.textContent).toContain("3"));
-    expect(today.textContent).toContain("things waiting for you");
+    expect(today.textContent).toContain("3 things waiting for you");
   });
 
   it("draws no count when nothing is waiting", async () => {
@@ -218,6 +218,21 @@ describe("the sidebar's numbers come from the one read of /api/today", () => {
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(document.querySelector(".frame__count")).toBeNull();
     expect(document.querySelector(".frame__alert")).toBeNull();
+  });
+
+  it("keeps the last reading when a later read fails, and says it could not refresh", async () => {
+    const answers: Answers = { items: [BOSTA, CHATS], unread: 6 };
+    await open("/today", "owner", answers);
+    await screen.findByText(BOSTA.what);
+    await waitFor(() => expect(screen.getByRole("button", { name: /^Inbox/ }).textContent).toContain("6"));
+
+    // The next read fails: a tab coming back into view asks at once.
+    answers.today = "failed";
+    document.dispatchEvent(new Event("visibilitychange"));
+
+    expect(await screen.findByText(/^Could not refresh · Updated/)).toBeTruthy();
+    expect(screen.getByText(BOSTA.what)).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^Inbox/ }).textContent).toContain("6");
   });
 });
 
@@ -389,6 +404,12 @@ describe("Orders, last 7 days", () => {
     expect(ordersSentence({ ...ORDERS, placed: 1, rows: [{ ...ORDERS.rows[3], count: 1 }] })).toBe(
       "1 order: 1 delivered",
     );
+  });
+
+  it("says how old Bosta's reading is: a time today, yesterday, or a date", () => {
+    expect(asOf("2026-10-25T06:38:00Z", NOW)).toBe("09:38");
+    expect(asOf("2026-10-24T06:38:00Z", NOW)).toBe("yesterday 09:38");
+    expect(asOf("2026-10-20T06:38:00Z", NOW)).toBe("20 Oct");
   });
 });
 

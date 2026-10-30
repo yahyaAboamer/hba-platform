@@ -678,3 +678,30 @@ def test_a_model_may_not_read_today(owner):
 def test_signed_out_is_refused(fresh_database):
     with TestClient(app) as client:
         assert client.get("/api/today").status_code == 401
+
+
+def test_a_customer_who_answered_cancel_and_then_took_the_parcel_was_delivered():
+    """The answer counts as the cancellation only until the parcel arrives:
+    a delivered order is delivered, whatever was tapped before."""
+    from types import SimpleNamespace
+
+    def order(**facts):
+        base = dict(
+            cancelled_at=None,
+            financial_status="pending",
+            delivery_state=None,
+            fulfillment_status=None,
+            return_activity=None,
+            return_open=False,
+        )
+        return SimpleNamespace(**{**base, **facts})
+
+    answered_cancel = ("sent", "cancelled")
+    assert order_week.where_it_is(order(delivery_state="delivered"), answered_cancel, True) == "delivered"
+    assert order_week.where_it_is(order(), answered_cancel, False) == "cancelled"
+    assert order_week.where_it_is(order(), answered_cancel, True) == "cancelled"
+    # A cancellation in Shopify still wins over delivered.
+    assert (
+        order_week.where_it_is(order(delivery_state="delivered", cancelled_at=utcnow()), None, True)
+        == "cancelled"
+    )

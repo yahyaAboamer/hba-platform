@@ -122,6 +122,8 @@ class OpsBostaDelivery(Base):
         Index("ix_ops_bosta_delivery_state_code", "state_code"),
         Index("ix_ops_bosta_delivery_created_at", "created_at"),
         Index("ix_ops_bosta_delivery_collected_at", "collected_at"),
+        # Which of a week's orders Bosta holds (Today's orders panel).
+        Index("ix_ops_bosta_delivery_shopify_order_number", "shopify_order_number"),
     )
 
     bosta_id: Mapped[str] = mapped_column(String(40), primary_key=True)

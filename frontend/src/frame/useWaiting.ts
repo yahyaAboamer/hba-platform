@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { departmentsFor } from "../departments";
 import type { CountKey } from "../departments/types";
@@ -15,10 +15,11 @@ type Counts = Partial<Record<CountKey, number>>;
  * What the sidebar has to say, and where it comes from: one read of
  * `GET /api/today`, which the Today page shares rather than asking again.
  *
- * A failed or refused read leaves its number *absent*, never 0: no badge
+ * Until something has been read, every number is *absent*, never 0: no badge
  * reads as nothing to say, while a 0 asserts there is nothing waiting - a
- * claim this would be making up. The server only reads the departments this
- * person holds, so nobody knocks on a door that refuses them.
+ * claim this would be making up. A later failed read keeps the last reading.
+ * The server only reads the departments this person holds, so nobody knocks
+ * on a door that refuses them.
  */
 export type Waiting = {
   counts: Counts;
@@ -35,35 +36,57 @@ const NO_FAILURES: Record<string, string | null> = {};
 
 export function useWaiting(session: Session): Waiting {
   const [today, setToday] = useState<TodayRead>({ body: null, readAt: null, failed: false });
-  // Chats' own, newer number; the next read of the whole body replaces it.
+  // Chats' own, newer number; a read asked for after it replaces it.
   const [pushed, setPushed] = useState<number | null>(null);
+  const pushedAt = useRef(0);
   const holdsAny = departmentsFor(session).length > 0;
 
   useEffect(() => {
     if (!holdsAny) return undefined;
     let current = true;
-    const read = () =>
-      api
+    const read = () => {
+      const asked = Date.now();
+      return api
         .get<TodayBody>("/api/today")
         .then((body) => {
           if (!current) return;
           setToday({ body, readAt: Date.now(), failed: false });
-          setPushed(null);
+          // An answer to a question asked before Chats' number is older than it.
+          if (asked >= pushedAt.current) setPushed(null);
         })
         .catch(() => {
           if (!current) return;
-          setToday({ body: null, readAt: null, failed: true });
-          setPushed(null);
+          // One failed read (a restart, a phone between networks) keeps what
+          // was last read, with its time, rather than blanking the page and
+          // every badge: an old reading says when it is from; a blank says
+          // nothing is known. Nothing read yet stays nothing.
+          setToday((now) => ({ ...now, failed: true }));
         });
+    };
+    // A tab nobody is looking at does not ask; it asks again on being looked at.
+    const tick = () => {
+      if (!document.hidden) void read();
+    };
+    const seen = () => {
+      if (!document.hidden) void read();
+    };
     void read();
-    const timer = window.setInterval(() => void read(), EVERY_MS);
+    const timer = window.setInterval(tick, EVERY_MS);
+    document.addEventListener("visibilitychange", seen);
     return () => {
       current = false;
       window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", seen);
     };
   }, [holdsAny]);
 
-  const setUnread = useMemo(() => (unread: number) => setPushed(unread), []);
+  const setUnread = useMemo(
+    () => (unread: number) => {
+      pushedAt.current = Date.now();
+      setPushed(unread);
+    },
+    [],
+  );
 
   const counts = useMemo<Counts>(() => {
     const read = today.body?.counts ?? NO_COUNTS;

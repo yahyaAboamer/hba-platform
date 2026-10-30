@@ -88,7 +88,8 @@ function Alert({ sentence }: { sentence: string }) {
 function todayMark(waiting: Waiting): Mark["count"] {
   const items = waiting.today.body?.items.length ?? 0;
   if (items === 0) return null;
-  return { number: items, sentence: items === 1 ? "thing waiting for you" : "things waiting for you", settled: false };
+  // The number is hidden from screen readers; the sentence says it.
+  return { number: items, sentence: `${items} ${items === 1 ? "thing" : "things"} waiting for you`, settled: false };
 }
 
 /** The brand: the mark, "HBA", and the department you are in. */

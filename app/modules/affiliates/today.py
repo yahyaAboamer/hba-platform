@@ -20,7 +20,6 @@ from app.modules.affiliates.services.applications import waiting_applications
 from app.modules.affiliates.services.payments import awaiting_approval
 from app.modules.affiliates.services.payroll import working_month
 from app.modules.affiliates.services.targets import targets_not_set
-from app.shared.models.identity import UserAccount
 from app.shared.services.today import DEADLINE, ELAPSED, Item, Look
 
 DEPARTMENT = "affiliates"
@@ -112,10 +111,3 @@ def look(db: Session, permissions: frozenset[str], now: datetime) -> Look:
     if payments and Permission.PAYROLL_APPROVE in permissions:
         found.items.append(_payments(payments, month))
     return found
-
-
-def waiting(db: Session, user: UserAccount, now: datetime) -> list[Item]:
-    """What waits in Affiliates for this person; nothing if they do not hold it."""
-    from app.shared.api.deps import permissions_of
-
-    return look(db, permissions_of(db, user), now).items

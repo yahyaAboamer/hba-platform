@@ -330,6 +330,33 @@ as the Inbox's count is now.
   restored production copy before the pull request; each item is a count, not
   a list.
 
+**As built (30 October)**
+- **Cost:** measured on a seeded copy of realistic size (4,000 orders, 400
+  chats, 80 models), not a restored production copy, which this session did
+  not have: about 0.56 s per read, 0.26 s of it the payments count (the same
+  work the old sidebar read did every 60 s). A tab nobody is looking at does
+  not ask; three indexes (migration `b2d7f4a10023`) keep the counts cheap as
+  the tables grow.
+- **The orders panel** puts each order in the first row it fits: cancelled or
+  returned in Shopify; delivered; a customer's *Cancel* answer; with Bosta;
+  waiting for an answer (an *edit* answer counts as waiting); confirmed (a
+  paid order needs no confirmation, so counts as confirmed). Orders never
+  asked get a sixth row, *Not asked to confirm*, shown only when there are
+  any, so the rows always add up to the number placed.
+- **Applications** count every pending profile, house accounts included, as
+  the Models screen's Applications segment does; the old sidebar count now
+  uses the same function.
+- **Payments waiting for approval** count the month the Payments screen opens
+  on, for whoever may approve; the sidebar badge now uses that month too.
+  During a running month that is everyone on the desk, because the app lets a
+  month be approved before it ends. Whether Today should count only ended
+  months is the owner's to decide.
+- **Not addressable yet:** Chats' *Wants a change* view and the Shopify tab's
+  *never reached Bosta* card open on a click, so those rows open the screen,
+  not the view.
+- **A failed refresh** keeps the last reading with its time ("Could not
+  refresh · Updated 3 minutes ago") rather than blanking the page and badges.
+
 ---
 
 ## Batch 2.3 — Settings split

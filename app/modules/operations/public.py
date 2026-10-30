@@ -13,9 +13,8 @@ from sqlalchemy.orm import Session
 from app.modules.operations.services.bosta import order_numbers_on_bosta
 from app.modules.operations.services.freshness import describe
 from app.modules.operations.today import look as today_look
-from app.modules.operations.today import waiting
 
-__all__ = ["bosta_read_at", "order_numbers_on_bosta", "today_look", "waiting"]
+__all__ = ["bosta_read_at", "order_numbers_on_bosta", "today_look"]
 
 
 def bosta_read_at(db: Session) -> datetime | None:
