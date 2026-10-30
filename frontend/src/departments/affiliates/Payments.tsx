@@ -1,20 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
-import { Money } from "../components/Money";
-import { MonthPicker } from "../components/MonthPicker";
-import type { MonthLock } from "../components/MonthPicker";
-import { api, can } from "../lib/api";
-import type { Session } from "../lib/api";
+import { Money } from "../../components/Money";
+import { MonthPicker } from "../../components/MonthPicker";
+import type { MonthLock } from "../../components/MonthPicker";
+import { api, can } from "../../lib/api";
+import type { Session } from "../../lib/api";
 import {
   currentMonth,
   describeBlocker,
   formatEgp,
   formatMonth,
   platformMonths,
-} from "../lib/money";
-import { NO_DESTINATION_RECORDED, PAY_TYPE, describeDestination } from "../lib/payouts";
-import type { DestinationCard } from "../lib/payouts";
+} from "../../lib/money";
+import { NO_DESTINATION_RECORDED, PAY_TYPE, describeDestination } from "../../lib/payouts";
+import type { DestinationCard } from "../../lib/payouts";
 
 // Re-exported where it has always been imported from, so this move is not a
 // change to anybody else's imports.

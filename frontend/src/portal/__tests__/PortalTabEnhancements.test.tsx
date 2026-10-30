@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { RankingContents } from "../MyRanking";
 import { WardrobeContents } from "../MyWardrobe";
-import { PortalSkeleton } from "../../components/PortalSkeleton";
+import { PortalSkeleton } from "../PortalSkeleton";
 
 afterEach(cleanup);
 

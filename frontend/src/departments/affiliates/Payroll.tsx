@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
-import { Money } from "../components/Money";
-import { MonthPicker } from "../components/MonthPicker";
-import type { MonthLock } from "../components/MonthPicker";
-import { api, can } from "../lib/api";
-import type { Session } from "../lib/api";
-import { currentMonth, describeBlocker, formatMonth, platformMonths } from "../lib/money";
+import { Money } from "../../components/Money";
+import { MonthPicker } from "../../components/MonthPicker";
+import type { MonthLock } from "../../components/MonthPicker";
+import { api, can } from "../../lib/api";
+import type { Session } from "../../lib/api";
+import { currentMonth, describeBlocker, formatMonth, platformMonths } from "../../lib/money";
 import "./Payroll.css";
 
 export type PayrollRow = {

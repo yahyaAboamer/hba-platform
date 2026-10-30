@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 
-import type { ChatMessage } from "../lib/inbox";
-import { NO_MICROPHONE, canRecord, startRecording } from "../lib/voiceNote";
-import type { Recording } from "../lib/voiceNote";
+import type { ChatMessage } from "../../lib/inbox";
+import { NO_MICROPHONE, canRecord, startRecording } from "../../lib/voiceNote";
+import type { Recording } from "../../lib/voiceNote";
 import { ChatTemplates } from "./ChatTemplates";
 import type { Template } from "./ChatTemplates";
 import { InboxIcon } from "./InboxIcon";
-import { useIsNarrow } from "./OpsSource";
+import { useIsNarrow } from "../../components/OpsSource";
 
 /** WhatsApp's own limit on a text message. */
 const MAX_TEXT = 4096;

@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
-import { api } from "../lib/api";
+import { api } from "../../lib/api";
 import {
   egpPlain,
   formatEgp,
   formatMonth,
   parseEgp,
   shortMonth,
-} from "../lib/money";
+} from "../../lib/money";
 import {
   fromServer,
   outcomesFrom,
@@ -17,7 +17,7 @@ import {
   startLine,
   toBasisPoints,
   MISSING_REASON,
-} from "../lib/payHistory";
+} from "../../lib/payHistory";
 import type {
   Arrangement,
   Kind,
@@ -25,7 +25,7 @@ import type {
   PayHistory,
   Readiness,
   Run,
-} from "../lib/payHistory";
+} from "../../lib/payHistory";
 import "./Payroll.css";
 import "./Compensation.css";
 import "./PaymentDetail.css";

@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
-import { Money } from "../components/Money";
-import { api } from "../lib/api";
-import { egpPlain, formatEgp, formatMonth, monthAdd, parseEgp } from "../lib/money";
+import { Money } from "../../components/Money";
+import { api } from "../../lib/api";
+import { egpPlain, formatEgp, formatMonth, monthAdd, parseEgp } from "../../lib/money";
 import type { Balance } from "./Payments";
 import "./Payments.css";
 

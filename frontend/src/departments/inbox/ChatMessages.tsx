@@ -1,10 +1,10 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 
-import { OpsIcon, clockTime } from "./OpsSource";
+import { OpsIcon, clockTime } from "../../components/OpsSource";
 import { InboxIcon } from "./InboxIcon";
-import { ApiError, api } from "../lib/api";
-import { dayKey, dayMark } from "../lib/inbox";
-import type { ChatMessage, ChatOrder, TriedAgain } from "../lib/inbox";
+import { ApiError, api } from "../../lib/api";
+import { dayKey, dayMark } from "../../lib/inbox";
+import type { ChatMessage, ChatOrder, TriedAgain } from "../../lib/inbox";
 
 /**
  * A chat's messages, oldest first (ADR 0059; the approved mockup

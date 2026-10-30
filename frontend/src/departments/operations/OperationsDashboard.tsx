@@ -1,6 +1,6 @@
 import { Navigate, useParams } from "react-router-dom";
 
-import { OPERATIONS_SECTIONS } from "../components/OperationsLayout";
+import { OPERATIONS_SECTIONS } from "./OperationsLayout";
 import { OperationsBosta } from "./OperationsBosta";
 import { OperationsEstebdal } from "./OperationsEstebdal";
 import { OperationsShopify } from "./OperationsShopify";

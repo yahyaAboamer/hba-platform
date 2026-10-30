@@ -8,7 +8,7 @@ import { ShopifyConnection } from "../components/ShopifyConnection";
 import type { ShopifyConnectionState } from "../components/ShopifyConnection";
 import { api } from "../lib/api";
 import { formatMonth } from "../lib/money";
-import "./PaymentDetail.css";
+import "../departments/affiliates/PaymentDetail.css";
 
 type Sync = {
   shopify_configured: boolean;

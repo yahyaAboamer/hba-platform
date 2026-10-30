@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Outlet, useMatch, useOutletContext } from "react-router-dom";
 
-import { api } from "../lib/api";
-import type { Session } from "../lib/api";
-import { SideShell } from "./SideShell";
+import { api } from "../../lib/api";
+import type { Session } from "../../lib/api";
+import { SideShell } from "../../components/SideShell";
 
 /** How often the sidebar's unread count is read while Chats is not open. */
 const COUNT_EVERY_MS = 30_000;

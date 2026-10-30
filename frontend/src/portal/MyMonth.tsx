@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { usePortal } from "../components/AffiliateLayout";
+import { usePortal } from "./AffiliateLayout";
 import { Money } from "../components/Money";
-import { MonthSheet } from "../components/MonthSheet";
+import { MonthSheet } from "./MonthSheet";
 import { api } from "../lib/api";
 import { formatDay, formatEgp, formatMonth } from "../lib/money";
 import type { MyEarnings, MyHome, PaymentMonth } from "../lib/portal";

@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { api, type Session } from "../../lib/api";
+import { api, type Session } from "../../../lib/api";
 import { ModelLifecycle } from "../ModelLifecycle";
 
 /** ADR 0052: what each status offers on her profile, and to whom. */

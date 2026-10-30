@@ -2,9 +2,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import type { MyOrder } from "../../lib/portal";
-import { commissionRule } from "../MyCalculation";
-import { explain, Row } from "../MyOrders";
-import { countedSalesDetail } from "../PaymentDetail";
+import { commissionRule } from "../../portal/MyCalculation";
+import { explain, Row } from "../../portal/MyOrders";
+import { countedSalesDetail } from "../../departments/affiliates/PaymentDetail";
 
 /**
  * F02 / ADR 0040 in the words on three screens: delivered and pending count,

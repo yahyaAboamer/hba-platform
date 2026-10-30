@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
-import { MonthPicker } from "../components/MonthPicker";
-import type { MonthLock } from "../components/MonthPicker";
-import { api, can } from "../lib/api";
-import type { Session } from "../lib/api";
-import { currentMonth, formatMonth, platformMonths } from "../lib/money";
-import { PAY_TYPE } from "../lib/payouts";
+import { MonthPicker } from "../../components/MonthPicker";
+import type { MonthLock } from "../../components/MonthPicker";
+import { api, can } from "../../lib/api";
+import type { Session } from "../../lib/api";
+import { currentMonth, formatMonth, platformMonths } from "../../lib/money";
+import { PAY_TYPE } from "../../lib/payouts";
 import "./Targets.css";
 
 type Row = {

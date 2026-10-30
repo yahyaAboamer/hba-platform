@@ -2,15 +2,15 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import type { KeyboardEvent } from "react";
 import { Link } from "react-router-dom";
 
-import { ApiError, api } from "../lib/api";
-import { chatName, formatPhone, orderStatus } from "../lib/inbox";
-import type { ChatMessage, ConversationDetail } from "../lib/inbox";
+import { ApiError, api } from "../../lib/api";
+import { chatName, formatPhone, orderStatus } from "../../lib/inbox";
+import type { ChatMessage, ConversationDetail } from "../../lib/inbox";
 import { ChatComposer } from "./ChatComposer";
 import { ChatMessages } from "./ChatMessages";
 import { ChatOrderPanel } from "./ChatOrderPanel";
 import type { Template } from "./ChatTemplates";
 import { InboxIcon } from "./InboxIcon";
-import { clockTime, dayMonth, useIsNarrow, useNow } from "./OpsSource";
+import { clockTime, dayMonth, useIsNarrow, useNow } from "../../components/OpsSource";
 
 /** New messages and ticks show within this long. Not read while hidden. */
 const CHAT_EVERY_MS = 4_000;

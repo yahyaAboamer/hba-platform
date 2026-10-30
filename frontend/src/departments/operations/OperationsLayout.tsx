@@ -1,7 +1,7 @@
 import { Outlet } from "react-router-dom";
 
-import type { Session } from "../lib/api";
-import { SideShell } from "./SideShell";
+import type { Session } from "../../lib/api";
+import { SideShell } from "../../components/SideShell";
 
 /**
  * Operations' four sections (ADR 0057; the approved mockup

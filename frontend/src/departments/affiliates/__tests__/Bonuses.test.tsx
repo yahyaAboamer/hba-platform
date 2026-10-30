@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { Session } from "../../lib/api";
+import type { Session } from "../../../lib/api";
 import { Bonuses } from "../Bonuses";
 
 const reply = (status: number, body: unknown) =>

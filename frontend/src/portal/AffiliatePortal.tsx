@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
 import { Navigate, Route, Routes, useLocation, useSearchParams } from "react-router-dom";
 
-import { AffiliateLayout, PortalHeader } from "../components/AffiliateLayout";
-import type { PortalContext } from "../components/AffiliateLayout";
+import { AffiliateLayout, PortalHeader } from "./AffiliateLayout";
+import type { PortalContext } from "./AffiliateLayout";
 import { api } from "../lib/api";
 import type { Session } from "../lib/api";
 import { MyBestSellers, MyWardrobe } from "./MyWardrobe";
 import { storedTheme } from "../lib/theme";
 import { Apply } from "./Apply";
 import { ApplicationPending } from "./ApplicationPending";
-import { Glossary } from "./Glossary";
+import { Glossary } from "../screens/Glossary";
 import type { Me } from "./MyDetails";
 import { MyCalculation } from "./MyCalculation";
 import { MyMonth } from "./MyMonth";

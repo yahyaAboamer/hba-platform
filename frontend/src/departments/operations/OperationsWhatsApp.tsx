@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { api } from "../lib/api";
+import { api } from "../../lib/api";
 import {
   OpsIcon,
   age,
@@ -11,7 +11,7 @@ import {
   useNow,
   useOpsTab,
   waitingLabel,
-} from "../components/OpsSource";
+} from "../../components/OpsSource";
 import "./OperationsDashboard.css";
 
 /**

@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 
-import { Money } from "../components/Money";
-import { api, can } from "../lib/api";
-import type { Session } from "../lib/api";
-import { formatMonth } from "../lib/money";
+import { Money } from "../../components/Money";
+import { api, can } from "../../lib/api";
+import type { Session } from "../../lib/api";
+import { formatMonth } from "../../lib/money";
 import "./PaymentDetail.css";
 
 type Correction = {

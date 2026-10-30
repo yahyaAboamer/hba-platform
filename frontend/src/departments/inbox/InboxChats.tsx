@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
-import { ChatPane } from "../components/ChatPane";
-import { InboxIcon } from "../components/InboxIcon";
-import type { InboxIconName } from "../components/InboxIcon";
-import { useInbox } from "../components/InboxLayout";
-import { OpsIcon, age, clockTime, useNow } from "../components/OpsSource";
-import { api } from "../lib/api";
-import { chatName, listTime } from "../lib/inbox";
-import type { Conversation, InboxHealth } from "../lib/inbox";
-import "./OperationsDashboard.css";
+import { ChatPane } from "./ChatPane";
+import { InboxIcon } from "./InboxIcon";
+import type { InboxIconName } from "./InboxIcon";
+import { useInbox } from "./InboxLayout";
+import { OpsIcon, age, clockTime, useNow } from "../../components/OpsSource";
+import { api } from "../../lib/api";
+import { chatName, listTime } from "../../lib/inbox";
+import type { Conversation, InboxHealth } from "../../lib/inbox";
+import "../operations/OperationsDashboard.css";
 import "./Inbox.css";
 
 /**

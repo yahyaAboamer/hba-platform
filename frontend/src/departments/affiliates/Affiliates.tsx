@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { Link, useLocation, useSearchParams, useNavigate } from "react-router-dom";
 
-import { Money } from "../components/Money";
-import { api } from "../lib/api";
-import { PAY_TYPE } from "../lib/payouts";
-import { formatMonth, shortMonth } from "../lib/money";
+import { Money } from "../../components/Money";
+import { api } from "../../lib/api";
+import { PAY_TYPE } from "../../lib/payouts";
+import { formatMonth, shortMonth } from "../../lib/money";
 import "./Affiliates.css";
 
 /** The approved roster's segments. */

@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { Session } from "../../lib/api";
+import type { Session } from "../../../lib/api";
 import { ProductDetail } from "../Products";
 
 const reply = (status: number, body: unknown) =>

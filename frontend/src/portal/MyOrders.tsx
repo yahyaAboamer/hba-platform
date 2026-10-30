@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
-import { usePortal } from "../components/AffiliateLayout";
+import { usePortal } from "./AffiliateLayout";
 import { api } from "../lib/api";
 import { formatMonth } from "../lib/money";
 import type { MyEarnings, MyOrder } from "../lib/portal";

@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link, MemoryRouter, useParams } from "react-router-dom";
 
-import { api, startPortalPreview } from "../lib/api";
-import type { Session } from "../lib/api";
-import { AffiliatePortal } from "./AffiliatePortal";
+import { api, startPortalPreview } from "../../lib/api";
+import type { Session } from "../../lib/api";
+import { AffiliatePortal } from "../../portal/AffiliatePortal";
 import "./PortalPreview.css";
 
 /**

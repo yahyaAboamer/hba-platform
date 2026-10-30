@@ -1,14 +1,14 @@
 import { useEffect, useState } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 
-import { Money } from "../components/Money";
-import { api } from "../lib/api";
+import { Money } from "../../components/Money";
+import { api } from "../../lib/api";
 import {
   NO_DESTINATION_RECORDED,
   PAYOUT_FIELD_LABEL,
   describeDestination,
-} from "../lib/payouts";
-import { egpPlain, formatMonth, parseEgp } from "../lib/money";
+} from "../../lib/payouts";
+import { egpPlain, formatMonth, parseEgp } from "../../lib/money";
 import type { Balance } from "./Payments";
 import "./Payments.css";
 import "./PaymentDetail.css";

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
-import { ApiError, api } from "../lib/api";
-import { OpsIcon } from "./OpsSource";
+import { ApiError, api } from "../../lib/api";
+import { OpsIcon } from "../../components/OpsSource";
 
 /**
  * The approved messages (ADR 0059; the approved mockup's frame 2, "The

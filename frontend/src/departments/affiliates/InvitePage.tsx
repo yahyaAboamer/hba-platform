@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
-import { api, can, type Session } from "../lib/api";
+import { api, can, type Session } from "../../lib/api";
 import { formatSentAt, onePerAddress, type Invited } from "./Affiliates";
 import "./InvitePage.css";
 

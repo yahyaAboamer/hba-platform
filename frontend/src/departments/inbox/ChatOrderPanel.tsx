@@ -1,9 +1,9 @@
 import { useState } from "react";
 
-import { ApiError, api } from "../lib/api";
-import { ANSWER_WORDS, dayTimeLabel, orderStatus, totalLabel } from "../lib/inbox";
-import type { ChatOrder } from "../lib/inbox";
-import { OpsIcon, dayMonth } from "./OpsSource";
+import { ApiError, api } from "../../lib/api";
+import { ANSWER_WORDS, dayTimeLabel, orderStatus, totalLabel } from "../../lib/inbox";
+import type { ChatOrder } from "../../lib/inbox";
+import { OpsIcon, dayMonth } from "../../components/OpsSource";
 
 /**
  * The customer's order, beside her chat (ADR 0059; the approved mockup's

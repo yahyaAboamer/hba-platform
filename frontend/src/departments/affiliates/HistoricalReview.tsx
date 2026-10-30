@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { api, can } from "../lib/api";
-import type { Session } from "../lib/api";
-import { formatMonth } from "../lib/money";
+import { api, can } from "../../lib/api";
+import type { Session } from "../../lib/api";
+import { formatMonth } from "../../lib/money";
 
 /**
  * A09. Finishing the months that happened before the platform, for everybody

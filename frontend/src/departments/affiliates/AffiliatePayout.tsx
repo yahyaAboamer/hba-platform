@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
-import { api } from "../lib/api";
-import { PAYOUT_FIELD_LABEL, WALLET_PROVIDERS } from "../lib/payouts";
+import { api } from "../../lib/api";
+import { PAYOUT_FIELD_LABEL, WALLET_PROVIDERS } from "../../lib/payouts";
 import type { Affiliate } from "./Affiliates";
-import { instapayProblem } from "./Apply";
+import { instapayProblem } from "../../portal/Apply";
 import "./Payroll.css";
 import "./Compensation.css";
 

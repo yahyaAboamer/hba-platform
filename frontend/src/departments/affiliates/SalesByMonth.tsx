@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 
-import { formatMonth, shortMonth } from "../lib/money";
+import { formatMonth, shortMonth } from "../../lib/money";
 import { axisLabels } from "./PortalYearChart";
 import "./SalesByMonth.css";
 

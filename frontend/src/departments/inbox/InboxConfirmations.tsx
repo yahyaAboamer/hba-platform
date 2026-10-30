@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
-import { ApiError, api } from "../lib/api";
-import { dayTimeLabel, formatPhone } from "../lib/inbox";
-import { OpsIcon, age, clockTime, useIsNarrow, useNow, useOpsTab } from "../components/OpsSource";
-import "./OperationsDashboard.css";
+import { ApiError, api } from "../../lib/api";
+import { dayTimeLabel, formatPhone } from "../../lib/inbox";
+import { OpsIcon, age, clockTime, useIsNarrow, useNow, useOpsTab } from "../../components/OpsSource";
+import "../operations/OperationsDashboard.css";
 import "./Inbox.css";
 
 /**

@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 
-import { usePortal } from "../components/AffiliateLayout";
+import { usePortal } from "./AffiliateLayout";
 import { Money } from "../components/Money";
-import { PortalSkeleton } from "../components/PortalSkeleton";
+import { PortalSkeleton } from "./PortalSkeleton";
 import { api } from "../lib/api";
 import { formatMonth } from "../lib/money";
 import "./MyRanking.css";

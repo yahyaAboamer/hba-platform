@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { api, can } from "../lib/api";
-import type { Session } from "../lib/api";
-import { formatMonth } from "../lib/money";
-import { Money } from "./Money";
+import { api, can } from "../../lib/api";
+import type { Session } from "../../lib/api";
+import { formatMonth } from "../../lib/money";
+import { Money } from "../../components/Money";
 import "./Corrections.css";
 
 type Correction = {

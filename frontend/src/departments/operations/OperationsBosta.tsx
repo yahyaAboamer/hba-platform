@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { ApiError, api } from "../lib/api";
+import { ApiError, api } from "../../lib/api";
 import {
   FreshLine,
   OpsIcon,
@@ -12,8 +12,8 @@ import {
   useIsNarrow,
   useNow,
   useOpsTab,
-} from "../components/OpsSource";
-import type { Freshness } from "../components/OpsSource";
+} from "../../components/OpsSource";
+import type { Freshness } from "../../components/OpsSource";
 import "./OperationsDashboard.css";
 
 /**

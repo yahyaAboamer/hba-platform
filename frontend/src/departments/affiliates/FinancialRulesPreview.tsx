@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 
-import { api } from "../lib/api";
-import { describeBlocker, formatMonth, monthsBetween } from "../lib/money";
-import { Money } from "./Money";
-import { MonthPicker } from "./MonthPicker";
+import { api } from "../../lib/api";
+import { describeBlocker, formatMonth, monthsBetween } from "../../lib/money";
+import { Money } from "../../components/Money";
+import { MonthPicker } from "../../components/MonthPicker";
 import "./FinancialRulesPreview.css";
 
 export type RulesPreview = {

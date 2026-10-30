@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { Money } from "../components/Money";
-import { SalesByMonth } from "../components/SalesByMonth";
-import { MonthPicker } from "../components/MonthPicker";
-import { api } from "../lib/api";
-import type { Session } from "../lib/api";
-import { formatMonth, platformMonths } from "../lib/money";
+import { Money } from "../../components/Money";
+import { SalesByMonth } from "./SalesByMonth";
+import { MonthPicker } from "../../components/MonthPicker";
+import { api } from "../../lib/api";
+import type { Session } from "../../lib/api";
+import { formatMonth, platformMonths } from "../../lib/money";
 
 type PayrollRow = {
   affiliate_id: number;

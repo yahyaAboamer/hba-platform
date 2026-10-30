@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
-import { api, can } from "../lib/api";
-import type { Session } from "../lib/api";
+import { api, can } from "../../lib/api";
+import type { Session } from "../../lib/api";
 import "./Products.css";
 import "./PaymentDetail.css";
 

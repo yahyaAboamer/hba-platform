@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { api } from "../lib/api";
+import { api } from "../../lib/api";
 import "./ContactForm.css";
 
 export type ContactShipping = {

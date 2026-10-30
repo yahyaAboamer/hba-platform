@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
-import { TargetBars } from "../components/TargetProgress";
-import { PortalSkeleton } from "../components/PortalSkeleton";
+import { TargetBars } from "./TargetProgress";
+import { PortalSkeleton } from "./PortalSkeleton";
 import { api } from "../lib/api";
 import type { MonthTargets } from "../lib/portal";
 import { formatDay, formatMonth } from "../lib/money";

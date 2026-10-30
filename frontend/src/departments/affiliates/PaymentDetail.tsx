@@ -1,17 +1,17 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
-import { DestinationDetails } from "../components/DestinationDetails";
-import { Money } from "../components/Money";
-import { api, can } from "../lib/api";
-import type { Session } from "../lib/api";
-import { describeBlocker, formatEgp, formatMonth } from "../lib/money";
+import { DestinationDetails } from "./DestinationDetails";
+import { Money } from "../../components/Money";
+import { api, can } from "../../lib/api";
+import type { Session } from "../../lib/api";
+import { describeBlocker, formatEgp, formatMonth } from "../../lib/money";
 import {
   NO_DESTINATION_RECORDED,
   describeDestination,
   destinationHolder,
   PAY_TYPE,
-} from "../lib/payouts";
+} from "../../lib/payouts";
 import type { Balance } from "./Payments";
 import { paymentRowPresentation, STATE_PILL } from "./Payments";
 import "./PaymentDetail.css";

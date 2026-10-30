@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 import { Link } from "react-router-dom";
 
-import { usePortal } from "../components/AffiliateLayout";
+import { usePortal } from "./AffiliateLayout";
 import { Money } from "../components/Money";
 import { api, portalPath } from "../lib/api";
 import { formatMonth } from "../lib/money";

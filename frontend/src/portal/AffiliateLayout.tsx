@@ -12,7 +12,7 @@ import { api } from "../lib/api";
 import { formatMonth, shortMonth } from "../lib/money";
 import { monthListStates } from "../lib/portal";
 import type { MonthListState, MyPayments } from "../lib/portal";
-import type { Me } from "../screens/MyDetails";
+import type { Me } from "./MyDetails";
 import { MonthSheet } from "./MonthSheet";
 import "./AffiliateLayout.css";
 

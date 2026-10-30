@@ -2,8 +2,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import type { MyOrder } from "../../lib/portal";
-import { explain, facts, productDetail, Row } from "../MyOrders";
-import { countsTowards, orderStatus } from "../Orders";
+import { explain, facts, productDetail, Row } from "../../portal/MyOrders";
+import { countsTowards, orderStatus } from "../../departments/affiliates/Orders";
 
 /**
  * Batch D: the Orders experience in the approved words - and a void order

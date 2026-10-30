@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-import { api, can, type Session } from "../lib/api";
+import { api, can, type Session } from "../../lib/api";
 import "./ModelLifecycle.css";
 
 /**

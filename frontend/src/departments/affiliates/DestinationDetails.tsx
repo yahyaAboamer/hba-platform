@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { DestinationCard } from "../lib/payouts";
+import type { DestinationCard } from "../../lib/payouts";
 
 /**
  * Where a model's money goes, in full, with a copy button on each line and
