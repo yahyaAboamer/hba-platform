@@ -125,3 +125,10 @@ def describe(db: Session, source: str, now: datetime | None = None) -> dict:
         "error": row.last_error if state == State.FAILED else None,
         "row_count": row.row_count if row else None,
     }
+
+
+def has_numbers(described: dict) -> bool:
+    """Whether a clean read's numbers exist to show. A source with no key
+    shows none, however old its last numbers are. The tabs and Today both
+    ask this, so a card is counted on Today only when its tab shows it."""
+    return described["updated_at"] is not None and described["state"] != State.NOT_CONNECTED

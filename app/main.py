@@ -38,6 +38,7 @@ from app.shared.api import (
     client_config,
     health,
     staff,
+    today,
     webhooks,
 )
 from app.core.observability import init_observability
@@ -174,6 +175,7 @@ app.include_router(payroll.router)
 app.include_router(payments.router)
 app.include_router(products.router)
 app.include_router(policy.router)
+app.include_router(today.router)
 
 
 if (WEB_DIR / "index.html").exists():

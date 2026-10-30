@@ -4,6 +4,7 @@
  */
 import { vi } from "vitest";
 
+import type { TodayDepartment, TodayItem, TodayOrders } from "../departments/today/types";
 import type { Session } from "../lib/api";
 
 const PLATFORM = { working_month: "2026-10", go_live_month: "2026-10", start_month: "2026-01" };
@@ -69,12 +70,20 @@ export function reply(status: number, body: unknown): Response {
 }
 
 export type Answers = {
-  /** Unread chats, or null for a refused read. */
+  /** Unread chats, or null for a number the server could not read. */
   unread?: number | null;
-  /** `/api/operations/counts`, or null for a refused read. */
+  /** The two Affiliates numbers, or null when they could not be read. */
   counts?: Record<string, number> | null;
-  /** `/api/operations/freshness` sources, or null for a refused read. */
+  /** Operations sources, by how their latest read went; null for none read. */
   freshness?: Record<string, { state: string; updated_at?: string | null }> | null;
+  /** The things waiting, in the order the server gives them. */
+  items?: TodayItem[];
+  /** The week's orders, or null (the default) for somebody who does not hold both. */
+  orders?: TodayOrders | null;
+  /** Departments the server could not read. */
+  unreadDepartments?: TodayDepartment[];
+  /** `GET /api/today` itself failing, whole. */
+  today?: "failed";
 };
 
 let requested: string[] = [];
@@ -82,10 +91,36 @@ let requested: string[] = [];
 /** Every address asked of the server since the last `serve`. */
 export const asked = () => requested;
 
+/** `GET /api/today` for this person: the numbers and failures the sidebar reads, and whatever else the test gave. */
+function todayBody(me: Session, answers: Answers) {
+  const { unread = 4, counts = { models_awaiting_approval: 0, payments_awaiting_approval: 0 } } = answers;
+  const holds = (permission: string) => me.permissions.includes(permission);
+  const departments: TodayDepartment[] = [
+    ...(holds("inbox.use") ? (["inbox"] as const) : []),
+    ...(holds("order_ops.view") ? (["operations"] as const) : []),
+    ...(holds("affiliates.view") ? (["affiliates"] as const) : []),
+  ];
+  const read: Record<string, number> = {};
+  if (holds("inbox.use") && unread !== null) read.chats_unread = unread;
+  if (holds("affiliates.view") && counts !== null) Object.assign(read, counts);
+  const failures = Object.fromEntries(
+    Object.entries(answers.freshness ?? {})
+      .filter(([, source]) => source.state === "failed")
+      .map(([name, source]) => [name, source.updated_at ?? null]),
+  );
+  return {
+    now: "2026-10-30T10:00:00Z",
+    departments,
+    items: answers.items ?? [],
+    counts: read,
+    failures: holds("order_ops.view") ? failures : {},
+    orders: answers.orders ?? null,
+    ...(answers.unreadDepartments ? { unread: answers.unreadDepartments } : {}),
+  };
+}
+
 export function serve(me: unknown, answers: Answers = {}) {
   requested = [];
-  const { unread = 4, counts = { models_awaiting_approval: 0, payments_awaiting_approval: 0 } } = answers;
-  const freshness = answers.freshness === undefined ? {} : answers.freshness;
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: RequestInfo | URL) => {
@@ -95,9 +130,11 @@ export function serve(me: unknown, answers: Answers = {}) {
       if (url.endsWith("/api/staff/me/preferences")) {
         return reply(200, { preferences: {}, labels: {}, descriptions: {}, theme: null });
       }
+      if (url.endsWith("/api/today")) {
+        return answers.today === "failed" ? reply(500, { detail: "No" }) : reply(200, todayBody(me as Session, answers));
+      }
       if (url.includes("/api/inbox/conversations")) {
-        if (unread === null) return reply(403, { detail: "No" });
-        return reply(200, { conversations: [], next: null, counts: { all: 0, unread, edit: 0 } });
+        return reply(200, { conversations: [], next: null, counts: { all: 0, unread: answers.unread ?? 4, edit: 0 } });
       }
       if (url.includes("/api/inbox/health")) {
         return reply(200, { connected: true, sending: true, last_heard_at: null, quiet_since: null });
@@ -108,22 +145,6 @@ export function serve(me: unknown, answers: Answers = {}) {
           total: 0,
           tiles: { waiting: 0, edit: 0, cancelled: 0, not_sent: 0, no_whatsapp: 0, confirmed: 0 },
           orders: null,
-        });
-      }
-      if (url.endsWith("/api/operations/counts")) {
-        return counts === null ? reply(403, { detail: "No" }) : reply(200, counts);
-      }
-      if (url.endsWith("/api/operations/freshness")) {
-        if (freshness === null) return reply(403, { detail: "No" });
-        const labels: Record<string, string> = { shopify: "Shopify", bosta: "Bosta", estebdal: "E-stebdal" };
-        return reply(200, {
-          sources: Object.keys(labels).map((source) => ({
-            source,
-            label: labels[source],
-            state: freshness[source]?.state ?? "fresh",
-            updated_at: freshness[source] && "updated_at" in freshness[source] ? freshness[source].updated_at : "2026-10-30T10:00:00+00:00",
-            failed_at: freshness[source]?.state === "failed" ? "2026-10-30T10:20:00+00:00" : null,
-          })),
         });
       }
       return reply(404, { detail: "Not here" });

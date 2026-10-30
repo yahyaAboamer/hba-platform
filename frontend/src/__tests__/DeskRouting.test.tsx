@@ -65,10 +65,11 @@ describe("deskFor", () => {
 
 describe("each kind of person: the departments they hold, and where they start", () => {
   const cases: [Kind, [string, boolean][], string][] = [
-    ["owner", [["Inbox", false], ["Operations", false], ["Affiliates", true]], "/affiliates/overview"],
+    // Two or more departments start on Today, with every department folded.
+    ["owner", [["Inbox", false], ["Operations", false], ["Affiliates", false]], "/today"],
     ["affiliate_manager", [["Affiliates", true]], "/affiliates/overview"],
     ["content_manager", [["Affiliates", true]], "/affiliates/overview"],
-    ["operations_manager", [["Inbox", false], ["Operations", true]], "/operations/shopify"],
+    ["operations_manager", [["Inbox", false], ["Operations", false]], "/today"],
     ["operations_only", [["Operations", true]], "/operations/shopify"],
     ["customer_service", [["Inbox", true]], "/inbox/chats"],
   ];
@@ -102,12 +103,12 @@ describe("a person holding two roles", () => {
 });
 
 describe("the operations manager, now two roles", () => {
-  it("still starts on Operations and asks the affiliate side nothing", async () => {
+  it("starts on Today, with the Operations and Inbox rows, and asks the affiliate side nothing", async () => {
     serve(sessionOf("operations_manager"));
     render(<App />);
 
-    expect(await screen.findByRole("heading", { name: "Shopify" })).toBeTruthy();
-    expect(window.location.pathname).toBe("/operations/shopify");
+    expect(await screen.findByRole("heading", { name: "Today" })).toBeTruthy();
+    expect(window.location.pathname).toBe("/today");
     expect(
       asked().filter((url) => url.includes("/api/affiliates") || url.endsWith("/api/operations/counts")),
     ).toEqual([]);

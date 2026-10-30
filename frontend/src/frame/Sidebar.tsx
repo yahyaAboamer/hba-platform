@@ -9,7 +9,7 @@ import { pickMaintainerChoice, storedMaintainerChoice } from "../lib/theme";
 import type { ThemeChoice } from "../lib/theme";
 import { Icon } from "./Icon";
 import type { Waiting } from "./useWaiting";
-import { canOpenSettings } from "./where";
+import { TODAY, canOpenSettings, holdsToday } from "./where";
 import type { Where } from "./where";
 
 const THEMES: [ThemeChoice, string][] = [
@@ -82,6 +82,13 @@ function Alert({ sentence }: { sentence: string }) {
       <span className="visually-hidden"> {sentence}</span>
     </span>
   );
+}
+
+/** What Today's row says is waiting: every item it lists, whatever department it is in. */
+function todayMark(waiting: Waiting): Mark["count"] {
+  const items = waiting.today.body?.items.length ?? 0;
+  if (items === 0) return null;
+  return { number: items, sentence: items === 1 ? "thing waiting for you" : "things waiting for you", settled: false };
 }
 
 /** The brand: the mark, "HBA", and the department you are in. */
@@ -219,11 +226,26 @@ export function SideBody({
     setFold({ at: pathname, open: current });
   }
   const sectionsId = useId();
+  const today = holdsToday(departments) ? todayMark(waiting) : null;
 
   return (
     <>
       <nav className="frame__nav" aria-label="Departments">
         <ul className="frame__depts">
+          {holdsToday(departments) && (
+            <li>
+              <Link
+                to={TODAY}
+                className="frame__dept"
+                aria-current={where.today ? "page" : undefined}
+                onClick={onNavigate}
+              >
+                <Icon name="today" />
+                <span className="frame__dept-name">Today</span>
+                {today && <Count mark={today} />}
+              </Link>
+            </li>
+          )}
           {departments.map((department) => {
             const isOpen = open === department.key;
             const mark = isOpen ? null : departmentMark(department, waiting);

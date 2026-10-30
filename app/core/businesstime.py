@@ -95,3 +95,53 @@ def working_days_since(moment_utc: datetime, now_utc: datetime) -> int:
         1 for offset in range(extra) if (first + timedelta(days=offset)).weekday() == _FRIDAY
     )
     return days - fridays
+
+
+def business_midnight(day: date) -> datetime:
+    """The instant a Cairo calendar day begins, in UTC."""
+    return datetime.combine(day, datetime.min.time(), tzinfo=BUSINESS_TIMEZONE).astimezone(
+        timezone.utc
+    )
+
+
+def clock_words(moment_utc: datetime, now_utc: datetime) -> str:
+    """When something happened, as a sentence says it, in Cairo time.
+
+    Today: ``09:40``. Yesterday: ``yesterday 09:40``. Older: ``26 Oct``.
+    For "since …" sentences; ``at_words`` is the same for "… at …".
+    """
+    local = _require_aware(moment_utc).astimezone(BUSINESS_TIMEZONE)
+    days = (business_date(now_utc) - local.date()).days
+    if days <= 0:
+        return local.strftime("%H:%M")
+    if days == 1:
+        return f"yesterday {local.strftime('%H:%M')}"
+    return f"{local.day} {_MONTH_NAMES[local.month - 1][:3]}"
+
+
+def at_words(moment_utc: datetime, now_utc: datetime) -> str:
+    """``clock_words`` after a verb: ``at 09:40``, ``yesterday at 09:40``,
+    ``on 26 Oct``."""
+    local = _require_aware(moment_utc).astimezone(BUSINESS_TIMEZONE)
+    days = (business_date(now_utc) - local.date()).days
+    if days <= 0:
+        return f"at {local.strftime('%H:%M')}"
+    if days == 1:
+        return f"yesterday at {local.strftime('%H:%M')}"
+    return f"on {local.day} {_MONTH_NAMES[local.month - 1][:3]}"
+
+
+_MONTH_NAMES = (
+    "January", "February", "March", "April", "May", "June", "July",
+    "August", "September", "October", "November", "December",
+)
+
+
+def month_name(month: str) -> str:
+    """``2026-11`` -> ``November``."""
+    return _MONTH_NAMES[int(parse_month(month)[5:]) - 1]
+
+
+def month_words(month: str) -> str:
+    """``2026-11`` -> ``November 2026``."""
+    return f"{month_name(month)} {month[:4]}"

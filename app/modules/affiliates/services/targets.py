@@ -169,6 +169,52 @@ def targets_for(db: Session, month: str) -> dict[int, MonthlyTarget]:
     }
 
 
+def grid_roster(db: Session, *, include_archived: bool = False) -> list[AffiliateProfile]:
+    """Who the Targets grid lists down the side (``GET /api/targets/{month}``).
+
+    A declined application is nobody's model (ADR 0058). Usually it is gone
+    altogether; one kept because an order is hers still has no targets.
+    House accounts and months before her start stay listed: the screen draws
+    them (or leaves a house code out), and a payload that quietly omits rows
+    is one nobody can reconcile against the registry.
+    """
+    from app.modules.affiliates.models.affiliates import AffiliateStatus
+    from app.modules.affiliates.services.affiliates import list_affiliates
+
+    return [
+        affiliate
+        for affiliate in list_affiliates(db, include_archived=include_archived)
+        if affiliate.status != AffiliateStatus.DECLINED
+    ]
+
+
+def targets_not_set(db: Session, month: str) -> tuple[int, int]:
+    """For Today: ``(not set, models)`` - how many models the Targets grid
+    for ``month`` shows open with no target, out of how many it shows open.
+
+    The grid's own roster (``grid_roster``, archived left out as the screen
+    opens), less the rows the screen does not ask anybody to fill: a house
+    code (the screen leaves it off) and a month before her start (drawn
+    closed). No target means ``required_videos`` is empty, as the grid shows
+    it. Not ``pace_for``: pace is about counts recorded, not targets set.
+    """
+    from app.modules.affiliates.models.affiliates import AccountKind
+
+    parse_month(month)
+    found = targets_for(db, month)
+    open_rows = [
+        affiliate
+        for affiliate in grid_roster(db)
+        if affiliate.account_kind != AccountKind.HOUSE and not before_her_start(affiliate, month)
+    ]
+    missing = sum(
+        1
+        for affiliate in open_rows
+        if (target := found.get(affiliate.id)) is None or target.required_videos is None
+    )
+    return missing, len(open_rows)
+
+
 def set_requirements(
     db: Session,
     affiliate: AffiliateProfile,

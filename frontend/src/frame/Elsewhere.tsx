@@ -63,7 +63,7 @@ export function Elsewhere({
   );
 }
 
-/** `/`: each person's start, until Today replaces it (Batch 2.2). Keeps the query, the hash and the state. */
+/** `/`: each person's start: Today for anyone holding two or more departments, else their one department. Keeps the query, the hash and the state. */
 export function Start({ session, departments }: { session: Session; departments: readonly Department[] }) {
   const start = startFor(session);
   if (start === "/") return <Elsewhere session={session} departments={departments} />;

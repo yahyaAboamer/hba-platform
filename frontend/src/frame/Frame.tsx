@@ -3,6 +3,7 @@ import { Outlet, useLocation } from "react-router-dom";
 
 import { useMaintainerTheme } from "../components/useMaintainerTheme";
 import type { InboxOutlet } from "../departments/inbox/useInbox";
+import type { TodayOutlet } from "../departments/today/useToday";
 import type { Department } from "../departments/types";
 import type { Session } from "../lib/api";
 import { Shell } from "./Shell";
@@ -14,13 +15,15 @@ import { whereAmI } from "./where";
  * The staff route tree's one layout: the sidebar for the departments this
  * person holds, and the page beside it.
  *
- * `departments` is already only the ones they hold. The Inbox's screens are
- * handed `useInbox()` through the outlet's context, as before.
+ * `departments` is already only the ones they hold. The outlet's context
+ * carries what the screens inside need from the frame: the Inbox's
+ * `setUnread`, and the one read of `/api/today` the Today page shares with
+ * the sidebar.
  */
 export function Frame({ session, departments }: { session: Session; departments: readonly Department[] }) {
   const { pathname } = useLocation();
   const where = whereAmI(pathname, departments);
-  const waiting = useWaiting(session, where.section?.count?.key === "chats_unread");
+  const waiting = useWaiting(session);
   // Opened *at* an address: moving to another one closes it, with no effect
   // to run late and close a menu somebody has only just opened.
   const [openedAt, setOpenedAt] = useState<string | null>(null);
@@ -31,11 +34,22 @@ export function Frame({ session, departments }: { session: Session; departments:
   // choice holds once it answers.
   useMaintainerTheme();
 
-  const inbox = useMemo<InboxOutlet>(() => ({ setUnread: waiting.setUnread }), [waiting.setUnread]);
+  const outlet = useMemo<InboxOutlet & TodayOutlet>(
+    () => ({ setUnread: waiting.setUnread, today: waiting.today }),
+    [waiting.setUnread, waiting.today],
+  );
 
-  const role = where.settings ? "Settings" : ((where.department ?? departments[0])?.name ?? "");
-  const title = where.settings ? "Settings" : (where.section?.label ?? where.department?.name ?? "HBA");
-  const page = <Outlet context={inbox} />;
+  const role = where.settings
+    ? "Settings"
+    : where.today
+      ? "Today"
+      : ((where.department ?? departments[0])?.name ?? "");
+  const title = where.settings
+    ? "Settings"
+    : where.today
+      ? "Today"
+      : (where.section?.label ?? where.department?.name ?? "HBA");
+  const page = <Outlet context={outlet} />;
 
   return (
     <Shell immersive={where.department?.immersive?.(pathname) === true}>

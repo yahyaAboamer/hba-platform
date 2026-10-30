@@ -444,3 +444,19 @@ def _handle_confirm_sweep(db: Session, payload: dict) -> None:
         reminders = payments.queue_reminders(db)
         if reminders:
             logger.info("confirmation sweep queued %s payment reminders", reminders)
+
+
+def latest_for_orders(db: Session, order_ids: set[str]) -> dict[str, tuple[str, str | None]]:
+    """Each order's confirmation as it stands - ``(state, answer)`` - for
+    Today's order week. One row per order (``shopify_order_id`` is unique);
+    an order with none is absent."""
+    if not order_ids:
+        return {}
+    return {
+        order_id: (state, answer)
+        for order_id, state, answer in db.execute(
+            select(
+                OrderConfirmation.shopify_order_id, OrderConfirmation.state, OrderConfirmation.answer
+            ).where(OrderConfirmation.shopify_order_id.in_(order_ids))
+        )
+    }

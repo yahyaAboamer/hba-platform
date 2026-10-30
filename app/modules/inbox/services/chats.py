@@ -208,6 +208,56 @@ def counts(db: Session) -> dict:
     }
 
 
+def oldest_unread_at(db: Session) -> datetime | None:
+    """When the longest-waiting customer wrote, among the chats ``counts``
+    calls unread (Today, Phase 2 batch 2.2).
+
+    A chat's ``unread_count`` is raised by one for each message she sends
+    that is not a reaction (``events.apply_message``; the importer the same),
+    and set to 0 when the chat is read. So her unread messages are her last
+    ``unread_count`` incoming non-reactions, and the oldest of them is when
+    she started waiting.
+    """
+    ranked = (
+        select(
+            InboxMessage.occurred_at.label("occurred_at"),
+            InboxConversation.unread_count.label("unread"),
+            func.row_number()
+            .over(
+                partition_by=InboxMessage.conversation_id,
+                order_by=(InboxMessage.occurred_at.desc(), InboxMessage.id.desc()),
+            )
+            .label("place"),
+        )
+        .join(InboxConversation, InboxConversation.id == InboxMessage.conversation_id)
+        .where(
+            InboxConversation.unread_count > 0,
+            InboxMessage.direction == "in",
+            InboxMessage.kind != "reaction",
+        )
+        .subquery()
+    )
+    return db.scalar(select(func.min(ranked.c.occurred_at)).where(ranked.c.place <= ranked.c.unread))
+
+
+def oldest_edit_answer_at(db: Session) -> datetime | None:
+    """When the longest-waiting of the chats in *Wants a change* (``counts``'
+    ``edit``) answered Change on her latest order."""
+    # Each chat's latest order, as `_latest_answer` picks it, in one pass.
+    latest = (
+        select(OrderConfirmation.answer, OrderConfirmation.answered_at)
+        .where(OrderConfirmation.conversation_id.is_not(None))
+        .distinct(OrderConfirmation.conversation_id)
+        .order_by(
+            OrderConfirmation.conversation_id,
+            OrderConfirmation.created_at.desc(),
+            OrderConfirmation.id.desc(),
+        )
+        .subquery()
+    )
+    return db.scalar(select(func.min(latest.c.answered_at)).where(latest.c.answer == "edit"))
+
+
 # ── One chat ──────────────────────────────────────────────────────────────────
 
 

@@ -91,6 +91,21 @@ def on_the_desk(
     return kept
 
 
+def awaiting_approval(db: Session, month: str) -> int:
+    """How many on the desk are *Awaiting approval* for this month.
+
+    The size of the Payments screen's filter of that name: the desk's own
+    people (`on_the_desk`), each through the same `balance_for` the screen
+    shows. One function for the sidebar's badge and Today, so neither can say
+    22 above a screen showing 19.
+    """
+    return sum(
+        1
+        for affiliate in on_the_desk(db, month)
+        if balance_for(db, affiliate, month)["state"] == "not_approved"
+    )
+
+
 def allocated_to(db: Session, snapshot: PayrollSnapshot) -> int:
     """Money applied to this **version** of a month.
 

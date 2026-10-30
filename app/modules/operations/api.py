@@ -27,7 +27,7 @@ from app.core.permissions import Permission
 from app.db import get_session
 from app.shared.models.identity import UserAccount
 from app.modules.operations.services import bosta, connections, estebdal, shopify
-from app.modules.operations.services.freshness import SOURCES, State, describe
+from app.modules.operations.services.freshness import SOURCES, State, describe, has_numbers
 
 #: The one guard, kept by name so a test can find it on every route.
 GUARD = require_permission(Permission.ORDER_OPS_VIEW)
@@ -46,10 +46,8 @@ def freshness(db: Session, source: str) -> dict:
     return describe(db, source)
 
 
-def _has_numbers(described: dict) -> bool:
-    """Whether a clean read's numbers exist to show. A source with no key
-    shows none, however old its last numbers are."""
-    return described["updated_at"] is not None and described["state"] != State.NOT_CONNECTED
+#: Shared with Today (``app.modules.operations.today``).
+_has_numbers = has_numbers
 
 
 @frame_router.get("/freshness")

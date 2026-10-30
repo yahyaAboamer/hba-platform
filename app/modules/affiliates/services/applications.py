@@ -18,7 +18,9 @@ verify rather than a free-text field to retype, and the existing gate does the
 refusing.
 """
 
-from sqlalchemy import select
+from datetime import datetime
+
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.modules.affiliates.models.affiliates import AccountKind, AffiliateProfile, AffiliateStatus
@@ -230,3 +232,19 @@ def application_state(db: Session, affiliate: AffiliateProfile) -> str:
     if affiliate.status == AffiliateStatus.DECLINED:
         return "declined"
     return "paused"
+
+
+def waiting_applications(db: Session) -> tuple[int, datetime | None]:
+    """How many applications wait for an answer, and when the oldest arrived.
+
+    **The Models screen's *Applications* segment**: every profile still
+    ``pending``, of any kind - the roster lists house accounts too, and a house
+    account waiting for its code to be verified is waiting on a person all the
+    same. One rule for that segment, the sidebar's badge and Today.
+    """
+    count, oldest = db.execute(
+        select(func.count(), func.min(AffiliateProfile.created_at)).where(
+            AffiliateProfile.status == AffiliateStatus.PENDING
+        )
+    ).one()
+    return count or 0, oldest

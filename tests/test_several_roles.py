@@ -479,6 +479,8 @@ PROBES = {
     "/api/order-ops/shopify": {P.ORDER_OPS_VIEW},
     "/api/inbox/conversations": {P.INBOX_USE},
     "/api/inbox/connection": {P.INBOX_USE, P.SETTINGS_MANAGE},
+    # Today (Phase 2, batch 2.2): every member of staff, never a model.
+    "/api/today": {"<require_staff>"},
 }
 
 

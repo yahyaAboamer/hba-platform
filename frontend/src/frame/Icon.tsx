@@ -4,6 +4,8 @@
  * Always beside words or under an `aria-label` - never the only thing said.
  */
 export type IconName =
+  | "today"
+  | "clock"
   | "inbox"
   | "truck"
   | "models"
@@ -22,6 +24,15 @@ export function Icon({ name, className }: { name: IconName; className?: string }
       aria-hidden="true"
       focusable="false"
     >
+      {name === "today" && (
+        <path d="M3.5 6.5l1.6 1.6 3-3.1M3.5 13.5l1.6 1.6 3-3.1M11 7h9.5M11 14h9.5M11 20h9.5M4.5 20h2" />
+      )}
+      {name === "clock" && (
+        <>
+          <circle cx="12" cy="12" r="8.5" />
+          <path d="M12 7.5V12l3 2" />
+        </>
+      )}
       {name === "inbox" && (
         <path d="M5 4.5h14a1.5 1.5 0 0 1 1.5 1.5v9.5A1.5 1.5 0 0 1 19 17h-7.5L7 20.5V17H5a1.5 1.5 0 0 1-1.5-1.5V6A1.5 1.5 0 0 1 5 4.5z" />
       )}
