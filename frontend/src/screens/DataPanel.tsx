@@ -353,7 +353,7 @@ export function DataPanel({ goLiveMonth }: { goLiveMonth: string | null }) {
                 </strong>{" "}
                 More than one model has the same phone number on file, so the
                 platform cannot tell whose parcel it is. Give each model her own
-                number under <Link to="/affiliates">Models</Link> → her profile →
+                number under <Link to="/affiliates/models">Models</Link> → her profile →
                 Contact and shipping → Phone on the parcel, then match again under
                 Tools.
               </p>
@@ -409,7 +409,7 @@ export function DataPanel({ goLiveMonth }: { goLiveMonth: string | null }) {
                         {row.held_by && row.held_by.length > 0
                           ? row.held_by.map((holder, index) => (
                               <span key={`${holder.affiliate_id}-${holder.start_month}-${index}`} className="data__holder">
-                                <Link to={`/affiliates/${holder.affiliate_id}`}>{holder.name}</Link>
+                                <Link to={`/affiliates/models/${holder.affiliate_id}`}>{holder.name}</Link>
                                 {holder.end_month
                                   ? `, ${formatMonth(holder.start_month)} – ${formatMonth(holder.end_month)}`
                                   : `, from ${formatMonth(holder.start_month)}`}

@@ -1,90 +1,20 @@
 // @vitest-environment jsdom
 /**
  * Where a person lands is decided by what they may do, never by a role's name
- * (ADR 0067, decision 9).
+ * (ADR 0067, decision 9), and what they get is the one frame with the
+ * departments they hold (ADR 0068).
  *
  * Every role that existed before several roles per person must land exactly
- * where it did then; a person holding two roles gets the screens of both; and
- * a role's name, whatever it says, changes nothing.
+ * where it did then; a person holding two roles gets the departments of both;
+ * and a role's name, whatever it says, changes nothing.
  */
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import App from "../App";
 import { deskFor, roleLabel } from "../lib/api";
-import type { Session } from "../lib/api";
-
-const PLATFORM = { working_month: "2026-10", go_live_month: "2026-10", start_month: "2026-01" };
-
-/** What each role's holder may do, as `/api/auth/me` reports it. The
- *  operations manager is a person holding two roles since ADR 0067. */
-const HELD: Record<string, { roles: string[]; permissions: string[] }> = {
-  admin: {
-    roles: ["admin"],
-    permissions: [
-      "affiliates.view", "affiliates.manage", "affiliates.erase", "compensation.manage",
-      "targets.record", "targets.manage", "targets.verify", "payroll.approve",
-      "payroll.reopen", "payments.record", "invitations.send", "audit.view",
-      "settings.manage", "order_ops.view", "inbox.use",
-    ],
-  },
-  affiliate_manager: {
-    roles: ["affiliate_manager"],
-    permissions: [
-      "affiliates.view", "affiliates.manage", "compensation.manage", "targets.manage",
-      "targets.verify", "targets.record", "payroll.approve", "invitations.send", "audit.view",
-    ],
-  },
-  content_manager: {
-    roles: ["content_manager"],
-    permissions: [
-      "affiliates.view", "affiliates.manage", "compensation.manage", "targets.record",
-      "targets.manage", "targets.verify", "audit.view",
-    ],
-  },
-  operations_manager: {
-    roles: ["operations_manager", "customer_service"],
-    permissions: ["order_ops.view", "inbox.use"],
-  },
-  customer_service: { roles: ["customer_service"], permissions: ["inbox.use"] },
-  affiliate: { roles: ["affiliate"], permissions: [] },
-};
-
-function session(roles: string[], permissions: string[], isModel = false): Session {
-  return {
-    actor: {
-      id: 7, email: "someone@example.com", display_name: "Nour",
-      roles, is_staff: roles.some((role) => role !== "affiliate"), is_model: isModel,
-    },
-    permissions,
-    platform: PLATFORM,
-  };
-}
-
-function reply(status: number, body: unknown): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
-}
-
-let requested: string[] = [];
-
-function serve(me: unknown) {
-  requested = [];
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(async (input: RequestInfo | URL) => {
-      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
-      requested.push(url);
-      if (url.endsWith("/api/auth/me")) return reply(200, me);
-      if (url.endsWith("/api/staff/me/preferences")) {
-        return reply(200, { preferences: {}, labels: {}, descriptions: {}, theme: null });
-      }
-      return reply(404, { detail: "Not here" });
-    }),
-  );
-}
+import { HELD, asked, serve, sessionOf } from "./frameHarness";
+import type { Kind } from "./frameHarness";
 
 beforeEach(() => window.history.pushState({}, "", "/"));
 afterEach(() => {
@@ -92,56 +22,79 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+/** The department rows in the sidebar, in order, with whether each is open. */
+function departments(): [string, boolean][] {
+  const nav = screen.getByRole("navigation", { name: "Departments" });
+  return within(nav)
+    .getAllByRole("button")
+    .map((row) => [
+      row.querySelector(".frame__dept-name")?.textContent ?? "",
+      row.getAttribute("aria-expanded") === "true",
+    ]);
+}
+
 describe("deskFor", () => {
-  it("sends every role that existed where its name used to", () => {
-    // The routing before ADR 0067, by name: affiliate → portal,
-    // operations_manager → Operations, customer_service → Inbox, else the
-    // affiliate dashboard.
-    const before: Record<string, string> = {
-      admin: "affiliates",
-      affiliate_manager: "affiliates",
-      content_manager: "affiliates",
-      operations_manager: "operations",
-      customer_service: "inbox",
-      affiliate: "portal",
-    };
-    for (const [role, held] of Object.entries(HELD)) {
-      expect(deskFor(session(held.roles, held.permissions)), role).toBe(before[role]);
+  it("gives every role with a staff permission the frame, and a model her portal", () => {
+    for (const kind of Object.keys(HELD) as Kind[]) {
+      expect(deskFor(sessionOf(kind)), kind).toBe(kind === "model" ? "portal" : "staff");
     }
   });
 
   it("never reads a role's name", () => {
     // Names that would once have chosen another tree change nothing.
-    expect(deskFor(session(["operations_manager"], HELD.content_manager.permissions))).toBe("affiliates");
-    expect(deskFor(session(["admin"], []))).toBe("portal");
-    expect(deskFor(session(["affiliate"], ["inbox.use"]))).toBe("inbox");
+    const named = (roles: string[], permissions: string[]) => ({
+      ...sessionOf("model"),
+      actor: { ...sessionOf("model").actor, roles },
+      permissions,
+    });
+    expect(deskFor(named(["operations_manager"], [...HELD.content_manager.permissions]))).toBe("staff");
+    expect(deskFor(named(["admin"], []))).toBe("portal");
+    expect(deskFor(named(["affiliate"], ["inbox.use"]))).toBe("staff");
   });
 
   it("gives a model, and somebody invited to become one, the portal", () => {
-    expect(deskFor(session(["affiliate"], [], true))).toBe("portal");
-    expect(deskFor(session([], [], false))).toBe("portal");
+    expect(deskFor(sessionOf("model"))).toBe("portal");
+    expect(deskFor({ ...sessionOf("model"), actor: { ...sessionOf("model").actor, roles: [] } })).toBe("portal");
   });
 
   it("names a person by the widest role they hold", () => {
-    expect(roleLabel(session(HELD.operations_manager.roles, []).actor)).toBe("operations manager");
-    expect(roleLabel(session([], []).actor)).toBe("");
+    expect(roleLabel(sessionOf("operations_manager").actor)).toBe("operations manager");
+    expect(roleLabel({ ...sessionOf("model").actor, roles: [] })).toBe("");
+  });
+});
+
+describe("each kind of person: the departments they hold, and where they start", () => {
+  const cases: [Kind, [string, boolean][], string][] = [
+    ["owner", [["Inbox", false], ["Operations", false], ["Affiliates", true]], "/affiliates/overview"],
+    ["affiliate_manager", [["Affiliates", true]], "/affiliates/overview"],
+    ["content_manager", [["Affiliates", true]], "/affiliates/overview"],
+    ["operations_manager", [["Inbox", false], ["Operations", true]], "/operations/shopify"],
+    ["operations_only", [["Operations", true]], "/operations/shopify"],
+    ["customer_service", [["Inbox", true]], "/inbox/chats"],
+  ];
+
+  it.each(cases)("%s", async (kind, rows, start) => {
+    serve(sessionOf(kind));
+    render(<App />);
+
+    await screen.findByRole("navigation", { name: "Departments" });
+    await waitFor(() => expect(window.location.pathname).toBe(start));
+    await waitFor(() => expect(departments()).toEqual(rows));
   });
 });
 
 describe("a person holding two roles", () => {
-  it("lands on the affiliate dashboard and is offered the Inbox beside it", async () => {
-    const both = [...HELD.content_manager.permissions, "inbox.use"];
-    serve(session(["content_manager", "customer_service"], both));
+  it("is offered the Inbox beside the affiliate side", async () => {
+    serve({ ...sessionOf("content_manager"), permissions: [...HELD.content_manager.permissions, "inbox.use"] });
     render(<App />);
 
-    await screen.findByRole("navigation", { name: "Sections" });
-    expect(screen.getByRole("link", { name: "Inbox" }).getAttribute("href")).toBe("/inbox");
-    expect(screen.queryByRole("link", { name: "Operations" })).toBeNull();
+    await screen.findByRole("navigation", { name: "Departments" });
+    expect(departments().map(([name]) => name)).toEqual(["Inbox", "Affiliates"]);
   });
 
   it("reaches the Inbox at its own address", async () => {
     window.history.pushState({}, "", "/inbox/confirmations");
-    serve(session(["content_manager", "customer_service"], [...HELD.content_manager.permissions, "inbox.use"]));
+    serve({ ...sessionOf("content_manager"), permissions: [...HELD.content_manager.permissions, "inbox.use"] });
     render(<App />);
 
     expect(await screen.findByRole("heading", { name: "Confirmations" })).toBeTruthy();
@@ -149,13 +102,27 @@ describe("a person holding two roles", () => {
 });
 
 describe("the operations manager, now two roles", () => {
-  it("still lands on Operations and asks the affiliate side nothing", async () => {
-    window.history.pushState({}, "", "/payments");
-    serve(session(HELD.operations_manager.roles, HELD.operations_manager.permissions));
+  it("still starts on Operations and asks the affiliate side nothing", async () => {
+    serve(sessionOf("operations_manager"));
     render(<App />);
 
     expect(await screen.findByRole("heading", { name: "Shopify" })).toBeTruthy();
     expect(window.location.pathname).toBe("/operations/shopify");
-    expect(requested.filter((url) => url.includes("/api/affiliates"))).toEqual([]);
+    expect(
+      asked().filter((url) => url.includes("/api/affiliates") || url.endsWith("/api/operations/counts")),
+    ).toEqual([]);
+  });
+});
+
+describe("a model", () => {
+  it.each(["/payments", "/targets"])("stays in her portal at %s, whatever staff addresses are", async (address) => {
+    // Links in the emails she is sent: her portal's own addresses.
+    window.history.pushState({}, "", address);
+    serve(sessionOf("model"));
+    render(<App />);
+
+    await screen.findByRole("alert");
+    expect(window.location.pathname).toBe(address);
+    expect(screen.queryByRole("navigation", { name: "Departments" })).toBeNull();
   });
 });

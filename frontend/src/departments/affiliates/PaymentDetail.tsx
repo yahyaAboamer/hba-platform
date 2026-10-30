@@ -217,7 +217,7 @@ export function PaymentDetail({ session }: { session: Session }) {
 
   const head = (
     <div className="page__head">
-      <Link className="button pay__back" to={`/payments?month=${month}`}>
+      <Link className="button pay__back" to={`/affiliates/payments?month=${month}`}>
         ← Payments
       </Link>
       <div className="page__title">
@@ -291,7 +291,7 @@ export function PaymentDetail({ session }: { session: Session }) {
             </span>
             <Link
               className="pay-detail__link"
-              to={`/affiliates/${affiliateId}?section=payments&month=${month}`}
+              to={`/affiliates/models/${affiliateId}?section=payments&month=${month}`}
             >
               Open profile →
             </Link>
@@ -302,7 +302,7 @@ export function PaymentDetail({ session }: { session: Session }) {
               <div>{statement.blockers.map(describeBlocker).join(" · ")}</div>
               <Link
                 className="button button--row pay-detail__blocked-act"
-                to={needsTerms ? `/affiliates/${affiliateId}/compensation` : `/targets?month=${month}`}
+                to={needsTerms ? `/affiliates/models/${affiliateId}/compensation` : `/affiliates/targets?month=${month}`}
               >
                 {needsTerms ? "Set compensation terms" : "Open Targets"}
               </Link>
@@ -375,7 +375,7 @@ export function PaymentDetail({ session }: { session: Session }) {
               <Money piastres={balance.paid_piastres} kind="agreed" /> was transferred
               against an approved <Money piastres={balance.obligation_piastres} kind="agreed" />.
               The difference stays visible rather than being adjusted away.{" "}
-              <Link className="pay-detail__link" to={`/payments/${month}/${affiliateId}/reconcile`}>
+              <Link className="pay-detail__link" to={`/affiliates/payments/${month}/${affiliateId}/reconcile`}>
                 Settle the difference →
               </Link>
             </p>
@@ -384,7 +384,7 @@ export function PaymentDetail({ session }: { session: Session }) {
             <Link
               key={index}
               className="pay-detail__correction"
-              to={`/payments/${month}/${affiliateId}/correction`}
+              to={`/affiliates/payments/${month}/${affiliateId}/correction`}
             >
               A difference was found after {formatMonth(month)} was agreed. A
               decision is needed.
@@ -412,7 +412,7 @@ export function PaymentDetail({ session }: { session: Session }) {
                   {balance.name} has not submitted payment details, so nothing
                   can be sent yet.
                 </p>
-                <Link className="button button--row" to={`/affiliates/${affiliateId}`}>
+                <Link className="button button--row" to={`/affiliates/models/${affiliateId}`}>
                   Open the profile
                 </Link>
               </>
@@ -510,7 +510,7 @@ export function PaymentDetail({ session }: { session: Session }) {
                 <Link
                   key={transfer.id}
                   className="pay-detail__transfer"
-                  to={`/payments/${month}/${affiliateId}/receipts/${transfer.id}`}
+                  to={`/affiliates/payments/${month}/${affiliateId}/receipts/${transfer.id}`}
                 >
                   <span className="pay-detail__transfer-top">
                     <Money piastres={here?.allocated_piastres ?? transfer.amount_piastres} kind="agreed" />
@@ -538,7 +538,7 @@ export function PaymentDetail({ session }: { session: Session }) {
               balance.balance_piastres > 0 && (
                 <Link
                   className="button pay-detail__wide pay-detail__record"
-                  to={`/payments/${month}/${affiliateId}/record`}
+                  to={`/affiliates/payments/${month}/${affiliateId}/record`}
                 >
                   Record payment
                 </Link>
@@ -596,7 +596,7 @@ export function PaymentReceipt() {
 
   const transfer = history?.payments.find((payment) => String(payment.id) === paymentId);
   const match = transfer ? receiptFor(transfer, month) : null;
-  const back = `/payments/${month}/${affiliateId}`;
+  const back = `/affiliates/payments/${month}/${affiliateId}`;
 
   return (
     <>
@@ -625,7 +625,7 @@ export function PaymentReceipt() {
         <p className="empty">
           This transfer did not pay for {formatMonth(month)}. It settled{" "}
           {match.months.map(formatMonth).join(" and ")}.{" "}
-          <Link className="pay-detail__link" to={`/payments/${match.months[0]}/${affiliateId}`}>
+          <Link className="pay-detail__link" to={`/affiliates/payments/${match.months[0]}/${affiliateId}`}>
             Open {formatMonth(match.months[0])} →
           </Link>
         </p>

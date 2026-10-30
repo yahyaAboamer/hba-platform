@@ -543,7 +543,7 @@ export function PaymentRow({
       <td className="payments__who">
         {/* The export opens the model's payment for this month from her name,
          *  not her profile - the profile is one link further, from there. */}
-        <Link className="payments__name control-font" to={`/payments/${month}/${row.affiliate_id}`}>
+        <Link className="payments__name control-font" to={`/affiliates/payments/${month}/${row.affiliate_id}`}>
           {row.name}
         </Link>
         {/* Her arrangement under her name, as the export writes it: the
@@ -689,7 +689,7 @@ function PaymentAction({
     return (
       <Link
         className={canApprove ? "button button--row button--primary" : "button button--row"}
-        to={`/payments/${month}/${row.affiliate_id}`}
+        to={`/affiliates/payments/${month}/${row.affiliate_id}`}
       >
         {action}
       </Link>
@@ -699,7 +699,7 @@ function PaymentAction({
     return (
       <Link
         className="button button--row button--primary"
-        to={`/affiliates/${row.affiliate_id}/compensation`}
+        to={`/affiliates/models/${row.affiliate_id}/compensation`}
       >
         {action}
       </Link>
@@ -709,7 +709,7 @@ function PaymentAction({
     return (
       <Link
         className="button button--row button--primary"
-        to={`/payments/${month}/${row.affiliate_id}/record`}
+        to={`/affiliates/payments/${month}/${row.affiliate_id}/record`}
       >
         {action}
       </Link>
@@ -719,7 +719,7 @@ function PaymentAction({
     return (
       <Link
         className="button button--row"
-        to={`/payments/${month}/${row.affiliate_id}/reconcile`}
+        to={`/affiliates/payments/${month}/${row.affiliate_id}/reconcile`}
       >
         {action}
       </Link>
@@ -728,7 +728,7 @@ function PaymentAction({
   return (
     <Link
       className="button button--row"
-      to={`/payments/${month}/${row.affiliate_id}`}
+      to={`/affiliates/payments/${month}/${row.affiliate_id}`}
     >
       Open
     </Link>

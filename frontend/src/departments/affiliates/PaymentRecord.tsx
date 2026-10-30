@@ -137,7 +137,7 @@ export function PaymentRecord() {
   const [error, setError] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
   const [operationKey] = useState(() => crypto.randomUUID());
-  const back = `/payments/${month}/${affiliateId}`;
+  const back = `/affiliates/payments/${month}/${affiliateId}`;
 
   useEffect(() => {
     setError(null);

@@ -180,7 +180,7 @@ export function Orders({ session }: { session: Session }) {
       const found = await api.get<OrderRow>(
         `/api/orders/lookup/${encodeURIComponent(search.trim())}`,
       );
-      navigate(`/orders/${encodeURIComponent(found.shopify_order_id)}`);
+      navigate(`/affiliates/orders/${encodeURIComponent(found.shopify_order_id)}`);
     } catch {
       setLookedUp("missing");
     }
@@ -293,7 +293,7 @@ export function Orders({ session }: { session: Session }) {
 function OrderTableRow({ row }: { row: OrderRow }) {
   const navigate = useNavigate();
   const status = orderStatus(row);
-  const open = `/orders/${encodeURIComponent(row.shopify_order_id)}`;
+  const open = `/affiliates/orders/${encodeURIComponent(row.shopify_order_id)}`;
 
   return (
     /*
@@ -378,7 +378,7 @@ export function OrderDetail() {
       <div className="page__head">
         <Link
           className="button orders__back"
-          to={from?.to ?? (order ? `/orders?month=${order.business_month}` : "/orders")}
+          to={from?.to ?? (order ? `/affiliates/orders?month=${order.business_month}` : "/affiliates/orders")}
         >
           ← {from?.label ?? "Attributed orders"}
         </Link>
@@ -413,7 +413,7 @@ export function OrderDetail() {
                   {order.outcome === "attributed" && order.affiliate_id !== null ? (
                     <Link
                       className="order__model"
-                      to={`/affiliates/${order.affiliate_id}?section=performance&month=${order.business_month}`}
+                      to={`/affiliates/models/${order.affiliate_id}?section=performance&month=${order.business_month}`}
                     >
                       {order.affiliate_name}
                       {order.matched_codes.length > 0 && ` · ${order.matched_codes.join(" · ")}`}

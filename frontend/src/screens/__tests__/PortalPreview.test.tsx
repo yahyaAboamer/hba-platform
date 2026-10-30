@@ -155,9 +155,11 @@ describe("her screens, in a preview", () => {
 
 describe("the frame's own address", () => {
   it("is recognised before routing, and nothing else is", () => {
+    expect(previewFrameFor("/affiliates/models/12/portal/frame")).toBe(12);
+    // The address it had before the frame: an old bookmark, or a tab left open.
     expect(previewFrameFor("/affiliates/12/portal/frame")).toBe(12);
-    expect(previewFrameFor("/affiliates/12/portal")).toBeNull();
-    expect(previewFrameFor("/affiliates/abc/portal/frame")).toBeNull();
+    expect(previewFrameFor("/affiliates/models/12/portal")).toBeNull();
+    expect(previewFrameFor("/affiliates/models/abc/portal/frame")).toBeNull();
     expect(isPortalPreview()).toBe(false);
   });
 });

@@ -64,7 +64,7 @@ export function PaymentCorrection({ session }: { session: Session }) {
   }, [affiliateId]);
 
   const row = body?.corrections.find((candidate) => candidate.month === month) ?? null;
-  const back = `/payments/${month}/${affiliateId}`;
+  const back = `/affiliates/payments/${month}/${affiliateId}`;
   // Opened from Home's notice, Back returns to Home, as the export's
   // correction view does (`backLabel: "Home"`); otherwise to the payment.
   const from = (useLocation().state as { back?: { label: string; to: string } } | null)?.back;
@@ -200,7 +200,7 @@ export function PaymentCorrection({ session }: { session: Session }) {
                 {decided.choice === "credit" && (
                   <Link
                     className="pay-detail__link"
-                    to={`/payments?month=${decided.destination}`}
+                    to={`/affiliates/payments?month=${decided.destination}`}
                   >
                     Open the destination month in Payments →
                   </Link>

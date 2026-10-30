@@ -274,11 +274,11 @@ export function Products({ session }: { session: Session }) {
                     // product, in the control font (ADR 0044), so its pill is
                     // the export's 20px. The name stays a link.
                     <tr key={row.shopify_product_id} className="control-font products__row"
-                      onClick={() => navigate(`/products/${row.shopify_product_id}`)}>
+                      onClick={() => navigate(`/affiliates/products/${row.shopify_product_id}`)}>
                       <td>
                         <Link
                           className="products__who"
-                          to={`/products/${row.shopify_product_id}`}
+                          to={`/affiliates/products/${row.shopify_product_id}`}
                         >
                           {row.image_url ? (
                             <img className="products__thumb" src={row.image_url} alt="" loading="lazy" />
@@ -448,7 +448,7 @@ function ProductDetailPage({ id, session }: { id: string; session: Session }) {
   if (shipmentOrder) {
     return <>
       <div className="page__head">
-        <Link className="button product__back" to={`/products/${id}`}>← {detail.title}</Link>
+        <Link className="button product__back" to={`/affiliates/products/${id}`}>← {detail.title}</Link>
         <div className="page__title">
           <h1>Shipment record</h1>
           {shipment && <span className="page__subtitle">{detail.title} · {shipment.entry.name}</span>}
@@ -464,7 +464,7 @@ function ProductDetailPage({ id, session }: { id: string; session: Session }) {
     <div className="page__head">
       {promotion
         ? <button type="button" className="button product__back" onClick={() => setView(false)} disabled={saving}>← {detail.title}</button>
-        : <Link className="button product__back" to="/products">← Products</Link>}
+        : <Link className="button product__back" to="/affiliates/products">← Products</Link>}
       <div className="page__title">
         <h1>{promotion ? "Feature request" : detail.title}</h1>
       </div>
@@ -559,11 +559,11 @@ function ProductDetailPage({ id, session }: { id: string; session: Session }) {
               ? <p className="product__group-empty">{search ? "No matching models." : "None."}</p>
               : <ul className="product__roster">
                   {shown.map((entry) => <li key={entry.affiliate_id}>
-                    <Link className="product__roster-name" to={`/affiliates/${entry.affiliate_id}?section=wardrobe`}>{entry.name}</Link>
+                    <Link className="product__roster-name" to={`/affiliates/models/${entry.affiliate_id}?section=wardrobe`}>{entry.name}</Link>
                     {/* The export's second column: the order that carried it,
                      *  opening its shipment record; *not sent* otherwise. */}
                     {entry.shopify_order_id
-                      ? <Link className="product__roster-ref control-font" to={`/products/${id}?shipment=${entry.shopify_order_id}&model=${entry.affiliate_id}`}>{entry.order_number}</Link>
+                      ? <Link className="product__roster-ref control-font" to={`/affiliates/products/${id}?shipment=${entry.shopify_order_id}&model=${entry.affiliate_id}`}>{entry.order_number}</Link>
                       : entry.manual
                         ? <span className="product__roster-ref product__roster-ref--hand">Assigned manually{entry.size ? ` · ${entry.size}` : ""}</span>
                         : <span className="product__roster-ref product__roster-ref--none">not sent</span>}
@@ -682,11 +682,11 @@ function ShipmentRecord({ productId, title, shipment }: { productId: string; tit
   const state = SHIPMENT_STATE[shipment.state];
   return <section className="pay-detail__card shipment">
     <div className="shipment__head">
-      <Link className="shipment__product control-font" to={`/products/${productId}`}>{title}</Link>
+      <Link className="shipment__product control-font" to={`/affiliates/products/${productId}`}>{title}</Link>
       <span className={`shipment__state shipment__state--${state.tone}`}>{state.label}</span>
     </div>
     <div className="shipment__row"><span>Model</span>
-      <Link className="control-font" to={`/affiliates/${shipment.entry.affiliate_id}?section=wardrobe`}>{shipment.entry.name}</Link></div>
+      <Link className="control-font" to={`/affiliates/models/${shipment.entry.affiliate_id}?section=wardrobe`}>{shipment.entry.name}</Link></div>
     <div className="shipment__row"><span>Size</span><span>{shipment.entry.size || "not recorded"}</span></div>
     <div className="shipment__row"><span>Shopify order</span><span>{shipment.entry.order_number}</span></div>
     <p className="shipment__note">{state.note}</p>

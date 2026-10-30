@@ -511,7 +511,7 @@ export function AffiliateDetail({ session }: { session: Session }) {
       )}
       {can(session, "affiliates.manage") && !house && (
         <p className="profile__card-actions">
-          <Link className="pay-detail__link profile__card-link" to={`/affiliates/${detail.id}/payout-destination`}>
+          <Link className="pay-detail__link profile__card-link" to={`/affiliates/models/${detail.id}/payout-destination`}>
             {detail.payout_destination ? "Correct it →" : "Set it →"}
           </Link>
         </p>
@@ -526,7 +526,7 @@ export function AffiliateDetail({ session }: { session: Session }) {
   return (
     <>
       <div className="page__head">
-        <Link className="button profile__back" to="/affiliates">
+        <Link className="button profile__back" to="/affiliates/models">
           ← Models
         </Link>
         {/* Her name, and under it the code an order knows her by: the
@@ -538,7 +538,7 @@ export function AffiliateDetail({ session }: { session: Session }) {
         {/* ADR 0064: her portal as she sees it, read only. A house account
          *  is not a person and has no portal to look at. */}
         {!house && (
-          <Link className="button" to={`/affiliates/${detail.id}/portal`}>
+          <Link className="button" to={`/affiliates/models/${detail.id}/portal`}>
             View her portal
           </Link>
         )}
@@ -591,7 +591,7 @@ export function AffiliateDetail({ session }: { session: Session }) {
           subject={detail}
           session={session}
           onChanged={changed}
-          onErased={(message) => navigate("/affiliates", { state: { notice: message } })}
+          onErased={(message) => navigate("/affiliates/models", { state: { notice: message } })}
         />
       </header>
 
@@ -784,7 +784,7 @@ export function AffiliateDetail({ session }: { session: Session }) {
                     : "Required before approving."}
                 </span>
               </div>
-              <Link className="button" to={`/affiliates/${detail.id}/compensation`}>
+              <Link className="button" to={`/affiliates/models/${detail.id}/compensation`}>
                 {detail.compensation ? "Change it" : "Set it"}
               </Link>
             </li>
@@ -822,7 +822,7 @@ export function AffiliateDetail({ session }: { session: Session }) {
                   )}
                 </span>
               </div>
-              <Link className="button" to="/targets">
+              <Link className="button" to="/affiliates/targets">
                 {targetsSet ? "Change them" : "Open targets"}
               </Link>
             </li>
@@ -1129,7 +1129,7 @@ export function AffiliateDetail({ session }: { session: Session }) {
           <h2 className="pay-detail__card-title">Current terms</h2>
           <p className="profile__card-line">{termLine}</p>
           {can(session, "compensation.manage") && (
-            <Link className="pay-detail__link profile__card-link control-font" to={`/affiliates/${id}/compensation`}>
+            <Link className="pay-detail__link profile__card-link control-font" to={`/affiliates/models/${id}/compensation`}>
               Compensation history →
             </Link>
           )}
@@ -1204,7 +1204,7 @@ export function AffiliateDetail({ session }: { session: Session }) {
                     </span>
                   </>;
                   return item.shopify_product_id
-                    ? <Link key={`${item.shopify_order_id}-${index}`} className="profile__piece" to={`/products/${item.shopify_product_id}`}>{body}</Link>
+                    ? <Link key={`${item.shopify_order_id}-${index}`} className="profile__piece" to={`/affiliates/products/${item.shopify_product_id}`}>{body}</Link>
                     : <div key={`${item.shopify_order_id}-${index}`} className="profile__piece">{body}</div>;
                 })}
               </div>
@@ -1233,7 +1233,7 @@ export function AffiliateDetail({ session }: { session: Session }) {
             </>}
             <div className="profile__catalogue">
               <span>What HBA has not sent {detail.name} yet is in the catalogue.</span>
-              <Link className="pay-detail__link" to="/products">Open the catalogue →</Link>
+              <Link className="pay-detail__link" to="/affiliates/products">Open the catalogue →</Link>
             </div>
           </>}
         </div>}
@@ -1261,7 +1261,7 @@ export function AffiliateDetail({ session }: { session: Session }) {
                 <tbody>
                   {orders.map((order) => {
                     const state = ORDER_STATE[order.status] ?? ORDER_STATE.pending;
-                    const opens = `/orders/${encodeURIComponent(order.shopify_order_id)}`;
+                    const opens = `/affiliates/orders/${encodeURIComponent(order.shopify_order_id)}`;
                     // The export's row is one button: the whole line opens
                     // the order, and the order's back link returns here.
                     const back = { label: detail.name, to: `${location.pathname}${location.search}` };
@@ -1303,7 +1303,7 @@ export function AffiliateDetail({ session }: { session: Session }) {
         {section === "targets" && <div className="profile__full">
           <div className="profile__subhead">
             <h2>Recorded content</h2>
-            <Link className="pay-detail__link" to={`/targets?month=${month}`}>Open Targets →</Link>
+            <Link className="pay-detail__link" to={`/affiliates/targets?month=${month}`}>Open Targets →</Link>
           </div>
           <div className="surface">
             {!record ? (
@@ -1354,7 +1354,7 @@ export function AffiliateDetail({ session }: { session: Session }) {
               <p className="pay-detail__faint">For {formatMonth(detail.terms_month)}</p>
             )}
             {can(session, "compensation.manage") && (
-              <Link className="pay-detail__link profile__card-link control-font" to={`/affiliates/${id}/compensation`}>
+              <Link className="pay-detail__link profile__card-link control-font" to={`/affiliates/models/${id}/compensation`}>
                 Edit terms →
               </Link>
             )}
@@ -1382,7 +1382,7 @@ export function AffiliateDetail({ session }: { session: Session }) {
                   return (
                     <tr key={row.month}>
                       <td>
-                        <Link to={`/payments/${row.month}/${detail.id}`}>{formatMonth(row.month)}</Link>
+                        <Link to={`/affiliates/payments/${row.month}/${detail.id}`}>{formatMonth(row.month)}</Link>
                       </td>
                       <td className="profile__money">
                         <Money piastres={row.obligation_piastres} kind="agreed" />
@@ -1402,7 +1402,7 @@ export function AffiliateDetail({ session }: { session: Session }) {
           {/* Admin Models audit: her whole ledger has its own page, which
               nothing linked to. */}
           <p className="profile__ledger-link">
-            <Link className="pay-detail__link" to={`/affiliates/${detail.id}/payments`}>
+            <Link className="pay-detail__link" to={`/affiliates/models/${detail.id}/payments`}>
               See every transfer and adjustment →
             </Link>
           </p>

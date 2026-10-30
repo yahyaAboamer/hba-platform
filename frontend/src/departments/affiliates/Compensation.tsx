@@ -292,7 +292,7 @@ export function Compensation() {
   return (
     <>
       <div className="page__head">
-        <Link className="button pay__back" to={`/affiliates/${id}`}>
+        <Link className="button pay__back" to={`/affiliates/models/${id}`}>
           ← {data.name}
         </Link>
         <div className="page__title">
@@ -564,7 +564,7 @@ export function Compensation() {
                       ? "Select months first"
                       : `Review ${ordered.length} ${ordered.length === 1 ? "month" : "months"}`}
                   </button>
-                  <Link className="button terms__big" to={`/affiliates/${id}`}>
+                  <Link className="button terms__big" to={`/affiliates/models/${id}`}>
                     Done
                   </Link>
                 </>

@@ -157,7 +157,7 @@ export function InvitePage({ session }: { session: Session }) {
 
   return (
     <div className="invite-page">
-      <Link className="invite-page__back" to="/affiliates">
+      <Link className="invite-page__back" to="/affiliates/models">
         ← Models
       </Link>
 
@@ -268,7 +268,7 @@ export function InvitePage({ session }: { session: Session }) {
         <section className="invite-page__list">
           <h2 className="invite-page__list-title">Applications awaiting review</h2>
           {applicants.map((row) => (
-            <Link className="invite-page__row" key={row.id} to={`/affiliates/${row.id}`}>
+            <Link className="invite-page__row" key={row.id} to={`/affiliates/models/${row.id}`}>
               <span>
                 {row.name}
                 <span className="invite-page__sub">

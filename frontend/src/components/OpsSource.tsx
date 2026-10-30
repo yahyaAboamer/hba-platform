@@ -178,7 +178,7 @@ export function useNow(): number {
 
 const NARROW = "(max-width: 800px)";
 
-/** Whether the shell has folded to its phone layout (Layout.css, <=800px). */
+/** Whether the shell has folded to its phone layout (frame/frame.css, <=800px). */
 export function useIsNarrow(): boolean {
   // Wide where the browser cannot say (jsdom, very old browsers).
   const supported = typeof window.matchMedia === "function";

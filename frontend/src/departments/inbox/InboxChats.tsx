@@ -4,7 +4,7 @@ import { Link, useParams } from "react-router-dom";
 import { ChatPane } from "./ChatPane";
 import { InboxIcon } from "./InboxIcon";
 import type { InboxIconName } from "./InboxIcon";
-import { useInbox } from "./InboxLayout";
+import { useInbox } from "./useInbox";
 import { OpsIcon, age, clockTime, useNow } from "../../components/OpsSource";
 import { api } from "../../lib/api";
 import { chatName, listTime } from "../../lib/inbox";

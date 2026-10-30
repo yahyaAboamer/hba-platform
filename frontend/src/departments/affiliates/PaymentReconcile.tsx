@@ -69,7 +69,7 @@ export function PaymentReconcile() {
         reason: reason.trim(),
         destination_month: kind === "credit" ? destination : null,
       });
-      navigate("/payments");
+      navigate("/affiliates/payments");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not record it.");
     } finally {
@@ -81,7 +81,7 @@ export function PaymentReconcile() {
     <>
       <div className="page__head">
         <div className="page__title">
-          <Link to="/payments" className="detail__back">
+          <Link to="/affiliates/payments" className="detail__back">
             Payments
           </Link>
           <h1>
@@ -221,7 +221,7 @@ export function PaymentReconcile() {
             <button
               type="button"
               className="button"
-              onClick={() => navigate("/payments")}
+              onClick={() => navigate("/affiliates/payments")}
               disabled={working}
             >
               Cancel

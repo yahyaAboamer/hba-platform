@@ -256,13 +256,21 @@ def test_only_the_preview_frame_may_be_framed_and_only_by_our_own_pages():
     """`X-Frame-Options: DENY` everywhere else, as before: clickjacking."""
     client = TestClient(app)
 
-    frame = client.get("/affiliates/3/portal/frame")
-    assert frame.headers["x-frame-options"] == "SAMEORIGIN"
-    assert frame.headers["content-security-policy"] == "frame-ancestors 'self'"
+    # The address since ADR 0068, and the old one, kept for bookmarks.
+    for address in ("/affiliates/models/3/portal/frame", "/affiliates/3/portal/frame"):
+        frame = client.get(address)
+        assert frame.headers["x-frame-options"] == "SAMEORIGIN", address
+        assert frame.headers["content-security-policy"] == "frame-ancestors 'self'", address
 
     for elsewhere in ("/affiliates/3/portal", "/affiliates/3", "/api/affiliates/3/portal",
-                      "/affiliates/3/portal/frame/extra", "/sign-in"):
-        assert client.get(elsewhere).headers["x-frame-options"] == "DENY", elsewhere
+                      "/affiliates/3/portal/frame/extra", "/sign-in",
+                      "/affiliates/models/3/portal", "/affiliates/models/3",
+                      "/affiliates/models/3/portal/frame/extra",
+                      "/affiliates/models/abc/portal/frame",
+                      "/affiliates/other/3/portal/frame"):
+        response = client.get(elsewhere)
+        assert response.headers["x-frame-options"] == "DENY", elsewhere
+        assert "content-security-policy" not in response.headers, elsewhere
 
 
 def test_her_own_routes_still_refuse_staff(admin):

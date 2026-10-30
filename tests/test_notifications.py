@@ -176,6 +176,31 @@ def test_a_month_email_states_a_figure_and_links_to_the_screen(monkeypatch):
     assert message.body.count("EGP ") == 1
 
 
+@pytest.mark.parametrize(
+    ("event", "payload", "path"),
+    [
+        # To the maintainer: the staff addresses since ADR 0068.
+        (Event.APPLICATION_RECEIVED, {"name": "Nour", "code": "NOUR10"}, "/affiliates/models"),
+        (Event.DESTINATION_CHANGED, {"name": "Nour", "masked": "…4567"}, "/affiliates/payments"),
+        # To whoever records content: a reminder about the models, not to one.
+        (
+            Event.TARGETS_REMINDER,
+            {"name": "Sara", "month": "2026-11", "missing": 3, "total": 23},
+            "/affiliates/targets",
+        ),
+        # To the model: her portal's addresses, unchanged.
+        (Event.PAYMENT_RECORDED, {"name": "Nour", "amount_piastres": 100_000}, "/payments"),
+    ],
+)
+def test_each_email_links_to_its_readers_own_address(monkeypatch, event, payload, path):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "public_base_url", "https://pay.example.com")
+    message = render(event, {"email": "someone@example.com", **payload})
+
+    assert f"https://pay.example.com{path}" in message.body.splitlines()
+
+
 def test_no_link_is_better_than_a_broken_one(monkeypatch):
     """A sign-in link pointing at localhost teaches twenty people that mail
     from HBA does not work, and that lesson is expensive to unteach.
