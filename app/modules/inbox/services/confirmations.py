@@ -46,7 +46,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
-from sqlalchemy import exists, select
+from sqlalchemy import and_, exists, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -278,6 +278,9 @@ def confirm_order(
 
         queue_confirmation_send(db, order_id)
     row = _recorded(db, order_id)
+    if inserted is not None and state in ("no_phone", "bad_phone"):
+        # Nothing will message her and nothing tags the order: say so now.
+        report(Anomaly.ORDER_NOT_MESSAGED, order=row.order_name if row else order_id, state=state)
     # Shopify's invoice email goes whether or not WhatsApp can reach her
     # (ADR 0062, point 6) - most of all when it cannot.
     if inserted is not None and row is not None and row.state != "not_needed":
@@ -346,6 +349,45 @@ def unconfirmed_recent(db: Session, *, limit: int = SWEEP_BATCH) -> list[str]:
     )
 
 
+#: How long an order may sit with no tag before it is called silent.
+UNTAGGED_AFTER = timedelta(minutes=30)
+
+#: How many silent orders the sweep's one line names.
+UNTAGGED_NAMED = 10
+
+
+def untagged(db: Session) -> list[OrderConfirmation]:
+    """Orders that should carry a confirmation tag by now and do not.
+
+    A catch-all by state, not by cause: nothing sent (no number, a number
+    that could not be read, sending off, a send stuck or failed), or sent and
+    the tag read back from Shopify is not there. Settled orders (paid, test,
+    cancelled, answered) are not listed.
+    """
+    now = utcnow()
+    silent = OrderConfirmation.state.in_(
+        ("no_phone", "bad_phone", "failed", "pending", "sending", "would_send")
+    )
+    sent_no_tag = and_(
+        OrderConfirmation.state == "sent",
+        OrderConfirmation.answer.is_(None),
+        OrderConfirmation.shopify_tags.is_(None),
+        OrderConfirmation.tags_read_at.is_not(None),
+        OrderConfirmation.tags_read_at > OrderConfirmation.sent_at,
+    )
+    return list(
+        db.scalars(
+            select(OrderConfirmation)
+            .where(
+                OrderConfirmation.placed_at >= now - FRESH_FOR,
+                OrderConfirmation.placed_at < now - UNTAGGED_AFTER,
+                or_(silent, sent_no_tag),
+            )
+            .order_by(OrderConfirmation.placed_at)
+        )
+    )
+
+
 @register_handler(JobKind.INBOX_CONFIRM_ORDER)
 def _handle_confirm_order(db: Session, payload: dict) -> None:
     order_id = str(payload.get("order_id") or "").strip()
@@ -386,6 +428,14 @@ def _handle_confirm_sweep(db: Session, payload: dict) -> None:
         tags.queue_read(db, order_id)
     if stale:
         logger.info("confirmation sweep queued %s tag reads", len(stale))
+
+    silent = untagged(db)
+    if silent:
+        report(
+            Anomaly.ORDERS_UNTAGGED,
+            count=len(silent),
+            orders=[row.order_name for row in silent[:UNTAGGED_NAMED]],
+        )
 
     # A payment request's one reminder, 24 hours on (ADR 0062).
     from app.modules.inbox.services import payments

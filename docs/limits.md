@@ -1223,6 +1223,29 @@ within seconds.
 
 *What to do:* nothing, unless the rate is high, which means a sender is looping.
 
+### `order_not_messaged`
+
+A cash-on-delivery order was decided with **no confirmation to send**: it has
+no phone number, or one the platform could not read as a mobile. Reported once,
+when the order is decided, with its `order` name and `state` (`no_phone` or
+`bad_phone`). No customer detail is in the line. Such an order carries no tag in
+Shopify, so it is easy to miss there.
+
+*What to do:* call her. Read the number on the order (Shopify's own page tidies
+it; the API returns it as typed). If the number was a usable mobile the reader
+refused, that is a bug in `egyptian_mobile`.
+
+### `orders_untagged`
+
+Every sweep, orders placed between 30 minutes and 48 hours ago whose
+confirmation should have left a tag in Shopify and has not: nothing sent, a
+send stuck or failed, or sent with no tag read back. One line with the `count`
+and up to ten order names. **A catch-all**: it names no cause, only that an
+order is silent.
+
+*What to do:* open the order names in Operations' WhatsApp tab. It repeats on
+every sweep until each order is sent, tagged, or older than 48 hours.
+
 ---
 
 ### 🟠 A summed money column comes back as a string *(fixed, guarded)*
