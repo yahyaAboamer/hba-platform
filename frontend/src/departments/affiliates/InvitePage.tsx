@@ -1,0 +1,340 @@
+import { useCallback, useEffect, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
+
+import { api, can, type Session } from "../../lib/api";
+import { formatSentAt, onePerAddress, type Invited } from "./Affiliates";
+import "./InvitePage.css";
+
+/** Only the fields this screen reads. The roster's payload is much wider. */
+type Applicant = {
+  id: number;
+  name: string;
+  status: string;
+  created_at: string | null;
+};
+
+/**
+ * Putting a model on the programme — `vInvite` in the approved admin, lines
+ * 1232–1277.
+ *
+ * **Not a role in a dropdown.** Inviting staff is granting somebody
+ * permissions over other people's money; inviting a model is putting them on
+ * the programme, and they hold no permission at all (§6.1 gives the
+ * `affiliate` role an empty permission set on purpose). Offering both from one
+ * list says they are variations of one decision, and they are not.
+ *
+ * **A page, not the modal it used to be.** The export gives the act a screen
+ * because two things belong beside it: the applications somebody is waiting to
+ * review, and the invitations already out. In a modal those were invisible,
+ * and the most common reason to invite somebody twice is not knowing the first
+ * link is still live.
+ *
+ * What happens next is theirs: they set a password, fill in their own details
+ * and their own payout destination, and apply. §6.5 keeps the application form
+ * free of anything deciding what they are paid, so approving them — and
+ * setting their rate — stays a separate, deliberate act.
+ */
+export function InvitePage({ session }: { session: Session }) {
+  // A content manager may read this page but the server refuses every send,
+  // resend and withdraw from her: offer none of them rather than three
+  // buttons that each end in a refusal.
+  const mayInvite = can(session, "invitations.send");
+  const [query] = useSearchParams();
+  const opened = query.get("email");
+  const [email, setEmail] = useState("");
+  // Optional (audit D, 1 October 2026): the invitation email greets her by
+  // it, and says "Hello," without it.
+  const [name, setName] = useState("");
+  const [link, setLink] = useState<string | null>(null);
+  const [emailed, setEmailed] = useState(false);
+  const [sentTo, setSentTo] = useState("");
+  const [copied, setCopied] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const [working, setWorking] = useState(false);
+  const [applicants, setApplicants] = useState<Applicant[] | null>(null);
+  const [invited, setInvited] = useState<Invited[]>([]);
+
+  const reload = useCallback(() => {
+    api
+      .get<{ affiliates: Applicant[]; invited: Invited[] }>("/api/affiliates")
+      .then((body) => {
+        setApplicants(body.affiliates.filter((row) => row.status === "pending"));
+        setInvited(onePerAddress(body.invited ?? []));
+      })
+      .catch((caught) => setProblem(caught.message));
+  }, []);
+
+  useEffect(reload, [reload]);
+
+  async function send(event: React.FormEvent) {
+    event.preventDefault();
+    setWorking(true);
+    setProblem(null);
+    setLink(null);
+    setCopied(false);
+    try {
+      const result = await api.post<{ link: string; emailed: boolean }>(
+        "/api/auth/invitations",
+        { email: email.trim(), role: "affiliate", name: name.trim() },
+      );
+      setEmailed(result.emailed);
+      setSentTo(email.trim());
+      // **The server's link, not one assembled here.** This screen used to
+      // build its own from the browser's address bar while the email built a
+      // different one from PUBLIC_BASE_URL - so on 2026-09-02 the maintainer
+      // read a working link off the panel while the model received a dead one,
+      // and only the model could tell. An empty string means the platform does
+      // not know its own address, which is said below rather than hidden.
+      setLink(result.link);
+      setEmail("");
+      setName("");
+      reload();
+    } catch (caught) {
+      setProblem(
+        caught instanceof Error ? caught.message : "Could not send the invitation.",
+      );
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  async function copy() {
+    if (!link) return;
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1400);
+    } catch {
+      // Denied, or an insecure context. The link is on screen and selectable,
+      // so the button quietly does nothing rather than raising an error about
+      // a convenience.
+    }
+  }
+
+  /**
+   * Resend or withdraw one invitation.
+   *
+   * **Both paths written out.** `…/${id}/${what}` reads to the reachability
+   * guard as `/api/staff/invitations/{}/{}`, which nothing serves — it fails
+   * the build, and rightly: a path assembled from a variable is a path no
+   * test can check against the routes that exist.
+   */
+  function act(row: Invited, what: "resend" | "revoke") {
+    setProblem(null);
+    if (what === "revoke") {
+      // Withdrawing kills a link somebody may be about to open, and it
+      // cannot be undone - only replaced by a new invitation.
+      if (!window.confirm(`Withdraw the invitation to ${row.email}? The link stops working.`)) return;
+      api
+        .post(`/api/staff/invitations/${row.id}/revoke`)
+        .then(reload)
+        .catch((caught) => setProblem(caught.message));
+      return;
+    }
+    // A resend is a new link, shown the way a new invitation's is. The server
+    // always returned it; this screen used to drop it, so with email off a
+    // resent link could not be delivered at all.
+    setLink(null);
+    setCopied(false);
+    api
+      .post<{ link: string; emailed: boolean }>(`/api/staff/invitations/${row.id}/resend`)
+      .then((result) => {
+        setEmailed(result.emailed);
+        setSentTo(row.email);
+        setLink(result.link);
+        reload();
+      })
+      .catch((caught) => setProblem(caught.message));
+  }
+
+  // Resending issues a new invitation and lapses the old one, so one address
+  // can have two rows: the live one is the invitation, else the newest.
+  // Case-blind, as `onePerAddress` is, so the row it kept is the row found.
+  const sameAddress = invited.filter(
+    (row) => row.email.toLowerCase() === (opened ?? "").toLowerCase(),
+  );
+  const openedId = (sameAddress.find((row) => !row.expired && !row.withdrawn) ?? sameAddress[0])?.id;
+
+  return (
+    <div className="invite-page">
+      <Link className="invite-page__back" to="/affiliates">
+        ← Models
+      </Link>
+
+      <section className="invite-page__card">
+        {/* The export's own title and subtitle: *Invitations*, because the
+         *  screen is both halves - sending one and managing the ones still
+         *  outstanding - and a page headed *Invite a model* above a list of
+         *  three unanswered links is describing one of the two. */}
+        <h1 className="invite-page__title">Invitations</h1>
+        <p className="invite-page__subtitle">
+          Invite a model and manage outstanding links
+        </p>
+
+        {!mayInvite && (
+          <p className="invite-page__hint">
+            You can see who has been invited. Sending, resending and
+            withdrawing invitations is for an administrator or affiliate manager.
+          </p>
+        )}
+        {mayInvite && (
+        <form className="invite-page__form" onSubmit={send}>
+          <input
+            className="input invite-page__name"
+            type="text"
+            value={name}
+            maxLength={120}
+            autoComplete="off"
+            placeholder="First name (optional)"
+            aria-label="First name, optional"
+            onChange={(event) => setName(event.target.value)}
+          />
+          <input
+            className="input"
+            type="email"
+            required
+            value={email}
+            placeholder="name@example.com"
+            aria-label="Email address"
+            onChange={(event) => setEmail(event.target.value)}
+          />
+          <button
+            type="submit"
+            className="button button--primary"
+            disabled={working || !email.trim()}
+          >
+            {working ? "Sending…" : "Send invitation"}
+          </button>
+        </form>
+        )}
+
+        {/* This is what they sign in with, so it has to be the address they
+            actually read. */}
+        <p className="invite-page__hint">
+          The link opens a form: a password, their own details, and where they
+          want to be paid. You approve the application and set the pay after
+          that — nothing about pay is decided here.
+        </p>
+
+        {problem && (
+          <p className="invite-page__problem" role="alert">
+            {problem}
+          </p>
+        )}
+
+        {/*
+         * Both the confirmation and the link: an emailed link is exactly what
+         * somebody wants on screen the moment it is said never to have
+         * arrived, and it is shown once because it is a working credential
+         * until it is used.
+         */}
+        {link && (
+          <div className="invite-page__link">
+            <span className="code invite-page__link-value">{link}</span>
+            <button type="button" className="button button--row" onClick={copy}>
+              {copied ? "Copied" : "Copy"}
+            </button>
+          </div>
+        )}
+        {link && (
+          <p className="invite-page__hint">
+            {emailed
+              ? `Emailed to ${sentTo}. The same link is above, in case it does not arrive — it only appears here once.`
+              : "Email is not switched on, so send this link yourself — it only appears here once."}
+          </p>
+        )}
+
+        {/*
+         * The one state that must never be silent: the platform does not know
+         * its own public address, so the email it just queued carries no link
+         * at all. Saying nothing here leaves somebody waiting for a mail that
+         * can never work.
+         */}
+        {link === "" && sentTo && (
+          <p className="invite-page__problem" role="alert">
+            The invitation was recorded, but the platform does not know its own
+            web address, so no link could be built — the email will not contain
+            one. Set <span className="code">PUBLIC_BASE_URL</span> on the
+            service, then use Resend on {sentTo}.
+          </p>
+        )}
+      </section>
+
+      {/*
+       * Waiting on somebody here, so it sits above the invitations that are
+       * waiting on somebody else.
+       */}
+      {applicants !== null && applicants.length > 0 && (
+        <section className="invite-page__list">
+          <h2 className="invite-page__list-title">Applications awaiting review</h2>
+          {applicants.map((row) => (
+            <Link className="invite-page__row" key={row.id} to={`/affiliates/${row.id}`}>
+              <span>
+                {row.name}
+                <span className="invite-page__sub">
+                  {row.created_at ? `Applied ${formatSentAt(row.created_at)}` : "Applied"}
+                </span>
+              </span>
+              <span className="invite-page__go">Review →</span>
+            </Link>
+          ))}
+        </section>
+      )}
+
+      <section className="invite-page__list">
+        <h2 className="invite-page__list-title">Outstanding invitations</h2>
+        {invited.length === 0 ? (
+          <p className="invite-page__empty">No invitation is outstanding.</p>
+        ) : (
+          // Live first, then lapsed and withdrawn: the ones somebody is still
+          // waiting on belong on top.
+          [...invited.filter((row) => !row.expired), ...invited.filter((row) => row.expired)].map(
+            (row) => (
+              <div key={row.id}
+                // Opened from the roster's row: that invitation is the one in
+                // view, marked, with its Resend and Withdraw beside it.
+                className={row.id === openedId ? "invite-page__row invite-page__row--opened" : "invite-page__row"}
+                ref={row.id === openedId ? (el) => el?.scrollIntoView({ block: "center" }) : undefined}>
+                <span>
+                  {row.email}
+                  <span className="invite-page__sub">Sent {formatSentAt(row.created_at)}</span>
+                </span>
+                {/* The export's words (`inviteRows`): *Awaiting application*
+                    in amber, *Link expired* in red. *Withdrawn* is ours and
+                    waits on the owner (checklist, exception a). */}
+                <span
+                  className={
+                    row.withdrawn
+                      ? "invite-page__state invite-page__state--gone"
+                      : row.expired
+                        ? "invite-page__state invite-page__state--expired"
+                        : "invite-page__state"
+                  }
+                >
+                  {row.withdrawn ? "Withdrawn" : row.expired ? "Link expired" : "Awaiting application"}
+                </span>
+                {/* Resend always - *Send a new link* where the old one no
+                    longer works, as the export says; withdraw only where it
+                    can still do anything. */}
+                {mayInvite && (
+                  <button type="button" className="button button--row" onClick={() => act(row, "resend")}>
+                    {row.expired || row.withdrawn ? "Send a new link" : "Resend"}
+                  </button>
+                )}
+                {mayInvite && !row.expired && !row.withdrawn && (
+                  <button
+                    type="button"
+                    className="button button--row invite-page__withdraw"
+                    onClick={() => act(row, "revoke")}
+                  >
+                    Withdraw
+                  </button>
+                )}
+              </div>
+            ),
+          )
+        )}
+      </section>
+    </div>
+  );
+}

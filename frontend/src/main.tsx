@@ -26,9 +26,9 @@ import "./styles/portal.css";
 // The whole brand decision, in eight declarations. Loaded last so the accent
 // it defines is available to every rule that consumes it.
 import "./styles/accent.css";
-import "./screens/Overview.css";
-import "./screens/Affiliates.css";
-import "./screens/AffiliateDetail.css";
+import "./departments/affiliates/Overview.css";
+import "./departments/affiliates/Affiliates.css";
+import "./departments/affiliates/AffiliateDetail.css";
 import App from "./App";
 import { initErrorTracking } from "./lib/errorTracking";
 

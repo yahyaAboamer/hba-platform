@@ -13,10 +13,10 @@ import {
   startPortalPreview,
   stopPortalPreview,
 } from "../../lib/api";
-import type { Me } from "../MyDetails";
-import { Measurements, Notifications, ShippingAddress } from "../MyDetails";
-import { MyYou, YouPayout } from "../MyYou";
-import { previewFrameFor } from "../PortalPreview";
+import type { Me } from "../../portal/MyDetails";
+import { Measurements, Notifications, ShippingAddress } from "../../portal/MyDetails";
+import { MyYou, YouPayout } from "../../portal/MyYou";
+import { previewFrameFor } from "../../departments/affiliates/PortalPreview";
 
 const ok = (body: unknown) =>
   Promise.resolve({

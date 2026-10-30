@@ -106,7 +106,7 @@ app = FastAPI(
 )
 
 
-#: The frame inside *View her portal* (ADR 0064, `frontend/src/screens/PortalPreview.tsx`).
+#: The frame inside *View her portal* (ADR 0064, `frontend/src/departments/affiliates/PortalPreview.tsx`).
 _PREVIEW_FRAME = re.compile(r"^/affiliates/\d+/portal/frame/?$")
 
 

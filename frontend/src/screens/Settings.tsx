@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
-import { HistoricalReview } from "./HistoricalReview";
-import type { HistoricalReviewBody } from "./HistoricalReview";
+import { HistoricalReview } from "../departments/affiliates/HistoricalReview";
+import type { HistoricalReviewBody } from "../departments/affiliates/HistoricalReview";
 import { pickMaintainerChoice, storedMaintainerChoice, themePickedThisVisit } from "../lib/theme";
 import type { ThemeChoice } from "../lib/theme";
 
@@ -13,7 +13,7 @@ import type { DeviceSession, Session, TrustedBrowser, TwoStepStatus } from "../l
 import { CodeForm, PasswordForm, RecoveryCodes, TwoStepSetup } from "../components/TwoStepSetup";
 import { currentMonth, formatMonth, monthAdd, monthsBetween } from "../lib/money";
 import { DataPanel, longWhen } from "./DataPanel";
-import "./ModelLifecycle.css";
+import "../departments/affiliates/ModelLifecycle.css";
 import "./Settings.css";
 
 type SyncStatus = {

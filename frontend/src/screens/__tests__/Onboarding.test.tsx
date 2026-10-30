@@ -5,9 +5,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PasswordField } from "../../components/PasswordField";
 import { AcceptInvitation } from "../AcceptInvitation";
-import { ApplicationPending } from "../ApplicationPending";
-import { Apply } from "../Apply";
-import type { Me } from "../MyDetails";
+import { ApplicationPending } from "../../portal/ApplicationPending";
+import { Apply } from "../../portal/Apply";
+import type { Me } from "../../portal/MyDetails";
 
 /*
  * The owner's audit of the way in, 26 September: the 12-character rule the
