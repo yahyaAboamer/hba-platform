@@ -992,7 +992,7 @@ export function historicalState(row: SetupRow) {
   if (setup.eligible === 0) {
     return <>
       <span className="pill settings__pill--owed">No start month</span>
-      <Link className="settings__fix" to={`/affiliates/${row.id}`}>Record her start month →</Link>
+      <Link className="settings__fix" to={`/affiliates/models/${row.id}`}>Record her start month →</Link>
     </>;
   }
   if (setup.blocking === 0) return <span className="pill settings__pill--ok">Ready</span>;
@@ -1004,7 +1004,7 @@ export function historicalState(row: SetupRow) {
   ].filter(Boolean).join(" · ");
   return <>
     <span className="pill settings__pill--owed">{parts || `${setup.blocking} months`} cannot be calculated</span>
-    <Link className="settings__fix" to={`/affiliates/${row.id}/compensation`}>
+    <Link className="settings__fix" to={`/affiliates/models/${row.id}/compensation`}>
       {/* Only a model with no terms at all is known to need terms; a gap
           later on may be a guarantee outcome or unconfirmed targets instead. */}
       {!setup.first_gap
@@ -1054,7 +1054,7 @@ function SetupRoster({ session }: { session: Session }) {
         <th>Model</th><th>Started</th><th>Terms from</th><th>What is needed</th>
       </tr></thead>
       <tbody>{shownRows.map((row) => <tr key={row.id}>
-        <td><Link to={`/affiliates/${row.id}`}>{row.name}</Link></td>
+        <td><Link to={`/affiliates/models/${row.id}`}>{row.name}</Link></td>
         <td>{row.collaboration_start_month ? formatMonth(row.collaboration_start_month) : <span className="settings__gap">Not recorded</span>}</td>
         <td>{row.earliest_terms_month ? formatMonth(row.earliest_terms_month) : <span className="settings__gap">None written</span>}</td>
         <td className="settings__need">{historicalState(row)}</td>
@@ -1136,7 +1136,7 @@ function BrandCodes({ session }: { session: Session }) {
         <tbody>{shown.map((row) => {
           const [words, tone] = CODE_STATE[row.status] ?? [row.status, "off"];
           return <tr key={row.id}>
-            <td><Link to={`/affiliates/${row.id}`}>{row.code || "No code"}</Link></td>
+            <td><Link to={`/affiliates/models/${row.id}`}>{row.code || "No code"}</Link></td>
             <td className="settings__muted">{row.name === row.code ? "—" : row.name}</td>
             <td className="numeric">{row.uses ?? 0}</td>
             <td><span className={`pill settings__pill--${tone}`}>{words}</span></td>

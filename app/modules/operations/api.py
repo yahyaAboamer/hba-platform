@@ -10,7 +10,8 @@ E-stebdal while a page waits. Each response carries ``freshness`` for the
 source it is about, so a number is never shown without the time it was read,
 and a source that could not be read never shows as 0.
 
-One route per tab - Shopify, E-stebdal, Bosta - and Bosta's success rate.
+One route per tab - Shopify, E-stebdal, Bosta - and Bosta's success rate; and
+every source's state at once, for the frame's sidebar.
 """
 
 from datetime import date
@@ -26,12 +27,18 @@ from app.core.permissions import Permission
 from app.db import get_session
 from app.shared.models.identity import UserAccount
 from app.modules.operations.services import bosta, connections, estebdal, shopify
-from app.modules.operations.services.freshness import State, describe
+from app.modules.operations.services.freshness import SOURCES, State, describe
 
 #: The one guard, kept by name so a test can find it on every route.
 GUARD = require_permission(Permission.ORDER_OPS_VIEW)
 
 router = APIRouter(prefix="/api/order-ops", tags=["order-ops"], dependencies=[Depends(GUARD)])
+
+#: The frame's own reads about Operations (ADR 0068), under `/api/operations`
+#: beside the sidebar's other numbers. The same guard, on the router itself.
+frame_router = APIRouter(
+    prefix="/api/operations", tags=["order-ops"], dependencies=[Depends(GUARD)]
+)
 
 
 def freshness(db: Session, source: str) -> dict:
@@ -43,6 +50,31 @@ def _has_numbers(described: dict) -> bool:
     """Whether a clean read's numbers exist to show. A source with no key
     shows none, however old its last numbers are."""
     return described["updated_at"] is not None and described["state"] != State.NOT_CONNECTED
+
+
+@frame_router.get("/freshness")
+def every_sources_freshness(db: Session = Depends(get_session)) -> dict:
+    """Each source's state, in ``SOURCES`` order, for the sidebar's red dot.
+
+    ``failed_at`` is when the latest failed read was tried, not when the
+    failures began: each attempt rewrites it, so the sidebar says how long
+    since ``updated_at``, the last clean read. Null unless the state is
+    ``failed``.
+    """
+    sources = []
+    for source in SOURCES:
+        described = describe(db, source)
+        failed = described["state"] == State.FAILED
+        sources.append(
+            {
+                "source": described["source"],
+                "label": described["label"],
+                "state": described["state"],
+                "updated_at": described["updated_at"],
+                "failed_at": described["checked_at"] if failed else None,
+            }
+        )
+    return {"sources": sources}
 
 
 @router.get("/shopify")

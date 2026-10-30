@@ -515,7 +515,7 @@ export function Targets({ session, affiliateId, initialMonth, embedded = false }
                         )}
                       <Link
                         className="targets__name"
-                        to={`/affiliates/${row.affiliate_id}`}
+                        to={`/affiliates/models/${row.affiliate_id}`}
                       >
                         {row.name}
                       </Link>

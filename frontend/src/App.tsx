@@ -1,67 +1,45 @@
 import { useEffect, useState } from "react";
-import { BrowserRouter, Link, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
-import { InboxLayout } from "./departments/inbox/InboxLayout";
-import { Layout } from "./components/Layout";
-import { OperationsLayout } from "./departments/operations/OperationsLayout";
+import { DEPARTMENTS, departmentsFor } from "./departments";
 import { api, can, currentUser, deskFor } from "./lib/api";
 import type { Session } from "./lib/api";
 import { AcceptInvitation } from "./screens/AcceptInvitation";
 import { ResetPassword } from "./screens/ResetPassword";
-import { AffiliateDetail } from "./departments/affiliates/AffiliateDetail";
 import { AffiliatePortal } from "./portal/AffiliatePortal";
-import { AffiliatePayments } from "./departments/affiliates/AffiliatePayments";
-import { AffiliatePayout } from "./departments/affiliates/AffiliatePayout";
-import { Affiliates } from "./departments/affiliates/Affiliates";
-import { Compensation } from "./departments/affiliates/Compensation";
+import { Elsewhere, Start } from "./frame/Elsewhere";
+import { Frame } from "./frame/Frame";
+import { canOpenSettings } from "./frame/where";
 import { FirstRun } from "./screens/FirstRun";
 import { Glossary } from "./screens/Glossary";
-import { InboxChats } from "./departments/inbox/InboxChats";
-import { InboxConfirmations } from "./departments/inbox/InboxConfirmations";
-import { InvitePage } from "./departments/affiliates/InvitePage";
-import { OperationsDashboard } from "./departments/operations/OperationsDashboard";
-import { OrderDetail, Orders } from "./departments/affiliates/Orders";
-import { Overview } from "./departments/affiliates/Overview";
-import { ProductDetail, Products } from "./departments/affiliates/Products";
-import { PaymentReconcile } from "./departments/affiliates/PaymentReconcile";
-import { PortalPreview, PortalPreviewFrame, previewFrameFor } from "./departments/affiliates/PortalPreview";
-import { PaymentCorrection } from "./departments/affiliates/PaymentCorrection";
-import { PaymentDetail, PaymentReceipt } from "./departments/affiliates/PaymentDetail";
-import { PaymentRecord } from "./departments/affiliates/PaymentRecord";
-import { Payments } from "./departments/affiliates/Payments";
-import { Payroll } from "./departments/affiliates/Payroll";
-import { PayrollApprove } from "./departments/affiliates/PayrollApprove";
+import { PortalPreviewFrame, previewFrameFor } from "./departments/affiliates/PortalPreview";
 import { Settings } from "./screens/Settings";
 import { SignIn } from "./screens/SignIn";
 import { TwoStepRequired } from "./screens/TwoStepRequired";
-import { Targets } from "./departments/affiliates/Targets";
 
 /**
- * Operations' addresses (ADR 0057), for the operations manager and for the
- * admin who switches to it. `/operations` opens on Shopify.
+ * The staff routes (ADR 0068): one frame, and in it a department's routes for
+ * each department the person holds. Everything else - an old address, a
+ * department they do not hold, an address that is not a screen - is
+ * `Elsewhere`, inside the frame.
  */
-function operationsRoutes(session: Session) {
+function staffRoutes(session: Session) {
+  const held = departmentsFor(session);
   return (
-    <Route path="/operations" element={<OperationsLayout session={session} />}>
-      <Route index element={<Navigate to="shopify" replace />} />
-      <Route path=":tab" element={<OperationsDashboard />} />
-    </Route>
-  );
-}
-
-/**
- * The Inbox's addresses (ADR 0059), for customer service and for the
- * operations manager and the admin who switch to it. `/inbox` opens on Chats,
- * and a chat's own address is `/inbox/chats/<id>`.
- */
-function inboxRoutes(session: Session) {
-  return (
-    <Route path="/inbox" element={<InboxLayout session={session} />}>
-      <Route index element={<Navigate to="chats" replace />} />
-      <Route path="chats" element={<InboxChats />} />
-      <Route path="chats/:conversationId" element={<InboxChats />} />
-      <Route path="confirmations" element={<InboxConfirmations />} />
-      <Route path="*" element={<Navigate to="/inbox/chats" replace />} />
+    <Route element={<Frame session={session} departments={held} />}>
+      <Route path="/" element={<Start session={session} departments={DEPARTMENTS} />} />
+      {held.map((department) => (
+        <Route key={department.key} path={department.base}>
+          {department.routes(session)}
+        </Route>
+      ))}
+      {canOpenSettings(session) && (
+        <>
+          <Route path="/settings" element={<Settings session={session} />} />
+          <Route path="/glossary" element={<Glossary />} />
+        </>
+      )}
+      <Route path="*" element={<Elsewhere session={session} departments={DEPARTMENTS} />} />
     </Route>
   );
 }
@@ -198,112 +176,8 @@ export default function App() {
          */}
         {session && desk === "portal" ? (
           <Route path="*" element={<AffiliatePortal session={session} />} />
-        ) : session && desk === "operations" ? (
-          /*
-           * ADR 0057: Operations and nothing else. Any other address - the
-           * root after signing in or accepting an invitation, an old bookmark
-           * to the affiliate side - lands on Shopify.
-           */
-          <>
-            {operationsRoutes(session)}
-            {/* ADR 0059: the Inbox too, for whoever holds it. */}
-            {can(session, "inbox.use") && inboxRoutes(session)}
-            <Route path="*" element={<Navigate to="/operations/shopify" replace />} />
-          </>
-        ) : session && desk === "inbox" ? (
-          /*
-           * ADR 0059: the Inbox and nothing else. Any other address lands on
-           * Chats, as the operations manager's lands on Shopify.
-           */
-          <>
-            {inboxRoutes(session)}
-            <Route path="*" element={<Navigate to="/inbox/chats" replace />} />
-          </>
         ) : session ? (
-          <>
-          {can(session, "order_ops.view") && operationsRoutes(session)}
-          {can(session, "inbox.use") && inboxRoutes(session)}
-          <Route element={<Layout session={session} />}>
-            <Route path="/" element={<Overview session={session} />} />
-            <Route path="/affiliates" element={<Affiliates />} />
-            {/* Before the profile route so `invite` is never read as an id. */}
-            <Route path="/affiliates/invite" element={<InvitePage session={session} />} />
-            <Route
-              path="/affiliates/:id"
-              element={<AffiliateDetail session={session} />}
-            />
-            {can(session, "affiliates.view") && (
-              <Route path="/affiliates/:id/portal" element={<PortalPreview />} />
-            )}
-            <Route
-              path="/affiliates/:id/compensation"
-              element={<Compensation />}
-            />
-            <Route
-              path="/affiliates/:id/payments"
-              element={<AffiliatePayments />}
-            />
-            <Route
-              path="/affiliates/:id/payout-destination"
-              element={<AffiliatePayout />}
-            />
-            <Route path="/products" element={<Products session={session} />} />
-            <Route
-              path="/products/:id"
-              element={<ProductDetail session={session} />}
-            />
-            {/*
-             * Off the sidebar since the redesign, and deliberately still
-             * routed. Orders is linked from Home, Payroll from Payments -
-             * S02 keeps every necessary operation reachable, and neither
-             * screen was rebuilt in this batch, only moved.
-             */}
-            <Route path="/orders" element={<Orders session={session} />} />
-            {/* The approved export opens an order into its own view. */}
-            <Route path="/orders/:orderId" element={<OrderDetail />} />
-            <Route path="/payroll" element={<Payroll session={session} />} />
-            <Route path="/payroll/:month/approve" element={<PayrollApprove />} />
-            <Route path="/payments" element={<Payments session={session} />} />
-            {/* One model's month, as the approved export opens it: the
-             *  figure, where to send it, the approval and the transfers. */}
-            <Route
-              path="/payments/:month/:affiliateId"
-              element={<PaymentDetail session={session} />}
-            />
-            <Route
-              path="/payments/:month/:affiliateId/record"
-              element={<PaymentRecord />}
-            />
-            <Route
-              path="/payments/:month/:affiliateId/receipts/:paymentId"
-              element={<PaymentReceipt />}
-            />
-            <Route
-              path="/payments/:month/:affiliateId/reconcile"
-              element={<PaymentReconcile />}
-            />
-            <Route
-              path="/payments/:month/:affiliateId/correction"
-              element={<PaymentCorrection session={session} />}
-            />
-            <Route path="/targets" element={<Targets session={session} />} />
-            <Route path="/settings" element={<Settings session={session} />} />
-            <Route path="/glossary" element={<Glossary />} />
-            {/*
-             * An address that is not a screen - an old bookmark to the retired
-             * reopening screen, say - says so inside the layout, rather than
-             * rendering a blank page.
-             */}
-            <Route path="*" element={
-              <div className="page__head">
-                <div className="page__title">
-                  <h1>Nothing here</h1>
-                  <span className="page__subtitle">There is no screen at this address. <Link to="/">Home</Link></span>
-                </div>
-              </div>
-            } />
-          </Route>
-          </>
+          staffRoutes(session)
         ) : (
           <Route path="*" element={<Navigate to="/sign-in" replace />} />
         )}

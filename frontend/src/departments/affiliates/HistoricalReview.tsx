@@ -211,7 +211,7 @@ export function HistoricalReview({ session }: { session: Session }) {
           <ul className="settings__gaps">
             {blocked.map((row) => (
               <li key={row.id}>
-                <Link to={`/affiliates/${row.id}/compensation`}>{row.name}</Link>
+                <Link to={`/affiliates/models/${row.id}/compensation`}>{row.name}</Link>
                 {" — "}
                 {row.months.length} month{row.months.length === 1 ? "" : "s"}
                 {" from "}{formatMonth(row.months[0])}

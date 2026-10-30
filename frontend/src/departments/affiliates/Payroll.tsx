@@ -363,7 +363,7 @@ export function Payroll({ session }: { session: Session }) {
             className="button button--primary"
             disabled={chosen.size === 0}
             onClick={() =>
-              navigate(`/payroll/${month}/approve`, {
+              navigate(`/affiliates/payroll/${month}/approve`, {
                 state: { affiliate_ids: [...chosen] },
               })
             }
@@ -413,7 +413,7 @@ function PayrollTableRow({
         )}
       </td>
       <td>
-        <Link className="payroll__name" to={`/affiliates/${row.affiliate_id}`}>
+        <Link className="payroll__name" to={`/affiliates/models/${row.affiliate_id}`}>
           {row.name}
         </Link>
       </td>

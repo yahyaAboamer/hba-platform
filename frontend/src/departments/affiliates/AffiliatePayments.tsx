@@ -102,7 +102,7 @@ export function AffiliatePayments() {
     <>
       <div className="page__head">
         <div className="page__title">
-          <Link to={`/affiliates/${id}`} className="detail__back">
+          <Link to={`/affiliates/models/${id}`} className="detail__back">
             {history.name}
           </Link>
           <h1>What {history.name} has been paid</h1>

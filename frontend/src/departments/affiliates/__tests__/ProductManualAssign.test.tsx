@@ -42,8 +42,8 @@ beforeEach(() => { fetchMock = vi.fn(() => reply(200, DETAIL)); vi.stubGlobal("f
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 const at = (session: Session) => render(
-  <MemoryRouter initialEntries={["/products/pants"]}>
-    <Routes><Route path="/products/:id" element={<ProductDetail session={session} />} /></Routes>
+  <MemoryRouter initialEntries={["/affiliates/products/pants"]}>
+    <Routes><Route path="/affiliates/products/:id" element={<ProductDetail session={session} />} /></Routes>
   </MemoryRouter>,
 );
 

@@ -133,12 +133,18 @@ def _served() -> set[tuple[str, str]]:
     # router listed and not served would make the interface look broken - so
     # adding an API module is a line in this tuple, on purpose.
     found: set[tuple[str, str]] = set()
-    for module in (
-        affiliate_self, affiliates, applications, audit, auth, earnings,
-        health, inbox, operations, order_ops, orders, payments, payroll, policy,
-        portal_preview, products, staff, targets, webhooks,
-    ):
-        for route in module.router.routes:
+    routers = [
+        module.router
+        for module in (
+            affiliate_self, affiliates, applications, audit, auth, earnings,
+            health, inbox, operations, order_ops, orders, payments, payroll, policy,
+            portal_preview, products, staff, targets, webhooks,
+        )
+    ]
+    # Operations' second router: the frame's reads, under `/api/operations`.
+    routers.append(order_ops.frame_router)
+    for router in routers:
+        for route in router.routes:
             for method in getattr(route, "methods", set()):
                 if method not in ("HEAD", "OPTIONS"):
                     found.add((method, route.path))

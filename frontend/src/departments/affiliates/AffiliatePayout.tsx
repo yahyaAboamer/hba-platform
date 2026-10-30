@@ -91,7 +91,7 @@ export function AffiliatePayout() {
       const body: Record<string, string | null> = { method };
       for (const field of needed) body[field] = (fields[field] ?? "").trim();
       await api.put(`/api/affiliates/${id}/payout-destination`, body);
-      navigate(`/affiliates/${id}`);
+      navigate(`/affiliates/models/${id}`);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not save that.");
     } finally {
@@ -114,7 +114,7 @@ export function AffiliatePayout() {
     <>
       <div className="page__head">
         <div className="page__title">
-          <Link to={`/affiliates/${id}`} className="detail__back">
+          <Link to={`/affiliates/models/${id}`} className="detail__back">
             {detail.name}
           </Link>
           <h1>Where {detail.name} is paid</h1>
@@ -217,7 +217,7 @@ export function AffiliatePayout() {
           <button
             type="button"
             className="button"
-            onClick={() => navigate(`/affiliates/${id}`)}
+            onClick={() => navigate(`/affiliates/models/${id}`)}
             disabled={working}
           >
             Cancel

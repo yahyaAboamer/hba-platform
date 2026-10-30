@@ -31,20 +31,20 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 const at = (url: string) => render(
   <MemoryRouter initialEntries={[url]}>
-    <Routes><Route path="/products/:id" element={<ProductDetail session={SESSION} />} /></Routes>
+    <Routes><Route path="/affiliates/products/:id" element={<ProductDetail session={SESSION} />} /></Routes>
   </MemoryRouter>,
 );
 
 describe("a product's coverage names the order that carried it (item 16)", () => {
   it("prints the order beside a model who has it, and not sent beside one who does not", async () => {
-    at("/products/track-jacket");
+    at("/affiliates/products/track-jacket");
     const order = await screen.findByRole("link", { name: "#G2001" });
-    expect(order.getAttribute("href")).toBe("/products/track-jacket?shipment=2001&model=1");
+    expect(order.getAttribute("href")).toBe("/affiliates/products/track-jacket?shipment=2001&model=1");
     expect(screen.getByText("not sent")).toBeTruthy();
   });
 
   it("opens the export's shipment record from the address alone", async () => {
-    at("/products/track-jacket?shipment=2001&model=1");
+    at("/affiliates/products/track-jacket?shipment=2001&model=1");
     expect(await screen.findByRole("heading", { name: "Shipment record" })).toBeTruthy();
     expect(screen.getByText("Panel Track Jacket · Sara Edrees")).toBeTruthy();
     expect(screen.getByText("Processing")).toBeTruthy();
@@ -53,7 +53,7 @@ describe("a product's coverage names the order that carried it (item 16)", () =>
   });
 
   it("the message presets fill the message, which counts its characters", async () => {
-    at("/products/track-jacket?view=promotion");
+    at("/affiliates/products/track-jacket?view=promotion");
     fireEvent.click(await screen.findByRole("button", { name: "New colourway" }));
     await waitFor(() => expect((screen.getByLabelText(/Short message/) as HTMLTextAreaElement).value)
       .toBe("New colourway — we would love to see it styled."));

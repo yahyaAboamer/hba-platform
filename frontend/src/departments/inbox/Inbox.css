@@ -1,7 +1,7 @@
 /*
  * The Inbox (ADR 0059), drawn from the owner-approved mockup
  * docs/design/whatsapp-inbox-2026-10-11.html on the product's own tokens.
- * The shell is Layout.css's; Confirmations' cards, panels and tables are
+ * The shell is frame/frame.css's; Confirmations' cards, panels and tables are
  * Operations' (`ops-`, OperationsDashboard.css). What is new is here, under
  * `inbox-`.
  */
@@ -201,7 +201,6 @@
 
 /* ── On a phone: one column at a time ──────────────────────────────────── */
 @media (max-width:800px) {
-  .layout--immersive .layout__sidebar { display:none; }
   .inbox { display:block; height:auto; }
   .inbox-col { border-right:0; }
   .inbox-col--list .inbox-col__head { display:none; }

@@ -1,0 +1,189 @@
+/*
+ * The frame: one sidebar for every department (Phase 2, Batch 2.1; ADR 0068).
+ *
+ * Ported value for value from the approved mockup's `<style>`
+ * (`docs/design/hba-os-shell-2026-10-25.html`: `.shell .side .brand .dept
+ * .sections .nav__count .nav__alert .side__foot .account`, and the phone's
+ * `.pbar .iconbtn .sheet`), under a `frame` prefix so nothing collides. The
+ * mockup's `.main` is `.frame__main`; the sticky `.page__head` rules are the
+ * ones every screen has relied on since `Layout.css`.
+ *
+ * Where a line differs from the mockup it is because the mockup draws a
+ * picture and this runs: `height:100dvh` for a scrolling workspace, `overflow`
+ * on the nav, a fixed full-screen sheet, and the account menu.
+ */
+
+.frame {
+  display: grid;
+  grid-template-columns: 216px minmax(0, 1fr);
+  grid-template-areas: "side main";
+  height: 100dvh;
+}
+
+.frame__ic {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ── The sidebar ── */
+.frame__side {
+  grid-area: side;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--rule);
+}
+/* The mockup sets no line height; the app's base one is taller, which shows
+   only in this two-line block. */
+.frame__brand { display: flex; align-items: center; gap: 9px; padding: 14px 16px 12px; line-height: normal; }
+.frame__mark {
+  display: grid; place-items: center; flex: none; width: 30px; height: 30px;
+  border: 1px solid var(--accent); border-radius: var(--radius-sm);
+  color: var(--accent); font-size: 12px;
+}
+.frame__name { display: block; font-size: 14px; }
+.frame__role { display: block; margin-top: 2px; font-size: 11.5px; color: var(--faint); }
+.frame__nav { flex: 1; min-height: 0; overflow-y: auto; padding: 6px 9px 8px; }
+.frame__depts, .frame__sections { margin: 0; padding: 0; list-style: none; }
+.frame__dept {
+  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 38px;
+  margin-bottom: 2px; padding: 8px 11px; border: 0; border-radius: var(--radius);
+  background: none; color: var(--quiet); font-size: 14px; text-align: left;
+  text-decoration: none; cursor: pointer;
+  transition: background-color .12s, color .12s;
+}
+.frame__dept:hover { background: var(--hover); color: var(--ink); }
+.frame__dept:active { background: var(--hover); }
+.frame__dept .frame__ic { flex: none; width: 16px; height: 16px; }
+.frame__dept-name { flex: 1; min-width: 0; }
+.frame__chev {
+  flex: none; width: 12px; height: 12px; color: var(--faint);
+  transition: transform .16s cubic-bezier(.2, .8, .2, 1);
+}
+.frame__dept[aria-expanded="true"] { color: var(--ink); }
+.frame__dept[aria-expanded="true"] .frame__chev { transform: rotate(90deg); }
+.frame__dept[aria-current="page"] { background: var(--accent-soft); color: var(--accent-text); }
+.frame__sections { margin: 0 0 6px; }
+.frame__sections a {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  min-height: 34px; margin-bottom: 1px; padding: 7px 11px 7px 37px;
+  border-radius: var(--radius); color: var(--quiet); font-size: 13.5px;
+  text-decoration: none;
+  transition: background-color .12s, color .12s;
+}
+.frame__sections a:hover { background: var(--hover); color: var(--ink); }
+.frame__sections a[aria-current="page"] { background: var(--accent-soft); color: var(--accent-text); }
+.frame__count {
+  flex: none; min-width: 20px; padding: 1px 6px; border-radius: 999px;
+  background: var(--accent-soft); color: var(--accent-text); font-size: 11.5px;
+  text-align: center; font-variant-numeric: tabular-nums;
+}
+/* Money waiting to be released: the quieter look Payments has always had. */
+.frame__count--settled { color: var(--accent-lift); }
+.frame__alert {
+  flex: none; width: 7px; height: 7px; margin-right: 6px; border-radius: 50%;
+  background: var(--refused);
+}
+.frame__foot { padding: 6px 9px; border-top: 1px solid var(--rule); }
+
+/* ── Who is signed in ── */
+.frame__account-wrap { position: relative; }
+.frame__account {
+  display: flex; gap: 10px; align-items: center; width: 100%; padding: 12px 16px;
+  border: 0; border-top: 1px solid var(--rule); background: none; color: var(--ink);
+  text-align: left; cursor: pointer;
+}
+.frame__avatar {
+  display: grid; place-items: center; flex: none; width: 30px; height: 30px;
+  border: 1px solid var(--rule); border-radius: 50%; background: var(--accent-soft);
+  color: var(--accent-text); font-size: 11.5px;
+}
+.frame__who { flex: 1; min-width: 0; font-size: 13px; }
+.frame__who > span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.frame__who small { display: block; margin-top: 2px; color: var(--faint); font-size: 11.5px; }
+.frame__account .frame__ic { width: 14px; height: 14px; color: var(--faint); }
+.frame__menu {
+  position: absolute; left: 9px; right: 9px; bottom: calc(100% - 1px); z-index: 30;
+  display: flex; flex-direction: column; padding: 6px;
+  border-radius: var(--radius); background: var(--raise); box-shadow: var(--float);
+}
+.frame__menu a, .frame__menu button {
+  min-height: 36px; padding: 9px 11px; border: 0; border-radius: var(--radius-sm);
+  background: none; color: var(--quiet); font-size: 13px; text-align: left;
+  text-decoration: none; cursor: pointer;
+}
+.frame__menu a:hover, .frame__menu button:hover { background: var(--hover); color: var(--ink); }
+.frame__themes {
+  display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 4px; padding-bottom: 4px;
+  border-bottom: 1px solid var(--rule);
+}
+.frame__themes button { padding: 7px 9px; }
+.frame__themes button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-text); }
+
+/* ── The page beside it ── */
+.frame__main { grid-area: main; min-width: 0; overflow: auto; padding: 0 22px 30px; }
+.frame__main > .page__head {
+  position: sticky; top: 0; z-index: 10; gap: 14px; margin: 0 -22px 20px;
+  padding: 14px 22px; min-height: 68px; border-bottom: 1px solid var(--rule);
+  background: var(--paper);
+}
+/* The one heading element the export draws: an h4 under the design
+   system's heading rule - 500, 1.12, -0.015em - at 18px (ADR 0043). */
+.frame__main > .page__head h1 {
+  font-size: 18px; font-weight: 500; line-height: 1.12; letter-spacing: -0.015em;
+}
+/* A screen that runs edge to edge and scrolls inside itself: the Inbox's
+   Chats, whose three columns each scroll on their own. */
+.frame__main--wide { padding: 0; overflow: hidden; }
+
+/* ── Phone: a top bar and a full-screen menu ── */
+.frame__pbar {
+  grid-area: pbar; display: none; align-items: center; gap: 4px; height: 56px;
+  padding: 0 6px; border-bottom: 1px solid var(--rule); background: var(--surface);
+}
+.frame__pbar-title { flex: 1; min-width: 0; font-size: 16px; font-weight: 500; text-align: center; }
+.frame__pbar-gap { flex: none; width: 44px; height: 44px; }
+.frame__iconbtn {
+  display: grid; place-items: center; flex: none; width: 44px; height: 44px;
+  border: 0; border-radius: var(--radius); background: none; color: var(--quiet); cursor: pointer;
+}
+.frame__iconbtn:hover { background: var(--hover); color: var(--ink); }
+.frame__iconbtn .frame__ic { width: 20px; height: 20px; }
+.frame__sheet {
+  position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column;
+  background: var(--surface);
+}
+.frame__sheet-top { display: flex; align-items: center; justify-content: space-between; padding: 6px 6px 6px 16px; }
+.frame__sheet-top .frame__brand { padding: 0; }
+.frame__sheet .frame__nav { padding: 4px 8px; }
+.frame__sheet .frame__dept { min-height: 46px; font-size: 15px; }
+.frame__sheet .frame__sections a { min-height: 44px; font-size: 14.5px; }
+.frame__sheet .frame__foot { padding: 6px 8px; }
+
+@media (max-width: 800px) {
+  .frame {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "pbar" "main";
+    grid-template-rows: auto 1fr;
+    height: auto;
+    min-height: 100dvh;
+  }
+  .frame__side { display: none; }
+  .frame__pbar { display: flex; position: sticky; top: 0; z-index: 20; }
+  /* An open chat has its own way back and takes the whole display. */
+  .frame--immersive .frame__pbar { display: none; }
+  .frame__main { padding: 0 16px 24px; overflow: visible; }
+  .frame__main > .page__head { position: static; margin: 0 -16px 16px; padding: 14px 16px; }
+  .frame__main--wide { padding: 0; overflow: visible; }
+}
+@media (min-width: 801px) {
+  .frame__sheet { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .frame__dept, .frame__sections a, .frame__chev { transition: none; }
+}

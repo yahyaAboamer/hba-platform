@@ -719,7 +719,8 @@ def render(event: str, payload: dict) -> Message | None:
                 + (f" with the code {payload['code']}." if payload.get("code") else ".")
                 + "\n\nThe code needs checking against Shopify before "
                 "the application can be approved.",
-                "/affiliates",
+                # To the maintainer: the staff address (ADR 0068), not a model's.
+                "/affiliates/models",
                 "Review it here:",
             ),
         )
@@ -745,7 +746,8 @@ def render(event: str, payload: dict) -> Message | None:
                 f"Hi {first},\n\nYour weekly reminder to record achieved "
                 f"content. {state}\n\nYou can turn this reminder off in "
                 "Settings → Appearance.",
-                "/targets",
+                # To staff, about the models (ADR 0068's address).
+                "/affiliates/targets",
                 "Record it here:",
             ),
         )
@@ -874,7 +876,9 @@ def render(event: str, payload: dict) -> Message | None:
                 f"It now ends {payload.get('masked') or 'unknown'}.\n\n"
                 "If that was not expected, check with them before the next "
                 "payment run.",
-                "/payments",
+                # To the maintainer, so the staff address (ADR 0068). A model's
+                # own emails keep `/payments`, her portal's address.
+                "/affiliates/payments",
                 "The payments screen flags it too:",
             ),
         )

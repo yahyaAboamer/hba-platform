@@ -107,7 +107,9 @@ app = FastAPI(
 
 
 #: The frame inside *View her portal* (ADR 0064, `frontend/src/departments/affiliates/PortalPreview.tsx`).
-_PREVIEW_FRAME = re.compile(r"^/affiliates/\d+/portal/frame/?$")
+#: At `/affiliates/models/<id>/portal/frame` since ADR 0068; the old
+#: `/affiliates/<id>/portal/frame` still matches, for bookmarks.
+_PREVIEW_FRAME = re.compile(r"^/affiliates/(?:models/)?[0-9]+/portal/frame/?$")
 
 
 @app.middleware("http")
@@ -157,6 +159,7 @@ app.include_router(auth.router)
 app.include_router(webhooks.router)
 app.include_router(operations.router)
 app.include_router(order_ops.router)
+app.include_router(order_ops.frame_router)
 app.include_router(inbox.router)
 app.include_router(affiliates.router)
 app.include_router(applications.router)

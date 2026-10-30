@@ -115,7 +115,7 @@ export function SalesByMonth({
       <ul className="sales-year__months">
         {year.map((row) => (
           <li key={row.month}>
-            <Link to={`/?month=${row.month}`}>
+            <Link to={`/affiliates/overview?month=${row.month}`}>
               {formatMonth(row.month)} · {row.sales}
             </Link>
           </li>

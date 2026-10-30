@@ -29,9 +29,13 @@ function storedSize(): Size {
   }
 }
 
-/** The address of the frame itself, for `App` to recognise before routing. */
+/**
+ * The address of the frame itself, for `App` to recognise before routing:
+ * `/affiliates/models/<id>/portal/frame`, and the address it had before the
+ * frame (an old bookmark, or a tab left open across the release).
+ */
 export function previewFrameFor(pathname: string): number | null {
-  const found = /^\/affiliates\/(\d+)\/portal\/frame\/?$/.exec(pathname);
+  const found = /^\/affiliates\/(?:models\/)?(\d+)\/portal\/frame\/?$/.exec(pathname);
   return found ? Number(found[1]) : null;
 }
 
@@ -74,7 +78,7 @@ export function PortalPreview() {
   return (
     <>
       <div className="page__head">
-        <Link className="button profile__back" to={`/affiliates/${id}`}>
+        <Link className="button profile__back" to={`/affiliates/models/${id}`}>
           ← {name ?? "Back"}
         </Link>
         <div className="page__title">
@@ -114,7 +118,7 @@ export function PortalPreview() {
       <div className={`preview__stage preview__stage--${size}`}>
         <iframe
           className="preview__frame"
-          src={`/affiliates/${id}/portal/frame`}
+          src={`/affiliates/models/${id}/portal/frame`}
           title={`${who}'s portal, read only`}
         />
       </div>
@@ -154,7 +158,7 @@ export function PortalPreviewFrame({
       {!framed && (
         <p className="preview__strip" role="status">
           Read-only preview of her portal.{" "}
-          <a href={`/affiliates/${affiliateId}`}>Back to her profile</a>
+          <a href={`/affiliates/models/${affiliateId}`}>Back to her profile</a>
         </p>
       )}
       <MemoryRouter>

@@ -629,7 +629,7 @@ export function Affiliates() {
            * gives the act one — and because the applications waiting to be
            * reviewed and the links already out belong beside it.
            */}
-          <Link className="button button--primary" to="/affiliates/invite">
+          <Link className="button button--primary" to="/affiliates/models/invite">
             Invite a model
           </Link>
         </div>
@@ -702,7 +702,7 @@ export function Affiliates() {
               <strong>You approve</strong> Check her code with Shopify, set her pay terms, approve.
             </li>
           </ol>
-          <Link className="button button--primary" to="/affiliates/invite">
+          <Link className="button button--primary" to="/affiliates/models/invite">
             Invite your first model
           </Link>
         </div>
@@ -780,14 +780,14 @@ export function Affiliates() {
                   // `vInvite`), where Resend and Withdraw are; the row itself
                   // carries neither. Whole row, control font, as the model rows.
                   <tr key={row.id} className="control-font affiliates__row"
-                    onClick={() => navigate(`/affiliates/invite?email=${encodeURIComponent(row.email)}`)}>
+                    onClick={() => navigate(`/affiliates/models/invite?email=${encodeURIComponent(row.email)}`)}>
                     <td>
                       <span className="affiliates__who">
                         <span className="affiliates__avatar" aria-hidden="true">
                           {row.email.charAt(0).toUpperCase()}
                         </span>
                         <span className="affiliates__who-text">
-                          <Link className="affiliates__name" to={`/affiliates/invite?email=${encodeURIComponent(row.email)}`}>{row.email}</Link>
+                          <Link className="affiliates__name" to={`/affiliates/models/invite?email=${encodeURIComponent(row.email)}`}>{row.email}</Link>
                           <span className="affiliates__sub">
                             {row.withdrawn
                               ? "Withdrawn"
@@ -888,7 +888,7 @@ export function Affiliates() {
                   // is what makes its pill 20px. The name stays a link for
                   // the keyboard and a screen reader.
                   <tr key={row.id} className="control-font affiliates__row"
-                    onClick={() => navigate(`/affiliates/${row.id}`)}>
+                    onClick={() => navigate(`/affiliates/models/${row.id}`)}>
                     <td className="affiliates__pick" onClick={(event) => event.stopPropagation()}>
                       <input
                         type="checkbox"
@@ -898,7 +898,7 @@ export function Affiliates() {
                       />
                     </td>
                     <td>
-                      <Link className="affiliates__who" to={`/affiliates/${row.id}`}>
+                      <Link className="affiliates__who" to={`/affiliates/models/${row.id}`}>
                         <span className="affiliates__avatar" aria-hidden="true">
                           {row.name.charAt(0).toUpperCase()}
                         </span>
@@ -1015,7 +1015,7 @@ export function Affiliates() {
                   {/* Admin Models audit: a card keeps what the table row
                       says - her code, sales and content - not just her name. */}
                   <span className="affiliates__card-top">
-                    <Link className="affiliates__name" to={`/affiliates/${row.id}`}>
+                    <Link className="affiliates__name" to={`/affiliates/models/${row.id}`}>
                       {row.name}
                     </Link>
                     <span className={`pill affiliates__tone--${status.tone}`}>{status.label}</span>

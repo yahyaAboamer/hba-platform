@@ -374,3 +374,101 @@ def test_every_operations_route_carries_the_guard():
 def test_each_response_carries_its_sources_freshness(db):
     record_success(db, "bosta", 165)
     assert order_ops.freshness(db, "bosta") == describe(db, "bosta")
+
+
+# ── Every source at once, for the frame's sidebar (ADR 0068) ─────────────────
+
+FRESHNESS = "/api/operations/freshness"
+
+
+def test_the_frame_route_carries_the_guard_too():
+    for route in order_ops.frame_router.routes:
+        assert any(
+            dependency.call is order_ops.GUARD for dependency in route.dependant.dependencies
+        ), route.path
+
+
+@pytest.mark.parametrize(
+    ("role", "expected"),
+    [
+        ("admin", 200),
+        ("operations_manager", 200),
+        ("affiliate_manager", 403),
+        ("content_manager", 403),
+        ("customer_service", 403),
+        ("affiliate", 403),
+    ],
+)
+def test_only_whoever_reaches_operations_reads_its_freshness(client, role, expected):
+    if role != "admin":
+        _demote_to(role)
+    assert client.get(FRESHNESS).status_code == expected
+
+
+def test_nobody_signed_out_reads_the_freshness(fresh_database):
+    with TestClient(app) as anonymous:
+        assert anonymous.get(FRESHNESS).status_code == 401
+
+
+def test_never_read_is_one_entry_per_source_in_order(client):
+    body = client.get(FRESHNESS).json()
+
+    assert body == {
+        "sources": [
+            {"source": "shopify", "label": "Shopify", "state": "never",
+             "updated_at": None, "failed_at": None},
+            {"source": "bosta", "label": "Bosta", "state": "never",
+             "updated_at": None, "failed_at": None},
+            {"source": "estebdal", "label": "E-stebdal", "state": "never",
+             "updated_at": None, "failed_at": None},
+        ]
+    }
+
+
+def test_each_state_and_its_times(client):
+    """Fresh, stale, failed, not connected; ``failed_at`` only when failed."""
+    clean = utcnow() - timedelta(minutes=3)
+    old = utcnow() - timedelta(hours=2)
+    failed_at = utcnow() - timedelta(minutes=1)
+    with SessionLocal() as session:
+        record_success(session, "shopify", 12, at=clean)
+        record_success(session, "bosta", 165, at=old)
+        record_failure(session, "bosta", "Bosta didn't answer.", at=failed_at)
+        record_not_connected(session, "estebdal")
+        session.commit()
+
+    sources = {entry["source"]: entry for entry in client.get(FRESHNESS).json()["sources"]}
+
+    assert sources["shopify"]["state"] == State.FRESH
+    assert sources["shopify"]["updated_at"] == clean.isoformat()
+    assert sources["shopify"]["failed_at"] is None
+
+    assert sources["bosta"]["state"] == State.FAILED
+    assert sources["bosta"]["updated_at"] == old.isoformat()  # the last clean read
+    assert sources["bosta"]["failed_at"] == failed_at.isoformat()
+
+    assert sources["estebdal"]["state"] == State.NOT_CONNECTED
+    assert sources["estebdal"]["failed_at"] is None
+
+
+def test_stale_is_not_failing(client):
+    old = utcnow() - timedelta(hours=2)
+    with SessionLocal() as session:
+        record_success(session, "estebdal", 4, at=old)
+        session.commit()
+
+    estebdal = client.get(FRESHNESS).json()["sources"][2]
+
+    assert estebdal["state"] == State.STALE
+    assert estebdal["updated_at"] == old.isoformat()
+    assert estebdal["failed_at"] is None
+
+
+def test_the_answer_says_no_more_than_the_sidebar_needs(client):
+    """No reason and no count: a red dot and a time are all it draws."""
+    with SessionLocal() as session:
+        record_failure(session, "shopify", "Shopify refused the key.")
+        session.commit()
+
+    for entry in client.get(FRESHNESS).json()["sources"]:
+        assert set(entry) == {"source", "label", "state", "updated_at", "failed_at"}

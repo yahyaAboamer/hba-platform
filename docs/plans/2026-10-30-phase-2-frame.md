@@ -210,7 +210,7 @@ now.
 | Old | New |
 |---|---|
 | `/` (Affiliates Home) | `/affiliates/overview` for people with Affiliates; `/` itself sends each person to their start (below) |
-| `/affiliates` (Models) | `/affiliates/models` — `/affiliates` itself opens the department on Overview |
+| `/affiliates` (Models) | `/affiliates/models`, with its query (`?segment=applications`), because emails already sent and Overview's own links mean the roster. The department's first section is still Overview |
 | `/affiliates/invite` | `/affiliates/models/invite` |
 | `/affiliates/:id` and everything under it | `/affiliates/models/:id/…` (only numbers are read as an id) |
 | `/products`, `/products/:id` | `/affiliates/products`, `/affiliates/products/:id` |
@@ -291,11 +291,13 @@ now.
 | Department | Items |
 |---|---|
 | Operations | A source that could not be read (Bosta, Shopify, E-stebdal) and since when — **broken**; confirmed orders that never reached Bosta |
-| Inbox | Customers waiting for a reply and the oldest; WhatsApp not working — **broken** |
+| Inbox | Customers waiting for a reply and the oldest; customers who want a change to their order; WhatsApp not working — **broken** |
 | Affiliates | Applications to review; next month's targets not set, from the 24th; payments waiting for approval (for whoever approves) |
 
-  The mockup's "customers asked to change their order" has no record behind
-  it today, so it is not shown (*Choices*, 8).
+  *Corrected 30 October, while building 2.1:* the mockup's "customers asked
+  to change their order" **does** have a record behind it: Chats' *Wants a
+  change* view, counted as `edit` in `/api/inbox/conversations`. It joins
+  the Inbox's items.
 
 - **Orders, last 7 days** (for people holding the Inbox and Operations): the
   week's orders by where they are — waiting for an answer, confirmed and not

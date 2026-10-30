@@ -50,7 +50,7 @@ export function PayrollApprove() {
     return_to?: string;
   } | null;
   const chosen = routeState?.affiliate_ids;
-  const returnTo = routeState?.return_to === "/payments" ? "/payments" : "/payroll";
+  const returnTo = routeState?.return_to === "/affiliates/payments" ? "/affiliates/payments" : "/affiliates/payroll";
 
   const [preview, setPreview] = useState<ApprovalResult | null>(null);
   const [done, setDone] = useState<ApprovalResult | null>(null);
@@ -117,7 +117,7 @@ export function PayrollApprove() {
         />
         <p className="empty">
           Nobody was chosen. Pick who to approve on the{" "}
-          <Link to="/payroll">payroll screen</Link> first.
+          <Link to="/affiliates/payroll">payroll screen</Link> first.
         </p>
       </>
     );
@@ -209,7 +209,7 @@ export function PayrollApprove() {
             className="button button--primary"
             to={returnTo}
           >
-            {returnTo === "/payments" ? "Continue to payments" : "Back to payroll"}
+            {returnTo === "/affiliates/payments" ? "Continue to payments" : "Back to payroll"}
           </Link>
         </div>
       </>
@@ -327,7 +327,7 @@ function Head({ month, returnTo }: { month: string; returnTo: string }) {
           to={returnTo}
           className="detail__back"
         >
-          {returnTo === "/payments" ? "Payments" : "Payroll"}
+          {returnTo === "/affiliates/payments" ? "Payments" : "Payroll"}
         </Link>
         <h1>Approve {formatMonth(month)}</h1>
       </div>

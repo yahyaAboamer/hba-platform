@@ -303,7 +303,7 @@ export function Overview({ session }: { session: Session }) {
             {item.detail && <small>{item.detail}</small>}
           </div>
           <Link className="button" to={item.where}
-            state={item.key.startsWith("correction:") ? { back: { label: "Home", to: "/" } } : undefined}>{item.action}</Link>
+            state={item.key.startsWith("correction:") ? { back: { label: "Home", to: "/affiliates/overview" } } : undefined}>{item.action}</Link>
           <button className="button overview__notice-icon" aria-label={`Options for ${item.text}`} aria-expanded={noticeMenu === item.key}
             onClick={() => setNoticeMenu(noticeMenu === item.key ? null : item.key)}>⋯</button>
           <button className="button overview__notice-icon" aria-label={`Dismiss ${item.text}`} onClick={() => hide(item.key)}>✕</button>
@@ -331,7 +331,7 @@ export function Overview({ session }: { session: Session }) {
               {summary.selling_models} {summary.selling_models === 1 ? "model" : "models"} with
               {" "}attributed orders in {formatMonth(month)}
             </p>
-            <Link className="control-font" to={`/orders?month=${month}`}>All attributed orders →</Link>
+            <Link className="control-font" to={`/affiliates/orders?month=${month}`}>All attributed orders →</Link>
           </section>
           <section className="overview__card overview__card--payout">
             <h2>{payroll?.is_historical
@@ -347,14 +347,14 @@ export function Overview({ session }: { session: Session }) {
                 {summary.expected.bonus_piastres > 0 && <div className="overview__parts--lift"><dt>Bonuses</dt><dd><Money piastres={summary.expected.bonus_piastres} /></dd></div>}
               </dl>
             </>}
-            <Link className="control-font" to={`/payments?month=${month}`}>Open {formatMonth(month)} in Payments →</Link>
+            <Link className="control-font" to={`/affiliates/payments?month=${month}`}>Open {formatMonth(month)} in Payments →</Link>
           </section>
           <section className="overview__card overview__card--count">
             <h2>Active models</h2><div className="overview__hero-value overview__hero-value--count">{summary.active_models}</div>
             <p className="overview__card-note">
               {summary.active_models} collaborating in {shortMonth(month)}
             </p>
-            <Link className="control-font" to="/affiliates">Open roster →</Link>
+            <Link className="control-font" to="/affiliates/models">Open roster →</Link>
           </section>
         </div>
         <div className="overview__lower">
@@ -365,7 +365,7 @@ export function Overview({ session }: { session: Session }) {
                 <span className="overview__place">{row.rank}</span>
                 <span className="layout__avatar" aria-hidden="true">{row.name.charAt(0)}</span>
                 <span className="overview__top-who">
-                  <Link to={`/affiliates/${row.affiliate_id}?section=performance&month=${month}`}>{row.name}</Link>
+                  <Link to={`/affiliates/models/${row.affiliate_id}?section=performance&month=${month}`}>{row.name}</Link>
                   {row.code && <small>{row.code}</small>}
                 </span>
                 <Money piastres={row.sales_piastres} />
@@ -374,7 +374,7 @@ export function Overview({ session }: { session: Session }) {
           <section className="panel">
             <div className="panel__head">
               <h2 className="panel__title">Content progress to review</h2>
-              <Link className="control-font" to={`/targets?month=${month}`}>Targets →</Link>
+              <Link className="control-font" to={`/affiliates/targets?month=${month}`}>Targets →</Link>
             </div>
             {toReview(summary.content).length === 0 ? <p className="empty">Every model's record is up to date for {formatMonth(month)}.</p> : <>
               <table className="table overview__content">
@@ -384,7 +384,7 @@ export function Overview({ session }: { session: Session }) {
                     <td>
                       <Link
                         className="overview__content-name"
-                        to={`/affiliates/${row.affiliate_id}?section=targets&month=${month}`}
+                        to={`/affiliates/models/${row.affiliate_id}?section=targets&month=${month}`}
                       >
                         {row.name}
                       </Link>
