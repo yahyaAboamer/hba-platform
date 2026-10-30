@@ -25,12 +25,13 @@ nothing, and neither does anything in this file until somebody says it happened.
 
 from datetime import datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, exists, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.core.businesstime import parse_month, utcnow
-from app.modules.affiliates.models.affiliates import AffiliateProfile, AffiliateStatus
+from app.core.businesstime import business_month, month_add, parse_month, utcnow
+from app.modules.affiliates.models.affiliates import AccountKind, AffiliateProfile, AffiliateStatus
+from app.modules.affiliates.models.attributed_orders import AttributedOrder
 from app.modules.affiliates.models.payments import (
     AdjustmentType,
     PaymentAllocation,
@@ -42,7 +43,7 @@ from app.modules.affiliates.models.payroll import PayrollMonth, PayrollSnapshot
 from app.shared.services.audit import record_audit
 from app.modules.affiliates.services.payments_state import SettlementState
 from app.modules.affiliates.services.payouts import current_destination, mask_destination
-from app.modules.affiliates.services.payroll import get_month, is_historical, open_month
+from app.modules.affiliates.services.payroll import get_month, go_live_month, is_historical, open_month
 
 
 def on_the_desk(
@@ -103,6 +104,77 @@ def awaiting_approval(db: Session, month: str) -> int:
         1
         for affiliate in on_the_desk(db, month)
         if balance_for(db, affiliate, month)["state"] == "not_approved"
+    )
+
+
+def ended_months_awaiting_approval(db: Session, now: datetime) -> list[tuple[str, int]]:
+    """The months that have **ended** and still have somebody *Awaiting
+    approval*, oldest first, with how many: what Today and the sidebar's badge
+    count.
+
+    Only ended months, on the owner's word (30 October). The app lets a month
+    be approved while it runs, so counting the running month said every model
+    on the desk was waiting, all month long.
+
+    From go-live to last month: an earlier month was settled outside the
+    platform and never awaits anything (`is_historical`). Each month is first
+    asked one cheap question - does anybody on its desk lack an agreed figure?
+    - and only a month where somebody does is counted, by `awaiting_approval`,
+    exactly as the Payments screen's filter counts it.
+    """
+    configured = go_live_month()
+    if not configured:
+        return []
+    found: list[tuple[str, int]] = []
+    month = parse_month(configured)
+    last = month_add(business_month(now), -1)
+    while month <= last:
+        if _anyone_without_an_agreed_figure(db, month):
+            count = awaiting_approval(db, month)
+            if count:
+                found.append((month, count))
+        month = month_add(month, 1)
+    return found
+
+
+def _anyone_without_an_agreed_figure(db: Session, month: str) -> bool:
+    """`on_the_desk` and *not approved*, as one query, to skip the months
+    where nobody can be waiting.
+
+    The desk's rule, in SQL: payable, not an application, not archived, and
+    started by this month - a recorded start, or else her first order, or
+    nothing known at all (which `on_the_desk` keeps). *Not approved* is
+    `balance_for`'s: no month row, or one with no agreed figure (never
+    approved, or reopened). It only decides whether to count, so a month it
+    lets through is still counted the screen's way.
+    """
+    first_order = (
+        select(func.min(AttributedOrder.business_month))
+        .where(AttributedOrder.affiliate_id == AffiliateProfile.id)
+        .scalar_subquery()
+    )
+    agreed = select(PayrollMonth.affiliate_id).where(
+        PayrollMonth.month == month, PayrollMonth.active_snapshot_id.is_not(None)
+    )
+    return bool(
+        db.scalar(
+            select(
+                exists().where(
+                    AffiliateProfile.account_kind != AccountKind.HOUSE,
+                    AffiliateProfile.status.not_in(
+                        (AffiliateStatus.PENDING, AffiliateStatus.ARCHIVED)
+                    ),
+                    or_(
+                        AffiliateProfile.collaboration_start_month <= month,
+                        and_(
+                            AffiliateProfile.collaboration_start_month.is_(None),
+                            or_(first_order.is_(None), first_order <= month),
+                        ),
+                    ),
+                    AffiliateProfile.id.not_in(agreed),
+                )
+            )
+        )
     )
 
 

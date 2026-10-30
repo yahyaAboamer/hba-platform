@@ -1490,13 +1490,19 @@ def test_the_sidebar_badge_counts_the_people_the_desk_lists(client):
             {"id": applied["id"]},
         )
 
-    from app.modules.affiliates.services.payroll import working_month
+    from app.core.businesstime import business_month, month_add, utcnow
 
-    desk = client.get(f"/api/payments/{working_month()}").json()["affiliates"]
-    awaiting = sum(1 for row in desk if row["state"] == "not_approved")
+    # Only the months that have ended count (owner, 30 October): every one
+    # from go-live to last month, each as its own desk lists it.
+    last = month_add(business_month(utcnow()), -1)
+    awaiting, month = 0, "2026-01"
+    while month <= last:
+        desk = client.get(f"/api/payments/{month}").json()["affiliates"]
+        awaiting += sum(1 for row in desk if row["state"] == "not_approved")
+        month = month_add(month, 1)
     badge = client.get("/api/operations/counts").json()["payments_awaiting_approval"]
 
-    assert badge == awaiting
+    assert badge == awaiting > 0
 
 
 # ── A credit race cannot recover an overpayment twice (security audit) ──────────

@@ -814,22 +814,23 @@ def counts(
     it is the screen's.
     """
     from app.modules.affiliates.services.applications import waiting_applications
-    from app.modules.affiliates.services.payments import awaiting_approval
-    from app.modules.affiliates.services.payroll import working_month
+    from app.modules.affiliates.services.payments import ended_months_awaiting_approval
 
     # **The same people the desk lists**, through the same function. Counting
     # every payable affiliate here instead put 22 on the badge above a screen
     # showing 19, which is the disagreement the paragraph above predicted.
     #
-    # The month is the one the Payments screen opens on (`working_month`),
-    # not this calendar month: before go-live the two differ, and the badge
-    # counted a month the screen was not showing. Today reads the same.
+    # Only the months that have ended, added up: the owner's word (30
+    # October), and what Today counts. The app lets a month be approved while
+    # it runs, so the running month said everyone was waiting, all month long.
     #
     # Applications are the Models screen's *Applications* segment
     # (`waiting_applications`), which Today reads too.
     return {
         "models_awaiting_approval": waiting_applications(db)[0],
-        "payments_awaiting_approval": awaiting_approval(db, working_month()),
+        "payments_awaiting_approval": sum(
+            count for _, count in ended_months_awaiting_approval(db, utcnow())
+        ),
     }
 
 
