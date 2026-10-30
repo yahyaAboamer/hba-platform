@@ -10,6 +10,14 @@ import type { Session } from "../lib/api";
  */
 export const SETTINGS_BASES = ["/settings", "/glossary"] as const;
 
+/** Today's address: a page of its own, for anyone who holds two or more departments. */
+export const TODAY = "/today";
+
+/** Whether Today exists for this person: they hold two or more departments. */
+export function holdsToday(departments: readonly Department[]): boolean {
+  return departments.length >= 2;
+}
+
 export function canOpenSettings(session: Session | null): boolean {
   return can(session, "affiliates.view");
 }
@@ -23,6 +31,8 @@ export type Where = {
   department: Department | null;
   section: DepartmentSection | null;
   settings: boolean;
+  /** On Today, which belongs to no department. */
+  today: boolean;
 };
 
 /**
@@ -32,13 +42,14 @@ export type Where = {
  */
 export function whereAmI(pathname: string, departments: readonly Department[]): Where {
   if (SETTINGS_BASES.some((base) => within(pathname, base))) {
-    return { department: null, section: null, settings: true };
+    return { department: null, section: null, settings: true, today: false };
   }
+  if (within(pathname, TODAY)) return { department: null, section: null, settings: false, today: true };
   const department = departments.find((candidate) => within(pathname, candidate.base)) ?? null;
   const section =
     department?.sections.find(
       (candidate) =>
         within(pathname, candidate.to) || candidate.also?.some((also) => within(pathname, also)),
     ) ?? null;
-  return { department, section, settings: false };
+  return { department, section, settings: false, today: false };
 }

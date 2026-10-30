@@ -1,0 +1,81 @@
+/*
+ * Today (Phase 2, Batch 2.2): ported value for value from the approved
+ * mockup's `/* Today *\/` block (`docs/design/hba-os-shell-2026-10-25.html`:
+ * `.today .wait .flow .swatch`) and its phone rows (`.psub .prows .prow`).
+ * "Opened recently" and the search box are left out on the owner's decision.
+ */
+
+.today { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px; align-items: start; }
+/* No orders to show (somebody who does not hold both Inbox and Operations): the list takes the width. */
+.today--single { grid-template-columns: minmax(0, 1fr); }
+.panel__hint { margin: 0; font-size: 12.5px; color: var(--quiet); text-align: right; }
+
+.today__fresh { display: inline-flex; align-items: center; gap: 7px; margin: 0; font-size: 12.5px; color: var(--quiet); }
+.today__fresh .frame__ic { flex: none; width: 14px; height: 14px; }
+.today__state { margin: 0; padding: 18px; font-size: 13.5px; color: var(--quiet); }
+
+/* ── Waiting for you ── */
+.wait, .prows { margin: 0; padding: 0; list-style: none; }
+.wait > li {
+  display: grid; grid-template-columns: 16px minmax(0, 1fr) 96px 108px; gap: 14px; align-items: center;
+  min-height: 62px; padding: 10px 18px; border-bottom: 1px solid var(--rule);
+}
+.wait > li:last-child { border-bottom: 0; }
+.wait__dept { display: grid; place-items: center; color: var(--quiet); }
+.wait__dept .frame__ic { width: 16px; height: 16px; }
+.wait__what { min-width: 0; font-size: 14px; line-height: 1.35; }
+.wait__what small { display: block; margin-top: 3px; font-size: 12.5px; color: var(--quiet); }
+.wait__from { color: var(--ink); }
+.wait > li.is-alert .wait__from { color: var(--refused); }
+.wait > li.is-alert .wait__dept { color: var(--refused); }
+.wait__when { font-size: 12.5px; color: var(--quiet); text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.wait__when--late { color: var(--owed); }
+.wait__go { justify-self: end; white-space: nowrap; }
+/* The mockup fills the button of what is broken, and only that one: it is the
+   one thing on the list to do first. The app's row buttons are otherwise never
+   tinted (base.css), which the quiet rows keep. */
+.wait > li.is-alert .wait__go,
+.wait > li.is-alert .wait__go:hover:not(:disabled) {
+  border-color: var(--accent-fill);
+  background: var(--accent-fill);
+  color: var(--accent-on);
+}
+/* A line the list says in its own voice: nothing waiting, or a department that could not be read. */
+.wait > li.wait__note { display: block; min-height: 0; font-size: 13.5px; color: var(--quiet); }
+
+/* ── Orders, last 7 days ── */
+.flow { padding: 16px 18px 4px; }
+.flow__bar { display: flex; gap: 2px; height: 12px; margin: 0 0 6px; border-radius: 999px; overflow: hidden; }
+.flow__bar span { display: block; height: 100%; }
+.flow .table td { padding-top: 9px; padding-bottom: 9px; }
+.flow .table td:first-child { padding-left: 0; }
+.flow .table td:last-child { padding-right: 0; }
+.flow .table td small { display: block; margin: 2px 0 0 17px; font-size: 12px; color: var(--quiet); }
+.flow .table b { font-weight: 500; }
+.flow .r { text-align: right; }
+.flow .num { font-variant-numeric: tabular-nums; }
+.flow .muted { color: var(--faint); }
+.swatch { display: inline-block; flex: none; width: 9px; height: 9px; margin-right: 8px; border-radius: 50%; vertical-align: 0; }
+
+/* ── On a phone: the rows are links, the orders sit below ── */
+.today--phone { display: block; }
+.today--phone .psub { margin: 0; padding: 14px 0 8px; font-size: 13px; color: var(--quiet); line-height: 1.45; }
+.today--phone .prows { margin: 0 -16px; padding: 0 0 16px; }
+.today--phone .prows > li.wait__note { padding: 14px 16px; font-size: 13.5px; color: var(--quiet); }
+.prow {
+  display: grid; grid-template-columns: minmax(0, 1fr) 18px; gap: 10px; align-items: center;
+  min-height: 72px; padding: 10px 16px; border-bottom: 1px solid var(--rule);
+  color: var(--ink); text-decoration: none;
+}
+.prow:active { background: var(--hover); }
+.prow > .frame__ic { width: 16px; height: 16px; color: var(--faint); }
+.prow__dept { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--quiet); }
+.prow__dept .frame__ic { width: 13px; height: 13px; }
+.prow.is-alert .prow__dept { color: var(--refused); }
+.prow__what { display: block; margin-top: 3px; font-size: 14.5px; line-height: 1.35; }
+.prow__when { display: block; margin-top: 3px; font-size: 12.5px; color: var(--quiet); }
+.prow__when--late { color: var(--owed); }
+
+@media (max-width: 800px) {
+  .today { grid-template-columns: minmax(0, 1fr); }
+}

@@ -813,27 +813,23 @@ def counts(
     screen itself calls, on the same month, so there is one implementation and
     it is the screen's.
     """
-    from app.modules.affiliates.models.affiliates import AffiliateProfile
-    from app.modules.affiliates.services.payments import balance_for, on_the_desk
+    from app.modules.affiliates.services.applications import waiting_applications
+    from app.modules.affiliates.services.payments import awaiting_approval
+    from app.modules.affiliates.services.payroll import working_month
 
-    month = business_month(utcnow())
     # **The same people the desk lists**, through the same function. Counting
     # every payable affiliate here instead put 22 on the badge above a screen
     # showing 19, which is the disagreement the paragraph above predicted.
-    awaiting = sum(
-        1
-        for affiliate in on_the_desk(db, month)
-        if balance_for(db, affiliate, month)["state"] == "not_approved"
-    )
-
+    #
+    # The month is the one the Payments screen opens on (`working_month`),
+    # not this calendar month: before go-live the two differ, and the badge
+    # counted a month the screen was not showing. Today reads the same.
+    #
+    # Applications are the Models screen's *Applications* segment
+    # (`waiting_applications`), which Today reads too.
     return {
-        "models_awaiting_approval": db.scalar(
-            select(func.count())
-            .select_from(AffiliateProfile)
-            .where(AffiliateProfile.status == "pending")
-        )
-        or 0,
-        "payments_awaiting_approval": awaiting,
+        "models_awaiting_approval": waiting_applications(db)[0],
+        "payments_awaiting_approval": awaiting_approval(db, working_month()),
     }
 
 

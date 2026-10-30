@@ -80,9 +80,9 @@ every recommended choice.
 
 | Batch | Task | Status |
 |---|---|---|
-| 2.0 | Frontend department folders (moves only) | In progress: the built bundle is byte-identical to `main`'s |
-| 2.1 | Departments declared once; the sidebar; the phone layout; department addresses with redirects | Pending |
-| 2.2 | Today, and the sidebar's numbers from the same source | Pending |
+| 2.0 | Frontend department folders (moves only) | Completed: PR #136, on staging and production at `70c2204` 30 Oct; the built bundle was byte-identical |
+| 2.1 | Departments declared once; the sidebar; the phone layout; department addresses with redirects | Completed: PR #137, on staging and production at `bdb70fd` 30 Oct |
+| 2.2 | Today, and the sidebar's numbers from the same source | In review |
 | 2.3 | Settings split: Me, Integrations, Company; department settings into their departments; the activity log by department | Pending |
 | 2.4 | Team and access by department | Pending |
 

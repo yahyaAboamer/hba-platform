@@ -531,3 +531,23 @@ def success_rate(db: Session, start: date, end: date, now: datetime | None = Non
         "finished": finished,
         "rate": round(successful / finished, 4) if finished else None,
     }
+
+
+# ── For Today's order week ────────────────────────────────────────────────────
+
+
+def order_numbers_on_bosta(db: Session, order_numbers: set[str]) -> set[str]:
+    """Which of these Shopify order numbers ("#31038") have an order on Bosta
+    that Bosta still has (not ``deleted_at``)."""
+    if not order_numbers:
+        return set()
+    return set(
+        db.scalars(
+            select(OpsBostaDelivery.shopify_order_number)
+            .where(
+                OpsBostaDelivery.shopify_order_number.in_(order_numbers),
+                OpsBostaDelivery.deleted_at.is_(None),
+            )
+            .distinct()
+        )
+    )

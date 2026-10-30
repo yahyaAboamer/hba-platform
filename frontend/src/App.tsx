@@ -1,17 +1,19 @@
 import { useEffect, useState } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
-import { DEPARTMENTS, departmentsFor } from "./departments";
+import { DEPARTMENTS, departmentsFor, startFor } from "./departments";
 import { api, can, currentUser, deskFor } from "./lib/api";
 import type { Session } from "./lib/api";
 import { AcceptInvitation } from "./screens/AcceptInvitation";
 import { ResetPassword } from "./screens/ResetPassword";
 import { AffiliatePortal } from "./portal/AffiliatePortal";
 import { Elsewhere, Start } from "./frame/Elsewhere";
+import { Onward } from "./frame/Onward";
 import { Frame } from "./frame/Frame";
-import { canOpenSettings } from "./frame/where";
+import { TODAY, canOpenSettings, holdsToday } from "./frame/where";
 import { FirstRun } from "./screens/FirstRun";
 import { Glossary } from "./screens/Glossary";
+import { Today } from "./departments/today/Today";
 import { PortalPreviewFrame, previewFrameFor } from "./departments/affiliates/PortalPreview";
 import { Settings } from "./screens/Settings";
 import { SignIn } from "./screens/SignIn";
@@ -28,6 +30,12 @@ function staffRoutes(session: Session) {
   return (
     <Route element={<Frame session={session} departments={held} />}>
       <Route path="/" element={<Start session={session} departments={DEPARTMENTS} />} />
+      {/* Today is for anyone holding two or more departments; one department's person starts in it. */}
+      {holdsToday(held) ? (
+        <Route path={TODAY} element={<Today />} />
+      ) : (
+        held.length === 1 && <Route path={TODAY} element={<Onward to={startFor(session)} />} />
+      )}
       {held.map((department) => (
         <Route key={department.key} path={department.base}>
           {department.routes(session)}

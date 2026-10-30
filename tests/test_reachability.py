@@ -53,6 +53,15 @@ UNREACHED_ON_PURPOSE = {
     # Superseded. The payroll screen answers the same question with the
     # blockers attached, which is what anybody actually needs.
     ("GET", "/api/earnings/{month}"),
+    # Superseded by `/api/today` (Batch 2.2), which carries the sidebar's
+    # numbers and failed sources from the same functions these call. Kept,
+    # with their tests, for anything outside the interface that reads them.
+    ("GET", "/api/operations/counts"),
+    ("GET", "/api/operations/freshness"),
+    # Reached, but out of the scan's sight: Chats builds the list's address
+    # with its filters in a function and passes the result to `api.get`.
+    # Until 2.2 the frame's own literal call to it was what the scan found.
+    ("GET", "/api/inbox/conversations"),
     # The retired Year screen redirects to Home, whose annual data arrives
     # through /api/me/home/{month}. Keep the existing read-only annual API
     # compatible while removing unused UI; its API regression tests remain.
@@ -126,7 +135,7 @@ def _served() -> set[tuple[str, str]]:
     )
     from app.modules.inbox import api as inbox
     from app.modules.operations import api as order_ops
-    from app.shared.api import audit, auth, health, staff, webhooks
+    from app.shared.api import audit, auth, health, staff, today, webhooks
 
     # **Named one by one, not discovered.** A router that is served and not
     # listed here would make every one of its routes look unreached, and a
@@ -138,7 +147,7 @@ def _served() -> set[tuple[str, str]]:
         for module in (
             affiliate_self, affiliates, applications, audit, auth, earnings,
             health, inbox, operations, order_ops, orders, payments, payroll, policy,
-            portal_preview, products, staff, targets, webhooks,
+            portal_preview, products, staff, targets, today, webhooks,
         )
     ]
     # Operations' second router: the frame's reads, under `/api/operations`.

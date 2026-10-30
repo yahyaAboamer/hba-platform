@@ -54,7 +54,7 @@ describe("old addresses go to their new ones, keeping the rest, the query and th
     ["/orders/1001?month=2026-09", "/affiliates/orders/1001?month=2026-09"],
     ["/operations", "/operations/shopify"],
     ["/inbox", "/inbox/chats"],
-    ["/?month=2026-08#h", "/affiliates/overview?month=2026-08#h"],
+    ["/?month=2026-08#h", "/today?month=2026-08#h"],
   ];
 
   it.each(table)("%s", async (old, current) => {
