@@ -82,7 +82,7 @@ every recommended choice.
 |---|---|---|
 | 2.0 | Frontend department folders (moves only) | Completed: PR #136, on staging and production at `70c2204` 30 Oct; the built bundle was byte-identical |
 | 2.1 | Departments declared once; the sidebar; the phone layout; department addresses with redirects | Completed: PR #137, on staging and production at `bdb70fd` 30 Oct |
-| 2.2 | Today, and the sidebar's numbers from the same source | Completed: PR #138, on staging and production at `17503e7` 30 Oct; the change count corrected in the PR after it |
+| 2.2 | Today, and the sidebar's numbers from the same source | Completed: PR #138, on staging and production at `17503e7` 30 Oct; the change count corrected in PR #139, payments only in ended months in PR #140, live at `2e1f094` |
 | 2.3 | Settings split: Me, Integrations, Company; department settings into their departments; the activity log by department | Pending |
 | 2.4 | Team and access by department | Pending |
 
