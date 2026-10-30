@@ -119,14 +119,22 @@ and draws none of them half-built (*Choices*, 1).
 | Folder | What moves into it |
 |---|---|
 | `frontend/src/frame/` | The new frame's parts (empty until 2.1) |
-| `frontend/src/departments/inbox/` | `InboxChats`, `InboxConfirmations`, `Chat*`, `InboxConnection`, `InboxIcon`, `Inbox.css` |
-| `frontend/src/departments/operations/` | The `Operations*` screens and `OpsSource`. `IntegrationKey` and `ShopifyConnection` stay in `components/`, because Integrations (2.3) uses them too |
+| `frontend/src/departments/inbox/` | `InboxChats`, `InboxConfirmations`, `Chat*`, `InboxIcon`, `InboxLayout`, `Inbox.css` |
+| `frontend/src/departments/operations/` | The `Operations*` screens and `OperationsDashboard.css` (which the Inbox's screens also import: see 2.1). `OpsSource` (Inbox and Operations) stays in `components/`, and so do `IntegrationKey`, `ShopifyConnection` and `InboxConnection`, which Settings uses and Integrations (2.3) will |
 | `frontend/src/departments/affiliates/` | Overview, Affiliates, AffiliateDetail, Compensation, Payments and Payment*, Payroll*, Targets, Products, Orders, InvitePage, PortalPreview, Bonuses, Corrections, the money and month components they alone use |
 | `frontend/src/portal/` | The model portal (`AffiliatePortal`, `My*`, `AffiliateLayout`, `Apply`, `ApplicationPending`, `PortalSkeleton`...) — moved, not changed |
 | `frontend/src/screens/` | What belongs to nobody in particular: sign-in, first run, invitations, password reset, two-step, Settings, Glossary |
 
 A component two departments use stays in `frontend/src/components/`.
 Tests move with the files they test.
+
+*As done (PR review, 30 October):* one deliberate exception, `HistoricalReview`,
+moved to Affiliates although only Settings imports it, because 2.3 moves it
+into Affiliates anyway. Three crossings left for 2.1 to tidy: the Inbox
+imports `OperationsDashboard.css` (its shared rules go to a shared
+stylesheet), Settings and `DataPanel` import two Affiliates stylesheets
+(settled by 2.3), and `AffiliatePayout` imports `instapayProblem` from the
+portal's `Apply` (moves to `lib/`).
 
 **Done when** `npm test` and `npm run build` pass, the diff is only moves and
 import lines, and every screen is unchanged. *As done:* the built bundle came
