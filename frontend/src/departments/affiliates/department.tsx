@@ -1,5 +1,6 @@
-import { Navigate, Route } from "react-router-dom";
+import { Route } from "react-router-dom";
 
+import { Onward } from "../../frame/Onward";
 import type { Department } from "../types";
 import { AffiliateDetail } from "./AffiliateDetail";
 import { AffiliatePayments } from "./AffiliatePayments";
@@ -68,7 +69,9 @@ export const affiliates: Department = {
   ],
   routes: (session) => (
     <>
-      <Route index element={<Navigate to="overview" replace />} />
+      {/* `/affiliates` was the Models roster, and emails already sent and
+          links like `?segment=applications` still mean it. */}
+      <Route index element={<Onward to="/affiliates/models" />} />
       <Route path="overview" element={<Overview session={session} />} />
       <Route path="models" element={<Affiliates />} />
       {/* Before the profile route so `invite` is never read as an id. */}
@@ -103,7 +106,7 @@ export const affiliates: Department = {
     </>
   ),
   moved: [
-    { from: "/affiliates", to: "/affiliates/overview", exact: true },
+    { from: "/affiliates", to: "/affiliates/models", exact: true },
     { from: "/affiliates/invite", to: "/affiliates/models/invite" },
     { from: "/affiliates/:id", to: "/affiliates/models/:id" },
     { from: "/products", to: "/affiliates/products" },

@@ -22,7 +22,7 @@ type Counts = Partial<Record<CountKey, number>>;
  */
 export type Waiting = {
   counts: Counts;
-  /** Operations sources whose latest read failed, with when the failures began. */
+  /** Operations sources whose latest read failed, with when each was last read cleanly. */
   failures: Record<string, string | null>;
   /** Chats reads the list far more often than the frame does, and tells it. */
   setUnread: (unread: number) => void;
@@ -86,7 +86,7 @@ export function useWaiting(session: Session, chatsOpen: boolean): Waiting {
                 Object.fromEntries(
                   body.sources
                     .filter((row) => row.state === "failed")
-                    .map((row) => [row.source, row.failing_since ?? null]),
+                    .map((row) => [row.source, row.updated_at ?? null]),
                 ),
               ),
             )
@@ -124,5 +124,5 @@ type FreshnessRow = {
   label: string;
   state: Freshness["state"];
   updated_at: string | null;
-  failing_since: string | null;
+  failed_at: string | null;
 };

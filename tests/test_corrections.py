@@ -1349,7 +1349,7 @@ def test_home_names_a_late_courier_failure_in_the_exports_words(db):
     assert notice["text"] == "Late failed order needs a decision"
     assert notice["detail"] == "Nour · order #1 failed after August was approved."
     assert notice["action"] == "Open correction"
-    assert notice["where"] == f"/payments/{AUGUST}/{affiliate.id}/correction"
+    assert notice["where"] == f"/affiliates/payments/{AUGUST}/{affiliate.id}/correction"
     assert notice["severity"] == "blocking"
 
 

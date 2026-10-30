@@ -416,17 +416,17 @@ def test_never_read_is_one_entry_per_source_in_order(client):
     assert body == {
         "sources": [
             {"source": "shopify", "label": "Shopify", "state": "never",
-             "updated_at": None, "failing_since": None},
+             "updated_at": None, "failed_at": None},
             {"source": "bosta", "label": "Bosta", "state": "never",
-             "updated_at": None, "failing_since": None},
+             "updated_at": None, "failed_at": None},
             {"source": "estebdal", "label": "E-stebdal", "state": "never",
-             "updated_at": None, "failing_since": None},
+             "updated_at": None, "failed_at": None},
         ]
     }
 
 
 def test_each_state_and_its_times(client):
-    """Fresh, stale, failed, not connected; ``failing_since`` only when failed."""
+    """Fresh, stale, failed, not connected; ``failed_at`` only when failed."""
     clean = utcnow() - timedelta(minutes=3)
     old = utcnow() - timedelta(hours=2)
     failed_at = utcnow() - timedelta(minutes=1)
@@ -441,14 +441,14 @@ def test_each_state_and_its_times(client):
 
     assert sources["shopify"]["state"] == State.FRESH
     assert sources["shopify"]["updated_at"] == clean.isoformat()
-    assert sources["shopify"]["failing_since"] is None
+    assert sources["shopify"]["failed_at"] is None
 
     assert sources["bosta"]["state"] == State.FAILED
     assert sources["bosta"]["updated_at"] == old.isoformat()  # the last clean read
-    assert sources["bosta"]["failing_since"] == failed_at.isoformat()
+    assert sources["bosta"]["failed_at"] == failed_at.isoformat()
 
     assert sources["estebdal"]["state"] == State.NOT_CONNECTED
-    assert sources["estebdal"]["failing_since"] is None
+    assert sources["estebdal"]["failed_at"] is None
 
 
 def test_stale_is_not_failing(client):
@@ -461,7 +461,7 @@ def test_stale_is_not_failing(client):
 
     assert estebdal["state"] == State.STALE
     assert estebdal["updated_at"] == old.isoformat()
-    assert estebdal["failing_since"] is None
+    assert estebdal["failed_at"] is None
 
 
 def test_the_answer_says_no_more_than_the_sidebar_needs(client):
@@ -471,4 +471,4 @@ def test_the_answer_says_no_more_than_the_sidebar_needs(client):
         session.commit()
 
     for entry in client.get(FRESHNESS).json()["sources"]:
-        assert set(entry) == {"source", "label", "state", "updated_at", "failing_since"}
+        assert set(entry) == {"source", "label", "state", "updated_at", "failed_at"}

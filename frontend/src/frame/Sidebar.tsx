@@ -24,8 +24,13 @@ type Mark = {
   alert: string | null;
 };
 
+/**
+ * `since` is the last clean read. When the failures began is not recorded
+ * (each failed attempt rewrites its time), so the sentence claims no more
+ * than that: not read since the last time it was.
+ */
 function failedSentence(label: string | null, since: string | null | undefined): string {
-  const what = since ? `could not be read since ${clockTime(since)}` : "could not be read";
+  const what = since ? `not read since ${clockTime(since)}` : "could not be read";
   return label ? `${label} ${what}` : `${what[0].toUpperCase()}${what.slice(1)}`;
 }
 
@@ -228,7 +233,8 @@ export function SideBody({
                   type="button"
                   className="frame__dept"
                   aria-expanded={isOpen}
-                  aria-controls={`${sectionsId}-${department.key}`}
+                  // Only a list that is drawn can be pointed at.
+                  aria-controls={isOpen ? `${sectionsId}-${department.key}` : undefined}
                   onClick={() => setFold({ at: pathname, open: isOpen ? null : department.key })}
                 >
                   <Icon name={department.icon} />

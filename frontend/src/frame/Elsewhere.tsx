@@ -1,10 +1,11 @@
-import { Link, Navigate, useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 
 import { startFor } from "../departments";
 import type { Department } from "../departments/types";
 import { can } from "../lib/api";
 import type { Session } from "../lib/api";
 import { movedAddress } from "./moved";
+import { Onward } from "./Onward";
 import { SETTINGS_BASES, canOpenSettings, within } from "./where";
 
 /**
@@ -23,10 +24,10 @@ export function Elsewhere({
   /** Every department, held or not. */
   departments: readonly Department[];
 }) {
-  const { pathname, search, hash } = useLocation();
+  const { pathname } = useLocation();
 
   const moved = movedAddress(pathname, departments.flatMap((department) => department.moved));
-  if (moved) return <Navigate to={{ pathname: moved, search, hash }} replace />;
+  if (moved) return <Onward to={moved} />;
 
   const start = startFor(session);
   const refused =
@@ -62,10 +63,9 @@ export function Elsewhere({
   );
 }
 
-/** `/`: each person's start, until Today replaces it (Batch 2.2). Keeps the query and hash. */
+/** `/`: each person's start, until Today replaces it (Batch 2.2). Keeps the query, the hash and the state. */
 export function Start({ session, departments }: { session: Session; departments: readonly Department[] }) {
-  const { search, hash } = useLocation();
   const start = startFor(session);
   if (start === "/") return <Elsewhere session={session} departments={departments} />;
-  return <Navigate to={{ pathname: start, search, hash }} replace />;
+  return <Onward to={start} />;
 }

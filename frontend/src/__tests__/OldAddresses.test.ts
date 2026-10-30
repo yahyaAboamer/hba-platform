@@ -12,14 +12,17 @@ import { describe, expect, it } from "vitest";
  * would notice until the redirects are retired. So it is read for rather than
  * trusted.
  *
- * The staff screens are `departments/`, `screens/` and `components/`. The
+ * The staff code is `departments/`, `screens/`, `components/`, `frame/`,
+ * `lib/` and `App.tsx`. The
  * model portal is not scanned: her addresses (`/payments`, `/targets`) are her
  * own and are the ones in her emails. The one file that names the old
  * addresses on purpose is the list of where they went.
  */
 
 const SRC = resolve(__dirname, "..");
-const SCANNED = ["departments", "screens", "components"];
+const SCANNED = ["departments", "screens", "components", "frame", "lib"];
+/** Files straight in `src/` that are staff code too. */
+const SCANNED_FILES = ["App.tsx"];
 const NAMES_OLD_ADDRESSES = ["departments/affiliates/department.tsx"];
 
 function files(directory: string): string[] {
@@ -45,11 +48,15 @@ const OLD_ADDRESSES: [string, RegExp][] = [
   ["/affiliates (bare)", /["'`]\/affiliates(?=["'`?#])/],
   ["/affiliates/invite", /\/affiliates\/invite(?![\w-])/],
   ["/affiliates/${id}", /["'`]\/affiliates\/\$\{/],
+  ['"/affiliates/" + id', /["'`]\/affiliates\/["'`]\s*\+/],
   ["/?month (the old Home)", /["'`]\/\?/],
 ];
 
 describe("the staff screens' links", () => {
-  const found = SCANNED.flatMap((directory) => files(join(SRC, directory)))
+  const found = [
+    ...SCANNED.flatMap((directory) => files(join(SRC, directory))),
+    ...SCANNED_FILES.map((name) => join(SRC, name)),
+  ]
     .map((path) => relative(SRC, path).split(sep).join("/"))
     .filter((path) => !NAMES_OLD_ADDRESSES.includes(path));
 

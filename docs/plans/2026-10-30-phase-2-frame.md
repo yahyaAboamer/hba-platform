@@ -210,7 +210,7 @@ now.
 | Old | New |
 |---|---|
 | `/` (Affiliates Home) | `/affiliates/overview` for people with Affiliates; `/` itself sends each person to their start (below) |
-| `/affiliates` (Models) | `/affiliates/models` — `/affiliates` itself opens the department on Overview |
+| `/affiliates` (Models) | `/affiliates/models`, with its query (`?segment=applications`), because emails already sent and Overview's own links mean the roster. The department's first section is still Overview |
 | `/affiliates/invite` | `/affiliates/models/invite` |
 | `/affiliates/:id` and everything under it | `/affiliates/models/:id/…` (only numbers are read as an id) |
 | `/products`, `/products/:id` | `/affiliates/products`, `/affiliates/products/:id` |

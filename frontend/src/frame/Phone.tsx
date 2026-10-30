@@ -57,13 +57,26 @@ export function PhoneMenu({
 }) {
   const sheet = useRef<HTMLDivElement>(null);
   const close = useRef<HTMLButtonElement>(null);
+  // The latest `onClose`, read when the window widens, so a new function on
+  // every render does not move the focus back and forth.
+  const closing = useRef(onClose);
+  closing.current = onClose;
 
   useEffect(() => {
     const opener = menuButton.current;
     close.current?.focus();
     const overflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    // Widened past a phone (a turned tablet, a resized window), the sidebar
+    // is back and the menu has nothing left to do: it closes rather than
+    // holding the page still from behind its own `display: none`.
+    const wide = window.matchMedia?.("(min-width: 801px)");
+    const onWide = (event: MediaQueryListEvent) => {
+      if (event.matches) closing.current();
+    };
+    wide?.addEventListener("change", onWide);
     return () => {
+      wide?.removeEventListener("change", onWide);
       document.body.style.overflow = overflow;
       opener?.focus();
     };

@@ -944,7 +944,7 @@ def attention(
             "applications_waiting",
             ATTENTION,
             f"{waiting} application{_s(waiting)} awaiting review",
-            "/affiliates?segment=applications",
+            "/affiliates/models?segment=applications",
             "Open applications",
             "Submitted through the invitation link.",
         )
@@ -995,7 +995,7 @@ def attention(
                 BLOCKING,
                 title,
                 # The month's own correction, where it is carried or absorbed.
-                f"/payments/{month}/{affiliate.id}/correction",
+                f"/affiliates/payments/{month}/{affiliate.id}/correction",
                 "Open correction",
                 detail,
             )
@@ -1091,7 +1091,7 @@ def attention(
             "orders_held",
             BLOCKING,
             f"{held} order{_s(held)} carry two models' codes and need a decision",
-            "/orders",
+            "/affiliates/orders",
             "Open orders",
             "Nobody is credited until somebody says which model it belongs to.",
         )
@@ -1108,7 +1108,7 @@ def attention(
             f"{_month_words(months[0])} was reopened and never agreed again"
             if len(months) == 1
             else f"{len(months)} months were reopened and never agreed again",
-            "/payroll",
+            "/affiliates/payroll",
             "Open payroll",
             "A month left open is a month nobody is being paid for.",
         )
@@ -1133,7 +1133,7 @@ def attention(
                 ATTENTION,
                 f"{unapproved} model{_s(unapproved)} still unapproved for "
                 f"{_month_words(previous)}",
-                "/payroll",
+                "/affiliates/payroll",
                 "Open payroll",
                 "The month cannot close while any model is still unapproved.",
             )

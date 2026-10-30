@@ -56,9 +56,10 @@ def _has_numbers(described: dict) -> bool:
 def every_sources_freshness(db: Session = Depends(get_session)) -> dict:
     """Each source's state, in ``SOURCES`` order, for the sidebar's red dot.
 
-    ``failing_since`` is when the latest failed read was tried: a run of
-    failures is not recorded, as each one rewrites the attempt's time. Null
-    unless the state is ``failed``.
+    ``failed_at`` is when the latest failed read was tried, not when the
+    failures began: each attempt rewrites it, so the sidebar says how long
+    since ``updated_at``, the last clean read. Null unless the state is
+    ``failed``.
     """
     sources = []
     for source in SOURCES:
@@ -70,7 +71,7 @@ def every_sources_freshness(db: Session = Depends(get_session)) -> dict:
                 "label": described["label"],
                 "state": described["state"],
                 "updated_at": described["updated_at"],
-                "failing_since": described["checked_at"] if failed else None,
+                "failed_at": described["checked_at"] if failed else None,
             }
         )
     return {"sources": sources}

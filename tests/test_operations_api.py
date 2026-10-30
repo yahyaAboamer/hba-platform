@@ -1025,7 +1025,7 @@ def test_home_says_when_applications_are_waiting(client):
     assert notice["text"] == "2 applications awaiting review"
     assert notice["detail"] == "Submitted through the invitation link."
     assert notice["action"] == "Open applications"
-    assert notice["where"] == "/affiliates?segment=applications"
+    assert notice["where"] == "/affiliates/models?segment=applications"
     assert notice["severity"] != "blocking"
 
 
@@ -1076,3 +1076,20 @@ def test_a_code_nobody_holds_says_so(client):
     _add_order("1", "QUIET")
     row = client.get("/api/operations/unregistered-codes").json()["codes"][0]
     assert row["held_by"] == []
+
+
+def test_every_link_overview_is_handed_is_a_department_address():
+    """Overview's attention items carry the address they open (`where`).
+
+    Since ADR 0068 the affiliate side's screens live under `/affiliates/...`;
+    an old address still works only by being redirected, and loses nothing
+    only by luck. So the module that writes them is read, not trusted.
+    """
+    import re
+    from pathlib import Path
+
+    import app.modules.affiliates.api.operations as module
+
+    source = Path(module.__file__).read_text(encoding="utf-8")
+    old = re.compile(r"""f?["'](/(?:payments|orders|payroll|targets|products)(?![\w-])|/affiliates(?=["'?#]))""")
+    assert old.findall(source) == []

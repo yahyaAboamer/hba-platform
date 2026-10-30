@@ -74,7 +74,7 @@ export type Answers = {
   /** `/api/operations/counts`, or null for a refused read. */
   counts?: Record<string, number> | null;
   /** `/api/operations/freshness` sources, or null for a refused read. */
-  freshness?: Record<string, { state: string; failing_since?: string | null }> | null;
+  freshness?: Record<string, { state: string; updated_at?: string | null }> | null;
 };
 
 let requested: string[] = [];
@@ -121,8 +121,8 @@ export function serve(me: unknown, answers: Answers = {}) {
             source,
             label: labels[source],
             state: freshness[source]?.state ?? "fresh",
-            updated_at: "2026-10-30T10:00:00+00:00",
-            failing_since: freshness[source]?.failing_since ?? null,
+            updated_at: freshness[source] && "updated_at" in freshness[source] ? freshness[source].updated_at : "2026-10-30T10:00:00+00:00",
+            failed_at: freshness[source]?.state === "failed" ? "2026-10-30T10:20:00+00:00" : null,
           })),
         });
       }

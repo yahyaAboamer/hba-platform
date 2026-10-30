@@ -33,7 +33,10 @@ const here = () => window.location.pathname + window.location.search + window.lo
 
 describe("old addresses go to their new ones, keeping the rest, the query and the hash", () => {
   const table: [string, string][] = [
-    ["/affiliates", "/affiliates/overview"],
+    // `/affiliates` was the Models roster; Overview's "Open applications"
+    // and emails already sent still mean it.
+    ["/affiliates", "/affiliates/models"],
+    ["/affiliates?segment=applications#list", "/affiliates/models?segment=applications#list"],
     ["/affiliates/invite?email=a%40b.c#top", "/affiliates/models/invite?email=a%40b.c#top"],
     ["/affiliates/12", "/affiliates/models/12"],
     ["/affiliates/12/compensation?month=2026-09#terms", "/affiliates/models/12/compensation?month=2026-09#terms"],
@@ -60,6 +63,16 @@ describe("old addresses go to their new ones, keeping the rest, the query and th
     render(<App />);
 
     await waitFor(() => expect(here()).toBe(current));
+  });
+
+  it("carries what the last screen handed over, so a back button still knows where back is", async () => {
+    const back = { back: { label: "Home", to: "/affiliates/overview" } };
+    window.history.pushState({ usr: back, key: "old", idx: 0 }, "", "/payments/2026-09/12/correction");
+    serve(sessionOf("owner"));
+    render(<App />);
+
+    await waitFor(() => expect(here()).toBe("/affiliates/payments/2026-09/12/correction"));
+    expect(window.history.state?.usr).toEqual(back);
   });
 
   it("knows an id is only digits: any other word is not moved", () => {
@@ -197,25 +210,25 @@ describe("the sidebar", () => {
     expect(row(/^Inbox/).textContent).toBe("Inbox");
   });
 
-  it("puts a red dot on a failed source, saying since when, in Cairo time", async () => {
+  it("puts a red dot on a failed source, saying when it was last read, in Cairo time", async () => {
     await open("/operations/shopify", "owner", {
-      freshness: { shopify: { state: "failed", failing_since: "2026-01-15T10:05:00+00:00" } },
+      freshness: { shopify: { state: "failed", updated_at: "2026-01-15T10:05:00+00:00" } },
     });
 
     const shopify = screen.getByRole("link", { name: /^Shopify/ });
     await waitFor(() => expect(shopify.querySelector(".frame__alert")).not.toBeNull());
-    expect(shopify.textContent).toContain("Could not be read since 12:05");
+    expect(shopify.textContent).toContain("Not read since 12:05");
     expect(screen.getByRole("link", { name: /^Bosta/ }).querySelector(".frame__alert")).toBeNull();
   });
 
   it("puts the dot on the folded Operations row too, and not when nothing failed", async () => {
     await open("/affiliates/overview", "owner", {
-      freshness: { bosta: { state: "failed", failing_since: "2026-01-15T10:05:00+00:00" } },
+      freshness: { bosta: { state: "failed", updated_at: "2026-01-15T10:05:00+00:00" } },
     });
 
     const operations = row(/^Operations/);
     await waitFor(() => expect(operations.querySelector(".frame__alert")).not.toBeNull());
-    expect(operations.textContent).toContain("Bosta could not be read since 12:05");
+    expect(operations.textContent).toContain("Bosta not read since 12:05");
     cleanup();
 
     await open("/affiliates/overview", "owner", { freshness: { shopify: { state: "stale" } } });
