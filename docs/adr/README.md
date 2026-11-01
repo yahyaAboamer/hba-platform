@@ -110,6 +110,7 @@ what was chosen.
 | [0068](0068-one-frame-for-every-department.md) | One frame for every department | Accepted, not built yet; amends 0057 and 0059 |
 | [0069](0069-production-keeps-its-own-look-and-its-data-moves-into-hba.md) | Production keeps its own look, and its data moves into HBA's database | Accepted, not built yet; an owner's exception to 0039 and 0068 |
 | [0070](0070-a-bonus-is-added-on-top-of-an-unagreed-month.md) | A bonus is added on top of a month nobody has agreed yet | Accepted |
+| [0071](0071-khazenly-ships-only-orders-confirmed-in-shopify.md) | Khazenly ships only orders confirmed in Shopify, and the platform builds the file that tells it so | Accepted |
 
 **0014 is superseded by 0036** and **0038 by 0039**. **0027 keeps its
 principle and loses its mechanism to 0039**: an agreed figure is still set

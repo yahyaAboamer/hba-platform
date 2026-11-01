@@ -198,6 +198,8 @@ KINDS: dict[str, tuple[str, ...]] = {
     ),
     # What staff did to an order's confirmation from the Inbox (ADR 0059).
     "inbox": ("inbox.confirmation_resent", "inbox.answer_set"),
+    # A Khazenly bulk-confirm file built from Operations (ADR 0071).
+    "operations": ("order_ops.khazenly_file_built",),
 }
 
 #: Signing in and out: true, recorded, and the thing that buried every payment
