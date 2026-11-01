@@ -190,7 +190,7 @@ def test_an_accepted_operations_manager_reaches_operations_and_the_inbox(client)
     headers = {"X-CSRF-Token": accepted.json()["csrf"]}
 
     me = client.get("/api/auth/me", headers=headers).json()
-    assert sorted(me["permissions"]) == ["inbox.use", "order_ops.view"]
+    assert sorted(me["permissions"]) == ["inbox.use", "khazenly.use", "order_ops.view"]
     assert client.get("/api/order-ops/shopify", headers=headers).status_code == 200
     assert client.get("/api/inbox/conversations", headers=headers).status_code == 200
     assert client.get("/api/affiliates", headers=headers).status_code == 403

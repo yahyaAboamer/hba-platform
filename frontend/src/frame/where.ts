@@ -15,7 +15,8 @@ export const TODAY = "/today";
 
 /** Whether Today exists for this person: they hold two or more departments. */
 export function holdsToday(departments: readonly Department[]): boolean {
-  return departments.length >= 2;
+  // A department seen only in part (one section, ADR 0072) does not count.
+  return departments.filter((department) => !department.partial).length >= 2;
 }
 
 export function canOpenSettings(session: Session | null): boolean {

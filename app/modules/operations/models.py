@@ -16,6 +16,7 @@ from sqlalchemy import (
     CheckConstraint,
     Date,
     DateTime,
+    ForeignKey,
     Index,
     Integer,
     SmallInteger,
@@ -24,7 +25,7 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
-from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -194,3 +195,38 @@ class OpsIntegrationKey(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )
+
+
+class OpsKhazenlyRun(Base):
+    """One Khazenly bulk-confirm file built, as its summary showed it (ADR 0072).
+
+    Kept so the tab can say when orders were last confirmed and which. Orders
+    are stored **by number only** - Shopify's and Khazenly's - exactly as the
+    summary lists them. The export itself, and every name and amount in it,
+    is never stored.
+    """
+
+    __tablename__ = "ops_khazenly_run"
+    __table_args__ = (Index("ix_ops_khazenly_run_built_at", "built_at"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    built_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    built_by: Mapped[int | None] = mapped_column(
+        ForeignKey("user_account.id", ondelete="SET NULL")
+    )
+    #: When the Shopify tags it was matched against were read.
+    shopify_read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    rows_read: Mapped[int] = mapped_column(Integer, nullable=False)
+    #: Khazenly's own count of the orders in its export, if it gave one.
+    stated_count: Mapped[int | None] = mapped_column(Integer)
+    skipped_rows: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    confirmed: Mapped[int] = mapped_column(Integer, nullable=False)
+    not_confirmed: Mapped[int] = mapped_column(Integer, nullable=False)
+    #: None when nothing was confirmed and so no file was offered.
+    file_name: Mapped[str | None] = mapped_column(String(80))
+    #: ``[{"sales_order", "order_number"}]``, in the export's order.
+    confirmed_orders: Mapped[list] = mapped_column(JSONB, nullable=False)
+    #: ``[{"reason", "label", "count", "orders": [...]}]``, as the summary shows.
+    left_out: Mapped[list] = mapped_column(JSONB, nullable=False)

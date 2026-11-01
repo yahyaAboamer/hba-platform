@@ -13,9 +13,10 @@ from datetime import datetime, timedelta, timezone
 import openpyxl
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import select, text
 
 from app.core.businesstime import utcnow
+from app.db import engine
 from app.main import app
 from app.modules.operations.models import OpsShopifyOrder
 from app.modules.operations.services import khazenly
@@ -210,7 +211,10 @@ def test_each_order_is_decided_against_shopify(db):
 
     decision = khazenly.decide(db, orders)
 
-    assert decision.confirmed == [_kh(1), _kh(2)]
+    assert decision.confirmed == [
+        {"sales_order": _kh(1), "order_number": "#31840"},
+        {"sales_order": _kh(2), "order_number": "#31841"},
+    ]
     assert decision.left_out == {
         "wa_sent": [{"sales_order": _kh(3), "order_number": "#31842"}],
         "confirmed_but_cancelled": [{"sales_order": _kh(4), "order_number": "#31843"}],
@@ -304,7 +308,7 @@ XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 
 def _upload(client, content: bytes, name: str = "Dashboard - Active Orders.xlsx"):
-    return client.post("/api/order-ops/khazenly", files={"file": (name, content, XLSX)})
+    return client.post("/api/khazenly", files={"file": (name, content, XLSX)})
 
 
 def _shop(*orders, at=None):
@@ -317,9 +321,9 @@ def _shop(*orders, at=None):
 
 
 def test_the_tab_shows_how_fresh_shopifys_tags_are(client):
-    assert client.get("/api/order-ops/khazenly").json()["freshness"]["state"] == "never"
+    assert client.get("/api/khazenly").json()["freshness"]["state"] == "never"
     _shop((31840, ["Confirmed ✅"]))
-    assert client.get("/api/order-ops/khazenly").json()["freshness"]["state"] == "fresh"
+    assert client.get("/api/khazenly").json()["freshness"]["state"] == "fresh"
 
 
 def test_an_export_comes_back_as_khazenlys_file_with_a_summary(client):
@@ -375,7 +379,9 @@ def test_who_built_it_is_audited_with_counts_only(client):
         ).one()
     assert event.actor_email == "owner@example.com"
     assert event.department == "operations"
-    assert event.after_json == {"rows_read": 2, "confirmed": 1, "file": True}
+    assert set(event.after_json) == {"rows_read", "confirmed", "file", "run"}
+    assert event.after_json["rows_read"] == 2
+    assert event.after_json["confirmed"] == 1
 
 
 def test_nothing_confirmed_offers_no_file(client):
@@ -420,3 +426,87 @@ def test_someone_signed_out_cannot_upload():
     with TestClient(app) as anonymous:
         response = _upload(anonymous, export([(_kh(0), "31840")]))
     assert response.status_code in (401, 403)
+
+
+# ── The runs, kept for the tab's history (ADR 0072) ───────────────────────────
+
+
+def test_each_build_is_kept_with_its_summary_and_listed_newest_first(client):
+    _shop((31840, ["Confirmed ✅"]), (31841, ["WA Sent 📤"]))
+    first = _upload(client, export([(_kh(0), "31840"), (_kh(1), "31841")])).json()
+    second = _upload(client, export([(_kh(1), "31841")])).json()
+
+    runs = client.get("/api/khazenly").json()["runs"]
+
+    assert [run["id"] for run in runs] == [second["run_id"], first["run_id"]]
+    newest = runs[1]
+    assert newest["built_by"] == "Owner"
+    assert newest["rows_read"] == 2
+    assert newest["confirmed"] == 1
+    assert newest["not_confirmed"] == 1
+    assert newest["file_name"].startswith("khazenly-bulk-confirm-")
+    assert newest["shopify_read_at"] is not None
+    assert runs[0]["file_name"] is None  # nothing confirmed, no file
+
+
+def test_a_run_opens_to_the_same_summary_with_the_confirmed_orders(client):
+    _shop((31840, ["Confirmed ✅"]), (31841, ["WA Sent 📤"]))
+    built = _upload(client, export([(_kh(0), "31840"), (_kh(1), "31841")])).json()
+
+    run = client.get(f"/api/khazenly/runs/{built['run_id']}").json()
+
+    assert run["confirmed_orders"] == [{"sales_order": _kh(0), "order_number": "#31840"}]
+    assert run["left_out"] == built["left_out"]
+    assert run["confirmed"] == built["confirmed"]
+    assert "Test Customer" not in str(run)
+    assert client.get("/api/khazenly/runs/999999").status_code == 404
+
+
+def test_a_refused_upload_is_not_kept(client):
+    _shop((31840, ["Confirmed ✅"]))
+    _upload(client, export([(_kh(0), "31840"), (_kh(0), "31841")]))
+    assert client.get("/api/khazenly").json()["runs"] == []
+
+
+# ── Who holds it (ADR 0072) ───────────────────────────────────────────────────
+
+
+def _demote_to(role: str) -> None:
+    with engine.begin() as connection:
+        connection.execute(text("UPDATE role_assignment SET role = :r"), {"r": role})
+
+
+@pytest.mark.parametrize(
+    ("role", "expected"),
+    [
+        ("admin", 200),
+        ("customer_service", 200),
+        ("operations_manager", 200),
+        ("affiliate_manager", 403),
+        ("content_manager", 403),
+        ("affiliate", 403),
+    ],
+)
+def test_customer_service_the_operations_manager_and_the_admin_hold_khazenly(client, role, expected):
+    if role != "admin":
+        _demote_to(role)
+    assert client.get("/api/khazenly").status_code == expected
+
+
+def test_customer_service_builds_the_file_and_sees_no_other_operations(client):
+    _shop((31840, ["Confirmed ✅"]))
+    _demote_to("customer_service")
+
+    assert _upload(client, export([(_kh(0), "31840")])).status_code == 200
+    for path in ("/api/order-ops/shopify", "/api/order-ops/bosta", "/api/operations/freshness"):
+        assert client.get(path).status_code == 403, path
+
+
+def test_every_khazenly_route_carries_its_guard():
+    from app.modules.operations import api as order_ops
+
+    assert order_ops.khazenly_router.routes
+    for route in order_ops.khazenly_router.routes:
+        assert any(
+            dependency.call is order_ops.KHAZENLY_GUARD for dependency in route.dependant.dependencies
+        ), route.path

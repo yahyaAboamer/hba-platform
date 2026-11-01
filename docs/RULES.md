@@ -185,13 +185,15 @@ payroll without touching a maintainer screen.
   - Exactly one person holds the role at a time, and the database refuses a
     second. Only an admin gives it, and he invites nobody.
   - He sees nothing of models, codes, targets, payroll or payments. Nobody but
-    him and an admin sees Operations.
+    him and an admin sees Operations, except its Khazenly section, which
+    customer service holds too (ADR 0072).
   - No customer name, phone, address or note is stored or shown there.
   - He also holds the customer inbox (ADR 0059).
 - **The customer inbox stands apart, and holds the only customer data**
   (ADR 0059).
-  - Customer service sees the inbox and nothing else. Any number of people
-    may hold the role, and only an admin gives it.
+  - Customer service sees the inbox and, of Operations, only its Khazenly
+    section (ADR 0072). Any number of people may hold the role, and only an
+    admin gives it.
   - Affiliate managers, content managers and models see nothing of it.
   - Only an admin sees or changes its keys. They are stored encrypted and
     never shown, logged or audited.
@@ -242,8 +244,11 @@ payroll without touching a maintainer screen.
   - The file holds only `True` rows; anything not confirmed stays on hold.
   - No file is built unless Shopify's tags are fresh (read within 10
     minutes), and the export's own order count must match what was read.
-  - The uploaded export is never stored; the audit keeps who, when, and the
-    counts.
+  - The uploaded export is never stored. Each run is kept with its summary,
+    orders by number only, and shown as the tab's history (ADR 0072).
+  - Customer service, the operations manager and the admin hold the tab
+    (`khazenly.use`). Customer service sees Operations with that one
+    section and nothing else of it (ADR 0072).
 - **A parcel is hers only when its number is hers** (ADR 0060). Her numbers
   are her profile phone and every number staff confirmed for her by
   assigning a gift. A number two models share attaches to neither. Free

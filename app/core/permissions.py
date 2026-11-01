@@ -48,6 +48,10 @@ class Permission:
     #: The customer inbox - WhatsApp chats and order confirmations (ADR 0059).
     #: Reading and replying: the one permission customer service holds.
     INBOX_USE = "inbox.use"
+    #: Operations → Khazenly: building the bulk-confirm file and reading the
+    #: runs before it (ADR 0071, 0072). Customer service, the operations
+    #: manager and the admin.
+    KHAZENLY_USE = "khazenly.use"
 
 
 ALL_PERMISSIONS = frozenset(
@@ -104,11 +108,14 @@ ROLES: dict[str, frozenset[str]] = {
     # since ADR 0067 as a second assignment, `customer_service`, rather than
     # as part of this role: migration c3e7a1f90019 gave it to whoever held
     # this role then, so nobody's access changed.
-    "operations_manager": frozenset({Permission.ORDER_OPS_VIEW}),
+    #
+    # Khazenly (ADR 0072) is his as well as customer service's.
+    "operations_manager": frozenset({Permission.ORDER_OPS_VIEW, Permission.KHAZENLY_USE}),
     # Customer service (ADR 0059): the inbox and nothing else - no model, code,
     # target, payroll, payment or Operations, and no invitations. Any number
-    # of people may hold it; only an admin gives it.
-    "customer_service": frozenset({Permission.INBOX_USE}),
+    # of people may hold it; only an admin gives it. Of Operations, the
+    # Khazenly section alone (ADR 0072): confirming orders is their job.
+    "customer_service": frozenset({Permission.INBOX_USE, Permission.KHAZENLY_USE}),
     # Affiliates reach their own portal by owning the record, not by holding a
     # staff permission, so this set is intentionally empty.
     "affiliate": frozenset(),

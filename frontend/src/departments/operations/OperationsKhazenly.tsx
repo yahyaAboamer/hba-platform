@@ -6,6 +6,7 @@ import {
   OpsIcon,
   SourceBanner,
   clockTime,
+  dayAndTime,
   stateNow,
   useNow,
   useOpsTab,
@@ -15,35 +16,53 @@ import "./OperationsDashboard.css";
 
 /**
  * Operations → Khazenly: the bulk-confirm file for orders confirmed in
- * Shopify (ADR 0071).
+ * Shopify (ADR 0071), and every run before it (ADR 0072).
  *
  * Khazenly holds every order on hold until it is confirmed on their
  * dashboard. Upload their *Active Orders* export here; the platform keeps
  * the orders tagged Confirmed in Shopify and returns Khazenly's own template
- * filled in with them, to upload back to Khazenly. Nothing is sent anywhere,
+ * filled in with them, to upload back to Khazenly. Each run's summary is
+ * kept and listed under the upload, newest first. Nothing is sent anywhere,
  * and nothing about the customer is shown: order numbers only.
+ *
+ * Customer service holds this tab too, and no other tab of Operations.
  *
  * No approved frame exists for this tab; it is drawn from the Operations
  * dashboard's own pieces (heading, freshness line, cards, panels).
  */
 
-type LeftOut = {
-  reason: string;
-  label: string;
-  count: number;
-  orders: { sales_order: string; order_number: string | null }[];
+type Order = { sales_order: string; order_number: string | null };
+type LeftOut = { reason: string; label: string; count: number; orders: Order[] };
+
+/** What a run's summary shows, live or from the history. */
+type Shown = {
+  rows_read: number;
+  skipped_rows: number;
+  confirmed: number;
+  not_confirmed: number;
+  confirmed_orders: Order[];
+  left_out: LeftOut[];
 };
-type Result = {
+type Result = Shown & {
   freshness: Freshness;
+  run_id: number;
+  stated_count: number | null;
+  file: { name: string; content_base64: string } | null;
+};
+type RunHead = {
+  id: number;
+  built_at: string;
+  built_by: string | null;
+  shopify_read_at: string | null;
   rows_read: number;
   stated_count: number | null;
   skipped_rows: number;
   confirmed: number;
   not_confirmed: number;
-  left_out: LeftOut[];
-  file: { name: string; content_base64: string } | null;
+  file_name: string | null;
 };
-type KhazenlyTab = { freshness: Freshness };
+type Run = RunHead & Shown;
+type KhazenlyTab = { freshness: Freshness; runs: RunHead[] };
 
 /** The safety exclusions: confirmed, but held back (ADR 0071, decision 3). */
 const HELD_BACK = new Set(["not_open", "confirmed_but_cancelled", "confirmed_but_shipped"]);
@@ -71,9 +90,19 @@ function useFileUrl(file: Result["file"]): string | null {
   return url;
 }
 
-function LeftOutGroup({ group }: { group: LeftOut }) {
+/** One group of orders - the confirmed ones, or one reason - opening to its list. */
+function OrderGroup({
+  id,
+  label,
+  note,
+  orders,
+}: {
+  id: string;
+  label: string;
+  note?: string;
+  orders: Order[];
+}) {
   const [open, setOpen] = useState(false);
-  const id = `ops-kh-${group.reason}`;
   return (
     <li className="ops-kh__group">
       <button
@@ -84,10 +113,10 @@ function LeftOutGroup({ group }: { group: LeftOut }) {
         onClick={() => setOpen(!open)}
       >
         <span>
-          {group.label}
-          {HELD_BACK.has(group.reason) && <small>Held back for safety</small>}
+          {label}
+          {note && <small>{note}</small>}
         </span>
-        <span className="num">{group.count}</span>
+        <span className="num">{orders.length}</span>
         <OpsIcon name={open ? "up" : "down"} />
       </button>
       {open && (
@@ -99,7 +128,7 @@ function LeftOutGroup({ group }: { group: LeftOut }) {
             </tr>
           </thead>
           <tbody>
-            {group.orders.map((order) => (
+            {orders.map((order) => (
               <tr key={order.sales_order}>
                 <td className="num">{order.order_number ?? "—"}</td>
                 <td className="num">{order.sales_order}</td>
@@ -112,51 +141,72 @@ function LeftOutGroup({ group }: { group: LeftOut }) {
   );
 }
 
-function Summary({ result }: { result: Result }) {
-  const url = useFileUrl(result.file);
-  const readAt = result.freshness.updated_at;
+/** The three cards and the orders behind them: the same for a run just built and one from the history. */
+function SummaryBody({ shown, prefix }: { shown: Shown; prefix: string }) {
   return (
     <>
       <div className="ops-tiles">
         <div className="ops-tile ops-tile--zero">
           <span className="ops-tile__label">In Khazenly's file</span>
-          <span className="ops-tile__value">{result.rows_read}</span>
+          <span className="ops-tile__value">{shown.rows_read}</span>
           <span className="ops-tile__note">Orders on hold, read from the export</span>
         </div>
         <div className="ops-tile ops-tile--zero ops-kh__tile--in">
           <span className="ops-tile__label">Confirmed</span>
-          <span className="ops-tile__value">{result.confirmed}</span>
+          <span className="ops-tile__value">{shown.confirmed}</span>
           <span className="ops-tile__note">In the file, each True</span>
         </div>
         <div className="ops-tile ops-tile--zero">
           <span className="ops-tile__label">Not confirmed</span>
-          <span className="ops-tile__value">{result.not_confirmed}</span>
+          <span className="ops-tile__value">{shown.not_confirmed}</span>
           <span className="ops-tile__note">Left out: they stay on hold at Khazenly</span>
         </div>
       </div>
 
-      {result.skipped_rows > 0 && (
+      {shown.skipped_rows > 0 && (
         <p className="ops-hint ops-list">
-          {plural(result.skipped_rows, "row", "rows")} in the export had no Khazenly sales order
-          number, so {result.skipped_rows === 1 ? "it was" : "they were"} not read as orders.
+          {plural(shown.skipped_rows, "row", "rows")} in the export had no Khazenly sales order
+          number, so {shown.skipped_rows === 1 ? "it was" : "they were"} not read as orders.
         </p>
       )}
 
-      {result.left_out.length > 0 && (
-        <section className="panel ops-list" aria-labelledby="ops-kh-left-out">
-          <div className="panel__head ops-kh__head">
-            <h2 className="panel__title" id="ops-kh-left-out">
-              Left out · {plural(result.not_confirmed, "order", "orders")}
-            </h2>
-            <p className="ops-hint">By reason. Open one to see its orders.</p>
-          </div>
-          <ul className="ops-kh__groups">
-            {result.left_out.map((group) => (
-              <LeftOutGroup key={group.reason} group={group} />
-            ))}
-          </ul>
-        </section>
-      )}
+      <section className="panel ops-list" aria-labelledby={`${prefix}-orders`}>
+        <div className="panel__head ops-kh__head">
+          <h2 className="panel__title" id={`${prefix}-orders`}>
+            Orders · {plural(shown.rows_read, "order", "orders")}
+          </h2>
+          <p className="ops-hint">Open a group to see its orders.</p>
+        </div>
+        <ul className="ops-kh__groups">
+          {shown.confirmed_orders.length > 0 && (
+            <OrderGroup
+              id={`${prefix}-confirmed`}
+              label="Confirmed: in the file"
+              orders={shown.confirmed_orders}
+            />
+          )}
+          {shown.left_out.map((group) => (
+            <OrderGroup
+              key={group.reason}
+              id={`${prefix}-${group.reason}`}
+              label={group.label}
+              note={HELD_BACK.has(group.reason) ? "Held back for safety" : "Not confirmed: left out"}
+              orders={group.orders}
+            />
+          ))}
+        </ul>
+      </section>
+    </>
+  );
+}
+
+/** A run just built: its summary, then the file to download. */
+function Summary({ result }: { result: Result }) {
+  const url = useFileUrl(result.file);
+  const readAt = result.freshness.updated_at;
+  return (
+    <>
+      <SummaryBody shown={result} prefix="ops-kh-now" />
 
       <section className="panel ops-list" aria-labelledby="ops-kh-file">
         <div className="panel__head ops-kh__head">
@@ -185,9 +235,104 @@ function Summary({ result }: { result: Result }) {
   );
 }
 
+/** One run in the history, opening to its summary (read when opened). */
+function HistoryRun({ run }: { run: RunHead }) {
+  const [open, setOpen] = useState(false);
+  const [found, setFound] = useState<Run | null>(null);
+  const [failed, setFailed] = useState(false);
+  const id = `ops-kh-run-${run.id}`;
+
+  function toggle() {
+    const opening = !open;
+    setOpen(opening);
+    if (opening && !found) {
+      setFailed(false);
+      api
+        .get<Run>(`/api/khazenly/runs/${run.id}`)
+        .then(setFound)
+        .catch(() => setFailed(true));
+    }
+  }
+
+  return (
+    <li className="ops-kh__group">
+      <button
+        type="button"
+        className="ops-kh__run"
+        aria-expanded={open}
+        aria-controls={open ? id : undefined}
+        onClick={toggle}
+      >
+        <span>
+          <span className="num">{dayAndTime(run.built_at)}</span>
+          <small>
+            {run.built_by ? `By ${run.built_by}` : "By someone no longer here"}
+            {" · "}
+            {run.file_name ? "File built" : "No file: nothing confirmed"}
+          </small>
+        </span>
+        <span className="ops-kh__counts">
+          <span className="num">{run.rows_read} read</span>
+          <span className="num ops-kh__in">{run.confirmed} confirmed</span>
+          <span className="num">{run.not_confirmed} not</span>
+        </span>
+        <OpsIcon name={open ? "up" : "down"} />
+      </button>
+      {open && (
+        <div className="ops-kh__past" id={id}>
+          {failed && (
+            <p className="notice notice--refused" role="alert">
+              Couldn't load this run.{" "}
+              <button type="button" className="ops-linkbtn" onClick={() => { setOpen(false); setFound(null); }}>
+                Close
+              </button>
+            </p>
+          )}
+          {!found && !failed && <p className="loading">Loading…</p>}
+          {found && (
+            <>
+              {found.shopify_read_at && (
+                <p className="ops-hint ops-list">
+                  Checked against Shopify's tags from {dayAndTime(found.shopify_read_at)}
+                  {found.file_name ? ` · ${found.file_name}` : ""}
+                </p>
+              )}
+              <SummaryBody shown={found} prefix={id} />
+            </>
+          )}
+        </div>
+      )}
+    </li>
+  );
+}
+
+function History({ runs }: { runs: RunHead[] }) {
+  return (
+    <section className="panel ops-list" aria-labelledby="ops-kh-history">
+      <div className="panel__head ops-kh__head">
+        <h2 className="panel__title" id="ops-kh-history">
+          History
+        </h2>
+        <p className="ops-hint">
+          {runs.length ? `Last built ${dayAndTime(runs[0].built_at)}` : "Every file built is kept here."}
+        </p>
+      </div>
+      {runs.length ? (
+        <ul className="ops-kh__groups">
+          {runs.map((run) => (
+            <HistoryRun key={run.id} run={run} />
+          ))}
+        </ul>
+      ) : (
+        <p className="empty">No file has been built yet.</p>
+      )}
+    </section>
+  );
+}
+
 export function OperationsKhazenly() {
   const now = useNow();
-  const { tab, failed, reload } = useOpsTab(() => api.get<KhazenlyTab>("/api/order-ops/khazenly"));
+  const { tab, failed, reload } = useOpsTab(() => api.get<KhazenlyTab>("/api/khazenly"));
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -203,14 +348,16 @@ export function OperationsKhazenly() {
     setError(null);
     setResult(null);
     api
-      .upload<Result>("/api/order-ops/khazenly", file)
+      .upload<Result>("/api/khazenly", file)
       .then(setResult)
       .catch((caught: unknown) => {
         setError(caught instanceof ApiError ? caught.message : "Couldn't reach the platform. Try again.");
-        // A refusal for old tags: show the line as it is now.
-        reload();
       })
-      .finally(() => setBusy(false));
+      // The new run joins the history; a refusal for old tags shows the line as it is now.
+      .finally(() => {
+        setBusy(false);
+        reload();
+      });
   }
 
   return (
@@ -291,6 +438,8 @@ export function OperationsKhazenly() {
       )}
 
       {result && <Summary result={result} />}
+
+      {tab && <History runs={tab.runs} />}
     </>
   );
 }

@@ -37,10 +37,11 @@ export const HELD = {
   // A person holding two roles since ADR 0067.
   operations_manager: {
     roles: ["operations_manager", "customer_service"],
-    permissions: ["order_ops.view", "inbox.use"],
+    permissions: ["order_ops.view", "inbox.use", "khazenly.use"],
   },
-  operations_only: { roles: ["operations_manager"], permissions: ["order_ops.view"] },
-  customer_service: { roles: ["customer_service"], permissions: ["inbox.use"] },
+  operations_only: { roles: ["operations_manager"], permissions: ["order_ops.view", "khazenly.use"] },
+  // The Inbox, and of Operations only Khazenly (ADR 0072).
+  customer_service: { roles: ["customer_service"], permissions: ["inbox.use", "khazenly.use"] },
   model: { roles: ["affiliate"], permissions: [] as string[] },
 } as const;
 
@@ -145,6 +146,15 @@ export function serve(me: unknown, answers: Answers = {}) {
           total: 0,
           tiles: { waiting: 0, edit: 0, cancelled: 0, not_sent: 0, no_whatsapp: 0, confirmed: 0 },
           orders: null,
+        });
+      }
+      if (url.endsWith("/api/khazenly")) {
+        return reply(200, {
+          freshness: {
+            source: "shopify", label: "Shopify", state: "fresh", updated_at: new Date().toISOString(),
+            checked_at: new Date().toISOString(), error: null, row_count: 3,
+          },
+          runs: [],
         });
       }
       return reply(404, { detail: "Not here" });

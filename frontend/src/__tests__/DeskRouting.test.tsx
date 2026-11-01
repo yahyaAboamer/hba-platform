@@ -71,7 +71,9 @@ describe("each kind of person: the departments they hold, and where they start",
     ["content_manager", [["Affiliates", true]], "/affiliates/overview"],
     ["operations_manager", [["Inbox", false], ["Operations", false]], "/today"],
     ["operations_only", [["Operations", true]], "/operations/shopify"],
-    ["customer_service", [["Inbox", true]], "/inbox/chats"],
+    // The Inbox, and Operations with Khazenly alone, which is not a second
+    // department for Today (ADR 0072): she still starts in the Inbox.
+    ["customer_service", [["Inbox", true], ["Operations", false]], "/inbox/chats"],
   ];
 
   it.each(cases)("%s", async (kind, rows, start) => {

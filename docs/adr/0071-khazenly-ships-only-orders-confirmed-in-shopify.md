@@ -1,6 +1,6 @@
 # 0071. Khazenly ships only orders confirmed in Shopify, and the platform builds the file that tells it so
 
-**Status:** Accepted
+**Status:** Accepted. Decisions 1 and 8 amended by 0072 (runs are kept; customer service holds the tab)
 **Date:** 2026-11-01
 
 ## Context

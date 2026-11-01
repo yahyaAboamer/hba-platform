@@ -35,14 +35,13 @@ describe("customer service", () => {
     expect(links[0].getAttribute("aria-current")).toBe("page");
   });
 
-  it("holds one department, so sees nothing of the others and asks them nothing", async () => {
+  it("holds the Inbox and Operations' Khazenly alone, and asks nothing else", async () => {
     serve(sessionOf("customer_service"));
     render(<App />);
     await screen.findByRole("heading", { name: "Chats" });
 
-    for (const name of ["Operations", "Affiliates"]) {
-      expect(screen.queryByRole("button", { name })).toBeNull();
-    }
+    // Operations shows, with its Khazenly section only (ADR 0072).
+    expect(screen.queryByRole("button", { name: /^Affiliates/ })).toBeNull();
     for (const name of ["Shopify", "Models", "Payments", "Settings"]) {
       expect(screen.queryByRole("link", { name })).toBeNull();
     }

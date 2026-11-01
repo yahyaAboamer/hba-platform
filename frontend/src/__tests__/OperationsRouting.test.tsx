@@ -6,7 +6,7 @@
  * sidebar, and no request to the affiliate side's endpoints - a 403 that is
  * swallowed is still a door left on the latch.
  */
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import App from "../App";
@@ -87,5 +87,30 @@ describe("the other managers", () => {
     expect(await screen.findByRole("heading", { name: "Not available" })).toBeTruthy();
     expect(screen.getByText(/This page is in Operations, which your access does not include\./)).toBeTruthy();
     expect(screen.queryByRole("button", { name: /Operations/ })).toBeNull();
+  });
+});
+
+describe("customer service (ADR 0072)", () => {
+  it("still starts in the Inbox, and sees Operations with Khazenly alone", async () => {
+    serve(sessionOf("customer_service"));
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "Chats" })).toBeTruthy();
+    const sidebar = screen.getByRole("navigation", { name: "Departments" });
+    fireEvent.click(within(sidebar).getByRole("button", { name: /^Operations/ }));
+    await waitFor(() => expect(within(sidebar).getByRole("link", { name: "Khazenly" })).toBeTruthy());
+    const operations = within(sidebar).getAllByRole("link").map((link) => link.textContent);
+    for (const name of ["Shopify", "Bosta", "E-stebdal", "WhatsApp"]) expect(operations).not.toContain(name);
+    expect(within(sidebar).queryByRole("link", { name: "Today" })).toBeNull();
+  });
+
+  it("opens Khazenly, and never another Operations tab", async () => {
+    window.history.pushState({}, "", "/operations/shopify");
+    serve(sessionOf("customer_service"));
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "Khazenly" })).toBeTruthy();
+    expect(window.location.pathname).toBe("/operations/khazenly");
+    expect(asked().filter((url) => url.includes("/api/order-ops") || url.includes("/api/operations/"))).toEqual([]);
   });
 });

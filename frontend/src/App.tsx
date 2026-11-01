@@ -34,7 +34,7 @@ function staffRoutes(session: Session) {
       {holdsToday(held) ? (
         <Route path={TODAY} element={<Today />} />
       ) : (
-        held.length === 1 && <Route path={TODAY} element={<Onward to={startFor(session)} />} />
+        held.length >= 1 && <Route path={TODAY} element={<Onward to={startFor(session)} />} />
       )}
       {held.map((department) => (
         <Route key={department.key} path={department.base}>
