@@ -1,7 +1,8 @@
 /**
- * Operations' four sections (ADR 0057; the approved mockup
+ * Operations' five sections (ADR 0057; the approved mockup
  * `docs/design/operations-dashboard-2026-10-03.html`. WhatsApp is the fourth,
- * ADR 0059 and `docs/design/whatsapp-inbox-2026-10-11.html`, frame 4). The
+ * ADR 0059 and `docs/design/whatsapp-inbox-2026-10-11.html`, frame 4;
+ * Khazenly the fifth, ADR 0071, with no frame of its own). The
  * slug is the address and what the dashboard reads to know which tab is open.
  */
 export const OPERATIONS_SECTIONS = [
@@ -9,4 +10,5 @@ export const OPERATIONS_SECTIONS = [
   { slug: "bosta", label: "Bosta" },
   { slug: "estebdal", label: "E-stebdal" },
   { slug: "whatsapp", label: "WhatsApp" },
+  { slug: "khazenly", label: "Khazenly" },
 ] as const;

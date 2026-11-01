@@ -233,6 +233,17 @@ payroll without touching a maintainer screen.
   - The platform reads each source every 5 minutes.
   - A source that can't be read shows as a failure, never as 0.
   - Its day limits count working days in Cairo time, Saturday to Thursday.
+- **Khazenly ships only orders confirmed in Shopify** (ADR 0071).
+  - An order goes in Khazenly's bulk-confirm file only if its Shopify tags
+    include Confirmed (`Confirmed ✅` or `Confirmed✅`). Compression orders
+    need nothing more. Paid orders count, being tagged Confirmed too.
+  - Left out, even if Confirmed: also tagged Cancelled ❌, shipped in whole
+    or in part, or not open in Shopify at all (cancelled, closed, shipped).
+  - The file holds only `True` rows; anything not confirmed stays on hold.
+  - No file is built unless Shopify's tags are fresh (read within 10
+    minutes), and the export's own order count must match what was read.
+  - The uploaded export is never stored; the audit keeps who, when, and the
+    counts.
 - **A parcel is hers only when its number is hers** (ADR 0060). Her numbers
   are her profile phone and every number staff confirmed for her by
   assigning a gift. A number two models share attaches to neither. Free

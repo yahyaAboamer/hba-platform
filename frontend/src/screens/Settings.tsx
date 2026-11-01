@@ -1336,6 +1336,7 @@ const KIND_LABEL: Record<string, string> = {
   content: "Content",
   settings: "Settings",
   inbox: "Inbox",
+  operations: "Operations",
 };
 
 type Filters = { models: { id: number; name: string }[]; people: { id: number; name: string }[]; kinds: string[] };

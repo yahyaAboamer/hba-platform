@@ -209,6 +209,7 @@ def sentence(event: AuditEvent, names: _Names) -> str:
         "policy_version.created":f"Put a new commission policy in force from {_month(a.get('effective_month'))}",
         "shopify.connection_updated": "Updated the Shopify connection",
         "order_ops.key_saved": f"Saved a new {_PROVIDER.get(a.get('provider'), 'operations')} key",
+        "order_ops.khazenly_file_built": f"Built the Khazenly confirmation file: {a.get('confirmed', '?')} of {a.get('rows_read', '?')} orders confirmed" if a.get("file") else f"Checked a Khazenly export: none of its {a.get('rows_read', '?')} orders confirmed",
         "inbox.whatsapp_saved": "Saved the WhatsApp connection",
         "inbox.sending_changed": f"Turned WhatsApp sending {'on' if a.get('sending') else 'off'}",
         "inbox.tags_connection_saved": "Saved the Shopify connection that writes order tags",

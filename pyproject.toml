@@ -40,6 +40,12 @@ dependencies = [
     # dependency of its own, and neither touches the network.
     "pyotp>=2.9,<3",
     "segno>=1.6,<2",
+    # Khazenly's order export and bulk-confirm file are Excel workbooks
+    # (ADR 0071). openpyxl reads the export; defusedxml is what openpyxl
+    # parses with when it is installed, so an uploaded workbook cannot expand
+    # into gigabytes of XML.
+    "openpyxl>=3.1,<4",
+    "defusedxml>=0.7,<1",
 ]
 
 # Without this, setuptools flat-layout discovery sees app/, frontend/ and
