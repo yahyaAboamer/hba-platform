@@ -516,8 +516,14 @@ def test_a_month_agreed_for_everybody_is_skipped_without_counting(db, monkeypatc
 # ── The order of the list ─────────────────────────────────────────────────────
 
 
-def test_broken_first_then_the_longest_waiting(db):
+def test_broken_first_then_the_longest_waiting(db, monkeypatch):
+    from app.config import settings
+
     now = _cairo(2026, 10, 25, 12, 0)
+    # Go-live the month before this test's own date, not the real clock's, so
+    # one month has ended whatever day the suite runs.
+    ended = month_add(business_month(now), -1)
+    monkeypatch.setattr(settings, "go_live_month", ended, raising=False)
     freshness.record_success(db, "shopify", 1, at=_cairo(2026, 10, 25, 11, 0))
     freshness.record_failure(db, "shopify", "Shopify didn't answer.", at=_cairo(2026, 10, 25, 11, 55))
     _shopify_open(db, "5001", _cairo(2026, 10, 20, 9, 0), "bosta_sync_failed")
@@ -537,7 +543,7 @@ def test_broken_first_then_the_longest_waiting(db):
         "inbox.waiting_for_reply",
         # Then those with no time, in department order.
         "affiliates.targets_not_set",
-        PAYMENTS_KEY,
+        f"affiliates.payments_awaiting_approval.{ended}",
     ]
 
 
