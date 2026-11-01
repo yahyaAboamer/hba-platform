@@ -7,11 +7,12 @@ Shopify tags say *Confirmed*, each ``True``, to upload to Khazenly.
 
 Three steps, each its own function: ``read_export`` reads Khazenly's file,
 ``decide`` matches it against ``ops_shopify_order``, ``fill_template`` writes
-the answer. ``build`` runs them for the route.
+the answer. ``build`` runs them for the route, and ``keep`` stores the
+summary as a run for the tab's history (ADR 0072).
 
 Nothing is written to Shopify or Khazenly, and nothing about the customer is
 kept: the upload is read in memory, and only the sales order number and the
-merchant order number of each row are ever read.
+merchant order number of each row are ever read - and kept.
 """
 
 import io
@@ -27,7 +28,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.businesstime import BUSINESS_TIMEZONE, utcnow
-from app.modules.operations.models import OpsShopifyOrder
+from app.modules.operations.models import OpsKhazenlyRun, OpsShopifyOrder
+from app.shared.models.identity import UserAccount
 from app.modules.operations.services.shopify import (
     CANCELLED,
     CONFIRMED,
@@ -272,10 +274,17 @@ def reason_for(tags: list[str], fulfillment_status: str | None) -> str | None:
     return "no_tag"
 
 
+def _as_shown(merchant_order: str) -> str | None:
+    """Khazenly's merchant order number as Shopify writes it, ``#31840`` - or
+    None for anything else in that cell, which is then never shown or kept."""
+    number = normalise(merchant_order)
+    return f"#{number}" if number.isdigit() and len(number) <= 12 else None
+
+
 @dataclass
 class Decision:
-    #: Khazenly's sales order numbers to confirm, in the export's order.
-    confirmed: list[str] = field(default_factory=list)
+    #: The orders to confirm, in the export's order, by both numbers.
+    confirmed: list[dict] = field(default_factory=list)
     #: Reason -> the orders left out for it.
     left_out: dict[str, list[dict]] = field(default_factory=dict)
 
@@ -295,13 +304,10 @@ def decide(db: Session, orders: list[ExportOrder]) -> Decision:
         else:
             reason = reason_for(shopify.tags, shopify.fulfillment_status)
         if reason is None:
-            decision.confirmed.append(order.sales_order)
+            decision.confirmed.append({"sales_order": order.sales_order, "order_number": shopify.order_number})
             continue
         decision.left_out.setdefault(reason, []).append(
-            {
-                "sales_order": order.sales_order,
-                "order_number": shopify.order_number if shopify else (f"#{order.merchant_order}" if order.merchant_order else None),
-            }
+            {"sales_order": order.sales_order, "order_number": shopify.order_number if shopify else _as_shown(order.merchant_order)}
         )
     return decision
 
@@ -398,8 +404,83 @@ def build(db: Session, filename: str, content: bytes, now: datetime | None = Non
         "skipped_rows": export.skipped,
         "confirmed": len(decision.confirmed),
         "not_confirmed": len(export.orders) - len(decision.confirmed),
+        "confirmed_orders": decision.confirmed,
         "left_out": left_out,
     }
     if not decision.confirmed:
         return Built(summary, None, None)
-    return Built(summary, fill_template(decision.confirmed), file_name(now))
+    return Built(
+        summary, fill_template([order["sales_order"] for order in decision.confirmed]), file_name(now)
+    )
+
+
+# ── The runs, for the tab's history (ADR 0072) ────────────────────────────────
+
+#: How many runs the history lists. Older ones are kept, just not listed.
+HISTORY_LIMIT = 60
+
+
+def keep(db: Session, built: Built, built_by: int | None, shopify_read_at: datetime | None) -> OpsKhazenlyRun:
+    """Store the run the person was just shown. The caller commits."""
+    summary = built.summary
+    run = OpsKhazenlyRun(
+        built_by=built_by,
+        shopify_read_at=shopify_read_at,
+        rows_read=summary["rows_read"],
+        stated_count=summary["stated_count"],
+        skipped_rows=summary["skipped_rows"],
+        confirmed=summary["confirmed"],
+        not_confirmed=summary["not_confirmed"],
+        file_name=built.file_name,
+        confirmed_orders=summary["confirmed_orders"],
+        left_out=summary["left_out"],
+    )
+    db.add(run)
+    db.flush()
+    return run
+
+
+def _who(db: Session, user_ids: set[int]) -> dict[int, str]:
+    if not user_ids:
+        return {}
+    rows = db.execute(
+        select(UserAccount.id, UserAccount.display_name, UserAccount.email).where(UserAccount.id.in_(user_ids))
+    ).all()
+    return {row.id: row.display_name or row.email for row in rows}
+
+
+def _iso(value: datetime | None) -> str | None:
+    return value.isoformat() if value else None
+
+
+def _head(run: OpsKhazenlyRun, names: dict[int, str]) -> dict:
+    return {
+        "id": run.id,
+        "built_at": run.built_at.isoformat(),
+        "built_by": names.get(run.built_by) if run.built_by else None,
+        "shopify_read_at": _iso(run.shopify_read_at),
+        "rows_read": run.rows_read,
+        "stated_count": run.stated_count,
+        "skipped_rows": run.skipped_rows,
+        "confirmed": run.confirmed,
+        "not_confirmed": run.not_confirmed,
+        "file_name": run.file_name,
+    }
+
+
+def history(db: Session, limit: int = HISTORY_LIMIT) -> list[dict]:
+    """The latest runs, newest first: when, who and the counts."""
+    runs = db.scalars(
+        select(OpsKhazenlyRun).order_by(OpsKhazenlyRun.built_at.desc(), OpsKhazenlyRun.id.desc()).limit(limit)
+    ).all()
+    names = _who(db, {run.built_by for run in runs if run.built_by})
+    return [_head(run, names) for run in runs]
+
+
+def run_summary(db: Session, run_id: int) -> dict | None:
+    """One run with its orders, as its summary showed them."""
+    run = db.get(OpsKhazenlyRun, run_id)
+    if run is None:
+        return None
+    names = _who(db, {run.built_by} if run.built_by else set())
+    return {**_head(run, names), "confirmed_orders": run.confirmed_orders, "left_out": run.left_out}

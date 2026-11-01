@@ -12,12 +12,13 @@ import { OperationsWhatsApp } from "./OperationsWhatsApp";
  * WhatsApp (ADR 0059) and Khazenly (ADR 0071).
  *
  * The tab is the address (`/operations/<slug>`); anything else lands on
- * Shopify, the first of them.
+ * the first tab this person sees - Shopify, or for customer service, who
+ * see Khazenly alone (ADR 0072), Khazenly.
  */
-export function OperationsDashboard() {
+export function OperationsDashboard({ slugs }: { slugs: readonly string[] }) {
   const { tab } = useParams();
-  const section = OPERATIONS_SECTIONS.find((candidate) => candidate.slug === tab);
-  if (!section) return <Navigate to="/operations/shopify" replace />;
+  const section = OPERATIONS_SECTIONS.find((candidate) => candidate.slug === tab && slugs.includes(candidate.slug));
+  if (!section) return <Navigate to={`/operations/${slugs[0] ?? "shopify"}`} replace />;
 
   if (section.slug === "bosta") return <OperationsBosta />;
   if (section.slug === "estebdal") return <OperationsEstebdal />;

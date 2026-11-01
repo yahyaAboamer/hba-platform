@@ -12,11 +12,12 @@ and a source that could not be read never shows as 0.
 
 One route per tab - Shopify, E-stebdal, Bosta - and Bosta's success rate; and
 every source's state at once, for the frame's sidebar. Khazenly (ADR 0071)
-reads the same Shopify table, from a file a person uploads.
+reads the same Shopify table, from a file a person uploads; it has its own
+router and permission (ADR 0072), at the end of this file.
 """
 
 import base64
-from datetime import date
+from datetime import date, datetime
 
 from typing import Literal
 
@@ -41,6 +42,14 @@ router = APIRouter(prefix="/api/order-ops", tags=["order-ops"], dependencies=[De
 #: beside the sidebar's other numbers. The same guard, on the router itself.
 frame_router = APIRouter(
     prefix="/api/operations", tags=["order-ops"], dependencies=[Depends(GUARD)]
+)
+
+#: Operations → Khazenly (ADR 0071, 0072), held by customer service as well:
+#: its own permission, on the router itself, as `GUARD` is on `router`.
+KHAZENLY_GUARD = require_permission(Permission.KHAZENLY_USE)
+
+khazenly_router = APIRouter(
+    prefix="/api/khazenly", tags=["khazenly"], dependencies=[Depends(KHAZENLY_GUARD)]
 )
 
 
@@ -162,62 +171,6 @@ def whatsapp_tab(
     return health.summary(db, card=card, days=days)
 
 
-@router.get("/khazenly")
-def khazenly_tab(db: Session = Depends(get_session)) -> dict:
-    """How fresh Shopify's tags are, before a Khazenly export is uploaded."""
-    return {"freshness": freshness(db, "shopify")}
-
-
-@router.post("/khazenly")
-def khazenly_confirmations(
-    file: UploadFile = File(...),
-    actor: UserAccount = Depends(GUARD),
-    db: Session = Depends(get_session),
-) -> dict:
-    """Khazenly's bulk-confirm file for the confirmed orders in its export.
-
-    Read in memory and never stored: the export carries customer names. The
-    answer names orders by number only, and the file comes back in it, so
-    nothing waits on the server to be downloaded. **Only while Shopify's
-    tags are fresh** - an export matched against old tags is never a file
-    (ADR 0071, decision 4).
-    """
-    described = freshness(db, "shopify")
-    if described["state"] != State.FRESH:
-        raise HTTPException(
-            409,
-            "Shopify's tags aren't up to date, so no file was built. "
-            "Try again once Operations shows Shopify updated in the last few minutes.",
-        )
-    content = file.file.read(khazenly.MAX_UPLOAD_BYTES + 1)
-    try:
-        built = khazenly.build(db, file.filename or "", content)
-    except khazenly.ExportRefused as exc:
-        raise HTTPException(422, str(exc)) from None
-
-    record_audit(
-        db,
-        action="order_ops.khazenly_file_built",
-        subject="khazenly",
-        actor_id=actor.id,
-        actor_email=actor.email,
-        # Counts only: the export's names never reach the trail.
-        after={
-            "rows_read": built.summary["rows_read"],
-            "confirmed": built.summary["confirmed"],
-            "file": built.file is not None,
-        },
-    )
-    db.commit()
-    return {
-        "freshness": described,
-        **built.summary,
-        "file": None
-        if built.file is None
-        else {"name": built.file_name, "content_base64": base64.b64encode(built.file).decode()},
-    }
-
-
 # ── The keys, for Settings ────────────────────────────────────────────────────
 
 #: Changing a key is an admin's: ``settings.manage`` on top of the router's
@@ -267,3 +220,79 @@ def save_key(
     db.commit()
     return described
 
+
+
+# ── Khazenly (ADR 0071, 0072) ─────────────────────────────────────────────────
+
+
+@khazenly_router.get("")
+def khazenly_tab(db: Session = Depends(get_session)) -> dict:
+    """How fresh Shopify's tags are, and the runs so far, newest first."""
+    return {"freshness": freshness(db, "shopify"), "runs": khazenly.history(db)}
+
+
+@khazenly_router.get("/runs/{run_id}")
+def khazenly_run(run_id: int, db: Session = Depends(get_session)) -> dict:
+    """One run with its orders, as its summary showed them."""
+    found = khazenly.run_summary(db, run_id)
+    if found is None:
+        raise HTTPException(404, "There is no such run.")
+    return found
+
+
+@khazenly_router.post("")
+def khazenly_confirmations(
+    file: UploadFile = File(...),
+    actor: UserAccount = Depends(KHAZENLY_GUARD),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Khazenly's bulk-confirm file for the confirmed orders in its export.
+
+    Read in memory and never stored: the export carries customer names. The
+    answer names orders by number only, and the file comes back in it, so
+    nothing waits on the server to be downloaded. The summary is kept as a
+    run for the history (ADR 0072). **Only while Shopify's tags are fresh** -
+    an export matched against old tags is never a file (ADR 0071, decision 4).
+    """
+    described = freshness(db, "shopify")
+    if described["state"] != State.FRESH:
+        raise HTTPException(
+            409,
+            "Shopify's tags aren't up to date, so no file was built. "
+            "Try again once the tab shows Shopify updated in the last few minutes.",
+        )
+    content = file.file.read(khazenly.MAX_UPLOAD_BYTES + 1)
+    try:
+        built = khazenly.build(db, file.filename or "", content)
+    except khazenly.ExportRefused as exc:
+        raise HTTPException(422, str(exc)) from None
+
+    run = khazenly.keep(
+        db,
+        built,
+        built_by=actor.id,
+        shopify_read_at=datetime.fromisoformat(described["updated_at"]) if described["updated_at"] else None,
+    )
+    record_audit(
+        db,
+        action="order_ops.khazenly_file_built",
+        subject="khazenly",
+        actor_id=actor.id,
+        actor_email=actor.email,
+        # Counts only: the orders are in the run, the names nowhere.
+        after={
+            "rows_read": built.summary["rows_read"],
+            "confirmed": built.summary["confirmed"],
+            "file": built.file is not None,
+            "run": run.id,
+        },
+    )
+    db.commit()
+    return {
+        "freshness": described,
+        "run_id": run.id,
+        **built.summary,
+        "file": None
+        if built.file is None
+        else {"name": built.file_name, "content_base64": base64.b64encode(built.file).decode()},
+    }

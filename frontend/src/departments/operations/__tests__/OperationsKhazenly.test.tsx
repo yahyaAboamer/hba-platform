@@ -28,11 +28,16 @@ const freshness = (extra: object = {}) => ({
 
 const built = {
   freshness: freshness(),
+  run_id: 7,
   rows_read: 4,
   stated_count: 4,
   skipped_rows: 0,
   confirmed: 2,
   not_confirmed: 2,
+  confirmed_orders: [
+    { sales_order: "KH-HBA-08800000", order_number: "#31840" },
+    { sales_order: "KH-HBA-08800001", order_number: "#31841" },
+  ],
   left_out: [
     {
       reason: "not_open",
@@ -50,10 +55,38 @@ const built = {
   file: { name: "khazenly-bulk-confirm-2026-10-30-2245.xlsx", content_base64: btoa("PK fake") },
 };
 
-function respond(post: () => Promise<Response>, tab = { freshness: freshness() }) {
-  fetchMock.mockImplementation((_path: string, init?: RequestInit) =>
-    init?.method === "POST" ? post() : reply(200, tab),
-  );
+const run = {
+  id: 3,
+  built_at: "2026-10-30T20:45:00+00:00",
+  built_by: "Amr",
+  shopify_read_at: "2026-10-30T20:43:00+00:00",
+  rows_read: 152,
+  stated_count: 152,
+  skipped_rows: 0,
+  confirmed: 120,
+  not_confirmed: 32,
+  file_name: "khazenly-bulk-confirm-2026-10-30-2245.xlsx",
+};
+
+function respond(post: () => Promise<Response>, tab: object = { freshness: freshness(), runs: [] }) {
+  fetchMock.mockImplementation((path: string, init?: RequestInit) => {
+    if (init?.method === "POST") return post();
+    if (path.startsWith("/api/khazenly/runs/")) {
+      return reply(200, {
+        ...run,
+        confirmed_orders: [{ sales_order: "KH-HBA-08700001", order_number: "#31700" }],
+        left_out: [
+          {
+            reason: "edit",
+            label: "Asked to change the order (Edit ✏️)",
+            count: 1,
+            orders: [{ sales_order: "KH-HBA-08700002", order_number: "#31701" }],
+          },
+        ],
+      });
+    }
+    return reply(200, tab);
+  });
 }
 
 async function chooseAndBuild() {
@@ -85,7 +118,7 @@ describe("Operations → Khazenly (ADR 0071)", () => {
     render(<OperationsKhazenly />);
 
     expect(await screen.findByText("Updated 2 minutes ago")).toBeTruthy();
-    expect(fetchMock.mock.calls[0][0]).toContain("/api/order-ops/khazenly");
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/khazenly");
     const button = screen.getByRole("button", { name: "Build the file" }) as HTMLButtonElement;
     expect(button.disabled).toBe(true);
   });
@@ -100,17 +133,39 @@ describe("Operations → Khazenly (ADR 0071)", () => {
     expect(download.getAttribute("download")).toBe("khazenly-bulk-confirm-2026-10-30-2245.xlsx");
 
     const post = fetchMock.mock.calls.find(([, init]) => init?.method === "POST")!;
-    expect(post[0]).toBe("/api/order-ops/khazenly");
+    expect(post[0]).toBe("/api/khazenly");
     expect(post[1].body).toBeInstanceOf(FormData);
 
     expect(screen.getByText("In Khazenly's file").parentElement?.textContent).toContain("4");
     expect(screen.getByText("Confirmed").parentElement?.textContent).toContain("2");
-    expect(screen.getByText("Left out · 2 orders")).toBeTruthy();
+    expect(screen.getByText("Orders · 4 orders")).toBeTruthy();
     expect(screen.getByText("Held back for safety")).toBeTruthy();
 
     // The summary comes before the download, as asked.
-    const summary = screen.getByText("Left out · 2 orders");
+    const summary = screen.getByText("Orders · 4 orders");
     expect(summary.compareDocumentPosition(download) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("lists the confirmed orders, too, by number", async () => {
+    respond(() => reply(200, built));
+    render(<OperationsKhazenly />);
+    await chooseAndBuild();
+
+    const confirmed = await screen.findByRole("button", { name: /Confirmed: in the file/ });
+    fireEvent.click(confirmed);
+    expect(screen.getByText("#31841")).toBeTruthy();
+    expect(screen.getByText("KH-HBA-08800001")).toBeTruthy();
+  });
+
+  it("asks for the history again once a file is built", async () => {
+    respond(() => reply(200, built));
+    render(<OperationsKhazenly />);
+    await chooseAndBuild();
+    await screen.findByRole("link", { name: /Download/ });
+
+    await waitFor(() =>
+      expect(fetchMock.mock.calls.filter(([path, init]) => path === "/api/khazenly" && init?.method === "GET").length).toBe(2),
+    );
   });
 
   it("opens a reason to show its orders by number only", async () => {
@@ -137,7 +192,7 @@ describe("Operations → Khazenly (ADR 0071)", () => {
 
   it("offers no file when nothing is confirmed", async () => {
     respond(() =>
-      reply(200, { ...built, confirmed: 0, not_confirmed: 4, file: null }),
+      reply(200, { ...built, confirmed: 0, not_confirmed: 4, confirmed_orders: [], file: null }),
     );
     render(<OperationsKhazenly />);
     await chooseAndBuild();
@@ -157,7 +212,7 @@ describe("Operations → Khazenly (ADR 0071)", () => {
   });
 
   it("builds nothing while Shopify's tags are old", async () => {
-    respond(() => reply(200, built), { freshness: freshness({ state: "stale", updated_at: minutesAgo(25) }) });
+    respond(() => reply(200, built), { freshness: freshness({ state: "stale", updated_at: minutesAgo(25) }), runs: [] });
     render(<OperationsKhazenly />);
 
     const input = await screen.findByLabelText(/Choose Khazenly's export/);
@@ -170,12 +225,40 @@ describe("Operations → Khazenly (ADR 0071)", () => {
   });
 
   it("builds nothing while Shopify isn't connected", async () => {
-    respond(() => reply(200, built), { freshness: freshness({ state: "not_connected" }) });
+    respond(() => reply(200, built), { freshness: freshness({ state: "not_connected" }), runs: [] });
     render(<OperationsKhazenly />);
 
     expect(await screen.findByText("Shopify isn't connected yet.")).toBeTruthy();
     await waitFor(() =>
       expect((screen.getByRole("button", { name: "Build the file" }) as HTMLButtonElement).disabled).toBe(true),
     );
+  });
+
+  it("says when no file has been built yet", async () => {
+    respond(() => reply(200, built));
+    render(<OperationsKhazenly />);
+
+    expect(await screen.findByText("No file has been built yet.")).toBeTruthy();
+  });
+
+  it("lists the runs so far, each opening to its summary", async () => {
+    respond(() => reply(200, built), { freshness: freshness(), runs: [run] });
+    render(<OperationsKhazenly />);
+
+    const past = await screen.findByRole("button", { name: /By Amr/ });
+    expect(past.textContent).toContain("152 read");
+    expect(past.textContent).toContain("120 confirmed");
+    expect(past.textContent).toContain("32 not");
+    expect(screen.getByText(/^Last built /)).toBeTruthy();
+
+    fireEvent.click(past);
+
+    expect(past.getAttribute("aria-expanded")).toBe("true");
+    expect(await screen.findByText("Orders · 152 orders")).toBeTruthy();
+    expect(fetchMock.mock.calls.some(([path]) => path === "/api/khazenly/runs/3")).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: /Asked to change the order/ }));
+    expect(screen.getByText("#31701")).toBeTruthy();
+    // The file is not offered again from the history (ADR 0072).
+    expect(screen.queryByRole("link", { name: /Download/ })).toBeNull();
   });
 });

@@ -30,6 +30,12 @@ export type DepartmentSection = {
   also?: readonly string[];
   /** The screen runs edge to edge and scrolls inside itself (Chats). */
   wide?: boolean;
+  /**
+   * A permission that shows this section on its own, to someone who does not
+   * hold the department's (ADR 0072: customer service sees Operations →
+   * Khazenly and nothing else of Operations).
+   */
+  holds?: string;
 };
 
 /** One department, declared once: the frame, the router and the menu read this. */
@@ -47,4 +53,6 @@ export type Department = {
   moved: readonly Moved[];
   /** On a phone this address takes the whole display (an open chat). */
   immersive?: (pathname: string) => boolean;
+  /** Seen only in part: some sections, by their own `holds` (ADR 0072). */
+  partial?: boolean;
 };

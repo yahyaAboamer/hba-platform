@@ -10,5 +10,7 @@ export const OPERATIONS_SECTIONS = [
   { slug: "bosta", label: "Bosta" },
   { slug: "estebdal", label: "E-stebdal" },
   { slug: "whatsapp", label: "WhatsApp" },
-  { slug: "khazenly", label: "Khazenly" },
+  // Customer service holds this one section and nothing else of Operations
+  // (ADR 0072).
+  { slug: "khazenly", label: "Khazenly", holds: "khazenly.use" },
 ] as const;

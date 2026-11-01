@@ -1,8 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
 
-import { startFor } from "../departments";
+import { departmentsFor, startFor } from "../departments";
 import type { Department } from "../departments/types";
-import { can } from "../lib/api";
 import type { Session } from "../lib/api";
 import { movedAddress } from "./moved";
 import { Onward } from "./Onward";
@@ -30,8 +29,9 @@ export function Elsewhere({
   if (moved) return <Onward to={moved} />;
 
   const start = startFor(session);
+  const seen = new Set(departmentsFor(session).map((department) => department.key));
   const refused =
-    departments.find((department) => within(pathname, department.base) && !can(session, department.holds))
+    departments.find((department) => within(pathname, department.base) && !seen.has(department.key))
       ?.name ??
     (SETTINGS_BASES.some((base) => within(pathname, base)) && !canOpenSettings(session)
       ? "Settings"

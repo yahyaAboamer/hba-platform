@@ -74,6 +74,9 @@ ROLES_BEFORE: dict[str, frozenset[str]] = {
 GRANTED_SINCE: dict[str, frozenset[str]] = {
     # ADR 0070: adding a bonus (owner, 29 October 2026).
     "affiliate_manager": frozenset({P.PAYROLL_BONUS}),
+    # ADR 0072: Operations → Khazenly (owner, 1 November 2026).
+    "operations_manager": frozenset({P.KHAZENLY_USE}),
+    "customer_service": frozenset({P.KHAZENLY_USE}),
 }
 
 
@@ -87,7 +90,7 @@ def test_the_snapshot_covers_every_role_there_is():
     # Only the operations manager's role changed shape, and only by the Inbox.
     for role, granted in ROLES_BEFORE.items():
         if role == "operations_manager":
-            assert ROLES[role] == granted - {P.INBOX_USE}
+            assert ROLES[role] == (granted - {P.INBOX_USE}) | GRANTED_SINCE[role]
         else:
             assert ROLES[role] == _expected(role), role
 

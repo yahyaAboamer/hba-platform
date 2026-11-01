@@ -553,9 +553,10 @@ def test_the_roster_says_what_each_access_can_do(client):
     }
     assert body["content_manager"] == sorted(permissions_for("content_manager"))
     # ADR 0067: the role is Operations alone; he holds the inbox (ADR 0059)
-    # as a second assignment, customer service.
-    assert body["operations_manager"] == ["order_ops.view"]
-    assert body["customer_service"] == ["inbox.use"]
+    # as a second assignment, customer service. Khazenly is both roles'
+    # (ADR 0072).
+    assert body["operations_manager"] == ["khazenly.use", "order_ops.view"]
+    assert body["customer_service"] == ["inbox.use", "khazenly.use"]
     assert "payments.record" in body["admin"]
     assert "payments.record" not in body["affiliate_manager"]
 

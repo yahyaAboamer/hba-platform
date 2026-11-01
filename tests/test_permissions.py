@@ -197,34 +197,36 @@ def test_the_six_expected_roles_exist_and_no_others():
 # ── operations_manager (ADR 0057, and the inbox from ADR 0059) ────────────────
 
 
-def test_operations_manager_holds_the_operations_dashboard_alone():
+def test_operations_manager_holds_the_operations_dashboard_and_khazenly_alone():
     """ADR 0067: his Inbox (ADR 0059) is a second assignment, customer
-    service, not part of this role - migration c3e7a1f90019 moved it."""
-    assert ROLES["operations_manager"] == {Permission.ORDER_OPS_VIEW}
+    service, not part of this role - migration c3e7a1f90019 moved it.
+    Khazenly (ADR 0072) is his own as well."""
+    assert ROLES["operations_manager"] == {Permission.ORDER_OPS_VIEW, Permission.KHAZENLY_USE}
 
 
 def test_operations_manager_sees_nothing_of_the_affiliate_side():
-    for permission in ALL_PERMISSIONS - {Permission.ORDER_OPS_VIEW}:
+    for permission in ALL_PERMISSIONS - {Permission.ORDER_OPS_VIEW, Permission.KHAZENLY_USE}:
         assert has_permission("operations_manager", permission) is False
 
 
 def test_the_operations_manager_person_holds_operations_and_the_inbox():
     """What he may do is both his roles together, exactly as before."""
     held = {"operations_manager", "customer_service"}
-    assert permissions_of_roles(held) == {Permission.ORDER_OPS_VIEW, Permission.INBOX_USE}
-    for permission in ALL_PERMISSIONS - {Permission.ORDER_OPS_VIEW, Permission.INBOX_USE}:
+    mine = {Permission.ORDER_OPS_VIEW, Permission.INBOX_USE, Permission.KHAZENLY_USE}
+    assert permissions_of_roles(held) == mine
+    for permission in ALL_PERMISSIONS - mine:
         assert has_permission(held, permission) is False
 
 
 # ── customer_service (ADR 0059) ───────────────────────────────────────────────
 
 
-def test_customer_service_holds_only_the_inbox():
-    assert ROLES["customer_service"] == {Permission.INBOX_USE}
+def test_customer_service_holds_only_the_inbox_and_khazenly():
+    assert ROLES["customer_service"] == {Permission.INBOX_USE, Permission.KHAZENLY_USE}
 
 
 def test_customer_service_sees_nothing_else():
-    for permission in ALL_PERMISSIONS - {Permission.INBOX_USE}:
+    for permission in ALL_PERMISSIONS - {Permission.INBOX_USE, Permission.KHAZENLY_USE}:
         assert has_permission("customer_service", permission) is False
 
 
