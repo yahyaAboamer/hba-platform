@@ -24,12 +24,6 @@ export function departmentsFor(session: Session): Department[] {
   });
 }
 
-/** Whether a section of a department is this person's to see. */
-export function seesSection(session: Session, department: Department, slug: string): boolean {
-  return (departmentsFor(session).find((held) => held.key === department.key)?.sections ?? []).some(
-    (section) => section.slug === slug,
-  );
-}
 
 /** Who starts where when they hold just one department, widest first. */
 const START_ORDER: readonly Department["key"][] = ["affiliates", "operations", "inbox"];

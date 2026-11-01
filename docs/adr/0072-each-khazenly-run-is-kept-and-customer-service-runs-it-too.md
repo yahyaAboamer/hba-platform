@@ -24,14 +24,16 @@ used it on production that day. Two things followed from using it.
    same summary the screen shows: when, who, when Shopify's tags were read,
    the counts, the file's name, the confirmed orders and the left-out orders
    by reason. Orders are stored **by number only** (Shopify's and
-   Khazenly's), as the summary shows them. Nothing else from the export is
+   Khazenly's), as the summary shows them; a merchant order cell that is not
+   an order number is neither shown nor kept. Nothing else from the export is
    kept: not the file, not a name, not an amount. A refused upload is not a
    run and is not kept. Runs are kept indefinitely; each is a few kilobytes.
    This replaces ADR 0071's "only counts are kept" (decision 8). The audit
    entry stays as it was.
 
-2. **The Khazenly tab shows the history**, newest first, under the upload.
-   Each run opens to the same summary, the confirmed orders included. The
+2. **The Khazenly tab shows the history**, newest first, under the upload:
+   the latest 60 runs (older ones are kept, not listed). Each run opens to
+   the same summary, the confirmed orders included. The
    file itself is not offered again from the history: Shopify's tags will
    have moved on since, and a file confirming orders should only ever come
    from tags read in the last few minutes.

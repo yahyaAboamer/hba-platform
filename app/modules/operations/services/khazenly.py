@@ -274,6 +274,13 @@ def reason_for(tags: list[str], fulfillment_status: str | None) -> str | None:
     return "no_tag"
 
 
+def _as_shown(merchant_order: str) -> str | None:
+    """Khazenly's merchant order number as Shopify writes it, ``#31840`` - or
+    None for anything else in that cell, which is then never shown or kept."""
+    number = normalise(merchant_order)
+    return f"#{number}" if number.isdigit() and len(number) <= 12 else None
+
+
 @dataclass
 class Decision:
     #: The orders to confirm, in the export's order, by both numbers.
@@ -300,10 +307,7 @@ def decide(db: Session, orders: list[ExportOrder]) -> Decision:
             decision.confirmed.append({"sales_order": order.sales_order, "order_number": shopify.order_number})
             continue
         decision.left_out.setdefault(reason, []).append(
-            {
-                "sales_order": order.sales_order,
-                "order_number": shopify.order_number if shopify else (f"#{order.merchant_order}" if order.merchant_order else None),
-            }
+            {"sales_order": order.sales_order, "order_number": shopify.order_number if shopify else _as_shown(order.merchant_order)}
         )
     return decision
 

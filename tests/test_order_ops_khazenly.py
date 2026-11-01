@@ -207,6 +207,8 @@ def test_each_order_is_decided_against_shopify(db):
         # Cancelled, closed or shipped: not in the table at all (#31874).
         khazenly.ExportOrder(_kh(5), "31874"),
         khazenly.ExportOrder(_kh(6), ""),
+        # Whatever else is in the cell is neither shown nor kept.
+        khazenly.ExportOrder(_kh(7), "Call her first"),
     ]
 
     decision = khazenly.decide(db, orders)
@@ -218,7 +220,10 @@ def test_each_order_is_decided_against_shopify(db):
     assert decision.left_out == {
         "wa_sent": [{"sales_order": _kh(3), "order_number": "#31842"}],
         "confirmed_but_cancelled": [{"sales_order": _kh(4), "order_number": "#31843"}],
-        "not_open": [{"sales_order": _kh(5), "order_number": "#31874"}],
+        "not_open": [
+            {"sales_order": _kh(5), "order_number": "#31874"},
+            {"sales_order": _kh(7), "order_number": None},
+        ],
         "no_number": [{"sales_order": _kh(6), "order_number": None}],
     }
 
@@ -505,6 +510,8 @@ def test_customer_service_builds_the_file_and_sees_no_other_operations(client):
 def test_every_khazenly_route_carries_its_guard():
     from app.modules.operations import api as order_ops
 
+    # On the router itself, so a route added later cannot be added without it.
+    assert any(dependency.dependency is order_ops.KHAZENLY_GUARD for dependency in order_ops.khazenly_router.dependencies)
     assert order_ops.khazenly_router.routes
     for route in order_ops.khazenly_router.routes:
         assert any(
