@@ -152,6 +152,8 @@ def _served() -> set[tuple[str, str]]:
     ]
     # Operations' second router: the frame's reads, under `/api/operations`.
     routers.append(order_ops.frame_router)
+    # And its third: Khazenly, behind its own permission (ADR 0072).
+    routers.append(order_ops.khazenly_router)
     for router in routers:
         for route in router.routes:
             for method in getattr(route, "methods", set()):
