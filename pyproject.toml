@@ -140,3 +140,14 @@ forbidden_modules = [
     "app.modules.operations.api", "app.modules.operations.models", "app.modules.operations.services",
 ]
 allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "Integrations reach departments only through their public"
+type = "forbidden"
+source_modules = ["app.shared.api.integrations", "app.shared.services.integrations"]
+forbidden_modules = [
+    "app.modules.affiliates.api", "app.modules.affiliates.models", "app.modules.affiliates.services",
+    "app.modules.inbox.api", "app.modules.inbox.models", "app.modules.inbox.services",
+    "app.modules.operations.api", "app.modules.operations.models", "app.modules.operations.services",
+]
+allow_indirect_imports = true

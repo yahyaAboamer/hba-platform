@@ -5,7 +5,8 @@ import type { Department } from "../departments/types";
 import type { Session } from "../lib/api";
 import { movedAddress } from "./moved";
 import { Onward } from "./Onward";
-import { SETTINGS_BASES, canOpenSettings, within } from "./where";
+import { AFFILIATES_PAGES, OWNER_SETTINGS, SETTINGS_BASES, canOpenSettings, isOwner, within } from "./where";
+import { can } from "../lib/api";
 
 /**
  * Any address in the staff tree that is not a screen, said inside the frame:
@@ -36,14 +37,25 @@ export function Elsewhere({
     (SETTINGS_BASES.some((base) => within(pathname, base)) && !canOpenSettings(session)
       ? "Settings"
       : null);
+  // Somebody who has Settings (*Me*) but not the owner's pages, or Affiliates
+  // but not a page there that has a permission of its own (Batch 2.3).
+  const ownersOnly =
+    OWNER_SETTINGS.some((page) => within(pathname, page)) && canOpenSettings(session) && !isOwner(session);
+  const pageOutsideAccess = AFFILIATES_PAGES.some(
+    (page) => within(pathname, page.to) && seen.has("affiliates") && !can(session, page.holds),
+  );
 
-  if (refused) {
+  if (refused || ownersOnly || pageOutsideAccess) {
     return (
       <div className="page__head">
         <div className="page__title">
           <h1>Not available</h1>
           <span className="page__subtitle">
-            This page is in {refused}, which your access does not include.{" "}
+            {refused
+              ? `This page is in ${refused}, which your access does not include.`
+              : ownersOnly
+                ? "This page is in Settings, and only the owner can open it."
+                : "Your access does not include this page."}{" "}
             <Link to={start}>Go to your start</Link>
           </span>
         </div>

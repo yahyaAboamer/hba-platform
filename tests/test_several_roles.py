@@ -477,13 +477,14 @@ PROBES = {
     "/api/affiliates": {P.AFFILIATES_VIEW},
     "/api/audit": {P.AUDIT_VIEW},
     "/api/staff": {P.SETTINGS_MANAGE},
-    "/api/staff/invitations": {P.INVITATIONS_SEND},
     "/api/payroll/historical/review": {P.PAYROLL_APPROVE},
     "/api/order-ops/shopify": {P.ORDER_OPS_VIEW},
     "/api/inbox/conversations": {P.INBOX_USE},
     "/api/inbox/connection": {P.INBOX_USE, P.SETTINGS_MANAGE},
     # Today (Phase 2, batch 2.2): every member of staff, never a model.
     "/api/today": {"<require_staff>"},
+    # Settings → Integrations (Batch 2.3): the owner's alone.
+    "/api/integrations": {P.SETTINGS_MANAGE},
 }
 
 

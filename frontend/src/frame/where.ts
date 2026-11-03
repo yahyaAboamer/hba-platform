@@ -3,10 +3,9 @@ import { can } from "../lib/api";
 import type { Session } from "../lib/api";
 
 /**
- * Settings is not a department in Batch 2.1: a link at the foot of the
- * sidebar, for whoever can open it today (whoever holds `affiliates.view`).
- * The glossary stays, inside the frame, and counts as Settings for "where am
- * I".
+ * Settings is not a department: a link at the foot of the sidebar, for every
+ * member of staff (Batch 2.3). The glossary stays, inside the frame, and
+ * counts as Settings for "where am I".
  */
 export const SETTINGS_BASES = ["/settings", "/glossary"] as const;
 
@@ -19,9 +18,37 @@ export function holdsToday(departments: readonly Department[]): boolean {
   return departments.filter((department) => !department.partial).length >= 2;
 }
 
+/** Every member of staff has *Me*; a model, who holds no permission, has no Settings. */
 export function canOpenSettings(session: Session | null): boolean {
-  return can(session, "affiliates.view");
+  return (session?.permissions.length ?? 0) > 0;
 }
+
+/** The owner's: whoever holds `settings.manage`. */
+export function isOwner(session: Session | null): boolean {
+  return can(session, "settings.manage");
+}
+
+/** The Settings pages only the owner opens; everything else under Settings is for any member of staff. */
+export const OWNER_SETTINGS = ["/settings/team", "/settings/integrations", "/settings/company"] as const;
+
+/** Settings' sections as the sidebar draws them: *Me* for everyone, the rest the owner's. */
+export const SETTINGS_SECTIONS = [
+  { label: "Me", to: "/settings/me", owner: false },
+  { label: "Team and access", to: "/settings/team", owner: true },
+  { label: "Integrations", to: "/settings/integrations", owner: true },
+  { label: "Company", to: "/settings/company", owner: true },
+] as const;
+
+/**
+ * Pages in Affiliates that are off the sidebar and held by a permission of
+ * their own, not the department's (Batch 2.3). `Elsewhere` says so rather
+ * than "Nothing here" to somebody who holds Affiliates but not the page.
+ */
+export const AFFILIATES_PAGES = [
+  { to: "/affiliates/brand-codes", holds: "affiliates.view" },
+  { to: "/affiliates/historical", holds: "compensation.manage" },
+  { to: "/affiliates/activity", holds: "audit.view" },
+] as const;
 
 /** Whether an address is `base` or somewhere under it. */
 export function within(pathname: string, base: string): boolean {

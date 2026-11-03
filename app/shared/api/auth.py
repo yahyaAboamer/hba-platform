@@ -13,6 +13,7 @@ from app.shared.api.deps import (
     actor_payload,
     client_address,
     current_user,
+    holds,
     permission_list,
     require_permission,
     roles_of,
@@ -28,6 +29,7 @@ from app.core.permissions import (
     VALID_ROLES,
     Permission,
     can_invite,
+    invitation_permission,
     is_staff,
     sorted_roles,
 )
@@ -716,6 +718,11 @@ def invite(
     """
     if body.role not in VALID_ROLES:
         raise HTTPException(422, f"Unknown role: {body.role}")
+    # A staff invitation is the owner's (Batch 2.3); a model's needs only
+    # `invitations.send`, which every caller here already holds.
+    needed = invitation_permission(body.role)
+    if not holds(db, actor, needed):
+        raise HTTPException(403, f"Permission required: {needed}")
     # An invitation is a grant: nobody may give access they do not hold.
     # Against everything the inviter holds together (ADR 0067).
     held = roles_of(db, actor)

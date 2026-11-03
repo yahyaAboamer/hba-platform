@@ -37,6 +37,7 @@ from app.shared.api import (
     auth,
     client_config,
     health,
+    integrations,
     staff,
     today,
     webhooks,
@@ -177,6 +178,7 @@ app.include_router(payments.router)
 app.include_router(products.router)
 app.include_router(policy.router)
 app.include_router(today.router)
+app.include_router(integrations.router)
 
 
 if (WEB_DIR / "index.html").exists():

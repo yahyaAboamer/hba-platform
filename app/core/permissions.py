@@ -147,9 +147,40 @@ def can_invite(actor_roles: str | Iterable[str], target_role: str) -> bool:
 #: manager reads "operations manager", not "customer service").
 ROLE_ORDER: tuple[str, ...] = tuple(ROLES)
 
+#: Which permission makes somebody hold each department (Phase 2). Today
+#: lists a department's items to whoever holds it, and the activity log shows
+#: them its entries (Batch 2.3) - one table, so the two can never disagree
+#: about who works where. The names are the ones `audit_event.department`
+#: carries (`app.shared.services.audit.DEPARTMENTS`).
+DEPARTMENT_HELD_BY: dict[str, str] = {
+    "inbox": Permission.INBOX_USE,
+    "operations": Permission.ORDER_OPS_VIEW,
+    "affiliates": Permission.AFFILIATES_VIEW,
+}
+
+
+def departments_held(permissions: Iterable[str]) -> tuple[str, ...]:
+    """The departments these permissions make somebody hold, in
+    `DEPARTMENT_HELD_BY`'s order."""
+    held = frozenset(permissions)
+    return tuple(name for name, permission in DEPARTMENT_HELD_BY.items() if permission in held)
+
+
 #: The role that grants no staff permission. A model holds it; nobody is
 #: *staff* by holding it (ADR 0067, decision 2).
 MODEL_ROLE = "affiliate"
+
+
+def invitation_permission(role: str) -> str:
+    """The permission an invitation to `role` needs, beside `can_invite`.
+
+    **Staff invitations are the owner's** (Batch 2.3, Choice 4): the Team page
+    is the owner's, so inviting anybody to a staff role - and seeing, resending
+    or withdrawing a staff invitation - needs `settings.manage`. Inviting a
+    model stays `invitations.send` (Affiliates → Models → Invite), which the
+    affiliate manager keeps.
+    """
+    return Permission.INVITATIONS_SEND if role == MODEL_ROLE else Permission.SETTINGS_MANAGE
 
 
 def permissions_for(role: str) -> frozenset[str]:

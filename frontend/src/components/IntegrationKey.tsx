@@ -52,7 +52,7 @@ const BUTTON_WORDS: Record<string, string> = {
  * provider before it is saved, so a refusal here means the key in use has
  * not changed - and the field keeps what was typed.
  */
-function KeyCard({ provider }: { provider: "bosta" | "estebdal" }) {
+export function KeyCard({ provider }: { provider: "bosta" | "estebdal" }) {
   const [state, setState] = useState<KeyState | null>(null);
   const [open, setOpen] = useState(false);
   const [key, setKey] = useState("");

@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { Money } from "../../components/Money";
 import { SalesByMonth } from "./SalesByMonth";
 import { MonthPicker } from "../../components/MonthPicker";
-import { api } from "../../lib/api";
+import { api, can } from "../../lib/api";
 import type { Session } from "../../lib/api";
 import { formatMonth, platformMonths } from "../../lib/money";
 
@@ -277,7 +277,10 @@ export function Overview({ session }: { session: Session }) {
   return (
     <>
       <div className="page__head">
-        <div className="page__title"><h1>Home</h1><span className="page__subtitle">{formatMonth(month)}</span></div>
+        <div className="page__title"><h1>Home</h1><span className="page__subtitle">{formatMonth(month)}</span>
+          {/* Off the sidebar since Batch 2.3; this is its way in. */}
+          {can(session, "audit.view") && <Link className="control-font" to="/affiliates/activity">Activity log →</Link>}
+        </div>
         {/* The export's select and nothing beside it. An earlier month says
          *  what it is on its own figures and payment views; Home adds no
          *  sentence about it (owner, 24 September). */}

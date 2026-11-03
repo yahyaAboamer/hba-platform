@@ -1,12 +1,16 @@
 import { Route } from "react-router-dom";
 
 import { Onward } from "../../frame/Onward";
+import { can } from "../../lib/api";
 import type { Department } from "../types";
 import { AffiliateDetail } from "./AffiliateDetail";
 import { AffiliatePayments } from "./AffiliatePayments";
 import { AffiliatePayout } from "./AffiliatePayout";
 import { Affiliates } from "./Affiliates";
+import { ActivityLog } from "./ActivityLog";
+import { BrandCodes } from "./BrandCodes";
 import { Compensation } from "./Compensation";
+import { HistoricalSetup } from "./HistoricalSetup";
 import { InvitePage } from "./InvitePage";
 import { OrderDetail, Orders } from "./Orders";
 import { Overview } from "./Overview";
@@ -40,12 +44,14 @@ export const affiliates: Department = {
       slug: "overview",
       label: "Overview",
       to: "/affiliates/overview",
-      also: ["/affiliates/orders"],
+      // Orders, and the activity log narrowed to Affiliates (Batch 2.3).
+      also: ["/affiliates/orders", "/affiliates/activity"],
     },
     {
       slug: "models",
       label: "Models",
       to: "/affiliates/models",
+      also: ["/affiliates/brand-codes"],
       count: {
         key: "models_awaiting_approval",
         sentence: (count) => `${count} ${count === 1 ? "model" : "models"} awaiting approval`,
@@ -57,7 +63,7 @@ export const affiliates: Department = {
       slug: "payments",
       label: "Payments",
       to: "/affiliates/payments",
-      also: ["/affiliates/payroll"],
+      also: ["/affiliates/payroll", "/affiliates/historical"],
       // The size of the *Awaiting approval* filter, counted by the same
       // function the Payments screen counts it with.
       count: {
@@ -103,6 +109,15 @@ export const affiliates: Department = {
         element={<PaymentCorrection session={session} />}
       />
       <Route path="targets" element={<Targets session={session} />} />
+      {/* Off the sidebar: each by its own permission (Batch 2.3). Anybody else
+          reaches `Elsewhere`, which says the page is not theirs. */}
+      {can(session, "affiliates.view") && (
+        <Route path="brand-codes" element={<BrandCodes session={session} />} />
+      )}
+      {can(session, "compensation.manage") && (
+        <Route path="historical" element={<HistoricalSetup session={session} />} />
+      )}
+      {can(session, "audit.view") && <Route path="activity" element={<ActivityLog />} />}
     </>
   ),
   moved: [

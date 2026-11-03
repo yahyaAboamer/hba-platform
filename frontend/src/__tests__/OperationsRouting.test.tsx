@@ -40,7 +40,7 @@ describe("the operations manager", () => {
     await screen.findByRole("heading", { name: "Shopify" });
 
     expect(screen.queryByRole("button", { name: /Affiliates/ })).toBeNull();
-    for (const name of ["Models", "Products", "Targets", "Payments", "Settings"]) {
+    for (const name of ["Models", "Products", "Targets", "Payments"]) {
       expect(screen.queryByRole("link", { name })).toBeNull();
     }
     const strayed = asked().filter(

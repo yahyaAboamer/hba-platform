@@ -3,7 +3,9 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { Settings, historicalState } from "../Settings";
+import { historicalState } from "../../departments/affiliates/HistoricalSetup";
+import { HistoricalSetup } from "../../departments/affiliates/HistoricalSetup";
+import { Team } from "../settings/Team";
 import type { Session } from "../../lib/api";
 
 const reply = (status: number, body: unknown) =>
@@ -54,12 +56,12 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
-const renderAt = (role: keyof typeof PERMISSIONS, section = "") =>
-  render(<MemoryRouter initialEntries={[`/settings${section ? `?section=${section}` : ""}`]}><Settings session={session(role)} /></MemoryRouter>);
+const renderAt = (role: keyof typeof PERMISSIONS) =>
+  render(<MemoryRouter initialEntries={["/settings/team"]}><Team session={session(role)} /></MemoryRouter>);
 
 describe("Settings → Team", () => {
   it("shows the link once, after an invitation is sent", async () => {
-    renderAt("admin", "team");
+    renderAt("admin");
     fireEvent.change(await screen.findByLabelText("Email"), { target: { value: "new@hbawear.store" } });
     fireEvent.click(screen.getByRole("button", { name: "Send invitation" }));
     expect((await screen.findByRole("status")).textContent).toContain("https://hba.test/accept-invitation?token=t0k3n");
@@ -67,7 +69,7 @@ describe("Settings → Team", () => {
   });
 
   it("never offers you your own access or a way to suspend yourself", async () => {
-    renderAt("admin", "team");
+    renderAt("admin");
     const own = (await screen.findByText("You")).closest("tr")!;
     expect(within(own).queryByRole("combobox")).toBeNull();
     expect(within(own).queryByRole("button", { name: /More for/ })).toBeNull();
@@ -75,7 +77,7 @@ describe("Settings → Team", () => {
   });
 
   it("asks before giving somebody access, and says what they gain", async () => {
-    renderAt("admin", "team");
+    renderAt("admin");
     fireEvent.change(await screen.findByLabelText("Add access for Mona"), { target: { value: "admin" } });
     const dialog = await screen.findByRole("dialog");
     expect(dialog.textContent).toContain("Make Mona an admin?");
@@ -97,7 +99,7 @@ describe("Settings → Team", () => {
       if (url.includes("/api/staff")) return reply(200, roster);
       return reply(200, {});
     });
-    renderAt("admin", "team");
+    renderAt("admin");
 
     const held = await screen.findByRole("list", { name: "Access for Mona" });
     expect(within(held).getAllByRole("listitem").map((item) => item.firstChild?.textContent))
@@ -130,7 +132,7 @@ describe("Settings → Team", () => {
       if (url.includes("/api/staff")) return reply(200, roster);
       return reply(200, {});
     });
-    renderAt("admin", "team");
+    renderAt("admin");
 
     fireEvent.click(await screen.findByRole("button", { name: "Remove Customer service from Mona" }));
     const dialog = await screen.findByRole("dialog");
@@ -144,20 +146,13 @@ describe("Settings → Team", () => {
   });
 
   it("does not offer to remove somebody's only role", async () => {
-    renderAt("admin", "team");
+    renderAt("admin");
     const held = await screen.findByRole("list", { name: "Access for Mona" });
     expect(within(held).queryByRole("button")).toBeNull();
   });
-
-  it("offers an affiliate manager only the access they hold", async () => {
-    renderAt("affiliate_manager");
-    const select = await screen.findByLabelText("Access");
-    const offered = within(select).getAllByRole("option").map((option) => option.textContent);
-    expect(offered).toEqual(["Content manager", "Affiliate manager"]);
-  });
 });
 
-describe("Settings → the rail", () => {
+describe("Settings → Team, the roles it names", () => {
   it("names the operations manager, and says what that access can do", async () => {
     const permissions = { ...PERMISSIONS, operations_manager: ["order_ops.view"] };
     const roster = {
@@ -172,27 +167,19 @@ describe("Settings → the rail", () => {
       if (url.includes("/api/staff")) return reply(200, roster);
       return reply(200, {});
     });
-    renderAt("admin", "team");
+    renderAt("admin");
 
     expect((await screen.findAllByText("Operations manager")).length).toBeGreaterThan(0);
     expect(screen.queryByText("operations_manager")).toBeNull();
     expect(screen.getByText("See the operations dashboard")).toBeTruthy();
     expect(screen.getByRole("columnheader", { name: "Operations manager" })).toBeTruthy();
   });
+});
 
-  it("lists only what a content manager can use, and opens on the first", async () => {
-    renderAt("content_manager");
-    const rail = screen.getByRole("navigation", { name: "Settings sections" });
-    const labels = within(rail).getAllByRole("button").map((button) => button.textContent);
-    expect(labels).not.toContain("Team");
-    expect(labels).not.toContain("Pay policy");
-    expect(within(rail).getByRole("button", { name: "Shopify and sync" }).getAttribute("aria-current")).toBe("page");
-  });
-
-  it("drops Historical setup once every month before go-live is final", async () => {
-    renderAt("admin");
-    const rail = screen.getByRole("navigation", { name: "Settings sections" });
-    await waitFor(() => expect(within(rail).queryByRole("button", { name: "Historical setup" })).toBeNull());
+describe("Historical setup (Affiliates)", () => {
+  it("says so once every month before go-live is final", async () => {
+    render(<MemoryRouter initialEntries={["/affiliates/historical"]}><HistoricalSetup session={session("admin")} /></MemoryRouter>);
+    expect(await screen.findByText(/History is complete: every month before October 2026 is final\./)).toBeTruthy();
   });
 });
 

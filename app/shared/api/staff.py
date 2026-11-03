@@ -11,6 +11,13 @@ several roles (ADR 0067), so giving one and taking one are two actions. Revoking
 invitation is gated on `invitations.send` instead - the mirror of the action
 that creates one, so whoever may send an invitation may also withdraw it
 without needing the broader permission.
+
+**Staff invitations are the owner's** (Batch 2.3, Choice 4): resending or
+withdrawing one needs `settings.manage`, as sending one does, and the owner
+reads them on the roster. A model's invitation stays `invitations.send` -
+Affiliates → Models → Invite resends and withdraws through the same two
+routes. `GET /api/staff/invitations`, the affiliate manager's own list
+(Settings audit X2), was retired with it: nothing asked for it any more.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -27,6 +34,7 @@ from app.core.permissions import (
     MODEL_ROLE,
     Permission,
     can_invite,
+    invitation_permission,
     permissions_for,
     sorted_roles,
 )
@@ -83,7 +91,13 @@ def _may_act_on(db: Session, actor: UserAccount, invitation: Invitation) -> None
     it carries - and Resend hands back a working link - so both are held to the
     same rule as sending one (`can_grant`). Without this an affiliate manager
     could resend a pending *admin* invitation and set that account's password
-    themselves."""
+    themselves.
+
+    A staff invitation is the owner's besides (Batch 2.3): the affiliate
+    manager may resend or withdraw a model's, not a colleague's."""
+    needed = invitation_permission(invitation.role)
+    if not holds(db, actor, needed):
+        raise HTTPException(403, f"Permission required: {needed}")
     if not can_invite(roles_of(db, actor), invitation.role):
         raise HTTPException(403, GRANT_REFUSED)
 
@@ -136,33 +150,6 @@ def roster(
 
 def _role_permissions() -> dict[str, list[str]]:
     return {role: sorted(permissions_for(role)) for role in sorted(ASSIGNABLE_ROLES)}
-
-
-@router.get("/invitations")
-def staff_invitations(
-    actor: UserAccount = Depends(require_permission(Permission.INVITATIONS_SEND)),
-    db: Session = Depends(get_session),
-) -> dict:
-    """The pending staff invitations this person may act on, and the roles they
-    may invite to.
-
-    For whoever may invite without holding `settings.manage` - an affiliate
-    manager. They used to get the invite form and nothing else: no list of what
-    they had sent, so nothing to resend or withdraw (Settings audit, X2).
-    """
-    held = roles_of(db, actor)
-    now = utcnow()
-    return {
-        "invitations": [
-            _invitation_row(invitation, now)
-            for invitation in list_pending_invitations(
-                db, exclude_roles=("affiliate",), current_only=True
-            )
-            if can_invite(held, invitation.role)
-        ],
-        "invitable_roles": invitable_roles(held),
-        "role_permissions": _role_permissions(),
-    }
 
 
 @router.post("/{user_id}/roles", status_code=201)

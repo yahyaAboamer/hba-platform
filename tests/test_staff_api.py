@@ -374,14 +374,16 @@ def test_revoking_an_invitation_closes_the_link(client):
     assert "invitation.revoked" in _audit_actions()
 
 
-def test_invitations_send_alone_may_revoke_its_own_invite(client):
+def test_invitations_send_alone_may_revoke_a_models_invite(client):
     """The mirror of the permission that creates one - `affiliate_manager`
-    holds `invitations.send` without `settings.manage`.
+    holds `invitations.send` without `settings.manage`. A model's invitation:
+    a staff one is the owner's since Batch 2.3.
     """
     _demote_to("affiliate_manager")
     invite = client.post(
-        "/api/auth/invitations", json={"email": "layla@example.com", "role": "content_manager"}
-    ).json()
+        "/api/auth/invitations", json={"email": "layla@example.com", "role": "affiliate"}
+    )
+    assert invite.status_code == 201, invite.text
 
     with engine.connect() as connection:
         invitation_id = connection.execute(
@@ -438,16 +440,32 @@ def test_an_affiliate_manager_cannot_invite_an_admin(client):
 
     response = _invite(client, "second.me@example.com", "admin")
 
+    # Refused before the grant rule is even asked: since Batch 2.3 a staff
+    # invitation needs `settings.manage`.
     assert response.status_code == 403
-    assert "access you hold" in response.json()["detail"]
+    assert "settings.manage" in response.json()["detail"]
     with engine.connect() as connection:
         assert connection.execute(text("SELECT count(*) FROM invitation")).scalar_one() == 0
 
 
-@pytest.mark.parametrize("role", ["affiliate_manager", "content_manager", "affiliate"])
-def test_an_affiliate_manager_may_invite_what_they_hold(client, role):
+def test_an_affiliate_manager_may_invite_a_model(client):
+    """Affiliates → Models → Invite: unchanged by Batch 2.3."""
     _demote_to("affiliate_manager")
-    assert _invite(client, f"{role}@example.com", role).status_code == 201
+    assert _invite(client, "affiliate@example.com", "affiliate").status_code == 201
+
+
+@pytest.mark.parametrize("role", ["affiliate_manager", "content_manager"])
+def test_an_affiliate_manager_may_not_invite_staff_even_what_they_hold(client, role):
+    """Staff invitations are the owner's (Batch 2.3, Choice 4): the Team page
+    is the owner's, so even a role the affiliate manager holds is refused."""
+    _demote_to("affiliate_manager")
+
+    response = _invite(client, f"{role}@example.com", role)
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Permission required: settings.manage"
+    with engine.connect() as connection:
+        assert connection.execute(text("SELECT count(*) FROM invitation")).scalar_one() == 0
 
 
 def test_an_admin_may_invite_anyone(client):
@@ -479,22 +497,36 @@ def test_the_roster_says_which_roles_you_may_invite(client):
     ]
 
 
-def test_an_affiliate_manager_sees_the_invitations_they_may_act_on(client):
-    """X2: they used to get the invite form and nothing else."""
-    _invite(client, "new.admin@example.com", "admin")
+def test_an_affiliate_manager_may_not_resend_or_withdraw_a_staff_invitation(client):
+    """Even one to a role they hold: the owner's since Batch 2.3."""
     _invite(client, "layla@example.com", "content_manager")
+    invitation_id = _invitation_id("layla@example.com")
     _demote_to("affiliate_manager")
 
-    body = client.get("/api/staff/invitations").json()
+    resend = client.post(f"/api/staff/invitations/{invitation_id}/resend")
+    revoke = client.post(f"/api/staff/invitations/{invitation_id}/revoke")
 
-    assert [row["email"] for row in body["invitations"]] == ["layla@example.com"]
-    assert body["invitable_roles"] == ["affiliate_manager", "content_manager"]
+    assert resend.status_code == 403
+    assert revoke.status_code == 403
+    assert "link" not in resend.json()
+    assert resend.json()["detail"] == "Permission required: settings.manage"
 
 
-def test_a_content_manager_may_not_list_or_send_invitations(client):
+def test_an_affiliate_manager_may_resend_a_models_invitation(client):
+    """Affiliates → Models → Invite resends through the same route."""
+    _demote_to("affiliate_manager")
+    assert _invite(client, "nour@example.com", "affiliate").status_code == 201
+
+    resend = client.post(f"/api/staff/invitations/{_invitation_id('nour@example.com')}/resend")
+
+    assert resend.status_code == 201, resend.text
+    assert "link" in resend.json()
+
+
+def test_a_content_manager_may_not_send_invitations(client):
     _demote_to("content_manager")
-    assert client.get("/api/staff/invitations").status_code == 403
     assert _invite(client, "x@example.com", "content_manager").status_code == 403
+    assert _invite(client, "y@example.com", "affiliate").status_code == 403
 
 
 # ── One pending line per address (Settings audit T1) ────────────────────────
@@ -582,7 +614,8 @@ def test_nobody_replaces_an_invitation_they_could_not_have_sent(client):
     _invite(client, "new.admin@example.com", "admin")
     _demote_to("affiliate_manager")
 
-    response = _invite(client, "new.admin@example.com", "content_manager")
+    # A model's invitation, the one kind the affiliate manager still sends.
+    response = _invite(client, "new.admin@example.com", "affiliate")
 
     assert response.status_code == 403
     assert "more access" in response.json()["detail"]

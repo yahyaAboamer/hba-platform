@@ -15,9 +15,10 @@ neither does.
 """
 
 import re
+from collections.abc import Collection
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import and_, false, or_, select
 from sqlalchemy.orm import Session
 
 from app.shared.models.audit import AuditEvent
@@ -214,6 +215,39 @@ _SUBJECT = re.compile(r"^(affiliate|user|invitation|policy_version):\S+$")
 _ESCAPE = "\\"
 
 
+def in_departments(names: Collection[str]):
+    """The condition an entry of one of these departments meets, in SQL.
+
+    Its stored `department`, or - for an entry written before the column
+    existed (migration c3e7a1f90019 added it empty), whose department is
+    NULL - the one `department_of` reads from its action, by the same
+    prefixes. **Derived as it is read; no entry is ever rewritten**: the
+    trail stays as it was written. An action no department claims (a sign-in,
+    staff access, a connection) matches no list either way, so it stays the
+    owner's.
+    """
+    names = sorted(names)
+    if not names:
+        return false()
+    prefixes = [prefix for name in names for prefix in DEPARTMENTS[name]]
+    return or_(
+        AuditEvent.department.in_(names),
+        and_(
+            AuditEvent.department.is_(None),
+            # `_` in `order_ops.` is a LIKE wildcard: escaped, matched as written.
+            or_(*(AuditEvent.action.startswith(prefix, autoescape=True) for prefix in prefixes)),
+        ),
+    )
+
+
+def readable_by(query, readable: Collection[str] | None):
+    """`query` narrowed to the entries of the `readable` departments; `None`
+    leaves it whole (the owner)."""
+    if readable is None:
+        return query
+    return query.where(in_departments(readable))
+
+
 def kind_of(action: str) -> str | None:
     """Which of `KINDS` an action belongs to, or `None`."""
     for name, prefixes in KINDS.items():
@@ -243,6 +277,8 @@ def recent_events(
     kind: str | None = None,
     include_sign_ins: bool = True,
     before_id: int | None = None,
+    readable: Collection[str] | None = None,
+    department: str | None = None,
 ) -> list[AuditEvent]:
     """The most recent business events, newest first. Read-only counterpart to
     `record_audit` - nothing here writes, and this is the only function in the
@@ -256,13 +292,23 @@ def recent_events(
     `subject_contains` is the older substring filter, kept for its callers.
     `before_id` pages backwards: everything older than the last entry already
     shown (R2).
+
+    `readable` is the departments the reader may see (Batch 2.3), `None` for
+    the owner, who sees everything. An entry no department claims is the
+    platform's own and is never in it (`in_departments`). Narrowed here, in the query, so a page
+    of fifty is fifty the reader may see - never fifty cut down afterwards.
+    `department` narrows to one; the caller checks it may be read.
     """
-    from sqlalchemy import or_, tuple_
+    from sqlalchemy import tuple_
 
     from app.modules.affiliates.models.affiliates import AffiliateProfile
     from app.shared.models.identity import UserAccount
 
-    query = select(AuditEvent)
+    query = readable_by(select(AuditEvent), readable)
+    if department is not None:
+        if department not in DEPARTMENTS:
+            raise ValueError(f"No such department: {department!r}")
+        query = query.where(in_departments((department,)))
     if subject_contains:
         query = query.where(
             AuditEvent.subject.ilike(_like(subject_contains), escape=_ESCAPE)

@@ -8,7 +8,8 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { Settings } from "../Settings";
+import { Me } from "../settings/Me";
+import { Team } from "../settings/Team";
 import { SignIn } from "../SignIn";
 import type { Session } from "../../lib/api";
 
@@ -173,7 +174,7 @@ function settingsWith(status: Record<string, unknown>) {
       return reply(200, current);
     }
   };
-  render(<MemoryRouter initialEntries={["/settings?section=appearance"]}><Settings session={ME} /></MemoryRouter>);
+  render(<MemoryRouter initialEntries={["/settings/me"]}><Me /></MemoryRouter>);
 }
 
 describe("Settings → Two-step sign-in", () => {
@@ -247,11 +248,10 @@ describe("Settings → Team", () => {
   beforeEach(() => {
     routes = (url) => {
       if (url === "/api/staff") return reply(200, ROSTER);
-      if (url === "/api/staff/invitations") return reply(200, { invitations: [], invitable_roles: [], role_permissions: {} });
       if (url === "/api/staff/2/sessions") return reply(200, { sessions: [] });
       if (url === "/api/staff/2/trusted-browsers") return reply(200, BROWSERS);
     };
-    render(<MemoryRouter initialEntries={["/settings?section=team"]}><Settings session={ME} /></MemoryRouter>);
+    render(<MemoryRouter initialEntries={["/settings/team"]}><Team session={ME} /></MemoryRouter>);
   });
 
   it("says which kind of two-step sign-in a person has", async () => {

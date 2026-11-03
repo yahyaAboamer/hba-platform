@@ -547,6 +547,8 @@ export function Affiliates() {
               {`${rosterMatches(rows, "active", "").length} active`}
             </span>
           )}
+          {/* Off the sidebar since Batch 2.3; this is its way in. */}
+          <Link className="control-font" to="/affiliates/brand-codes">Brand codes →</Link>
         </div>
       </div>
 

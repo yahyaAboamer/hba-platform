@@ -135,7 +135,7 @@ def _served() -> set[tuple[str, str]]:
     )
     from app.modules.inbox import api as inbox
     from app.modules.operations import api as order_ops
-    from app.shared.api import audit, auth, health, staff, today, webhooks
+    from app.shared.api import audit, auth, health, integrations, staff, today, webhooks
 
     # **Named one by one, not discovered.** A router that is served and not
     # listed here would make every one of its routes look unreached, and a
@@ -146,8 +146,8 @@ def _served() -> set[tuple[str, str]]:
         module.router
         for module in (
             affiliate_self, affiliates, applications, audit, auth, earnings,
-            health, inbox, operations, order_ops, orders, payments, payroll, policy,
-            portal_preview, products, staff, targets, today, webhooks,
+            health, inbox, integrations, operations, order_ops, orders, payments, payroll,
+            policy, portal_preview, products, staff, targets, today, webhooks,
         )
     ]
     # Operations' second router: the frame's reads, under `/api/operations`.
