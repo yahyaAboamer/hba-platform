@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
-from app.shared.api.deps import require_permission
+from app.shared.api.deps import holds, require_permission
 from app.config import settings
 from app.core.businesstime import business_month, parse_month, utcnow
 from app.core.permissions import Permission
@@ -834,6 +834,11 @@ def counts(
     }
 
 
+#: Said on a notice only the owner can act on, to anybody else (Batch 2.3):
+#: the Settings pages it would open are the owner's, so no link is given.
+OWNERS_TO_FIX = "The owner fixes this in Settings."
+
+
 @router.get("/attention")
 def attention(
     _actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_VIEW)),
@@ -864,6 +869,18 @@ def attention(
     from app.modules.affiliates.services.payroll import months_left_reopened, working_month
 
     items: list[dict] = []
+    # Who may open the owner's Settings pages (Batch 2.3). Anybody else gets
+    # the notice without a button they could not use.
+    # Called directly with no reader (a test, a script): nobody's, so no link.
+    is_owner = _actor is not None and holds(db, _actor, Permission.SETTINGS_MANAGE)
+
+    def owners(where: str, action: str, detail: str) -> tuple[str | None, str | None, str]:
+        """`where`, `action` and `detail` for a notice fixed on an owner's
+        page: as given for the owner; for anybody else no link, and the
+        detail says who fixes it."""
+        if is_owner:
+            return where, action, detail
+        return None, None, f"{detail} {OWNERS_TO_FIX}"
 
     # **A blocking notice cannot be muted**, and that is not an oversight.
     # A10 lets somebody stop seeing a notice; it does not let them stop seeing
@@ -880,8 +897,8 @@ def attention(
         key: str,
         severity: str,
         text: str,
-        where: str,
-        action: str,
+        where: str | None,
+        action: str | None,
         detail: str | None = None,
     ) -> None:
         """One notice, and **the words on its own button**.
@@ -915,9 +932,11 @@ def attention(
             "go_live_month_unset",
             BLOCKING,
             "No go-live month is set, so nothing can be approved",
-            "/settings",
-            "Open settings",
-            "Until it is set, no month can be agreed and no model can be paid.",
+            *owners(
+                "/settings/company",
+                "Open settings",
+                "Until it is set, no month can be agreed and no model can be paid.",
+            ),
         )
 
     # -- People waiting to be let in -----------------------------------------
@@ -1006,9 +1025,11 @@ def attention(
             "mail_not_configured",
             ATTENTION,
             "No email is being sent",
-            "/settings",
-            "Open settings",
-            "Invitations and receipts are written and never delivered.",
+            *owners(
+                "/settings/integrations",
+                "Open settings",
+                "Invitations and receipts are written and never delivered.",
+            ),
         )
 
     failed_mail = db.scalar(
@@ -1021,9 +1042,11 @@ def attention(
             "notifications_failed",
             ATTENTION,
             f"{failed_mail} email{_s(failed_mail)} did not arrive",
-            "/settings",
-            "Open settings",
-            "They can be sent again without writing them a second time.",
+            *owners(
+                "/settings/integrations",
+                "Open settings",
+                "They can be sent again without writing them a second time.",
+            ),
         )
 
     # -- Work that did not happen --------------------------------------------
@@ -1037,9 +1060,11 @@ def attention(
             "failed_jobs",
             ATTENTION,
             f"{failed_jobs} piece{_s(failed_jobs)} of order syncing failed",
-            "/settings",
-            "Open sync",
-            "Sales in those orders are not attributed to anybody yet.",
+            *owners(
+                "/settings/integrations",
+                "Open sync",
+                "Sales in those orders are not attributed to anybody yet.",
+            ),
         )
 
     # -- Orders nobody owns --------------------------------------------------
@@ -1062,7 +1087,8 @@ def attention(
             "unregistered_codes",
             ATTENTION,
             f"{unowned} discount code{_s(unowned)} on orders belong{'s' if unowned == 1 else ''} to no model",
-            "/settings",
+            # Models' Brand codes: anybody who reads this list may open it.
+            "/affiliates/brand-codes",
             "Open codes",
             "Whoever earned on them is not being credited.",
         )

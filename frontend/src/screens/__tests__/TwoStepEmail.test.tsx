@@ -174,7 +174,7 @@ function settingsWith(status: Record<string, unknown>) {
       return reply(200, current);
     }
   };
-  render(<MemoryRouter initialEntries={["/settings/me"]}><Me /></MemoryRouter>);
+  render(<MemoryRouter initialEntries={["/settings/me"]}><Me session={ME} /></MemoryRouter>);
 }
 
 describe("Settings → Two-step sign-in", () => {

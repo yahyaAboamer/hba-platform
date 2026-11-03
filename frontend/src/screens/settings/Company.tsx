@@ -183,7 +183,7 @@ export function Company({ session }: { session: Session }) {
           <Row label="Go-live month">{goLive ? formatMonth(goLive) : "Not set"}</Row>
         </dl>
       </section>
-      <ActivityPanel />
+      <ActivityPanel title="Activity log" />
     </div>
   </>;
 }

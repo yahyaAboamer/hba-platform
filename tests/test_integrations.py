@@ -15,12 +15,13 @@ from fastapi.testclient import TestClient
 from sqlalchemy import text
 
 from app.config import settings
-from app.core.businesstime import utcnow
+from app.core.businesstime import at_words, utcnow
 from app.core.passwords import hash_password
 from app.db import engine
 from app.main import app
 from app.modules.inbox import public as inbox_public
 from app.modules.inbox.models import InboxConnection, InboxConversation, InboxMedia, InboxMessage
+from app.modules.inbox.services import media
 from app.modules.operations.services import freshness
 from app.shared.models.notifications import NotificationOutbox
 from app.shared.services.integrations import connections
@@ -94,8 +95,11 @@ def _message(db, at, *, direction="in") -> InboxMessage:
     return message
 
 
-def _file(db, at, state: str) -> None:
+def _file(db, at, state: str, *, refused_at=None) -> None:
+    """A file, and - for one the bucket refused - the note `media` writes."""
     message = _message(db, at)
+    if refused_at is not None:
+        message.extra = {media.BUCKET_REFUSED: refused_at.isoformat()}
     db.add(
         InboxMedia(
             message_id=message.id, state=state, created_at=at,
@@ -308,38 +312,188 @@ def test_only_emails_refused_for_their_own_reasons_is_never_not_failed(db, monke
     assert (row["state"], row["why"], row["when"]) == ("never", None, None)
 
 
-#: How the outbox records the mail service itself failing, and what the
-#: owner is told.
-THE_SERVICES = [
-    ("The mail account was refused: (535, b'5.7.8 Bad credentials')",
-     "The mail account was refused: (535, b'5.7.8 Bad credentials')."),
-    ('resend refused the message (401): {"message":"API key is invalid"}',
-     'resend refused the message (401): {"message":"API key is invalid"}.'),
-    ("brevo refused the message (403): unauthorised",
-     "brevo refused the message (403): unauthorised."),
-    ("RuntimeError: Could not reach resend: [Errno 11001] getaddrinfo failed",
-     "Still failing after every retry: Could not reach resend: [Errno 11001] getaddrinfo failed."),
-    ("RuntimeError: brevo returned 503", "Still failing after every retry: brevo returned 503."),
-    ("SMTPServerDisconnected: Connection unexpectedly closed",
-     "Still failing after every retry: Connection unexpectedly closed."),
-    ("TimeoutError: timed out", "Still failing after every retry: timed out."),
-]
+# ── Email, through the real mail code ─────────────────────────────────────────
+#
+# Each failure is produced by `notifications.send_notification` and `mail`
+# themselves, with only the provider (httpx) or the server (smtplib) faked,
+# so the words the rule reads are the words that code writes. A change of
+# wording there fails here.
 
 
-@pytest.mark.parametrize(("error", "why"), THE_SERVICES)
-def test_the_mail_service_failing_since_the_last_sent_is_failed(db, monkeypatch, error, why):
+class _Smtp:
+    """smtplib.SMTP, failing at the step it is told to."""
+
+    fail_at: str | None = None
+    error: Exception | None = None
+
+    def __init__(self, *args, **kwargs):
+        if self.fail_at == "connect":
+            raise self.error
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def _step(self, name):
+        if self.fail_at == name:
+            raise self.error
+
+    def starttls(self):
+        self._step("starttls")
+
+    def login(self, *args):
+        self._step("login")
+
+    def send_message(self, *args):
+        self._step("send")
+
+
+def _smtp(monkeypatch, fail_at: str, error: Exception) -> None:
+    import smtplib
+
+    monkeypatch.setattr(settings, "mail_from_address", "hello@example.com", raising=False)
+    monkeypatch.setattr(settings, "smtp_host", "smtp.example.com", raising=False)
+    monkeypatch.setattr(settings, "smtp_username", "hello@example.com", raising=False)
+    monkeypatch.setattr(settings, "smtp_use_tls", True, raising=False)
+    monkeypatch.setattr(smtplib, "SMTP", type("Smtp", (_Smtp,), {"fail_at": fail_at, "error": error}))
+
+
+def _resend(monkeypatch, answer) -> None:
+    """Resend answering with `answer` (a status and body), or raising it."""
+    import httpx
+
     _mail_on(monkeypatch)
-    _email(db, "sent", created_at=NOW - timedelta(hours=2), sent_at=NOW - timedelta(hours=2))
-    failed_at = NOW - timedelta(minutes=10)
-    _email(db, "failed", created_at=failed_at, error=error)
-    # An email of its own refused after it does not hide it.
-    _email(db, "failed", created_at=NOW - timedelta(minutes=2), error="There is no email address to send to")
 
-    row = _row(connections(db, NOW), "email")
+    def post(*args, **kwargs):
+        if isinstance(answer, Exception):
+            raise answer
+        status, body = answer
+        return httpx.Response(status, text=body)
+
+    monkeypatch.setattr(httpx, "post", post)
+
+
+def _deliver(db, *, event=None, payload=None, written_ago=None) -> NotificationOutbox:
+    """Queue one email and let the real sender try it - as its last try, so a
+    failure it would retry gives up and is recorded as failed."""
+    from app.shared.services.notifications import MAX_ATTEMPTS, Event, queue, send_notification
+
+    row = queue(
+        db,
+        event=event or Event.APPLICATION_APPROVED,
+        recipient_email="nour@example.com",
+        payload=payload or {"email": "nour@example.com", "name": "Nour"},
+    )
+    db.flush()
+    row.attempts = MAX_ATTEMPTS - 1
+    if written_ago is not None:
+        row.created_at = utcnow() - written_ago
+    db.flush()
+    send_notification(db, {"outbox_id": row.id})
+    db.flush()
+    assert row.state == "failed", (row.state, row.last_error)
+    return row
+
+
+def _smtp_case(fail_at, error):
+    return lambda monkeypatch: _smtp(monkeypatch, fail_at, error)
+
+
+def _resend_case(answer):
+    return lambda monkeypatch: _resend(monkeypatch, answer)
+
+
+def _service_cases():
+    import smtplib
+
+    import httpx
+
+    return [
+        ("sign-in refused", _smtp_case("login", smtplib.SMTPAuthenticationError(535, b"5.7.8 Bad credentials")),
+         "The mail service refused the account's sign-in {at}."),
+        ("no STARTTLS", _smtp_case("starttls", smtplib.SMTPNotSupportedError(
+            "STARTTLS extension not supported by server.")),
+         "The mail server would not open a secure connection {at}."),
+        ("server unreachable", _smtp_case("connect", ConnectionRefusedError(111, "Connection refused")),
+         "The mail service could not be reached {at}, even after every retry."),
+        ("server hung up", _smtp_case("send", smtplib.SMTPServerDisconnected("Connection unexpectedly closed")),
+         "The mail service could not be reached {at}, even after every retry."),
+        ("key refused", _resend_case((401, '{"message":"API key is invalid"}')),
+         "The mail service refused the key {at}."),
+        ("key not allowed", _resend_case((403, '{"message":"You do not have access"}')),
+         "The mail service refused the key {at}."),
+        ("domain not verified (403)", _resend_case(
+            (403, '{"message":"The example.com domain is not verified. Please, add and verify your domain"}')),
+         "The mail service refused the sender address {at}: its domain is not verified."),
+        ("sender domain not verified (422)", _resend_case(
+            (422, '{"message":"The sender domain is not verified"}')),
+         "The mail service refused the sender address {at}: its domain is not verified."),
+        ("rate limited", _resend_case((429, '{"message":"Too many requests"}')),
+         "The mail service turned emails away as too many {at}."),
+        ("provider down", _resend_case((503, "unavailable")),
+         "The mail service could not be reached {at}, even after every retry."),
+        ("provider unreachable", _resend_case(httpx.ConnectError("Network is unreachable")),
+         "The mail service could not be reached {at}, even after every retry."),
+    ]
+
+
+@pytest.mark.parametrize("case", range(11))
+def test_the_mail_service_failing_turns_email_failed(db, monkeypatch, case):
+    name, make, why = _service_cases()[case]
+    make(monkeypatch)
+
+    failed = _deliver(db)
+    now = utcnow()
+    row = _row(connections(db, now), "email")
+
+    assert row["state"] == "failed", (name, failed.last_error)
+    assert row["why"] == why.format(at=at_words(failed.created_at, now)), name
+    # Nothing was ever sent: no time it last worked.
+    assert row["when"] is None
+
+
+def test_a_failed_emails_when_is_still_the_last_sent(db, monkeypatch):
+    sent = utcnow() - timedelta(days=2)
+    _email(db, "sent", created_at=sent, sent_at=sent)
+    _resend(monkeypatch, (401, '{"message":"API key is invalid"}'))
+    _deliver(db)
+    # An email of its own refused after it does not hide it.
+    _email(db, "failed", created_at=utcnow(), error="There is no email address to send to")
+
+    row = _row(connections(db, utcnow()), "email")
 
     assert row["state"] == "failed"
-    assert row["why"] == why
-    assert row["when"] == failed_at.isoformat()
+    assert row["when"] == sent.isoformat()
+
+
+def _own_cases():
+    import smtplib
+
+    from app.shared.services.notifications import Event
+
+    return [
+        ("no address", lambda mp: _resend(mp, (200, "{}")), {"payload": {"email": "", "name": "Nour"}}),
+        ("code expired", lambda mp: _resend(mp, (200, "{}")),
+         {"event": Event.SIGN_IN_CODE, "payload": {"email": "nour@example.com", "code": "123456"},
+          "written_ago": timedelta(hours=1)}),
+        ("address refused by the provider",
+         lambda mp: _resend(mp, (422, '{"message":"Invalid `to` field."}')), {}),
+        ("recipient refused by the server", lambda mp: _smtp(
+            mp, "send", smtplib.SMTPRecipientsRefused({"nour@example.com": (550, b"5.1.1 No such user")})), {}),
+    ]
+
+
+@pytest.mark.parametrize("case", range(4))
+def test_an_email_refused_for_its_own_reasons_does_not_turn_email_failed(db, monkeypatch, case):
+    name, make, how = _own_cases()[case]
+    make(monkeypatch)
+
+    failed = _deliver(db, **how)
+
+    row = _row(connections(db, utcnow()), "email")
+    assert row["state"] == "never", (name, failed.last_error)
 
 
 # ── File storage: the Inbox's copies ──────────────────────────────────────────
@@ -367,7 +521,7 @@ def test_storage_with_nothing_kept_yet_is_never(db, monkeypatch):
 
 def test_storage_working_as_of_the_last_file_kept(db, monkeypatch):
     _bucket_on(monkeypatch)
-    _file(db, NOW - timedelta(days=2), "failed")
+    _file(db, NOW - timedelta(days=2), "failed", refused_at=NOW - timedelta(days=2))
     kept = NOW - timedelta(hours=1)
     _file(db, kept, "stored")
 
@@ -376,17 +530,42 @@ def test_storage_working_as_of_the_last_file_kept(db, monkeypatch):
     assert (row["state"], row["why"], row["when"]) == ("working", None, kept.isoformat())
 
 
-def test_storage_whose_latest_copy_failed_has_failed(db, monkeypatch):
+def test_storage_whose_latest_copy_the_bucket_refused_has_failed(db, monkeypatch):
+    """`when` stays the last file kept, as Bosta's stays its last good read;
+    the refusal's time is in the words."""
     _bucket_on(monkeypatch)
-    _file(db, NOW - timedelta(hours=3), "stored")
-    failed = NOW - timedelta(minutes=8)
-    _file(db, failed, "failed")
+    kept = NOW - timedelta(hours=3)
+    _file(db, kept, "stored")
+    refused = NOW - timedelta(minutes=8)
+    _file(db, refused, "failed", refused_at=refused)
 
     row = _row(connections(db, NOW), "storage")
 
     assert row["state"] == "failed"
-    assert row["why"] == "The latest file could not be kept."
-    assert row["when"] == failed.isoformat()
+    assert row["why"] == f"File storage refused the latest file {at_words(refused, NOW)}."
+    assert row["when"] == kept.isoformat()
+
+
+def test_storage_refused_with_nothing_ever_kept_has_no_when(db, monkeypatch):
+    _bucket_on(monkeypatch)
+    _file(db, NOW, "failed", refused_at=NOW)
+
+    row = _row(connections(db, NOW), "storage")
+
+    assert (row["state"], row["when"]) == ("failed", None)
+
+
+def test_a_file_failed_for_its_own_reasons_is_not_storage_failing(db, monkeypatch):
+    """Too large to keep, or WhatsApp would not hand it over: `failed`, with
+    no note from the bucket - storage was never asked."""
+    _bucket_on(monkeypatch)
+    kept = NOW - timedelta(hours=3)
+    _file(db, kept, "stored")
+    _file(db, NOW - timedelta(minutes=8), "failed")
+
+    row = _row(connections(db, NOW), "storage")
+
+    assert (row["state"], row["why"], row["when"]) == ("working", None, kept.isoformat())
 
 
 def test_no_size_is_offered(db, monkeypatch):

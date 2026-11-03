@@ -83,6 +83,31 @@ describe("who sees each section of Settings", () => {
   });
 });
 
+describe("Me", () => {
+  const SWITCHES = (url: string) =>
+    url.endsWith("/api/staff/me/preferences")
+      ? reply(200, { preferences: { notices: true }, labels: { notices: "Show pop-up notices" }, descriptions: {}, theme: null })
+      : undefined;
+
+  it.each<Kind>(["operations_manager", "customer_service"])("hides the notification switches from %s", async (kind) => {
+    await open("/settings/me", kind, SWITCHES);
+    expect(await screen.findByRole("heading", { name: "Me" })).toBeTruthy();
+    await waitFor(() => expect(seen.some((url) => url.endsWith("/api/staff/me/preferences"))).toBe(true));
+    expect(screen.queryAllByRole("switch")).toHaveLength(0);
+  });
+
+  it("shows them to whoever holds Affiliates", async () => {
+    await open("/settings/me", "affiliate_manager", SWITCHES);
+    expect(await screen.findByRole("switch", { name: "Show pop-up notices" })).toBeTruthy();
+  });
+
+  it("ends with the way to the glossary", async () => {
+    await open("/settings/me", "customer_service");
+    const link = await screen.findByRole("link", { name: /Help and definitions/ });
+    expect(link.getAttribute("href")).toBe("/glossary");
+  });
+});
+
 describe("the owner's pages, opened by anybody else", () => {
   const pages = ["/settings/team", "/settings/integrations", "/settings/company"];
   const others: Kind[] = ["affiliate_manager", "content_manager", "operations_manager", "customer_service"];
@@ -121,6 +146,8 @@ describe("Company", () => {
       if (url.includes("/api/policy/versions")) return reply(200, { versions: [] });
       return undefined;
     });
+    expect(await screen.findByRole("heading", { name: "Activity log" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Include sign-ins" })).toBeTruthy();
     expect(await screen.findByText("Go-live month")).toBeTruthy();
     expect(screen.getByText("October 2026")).toBeTruthy();
     await waitFor(() => expect(seen.some((url) => url.startsWith("/api/audit?"))).toBe(true));
@@ -201,12 +228,33 @@ describe("Brand codes, Historical setup and the activity log, inside Affiliates"
     expect(link.getAttribute("href")).toBe("/affiliates/historical");
   });
 
+  it("links to Historical setup for the content manager too, who cannot read the review", async () => {
+    await open("/affiliates/payments", "content_manager", answers);
+    const link = await screen.findByRole("link", { name: /Historical setup/ });
+    expect(link.getAttribute("href")).toBe("/affiliates/historical");
+    // The review is asked only of whoever can read it.
+    expect(seen.some((url) => url.includes("/api/payroll/historical/review"))).toBe(false);
+  });
+
   it("does not link to Historical setup once every month is final", async () => {
     await open("/affiliates/payments", "affiliate_manager", (url) =>
       url.includes("/api/payroll/historical/review") ? reply(200, { totals: { ready: 0, blocked: 0 } }) : answers(url));
     await screen.findByRole("heading", { name: "Payments" });
     await waitFor(() => expect(seen.some((url) => url.includes("/api/payroll/historical/review"))).toBe(true));
     expect(screen.queryByRole("link", { name: /Historical setup/ })).toBeNull();
+  });
+
+  it("offers the Affiliates activity page only the kinds that can match, and no sign-ins", async () => {
+    await open("/affiliates/activity", "content_manager", (url) =>
+      url.startsWith("/api/audit/filters")
+        ? reply(200, { models: [], people: [], kinds: ["money", "access", "models", "content", "settings", "inbox", "operations"] })
+        : answers(url));
+    const kinds = await screen.findByRole("group", { name: "Kind" });
+    await waitFor(() => expect(within(kinds).getByRole("button", { name: "Money" })).toBeTruthy());
+    expect(within(kinds).getAllByRole("button").map((button) => button.textContent))
+      .toEqual(["All", "Money", "Models", "Content"]);
+    expect(screen.queryByRole("button", { name: "Include sign-ins" })).toBeNull();
+    expect(seen).toContain("/api/audit/filters?department=affiliates");
   });
 
   it("opens the activity log narrowed to Affiliates, counted as Overview", async () => {
@@ -296,8 +344,12 @@ describe("Integrations", () => {
     // Operations' own key card: it says where the key comes from and offers to replace it.
     const detail = await screen.findByRole("region", { name: "Bosta details" });
     expect(await within(detail).findByRole("button", { name: "Replace key" })).toBeTruthy();
+    const reads = seen.filter((url) => url.endsWith("/api/integrations")).length;
     fireEvent.click(within(detail).getByRole("button", { name: "Close" }));
     expect(screen.queryByRole("region", { name: "Bosta details" })).toBeNull();
+    // The list is read again, and focus goes back to the button that opened the form.
+    await waitFor(() => expect(seen.filter((url) => url.endsWith("/api/integrations")).length).toBe(reads + 1));
+    await waitFor(() => expect(document.activeElement).toBe(within(row).getByRole("button", { name: /^Replace key/ })));
   });
 
   it("says Email's key is set on the server, not here", async () => {

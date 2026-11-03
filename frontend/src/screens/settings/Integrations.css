@@ -18,7 +18,7 @@
 .conns small { display:block; margin-top:2px; color:var(--quiet); font-size:12.5px; line-height:1.4; }
 .conns .when { color:var(--quiet); font-size:12.5px; text-align:right; font-variant-numeric:tabular-nums; }
 .conns .act { justify-self:end; }
-.conns li.is-failed small.why { color:var(--refused); }
+.conns li.is-failed small.why { color:var(--refused); overflow-wrap:anywhere; }
 
 .conns__pill {
   display:inline-flex; align-items:center; gap:6px; flex:none; padding:2px 9px; border-radius:999px;
@@ -35,8 +35,9 @@
   font-size:12.5px; line-height:normal; cursor:pointer;
 }
 .conns__btn:hover { border-color:var(--faint); }
-.conns__btn--primary { border-color:var(--accent); background:var(--accent-soft); color:var(--accent-text); }
-.conns__btn--primary:hover { border-color:var(--accent); }
+/* Frame 6's `.btn`: the one filled button, as Today's are. */
+.conns__btn--primary { border-color:var(--accent-fill); background:var(--accent-fill); color:var(--accent-on); }
+.conns__btn--primary:hover { border-color:var(--accent-fill); }
 
 .integrations__detail { margin-top:16px; }
 .integrations__detail-body { display:flex; flex-direction:column; gap:16px; padding:16px 18px; }

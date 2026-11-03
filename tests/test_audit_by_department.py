@@ -311,3 +311,101 @@ def test_the_filters_models_stay_the_roster(owner):
     models = reader.get("/api/audit/filters").json()["models"]
 
     assert [model["name"] for model in models] == ["Nour Eldin"]
+
+
+# ── A model's invitation is Affiliates' ───────────────────────────────────────
+
+
+def _after(action: str, after: dict, *, actor: int | None = None, subject="invitation:x") -> None:
+    """An entry with its `after`, written as `record_audit` writes an
+    invitation's: no department, since `invitation.` is no department's."""
+    import json
+
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO audit_event (action, subject, actor_id, after_json) "
+                "VALUES (:a, :s, :u, CAST(:j AS jsonb))"
+            ),
+            {"a": action, "s": subject, "u": actor, "j": json.dumps(after)},
+        )
+
+
+def test_a_model_invitation_sent_by_the_affiliate_manager_is_hers_to_read(owner):
+    reader = _as("affiliate_manager")
+    sent = reader.post("/api/auth/invitations", json={"email": "nour@example.com", "role": "affiliate"})
+    assert sent.status_code == 201, sent.text
+    staff = owner.post("/api/auth/invitations", json={"email": "layla@example.com", "role": "content_manager"})
+    assert staff.status_code == 201, staff.text
+
+    hers = reader.get("/api/audit?limit=200").json()["events"]
+    narrowed = reader.get("/api/audit?limit=200&department=affiliates").json()["events"]
+
+    assert [(row["action"], row["subject"]) for row in hers] == [
+        ("invitation.create", "invitation:nour@example.com")
+    ]
+    assert narrowed == hers
+    # The owner reads both, and the staff one is never Affiliates'.
+    assert {row["subject"] for row in owner.get("/api/audit?limit=200").json()["events"]} >= {
+        "invitation:nour@example.com",
+        "invitation:layla@example.com",
+    }
+    assert "invitation:layla@example.com" not in {
+        row["subject"]
+        for row in owner.get("/api/audit?limit=200&department=affiliates").json()["events"]
+    }
+
+
+def test_every_step_of_a_model_invitation_is_affiliates_and_no_staff_one_is(owner):
+    boda = _account("boda@example.com")
+    for action in ("invitation.create", "invitation.resend", "invitation.revoked"):
+        _after(action, {"email": "nour@example.com", "role": "affiliate"}, actor=boda,
+               subject="invitation:nour@example.com")
+        _after(action, {"email": "layla@example.com", "role": "content_manager"}, actor=boda,
+               subject="invitation:layla@example.com")
+    _after("invitation.accept", {"email": "nour@example.com", "roles": ["affiliate"]}, subject="user:41")
+    _after("invitation.accept", {"email": "layla@example.com", "roles": ["content_manager"]}, subject="user:42")
+    # Somebody who is both a model and staff is staff: not Affiliates' alone.
+    _after("invitation.accept", {"email": "sara@example.com", "roles": ["affiliate", "content_manager"]},
+           subject="user:43")
+    _event("auth.login", None, actor=boda, subject="user:41")
+    reader = _as("affiliate_manager")
+
+    subjects = [row["subject"] for row in reader.get("/api/audit?limit=200&include_sign_ins=true").json()["events"]]
+
+    assert sorted(subjects) == sorted(["invitation:nour@example.com"] * 3 + ["user:41"])
+
+
+# ── The filters by department ─────────────────────────────────────────────────
+
+
+def test_the_filters_kinds_are_only_those_ones_entries_can_hold(owner):
+    reader = _as("affiliate_manager")
+
+    kinds = reader.get("/api/audit/filters").json()["kinds"]
+
+    # Inbox's and Operations' kinds could only match entries she cannot see.
+    assert kinds == ["money", "access", "models", "content", "settings"]
+    assert owner.get("/api/audit/filters").json()["kinds"] == [
+        "money", "access", "models", "content", "settings", "inbox", "operations",
+    ]
+
+
+def test_the_filters_narrow_to_a_department_for_the_owner_too(owner):
+    _seed()
+
+    body = owner.get("/api/audit/filters?department=affiliates").json()
+
+    assert [person["name"] for person in body["people"]] == ["boda@example.com"]
+    assert "inbox" not in body["kinds"]
+    operations = owner.get("/api/audit/filters?department=operations").json()
+    assert [person["name"] for person in operations["people"]] == ["amr@example.com"]
+    assert operations["kinds"] == ["settings", "operations"]
+
+
+def test_the_filters_department_is_held_to_the_same_rule_as_the_log(owner):
+    reader = _as("affiliate_manager")
+
+    assert reader.get("/api/audit/filters?department=operations").status_code == 403
+    assert reader.get("/api/audit/filters?department=finance").status_code == 422
+    assert reader.get("/api/audit/filters?department=affiliates").status_code == 200

@@ -14,9 +14,9 @@ import "../../screens/Settings.css";
  * Whether the months before go-live are all final (D3). Asked only of
  * somebody who may see the review; for anybody else the section stays.
  */
-export function useHistoryState(session: Session) {
+export function useHistoryState(session: Session, wanted = true) {
   const [state, setState] = useState<"unknown" | "open" | "complete">("unknown");
-  const allowed = can(session, "payroll.approve");
+  const allowed = wanted && can(session, "payroll.approve");
   useEffect(() => {
     if (!allowed) return;
     let live = true;

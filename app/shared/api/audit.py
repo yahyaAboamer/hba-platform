@@ -29,7 +29,13 @@ from app.db import get_session
 from app.modules.affiliates.models.affiliates import AffiliateProfile
 from app.shared.models.audit import AuditEvent
 from app.shared.models.identity import UserAccount
-from app.shared.services.audit import DEPARTMENTS, KINDS, kind_of, readable_by, recent_events
+from app.shared.services.audit import (
+    DEPARTMENTS,
+    kind_of,
+    readable_by,
+    readable_kinds,
+    recent_events,
+)
 from app.shared.services.audit_words import describe
 
 router = APIRouter(prefix="/api/audit")
@@ -129,6 +135,7 @@ def recent(
 
 @router.get("/filters")
 def filters(
+    department: str | None = None,
     actor: UserAccount = Depends(require_permission(Permission.AUDIT_VIEW)),
     db: Session = Depends(get_session),
 ) -> dict:
@@ -138,10 +145,19 @@ def filters(
 
     The people are those in the entries this reader may read (Batch 2.3), so
     the list names nobody whose every entry is hidden from them. The models
-    stay the roster: whoever reads the log already sees every model."""
+    stay the roster: whoever reads the log already sees every model.
+
+    `department` narrows the people, and the kinds, to that department's
+    entries, as it narrows the log (the owner's too: the Affiliates activity
+    page sends it). The kinds are only those the entries read can hold
+    (`readable_kinds`): for somebody holding Affiliates alone, *inbox* and
+    *operations* go. Sign-ins are never a non-owner's, so the page offers
+    *Include sign-ins* only to the owner."""
+    readable = readable_departments(db, actor)
+    _checked_department(department, readable)
+    scope = {department} if department is not None else readable
     actors = readable_by(
-        select(AuditEvent.actor_id).where(AuditEvent.actor_id.is_not(None)),
-        readable_departments(db, actor),
+        select(AuditEvent.actor_id).where(AuditEvent.actor_id.is_not(None)), scope
     ).distinct()
     people = db.execute(
         select(UserAccount.id, UserAccount.display_name, UserAccount.email).where(
@@ -157,5 +173,5 @@ def filters(
             ({"id": row.id, "name": row.display_name or row.email} for row in people),
             key=lambda person: person["name"].lower(),
         ),
-        "kinds": list(KINDS),
+        "kinds": readable_kinds(scope),
     }

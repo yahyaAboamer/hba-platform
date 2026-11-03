@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 
 import { pickMaintainerChoice, storedMaintainerChoice, themePickedThisVisit } from "../../lib/theme";
 import type { ThemeChoice } from "../../lib/theme";
-import { api, devices, trustedBrowsers, twoStep } from "../../lib/api";
-import type { DeviceSession, TrustedBrowser, TwoStepStatus } from "../../lib/api";
+import { api, can, devices, trustedBrowsers, twoStep } from "../../lib/api";
+import type { DeviceSession, Session, TrustedBrowser, TwoStepStatus } from "../../lib/api";
 import { CodeForm, PasswordForm, RecoveryCodes, TwoStepSetup } from "../../components/TwoStepSetup";
 import { BrowserLine, DeviceLine } from "./DeviceLines";
 import "../Settings.css";
@@ -14,7 +15,7 @@ const THEME_WORDS: [ThemeChoice, string][] = [["dark", "Dark"], ["light", "Light
  * The theme, saved on the account so it follows this person between devices
  * (P1). It paints at once and is put back if the server refuses.
  */
-function AppearancePanel() {
+function AppearancePanel({ session }: { session: Session }) {
   const [theme, setTheme] = useState<ThemeChoice>(() => storedMaintainerChoice());
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -58,17 +59,21 @@ function AppearancePanel() {
         </label>)}</div>
     </section>
     {error && <p className="notice notice--refused" role="alert">{error}</p>}
-    <PreferenceSwitches />
+    {/* Saved by an endpoint that wants affiliates.view; for anybody else every switch would fail. */}
+    {can(session, "affiliates.view") && <PreferenceSwitches />}
     <TwoStepPanel />
     <DevicesPanel />
   </>;
 }
 
 /** `/settings/me`: what is only about the signed-in person. Every member of staff has it. */
-export function Me() {
+export function Me({ session }: { session: Session }) {
   return <>
     <div className="page__head"><div className="page__title"><h1>Me</h1></div></div>
-    <div className="settings__sections"><AppearancePanel /></div>
+    <div className="settings__sections">
+      <AppearancePanel session={session} />
+      <Link className="settings__glossary" to="/glossary">Help and definitions →</Link>
+    </div>
   </>;
 }
 

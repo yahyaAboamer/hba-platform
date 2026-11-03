@@ -260,7 +260,7 @@ const SESSIONS = {
 function renderSettings(section: "appearance" | "team") {
   return render(
     <MemoryRouter initialEntries={[section === "team" ? "/settings/team" : "/settings/me"]}>
-      {section === "team" ? <Team session={ME} /> : <Me />}
+      {section === "team" ? <Team session={ME} /> : <Me session={ME} />}
     </MemoryRouter>,
   );
 }

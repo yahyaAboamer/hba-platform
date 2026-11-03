@@ -29,6 +29,9 @@ const KIND_LABEL: Record<string, string> = {
   operations: "Operations",
 };
 
+/** The kinds of entry a department page can show. */
+const DEPARTMENT_KINDS: Record<string, string[]> = { affiliates: ["money", "models", "content"] };
+
 type Filters = { models: { id: number; name: string }[]; people: { id: number; name: string }[]; kinds: string[] };
 
 /** *Today*, *Yesterday*, or *Tuesday 29 September*, in Cairo. */
@@ -75,7 +78,7 @@ function changes(entry: AuditEntry): [string, string, string][] {
  * The activity log. `department` narrows it to one department's entries
  * (Affiliates' own page); Company sends none and, for the owner, reads all.
  */
-export function ActivityPanel({ department }: { department?: string } = {}) {
+export function ActivityPanel({ department, title }: { department?: string; title?: string } = {}) {
   const [events, setEvents] = useState<AuditEntry[] | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [filters, setFilters] = useState<Filters | null>(null);
@@ -93,8 +96,9 @@ export function ActivityPanel({ department }: { department?: string } = {}) {
   const latest = useRef(0);
 
   useEffect(() => {
-    api.get<Filters>("/api/audit/filters").then(setFilters).catch(() => undefined);
-  }, []);
+    api.get<Filters>(`/api/audit/filters${department ? `?department=${department}` : ""}`)
+      .then(setFilters).catch(() => undefined);
+  }, [department]);
 
   // The search box waits for a pause in typing rather than a button press.
   useEffect(() => {
@@ -149,11 +153,18 @@ export function ActivityPanel({ department }: { department?: string } = {}) {
     if (last && last[0] === heading) last[1].push(entry);
     else days.push([heading, [entry]]);
   }
+  // A department page offers only the kinds that can match it; the others
+  // (Access, Settings, another department) could only ever come back empty.
+  const offered = filters?.kinds ?? (department ? [] : Object.keys(KIND_LABEL));
+  const kinds = department
+    ? offered.filter((value) => (DEPARTMENT_KINDS[department] ?? offered).includes(value))
+    : offered;
   const narrowed = Boolean(search || model || person || kind);
 
   return (
     <>
       <section className="panel">
+        {title && <div className="panel__head"><h2 className="panel__title">{title}</h2></div>}
         <div className="settings__pad settings__filters">
           <div className="settings__filter-row">
             <input className="input settings__filter-search" type="search" value={q}
@@ -170,13 +181,16 @@ export function ActivityPanel({ department }: { department?: string } = {}) {
           </div>
           <div className="settings__filter-row" role="group" aria-label="Kind">
             <button type="button" className={`chip${kind === "" ? " chip--on" : ""}`} aria-pressed={kind === ""} onClick={() => setKind("")}>All</button>
-            {(filters?.kinds ?? Object.keys(KIND_LABEL)).map((value) => (
+            {kinds.map((value) => (
               <button key={value} type="button" className={`chip${kind === value ? " chip--on" : ""}`} aria-pressed={kind === value}
                 onClick={() => setKind(kind === value ? "" : value)}>{KIND_LABEL[value] ?? value}</button>
             ))}
-            <button type="button" className={`chip${signIns ? " chip--on" : ""}`} aria-pressed={signIns} onClick={() => setSignIns(!signIns)}>
-              Include sign-ins
-            </button>
+            {/* Sign-ins belong to no department, so a department page has none. */}
+            {!department && (
+              <button type="button" className={`chip${signIns ? " chip--on" : ""}`} aria-pressed={signIns} onClick={() => setSignIns(!signIns)}>
+                Include sign-ins
+              </button>
+            )}
           </div>
         </div>
       </section>

@@ -252,7 +252,7 @@ export function Products({ session }: { session: Session }) {
                 ? `No product matches “${asked.trim()}”.`
                 : scope === "requests"
                   ? "No feature request is visible to models right now."
-                  : "The catalogue has not been read yet. Settings → Connection → Read the catalogue."}
+                  : "The catalogue has not been read yet. Settings → Integrations → Shopify → Read the catalogue."}
             </p>
           ) : (
             <table className="table products__table">

@@ -107,9 +107,27 @@ export function Integrations({ session }: { session: Session }) {
   const detail = useRef<HTMLDivElement>(null);
   const now = useNow();
 
+  // What a screen reader hears: said once per load, not each time the clock ticks.
+  const [announced, setAnnounced] = useState("");
+  const buttons = useRef<Record<string, HTMLButtonElement | null>>({});
+
   const load = useCallback(() => {
-    api.get<Body>("/api/integrations").then(setBody).catch((caught) => setError(caught.message));
+    api.get<Body>("/api/integrations")
+      .then((fresh) => {
+        setBody(fresh);
+        setAnnounced(checkedWords(fresh.checked_at, Date.now()));
+      })
+      // A reload that fails leaves the list that is already there.
+      .catch((caught) => setBody((current) => { if (!current) setError(caught.message); return current; }));
   }, []);
+
+  // Closing the form reads the list again (a key may have just been saved)
+  // and puts focus back on the button that opened it.
+  function close(key: string) {
+    setOpen(null);
+    load();
+    window.setTimeout(() => buttons.current[key]?.focus(), 0);
+  }
   useEffect(load, [load]);
 
   // The key form opens below the list; focus goes to it so a keyboard or a
@@ -144,10 +162,13 @@ export function Integrations({ session }: { session: Session }) {
           {sub && <span className="page__subtitle">{sub}</span>}
         </div>
         {body && (
-          <p className="integrations__fresh" role="status">
-            <OpsIcon name="clock" />
-            {checkedWords(body.checked_at, now)}
-          </p>
+          <>
+            <p className="integrations__fresh" aria-hidden="true">
+              <OpsIcon name="clock" />
+              {checkedWords(body.checked_at, now)}
+            </p>
+            <span className="visually-hidden" role="status">{announced}</span>
+          </>
         )}
       </div>
       {!body ? (
@@ -172,10 +193,11 @@ export function Integrations({ session }: { session: Session }) {
                   <span className="act">
                     <button
                       type="button"
+                      ref={(element) => { buttons.current[row.key] = element; }}
                       className={`conns__btn${failed ? " conns__btn--primary" : ""}`}
                       aria-expanded={expanded}
                       aria-label={`${failed ? "Replace key" : "Details"}, ${row.name}`}
-                      onClick={() => setOpen(expanded ? null : row.key)}
+                      onClick={() => (expanded ? close(row.key) : setOpen(row.key))}
                     >
                       {failed ? "Replace key" : "Details"}
                     </button>
@@ -190,7 +212,7 @@ export function Integrations({ session }: { session: Session }) {
         <section className="panel integrations__detail" aria-labelledby="integrations-detail-title">
           <div className="panel__head">
             <h2 className="panel__title" id="integrations-detail-title">{opened.name} details</h2>
-            <button type="button" className="conns__btn" onClick={() => setOpen(null)}>Close</button>
+            <button type="button" className="conns__btn" onClick={() => close(opened.key)}>Close</button>
           </div>
           <div className="integrations__detail-body" ref={detail} tabIndex={-1}>
             {opened.key_form ? <KeyForm form={opened.key_form} session={session} /> : <ServerKey row={opened} now={now} />}

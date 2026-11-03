@@ -2,7 +2,17 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { IntegrationKeys } from "../IntegrationKey";
+import { KeyCard } from "../IntegrationKey";
+
+/** The two key cards, as Settings → Integrations opens them one at a time. */
+function IntegrationKeys() {
+  return (
+    <>
+      <KeyCard provider="bosta" />
+      <KeyCard provider="estebdal" />
+    </>
+  );
+}
 
 const reply = (status: number, body: unknown) =>
   Promise.resolve({

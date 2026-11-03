@@ -263,7 +263,7 @@ export function OperationsWhatsApp() {
           <div>
             WhatsApp isn't connected yet.
             <small>
-              An admin connects it in Settings → Shopify. Until then the platform sends no
+              An admin connects it in Settings → Integrations. Until then the platform sends no
               confirmation.
             </small>
           </div>
@@ -276,7 +276,7 @@ export function OperationsWhatsApp() {
           <div>
             The platform is not sending confirmations.
             <small>
-              Sending is switched off in Settings. The cards count only what the platform itself
+              Sending is switched off in Settings → Integrations → WhatsApp. The cards count only what the platform itself
               has decided or sent.
             </small>
           </div>

@@ -49,7 +49,7 @@ function staffRoutes(session: Session) {
         <>
           {/* Old `?section=` links go on to their new home (Batch 2.3). */}
           <Route path="/settings" element={<SettingsHome session={session} />} />
-          <Route path="/settings/me" element={<Me />} />
+          <Route path="/settings/me" element={<Me session={session} />} />
           {/* The owner's; anybody else reaches `Elsewhere`, which says so. */}
           {isOwner(session) && (
             <>

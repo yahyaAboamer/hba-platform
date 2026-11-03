@@ -136,6 +136,9 @@ def sentence(event: AuditEvent, names: _Names) -> str:
     who = names.subject(event.subject)
     month = _month(a.get("month") or b.get("month")) if (a.get("month") or b.get("month")) else None
     action = event.action or ""
+    # Every sentence below is built for every entry, so a key another action
+    # uses differently (payroll's `orders` is a count) must not break this one.
+    parcels = len(a["orders"]) if isinstance(a.get("orders"), list) else 0
 
     if action.startswith("adjustment."):
         kind = action.split(".", 1)[1]
@@ -167,10 +170,10 @@ def sentence(event: AuditEvent, names: _Names) -> str:
         "affiliate.wardrobe_removed": f"Took a product assigned by hand out of {who}'s wardrobe",
         # ADR 0060: a gift sent to a number not on her profile.
         "parcel.assigned": (
-            f"Attached {len(a.get('orders') or [])} gift parcel{'' if len(a.get('orders') or []) == 1 else 's'} to {who}"
+            f"Attached {parcels} gift parcel{'' if parcels == 1 else 's'} to {who}"
         ),
         "parcel.not_a_model": (
-            f"Marked {len(a.get('orders') or [])} gift parcel{'' if len(a.get('orders') or []) == 1 else 's'} as sent to someone who is not a model"
+            f"Marked {parcels} gift parcel{'' if parcels == 1 else 's'} as sent to someone who is not a model"
         ),
         # ADR 0058: a declined application is deleted the same way.
         "affiliate.declined_and_erased": "Declined an application and deleted it",

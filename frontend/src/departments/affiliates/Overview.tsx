@@ -40,9 +40,10 @@ type Attention = {
     text: string;
     /** The export's second line, naming which model or which order. */
     detail: string | null;
-    where: string;
+    /** Null when the fix is in a page this reader cannot open (the owner's Settings). */
+    where: string | null;
     /** The words on the button — *Open correction*, not *Open*. */
-    action: string;
+    action: string | null;
   }[];
   blocking: number;
   /** Still true, still unresolved, and somebody chose to stop seeing it. */
@@ -50,7 +51,7 @@ type Attention = {
     key: string;
     severity: "blocking" | "attention";
     text: string;
-    where: string;
+    where: string | null;
   }[];
 };
 
@@ -238,7 +239,7 @@ export function Overview({ session }: { session: Session }) {
   }
   const [error, setError] = useState<string | null>(null);
   /**
-   * Settings → Appearance's *Show pop-up notices on Home*, this account's own.
+   * Settings → Me's *Show pop-up notices on Home*, this account's own.
    * Unread or unreadable means on: a switch that failed to load must not hide
    * the way into a correction.
    */
@@ -291,10 +292,10 @@ export function Overview({ session }: { session: Session }) {
         <span>{hidden.length} notices hidden for now</span>
         <button className="button" onClick={() => { setHidden([]); try { sessionStorage.removeItem("hidden-notices"); } catch { /* optional persistence */ } }}>Show again</button>
       </div>}
-      {/* Turned off in Settings → Appearance: the export's own *hidden*
+      {/* Turned off in Settings → Me: the export's own *hidden*
        *  line in their place, so nothing reached through a notice is lost. */}
       {attention && !noticesOn && !showAnyway && attention.items.length > 0 && <div className="overview__hidden">
-        <span>{attention.items.length} {attention.items.length === 1 ? "notice" : "notices"} hidden · turned off in Settings → Appearance</span>
+        <span>{attention.items.length} {attention.items.length === 1 ? "notice" : "notices"} hidden · turned off in Settings → Me</span>
         <button className="button" onClick={() => setShowAnyway(true)}>Show</button>
       </div>}
       {attention && (noticesOn || showAnyway) && <section className="overview__notices" aria-label="Notifications">
@@ -305,8 +306,8 @@ export function Overview({ session }: { session: Session }) {
             <span>{item.text}</span>
             {item.detail && <small>{item.detail}</small>}
           </div>
-          <Link className="button" to={item.where}
-            state={item.key.startsWith("correction:") ? { back: { label: "Home", to: "/affiliates/overview" } } : undefined}>{item.action}</Link>
+          {item.where && <Link className="button" to={item.where}
+            state={item.key.startsWith("correction:") ? { back: { label: "Home", to: "/affiliates/overview" } } : undefined}>{item.action}</Link>}
           <button className="button overview__notice-icon" aria-label={`Options for ${item.text}`} aria-expanded={noticeMenu === item.key}
             onClick={() => setNoticeMenu(noticeMenu === item.key ? null : item.key)}>⋯</button>
           <button className="button overview__notice-icon" aria-label={`Dismiss ${item.text}`} onClick={() => hide(item.key)}>✕</button>
@@ -318,7 +319,7 @@ export function Overview({ session }: { session: Session }) {
       </section>}
       {attention && attention.muted.length > 0 && <details className="attention__muted">
         <summary>{attention.muted.length} muted notices</summary>
-        <ul>{attention.muted.map(item => <li key={item.key}><Link to={item.where}>{item.text}</Link>
+        <ul>{attention.muted.map(item => <li key={item.key}>{item.where ? <Link to={item.where}>{item.text}</Link> : <span>{item.text}</span>}
           <button className="button" onClick={() => unmute(item.key)}>Show again</button></li>)}</ul>
       </details>}
       {!summary && !error && <p className="empty">Loading…</p>}
@@ -341,7 +342,7 @@ export function Overview({ session }: { session: Session }) {
               ? `Historical earnings for ${formatMonth(month)}`
               : `Expected payment for ${formatMonth(month)}`}
               {!payroll?.is_historical && <span className="state">Estimated</span>}</h2>
-            {payroll?.is_historical ? <p className="overview__note">Settled outside this dashboard. Review historical terms in Settings.</p> : <>
+            {payroll?.is_historical ? <p className="overview__note">Settled outside this dashboard. Review historical terms in <Link to="/affiliates/historical">Historical setup</Link>.</p> : <>
               <div className="overview__hero-value"><Money piastres={summary.expected.payout_piastres} /></div>
               <dl className="overview__parts">
                 <div><dt>Fixed salary</dt><dd><Money piastres={summary.expected.fixed_piastres} /></dd></div>

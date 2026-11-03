@@ -104,7 +104,7 @@ function Field({
 }
 
 /**
- * The WhatsApp connection in Settings → Shopify (ADR 0059; the approved
+ * The WhatsApp connection in Settings → Integrations (ADR 0059; the approved
  * mockup's frame 6).
  *
  * No key is ever sent to this page: the card shows the number, its name and

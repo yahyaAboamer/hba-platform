@@ -308,7 +308,7 @@ export function SourceBanner({ freshness, now }: { freshness: Freshness; now: nu
           {label} isn't connected yet.
           <small>
             {freshness.source === "shopify"
-              ? "An admin connects Shopify in Settings → Shopify."
+              ? "An admin connects Shopify in Settings → Integrations."
               : `An admin adds the ${label} key.`}{" "}
             Until then this tab has no numbers.
           </small>

@@ -308,6 +308,8 @@ export function SideBody({
               >
                 <Icon name="settings" />
                 <span className="frame__dept-name">Settings</span>
+                {/* Frame 6 draws Settings open, like a department, while you are in it. */}
+                <Icon name="chev" className={`frame__chev${where.settings ? " frame__chev--open" : ""}`} />
               </Link>
               {where.settings && (
                 <ul className="frame__sections" aria-label="Settings">
