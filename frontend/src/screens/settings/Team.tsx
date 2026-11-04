@@ -77,9 +77,9 @@ const ACCESS_LINES: [string, string[]][] = [
   ["See the operations dashboard", ["order_ops.view"]],
   ["Read and answer customers in the inbox", ["inbox.use"]],
   ["Build the Khazenly confirmation file", ["khazenly.use"]],
-  ["Invite staff, up to their own access", ["invitations.send"]],
+  ["Invite models", ["invitations.send"]],
   ["Record payments and reopen approved months", ["payments.record", "payroll.reopen"]],
-  ["Change anyone's access, Shopify and the pay policy; erase a model", ["settings.manage", "affiliates.erase"]],
+  ["Invite staff and change anyone's access, Shopify and the pay policy; erase a model", ["settings.manage", "affiliates.erase"]],
 ];
 
 function holds(permissions: string[] | undefined, line: string[]) {

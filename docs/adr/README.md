@@ -112,6 +112,7 @@ what was chosen.
 | [0070](0070-a-bonus-is-added-on-top-of-an-unagreed-month.md) | A bonus is added on top of a month nobody has agreed yet | Accepted |
 | [0071](0071-khazenly-ships-only-orders-confirmed-in-shopify.md) | Khazenly ships only orders confirmed in Shopify, and the platform builds the file that tells it so | Accepted; amended by 0072 |
 | [0072](0072-each-khazenly-run-is-kept-and-customer-service-runs-it-too.md) | Each Khazenly run is kept, and customer service can run it too | Accepted; amends 0071 |
+| [0073](0073-the-content-manager-invites-models.md) | The content manager invites models | Accepted |
 
 **0014 is superseded by 0036** and **0038 by 0039**. **0027 keeps its
 principle and loses its mechanism to 0039**: an agreed figure is still set

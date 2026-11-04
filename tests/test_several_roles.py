@@ -77,6 +77,8 @@ GRANTED_SINCE: dict[str, frozenset[str]] = {
     # ADR 0072: Operations → Khazenly (owner, 1 November 2026).
     "operations_manager": frozenset({P.KHAZENLY_USE}),
     "customer_service": frozenset({P.KHAZENLY_USE}),
+    # ADR 0073: the content manager invites models (owner, 4 November 2026).
+    "content_manager": frozenset({P.INVITATIONS_SEND}),
 }
 
 

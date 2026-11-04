@@ -18,6 +18,7 @@ from app.core.permissions import (
     VALID_ROLES,
     Permission,
     has_permission,
+    invitation_permission,
     permissions_for,
     permissions_of_roles,
 )
@@ -100,8 +101,13 @@ def test_content_manager_cannot_approve_payroll_or_move_money():
         assert has_permission("content_manager", forbidden) is False
 
 
-def test_content_manager_cannot_grant_access_to_others():
-    assert has_permission("content_manager", Permission.INVITATIONS_SEND) is False
+def test_content_manager_invites_models_but_grants_no_staff_access():
+    """ADR 0073: she may invite a model; a staff invitation is the owner's."""
+    assert has_permission("content_manager", Permission.INVITATIONS_SEND) is True
+    assert has_permission("content_manager", Permission.SETTINGS_MANAGE) is False
+    assert invitation_permission("affiliate") == Permission.INVITATIONS_SEND
+    for role in ("admin", "affiliate_manager", "content_manager", "customer_service", "operations_manager"):
+        assert invitation_permission(role) == Permission.SETTINGS_MANAGE, role
 
 
 def test_content_manager_cannot_change_platform_settings():
