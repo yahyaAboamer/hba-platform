@@ -369,11 +369,14 @@ def test_the_invited_role_gets_exactly_its_permissions(client):
     # The boundary that holds: they cannot approve payroll or move money.
     assert "payroll.approve" not in permissions
     assert "payments.record" not in permissions
-    assert "invitations.send" not in permissions
+    # She invites models (ADR 0073), but nothing that gives staff access.
+    assert "invitations.send" in permissions
+    assert "settings.manage" not in permissions
 
 
-def test_a_role_without_invitation_rights_cannot_invite(client):
-    """Server-side enforcement, not a hidden button."""
+def test_a_role_without_the_owners_permission_cannot_invite_staff(client):
+    """Server-side enforcement, not a hidden button. The content manager may
+    invite models (ADR 0073), never staff."""
     body = _bootstrap(client)
     invite = client.post(
         "/api/auth/invitations",
@@ -397,7 +400,7 @@ def test_a_role_without_invitation_rights_cannot_invite(client):
         headers={"X-CSRF-Token": accepted["csrf"]},
     )
     assert forbidden.status_code == 403
-    assert "invitations.send" in forbidden.json()["detail"]
+    assert "settings.manage" in forbidden.json()["detail"]
 
 
 def test_an_invitation_cannot_be_accepted_twice(client):

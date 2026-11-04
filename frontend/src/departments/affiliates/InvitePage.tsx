@@ -174,7 +174,8 @@ export function InvitePage({ session }: { session: Session }) {
         {!mayInvite && (
           <p className="invite-page__hint">
             You can see who has been invited. Sending, resending and
-            withdrawing invitations is for an administrator or affiliate manager.
+            withdrawing invitations is for the owner, an affiliate manager or a
+            content manager.
           </p>
         )}
         {mayInvite && (

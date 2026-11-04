@@ -523,10 +523,21 @@ def test_an_affiliate_manager_may_resend_a_models_invitation(client):
     assert "link" in resend.json()
 
 
-def test_a_content_manager_may_not_send_invitations(client):
+def test_a_content_manager_invites_models_but_not_staff(client):
+    """ADR 0073: a model's invitation is hers to send, resend and withdraw;
+    a staff invitation is still the owner's."""
+    _invite(client, "staffer@example.com", "content_manager")
+    staffer = _invitation_id("staffer@example.com")
     _demote_to("content_manager")
+
     assert _invite(client, "x@example.com", "content_manager").status_code == 403
-    assert _invite(client, "y@example.com", "affiliate").status_code == 403
+    assert client.post(f"/api/staff/invitations/{staffer}/resend").status_code == 403
+    assert client.post(f"/api/staff/invitations/{staffer}/revoke").status_code == 403
+
+    assert _invite(client, "y@example.com", "affiliate").status_code == 201
+    model = _invitation_id("y@example.com")
+    assert client.post(f"/api/staff/invitations/{model}/resend").status_code == 201
+    assert client.post(f"/api/staff/invitations/{model}/revoke").status_code == 200
 
 
 # ── One pending line per address (Settings audit T1) ────────────────────────

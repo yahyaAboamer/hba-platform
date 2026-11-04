@@ -178,6 +178,10 @@ payroll without touching a maintainer screen.
 - **Nobody grants access they do not hold** (`can_grant`). An invitation, a
   resend and a withdrawal are all held to it; nobody changes or suspends their
   own staff account.
+- **Who invites.** A staff invitation, its resend and its withdrawal are the
+  owner's (`settings.manage`). A model's are anybody's who holds
+  `invitations.send`: the owner, the affiliate manager and the content manager
+  (ADR 0073).
 - **Operations only reads, and never decides pay** (ADR 0057). It writes
   nothing to Shopify, Bosta or E-stebdal. Bosta's data is for operations only: delivery for pay is still
   read from Shopify (ADR 0023).

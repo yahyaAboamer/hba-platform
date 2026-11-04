@@ -96,6 +96,9 @@ ROLES: dict[str, frozenset[str]] = {
             Permission.TARGETS_RECORD,
             Permission.TARGETS_MANAGE,
             Permission.TARGETS_VERIFY,
+            # Models only (ADR 0073): staff invitations are `settings.manage`
+            # since Batch 2.3, so this hands out no staff access.
+            Permission.INVITATIONS_SEND,
             Permission.AUDIT_VIEW,
         }
     ),
