@@ -85,6 +85,9 @@ class Event:
     SIGN_IN_CODE = "sign_in.code"
     #: Settings → Appearance's weekly reminder, to a member of staff.
     TARGETS_REMINDER = "targets.weekly_reminder"
+    #: Team and access's *Send a reminder* (Batch 2.4): the owner asking a
+    #: member of staff to turn on two-step sign-in.
+    TWO_STEP_REMINDER = "two_step.reminder"
 
     #: Not in §16's table. Added with the maintainer's own
     #: payout-destination screen, because that screen is the first way one
@@ -516,6 +519,27 @@ def targets_reminder(db: Session, account, month: str, missing: int, total: int)
         },
     )
 
+def two_step_reminder(db: Session, account, *, required: bool) -> NotificationOutbox | None:
+    """The owner's nudge to turn on two-step sign-in (Batch 2.4).
+
+    `required` is whether this person's access asks for it, so the email can
+    say so plainly rather than leave them to guess. Nothing secret travels: it
+    points at Settings → Me and stops there.
+    """
+    return queue(
+        db,
+        event=Event.TWO_STEP_REMINDER,
+        recipient_email=account.email,
+        recipient_name=account.display_name,
+        subject_ref=f"user:{account.id}",
+        payload={
+            "email": account.email,
+            "name": account.display_name or "",
+            "required": bool(required),
+        },
+    )
+
+
 # -- What each one says -------------------------------------------------------
 
 
@@ -674,6 +698,31 @@ def render(event: str, payload: dict) -> Message | None:
                 f"{code}\n\n"
                 "It works for 10 minutes. If you did not just try to sign in, "
                 "change your password."
+                + _sign_off()
+            ),
+        )
+
+    if event == Event.TWO_STEP_REMINDER:
+        # Short: what it is, whether their access needs it, and where to turn
+        # it on. No link to press - Settings → Me is where they already go,
+        # and a link in a sign-in email is what a fake one looks like.
+        greeting = f"Hi {first}," if name else "Hello,"
+        needed = (
+            "Your access to HBA requires it, so please turn it on soon."
+            if payload.get("required")
+            else "Your access to HBA does not require it, but it keeps your "
+            "account safe if your password is ever guessed or leaked."
+        )
+        return Message(
+            to_address=payload["email"],
+            to_name=name or None,
+            subject="Turn on two-step sign-in for HBA",
+            body=(
+                f"{greeting}\n\n"
+                "Two-step sign-in asks for a code as well as your password "
+                "when you sign in on a new browser, so your password alone is "
+                f"not enough to get in.\n\n{needed}\n\n"
+                "To turn it on, sign in to HBA and open Settings → Me."
                 + _sign_off()
             ),
         )

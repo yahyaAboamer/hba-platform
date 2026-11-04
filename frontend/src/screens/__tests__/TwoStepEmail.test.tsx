@@ -251,23 +251,22 @@ describe("Settings → Team", () => {
       if (url === "/api/staff/2/sessions") return reply(200, { sessions: [] });
       if (url === "/api/staff/2/trusted-browsers") return reply(200, BROWSERS);
     };
-    render(<MemoryRouter initialEntries={["/settings/team"]}><Team session={ME} /></MemoryRouter>);
+    render(<MemoryRouter initialEntries={["/settings/team?person=2"]}><Team session={ME} /></MemoryRouter>);
   });
 
   it("says which kind of two-step sign-in a person has", async () => {
-    const mona = (await screen.findByText("Mona")).closest("tr")!;
-    expect(within(mona).getByLabelText("Two-step sign-in on, code by email")).toBeTruthy();
-    expect(within(screen.getByText("Yahya").closest("tr")!).getByLabelText("Two-step sign-in on, authenticator app")).toBeTruthy();
-    expect(within(screen.getByText("Aya").closest("tr")!).queryByLabelText(/Two-step sign-in on/)).toBeNull();
+    const list = await screen.findByRole("region", { name: "People" });
+    const lineOf = (name: string) => within(list).getByText(name).closest("a")!;
+    expect(within(lineOf("Mona")).getByLabelText("Two-step sign-in on, code by email")).toBeTruthy();
+    expect(within(lineOf("Yahya")).getByLabelText("Two-step sign-in on, authenticator app")).toBeTruthy();
+    expect(within(lineOf("Aya")).queryByLabelText(/Two-step sign-in on/)).toBeNull();
   });
 
   it("lists a person's remembered browsers beside their devices", async () => {
-    fireEvent.click(await screen.findByRole("button", { name: "More for Mona" }));
     // Email codes have no authenticator to reset.
+    expect(await screen.findByRole("heading", { name: "Mona" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: /Reset two-step sign-in/ })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: /Signed in on/ }));
-    const dialog = await screen.findByRole("dialog");
-    const list = await within(dialog).findByRole("list", { name: "Remembered browsers for Mona" });
+    const list = await screen.findByRole("list", { name: "Remembered browsers for Mona" });
     expect(within(list).getAllByRole("listitem")).toHaveLength(2);
   });
 });

@@ -18,23 +18,37 @@ This is where that promise is kept. `settings.manage`, `invitations.send` and
 `audit.view` were defined with this screen in mind and had no UI until now.
 """
 
+from datetime import timedelta
+
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.businesstime import utcnow
 from app.core.permissions import (
+    DEPARTMENT_LEVELS,
     GRANT_REFUSED,
     MODEL_ROLE,
+    OWNER_ROLE,
     VALID_ROLES,
+    access_of,
+    access_words,
     can_grant,
+    role_for_level,
+    roles_of_department,
     sorted_roles,
 )
+from app.shared.models.audit import AuditEvent
 from app.shared.models.identity import Invitation, RoleAssignment, UserAccount
 from app.shared.services.access import live_roles, live_roles_by_account
 from app.shared.services.audit import record_audit
 from app.shared.services.auth import revoke_all_sessions
 from app.shared.services.trusted_browsers import forget_all as forget_trusted_browsers
-from app.shared.services.two_step import cancel_pending, enabled_account_ids, method_from
+from app.shared.services.two_step import (
+    cancel_pending,
+    enabled_account_ids,
+    method_from,
+    required_now,
+)
 
 #: A model's role grants nothing and makes nobody staff; a model holds it by
 #: accepting her invitation, and reaches her portal by owning her record. It
@@ -107,7 +121,7 @@ def invitable_roles(actor_roles: frozenset[str]) -> list[str]:
     return sorted(role for role in ASSIGNABLE_ROLES if can_grant(actor_roles, role))
 
 
-def list_staff(db: Session) -> list[dict]:
+def list_staff(db: Session, *, only: int | None = None) -> list[dict]:
     """Every account that has ever held a staff role, with what it holds now.
 
     "Has ever held one" rather than "holds one now": a suspended account still
@@ -119,14 +133,14 @@ def list_staff(db: Session) -> list[dict]:
     was still *waiting to be approved*, which reads as the platform
     contradicting itself. They belong on Affiliates, which is where their
     status means what it says.
+
+    `only` narrows it to one account - the row Team and access shows again
+    after changing somebody's level - built by exactly the same code.
     """
-    account_ids = list(
-        db.scalars(
-            select(RoleAssignment.user_account_id)
-            .where(RoleAssignment.role != MODEL_ROLE)
-            .distinct()
-        )
-    )
+    query = select(RoleAssignment.user_account_id).where(RoleAssignment.role != MODEL_ROLE)
+    if only is not None:
+        query = query.where(RoleAssignment.user_account_id == only)
+    account_ids = list(db.scalars(query.distinct()))
     if not account_ids:
         return []
 
@@ -163,8 +177,17 @@ def list_staff(db: Session) -> list[dict]:
             "two_step_enabled": methods[account.id] is not None,
             "two_step_method": methods[account.id],
             "two_step_email_on": account.two_step_email_at is not None,
+            #: Whether their access asks for it today - the same answer the
+            #: reminder email gives (`required_now`, Batch 2.4).
+            "two_step_required": required_now(held[account.id]),
             "last_login_at": account.last_login_at,
             "created_at": account.created_at,
+            # Team and access by department (Batch 2.4). Read from the same
+            # roles as `roles`, so the two can never disagree.
+            "owner": OWNER_ROLE in held[account.id],
+            "access": access_of(held[account.id]),
+            "access_words": access_words(held[account.id]),
+            "joined_at": account.created_at,
         }
         for account in accounts
     ]
@@ -278,6 +301,34 @@ def _name(user: UserAccount) -> str:
     return user.display_name or user.email
 
 
+def suspended_refusal(user: UserAccount) -> str:
+    """What a refusal says about a suspended account. Reactivating comes
+    first, deliberately, and gives nothing back (ADR 0067, decision 6)."""
+    return f"{_name(user)} is suspended. Reactivate the account first."
+
+
+def _lock_account(db: Session, user: UserAccount) -> None:
+    """Lock the person's account row for the rest of the transaction, and
+    read it afresh.
+
+    **One change to somebody's access at a time** (Batch 2.4 review). Each
+    role row is locked on its own, so without this two changes at once - two
+    owners, or two presses - each read the roles before the other's change:
+    two removals could each see the other role still there and leave nothing,
+    and two level changes could leave both Affiliates roles. The second now
+    waits for the first to commit, then reads what it left.
+    """
+    # Anything this session changed is written first: the fresh read must
+    # not overwrite it (the session does not flush on its own).
+    db.flush()
+    db.execute(
+        select(UserAccount)
+        .where(UserAccount.id == user.id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+
+
 def _refuse_own_account(user: UserAccount, actor_id: int | None) -> None:
     # Nobody changes their own access - one mis-click demoting yourself locks
     # you out of the very screen that would undo it (Settings audit, T2).
@@ -301,6 +352,10 @@ def give_role(
     roles together (`can_grant`); there is one operations manager at a time.
     A role already held is refused here with the reason, and by the database's
     one-live-role-per-person index when two requests race.
+
+    **Never to a suspended account** (Batch 2.4 review): reactivating comes
+    first, so access cannot slip back to somebody locked out while they are
+    still locked out.
     """
     if role not in ASSIGNABLE_ROLES:
         raise ValueError(f"Not an assignable role: {role!r}")
@@ -308,6 +363,9 @@ def give_role(
     if not can_grant(actor_roles, role):
         raise ValueError(GRANT_REFUSED)
 
+    _lock_account(db, user)
+    if user.status == "suspended":
+        raise ValueError(suspended_refusal(user))
     before = live_roles(db, user.id)
     if role in before:
         raise ValueError(f"{_name(user)} already holds this access")
@@ -363,6 +421,7 @@ def remove_role(
     if not can_grant(actor_roles, role):
         raise ValueError(GRANT_REFUSED)
 
+    _lock_account(db, user)
     live = db.scalar(
         select(RoleAssignment)
         .where(
@@ -396,6 +455,65 @@ def remove_role(
         after={"role": role, "roles": sorted_roles(before - {role})},
     )
     return live
+
+
+def set_level(
+    db: Session,
+    user: UserAccount,
+    department: str,
+    level: str,
+    *,
+    actor_roles: frozenset[str],
+    actor_id: int | None,
+    actor_email: str | None,
+) -> bool:
+    """Set one department of somebody's access to one level (Batch 2.4).
+    Returns whether anything changed.
+
+    **Nothing new decides who may do what.** A level is one of today's roles
+    (`DEPARTMENT_LEVELS`), so this is `give_role` and then `remove_role`, and
+    every rule those keep still refuses: not your own access, nothing you do
+    not hold (`can_grant`), one operations manager at a time, the last staff
+    role kept (suspend instead). Each step is audited as it always was.
+
+    **Giving before taking**, so moving between two levels never trips "this
+    is the only access". Choosing a level takes away every other role of the
+    department, so somebody holding both Affiliates roles who is set to
+    Manager keeps only the manager's.
+
+    **All of it or none of it.** The steps run inside a savepoint: a refusal
+    at any step undoes the ones before it, so a department is never left half
+    changed, whatever the caller then does with its transaction. The account
+    is locked first, inside it, and the roles read only then, so two changes
+    at once queue rather than each acting on what the other is replacing.
+
+    Raises `KeyError` for an unknown department and `ValueError` for a level
+    not offered there, before anything is read or written.
+    """
+    if department not in DEPARTMENT_LEVELS:
+        raise KeyError(department)
+    wanted_role = role_for_level(department, level)
+    # Before anything else, as `give_role` and `remove_role` both would: a
+    # level that is already yours still is not yours to set.
+    _refuse_own_account(user, actor_id)
+
+    wanted = frozenset({wanted_role}) if wanted_role else frozenset()
+    with db.begin_nested():
+        _lock_account(db, user)
+        held_here = live_roles(db, user.id) & roles_of_department(department)
+        if held_here == wanted:
+            return False
+        if wanted_role and wanted_role not in held_here:
+            give_role(
+                db, user, wanted_role,
+                actor_roles=actor_roles, actor_id=actor_id, actor_email=actor_email,
+            )
+        for role in sorted_roles(held_here - wanted):
+            remove_role(
+                db, user, role,
+                actor_roles=actor_roles, actor_id=actor_id, actor_email=actor_email,
+            )
+    return True
 
 
 def _revoke(db: Session, assignments: list[RoleAssignment]) -> None:
@@ -438,6 +556,9 @@ def suspend_staff(
         raise ValueError("Suspending an account needs a written reason")
     if actor_id is not None and actor_id == user.id:
         raise ValueError("You cannot suspend your own account. Another admin can.")
+    # Locked, so a role given at the same moment is either taken with the
+    # rest or refused as given to a suspended account - never left behind.
+    _lock_account(db, user)
     if user.status == "suspended":
         raise ValueError(f"{user.display_name or user.email} is already suspended")
 
@@ -513,6 +634,23 @@ def reactivate_staff(
         after={"status": "active"},
     )
     return user
+
+
+#: One reminder per person per day (Batch 2.4): a nudge, not a nag.
+REMINDER_EVERY = timedelta(hours=24)
+
+
+def last_two_step_reminder(db: Session, user_id: int):
+    """When the owner last reminded this person to turn on two-step sign-in,
+    within `REMINDER_EVERY`, or None. Read from the audit trail, which keeps
+    every reminder for good - the outbox is the email's record, not this."""
+    return db.scalar(
+        select(func.max(AuditEvent.created_at)).where(
+            AuditEvent.action == "staff.two_step_reminded",
+            AuditEvent.subject == f"user:{user_id}",
+            AuditEvent.created_at > utcnow() - REMINDER_EVERY,
+        )
+    )
 
 
 def revoke_invitation(

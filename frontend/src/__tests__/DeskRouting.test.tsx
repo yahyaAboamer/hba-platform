@@ -58,7 +58,7 @@ describe("deskFor", () => {
   });
 
   it("names a person by the widest role they hold", () => {
-    expect(roleLabel(sessionOf("operations_manager").actor)).toBe("operations manager");
+    expect(roleLabel(sessionOf("operations_manager").actor)).toBe("Operations manager");
     expect(roleLabel({ ...sessionOf("model").actor, roles: [] })).toBe("");
   });
 });

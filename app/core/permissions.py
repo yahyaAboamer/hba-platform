@@ -169,6 +169,116 @@ def departments_held(permissions: Iterable[str]) -> tuple[str, ...]:
     return tuple(name for name, permission in DEPARTMENT_HELD_BY.items() if permission in held)
 
 
+# ── Access by department (Batch 2.4) ──────────────────────────────────────────
+#
+# Team and access shows a person's access as a level in each department rather
+# than as a list of roles. **A level is one of today's roles in other words**:
+# nothing about how access is stored changes, and giving or taking a level is
+# `give_role` / `remove_role` with every rule they keep
+# (`app.shared.services.staff.set_level`).
+
+#: The levels, lowest first. "none" is holding no role of that department.
+LEVELS: tuple[str, ...] = ("none", "viewer", "staff", "manager")
+
+#: The role behind each level of each department, in the sidebar's order
+#: (Inbox, Operations, Affiliates). `None` is a level not offered yet: no role
+#: grants it today. Production, Finance and People are not drawn (Batch 2.4,
+#: Choice 2). The owner (`admin`) is no department's level; it is its own line.
+DEPARTMENT_LEVELS: dict[str, dict[str, str | None]] = {
+    "inbox": {"viewer": None, "staff": "customer_service", "manager": None},
+    "operations": {"viewer": None, "staff": None, "manager": "operations_manager"},
+    "affiliates": {"viewer": None, "staff": "content_manager", "manager": "affiliate_manager"},
+}
+
+#: Each department as the screen names it.
+DEPARTMENT_NAMES: dict[str, str] = {
+    "inbox": "Inbox",
+    "operations": "Operations",
+    "affiliates": "Affiliates",
+}
+
+#: The owner's role: every department, Settings and money.
+OWNER_ROLE = "admin"
+
+#: Each staff role as staff are shown it (Batch 2.4, Choice 6). The stored
+#: names do not change; these are the only words the screens, the
+#: invitations and the activity log use for them.
+ROLE_WORDS: dict[str, str] = {
+    "admin": "Owner",
+    "operations_manager": "Operations manager",
+    "customer_service": "Inbox staff",
+    "affiliate_manager": "Affiliates manager",
+    "content_manager": "Affiliates staff",
+}
+
+#: Refused when a level has no role behind it yet.
+NOT_OFFERED = "Not offered yet"
+
+
+def roles_of_department(department: str) -> frozenset[str]:
+    """Every role that is some level of this department."""
+    return frozenset(role for role in DEPARTMENT_LEVELS[department].values() if role)
+
+
+def role_for_level(department: str, level: str) -> str | None:
+    """The role behind a level, `None` for "none".
+
+    Raises `KeyError` for an unknown department and `ValueError` for a level
+    not offered there (or not a level at all), so a caller cannot mistake
+    "not offered" for "none".
+    """
+    levels = DEPARTMENT_LEVELS[department]
+    if level == "none":
+        return None
+    if level not in LEVELS or levels.get(level) is None:
+        raise ValueError(NOT_OFFERED)
+    return levels[level]
+
+
+def level_of_role(role: str) -> tuple[str, str] | None:
+    """The department and level a role is, or `None` for one that is no
+    department's level (the owner, a model)."""
+    for department, levels in DEPARTMENT_LEVELS.items():
+        for level, held_by in levels.items():
+            if held_by == role:
+                return department, level
+    return None
+
+
+def level_in(department: str, roles: Iterable[str]) -> str:
+    """A person's level in one department: the highest whose role they hold
+    there (Manager > Staff > Viewer), "none" when they hold none. Somebody
+    holding both Affiliates roles reads as Manager."""
+    held = _as_roles(roles)
+    levels = DEPARTMENT_LEVELS[department]
+    for level in reversed(LEVELS[1:]):
+        role = levels.get(level)
+        if role is not None and role in held:
+            return level
+    return "none"
+
+
+def access_of(roles: Iterable[str]) -> dict[str, str]:
+    """A person's level in every department, in the sidebar's order."""
+    held = _as_roles(roles)
+    return {department: level_in(department, held) for department in DEPARTMENT_LEVELS}
+
+
+def access_words(roles: Iterable[str]) -> str:
+    """The small line under a name on Team and access: "Owner" for an owner,
+    else each department they reach at its level, the widest level first and
+    ties in the sidebar's order - frame 5's "Operations manager · Inbox
+    staff" - else "No access" (a suspended or reactivated account)."""
+    held = _as_roles(roles)
+    if OWNER_ROLE in held:
+        return ROLE_WORDS[OWNER_ROLE]
+    reached = [(department, level) for department, level in access_of(held).items() if level != "none"]
+    # Stable, so departments at the same level keep the sidebar's order.
+    reached.sort(key=lambda pair: -LEVELS.index(pair[1]))
+    words = [ROLE_WORDS[DEPARTMENT_LEVELS[department][level]] for department, level in reached]
+    return " · ".join(words) if words else "No access"
+
+
 #: The role that grants no staff permission. A model holds it; nobody is
 #: *staff* by holding it (ADR 0067, decision 2).
 MODEL_ROLE = "affiliate"

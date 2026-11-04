@@ -257,9 +257,9 @@ const SESSIONS = {
   ],
 };
 
-function renderSettings(section: "appearance" | "team") {
+function renderSettings(section: "appearance" | "team", person = 2) {
   return render(
-    <MemoryRouter initialEntries={[section === "team" ? "/settings/team" : "/settings/me"]}>
+    <MemoryRouter initialEntries={[section === "team" ? `/settings/team?person=${person}` : "/settings/me"]}>
       {section === "team" ? <Team session={ME} /> : <Me session={ME} />}
     </MemoryRouter>,
   );
@@ -400,26 +400,24 @@ describe("Settings → Team", () => {
 
   it("marks only the people who have two-step sign-in on", async () => {
     renderSettings("team");
-    const mona = (await screen.findByText("Mona")).closest("tr")!;
-    expect(within(mona).getByLabelText("Two-step sign-in on")).toBeTruthy();
-    expect(within(screen.getByText("Aya").closest("tr")!).queryByLabelText("Two-step sign-in on")).toBeNull();
+    const list = await screen.findByRole("region", { name: "People" });
+    const lineOf = (name: string) => within(list).getByText(name).closest("a")!;
+    expect(within(lineOf("Mona")).getByLabelText("Two-step sign-in on")).toBeTruthy();
+    expect(within(lineOf("Aya")).queryByLabelText("Two-step sign-in on")).toBeNull();
   });
 
-  it("lists somebody's devices and signs them out of every one", async () => {
+  it("lists somebody's devices on their page and signs them out of every one", async () => {
     renderSettings("team");
-    fireEvent.click(await screen.findByRole("button", { name: "More for Mona" }));
-    fireEvent.click(screen.getByRole("button", { name: /Signed in on/ }));
-    const dialog = await screen.findByRole("dialog");
-    expect(await within(dialog).findByText("Safari on iPhone")).toBeTruthy();
-    fireEvent.click(within(dialog).getByRole("button", { name: "Sign out of every device" }));
+    const panel = (await screen.findByRole("heading", { name: "Signed in on" })).closest("section")!;
+    expect(await within(panel).findByText("Safari on iPhone")).toBeTruthy();
+    fireEvent.click(within(panel).getByRole("button", { name: "Sign out of every device" }));
     await waitFor(() => expect(called("POST", "/api/staff/2/sessions/end-all")).toBeTruthy());
-    expect(await within(dialog).findByText("Not signed in anywhere.")).toBeTruthy();
+    expect(await within(panel).findByText("Not signed in anywhere.")).toBeTruthy();
   });
 
   it("resets somebody's two-step sign-in with the owner's own code", async () => {
     renderSettings("team");
-    fireEvent.click(await screen.findByRole("button", { name: "More for Mona" }));
-    fireEvent.click(screen.getByRole("button", { name: /Reset two-step sign-in/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /Reset two-step sign-in/ }));
     const dialog = await screen.findByRole("dialog");
     expect(dialog.textContent).toContain("set it up again");
     fireEvent.change(within(dialog).getByLabelText("Your own 6-digit code"), { target: { value: "111222" } });
@@ -433,8 +431,7 @@ describe("Settings → Team", () => {
     routes = (url, method, body) =>
       url === "/api/staff/2/two-step/reset" ? reply(400, { detail: "That code did not work." }) : base(url, method, body);
     renderSettings("team");
-    fireEvent.click(await screen.findByRole("button", { name: "More for Mona" }));
-    fireEvent.click(screen.getByRole("button", { name: /Reset two-step sign-in/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /Reset two-step sign-in/ }));
     const dialog = await screen.findByRole("dialog");
     fireEvent.change(within(dialog).getByLabelText("Your own 6-digit code"), { target: { value: "000000" } });
     fireEvent.click(within(dialog).getByRole("button", { name: "Reset two-step sign-in" }));
@@ -442,15 +439,16 @@ describe("Settings → Team", () => {
   });
 
   it("does not offer a reset to somebody who has no two-step sign-in", async () => {
-    renderSettings("team");
-    fireEvent.click(await screen.findByRole("button", { name: "More for Aya" }));
+    renderSettings("team", 3);
+    await screen.findByRole("heading", { name: "Aya" });
     expect(screen.queryByRole("button", { name: /Reset two-step sign-in/ })).toBeNull();
   });
 
   it("says what suspending does, in the mockup's words", async () => {
     renderSettings("team");
-    fireEvent.click(await screen.findByRole("button", { name: "More for Mona" }));
-    fireEvent.click(screen.getByRole("button", { name: /Suspend/ }));
+    expect((await screen.findByText(/Removes every department and signs out every device at once\./)).textContent)
+      .toContain("The record of what Mona did stays.");
+    fireEvent.click(screen.getByRole("button", { name: "Suspend Mona" }));
     const dialog = await screen.findByRole("dialog");
     expect(dialog.textContent).toContain("Removes every department and signs out every device at once.");
     expect(dialog.textContent).toContain("The record of what Mona did stays.");
@@ -462,10 +460,9 @@ describe("Settings → Team", () => {
       if (url === "/api/staff") return reply(200, suspended);
     };
     renderSettings("team");
-    fireEvent.click(await screen.findByRole("button", { name: "More for Mona" }));
-    fireEvent.click(screen.getByRole("button", { name: /Reactivate/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /Reactivate/ }));
     const dialog = await screen.findByRole("dialog");
     expect(dialog.textContent).toContain("gives no access");
-    expect(dialog.textContent).toContain("Add it again with Add access.");
+    expect(dialog.textContent).toContain("Give it again");
   });
 });

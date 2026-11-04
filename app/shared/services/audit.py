@@ -186,6 +186,8 @@ KINDS: dict[str, tuple[str, ...]] = {
         "staff.role_removed",
         "staff.suspended",
         "staff.reactivated",
+        # Team and access's *Send a reminder* (Batch 2.4).
+        "staff.two_step_reminded",
     ),
     # `portal.previewed`: staff looking at her portal, read only (ADR 0064).
     "models": ("affiliate.", "application.", "code.", "parcel.", "portal."),
