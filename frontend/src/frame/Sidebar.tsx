@@ -9,7 +9,7 @@ import { pickMaintainerChoice, storedMaintainerChoice } from "../lib/theme";
 import type { ThemeChoice } from "../lib/theme";
 import { Icon } from "./Icon";
 import type { Waiting } from "./useWaiting";
-import { TODAY, canOpenSettings, holdsToday } from "./where";
+import { SETTINGS_SECTIONS, TODAY, canOpenSettings, holdsToday, isOwner, within } from "./where";
 import type { Where } from "./where";
 
 const THEMES: [ThemeChoice, string][] = [
@@ -161,9 +161,9 @@ function Account({ session, onNavigate }: { session: Session; onNavigate: () => 
               </button>
             ))}
           </div>
-          {canOpenSettings(session) && (
+          {isOwner(session) && (
             <Link
-              to="/settings?section=team"
+              to="/settings/team"
               onClick={() => {
                 setOpen(false);
                 onNavigate();
@@ -228,6 +228,7 @@ export function SideBody({
   }
   const sectionsId = useId();
   const today = holdsToday(departments) ? todayMark(waiting) : null;
+  const onSection = SETTINGS_SECTIONS.some((section) => within(pathname, section.to));
 
   return (
     <>
@@ -298,14 +299,33 @@ export function SideBody({
           <ul className="frame__depts">
             <li>
               <Link
-                to="/settings"
+                to="/settings/me"
                 className="frame__dept"
-                aria-current={where.settings ? "page" : undefined}
+                // A section below carries the "current" mark when there is
+                // one; the glossary has none, so Settings carries it.
+                aria-current={where.settings && !onSection ? "page" : undefined}
                 onClick={onNavigate}
               >
                 <Icon name="settings" />
                 <span className="frame__dept-name">Settings</span>
+                {/* Frame 6 draws Settings open, like a department, while you are in it. */}
+                <Icon name="chev" className={`frame__chev${where.settings ? " frame__chev--open" : ""}`} />
               </Link>
+              {where.settings && (
+                <ul className="frame__sections" aria-label="Settings">
+                  {SETTINGS_SECTIONS.filter((section) => !section.owner || isOwner(session)).map((section) => (
+                    <li key={section.to}>
+                      <Link
+                        to={section.to}
+                        aria-current={within(pathname, section.to) ? "page" : undefined}
+                        onClick={onNavigate}
+                      >
+                        <span>{section.label}</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </li>
           </ul>
         </div>

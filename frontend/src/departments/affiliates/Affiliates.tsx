@@ -547,6 +547,8 @@ export function Affiliates() {
               {`${rosterMatches(rows, "active", "").length} active`}
             </span>
           )}
+          {/* Off the sidebar since Batch 2.3; this is its way in. */}
+          <Link className="control-font" to="/affiliates/brand-codes">Brand codes →</Link>
         </div>
       </div>
 
@@ -615,7 +617,7 @@ export function Affiliates() {
           />
 
 
-          {/* Brand codes are added under Settings → Brand codes, their one
+          {/* Brand codes are added under Brand codes (Models → Brand codes), their one
               home (owner, 30 September: D2) - here, beside *Invite a model*,
               the button read as registering a model's code. */}
 

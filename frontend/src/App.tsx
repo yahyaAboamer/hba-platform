@@ -10,12 +10,16 @@ import { AffiliatePortal } from "./portal/AffiliatePortal";
 import { Elsewhere, Start } from "./frame/Elsewhere";
 import { Onward } from "./frame/Onward";
 import { Frame } from "./frame/Frame";
-import { TODAY, canOpenSettings, holdsToday } from "./frame/where";
+import { TODAY, canOpenSettings, holdsToday, isOwner } from "./frame/where";
 import { FirstRun } from "./screens/FirstRun";
 import { Glossary } from "./screens/Glossary";
 import { Today } from "./departments/today/Today";
 import { PortalPreviewFrame, previewFrameFor } from "./departments/affiliates/PortalPreview";
-import { Settings } from "./screens/Settings";
+import { Company } from "./screens/settings/Company";
+import { Integrations } from "./screens/settings/Integrations";
+import { Me } from "./screens/settings/Me";
+import { SettingsHome } from "./screens/settings/SettingsHome";
+import { Team } from "./screens/settings/Team";
 import { SignIn } from "./screens/SignIn";
 import { TwoStepRequired } from "./screens/TwoStepRequired";
 
@@ -43,7 +47,17 @@ function staffRoutes(session: Session) {
       ))}
       {canOpenSettings(session) && (
         <>
-          <Route path="/settings" element={<Settings session={session} />} />
+          {/* Old `?section=` links go on to their new home (Batch 2.3). */}
+          <Route path="/settings" element={<SettingsHome session={session} />} />
+          <Route path="/settings/me" element={<Me session={session} />} />
+          {/* The owner's; anybody else reaches `Elsewhere`, which says so. */}
+          {isOwner(session) && (
+            <>
+              <Route path="/settings/team" element={<Team session={session} />} />
+              <Route path="/settings/integrations" element={<Integrations session={session} />} />
+              <Route path="/settings/company" element={<Company session={session} />} />
+            </>
+          )}
           <Route path="/glossary" element={<Glossary />} />
         </>
       )}

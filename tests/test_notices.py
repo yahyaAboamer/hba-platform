@@ -168,3 +168,86 @@ def test_every_notice_says_where_to_go(client):
     """
     for row in client.get("/api/operations/attention").json()["items"]:
         assert row["where"], row
+
+
+# ── Where each notice goes since Settings split (Batch 2.3) ───────────────────
+
+
+def _broken_everywhere(monkeypatch) -> None:
+    """Every notice that used to open bare `/settings`, true at once."""
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "go_live_month", "", raising=False)
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO notification_outbox (event, recipient_email, payload, state) "
+                "VALUES ('application.approved', 'nour@example.com', '{}', 'failed')"
+            )
+        )
+        connection.execute(
+            text(
+                "INSERT INTO background_job (kind, payload, status) "
+                "VALUES ('shopify_sync_order', '{}', 'failed')"
+            )
+        )
+        connection.execute(
+            text(
+                "INSERT INTO order_index (shopify_order_id, order_number, placed_at, "
+                "business_month, discount_codes, subtotal_piastres, total_piastres, "
+                "shipping_piastres, tax_piastres, currency) "
+                "VALUES ('9001', '#9001', now(), '2026-08', ARRAY['NOBODY10'], 0, 0, 0, 0, 'EGP')"
+            )
+        )
+
+
+#: Each notice and the page that fixes it.
+HOMES = {
+    "go_live_month_unset": "/settings/company",
+    "mail_not_configured": "/settings/integrations",
+    "notifications_failed": "/settings/integrations",
+    "failed_jobs": "/settings/integrations",
+    "unregistered_codes": "/affiliates/brand-codes",
+}
+
+
+def test_each_notice_opens_its_new_home_for_the_owner(client, monkeypatch):
+    _broken_everywhere(monkeypatch)
+
+    items = {row["key"]: row for row in client.get("/api/operations/attention").json()["items"]}
+
+    assert {key: items[key]["where"] for key in HOMES} == HOMES
+    assert not any(row["where"] == "/settings" for row in items.values())
+
+
+def test_nobody_else_is_sent_to_an_owners_page(client, monkeypatch):
+    """The affiliate manager reads the same notices; the Settings pages they
+    would open are the owner's, so she gets no button, and the notice says who
+    fixes it. Brand codes are hers, so that one keeps its link."""
+    from app.core.passwords import hash_password
+
+    _broken_everywhere(monkeypatch)
+    with engine.begin() as connection:
+        account = connection.execute(
+            text(
+                "INSERT INTO user_account (email, password_hash, status, display_name) "
+                "VALUES ('boda@example.com', :p, 'active', 'Boda') RETURNING id"
+            ),
+            {"p": hash_password(BOOTSTRAP["password"])},
+        ).scalar_one()
+        connection.execute(
+            text("INSERT INTO role_assignment (user_account_id, role) VALUES (:u, 'affiliate_manager')"),
+            {"u": account},
+        )
+    with TestClient(app) as hers:
+        signed_in = hers.post(
+            "/api/auth/login", json={"email": "boda@example.com", "password": BOOTSTRAP["password"]}
+        )
+        assert signed_in.status_code == 200, signed_in.text
+        hers.headers["X-CSRF-Token"] = signed_in.json()["csrf"]
+        items = {row["key"]: row for row in hers.get("/api/operations/attention").json()["items"]}
+
+    for key in ("go_live_month_unset", "mail_not_configured", "notifications_failed", "failed_jobs"):
+        assert (items[key]["where"], items[key]["action"]) == (None, None), key
+        assert items[key]["detail"].endswith("The owner fixes this in Settings."), key
+    assert items["unregistered_codes"]["where"] == "/affiliates/brand-codes"

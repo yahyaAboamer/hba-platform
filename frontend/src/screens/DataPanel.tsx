@@ -2,8 +2,6 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { GiftReview } from "../components/GiftReview";
-import { InboxConnections } from "../components/InboxConnection";
-import { IntegrationKeys } from "../components/IntegrationKey";
 import { ShopifyConnection } from "../components/ShopifyConnection";
 import type { ShopifyConnectionState } from "../components/ShopifyConnection";
 import { api } from "../lib/api";
@@ -385,7 +383,7 @@ export function DataPanel({ goLiveMonth }: { goLiveMonth: string | null }) {
                 those sales count for no one. Only those orders are counted here:
                 a code a model holds from a later month is listed with her, and
                 her own orders are on her profile. If a code is HBA's own, add it
-                under <Link to="/settings?section=codes">Brand codes</Link>.
+                under <Link to="/affiliates/brand-codes">Brand codes</Link>.
               </p>
               <table className="table">
                 <thead>
@@ -507,11 +505,7 @@ export function DataPanel({ goLiveMonth }: { goLiveMonth: string | null }) {
       {/* The export's Connection card, editable (owner, decision b). */}
       <ShopifyConnection onChanged={setConnection} />
 
-      {/* Operations' Bosta and E-stebdal keys, beside it (ADR 0057 §10). */}
-      <IntegrationKeys />
-
-      {/* The inbox's WhatsApp keys and its second Shopify app (ADR 0059). */}
-      <InboxConnections />
+      {/* Bosta, E-stebdal and WhatsApp keys have their own rows in Settings → Integrations (Batch 2.3). */}
 
       {/*
        * S2: the three things somebody runs rarely, together and out of the

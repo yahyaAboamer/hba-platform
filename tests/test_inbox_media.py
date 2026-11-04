@@ -536,3 +536,87 @@ def test_the_approved_messages_need_whatsapp_connected(client):
     response = client.get("/api/inbox/templates")
     assert response.status_code == 409
     assert response.json()["detail"] == "WhatsApp is not connected."
+
+
+# ── What Settings → Integrations reads of it (Batch 2.3) ──────────────────────
+
+
+@pytest.fixture()
+def bucket_configured(monkeypatch):
+    for name, value in (
+        ("inbox_media_bucket", "hba-files"),
+        ("inbox_media_endpoint", "https://storage.example.com"),
+        ("inbox_media_access_key_id", "made-up-id"),
+        ("inbox_media_secret_access_key", "made-up-secret"),
+    ):
+        monkeypatch.setattr(f"app.config.settings.{name}", value)
+
+
+def _refused_at(db):
+    from app.modules.inbox import public
+
+    return public.file_storage(db)["refused_at"]
+
+
+def test_the_bucket_refusing_the_last_try_is_noted_as_storage_failing(db, connected, bucket_configured):
+    file = _waiting(db)
+    media.fetch(db, file.id, client=_meta(), store=Store(fail=StorageError("refused (403)")), last_try=True)
+
+    assert file.state == "failed"
+    assert media.BUCKET_REFUSED in db.get(InboxMessage, file.message_id).extra
+    assert _refused_at(db) is not None
+
+
+@pytest.mark.parametrize(
+    "client_",
+    [
+        # Too large to keep: never offered to the bucket.
+        lambda: _meta(size=media.INBOUND_MAX_BYTES + 1),
+        # WhatsApp would not hand it over.
+        lambda: _meta(info_status=400, info_code=None),
+    ],
+)
+def test_a_file_failed_for_other_reasons_is_not_storage_failing(db, connected, bucket_configured, client_):
+    file = _waiting(db)
+    media.fetch(db, file.id, client=client_(), store=Store(), last_try=True)
+
+    assert file.state == "failed"
+    assert media.BUCKET_REFUSED not in (db.get(InboxMessage, file.message_id).extra or {})
+    assert _refused_at(db) is None
+
+
+def test_asked_again_and_the_bucket_refuses_it_is_noted(db, connected, bucket_configured):
+    file = _waiting(db, state="failed")
+    found, _ = media.try_again(db, file.id, client=_meta(), store=Store(fail=StorageError("refused (403)")))
+
+    assert found.state == "failed"
+    assert _refused_at(db) is not None
+
+
+def test_asked_again_and_whatsapp_refuses_it_is_not(db, connected, bucket_configured):
+    file = _waiting(db, state="failed")
+    media.try_again(db, file.id, client=_meta(info_status=400), store=Store())
+
+    assert _refused_at(db) is None
+
+
+def test_a_file_kept_after_a_refusal_clears_it(db, connected, bucket_configured):
+    """Storage working again: the latest finished copy is the one that counts."""
+    refused = _waiting(db)
+    media.fetch(db, refused.id, client=_meta(), store=Store(fail=StorageError("refused")), last_try=True)
+    first = db.get(InboxMessage, refused.message_id)
+    message = InboxMessage(
+        conversation_id=first.conversation_id, direction="in", kind="image",
+        wa_message_id="wamid.M2", status="received", origin="customer", occurred_at=utcnow(),
+    )
+    db.add(message)
+    db.flush()
+    kept = InboxMedia(message_id=message.id, wa_media_id="9002", mime_type="image/jpeg", state="pending")
+    db.add(kept)
+    db.flush()
+    assert _refused_at(db) is not None
+
+    media.fetch(db, kept.id, client=_meta(), store=Store())
+
+    assert kept.state == "stored"
+    assert _refused_at(db) is None

@@ -108,11 +108,11 @@ describe("a department the person does not hold", () => {
     expect(screen.getByRole("link", { name: "Go to your start" }).getAttribute("href")).toBe("/operations/shopify");
   });
 
-  it("covers Settings too: customer service has no Settings row, and no Settings page", async () => {
-    await open("/settings", "customer_service");
+  it("covers Settings too: customer service has Me, and is told the owner's pages are not theirs", async () => {
+    await open("/settings/team", "customer_service");
 
-    expect(await screen.findByText(/This page is in Settings, which your access does not include\./)).toBeTruthy();
-    expect(screen.queryByRole("link", { name: "Settings" })).toBeNull();
+    expect(await screen.findByText(/This page is in Settings, and only the owner can open it\./)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Settings" })).toBeTruthy();
   });
 });
 
@@ -130,7 +130,7 @@ describe("Settings and the glossary", () => {
     await open("/glossary", "affiliate_manager");
 
     const settings = screen.getByRole("link", { name: "Settings" });
-    expect(settings.getAttribute("href")).toBe("/settings");
+    expect(settings.getAttribute("href")).toBe("/settings/me");
     expect(settings.getAttribute("aria-current")).toBe("page");
     expect(screen.getByText("Settings", { selector: ".frame__role" })).toBeTruthy();
   });
@@ -282,14 +282,14 @@ describe("the account", () => {
       "Light",
       "Match my device",
     ]);
-    expect(screen.getByRole("link", { name: "Team and access" }).getAttribute("href")).toBe("/settings?section=team");
+    expect(screen.getByRole("link", { name: "Team and access" }).getAttribute("href")).toBe("/settings/team");
     expect(screen.getByRole("button", { name: "Sign out" })).toBeTruthy();
 
     fireEvent.keyDown(account, { key: "Escape" });
     expect(account.getAttribute("aria-expanded")).toBe("false");
   });
 
-  it("offers no Team and access to somebody who cannot open Settings", async () => {
+  it("offers no Team and access to anybody but the owner", async () => {
     await open("/inbox/chats", "customer_service");
 
     fireEvent.click(screen.getByRole("button", { name: /Nour/ }));

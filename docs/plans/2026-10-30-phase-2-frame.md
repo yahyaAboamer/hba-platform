@@ -420,6 +420,29 @@ Settings becomes four addresses, as the mockup's sidebar draws them:
   moves, each with a test that the person who used it can still reach it.
 - *The activity filter shows too much:* a test per department per level.
 
+**As built (3–4 November)** — the contract is `2026-11-03-batch-2.3-contract.md`.
+- **Staff invitations are the owner's on the server** too (Choice 4): inviting,
+  resending or withdrawing a staff invitation needs `settings.manage`; model
+  invitations are unchanged. `GET /api/staff/invitations` had no caller left
+  and is retired.
+- **Older activity keeps its department.** Entries written before the column
+  existed are given the department their action names when read (and a
+  model's invitation counts as Affiliates'); no audit row is rewritten.
+  Sign-ins and staff access stay the owner's (ADR 0067, decision 7).
+- **Integrations departs from frame 6 in two places:** File storage reads
+  "Chat photos and voice notes · Used by Inbox" (only the Inbox's files go to
+  the bucket) and shows no size (Choice 9). Email and File storage turn to
+  *Not working* only when the service itself refuses, not for one email's or
+  one file's own problem; a failed row keeps the last good time, and the
+  failure's time is in the sentence.
+- **The key forms were never on the Operations or Inbox screens**, only in
+  Settings' *Shopify and sync*: they now open from their Integrations rows.
+- **Fixed on the way:** the activity log answered with an error whenever a
+  payroll approval was in it (the gift-parcel sentence took the length of
+  payroll's order count). This was on `main` and live.
+- **Left for 2.4:** the Team page is wider than a 390 phone, as before; frame
+  5 redraws it.
+
 ---
 
 ## Batch 2.4 — Team and access by department

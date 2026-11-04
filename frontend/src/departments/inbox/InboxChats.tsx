@@ -172,7 +172,7 @@ function Pulse({ health, failed, now }: { health: InboxHealth | null; failed: bo
   }
   if (health && !health.connected) {
     return (
-      <p className="ops-fresh" role="status" title="An admin connects WhatsApp in Settings.">
+      <p className="ops-fresh" role="status" title="An admin connects WhatsApp in Settings → Integrations.">
         <OpsIcon name="plug" />
         Not connected
       </p>

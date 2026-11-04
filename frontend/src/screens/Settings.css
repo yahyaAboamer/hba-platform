@@ -898,3 +898,6 @@
 /* Devices: a list, with no bullets, inside a panel or a dialog. */
 .settings__devices { margin: 0; padding: 0; list-style: none; }
 .settings__explain-line { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--quiet); }
+
+/* The way to the glossary, at the foot of Me (it was the old rail's last link; the rail is gone). */
+.settings__glossary { align-self: flex-start; font-size: 13px; color: var(--accent-text); }

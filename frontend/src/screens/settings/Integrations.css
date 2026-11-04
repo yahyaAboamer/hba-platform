@@ -1,0 +1,56 @@
+/*
+ * Settings → Integrations, drawn from frame 6 of
+ * docs/design/hba-os-shell-2026-10-25.html on the product's own tokens.
+ * The head, panel and shell are the frame's (.page__head, .panel); what is
+ * new is here, under `conns` and `integrations`.
+ */
+
+.integrations__fresh { display:inline-flex; align-items:center; gap:7px; margin:0; font-size:12.5px; color:var(--quiet); }
+.integrations__fresh svg { flex:none; width:14px; height:14px; }
+
+.conns { margin:0; padding:0; list-style:none; }
+.conns li {
+  display:grid; grid-template-columns:200px minmax(0, 1fr) 150px 140px 130px; gap:14px; align-items:center;
+  min-height:64px; padding:12px 18px; border-bottom:1px solid var(--rule); font-size:13.5px;
+}
+.conns li:last-child { border-bottom:0; }
+.conns b { display:block; font-weight:500; }
+.conns small { display:block; margin-top:2px; color:var(--quiet); font-size:12.5px; line-height:1.4; }
+.conns .when { color:var(--quiet); font-size:12.5px; text-align:right; font-variant-numeric:tabular-nums; }
+.conns .act { justify-self:end; }
+.conns li.is-failed small.why { color:var(--refused); overflow-wrap:anywhere; }
+
+.conns__pill {
+  display:inline-flex; align-items:center; gap:6px; flex:none; padding:2px 9px; border-radius:999px;
+  background:var(--accent-soft); color:var(--accent-lift); font-size:12px; white-space:nowrap;
+}
+.conns__pill svg { width:13px; height:13px; flex:none; }
+.conns__pill--failed { background:var(--refused-quiet); color:var(--refused); }
+.conns__pill--late { background:var(--owed-quiet); color:var(--owed); }
+.conns__pill--off { background:var(--hover); color:var(--quiet); }
+
+.conns__btn {
+  display:inline-flex; align-items:center; justify-content:center; min-height:32px; padding:5px 11px;
+  border:1px solid var(--rule-strong); border-radius:var(--radius); background:transparent; color:var(--ink);
+  font-size:12.5px; line-height:normal; cursor:pointer;
+}
+.conns__btn:hover { border-color:var(--faint); }
+/* Frame 6's `.btn`: the one filled button, as Today's are. */
+.conns__btn--primary { border-color:var(--accent-fill); background:var(--accent-fill); color:var(--accent-on); }
+.conns__btn--primary:hover { border-color:var(--accent-fill); }
+
+.integrations__detail { margin-top:16px; }
+.integrations__detail-body { display:flex; flex-direction:column; gap:16px; padding:16px 18px; }
+.integrations__detail-body:focus { outline:none; }
+.integrations__server { margin:0; color:var(--quiet); font-size:13.5px; }
+
+@media (max-width:800px) {
+  /* The row folds into a stack: who, what it is used for, how it is, the button. */
+  .conns li { grid-template-columns:minmax(0, 1fr) auto; gap:6px 12px; padding:14px 16px; }
+  .conns li > :nth-child(1) { grid-column:1 / -1; }
+  .conns li > :nth-child(2) { grid-column:1 / -1; }
+  .conns li > :nth-child(3) { grid-column:1; }
+  .conns .when { grid-column:1; text-align:left; }
+  .conns .act { grid-column:2; grid-row:3 / span 2; align-self:center; }
+  .conns__btn { min-height:44px; padding:8px 14px; }
+}

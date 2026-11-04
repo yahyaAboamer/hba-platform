@@ -172,7 +172,7 @@ export function CodeStep({
               recoveryCodesLeft === 0
                 ? "You have none left"
                 : `You have ${recoveryCodesLeft} left`
-            } - make new ones in Settings, under My preferences.`,
+            } - make new ones in Settings → Me.`,
       );
     } catch (caught) {
       failed(caught);

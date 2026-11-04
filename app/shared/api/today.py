@@ -22,7 +22,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.core.businesstime import utcnow
-from app.core.permissions import Permission
+from app.core.permissions import DEPARTMENT_HELD_BY
 from app.db import get_session
 from app.modules.affiliates import public as affiliates
 from app.modules.inbox import public as inbox
@@ -37,11 +37,15 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/today", tags=["today"])
 
 #: Each department, the permission that makes somebody hold it, and how its
-#: part of Today is read - in the order the page lists them.
-DEPARTMENTS: tuple[tuple[str, str, Callable[[Session, frozenset[str], datetime], Look]], ...] = (
-    ("inbox", Permission.INBOX_USE, inbox.today_look),
-    ("operations", Permission.ORDER_OPS_VIEW, operations.today_look),
-    ("affiliates", Permission.AFFILIATES_VIEW, affiliates.today_look),
+#: part of Today is read - in the order the page lists them. Who holds what is
+#: `DEPARTMENT_HELD_BY`, which the activity log reads too.
+DEPARTMENTS: tuple[tuple[str, str, Callable[[Session, frozenset[str], datetime], Look]], ...] = tuple(
+    (name, DEPARTMENT_HELD_BY[name], reader)
+    for name, reader in (
+        ("inbox", inbox.today_look),
+        ("operations", operations.today_look),
+        ("affiliates", affiliates.today_look),
+    )
 )
 
 _ORDER = {name: index for index, (name, _, _) in enumerate(DEPARTMENTS)}

@@ -44,7 +44,7 @@ const BUTTON_WORDS: Record<string, string> = {
 };
 
 /**
- * One of Operations' keys in Settings → Shopify (ADR 0057 §10; the approved
+ * One of Operations' keys in Settings → Integrations (ADR 0057 §10; the approved
  * mockup's frame 6, beside the Shopify connection).
  *
  * The key is never sent to this page: the card shows where the key in use
@@ -52,7 +52,7 @@ const BUTTON_WORDS: Record<string, string> = {
  * provider before it is saved, so a refusal here means the key in use has
  * not changed - and the field keeps what was typed.
  */
-function KeyCard({ provider }: { provider: "bosta" | "estebdal" }) {
+export function KeyCard({ provider }: { provider: "bosta" | "estebdal" }) {
   const [state, setState] = useState<KeyState | null>(null);
   const [open, setOpen] = useState(false);
   const [key, setKey] = useState("");
@@ -179,15 +179,5 @@ function KeyCard({ provider }: { provider: "bosta" | "estebdal" }) {
         </>
       )}
     </section>
-  );
-}
-
-/** Operations' two keys, beside the Shopify connection. */
-export function IntegrationKeys() {
-  return (
-    <>
-      <KeyCard provider="bosta" />
-      <KeyCard provider="estebdal" />
-    </>
   );
 }

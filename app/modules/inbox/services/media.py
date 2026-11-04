@@ -122,6 +122,23 @@ def queue_fetch(db: Session, media_id: int) -> None:
     )
 
 
+#: Where a message notes that **the bucket** refused its file's copy, and
+#: when (ISO). A file is ``failed`` for other reasons too - too large to keep,
+#: or WhatsApp's download failing - which say nothing about file storage; this
+#: lets Settings → Integrations tell them apart (Batch 2.3) without a column.
+#: Written only where a ``StorageError`` is caught.
+BUCKET_REFUSED = "copy_refused_at"
+
+
+def note_bucket_refused(message: InboxMessage | None, error: Exception) -> None:
+    """Note on the message that the bucket refused its file. Not for a server
+    with no bucket at all: that is "not connected", not a failure."""
+    if message is None or isinstance(error, storage.NotConfigured):
+        return
+    # Reassigned, not mutated: a changed key inside JSONB is not seen otherwise.
+    message.extra = {**(message.extra or {}), BUCKET_REFUSED: utcnow().isoformat()}
+
+
 def _not_this_time(media: InboxMedia, reason: str, last_try: bool, cause: Exception) -> InboxMedia:
     """A try that did not copy the file: ``failed`` on the last, else again."""
     if not last_try:
@@ -179,6 +196,8 @@ def fetch(
         try:
             store.put(key, content, media.mime_type or "application/octet-stream")
         except storage.StorageError as exc:
+            if last_try:
+                note_bucket_refused(message, exc)
             return _not_this_time(media, str(exc), last_try, exc)
         media.storage_key = key
         media.state = "stored"
@@ -246,6 +265,8 @@ def try_again(
     except CopyFailed as exc:
         logger.warning("inbox file %s could not be copied: %s", media.id, exc)
         media.state = "failed"
+        if isinstance(exc.__cause__, storage.StorageError):
+            note_bucket_refused(message, exc.__cause__)
         db.flush()
         return media, str(exc)
     if media.state == "gone":
@@ -364,6 +385,7 @@ def send_file(
     except storage.StorageError as exc:
         logger.warning("a sent file's copy was not kept: %s", exc)
         media.state = "failed"
+        note_bucket_refused(message, exc)
     finally:
         if owned and store is not None:
             store.close()

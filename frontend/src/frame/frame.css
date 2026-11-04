@@ -66,7 +66,8 @@
   transition: transform .16s cubic-bezier(.2, .8, .2, 1);
 }
 .frame__dept[aria-expanded="true"] { color: var(--ink); }
-.frame__dept[aria-expanded="true"] .frame__chev { transform: rotate(90deg); }
+.frame__dept[aria-expanded="true"] .frame__chev,
+.frame__chev--open { transform: rotate(90deg); }
 .frame__dept[aria-current="page"] { background: var(--accent-soft); color: var(--accent-text); }
 .frame__sections { margin: 0 0 6px; }
 .frame__sections a {

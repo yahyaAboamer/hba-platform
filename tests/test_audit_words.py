@@ -91,3 +91,13 @@ def test_the_operations_manager_role_is_said_in_words():
     assert "operations manager" in words
     assert "operations_manager" not in words
     assert audit_words._month("2026-02") == "February 2026"
+
+
+def test_a_count_of_orders_does_not_break_the_gift_parcel_sentence():
+    # Every action's sentence is built for every entry; payroll's `orders` is
+    # a number, and the gift parcels' sentence once took its len() and broke
+    # the whole activity log.
+    names = _names()
+    assert sentence(_event("payroll.approved", subject="payroll_period:5", after={"orders": 2}), names)
+    assert sentence(_event("parcel.assigned", after={"orders": ["#1001", "#1002"]}), names) \
+        == "Attached 2 gift parcels to Yahya Aboamer"

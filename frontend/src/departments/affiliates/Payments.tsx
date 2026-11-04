@@ -19,6 +19,7 @@ import type { DestinationCard } from "../../lib/payouts";
 // Re-exported where it has always been imported from, so this move is not a
 // change to anybody else's imports.
 export type { DestinationCard };
+import { useHistoryState } from "./HistoricalSetup";
 import "./Payments.css";
 
 export type SettlementState =
@@ -245,6 +246,9 @@ function matchesFilter(row: Balance, filter: Filter): boolean {
  * into a debt or make an approval look like payment (F14).
  */
 export function Payments({ session }: { session: Session }) {
+  const mayOpenHistorical = can(session, "compensation.manage");
+  // Asked only of somebody who will see the link.
+  const history = useHistoryState(session, mayOpenHistorical);
   const [query] = useSearchParams();
   const [month, setMonth] = useState(query.get("month")?.match(/^\d{4}-(0[1-9]|1[0-2])$/) ? query.get("month")! : session.platform.working_month);
   const [data, setData] = useState<Outstanding | null>(null);
@@ -290,6 +294,10 @@ export function Payments({ session }: { session: Session }) {
         <div className="page__title">
           <h1>Payments</h1>
           <span className="page__subtitle">{formatMonth(month)}</span>
+          {/* Off the sidebar since Batch 2.3; it leaves once every month before go-live is final (as before, it stays where that cannot be read). */}
+          {mayOpenHistorical && history.state !== "complete" && (
+            <Link className="control-font" to="/affiliates/historical">Historical setup →</Link>
+          )}
         </div>
         <MonthPicker
           value={month}

@@ -10,7 +10,8 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import App from "../../App";
-import { Settings } from "../Settings";
+import { Me } from "../settings/Me";
+import { Team } from "../settings/Team";
 import { ResetPassword } from "../ResetPassword";
 import { SignIn } from "../SignIn";
 import type { Session } from "../../lib/api";
@@ -256,9 +257,11 @@ const SESSIONS = {
   ],
 };
 
-function renderSettings(section: string) {
+function renderSettings(section: "appearance" | "team") {
   return render(
-    <MemoryRouter initialEntries={[`/settings?section=${section}`]}><Settings session={ME} /></MemoryRouter>,
+    <MemoryRouter initialEntries={[section === "team" ? "/settings/team" : "/settings/me"]}>
+      {section === "team" ? <Team session={ME} /> : <Me session={ME} />}
+    </MemoryRouter>,
   );
 }
 
@@ -387,7 +390,6 @@ describe("Settings → Team", () => {
   beforeEach(() => {
     routes = (url, method) => {
       if (url === "/api/staff") return reply(200, ROSTER);
-      if (url === "/api/staff/invitations") return reply(200, { invitations: [], invitable_roles: [], role_permissions: {} });
       if (url === "/api/staff/2/sessions") return reply(200, SESSIONS);
       if (url === "/api/staff/2/sessions/end-all") return reply(200, { ended: 2 });
       if (url === "/api/staff/2/two-step/reset" && method === "POST") return reply(200, { enabled: false });
@@ -458,7 +460,6 @@ describe("Settings → Team", () => {
     const suspended = { ...ROSTER, staff: ROSTER.staff.map((row) => row.id === 2 ? { ...row, status: "suspended", roles: [] } : row) };
     routes = (url) => {
       if (url === "/api/staff") return reply(200, suspended);
-      if (url === "/api/staff/invitations") return reply(200, { invitations: [], invitable_roles: [], role_permissions: {} });
     };
     renderSettings("team");
     fireEvent.click(await screen.findByRole("button", { name: "More for Mona" }));

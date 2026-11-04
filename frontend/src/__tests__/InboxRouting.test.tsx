@@ -42,7 +42,7 @@ describe("customer service", () => {
 
     // Operations shows, with its Khazenly section only (ADR 0072).
     expect(screen.queryByRole("button", { name: /^Affiliates/ })).toBeNull();
-    for (const name of ["Shopify", "Models", "Payments", "Settings"]) {
+    for (const name of ["Shopify", "Models", "Payments"]) {
       expect(screen.queryByRole("link", { name })).toBeNull();
     }
     const strayed = asked().filter(
