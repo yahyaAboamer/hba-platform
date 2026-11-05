@@ -1,0 +1,132 @@
+/*
+ * Settings → Team and access, drawn from frame 5 of
+ * docs/design/hba-os-shell-2026-10-25.html on the product's own tokens. The
+ * head and panels are the frame's (.page__head, .panel); what is new is here.
+ * There is no phone drawing in the frame: at 800px and under the list is the
+ * page, and choosing a person opens their page full width (contract §5).
+ */
+
+.team { display:grid; grid-template-columns:300px minmax(0, 1fr); gap:20px; align-items:start; }
+.team__headact { display:flex; gap:10px; }
+.team__back { display:none; }
+
+.people { margin:0; padding:6px 0; list-style:none; }
+.people a {
+  display:grid; grid-template-columns:30px minmax(0, 1fr) auto; gap:10px; align-items:center;
+  padding:9px 16px; color:var(--ink); text-decoration:none;
+}
+.people a:hover { background:var(--hover); }
+.people a[aria-current="true"] { background:var(--accent-soft); }
+.people b { display:block; font-size:13.5px; font-weight:400; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.people small {
+  display:block; margin-top:2px; overflow:hidden; color:var(--quiet); font-size:12px;
+  white-space:nowrap; text-overflow:ellipsis;
+}
+.people__off b { color:var(--faint); }
+.people__group { margin:8px 16px 2px; font-size:12px; color:var(--faint); }
+.people .avatar {
+  display:grid; place-items:center; width:30px; height:30px; border-radius:50%;
+  background:var(--accent-soft); color:var(--accent-text); font-size:12px;
+}
+.team__lock { width:14px; height:14px; color:var(--accent-text); }
+.team__ic { width:15px; height:15px; color:var(--quiet); flex:none; }
+
+.team__person { display:flex; flex-direction:column; gap:20px; min-width:0; }
+.team__namehead { flex-wrap:wrap; }
+.team__namehead .panel__title { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.team__hint { margin:0; font-size:12.5px; color:var(--quiet); overflow-wrap:anywhere; }
+
+.team__owner {
+  display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px 14px;
+  padding:12px 18px; border-bottom:1px solid var(--rule); font-size:13.5px; color:var(--quiet);
+}
+.team__owner b { color:var(--ink); font-weight:500; }
+
+.access { width:100%; border-collapse:collapse; font-size:13.5px; }
+.access td { padding:10px 8px; border-bottom:1px solid var(--rule); vertical-align:middle; }
+.access td:first-child { padding-left:18px; white-space:nowrap; }
+.access td:last-child { padding-right:18px; color:var(--quiet); font-size:12.5px; }
+.access tr:last-child td { border-bottom:0; }
+.access .dept-cell { display:flex; align-items:center; gap:9px; }
+
+.team__seg { display:inline-flex; padding:3px; border:1px solid var(--rule); border-radius:var(--radius); background:var(--paper); }
+.team__seg button {
+  min-height:28px; padding:4px 10px; border:0; border-radius:6px; background:none; color:var(--quiet);
+  font-size:12.5px; line-height:normal; white-space:nowrap; cursor:pointer;
+}
+.team__seg button:hover:not(:disabled):not([aria-checked="true"]) { color:var(--ink); }
+.team__seg button[aria-checked="true"] { background:var(--surface); color:var(--ink); box-shadow:var(--elev); }
+.team__seg button:disabled { cursor:not-allowed; color:var(--faint); }
+.team__seg button[aria-checked="true"]:disabled { color:var(--quiet); }
+.team__seg button:focus-visible { outline:2px solid var(--accent-text); outline-offset:1px; }
+.team__seg[aria-disabled="true"] { opacity:.6; }
+
+.team__note { margin:0; padding:10px 18px; border-top:1px solid var(--rule); font-size:12.5px; color:var(--quiet); }
+.gives { margin:0; padding:14px 18px; border-top:1px solid var(--rule); font-size:13.5px; line-height:1.55; }
+.gives__label { font-weight:500; }
+
+.secure { display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); gap:20px; align-items:start; }
+.team__para { margin:0; padding:14px 18px; font-size:13.5px; line-height:1.5; color:var(--quiet); }
+.team__para b { color:var(--ink); font-weight:500; }
+.team__para--flush { padding:0; }
+.team__pad { margin:12px 18px; }
+.team__sub { margin:4px 18px 0; font-size:12.5px; font-weight:400; color:var(--faint); }
+.team__foot { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:8px; padding:4px 18px 14px; }
+.secure .settings__devices > li { padding:10px 18px; border-bottom:1px solid var(--rule); font-size:13.5px; }
+.secure .settings__devices small { display:block; margin-top:2px; color:var(--quiet); font-size:12px; }
+
+.team__state { display:inline-block; padding:2px 9px; border:1px solid currentColor; border-radius:999px; font-size:11.5px; color:var(--faint); white-space:nowrap; }
+/* Frame 5's pill--off: no outline, a quiet fill. */
+.team__state:not(.team__state--on):not(.team__state--suspended) { border-color:transparent; background:var(--hover); color:var(--quiet); }
+.team__state--on { color:var(--accent); }
+.team__state--suspended { color:var(--refused); }
+
+.danger {
+  display:flex; flex-wrap:nowrap; align-items:center; justify-content:space-between; gap:10px 16px;
+  padding:14px 18px; border:1px solid var(--refused-quiet); border-radius:var(--radius-lg);
+  background:var(--surface); font-size:13.5px;
+}
+.danger p { margin:0; flex:1 1 auto; max-width:62ch; color:var(--quiet); line-height:1.5; }
+.danger .button { flex:none; }
+.danger b { color:var(--ink); font-weight:500; }
+
+.team__btn {
+  display:inline-flex; align-items:center; justify-content:center; min-height:32px; padding:5px 12px;
+  border:1px solid var(--rule-strong); border-radius:var(--radius); background:transparent; color:var(--ink);
+  font-size:12.5px; line-height:normal; cursor:pointer;
+}
+/* Frame 5's `.btn`: the one filled button, as Integrations' is. */
+.team__btn--primary { border-color:var(--accent-fill); background:var(--accent-fill); color:var(--accent-on); }
+
+.team__invite { display:flex; flex-direction:column; gap:12px; }
+
+@media (max-width:1000px) {
+  .secure { grid-template-columns:minmax(0, 1fr); }
+}
+
+@media (max-width:800px) {
+  /* The list is the page; a person opens full width, with a way back. */
+  .team { grid-template-columns:minmax(0, 1fr); }
+  .team:not(.team--chosen) .team__detail { display:none; }
+  .team--chosen .team__list { display:none; }
+  .team__back {
+    display:inline-flex; align-items:center; gap:4px; min-height:44px; margin-bottom:6px; padding:0 6px 0 0;
+    color:var(--accent-text); font-size:14px; text-decoration:none;
+  }
+  .people a { min-height:56px; padding:10px 16px; }
+
+  .access, .access tbody, .access tr, .access td { display:block; }
+  .access tr { padding:12px 18px; border-bottom:1px solid var(--rule); }
+  .access tr:last-child { border-bottom:0; }
+  .access td, .access td:first-child, .access td:last-child { padding:0; border:0; white-space:normal; }
+  .access td + td { margin-top:8px; }
+  /* Two rows of two, each button at least 44px high. */
+  .team__seg { display:grid; grid-template-columns:1fr 1fr; gap:3px; width:100%; }
+  .team__seg button { min-height:44px; padding:8px 10px; }
+  .danger { flex-direction:column; align-items:stretch; }
+  .danger p { max-width:none; }
+  .team__foot { justify-content:stretch; }
+  .team__btn { min-height:44px; padding:8px 14px; }
+  .team__owner .button, .team__foot .button, .danger .button { min-height:44px; }
+  .team__headact .button { min-height:44px; }
+}

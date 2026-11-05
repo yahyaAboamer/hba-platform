@@ -81,14 +81,15 @@ def test_who_is_the_person_not_the_address():
 
 
 def test_the_operations_manager_role_is_said_in_words():
-    """ADR 0057. Without its entry the log wrote the code, `operations_manager`."""
+    """ADR 0057. Without its entry the log wrote the code, `operations_manager`.
+    Since Batch 2.4 (Choice 6) in the words Team and access uses."""
     names = _names(users={1: "Nour Hassan", 7: "Amr"})
     words = sentence(
         _event("staff.role_changed", subject="user:7", after={"role": "operations_manager"}),
         names,
     )
 
-    assert "operations manager" in words
+    assert "Operations manager" in words
     assert "operations_manager" not in words
     assert audit_words._month("2026-02") == "February 2026"
 

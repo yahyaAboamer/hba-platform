@@ -334,7 +334,24 @@ export function can(session: Session | null, permission: string): boolean {
  * decided by it.
  */
 export function roleLabel(actor: Actor): string {
-  return (actor.roles[0] ?? "").replace(/_/g, " ");
+  return roleWords(actor.roles[0] ?? "");
+}
+
+/**
+ * A role in the words staff read (Batch 2.4, Choice 6). The stored names do
+ * not change and nothing sent to the server uses these.
+ */
+export const ROLE_WORDS: Record<string, string> = {
+  admin: "Owner",
+  operations_manager: "Operations manager",
+  customer_service: "Inbox staff",
+  affiliate_manager: "Affiliates manager",
+  content_manager: "Affiliates staff",
+};
+
+export function roleWords(role: string): string {
+  if (!role) return "";
+  return ROLE_WORDS[role] ?? role.replace(/_/g, " ");
 }
 
 /**

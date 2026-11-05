@@ -83,8 +83,8 @@ every recommended choice.
 | 2.0 | Frontend department folders (moves only) | Completed: PR #136, on staging and production at `70c2204` 30 Oct; the built bundle was byte-identical |
 | 2.1 | Departments declared once; the sidebar; the phone layout; department addresses with redirects | Completed: PR #137, on staging and production at `bdb70fd` 30 Oct |
 | 2.2 | Today, and the sidebar's numbers from the same source | Completed: PR #138, on staging and production at `17503e7` 30 Oct; the change count corrected in PR #139, payments only in ended months in PR #140, live at `2e1f094` |
-| 2.3 | Settings split: Me, Integrations, Company; department settings into their departments; the activity log by department | In review: branch `claude/phase-2-2.3-settings`, contract `2026-11-03-batch-2.3-contract.md` |
-| 2.4 | Team and access by department | Pending |
+| 2.3 | Settings split: Me, Integrations, Company; department settings into their departments; the activity log by department | Completed: PR #145, on staging and production at `dda49ec` 4 Nov; the owner's pages checked on staging (the affiliate manager's view and production's read-only check skipped at the owner's word). The content manager invites models since PR #146 (ADR 0073), live at `37fdd94` |
+| 2.4 | Team and access by department | In review: branch `claude/phase-2-2.4-team`, contract `2026-11-04-batch-2.4-contract.md` |
 
 ## Phase 3 — Shared records (ADRs 0066, 0068)
 

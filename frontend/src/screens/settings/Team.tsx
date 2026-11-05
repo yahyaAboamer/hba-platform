@@ -1,11 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 
-import { api, can, devices, trustedBrowsers } from "../../lib/api";
+import { api, devices, roleWords as storedRoleWords, trustedBrowsers } from "../../lib/api";
 import type { DeviceSession, Session, TrustedBrowser } from "../../lib/api";
 import { CodeForm } from "../../components/TwoStepSetup";
 import { BrowserLine, DeviceLine, lastSeen } from "./DeviceLines";
+import {
+  ACCESS_LINES, LEVELS, LEVEL_WORDS, ROLE_BLURB, accessWordsOf, givesSentence, grantedBy, holds,
+  levelIn, roleOf, rolesOfDepartment, rolesWords,
+} from "./teamAccess";
+import type { Department, Level } from "./teamAccess";
 import "../../departments/affiliates/ModelLifecycle.css";
 import "../Settings.css";
+import "./Team.css";
+
+/** The stored name of the owner's role (shown as "Owner"). */
+const OWNER_ROLE = "admin";
 
 type StaffRow = {
   id: number;
@@ -20,12 +30,21 @@ type StaffRow = {
   two_step_method?: "authenticator" | "email" | null;
   last_login_at: string | null;
   created_at: string | null;
+  /** Batch 2.4 contract §3. */
+  owner?: boolean;
+  access?: Record<string, Level>;
+  access_words?: string;
+  /** The server's own answer to *is two-step asked of them* (Batch 2.4 review). */
+  two_step_required?: boolean;
+  joined_at?: string | null;
 };
 
 type InvitationRow = {
   id: number;
   email: string;
   role: string;
+  access_words?: string;
+  sent_at?: string | null;
   expires_at: string;
   expired: boolean;
   created_at: string | null;
@@ -36,54 +55,56 @@ type Roster = {
   invitations: InvitationRow[];
   assignable_roles: string[];
   /** Only access the signed-in person holds themselves, all their roles
-   *  together (`can_grant`). What *Add access* and the invite form offer. */
+   *  together (`can_grant`). What the invite form offers. */
   invitable_roles: string[];
   /** What each role grants, from the server's own list (T4). */
   role_permissions: Record<string, string[]>;
+  departments?: Department[];
+  role_words?: Record<string, string>;
 };
 
-const ROLE_LABEL: Record<string, string> = {
-  admin: "Admin",
-  affiliate_manager: "Affiliate manager",
-  content_manager: "Content manager",
-  operations_manager: "Operations manager",
-  customer_service: "Customer service",
-};
+const nameOf = (row: StaffRow) => row.display_name || row.email;
+const firstNameOf = (row: StaffRow) => (row.display_name || row.email.split("@")[0]).trim().split(/\s+/)[0];
 
-const roleWords = (role: string) => ROLE_LABEL[role] ?? role;
-
-/** Several roles in words: *Content manager and Customer service*. */
-const rolesWords = (roles: string[]) => {
-  const words = roles.map(roleWords);
-  return words.length <= 1 ? (words[0] ?? "no access")
-    : `${words.slice(0, -1).join(", ")} and ${words[words.length - 1]}`;
-};
-
-/** Everything a set of roles grants together, as the server reads it. */
-function grantedBy(roles: string[], rolePermissions: Record<string, string[]> | undefined): string[] {
-  return [...new Set(roles.flatMap((role) => rolePermissions?.[role] ?? []))];
+function initialsOf(text: string): string {
+  const words = text.split("@")[0].trim().split(/[\s._-]+/).filter(Boolean);
+  const letters = words.length >= 2 ? words[0][0] + words[1][0] : (words[0] ?? "?").slice(0, 1);
+  return letters.toUpperCase();
 }
 
-/**
- * *What can each access do?* (Settings audit T4), in plain words. A role has a
- * line when it holds every permission the line names - read from the server's
- * own `ROLES`, so the table cannot drift from what the server enforces.
- */
-const ACCESS_LINES: [string, string[]][] = [
-  ["See and edit models, and set their pay terms", ["affiliates.manage", "compensation.manage"]],
-  ["Set, record and confirm content targets", ["targets.manage", "targets.record", "targets.verify"]],
-  ["Read the activity log", ["audit.view"]],
-  ["Approve a month's pay", ["payroll.approve"]],
-  ["See the operations dashboard", ["order_ops.view"]],
-  ["Read and answer customers in the inbox", ["inbox.use"]],
-  ["Build the Khazenly confirmation file", ["khazenly.use"]],
-  ["Invite models", ["invitations.send"]],
-  ["Record payments and reopen approved months", ["payments.record", "payroll.reopen"]],
-  ["Invite staff and change anyone's access, Shopify and the pay policy; erase a model", ["settings.manage", "affiliates.erase"]],
-];
+const dayWords = (iso: string) =>
+  new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Cairo", day: "numeric", month: "long" }).format(new Date(iso));
 
-function holds(permissions: string[] | undefined, line: string[]) {
-  return !!permissions && line.every((permission) => permissions.includes(permission));
+/** *sent yesterday*, *sent today*, *sent 21 October*. */
+function sentWords(iso: string | null | undefined): string {
+  if (!iso) return "sent";
+  const seen = lastSeen(iso);
+  if (seen.startsWith("Today")) return "sent today";
+  if (seen === "Yesterday") return "sent yesterday";
+  return `sent ${dayWords(iso)}`;
+}
+
+function DeptIcon({ name }: { name: string }) {
+  const common = { fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  return (
+    <svg className="team__ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      {name === "inbox" && <path d="M4 5h16v11h-6l-2 3-2-3H4z" {...common} />}
+      {name === "operations" && <><path d="M3 7h11v9H3zM14 10h4l3 3v3h-7z" {...common} /><circle cx="7" cy="17.5" r="1.6" {...common} /><circle cx="17" cy="17.5" r="1.6" {...common} /></>}
+      {name === "affiliates" && <><circle cx="9" cy="8" r="3" {...common} /><path d="M3 19c0-3 2.7-5 6-5s6 2 6 5M16 5.5a3 3 0 0 1 0 5.5M18 14c2 .6 3 2.2 3 4.5" {...common} /></>}
+    </svg>
+  );
+}
+
+function Lock({ method }: { method?: StaffRow["two_step_method"] }) {
+  return (
+    <svg className="team__lock" role="img"
+      aria-label={method === "email" ? "Two-step sign-in on, code by email"
+        : method === "authenticator" ? "Two-step sign-in on, authenticator app"
+        : "Two-step sign-in on"} viewBox="0 0 24 24"
+      fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" />
+    </svg>
+  );
 }
 
 // ── A confirmation, for anything that changes somebody's access ─────────────
@@ -205,61 +226,6 @@ function DialogFrame({ title, onClose, children }: { title: string; onClose: () 
   );
 }
 
-
-function DevicesDialog({ row, onClose, onChanged }: { row: StaffRow; onClose: () => void; onChanged: () => void }) {
-  const name = row.display_name || row.email;
-  const [list, setList] = useState<DeviceSession[] | null>(null);
-  const [remembered, setRemembered] = useState<TrustedBrowser[]>([]);
-  const [problem, setProblem] = useState<string | null>(null);
-  const [working, setWorking] = useState(false);
-
-  const load = useCallback(() => {
-    trustedBrowsers.of(row.id).then((body) => setRemembered(body.browsers)).catch(() => undefined);
-    devices.of(row.id).then((body) => setList(body.sessions))
-      .catch((caught) => setProblem(caught instanceof Error ? caught.message : "Could not load this."));
-  }, [row.id]);
-  useEffect(load, [load]);
-
-  async function endAll() {
-    setWorking(true);
-    setProblem(null);
-    try {
-      await devices.endAllOf(row.id);
-      setList([]);
-      setRemembered([]);
-      onChanged();
-    } catch (caught) {
-      setProblem(caught instanceof Error ? caught.message : "That did not go through.");
-    } finally {
-      setWorking(false);
-    }
-  }
-
-  return (
-    <DialogFrame title={`${name} is signed in on`} onClose={onClose}>
-      {problem && <p className="notice notice--refused" role="alert">{problem}</p>}
-      {list === null && !problem && <p className="empty">Loading…</p>}
-      {list && list.length === 0 && <p className="empty">Not signed in anywhere.</p>}
-      {list && list.length > 0 && <ul className="settings__devices" aria-label={`Devices for ${name}`}>
-        {list.map((device) => <DeviceLine key={device.id} device={device} />)}
-      </ul>}
-      {remembered.length > 0 && <>
-        <h3 className="twostep__sub">Remembered browsers</h3>
-        <ul className="settings__devices" aria-label={`Remembered browsers for ${name}`}>
-          {remembered.map((browser) => <BrowserLine key={browser.id} browser={browser} />)}
-        </ul>
-      </>}
-      <div className="lifecycle__acts">
-        <button type="button" className="button" onClick={onClose}>Close</button>
-        <button type="button" className="button lifecycle__danger" onClick={endAll}
-          disabled={working || !list || (list.length === 0 && remembered.length === 0)}>
-          {working ? "Working…" : "Sign out of every device"}
-        </button>
-      </div>
-    </DialogFrame>
-  );
-}
-
 function ResetTwoStepDialog({ row, onClose, onDone }: { row: StaffRow; onClose: () => void; onDone: () => void }) {
   const name = row.display_name || row.email;
   return (
@@ -283,89 +249,579 @@ function ResetTwoStepDialog({ row, onClose, onDone }: { row: StaffRow; onClose: 
   );
 }
 
-
-
-const STATE_ORDER: Record<string, number> = { active: 0, invited: 1, suspended: 2 };
+// ── A person's page ─────────────────────────────────────────────────────────
 
 type Pending =
-  | { kind: "give"; row: StaffRow; role: string }
-  | { kind: "remove"; row: StaffRow; role: string }
+  | { kind: "level"; row: StaffRow; dept: Department; level: Level }
+  | { kind: "owner"; row: StaffRow; give: boolean }
   | { kind: "suspend"; row: StaffRow }
   | { kind: "reactivate"; row: StaffRow }
-  | { kind: "devices"; row: StaffRow }
   | { kind: "reset"; row: StaffRow };
 
-function RosterPanel({ session }: { session: Session }) {
+/** The four levels of one department as a segmented control. Levels not offered are drawn, and cannot be chosen. */
+function LevelControl({ dept, current, locked, onChoose }: {
+  dept: Department;
+  current: Level;
+  locked: boolean;
+  onChoose: (level: Level) => void;
+}) {
+  const group = useRef<HTMLDivElement>(null);
+
+  function move(event: React.KeyboardEvent, step: 1 | -1) {
+    const stops = Array.from(group.current?.querySelectorAll<HTMLButtonElement>("button:not([disabled])") ?? []);
+    const at = stops.indexOf(document.activeElement as HTMLButtonElement);
+    if (at < 0 || stops.length === 0) return;
+    event.preventDefault();
+    stops[(at + step + stops.length) % stops.length].focus();
+  }
+
+  return (
+    <div ref={group} className="team__seg" role="radiogroup" aria-label={`${dept.name} access`}
+      aria-disabled={locked || undefined}
+      onKeyDown={(event) => {
+        if (event.key === "ArrowRight" || event.key === "ArrowDown") move(event, 1);
+        if (event.key === "ArrowLeft" || event.key === "ArrowUp") move(event, -1);
+      }}>
+      {LEVELS.map((level) => {
+        const entry = dept.levels.find((candidate) => candidate.level === level);
+        const offered = entry?.offered ?? false;
+        return (
+          <button key={level} type="button" role="radio" aria-checked={current === level}
+            tabIndex={current === level ? 0 : -1}
+            disabled={locked || !offered}
+            title={offered ? undefined : "Not offered yet"}
+            onClick={() => { if (current !== level) onChoose(level); }}>
+            {LEVEL_WORDS[level]}
+            {!offered && <span className="visually-hidden"> Not offered yet</span>}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function TwoStepPanel({ row, you, required, onReset }: {
+  row: StaffRow;
+  you: boolean;
+  required: boolean;
+  onReset: () => void;
+}) {
+  const first = firstNameOf(row);
+  const on = !!row.two_step_enabled;
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState<string | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+
+  async function remind() {
+    setBusy(true);
+    setProblem(null);
+    setDone(null);
+    try {
+      const result = await api.post<{ emailed?: boolean }>(`/api/staff/${row.id}/two-step/remind`);
+      setDone(result?.emailed === false ? "Saved, but this server sends no email." : `A reminder was emailed to ${first}.`);
+    } catch (caught) {
+      setProblem(caught instanceof Error ? caught.message : "That did not go through.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="panel" aria-labelledby="twostep-title">
+      <div className="panel__head">
+        <h2 className="panel__title" id="twostep-title">Two-step sign-in</h2>
+        <span className={`team__state${on ? " team__state--on" : ""}`}>{on ? "On" : "Off"}</span>
+      </div>
+      <p className="team__para">
+        {on
+          ? <>On for {first}{row.two_step_method === "email" ? ", with a code sent by email" : ", with an authenticator app"}.</>
+          : required
+            ? <><b>Required for {first}&apos;s access</b>, and not on yet. Required for anyone who approves or pays money, and for the owner.</>
+            : <>Not required for {first}&apos;s access. <b>Required for anyone who approves or pays money</b>, and for the owner.</>}
+      </p>
+      {problem && <p className="notice notice--refused team__pad" role="alert">{problem}</p>}
+      {done && <p className="team__para" role="status">{done}</p>}
+      {!you && row.status !== "suspended" && (
+        <div className="team__foot">
+          {!on && (
+            <button type="button" className="button button--row" disabled={busy} onClick={remind}>
+              {busy ? "Sending…" : "Send a reminder"}
+            </button>
+          )}
+          {on && row.two_step_method !== "email" && (
+            <button type="button" className="button button--row" onClick={onReset}>Reset two-step sign-in…</button>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function SignedInOn({ row, you, onChanged }: { row: StaffRow; you: boolean; onChanged: () => void }) {
+  const [list, setList] = useState<DeviceSession[] | null>(null);
+  const [remembered, setRemembered] = useState<TrustedBrowser[]>([]);
+  const [problem, setProblem] = useState<string | null>(null);
+  const [working, setWorking] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    setList(null);
+    setRemembered([]);
+    setProblem(null);
+    trustedBrowsers.of(row.id).then((body) => { if (alive) setRemembered(body.browsers); }).catch(() => undefined);
+    devices.of(row.id).then((body) => { if (alive) setList(body.sessions); })
+      .catch((caught) => { if (alive) setProblem(caught instanceof Error ? caught.message : "Could not load this."); });
+    return () => { alive = false; };
+  }, [row.id]);
+
+  async function endAll() {
+    setWorking(true);
+    setProblem(null);
+    try {
+      await devices.endAllOf(row.id);
+      setList([]);
+      setRemembered([]);
+      onChanged();
+    } catch (caught) {
+      setProblem(caught instanceof Error ? caught.message : "That did not go through.");
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  const name = nameOf(row);
+  return (
+    <section className="panel" aria-labelledby="devices-title">
+      <div className="panel__head"><h2 className="panel__title" id="devices-title">Signed in on</h2></div>
+      {problem && <p className="notice notice--refused team__pad" role="alert">{problem}</p>}
+      {list === null && !problem && <p className="empty">Loading…</p>}
+      {list && list.length === 0 && <p className="team__para">Not signed in anywhere.</p>}
+      {list && list.length > 0 && (
+        <ul className="settings__devices" aria-label={`Devices for ${name}`}>
+          {list.map((device) => <DeviceLine key={device.id} device={device} />)}
+        </ul>
+      )}
+      {remembered.length > 0 && (
+        <>
+          <h3 className="twostep__sub team__sub">Remembered browsers</h3>
+          <ul className="settings__devices" aria-label={`Remembered browsers for ${name}`}>
+            {remembered.map((browser) => <BrowserLine key={browser.id} browser={browser} />)}
+          </ul>
+        </>
+      )}
+      {!you && (
+        <div className="team__foot">
+          <button type="button" className="button button--row" onClick={endAll}
+            disabled={working || !list || (list.length === 0 && remembered.length === 0)}>
+            {working ? "Working…" : "Sign out of every device"}
+          </button>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function PersonPage({ row, roster, you, ask, reload }: {
+  row: StaffRow;
+  roster: Roster;
+  you: boolean;
+  ask: (action: Pending) => void;
+  reload: () => void;
+}) {
+  const name = nameOf(row);
+  const first = firstNameOf(row);
+  const suspended = row.status === "suspended";
+  const owner = row.owner ?? row.roles.includes("admin");
+  const departments = roster.departments ?? [];
+  const joined = row.joined_at ?? row.created_at;
+  const permissions = grantedBy(row.roles, roster.role_permissions);
+  // Two-step is asked of whoever approves or pays money, and of the owner.
+  const required = row.two_step_required ?? (owner || permissions.some((permission) =>
+    permission === "payroll.approve" || permission === "payments.record" || permission === "settings.manage"));
+  const locked = you || suspended || owner;
+  const canGiveOwner = roster.invitable_roles.includes("admin");
+
+  return (
+    <div className="stack team__person">
+      <section className="panel" aria-labelledby="person-title">
+        <div className="panel__head team__namehead">
+          <h2 className="panel__title" id="person-title">
+            {name}
+            {you && <span className="settings__you">You</span>}
+            {suspended && <span className="team__state team__state--suspended">Suspended</span>}
+          </h2>
+          <p className="team__hint">{row.email}{joined && ` · joined ${dayWords(joined)}`}</p>
+        </div>
+
+        <div className="team__owner">
+          <span><b>Owner</b> — every department, Settings and money</span>
+          {owner && <span className="team__state team__state--on">Owner</span>}
+          {!you && !suspended && (owner
+            ? <button type="button" className="button button--row"
+                onClick={() => ask({ kind: "owner", row, give: false })}>Take ownership</button>
+            : canGiveOwner && <button type="button" className="button button--row"
+                onClick={() => ask({ kind: "owner", row, give: true })}>Make owner</button>)}
+        </div>
+
+        <table className="access">
+          <tbody>
+            {departments.map((dept) => {
+              const current = (row.access?.[dept.key] as Level | undefined) ?? levelIn(dept, row.roles);
+              const role = roleOf(dept, current);
+              return (
+                <tr key={dept.key}>
+                  <td><span className="dept-cell"><DeptIcon name={dept.key} />{dept.name}</span></td>
+                  <td>
+                    <LevelControl dept={dept} current={current} locked={locked}
+                      onChoose={(level) => ask({ kind: "level", row, dept, level })} />
+                  </td>
+                  <td>{owner ? "The owner reaches every department." : (role && ROLE_BLURB[role]) || "–"}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        {you && <p className="team__note">You cannot change your own access. Another owner changes yours.</p>}
+        {suspended && <p className="team__note">{first} is suspended. Reactivate them to give access.</p>}
+
+        <p className="gives" aria-live="polite">
+          <span className="gives__label">What this gives {first}:</span> {suspended ? "nothing while suspended." : givesSentence(first, row.roles, roster.role_permissions)}
+        </p>
+      </section>
+
+      <div className="secure">
+        <TwoStepPanel row={row} you={you} required={required} onReset={() => ask({ kind: "reset", row })} />
+        <SignedInOn row={row} you={you} onChanged={reload} />
+      </div>
+
+      {!you && (suspended ? (
+        <div className="danger">
+          <p><b>{name} is suspended.</b> Reactivating gives no access. Give it again from the levels above.</p>
+          <button type="button" className="button button--row" onClick={() => ask({ kind: "reactivate", row })}>
+            Reactivate {name}
+          </button>
+        </div>
+      ) : (
+        <div className="danger">
+          <p><b>Suspend {name}.</b> Removes every department and signs out every device at once. The record of what {first} did stays.</p>
+          <button type="button" className="button button--danger button--row"
+            onClick={() => ask({ kind: "suspend", row })}>Suspend {name}</button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── A waiting invitation's page ─────────────────────────────────────────────
+
+function InvitationPage({ row, roster, onChanged, onGone }: {
+  row: InvitationRow;
+  roster: Roster;
+  onChanged: () => void;
+  onGone: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [resent, setResent] = useState(false);
+  const words = row.access_words ?? (roster.role_words?.[row.role] ?? storedRoleWords(row.role));
+
+  async function act(path: "resend" | "revoke") {
+    setBusy(true);
+    setError(null);
+    setResent(false);
+    try {
+      // Written out in full, so the reachability check can match each route.
+      await api.post(path === "resend" ? `/api/staff/invitations/${row.id}/resend` : `/api/staff/invitations/${row.id}/revoke`);
+      if (path === "revoke") onGone(); else setResent(true);
+      onChanged();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "That did not go through.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="stack team__person">
+      <section className="panel" aria-labelledby="invitation-title">
+        <div className="panel__head team__namehead">
+          <h2 className="panel__title" id="invitation-title">{row.email}</h2>
+          <p className="team__hint">
+            {words} · {sentWords(row.sent_at ?? row.created_at)} ·{" "}
+            {row.expired
+              ? <span className="settings__gap">Link expired {dayWords(row.expires_at)}</span>
+              : `expires ${dayWords(row.expires_at)}`}
+          </p>
+        </div>
+        <p className="team__para">
+          {row.email} has not joined yet. The invitation gives {words} access once they accept it.
+        </p>
+        {error && <p className="notice notice--refused team__pad" role="alert">{error}</p>}
+        {resent && <p className="team__para" role="status">Sent again.</p>}
+        <div className="team__foot">
+          <button type="button" className="button button--row" disabled={busy} onClick={() => act("resend")}>Resend</button>
+          <button type="button" className={`button button--row${row.expired ? "" : " settings__withdraw"}`}
+            disabled={busy} onClick={() => act("revoke")}>
+            {row.expired ? "Remove" : "Withdraw"}
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+// ── Invite someone ──────────────────────────────────────────────────────────
+
+function InviteDialog({ roster, onClose, onInvited }: { roster: Roster; onClose: () => void; onInvited: () => void }) {
+  const words = (role: string) => roster.role_words?.[role] ?? storedRoleWords(role);
+  // Only what the signed-in person may give, and only levels offered.
+  const options = (roster.departments ?? []).map((dept) => ({
+    dept,
+    levels: dept.levels.filter((entry) => entry.offered && entry.role && roster.invitable_roles.includes(entry.role)),
+  })).filter((option) => option.levels.length > 0);
+  const canOwner = roster.invitable_roles.includes("admin");
+
+  const [email, setEmail] = useState("");
+  const [where, setWhere] = useState<string>(options[0]?.dept.key ?? (canOwner ? "owner" : ""));
+  const [level, setLevel] = useState<string>("");
+  const [link, setLink] = useState<string | null>(null);
+  const [emailed, setEmailed] = useState(false);
+  const [copied, setCopied] = useState<boolean | null>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [working, setWorking] = useState(false);
+
+  const chosen = options.find((option) => option.dept.key === where);
+  // The smallest access first: an invitation is easy to widen and awkward to take back.
+  const levelsHere = chosen?.levels ?? [];
+  const levelNow = levelsHere.find((entry) => entry.level === level) ?? levelsHere[0];
+  const role = where === "owner" ? "admin" : (levelNow?.role ?? "");
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    setWorking(true);
+    setError(null);
+    setLink(null);
+    setCopied(false);
+    try {
+      const result = await api.post<{ token: string; emailed: boolean; link?: string }>(
+        "/api/auth/invitations",
+        { email: email.trim(), role },
+      );
+      setEmailed(result.emailed);
+      // The server builds the link from its own public address; where none is
+      // set (a development machine) it sends "", and the page builds it.
+      setLink(result.link || `${window.location.origin}/accept-invitation?token=${result.token}`);
+      setEmail("");
+      onInvited();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not invite them.");
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  async function copy() {
+    if (!link) return;
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+    } catch {
+      setCopied(null);
+    }
+  }
+
+  return (
+    <DialogFrame title="Invite someone" onClose={onClose}>
+      {error && <p className="notice notice--refused" role="alert">{error}</p>}
+      {/*
+       * §16. The platform emails the link, and the link is still shown here
+       * - once, because it is a working credential until it is used - for
+       * the moment the recipient says it never arrived.
+       */}
+      {link && (
+        <div className="settings__linkbox" role="status">
+          <span>
+            {emailed
+              ? "Emailed to them. The same link, in case it does not arrive - it only appears here once:"
+              : "Send this to them yourself - it only appears here once:"}
+          </span>
+          <code>{link}</code>
+          <button type="button" className="button button--row" onClick={copy}>
+            {copied ? "Copied" : copied === null ? "Could not copy - select it instead" : "Copy link"}
+          </button>
+        </div>
+      )}
+      <form onSubmit={submit} className="team__invite">
+        <label className="lifecycle__field">
+          <span>Email</span>
+          <input className="input" type="email" required value={email}
+            onChange={(event) => setEmail(event.target.value)} placeholder="name@hbawear.store" aria-label="Email" />
+        </label>
+        <label className="lifecycle__field">
+          <span>Access</span>
+          <select className="input" value={where} aria-label="Department"
+            onChange={(event) => { setWhere(event.target.value); setLevel(""); }}>
+            {canOwner && <option value="owner">{words("admin")}</option>}
+            {options.map((option) => <option key={option.dept.key} value={option.dept.key}>{option.dept.name}</option>)}
+          </select>
+        </label>
+        {where !== "owner" && (
+          <label className="lifecycle__field">
+            <span>Level</span>
+            <select className="input" value={levelNow?.level ?? ""} aria-label="Level"
+              onChange={(event) => setLevel(event.target.value)}>
+              {levelsHere.map((entry) => <option key={entry.level} value={entry.level}>{LEVEL_WORDS[entry.level]}</option>)}
+            </select>
+          </label>
+        )}
+        <p className="team__para team__para--flush">
+          {role ? `${email.trim() || "They"} will have ${role === "operations_manager" ? `${words(role)} and ${words("customer_service")}` : words(role)} access.` : "Choose what they can reach."}
+        </p>
+        <div className="lifecycle__acts">
+          <button type="button" className="button" onClick={onClose}>{link ? "Done" : "Cancel"}</button>
+          <button type="submit" className="button button--primary" disabled={working || !email.trim() || !role}>
+            {working ? "Sending…" : "Send invitation"}
+          </button>
+        </div>
+      </form>
+    </DialogFrame>
+  );
+}
+
+// ── The page ────────────────────────────────────────────────────────────────
+
+const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
+
+const LEVEL_RANK: Record<string, number> = { manager: 3, staff: 2, viewer: 1, none: 0 };
+
+/** Where a person sits in the list: the sidebar's department order, then how much, then name. */
+function peopleOrder(a: StaffRow, b: StaffRow, departments: Department[]): number {
+  const key = (row: StaffRow) => {
+    const levels = departments.map((dept) => (row.access?.[dept.key] as Level | undefined) ?? levelIn(dept, row.roles));
+    const first = levels.findIndex((level) => level !== "none");
+    return {
+      suspended: row.status === "suspended" ? 1 : 0,
+      owner: row.owner ?? row.roles.includes("admin") ? 0 : 1,
+      first: first < 0 ? 99 : first,
+      count: levels.filter((level) => level !== "none").length,
+      rank: first < 0 ? 0 : LEVEL_RANK[levels[first]],
+    };
+  };
+  const x = key(a);
+  const y = key(b);
+  return x.suspended - y.suspended || x.owner - y.owner || x.first - y.first || y.count - x.count
+    || y.rank - x.rank || nameOf(a).localeCompare(nameOf(b));
+}
+
+/** `/settings/team`: who has access, by department, and what each can do. The owner's. */
+export function Team({ session }: { session: Session }) {
   const [roster, setRoster] = useState<Roster | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
-  const [menu, setMenu] = useState<number | null>(null);
+  const [inviting, setInviting] = useState(false);
+  const [params, setParams] = useSearchParams();
 
   const load = useCallback(() => {
     api.get<Roster>("/api/staff").then(setRoster).catch((caught) => setError(caught.message));
   }, []);
   useEffect(load, [load]);
 
-  useEffect(() => {
-    if (menu === null) return;
-    const close = (event: Event) => {
-      if (event instanceof KeyboardEvent && event.key !== "Escape") return;
-      if (event.type === "click" && (event.target as HTMLElement).closest(".settings__menu-wrap")) return;
-      setMenu(null);
-    };
-    document.addEventListener("click", close);
-    document.addEventListener("keydown", close);
-    return () => { document.removeEventListener("click", close); document.removeEventListener("keydown", close); };
-  }, [menu]);
+  const staff = roster ? [...roster.staff].sort((a, b) => peopleOrder(a, b, roster.departments ?? [])) : [];
+  const invitations = roster?.invitations ?? [];
 
-  const staff = roster
-    ? [...roster.staff].sort((a, b) =>
-      (STATE_ORDER[a.status] ?? 9) - (STATE_ORDER[b.status] ?? 9)
-      || (a.display_name || a.email).localeCompare(b.display_name || b.email))
-    : [];
+  const personId = Number(params.get("person")) || null;
+  const invitationId = Number(params.get("invitation")) || null;
+  const chosen = personId !== null || invitationId !== null;
+  const selectedInvitation = invitationId !== null ? invitations.find((row) => row.id === invitationId) ?? null : null;
+  const selectedPerson = selectedInvitation ? null
+    : (personId !== null ? staff.find((row) => row.id === personId) : undefined) ?? (invitationId === null ? staff[0] ?? null : null);
+
+  const words = (role: string) => roster?.role_words?.[role] ?? storedRoleWords(role);
+
+  function replaceRow(next: StaffRow) {
+    setRoster((current) => current && ({
+      ...current,
+      staff: current.staff.map((row) => (row.id === next.id ? { ...row, ...next } : row)),
+    }));
+  }
 
   function dialogFor(action: Pending) {
-    const name = action.row.display_name || action.row.email;
-    if (action.kind === "devices") {
-      return <DevicesDialog row={action.row} onClose={() => setPending(null)} onChanged={load} />;
-    }
+    const name = nameOf(action.row);
     if (action.kind === "reset") {
       return <ResetTwoStepDialog row={action.row} onClose={() => setPending(null)}
         onDone={() => { setPending(null); load(); }} />;
     }
-    if (action.kind === "give" || action.kind === "remove") {
+    if (action.kind === "level" || action.kind === "owner") {
       // ADR 0067: a person holds several roles, and may do everything they
       // grant together - so what changes is read from all of them.
-      const giving = action.kind === "give";
-      // Asked of what the role grants, not its name: the access that can
-      // change everybody else's is the one worth a sterner question.
-      const toAdmin = giving && (roster?.role_permissions[action.role] ?? []).includes("settings.manage");
-      const afterRoles = giving
-        ? [...action.row.roles, action.role]
-        : action.row.roles.filter((role) => role !== action.role);
+      let afterRoles: string[];
+      let title: string;
+      let confirm: string;
+      let danger = false;
+      if (action.kind === "owner") {
+        afterRoles = action.give ? [...action.row.roles, "admin"] : action.row.roles.filter((role) => role !== "admin");
+        title = action.give ? `Make ${name} the owner?` : `Take ownership from ${name}?`;
+        confirm = action.give ? "Make owner" : "Take ownership";
+        danger = !action.give;
+      } else {
+        const departmentRoles = rolesOfDepartment(action.dept);
+        const newRole = roleOf(action.dept, action.level);
+        const kept = action.row.roles.filter((role) => !departmentRoles.includes(role));
+        afterRoles = newRole ? [...kept, newRole] : kept;
+        const had = levelIn(action.dept, action.row.roles) !== "none";
+        if (!newRole) {
+          title = `Take ${action.dept.name} access from ${name}?`;
+          confirm = "Remove access";
+          danger = true;
+        } else if (had) {
+          title = `Change ${name} to ${words(newRole)}?`;
+          confirm = "Change access";
+        } else {
+          title = `Give ${name} ${words(newRole)} access?`;
+          confirm = "Give access";
+        }
+      }
       const before = grantedBy(action.row.roles, roster?.role_permissions);
       const after = grantedBy(afterRoles, roster?.role_permissions);
-      const gains = ACCESS_LINES.filter(([, line]) => holds(after, line) && !holds(before, line)).map(([words]) => words);
-      const loses = ACCESS_LINES.filter(([, line]) => holds(before, line) && !holds(after, line)).map(([words]) => words);
+      const gains = ACCESS_LINES.filter(([, line]) => holds(after, line) && !holds(before, line)).map(([text]) => text);
+      const loses = ACCESS_LINES.filter(([, line]) => holds(before, line) && !holds(after, line)).map(([text]) => text);
+      const lower = (line: string) => `${line.charAt(0).toLowerCase()}${line.slice(1)}`;
+      const keeping = action.kind === "owner" ? afterRoles : afterRoles.filter((role) =>
+        action.kind === "level" && !rolesOfDepartment(action.dept).includes(role));
       return <ConfirmDialog
-        title={giving
-          ? (toAdmin ? `Make ${name} an admin?` : `Give ${name} ${roleWords(action.role)} access?`)
-          : `Take ${roleWords(action.role)} access from ${name}?`}
+        title={title}
         effects={[
-          ...gains.map((line) => `Can now: ${line.charAt(0).toLowerCase()}${line.slice(1)}`),
-          ...loses.map((line) => `Can no longer: ${line.charAt(0).toLowerCase()}${line.slice(1)}`),
-          `Keeps: ${rolesWords(giving ? action.row.roles : afterRoles)}.`,
+          ...gains.map((line) => `Can now: ${lower(line)}`),
+          ...loses.map((line) => `Can no longer: ${lower(line)}`),
+          keeping.length > 0 ? `Keeps: ${rolesWords(keeping, words)}.` : "Keeps: nothing else.",
           "Takes effect on their very next click.",
         ]}
-        confirm={giving ? (toAdmin ? "Make admin" : "Add access") : "Remove access"}
-        danger={!giving}
+        confirm={confirm}
+        danger={danger}
         onCancel={() => setPending(null)}
         onConfirm={async () => {
-          await (giving
-            ? api.post(`/api/staff/${action.row.id}/roles`, { role: action.role })
-            : api.post(`/api/staff/${action.row.id}/roles/${encodeURIComponent(action.role)}/remove`));
+          if (action.kind === "owner") {
+            try {
+              await (action.give
+                ? api.post(`/api/staff/${action.row.id}/roles`, { role: OWNER_ROLE })
+                : api.post(`/api/staff/${action.row.id}/roles/${OWNER_ROLE}/remove`));
+            } catch (caught) {
+              load();
+              throw caught;
+            }
+            setPending(null);
+            load();
+            return;
+          }
+          let next: StaffRow;
+          try {
+            next = await api.put<StaffRow>(`/api/staff/${action.row.id}/access/${action.dept.key}`, { level: action.level });
+          } catch (caught) {
+            load();
+            throw caught;
+          }
           setPending(null);
-          load();
+          if (next && Array.isArray(next.roles)) replaceRow(next); else load();
         }} />;
     }
     if (action.kind === "suspend") {
@@ -385,7 +841,7 @@ function RosterPanel({ session }: { session: Session }) {
     }
     return <ConfirmDialog
       title={`Reactivate ${name}?`}
-      effects={[`Reactivating ${name} gives no access. Add it again with Add access.`]}
+      effects={[`Reactivating ${name} gives no access. Give it again from the levels on their page.`]}
       confirm="Reactivate"
       onCancel={() => setPending(null)}
       onConfirm={async () => {
@@ -395,322 +851,87 @@ function RosterPanel({ session }: { session: Session }) {
       }} />;
   }
 
+  const canInvite = !!roster && roster.invitable_roles.length > 0;
+
   return (
     <>
+      <div className="page__head">
+        <div className="page__title">
+          <h1>Team and access</h1>
+          {roster && (
+            <span className="page__subtitle">
+              {plural(roster.staff.length, "person", "people")} · {plural(invitations.length, "invitation", "invitations")} waiting
+            </span>
+          )}
+        </div>
+        {canInvite && (
+          <div className="team__headact">
+            <button type="button" className="team__btn team__btn--primary" onClick={() => setInviting(true)}>Invite someone</button>
+          </div>
+        )}
+      </div>
       {error && <p className="notice notice--refused" role="alert">{error}</p>}
       {roster === null && !error && <p className="empty">Loading…</p>}
 
       {roster && (
-        <section className="panel" aria-label="Staff">
-          <table className="table settings__table">
-            <thead>
-              <tr>
-                <th>Staff</th>
-                <th className="settings__access">Access</th>
-                <th className="settings__seen">Last signed in</th>
-                <th className="settings__state">State</th>
-                <th className="settings__action"><span className="visually-hidden">Actions</span></th>
-              </tr>
-            </thead>
-            <tbody>
+        <div className={`team${chosen ? " team--chosen" : ""}`}>
+          <section className="panel team__list" aria-label="People">
+            <ul className="people">
               {staff.map((row) => {
-                const you = row.id === session.actor.id;
-                const name = row.display_name || row.email;
-                const changeable = !you && row.status !== "suspended";
-                // *Add access* offers only what this person may give
-                // (`can_grant`), and nothing already held.
-                const addable = roster.invitable_roles.filter((role) => !row.roles.includes(role));
-                // The last role is not taken here: suspending is how somebody
-                // loses all their access.
-                const removable = (role: string) =>
-                  row.roles.length > 1 && roster.invitable_roles.includes(role);
+                const selected = selectedPerson?.id === row.id;
                 return (
-                  <tr key={row.id} className={row.status === "suspended" ? "settings__row--off" : undefined}>
-                    <td>
-                      {name}
-                      {row.two_step_enabled && (
-                        <svg className="twostep__lock" role="img"
-                          aria-label={row.two_step_method === "email" ? "Two-step sign-in on, code by email"
-                            : row.two_step_method === "authenticator" ? "Two-step sign-in on, authenticator app"
-                            : "Two-step sign-in on"} viewBox="0 0 24 24"
-                          fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" />
-                        </svg>
-                      )}
-                      {you && <span className="settings__you">You</span>}
-                      <span className="settings__email">{row.email}</span>
-                    </td>
-                    <td className="settings__access">
-                      <ul className="settings__roles" aria-label={`Access for ${name}`}>
-                        {row.roles.map((role) => (
-                          <li key={role} className="settings__role">
-                            {roleWords(role)}
-                            {changeable && removable(role) && (
-                              <button type="button" className="settings__link-button"
-                                aria-label={`Remove ${roleWords(role)} from ${name}`}
-                                onClick={() => setPending({ kind: "remove", row, role })}>Remove</button>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                      {changeable && addable.length > 0 && (
-                        <select className="input settings__role-select settings__add-access" value=""
-                          aria-label={`Add access for ${name}`}
-                          onChange={(event) => {
-                            if (event.target.value) setPending({ kind: "give", row, role: event.target.value });
-                          }}>
-                          <option value="">Add access…</option>
-                          {addable.map((role) => <option key={role} value={role}>{roleWords(role)}</option>)}
-                        </select>
-                      )}
-                      {you && <span className="settings__email">Another admin changes yours</span>}
-                    </td>
-                    <td className="settings__seen">{lastSeen(row.last_login_at)}</td>
-                    <td className="settings__state">
-                      <span className={`pill settings__pill--${row.status}`}>
-                        {row.status === "active" ? "Active" : row.status === "suspended" ? "Suspended" : "Invited"}
+                  <li key={row.id} className={row.status === "suspended" ? "people__off" : undefined}>
+                    <Link to={{ search: `?person=${row.id}` }} aria-current={selected ? "true" : undefined}>
+                      <span className="avatar" aria-hidden="true">{initialsOf(nameOf(row))}</span>
+                      <span>
+                        <b>{nameOf(row)}</b>
+                        <small>{row.status === "suspended" ? "Suspended" : (row.access_words ?? accessWordsOf(row.roles))}</small>
                       </span>
-                    </td>
-                    <td className="settings__action">
-                      {!you && (
-                        <span className="settings__menu-wrap">
-                          <button type="button" className="settings__kebab"
-                            aria-expanded={menu === row.id} aria-label={`More for ${name}`}
-                            onClick={() => setMenu(menu === row.id ? null : row.id)}>⋯</button>
-                          {menu === row.id && (
-                            <span className="settings__menu">
-                              <button type="button" autoFocus
-                                onClick={() => { setMenu(null); setPending({ kind: "devices", row }); }}>
-                                Signed in on…
-                                <small>See where, and sign them out</small>
-                              </button>
-                              {row.two_step_enabled && row.two_step_method !== "email" && (
-                                <button type="button"
-                                  onClick={() => { setMenu(null); setPending({ kind: "reset", row }); }}>
-                                  Reset two-step sign-in…
-                                  <small>Lets them set it up again</small>
-                                </button>
-                              )}
-                              {row.status === "suspended" ? (
-                                <button type="button"
-                                  onClick={() => { setMenu(null); setPending({ kind: "reactivate", row }); }}>
-                                  Reactivate
-                                  <small>They can sign in again, with no access</small>
-                                </button>
-                              ) : (
-                                <button type="button" className="settings__menu-danger"
-                                  onClick={() => { setMenu(null); setPending({ kind: "suspend", row }); }}>
-                                  Suspend…
-                                  <small>Removes every department and signs them out</small>
-                                </button>
-                              )}
-                            </span>
-                          )}
-                        </span>
-                      )}
-                    </td>
-                  </tr>
+                      {row.two_step_enabled ? <Lock method={row.two_step_method} /> : <span />}
+                    </Link>
+                  </li>
                 );
               })}
-            </tbody>
-          </table>
-        </section>
+              {invitations.length > 0 && <li><p className="people__group">Invited, not joined yet</p></li>}
+              {invitations.map((row) => {
+                const selected = selectedInvitation?.id === row.id;
+                return (
+                  <li key={`invitation-${row.id}`}>
+                    <Link to={{ search: `?invitation=${row.id}` }} aria-current={selected ? "true" : undefined}>
+                      <span className="avatar" aria-hidden="true">{initialsOf(row.email)}</span>
+                      <span>
+                        <b>{row.email}</b>
+                        <small>{row.access_words ?? words(row.role)} · {sentWords(row.sent_at ?? row.created_at)}</small>
+                      </span>
+                      <span />
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+
+          <div className="team__detail">
+            <Link className="team__back" to={{ search: "" }}>
+              <span aria-hidden="true">‹</span> Team and access
+            </Link>
+            {selectedPerson && (
+              <PersonPage key={selectedPerson.id} row={selectedPerson} roster={roster}
+                you={selectedPerson.id === session.actor.id} ask={setPending} reload={load} />
+            )}
+            {selectedInvitation && (
+              <InvitationPage key={`invitation-${selectedInvitation.id}`} row={selectedInvitation} roster={roster}
+                onChanged={load} onGone={() => setParams({})} />
+            )}
+            {!selectedPerson && !selectedInvitation && <p className="empty">No one to show.</p>}
+          </div>
+        </div>
       )}
 
-      {roster && can(session, "invitations.send") && (
-        <InvitePanel roles={roster.invitable_roles} permissions={roster.role_permissions} onInvited={load} />
+      {roster && inviting && (
+        <InviteDialog roster={roster} onClose={() => setInviting(false)} onInvited={load} />
       )}
-      {roster && <PendingInvitations rows={roster.invitations} onChanged={load} />}
       {pending && dialogFor(pending)}
     </>
   );
-}
-
-/**
- * For whoever may invite without holding `settings.manage` - an affiliate
- * manager. The form, and the invitations they may still resend or withdraw
- * (X2: they used to get the form and nothing else).
- */
-
-function InvitePanel({ roles, permissions, onInvited }: {
-  roles: string[];
-  permissions: Record<string, string[]>;
-  onInvited?: () => void;
-}) {
-  // The least access first: an invitation is easy to widen and awkward to
-  // take back.
-  const offered = [...roles].sort((a, b) => (permissions[a]?.length ?? 0) - (permissions[b]?.length ?? 0));
-  const [email, setEmail] = useState("");
-  const [role, setRole] = useState(offered[0] ?? "");
-  const [link, setLink] = useState<string | null>(null);
-  const [emailed, setEmailed] = useState(false);
-  const [copied, setCopied] = useState<boolean | null>(false);
-  const [error, setError] = useState<string | null>(null);
-  const [working, setWorking] = useState(false);
-
-  useEffect(() => { if (!offered.includes(role)) setRole(offered[0] ?? ""); }, [offered, role]);
-
-  async function submit(event: React.FormEvent) {
-    event.preventDefault();
-    setWorking(true);
-    setError(null);
-    setLink(null);
-    setCopied(false);
-    try {
-      const result = await api.post<{ token: string; emailed: boolean; link?: string }>(
-        "/api/auth/invitations",
-        { email: email.trim(), role },
-      );
-      setEmailed(result.emailed);
-      // The server builds the link from its own public address; where none is
-      // set (a development machine) it sends "", and the page builds it.
-      setLink(result.link || `${window.location.origin}/accept-invitation?token=${result.token}`);
-      setEmail("");
-      onInvited?.();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not invite them.");
-    } finally {
-      setWorking(false);
-    }
-  }
-
-  async function copy() {
-    if (!link) return;
-    try {
-      await navigator.clipboard.writeText(link);
-      setCopied(true);
-    } catch {
-      // The browser refused. Say so, rather than let somebody paste nothing.
-      setCopied(null);
-    }
-  }
-
-  if (offered.length === 0) return null;
-
-  return (
-    <section className="panel">
-      <div className="panel__head"><h2 className="panel__title">Invite a staff member</h2></div>
-      <div className="settings__pad">
-        {error && <p className="notice notice--refused" role="alert">{error}</p>}
-        {/*
-         * §16. The platform emails the link, and the link is still shown here
-         * - once, because it is a working credential until it is used - for
-         * the moment the recipient says it never arrived.
-         */}
-        {link && (
-          <div className="settings__linkbox" role="status">
-            <span>
-              {emailed
-                ? "Emailed to them. The same link, in case it does not arrive - it only appears here once:"
-                : "Send this to them yourself - it only appears here once:"}
-            </span>
-            <code>{link}</code>
-            <button type="button" className="button button--row" onClick={copy}>
-              {copied ? "Copied" : copied === null ? "Could not copy - select it instead" : "Copy link"}
-            </button>
-          </div>
-        )}
-        <form onSubmit={submit} className="settings__invite-row">
-          <input className="input settings__invite-email" type="email" required value={email}
-            onChange={(event) => setEmail(event.target.value)} placeholder="name@hbawear.store" aria-label="Email" />
-          <select className="input settings__invite-role" value={role}
-            onChange={(event) => setRole(event.target.value)} aria-label="Access">
-            {offered.map((value) => <option key={value} value={value}>{roleWords(value)}</option>)}
-          </select>
-          <button type="submit" className="button button--primary settings__invite-send"
-            disabled={working || !email.trim() || !role}>
-            {working ? "Sending…" : "Send invitation"}
-          </button>
-        </form>
-        <details className="settings__explain">
-          <summary>What can each access do?</summary>
-          <table className="settings__perm">
-            <thead>
-              <tr><th>Can…</th>{["content_manager", "affiliate_manager", "operations_manager", "admin"].filter((r) => permissions[r]).map((r) => <th key={r}>{roleWords(r)}</th>)}</tr>
-            </thead>
-            <tbody>
-              {ACCESS_LINES.map(([words, line]) => (
-                <tr key={words}>
-                  <td>{words}</td>
-                  {["content_manager", "affiliate_manager", "operations_manager", "admin"].filter((r) => permissions[r]).map((r) => (
-                    <td key={r} className="settings__perm-mark">
-                      {holds(permissions[r], line) ? <span aria-label="Yes">✓</span> : <span aria-label="No" className="settings__perm-no">—</span>}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </details>
-      </div>
-    </section>
-  );
-}
-
-const longDate = (iso: string) =>
-  new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Cairo", day: "numeric", month: "long" }).format(new Date(iso));
-
-/**
- * One line per address, the newest (T1). A live link can be resent or
- * withdrawn; a lapsed one resent or removed - nothing sits here for ever.
- */
-function PendingInvitations({ rows, onChanged }: { rows: InvitationRow[]; onChanged: () => void }) {
-  const [busy, setBusy] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  async function act(id: number, path: "resend" | "revoke") {
-    setBusy(id);
-    setError(null);
-    try {
-      await api.post(path === "resend" ? `/api/staff/invitations/${id}/resend` : `/api/staff/invitations/${id}/revoke`);
-      onChanged();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "That did not go through.");
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  return (
-    <section className="panel">
-      <div className="panel__head"><h2 className="panel__title">Pending staff invitations</h2></div>
-      {error && <p className="notice notice--refused settings__pad" role="alert">{error}</p>}
-      {rows.length === 0 ? (
-        <p className="settings__none">No staff invitation is outstanding.</p>
-      ) : (
-        <ul className="settings__pending">
-          {rows.map((row) => (
-            <li key={row.id}>
-              <span className="settings__pending-who">
-                {row.email}
-                <span className="settings__email">
-                  {roleWords(row.role)}
-                  {row.created_at && ` · Sent ${longDate(row.created_at)}`}
-                  {" · "}
-                  {row.expired
-                    ? <span className="settings__gap">Link expired {longDate(row.expires_at)}</span>
-                    : `expires ${longDate(row.expires_at)}`}
-                </span>
-              </span>
-              <button type="button" className="button button--row" disabled={busy === row.id}
-                onClick={() => act(row.id, "resend")}>Resend</button>
-              <button type="button" className={`button button--row${row.expired ? "" : " settings__withdraw"}`}
-                disabled={busy === row.id} onClick={() => act(row.id, "revoke")}>
-                {row.expired ? "Remove" : "Withdraw"}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-}
-
-
-/** `/settings/team`: who has access and what each can do. The owner's. */
-export function Team({ session }: { session: Session }) {
-  return <>
-    <div className="page__head"><div className="page__title"><h1>Team and access</h1></div></div>
-    <div className="settings__sections"><RosterPanel session={session} /></div>
-  </>;
 }

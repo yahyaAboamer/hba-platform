@@ -20,19 +20,29 @@ routes. `GET /api/staff/invitations`, the affiliate manager's own list
 (Settings audit X2), was retired with it: nothing asked for it any more.
 """
 
+from typing import Literal
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.shared.api.deps import client_address, holds, require_permission, require_staff, roles_of
 from app.core import throttle
 from app.config import settings
-from app.core.businesstime import utcnow
+from app.core.businesstime import at_words, utcnow
 from app.core.permissions import (
+    DEPARTMENT_LEVELS,
+    DEPARTMENT_NAMES,
     GRANT_REFUSED,
+    INVITATION_BRINGS,
+    LEVELS,
     MODEL_ROLE,
+    NOT_OFFERED,
+    ROLE_WORDS,
     Permission,
+    access_words,
     can_invite,
     invitation_permission,
     permissions_for,
@@ -44,17 +54,25 @@ from app.shared.services import trusted_browsers, two_step
 from app.shared.services.audit import record_audit
 from app.shared.services.auth import live_sessions, revoke_all_sessions, session_rows
 from app.shared.services.invitations import create_invitation
-from app.shared.services.notifications import invitation_link, invitation_sent
+from app.shared.services.notifications import (
+    invitation_link,
+    invitation_sent,
+    two_step_reminder,
+)
 from app.shared.services.staff import (
     ASSIGNABLE_ROLES,
+    REMINDER_EVERY,
     give_role,
     invitable_roles,
+    last_two_step_reminder,
     list_pending_invitations,
     list_staff,
     reactivate_staff,
     remove_role,
     revoke_invitation,
+    set_level,
     suspend_staff,
+    suspended_refusal,
 )
 
 router = APIRouter(prefix="/api/staff")
@@ -62,6 +80,10 @@ router = APIRouter(prefix="/api/staff")
 
 class RoleBody(BaseModel):
     role: str
+
+
+class LevelBody(BaseModel):
+    level: Literal["none", "viewer", "staff", "manager"]
 
 
 class SuspendBody(BaseModel):
@@ -112,7 +134,45 @@ def _invitation_row(invitation: Invitation, now) -> dict:
         # When it went out - the approved panel writes *Finance - Sent
         # 3 November 2026* under each address.
         "created_at": _isoformat(invitation.created_at),
+        # The same moment under the name Batch 2.4's contract gives it.
+        "sent_at": _isoformat(invitation.created_at),
+        # "Inbox staff" - what accepting it gives, every role it brings
+        # included (an operations manager's brings the Inbox).
+        "access_words": access_words(
+            (invitation.role, *INVITATION_BRINGS.get(invitation.role, ()))
+        ),
     }
+
+
+def _staff_row(row: dict) -> dict:
+    return {
+        **row,
+        "last_login_at": _isoformat(row["last_login_at"]),
+        "created_at": _isoformat(row["created_at"]),
+        "joined_at": _isoformat(row["joined_at"]),
+    }
+
+
+def _departments() -> list[dict]:
+    """Every department Team and access draws, and each of its four levels
+    with the role behind it - `None` and not offered where no role grants it
+    yet. From `DEPARTMENT_LEVELS` itself, so the screen cannot offer a level
+    the server would refuse."""
+    return [
+        {
+            "key": key,
+            "name": DEPARTMENT_NAMES[key],
+            "levels": [
+                {
+                    "level": level,
+                    "role": levels.get(level),
+                    "offered": level == "none" or levels.get(level) is not None,
+                }
+                for level in LEVELS
+            ],
+        }
+        for key, levels in DEPARTMENT_LEVELS.items()
+    ]
 
 
 @router.get("")
@@ -124,14 +184,7 @@ def roster(
     waiting on somebody to open it."""
     now = utcnow()
     return {
-        "staff": [
-            {
-                **row,
-                "last_login_at": _isoformat(row["last_login_at"]),
-                "created_at": _isoformat(row["created_at"]),
-            }
-            for row in list_staff(db)
-        ],
+        "staff": [_staff_row(row) for row in list_staff(db)],
         "invitations": [
             _invitation_row(invitation, now)
             for invitation in list_pending_invitations(
@@ -145,6 +198,10 @@ def roster(
         #: What each role grants, from `ROLES` itself, so the screen's
         #: "What can each access do?" can never disagree with the server (T4).
         "role_permissions": _role_permissions(),
+        #: Each department and its levels (Batch 2.4), and each role in the
+        #: words staff are shown it.
+        "departments": _departments(),
+        "role_words": dict(ROLE_WORDS),
     }
 
 
@@ -211,6 +268,104 @@ def remove_access(
 
 def _roles_now(db: Session, user: UserAccount) -> list[str]:
     return sorted_roles(roles_of(db, user) - {MODEL_ROLE})
+
+
+def _staff_or_404(db: Session, user_id: int) -> tuple[UserAccount, dict]:
+    """An account on the roster, and its row there. Anybody else - a model,
+    an id nobody has - is no member of staff to act on here."""
+    user = _user_or_404(db, user_id)
+    rows = list_staff(db, only=user.id)
+    if not rows:
+        raise HTTPException(404, "No such member of staff")
+    return user, rows[0]
+
+
+@router.put("/{user_id}/access/{department}")
+def set_department_access(
+    user_id: int,
+    department: str,
+    body: LevelBody,
+    actor: UserAccount = Depends(require_permission(Permission.SETTINGS_MANAGE)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Team and access: one department of somebody's access set to one level
+    (Batch 2.4). `give_role` then `remove_role` in one transaction, so every
+    rule they keep still refuses, with today's words, and a refusal leaves
+    nothing half changed. Answers the person's roster row as it is after."""
+    if department not in DEPARTMENT_LEVELS:
+        raise HTTPException(404, "No such department")
+    if body.level != "none" and DEPARTMENT_LEVELS[department].get(body.level) is None:
+        raise HTTPException(422, NOT_OFFERED)
+    user, _row = _staff_or_404(db, user_id)
+    try:
+        set_level(
+            db,
+            user,
+            department,
+            body.level,
+            actor_roles=roles_of(db, actor),
+            actor_id=actor.id,
+            actor_email=actor.email,
+        )
+        db.commit()
+    except IntegrityError as exc:
+        # Two presses racing past the checks: a database index refused the
+        # second, and every step of it goes back with it.
+        db.rollback()
+        raise HTTPException(409, "This access was changed a moment ago.") from exc
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(400, str(exc)) from exc
+    return _staff_row(list_staff(db, only=user.id)[0])
+
+
+@router.post("/{user_id}/two-step/remind", status_code=201)
+def remind_two_step(
+    user_id: int,
+    request: Request,
+    actor: UserAccount = Depends(require_permission(Permission.SETTINGS_MANAGE)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Team and access, *Send a reminder* (Batch 2.4): email somebody whose
+    two-step sign-in is off what it is, whether their access needs it, and
+    where to turn it on. One per person per day, and never yourself."""
+    user = _user_or_404(db, user_id)
+    if user.id == actor.id:
+        raise HTTPException(400, "This is your own account. Turn two-step sign-in on in Settings → Me.")
+    # Locked first, so two presses at once send one reminder, not two.
+    db.execute(select(UserAccount.id).where(UserAccount.id == user.id).with_for_update())
+    user, row = _staff_or_404(db, user_id)
+    name = user.display_name or user.email
+    if user.status != "active":
+        raise HTTPException(409, suspended_refusal(user))
+    if row["two_step_enabled"]:
+        raise HTTPException(409, f"Two-step sign-in is already on for {name}.")
+    sent_at = last_two_step_reminder(db, user.id)
+    if sent_at is not None:
+        now = utcnow()
+        wait = max(1, int((sent_at + REMINDER_EVERY - now).total_seconds()))
+        raise HTTPException(
+            429,
+            f"A reminder was sent {at_words(sent_at, now)}. "
+            "You can send another a day after it.",
+            headers={"Retry-After": str(wait)},
+        )
+
+    # Whether their access asks for it today: the roster row's own answer
+    # (`two_step.required_now`), so the email and the screen say the same.
+    required = row["two_step_required"]
+    queued = two_step_reminder(db, user, required=required)
+    record_audit(
+        db,
+        action="staff.two_step_reminded",
+        subject=f"user:{user.id}",
+        actor_id=actor.id,
+        actor_email=actor.email,
+        after={"required": required},
+        ip_address=client_address(request),
+    )
+    db.commit()
+    return {"emailed": queued is not None and settings.mail_configured}
 
 
 @router.post("/{user_id}/suspend")

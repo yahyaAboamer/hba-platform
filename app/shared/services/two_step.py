@@ -158,6 +158,14 @@ def required_method(roles: frozenset[str]) -> str | None:
     return None
 
 
+def required_now(roles: frozenset[str]) -> bool:
+    """Whether these roles are asked for two-step sign-in **today**: only
+    while the owner's switch is on, and only for staff (a model is never
+    asked). The one answer Team and access shows beside a name and the
+    reminder email gives (Batch 2.4), so the two can never disagree."""
+    return bool(settings.two_step_enforced and is_staff(roles) and is_required(roles))
+
+
 def email_on(user: UserAccount) -> bool:
     """Whether this person turned email codes on themselves."""
     return user.two_step_email_at is not None

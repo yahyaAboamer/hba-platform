@@ -14,6 +14,7 @@ by the name on record, and a destination only by its method.
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.permissions import MODEL_ROLE, ROLE_WORDS
 from app.modules.affiliates.models.affiliates import AffiliateProfile
 from app.shared.models.audit import AuditEvent
 from app.shared.models.identity import UserAccount
@@ -27,14 +28,11 @@ _MONTHS = (
 #: Operations' sources, as the audit sentence names them (ADR 0057).
 _PROVIDER = {"bosta": "Bosta", "estebdal": "E-stebdal"}
 
-_ROLE = {
-    "admin": "admin",
-    "affiliate_manager": "affiliate manager",
-    "content_manager": "content manager",
-    "operations_manager": "operations manager",
-    "customer_service": "customer service",
-    "affiliate": "model",
-}
+#: Each role in the words staff are shown (Batch 2.4, Choice 6): "Gave Mona
+#: Inbox staff access". One table, `ROLE_WORDS`, so the log and Team and access
+#: never name a role two ways. A model's role is no staff access and keeps its
+#: own word.
+_ROLE = {**ROLE_WORDS, MODEL_ROLE: "model"}
 
 _METHOD = {"instapay": "InstaPay", "wallet": "a wallet", "bank": "a bank account"}
 
@@ -223,6 +221,7 @@ def sentence(event: AuditEvent, names: _Names) -> str:
         "staff.role_given": f"Gave {who} {_ROLE.get(a.get('role'), a.get('role'))} access",
         "staff.role_removed": f"Took {_ROLE.get(a.get('role'), a.get('role'))} access from {who}",
         "staff.suspended": f"Suspended {who}'s access",
+        "staff.two_step_reminded": f"Reminded {who} to turn on two-step sign-in",
         "staff.reactivated": f"Restored {who}'s access",
         "target.requirements_set": f"Set {who}'s content targets for {month}",
         "target.requirements_set_for_year": f"Set {who}'s content targets for the year",
