@@ -4,7 +4,7 @@ reset email.
 Added by the security audit of October 2026: nothing limited either.
 
 **Kept in this process's memory, deliberately.** The service runs one uvicorn
-process on one replica (`railway.json`, `docker-entrypoint.sh`), so a counter
+process on one replica (`.railway/railway.ts`, `docker-entrypoint.sh`), so a counter
 here sees every request. A deploy clears it, which gives an attacker back at
 most one window - not worth a table and a migration. If the service ever runs
 more than one process, this has to move to the database.

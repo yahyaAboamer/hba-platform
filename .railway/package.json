@@ -1,0 +1,9 @@
+{
+  "name": "hba-platform-railway-iac",
+  "private": true,
+  "type": "module",
+  "description": "Railway's TypeScript SDK for .railway/railway.ts only. Not part of the application build.",
+  "dependencies": {
+    "railway": "3.16.0"
+  }
+}
