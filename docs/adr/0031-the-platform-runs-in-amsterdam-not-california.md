@@ -69,6 +69,9 @@ this one could not be.
 and the Shopify webhook addresses are all unaffected, which is Railway's
 documented behaviour and held in practice.
 
+*(Since 6 November 2026 `.railway/railway.ts` replaces `railway.json` and
+does name the region, `europe-west4-drams3a`, for one replica.)*
+
 **The repository does not pin the region.** `railway.json` sets `numReplicas:
 1` and says nothing about geography; the region lives in Railway's own service
 settings. There was a real worry that our file would reassert the account

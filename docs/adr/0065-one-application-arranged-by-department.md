@@ -18,7 +18,7 @@ What exists on 25 October 2026:
   `operations`, `inbox`, `app/worker.py`), so a backlog in one never delays
   another. Jobs are leased (ADR 0021), so the worker can move to its own
   process without any change to the queue.
-- **One replica per environment** (`railway.json`), migrations run on start
+- **One replica per environment** (`.railway/railway.ts`), migrations run on start
   (`docker-entrypoint.sh`), backups run in their own container (ADR 0032), and
   staging and production are separate services (ADR 0034).
 - **The newer departments are already self-contained folders.**
