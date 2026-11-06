@@ -6,11 +6,10 @@
 // `railway config migrate` was run as a dry run only, because its output
 // guessed service names from folder names and dropped the restart policies.
 //
-// WHY THE ROOT railway.json IS STILL THERE. Production's app service still
-// gets its health check and restart policy from it, not from its own settings.
-// It stays until this file has been applied to production; it can then be
-// deleted. It must go no later than 2026-12-01, when Railway stops reading it
-// anyway. (ops/backup/railway.json was deleted: no service ever read it.)
+// THE OLD FILES ARE GONE. This file was applied to staging and production on
+// 2026-11-06; Railway now holds the health check and restart policy in each
+// service's own settings, so the root railway.json was deleted the same day.
+// (ops/backup/railway.json was deleted earlier: no service ever read it.)
 //
 // HOW THIS FILE TAKES EFFECT. Railway does NOT read it on deploy. It changes
 // nothing until someone runs `railway config apply` against an environment.
@@ -44,8 +43,8 @@ const REGION = "europe-west4-drams3a";
 const keep = (...names: string[]) => Object.fromEntries(names.map((name) => [name, preserve()]));
 
 // The application's build, start, health check and restart policy. Identical
-// in both environments; previously the health check and restart policy came
-// from railway.json for production and from the dashboard for staging.
+// in both environments; before 2026-11-06 the health check and restart policy
+// came from railway.json for production and from the dashboard for staging.
 const appRuntime = {
   build: { buildEnvironment: "V3", builder: "DOCKERFILE", dockerfilePath: "Dockerfile" },
   start: "/app/docker-entrypoint.sh",
