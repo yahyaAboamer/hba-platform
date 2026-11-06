@@ -11,13 +11,14 @@ under which that risk was accepted, not niceties that came with the feature.
 
 import io
 import threading
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 from sqlalchemy import text
 
+from app.core.businesstime import business_date
 from app.core.passwords import hash_password
 from app.db import engine
 from app.main import app
@@ -319,6 +320,52 @@ def test_retrying_the_same_transfer_returns_the_original_record(client):
                 "WHERE event = 'payment.recorded'"
             )
         ) == 1
+
+
+def test_a_transfer_dated_in_the_future_is_refused(client):
+    """Payments audit, 6 Nov 2026. The ledger is append-only, so a transfer
+    recorded with a mistyped year would stay on it for good. Refused, and
+    nothing is written.
+    """
+    affiliate = _affiliate(client)
+    snapshot = _owed(client, affiliate)
+    later = (datetime.now(timezone.utc) + timedelta(days=2)).date().isoformat()
+
+    response = client.post(
+        "/api/payments",
+        json={
+            "affiliate_id": affiliate["id"],
+            "amount_piastres": 200_000,
+            "allocations": [{"payroll_snapshot_id": snapshot, "piastres": 200_000}],
+            "occurred_at": f"{later}T12:00:00Z",
+        },
+    )
+
+    assert response.status_code == 400, response.text
+    assert "in the future" in response.json()["detail"]
+    with engine.begin() as connection:
+        assert connection.scalar(text("SELECT count(*) FROM payment_transaction")) == 0
+
+
+def test_a_transfer_dated_today_in_cairo_is_accepted(client):
+    """The form sends noon UTC of the day picked. Today's date must pass at any
+    hour, including Cairo mornings when that noon is still hours away.
+    """
+    affiliate = _affiliate(client)
+    snapshot = _owed(client, affiliate)
+    today = business_date(datetime.now(timezone.utc)).isoformat()
+
+    response = client.post(
+        "/api/payments",
+        json={
+            "affiliate_id": affiliate["id"],
+            "amount_piastres": 200_000,
+            "allocations": [{"payroll_snapshot_id": snapshot, "piastres": 200_000}],
+            "occurred_at": f"{today}T12:00:00Z",
+        },
+    )
+
+    assert response.status_code == 201, response.text
 
 
 def test_an_operation_key_cannot_be_reused_for_different_money(client):

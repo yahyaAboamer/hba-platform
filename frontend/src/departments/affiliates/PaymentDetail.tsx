@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { DestinationDetails } from "./DestinationDetails";
@@ -150,6 +150,13 @@ export function PaymentDetail({ session }: { session: Session }) {
   const [corrections, setCorrections] = useState<Correction[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [approving, setApproving] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const confirmButton = useRef<HTMLButtonElement>(null);
+
+  // The question replaces the button that asked it, so focus moves to it.
+  useEffect(() => {
+    if (confirming) confirmButton.current?.focus();
+  }, [confirming]);
 
   const load = useCallback(() => {
     setError(null);
@@ -212,6 +219,7 @@ export function PaymentDetail({ session }: { session: Session }) {
       setError(caught instanceof Error ? caught.message : "Approval failed.");
     } finally {
       setApproving(false);
+      setConfirming(false);
     }
   }
 
@@ -357,6 +365,13 @@ export function PaymentDetail({ session }: { session: Session }) {
               <span>{totalLabel}</span>
               <Money piastres={statement.total_piastres} kind="agreed" />
             </div>
+            {/* ADR 0004: the month is rounded half-up to whole pounds, once.
+             *  Without this, sales × rate visibly fails to match the line. */}
+            {statement.basis !== "settled_outside" && (
+              <p className="pay-detail__rounding">
+                Pay is worked out exactly, then rounded to the nearest whole pound.
+              </p>
+            )}
           </section>
 
           {balance.credited_piastres > 0 && view.explanation && (
@@ -475,14 +490,51 @@ export function PaymentDetail({ session }: { session: Session }) {
                   <p className="pay-detail__muted">
                     Approval freezes this calculation. Recording the transfer is separate.
                   </p>
-                  <button
-                    type="button"
-                    className="button button--primary pay-detail__wide"
-                    disabled={approving}
-                    onClick={approve}
-                  >
-                    {approving ? "Approving…" : "Approve this month"}
-                  </button>
+                  {confirming ? (
+                    /* Approval cannot be taken back from any screen (05B), so
+                     * it asks once, naming who, which month and how much. */
+                    <div
+                      className="pay-detail__confirm"
+                      role="group"
+                      aria-labelledby="pay-detail-confirm-title"
+                    >
+                      <p id="pay-detail-confirm-title" className="pay-detail__confirm-title">
+                        Approve {statement.name}’s {formatMonth(month)} at{" "}
+                        <Money piastres={statement.total_piastres} kind="agreed" />?
+                      </p>
+                      <p className="pay-detail__muted">
+                        This cannot be undone. A difference found later is settled
+                        as a correction.
+                      </p>
+                      <div className="pay-detail__confirm-acts">
+                        <button
+                          ref={confirmButton}
+                          type="button"
+                          className="button button--primary"
+                          disabled={approving}
+                          onClick={approve}
+                        >
+                          {approving ? "Approving…" : "Yes, approve"}
+                        </button>
+                        <button
+                          type="button"
+                          className="button"
+                          disabled={approving}
+                          onClick={() => setConfirming(false)}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      className="button button--primary pay-detail__wide"
+                      onClick={() => setConfirming(true)}
+                    >
+                      Approve this month
+                    </button>
+                  )}
                 </>
               ))}
           </section>

@@ -21,7 +21,7 @@ other permission check. A URL that is its own permission leaks the moment
 somebody forwards a message.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
 from pydantic import BaseModel, Field
@@ -29,7 +29,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.shared.api.deps import require_permission
-from app.core.businesstime import parse_month
+from app.core.businesstime import business_date, parse_month, utcnow
 from app.core.money import format_egp
 from app.core.permissions import Permission
 from app.db import get_session
@@ -368,6 +368,22 @@ def record(
         except PaymentOperationConflict as exc:
             raise HTTPException(409, str(exc)) from exc
         return _render_recorded_payment(existing, replayed=True)
+
+    # A transfer that has not happened yet cannot be recorded as made. The
+    # ledger is append-only, so a mistyped year would stay on it for good.
+    # Compared as Cairo dates: the form sends noon UTC of the day picked, which
+    # is that same day in Cairo. Checked after the replay above, so a retry of
+    # a request accepted earlier is still answered with its own row.
+    if body.occurred_at is not None:
+        occurred = body.occurred_at
+        if occurred.tzinfo is None or occurred.utcoffset() is None:
+            occurred = occurred.replace(tzinfo=timezone.utc)
+        if business_date(occurred) > business_date(utcnow()):
+            raise HTTPException(
+                400,
+                "The transfer date is in the future. Record a transfer once it "
+                "has been sent, with the date it was sent.",
+            )
 
     # §14. A difference from what was owed is refused without a note - the note
     # is what separates a deliberate partial payment from a typo, and only the

@@ -161,10 +161,13 @@ export function PaymentRecord() {
   const differs = piastres !== null && piastres !== owed;
   const noteMissing = differs && note.trim() === "";
   const over = piastres !== null && piastres > owed;
+  // ISO dates compare correctly as strings. The server refuses these too.
+  const today = cairoToday();
+  const dateInFuture = transferDate > today;
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
-    if (piastres === null || piastres <= 0 || balance === null) return;
+    if (piastres === null || piastres <= 0 || balance === null || dateInFuture) return;
     setWorking(true);
     setError(null);
     try {
@@ -240,6 +243,13 @@ export function PaymentRecord() {
     <>
       {head}
       <form className="pay-record" onSubmit={submit}>
+        {/* The export puts this sentence under the button. A first-time
+         *  payer read the screen as one that sends money; the owner asked for
+         *  it to come first (payments audit, 6 Nov 2026). */}
+        <p className="pay-record__note pay-record__note--lead">
+          Saving records a transfer that finance already made outside this
+          dashboard. No money is sent from here.
+        </p>
         <p className="pay-record__due">
           <Money piastres={owed} kind="agreed" /> outstanding for {formatMonth(month)}
         </p>
@@ -268,6 +278,7 @@ export function PaymentRecord() {
             className="input pay-record__input"
             type="date"
             required
+            max={today}
             value={transferDate}
             onChange={(event) => setTransferDate(event.target.value)}
           />
@@ -336,6 +347,12 @@ export function PaymentRecord() {
             Enter the amount that was actually transferred.
           </p>
         )}
+        {dateInFuture && (
+          <p className="pay-record__error" role="alert">
+            The transfer date is in the future. Record a transfer once it has
+            been sent, with the date it was sent.
+          </p>
+        )}
         {over && (
           <p className="pay-record__warn">
             That is more than the outstanding <Money piastres={owed} kind="agreed" />.
@@ -353,7 +370,7 @@ export function PaymentRecord() {
           <button
             type="submit"
             className="button button--primary pay-record__big"
-            disabled={working || piastres === null || piastres <= 0 || noteMissing}
+            disabled={working || piastres === null || piastres <= 0 || noteMissing || dateInFuture}
           >
             {working ? "Recording…" : "Record payment"}
           </button>
@@ -361,11 +378,6 @@ export function PaymentRecord() {
             Cancel
           </Link>
         </div>
-
-        <p className="pay-record__note">
-          Saving records a transfer that finance already made outside this
-          dashboard.
-        </p>
       </form>
     </>
   );
