@@ -122,7 +122,10 @@ describe("approving a month", () => {
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
     expect(posts()).toHaveLength(0);
-    expect(screen.getByRole("button", { name: "Approve this month" })).toBeTruthy();
+    // Focus goes back to the button that asked, not to the top of the page.
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "Approve this month" }),
+    );
   });
 
   it("approves on the second, deliberate press", async () => {

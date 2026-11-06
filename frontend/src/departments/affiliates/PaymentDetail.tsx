@@ -152,10 +152,19 @@ export function PaymentDetail({ session }: { session: Session }) {
   const [approving, setApproving] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const confirmButton = useRef<HTMLButtonElement>(null);
+  const approveButton = useRef<HTMLButtonElement>(null);
+  // Set only by Cancel: focus returns to the button that asked the question,
+  // instead of falling to the top of the page when the question unmounts.
+  const returnFocus = useRef(false);
 
   // The question replaces the button that asked it, so focus moves to it.
   useEffect(() => {
-    if (confirming) confirmButton.current?.focus();
+    if (confirming) {
+      confirmButton.current?.focus();
+    } else if (returnFocus.current) {
+      returnFocus.current = false;
+      approveButton.current?.focus();
+    }
   }, [confirming]);
 
   const load = useCallback(() => {
@@ -520,7 +529,10 @@ export function PaymentDetail({ session }: { session: Session }) {
                           type="button"
                           className="button"
                           disabled={approving}
-                          onClick={() => setConfirming(false)}
+                          onClick={() => {
+                            returnFocus.current = true;
+                            setConfirming(false);
+                          }}
                         >
                           Cancel
                         </button>
@@ -528,6 +540,7 @@ export function PaymentDetail({ session }: { session: Session }) {
                     </div>
                   ) : (
                     <button
+                      ref={approveButton}
                       type="button"
                       className="button button--primary pay-detail__wide"
                       onClick={() => setConfirming(true)}
