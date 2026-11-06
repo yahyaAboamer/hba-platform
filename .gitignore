@@ -24,3 +24,6 @@ HBA_Design_Parity_Code_Package/
 
 # Private order-audit scratchpads must never be committed or uploaded.
 orders_audit.md
+
+# Railway IaC SDK, installed with `npm --prefix .railway ci`.
+.railway/node_modules/

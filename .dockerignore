@@ -19,6 +19,7 @@ design-preview/
 ops/
 scripts/
 .claude/
+.railway/
 
 # Local historical evidence is never an application build input.
 HBA_Readiness_Audit/
