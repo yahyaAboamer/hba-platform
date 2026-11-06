@@ -284,6 +284,21 @@ export function PaymentDetail({ session }: { session: Session }) {
   const destination = balance.destination ?? null;
   // Present only for an account that may record payments. ADR 0042.
   const card = balance.destination_card ?? null;
+  /*
+   * Where this month stands, which decides what the phone shows first: the
+   * card that holds the next act moves to the top of the side column. One
+   * agreement, then a transfer made elsewhere, then a record of it - the
+   * order the owner's payer works in, and the distinction between approving
+   * and paying that a first-time payer missed.
+   */
+  const stage =
+    statement.basis === "estimate"
+      ? "approve"
+      : statement.basis === "approved" && balance.balance_piastres > 0
+        ? "send"
+        : "done";
+  const agreed = balance.obligation_piastres;
+  const paidShare = agreed > 0 ? Math.min(1, Math.max(0, balance.paid_piastres / agreed)) : 0;
 
   return (
     <>
@@ -417,8 +432,8 @@ export function PaymentDetail({ session }: { session: Session }) {
           ))}
         </div>
 
-        <aside className="pay-detail__side">
-          <section className="pay-detail__card">
+        <aside className="pay-detail__side" data-stage={stage}>
+          <section className="pay-detail__card pay-detail__card--send">
             <div className="pay-detail__card-head">
               <h2 className="pay-detail__card-title">Where to send it</h2>
               {/* The export puts a quiet word beside the heading either way:
@@ -472,7 +487,7 @@ export function PaymentDetail({ session }: { session: Session }) {
             )}
           </section>
 
-          <section className="pay-detail__card">
+          <section className="pay-detail__card pay-detail__card--approval">
             <h2 className="pay-detail__card-title">Approval</h2>
             {statement.basis === "approved" && (
               <p className="pay-detail__approved">
@@ -552,8 +567,17 @@ export function PaymentDetail({ session }: { session: Session }) {
               ))}
           </section>
 
-          <section className="pay-detail__card">
+          <section className="pay-detail__card pay-detail__card--transfers">
             <h2 className="pay-detail__card-title">Transfers</h2>
+            {/* Recorded against agreed, as a bar: a part payment reads at a
+             *  glance. The sentence below says the same in words, so the bar
+             *  is decoration to a screen reader. Only once a figure is agreed:
+             *  an estimate is not a debt to measure progress against. */}
+            {statement.basis === "approved" && agreed > 0 && (
+              <div className="pay-detail__progress" aria-hidden="true">
+                <span style={{ width: `${paidShare * 100}%` }} />
+              </div>
+            )}
             <p className="pay-detail__muted pay-detail__summary">
               {balance.paid_piastres > 0 ? (
                 <>

@@ -250,8 +250,11 @@ export function PaymentRecord() {
           Saving records a transfer that finance already made outside this
           dashboard. No money is sent from here.
         </p>
+        {/* The figure the payer is about to match, as the form's headline
+         *  rather than a 13px grey line above the field that repeats it. */}
         <p className="pay-record__due">
-          <Money piastres={owed} kind="agreed" /> outstanding for {formatMonth(month)}
+          <span className="pay-record__due-label">Outstanding for {formatMonth(month)}</span>
+          <Money piastres={owed} kind="agreed" className="pay-record__due-figure" />
         </p>
 
         {balance.destination_changed_at && (

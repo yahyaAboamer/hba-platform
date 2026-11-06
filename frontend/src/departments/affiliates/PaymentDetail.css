@@ -247,6 +247,21 @@
   margin-top: 8px;
 }
 
+/* Recorded against agreed. Flat, one hue, no track chrome beyond a tone. */
+.pay-detail__progress {
+  height: 4px;
+  margin: 12px 0 2px;
+  border-radius: 2px;
+  background: var(--rule);
+  overflow: hidden;
+}
+
+.pay-detail__progress > span {
+  display: block;
+  height: 100%;
+  background: var(--accent-lift);
+}
+
 .pay-detail__wide {
   width: 100%;
   min-height: 42px;
@@ -332,9 +347,21 @@
 }
 
 .pay-record__due {
-  margin: 0 0 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 2px 0 4px;
+}
+
+.pay-record__due-label {
   font-size: 13px;
   color: var(--quiet);
+}
+
+.money.pay-record__due-figure {
+  font-size: 24px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
 }
 
 .pay-record__field {
@@ -585,4 +612,152 @@
   display: inline-block;
   margin-top: 10px;
   font-size: 12.5px;
+}
+
+
+/* ── One model's month on a phone ──────────────────────────────────────────
+ *
+ * Measured at 390px before this: the side cards were 320px wide beside a
+ * 343px breakdown (a fixed flex-basis), the amount sat fourth in its own list,
+ * and the act the month is waiting for came after the destination, so the
+ * InstaPay button was offered above "Approve this month".
+ */
+@media (max-width: 640px) {
+  .pay-detail {
+    gap: 14px;
+  }
+
+  .pay-detail__main,
+  .pay-detail__side {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  /* The state and the way to her profile on one line, her arrangement
+     under them: three items no longer fit one 343px row. */
+  .pay-detail__status {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 6px 10px;
+  }
+
+  .pay-detail__status .pay-detail__link {
+    justify-self: end;
+    grid-row: 1;
+    grid-column: 2;
+  }
+
+  .pay-detail__status .pay-detail__terms {
+    grid-column: 1 / -1;
+  }
+
+  /* Copy as a word with a thumb-sized target, like the list. */
+  .pay-detail__dest .button--quiet {
+    min-height: 44px;
+    padding: 0 10px;
+    border-color: transparent;
+    background: none;
+    color: var(--accent);
+    font-size: 13px;
+  }
+
+  /* The amount first, the arithmetic under it. */
+  .pay-detail__lines {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .pay-detail__total {
+    order: -1;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    padding: 16px 16px 14px;
+    border-bottom: 1px solid var(--rule);
+    font-size: 13px;
+    color: var(--quiet);
+  }
+
+  .pay-detail__total .money {
+    font-size: 28px;
+    line-height: 1.15;
+    color: var(--ink);
+  }
+
+  .pay-detail__line {
+    padding: 12px 16px;
+    font-size: 14px;
+  }
+
+  .pay-detail__rounding {
+    padding-top: 2px;
+    font-size: 12px;
+  }
+
+  /* The card holding the next act comes first. */
+  .pay-detail__side[data-stage="approve"] .pay-detail__card--approval,
+  .pay-detail__side[data-stage="send"] .pay-detail__card--send,
+  .pay-detail__side[data-stage="done"] .pay-detail__card--transfers {
+    order: -1;
+  }
+
+  /* What is already settled goes last: the agreement once money is moving,
+     the destination once nothing is left to send. */
+  .pay-detail__side[data-stage="send"] .pay-detail__card--approval,
+  .pay-detail__side[data-stage="done"] .pay-detail__card--send {
+    order: 1;
+  }
+
+  .pay-detail__card {
+    padding: 16px;
+  }
+
+
+  .pay-detail__dest-value {
+    font-size: 15px;
+  }
+
+  .pay-detail__wide,
+  .pay-detail__instapay {
+    width: 100%;
+    min-height: 48px;
+  }
+
+  /* The record form: one column of thumb-sized controls, the act at the
+     bottom across the width, Cancel under it. */
+  .pay-record {
+    gap: 16px;
+  }
+
+  .money.pay-record__due-figure {
+    font-size: 28px;
+  }
+
+  .pay-record__input {
+    min-height: 48px;
+    font-size: 16px;
+  }
+
+  .pay-record__drop {
+    min-height: 72px;
+  }
+
+  .pay-record__acts {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .pay-record__acts .pay-record__big {
+    width: 100%;
+    min-height: 48px;
+    justify-content: center;
+    text-align: center;
+  }
+}
+
+/* The money being entered reads like money: figures that line up, set a size
+   above the other fields. 16px and up also stops iOS zooming on focus. */
+.pay-record__input[inputmode="decimal"] {
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
 }

@@ -317,22 +317,7 @@
   font-size: var(--text-sm);
 }
 
-@media (max-width: 640px) {
-  .payments__summary {
-    grid-template-columns: 1fr;
-  }
 
-  .payments__figure + .payments__figure {
-    border-top: 1px solid var(--rule);
-    border-left: none;
-  }
-
-  .payments__tools {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-}
 
 /* §6.4.5. Above the fold, before the amount and before the destination is
    revealed - a warning that arrives after somebody has already sent money is
@@ -445,4 +430,180 @@
 
 .money--owed.payments__total {
   color: var(--owed);
+}
+
+/* ── The desk on a phone (last in the file: it overrides the rules above) ────────────────────────────────────────────────
+ *
+ * Measured at 390px before this: three 115px figure cards, then six filter
+ * chips over three rows, then a 864px table clipped at the screen's edge with
+ * every row's action off it. The first model started 700px down. Now the
+ * totals are one divided panel, the filters one row that scrolls inside
+ * itself, and each model a row that ends in its action.
+ */
+@media (max-width: 640px) {
+  /* The month is already the picker's value beside the title. */
+  .payments__head .page__subtitle {
+    display: none;
+  }
+
+  .payments__head {
+    margin-bottom: var(--space-4);
+  }
+
+  /* One panel, label left and figure right: three facts read down one edge
+     instead of three cards that each take a third of the screen. */
+  .payments__summary {
+    flex-direction: column;
+    gap: 0;
+    margin-bottom: 14px;
+    border-radius: var(--radius);
+    background: var(--surface);
+  }
+
+  .payments__figure {
+    flex: none;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 13px 16px;
+    background: none;
+    border-radius: 0;
+  }
+
+  .payments__figure + .payments__figure {
+    border-top: 1px solid var(--rule);
+  }
+
+  .payments__figure-label {
+    font-size: 13.5px;
+  }
+
+  .money.payments__total {
+    margin-top: 0;
+    font-size: 17px;
+  }
+
+  .payments__tools {
+    align-items: stretch;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    gap: 10px;
+  }
+
+  /* One row, scrolled sideways inside itself and running to the screen's
+     edge, so the chip cut off there says there is more. */
+  .payments__filters {
+    min-width: 0;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    margin: 0 calc(-1 * var(--page-gutter, 16px));
+    padding: 2px var(--page-gutter, 16px);
+    scroll-padding-inline: var(--page-gutter, 16px);
+    scrollbar-width: none;
+  }
+
+  .payments__filters::-webkit-scrollbar {
+    display: none;
+  }
+
+  .payments__filters .chip {
+    flex: none;
+  }
+
+  .payments__tools .input--search {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  /* The table, as a list of rows. Roles are stated in the markup, so it is
+     still a table to a screen reader. */
+  .payments__table-wrap {
+    overflow: visible;
+  }
+
+  .payments__table,
+  .payments__table tbody {
+    display: block;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .payments__table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .payments__table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "who amount"
+      "where where"
+      "state action";
+    column-gap: 12px;
+    row-gap: 8px;
+    padding: 14px 16px;
+  }
+
+  .payments__table tr + tr {
+    border-top: 1px solid var(--rule);
+  }
+
+  .payments__table td,
+  .table.payments__table td {
+    display: block;
+    width: auto;
+    min-width: 0;
+    padding: 0;
+    border: none;
+  }
+
+  .payments__table td.payments__who { grid-area: who; }
+  .payments__table td.payments__amount { grid-area: amount; text-align: right; }
+  .payments__table td.payments__destination { grid-area: where; white-space: normal; }
+  .payments__table td.payments__state { grid-area: state; align-self: center; }
+  .payments__table td.payments__action { grid-area: action; text-align: right; }
+
+  .payments__name {
+    font-size: 15px;
+  }
+
+  .payments__amount .money {
+    font-size: 15px;
+  }
+
+  .payments__unavailable {
+    font-size: 14px;
+  }
+
+  .payments__destination {
+    font-size: 13px;
+  }
+
+  /* Copy keeps a thumb-sized target but reads as a word beside the number,
+     not a third box in the row. */
+  .payments__copy.button {
+    min-height: 44px;
+    margin-block: -12px;
+    padding: 0 10px;
+    border-color: transparent;
+    background: none;
+    color: var(--accent);
+    font-size: 13px;
+  }
+
+  .payments__action .button {
+    min-height: 44px;
+  }
+
+  .payments__action .button {
+    display: inline-flex;
+    align-items: center;
+    padding-inline: 16px;
+  }
 }

@@ -290,7 +290,7 @@ export function Payments({ session }: { session: Session }) {
 
   return (
     <>
-      <div className="page__head">
+      <div className="page__head payments__head">
         <div className="page__title">
           <h1>Payments</h1>
           <span className="page__subtitle">{formatMonth(month)}</span>
@@ -417,17 +417,20 @@ export function Payments({ session }: { session: Session }) {
               </div>
             ) : (
               <div className="surface payments__table-wrap">
-                <table className="table payments__table">
-                  <thead>
-                    <tr>
-                      <th className="payments__who">Model</th>
-                      <th className="payments__amount">To receive</th>
-                      <th className="payments__destination">Destination</th>
-                      <th className="payments__state">State</th>
-                      <th className="payments__action">Next action</th>
+                {/* Explicit roles: below 640px the rows are laid out as a list
+                 *  of two-line rows, and a table whose CSS display changes
+                 *  loses its semantics in Chromium unless they are stated. */}
+                <table className="table payments__table" role="table">
+                  <thead role="rowgroup">
+                    <tr role="row">
+                      <th role="columnheader" className="payments__who">Model</th>
+                      <th role="columnheader" className="payments__amount">To receive</th>
+                      <th role="columnheader" className="payments__destination">Destination</th>
+                      <th role="columnheader" className="payments__state">State</th>
+                      <th role="columnheader" className="payments__action">Next action</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody role="rowgroup">
                     {visibleRows.map((row) => (
                       <PaymentRow
                         key={row.affiliate_id}
@@ -547,8 +550,8 @@ export function PaymentRow({
   const isForecast = row.required_kind === "forecast";
 
   return (
-    <tr>
-      <td className="payments__who">
+    <tr role="row">
+      <td role="cell" className="payments__who">
         {/* The export opens the model's payment for this month from her name,
          *  not her profile - the profile is one link further, from there. */}
         <Link className="payments__name control-font" to={`/affiliates/payments/${month}/${row.affiliate_id}`}>
@@ -564,7 +567,7 @@ export function PaymentRow({
           )}
         </span>
       </td>
-      <td className="payments__amount">
+      <td role="cell" className="payments__amount">
         {row.required_kind === "unavailable" ? (
           <span className="payments__unavailable">Unavailable</span>
         ) : (
@@ -583,7 +586,7 @@ export function PaymentRow({
           </>
         )}
       </td>
-      <td className="payments__destination">
+      <td role="cell" className="payments__destination">
         {/* **The real destination, on the row.** The approved export writes
          *  `InstaPay · 010 7014 2033` here and the owner asked for exactly
          *  that: the person reading this list is about to type it into a
@@ -620,12 +623,12 @@ export function PaymentRow({
        * payment view, which is where somebody acts on them, and
        * `view.explanation` still carries them there.
        */}
-      <td className="payments__state">
+      <td role="cell" className="payments__state">
         <span className={`pill ${STATE_PILL[view.label] ?? "payments__pill--quiet"}`}>
           {view.label}
         </span>
       </td>
-      <td className="payments__action">
+      <td role="cell" className="payments__action">
         <PaymentAction
           row={row}
           month={month}
