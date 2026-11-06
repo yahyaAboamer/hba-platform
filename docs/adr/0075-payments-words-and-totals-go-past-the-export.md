@@ -1,6 +1,6 @@
 # 0075 — The payments desk's totals, labels and messages go past the approved export
 
-**Status:** proposed. A divergence from the approved export, for the owner to accept or overrule.
+**Status:** accepted by the owner, 6 November 2026. A divergence from the approved export.
 **Date:** 2026-11-06
 **Related:** ADR 0074 (the desk on a phone), ADR 0042 (full destinations),
 F14 (an estimate is not a debt), `docs/design-refinement/payments/JOURNAL.md`
