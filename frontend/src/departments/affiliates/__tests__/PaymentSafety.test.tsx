@@ -192,3 +192,53 @@ describe("recording a transfer", () => {
     ).toBe(true);
   });
 });
+
+/**
+ * The phone shows the card for the month's next act first (CSS `order`,
+ * keyed on `data-stage`). The stage is the logic worth holding: approve, then
+ * send elsewhere, then nothing left.
+ */
+describe("what the month is waiting for", () => {
+  const approvedStatement = { ...statement, basis: "approved", source_version: null, approved_at: "2026-11-06T10:00:00Z", version: 1 };
+
+  function serve(row: Partial<Balance>, found: object) {
+    fetchMock.mockImplementation((url: string) => {
+      if (url.includes("/statement/")) return reply(200, found);
+      if (url.includes("/corrections")) return reply(200, { corrections: [] });
+      if (url.includes("/api/affiliates/1/payments")) return reply(200, { name: "Sara", payments: [] });
+      if (url.includes("/api/payments/2026-10")) return reply(200, { affiliates: [balance(row)] });
+      return reply(404, {});
+    });
+  }
+
+  const side = () => document.querySelector(".pay-detail__side") as HTMLElement;
+
+  it("is approval while the figure is an estimate, with no progress bar", async () => {
+    detail();
+    await screen.findByRole("button", { name: "Approve this month" });
+    expect(side().dataset.stage).toBe("approve");
+    expect(document.querySelector(".pay-detail__progress")).toBeNull();
+  });
+
+  it("is sending once approved with money left, and the bar shows the share recorded", async () => {
+    serve(
+      { state: "partially_paid", payroll_snapshot_id: 18, obligation_piastres: 1_000_000, paid_piastres: 250_000, balance_piastres: 750_000, required_kind: "approved" },
+      approvedStatement,
+    );
+    detail();
+    await screen.findByText("Transfers");
+    expect(side().dataset.stage).toBe("send");
+    expect((document.querySelector(".pay-detail__progress > span") as HTMLElement).style.width).toBe("25%");
+  });
+
+  it("is done once nothing is left to send", async () => {
+    serve(
+      { state: "settled", payroll_snapshot_id: 18, obligation_piastres: 1_000_000, paid_piastres: 1_000_000, balance_piastres: 0, required_kind: "approved" },
+      approvedStatement,
+    );
+    detail();
+    await screen.findByText("Transfers");
+    expect(side().dataset.stage).toBe("done");
+    expect((document.querySelector(".pay-detail__progress > span") as HTMLElement).style.width).toBe("100%");
+  });
+});
