@@ -54,6 +54,8 @@ export function PaymentReconcile() {
 
   const piastres = parseEgp(amount);
   const over = Math.abs(Math.min(0, balance?.balance_piastres ?? 0));
+  const back = `/affiliates/payments/${month}/${affiliateId}`;
+  const first = (balance?.name ?? "").split(" ")[0];
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -69,7 +71,8 @@ export function PaymentReconcile() {
         reason: reason.trim(),
         destination_month: kind === "credit" ? destination : null,
       });
-      navigate("/affiliates/payments");
+      // Back to the month it settles, where the result shows (F-S1).
+      navigate(back);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not record it.");
     } finally {
@@ -79,14 +82,17 @@ export function PaymentReconcile() {
 
   return (
     <>
+      {/* The same head as every other Payments page: back to the month,
+       *  the act as the title, who and when under it (F-S1). */}
       <div className="page__head">
+        <Link className="button pay__back" to={back}>
+          ← {balance?.name ?? "Payment"}
+        </Link>
         <div className="page__title">
-          <Link to="/affiliates/payments" className="detail__back">
-            Payments
-          </Link>
-          <h1>
-            Settle the difference — {balance?.name ?? "…"}, {formatMonth(month)}
-          </h1>
+          <h1>Settle the difference</h1>
+          <span className="page__subtitle">
+            {balance?.name ? `${balance.name} · ${formatMonth(month)}` : formatMonth(month)}
+          </span>
         </div>
       </div>
 
@@ -110,14 +116,10 @@ export function PaymentReconcile() {
           <section className="panel approve__summary">
             <h2 className="panel__title">What happened</h2>
             <p className="approve__lead">
-              {balance.name} has been sent{" "}
+              {balance.name} was sent{" "}
               <Money piastres={over} kind="agreed" tone="owed" /> more than{" "}
-              {formatMonth(month)} agreed. The money is gone, so the only
-              question is where it counts.
-            </p>
-            <p className="approve__lead">
-              Either answer is recorded and both are visible to {balance.name}.
-              Nothing here takes money back.
+              {formatMonth(month)} was approved at. This doesn’t take money
+              back. It decides where the difference counts.
             </p>
           </section>
 
@@ -136,10 +138,12 @@ export function PaymentReconcile() {
                 onChange={() => setKind("credit")}
               />
               <span className="pay__option-body">
-                <strong>Count it against a later month</strong>
+                {/* The same two words as the correction screen, which
+                 *  makes the same decision (F-S4). */}
+                <strong>Take it off a later payment</strong>
                 <span className="detail__note">
-                  {balance.name} keeps it, and next month owes that much less. Use
-                  this while they are still on the programme.
+                  A later month pays that much less. Best while {first} still
+                  works with HBA.
                 </span>
               </span>
             </label>
@@ -158,10 +162,10 @@ export function PaymentReconcile() {
                 onChange={() => setKind("writeoff")}
               />
               <span className="pay__option-body">
-                <strong>Absorb it</strong>
+                <strong>HBA absorbs it</strong>
                 <span className="detail__note">
-                  HBA takes the loss and nothing carries forward. Use this for
-                  small differences, or when they are leaving.
+                  Nothing carries forward. Best for small amounts, or if {first}
+                  is leaving.
                 </span>
               </span>
             </label>
@@ -169,15 +173,18 @@ export function PaymentReconcile() {
 
           {kind === "credit" && (
             <label className="field pay__field">
-              <span className="field__label">Which month should it count against?</span>
+              <span className="field__label">Which month should it come off?</span>
+              {/* A month picker, as on the correction screen, instead of
+               *  typing `2026-11` by hand (F-S2). */}
               <input
-                className="input code"
+                className="input"
+                type="month"
+                min={monthAdd(month, 1)}
                 value={destination}
                 onChange={(event) => setDestination(event.target.value)}
-                placeholder="2026-10"
               />
               <span className="detail__note">
-                {formatMonth(destination)} will owe{" "}
+                {formatMonth(destination)} will pay{" "}
                 {piastres === null ? "that much" : formatEgp(piastres)} less.
               </span>
             </label>
@@ -196,7 +203,7 @@ export function PaymentReconcile() {
                 ? "Type a figure, for example 120.00"
                 : piastres > over
                   ? `More than the ${formatEgp(over)} overpaid.`
-                  : `${formatEgp(piastres)} of the ${formatEgp(over)} overpaid.`}
+                  : `Up to ${formatEgp(over)}.`}
             </span>
           </label>
 
@@ -212,20 +219,12 @@ export function PaymentReconcile() {
               placeholder="A parcel from September came back refused after she was paid."
             />
             <span className="detail__note">
-              Kept in the record, and shown to {balance.name} — a credit they
-              cannot see is a credit they cannot check.
+              {first} will see this.
             </span>
           </label>
 
-          <div className="payroll__actions">
-            <button
-              type="button"
-              className="button"
-              onClick={() => navigate("/affiliates/payments")}
-              disabled={working}
-            >
-              Cancel
-            </button>
+          {/* The act first and Cancel after it, as on the record form. */}
+          <div className="payroll__actions pay__decision-acts">
             <button
               type="submit"
               className="button button--primary"
@@ -247,9 +246,18 @@ export function PaymentReconcile() {
                 : kind === null
                   ? "Choose what happens to it"
                   : kind === "credit"
-                    ? `Count ${piastres === null ? "it" : formatEgp(piastres)} against ${formatMonth(destination)}`
+                    ? `Take ${piastres === null ? "it" : formatEgp(piastres)} off ${formatMonth(destination)}`
                     : `Absorb ${piastres === null ? "it" : formatEgp(piastres)}`}
             </button>
+            <Link
+              className="button"
+              to={back}
+              aria-disabled={working || undefined}
+              // Not while the decision is being saved: the result shows there.
+              onClick={(event) => working && event.preventDefault()}
+            >
+              Cancel
+            </Link>
           </div>
         </form>
       )}

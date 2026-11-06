@@ -4,7 +4,7 @@ import { Link, useLocation, useParams } from "react-router-dom";
 import { Money } from "../../components/Money";
 import { api, can } from "../../lib/api";
 import type { Session } from "../../lib/api";
-import { formatMonth } from "../../lib/money";
+import { formatMonth, monthAdd } from "../../lib/money";
 import "./PaymentDetail.css";
 
 type Correction = {
@@ -47,8 +47,10 @@ export function PaymentCorrection({ session }: { session: Session }) {
   const { month = "", affiliateId = "" } = useParams();
   const [body, setBody] = useState<Body | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [choice, setChoice] = useState<Choice>("credit");
-  const [destination, setDestination] = useState("");
+  // Neither choice is made for them: the overpayment screen refuses to
+  // preselect the same decision, for the same reason (F-C2).
+  const [choice, setChoice] = useState<Choice | null>(null);
+  const [destination, setDestination] = useState(() => monthAdd(month, 1));
   const [reason, setReason] = useState("");
   const [working, setWorking] = useState(false);
   const [decided, setDecided] = useState<{ choice: Choice; destination: string; reason: string } | null>(null);
@@ -70,7 +72,7 @@ export function PaymentCorrection({ session }: { session: Session }) {
   const from = (useLocation().state as { back?: { label: string; to: string } } | null)?.back;
 
   async function save() {
-    if (!row) return;
+    if (!row || choice === null) return;
     setWorking(true);
     setError(null);
     try {
@@ -101,6 +103,7 @@ export function PaymentCorrection({ session }: { session: Session }) {
   // of reach here.
   const recoverable = (row?.recoverable_piastres ?? 0) > 0;
   const ready =
+    choice !== null &&
     reason.trim() !== "" &&
     (choice === "writeoff" ? true : recoverable && destination !== "");
 
@@ -161,10 +164,15 @@ export function PaymentCorrection({ session }: { session: Session }) {
                     <dt>Difference still open</dt>
                     <dd><Money piastres={row.outstanding_piastres} kind="agreed" tone="owed" /></dd>
                   </div>
-                  <div>
-                    <dt>Recoverable</dt>
-                    <dd><Money piastres={row.recoverable_piastres} kind="agreed" tone="owed" /></dd>
-                  </div>
+                  {/* Only where it differs from the open difference: it is
+                      capped at what was actually sent, and two equal amber
+                      figures in a row read as a typo (F-C1). */}
+                  {row.recoverable_piastres !== row.outstanding_piastres && (
+                    <div>
+                      <dt>Can be recovered (no more than was sent)</dt>
+                      <dd><Money piastres={row.recoverable_piastres} kind="agreed" tone="owed" /></dd>
+                    </div>
+                  )}
                 </dl>
                 {/*
                  * F09. The difference is real and nothing was sent, so there
@@ -193,7 +201,7 @@ export function PaymentCorrection({ session }: { session: Session }) {
               <div className="pay-fix__decided">
                 <div>
                   {decided.choice === "credit"
-                    ? `Carried to ${formatMonth(decided.destination)}`
+                    ? `Taken off ${formatMonth(decided.destination)}`
                     : "HBA absorbed this"}
                   {decided.reason ? ` · ${decided.reason}` : ""}
                 </div>
@@ -236,7 +244,7 @@ export function PaymentCorrection({ session }: { session: Session }) {
                         className={choice === "credit" ? "pay-fix__option pay-fix__option--on" : "pay-fix__option"}
                         onClick={() => setChoice("credit")}
                       >
-                        Carry to a later payment
+                        Take it off a later payment
                       </button>
                     </div>
 
@@ -253,7 +261,9 @@ export function PaymentCorrection({ session }: { session: Session }) {
                       * carried to.
                       */}
                     <p className="pay-fix__note">
-                      {choice === "writeoff" ? (
+                      {choice === null ? (
+                        "Choose what happens to the difference."
+                      ) : choice === "writeoff" ? (
                         <>
                           HBA takes the whole remaining difference of{" "}
                           <Money piastres={row.outstanding_piastres} kind="agreed" />. The
@@ -272,7 +282,7 @@ export function PaymentCorrection({ session }: { session: Session }) {
 
                     {choice === "credit" && (
                       <label className="pay-fix__field">
-                        <span>Destination month</span>
+                        <span>Which month should it come off?</span>
                         <input
                           className="input pay-fix__input"
                           type="month"
@@ -302,11 +312,13 @@ export function PaymentCorrection({ session }: { session: Session }) {
                     >
                       {working
                         ? "Saving…"
-                        : choice === "writeoff"
-                          ? "HBA absorbs this"
-                          : destination
-                            ? `Carry to ${formatMonth(destination)}`
-                            : "Carry to a later payment"}
+                        : choice === null
+                          ? "Choose what happens to it"
+                          : choice === "writeoff"
+                            ? "HBA absorbs this"
+                            : destination
+                              ? `Take it off ${formatMonth(destination)}`
+                              : "Take it off a later payment"}
                     </button>
                   </>
                 )}

@@ -8,7 +8,7 @@ import {
   PAYOUT_FIELD_LABEL,
   describeDestination,
 } from "../../lib/payouts";
-import { egpPlain, formatMonth, parseEgp } from "../../lib/money";
+import { egpPlain, formatEgp, formatMonth, parseEgp } from "../../lib/money";
 import type { Balance } from "./Payments";
 import "./Payments.css";
 import "./PaymentDetail.css";
@@ -161,13 +161,15 @@ export function PaymentRecord() {
   const differs = piastres !== null && piastres !== owed;
   const noteMissing = differs && note.trim() === "";
   const over = piastres !== null && piastres > owed;
+  const amountInvalid = amount.trim() !== "" && (piastres === null || piastres <= 0);
+  const first = (balance?.name ?? "").split(" ")[0];
   // ISO dates compare correctly as strings. The server refuses these too.
   const today = cairoToday();
   const dateInFuture = transferDate > today;
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
-    if (piastres === null || piastres <= 0 || balance === null || dateInFuture) return;
+    if (piastres === null || piastres <= 0 || balance === null || noteMissing || dateInFuture || transferDate === "") return;
     setWorking(true);
     setError(null);
     try {
@@ -242,13 +244,12 @@ export function PaymentRecord() {
   return (
     <>
       {head}
-      <form className="pay-record" onSubmit={submit}>
+      <form className="pay-record" onSubmit={submit} noValidate>
         {/* The export puts this sentence under the button. A first-time
          *  payer read the screen as one that sends money; the owner asked for
          *  it to come first (payments audit, 6 Nov 2026). */}
         <p className="pay-record__note pay-record__note--lead">
-          Saving records a transfer that finance already made outside this
-          dashboard. No money is sent from here.
+          Record a transfer you’ve already made. Nothing is sent from here.
         </p>
         {/* The figure the payer is about to match, as the form's headline
          *  rather than a 13px grey line above the field that repeats it. */}
@@ -257,63 +258,131 @@ export function PaymentRecord() {
           <Money piastres={owed} kind="agreed" className="pay-record__due-figure" />
         </p>
 
+        {/* This form comes after the money has gone, so the warning asks
+         *  them to check where it went rather than to hold off (F-R5). */}
         {balance.destination_changed_at && (
-          <p className="pay-record__warn" role="alert">
-            Where {balance.name} is paid changed{" "}
-            <strong>{describeWhen(balance.destination_changed_at)}</strong>. If you
-            were not expecting that, check with them before sending anything.
+          <p className="pay-record__warn">
+            <strong>
+              {first}’s payment details changed {describeWhen(balance.destination_changed_at)}.
+            </strong>{" "}
+            Check with {first} that the money arrived before you record it.
           </p>
         )}
 
-        <label className="pay-record__field">
-          <span>Amount transferred, EGP</span>
+        <div className="pay-record__field">
+          <label htmlFor="pay-record-amount">Amount transferred, EGP</label>
           <input
-            className="input pay-record__input"
+            id="pay-record-amount"
+            className="input pay-record__input pay-record__input--amount"
             inputMode="decimal"
             value={amount}
+            aria-invalid={amountInvalid || undefined}
+            aria-describedby="pay-record-amount-hint"
             onChange={(event) => setAmount(event.target.value)}
           />
-        </label>
+          {/* What this transfer leaves, worked out from the two figures on
+           *  the screen, so a partial payment is never a surprise (F-R2). */}
+          <span
+            id="pay-record-amount-hint"
+            className={
+              amountInvalid
+                ? "pay-record__hint pay-record__hint--error"
+                : over
+                  ? "pay-record__hint pay-record__hint--over"
+                  : "pay-record__hint"
+            }
+            role={amountInvalid ? "alert" : undefined}
+          >
+            {amountInvalid ? (
+              "Enter the amount that was actually transferred."
+            ) : over ? (
+              <>
+                More than the outstanding <Money piastres={owed} kind="agreed" />. The
+                difference will show as overpaid.
+              </>
+            ) : amount.trim() === "" ? (
+              "Enter the amount that left the bank."
+            ) : differs && piastres !== null ? (
+              <>
+                <Money piastres={owed - piastres} kind="agreed" /> will still be left to send.
+              </>
+            ) : (
+              "Change it if you sent less."
+            )}
+          </span>
+        </div>
 
-        <label className="pay-record__field">
-          <span>Transfer date</span>
+        {/* Right under the amount it explains, not below the receipt. */}
+        {differs && piastres !== null && piastres > 0 && (
+          <div className="pay-record__field">
+            <label htmlFor="pay-record-note">
+              {over
+                ? `Why is it more than ${formatEgp(owed)}?`
+                : `Why is it less than ${formatEgp(owed)}?`}
+            </label>
+            <textarea
+              id="pay-record-note"
+              className="input pay-record__input"
+              rows={2}
+              maxLength={500}
+              required
+              value={note}
+              onChange={(event) => setNote(event.target.value)}
+              placeholder="InstaPay would not send the whole amount in one transfer."
+            />
+          </div>
+        )}
+
+        <div className="pay-record__field">
+          <label htmlFor="pay-record-date">Transfer date</label>
           <input
+            id="pay-record-date"
             className="input pay-record__input"
             type="date"
             required
             max={today}
             value={transferDate}
+            aria-invalid={dateInFuture || undefined}
+            aria-describedby={dateInFuture ? "pay-record-date-error" : undefined}
             onChange={(event) => setTransferDate(event.target.value)}
           />
-        </label>
+          {dateInFuture && (
+            <span id="pay-record-date-error" className="pay-record__hint pay-record__hint--error" role="alert">
+              The date can’t be in the future.
+            </span>
+          )}
+        </div>
 
-        <label className="pay-record__field">
-          <span>Destination used</span>
-          <select className="input pay-record__input" value="current" disabled>
-            {/* *No destination recorded* is what the admin says; *Nothing on
-             *  file yet* is what the portal says to the model herself. This
-             *  is an admin screen and it was borrowing her sentence. */}
-            <option value="current">
-              {balance.destination
+        {/* It cannot be chosen here, so it is not drawn as a control (F-R3).
+         *  The full line where the server sends one (ADR 0042). */}
+        <div className="pay-record__field">
+          <span className="pay-record__label">Sent to</span>
+          <span className="pay-record__fixed">
+            {balance.destination_line ??
+              (balance.destination
                 ? describeDestination(balance.destination)
-                : NO_DESTINATION_RECORDED}
-            </option>
-          </select>
-        </label>
+                : NO_DESTINATION_RECORDED)}
+          </span>
+        </div>
 
-        <label className="pay-record__field">
-          <span>Reference</span>
+        <div className="pay-record__field">
+          <label htmlFor="pay-record-reference">
+            Reference <span className="pay-record__optional">(optional)</span>
+          </label>
           <input
+            id="pay-record-reference"
             className="input pay-record__input"
             maxLength={120}
             value={reference}
             onChange={(event) => setReference(event.target.value)}
             placeholder="From the transfer confirmation"
           />
-        </label>
+        </div>
 
         <div className="pay-record__field">
-          <span>Receipt</span>
+          <span className="pay-record__label">
+            Receipt <span className="pay-record__optional">(optional)</span>
+          </span>
           <label className={proof ? "pay-record__drop pay-record__drop--on" : "pay-record__drop"}>
             <input
               type="file"
@@ -326,54 +395,27 @@ export function PaymentRecord() {
             />
             {proof
               ? `${proof.name} attached · choose another to replace it`
-              : "Attach the transfer receipt"}
+              : "Attach a screenshot of the transfer"}
           </label>
         </div>
 
-        {differs && (
-          <label className="pay-record__field">
-            <span>Why is it different from what is outstanding?</span>
-            <textarea
-              className="input pay-record__input"
-              rows={2}
-              maxLength={500}
-              required
-              value={note}
-              onChange={(event) => setNote(event.target.value)}
-              placeholder="InstaPay would not send the whole amount in one transfer."
-            />
-          </label>
-        )}
-
-        {amount.trim() !== "" && (piastres === null || piastres <= 0) && (
-          <p className="pay-record__error" role="alert">
-            Enter the amount that was actually transferred.
-          </p>
-        )}
-        {dateInFuture && (
-          <p className="pay-record__error" role="alert">
-            The transfer date is in the future. Record a transfer once it has
-            been sent, with the date it was sent.
-          </p>
-        )}
-        {over && (
-          <p className="pay-record__warn">
-            That is more than the outstanding <Money piastres={owed} kind="agreed" />.
-            It will be recorded as transferred and the difference stays visible on
-            the payment.
-          </p>
-        )}
         {error && (
           <p className="pay-record__error" role="alert">
             {error}
           </p>
         )}
 
+        {/* Above the button it disables: a disabled button says why (web interface guidelines). */}
+        {noteMissing && !working && (
+          <p className="pay-record__note">Say why the amount is different to record it.</p>
+        )}
         <div className="pay-record__acts">
           <button
             type="submit"
             className="button button--primary pay-record__big"
-            disabled={working || piastres === null || piastres <= 0 || noteMissing || dateInFuture}
+            disabled={
+              working || piastres === null || piastres <= 0 || noteMissing || dateInFuture || transferDate === ""
+            }
           >
             {working ? "Recording…" : "Record payment"}
           </button>

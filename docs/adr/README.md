@@ -114,6 +114,7 @@ what was chosen.
 | [0072](0072-each-khazenly-run-is-kept-and-customer-service-runs-it-too.md) | Each Khazenly run is kept, and customer service can run it too | Accepted; amends 0071 |
 | [0073](0073-the-content-manager-invites-models.md) | The content manager invites models | Accepted |
 | [0074](0074-the-payments-desk-on-a-phone-goes-past-the-export.md) | The payments desk on a phone goes past the approved export | Proposed; a divergence |
+| [0075](0075-payments-words-and-totals-go-past-the-export.md) | The payments desk's totals, labels and messages go past the approved export | Proposed; a divergence |
 
 **0014 is superseded by 0036** and **0038 by 0039**. **0027 keeps its
 principle and loses its mechanism to 0039**: an agreed figure is still set

@@ -54,6 +54,46 @@ _VISIBLE = ("method", "bank_name", "bank_account_holder", "wallet_provider")
 #: which is the entire reason §13.1 collects a link rather than a number.
 INSTAPAY_HOST = "ipn.eg"
 
+#: An ipn.eg link inside whatever else was pasted with it. InstaPay's share
+#: button copies a sentence around the link, so most models paste that whole
+#: message; the scheme is optional for the same reason as below.
+_INSTAPAY_LINK = re.compile(
+    # Not inside another link: `facebook.com/?x=ipn.eg` must stay a facebook link.
+    r"(?<![\w./?=&#%@:-])(?:https?://)?(?:[a-z0-9-]+\.)*ipn\.eg(?:/[^\s<>\"'،]*)?",
+    re.IGNORECASE,
+)
+
+
+def extract_instapay_link(value: str | None) -> str:
+    """The ipn.eg link out of a pasted InstaPay message, or the value as it is.
+
+    InstaPay's *share* copies the link together with a sentence of its own, and
+    that whole message is what models paste. The model is not asked to edit it:
+    the link is found and kept, the text around it dropped, so *Open InstaPay*
+    opens. Trailing punctuation the message puts after the link (a full stop,
+    a bracket) is not part of it. Nothing found returns the text unchanged, so
+    the checks below can say what is wrong with it.
+    """
+    cleaned = str(value or "").strip()
+    match = _INSTAPAY_LINK.search(cleaned)
+    if match is None:
+        return cleaned
+    return match.group(0).rstrip(".,;:!?)]}>»\"'")
+
+
+def instapay_link_or_none(value: str | None) -> str | None:
+    """The openable link for a stored address, or None if it holds none.
+
+    For destinations saved before pasted text was cleaned on the way in: the
+    payment screens open the link inside it rather than the whole message.
+    """
+    if not value:
+        return None
+    try:
+        return normalise_instapay_address(value)
+    except ValueError:
+        return None
+
 
 def normalise_instapay_address(value: str) -> str:
     """Check an InstaPay payment address is one, and return it cleaned.
@@ -78,7 +118,7 @@ def normalise_instapay_address(value: str) -> str:
     import re
     from urllib.parse import urlparse
 
-    cleaned = str(value or "").strip()
+    cleaned = extract_instapay_link(value)
     if not cleaned:
         raise ValueError("An InstaPay payment address is needed")
 
@@ -540,7 +580,10 @@ def destination_card(destination: PayoutDestination | None) -> dict | None:
             },
             {
                 "label": "Payment link, as submitted",
-                "value": destination.instapay_address_url,
+                # The link alone, even where an older record kept the message
+                # it was pasted in.
+                "value": instapay_link_or_none(destination.instapay_address_url)
+                or destination.instapay_address_url,
                 "copy": "link",
             },
         ]
@@ -551,7 +594,7 @@ def destination_card(destination: PayoutDestination | None) -> dict | None:
             # §13.1 collects a link rather than a number precisely because a
             # phone hands it straight to the InstaPay app. This is that link,
             # as she submitted it - never rebuilt from the number.
-            "link": destination.instapay_address_url,
+            "link": instapay_link_or_none(destination.instapay_address_url),
         }
 
     if method == "wallet":

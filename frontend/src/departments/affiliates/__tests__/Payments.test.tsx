@@ -233,7 +233,9 @@ describe("the amount column, rendered", () => {
       required_piastres: 0,
     });
 
-    expect(html).toContain("Unavailable");
+    // Not a bare *Unavailable*: what is missing, which is the act (F-L3).
+    expect(html).toContain("Not worked out yet");
+    expect(html).toContain("no terms for this month");
     expect(html).not.toContain("EGP ");
   });
 
@@ -271,6 +273,9 @@ describe("the amount column, rendered", () => {
     expect(figure(html)).toContain("EGP 2,000.00");
     expect(under(html)).toContain("EGP 500.00");
     expect(under(html)).toContain("recorded");
+    // And what is left, which is the part-paid row's real question.
+    expect(under(html)).toContain("EGP 1,500.00");
+    expect(under(html)).toContain("left");
   });
 
   it("still shows what a fully paid month came to", () => {
@@ -286,8 +291,9 @@ describe("the amount column, rendered", () => {
     });
 
     expect(figure(html)).toContain("EGP 2,000.00");
-    expect(under(html)).toContain("EGP 2,000.00");
-    expect(under(html)).toContain("recorded");
+    // F2-4: the pill says it was paid; *EGP 2,000.00 recorded* only repeated
+    // the headline.
+    expect(under(html)).toBe("");
   });
 
   it("explains a correction-covered month rather than showing a bare zero", () => {
@@ -306,7 +312,7 @@ describe("the amount column, rendered", () => {
 
     expect(figure(html)).toContain("EGP 0.00");
     expect(under(html)).toContain("EGP 2,000.00");
-    expect(under(html)).toContain("deducted");
+    expect(under(html)).toContain("from credit");
   });
 
   it("shows a month settled outside the platform as owing nothing", () => {

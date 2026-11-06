@@ -40,3 +40,17 @@
   padding: 8px 11px;
   font-size: 13px;
 }
+
+/*
+ * On a phone (payments refinement F2-9, 6 Nov 2026): 38px was under the 44px
+ * a thumb needs, and a select set below 16px makes iOS Safari zoom the page
+ * when it is tapped. Both variants, every screen that uses the picker; the
+ * desktop sizes above are the export's and are unchanged.
+ */
+@media (max-width: 640px) {
+  .month-picker__select,
+  .month-picker--section .month-picker__select {
+    min-height: 44px;
+    font-size: 16px;
+  }
+}

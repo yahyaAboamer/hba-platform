@@ -10,7 +10,6 @@ import {
   NO_DESTINATION_RECORDED,
   describeDestination,
   destinationHolder,
-  PAY_TYPE,
 } from "../../lib/payouts";
 import type { Balance } from "./Payments";
 import { paymentRowPresentation, STATE_PILL } from "./Payments";
@@ -249,9 +248,12 @@ export function PaymentDetail({ session }: { session: Session }) {
       <>
         {head}
         {error ? (
-          <p className="notice notice--refused" role="alert">
-            {error}
-          </p>
+          <div className="notice notice--refused payments__error" role="alert">
+            <span>{error}</span>
+            <button type="button" className="button button--row" onClick={load}>
+              Try again
+            </button>
+          </div>
         ) : (
           <p className="empty">Loading…</p>
         )}
@@ -299,6 +301,23 @@ export function PaymentDetail({ session }: { session: Session }) {
         : "done";
   const agreed = balance.obligation_piastres;
   const paidShare = agreed > 0 ? Math.min(1, Math.max(0, balance.paid_piastres / agreed)) : 0;
+  const first = statement.name.split(" ")[0];
+  const next =
+    balance.state === "overpaid"
+      ? null // its own warning, with its act, says it
+      : stage === "approve"
+        ? null // the Approval card holds the act and says what it does (F2-6)
+        : stage === "send"
+          ? (
+              <>
+                Send <Money piastres={balance.balance_piastres} kind="agreed" />{" "}
+                {destination
+                  ? `to ${first}’s ${destinationHolder(destination)}`
+                  : `once ${first} adds payment details`}
+                , then record the transfer here.
+              </>
+            )
+          : null;
 
   return (
     <>
@@ -316,11 +335,12 @@ export function PaymentDetail({ session }: { session: Session }) {
             <span className={`pill pay-detail__pill ${STATE_PILL[view.label] ?? "payments__pill--quiet"}`}>
               {view.label}
             </span>
-            <span className="pay-detail__terms">
-              {statement.compensation_type
-                ? PAY_TYPE[statement.compensation_type] ?? statement.compensation_type
-                : "No terms set"}
-            </span>
+            {/* The arrangement is the breakdown's own first line (*Commission
+             *  at 10%*, *Fixed salary*); said here as well it was the same fact
+             *  twice in one screen (F2-6). Only its absence is news. */}
+            {!statement.compensation_type && (
+              <span className="pay-detail__terms">No terms set</span>
+            )}
             <Link
               className="pay-detail__link"
               to={`/affiliates/models/${affiliateId}?section=payments&month=${month}`}
@@ -329,9 +349,19 @@ export function PaymentDetail({ session }: { session: Session }) {
             </Link>
           </div>
 
+          {/* **What happens next, in one sentence** (refinement F-D2). The
+           *  page holds three acts in three cards; this says which one is
+           *  this month's turn, in the words the payer will act on. */}
+          {next && <p className="pay-detail__next">{next}</p>}
+
+          {/* Missing information is somebody's turn, not a fault (§11.3), so
+           *  it takes the warning tier, not the error tier (F-D5). */}
           {blocked && (
-            <div className="pay-detail__blocked" role="alert">
-              <div>{statement.blockers.map(describeBlocker).join(" · ")}</div>
+            <div className="pay-detail__blocked">
+              <div>
+                <strong className="pay-detail__blocked-title">Can’t be approved yet</strong>
+                <span>{statement.blockers.map(describeBlocker).join(" · ")}</span>
+              </div>
               <Link
                 className="button button--row pay-detail__blocked-act"
                 to={needsTerms ? `/affiliates/models/${affiliateId}/compensation` : `/affiliates/targets?month=${month}`}
@@ -393,13 +423,13 @@ export function PaymentDetail({ session }: { session: Session }) {
              *  Without this, sales × rate visibly fails to match the line. */}
             {statement.basis !== "settled_outside" && (
               <p className="pay-detail__rounding">
-                Pay is worked out exactly, then rounded to the nearest whole pound.
+                Rounded to the nearest whole pound.
               </p>
             )}
           </section>
 
           {balance.credited_piastres > 0 && view.explanation && (
-            <p className="pay-detail__note pay-detail__note--owed">{view.explanation}</p>
+            <p className="pay-detail__note">{view.explanation}</p>
           )}
           {statement.basis === "approved" &&
             balance.state === "settled" &&
@@ -409,15 +439,29 @@ export function PaymentDetail({ session }: { session: Session }) {
                 Approved with nothing to send. This month is complete.
               </p>
             )}
+          {/* A warning that ends in its act (F-D4). The overpayment is the
+           *  ledger's own balance gone negative, not a figure worked out here. */}
           {balance.state === "overpaid" && (
-            <p className="pay-detail__note pay-detail__note--owed">
-              <Money piastres={balance.paid_piastres} kind="agreed" /> was transferred
-              against an approved <Money piastres={balance.obligation_piastres} kind="agreed" />.
-              The difference stays visible rather than being adjusted away.{" "}
-              <Link className="pay-detail__link" to={`/affiliates/payments/${month}/${affiliateId}/reconcile`}>
-                Settle the difference →
-              </Link>
-            </p>
+            <div className="pay-detail__warn">
+              <p>
+                {/* The approved figure is the card above and what was sent is
+                 *  the Transfers card; quoting both again here was a third
+                 *  source for the same two numbers (F2-1). */}
+                <strong>
+                  <Money piastres={-balance.balance_piastres} kind="agreed" /> overpaid, still
+                  to settle.
+                </strong>{" "}
+                Decide whether it comes off a later payment or HBA absorbs it.
+              </p>
+              {can(session, "payments.record") && (
+                <Link
+                  className="button button--row"
+                  to={`/affiliates/payments/${month}/${affiliateId}/reconcile`}
+                >
+                  Settle the difference
+                </Link>
+              )}
+            </div>
           )}
           {corrections.map((_, index) => (
             <Link
@@ -425,9 +469,8 @@ export function PaymentDetail({ session }: { session: Session }) {
               className="pay-detail__correction"
               to={`/affiliates/payments/${month}/${affiliateId}/correction`}
             >
-              A difference was found after {formatMonth(month)} was agreed. A
-              decision is needed.
-              <span className="pay-detail__link">Open the correction →</span>
+              The figure changed after {formatMonth(month)} was approved.
+              <span className="pay-detail__link">Decide what happens →</span>
             </Link>
           ))}
         </div>
@@ -459,10 +502,13 @@ export function PaymentDetail({ session }: { session: Session }) {
               <>
                 {/* A destination that changed shortly before a transfer is
                  *  the moment a redirected payout costs money (§6.4.5). */}
+                {/* The moment a redirected payout costs money (§6.4.5): the
+                 *  warning tier, said first in the card, never just coloured
+                 *  text among the details (F-D1). */}
                 {balance.destination_changed_at && (
-                  <p className="pay-detail__missing">
-                    Changed {dateLong(balance.destination_changed_at)}. Check with{" "}
-                    {balance.name} before sending anything.
+                  <p className="pay-detail__warn pay-detail__warn--inline">
+                    <strong>These details changed on {dateLong(balance.destination_changed_at)}.</strong>{" "}
+                    Confirm them with {first} before you send anything.
                   </p>
                 )}
                 {/* **The full details, without a reveal step** (ADR 0042).
@@ -491,9 +537,10 @@ export function PaymentDetail({ session }: { session: Session }) {
             <h2 className="pay-detail__card-title">Approval</h2>
             {statement.basis === "approved" && (
               <p className="pay-detail__approved">
+                {/* When, not how much again: the amount is the page's
+                 *  headline figure (F2-6). */}
                 Approved
-                {statement.approved_at ? ` ${dateLong(statement.approved_at)}` : ""} ·{" "}
-                <Money piastres={statement.total_piastres} kind="agreed" />
+                {statement.approved_at ? ` on ${dateLong(statement.approved_at)}` : ""}
                 {statement.version && statement.version > 1 ? ` · version ${statement.version}` : ""}
               </p>
             )}
@@ -504,15 +551,15 @@ export function PaymentDetail({ session }: { session: Session }) {
             )}
             {statement.basis === "estimate" &&
               (!can(session, "payroll.approve") ? (
-                <p className="pay-detail__muted">Not approved yet.</p>
+                <p className="pay-detail__muted">Waiting for somebody who approves pay.</p>
               ) : blocked || !statement.source_version ? (
                 <p className="pay-detail__muted">
-                  It can be approved once what is blocking it is resolved.
+                  You can approve it once the problem above is fixed.
                 </p>
               ) : (
                 <>
                   <p className="pay-detail__muted">
-                    Approval freezes this calculation. Recording the transfer is separate.
+                    Approving fixes what HBA owes {first}. It doesn’t send any money.
                   </p>
                   {confirming ? (
                     /* Approval cannot be taken back from any screen (05B), so
@@ -527,8 +574,7 @@ export function PaymentDetail({ session }: { session: Session }) {
                         <Money piastres={statement.total_piastres} kind="agreed" />?
                       </p>
                       <p className="pay-detail__muted">
-                        This cannot be undone. A difference found later is settled
-                        as a correction.
+                        You can’t undo this. A later change is settled as a correction.
                       </p>
                       <div className="pay-detail__confirm-acts">
                         <button
@@ -538,7 +584,14 @@ export function PaymentDetail({ session }: { session: Session }) {
                           disabled={approving}
                           onClick={approve}
                         >
-                          {approving ? "Approving…" : "Yes, approve"}
+                          {/* The act and its amount, not *Yes* (NN/g, F-D8). */}
+                          {approving ? (
+                            "Approving…"
+                          ) : (
+                            <>
+                              Approve <Money piastres={statement.total_piastres} kind="agreed" />
+                            </>
+                          )}
                         </button>
                         <button
                           type="button"
@@ -567,31 +620,47 @@ export function PaymentDetail({ session }: { session: Session }) {
               ))}
           </section>
 
+          {/* Before approval with nothing recorded, the card was a heading over
+           *  one sentence saying it could not be used yet (F2-6); the Approval
+           *  card already says money comes after it. */}
+          {!(statement.basis === "estimate" && !transfers?.length) && (
           <section className="pay-detail__card pay-detail__card--transfers">
             <h2 className="pay-detail__card-title">Transfers</h2>
             {/* Recorded against agreed, as a bar: a part payment reads at a
              *  glance. The sentence below says the same in words, so the bar
              *  is decoration to a screen reader. Only once a figure is agreed:
              *  an estimate is not a debt to measure progress against. */}
-            {statement.basis === "approved" && agreed > 0 && (
+            {statement.basis === "approved" && agreed > 0 && balance.paid_piastres > 0 && (
               <div className="pay-detail__progress" aria-hidden="true">
                 <span style={{ width: `${paidShare * 100}%` }} />
               </div>
             )}
+            {/* One sentence for where the month stands (F-D3). Before
+             *  approval there is nothing to measure against, and *EGP 0
+             *  remaining* read as "nothing owed". */}
             <p className="pay-detail__muted pay-detail__summary">
-              {balance.paid_piastres > 0 ? (
+              {statement.basis === "settled_outside" ? (
+                `Paid outside the platform. No payments are recorded here for ${formatMonth(month)}.`
+              ) : statement.basis === "estimate" ? (
+                /* Only reached with transfers listed: a month reopened after
+                 * money went out against its earlier approval. */
+                "Recorded against an earlier approval. Approve the new figure before sending more."
+              ) : agreed === 0 && balance.paid_piastres === 0 ? (
+                "Nothing to send for this month."
+              ) : balance.paid_piastres === 0 ? (
+                /* The amount is in the sentence at the top and the headline. */
+                "Nothing recorded yet."
+              ) : (
                 <>
                   <Money piastres={balance.paid_piastres} kind="agreed" /> recorded
+                  {balance.balance_piastres > 0 && (
+                    <>
+                      {" · "}
+                      <Money piastres={balance.balance_piastres} kind="agreed" /> left to send
+                    </>
+                  )}
                 </>
-              ) : (
-                "Nothing recorded yet"
               )}
-              {" · "}
-              <Money
-                piastres={balance.balance_piastres > 0 ? balance.balance_piastres : 0}
-                kind="agreed"
-              />{" "}
-              remaining
             </p>
             {transfers?.map((transfer) => {
               const here = transfer.allocations.find((allocation) => allocation.month === month);
@@ -603,25 +672,20 @@ export function PaymentDetail({ session }: { session: Session }) {
                 >
                   <span className="pay-detail__transfer-top">
                     <Money piastres={here?.allocated_piastres ?? transfer.amount_piastres} kind="agreed" />
-                    <span className="pay-detail__link">Receipt →</span>
+                    <span className="pay-detail__link">Details →</span>
                   </span>
                   <span className="pay-detail__transfer-meta">
                     {dateLong(transfer.occurred_at)}
                     {transfer.reference ? ` · ${transfer.reference}` : ""}
                   </span>
-                  <span className={transfer.has_proof ? "pay-detail__tone--lift" : "pay-detail__tone--owed"}>
-                    {transfer.has_proof ? "Receipt attached" : "No receipt attached"}
+                  {/* The receipt is optional, so its absence is a fact, not a
+                   *  warning on every row (F-D6). */}
+                  <span className="pay-detail__transfer-meta">
+                    {transfer.has_proof ? "Receipt attached" : "No receipt"}
                   </span>
                 </Link>
               );
             })}
-            {transfers?.length === 0 && (
-              <p className="pay-detail__faint">
-                {statement.basis === "settled_outside"
-                  ? `No payments recorded here for ${formatMonth(month)}.`
-                  : "No transfer has been recorded yet."}
-              </p>
-            )}
             {can(session, "payments.record") &&
               statement.basis === "approved" &&
               balance.balance_piastres > 0 && (
@@ -633,6 +697,7 @@ export function PaymentDetail({ session }: { session: Session }) {
                 </Link>
               )}
           </section>
+          )}
         </aside>
       </div>
     </>
@@ -694,7 +759,9 @@ export function PaymentReceipt() {
           ← {history?.name ?? "Payment"}
         </Link>
         <div className="page__title">
-          <h1>Receipt</h1>
+          {/* A transfer's page, titled for the transfer: *Receipt* above
+           *  *No receipt attached* contradicted itself (F-T1). */}
+          <h1>Transfer</h1>
           <span className="page__subtitle">{formatMonth(month)}</span>
         </div>
       </div>
@@ -736,7 +803,9 @@ export function PaymentReceipt() {
             </div>
             <dl className="pay-receipt__rows">
               <div>
-                <dt>Recorded</dt>
+                {/* `occurred_at` is the date the money was sent, as typed on
+                 *  the record form - not when it was recorded (F-T2). */}
+                <dt>Sent on</dt>
                 <dd>{dateLong(transfer.occurred_at)}</dd>
               </div>
               <div>
@@ -749,7 +818,7 @@ export function PaymentReceipt() {
               </div>
               <div>
                 <dt>Receipt</dt>
-                <dd>{transfer.has_proof ? "Attached" : "No receipt attached"}</dd>
+                <dd>{transfer.has_proof ? "Attached, below" : "Not attached"}</dd>
               </div>
               {transfer.note && (
                 <div>
@@ -758,19 +827,14 @@ export function PaymentReceipt() {
                 </div>
               )}
             </dl>
-            {transfer.has_proof ? (
+            {transfer.has_proof && (
               <img
                 className="pay-receipt__image"
                 src={`/api/payments/${transfer.id}/proof`}
                 alt="Transfer confirmation"
               />
-            ) : (
-              <div className="pay-receipt__none">No receipt attached to this transfer</div>
             )}
           </section>
-          <Link className="button pay-receipt__back" to={back}>
-            Open the month’s payment
-          </Link>
         </div>
       )}
     </>
