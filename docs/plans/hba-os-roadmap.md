@@ -106,7 +106,7 @@ Phase 3.
 | Task | Status |
 |---|---|
 | Site requires sign-in | Deferred: the owner retires the site once Production moves in |
-| Source code, data and files exported from ChatGPT | In progress: the owner is exporting (7 November), into `evidenceproduction-export-2026-11-07` outside the repository |
+| Source code, data and files exported from ChatGPT | In progress: the owner is exporting (7 November), into `evidence/production-export-2026-11-07/` outside the repository |
 | Production-frame mockup approved | Completed |
 | Read the exported code in full | Pending: after the export |
 | The platform answers Production's five requests; data into HBA's database | Pending: after Batch 1.2 |
