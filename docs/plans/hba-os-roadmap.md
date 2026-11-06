@@ -2,7 +2,7 @@
 
 **The one place to see how everything fits.** One hierarchy only: Phase →
 Batch → Task → Status. Statuses: **Completed**, **In progress**, **Blocked by
-owner**, **Pending**, **Deferred**. Updated 28 October 2026.
+owner**, **Pending**, **Deferred**. Updated 7 November 2026.
 
 Sources: ADRs 0065–0069 (the architecture), `2026-10-25-phase-1-foundations.md`
 (Phase 1 in detail). The batch in flight keeps its working checkpoint in
@@ -87,7 +87,7 @@ every recommended choice.
 | 2.4 | Team and access by department | Completed: PR #147, on staging and production at `92bfd38` 6 Nov (delayed by Railway billing); the owner's account gave the test account a level and took it back on staging, both in the activity log (signing in as the test account skipped at the owner's word). Contract `2026-11-04-batch-2.4-contract.md` |
 
 **Phase 2 completed 6 November 2026.** Recommended next (the owner has not
-chosen yet; see `2026-11-06-continuation-handoff.md`): Batch 4.1 once the export arrives, then
+chosen yet; see `2026-11-07-continuation-handoff.md`): Batch 4.1 once the export arrives, then
 Phase 3.
 
 ## Phase 3 — Shared records (ADRs 0066, 0068)
@@ -106,7 +106,7 @@ Phase 3.
 | Task | Status |
 |---|---|
 | Site requires sign-in | Deferred: the owner retires the site once Production moves in |
-| Source code, data and files exported from ChatGPT | **Blocked by owner** |
+| Source code, data and files exported from ChatGPT | In progress: the owner is exporting (7 November), into `evidenceproduction-export-2026-11-07` outside the repository |
 | Production-frame mockup approved | Completed |
 | Read the exported code in full | Pending: after the export |
 | The platform answers Production's five requests; data into HBA's database | Pending: after Batch 1.2 |
