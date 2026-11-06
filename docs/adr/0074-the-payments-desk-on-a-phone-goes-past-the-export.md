@@ -1,6 +1,6 @@
 # 0074 — The payments desk on a phone goes past the approved export
 
-**Status:** proposed — a divergence from the approved export, for the owner to accept or overrule
+**Status:** accepted by the owner, 6 November 2026 (merged as PR #153). A divergence from the approved export.
 **Date:** 2026-11-06
 **Related:** `frontend/src/departments/affiliates/Payments.tsx`, `Payments.css`;
 `PaymentDetail.tsx`, `PaymentDetail.css`; `PaymentRecord.tsx`;
