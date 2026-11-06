@@ -31,8 +31,22 @@ type Method = "instapay" | "bank" | "wallet";
  * no real address has ever been seen here, and refusing a genuine one because
  * its path looks unfamiliar would stop them joining at all.
  */
-export function instapayProblem(value: string): string | null {
+/**
+ * The ipn.eg link out of a pasted InstaPay message, as `extract_instapay_link`
+ * does on the server. InstaPay's share copies a sentence around the link, and
+ * the model should not have to cut it out: the server keeps the link alone.
+ */
+const INSTAPAY_LINK =
+  /(?<![\w./?=&#%@:-])(?:https?:\/\/)?(?:[a-z0-9-]+\.)*ipn\.eg(?:\/[^\s<>"'\u060c]*)?/i;
+
+export function extractInstapayLink(value: string): string {
   const cleaned = value.trim();
+  const found = cleaned.match(INSTAPAY_LINK);
+  return found ? found[0].replace(/[.,;:!?)\]}>\u00bb"']+$/, "") : cleaned;
+}
+
+export function instapayProblem(value: string): string | null {
+  const cleaned = extractInstapayLink(value);
   if (!cleaned) return null;
 
   if (/^[+\d][\d\s\-()]*$/.test(cleaned)) {

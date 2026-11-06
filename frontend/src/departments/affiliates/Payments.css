@@ -112,7 +112,7 @@
 
 .payments__amount,
 .table th.payments__amount {
-  width: 130px;
+  width: 170px;
   text-align: left;
   font-variant-numeric: tabular-nums;
 }
@@ -161,11 +161,71 @@
   color: var(--faint);
 }
 
+/* The line under a figure is a footnote to it, not a second figure: one
+   weight, one quiet colour, the amount inside it in the same colour as its
+   words (refinement F-L2). It was the ink figure beside a green word, which
+   read as two amounts of equal standing on one row. */
 .payments__part {
   display: block;
   margin-top: 3px;
   font-size: 12px;
-  color: var(--accent-lift);
+  color: var(--quiet);
+}
+
+.payments__part .money {
+  color: inherit;
+}
+
+.payments__part--over {
+  color: var(--refused);
+}
+
+.payments__part--quiet {
+  white-space: normal;
+}
+
+.payments__left {
+  display: block;
+  color: var(--owed);
+}
+
+/* What the three cards leave out: the estimate, and an overpayment. */
+.payments__summary-note {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  margin: -6px 0 18px;
+  font-size: 12.5px;
+  color: var(--quiet);
+}
+
+.payments__summary-note .money {
+  color: var(--ink);
+}
+
+
+/* A failed load says what failed and offers the one thing to do about it. */
+.payments__error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: var(--space-4);
+}
+
+.payments__error .button {
+  flex: none;
+}
+
+.payments__none {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-bottom: var(--space-6);
+}
+
+.payments__none .empty {
+  padding-bottom: var(--space-3);
 }
 
 .payments__unavailable {
@@ -450,12 +510,13 @@
     margin-bottom: var(--space-4);
   }
 
-  /* One panel, label left and figure right: three facts read down one edge
-     instead of three cards that each take a third of the screen. */
+  /* One panel, two figures side by side: the two cash facts read in one
+     glance instead of taking a third of the first screen. */
   .payments__summary {
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     gap: 0;
-    margin-bottom: 14px;
+    margin-bottom: 12px;
     border-radius: var(--radius);
     background: var(--surface);
   }
@@ -463,25 +524,36 @@
   .payments__figure {
     flex: none;
     display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 13px 16px;
+    flex-direction: column;
+    gap: 4px;
+    padding: 12px 16px;
     background: none;
     border-radius: 0;
   }
 
   .payments__figure + .payments__figure {
-    border-top: 1px solid var(--rule);
+    border-left: 1px solid var(--rule);
   }
 
   .payments__figure-label {
-    font-size: 13.5px;
+    font-size: 13px;
   }
 
   .money.payments__total {
     margin-top: 0;
-    font-size: 17px;
+    font-size: 18px;
+  }
+
+  /* Where a row sends nothing, where it would have gone is one more line
+     between the name and the act (F2-4). It is on the model's own page. */
+  .table.payments__table td.payments__destination--idle {
+    display: none;
+  }
+
+  .payments__table tr:has(.payments__destination--idle) {
+    grid-template-areas:
+      "who amount"
+      "state action";
   }
 
   .payments__tools {
@@ -577,6 +649,11 @@
     font-size: 15px;
   }
 
+  /* The footnote keeps its own size inside the cell's larger figure. */
+  .payments__amount .payments__part .money {
+    font-size: inherit;
+  }
+
   .payments__unavailable {
     font-size: 14px;
   }
@@ -605,5 +682,23 @@
     display: inline-flex;
     align-items: center;
     padding-inline: 16px;
+  }
+}
+
+@media (max-width: 640px) {
+  .payments__head .page__title > a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    margin-block: -14px;
+  }
+
+  .payments__error {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .payments__error .button {
+    min-height: 44px;
   }
 }

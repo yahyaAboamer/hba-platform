@@ -112,8 +112,8 @@ describe("approving a month", () => {
     expect(posts()).toHaveLength(0);
     const question = screen.getByRole("group", { name: /Approve Sara’s October 2026 at/ });
     expect(question.textContent).toContain("EGP 14,326.00");
-    expect(question.textContent).toContain("cannot be undone");
-    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Yes, approve" }));
+    expect(question.textContent).toMatch(/can.t undo this/);
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: /^Approve EGP 14,326\.00$/ }));
   });
 
   it("does nothing when cancelled", async () => {
@@ -131,7 +131,7 @@ describe("approving a month", () => {
   it("approves on the second, deliberate press", async () => {
     detail();
     fireEvent.click(await screen.findByRole("button", { name: "Approve this month" }));
-    fireEvent.click(screen.getByRole("button", { name: "Yes, approve" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Approve EGP 14,326\.00$/ }));
 
     await waitFor(() => expect(posts()).toHaveLength(1));
     expect(String(posts()[0][0])).toContain("/api/payroll/2026-10/approve");
@@ -139,7 +139,7 @@ describe("approving a month", () => {
 
   it("says the total is rounded to whole pounds", async () => {
     detail();
-    expect(await screen.findByText(/rounded to the nearest whole pound/)).toBeTruthy();
+    expect(await screen.findByText(/rounded to the nearest whole pound/i)).toBeTruthy();
   });
 });
 
@@ -174,7 +174,7 @@ describe("recording a transfer", () => {
 
   it("says it records rather than sends before anything else on the form", async () => {
     record();
-    const lead = await screen.findByText(/No money is sent from here/);
+    const lead = await screen.findByText(/Nothing is sent from here/);
     const amount = screen.getByLabelText("Amount transferred, EGP");
     expect(lead.compareDocumentPosition(amount) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });

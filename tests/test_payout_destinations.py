@@ -906,3 +906,79 @@ def test_an_instapay_address_must_be_an_https_link(db, address):
 
     with pytest.raises(ValueError, match="https://"):
         normalise_instapay_address(address)
+
+
+# ── A pasted InstaPay message keeps only its link (owner, 6 Nov 2026) ─────────
+#
+# InstaPay's share copies a sentence around the link, and most models paste
+# the whole message. They are not asked to edit it: the link is kept, the
+# text dropped, so *Open InstaPay* opens.
+
+SHARED_MESSAGES = [
+    f"Send money to me via InstaPay: {INSTAPAY_URL}",
+    f"Send money to me via InstaPay: {INSTAPAY_URL}.",
+    f"حول لي على انستاباي {INSTAPAY_URL} شكرا",
+    f"{INSTAPAY_URL} (InstaPay)",
+    f"  {INSTAPAY_URL}\n",
+    "Pay me: ipn.eg/S/nour.mahmoud/instapay/8Xk2Qp",
+]
+
+
+@pytest.mark.parametrize("pasted", SHARED_MESSAGES)
+def test_a_pasted_instapay_message_keeps_only_the_link(pasted):
+    from app.modules.affiliates.services.payouts import normalise_instapay_address
+
+    assert normalise_instapay_address(pasted) == INSTAPAY_URL
+
+
+def test_the_link_alone_is_what_is_stored(db):
+    nour = _affiliate(db)
+    _instapay(db, nour, url=f"Send money to me via InstaPay: {INSTAPAY_URL}")
+    db.flush()
+
+    assert current_destination(db, nour).instapay_address_url == INSTAPAY_URL
+
+
+@pytest.mark.parametrize(
+    "pasted",
+    [
+        "https://facebook.com/?x=ipn.eg",
+        "https://evil.example/ipn.eg/S/nour",
+        "Pay me on InstaPay please",
+    ],
+)
+def test_an_ipn_eg_inside_another_link_is_not_taken_for_one(pasted):
+    """Finding the link must not turn somebody else's URL into a valid one."""
+    from app.modules.affiliates.services.payouts import normalise_instapay_address
+
+    with pytest.raises(ValueError):
+        normalise_instapay_address(pasted)
+
+
+def test_a_message_saved_before_the_fix_still_opens():
+    """Records are not rewritten. The payment card finds the link inside a
+    message stored earlier, so models who already pasted text can be paid
+    with *Open InstaPay* today, without a data migration."""
+    from app.modules.affiliates.services.payouts import destination_card
+
+    stored = PayoutDestination(
+        method=PayoutMethod.INSTAPAY,
+        instapay_address_url=f"Send money to me via InstaPay: {INSTAPAY_URL}",
+        instapay_phone="01001234567",
+    )
+    card = destination_card(stored)
+
+    assert card["link"] == INSTAPAY_URL
+    link_row = next(row for row in card["rows"] if row["copy"] == "link")
+    assert link_row["value"] == INSTAPAY_URL
+
+
+def test_a_stored_value_with_no_link_opens_nothing():
+    from app.modules.affiliates.services.payouts import destination_card
+
+    stored = PayoutDestination(
+        method=PayoutMethod.INSTAPAY,
+        instapay_address_url="not a link at all",
+        instapay_phone="01001234567",
+    )
+    assert destination_card(stored)["link"] is None

@@ -59,20 +59,73 @@
   text-decoration: none;
 }
 
+/* ── Three tiers of message (refinement, §5 of the journal) ───────────────
+ *
+ * **Warning**: money could go to the wrong place, too much went, or the month
+ * cannot move until somebody acts. Amber rule, a tinted ground, the fact in
+ * bold, and the act beside it. GOV.UK: keep warnings for real consequences,
+ * or they stop being read.
+ * **Note**: a fact that changes how to read a figure. A quiet rule, no fill.
+ * **Help**: plain quiet text, no frame at all.
+ * Before this, amber meant all three.
+ */
+.pay-detail__warn,
 .pay-detail__blocked {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 16px;
   margin-top: 14px;
   padding: 13px 15px;
-  border: 1px solid var(--refused);
+  border-left: 3px solid var(--owed);
   border-radius: var(--radius);
-  background: var(--refused-quiet);
+  background: var(--owed-quiet);
   font-size: 13.5px;
-  color: var(--refused);
+  line-height: 1.55;
+  color: var(--ink);
+}
+
+.pay-detail__warn p {
+  flex: 1 1 260px;
+  margin: 0;
+}
+
+.pay-detail__warn strong,
+.pay-detail__blocked-title {
+  font-weight: 600;
+  color: var(--owed);
+}
+
+.pay-detail__warn .money {
+  color: inherit;
+}
+
+.pay-detail__blocked-title {
+  display: block;
+  margin-bottom: 2px;
+}
+
+/* In a card, above the details it is about. */
+.pay-detail__warn--inline {
+  display: block;
+  margin: 10px 0 4px;
 }
 
 .pay-detail__blocked-act {
-  margin-top: 10px;
-  border-color: var(--refused);
-  color: var(--refused);
+  flex: none;
+}
+
+/* What this month is waiting for, in one sentence. */
+.pay-detail__next {
+  margin: 14px 0 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ink);
+}
+
+.pay-detail__next .money {
+  color: inherit;
 }
 
 .pay-detail__lines {
@@ -135,16 +188,15 @@
 
 .pay-detail__note {
   margin: 12px 0 0;
-  padding: 13px 15px;
-  border: 1px solid var(--owed);
-  border-radius: var(--radius);
+  padding: 4px 0 4px 14px;
+  border-left: 2px solid var(--rule-strong);
   font-size: 13px;
   line-height: 1.6;
   color: var(--quiet);
 }
 
 .pay-detail__note--settled {
-  border-color: var(--accent);
+  border-left-color: var(--accent);
   color: var(--accent-lift);
 }
 
@@ -368,7 +420,9 @@
   display: block;
 }
 
-.pay-record__field > span {
+.pay-record__field > label:not(.pay-record__drop),
+.pay-record__label,
+.pay-record__field > span:not(.pay-record__hint):not(.pay-record__fixed) {
   display: block;
   margin-bottom: 6px;
   font-size: 12.5px;
@@ -428,7 +482,12 @@
 }
 
 .pay-record__warn {
-  border: 1px solid var(--owed);
+  border-left: 3px solid var(--owed);
+  background: var(--owed-quiet);
+  color: var(--ink);
+}
+
+.pay-record__warn strong {
   color: var(--owed);
 }
 
@@ -458,6 +517,47 @@
 /* First on the form, in full ink: what saving does is the first thing a
  * payer needs to know here. */
 .pay-record__note--lead {
+  padding: 4px 0 4px 14px;
+  border-left: 2px solid var(--accent);
+  font-size: 14px;
+  color: var(--ink);
+}
+
+/* A field's own message, under it and tied to it (refinement F-R1). */
+.pay-record__hint {
+  display: block;
+  margin-top: 6px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--quiet);
+}
+
+.pay-record__hint .money {
+  color: var(--ink);
+}
+
+.pay-record__hint--error {
+  color: var(--refused);
+}
+
+.pay-record__hint--over {
+  color: var(--owed);
+}
+
+.pay-record__input[aria-invalid="true"] {
+  border-color: var(--refused);
+}
+
+.pay-record__optional {
+  color: var(--faint);
+}
+
+/* Read, not chosen: where it went is a fact on this form, not a control. */
+.pay-record__fixed {
+  display: block;
+  padding: 12px 13px;
+  border-radius: var(--radius);
+  background: var(--surface);
   font-size: 14px;
   color: var(--ink);
 }
@@ -760,4 +860,52 @@
 .pay-record__input[inputmode="decimal"] {
   font-size: 18px;
   font-variant-numeric: tabular-nums;
+}
+
+/* ── Thumb-sized targets on every Payments page (refinement, measured) ──────
+ *
+ * Measured at 360, 390 and 430 in an iPhone-emulated session: the back
+ * button was 36px, *Open profile* 20px, a warning's act 34px, and the
+ * overpayment form's fields and buttons 38px. Apple's floor is 44pt.
+ */
+@media (max-width: 640px) {
+  .pay__back.button,
+  .pay-detail__warn .button,
+  .pay-detail__blocked .button,
+  .pay__decision-acts .button,
+  .pay__field .input,
+  .pay-fix__input {
+    min-height: 44px;
+  }
+
+  .pay__back.button,
+  .pay-detail__warn .button,
+  .pay-detail__blocked .button,
+  .pay__decision-acts .button {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .pay-detail__status .pay-detail__link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    margin-block: -12px;
+  }
+
+  .pay-detail__warn .button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .pay__field .input {
+    font-size: 16px;
+  }
+}
+
+/* The amount inside the approve button is part of its label (F2-8): it took
+   the page's money colour, so the button read in two colours. */
+.pay-detail__confirm-acts .button .money {
+  color: inherit;
+  font: inherit;
 }

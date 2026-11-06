@@ -159,16 +159,19 @@ export function paymentRowPresentation(row: Balance): RowPresentation {
     return { label: "Partly paid", explanation: null, action: "Record payment" };
   }
   if (row.state === "unpaid") {
+    /* *Approved* alone was ambiguous: a part-paid and a fully paid month
+     * are approved too. The state is "agreed, nothing sent yet", and the
+     * payer's next act is the label (refinement F-L4). */
     return {
-      label: "Approved",
+      label: "Ready to send",
       explanation: null,
       action: "Record payment",
     };
   }
   if (row.state === "overpaid") {
     return {
-      label: "More sent than due",
-      explanation: "Review the recorded transfers before deciding the difference.",
+      label: "Overpaid",
+      explanation: "More was sent than this month was approved at. Decide what happens to the difference.",
       action: "Settle difference",
     };
   }
@@ -210,10 +213,10 @@ export function paymentRowPresentation(row: Balance): RowPresentation {
 export const STATE_PILL: Record<string, string> = {
   "Awaiting approval": "payments__pill--owed",
   "Partly paid": "payments__pill--owed",
-  Approved: "payments__pill--approved",
+  "Ready to send": "payments__pill--approved",
   "Fully paid": "payments__pill--settled",
   "Terms missing": "payments__pill--refused",
-  "More sent than due": "payments__pill--refused",
+  Overpaid: "payments__pill--refused",
 };
 
 type Filter = "all" | "review" | "unpaid" | "partial" | "paid" | "no_due";
@@ -221,7 +224,7 @@ type Filter = "all" | "review" | "unpaid" | "partial" | "paid" | "no_due";
 const FILTERS: { value: Filter; label: string }[] = [
   { value: "all", label: "All" },
   { value: "review", label: "Awaiting approval" },
-  { value: "unpaid", label: "Approved" },
+  { value: "unpaid", label: "Ready to send" },
   { value: "partial", label: "Partly paid" },
   { value: "paid", label: "Fully paid" },
   { value: "no_due", label: "No transfer due" },
@@ -257,6 +260,9 @@ export function Payments({ session }: { session: Session }) {
   const [filter, setFilter] = useState<Filter>("all");
   const [search, setSearch] = useState("");
 
+  // Bumped by *Try again*: a failed load is a dead end without it.
+  const [attempt, setAttempt] = useState(0);
+
   useEffect(() => {
     setError(null);
     setLockNote(null);
@@ -264,7 +270,7 @@ export function Payments({ session }: { session: Session }) {
       .get<Outstanding>(`/api/payments/${month}`)
       .then(setData)
       .catch((caught) => setError(caught.message));
-  }, [month]);
+  }, [month, attempt]);
 
   function lockFor(candidate: string): MonthLock {
     if (
@@ -315,12 +321,12 @@ export function Payments({ session }: { session: Session }) {
       </div>
 
       {error && (
-        <p
-          className="notice notice--refused"
-          role="alert"
-        >
-          {error}
-        </p>
+        <div className="notice notice--refused payments__error" role="alert">
+          <span>{error}</span>
+          <button type="button" className="button button--row" onClick={() => setAttempt((n) => n + 1)}>
+            Try again
+          </button>
+        </div>
       )}
 
       {lockNote && <p className="notice payments__note">{lockNote}</p>}
@@ -333,29 +339,29 @@ export function Payments({ session }: { session: Session }) {
             aria-label="Month-end payment totals"
           >
             {/*
-             * Three cards, three grounds, no sub-lines. Each used to carry a
-             * sentence under the figure - how much of the total was approved,
-             * that the second number came from the ledger, how many models
-             * were waiting. All three were ours, none is in the export, and
-             * together they turned a row somebody reads in one glance into
-             * three paragraphs.
+             * **Two cash figures, nothing that has to be reconciled**
+             * (refinement F-L1, then F2-1). A third card, *Total to send*,
+             * summed the server's `required_piastres`, which is what was sent
+             * plus what is left: on an overpaid month that counted money
+             * already transferred - more than the month was approved at - as
+             * still to send. *Left to send* is the act, so it comes first;
+             * *Recorded* is what has already left the bank, overpayments
+             * included, because that is what happened. Neither is the
+             * approved total, and neither claims to be.
              */}
             <PaymentFigure
-              label="Total required"
-              piastres={data.totals.required_piastres}
-              estimated={data.totals.forecast_piastres > 0}
-            />
-            <PaymentFigure
-              label="Recorded so far"
-              piastres={data.totals.recorded_piastres}
-              settled
-            />
-            <PaymentFigure
-              label="Remaining to send"
+              label="Left to send"
               piastres={data.totals.still_owed_piastres}
               owed
             />
+            <PaymentFigure
+              label="Recorded"
+              piastres={data.totals.recorded_piastres}
+              settled
+            />
           </section>
+          <SummaryNotes rows={rows} forecast={data.totals.forecast_piastres} />
+
 
           {/*
            * No corrections panel here. The export puts an open correction on
@@ -370,7 +376,15 @@ export function Payments({ session }: { session: Session }) {
                 role="group"
                 aria-label="Filter payment states"
               >
-                {FILTERS.map((option) => (
+                {/* A filter with nothing in it is hidden (F-L5), unless it is
+                 *  the one selected: six chips, four of them reading 0, made
+                 *  the row of choices harder to read than the list. */}
+                {FILTERS.filter(
+                  (option) =>
+                    option.value === "all" ||
+                    option.value === filter ||
+                    rows.some((row) => matchesFilter(row, option.value)),
+                ).map((option) => (
                   <button
                     key={option.value}
                     type="button"
@@ -408,12 +422,22 @@ export function Payments({ session }: { session: Session }) {
                *  month owes something - and telling somebody their search
                *  found nothing when they have not searched sends them looking
                *  for a search box they never used. */
-              <div className="surface">
+              <div className="surface payments__none">
                 <p className="empty">
                   {search.trim()
                     ? "No model matches that search."
                     : `Nothing in ${FILTERS.find((f) => f.value === filter)?.label.toLowerCase() ?? "this filter"} for this month.`}
                 </p>
+                <button
+                  type="button"
+                  className="button button--row"
+                  onClick={() => {
+                    setSearch("");
+                    setFilter("all");
+                  }}
+                >
+                  Show all models
+                </button>
               </div>
             ) : (
               <div className="surface payments__table-wrap">
@@ -451,26 +475,60 @@ export function Payments({ session }: { session: Session }) {
   );
 }
 
+/**
+ * What the two cards leave out, said once and only when it applies.
+ *
+ * Months not approved yet are an estimate (F14) and stay out of the cards;
+ * somebody asking finance for the month's cash still needs the figure, so it
+ * is here. An overpayment is in *Recorded* as what was actually sent, so the
+ * line names who, and by how much.
+ */
+function SummaryNotes({ rows, forecast }: { rows: Balance[]; forecast: number }) {
+  const waiting = rows.filter((row) => row.state === "not_approved").length;
+  const overpaid = rows.filter((row) => row.state === "overpaid");
+  if (waiting === 0 && overpaid.length === 0) return null;
+  return (
+    <p className="payments__summary-note">
+      {waiting > 0 && (
+        <span>
+          Not approved yet: {waiting} {waiting === 1 ? "model" : "models"}
+          {forecast > 0 && (
+            <>
+              , about <Money piastres={forecast} kind="provisional" />
+            </>
+          )}
+        </span>
+      )}
+      {overpaid.length > 0 && (
+        <span>
+          Overpaid:{" "}
+          {overpaid.map((row, index) => (
+            <span key={row.affiliate_id}>
+              {index > 0 && ", "}
+              {row.name} by <Money piastres={-row.balance_piastres} />
+            </span>
+          ))}
+        </span>
+      )}
+    </p>
+  );
+}
+
 function PaymentFigure({
   label,
   piastres,
   owed = false,
   settled = false,
-  estimated = false,
 }: {
   label: string;
   piastres: number;
   owed?: boolean;
   settled?: boolean;
-  /** F14. A total that still contains a forecast is not a debt yet, and the
-   *  export says so with a pill beside the label rather than in a sentence. */
-  estimated?: boolean;
 }) {
   return (
     <div className="payments__figure">
       <span className="payments__figure-head">
         <span className="payments__figure-label">{label}</span>
-        {estimated && <span className="pill payments__estimated">Estimated</span>}
       </span>
       <Money
         piastres={piastres}
@@ -505,6 +563,11 @@ function PaymentFigure({
  * *remaining* figure keeps its own place on the second line below.
  */
 export function amountShown(row: Balance): number {
+  /* **Except an overpaid month** (F2-1). There the server's figure is what
+   * was sent - paid plus nothing left - which put EGP 8,500 under *To
+   * receive* for a month approved at EGP 8,000. What she is due is the
+   * approved amount; the excess is said on the line below. */
+  if (row.state === "overpaid") return row.obligation_piastres;
   return row.required_piastres;
 }
 
@@ -518,21 +581,41 @@ export function amountShown(row: Balance): number {
  * applies there is no line at all.
  */
 export function secondLine(row: Balance) {
-  if (row.credited_piastres > 0) {
+  if (row.state === "overpaid") {
     return (
-      <span className="payments__part">
-        <Money piastres={row.credited_piastres} /> deducted
+      <span className="payments__part payments__part--over">
+        {/* The open excess, not what was sent: after part of it is settled,
+         *  or when a credit landed, the two differ (review, round 2). */}
+        <Money piastres={-row.balance_piastres} /> to settle
       </span>
     );
   }
-  if (row.paid_piastres > 0) {
+  if (row.credited_piastres > 0) {
+    return (
+      <span className="payments__part">
+        <Money piastres={row.credited_piastres} /> from credit
+      </span>
+    );
+  }
+  /* A fully paid row's *X recorded* only repeated its own headline beside a
+   * *Fully paid* pill (F2-4). The line is for a month that is not the whole
+   * story: what is left on a part-paid one. */
+  if (row.state === "partially_paid" && row.balance_piastres > 0) {
     return (
       <span className="payments__part">
         <Money piastres={row.paid_piastres} /> recorded
+        <span className="payments__left">
+          <Money piastres={row.balance_piastres} /> left
+        </span>
       </span>
     );
   }
   return null;
+}
+
+/** Whether this row's next act is sending money, so where it goes matters now. */
+function sendsMoney(row: Balance): boolean {
+  return row.required_kind === "approved" && row.balance_piastres > 0;
 }
 
 export function PaymentRow({
@@ -569,7 +652,18 @@ export function PaymentRow({
       </td>
       <td role="cell" className="payments__amount">
         {row.required_kind === "unavailable" ? (
-          <span className="payments__unavailable">Unavailable</span>
+          /* *Unavailable* said nothing about why, while her own page showed
+           * the blocker (F-L3). The reason is short, and it is the act. */
+          <>
+            <span className="payments__unavailable">Not worked out yet</span>
+            <span className="payments__part payments__part--quiet">
+              {row.terms === null
+                ? "No pay terms"
+                : row.forecast_blockers.length > 0
+                  ? row.forecast_blockers.map(describeBlocker).join(" · ")
+                  : "Missing information"}
+            </span>
+          </>
         ) : (
           <>
             <Money
@@ -586,7 +680,14 @@ export function PaymentRow({
           </>
         )}
       </td>
-      <td role="cell" className="payments__destination">
+      <td
+        role="cell"
+        className={
+          sendsMoney(row) || !row.destination
+            ? "payments__destination"
+            : "payments__destination payments__destination--idle"
+        }
+      >
         {/* **The real destination, on the row.** The approved export writes
          *  `InstaPay · 010 7014 2033` here and the owner asked for exactly
          *  that: the person reading this list is about to type it into a
@@ -607,7 +708,10 @@ export function PaymentRow({
                 ? describeDestination(row.destination)
                 : NO_DESTINATION_RECORDED)}
           </span>
-          {row.destination_card && canRecord && (
+          {/* Copy only where the next act is a transfer (F2-4): on a paid,
+           *  credited or unapproved row it was eight more buttons for a
+           *  number nobody was about to type. */}
+          {row.destination_card && canRecord && sendsMoney(row) && (
             <CopyDestination card={row.destination_card} />
           )}
         </span>
