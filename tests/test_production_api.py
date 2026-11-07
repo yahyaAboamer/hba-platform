@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import select, text
+from sqlalchemy import event, select, text
 
 from app.core.passwords import hash_password
 from app.core.permissions import DEPARTMENT_LEVELS, access_words, level_in
@@ -184,6 +184,33 @@ def test_a_supplier_with_no_lead_time_reads_one_day_as_before(owner):
     assert supplier["leadTime"] == "1 days"
     assert supplier["activeOrders"] == 1
     assert supplier["capacity"] == "Capacity not set"
+
+
+def test_products_are_listed_in_the_old_byte_order(owner):
+    # SQLite sorted names byte by byte: capitals before small letters, and a
+    # space or dash counts. Language-aware sorting would give the opposite here.
+    _seed()
+    at = datetime(2026, 9, 4, 17, 0, tzinfo=timezone.utc)
+    with SessionLocal() as db:
+        for key, name in (("x1", "basic tee"), ("x2", "Zip Hoodie"), ("x3", "Plain-Pants")):
+            db.add(ProductionProduct(id=key, style_code=key.upper(), name=name, created_at=at, updated_at=at))
+        db.commit()
+    statements: list[str] = []
+
+    def keep(conn, cursor, statement, *args):
+        statements.append(statement)
+
+    event.listen(engine, "before_cursor_execute", keep)
+    try:
+        names = [product["name"] for product in owner.get("/api/production/state").json()["products"]]
+    finally:
+        event.remove(engine, "before_cursor_execute", keep)
+    assert names == sorted(names, key=lambda name: name.encode("utf-8"))
+    assert names.index("Zip Hoodie") < names.index("basic tee")
+    # A database set up with byte order passes the lines above anyway (this
+    # one did, staging did not), so the query itself must ask for it.
+    products = [s for s in statements if "FROM production_product" in s and "ORDER BY" in s]
+    assert products and all('COLLATE "C"' in s.split("ORDER BY", 1)[1] for s in products)
 
 
 def test_the_revision_is_initial_until_something_is_logged(owner):
