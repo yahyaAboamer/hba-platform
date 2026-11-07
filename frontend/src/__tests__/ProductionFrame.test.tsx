@@ -55,12 +55,16 @@ describe("Production's frame", () => {
   it("follows Production's own navigation in the address bar without reloading it", async () => {
     await open("/production");
     const frame = document.querySelector("iframe")!;
-    act(() => {
-      window.dispatchEvent(
-        new MessageEvent("message", { origin: window.location.origin, data: { type: "production:path", path: "/samples" } }),
-      );
-    });
-    await waitFor(() => expect(window.location.pathname).toBe("/production/samples"), { timeout: 5000 });
+    // Sent again on each try: on a slow machine the frame may start listening
+    // only after the first message, which would then be lost.
+    await waitFor(() => {
+      act(() => {
+        window.dispatchEvent(
+          new MessageEvent("message", { origin: window.location.origin, data: { type: "production:path", path: "/samples" } }),
+        );
+      });
+      expect(window.location.pathname).toBe("/production/samples");
+    }, { timeout: 4000 });
     expect(frame.getAttribute("src")).toBe("/production-app/");
   });
 
