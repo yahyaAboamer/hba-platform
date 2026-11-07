@@ -69,3 +69,10 @@ Two screens were wider than a phone, on the old site too. Nothing else moves.
   timeline's chart panel (`gantt-panel`) scrolls sideways inside itself when
   the screen is narrower than the chart, as the calendar already did on a
   phone, instead of widening the page.
+
+## Staff record quality checks (ADR 0077, owner, 7 November 2026)
+
+- `components/pages/team-workspace.tsx`: the QC checklist is editable when
+  the server says `canCheckQc` (Production staff), as well as for "qc" and
+  "admin".
+- `lib/qc-checklist.ts`: `TeamUser` has an optional `canCheckQc`.

@@ -6,4 +6,4 @@ export const qcSteps = [
   { id: "delivery", name: "Final inspection & packing", checks: ["Finished quantities verified by size and colour", "Defects and rework recorded and resolved", "Packaging, tags and delivery quantities verified"] },
 ] as const;
 export type QcCheck = { orderCode: string; step: string; item: number; result: "Pending" | "Pass" | "Fail" | "N/A"; notes: string; checkedBy: string; updatedAt: string };
-export type TeamUser = { username: string; name: string; role: "admin" | "production" | "qc" | "viewer"; mustChangePassword?: boolean; roleLabel?: string };
+export type TeamUser = { username: string; name: string; role: "admin" | "production" | "qc" | "viewer"; mustChangePassword?: boolean; roleLabel?: string; canCheckQc?: boolean };

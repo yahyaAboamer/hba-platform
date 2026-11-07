@@ -210,7 +210,7 @@ def test_the_roster_reads_access_by_department(client):
     assert body["role_words"] == ROLE_WORDS
     assert [d["key"] for d in body["departments"]] == ["inbox", "operations", "affiliates", "production"]
     # Production alone offers QC (ADR 0076); the others keep their four.
-    assert [level["level"] for level in body["departments"][3]["levels"]] == ["none", "viewer", "qc", "staff", "manager"]
+    assert [level["level"] for level in body["departments"][3]["levels"]] == ["none", "viewer", "staff", "manager"]
     inbox = body["departments"][0]
     assert inbox["name"] == "Inbox"
     assert inbox["levels"] == [

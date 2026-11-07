@@ -116,20 +116,21 @@ def test_staff_without_production_are_refused_in_the_old_shape(owner):
 
 
 @pytest.mark.parametrize(
-    ("role", "shown", "label"),
+    ("role", "shown", "label", "checks"),
     [
-        ("production_viewer", "viewer", None),
-        ("production_qc", "qc", None),
-        ("production_staff", "production", None),
-        ("production_manager", "admin", "Production manager"),
+        ("production_viewer", "viewer", None, None),
+        # ADR 0077: staff keep the staff screens and get the QC checklist.
+        ("production_staff", "production", "Production staff", True),
+        ("production_manager", "admin", "Production manager", None),
     ],
 )
-def test_each_level_is_shown_to_the_screens_as_an_old_role(owner, role, shown, label):
+def test_each_level_is_shown_to_the_screens_as_an_old_role(owner, role, shown, label, checks):
     person = _person(f"{role}@example.com", role, name="Lina")
     user = person.get("/api/production/session").json()["user"]
     assert user["role"] == shown
     assert user["name"] == "Lina"
     assert user.get("roleLabel") == label
+    assert user.get("canCheckQc") == checks
 
 
 def test_the_owner_is_the_old_admin(owner):
@@ -322,12 +323,13 @@ def test_marking_a_sample_done_and_editing_clears_it(owner):
     assert state["samples"][0]["updates"] == 3
 
 
-def test_qc_needs_the_qc_level_and_a_note_on_a_failure(owner):
+def test_staff_record_qc_a_viewer_does_not_and_a_failure_needs_a_note(owner):
+    """ADR 0077: the people who produce are the people who check."""
     _seed()
-    staff = _person("staff@example.com", "production_staff")
-    qc = _person("qc@example.com", "production_qc")
+    viewer = _person("viewer@example.com", "production_viewer")
+    qc = _person("staff@example.com", "production_staff")
     check = {"step": "cutting", "item": 1, "result": "Fail", "notes": ""}
-    assert _act(staff, action="qc_check", recordId="807", payload=check).status_code == 403
+    assert _act(viewer, action="qc_check", recordId="807", payload=check).status_code == 403
     refused = _act(qc, action="qc_check", recordId="807", payload=check)
     assert refused.json()["error"] == "Add a note explaining the failure or why this check does not apply"
     saved = _act(qc, action="qc_check", recordId="807", payload={**check, "notes": "Short"})
@@ -440,10 +442,11 @@ def test_documents_are_listed_after_upload(owner, bucket):
 # ── Levels and the screens' own lists ─────────────────────────────────────────
 
 
-def test_production_offers_a_qc_level_and_the_others_do_not():
-    assert set(DEPARTMENT_LEVELS["production"]) == {"viewer", "qc", "staff", "manager"}
-    assert all("qc" not in levels for name, levels in DEPARTMENT_LEVELS.items() if name != "production")
-    assert level_in("production", {"production_qc"}) == "qc"
+def test_production_offers_viewer_staff_and_manager_and_no_qc_level():
+    """ADR 0077: QC is part of staff, not a level of its own."""
+    assert set(DEPARTMENT_LEVELS["production"]) == {"viewer", "staff", "manager"}
+    assert all("qc" not in levels for levels in DEPARTMENT_LEVELS.values())
+    assert level_in("production", {"production_staff"}) == "staff"
     assert access_words({"production_manager", "customer_service"}) == "Production manager · Inbox staff"
 
 
@@ -598,7 +601,7 @@ def test_an_upload_of_no_stated_size_is_refused(owner, bucket):
 
 def test_a_document_cannot_pass_as_a_photo(owner, bucket):
     _seed()
-    qc = _person("qc@example.com", "production_qc")
+    qc = _person("staff@example.com", "production_staff")
     saved = qc.post(
         "/api/production/documents",
         data={"module": "Samples", "recordId": "SMP-1", "documentType": "Sample photo"},

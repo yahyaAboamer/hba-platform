@@ -5,18 +5,17 @@
  */
 import { roleWords } from "../../lib/api";
 
-export type Level = "none" | "viewer" | "qc" | "staff" | "manager";
+export type Level = "none" | "viewer" | "staff" | "manager";
 
 export const LEVEL_WORDS: Record<Level, string> = {
   none: "No access",
   viewer: "Viewer",
-  qc: "QC",
   staff: "Staff",
   manager: "Manager",
 };
 
-/** "qc" is Production's alone (ADR 0076); a department shows only the levels the server lists for it. */
-export const LEVELS: Level[] = ["none", "viewer", "qc", "staff", "manager"];
+/** A department shows only the levels the server lists for it. Production's "qc" went with ADR 0077. */
+export const LEVELS: Level[] = ["none", "viewer", "staff", "manager"];
 
 export type DepartmentLevel = { level: Level; role: string | null; offered: boolean };
 export type Department = { key: string; name: string; levels: DepartmentLevel[] };
@@ -119,9 +118,8 @@ export const ROLE_BLURB: Record<string, string> = {
   content_manager: "Looks up models, records targets and sets pay terms",
   affiliate_manager: "Runs models and targets, and approves pay",
   production_viewer: "Reads Production",
-  production_qc: "Records quality checks",
-  production_staff: "Runs orders, tasks and samples",
-  production_manager: "Runs Production, its QC and suppliers",
+  production_staff: "Runs orders, tasks and samples, and records quality checks",
+  production_manager: "Runs Production and its suppliers",
 };
 
 /** *Inbox staff · Affiliates manager*, from the roles when the server sent no words. */
@@ -132,7 +130,7 @@ export function accessWordsOf(roles: string[]): string {
 
 /** The level a person holds in a department: the highest whose role they hold. */
 export function levelIn(department: Department, roles: string[]): Level {
-  for (const level of ["manager", "staff", "qc", "viewer"] as Level[]) {
+  for (const level of ["manager", "staff", "viewer"] as Level[]) {
     const entry = department.levels.find((candidate) => candidate.level === level);
     if (entry?.role && roles.includes(entry.role)) return level;
   }

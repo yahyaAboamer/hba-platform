@@ -199,7 +199,6 @@ def test_the_expected_roles_exist_and_no_others():
         "affiliate",
         # Production's levels (ADR 0076, decision 5).
         "production_viewer",
-        "production_qc",
         "production_staff",
         "production_manager",
     }
