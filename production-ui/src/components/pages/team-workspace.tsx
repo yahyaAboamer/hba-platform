@@ -41,7 +41,7 @@ export function OrderQcPage({orders,checks,user,refresh}: {orders:ProductionOrde
   const [selected,setSelected]=useState("");
   const order=orders.find(order=>order.code===selected || order.legacyCode===selected) ?? orders[0];
   const code=order?.code || "";
-  const canEdit=user.role==="qc" || user.role==="admin";
+  const canEdit=user.role==="qc" || user.role==="admin" || !!user.canCheckQc;
   async function save(check:QcCheck) {
     const response=await fetch("/api/production/actions",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"qc_check",recordId:code,payload:check})});
     const result=await response.json() as {error?:string};if(!response.ok) throw new Error(result.error || "Could not save check");await refresh();

@@ -495,7 +495,6 @@ def test_the_roster_says_which_roles_you_may_invite(client):
         "customer_service",
         "operations_manager",
         "production_manager",
-        "production_qc",
         "production_staff",
         "production_viewer",
     ]
@@ -598,7 +597,6 @@ def test_the_roster_says_what_each_access_can_do(client):
         "customer_service",
         "operations_manager",
         "production_manager",
-        "production_qc",
         "production_staff",
         "production_viewer",
     }

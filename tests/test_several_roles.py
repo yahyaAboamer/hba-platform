@@ -87,8 +87,8 @@ GRANTED_SINCE: dict[str, frozenset[str]] = {
 ADDED_SINCE: dict[str, frozenset[str]] = {
     # ADR 0076: Production's levels (owner, 7 November 2026).
     "production_viewer": frozenset({P.PRODUCTION_VIEW}),
-    "production_qc": frozenset({P.PRODUCTION_VIEW, P.PRODUCTION_QC}),
-    "production_staff": frozenset({P.PRODUCTION_VIEW, P.PRODUCTION_EDIT}),
+    # ADR 0077 (owner, 7 November 2026): staff also record QC; QC is no role.
+    "production_staff": frozenset({P.PRODUCTION_VIEW, P.PRODUCTION_EDIT, P.PRODUCTION_QC}),
     "production_manager": frozenset(
         {P.PRODUCTION_VIEW, P.PRODUCTION_EDIT, P.PRODUCTION_QC, P.PRODUCTION_SUPPLIERS}
     ),

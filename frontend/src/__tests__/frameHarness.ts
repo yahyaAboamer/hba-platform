@@ -45,7 +45,7 @@ export const HELD = {
   customer_service: { roles: ["customer_service"], permissions: ["inbox.use", "khazenly.use"] },
   model: { roles: ["affiliate"], permissions: [] as string[] },
   // Production's staff level (ADR 0076): Production and nothing else.
-  production_staff: { roles: ["production_staff"], permissions: ["production.view", "production.edit"] },
+  production_staff: { roles: ["production_staff"], permissions: ["production.view", "production.edit", "production.qc"] },
 } as const;
 
 export type Kind = keyof typeof HELD;

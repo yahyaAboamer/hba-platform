@@ -59,18 +59,24 @@ class Person:
     def view(self) -> dict:
         """The old `TeamUser`: its four roles decide what the screens offer.
 
-        The manager edits and checks QC, which only the old owner account
+        The manager handles suppliers, which only the old owner account
         could; the screens are told "admin" with the manager's own label, and
-        the server still refuses what only the owner may do.
+        the server still refuses what only the owner may do. Staff also
+        record QC checks (ADR 0077): they stay "production" and the screens
+        are told `canCheckQc`, so they get the checklist without the
+        manager's supplier and settings controls.
         """
         user: dict = {"username": self.user.email, "name": self.name}
         if OWNER_ROLE in self.roles:
             user["role"] = "admin"
-        elif Permission.PRODUCTION_EDIT in self.held and Permission.PRODUCTION_QC in self.held:
+        elif Permission.PRODUCTION_SUPPLIERS in self.held:
             user["role"] = "admin"
             user["roleLabel"] = "Production manager"
         elif Permission.PRODUCTION_EDIT in self.held:
             user["role"] = "production"
+            user["roleLabel"] = "Production staff"
+            if Permission.PRODUCTION_QC in self.held:
+                user["canCheckQc"] = True
         elif Permission.PRODUCTION_QC in self.held:
             user["role"] = "qc"
         else:

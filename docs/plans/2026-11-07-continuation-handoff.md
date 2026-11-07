@@ -15,7 +15,7 @@ Re-read the remote before describing it: `git ls-remote --heads origin main prod
 | | |
 |---|---|
 | **Code on both sites** | `origin/main` = `origin/production` = `32f6936` (PR #158), deployed 7 November on the owner's order ("merge after CI … deploy to staging and production"). This handoff's own docs-only PR follows it on both |
-| **Migration head** | `d1b4f0a10025` (Production's tables; the role checks gain Production's four levels), applied on staging and production 7 November. Joins the release gate's migration/rollback rehearsal list; rehearsed up/down/up on a disposable database |
+| **Migration head** | `e3c5a9d20026` (ADR 0077: Production QC folded into Production staff; the role checks lose `production_qc`), on its pull request; before it `d1b4f0a10025` (Production's tables; the role checks gain Production's four levels), applied on staging and production 7 November. Both join the release gate's migration/rollback rehearsal list; each rehearsed up/down/up on a disposable database (`e3c5a9d20026` with QC holders and a QC invitation seeded) |
 | **Production's data** | Imported on staging and on production 7 November from the 2 November export plus the 4 task confirmations of 6 November read from the live site. Both reconciled count by count and field by field, and compared with the live site's own `/api/state`: every order, task, sample, supplier and product equal, in the same order |
 | **Railway settings** | As in the 6 November handoff: `.railway/railway.ts` is the source; run `railway config plan` and read every line before any `apply` |
 | **Branches** | none open |
@@ -141,7 +141,7 @@ console errors; nothing changed.
 - Uploaded photos now need a signed-in Production holder; the old site served
   them to anyone with the link.
 - `update_task` refuses a date that is not one (the old server stored it).
-- A confidential document is listed only to Production QC, staff, manager and
+- A confidential document is listed only to Production staff, manager and
   the owner (the old server listed every document to anyone).
 - An upload must state its size (`Content-Length`); one that does not is refused.
 - The import's `--replace` refuses once Production holds uploaded files.

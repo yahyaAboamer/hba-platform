@@ -101,12 +101,12 @@ describe("Settings → Team and access, the page", () => {
       .toEqual(["Inbox access", "Operations access", "Affiliates access", "Production access"]);
   });
 
-  it("offers QC in Production alone (ADR 0076)", async () => {
+  it("offers the same three levels in Production, QC being part of Staff (ADR 0077)", async () => {
     renderAt("/settings/team?person=2");
     await screen.findByRole("heading", { name: "Mona" });
     const levels = (name: string) => Array.from(screen.getByRole("radiogroup", { name }).querySelectorAll("button"))
       .map((button) => button.textContent?.replace(" Not offered yet", ""));
-    expect(levels("Production access")).toEqual(["No access", "Viewer", "QC", "Staff", "Manager"]);
+    expect(levels("Production access")).toEqual(["No access", "Viewer", "Staff", "Manager"]);
     expect(levels("Inbox access")).toEqual(["No access", "Viewer", "Staff", "Manager"]);
   });
 

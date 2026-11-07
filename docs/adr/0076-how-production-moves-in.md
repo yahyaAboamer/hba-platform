@@ -3,6 +3,7 @@
 **Status:** Accepted — owner, 7 November 2026 (Batch 4.1 plan approved; technical choices delegated to the lead engineer).
 **Date:** 2026-11-07
 **Amends:** ADR 0069 decisions 2, 3, 4 and 8. Everything else in ADR 0069 stands.
+**Amended by:** ADR 0077 (decision 5: Staff also record QC checks; QC is no longer a level).
 
 ## Context
 
