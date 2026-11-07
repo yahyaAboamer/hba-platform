@@ -121,6 +121,9 @@ console errors; nothing changed.
 
 ## Batch 4.1: known, accepted differences
 
+- In the activity feed, lines the old site wrote in the same second may sit in
+  a different order within that minute (11 lines of 28 October today); the
+  old database's order for them was not a sort that can be repeated.
 - Three imported orders hold a dash as their dates; they read "—" as before,
   but the hidden ISO copy is empty instead of a dash.
 - Uploaded photos now need a signed-in Production holder; the old site served

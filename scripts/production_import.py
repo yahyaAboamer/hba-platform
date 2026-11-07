@@ -17,6 +17,10 @@ outside the repository**, and so do the two fixture files made from it.
   day. Rows made in the same second were listed in an order only its
   database knew; the import records each row's place so the lists read
   exactly as they did.
+- Task confirmations made on the old site after the export are taken from
+  `--live-state` too (`newer_confirmations`): the task, who, when to the
+  second, its stage and progress, and its activity line. Any other later change refuses the import,
+  so a stale export is never loaded silently.
 - `--check-only` writes nothing and compares the database with the export.
 - Either way it ends with the reconciliation: every kind counted on both
   sides, and every order, task, sample, supplier and product compared field
@@ -31,6 +35,7 @@ which one-time fixes had run, and the empty tables nothing writes.
 import argparse
 import json
 import sys
+import uuid
 from datetime import date, datetime, timezone
 from decimal import Decimal
 from pathlib import Path
@@ -102,6 +107,40 @@ def task_confirmations(activity: list[dict]) -> dict[str, tuple[str, dict, str]]
         if row["action"] in ("confirm_task", "reopen_task"):
             latest[row["record_id"]] = (row["action"], parse_json(row.get("new_value_json"), {}), row["created_at"])
     return latest
+
+
+def newer_confirmations(tables: dict, live: dict) -> tuple[list[dict], list[str]]:
+    """Confirmations the old site holds that the export does not.
+
+    The export ends at its newest activity; the live `/api/state` shows each
+    task's confirmation to the second and its activity line. Only a task
+    confirmed after the export can be carried: a task the export has confirmed
+    and the site no longer does (reopened since) cannot be dated, so it is
+    reported and the import refuses.
+    """
+    exported = task_confirmations(tables["activity_logs"])
+    newest = max((moment(row["created_at"]) for row in tables["activity_logs"]), default=None)
+    lines = {
+        (entry["record"], entry["action"]): entry for entry in reversed(live.get("activity", []))
+    }
+    carried, refused = [], []
+    for task in live.get("tasks", []):
+        action, _details, at = exported.get(task["id"], ("", {}, ""))
+        was = action == "confirm_task"
+        if task.get("confirmed") == was and (not was or moment(at) == moment(task.get("confirmedAt"))):
+            continue
+        when = moment(task.get("confirmedAt")) if task.get("confirmed") else None
+        if when is None or (newest is not None and when <= newest):
+            refused.append(f"task {task['id']}: its confirmation changed after the export and cannot be dated")
+            continue
+        line = lines.get((task["id"], "confirm task"), {})
+        carried.append({
+            "task": task["id"], "at": when, "actor": task.get("confirmedBy") or "",
+            "summary": line.get("next") or "",
+            # Confirming moved the task to Done at 100 (as `confirm_task` does here).
+            "stage": task.get("stage"), "progress": task.get("progress"),
+        })
+    return carried, refused
 
 
 def import_all(db: Session, tables: dict, lists: dict, texts: dict, live: dict) -> None:
@@ -232,6 +271,18 @@ def import_all(db: Session, tables: dict, lists: dict, texts: dict, live: dict) 
                 details=parse_json(row.get("new_value_json"), {}), created_at=moment(row["created_at"]),
             )
         )
+    carried, _refused = newer_confirmations(tables, live)
+    db.flush()
+    for entry in carried:
+        task = db.get(ProductionTask, entry["task"])
+        task.confirmed_at, task.confirmed_by = entry["at"], entry["actor"]
+        task.stage, task.progress, task.updated_at = entry["stage"], entry["progress"], entry["at"]
+        db.add(
+            ProductionActivity(
+                id=str(uuid.uuid4()), action="confirm_task", module="Production Tasks", record_id=entry["task"],
+                details={"actor": entry["actor"], "summary": entry["summary"]}, created_at=entry["at"],
+            )
+        )
     db.add_all(
         [
             ProductionFixture(key="lists", value=lists),
@@ -249,9 +300,10 @@ def _count(db: Session, model, *where) -> int:
     return db.scalar(select(func.count()).select_from(model).where(*where)) or 0
 
 
-def reconcile(db: Session, tables: dict, lists: dict) -> list[str]:
-    """Every difference between the export and the database, in words."""
+def reconcile(db: Session, tables: dict, lists: dict, live: dict) -> list[str]:
+    """Every difference between the export (plus what the live site added) and the database, in words."""
     problems: list[str] = []
+    carried, _refused = newer_confirmations(tables, live)
     settings = tables["system_settings"]
     pairs = [
         ("orders", len(tables["production_orders"]), _count(db, ProductionOrder)),
@@ -269,7 +321,8 @@ def reconcile(db: Session, tables: dict, lists: dict) -> list[str]:
             if r["category"] == "Order Phases" and parse_json(r["value_json"], {}).get("phaseId")
         ),
          _count(db, ProductionOrder, ProductionOrder.phase_id.is_not(None))),
-        ("activity", len(tables["activity_logs"]), _count(db, ProductionActivity)),
+        ("activity (export + later confirmations)", len(tables["activity_logs"]) + len(carried),
+         _count(db, ProductionActivity)),
         ("QC checks", len(tables["order_qc_checks"]), _count(db, ProductionQcCheck)),
         ("QC inspections (never written)", len(tables["qc_inspections"]), 0),
         ("documents and photos", len(tables["documents"]), _count(db, ProductionDocument)),
@@ -328,10 +381,26 @@ def reconcile(db: Session, tables: dict, lists: dict) -> list[str]:
         ("forecast_completion_date", "forecast_completion_date", day),
         ("size_breakdown_json", "size_breakdown", lambda v: parse_json(v or "{}", {})),
     ])
-    compare("task", tables["production_tasks"], ProductionTask, [
+    later = {entry["task"]: entry for entry in carried}
+    task_rows = [
+        {**row, "stage": later[row["id"]]["stage"], "progress": later[row["id"]]["progress"]} if row["id"] in later else row
+        for row in tables["production_tasks"]
+    ]
+    compare("task", task_rows, ProductionTask, [
         *text, ("stage", "stage", None), ("progress", "progress", None), ("owner", "owner", None),
         ("deadline", "deadline", day), ("deleted_at", "deleted_at", moment),
     ])
+    here_tasks = {row.id: row for row in db.scalars(select(ProductionTask))}
+    for task in live.get("tasks", []):
+        mine = here_tasks.get(task["id"])
+        if mine is None:
+            problems.append(f"task {task['id']}: on the live site, missing here")
+            continue
+        expected = (moment(task.get("confirmedAt")), task.get("confirmedBy")) if task.get("confirmed") else (None, None)
+        if (mine.confirmed_at, mine.confirmed_by if mine.confirmed_at else None) != expected:
+            problems.append(f"task {task['id']}: confirmation differs from the live site")
+        if (mine.stage, mine.progress) != (task.get("stage"), task.get("progress")):
+            problems.append(f"task {task['id']}: stage or progress differs from the live site")
     compare("sample", tables["samples_tracker"], ProductionSample, [
         *text, ("stage", "stage", None), ("progress", "progress", None), ("supplier", "supplier", None),
         ("updates", "updates", None), ("deadline", "deadline", day),
@@ -354,6 +423,13 @@ def main() -> int:
     lists = json.loads(args.lists.read_text(encoding="utf-8"))
     texts = json.loads(args.texts.read_text(encoding="utf-8"))
     live = json.loads(args.live_state.read_text(encoding="utf-8"))
+    carried, refused = newer_confirmations(tables, live)
+    if refused:
+        print("The live site changed after the export in a way the import cannot carry; take a fresh export.")
+        for line in refused:
+            print(" -", line)
+        return 2
+    print(f"Task confirmations made after the export, taken from the live site: {len(carried)}")
     if tables["documents"]:
         print("The export lists uploaded files; move them into the bucket first (not handled here).")
         return 2
@@ -371,7 +447,7 @@ def main() -> int:
                 for model in TABLES:
                     db.execute(delete(model))
             import_all(db, tables, lists, texts, live)
-        problems = reconcile(db, tables, lists)
+        problems = reconcile(db, tables, lists, live)
         if problems:
             db.rollback()
             print(f"\n{len(problems)} difference(s); nothing was written:" if not args.check_only else "")

@@ -475,6 +475,81 @@ def test_an_import_that_does_not_reconcile_writes_nothing(fresh_database, tmp_pa
     assert module.main() == 2
 
 
+def _import_module():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("production_import", ROOT / "scripts/production_import.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _run_import(module, tmp_path, monkeypatch, tables, live):
+    for name, content in {"export.json": {"tables": tables}, "lists.json": {}, "texts.json": {},
+                          "live.json": live}.items():
+        (tmp_path / name).write_text(json.dumps(content), encoding="utf-8")
+    monkeypatch.setattr("sys.argv", ["x", "--export", str(tmp_path / "export.json"), "--lists",
+                                     str(tmp_path / "lists.json"), "--texts", str(tmp_path / "texts.json"),
+                                     "--live-state", str(tmp_path / "live.json")])
+    return module.main()
+
+
+def _one_task_export(*, confirmed: bool) -> dict:
+    tables = {name: [] for name in (
+        "system_settings", "supplier_categories", "suppliers", "products", "production_orders",
+        "production_tasks", "activity_logs", "samples_tracker", "sample_status", "order_qc_checks",
+        "qc_inspections", "documents", "production_costs", "supplier_invoices", "supplier_payments",
+        "production_order_stages", "stage_updates",
+    )}
+    tables["production_tasks"] = [{
+        "id": "t1", "name": "Cut fabric", "supplier": "Supplier A", "supplier_type": "Cutting", "stage": "Preparation",
+        "next_action": "", "owner": "Person A", "action_date": "2026-10-01", "deadline": "2026-10-09", "progress": 20,
+        "priority": "Normal", "created_at": "2026-10-01 09:00:00", "updated_at": None, "deleted_at": None,
+    }]
+    tables["activity_logs"] = [{"id": "a1", "action": "update_task", "module": "Production Tasks", "record_id": "t1",
+                                "old_value_json": None, "new_value_json": json.dumps({"actor": "Person A"}),
+                                "created_at": "2026-10-28 01:00:00"}]
+    if confirmed:
+        tables["production_tasks"][0].update(stage="Done", progress=100)
+        tables["activity_logs"].append({
+            "id": "a2", "action": "confirm_task", "module": "Production Tasks", "record_id": "t1",
+            "old_value_json": None, "new_value_json": json.dumps({"actor": "Person A"}),
+            "created_at": "2026-10-28 02:00:00"})
+    return tables
+
+
+def _live_task(**fields) -> dict:
+    task = {"id": "t1", "name": "Cut fabric", "confirmed": False, "confirmedAt": "", "confirmedBy": "",
+            "stage": "Preparation", "progress": 20}
+    task.update(fields)
+    return task
+
+
+def test_a_confirmation_made_after_the_export_is_taken_from_the_live_site(fresh_database, tmp_path, monkeypatch):
+    live = {
+        "tasks": [_live_task(confirmed=True, confirmedAt="2026-11-06 15:00:48", confirmedBy="Person B",
+                             stage="Done", progress=100)],
+        "activity": [{"user": "Person B", "action": "confirm task", "module": "Production Tasks", "record": "t1",
+                      "old": "—", "next": "Cut fabric moved to Confirmed", "time": "06 Nov, 17:00"}],
+    }
+    assert _run_import(_import_module(), tmp_path, monkeypatch, _one_task_export(confirmed=False), live) == 0
+    with SessionLocal() as db:
+        task = db.get(ProductionTask, "t1")
+        assert (task.stage, task.progress, task.confirmed_by) == ("Done", 100, "Person B")
+        assert task.confirmed_at == datetime(2026, 11, 6, 15, 0, 48, tzinfo=timezone.utc)
+        line = db.scalar(select(ProductionActivity).where(ProductionActivity.action == "confirm_task"))
+        assert line.details == {"actor": "Person B", "summary": "Cut fabric moved to Confirmed"}
+        assert line.created_at == task.confirmed_at
+
+
+def test_a_later_change_the_import_cannot_date_refuses_it(fresh_database, tmp_path, monkeypatch):
+    # Confirmed in the export, no longer confirmed on the site: reopened when, nobody can say.
+    live = {"tasks": [_live_task()], "activity": []}
+    assert _run_import(_import_module(), tmp_path, monkeypatch, _one_task_export(confirmed=True), live) == 2
+    with SessionLocal() as db:
+        assert db.get(ProductionTask, "t1") is None
+
+
 def test_a_confidential_document_is_not_listed_to_a_viewer(owner, bucket):
     _seed()
     owner.post("/api/production/documents", data={"module": "Documents", "recordId": "general", "confidential": "true"},
