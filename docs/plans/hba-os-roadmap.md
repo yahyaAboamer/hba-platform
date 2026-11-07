@@ -109,12 +109,13 @@ Phase 3.
 | Source code, data and files exported from ChatGPT | Completed: export of 2 November (site version 22), kept outside the repository |
 | Production-frame mockup approved | Completed |
 | Read the exported code in full | Completed 7 November; plan approved; build decisions in ADR 0076 |
-| Production's screens at `/production` in their own build (`production-ui/`) | Completed in code (Batch 4.1 PR) |
-| The platform answers Production's requests from `production_` tables; audit trail; files in the bucket | Completed in code; its state answer matched the live site field by field on 7 November |
-| Production levels in Team and access (viewer, QC, staff, manager) | Completed in code |
-| HBA's frame around Production (the strip) | Completed in code |
+| Production's screens at `/production` in their own build (`production-ui/`) | Completed: PRs #156–#158, live on staging and production 7 November |
+| The platform answers Production's requests from `production_` tables; audit trail; files in the bucket | Completed: live 7 November; its state answer matches the live site field by field |
+| Production levels in Team and access (viewer, QC, staff, manager) | Completed: live 7 November; the team's levels are the owner's to give |
+| HBA's frame around Production (the strip) | Completed: live 7 November |
 | Supplier accounts that reach only their own work | Pending: Batch 4.1b (ADR 0076 decision 8) |
-| Final export, import and count-by-count reconciliation on staging, then production | Pending: after merge; `scripts/production_import.py` |
+| Import and count-by-count reconciliation on staging, then production | Completed 7 November: 2 November export plus the 6 November confirmations from the live site; later ChatGPT edits are re-entered by the team (owner's plan) |
+| Switch-over: the team works in HBA; the ChatGPT site retired | Pending: the owner's word |
 | Side-by-side check on staging, everyone switched, ChatGPT copy retired | Pending |
 | Production's costs joined to Finance | Deferred: its own decision (ADR 0076 decision 7 keeps the target cost, in piastres) |
 
