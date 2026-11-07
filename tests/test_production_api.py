@@ -492,3 +492,17 @@ def test_an_upload_of_no_stated_size_is_refused(owner, bucket):
         headers={"content-type": "multipart/form-data; boundary=x", "transfer-encoding": "chunked"},
     )
     assert answer.status_code == 413
+
+
+def test_a_document_cannot_pass_as_a_photo(owner, bucket):
+    _seed()
+    qc = _person("qc@example.com", "production_qc")
+    saved = qc.post(
+        "/api/production/documents",
+        data={"module": "Samples", "recordId": "SMP-1", "documentType": "Sample photo"},
+        files={"file": ("x.png", b"<html>not a photo</html>", "image/png")},
+    )
+    assert saved.status_code == 201
+    assert saved.json()["document"]["documentType"] == "Other"
+    assert owner.get("/api/production/sample-photos", params={"sample": "SMP-1"}).json()["photos"] == []
+    assert owner.get("/api/production/state").json()["samples"][0]["photoCount"] == 0

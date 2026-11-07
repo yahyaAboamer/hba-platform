@@ -277,6 +277,7 @@ def _samples(db: Session) -> tuple[list[dict], dict[str, bool]]:
         .where(
             ProductionDocument.module == "Samples",
             ProductionDocument.document_type == "Sample photo",
+            ProductionDocument.storage_key.startswith("production/sample-photos/"),
             ProductionDocument.confidential.is_(False),
             ProductionDocument.deleted_at.is_(None),
         )

@@ -59,6 +59,10 @@ def _iso(moment: datetime) -> str:
     return moment.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
+#: What a document upload may not call itself: only `save_photo` files photos.
+RESERVED_TYPES = frozenset(meta["type"] for meta in KINDS.values())
+
+
 def photo_view(row: ProductionDocument, kind: str) -> dict:
     return {
         "id": row.id,
@@ -93,6 +97,8 @@ def list_photos(db: Session, kind: str, record_id: str) -> list[dict]:
             ProductionDocument.module == meta["module"],
             ProductionDocument.document_type == meta["type"],
             ProductionDocument.record_id == record_id,
+            # Only files `save_photo` stored count as photos.
+            ProductionDocument.storage_key.startswith(f"production/{meta['prefix']}/"),
             ProductionDocument.confidential.is_(False),
             ProductionDocument.deleted_at.is_(None),
         )
@@ -109,6 +115,7 @@ def photo_for_download(db: Session, kind: str, photo_id: str) -> ProductionDocum
         .join(parent, parent.id == ProductionDocument.record_id)
         .where(
             ProductionDocument.id == photo_id,
+            ProductionDocument.storage_key.startswith(f"production/{meta['prefix']}/"),
             ProductionDocument.module == meta["module"],
             ProductionDocument.document_type == meta["type"],
             ProductionDocument.confidential.is_(False),
@@ -179,6 +186,10 @@ def save_document(db: Session, *, filename: str, content: bytes, content_type: s
     module = module.strip()[:80] or "Documents"
     record_id = record_id.strip()[:180] or "general"
     document_type = document_type.strip()[:80] or "Other"
+    if document_type in RESERVED_TYPES:
+        # A document never passes as a photo: photos are checked and filed by
+        # `save_photo` alone.
+        document_type = "Other"
     key = (
         f"production/documents/{_slug(module.lower().replace(' ', '-'))}/{_slug(record_id)}/"
         f"{document_id}-{_slug(filename, 120)}"
