@@ -282,7 +282,7 @@ function LevelControl({ dept, current, locked, onChoose }: {
         if (event.key === "ArrowRight" || event.key === "ArrowDown") move(event, 1);
         if (event.key === "ArrowLeft" || event.key === "ArrowUp") move(event, -1);
       }}>
-      {LEVELS.map((level) => {
+      {LEVELS.filter((level) => dept.levels.some((candidate) => candidate.level === level)).map((level) => {
         const entry = dept.levels.find((candidate) => candidate.level === level);
         const offered = entry?.offered ?? false;
         return (

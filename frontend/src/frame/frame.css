@@ -188,3 +188,102 @@
 @media (prefers-reduced-motion: reduce) {
   .frame__dept, .frame__sections a, .frame__chev { transition: none; }
 }
+
+/* ── Production's frame: HBA's strip, then Production (ADR 0076) ──
+ * Ported from `docs/design/hba-os-production-frame-2026-10-25.html`
+ * (`.framed .strip .flyout .hbar`). The strip uses HBA's dark tokens whatever
+ * the theme, because Production has only a dark look; they are written here
+ * as the mockup writes them, so a light theme cannot reach the strip. */
+.frame--strip {
+  --s-bg: #15171a; --s-rule: #23272b; --s-raise: #1d2126; --s-ink: #ecefea; --s-quiet: #a7ada6;
+  --s-faint: #8a918a; --s-accent: var(--accent-strip); --s-red: #e2705f; --s-badge: #2d3237;
+  --s-float: 0 16px 40px rgba(0, 0, 0, .6), 0 0 0 1px rgba(236, 239, 234, .08);
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  grid-template-areas: "strip own";
+  height: 100dvh;
+  background: #090b09;
+}
+.strip-wrap { grid-area: strip; position: relative; min-height: 0; }
+.strip {
+  display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; padding: 12px 0;
+  background: var(--s-bg); border-right: 1px solid var(--s-rule); color: var(--s-quiet);
+}
+.strip__mark {
+  display: grid; place-items: center; width: 30px; height: 30px; margin-bottom: 8px;
+  border: 1px solid var(--s-accent); border-radius: var(--radius-sm, 4px); color: var(--s-accent);
+  font-size: 12px; text-decoration: none;
+}
+.strip__btn {
+  position: relative; display: grid; place-items: center; width: 44px; height: 44px; border: 0;
+  border-radius: var(--radius, 8px); background: none; color: var(--s-quiet); cursor: pointer;
+  transition: background-color .12s, color .12s;
+}
+.strip__btn:hover, .strip__btn[aria-current="page"], .strip__btn[aria-expanded="true"] {
+  background: var(--s-raise); color: var(--s-ink);
+}
+.strip__btn .frame__ic { width: 19px; height: 19px; }
+.strip__rule { width: 28px; height: 1px; margin: 4px 0; background: var(--s-rule); }
+.strip__spacer { flex: 1; }
+.strip__badge {
+  position: absolute; top: 5px; right: 3px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px;
+  background: var(--s-badge); color: var(--s-ink); font-size: 10.5px; line-height: 16px; text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.strip__dot { position: absolute; top: 9px; right: 9px; width: 7px; height: 7px; border-radius: 50%; background: var(--s-quiet); }
+.strip__dot--red { background: var(--s-red); }
+.strip__avatar {
+  display: grid; place-items: center; width: 30px; height: 30px; margin-top: 6px; border: 1px solid var(--s-rule);
+  border-radius: 50%; background: var(--accent-strip-soft); color: var(--s-accent); font-size: 11.5px;
+}
+.strip__flyout {
+  position: absolute; top: 0; bottom: 0; left: 64px; z-index: 30; display: flex; flex-direction: column; width: 232px;
+  background: var(--s-bg); border-right: 1px solid var(--s-rule); box-shadow: var(--s-float); color: var(--s-quiet);
+}
+.strip__flyout-top { display: flex; align-items: center; justify-content: space-between; padding: 10px 6px 8px 16px; }
+.strip__brand { display: flex; align-items: center; gap: 9px; }
+.strip__brand .strip__mark { margin: 0; }
+.strip__brand b { display: block; color: var(--s-ink); font-size: 14px; font-weight: 400; }
+.strip__brand small { display: block; margin-top: 2px; color: var(--s-faint); font-size: 11.5px; }
+.strip__close {
+  display: grid; place-items: center; width: 40px; height: 40px; border: 0; border-radius: var(--radius, 8px);
+  background: none; color: var(--s-quiet); cursor: pointer;
+}
+.strip__close:hover { background: var(--s-raise); color: var(--s-ink); }
+.strip__close .frame__ic { width: 18px; height: 18px; }
+.strip__flyout ul { margin: 0; padding: 6px 9px; list-style: none; }
+.strip__flyout li a {
+  display: flex; align-items: center; gap: 10px; min-height: 38px; margin-bottom: 2px; padding: 8px 11px;
+  border-radius: var(--radius, 8px); color: var(--s-quiet); font-size: 14px; text-decoration: none;
+}
+.strip__flyout li a:hover, .strip__flyout li a[aria-current="page"] { background: var(--s-raise); color: var(--s-ink); }
+.strip__flyout li a .frame__ic { width: 16px; height: 16px; flex: none; }
+.strip__flyout li a > span:not([class]) { flex: 1; }
+.strip__count {
+  min-width: 20px; padding: 1px 6px; border-radius: 999px; background: var(--s-badge); color: var(--s-ink);
+  font-size: 11.5px; text-align: center;
+}
+.strip__red { width: 7px; height: 7px; border-radius: 50%; background: var(--s-red); }
+.strip__who { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-top: 1px solid var(--s-rule); color: var(--s-ink); font-size: 13px; }
+.strip__who .strip__avatar { margin: 0; }
+.strip__who small { display: block; color: var(--s-faint); font-size: 11.5px; }
+.frame__own { grid-area: own; min-width: 0; min-height: 0; }
+.frame__production { display: block; width: 100%; height: 100%; border: 0; background: #090b09; }
+.strip__hbar {
+  grid-area: hbar; display: none; align-items: center; gap: 9px; height: 44px; padding: 0 6px 0 12px;
+  background: var(--s-bg); border-bottom: 1px solid var(--s-rule); color: var(--s-ink);
+}
+.strip__hbar .strip__mark { width: 26px; height: 26px; margin: 0; font-size: 11px; }
+.strip__hbar b { flex: 1; font-size: 13.5px; font-weight: 500; }
+.strip__hbar b small { color: var(--s-faint); font-weight: 400; }
+.strip__hbar-btn {
+  display: inline-flex; align-items: center; gap: 7px; min-height: 36px; padding: 0 10px;
+  border: 1px solid var(--s-rule); border-radius: var(--radius, 8px); background: none; color: var(--s-ink);
+  font-size: 13px; cursor: pointer;
+}
+.strip__hbar-btn .frame__ic { width: 15px; height: 15px; }
+@media (max-width: 800px) {
+  .frame--strip { grid-template-columns: minmax(0, 1fr); grid-template-areas: "hbar" "own"; grid-template-rows: 44px 1fr; }
+  .frame--strip .strip-wrap { display: none; }
+  .strip__hbar { display: flex; }
+}

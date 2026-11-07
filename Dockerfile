@@ -41,11 +41,20 @@ RUN python -m venv --copies /opt/venv \
 COPY frontend/package.json frontend/package-lock.json ./frontend/
 RUN cd frontend && npm ci
 
+# Production's screens have their own build and lockfile (ADR 0076). Their
+# packages came with code the team did not write, so none of them may run an
+# install script.
+COPY production-ui/package.json production-ui/package-lock.json ./production-ui/
+RUN cd production-ui && npm ci --ignore-scripts
+
 COPY . .
 
 # Vite is configured to write into app/web, which FastAPI serves as the shell.
 # It runs after the full copy because it needs the whole frontend source.
 RUN cd frontend && npm run build
+
+# Production's screens, into app/web_production (ADR 0076).
+RUN cd production-ui && npm run build
 
 ENV PATH="/opt/venv/bin:$PATH" \
     PYTHONUNBUFFERED=1

@@ -27,3 +27,7 @@ orders_audit.md
 
 # Railway IaC SDK, installed with `npm --prefix .railway ci`.
 .railway/node_modules/
+
+# Production's screens, built by production-ui (ADR 0076)
+app/web_production/
+production-ui/node_modules/

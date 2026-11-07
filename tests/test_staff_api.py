@@ -494,6 +494,10 @@ def test_the_roster_says_which_roles_you_may_invite(client):
         "content_manager",
         "customer_service",
         "operations_manager",
+        "production_manager",
+        "production_qc",
+        "production_staff",
+        "production_viewer",
     ]
 
 
@@ -593,6 +597,10 @@ def test_the_roster_says_what_each_access_can_do(client):
         "content_manager",
         "customer_service",
         "operations_manager",
+        "production_manager",
+        "production_qc",
+        "production_staff",
+        "production_viewer",
     }
     assert body["content_manager"] == sorted(permissions_for("content_manager"))
     # ADR 0067: the role is Operations alone; he holds the inbox (ADR 0059)

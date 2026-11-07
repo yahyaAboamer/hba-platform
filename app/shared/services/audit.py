@@ -125,6 +125,8 @@ DEPARTMENTS: dict[str, tuple[str, ...]] = {
         "adjustment.",
         "payout_destination.",
     ),
+    # Every change made on Production's screens (ADR 0076, decision 2).
+    "production": ("production.",),
 }
 
 #: Actions that belong to no one department: who may sign in and with what
@@ -205,6 +207,8 @@ KINDS: dict[str, tuple[str, ...]] = {
     "inbox": ("inbox.confirmation_resent", "inbox.answer_set"),
     # A Khazenly bulk-confirm file built from Operations (ADR 0071).
     "operations": ("order_ops.khazenly_file_built",),
+    # Every change made on Production's screens (ADR 0076).
+    "production": ("production.",),
 }
 
 #: Signing in and out: true, recorded, and the thing that buried every payment

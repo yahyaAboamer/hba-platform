@@ -189,7 +189,7 @@ def test_no_test_references_a_role_that_does_not_exist():
     assert unknown == {"wizard"}, f"tests reference unknown roles: {unknown - {'wizard'}}"
 
 
-def test_the_six_expected_roles_exist_and_no_others():
+def test_the_expected_roles_exist_and_no_others():
     assert VALID_ROLES == {
         "admin",
         "affiliate_manager",
@@ -197,6 +197,11 @@ def test_the_six_expected_roles_exist_and_no_others():
         "operations_manager",
         "customer_service",
         "affiliate",
+        # Production's levels (ADR 0076, decision 5).
+        "production_viewer",
+        "production_qc",
+        "production_staff",
+        "production_manager",
     }
 
 

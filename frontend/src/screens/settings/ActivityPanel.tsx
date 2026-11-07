@@ -27,6 +27,7 @@ const KIND_LABEL: Record<string, string> = {
   settings: "Settings",
   inbox: "Inbox",
   operations: "Operations",
+  production: "Production",
 };
 
 /** The kinds of entry a department page can show. */

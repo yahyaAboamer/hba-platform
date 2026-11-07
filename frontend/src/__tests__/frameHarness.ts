@@ -18,6 +18,7 @@ export const HELD = {
       "targets.record", "targets.manage", "targets.verify", "payroll.approve",
       "payroll.reopen", "payments.record", "invitations.send", "audit.view",
       "settings.manage", "order_ops.view", "inbox.use",
+      "production.view", "production.edit", "production.qc", "production.suppliers", "production.payments",
     ],
   },
   affiliate_manager: {
@@ -43,6 +44,8 @@ export const HELD = {
   // The Inbox, and of Operations only Khazenly (ADR 0072).
   customer_service: { roles: ["customer_service"], permissions: ["inbox.use", "khazenly.use"] },
   model: { roles: ["affiliate"], permissions: [] as string[] },
+  // Production's staff level (ADR 0076): Production and nothing else.
+  production_staff: { roles: ["production_staff"], permissions: ["production.view", "production.edit"] },
 } as const;
 
 export type Kind = keyof typeof HELD;

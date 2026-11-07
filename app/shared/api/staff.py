@@ -169,6 +169,7 @@ def _departments() -> list[dict]:
                     "offered": level == "none" or levels.get(level) is not None,
                 }
                 for level in LEVELS
+                if level == "none" or level in levels
             ],
         }
         for key, levels in DEPARTMENT_LEVELS.items()

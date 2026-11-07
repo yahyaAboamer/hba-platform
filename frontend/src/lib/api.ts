@@ -347,6 +347,10 @@ export const ROLE_WORDS: Record<string, string> = {
   customer_service: "Inbox staff",
   affiliate_manager: "Affiliates manager",
   content_manager: "Affiliates staff",
+  production_manager: "Production manager",
+  production_staff: "Production staff",
+  production_qc: "Production QC",
+  production_viewer: "Production viewer",
 };
 
 export function roleWords(role: string): string {

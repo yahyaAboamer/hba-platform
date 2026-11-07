@@ -1,6 +1,6 @@
 # 0069. Production keeps its own look, and its data moves into HBA's database
 
-**Status:** Accepted — owner, 25 October 2026. **Not built yet**; waits on the source export from ChatGPT.
+**Status:** Accepted — owner, 25 October 2026. Decisions 2, 3, 4 and 8 amended by ADR 0076 (7 November 2026), after the export was read.
 **Date:** 2026-10-25
 **Builds on:** ADR 0065, ADR 0066, ADR 0067. **Excepts itself from:** ADR 0068's shared look, and RULES.md's single palette (ADR 0039), by the owner's decision.
 

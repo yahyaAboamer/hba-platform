@@ -1,0 +1,36 @@
+{
+  "name": "hba-production-ui",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "build": "tsc --noEmit -p tsconfig.json && vite build",
+    "dev": "vite"
+  },
+  "dependencies": {
+    "@hookform/resolvers": "5.7.1",
+    "@tanstack/react-table": "8.21.3",
+    "date-fns": "4.4.0",
+    "lucide-react": "1.28.0",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "react-hook-form": "7.84.0",
+    "recharts": "3.10.1",
+    "xlsx": "0.18.5",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "4.2.1",
+    "@types/node": "22.19.19",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "6.0.2",
+    "postcss": "8.5.14",
+    "tailwindcss": "4.2.1",
+    "typescript": "5.9.3",
+    "vite": "8.0.13"
+  }
+}

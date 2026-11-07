@@ -106,13 +106,17 @@ Phase 3.
 | Task | Status |
 |---|---|
 | Site requires sign-in | Deferred: the owner retires the site once Production moves in |
-| Source code, data and files exported from ChatGPT | In progress: the owner is exporting (7 November), into `evidence/production-export-2026-11-07/` outside the repository |
+| Source code, data and files exported from ChatGPT | Completed: export of 2 November (site version 22), kept outside the repository |
 | Production-frame mockup approved | Completed |
-| Read the exported code in full | Pending: after the export |
-| The platform answers Production's five requests; data into HBA's database | Pending: after Batch 1.2 |
-| HBA sign-in for the team, supplier accounts | Pending: after Batch 1.2 |
-| Side-by-side check, data reconciled, everyone switched, ChatGPT copy retired | Pending |
-| Production's costing and payments meet the money rules | Deferred: its own decision before any money is recorded |
+| Read the exported code in full | Completed 7 November; plan approved; build decisions in ADR 0076 |
+| Production's screens at `/production` in their own build (`production-ui/`) | Completed in code (Batch 4.1 PR) |
+| The platform answers Production's requests from `production_` tables; audit trail; files in the bucket | Completed in code; its state answer matched the live site field by field on 7 November |
+| Production levels in Team and access (viewer, QC, staff, manager) | Completed in code |
+| HBA's frame around Production (the strip) | Completed in code |
+| Supplier accounts that reach only their own work | Pending: Batch 4.1b (ADR 0076 decision 8) |
+| Final export, import and count-by-count reconciliation on staging, then production | Pending: after merge; `scripts/production_import.py` |
+| Side-by-side check on staging, everyone switched, ChatGPT copy retired | Pending |
+| Production's costs joined to Finance | Deferred: its own decision (ADR 0076 decision 7 keeps the target cost, in piastres) |
 
 **Batch 4.2 — Finance** — Deferred.  **Batch 4.3 — People** — Deferred.
 

@@ -53,6 +53,19 @@ class Permission:
     #: manager and the admin.
     KHAZENLY_USE = "khazenly.use"
 
+    # ── Production (ADR 0069, ADR 0076 decision 5) ──
+    #: Reading Production: every screen, read only.
+    PRODUCTION_VIEW = "production.view"
+    #: Orders, drop phases, tasks, samples, their photos and documents.
+    PRODUCTION_EDIT = "production.edit"
+    #: Recording an order's QC checklist, and uploading documents.
+    PRODUCTION_QC = "production.qc"
+    #: Adding suppliers and sending the supplier portal's update.
+    PRODUCTION_SUPPLIERS = "production.suppliers"
+    #: Approving a supplier invoice for payment. The owner's alone (ADR 0067,
+    #: decision 4; ADR 0076 decision 7).
+    PRODUCTION_PAYMENTS = "production.payments"
+
 
 ALL_PERMISSIONS = frozenset(
     value for name, value in vars(Permission).items() if not name.startswith("_")
@@ -119,6 +132,22 @@ ROLES: dict[str, frozenset[str]] = {
     # of people may hold it; only an admin gives it. Of Operations, the
     # Khazenly section alone (ADR 0072): confirming orders is their job.
     "customer_service": frozenset({Permission.INBOX_USE, Permission.KHAZENLY_USE}),
+    # Production's levels (ADR 0076, decision 5). The old app had four
+    # accounts' worth of roles - owner, production, QC, viewer - and kept QC
+    # apart from editing orders; that separation stays. The manager is the
+    # one who does both and handles suppliers. Approving a payment is no
+    # level's: the owner's alone.
+    "production_viewer": frozenset({Permission.PRODUCTION_VIEW}),
+    "production_qc": frozenset({Permission.PRODUCTION_VIEW, Permission.PRODUCTION_QC}),
+    "production_staff": frozenset({Permission.PRODUCTION_VIEW, Permission.PRODUCTION_EDIT}),
+    "production_manager": frozenset(
+        {
+            Permission.PRODUCTION_VIEW,
+            Permission.PRODUCTION_EDIT,
+            Permission.PRODUCTION_QC,
+            Permission.PRODUCTION_SUPPLIERS,
+        }
+    ),
     # Affiliates reach their own portal by owning the record, not by holding a
     # staff permission, so this set is intentionally empty.
     "affiliate": frozenset(),
@@ -159,6 +188,7 @@ DEPARTMENT_HELD_BY: dict[str, str] = {
     "inbox": Permission.INBOX_USE,
     "operations": Permission.ORDER_OPS_VIEW,
     "affiliates": Permission.AFFILIATES_VIEW,
+    "production": Permission.PRODUCTION_VIEW,
 }
 
 
@@ -178,16 +208,25 @@ def departments_held(permissions: Iterable[str]) -> tuple[str, ...]:
 # (`app.shared.services.staff.set_level`).
 
 #: The levels, lowest first. "none" is holding no role of that department.
-LEVELS: tuple[str, ...] = ("none", "viewer", "staff", "manager")
+#: "qc" is Production's alone (ADR 0076, decision 5): a department offers a
+#: level only when its row in `DEPARTMENT_LEVELS` names it, so the other
+#: departments still show the four they always did.
+LEVELS: tuple[str, ...] = ("none", "viewer", "qc", "staff", "manager")
 
 #: The role behind each level of each department, in the sidebar's order
-#: (Inbox, Operations, Affiliates). `None` is a level not offered yet: no role
-#: grants it today. Production, Finance and People are not drawn (Batch 2.4,
-#: Choice 2). The owner (`admin`) is no department's level; it is its own line.
+#: (Inbox, Operations, Affiliates, Production). `None` is a level not offered
+#: yet: no role grants it today. Production is drawn since Batch 4.1; Finance
+#: and People are not yet (Batch 2.4, Choice 2). The owner (`admin`) is no department's level; it is its own line.
 DEPARTMENT_LEVELS: dict[str, dict[str, str | None]] = {
     "inbox": {"viewer": None, "staff": "customer_service", "manager": None},
     "operations": {"viewer": None, "staff": None, "manager": "operations_manager"},
     "affiliates": {"viewer": None, "staff": "content_manager", "manager": "affiliate_manager"},
+    "production": {
+        "viewer": "production_viewer",
+        "qc": "production_qc",
+        "staff": "production_staff",
+        "manager": "production_manager",
+    },
 }
 
 #: Each department as the screen names it.
@@ -195,6 +234,7 @@ DEPARTMENT_NAMES: dict[str, str] = {
     "inbox": "Inbox",
     "operations": "Operations",
     "affiliates": "Affiliates",
+    "production": "Production",
 }
 
 #: The owner's role: every department, Settings and money.
@@ -209,6 +249,10 @@ ROLE_WORDS: dict[str, str] = {
     "customer_service": "Inbox staff",
     "affiliate_manager": "Affiliates manager",
     "content_manager": "Affiliates staff",
+    "production_manager": "Production manager",
+    "production_staff": "Production staff",
+    "production_qc": "Production QC",
+    "production_viewer": "Production viewer",
 }
 
 #: Refused when a level has no role behind it yet.

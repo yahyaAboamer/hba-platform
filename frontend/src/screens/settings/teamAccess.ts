@@ -5,16 +5,18 @@
  */
 import { roleWords } from "../../lib/api";
 
-export type Level = "none" | "viewer" | "staff" | "manager";
+export type Level = "none" | "viewer" | "qc" | "staff" | "manager";
 
 export const LEVEL_WORDS: Record<Level, string> = {
   none: "No access",
   viewer: "Viewer",
+  qc: "QC",
   staff: "Staff",
   manager: "Manager",
 };
 
-export const LEVELS: Level[] = ["none", "viewer", "staff", "manager"];
+/** "qc" is Production's alone (ADR 0076); a department shows only the levels the server lists for it. */
+export const LEVELS: Level[] = ["none", "viewer", "qc", "staff", "manager"];
 
 export type DepartmentLevel = { level: Level; role: string | null; offered: boolean };
 export type Department = { key: string; name: string; levels: DepartmentLevel[] };
@@ -38,6 +40,11 @@ export const PERMISSION_PHRASE: Record<string, string> = {
   "order_ops.view": "seeing the Operations dashboard",
   "inbox.use": "reading and replying to customers",
   "khazenly.use": "building the Khazenly confirmation file",
+  "production.view": "reading Production",
+  "production.edit": "changing production orders, tasks and samples",
+  "production.qc": "recording quality checks",
+  "production.suppliers": "adding suppliers",
+  "production.payments": "approving supplier payments",
 };
 
 /** What a person is told they do *not* get; each is said only when none of its permissions is held. */
@@ -92,6 +99,10 @@ export const ACCESS_LINES: [string, string[]][] = [
   ["See the operations dashboard", ["order_ops.view"]],
   ["Read and answer customers in the inbox", ["inbox.use"]],
   ["Build the Khazenly confirmation file", ["khazenly.use"]],
+  ["Read Production", ["production.view"]],
+  ["Change production orders, tasks and samples", ["production.edit"]],
+  ["Record quality checks in Production", ["production.qc"]],
+  ["Add suppliers in Production", ["production.suppliers"]],
   ["Invite models", ["invitations.send"]],
   ["Record payments and reopen approved months", ["payments.record", "payroll.reopen"]],
   ["Invite staff and change anyone's access, Shopify and the pay policy; erase a model", ["settings.manage", "affiliates.erase"]],
@@ -107,6 +118,10 @@ export const ROLE_BLURB: Record<string, string> = {
   operations_manager: "Sees the Operations dashboard",
   content_manager: "Looks up models, records targets and sets pay terms",
   affiliate_manager: "Runs models and targets, and approves pay",
+  production_viewer: "Reads Production",
+  production_qc: "Records quality checks",
+  production_staff: "Runs orders, tasks and samples",
+  production_manager: "Runs Production, its QC and suppliers",
 };
 
 /** *Inbox staff · Affiliates manager*, from the roles when the server sent no words. */
@@ -117,7 +132,7 @@ export function accessWordsOf(roles: string[]): string {
 
 /** The level a person holds in a department: the highest whose role they hold. */
 export function levelIn(department: Department, roles: string[]): Level {
-  for (const level of ["manager", "staff", "viewer"] as Level[]) {
+  for (const level of ["manager", "staff", "qc", "viewer"] as Level[]) {
     const entry = department.levels.find((candidate) => candidate.level === level);
     if (entry?.role && roles.includes(entry.role)) return level;
   }

@@ -14,7 +14,10 @@ export type IconName =
   | "down"
   | "menu"
   | "close"
-  | "alert";
+  | "alert"
+  | "scissors"
+  | "names"
+  | "grid";
 
 export function Icon({ name, className }: { name: IconName; className?: string }) {
   return (
@@ -61,6 +64,28 @@ export function Icon({ name, className }: { name: IconName; className?: string }
       {name === "down" && <path d="M6 9l6 6 6-6" />}
       {name === "menu" && <path d="M4 7h16M4 12h16M4 17h16" />}
       {name === "close" && <path d="M6 6l12 12M18 6L6 18" />}
+      {/* Production's frame (docs/design/hba-os-production-frame-2026-10-25.html). */}
+      {name === "scissors" && (
+        <>
+          <circle cx="6" cy="7" r="2.7" />
+          <circle cx="6" cy="17" r="2.7" />
+          <path d="M8.3 8.6L20.5 17M8.3 15.4L20.5 7" />
+        </>
+      )}
+      {name === "names" && (
+        <>
+          <rect x="3" y="4" width="18" height="16" rx="2" />
+          <path d="M9 4v16M13 10l2.5 2-2.5 2" />
+        </>
+      )}
+      {name === "grid" && (
+        <>
+          <rect x="4" y="4" width="6.5" height="6.5" rx="1.5" />
+          <rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5" />
+          <rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5" />
+          <rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5" />
+        </>
+      )}
       {name === "alert" && (
         <>
           <circle cx="12" cy="12" r="8.5" />
