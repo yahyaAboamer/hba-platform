@@ -620,6 +620,7 @@ tfoot td { border-top: 1px solid var(--line-strong); border-bottom: 0; font-weig
 .event-red { border-left-color: var(--red); }
 .event-blue { border-left-color: var(--blue); }
 
+.gantt-panel { overflow-x: auto; }
 .gantt-header { display: grid; grid-template-columns: 240px repeat(6, 1fr); min-width: 930px; border-bottom: 1px solid var(--line); padding: 0 13px; }
 .gantt-header span { min-height: 42px; display: flex; align-items: center; color: var(--muted); font-size: 8px; border-left: 1px solid var(--line); padding-left: 8px; }
 .gantt-header span:first-child { border-left: 0; }
@@ -918,7 +919,7 @@ tfoot td { border-top: 1px solid var(--line-strong); border-bottom: 0; font-weig
   :root { --sidebar: 226px; }
   .content-area { padding-inline: 22px; }
   .dashboard-main-grid { grid-template-columns: 1fr; }
-  .attention-list { display: grid; grid-template-columns: repeat(2,1fr); }
+  .attention-list { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); }
   .attention-list button:nth-child(2) { border-top-color: transparent; }
   .kanban-board { grid-template-columns: repeat(4, 270px); }
   .scorecard-grid { grid-template-columns: repeat(3,1fr); }
@@ -975,7 +976,7 @@ tfoot td { border-top: 1px solid var(--line-strong); border-bottom: 0; font-weig
   .stat-card > strong { font-size: 21px; }
   .dashboard-lower-grid { grid-template-columns: 1fr; }
   .dashboard-lower-grid > .panel:last-child { grid-column: auto; }
-  .attention-list { grid-template-columns: 1fr; }
+  .attention-list { grid-template-columns: minmax(0,1fr); }
   .attention-list button:nth-child(2) { border-top-color: var(--line); }
   .table-toolbar { align-items: stretch; flex-wrap: wrap; }
   .search-field { width: 100%; }

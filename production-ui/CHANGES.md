@@ -57,3 +57,15 @@ the first screen draws, so every screen shows exactly what it showed:
   sample note; the unused Users page's rows.
 - `components/pages/control-data.tsx`: the samples form's default owner.
 - `components/pages/team-workspace.tsx`: the QC page's eyebrow name.
+
+## Phone width (owner's word, 7 November 2026)
+
+Two screens were wider than a phone, on the old site too. Nothing else moves.
+
+- `src/globals.css`: the dashboard's attention list sizes its columns with
+  `minmax(0,1fr)`, so a long detail line is cut with "…" as its own rule
+  already asked, instead of widening the row past the screen.
+- `components/pages/production.tsx` and `src/globals.css`: the Production
+  timeline's chart panel (`gantt-panel`) scrolls sideways inside itself when
+  the screen is narrower than the chart, as the calendar already did on a
+  phone, instead of widening the page.
