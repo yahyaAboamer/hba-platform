@@ -295,9 +295,9 @@ attention unless read.
 
 ## 10. Open items
 
-- ADR 0075 (and 0074) wait for the owner's acceptance.
-- After a merge to `main`, re-run `tools/run.sh staging …` against the
-  deployed build.
+- ~~ADR 0075 (and 0074) wait for the owner's acceptance.~~ Both accepted on 6 November and live (PRs #153, #154).
+- ~~After a merge to `main`, re-run `tools/run.sh staging …` against the
+  deployed build.~~ Checked live on staging and production on 6 November instead (§11).
 - The model portal's Payments screen (`portal/MyPayments.tsx`) deserves its
   own pass with the same method.
 - ~~The shared month picker is 38px tall on phones.~~ Fixed in round 2 (F2-9).
