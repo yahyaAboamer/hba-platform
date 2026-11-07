@@ -48,6 +48,12 @@ FINISHED = ("Completed", "Warehouse Received")
 _LEGACY_CODE = r"^HBA-PO-\d{3,4}(-[A-Z]+)?$"
 
 
+
+def _bytes(column):
+    """Text sorted letter by letter as the old SQLite database did (byte order),
+    whatever language rules the Postgres server was set up with."""
+    return column.collate("C")
+
 def fixture_text(db: Session, key: str, fallback: str = "") -> str:
     """One of the fixed sentences (ADR 0076 decision 3), e.g. the default owner."""
     row = db.get(ProductionFixture, "texts")
@@ -79,7 +85,7 @@ def _orders(db: Session, phase_names: dict[str, str]) -> list[dict]:
         .outerjoin(ProductionSupplier, ProductionSupplier.id == ProductionOrder.main_manufacturer_id)
         .where(ProductionOrder.deleted_at.is_(None))
         .order_by(
-            ProductionOrder.created_at.desc(), ProductionOrder.legacy_position.nulls_last(), ProductionOrder.id
+            ProductionOrder.created_at.desc(), ProductionOrder.legacy_position.nulls_last(), _bytes(ProductionOrder.id)
         )
         .limit(100)
     ).all()
@@ -183,7 +189,7 @@ def _suppliers(db: Session) -> list[dict]:
         .where(ProductionSupplier.deleted_at.is_(None))
         .order_by(
             ProductionSupplier.created_at.desc(), ProductionSupplier.legacy_position.nulls_last(),
-            ProductionSupplier.id,
+            _bytes(ProductionSupplier.id),
         )
         .limit(100)
     ).all()
@@ -216,7 +222,7 @@ def _suppliers(db: Session) -> list[dict]:
 def _activity(db: Session) -> tuple[list[dict], str]:
     rows = db.scalars(
         select(ProductionActivity)
-        .order_by(ProductionActivity.created_at.desc(), ProductionActivity.id.desc())
+        .order_by(ProductionActivity.created_at.desc(), _bytes(ProductionActivity.id).desc())
         .limit(40)
     ).all()
     entries = []
@@ -245,7 +251,7 @@ def _tasks(db: Session, default_owner: str) -> list[dict]:
             ProductionTask.action_date.desc().nulls_last(),
             ProductionTask.created_at.desc(),
             ProductionTask.legacy_position.nulls_last(),
-            ProductionTask.id,
+            _bytes(ProductionTask.id),
         )
         .limit(100)
     ).all()
@@ -281,13 +287,13 @@ def _samples(db: Session) -> tuple[list[dict], dict[str, bool]]:
             ProductionDocument.confidential.is_(False),
             ProductionDocument.deleted_at.is_(None),
         )
-        .order_by(ProductionDocument.created_at.desc(), ProductionDocument.id.desc())
+        .order_by(ProductionDocument.created_at.desc(), _bytes(ProductionDocument.id).desc())
     ):
         photos[photo.record_id].append(photo)
     rows = db.scalars(
         select(ProductionSample)
         .where(ProductionSample.deleted_at.is_(None))
-        .order_by(ProductionSample.created_at.desc(), ProductionSample.id)
+        .order_by(ProductionSample.created_at.desc(), _bytes(ProductionSample.id))
     ).all()
     samples, statuses = [], {}
     for row in rows:
@@ -325,7 +331,7 @@ def _samples(db: Session) -> tuple[list[dict], dict[str, bool]]:
 
 def _products(db: Session) -> list[dict]:
     rows = db.scalars(
-        select(ProductionProduct).where(ProductionProduct.deleted_at.is_(None)).order_by(ProductionProduct.name)
+        select(ProductionProduct).where(ProductionProduct.deleted_at.is_(None)).order_by(_bytes(ProductionProduct.name), _bytes(ProductionProduct.id))
     )
     # Product variants were never recorded; the old server counted none.
     return [
