@@ -133,7 +133,7 @@ def test_each_level_is_exactly_its_role_and_back():
 
 
 def test_the_departments_are_the_sidebars_and_no_more():
-    assert list(DEPARTMENT_LEVELS) == ["inbox", "operations", "affiliates"]
+    assert list(DEPARTMENT_LEVELS) == ["inbox", "operations", "affiliates", "production"]
 
 
 def test_both_affiliates_roles_read_as_manager():
@@ -142,6 +142,7 @@ def test_both_affiliates_roles_read_as_manager():
         "inbox": "staff",
         "operations": "none",
         "affiliates": "manager",
+        "production": "none",
     }
 
 
@@ -198,7 +199,7 @@ def test_the_roster_reads_access_by_department(client):
     rows = {row["id"]: row for row in body["staff"]}
 
     assert rows[mona]["owner"] is False
-    assert rows[mona]["access"] == {"inbox": "staff", "operations": "none", "affiliates": "manager"}
+    assert rows[mona]["access"] == {"inbox": "staff", "operations": "none", "affiliates": "manager", "production": "none"}
     assert rows[mona]["access_words"] == "Affiliates manager · Inbox staff"
     assert rows[mona]["two_step_required"] is False
     assert rows[mona]["joined_at"] == rows[mona]["created_at"]
@@ -207,7 +208,9 @@ def test_the_roster_reads_access_by_department(client):
     assert owner["access_words"] == "Owner"
 
     assert body["role_words"] == ROLE_WORDS
-    assert [d["key"] for d in body["departments"]] == ["inbox", "operations", "affiliates"]
+    assert [d["key"] for d in body["departments"]] == ["inbox", "operations", "affiliates", "production"]
+    # Production alone offers QC (ADR 0076); the others keep their four.
+    assert [level["level"] for level in body["departments"][3]["levels"]] == ["none", "viewer", "qc", "staff", "manager"]
     inbox = body["departments"][0]
     assert inbox["name"] == "Inbox"
     assert inbox["levels"] == [
@@ -321,7 +324,7 @@ def test_a_level_not_offered_is_refused(client):
 def test_an_unknown_department_is_not_found(client):
     sara = _person("sara@example.com", "Sara", "content_manager")
 
-    assert _set(client, sara, "production", "staff").status_code == 404
+    assert _set(client, sara, "people", "staff").status_code == 404
     assert _set(client, sara, "finance", "none").status_code == 404
 
 
@@ -355,7 +358,7 @@ def test_a_suspended_account_is_given_nothing_by_either_route(client):
     assert back.status_code == 200, back.text
     assert back.json()["roles"] == []
     row = next(r for r in client.get("/api/staff").json()["staff"] if r["id"] == sara)
-    assert row["access"] == {"inbox": "none", "operations": "none", "affiliates": "none"}
+    assert row["access"] == {"inbox": "none", "operations": "none", "affiliates": "none", "production": "none"}
     assert row["access_words"] == "No access"
     # Given again deliberately, once reactivated.
     assert _set(client, sara, "inbox", "staff").status_code == 200
@@ -538,11 +541,11 @@ def test_two_level_changes_at_once_never_leave_both_affiliates_roles(fresh_datab
 @pytest.mark.parametrize(
     ("department", "level", "access"),
     [
-        ("inbox", "staff", {"inbox": "staff", "operations": "none", "affiliates": "none"}),
-        ("affiliates", "staff", {"inbox": "none", "operations": "none", "affiliates": "staff"}),
-        ("affiliates", "manager", {"inbox": "none", "operations": "none", "affiliates": "manager"}),
+        ("inbox", "staff", {"inbox": "staff", "operations": "none", "affiliates": "none", "production": "none"}),
+        ("affiliates", "staff", {"inbox": "none", "operations": "none", "affiliates": "staff", "production": "none"}),
+        ("affiliates", "manager", {"inbox": "none", "operations": "none", "affiliates": "manager", "production": "none"}),
         # His invitation brings the Inbox, by level exactly as by role.
-        ("operations", "manager", {"inbox": "staff", "operations": "manager", "affiliates": "none"}),
+        ("operations", "manager", {"inbox": "staff", "operations": "manager", "affiliates": "none", "production": "none"}),
     ],
 )
 def test_an_invitation_by_level_grants_the_same_as_by_role(client, department, level, access):

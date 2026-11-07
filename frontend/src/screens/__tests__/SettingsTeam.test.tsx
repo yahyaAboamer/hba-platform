@@ -94,11 +94,20 @@ describe("Settings → Team and access, the page", () => {
     expect(radio("Operations", "No access").getAttribute("aria-checked")).toBe("true");
   });
 
-  it("draws the three departments, and no Production or Finance", async () => {
+  it("draws the four departments, and no Finance", async () => {
     renderAt("/settings/team?person=2");
     await screen.findByRole("heading", { name: "Mona" });
     expect(screen.getAllByRole("radiogroup").map((group) => group.getAttribute("aria-label")))
-      .toEqual(["Inbox access", "Operations access", "Affiliates access"]);
+      .toEqual(["Inbox access", "Operations access", "Affiliates access", "Production access"]);
+  });
+
+  it("offers QC in Production alone (ADR 0076)", async () => {
+    renderAt("/settings/team?person=2");
+    await screen.findByRole("heading", { name: "Mona" });
+    const levels = (name: string) => Array.from(screen.getByRole("radiogroup", { name }).querySelectorAll("button"))
+      .map((button) => button.textContent?.replace(" Not offered yet", ""));
+    expect(levels("Production access")).toEqual(["No access", "Viewer", "QC", "Staff", "Manager"]);
+    expect(levels("Inbox access")).toEqual(["No access", "Viewer", "Staff", "Manager"]);
   });
 
   it("says what a person's levels give, with what they do not", async () => {
@@ -133,7 +142,7 @@ describe("Settings → Team and access, the page", () => {
     data.staff.push(person(4, "Karim", ["admin"], NONE));
     renderAt("/settings/team?person=4");
     await screen.findByRole("heading", { name: "Karim" });
-    expect(screen.getAllByText("The owner reaches every department.")).toHaveLength(3);
+    expect(screen.getAllByText("The owner reaches every department.")).toHaveLength(4);
     for (const button of screen.getAllByRole("radio")) expect((button as HTMLButtonElement).disabled).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "Take ownership" }));
     const dialog = await screen.findByRole("dialog");

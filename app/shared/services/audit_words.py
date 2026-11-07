@@ -138,6 +138,15 @@ def sentence(event: AuditEvent, names: _Names) -> str:
     # uses differently (payroll's `orders` is a count) must not break this one.
     parcels = len(a["orders"]) if isinstance(a.get("orders"), list) else 0
 
+    if action.startswith("production."):
+        # Production's own words (ADR 0076): each change already carries the
+        # sentence its screens show in their activity list.
+        if action == "production.upload_photo":
+            return f"Added a Production photo: {a.get('name') or 'a photo'}"
+        if action == "production.upload_document":
+            return f"Added a Production document: {a.get('name') or 'a file'}"
+        return f"Production: {a.get('summary') or action.split('.', 1)[1].replace('_', ' ')}"
+
     if action.startswith("adjustment."):
         kind = action.split(".", 1)[1]
         amount = _egp(a.get("amount_piastres"))

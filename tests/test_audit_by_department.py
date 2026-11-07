@@ -387,7 +387,7 @@ def test_the_filters_kinds_are_only_those_ones_entries_can_hold(owner):
     # Inbox's and Operations' kinds could only match entries she cannot see.
     assert kinds == ["money", "access", "models", "content", "settings"]
     assert owner.get("/api/audit/filters").json()["kinds"] == [
-        "money", "access", "models", "content", "settings", "inbox", "operations",
+        "money", "access", "models", "content", "settings", "inbox", "operations", "production",
     ]
 
 

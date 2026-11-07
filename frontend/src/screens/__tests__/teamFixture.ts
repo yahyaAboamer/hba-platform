@@ -8,6 +8,7 @@ export const ALL = [
   "targets.record", "targets.manage", "targets.verify", "payroll.approve", "payroll.reopen",
   "payments.record", "payroll.bonus", "invitations.send", "audit.view", "settings.manage",
   "order_ops.view", "inbox.use", "khazenly.use",
+  "production.view", "production.edit", "production.qc", "production.suppliers", "production.payments",
 ];
 
 export const ROLE_PERMISSIONS: Record<string, string[]> = {
@@ -22,6 +23,10 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
   ],
   operations_manager: ["order_ops.view", "khazenly.use"],
   customer_service: ["inbox.use", "khazenly.use"],
+  production_viewer: ["production.view"],
+  production_qc: ["production.view", "production.qc"],
+  production_staff: ["production.view", "production.edit"],
+  production_manager: ["production.view", "production.edit", "production.qc", "production.suppliers"],
 };
 
 export const ROLE_WORDS: Record<string, string> = {
@@ -30,6 +35,10 @@ export const ROLE_WORDS: Record<string, string> = {
   customer_service: "Inbox staff",
   affiliate_manager: "Affiliates manager",
   content_manager: "Affiliates staff",
+  production_manager: "Production manager",
+  production_staff: "Production staff",
+  production_qc: "Production QC",
+  production_viewer: "Production viewer",
 };
 
 const level = (name: string, role: string | null, offered: boolean) => ({ level: name, role, offered });
@@ -41,6 +50,9 @@ export const DEPARTMENTS = [
     level("none", null, true), level("viewer", null, false), level("staff", null, false), level("manager", "operations_manager", true)] },
   { key: "affiliates", name: "Affiliates", levels: [
     level("none", null, true), level("viewer", null, false), level("staff", "content_manager", true), level("manager", "affiliate_manager", true)] },
+  { key: "production", name: "Production", levels: [
+    level("none", null, true), level("viewer", "production_viewer", true), level("qc", "production_qc", true),
+    level("staff", "production_staff", true), level("manager", "production_manager", true)] },
 ];
 
 export function person(id: number, name: string, roles: string[], access: Record<string, string>, extra: object = {}) {
@@ -54,7 +66,7 @@ export function person(id: number, name: string, roles: string[], access: Record
   };
 }
 
-export const NONE = { inbox: "none", operations: "none", affiliates: "none" };
+export const NONE = { inbox: "none", operations: "none", affiliates: "none", production: "none" };
 
 export function roster(overrides: object = {}) {
   return {

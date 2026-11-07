@@ -3,13 +3,14 @@ import type { Session } from "../lib/api";
 import { affiliates } from "./affiliates/department";
 import { inbox } from "./inbox/department";
 import { operations } from "./operations/department";
+import { production } from "./production/department";
 import type { Department } from "./types";
 
 /**
  * Every department, in the order the sidebar draws them (Today sits above
  * them for anyone holding two or more). A person's departments are the ones whose `holds` they hold.
  */
-export const DEPARTMENTS: readonly Department[] = [inbox, operations, affiliates];
+export const DEPARTMENTS: readonly Department[] = [inbox, operations, affiliates, production];
 
 /**
  * The departments a person sees: whole when they hold the department's
@@ -26,7 +27,7 @@ export function departmentsFor(session: Session): Department[] {
 
 
 /** Who starts where when they hold just one department, widest first. */
-const START_ORDER: readonly Department["key"][] = ["affiliates", "operations", "inbox"];
+const START_ORDER: readonly Department["key"][] = ["affiliates", "operations", "inbox", "production"];
 
 /**
  * The address a person starts on: Today when they hold two or more
@@ -39,7 +40,7 @@ export function startFor(session: Session): string {
   for (const partial of [false, true]) {
     for (const key of START_ORDER) {
       const found = held.find((department) => department.key === key && !!department.partial === partial);
-      if (found) return found.sections[0].to;
+      if (found) return found.sections[0]?.to ?? found.base;
     }
   }
   return "/";

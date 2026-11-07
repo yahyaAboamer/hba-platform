@@ -93,6 +93,10 @@
   --accent-soft: rgba(20, 101, 58, 0.09); /* tints and pressed states */
   --accent-on: #ffffff; /* text on a filled accent */
   --accent-fill: #14653a; /* a filled accent that carries --accent-on */
+  /* HBA's strip beside Production (ADR 0076) is dark whatever the theme, so
+     it takes the dark accent always: the H mark and the avatar's tint. */
+  --accent-strip: #23a95c;
+  --accent-strip-soft: rgba(35, 169, 92, 0.14);
 }
 
 [data-theme="dark"] {

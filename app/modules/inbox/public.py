@@ -18,7 +18,22 @@ from app.modules.inbox.services.connection import describe_whatsapp
 from app.modules.inbox.services.media import BUCKET_REFUSED
 from app.modules.inbox.today import look as today_look
 
-__all__ = ["confirmations_for_orders", "file_storage", "today_look", "whatsapp_connection"]
+__all__ = [
+    "StorageError",
+    "confirmations_for_orders",
+    "file_bucket",
+    "file_bucket_configured",
+    "file_storage",
+    "today_look",
+    "whatsapp_connection",
+]
+
+#: The platform's one file bucket (ADR 0065: "the file bucket" is shared
+#: plumbing). It was built for the Inbox and still lives here; Production
+#: keeps its photos and documents in it under `production/` (ADR 0076).
+file_bucket = storage.bucket
+file_bucket_configured = storage.configured
+StorageError = storage.StorageError
 
 
 def whatsapp_connection(db: Session) -> dict:

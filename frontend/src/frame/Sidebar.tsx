@@ -19,7 +19,7 @@ const THEMES: [ThemeChoice, string][] = [
 ];
 
 /** What waits at one section, or in a folded department. Nothing waiting: nothing drawn. */
-type Mark = {
+export type Mark = {
   count: { number: number; sentence: string; settled: boolean } | null;
   alert: string | null;
 };
@@ -47,7 +47,7 @@ function sectionMark(section: DepartmentSection, waiting: Waiting): Mark {
 }
 
 /** A folded department adds up its sections, or shows the dot if any has one. */
-function departmentMark(department: Department, waiting: Waiting): Mark {
+export function departmentMark(department: Department, waiting: Waiting): Mark {
   const marks = department.sections.map((section) => sectionMark(section, waiting));
   const counted = marks.filter((mark) => mark.count !== null);
   const failed = department.sections.flatMap((section, index) =>
@@ -85,7 +85,7 @@ function Alert({ sentence }: { sentence: string }) {
 }
 
 /** What Today's row says is waiting: every item it lists, whatever department it is in. */
-function todayMark(waiting: Waiting): Mark["count"] {
+export function todayMark(waiting: Waiting): Mark["count"] {
   const items = waiting.today.body?.items.length ?? 0;
   if (items === 0) return null;
   // The number is hidden from screen readers; the sentence says it.
@@ -249,6 +249,22 @@ export function SideBody({
             </li>
           )}
           {departments.map((department) => {
+            if (department.own) {
+              // Its own navigation (Production): a link, no sections.
+              return (
+                <li key={department.key}>
+                  <Link
+                    to={department.base}
+                    className="frame__dept"
+                    aria-current={where.department === department ? "page" : undefined}
+                    onClick={onNavigate}
+                  >
+                    <Icon name={department.icon} />
+                    <span className="frame__dept-name">{department.name}</span>
+                  </Link>
+                </li>
+              );
+            }
             const isOpen = open === department.key;
             const mark = isOpen ? null : departmentMark(department, waiting);
             return (

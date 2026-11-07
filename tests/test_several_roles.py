@@ -82,13 +82,28 @@ GRANTED_SINCE: dict[str, frozenset[str]] = {
 }
 
 
+#: Roles made **after** that day, each by its own decision, written out the
+#: same way.
+ADDED_SINCE: dict[str, frozenset[str]] = {
+    # ADR 0076: Production's levels (owner, 7 November 2026).
+    "production_viewer": frozenset({P.PRODUCTION_VIEW}),
+    "production_qc": frozenset({P.PRODUCTION_VIEW, P.PRODUCTION_QC}),
+    "production_staff": frozenset({P.PRODUCTION_VIEW, P.PRODUCTION_EDIT}),
+    "production_manager": frozenset(
+        {P.PRODUCTION_VIEW, P.PRODUCTION_EDIT, P.PRODUCTION_QC, P.PRODUCTION_SUPPLIERS}
+    ),
+}
+
+
 def _expected(role: str) -> frozenset[str]:
     return ROLES_BEFORE[role] | GRANTED_SINCE.get(role, frozenset())
 
 
 def test_the_snapshot_covers_every_role_there_is():
     """A role added later needs its own before-and-after; this says so."""
-    assert set(ROLES_BEFORE) == set(ROLES)
+    assert set(ROLES_BEFORE) | set(ADDED_SINCE) == set(ROLES)
+    for role, granted in ADDED_SINCE.items():
+        assert ROLES[role] == granted, role
     # Only the operations manager's role changed shape, and only by the Inbox.
     for role, granted in ROLES_BEFORE.items():
         if role == "operations_manager":
