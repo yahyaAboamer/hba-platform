@@ -62,6 +62,17 @@ def _iso(moment: datetime) -> str:
 #: What a document upload may not call itself: only `save_photo` files photos.
 RESERVED_TYPES = frozenset(meta["type"] for meta in KINDS.values())
 
+#: Where `save_photo` keeps photos. A photo reused from the library keeps its
+#: first key, so an order may show one first stored under a sample's prefix.
+PHOTO_PREFIXES = tuple(f"production/{meta['prefix']}/" for meta in KINDS.values())
+
+#: How many photos the library lists, newest first.
+LIBRARY_LIMIT = 500
+
+
+def _photo_key():
+    return or_(*(ProductionDocument.storage_key.startswith(prefix) for prefix in PHOTO_PREFIXES))
+
 
 def photo_view(row: ProductionDocument, kind: str) -> dict:
     return {
@@ -98,7 +109,7 @@ def list_photos(db: Session, kind: str, record_id: str) -> list[dict]:
             ProductionDocument.document_type == meta["type"],
             ProductionDocument.record_id == record_id,
             # Only files `save_photo` stored count as photos.
-            ProductionDocument.storage_key.startswith(f"production/{meta['prefix']}/"),
+            _photo_key(),
             ProductionDocument.confidential.is_(False),
             ProductionDocument.deleted_at.is_(None),
         )
@@ -115,7 +126,7 @@ def photo_for_download(db: Session, kind: str, photo_id: str) -> ProductionDocum
         .join(parent, parent.id == ProductionDocument.record_id)
         .where(
             ProductionDocument.id == photo_id,
-            ProductionDocument.storage_key.startswith(f"production/{meta['prefix']}/"),
+            _photo_key(),
             ProductionDocument.module == meta["module"],
             ProductionDocument.document_type == meta["type"],
             ProductionDocument.confidential.is_(False),
@@ -154,6 +165,96 @@ def save_photo(db: Session, kind: str, record, *, filename: str, content: bytes,
         actor_id=actor_id, actor_email=actor_email, after={"photo": photo_id, "name": name},
     )
     return photo_view(row, kind)
+
+
+def photo_library(db: Session) -> list[dict]:
+    """Every photo already stored, once each, newest first: what "Choose
+    existing" offers. A stored file shared by several records is listed once,
+    under the record it was first added to. Photos of a deleted order or
+    sample are left out."""
+    rows = db.execute(
+        select(ProductionDocument, ProductionOrder.code, ProductionSample.name)
+        .outerjoin(ProductionOrder, (ProductionOrder.id == ProductionDocument.record_id)
+                   & (ProductionDocument.module == KINDS["order"]["module"]))
+        .outerjoin(ProductionSample, (ProductionSample.id == ProductionDocument.record_id)
+                   & (ProductionDocument.module == KINDS["sample"]["module"]))
+        .where(
+            _photo_key(),
+            ProductionDocument.document_type.in_(RESERVED_TYPES),
+            ProductionDocument.confidential.is_(False),
+            ProductionDocument.deleted_at.is_(None),
+            ProductionDocument.mime_type.in_(IMAGE_TYPES),
+            or_(
+                ProductionOrder.id.is_not(None) & ProductionOrder.deleted_at.is_(None),
+                ProductionSample.id.is_not(None) & ProductionSample.deleted_at.is_(None),
+            ),
+        )
+        .order_by(ProductionDocument.created_at.asc(), ProductionDocument.id.asc())
+    ).all()
+    first: dict[str, dict] = {}
+    for row, order_code, sample_name in rows:
+        if row.storage_key in first:
+            continue
+        kind = "order" if order_code is not None else "sample"
+        first[row.storage_key] = {
+            **photo_view(row, kind),
+            "source": order_code if kind == "order" else sample_name,
+            "sourceKind": kind,
+        }
+    newest = sorted(first.values(), key=lambda photo: (photo["createdAt"], photo["id"]), reverse=True)
+    return newest[:LIBRARY_LIMIT]
+
+
+def attach_photos(db: Session, kind: str, record, photo_ids: list[str], *, actor_name: str, actor_id: int,
+                  actor_email: str) -> list[dict]:
+    """Add photos already stored to an order or sample without storing them
+    again: each becomes a new photo row pointing at the same file. A photo
+    the record already shows is skipped. Raises `LookupError` when a photo is
+    not in the library. Staged; the route commits."""
+    meta = KINDS[kind]
+    wanted = list(dict.fromkeys(photo_ids))
+    library = {photo["id"] for photo in photo_library(db)}
+    if any(photo_id not in library for photo_id in wanted):
+        raise LookupError("photo")
+    by_id = {row.id: row for row in db.scalars(select(ProductionDocument).where(ProductionDocument.id.in_(wanted)))}
+    already = set(db.scalars(
+        select(ProductionDocument.storage_key).where(
+            ProductionDocument.module == meta["module"], ProductionDocument.record_id == record.id,
+            ProductionDocument.deleted_at.is_(None),
+        )
+    ))
+    added: list[dict] = []
+    created = _now()
+    for photo_id in wanted:
+        source = by_id[photo_id]
+        if source.storage_key in already:
+            continue
+        already.add(source.storage_key)
+        row = ProductionDocument(
+            id=str(uuid.uuid4()), name=source.name, document_type=meta["type"], storage_key=source.storage_key,
+            mime_type=source.mime_type, size_bytes=source.size_bytes, module=meta["module"], record_id=record.id,
+            confidential=False, uploaded_by_id=actor_id, created_at=created,
+        )
+        db.add(row)
+        added.append(photo_view(row, kind))
+    if added:
+        record_label = record.code if kind == "order" else record.name
+        count = f"{len(added)} photo" if len(added) == 1 else f"{len(added)} photos"
+        names = ", ".join(photo["name"] for photo in added)
+        summary = f"{count} added from the library: {names}"[:500]
+        db.add(
+            ProductionActivity(
+                id=str(uuid.uuid4()), action="attach_photo", module=meta["module"], record_id=record_label,
+                details={"actor": actor_name, "summary": summary, "photoIds": [p["id"] for p in added]},
+                actor_id=actor_id, created_at=created,
+            )
+        )
+        record_audit(
+            db, action="production.attach_photo", subject=f"production:{record_label}",
+            actor_id=actor_id, actor_email=actor_email,
+            after={"summary": summary, "photos": [p["id"] for p in added]},
+        )
+    return added
 
 
 def _slug(text: str, limit: int = 80) -> str:

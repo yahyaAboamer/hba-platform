@@ -76,3 +76,21 @@ Two screens were wider than a phone, on the old site too. Nothing else moves.
   the server says `canCheckQc` (Production staff), as well as for "qc" and
   "admin".
 - `lib/qc-checklist.ts`: `TeamUser` has an optional `canCheckQc`.
+
+## Row menus, deleting, and the photo library (owner, 8 November 2026)
+
+- `components/row-menu.tsx` (new): the ⋯ menu and the "Delete …?" confirm.
+  The menu's list is drawn at the top of the page so no panel clips it, and
+  follows its button as the page scrolls.
+- `components/pages/production.tsx`: each order row's ⋯ (once only a picture)
+  offers Open order, Edit order and Delete order; the order editor is one
+  component (`OrderEditModal`) used by the row menu and the order page's Edit
+  button. Rows are keyed by order. An order's page opened from its own link
+  waits for the orders instead of drawing nothing.
+- `components/drop-phases.tsx`: each phase card has a ⋯ with Rename and
+  Delete. Deleting a phase moves its orders to Unassigned.
+- `components/pages/control-data.tsx`: each sample row has Delete.
+- `components/record-photos.tsx`: adding photos to an order or sample offers
+  "Upload new" or "Choose existing", every photo already stored, searchable,
+  added without uploading again.
+- Deleted orders and samples are hidden, not erased (`deleted_at`).
