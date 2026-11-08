@@ -15,6 +15,8 @@ holds Production (`production.view`). Answers are the old shapes, with
 | `GET/POST /documents` | Document list and upload |
 | `GET/POST /order-photos`, `GET /order-photos/{id}` | Order photos |
 | `GET/POST /sample-photos`, `GET /sample-photos/{id}` | Sample photos |
+| `GET /photo-library` | Every stored photo, once each, to reuse |
+| `POST /order-photos/attach`, `POST /sample-photos/attach` | Reuse library photos on a record |
 """
 
 import json
@@ -265,6 +267,54 @@ def _download(kind: str, photo_id: str, db: Session) -> Response:
         headers={"Content-Disposition": "inline", "X-Content-Type-Options": "nosniff",
                  "Cache-Control": "private, max-age=300"},
     )
+
+
+async def _attach(kind: str, request: Request, person: Person, db: Session) -> Response:
+    """Add photos from the library to an order or sample: `{"order"|"sample": …, "photoIds": […]}`."""
+    if Permission.PRODUCTION_EDIT not in person.held:
+        return _json({"error": "Sign in with an owner or production account to add photos"}, 403)
+    try:
+        body = json.loads(await request.body())
+    except (ValueError, UnicodeDecodeError):
+        return _json({"error": "Invalid JSON payload"}, 400)
+    if not isinstance(body, dict):
+        return _json({"error": "Invalid JSON payload"}, 400)
+    ids = body.get("photoIds")
+    if not isinstance(ids, list) or not ids or len(ids) > 100 or not all(isinstance(i, str) for i in ids):
+        return _json({"error": "Choose at least one photo"}, 400)
+
+    def attach() -> Response:
+        record = files.find_record(db, kind, str(body.get(kind) or ""))
+        if record is None:
+            return _json({"error": "Production order not found" if kind == "order" else "Sample not found"}, 404)
+        try:
+            added = files.attach_photos(
+                db, kind, record, ids, actor_name=person.name, actor_id=person.user.id, actor_email=person.user.email,
+            )
+        except LookupError:
+            db.rollback()
+            return _json({"error": "One of those photos is no longer available. Reload and try again."}, 404)
+        db.commit()
+        return _json({"photos": added}, 201)
+
+    return await run_in_threadpool(attach)
+
+
+@router.get("/photo-library")
+def photo_library(_p: Person = Depends(production_person), db: Session = Depends(get_session)) -> Response:
+    return _json({"photos": files.photo_library(db)})
+
+
+@router.post("/order-photos/attach")
+async def attach_order_photos(request: Request, person: Person = Depends(production_person),
+                              db: Session = Depends(get_session)):
+    return await _attach("order", request, person, db)
+
+
+@router.post("/sample-photos/attach")
+async def attach_sample_photos(request: Request, person: Person = Depends(production_person),
+                               db: Session = Depends(get_session)):
+    return await _attach("sample", request, person, db)
 
 
 @router.get("/order-photos")

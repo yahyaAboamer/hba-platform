@@ -18,6 +18,9 @@ import {
   MessageSquareText,
   MoreHorizontal,
   PackageCheck,
+  Pencil,
+  ExternalLink,
+  Trash2,
   Plus,
   Search,
   ShieldCheck,
@@ -47,6 +50,7 @@ import {
 import { OrderPhotos } from "@/components/order-photos";
 import { ManufacturingTracker } from "@/components/manufacturing-tracker";
 import { DropPhasePanel, OrderPhasePicker } from "@/components/drop-phases";
+import { ConfirmDelete, RowMenu } from "@/components/row-menu";
 import { formatCurrency } from "@/lib/business-logic";
 import { Badge, Metric, Panel, PageHeader, ProgressBar, TableWrap, statusTone } from "@/components/ui";
 
@@ -70,10 +74,14 @@ export function ProductionOrdersPage({
   onNewOrder,
   onExport,
   orders,
+  supplierData,
+  actorName,
 }: {
   phaseView?: boolean;
   trackerView?: boolean;
   phases: DropPhase[];
+  supplierData: Supplier[];
+  actorName: string;
   canManage: boolean;
   notify: Notify;
   onSharedChange: ()=>Promise<void>;
@@ -84,7 +92,35 @@ export function ProductionOrdersPage({
 }) {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("All statuses");
-  const [phase, setPhase] = useState(phaseView ? "phase-one-drop" : "all");
+  const [chosenPhase, setPhase] = useState(phaseView ? "phase-one-drop" : "all");
+  // A phase deleted since it was chosen falls back to every phase.
+  const phase = chosenPhase === "all" || chosenPhase === "unassigned" || phases.some((item) => item.id === chosenPhase) ? chosenPhase : "all";
+  const [editingOrder, setEditingOrder] = useState<ProductionOrder | null>(null);
+  const [deletingOrder, setDeletingOrder] = useState<ProductionOrder | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+
+  async function deleteOrder() {
+    if (!deletingOrder) return;
+    setDeleting(true);
+    setDeleteError("");
+    try {
+      const response = await fetch("/api/production/actions", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "delete_order", recordId: deletingOrder.code, actorName }),
+      });
+      const result = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(result.error || "Could not delete the order");
+      await onSharedChange();
+      notify(`${deletingOrder.code} deleted`, "success");
+      setDeletingOrder(null);
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : "Could not delete the order");
+    } finally {
+      setDeleting(false);
+    }
+  }
   const [sorting, setSorting] = useState<SortingState>([]);
   const [trackerOnly, setTrackerOnly] = useState(true);
 
@@ -136,7 +172,13 @@ export function ProductionOrdersPage({
         cell: ({ row }) => <>{row.original.forecastDelivery}<small className={row.original.delayDays ? "danger-text" : "muted-text"}>{row.original.forecastDelivery === "—" ? "Date not set" : row.original.delayDays ? `+${row.original.delayDays} days` : "On schedule"}</small></>,
       },
       { accessorKey: "status", header: "Status", cell: ({ row }) => <Badge>{row.original.status}</Badge> },
-      { id: "menu", header: "", cell: () => <MoreHorizontal size={17} className="muted-icon" /> },
+      {
+        id: "menu",
+        header: () => <span className="sr-only">Actions</span>,
+        // Drawn by the row itself (below): a cell made here is a new component
+        // whenever these columns are rebuilt, which would close an open menu.
+        cell: () => null,
+      },
     ],
     [phases,canManage,notify,onSharedChange,navigate],
   );
@@ -198,8 +240,14 @@ export function ProductionOrdersPage({
             </thead>
             <tbody>
               {table.getRowModel().rows.map((row) => (
-                <tr key={row.id} className="clickable-row" onClick={() => navigate(`/production-orders/${row.original.code}`)}>
-                  {row.getVisibleCells().map((cell) => <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>)}
+                <tr key={row.original.id} className="clickable-row" onClick={() => navigate(`/production-orders/${row.original.code}`)}>
+                  {row.getVisibleCells().map((cell) => <td key={cell.id}>{cell.column.id === "menu" ? <RowMenu label={`Actions for ${row.original.code}`} items={[
+                    { label: "Open order", icon: <ExternalLink size={15} />, onSelect: () => navigate(`/production-orders/${row.original.code}`) },
+                    ...(canManage ? [
+                      { label: "Edit order", icon: <Pencil size={15} />, onSelect: () => setEditingOrder(row.original) },
+                      { label: "Delete order", icon: <Trash2 size={15} />, danger: true, onSelect: () => { setDeleteError(""); setDeletingOrder(row.original); } },
+                    ] : []),
+                  ]} /> : flexRender(cell.column.columnDef.cell, cell.getContext())}</td>)}
                 </tr>
               ))}
             </tbody>
@@ -207,6 +255,9 @@ export function ProductionOrdersPage({
         </TableWrap>}
         <div className="table-footer"><span>Showing {filtered.length} of {orders.length} orders</span><span>Shared team data · live</span></div>
       </Panel>
+      {editingOrder && <OrderEditModal order={orders.find((order) => order.id === editingOrder.id) ?? editingOrder} phases={phases} supplierData={supplierData} actorName={actorName} notify={notify} onSharedChange={onSharedChange} onClose={() => setEditingOrder(null)} />}
+      {deletingOrder && <ConfirmDelete title={`Delete ${deletingOrder.code}?`} confirmLabel="Delete order" busy={deleting} error={deleteError} onCancel={() => setDeletingOrder(null)} onConfirm={() => void deleteOrder()}
+        detail={<>“{deletingOrder.product}”{deletingOrder.color && deletingOrder.color !== "—" ? ` · ${deletingOrder.color}` : ""} will be removed from every list for everyone and recorded in Team changes. It is hidden, not erased, so it can be recovered.</>} />}
     </div>
   );
 }
@@ -232,7 +283,16 @@ function StageTimeline({ stages, onSelect }: { stages: ProductionStage[]; onSele
   );
 }
 
-export function ProductionOrderDetailPage({ canUploadPhotos, phases, code, navigate, notify, orders, supplierData, actorName, onSharedChange }: { canUploadPhotos:boolean; phases:DropPhase[]; code: string; navigate: Navigate; notify: Notify; orders: ProductionOrder[]; supplierData: Supplier[]; actorName: string; onSharedChange: () => Promise<void> }) {
+type OrderDetailProps = { canUploadPhotos:boolean; phases:DropPhase[]; code: string; navigate: Navigate; notify: Notify; orders: ProductionOrder[]; supplierData: Supplier[]; actorName: string; onSharedChange: () => Promise<void> };
+
+/** An order's page. Opened from its own link, it waits for the orders to
+ * arrive instead of drawing nothing (there is no order to draw yet). */
+export function ProductionOrderDetailPage(props: OrderDetailProps) {
+  if (!props.orders.length && !productionOrders.length) return <div className="page-stack"><Panel title="Production order"><p>Loading the order…</p></Panel></div>;
+  return <OrderDetail {...props} />;
+}
+
+function OrderDetail({ canUploadPhotos, phases, code, navigate, notify, orders, supplierData, actorName, onSharedChange }: OrderDetailProps) {
   const requestedOrder = orders.find((item) => item.code === code || item.legacyCode === code || item.id === code);
   const order = requestedOrder ?? orders[0] ?? productionOrders[0];
   const stages = order.stages.length ? order.stages : productionOrders[0].stages.map((stage, index) => ({ ...stage, id: `${order.id}-${index}`, supplier: index < 2 ? order.supplier : stage.supplier }));
@@ -240,7 +300,6 @@ export function ProductionOrderDetailPage({ canUploadPhotos, phases, code, navig
   const [selectedStage, setSelectedStage] = useState<ProductionStage | null>(null);
   const [approved, setApproved] = useState(order.status !== "Pending Approval");
   const [editing, setEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
   const tabs = ["Overview", "Photos", "Timeline", "Size Breakdown", "Materials & BOM", "Production Stages", "Supplier Updates", "Quality Control", "Costs", "Payments", "Documents", "Warehouse Receiving", "Activity Log"];
 
   return (
@@ -290,59 +349,7 @@ export function ProductionOrderDetailPage({ canUploadPhotos, phases, code, navig
         </div>
       )}
 
-      {editing && (
-        <div className="modal-backdrop" onClick={() => setEditing(false)}>
-          <section className="modal" onClick={(event) => event.stopPropagation()}>
-            <header><div><p className="eyebrow">Production order</p><h2>Edit {order.code}</h2><p>Saved changes sync to the HBA team.</p></div><button className="icon-button" onClick={() => setEditing(false)} aria-label="Close editor"><X size={18} /></button></header>
-            <form className="modal-form" onSubmit={async (event) => {
-              event.preventDefault();
-              setSaving(true);
-              const form = new FormData(event.currentTarget);
-              try {
-                const response = await fetch("/api/production/actions", {
-                  method: "POST",
-                  headers: { "content-type": "application/json" },
-                  body: JSON.stringify({
-                    action: "update_order",
-                    recordId: order.code,
-                    actorName,
-                    payload: Object.fromEntries(form.entries()),
-                  }),
-                });
-                const result = await response.json() as { error?: string };
-                if (!response.ok) throw new Error(result.error || "Could not update the order");
-                await onSharedChange();
-                setEditing(false);
-                notify(`${order.code} updated for everyone`, "success");
-              } catch (error) {
-                notify(error instanceof Error ? error.message : "Could not save the changes", "warning");
-              } finally {
-                setSaving(false);
-              }
-            }}>
-              <div className="form-grid">
-                <label>Drop phase<select name="phaseId" defaultValue={order.phaseId || ""}><option value="">Unassigned</option>{phases.map(phase=><option key={phase.id} value={phase.id}>{phase.name}</option>)}</select></label><label>Collection<input name="collection" defaultValue={order.collection} required /></label>
-                <label>Colour<input name="color" defaultValue={order.color} required /></label>
-                <label>Total quantity<input name="quantity" type="number" min="0" max="100000" defaultValue={order.quantity} required /></label>
-                <label>Fabric<input name="fabric" defaultValue={order.fabric || ""} /></label>
-                <label>Fabric weight (KG)<input name="fabricKg" type="number" min="0" step="0.1" defaultValue={order.fabricKg ?? ""} /></label>
-                <label>Priority<select name="priority" defaultValue={order.priority}><option>Critical</option><option>High</option><option>Normal</option><option>Low</option></select></label>
-                <label>Status<select name="status" defaultValue={order.status}><option>Pending Approval</option><option>Not Started</option><option>Waiting</option><option>In Progress</option><option>On Track</option><option>At Risk</option><option>Delayed</option><option>Blocked</option><option>Waiting for QC</option><option>Rework</option><option>Completed</option><option>Warehouse Received</option></select></label>
-                <label>Progress %<input name="progress" type="number" min="0" max="100" step="1" defaultValue={order.progress} required /></label>
-                <label>Current stage<input name="currentStage" defaultValue={order.currentStage} required /></label>
-                <label>Planned start<input name="startDate" type="date" defaultValue={order.startDateISO} /></label>
-                <label>Planned delivery<input name="plannedDelivery" type="date" defaultValue={order.plannedDeliveryISO} /></label>
-                <label>Forecast delivery<input name="forecastDelivery" type="date" defaultValue={order.forecastDeliveryISO} /></label>
-                <label>Main manufacturer<select name="supplier" defaultValue={order.supplier}>{supplierData.map((supplier) => <option key={supplier.code}>{supplier.name}</option>)}</select></label>
-                <label>Target unit cost (EGP)<input name="targetCost" type="number" min="0" step="0.01" defaultValue={order.targetCost} /></label>
-              </div>
-              <fieldset className="tracker-size-fields"><legend>Size quantities</legend>{['S','M','L','XL','XXL'].map(size=><label key={size}>{size}<input name={`size_${size}`} type="number" min="0" step="1" defaultValue={order.sizeBreakdown[size] ?? 0}/></label>)}</fieldset>
-              <label>Production notes<textarea name="notes" rows={4} defaultValue={order.notes} placeholder="Shared notes for the production team" /></label>
-              <footer><button className="button subtle" type="button" onClick={() => setEditing(false)}>Cancel</button><button className="button primary" type="submit" disabled={saving}>{saving ? "Saving for everyone…" : "Save shared changes"}</button></footer>
-            </form>
-          </section>
-        </div>
-      )}
+      {editing && <OrderEditModal order={order} phases={phases} supplierData={supplierData} actorName={actorName} notify={notify} onSharedChange={onSharedChange} onClose={() => setEditing(false)} />}
     </div>
   );
 }
@@ -392,4 +399,62 @@ export function ProductionCalendarPage({ navigate, orders }: { navigate: Navigat
 
 export function ProductionTimelinePage({ navigate, orders }: { navigate: Navigate; orders: ProductionOrder[] }) {
   return <div className="page-stack"><PageHeader eyebrow="Portfolio schedule" title="Production timeline" description="Cross-order view of progress, forecast shifts and delivery exposure." actions={<button className="button secondary" onClick={() => navigate("/production-calendar")}><CalendarDays size={16} /> Calendar</button>} /><Panel className="gantt-panel"><div className="gantt-header"><span>Order / product</span>{["02 Aug", "09 Aug", "16 Aug", "23 Aug", "30 Aug", "06 Sep"].map((date) => <span key={date}>{date}</span>)}</div><div className="gantt-body">{orders.map((order, index) => <button key={order.code} className="gantt-row" onClick={() => navigate(`/production-orders/${order.code}`)}><span><strong>{order.product}</strong><small>{order.code}</small></span><span className="gantt-track"><i className={`gantt-bar gantt-${statusTone(order.status)}`} style={{ left: `${Math.min(28, index * 4)}%`, width: `${Math.max(18, order.progress * 0.58)}%` }}><em>{order.progress}%</em></i><b className="gantt-today" /></span><Badge>{order.status}</Badge></button>)}</div></Panel></div>;
+}
+
+/** The order editor: from the order page's Edit button and a row's ⋯ menu. */
+export function OrderEditModal({ order, phases, supplierData, actorName, notify, onSharedChange, onClose }: { order: ProductionOrder; phases: DropPhase[]; supplierData: Supplier[]; actorName: string; notify: Notify; onSharedChange: () => Promise<void>; onClose: () => void }) {
+  const [saving, setSaving] = useState(false);
+  return (
+        <div className="modal-backdrop" onClick={() => onClose()}>
+          <section className="modal" onClick={(event) => event.stopPropagation()}>
+            <header><div><p className="eyebrow">Production order</p><h2>Edit {order.code}</h2><p>Saved changes sync to the HBA team.</p></div><button className="icon-button" onClick={() => onClose()} aria-label="Close editor"><X size={18} /></button></header>
+            <form className="modal-form" onSubmit={async (event) => {
+              event.preventDefault();
+              setSaving(true);
+              const form = new FormData(event.currentTarget);
+              try {
+                const response = await fetch("/api/production/actions", {
+                  method: "POST",
+                  headers: { "content-type": "application/json" },
+                  body: JSON.stringify({
+                    action: "update_order",
+                    recordId: order.code,
+                    actorName,
+                    payload: Object.fromEntries(form.entries()),
+                  }),
+                });
+                const result = await response.json() as { error?: string };
+                if (!response.ok) throw new Error(result.error || "Could not update the order");
+                await onSharedChange();
+                onClose();
+                notify(`${order.code} updated for everyone`, "success");
+              } catch (error) {
+                notify(error instanceof Error ? error.message : "Could not save the changes", "warning");
+              } finally {
+                setSaving(false);
+              }
+            }}>
+              <div className="form-grid">
+                <label>Drop phase<select name="phaseId" defaultValue={order.phaseId || ""}><option value="">Unassigned</option>{phases.map(phase=><option key={phase.id} value={phase.id}>{phase.name}</option>)}</select></label><label>Collection<input name="collection" defaultValue={order.collection} required /></label>
+                <label>Colour<input name="color" defaultValue={order.color} required /></label>
+                <label>Total quantity<input name="quantity" type="number" min="0" max="100000" defaultValue={order.quantity} required /></label>
+                <label>Fabric<input name="fabric" defaultValue={order.fabric || ""} /></label>
+                <label>Fabric weight (KG)<input name="fabricKg" type="number" min="0" step="0.1" defaultValue={order.fabricKg ?? ""} /></label>
+                <label>Priority<select name="priority" defaultValue={order.priority}><option>Critical</option><option>High</option><option>Normal</option><option>Low</option></select></label>
+                <label>Status<select name="status" defaultValue={order.status}><option>Pending Approval</option><option>Not Started</option><option>Waiting</option><option>In Progress</option><option>On Track</option><option>At Risk</option><option>Delayed</option><option>Blocked</option><option>Waiting for QC</option><option>Rework</option><option>Completed</option><option>Warehouse Received</option></select></label>
+                <label>Progress %<input name="progress" type="number" min="0" max="100" step="1" defaultValue={order.progress} required /></label>
+                <label>Current stage<input name="currentStage" defaultValue={order.currentStage} required /></label>
+                <label>Planned start<input name="startDate" type="date" defaultValue={order.startDateISO} /></label>
+                <label>Planned delivery<input name="plannedDelivery" type="date" defaultValue={order.plannedDeliveryISO} /></label>
+                <label>Forecast delivery<input name="forecastDelivery" type="date" defaultValue={order.forecastDeliveryISO} /></label>
+                <label>Main manufacturer<select name="supplier" defaultValue={order.supplier}>{supplierData.map((supplier) => <option key={supplier.code}>{supplier.name}</option>)}</select></label>
+                <label>Target unit cost (EGP)<input name="targetCost" type="number" min="0" step="0.01" defaultValue={order.targetCost} /></label>
+              </div>
+              <fieldset className="tracker-size-fields"><legend>Size quantities</legend>{['S','M','L','XL','XXL'].map(size=><label key={size}>{size}<input name={`size_${size}`} type="number" min="0" step="1" defaultValue={order.sizeBreakdown[size] ?? 0}/></label>)}</fieldset>
+              <label>Production notes<textarea name="notes" rows={4} defaultValue={order.notes} placeholder="Shared notes for the production team" /></label>
+              <footer><button className="button subtle" type="button" onClick={() => onClose()}>Cancel</button><button className="button primary" type="submit" disabled={saving}>{saving ? "Saving for everyone…" : "Save shared changes"}</button></footer>
+            </form>
+          </section>
+        </div>
+  );
 }

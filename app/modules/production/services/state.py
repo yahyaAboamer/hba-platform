@@ -283,7 +283,10 @@ def _samples(db: Session) -> tuple[list[dict], dict[str, bool]]:
         .where(
             ProductionDocument.module == "Samples",
             ProductionDocument.document_type == "Sample photo",
-            ProductionDocument.storage_key.startswith("production/sample-photos/"),
+            # A sample may show a photo first stored on an order (the photo
+            # library); both places are where `save_photo` keeps photos.
+            ProductionDocument.storage_key.startswith("production/sample-photos/")
+            | ProductionDocument.storage_key.startswith("production/order-photos/"),
             ProductionDocument.confidential.is_(False),
             ProductionDocument.deleted_at.is_(None),
         )
@@ -353,6 +356,7 @@ def _qc_checks(db: Session) -> list[dict]:
     rows = db.execute(
         select(ProductionQcCheck, ProductionOrder.code)
         .join(ProductionOrder, ProductionOrder.id == ProductionQcCheck.order_id)
+        .where(ProductionOrder.deleted_at.is_(None))
         .order_by(ProductionQcCheck.id)
     ).all()
     return [

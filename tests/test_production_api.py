@@ -611,3 +611,112 @@ def test_a_document_cannot_pass_as_a_photo(owner, bucket):
     assert saved.json()["document"]["documentType"] == "Other"
     assert owner.get("/api/production/sample-photos", params={"sample": "SMP-1"}).json()["photos"] == []
     assert owner.get("/api/production/state").json()["samples"][0]["photoCount"] == 0
+
+
+# ── Deleting orders and samples, renaming and deleting phases ─────────────────
+
+
+def test_a_deleted_order_leaves_the_lists_and_cannot_be_deleted_twice(owner):
+    _seed()
+    _act(owner, action="qc_check", recordId="807", payload={"step": "cutting", "item": 0, "result": "Pass"})
+    answer = _act(owner, action="delete_order", recordId="807")
+    assert answer.status_code == 201 and answer.json()["summary"] == "HBA-PO-807 deleted"
+    state = owner.get("/api/production/state").json()
+    assert state["orders"] == [] and state["qcChecks"] == []
+    with SessionLocal() as db:
+        assert db.get(ProductionOrder, "po-1").deleted_at is not None  # hidden, not erased
+    again = _act(owner, action="delete_order", recordId="807")
+    assert again.status_code == 404
+    assert again.json() == {"error": "Production order was not found or was already deleted"}
+
+
+def test_a_deleted_sample_leaves_the_list(owner):
+    _seed()
+    answer = _act(owner, action="delete_sample", recordId="SMP-1")
+    assert answer.json()["summary"] == "Zip top deleted"
+    assert owner.get("/api/production/state").json()["samples"] == []
+    assert _act(owner, action="delete_sample", recordId="SMP-1").status_code == 404
+
+
+def test_a_viewer_deletes_nothing(owner):
+    _seed()
+    viewer = _person("viewer@example.com", "production_viewer")
+    for action, record in (("delete_order", "807"), ("delete_sample", "SMP-1"), ("delete_phase", "phase-one"),
+                           ("rename_phase", "phase-one")):
+        assert _act(viewer, action=action, recordId=record, payload={"name": "X"}).status_code == 403
+    staff = _person("staff@example.com", "production_staff")
+    assert _act(staff, action="delete_sample", recordId="SMP-1").status_code == 201
+
+
+def test_a_phase_is_renamed_and_keeps_its_orders(owner):
+    _seed()
+    _act(owner, action="create_phase", payload={"name": "Phase Two"})
+    answer = _act(owner, action="rename_phase", recordId="phase-one", payload={"name": "Autumn Drop"})
+    assert answer.json()["summary"] == "Drop phase Phase One renamed to Autumn Drop"
+    state = owner.get("/api/production/state").json()
+    assert {"id": "phase-one", "name": "Autumn Drop"} in state["phases"]
+    assert state["orders"][0]["phaseName"] == "Autumn Drop"
+    taken = _act(owner, action="rename_phase", recordId="phase-one", payload={"name": "phase two"})
+    assert taken.status_code == 409 and taken.json() == {"error": "Another drop phase already has that name"}
+    assert _act(owner, action="rename_phase", recordId="phase-one", payload={"name": " "}).status_code == 400
+    # A new phase named as the renamed one was first called gets its own.
+    assert _act(owner, action="create_phase", payload={"name": "Phase One"}).json()["recordId"] == "phase-one-2"
+
+
+def test_a_deleted_phase_leaves_its_orders_unassigned(owner):
+    _seed()
+    answer = _act(owner, action="delete_phase", recordId="phase-one")
+    assert answer.json()["summary"] == "Drop phase Phase One deleted · 1 order moved to Unassigned"
+    state = owner.get("/api/production/state").json()
+    assert state["phases"] == []
+    assert len(state["orders"]) == 1 and not state["orders"][0].get("phaseId")
+    assert _act(owner, action="delete_phase", recordId="phase-one").status_code == 404
+
+
+# ── The photo library ─────────────────────────────────────────────────────────
+
+
+def test_the_library_lists_each_stored_photo_once_and_reuses_it(owner, bucket):
+    _seed()
+    saved = owner.post("/api/production/order-photos", data={"order": "807"},
+                       files={"file": ("front.png", PNG, "image/png")}).json()["photo"]
+    library = owner.get("/api/production/photo-library").json()["photos"]
+    assert [(p["id"], p["source"], p["sourceKind"]) for p in library] == [(saved["id"], "HBA-PO-807", "order")]
+
+    attached = owner.post("/api/production/sample-photos/attach", json={"sample": "SMP-1", "photoIds": [saved["id"]]})
+    assert attached.status_code == 201, attached.text
+    reused = attached.json()["photos"][0]
+    assert reused["id"] != saved["id"] and reused["name"] == "front.png"
+    assert len(bucket.files) == 1  # stored once
+    assert owner.get(reused["url"]).content == PNG
+    sample = owner.get("/api/production/state").json()["samples"][0]
+    assert sample["photoCount"] == 1 and sample["photoUrl"] == reused["url"]
+    # Still one entry in the library, and adding it again adds nothing.
+    assert len(owner.get("/api/production/photo-library").json()["photos"]) == 1
+    again = owner.post("/api/production/sample-photos/attach", json={"sample": "SMP-1", "photoIds": [saved["id"]]})
+    assert again.json()["photos"] == []
+
+
+def test_the_library_leaves_out_deleted_records_and_documents(owner, bucket):
+    _seed()
+    owner.post("/api/production/sample-photos", data={"sample": "SMP-1"}, files={"file": ("a.png", PNG, "image/png")})
+    owner.post("/api/production/documents", data={"module": "Samples", "recordId": "SMP-1"},
+               files={"file": ("b.png", PNG, "image/png")})
+    assert len(owner.get("/api/production/photo-library").json()["photos"]) == 1
+    _act(owner, action="delete_sample", recordId="SMP-1")
+    assert owner.get("/api/production/photo-library").json()["photos"] == []
+
+
+def test_attaching_needs_a_library_photo_and_an_editor(owner, bucket):
+    _seed()
+    document = owner.post("/api/production/documents", data={"module": "Documents", "recordId": "general"},
+                          files={"file": ("x.png", PNG, "image/png")}).json()["document"]
+    refused = owner.post("/api/production/order-photos/attach", json={"order": "807", "photoIds": [document["id"]]})
+    assert refused.status_code == 404
+    assert owner.post("/api/production/order-photos/attach", json={"order": "807", "photoIds": []}).status_code == 400
+    saved = owner.post("/api/production/order-photos", data={"order": "807"},
+                       files={"file": ("front.png", PNG, "image/png")}).json()["photo"]
+    viewer = _person("viewer@example.com", "production_viewer")
+    assert viewer.get("/api/production/photo-library").status_code == 200
+    assert viewer.post("/api/production/sample-photos/attach",
+                       json={"sample": "SMP-1", "photoIds": [saved["id"]]}).status_code == 403

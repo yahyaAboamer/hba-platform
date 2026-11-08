@@ -54,8 +54,9 @@ NEEDS: dict[str, str] = {
     **{
         action: Permission.PRODUCTION_EDIT
         for action in (
-            "create_phase", "assign_phase", "create_order", "update_order", "create_task", "create_sample",
-            "update_sample", "update_task", "delete_task", "confirm_task", "reopen_task", "sample_status",
+            "create_phase", "rename_phase", "delete_phase", "assign_phase", "create_order", "update_order",
+            "delete_order", "create_task", "create_sample", "update_sample", "delete_sample", "update_task",
+            "delete_task", "confirm_task", "reopen_task", "sample_status",
         )
     },
     "qc_check": Permission.PRODUCTION_QC,
@@ -67,14 +68,18 @@ NEEDS: dict[str, str] = {
 
 MODULE_OF: dict[str, str] = {
     "create_phase": "Production Orders",
+    "rename_phase": "Production Orders",
+    "delete_phase": "Production Orders",
     "assign_phase": "Production Orders",
     "create_task": "Production Tasks",
     "create_sample": "Samples",
     "update_sample": "Samples",
+    "delete_sample": "Samples",
     "qc_check": "Quality Control",
     "sample_status": "Samples",
     "create_order": "Production Orders",
     "update_order": "Production Orders",
+    "delete_order": "Production Orders",
     "create_supplier": "Suppliers",
     "supplier_update": "Supplier Portal",
     "approve_payment": "Payments",
@@ -219,10 +224,60 @@ def _create_phase(db, body, payload, actor):
     slug = phase_slug(name)
     if not slug:
         raise Refused(400, "Enter a phase name containing letters or numbers")
-    if db.get(ProductionPhase, slug) is None:
+    # The same name finds the same phase, as before. A phase renamed since
+    # keeps its old slug, so a new phase whose slug that is gets its own.
+    base, step = slug, 2
+    while (existing := db.get(ProductionPhase, slug)) is not None and existing.name.lower() != name.lower():
+        slug, step = f"{base}-{step}", step + 1
+    if existing is None:
         db.add(ProductionPhase(id=slug, name=name, created_at=_now()))
         db.flush()
     return slug, f"Drop phase {name} created"
+
+
+def _phase_by_id(db: Session, body: dict) -> ProductionPhase:
+    phase_id = clean_text(body.get("recordId"), "", 120)
+    phase = db.get(ProductionPhase, phase_id) if phase_id else None
+    if phase is None:
+        raise Refused(404, "Drop phase was not found")
+    return phase
+
+
+def _rename_phase(db, body, payload, actor):
+    """A new name for a phase. Its id stays the slug it was made with, so
+    every order keeps pointing at it."""
+    phase = _phase_by_id(db, body)
+    name = clean_text(payload.get("name"), "", 80)
+    if not name:
+        raise Refused(400, "Phase name is required")
+    taken = db.scalar(
+        select(ProductionPhase.id).where(
+            func.lower(ProductionPhase.name) == name.lower(), ProductionPhase.id != phase.id
+        )
+    )
+    if taken:
+        raise Refused(409, "Another drop phase already has that name")
+    old = phase.name
+    phase.name = name
+    return phase.id, f"Drop phase {old} renamed to {name}"
+
+
+def _delete_phase(db, body, payload, actor):
+    """A phase is only a label: its orders stay, unassigned."""
+    phase = _phase_by_id(db, body)
+    orders = db.scalars(select(ProductionOrder).where(ProductionOrder.phase_id == phase.id)).all()
+    live = 0
+    for order in orders:
+        order.phase_id = None
+        if order.deleted_at is None:
+            live += 1
+            order.updated_at = _now()
+    name, phase_id = phase.name, phase.id
+    db.flush()
+    db.delete(phase)
+    db.flush()
+    moved = f" · {live} {'order' if live == 1 else 'orders'} moved to Unassigned" if live else ""
+    return phase_id, f"Drop phase {name} deleted{moved}"
 
 
 def _assign_phase(db, body, payload, actor):
@@ -381,6 +436,18 @@ def _update_order(db, body, payload, actor):
     if isinstance(phase, str):
         existing.phase_id = phase or None
     return code, f"{code} updated · {quantity} units · {status}"
+
+
+def _delete_order(db, body, payload, actor):
+    """Hidden, not erased: the row keeps its code, stages and checks."""
+    code = _order_record_id(db, body)
+    if not code:
+        raise Refused(400, "Production order code is required")
+    order = _order_by_code(db, code)
+    if order is None:
+        raise Refused(404, "Production order was not found or was already deleted")
+    order.deleted_at = order.updated_at = _now()
+    return code, f"{code} deleted"
 
 
 # ── Suppliers ─────────────────────────────────────────────────────────────────
@@ -650,6 +717,17 @@ def _sample_status(db, body, payload, actor):
     return record_id, "Sample marked Done" if done else "Sample reopened"
 
 
+def _delete_sample(db, body, payload, actor):
+    record_id = clean_text(body.get("recordId"), "", 120)
+    if not record_id:
+        raise Refused(400, "Sample ID is required")
+    sample = _live_sample(db, record_id)
+    if sample is None:
+        raise Refused(404, "Sample was not found or was already deleted")
+    sample.deleted_at = sample.updated_at = _now()
+    return record_id, f"{clean_text(sample.name, 'Sample')} deleted"
+
+
 # ── Quality control ───────────────────────────────────────────────────────────
 
 
@@ -686,9 +764,12 @@ def _qc_check(db, body, payload, actor):
 
 _ACTIONS = {
     "create_phase": _create_phase,
+    "rename_phase": _rename_phase,
+    "delete_phase": _delete_phase,
     "assign_phase": _assign_phase,
     "create_order": _create_order,
     "update_order": _update_order,
+    "delete_order": _delete_order,
     "create_supplier": _create_supplier,
     "supplier_update": _supplier_update,
     "approve_payment": _approve_payment,
@@ -700,6 +781,7 @@ _ACTIONS = {
     "delete_task": _delete_task,
     "create_sample": lambda db, body, payload, actor: _save_sample(db, body, payload, actor, create=True),
     "update_sample": lambda db, body, payload, actor: _save_sample(db, body, payload, actor, create=False),
+    "delete_sample": _delete_sample,
     "sample_status": _sample_status,
     "qc_check": _qc_check,
 }
