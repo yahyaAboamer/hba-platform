@@ -812,3 +812,9 @@
 .product__assign-list li { padding: 6px 0; font-size: 13.5px; }
 .product__assign-list label { display: flex; align-items: center; gap: 9px; cursor: pointer; min-height: 28px; }
 .product__assign-acts { display: flex; gap: 9px; margin-top: 14px; flex-wrap: wrap; }
+
+/* Refresh from Shopify, sort, and how fresh the list is (9 November 2026). */
+.products__sync { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.products__synced { font-size: 12.5px; color: var(--quiet); }
+.products__tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.products__sort { min-height: 38px; }

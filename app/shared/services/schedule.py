@@ -53,6 +53,9 @@ SCHEDULE: dict[str, tuple[timedelta, dict]] = {
     # Re-read what is still undelivered (app.shared.services.reconcile, ADR 0051).
     # Every six hours: a stuck order is days old, not minutes.
     JobKind.RESYNC_IN_FLIGHT: (timedelta(hours=6), {}),
+    # The whole catalogue, daily: the backstop for product webhooks that never
+    # arrived (app.shared.services.shopify.catalogue). Ordinary reads; an upsert.
+    JobKind.SYNC_CATALOGUE: (timedelta(days=1), {}),
     # Operations' reads (ADR 0057): every 5 minutes, so no number on the
     # dashboard is more than 10 minutes old (app.modules.operations.services.polling).
     JobKind.ORDER_OPS_SHOPIFY: (POLL_EVERY, {}),

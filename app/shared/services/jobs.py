@@ -57,6 +57,11 @@ class JobKind:
     #: Shopify refuses must never be able to stop orders indexing.
     SYNC_CATALOGUE = "shopify_sync_catalogue"
 
+    #: Re-read one product after Shopify says it was created or edited
+    #: (products/create, products/update). The daily catalogue walk is the
+    #: backstop for a delivery that never arrived.
+    SYNC_PRODUCT = "shopify_sync_product"
+
     #: Work out which parcels went to which model (Phase 3, W03/W05). Carries
     #: its own cursor and re-enqueues itself: a whole history in one handler is
     #: a lease held for minutes and lost entirely if it dies at the end.

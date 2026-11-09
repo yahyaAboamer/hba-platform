@@ -27,6 +27,12 @@ ORDER_TOPICS = frozenset(
     }
 )
 
+#: A product created or edited in Shopify. Each queues a re-read of that one
+#: product. ``products/delete`` is deliberately absent: a product that left
+#: the shop is still in somebody's wardrobe, so it is kept, as the catalogue
+#: walk keeps archived ones.
+PRODUCT_TOPICS = frozenset({"products/create", "products/update"})
+
 #: A Shopify order payload is a few kilobytes. This is the only unauthenticated
 #: endpoint on the service, so a body anywhere near a megabyte is not Shopify -
 #: and reading it into memory on a small dyno is a free denial of service.
@@ -82,10 +88,23 @@ def order_id_from(topic: str, payload: Any) -> str | None:
     """
     if not isinstance(payload, dict):
         return None
+    if topic.startswith("products/"):
+        # A product payload's ``id`` is the product's; it is not an order.
+        return None
     field = "order_id" if topic.startswith("refunds/") else "id"
     value = str(payload.get(field) or "").strip()
     if not value or len(value) > MAX_ENTITY_ID:
         # A Shopify order id is a short number. Anything longer is not one, and
         # reporting it as unusable is more useful than a 500 from the insert.
+        return None
+    return value
+
+
+def product_id_from(topic: str, payload: Any) -> str | None:
+    """Which product a products/* payload is about, or None."""
+    if topic not in PRODUCT_TOPICS or not isinstance(payload, dict):
+        return None
+    value = str(payload.get("id") or "").strip()
+    if not value.isdigit() or len(value) > MAX_ENTITY_ID:
         return None
     return value

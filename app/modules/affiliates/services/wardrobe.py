@@ -147,6 +147,36 @@ def _gift_lines(db: Session, affiliate_id: int | None = None, product_id: str | 
     return db.execute(query).all()
 
 
+def coverage_counts():
+    """``(shopify_product_id, models)`` for every product any model has.
+
+    The same two sources as `coverage_for` - matched gift parcels and hand
+    assignments - unioned so a model with it both ways is one model. A
+    subquery, so the catalogue can sort the whole shop by it, not one page.
+    """
+    from sqlalchemy import union
+
+    gifts = (
+        select(
+            OrderLineItem.shopify_product_id.label("shopify_product_id"),
+            ModelShipment.affiliate_id.label("affiliate_id"),
+        )
+        .join(OrderLineItem, OrderLineItem.shopify_order_id == ModelShipment.shopify_order_id)
+        .join(OrderIndex, OrderIndex.shopify_order_id == ModelShipment.shopify_order_id)
+        .where(ModelShipment.affiliate_id.is_not(None))
+        .where(_is_gift())
+        .where(OrderLineItem.after_delivery.is_not(True))
+        .where(OrderLineItem.shopify_product_id.is_not(None))
+    )
+    by_hand = select(ManualWardrobeItem.shopify_product_id, ManualWardrobeItem.affiliate_id)
+    pairs = union(gifts, by_hand).subquery()
+    return (
+        select(pairs.c.shopify_product_id, func.count().label("models"))
+        .group_by(pairs.c.shopify_product_id)
+        .subquery()
+    )
+
+
 def coverage_for(db: Session, product_ids: list[str]) -> dict[str, int]:
     """How many models have each of these products, in one query.
 

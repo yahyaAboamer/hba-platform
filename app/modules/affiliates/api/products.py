@@ -11,6 +11,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.shared.api.deps import require_permission
+from app.shared.services.shopify.catalogue import catalogue_refreshing, refresh_catalogue_now
 from app.core.permissions import Permission
 from app.db import get_session
 from app.shared.models.catalogue import Product, ProductStatus, ProductVariant
@@ -41,6 +42,7 @@ def list_products(
     all_products: bool = False,
     scope: str | None = None,
     search: str | None = None,
+    sort: str = "name",
     limit: int = 60,
     offset: int = 0,
     _actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_VIEW)),
@@ -102,9 +104,23 @@ def list_products(
         select(func.count()).select_from(query.subquery())
     ) or 0
 
+    # *Most received* sorts the whole shop, not one page, by the coverage
+    # column the table shows. Ties, and products nobody has, fall back to the
+    # name so the order is stable between pages.
+    if sort in ("received", "least_received"):
+        from app.modules.affiliates.services.wardrobe import coverage_counts
+
+        counts = coverage_counts()
+        models = func.coalesce(counts.c.models, 0)
+        query = query.outerjoin(
+            counts, counts.c.shopify_product_id == Product.shopify_product_id
+        ).order_by(models.desc() if sort == "received" else models.asc(), Product.title)
+    else:
+        query = query.order_by(Product.title)
+
     rows = list(
         db.scalars(
-            query.order_by(Product.title)
+            query
             .offset(max(0, offset))
             .limit(min(max(1, limit), 200))
         )
@@ -170,7 +186,12 @@ def list_products(
             for row in rows
         ],
         "showing": scope,
+        "sort": sort if sort in ("received", "least_received") else "name",
         "total": total,
+        # When the catalogue was last read, and whether a read is due now -
+        # what the *Refresh products* button waits on.
+        "last_synced_at": _isoformat_or_none(db.scalar(select(func.max(Product.synced_at)))),
+        "refreshing": catalogue_refreshing(db),
         "offset": max(0, offset),
         # The counts inside the three filter labels - *Active 42* - which do
         # not move with the search, as the export's do not.
@@ -197,6 +218,21 @@ def list_products(
         )
         or 0,
     }
+
+
+@router.post("/refresh")
+def refresh_products(
+    _actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_MANAGE)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """*Refresh products*: read the whole catalogue from Shopify now.
+
+    Queued, not run here - a few pages of reads is not a request to wait on.
+    A click while a read is already under way joins it.
+    """
+    state, _job = refresh_catalogue_now(db)
+    db.commit()
+    return {"status": state}
 
 
 @router.get("/{shopify_product_id}")
@@ -317,3 +353,7 @@ def delete_manual_assignment(
         raise HTTPException(404, "She has no hand assignment of this product.")
     db.commit()
     return {"roster": roster_for(db, shopify_product_id)}
+
+
+def _isoformat_or_none(value) -> str | None:
+    return value.isoformat() if value else None

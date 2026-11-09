@@ -144,6 +144,15 @@ PRODUCT_FIELDS = """
     }
 """
 
+#: One product, after a products/create or products/update webhook.
+PRODUCT_ONE = f"""
+query ProductOne($id: ID!) {{
+  product(id: $id) {{
+    {PRODUCT_FIELDS}
+  }}
+}}
+"""
+
 PRODUCTS_PAGE = f"""
 query ProductsPage($first: Int!, $after: String) {{
   products(first: $first, after: $after, sortKey: UPDATED_AT) {{

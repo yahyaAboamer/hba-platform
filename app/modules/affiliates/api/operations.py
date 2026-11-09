@@ -26,7 +26,7 @@ from app.shared.services.shopify.client import (
 )
 from app.shared.services.shopify.client import REQUIRED_SCOPES
 from app.modules.affiliates.services.recipients import unmatched
-from app.shared.services.shopify.catalogue import catalogue_state
+from app.shared.services.shopify.catalogue import catalogue_state, refresh_catalogue_now
 from app.shared.services.shopify.discounts import REQUIRED_SCOPE, verify_discount_code
 from app.shared.services.shopify.facts import DEFAULT_SAMPLE
 
@@ -489,13 +489,10 @@ def sync_catalogue_route(
     Deduped, so a second click while one is running joins the first rather than
     starting a second walk over the same shop.
     """
-    job = enqueue(
-        db,
-        JobKind.SYNC_CATALOGUE,
-        {},
-        dedupe_key=JobKind.SYNC_CATALOGUE,
-    )
-    if job is None:
+    # Not a plain enqueue: the daily read waits under the same key, due
+    # tomorrow, and would absorb this one (refresh_catalogue_now).
+    state, job = refresh_catalogue_now(db)
+    if state == "running" or job is None:
         raise HTTPException(
             409, "A catalogue sync is already running. Wait for it to finish."
         )

@@ -850,3 +850,31 @@ td.profile__muted,
 .profile__card-actions {
   margin: 10px 0 0;
 }
+
+/* Add a product to her wardrobe by hand (ADR 0061, from her side). */
+.profile__subhead-end { display: flex; align-items: center; gap: 12px; font-size: 12.5px; color: var(--quiet); }
+.profile__piece-wrap { position: relative; display: flex; flex-direction: column; }
+.profile__piece-wrap > .profile__piece { flex: 1; padding-bottom: 30px; }
+.profile__piece-remove {
+  position: absolute; right: 10px; bottom: 8px;
+  padding: 2px 6px; border: 0; background: none; cursor: pointer;
+  font: inherit; font-size: 12px; color: var(--quiet); text-decoration: underline;
+}
+.profile__piece-remove:hover { color: var(--ink); }
+.wardrobe-add { margin-bottom: 14px; padding: 16px 18px; }
+.wardrobe-add__title { margin: 0; font-size: 15px; font-weight: 400; }
+.wardrobe-add__note { margin: 6px 0 12px; font-size: 13px; line-height: 1.5; color: var(--quiet); max-width: 62ch; }
+.wardrobe-add__search { width: 100%; max-width: 420px; }
+.wardrobe-add__list { list-style: none; margin: 10px 0 0; padding: 0; max-height: 320px; overflow-y: auto; }
+.wardrobe-add__option {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px;
+  padding: 6px 8px; border: 0; border-radius: var(--radius-sm);
+  background: none; color: var(--ink); font: inherit; font-size: 13.5px; text-align: left; cursor: pointer;
+}
+.wardrobe-add__option:hover:not(:disabled) { background: var(--paper); }
+.wardrobe-add__option:disabled { cursor: default; color: var(--quiet); }
+.wardrobe-add__thumb { flex: none; width: 34px; height: 40px; border-radius: var(--radius-sm); object-fit: cover; }
+.wardrobe-add__has { margin-left: auto; font-size: 12px; color: var(--quiet); }
+.wardrobe-add__chosen { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.wardrobe-add__size { margin-top: 12px; min-height: 38px; }
+.wardrobe-add__acts { display: flex; gap: 9px; margin-top: 14px; flex-wrap: wrap; }
