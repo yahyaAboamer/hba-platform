@@ -75,6 +75,8 @@ TAPS = {"👆 Confirm order": "confirm", "👆 Edit order": "edit", "👆 Cancel
 NOT_DELIVERED = "⚠️ Not delivered"
 #: n8n's stand-in for something she sent that it could not show.
 CANNOT_VIEW = "⚠️ Sent something we cannot view"
+#: n8n's other stand-in for the same, in its earliest messages.
+UNSUPPORTED = "[unsupported message]"
 #: n8n's stand-in for a reaction, which never said what it was on.
 REACTION = "[reaction message]"
 
@@ -223,7 +225,7 @@ def _kind_and_body(message: OldMessage) -> tuple[str, str | None, dict | None]:
     if message.direction == "in":
         if words in TAPS:
             return "button", message.text, None
-        if words.startswith(CANNOT_VIEW):
+        if words.startswith(CANNOT_VIEW) or words == UNSUPPORTED:
             return "unsupported", None, None
         if words == REACTION:
             return "reaction", None, None

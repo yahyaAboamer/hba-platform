@@ -190,7 +190,42 @@ def test_a_kind_this_inbox_cannot_show_is_kept_not_dropped(db, connected):
     stored = db.query(InboxMessage).one()
     assert (stored.kind, stored.extra) == ("unsupported", {"type": "location"})
     conversation = db.query(InboxConversation).one()
-    assert conversation.last_preview == "A message this inbox cannot show"
+    assert conversation.last_preview == "Shared a location (this inbox cannot show locations yet)"
+    assert conversation.unread_count == 1
+
+
+def test_a_message_whatsapp_held_back_keeps_what_it_was(db, connected):
+    """A poll vote reaches a business number only as error 131051, naming
+    what it was. The chat says that, rather than the general words."""
+    message = {
+        "from": HER,
+        "id": "wamid.P",
+        "timestamp": str(T0),
+        "type": "unsupported",
+        "unsupported": {"type": "poll_update", "raw_type": "poll_update"},
+        "errors": [{"code": 131051, "title": "Message type unknown"}],
+    }
+    apply_event(db, _callback(messages=[message]))
+    stored = db.query(InboxMessage).one()
+    assert (stored.kind, stored.extra) == ("unsupported", {"type": "unsupported", "raw_type": "poll_update"})
+    conversation = db.query(InboxConversation).one()
+    assert conversation.last_preview == "Voted in a poll (WhatsApp does not share the vote)"
+
+
+@pytest.mark.parametrize(
+    ("extra", "words"),
+    [
+        ({"type": "unsupported", "raw_type": "album"}, "Sent an album (its photos show as their own messages)"),
+        ({"type": "unsupported", "raw_type": "something_new"}, "Something WhatsApp does not share with this inbox"),
+        ({"type": "unsupported"}, "Something WhatsApp does not share with this inbox"),
+        ({"type": "contacts"}, "Shared a contact (this inbox cannot show contacts yet)"),
+        ({"type": "something_new"}, "A message this inbox cannot show"),
+        # Brought over from n8n, which kept nothing.
+        (None, "A message this inbox cannot show"),
+    ],
+)
+def test_the_words_for_a_message_the_inbox_cannot_draw(extra, words):
+    assert events.held_back_words(extra) == words
 
 
 def test_a_reaction_is_kept_but_is_not_a_message_to_answer(db, connected):

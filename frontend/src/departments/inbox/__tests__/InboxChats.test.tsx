@@ -329,6 +329,21 @@ describe("an open chat", () => {
     expect(within(pane).getByText("In reply to:").parentElement?.textContent).toContain("This one");
   });
 
+  it("says what a message it cannot draw was, where WhatsApp named it", async () => {
+    serve({
+      messages: [
+        message(1, { kind: "unsupported", body: null, note: "Voted in a poll (WhatsApp does not share the vote)" }),
+        message(2, { kind: "unsupported", body: null }),
+      ],
+    });
+    show("/inbox/chats/12");
+
+    const pane = await screen.findByRole("region", { name: "Chat with Nour Adel" });
+    expect(await within(pane).findByText("Voted in a poll (WhatsApp does not share the vote)")).toBeTruthy();
+    // One kept from before it was named says what it always said.
+    expect(within(pane).getByText("A message this inbox cannot show")).toBeTruthy();
+  });
+
   it("marks her read when it opens with something unread", async () => {
     serve({ detail: { unread_count: 2 }, messages: THREAD });
     show("/inbox/chats/12");

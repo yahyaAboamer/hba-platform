@@ -27,7 +27,7 @@ from app.modules.inbox.models import InboxConversation, InboxMedia, InboxMessage
 from app.shared.models.orders import OrderIndex
 from app.shared.services.audit import record_audit
 from app.modules.inbox.services import outbound, payments, sending, tags
-from app.modules.inbox.services.events import ANSWERS, _TAP
+from app.modules.inbox.services.events import ANSWERS, _TAP, held_back_words
 from app.modules.inbox.services.media import can_try_again
 from app.modules.inbox.services.meta import MetaClient
 from app.shared.services.stale import admin_url
@@ -314,6 +314,8 @@ def describe_message(
         "direction": message.direction,
         "kind": message.kind,
         "body": message.body,
+        # For a message the inbox cannot draw: what it was, in words.
+        "note": held_back_words(extra) if message.kind == "unsupported" else None,
         "status": message.status,
         "error": message.error,
         # customer, staff, automatic, or imported (the old inbox, which never
