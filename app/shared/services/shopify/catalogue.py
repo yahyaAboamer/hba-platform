@@ -347,6 +347,79 @@ def sync_catalogue(db: Session, client, *, page_size: int = PAGE_SIZE) -> dict:
     }
 
 
+def sync_one_product(db: Session, client, product_id: str) -> bool:
+    """Re-read one product and write it. False when Shopify no longer has it.
+
+    A product deleted in Shopify is left as it is here: it is still in
+    somebody's wardrobe, as an archived one is.
+    """
+    from app.shared.services.shopify.queries import PRODUCT_ONE
+
+    client.require_scope("read_products")
+    payload = client.execute(PRODUCT_ONE, {"id": f"gid://shopify/Product/{product_id}"})
+    node = (payload or {}).get("product")
+    if not node:
+        return False
+    values = normalise_product(node)
+    if values is None:
+        report(Anomaly.CATALOGUE_PRODUCT_SKIPPED, skipped=1, products=0)
+        return False
+    upsert_product(db, values, normalise_variants(node, values["shopify_product_id"]))
+    return True
+
+
+def refresh_catalogue_now(db: Session):
+    """Read the whole catalogue as soon as the worker is free.
+
+    Returns ``(state, job)``: ``"running"`` when a read is already under way,
+    else ``"queued"``.
+    The daily read waits as a pending job due tomorrow under the same dedupe
+    key, so a plain enqueue would be absorbed by it and nothing would happen
+    for a day: bringing that job forward is what *now* means.
+    """
+    from app.core.businesstime import utcnow
+    from app.shared.models.integration import BackgroundJob
+    from app.shared.services.jobs import JobStatus, enqueue
+
+    outstanding = db.scalar(
+        select(BackgroundJob)
+        .where(BackgroundJob.dedupe_key == JobKind.SYNC_CATALOGUE)
+        .where(BackgroundJob.status.in_([JobStatus.PENDING, JobStatus.RUNNING]))
+        .with_for_update()
+    )
+    if outstanding is not None:
+        if outstanding.status == JobStatus.RUNNING:
+            return "running", outstanding
+        outstanding.run_after = min(outstanding.run_after, utcnow())
+        db.flush()
+        return "queued", outstanding
+    job = enqueue(db, JobKind.SYNC_CATALOGUE, {}, dedupe_key=JobKind.SYNC_CATALOGUE)
+    db.flush()
+    return "queued", job
+
+
+def catalogue_refreshing(db: Session) -> bool:
+    """A full read is due now or under way (not tomorrow's daily one)."""
+    from app.core.businesstime import utcnow
+    from app.shared.models.integration import BackgroundJob
+    from app.shared.services.jobs import JobStatus
+
+    return bool(
+        db.scalar(
+            select(func.count())
+            .select_from(BackgroundJob)
+            .where(BackgroundJob.dedupe_key == JobKind.SYNC_CATALOGUE)
+            .where(
+                (BackgroundJob.status == JobStatus.RUNNING)
+                | (
+                    (BackgroundJob.status == JobStatus.PENDING)
+                    & (BackgroundJob.run_after <= utcnow())
+                )
+            )
+        )
+    )
+
+
 def frozen_lines(fulfilments: list[dict] | None, return_status: str | None) -> set[str] | None:
     """The lines an order was frozen with, or `None` when it is not frozen.
 
@@ -503,3 +576,18 @@ def catalogue_state(db: Session) -> dict:
         "line_items": lines,
         "last_synced_at": newest.isoformat() if newest else None,
     }
+
+
+@register_handler(JobKind.SYNC_PRODUCT)
+def _handle_sync_product(db: Session, payload: dict) -> None:
+    """One product, after Shopify said it was created or edited."""
+    from app.shared.services.shopify.sync import PERMANENT, build_client
+
+    product_id = str(payload.get("product_id") or "")
+    if not product_id.isdigit():
+        raise PermanentFailure("No product id in the job.")
+    try:
+        sync_one_product(db, build_client(), product_id)
+    except PERMANENT as exc:
+        raise PermanentFailure(str(exc)) from exc
+    db.commit()

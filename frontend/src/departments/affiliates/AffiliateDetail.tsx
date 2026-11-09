@@ -17,6 +17,7 @@ import { formatEgp, formatMonth } from "../../lib/money";
 import { ROSTER_STATUS } from "./Affiliates";
 import type { Affiliate } from "./Affiliates";
 import { ApproveDialog, ModelLifecycle } from "./ModelLifecycle";
+import { WardrobeAdd } from "./WardrobeAdd";
 import "./PaymentDetail.css";
 import "./AffiliateDetail.css";
 
@@ -67,7 +68,9 @@ type WardrobeItem = {
   state: string;
   image_url: string | null;
   image_thumb_url: string | null;
-  shopify_order_id: string;
+  shopify_order_id: string | null;
+  /** Staff added it by hand, with no order behind it (ADR 0061). */
+  manual?: boolean;
 };
 
 type Detail = Affiliate & {
@@ -216,6 +219,8 @@ export function AffiliateDetail({ session }: { session: Session }) {
   const [month, setMonth] = useState(query.get("month")?.match(/^\d{4}-(0[1-9]|1[0-2])$/) ? query.get("month")! : session.platform.working_month);
   const [wardrobeError, setWardrobeError] = useState<string | null>(null);
   const [wardrobeReload, setWardrobeReload] = useState(0);
+  const [addingPiece, setAddingPiece] = useState(false);
+  const [removingPiece, setRemovingPiece] = useState<string | null>(null);
   const [detail, setDetail] = useState<Detail | null>(null);
   const [earnings, setEarnings] = useState<Earnings | null>(null);
   /** Her content record and agreed months, and her orders for the month -
@@ -1187,8 +1192,19 @@ export function AffiliateDetail({ session }: { session: Session }) {
           {wardrobe && <>
             <div className="profile__subhead">
               <h2>Received</h2>
-              <span>{wardrobe.received.length} {wardrobe.received.length === 1 ? "piece" : "pieces"}</span>
+              <span className="profile__subhead-end">
+                <span>{wardrobe.received.length} {wardrobe.received.length === 1 ? "piece" : "pieces"}</span>
+                {can(session, "affiliates.manage") && !addingPiece && (
+                  <button type="button" className="button" onClick={() => setAddingPiece(true)}>Add a product</button>
+                )}
+              </span>
             </div>
+            {addingPiece && (
+              <WardrobeAdd affiliateId={detail.id} name={detail.name}
+                owned={new Set(wardrobe.received.map((item) => item.shopify_product_id).filter((each): each is string => !!each))}
+                onDone={() => { setAddingPiece(false); setWardrobeReload((n) => n + 1); }}
+                onCancel={() => setAddingPiece(false)} />
+            )}
             {wardrobe.received.length === 0 ? (
               <div className="surface"><p className="empty">Nothing received yet.</p></div>
             ) : (
@@ -1200,12 +1216,29 @@ export function AffiliateDetail({ session }: { session: Session }) {
                       : <span className="profile__piece-image profile__piece-image--none">image</span>}
                     <span className="profile__piece-text">
                       <span className="profile__piece-name">{item.title}</span>
-                      <span className="profile__piece-size">Size {item.size || "not recorded"}</span>
+                      <span className="profile__piece-size">Size {item.size || "not recorded"}{item.manual ? " · Added by hand" : ""}</span>
                     </span>
                   </>;
-                  return item.shopify_product_id
-                    ? <Link key={`${item.shopify_order_id}-${index}`} className="profile__piece" to={`/affiliates/products/${item.shopify_product_id}`}>{body}</Link>
-                    : <div key={`${item.shopify_order_id}-${index}`} className="profile__piece">{body}</div>;
+                  const key = `${item.shopify_order_id ?? "hand"}-${item.shopify_product_id}-${index}`;
+                  const piece = item.shopify_product_id
+                    ? <Link key={key} className="profile__piece" to={`/affiliates/products/${item.shopify_product_id}`}>{body}</Link>
+                    : <div key={key} className="profile__piece">{body}</div>;
+                  if (!(item.manual && item.shopify_product_id && can(session, "affiliates.manage"))) return piece;
+                  const productId = item.shopify_product_id;
+                  return <div key={key} className="profile__piece-wrap">
+                    {piece}
+                    <button type="button" className="profile__piece-remove" disabled={removingPiece === productId}
+                      aria-label={`Remove ${item.title} from the wardrobe`}
+                      onClick={async () => {
+                        setRemovingPiece(productId);
+                        try {
+                          await api.del(`/api/products/${productId}/manual-assignments/${detail.id}`);
+                          setWardrobeReload((n) => n + 1);
+                        } catch (caught) {
+                          setWardrobeError(caught instanceof Error ? caught.message : "Could not remove it.");
+                        } finally { setRemovingPiece(null); }
+                      }}>Remove</button>
+                  </div>;
                 })}
               </div>
             )}

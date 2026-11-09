@@ -158,3 +158,64 @@ def test_coverage_is_out_of_the_models_working_now(client):
     _product(PANTS, "Wide-leg trousers")
 
     assert client.get("/api/products").json()["active_models"] == 0
+
+
+# ── Sorting by how many models have it (9 November 2026) ──────────────────────
+
+
+def _model_with(name: str, *product_ids: str) -> None:
+    """A model who has these products, assigned by hand (ADR 0061)."""
+    with engine.begin() as connection:
+        account = connection.execute(
+            text(
+                "INSERT INTO user_account (email, password_hash, status, display_name)"
+                " VALUES (:e, 'x', 'active', :n) RETURNING id"
+            ),
+            {"e": f"{name}@example.com", "n": name},
+        ).scalar_one()
+        model = connection.execute(
+            text(
+                "INSERT INTO affiliate_profile (user_account_id, name, account_kind, status)"
+                " VALUES (:u, :n, 'model', 'active') RETURNING id"
+            ),
+            {"u": account, "n": name},
+        ).scalar_one()
+        for product_id in product_ids:
+            connection.execute(
+                text(
+                    "INSERT INTO manual_wardrobe_item (affiliate_id, shopify_product_id)"
+                    " VALUES (:a, :p)"
+                ),
+                {"a": model, "p": product_id},
+            )
+
+
+def _titles(client, **params) -> list[str]:
+    body = client.get("/api/products", params=params).json()
+    return [row["title"] for row in body["products"]]
+
+
+def test_most_received_sorts_the_whole_shop_not_one_page(client):
+    _product("a", "Apron")
+    _product("b", "Bomber")
+    _product("c", "Cargo")
+    _model_with("one", "c", "b")
+    _model_with("two", "c")
+
+    assert _titles(client) == ["Apron", "Bomber", "Cargo"]
+    assert _titles(client, sort="received") == ["Cargo", "Bomber", "Apron"]
+    # The first page of one is the most received, not the first by name.
+    assert _titles(client, sort="received", limit=1) == ["Cargo"]
+    assert _titles(client, sort="received", limit=1, offset=1) == ["Bomber"]
+    assert _titles(client, sort="least_received") == ["Apron", "Bomber", "Cargo"]
+
+
+def test_the_sort_agrees_with_the_count_it_shows(client):
+    _product("a", "Apron")
+    _product("b", "Bomber")
+    _model_with("one", "a", "b")
+    _model_with("two", "b")
+
+    rows = client.get("/api/products", params={"sort": "received"}).json()["products"]
+    counts = [row["models_with_it"] for row in rows]
+    assert counts == sorted(counts, reverse=True) == [2, 1]

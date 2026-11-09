@@ -128,3 +128,16 @@ delivery, or a rotated secret nobody noticed.
 That is deliberate. A webhook is a delivery mechanism, not a source of truth,
 and building on the assumption that every one arrives is how a missed delivery
 becomes a missing month of commission.
+
+## Product topics (ADR 0078)
+
+Subscribe these too, in the same place, so a product created or edited in
+Shopify reaches the dashboard within a minute:
+
+- `products/create`
+- `products/update`
+
+Each queues a re-read of that one product. Without them the catalogue is
+still read in full once a day, and **Products → Refresh products** reads it
+on demand.
+

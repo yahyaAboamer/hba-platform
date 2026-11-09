@@ -41,3 +41,18 @@ Stored in a new table, `manual_wardrobe_item`: one row per model and product
 - A new migration joins the release gate's rehearsal list. It creates one
   table and touches nothing existing; downgrade drops it and the assignments
   with it.
+
+## Addendum — 9 November 2026: from the model's side too
+
+The owner asked for a button to assign a product to a model. The product page
+already had one; a model's **Wardrobe** tab now has **Add a product** as well,
+for anyone who may manage models. Staff search the whole catalogue (archived
+and draft products included, since a piece she has may no longer be on sale),
+pick one, optionally a size, and save. Products she has already received are
+listed but cannot be picked. It saves the same `manual_wardrobe_item` row
+through the same endpoint, so the product's coverage and her wardrobe agree. A
+piece added by hand reads *Added by hand* in her wardrobe and has **Remove**.
+
+The case that prompted it: gift orders placed under the house customer
+*Sara Mohamed* with code `sponsordis` and shipped to a number on no model's
+profile stay unmatched (ADR 0060) until somebody says whose they are.

@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 
 import { api, can } from "../../lib/api";
 import type { Session } from "../../lib/api";
+import { Pager } from "../../components/Pager";
 import "./Products.css";
 import "./PaymentDetail.css";
 
@@ -106,15 +107,43 @@ type Detail = {
 
 type Scope = "active" | "all" | "requests";
 
+type Sort = "name" | "received" | "least_received";
+
 type Listing = {
   products: Row[];
   total: number;
+  last_synced_at?: string | null;
+  /** A full read of the catalogue is due now or under way. */
+  refreshing?: boolean;
   counts: { active: number; all: number; requests: number };
   active_models: number;
 };
 
-/** The export's page is ten rows, with Previous and Next under it. */
-const CATALOGUE_PAGE = 10;
+/**
+ * Rows per page, chosen under the table (owner, 9 November 2026: his
+ * screenshot replaces the export's ten rows with Previous and Next).
+ * Remembered in this browser.
+ */
+const PAGE_SIZES = [10, 25, 50, 100];
+const PAGE_SIZE_KEY = "hba.products.pageSize";
+function savedPageSize(): number {
+  try {
+    const saved = Number(window.localStorage.getItem(PAGE_SIZE_KEY));
+    return PAGE_SIZES.includes(saved) ? saved : 50;
+  } catch { return 50; }
+}
+
+/** How long ago the catalogue was read, in words. */
+export function syncedAgo(iso: string | null | undefined, now = Date.now()): string {
+  if (!iso) return "never";
+  const minutes = Math.max(0, Math.round((now - new Date(iso).getTime()) / 60000));
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours} h ago`;
+  const days = Math.round(hours / 24);
+  return `${days} ${days === 1 ? "day" : "days"} ago`;
+}
 
 /**
  * *Products* — `vProducts` in the approved export.
@@ -135,17 +164,23 @@ export function Products({ session }: { session: Session }) {
   const asked_scope = params.get("scope");
   const scope: Scope =
     asked_scope === "all" || asked_scope === "requests" ? asked_scope : "active";
+  const asked_sort = params.get("sort");
+  const sort: Sort = asked_sort === "received" || asked_sort === "least_received" ? asked_sort : "name";
   const [search, setSearch] = useState(() => params.get("q") ?? "");
   const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(savedPageSize);
+  const [reload, setReload] = useState(0);
+  const [refreshAsked, setRefreshAsked] = useState(false);
+  const mayRefresh = can(session, "affiliates.manage");
 
   const remember = useCallback(
-    (next: { scope?: string; q?: string }) => {
+    (next: { scope?: string; q?: string; sort?: string }) => {
       setParams(
         (previous) => {
           const updated = new URLSearchParams(previous);
           for (const [key, value] of Object.entries(next)) {
             // The default filter and an empty search leave no trace.
-            if (!value || value === "active") updated.delete(key);
+            if (!value || value === "active" || value === "name") updated.delete(key);
             else updated.set(key, value);
           }
           return updated;
@@ -170,14 +205,15 @@ export function Products({ session }: { session: Session }) {
     return () => clearTimeout(timer);
   }, [search, remember]);
 
-  useEffect(() => setPage(0), [scope, asked]);
+  useEffect(() => setPage(0), [scope, asked, sort, pageSize]);
 
   useEffect(() => {
     const query = new URLSearchParams();
     query.set("scope", scope);
     if (asked.trim()) query.set("search", asked.trim());
-    query.set("limit", String(CATALOGUE_PAGE));
-    query.set("offset", String(page * CATALOGUE_PAGE));
+    if (sort !== "name") query.set("sort", sort);
+    query.set("limit", String(pageSize));
+    query.set("offset", String(page * pageSize));
     let live = true;
     api
       .get<Listing>(`/api/products?${query}`)
@@ -188,7 +224,30 @@ export function Products({ session }: { session: Session }) {
     return () => {
       live = false;
     };
-  }, [scope, asked, page]);
+  }, [scope, asked, sort, page, pageSize, reload]);
+
+  /*
+   * While a read of the catalogue is under way, look again every few
+   * seconds; the list redraws with the new and edited products when it ends.
+   */
+  const refreshing = Boolean(listing?.refreshing);
+  useEffect(() => {
+    if (!refreshing) { setRefreshAsked(false); return; }
+    const timer = window.setTimeout(() => setReload((n) => n + 1), 4000);
+    return () => window.clearTimeout(timer);
+  }, [refreshing, listing]);
+
+  async function refreshNow() {
+    setRefreshAsked(true);
+    setError(null);
+    try {
+      await api.post("/api/products/refresh", {});
+      setReload((n) => n + 1);
+    } catch (caught) {
+      setRefreshAsked(false);
+      setError(caught instanceof Error ? caught.message : "Could not refresh the products.");
+    }
+  }
 
   const rows = listing?.products ?? null;
   const total = listing?.total ?? 0;
@@ -203,6 +262,18 @@ export function Products({ session }: { session: Session }) {
       <div className="page__head">
         <div className="page__title">
           <h1>Products</h1>
+        </div>
+        <div className="products__sync">
+          {listing && (
+            <span className="products__synced" aria-live="polite">
+              {refreshing || refreshAsked ? "Reading products from Shopify…" : `Updated from Shopify ${syncedAgo(listing.last_synced_at)}`}
+            </span>
+          )}
+          {mayRefresh && (
+            <button type="button" className="button" disabled={refreshing || refreshAsked} onClick={refreshNow}>
+              {refreshing || refreshAsked ? "Refreshing…" : "Refresh products"}
+            </button>
+          )}
         </div>
       </div>
 
@@ -227,6 +298,17 @@ export function Products({ session }: { session: Session }) {
             </button>
           ))}
         </div>
+        <span className="products__tools">
+        <select
+          className="products__sort"
+          aria-label="Sort products"
+          value={sort}
+          onChange={(event) => remember({ sort: event.target.value })}
+        >
+          <option value="name">Name, A–Z</option>
+          <option value="received">Most received</option>
+          <option value="least_received">Fewest received</option>
+        </select>
         <input
           type="search"
           className="input products__search"
@@ -235,6 +317,7 @@ export function Products({ session }: { session: Session }) {
           placeholder="Search name or SKU"
           aria-label="Search products by name or SKU"
         />
+        </span>
       </div>
 
       {rows === null && !error && <p className="empty">Loading…</p>}
@@ -327,30 +410,18 @@ export function Products({ session }: { session: Session }) {
       )}
 
       {rows !== null && total > 0 && (
-        <div className="products__pager">
-          <span>
-            {page * CATALOGUE_PAGE + 1}–{page * CATALOGUE_PAGE + rows.length} of {total}
-            {asked.trim() ? " matching" : ""}
-          </span>
-          <span className="products__pager-acts">
-            <button
-              type="button"
-              className="button button--row"
-              disabled={page === 0}
-              onClick={() => setPage(page - 1)}
-            >
-              Previous
-            </button>
-            <button
-              type="button"
-              className="button button--row"
-              disabled={(page + 1) * CATALOGUE_PAGE >= total}
-              onClick={() => setPage(page + 1)}
-            >
-              Next
-            </button>
-          </span>
-        </div>
+        <Pager
+          page={page}
+          size={pageSize}
+          total={total}
+          sizes={PAGE_SIZES}
+          suffix={asked.trim() ? " matching" : ""}
+          onPage={setPage}
+          onSize={(size) => {
+            setPageSize(size);
+            try { window.localStorage.setItem(PAGE_SIZE_KEY, String(size)); } catch { /* private window */ }
+          }}
+        />
       )}
 
       {session && null}

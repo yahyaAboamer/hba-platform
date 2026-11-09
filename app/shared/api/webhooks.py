@@ -28,8 +28,10 @@ from app.shared.services.jobs import JobKind, enqueue, record_event
 from app.shared.services.shopify.webhooks import (
     MAX_BODY_BYTES,
     ORDER_TOPICS,
+    PRODUCT_TOPICS,
     delivery_id,
     order_id_from,
+    product_id_from,
     verify_shopify_hmac,
 )
 
@@ -190,6 +192,7 @@ async def shopify_webhook(request: Request, db: Session = Depends(get_session)) 
         payload = None
 
     order_id = order_id_from(topic, payload)
+    product_id = product_id_from(topic, payload)
 
     _event, newly_recorded = record_event(
         db,
@@ -197,7 +200,7 @@ async def shopify_webhook(request: Request, db: Session = Depends(get_session)) 
         external_id=delivery_id(raw_body, request.headers.get("X-Shopify-Webhook-Id")),
         topic=topic,
         payload=payload if isinstance(payload, dict) else None,
-        entity_id=order_id,
+        entity_id=order_id or product_id,
     )
 
     if not newly_recorded:
@@ -224,6 +227,22 @@ async def shopify_webhook(request: Request, db: Session = Depends(get_session)) 
                 Anomaly.WEBHOOK_UNUSABLE,
                 topic=topic,
                 reason="no order id in payload",
+            )
+    elif topic in PRODUCT_TOPICS:
+        if product_id:
+            # Saving a product in Shopify's editor often fires several updates
+            # in a row; they are one re-read.
+            enqueue(
+                db,
+                JobKind.SYNC_PRODUCT,
+                {"product_id": product_id, "reason": topic},
+                dedupe_key=f"{JobKind.SYNC_PRODUCT}:{product_id}",
+            )
+        else:
+            report(
+                Anomaly.WEBHOOK_UNUSABLE,
+                topic=topic,
+                reason="no product id in payload",
             )
 
     db.commit()
