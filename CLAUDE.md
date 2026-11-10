@@ -208,6 +208,11 @@ does not see it. Its `SKILL.md` writes the search script's path with
 run `python .claude/skills/ui-ux-pro-max/scripts/search.py "<query>" --domain <domain>`
 (`.venv/Scripts/python.exe` on Windows; standard library only).
 
+**Refining an existing screen or tab** (UX, wording, density, phone,
+accessibility, polish) follows the project skill
+`.claude/skills/screen-refinement/` — the method first used on Payments
+(PRs #151–#154). It is the owner's standard for every screen.
+
 Its results are recommendations. **The approved exports and the owner's
 explicit requirements win over them**, and a suggestion that departs from an
 approved screen is brought to the owner as a choice, not built.
