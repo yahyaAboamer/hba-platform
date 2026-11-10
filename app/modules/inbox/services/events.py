@@ -64,6 +64,35 @@ _PREVIEW = {
     "unsupported": "A message this inbox cannot show",
 }
 
+#: What a message the inbox cannot draw was, in words staff can act on. The
+#: key is WhatsApp's own name for it: the kind WhatsApp gave, or, for one
+#: WhatsApp held back (kind ``unsupported``), the ``raw_type`` it named.
+#: Only kinds seen arriving, or documented as arriving, are named here.
+HELD_BACK = {
+    "poll_update": "Voted in a poll (WhatsApp does not share the vote)",
+    "album": "Sent an album (its photos show as their own messages)",
+    "location": "Shared a location (this inbox cannot show locations yet)",
+    "contacts": "Shared a contact (this inbox cannot show contacts yet)",
+    "order": "Sent a cart from the catalogue (this inbox cannot show carts yet)",
+}
+#: WhatsApp held it back and did not say what it was.
+HELD_BACK_UNNAMED = "Something WhatsApp does not share with this inbox"
+
+
+def held_back_words(extra: dict | None) -> str:
+    """The words for a message of kind ``unsupported``.
+
+    ``extra`` is what ``_read_message`` kept: ``{"type": <WhatsApp's kind>}``,
+    plus ``raw_type`` when that kind was ``unsupported``. A message brought
+    over from n8n kept nothing, and gets the general words.
+    """
+    extra = extra or {}
+    kind = extra.get("type")
+    if kind == "unsupported":
+        return HELD_BACK.get(str(extra.get("raw_type") or ""), HELD_BACK_UNNAMED)
+    return HELD_BACK.get(str(kind or ""), _PREVIEW["unsupported"])
+
+
 #: WhatsApp's own code for "this number cannot be reached" - no WhatsApp.
 UNDELIVERABLE = "undeliverable"
 
@@ -140,6 +169,14 @@ def _read_message(message: dict) -> dict:
             body=_text(reaction.get("emoji"), 16),
             reply_to=_text(reaction.get("message_id"), 200),
         )
+    elif kind == "unsupported":
+        # WhatsApp held it back (error 131051) but names what it was: a poll
+        # vote, an album's wrapper. Kept, so the chat can say so.
+        held = message.get("unsupported") or {}
+        fields["extra"] = {
+            "type": "unsupported",
+            "raw_type": _text(held.get("type") if isinstance(held, dict) else None, 40),
+        }
     else:
         fields["extra"] = {"type": _text(kind, 40)}
     return fields
@@ -283,9 +320,12 @@ def apply_message(db: Session, message: dict, names: dict[str, str]) -> bool:
         if conversation.last_message_at is None or occurred_at >= conversation.last_message_at:
             conversation.last_message_at = occurred_at
             conversation.last_direction = "in"
-            conversation.last_preview = (
-                ANSWER_WORDS[answer[0]] if answer else fields["body"] or _PREVIEW.get(fields["kind"])
-            )
+            if answer:
+                conversation.last_preview = ANSWER_WORDS[answer[0]]
+            elif fields["kind"] == "unsupported":
+                conversation.last_preview = held_back_words(fields["extra"])
+            else:
+                conversation.last_preview = fields["body"] or _PREVIEW.get(fields["kind"])
             if conversation.last_preview:
                 conversation.last_preview = conversation.last_preview[:160]
     db.flush()

@@ -147,6 +147,8 @@ export type ChatMessage = {
     | "text" | "image" | "audio" | "video" | "document" | "sticker"
     | "template" | "button" | "reaction" | "unsupported";
   body: string | null;
+  /** A message the inbox cannot draw (kind `unsupported`): what it was, in words. */
+  note?: string | null;
   status: "received" | "queued" | "sent" | "delivered" | "read" | "failed";
   error: string | null;
   origin: "customer" | "staff" | "automatic" | "imported";

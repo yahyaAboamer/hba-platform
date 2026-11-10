@@ -152,6 +152,15 @@ def test_an_old_file_is_gone_and_a_recent_one_waits_to_be_copied(db):
     assert photo.body == "This colour?"
 
 
+@pytest.mark.parametrize("words", ["⚠️ Sent something we cannot view", "[unsupported message]"])
+def test_both_of_n8ns_stand_ins_become_a_message_the_inbox_cannot_draw(db, words):
+    importer.import_all(db, [msg(1, words)], [], {}, now=NOW)
+    stored = db.scalars(select(InboxMessage)).one()
+    assert (stored.kind, stored.body) == ("unsupported", None)
+    shown = chats.describe_message(stored, None, None)
+    assert shown["note"] == "A message this inbox cannot show"
+
+
 @pytest.mark.parametrize(("raw", "phone"), [("2001005550188", "201005550188"), ("201005550188", "201005550188"), ("96650000000", "96650000000")])
 def test_the_extra_zero_n8n_kept_after_the_country_code_is_dropped(raw, phone):
     assert importer.phone_of(raw) == phone

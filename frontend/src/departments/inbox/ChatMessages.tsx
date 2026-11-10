@@ -396,7 +396,7 @@ export function ChatMessages({
               )}
               {isMedia && <Media message={message} customer={customer} />}
               {message.kind === "unsupported" ? (
-                <p className="inbox-msg__cannot">A message this inbox cannot show</p>
+                <p className="inbox-msg__cannot">{message.note || "A message this inbox cannot show"}</p>
               ) : (
                 message.body && (
                   <p dir="auto">
