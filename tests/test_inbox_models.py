@@ -192,13 +192,17 @@ def test_there_is_one_whatsapp_connection_and_it_starts_with_sending_off(db):
 
 def test_customer_details_live_only_in_the_inbox_tables():
     """ADR 0059, point 9. The inbox holds a phone and a name; the order
-    tables and Operations still hold neither."""
+    tables and Operations still hold neither - with one exception, named:
+    Returns' refunds (ADR 0079, decision 8), because recording a refund owed
+    to a customer needs to say who."""
     inspector = inspect(engine)
-    personal = {"phone", "name", "customer_name", "body", "display_number", "verified_name"}
+    personal = {
+        "phone", "name", "customer_name", "customer_phone", "body", "display_number", "verified_name",
+    }
     holding = {
         table
         for table in inspector.get_table_names()
         if table.startswith(("order_index", "attributed_order", "ops_"))
         and personal & {column["name"] for column in inspector.get_columns(table)}
     }
-    assert holding == set()
+    assert holding == {"ops_refund"}

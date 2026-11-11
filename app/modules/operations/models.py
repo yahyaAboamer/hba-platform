@@ -6,10 +6,12 @@ the time it was read, and a source that could not be read must show as a
 failure rather than as 0 - so how each source's last read went is kept here,
 one row per source, and every response about a source carries it.
 
-Nothing here holds customer details, keys or anything that decides pay.
+Nothing here holds keys or anything that decides pay. Only ``ops_refund``
+(ADR 0079) holds customer details, because recording a refund needs them.
 """
 
 from datetime import date, datetime
+from decimal import Decimal
 
 from sqlalchemy import (
     Boolean,
@@ -19,6 +21,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    Numeric,
     SmallInteger,
     String,
     Text,
@@ -230,3 +233,99 @@ class OpsKhazenlyRun(Base):
     confirmed_orders: Mapped[list] = mapped_column(JSONB, nullable=False)
     #: ``[{"reason", "label", "count", "orders": [...]}]``, as the summary shows.
     left_out: Mapped[list] = mapped_column(JSONB, nullable=False)
+
+
+#: Refund methods offered on Returns (ADR 0079).
+REFUND_METHODS = ("instapay", "vodafone_cash", "bank_transfer", "other")
+#: What the refund is for.
+REFUND_KINDS = ("return", "exchange")
+
+
+class OpsRefund(Base):
+    """One customer owed a refund, and whether it has been sent (ADR 0079).
+
+    **A record, never a payment**: nothing here moves money or writes to
+    Shopify or Khazenly, and nothing reads it to decide pay.
+
+    **This table holds customer details** - a name, a phone and where the
+    refund goes - because recording a refund needs them. Only Operations'
+    roles and the admin read them; the activity log names a refund by its
+    Khazenly number and amount alone.
+
+    Khazenly's timeline is kept as read (``timeline``, newest first); the row
+    is received once it says *Return Completed*, and only then can it be
+    paid. Amount, method and refund ID may wait until then, but a paid row
+    has all three, and all three are locked with it.
+    """
+
+    __tablename__ = "ops_refund"
+    __table_args__ = (
+        UniqueConstraint("khazenly_number", name="ops_refund_khazenly_number"),
+        CheckConstraint("kind IN ('return', 'exchange')", name="ops_refund_kind_valid"),
+        CheckConstraint(
+            "method IS NULL OR method IN ('instapay', 'vodafone_cash', 'bank_transfer', 'other')",
+            name="ops_refund_method_valid",
+        ),
+        CheckConstraint("amount IS NULL OR amount > 0", name="ops_refund_amount_positive"),
+        # Paid is the date and when it was recorded, both or neither; and a
+        # paid row was received and says what was sent, how and where.
+        CheckConstraint(
+            "(paid_on IS NULL) = (paid_recorded_at IS NULL)", name="ops_refund_paid_whole"
+        ),
+        CheckConstraint(
+            "paid_on IS NULL OR (received_at IS NOT NULL AND amount IS NOT NULL "
+            "AND method IS NOT NULL AND refund_to IS NOT NULL)",
+            name="ops_refund_paid_complete",
+        ),
+        Index("ix_ops_refund_paid_on", "paid_on"),
+        # The 30-minute read takes the rows not yet received.
+        Index(
+            "ix_ops_refund_waiting",
+            "checked_at",
+            postgresql_where=text("received_at IS NULL"),
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    #: Khazenly's order number, e.g. ``KH-HBA-08997921``.
+    khazenly_number: Mapped[str] = mapped_column(String(40), nullable=False)
+    kind: Mapped[str] = mapped_column(String(10), nullable=False)
+    #: Khazenly's merchant order number as it gave it, e.g. ``#31876-RE``.
+    merchant_order: Mapped[str | None] = mapped_column(String(60))
+    #: The Shopify order it is for, e.g. ``#31876``.
+    order_number: Mapped[str | None] = mapped_column(String(40))
+    customer_name: Mapped[str | None] = mapped_column(String(120))
+    customer_phone: Mapped[str | None] = mapped_column(String(30))
+    #: EGP, as the person will send it. Fees and deductions are not kept.
+    amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    method: Mapped[str | None] = mapped_column(String(20))
+    #: Where the refund goes: a phone, an InstaPay handle or link, an account.
+    refund_to: Mapped[str | None] = mapped_column(String(200))
+    #: Khazenly's latest step and when it happened.
+    step: Mapped[str | None] = mapped_column(String(80))
+    step_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    #: ``[{"step", "at", "note"}]``, newest first, as Khazenly gave it.
+    timeline: Mapped[list] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'::jsonb")
+    )
+    #: When Khazenly said *Return Completed*.
+    received_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    #: The last time Khazenly was asked, and why it did not answer, if not.
+    checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    check_error: Mapped[str | None] = mapped_column(String(200))
+    #: The day the money was sent, and when that was recorded, by whom.
+    paid_on: Mapped[date | None] = mapped_column(Date)
+    paid_recorded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    paid_by: Mapped[int | None] = mapped_column(ForeignKey("user_account.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    created_by: Mapped[int | None] = mapped_column(
+        ForeignKey("user_account.id", ondelete="SET NULL")
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    updated_by: Mapped[int | None] = mapped_column(
+        ForeignKey("user_account.id", ondelete="SET NULL")
+    )

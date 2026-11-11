@@ -37,7 +37,7 @@ export const operations: Department = {
     return (
       <>
         <Route index element={<Navigate to={slugs[0] ?? "shopify"} replace />} />
-        <Route path=":tab" element={<OperationsDashboard slugs={slugs} />} />
+        <Route path=":tab" element={<OperationsDashboard slugs={slugs} session={session} />} />
       </>
     );
   },

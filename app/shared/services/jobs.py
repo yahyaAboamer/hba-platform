@@ -104,6 +104,10 @@ class JobKind:
     ORDER_OPS_SHOPIFY = "order_ops_read_shopify"
     ORDER_OPS_BOSTA = "order_ops_read_bosta"
     ORDER_OPS_ESTEBDAL = "order_ops_read_estebdal"
+    #: Operations → Returns (ADR 0079): read Khazenly's tracking for every
+    #: refund not yet back, every 30 minutes
+    #: (app.modules.operations.services.returns).
+    ORDER_OPS_RETURNS = "order_ops_track_returns"
 
     #: Decide whether one order gets a WhatsApp confirmation, and record it
     #: (ADR 0059). One per order, queued when the order is first indexed.
@@ -162,7 +166,12 @@ INBOX_WORK = frozenset(
 #: waited behind the hourly batch of 500 line-item reads - 4.5 minutes late
 #: on staging, 6 October 2026. They are short, and nothing else waits on them.
 OPERATIONS_READS = frozenset(
-    {JobKind.ORDER_OPS_SHOPIFY, JobKind.ORDER_OPS_BOSTA, JobKind.ORDER_OPS_ESTEBDAL}
+    {
+        JobKind.ORDER_OPS_SHOPIFY,
+        JobKind.ORDER_OPS_BOSTA,
+        JobKind.ORDER_OPS_ESTEBDAL,
+        JobKind.ORDER_OPS_RETURNS,
+    }
 )
 
 

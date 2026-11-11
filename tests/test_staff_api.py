@@ -494,6 +494,8 @@ def test_the_roster_says_which_roles_you_may_invite(client):
         "content_manager",
         "customer_service",
         "operations_manager",
+        "operations_staff",
+        "operations_viewer",
         "production_manager",
         "production_staff",
         "production_viewer",
@@ -596,6 +598,8 @@ def test_the_roster_says_what_each_access_can_do(client):
         "content_manager",
         "customer_service",
         "operations_manager",
+        "operations_staff",
+        "operations_viewer",
         "production_manager",
         "production_staff",
         "production_viewer",
@@ -604,7 +608,9 @@ def test_the_roster_says_what_each_access_can_do(client):
     # ADR 0067: the role is Operations alone; he holds the inbox (ADR 0059)
     # as a second assignment, customer service. Khazenly is both roles'
     # (ADR 0072).
-    assert body["operations_manager"] == ["khazenly.use", "order_ops.view"]
+    assert body["operations_manager"] == ["khazenly.use", "order_ops.view", "returns.edit"]
+    assert body["operations_staff"] == ["khazenly.use", "order_ops.view", "returns.edit"]
+    assert body["operations_viewer"] == ["order_ops.view"]
     assert body["customer_service"] == ["inbox.use", "khazenly.use"]
     assert "payments.record" in body["admin"]
     assert "payments.record" not in body["affiliate_manager"]

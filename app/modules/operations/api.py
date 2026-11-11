@@ -25,12 +25,12 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.shared.api.deps import require_permission
+from app.shared.api.deps import require_any_permission, require_permission
 from app.core.permissions import Permission
 from app.db import get_session
 from app.shared.models.identity import UserAccount
 from app.shared.services.audit import record_audit
-from app.modules.operations.services import bosta, connections, estebdal, khazenly, shopify
+from app.modules.operations.services import bosta, connections, estebdal, khazenly, returns, shopify
 from app.modules.operations.services.freshness import SOURCES, State, describe, has_numbers
 
 #: The one guard, kept by name so a test can find it on every route.
@@ -44,13 +44,20 @@ frame_router = APIRouter(
     prefix="/api/operations", tags=["order-ops"], dependencies=[Depends(GUARD)]
 )
 
-#: Operations → Khazenly (ADR 0071, 0072), held by customer service as well:
-#: its own permission, on the router itself, as `GUARD` is on `router`.
+#: Operations → Khazenly (ADR 0071, 0072), held by customer service as well.
+#: Its history is read by customer service and by every Operations level
+#: (ADR 0079: viewers see every tab); building the file is `khazenly.use`
+#: alone, on the route itself.
 KHAZENLY_GUARD = require_permission(Permission.KHAZENLY_USE)
+KHAZENLY_READ = require_any_permission(Permission.KHAZENLY_USE, Permission.ORDER_OPS_VIEW)
 
 khazenly_router = APIRouter(
-    prefix="/api/khazenly", tags=["khazenly"], dependencies=[Depends(KHAZENLY_GUARD)]
+    prefix="/api/khazenly", tags=["khazenly"], dependencies=[Depends(KHAZENLY_READ)]
 )
+
+#: Operations → Returns (ADR 0079): seen with the dashboard (`GUARD`),
+#: changed only by staff, the manager and the admin.
+RETURNS_GUARD = require_permission(Permission.RETURNS_EDIT)
 
 
 def freshness(db: Session, source: str) -> dict:
@@ -196,6 +203,163 @@ def key_state(
     """The key in use, for Settings: where it comes from and its last four
     characters. **Never the key.**"""
     return connections.describe(db, provider)
+
+
+# ── Returns (ADR 0079) ────────────────────────────────────────────────────────
+
+
+class RefundAdd(BaseModel):
+    #: One Khazenly number, or several pasted together.
+    numbers: list[str]
+    kind: str
+    amount: str | None = None
+    method: str | None = None
+    refund_to: str | None = None
+    customer_name: str | None = None
+    customer_phone: str | None = None
+
+
+class RefundEdit(BaseModel):
+    kind: str | None = None
+    amount: str | None = None
+    method: str | None = None
+    refund_to: str | None = None
+    customer_name: str | None = None
+    customer_phone: str | None = None
+
+
+class RefundPaid(BaseModel):
+    paid_on: str | None = None
+    amount: str | None = None
+    method: str | None = None
+    refund_to: str | None = None
+
+
+class RefundUnpaid(BaseModel):
+    reason: str = ""
+
+
+def _refused(exc: returns.Refused) -> HTTPException:
+    return HTTPException(409 if isinstance(exc, returns.Locked) else 422, str(exc))
+
+
+def _row(db: Session, refund_id: int) -> dict:
+    return {"refund": returns.one(db, refund_id)}
+
+
+@router.get("/returns")
+def returns_tab(db: Session = Depends(get_session)) -> dict:
+    """Every unpaid refund and the latest paid, grouped by the next act."""
+    return returns.tab(db)
+
+
+@router.post("/returns")
+def add_refunds(
+    body: RefundAdd,
+    actor: UserAccount = Depends(RETURNS_GUARD),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Add one refund, or several pasted Khazenly numbers. Each is read from
+    Khazenly first; the ones refused say why, and the rest are added."""
+    details = body.model_dump(exclude={"numbers", "kind"}, exclude_unset=True)
+    try:
+        result = returns.add(db, body.numbers, body.kind, actor, details)
+    except returns.Refused as exc:
+        db.rollback()
+        raise _refused(exc) from None
+    db.commit()
+    return result
+
+
+@router.patch("/returns/{refund_id}")
+def edit_refund(
+    refund_id: int,
+    body: RefundEdit,
+    actor: UserAccount = Depends(RETURNS_GUARD),
+    db: Session = Depends(get_session),
+) -> dict:
+    try:
+        returns.edit(db, refund_id, body.model_dump(exclude_unset=True), actor)
+    except LookupError as exc:
+        raise HTTPException(404, str(exc)) from None
+    except returns.Refused as exc:
+        db.rollback()
+        raise _refused(exc) from None
+    db.commit()
+    return _row(db, refund_id)
+
+
+@router.post("/returns/{refund_id}/paid")
+def mark_refund_paid(
+    refund_id: int,
+    body: RefundPaid,
+    actor: UserAccount = Depends(RETURNS_GUARD),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Record that the refund was sent. Nothing is sent from here."""
+    try:
+        returns.mark_paid(db, refund_id, body.model_dump(exclude_unset=True), actor)
+    except LookupError as exc:
+        raise HTTPException(404, str(exc)) from None
+    except returns.Refused as exc:
+        db.rollback()
+        raise _refused(exc) from None
+    db.commit()
+    return _row(db, refund_id)
+
+
+@router.post("/returns/{refund_id}/unpaid")
+def undo_refund_paid(
+    refund_id: int,
+    body: RefundUnpaid,
+    actor: UserAccount = Depends(RETURNS_GUARD),
+    db: Session = Depends(get_session),
+) -> dict:
+    try:
+        returns.undo_paid(db, refund_id, body.reason, actor)
+    except LookupError as exc:
+        raise HTTPException(404, str(exc)) from None
+    except returns.Refused as exc:
+        db.rollback()
+        raise _refused(exc) from None
+    db.commit()
+    return _row(db, refund_id)
+
+
+@router.post("/returns/{refund_id}/check")
+def recheck_refund(
+    refund_id: int,
+    _actor: UserAccount = Depends(RETURNS_GUARD),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Ask Khazenly again now, rather than wait for the next read."""
+    try:
+        returns.recheck(db, refund_id)
+    except LookupError as exc:
+        raise HTTPException(404, str(exc)) from None
+    except returns.Refused as exc:
+        db.rollback()
+        raise _refused(exc) from None
+    db.commit()
+    return _row(db, refund_id)
+
+
+@router.delete("/returns/{refund_id}")
+def delete_refund(
+    refund_id: int,
+    actor: UserAccount = Depends(RETURNS_GUARD),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Remove a refund added by mistake. Never a paid one."""
+    try:
+        returns.delete(db, refund_id, actor)
+    except LookupError as exc:
+        raise HTTPException(404, str(exc)) from None
+    except returns.Refused as exc:
+        db.rollback()
+        raise _refused(exc) from None
+    db.commit()
+    return {"deleted": refund_id}
 
 
 @router.put("/connections/{provider}")

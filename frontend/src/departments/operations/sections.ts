@@ -13,4 +13,7 @@ export const OPERATIONS_SECTIONS = [
   // Customer service holds this one section and nothing else of Operations
   // (ADR 0072).
   { slug: "khazenly", label: "Khazenly", holds: "khazenly.use" },
+  // Refunds owed to customers (ADR 0079). Every Operations level sees it;
+  // customer service does not.
+  { slug: "returns", label: "Returns" },
 ] as const;

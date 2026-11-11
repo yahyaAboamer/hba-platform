@@ -39,6 +39,7 @@ export const PERMISSION_PHRASE: Record<string, string> = {
   "order_ops.view": "seeing the Operations dashboard",
   "inbox.use": "reading and replying to customers",
   "khazenly.use": "building the Khazenly confirmation file",
+  "returns.edit": "recording refunds owed to customers",
   "production.view": "reading Production",
   "production.edit": "changing production orders, tasks and samples",
   "production.qc": "recording quality checks",
@@ -98,6 +99,7 @@ export const ACCESS_LINES: [string, string[]][] = [
   ["See the operations dashboard", ["order_ops.view"]],
   ["Read and answer customers in the inbox", ["inbox.use"]],
   ["Build the Khazenly confirmation file", ["khazenly.use"]],
+  ["Add refunds and mark them paid on Returns", ["returns.edit"]],
   ["Read Production", ["production.view"]],
   ["Change production orders, tasks and samples", ["production.edit"]],
   ["Record quality checks in Production", ["production.qc"]],
@@ -114,7 +116,9 @@ export function holds(permissions: string[] | undefined, line: string[]) {
 /** The short line beside a department's level, as frame 5 has it. */
 export const ROLE_BLURB: Record<string, string> = {
   customer_service: "Reads and replies to customers",
-  operations_manager: "Sees the Operations dashboard",
+  operations_viewer: "Sees every Operations tab, changes nothing",
+  operations_staff: "Works Operations: Returns and the Khazenly file",
+  operations_manager: "Runs Operations: Returns and the Khazenly file",
   content_manager: "Looks up models, records targets and sets pay terms",
   affiliate_manager: "Runs models and targets, and approves pay",
   production_viewer: "Reads Production",

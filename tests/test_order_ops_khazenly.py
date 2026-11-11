@@ -510,10 +510,17 @@ def test_customer_service_builds_the_file_and_sees_no_other_operations(client):
 def test_every_khazenly_route_carries_its_guard():
     from app.modules.operations import api as order_ops
 
-    # On the router itself, so a route added later cannot be added without it.
-    assert any(dependency.dependency is order_ops.KHAZENLY_GUARD for dependency in order_ops.khazenly_router.dependencies)
+    # Reading, on the router itself, so a route added later cannot be added
+    # without it: customer service or any Operations level (ADR 0079).
+    assert any(dependency.dependency is order_ops.KHAZENLY_READ for dependency in order_ops.khazenly_router.dependencies)
+    assert order_ops.KHAZENLY_READ.any_of == {"khazenly.use", "order_ops.view"}
     assert order_ops.khazenly_router.routes
     for route in order_ops.khazenly_router.routes:
         assert any(
-            dependency.call is order_ops.KHAZENLY_GUARD for dependency in route.dependant.dependencies
+            dependency.call is order_ops.KHAZENLY_READ for dependency in route.dependant.dependencies
         ), route.path
+        # Building the file changes something: `khazenly.use` alone.
+        if "POST" in route.methods:
+            assert any(
+                dependency.call is order_ops.KHAZENLY_GUARD for dependency in route.dependant.dependencies
+            ), route.path

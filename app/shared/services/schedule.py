@@ -61,6 +61,9 @@ SCHEDULE: dict[str, tuple[timedelta, dict]] = {
     JobKind.ORDER_OPS_SHOPIFY: (POLL_EVERY, {}),
     JobKind.ORDER_OPS_ESTEBDAL: (POLL_EVERY, {}),
     JobKind.ORDER_OPS_BOSTA: (POLL_EVERY, {}),
+    # Operations → Returns (ADR 0079): Khazenly's tracking for the refunds
+    # not yet back. A parcel moves in hours, not minutes.
+    JobKind.ORDER_OPS_RETURNS: (timedelta(minutes=30), {}),
 }
 
 
