@@ -5,7 +5,7 @@
  */
 export const ALL = [
   "affiliates.view", "affiliates.manage", "affiliates.erase", "compensation.manage",
-  "targets.record", "targets.manage", "targets.verify", "payroll.approve", "payroll.reopen",
+  "targets.record", "targets.manage", "payroll.approve", "payroll.reopen",
   "payments.record", "payroll.bonus", "invitations.send", "audit.view", "settings.manage",
   "order_ops.view", "inbox.use", "khazenly.use", "returns.edit",
   "production.view", "production.edit", "production.qc", "production.suppliers", "production.payments",
@@ -14,12 +14,12 @@ export const ALL = [
 export const ROLE_PERMISSIONS: Record<string, string[]> = {
   admin: ALL,
   affiliate_manager: [
-    "affiliates.view", "affiliates.manage", "compensation.manage", "targets.manage", "targets.verify",
+    "affiliates.view", "affiliates.manage", "compensation.manage", "targets.manage",
     "targets.record", "payroll.approve", "payroll.bonus", "invitations.send", "audit.view",
   ],
   content_manager: [
     "affiliates.view", "affiliates.manage", "compensation.manage", "targets.record", "targets.manage",
-    "targets.verify", "invitations.send", "audit.view",
+    "invitations.send", "audit.view",
   ],
   operations_viewer: ["order_ops.view"],
   operations_staff: ["order_ops.view", "khazenly.use", "returns.edit"],

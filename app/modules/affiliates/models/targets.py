@@ -1,14 +1,18 @@
-"""What a model was asked to produce, what they produced, and who confirmed it.
+"""What a model was asked to produce, and what they produced.
 
 §15. For most models this is a management record. For a `base_guarantee` model it
 **decides what they are paid** (§9.5), and the same table serves both — the
 difference lives entirely in the compensation type, not here.
 
-## Three states, and only one of them is a boolean
+## Two states, and only one of them is a boolean
 
     requirements set, nothing recorded   nobody knows what they did
     recorded                             achieved, or not
-    recorded and verified                a second person confirmed the numbers
+
+Recorded is confirmed (ADR 0081). A third state, *verified*, used to sit on top
+and a met guarantee waited on it; the owner removed that step on 11 November
+2026. `verified_by` / `verified_at` stay, unread, so past confirmations remain
+in the record.
 
 ## A fourth shape, for months that happened before the platform
 
@@ -47,14 +51,6 @@ HBA wants named numeric fields it defines itself eventually; §3 of the
 specification records why that is not V1 and what it would cost. Nothing here
 blocks it - the achieved rule is *every requirement met*, which generalises to any
 number of fields unchanged.
-
-## No `verification_status` column
-
-§8 lists one. `verified_at` already carries the answer, and two representations of
-one fact can disagree: a row with `verified_at` set and a status saying
-`unverified` is a bug nobody would see until a guarantee failed to apply. The
-field list in §8 is explicitly indicative, so the timestamp is the truth and
-``is_verified`` reads it.
 """
 
 from datetime import datetime
@@ -175,9 +171,8 @@ class MonthlyTarget(Base):
     )
     recorded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
-    #: **When** a second person confirmed the numbers, not merely that somebody
-    #: did. "Verified, by whom, eight months ago" is a different answer from
-    #: "verified", and only one of them can be audited.
+    #: Who confirmed the numbers, and when, from before ADR 0081 removed the
+    #: step. Kept for the record; nothing reads it to decide money.
     verified_by: Mapped[int | None] = mapped_column(
         ForeignKey("user_account.id", ondelete="SET NULL")
     )
@@ -214,10 +209,6 @@ class MonthlyTarget(Base):
         if self.is_backfilled:
             return True
         return self.actual_videos is not None and self.actual_stories is not None
-
-    @property
-    def is_verified(self) -> bool:
-        return self.verified_at is not None
 
     @property
     def is_achieved(self) -> bool | None:

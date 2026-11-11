@@ -48,7 +48,7 @@ from app.modules.affiliates.services.payroll import (
     get_month,
     is_historical,
     policy_of,
-    source_version,
+    agreed_source_unchanged,
 )
 
 #: A month is only worth correcting if the difference is real money. Zero is
@@ -201,14 +201,12 @@ def correction_for(
     # The question here is only ever *has the evidence moved*, so both sides
     # of the comparison have to be the same rule.
     now = calculate_month(db, affiliate, month, policy=policy_of(snapshot))
-    if (
-        source_version(
-            now,
-            orders,
-            carried_into(db, affiliate, month),
-            deductions_landing_on(db, affiliate, month),
-        )
-        == frozen
+    if agreed_source_unchanged(
+        frozen,
+        now,
+        orders,
+        carried_into(db, affiliate, month),
+        deductions_landing_on(db, affiliate, month),
     ):
         return None
 

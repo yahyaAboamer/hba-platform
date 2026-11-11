@@ -39,7 +39,6 @@ function target(over: Partial<MonthTargets> = {}): MonthTargets {
     actual_stories: 12,
     numbers_kept: true,
     achieved: true,
-    verified: true,
     determines_pay: true,
     recorded_at: "2026-09-01T00:00:00+00:00",
     ...over,
@@ -54,19 +53,9 @@ describe("targetChip", () => {
     expect(chip.text.toLowerCase()).not.toContain("miss");
   });
 
-  it("distinguishes met-and-confirmed from met-and-waiting where pay depends on it", () => {
-    expect(targetChip(target({ verified: false }))!.text).toBe(
-      "Waiting to be confirmed",
-    );
+  it("says a met month is met, with no wait for a confirmation (ADR 0081)", () => {
     expect(targetChip(target())!.text).toBe("targets met");
-  });
-
-  it("does not raise confirmation where it decides nothing", () => {
-    // On commission, whether HBA has countersigned a number is their
-    // paperwork. Telling her it is outstanding invents a worry.
-    expect(
-      targetChip(target({ verified: false, determines_pay: false }))!.text,
-    ).toBe("targets met");
+    expect(targetChip(target({ determines_pay: false }))!.text).toBe("targets met");
   });
 });
 
@@ -122,17 +111,17 @@ describe("the visible current-month explanation", () => {
     expect(targetProgressNote(target({ achieved: null, actual_videos: null }))).toBeNull();
   });
 
-  it("does not settle a current shortfall before HBA confirms it", () => {
+  it("does not settle a current shortfall while the month runs", () => {
     const said = describeCurrentTargetPay(target({ achieved: false }));
-    expect(said).toContain("HBA must confirm the final result");
+    expect(said).toContain("applies if this month's targets are met");
     expect(said).toContain("commission still applies");
     expect(said).not.toContain("does not apply");
+    expect(said).not.toContain("confirm");
   });
 
-  it("distinguishes missing, waiting, and confirmed guarantee records", () => {
+  it("distinguishes missing and met guarantee records", () => {
     expect(describeCurrentTargetPay(target({ achieved: null }))).toContain("not recorded");
-    expect(describeCurrentTargetPay(target({ verified: false }))).toContain("as soon as HBA confirms");
-    expect(describeCurrentTargetPay(target())).toContain("Met and confirmed");
+    expect(describeCurrentTargetPay(target())).toBe("Met, so your guaranteed minimum applies.");
   });
 });
 
@@ -143,11 +132,8 @@ describe("targetOutcome", () => {
     expect(targetOutcome(target())).toBe("met");
   });
 
-  it("mentions confirmation only where it holds money up", () => {
-    expect(targetOutcome(target({ verified: false }))).toBe("met — to confirm");
-    expect(
-      targetOutcome(target({ verified: false, determines_pay: false })),
-    ).toBe("met");
+  it("never mentions a confirmation (ADR 0081)", () => {
+    expect(targetOutcome(target({ determines_pay: false }))).toBe("met");
   });
 });
 
@@ -172,22 +158,12 @@ describe("describeTargetPay", () => {
     expect(said).toContain("paid your commission");
   });
 
-  it("puts an unconfirmed month on HBA rather than on her", () => {
-    expect(describeTargetPay(target({ verified: false }))).toContain(
-      "as soon as HBA confirms",
-    );
-  });
-
   it("has a sentence for every combination and never an empty one", () => {
     for (const determines_pay of [true, false]) {
       for (const achieved of [null, false, true]) {
-        for (const verified of [true, false]) {
-          const said = describeTargetPay(
-            target({ determines_pay, achieved, verified }),
-          );
-          expect(said.length).toBeGreaterThan(20);
-          expect(said.endsWith(".")).toBe(true);
-        }
+        const said = describeTargetPay(target({ determines_pay, achieved }));
+        expect(said.length).toBeGreaterThan(20);
+        expect(said.endsWith(".")).toBe(true);
       }
     }
   });

@@ -248,13 +248,8 @@ def _deliver(order_id: str) -> None:
         )
 
 
-def _hit_targets(admin, affiliate_id, month, *, verified: bool):
-    """Record a month they met, and optionally confirm the numbers.
-
-    §15: verification is what unlocks a guarantee, and it confirms the numbers
-    rather than the outcome - the two steps are separate here because the gap
-    between them is a state a model actually sits in.
-    """
+def _hit_targets(admin, affiliate_id, month):
+    """Record a month they met. Recording is the confirmation (ADR 0081)."""
     response = admin.put(
         f"/api/targets/{month}",
         json={
@@ -275,15 +270,10 @@ def _hit_targets(admin, affiliate_id, month, *, verified: bool):
         },
     )
     assert response.status_code == 200, response.text
-    if verified:
-        confirmed = admin.post(
-            f"/api/targets/{month}/verify", json={"affiliate_ids": [affiliate_id]}
-        )
-        assert confirmed.status_code == 200, confirmed.text
 
 
 def _missed_targets(admin, affiliate_id, month):
-    """A month recorded and confirmed as short of what was asked."""
+    """A month recorded as short of what was asked."""
     response = admin.put(
         f"/api/targets/{month}",
         json={
@@ -304,10 +294,6 @@ def _missed_targets(admin, affiliate_id, month):
         },
     )
     assert response.status_code == 200, response.text
-    confirmed = admin.post(
-        f"/api/targets/{month}/verify", json={"affiliate_ids": [affiliate_id]}
-    )
-    assert confirmed.status_code == 200, confirmed.text
 
 
 def _egp(piastres: int) -> str:
@@ -636,7 +622,7 @@ def test_a_guarantee_says_what_it_replaced(admin):
         base_amount_piastres=800_000,
     )
     _order(affiliate["id"], "1", 100_000)
-    _hit_targets(admin, affiliate["id"], AUGUST, verified=True)
+    _hit_targets(admin, affiliate["id"], AUGUST)
 
     body = _sign_in().get(f"/api/me/earnings/{AUGUST}").json()
 
@@ -682,7 +668,6 @@ def test_a_guarantee_that_did_not_apply_is_still_named(admin):
         # sentence they read: nobody has recorded their month, rather than they
         # missed their targets.
         "targets_achieved": None,
-        "targets_verified": False,
     }
 
 
@@ -986,27 +971,6 @@ def test_a_month_with_no_terms_says_hba_has_not_set_them(admin):
     assert "HBA has not set" in body["waiting_on"][0]["text"]
 
 
-def test_unverified_targets_never_read_as_their_failure(admin):
-    """`targets_achieved_but_not_verified` means they hit them and somebody here
-    is slow. Shown raw it reads as an accusation.
-    """
-    affiliate = _affiliate(admin)
-    _terms(
-        admin,
-        affiliate["id"],
-        compensation_type="base_guarantee",
-        base_amount_piastres=800_000,
-    )
-    _order(affiliate["id"], "1", 100_000)
-    _hit_targets(admin, affiliate["id"], AUGUST, verified=False)
-
-    body = _sign_in().get(f"/api/me/earnings/{AUGUST}").json()
-
-    waiting = body["waiting_on"][0]
-    assert waiting["who"] == "hba"
-    assert "You hit your targets" in waiting["text"]
-
-
 def test_an_agreed_month_stays_settled_when_a_later_order_blocks_the_month(admin):
     """The live blocker list keeps answering *could this be approved now*, and
     after approval that question has a stale answer.
@@ -1118,8 +1082,8 @@ def test_a_target_says_whether_it_decides_their_pay(admin):
         base_amount_piastres=800_000,
     )
     _terms(admin, commission["id"])
-    _hit_targets(admin, guaranteed["id"], AUGUST, verified=True)
-    _hit_targets(admin, commission["id"], AUGUST, verified=True)
+    _hit_targets(admin, guaranteed["id"], AUGUST)
+    _hit_targets(admin, commission["id"], AUGUST)
 
     mine = _sign_in().get(f"/api/me/earnings/{AUGUST}").json()["targets"]
     theirs = _sign_in("sara@example.com").get(
@@ -1131,7 +1095,7 @@ def test_a_target_says_whether_it_decides_their_pay(admin):
     assert mine["required_videos"] == 4
     assert mine["actual_stories"] == 8
     assert mine["achieved"] is True
-    assert mine["verified"] is True
+    assert "verified" not in mine
 
 
 def test_a_month_with_no_target_recorded_has_nothing_to_show(admin):
@@ -1659,7 +1623,7 @@ def test_only_a_guarantee_lets_targets_decide_pay(admin, kind, extra, decides):
     """
     affiliate = _affiliate(admin)
     _terms(admin, affiliate["id"], compensation_type=kind, **extra)
-    _hit_targets(admin, affiliate["id"], SEPTEMBER, verified=False)
+    _hit_targets(admin, affiliate["id"], SEPTEMBER)
 
     body = _sign_in().get(f"/api/me/earnings/{SEPTEMBER}").json()
 
@@ -1671,8 +1635,7 @@ def test_a_month_with_no_terms_says_it_is_hba_who_has_not_finished(admin):
 
     §11.3 blocks on missing information, and all of the information missing is
     information HBA records. A blocker that did not name whose move it is reads
-    as an accusation - `targets_achieved_but_not_verified` especially, which
-    means they hit them and somebody here is slow.
+    as an accusation.
     """
     affiliate = _affiliate(admin)  # deliberately no compensation terms
 
@@ -2469,7 +2432,6 @@ def test_a_backfilled_target_shows_an_outcome_and_no_counts(admin, monkeypatch):
     assert body["targets"]["required_videos"] is None
     assert body["targets"]["actual_videos"] is None
     assert body["targets"]["achieved"] is True
-    assert body["targets"]["verified"] is True
 
 
 def _target_revision(admin, month):
@@ -2494,7 +2456,7 @@ def test_her_targets_cover_every_month_she_can_look_at(admin):
     affiliate = _affiliate(admin)
     _terms(admin, affiliate["id"])
     _order(affiliate["id"], "1", 100_000, month=AUGUST)
-    _hit_targets(admin, affiliate["id"], AUGUST, verified=True)
+    _hit_targets(admin, affiliate["id"], AUGUST)
 
     her = _sign_in()
     listed = her.get("/api/me/months").json()["months"]
@@ -2598,7 +2560,7 @@ def test_her_targets_are_only_ever_hers(admin):
     other = _affiliate(admin, "Sara", "sara@example.com", "SARA10")
     _terms(admin, mine["id"])
     _terms(admin, other["id"])
-    _hit_targets(admin, other["id"], AUGUST, verified=True)
+    _hit_targets(admin, other["id"], AUGUST)
 
     rows = _sign_in().get("/api/me/targets").json()["months"]
 

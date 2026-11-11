@@ -20,7 +20,7 @@ from app.modules.affiliates.services.compensation import set_terms
 from app.modules.affiliates.services.setup import (
     NO_TARGET_OUTCOME,
     NO_TERMS,
-    TARGET_NOT_VERIFIED,
+    TARGET_NOT_RECORDED,
     setup_readiness,
 )
 
@@ -116,20 +116,18 @@ def _outcome(db, affiliate, month, outcome="met"):
     db.flush()
 
 
-def _verified_target(db, affiliate, month):
-    """A live month's target, recorded and confirmed.
+def _recorded_target(db, affiliate, month):
+    """A live month's target, recorded (recording is the confirmation, ADR 0081).
 
-    The actuals are not decoration: `monthly_target_cannot_verify_the_unrecorded`
-    refuses a verification with nothing behind it, which is the database saying
-    the same thing F06 does - a guarantee is released by evidence, not by a
-    timestamp.
+    The actuals are the evidence: a guarantee is released by what she
+    produced, not by a timestamp (F06).
     """
     db.execute(
         text(
             "INSERT INTO monthly_target (affiliate_id, month, required_videos,"
-            " required_stories, actual_videos, actual_stories, verified_at,"
+            " required_stories, actual_videos, actual_stories,"
             " created_at, updated_at)"
-            " VALUES (:a, :m, 8, 12, 9, 14, now(), now(), now())"
+            " VALUES (:a, :m, 8, 12, 9, 14, now(), now())"
         ),
         {"a": affiliate.id, "m": month},
     )
@@ -287,9 +285,9 @@ def test_missed_counts_as_recorded(db):
     assert _months(_readiness(db, affiliate))["2026-03"]["ready"] is True
 
 
-def test_a_live_guarantee_month_wants_verification_not_an_outcome(db):
-    """Live months keep the existing gate. Verification is what releases a
-    guarantee today, and a second approval would duplicate one fact."""
+def test_a_live_guarantee_month_wants_counts_not_an_outcome(db):
+    """Live months need the counts recorded: met or missed decides the
+    guarantee, and recording is the confirmation (ADR 0081)."""
     affiliate = _affiliate(db)
     set_collaboration_start(db, affiliate, "2026-05")
     set_terms(
@@ -305,10 +303,10 @@ def test_a_live_guarantee_month_wants_verification_not_an_outcome(db):
     row = _months(_readiness(db, affiliate))["2026-05"]
 
     assert row["settled_outside"] is False
-    assert row["missing"] == [TARGET_NOT_VERIFIED]
+    assert row["missing"] == [TARGET_NOT_RECORDED]
 
 
-def test_a_verified_live_guarantee_month_is_ready(db):
+def test_a_recorded_live_guarantee_month_is_ready(db):
     affiliate = _affiliate(db)
     set_collaboration_start(db, affiliate, "2026-05")
     set_terms(
@@ -321,7 +319,7 @@ def test_a_verified_live_guarantee_month_is_ready(db):
         end_month="2026-05",
     )
     db.flush()
-    _verified_target(db, affiliate, "2026-05")
+    _recorded_target(db, affiliate, "2026-05")
 
     assert _months(_readiness(db, affiliate))["2026-05"]["ready"] is True
 
@@ -486,7 +484,7 @@ def test_a_guaranteed_month_without_an_outcome_blocks_it_too(db):
     )[affiliate.id]
 
     assert summary["eligible"] == 1
-    assert summary["blocking"] == 1, "the guarantee has no verified target"
+    assert summary["blocking"] == 1, "the guarantee has no recorded target"
     assert summary["first_gap"] == "2026-09"
 
 

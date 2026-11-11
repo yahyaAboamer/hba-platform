@@ -38,3 +38,29 @@ at the end of each screen's pass.
 15. **Real data shows what fixtures don't.** The InstaPay share-text problem
     was found by reading production's data read-only, not in the gallery.
     Where allowed, look at real values (never copy personal data out).
+16. **Read a rule's history before proposing to change it** (Targets). The
+    recommendation to measure pace per kind was approved before the code
+    showed the owner's own *any mix* rule; it had to be re-asked. The tests
+    and ADRs say who decided what.
+17. **Validate what the save sends, not what the screen shows** (Targets).
+    On a screen with modes or filters, a hidden box still goes in the save:
+    a mistyped requirement in the other mode was sent as 0.
+18. **A status is not a role** (Targets). New affiliates start *pending*
+    until their code is verified; "hide pending" would have hidden models
+    being onboarded. Check the lifecycle before filtering on a status.
+19. **Use your own disposable test DB when another session may be testing**
+    (Targets). Two runs on `hba_platform_test` deadlocked on TRUNCATE. And
+    give `run-suite.sh` its own `OUT_DIR` and `REV`: its log is shared.
+20. **Polish is not the job; the job is whether each feature earns its place**
+    (Targets, second pass). The first pass polished *Confirm* (hints, ticks,
+    a take-back panel) without asking what it did: it changed pay in one
+    case, the person who recorded the counts could confirm them a second
+    later, and the next weekly count wiped it. The owner asked; the owner
+    removed it (ADR 0081). Step 4 now asks this of every action.
+21. **When a check goes, the save becomes the check** (Targets). With no
+    confirm step, a typed count releases money by itself, so the save lists
+    every change old → new, and what it turns (*Target met → Below target ·
+    her guaranteed minimum no longer applies*), before anything is written.
+22. **ADR numbers race.** Another branch took 0079 while this one was open.
+    Check `git ls-tree origin/main docs/adr/` before numbering, and again
+    before shipping.

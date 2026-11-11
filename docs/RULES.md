@@ -163,6 +163,9 @@ payroll without touching a maintainer screen.
     payroll, payment, parcel or proof is already hers, or she holds a staff
     role, is she kept as `declined`: her code released, *Reconsider* returning
     her to Applications, and no row on the Targets grid.
+  - **A bare application (pending, no pay terms ever set) has no row on the
+    Targets grid either**, and is not counted in Today's *targets not set*
+    (ADR 0080). A pending model HBA has given terms is listed.
   - **Approval needs a verified code and, for a paid account, pay terms
     covering the working month.**
   - *Erase* is admin-only and only for a model with no order, payroll,
@@ -305,8 +308,11 @@ payroll without touching a maintainer screen.
   money until a separate decision brings them under the money rules.
 - **Three compensation types, not one.** `commission`,
   `fixed_plus_commission` (**both** are paid — the one most often got wrong),
-  `base_guarantee` (`max(commission, base)`, only where targets were met *and*
-  verified). No screen may hard-code an arrangement.
+  `base_guarantee` (`max(commission, base)`, only where targets were met). No
+  screen may hard-code an arrangement.
+- **Recording a target's counts is its confirmation** (ADR 0081). There is no
+  second confirming step: a guarantee month blocks only where nothing is
+  recorded, and the Targets save lists every change before it writes.
 
 ## Where the reasoning lives
 

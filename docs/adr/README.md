@@ -57,7 +57,7 @@ what was chosen.
 | [0015](0015-shopify-client-credentials.md) | Shopify authenticates by client credentials | Accepted; where the credentials live amended by 0045 |
 | [0016](0016-frontend-toolchain-pinned.md) | The frontend toolchain is pinned to the builder's Node | Accepted |
 | [0017](0017-payment-proof-visible-to-affiliates.md) | Payment screenshots are shown to affiliates | Accepted — risk knowingly accepted by the business |
-| [0018](0018-content-manager-scope.md) | content_manager holds wide, overlapping authority | Accepted — risk knowingly accepted by the business |
+| [0018](0018-content-manager-scope.md) | content_manager holds wide, overlapping authority | Accepted — risk knowingly accepted by the business; target confirmation removed by 0081 |
 | [0019](0019-size-to-the-requirement.md) | Size to the requirement, and record the measurement | Accepted |
 | [0020](0020-receipts-store-a-digest.md) | Event receipts store a digest, not the payload | Accepted |
 | [0021](0021-lease-committed-before-work.md) | The worker commits the lease before running the handler | Accepted |
@@ -118,6 +118,8 @@ what was chosen.
 | [0076](0076-how-production-moves-in.md) | How Production moves in: tables, its own screens in HBA's frame, HBA's sign-in, its levels | Accepted; amends 0069; decision 5 amended by 0077 |
 | [0077](0077-production-staff-also-records-quality-checks.md) | Production staff also record quality checks; QC is no longer a level of its own | Accepted; amends 0076 |
 | [0079](0079-operations-records-refunds-and-gets-its-levels.md) | Operations records refunds owed and never pays; Operations gets viewer and staff levels | Accepted; amends 0057, 0072 |
+| [0080](0080-targets-offers-a-box-only-where-a-save-keeps-it.md) | Targets offers a box only where a save keeps it, and is a list of cards on a phone | Accepted |
+| [0081](0081-recording-a-target-is-its-confirmation.md) | Recording a target is its confirmation; no separate confirm step, and the save lists its changes first | Accepted; amends 0018 (targets) |
 
 **0014 is superseded by 0036** and **0038 by 0039**. **0027 keeps its
 principle and loses its mechanism to 0039**: an agreed figure is still set

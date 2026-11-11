@@ -28,7 +28,6 @@ export const PERMISSION_PHRASE: Record<string, string> = {
   "compensation.manage": "setting models' pay terms",
   "targets.record": "recording what was published",
   "targets.manage": "setting content targets",
-  "targets.verify": "confirming targets were met",
   "payroll.approve": "approving a month's pay",
   "payroll.reopen": "reopening approved months",
   "payments.record": "recording payments",
@@ -93,7 +92,7 @@ export function givesSentence(
  */
 export const ACCESS_LINES: [string, string[]][] = [
   ["See and edit models, and set their pay terms", ["affiliates.manage", "compensation.manage"]],
-  ["Set, record and confirm content targets", ["targets.manage", "targets.record", "targets.verify"]],
+  ["Set and record content targets", ["targets.manage", "targets.record"]],
   ["Read the activity log", ["audit.view"]],
   ["Approve a month's pay", ["payroll.approve"]],
   ["See the operations dashboard", ["order_ops.view"]],

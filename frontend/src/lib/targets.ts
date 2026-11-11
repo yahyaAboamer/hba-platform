@@ -14,16 +14,14 @@ import type { MonthTargets } from "./portal";
 /**
  * The chip beside a month, if anything needs saying.
  *
- * One at most, and only where the numbers beside it do not already say it. A
- * model who met her targets can see so from the figures; what she cannot see
- * is whether anybody has confirmed them.
+ * One at most, and only where the numbers beside it do not already say it.
  *
  * **`achieved === null` is "not recorded", never "short".** §11.3: it is the
  * state that blocks a guaranteed minimum, and calling it a miss tells her the
  * month is lost when it is merely waiting.
  */
 export function targetChip(
-  target: Pick<MonthTargets, "achieved" | "verified" | "determines_pay">,
+  target: Pick<MonthTargets, "achieved" | "determines_pay">,
 ): { text: string; className: string } | null {
   if (target.achieved === null) {
     return { text: "Not recorded yet", className: "chip chip--quiet" };
@@ -33,9 +31,6 @@ export function targetChip(
   // progress, not a miss.
   if (!target.achieved) {
     return { text: "in progress", className: "chip chip--quiet" };
-  }
-  if (target.determines_pay && !target.verified) {
-    return { text: "Waiting to be confirmed", className: "chip" };
   }
   return { text: "targets met", className: "chip chip--ok" };
 }
@@ -92,14 +87,14 @@ function plural(name: string, amount: number | null): string {
 
 /** The Targets tab's visible pay note, without deciding any amount in the browser. */
 export function describeCurrentTargetPay(
-  row: Pick<MonthTargets, "achieved" | "verified" | "determines_pay">,
+  row: Pick<MonthTargets, "achieved" | "determines_pay">,
 ): string {
   if (!row.determines_pay) return describeTargetPay(row);
   if (row.achieved === null) {
     return "HBA has not recorded your result yet, so your guaranteed minimum is not settled. Your commission still applies.";
   }
   if (!row.achieved) {
-    return "This record can affect your guaranteed minimum. HBA must confirm the final result. Your commission still applies.";
+    return "Your guaranteed minimum applies if this month's targets are met. Your commission still applies.";
   }
   return describeTargetPay(row);
 }
@@ -107,16 +102,15 @@ export function describeCurrentTargetPay(
 /**
  * How a past month ended, in three words at most.
  *
- * *not recorded* rather than *short* where nobody counted, and the unconfirmed
+ * *not recorded* rather than *short* where nobody counted.
  * case is worth a word only where it holds money up — on commission, whether
  * HBA has countersigned a number is their paperwork and not her business.
  */
 export function targetOutcome(
-  row: Pick<MonthTargets, "achieved" | "verified" | "determines_pay">,
+  row: Pick<MonthTargets, "achieved" | "determines_pay">,
 ): string {
   if (row.achieved === null) return "not recorded";
   if (!row.achieved) return "not met";
-  if (row.determines_pay && !row.verified) return "met — to confirm";
   return "met";
 }
 
@@ -140,7 +134,7 @@ export function targetOutcome(
  * month where these same numbers did decide her pay.
  */
 export function describeTargetPay(
-  row: Pick<MonthTargets, "achieved" | "verified" | "determines_pay">,
+  row: Pick<MonthTargets, "achieved" | "determines_pay">,
 ): string {
   if (!row.determines_pay) {
     return "A record of what HBA asked for. It does not change what you are paid for this month.";
@@ -151,8 +145,5 @@ export function describeTargetPay(
   if (!row.achieved) {
     return "Short this month, so your guaranteed minimum does not apply and you are paid your commission.";
   }
-  if (!row.verified) {
-    return "Met. Your guaranteed minimum applies as soon as HBA confirms the numbers.";
-  }
-  return "Met and confirmed, so your guaranteed minimum applies.";
+  return "Met, so your guaranteed minimum applies.";
 }

@@ -1,24 +1,19 @@
-"""Setting requirements, recording what happened, and confirming it.
+"""Setting requirements and recording what happened.
 
 §15, and for a `base_guarantee` model this is the input that decides their pay.
 
-## Recording and confirming are separate permissions, deliberately
+## Recording is the confirmation
 
-`targets.record` writes what they produced; `targets.verify` confirms it. They are
-split because one person recording a number that unlocks a payment is one person
-deciding what somebody is owed.
+`targets.record` writes what they produced, and those counts are the confirmed
+ones (ADR 0081, owner, 11 November 2026). There used to be a second step,
+`targets.verify`, that a met guarantee waited on. It changed money in that one
+case only, and the person who recorded the counts could confirm them a second
+later, so it checked nothing; the owner removed it. The `verified_by` /
+`verified_at` columns stay, unread, so past confirmations remain in the record.
 
-**HBA's `content_manager` role holds both** (ADR 0018), so today the separation is
-structural rather than organisational - the platform enforces a split the staffing
-does not. That is recorded in `docs/limits.md` as an accepted exposure. It is worth
-keeping anyway: roles change, and the check is what will still be here.
-
-## Verifying is not the same as approving of the result
-
-A verified target that was **missed** is a confirmed miss. They are paid their
-commission, the month approves, and the guarantee simply does not apply (§11.3).
-Verification confirms the *numbers*, never the outcome - conflating them would
-block every model who had a quiet month.
+A **missed** target is paid its commission, the month approves, and the
+guarantee simply does not apply (§11.3) - missing information blocks a month,
+a quiet month never does.
 
 ## Nothing here can be changed once a month is approved
 
@@ -47,7 +42,6 @@ def _snapshot(target: MonthlyTarget) -> dict:
         "actual_videos": target.actual_videos,
         "actual_stories": target.actual_stories,
         "recorded_outcome": target.recorded_outcome,
-        "verified": target.is_verified,
     }
 
 
@@ -174,17 +168,28 @@ def grid_roster(db: Session, *, include_archived: bool = False) -> list[Affiliat
 
     A declined application is nobody's model (ADR 0058). Usually it is gone
     altogether; one kept because an order is hers still has no targets.
+
+    **A bare application is nobody's model yet** (owner, 10 November 2026):
+    pending, and no terms ever set. Nothing is owed to her, so a row of empty
+    boxes and an amber *No record yet* beside her name warned about nothing.
+    A pending model HBA has already given terms is being onboarded and stays.
     House accounts and months before her start stay listed: the screen draws
     them (or leaves a house code out), and a payload that quietly omits rows
     is one nobody can reconcile against the registry.
     """
     from app.modules.affiliates.models.affiliates import AffiliateStatus
+    from app.modules.affiliates.models.compensation import CompensationPeriod
     from app.modules.affiliates.services.affiliates import list_affiliates
 
+    with_terms = set(db.scalars(select(CompensationPeriod.affiliate_id).distinct()))
     return [
         affiliate
         for affiliate in list_affiliates(db, include_archived=include_archived)
         if affiliate.status != AffiliateStatus.DECLINED
+        and not (
+            affiliate.status == AffiliateStatus.PENDING
+            and affiliate.id not in with_terms
+        )
     ]
 
 
@@ -290,13 +295,9 @@ def record_actuals(
     a rule for - "eight videos and an unknown number of stories" cannot answer
     whether they achieved, and the database refuses it too.
 
-    **Re-recording clears any verification.** The confirmation was of the old
-    numbers; leaving it in place would let a correction inherit somebody else's
-    approval and unlock a guarantee nobody agreed to. **The same numbers again
-    are not a re-recording** and change nothing.
+    **The same numbers again are not a re-recording** and change nothing.
 
-    `recorded_at` is injectable, exactly as `verify`'s is and for the same
-    reason. **When** a count was recorded became a fact with consequences in
+    `recorded_at` is injectable. **When** a count was recorded became a fact with consequences in
     07A: weekly pace compares it against the week she is in, and a test that
     could not choose the date would only exercise whichever week the suite
     happened to run in.
@@ -308,22 +309,17 @@ def record_actuals(
 
     if (target.actual_videos, target.actual_stories) == (int(videos), int(stories)):
         # The same numbers again are not a re-recording. The grid sends every
-        # row it shows, so without this, saving one model's count cleared every
-        # other model's confirmation - and a confirmation is what releases a
-        # guaranteed minimum - and moved their *Last updated* to today.
+        # row it shows, so without this, saving one model's count moved every
+        # other model's *Last updated* to today.
         return target
     _refuse_before_her_start(db.get(AffiliateProfile, target.affiliate_id), target.month)
 
     before = _snapshot(target)
-    was_verified = target.is_verified
 
     target.actual_videos = int(videos)
     target.actual_stories = int(stories)
     target.recorded_by = actor_id
     target.recorded_at = recorded_at or utcnow()
-    if was_verified:
-        target.verified_by = None
-        target.verified_at = None
     target.updated_at = utcnow()
     db.flush()
 
@@ -334,84 +330,7 @@ def record_actuals(
         actor_id=actor_id,
         actor_email=actor_email,
         before=before,
-        after={**_snapshot(target), "verification_cleared": was_verified},
-    )
-    return target
-
-
-def verify(
-    db: Session,
-    target: MonthlyTarget,
-    *,
-    actor_id: int | None = None,
-    actor_email: str | None = None,
-    verified_at: datetime | None = None,
-) -> MonthlyTarget:
-    """A second person confirms the recorded numbers.
-
-    This is what unlocks a base guarantee (§9.5, §11.3). It confirms the
-    numbers, **not** the outcome - verifying a target they missed is a normal
-    thing to do, and it means "these figures are right", not "well done".
-    """
-    assert_recordable(db, target)
-    if not target.is_recorded:
-        raise ValueError(
-            "There is nothing to verify: no actuals have been recorded for this "
-            "month. Confirming numbers nobody has entered would unlock a base "
-            "guarantee on an empty month."
-        )
-
-    before = _snapshot(target)
-    target.verified_by = actor_id
-    target.verified_at = verified_at or utcnow()
-    target.updated_at = utcnow()
-    db.flush()
-
-    record_audit(
-        db,
-        action="target.verified",
-        subject=f"affiliate:{target.affiliate_id}",
-        actor_id=actor_id,
-        actor_email=actor_email,
-        before=before,
-        after={**_snapshot(target), "achieved": target.is_achieved},
-    )
-    return target
-
-
-def unverify(
-    db: Session,
-    target: MonthlyTarget,
-    *,
-    reason: str,
-    actor_id: int | None = None,
-    actor_email: str | None = None,
-) -> MonthlyTarget:
-    """Take a confirmation back.
-
-    **A written reason is required.** This is the only way back from a mistaken
-    verification, and a mistaken verification silently pays a guarantee - so the
-    audit trail has to say why somebody undid one.
-    """
-    assert_recordable(db, target)
-    if not str(reason or "").strip():
-        raise ValueError("Un-verifying a target requires a written reason")
-
-    before = _snapshot(target)
-    target.verified_by = None
-    target.verified_at = None
-    target.updated_at = utcnow()
-    db.flush()
-
-    record_audit(
-        db,
-        action="target.unverified",
-        subject=f"affiliate:{target.affiliate_id}",
-        actor_id=actor_id,
-        actor_email=actor_email,
-        before=before,
         after=_snapshot(target),
-        reason=reason.strip(),
     )
     return target
 
@@ -438,23 +357,8 @@ def record_outcome(
     by comparing it to what was asked. Letting an outcome be typed for
     September would let somebody unlock a guarantee by asserting it.
 
-    ## Recording it also verifies it, and here is why that is not a shortcut
-
-    Verification exists (§15) to stop one person inventing numbers that unlock
-    a payment. Two things make that impossible here. There are **no numbers**:
-    the outcome is the entire record, so a second person has nothing to check
-    it against. And a month before go-live **cannot be paid** - its balance is
-    structurally zero (ADR 0036), the payments screen refuses a transfer
-    against it, and the money it refers to moved months ago outside the
-    platform.
-
-    So the split protects nothing on these months, while requiring it would
-    mean a second pass through a screen built around counts, for every
-    guarantee month of every model. Recorded and confirmed are one act, by the
-    person who knows, and the audit trail says who.
-
-    **This is the only place in the platform where they are one act.** Anywhere
-    a month can still be paid, they are two.
+    Recorded is settled, as it is for counts (ADR 0081); the audit trail says
+    who.
     """
     from app.modules.affiliates.services.payroll import go_live_month, is_historical
 
@@ -471,7 +375,7 @@ def record_outcome(
     if not is_historical(month):
         raise ValueError(
             f"{month} is not before the platform started paying. Record what "
-            "they produced, and have it confirmed - an outcome asserted "
+            "they produced instead - an outcome asserted "
             "without numbers would unlock a guarantee on a month that can "
             "still be paid."
         )
@@ -506,8 +410,6 @@ def record_outcome(
     target.recorded_outcome = str(outcome)
     target.recorded_by = actor_id
     target.recorded_at = recorded_at
-    target.verified_by = actor_id
-    target.verified_at = recorded_at
     target.updated_at = recorded_at
     db.flush()
 
@@ -518,10 +420,7 @@ def record_outcome(
         actor_id=actor_id,
         actor_email=actor_email,
         before=before,
-        # Named in the trail rather than left to be inferred from two
-        # timestamps being equal: one person did both, deliberately, and the
-        # reason is in this function's docstring.
-        after={**_snapshot(target), "recorded_and_verified_together": True},
+        after=_snapshot(target),
     )
     return target
 
@@ -541,9 +440,8 @@ def clear_actuals(
     say "this was a mistake", it says *she produced nothing*, and that is the
     claim that fails a guaranteed minimum.
 
-    Clearing verification with it, for the same reason `record_actuals` does:
-    the confirmation was of numbers that are now gone, and leaving it would let
-    an empty month inherit somebody's approval.
+    A confirmation from before ADR 0081 is cleared with the counts: the
+    database refuses a confirmation of nothing.
 
     Refused on the same months a recording is refused on — an approved month is
     frozen in its snapshot, and a backfilled one never had counts to clear.
@@ -557,15 +455,13 @@ def clear_actuals(
         return target
 
     before = _snapshot(target)
-    was_verified = target.is_verified
 
     target.actual_videos = None
     target.actual_stories = None
     target.recorded_by = None
     target.recorded_at = None
-    if was_verified:
-        target.verified_by = None
-        target.verified_at = None
+    target.verified_by = None
+    target.verified_at = None
     target.updated_at = utcnow()
     db.flush()
 
@@ -576,7 +472,7 @@ def clear_actuals(
         actor_id=actor_id,
         actor_email=actor_email,
         before=before,
-        after={**_snapshot(target), "verification_cleared": was_verified},
+        after=_snapshot(target),
     )
     return target
 

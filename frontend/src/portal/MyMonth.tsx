@@ -443,7 +443,7 @@ function guaranteeNote(guarantee: NonNullable<MyHome["earnings"]["guarantee"]>):
   if (guarantee.applied) return "targets met · paid this month";
   if (guarantee.targets_achieved === null) return "targets not recorded yet";
   if (!guarantee.targets_achieved) return "targets not met";
-  return guarantee.targets_verified ? "targets met" : "targets met, being checked";
+  return "targets met";
 }
 
 /** When the money arrives, from the ledger - one row, and a way to Payments. */
