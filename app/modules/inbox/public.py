@@ -16,11 +16,13 @@ from app.modules.inbox.services import storage
 from app.modules.inbox.services.confirmations import latest_for_orders as confirmations_for_orders
 from app.modules.inbox.services.connection import describe_whatsapp
 from app.modules.inbox.services.media import BUCKET_REFUSED
+from app.modules.inbox.services.sending import egyptian_mobile
 from app.modules.inbox.today import look as today_look
 
 __all__ = [
     "StorageError",
     "confirmations_for_orders",
+    "egyptian_mobile",
     "file_bucket",
     "file_bucket_configured",
     "file_storage",

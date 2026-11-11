@@ -84,7 +84,7 @@ _INSTAPAY_HANDLE = re.compile(r"[^\s@]{1,80}@instapay", re.IGNORECASE)
 
 def local_mobile(raw: object) -> str | None:
     """An Egyptian mobile as people write it, ``01XXXXXXXXX``, or None."""
-    from app.modules.inbox.services.sending import egyptian_mobile
+    from app.modules.inbox.public import egyptian_mobile
 
     digits = egyptian_mobile(raw)
     return f"0{digits[2:]}" if digits else None
@@ -130,7 +130,7 @@ def refund_to_of(method: str | None, raw) -> str | None:
     Vodafone Cash takes a mobile. A bank transfer or *Other* takes what
     was typed.
     """
-    from app.modules.affiliates.services.payouts import extract_instapay_link, normalise_instapay_address
+    from app.modules.affiliates.public import extract_instapay_link, normalise_instapay_address
 
     text = re.sub(r"\s+", " ", str(raw or "")).strip()
     if not text:
