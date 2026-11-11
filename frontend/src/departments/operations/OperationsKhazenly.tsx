@@ -26,6 +26,7 @@ import "./OperationsDashboard.css";
  * and nothing about the customer is shown: order numbers only.
  *
  * Customer service holds this tab too, and no other tab of Operations.
+ * Operations' viewers see its history only (ADR 0079).
  *
  * No approved frame exists for this tab; it is drawn from the Operations
  * dashboard's own pieces (heading, freshness line, cards, panels).
@@ -330,7 +331,11 @@ function History({ runs }: { runs: RunHead[] }) {
   );
 }
 
-export function OperationsKhazenly() {
+/**
+ * `canBuild`: whether this person may build the file (`khazenly.use`).
+ * Operations' viewers see the history and nothing to build (ADR 0079).
+ */
+export function OperationsKhazenly({ canBuild = true }: { canBuild?: boolean }) {
   const now = useNow();
   const { tab, failed, reload } = useOpsTab(() => api.get<KhazenlyTab>("/api/khazenly"));
   const [file, setFile] = useState<File | null>(null);
@@ -383,7 +388,7 @@ export function OperationsKhazenly() {
 
       {freshness && <SourceBanner freshness={freshness} now={now} />}
 
-      {tab && (
+      {tab && canBuild && (
         <section className="panel ops-list" aria-labelledby="ops-kh-upload">
           <div className="panel__head ops-kh__head">
             <h2 className="panel__title" id="ops-kh-upload">

@@ -33,7 +33,7 @@ in place, and so is the sentence here that it replaced.
 |---|---|---|
 | **Maintainer** | Owner, marketing and finance teams on laptops | Laptop-first; match the approved Admin HTML structure and styling |
 | **Affiliate portal** (`.affiliate`) | Models on phones | Dark by default, denser, phone-shaped |
-| **Operations** (ADR 0057) | The one operations manager, and the admin | Laptop-first, usable on a phone. Its own shell, built from the owner-approved mockup (`docs/design/operations-dashboard-2026-10-03.html`), because no approved export draws it. Same tokens and palette as the maintainer's tool. |
+| **Operations** (ADR 0057, levels ADR 0079) | Its viewers, staff and one manager, and the admin | Laptop-first, usable on a phone. Its own shell, built from the owner-approved mockup (`docs/design/operations-dashboard-2026-10-03.html`), because no approved export draws it. Same tokens and palette as the maintainer's tool. |
 | **Inbox** (ADR 0059, being built) | Customer service, the operations manager, and the admin | Laptop-first, usable on a phone. Its own shell, built from the owner-approved mockup (`docs/design/whatsapp-inbox-2026-10-11.html`). Same tokens and palette. |
 | **Production** (ADR 0069, decided, not built yet) | The production team, its suppliers through the supplier portal, and the owner | **Its own look, exactly as the app the owner approved**: dark, its own green, its own typeface and sidebar. The one department that does not use HBA's tokens, by the owner's decision. Not restyled either way without a new ADR. |
 
@@ -75,6 +75,10 @@ payroll without touching a maintainer screen.
   items are what those fulfilments carried; its base, when not already final,
   is the cash paid up to delivery less shipping and tax. Rebuilt from Shopify's
   history, so it is the same whenever the order was first seen.
+- **A refund in Operations → Returns is a record, never a payment**
+  (ADR 0079). Nothing there moves money, writes to Shopify or Khazenly, or
+  changes model pay. A row can be marked paid only after Khazenly says
+  *Return Completed*; a paid row is locked, and undoing it needs a reason.
 - **A code use is every order that used her code** (ADR 0049, superseding
   D03's definition): delivered, pending, failed delivery, cancelled or
   refunded alike. *Orders counted* is delivered and pending only (F02).

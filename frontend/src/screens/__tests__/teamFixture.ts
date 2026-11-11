@@ -7,7 +7,7 @@ export const ALL = [
   "affiliates.view", "affiliates.manage", "affiliates.erase", "compensation.manage",
   "targets.record", "targets.manage", "payroll.approve", "payroll.reopen",
   "payments.record", "payroll.bonus", "invitations.send", "audit.view", "settings.manage",
-  "order_ops.view", "inbox.use", "khazenly.use",
+  "order_ops.view", "inbox.use", "khazenly.use", "returns.edit",
   "production.view", "production.edit", "production.qc", "production.suppliers", "production.payments",
 ];
 
@@ -21,7 +21,9 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     "affiliates.view", "affiliates.manage", "compensation.manage", "targets.record", "targets.manage",
     "invitations.send", "audit.view",
   ],
-  operations_manager: ["order_ops.view", "khazenly.use"],
+  operations_viewer: ["order_ops.view"],
+  operations_staff: ["order_ops.view", "khazenly.use", "returns.edit"],
+  operations_manager: ["order_ops.view", "khazenly.use", "returns.edit"],
   customer_service: ["inbox.use", "khazenly.use"],
   production_viewer: ["production.view"],
   production_staff: ["production.view", "production.edit", "production.qc"],
@@ -31,6 +33,8 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
 export const ROLE_WORDS: Record<string, string> = {
   admin: "Owner",
   operations_manager: "Operations manager",
+  operations_staff: "Operations staff",
+  operations_viewer: "Operations viewer",
   customer_service: "Inbox staff",
   affiliate_manager: "Affiliates manager",
   content_manager: "Affiliates staff",
@@ -45,7 +49,7 @@ export const DEPARTMENTS = [
   { key: "inbox", name: "Inbox", levels: [
     level("none", null, true), level("viewer", null, false), level("staff", "customer_service", true), level("manager", null, false)] },
   { key: "operations", name: "Operations", levels: [
-    level("none", null, true), level("viewer", null, false), level("staff", null, false), level("manager", "operations_manager", true)] },
+    level("none", null, true), level("viewer", "operations_viewer", true), level("staff", "operations_staff", true), level("manager", "operations_manager", true)] },
   { key: "affiliates", name: "Affiliates", levels: [
     level("none", null, true), level("viewer", null, false), level("staff", "content_manager", true), level("manager", "affiliate_manager", true)] },
   { key: "production", name: "Production", levels: [

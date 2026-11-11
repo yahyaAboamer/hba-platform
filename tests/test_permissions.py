@@ -199,6 +199,9 @@ def test_the_expected_roles_exist_and_no_others():
         "production_viewer",
         "production_staff",
         "production_manager",
+        # Operations' levels (ADR 0079).
+        "operations_viewer",
+        "operations_staff",
     }
 
 
@@ -208,19 +211,31 @@ def test_the_expected_roles_exist_and_no_others():
 def test_operations_manager_holds_the_operations_dashboard_and_khazenly_alone():
     """ADR 0067: his Inbox (ADR 0059) is a second assignment, customer
     service, not part of this role - migration c3e7a1f90019 moved it.
-    Khazenly (ADR 0072) is his own as well."""
-    assert ROLES["operations_manager"] == {Permission.ORDER_OPS_VIEW, Permission.KHAZENLY_USE}
+    Khazenly (ADR 0072) and Returns (ADR 0079) are his own as well."""
+    assert ROLES["operations_manager"] == {
+        Permission.ORDER_OPS_VIEW,
+        Permission.KHAZENLY_USE,
+        Permission.RETURNS_EDIT,
+    }
+
+
+def test_operations_viewers_see_and_staff_change_like_the_manager():
+    """ADR 0079 (the owner, 10 November 2026): viewers see every tab and
+    change nothing; staff change what the manager changes."""
+    assert ROLES["operations_viewer"] == {Permission.ORDER_OPS_VIEW}
+    assert ROLES["operations_staff"] == ROLES["operations_manager"]
+    assert Permission.SETTINGS_MANAGE not in ROLES["operations_staff"]
 
 
 def test_operations_manager_sees_nothing_of_the_affiliate_side():
-    for permission in ALL_PERMISSIONS - {Permission.ORDER_OPS_VIEW, Permission.KHAZENLY_USE}:
+    for permission in ALL_PERMISSIONS - {Permission.ORDER_OPS_VIEW, Permission.KHAZENLY_USE, Permission.RETURNS_EDIT}:
         assert has_permission("operations_manager", permission) is False
 
 
 def test_the_operations_manager_person_holds_operations_and_the_inbox():
     """What he may do is both his roles together, exactly as before."""
     held = {"operations_manager", "customer_service"}
-    mine = {Permission.ORDER_OPS_VIEW, Permission.INBOX_USE, Permission.KHAZENLY_USE}
+    mine = {Permission.ORDER_OPS_VIEW, Permission.INBOX_USE, Permission.KHAZENLY_USE, Permission.RETURNS_EDIT}
     assert permissions_of_roles(held) == mine
     for permission in ALL_PERMISSIONS - mine:
         assert has_permission(held, permission) is False

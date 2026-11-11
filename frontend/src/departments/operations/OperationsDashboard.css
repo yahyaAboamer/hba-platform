@@ -152,3 +152,88 @@
   .ops-kh__run svg { grid-column:2; grid-row:1 / span 2; }
   .ops-kh__past { padding:12px 12px 2px; }
 }
+
+/* ── Returns: refunds owed, by the next act (ADR 0079) ─────────────────────── */
+.ops-rt__tile .ops-tile__value { color:var(--ink); white-space:nowrap; }
+/* A sum of pounds is wider than a count: a size down, on one line. */
+.ops-rt__tile--money .ops-tile__value { font-size:26px; margin-top:12px; }
+.ops-rt__warn { color:var(--owed) !important; }
+.ops-rt__form { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:4px 18px; padding:16px 18px 18px; }
+.ops-rt__form .field { margin-bottom:0; }
+.ops-rt__numbers textarea { resize:vertical; font-variant-numeric:tabular-nums; }
+.ops-rt__kind { margin:0; padding:0; border:0; }
+.ops-rt__wide { grid-column:1 / -1; }
+.ops-rt__grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:12px 14px; margin:8px 0 6px; }
+.ops-rt__grid .field { margin-bottom:0; }
+.ops-rt__grid fieldset { margin:0; padding:0; border:0; }
+.ops-rt__note { margin:0 18px 16px; }
+.ops-rt__note .notice + .notice { margin-top:8px; }
+.ops-rt__refused-head { margin:0 0 4px; }
+.ops-rt__refused { margin:0; padding-left:18px; }
+.ops-rt__rows { margin:0; padding:0; list-style:none; }
+.ops-rt__row { border-bottom:1px solid var(--rule); }
+.ops-rt__row:last-child { border-bottom:0; }
+.ops-rt__summary { display:grid; grid-template-columns:minmax(150px,1.1fr) minmax(130px,1fr) minmax(130px,1fr) minmax(170px,1.3fr) 14px; align-items:start; gap:12px; width:100%; min-height:56px; padding:11px 18px; border:0; background:none; color:var(--ink); font:inherit; font-size:13.5px; text-align:left; cursor:pointer; }
+.ops-rt__summary:hover { background:var(--hover); }
+.ops-rt__summary[aria-expanded="true"] { background:var(--accent-soft); }
+.ops-rt__summary > span { min-width:0; overflow-wrap:anywhere; }
+.ops-rt__summary small { display:block; margin-top:2px; color:var(--quiet); font-size:12px; }
+.ops-rt__summary > svg { width:13px; height:13px; margin-top:3px; color:var(--faint); }
+.ops-rt__kh { font-weight:500; }
+.ops-rt__flags { display:flex; flex-wrap:wrap; margin-top:4px; }
+.ops-rt__flags .ops-tag { white-space:normal; }
+.ops-rt__flag { border-color:var(--owed); color:var(--owed); }
+.ops-rt__open { display:grid; grid-template-columns:minmax(220px,1fr) minmax(0,2fr); gap:18px 24px; padding:16px 18px 18px; border-top:1px solid var(--rule); background:var(--paper); }
+.ops-rt__sub { margin:0 0 8px; font-size:13px; font-weight:500; }
+.ops-rt__timeline ol { margin:0 0 10px; padding:0; list-style:none; border-left:1px solid var(--rule-strong); }
+.ops-rt__timeline li { position:relative; padding:0 0 10px 14px; font-size:13px; }
+.ops-rt__timeline li::before { content:""; position:absolute; left:-4px; top:6px; width:7px; height:7px; border-radius:50%; background:var(--rule-strong); }
+.ops-rt__timeline li.ops-rt__now::before { background:var(--accent); }
+.ops-rt__timeline li.ops-rt__now > span { font-weight:500; }
+.ops-rt__timeline small { display:block; color:var(--quiet); font-size:12px; }
+.ops-rt__work { display:grid; gap:18px; align-content:start; }
+.ops-rt__pay { padding:14px; border:1px solid var(--accent); border-radius:var(--radius); background:var(--surface); }
+.ops-rt__pay .ops-hint { margin-bottom:4px; }
+.ops-rt__undo .field { max-width:420px; }
+.ops-rt__form legend, .ops-rt__edit legend { padding:0; }
+
+/* Find and sort: one bar between adding and the four groups. */
+.ops-rt__find { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:8px 14px; padding:14px 18px; }
+.ops-rt__search { position:relative; display:flex; align-items:center; }
+.ops-rt__search svg { position:absolute; left:13px; width:17px; height:17px; color:var(--faint); pointer-events:none; }
+.ops-rt__search .input { min-height:44px; padding-left:40px; padding-right:44px; font-size:14.5px; }
+.ops-rt__search .input::-webkit-search-cancel-button { display:none; }
+.ops-rt__search .input:focus { border-color:var(--accent); outline:2px solid var(--focus); outline-offset:1px; }
+.ops-rt__clear { position:absolute; right:4px; width:36px; height:36px; border:0; border-radius:var(--radius); background:none; color:var(--quiet); font-size:20px; line-height:1; cursor:pointer; }
+.ops-rt__clear:hover { background:var(--hover); color:var(--ink); }
+.ops-rt__sortby { display:none; }
+.ops-rt__found { grid-column:1 / -1; }
+.ops-rt__heads { display:grid; grid-template-columns:minmax(150px,1.1fr) minmax(130px,1fr) minmax(130px,1fr) minmax(170px,1.3fr) 14px; gap:12px; padding:6px 18px; border-bottom:1px solid var(--rule); }
+.ops-rt__head { display:inline-flex; align-items:center; gap:5px; justify-self:start; min-height:32px; margin-left:-6px; padding:4px 6px; border:0; border-radius:var(--radius-sm); background:none; color:var(--faint); font:inherit; font-size:11px; letter-spacing:.06em; text-transform:uppercase; cursor:pointer; }
+.ops-rt__head:hover { background:var(--hover); color:var(--ink); }
+.ops-rt__head--on { color:var(--accent-text); }
+.ops-rt__head:focus-visible { outline:2px solid var(--focus); outline-offset:1px; }
+.ops-rt__arrow { font-size:12px; letter-spacing:0; }
+@media (max-width:800px) {
+  /* The two sums take a row each; the two counts share one. */
+  .ops-rt__tile--money { grid-column:1 / -1; }
+  /* A phone sorts from a menu: the column heads would not line up with
+     rows that stack. Search and menu each take the full width. */
+  .ops-rt__find { grid-template-columns:1fr; padding:12px 14px; position:sticky; top:var(--frame-top, 56px); z-index:2; box-shadow:0 6px 12px -10px rgba(0,0,0,.5); }
+  .ops-rt__search .input { font-size:16px; }
+  .ops-rt__sortby { display:flex; align-items:center; gap:10px; font-size:13px; color:var(--quiet); }
+  .ops-rt__sortby span { flex:none; }
+  .ops-rt__sortby .input { min-height:44px; font-size:15px; }
+  .ops-rt__heads { display:none; }
+  .ops-rt__form { grid-template-columns:1fr; padding:14px; }
+  .ops-rt__grid { grid-template-columns:1fr; }
+  .ops-rt__summary { grid-template-columns:minmax(0,1fr) minmax(0,auto) 12px; gap:6px 12px; padding:11px 14px; }
+  .ops-rt__who { grid-column:1; grid-row:1; }
+  .ops-rt__money { grid-column:2; grid-row:1; max-width:46vw; text-align:right; }
+  .ops-rt__kh { white-space:nowrap; }
+  .ops-rt__customer { grid-column:1 / span 2; grid-row:2; }
+  .ops-rt__state { grid-column:1 / span 2; grid-row:3; }
+  .ops-rt__summary > svg { grid-column:3; grid-row:1; }
+  .ops-rt__open { grid-template-columns:1fr; padding:14px; }
+  .ops-rt__note { margin:0 14px 14px; }
+}
