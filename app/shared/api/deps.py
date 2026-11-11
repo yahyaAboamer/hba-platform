@@ -129,6 +129,31 @@ def require_permission(permission: str):
     return dependency
 
 
+def require_any_permission(*permissions: str):
+    """Build a dependency that lets through anybody holding one of these.
+
+    For a read two departments share: Khazenly's history, seen by customer
+    service (`khazenly.use`) and by Operations' viewers (`order_ops.view`,
+    ADR 0079). Each name is validated at import time, as above.
+    """
+    if not permissions:
+        raise ValueError("require_any_permission needs at least one permission")
+    for permission in permissions:
+        has_permission("admin", permission)
+
+    def dependency(
+        user: UserAccount = Depends(current_user), db: Session = Depends(get_session)
+    ) -> UserAccount:
+        held = permissions_of(db, user)
+        if not any(permission in held for permission in permissions):
+            raise HTTPException(403, f"Permission required: one of {', '.join(permissions)}")
+        return user
+
+    # Read by tests/test_several_roles.py, as `permission` is above.
+    dependency.any_of = frozenset(permissions)  # type: ignore[attr-defined]
+    return dependency
+
+
 def require_staff(
     user: UserAccount = Depends(current_user), db: Session = Depends(get_session)
 ) -> UserAccount:

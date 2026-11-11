@@ -75,7 +75,8 @@ GRANTED_SINCE: dict[str, frozenset[str]] = {
     # ADR 0070: adding a bonus (owner, 29 October 2026).
     "affiliate_manager": frozenset({P.PAYROLL_BONUS}),
     # ADR 0072: Operations → Khazenly (owner, 1 November 2026).
-    "operations_manager": frozenset({P.KHAZENLY_USE}),
+    # ADR 0079: Returns (owner, 10 November 2026).
+    "operations_manager": frozenset({P.KHAZENLY_USE, P.RETURNS_EDIT}),
     "customer_service": frozenset({P.KHAZENLY_USE}),
     # ADR 0073: the content manager invites models (owner, 4 November 2026).
     "content_manager": frozenset({P.INVITATIONS_SEND}),
@@ -92,6 +93,9 @@ ADDED_SINCE: dict[str, frozenset[str]] = {
     "production_manager": frozenset(
         {P.PRODUCTION_VIEW, P.PRODUCTION_EDIT, P.PRODUCTION_QC, P.PRODUCTION_SUPPLIERS}
     ),
+    # ADR 0079: Operations' levels (owner, 10 November 2026).
+    "operations_viewer": frozenset({P.ORDER_OPS_VIEW}),
+    "operations_staff": frozenset({P.ORDER_OPS_VIEW, P.KHAZENLY_USE, P.RETURNS_EDIT}),
 }
 
 
@@ -389,6 +393,9 @@ def _gates(dependant, found: set[str]) -> set[str]:
         permission = getattr(call, "permission", None)
         if permission:
             found.add(permission)
+        any_of = getattr(call, "any_of", None)
+        if any_of:
+            found.add("any:" + "|".join(sorted(any_of)))
         name = getattr(call, "__name__", "")
         if name in ("require_staff", "current_affiliate", "_applicant"):
             found.add(f"<{name}>")
@@ -405,6 +412,10 @@ def _allowed(gates: set[str], permissions: frozenset[str], staff: bool, model: b
             return False
         if gate == "<current_affiliate>" and not model:
             return False
+        if gate.startswith("any:"):
+            if not set(gate[4:].split("|")) & permissions:
+                return False
+            continue
         if not gate.startswith("<") and gate not in permissions:
             return False
     return True

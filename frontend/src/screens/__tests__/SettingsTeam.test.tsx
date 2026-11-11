@@ -172,8 +172,9 @@ describe("Settings → Team and access, choosing a level", () => {
     expect(viewer.textContent).toContain("Not offered yet");
     fireEvent.click(viewer);
     expect(screen.queryByRole("dialog")).toBeNull();
-    // Operations offers only none and manager.
-    expect((radio("Operations", /Staff/) as HTMLButtonElement).disabled).toBe(true);
+    // Operations offers every level since ADR 0079.
+    expect((radio("Operations", /Viewer/) as HTMLButtonElement).disabled).toBe(false);
+    expect((radio("Operations", /Staff/) as HTMLButtonElement).disabled).toBe(false);
     expect((radio("Operations", "Manager") as HTMLButtonElement).disabled).toBe(false);
   });
 
@@ -367,7 +368,11 @@ describe("Settings → Team and access, review fixes", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Invite someone" }));
     const dialog = await screen.findByRole("dialog");
     fireEvent.change(within(dialog).getByLabelText("Department"), { target: { value: "operations" } });
+    fireEvent.change(within(dialog).getByLabelText("Level"), { target: { value: "manager" } });
     expect(dialog.textContent).toContain("will have Operations manager and Inbox staff access");
+    // Operations staff (ADR 0079) bring nothing else.
+    fireEvent.change(within(dialog).getByLabelText("Level"), { target: { value: "staff" } });
+    expect(dialog.textContent).toContain("will have Operations staff access");
   });
 
   it("orders the list: owners, then sidebar order of departments, then level, then name", async () => {

@@ -52,6 +52,10 @@ class Permission:
     #: runs before it (ADR 0071, 0072). Customer service, the operations
     #: manager and the admin.
     KHAZENLY_USE = "khazenly.use"
+    #: Operations → Returns: adding, editing, marking paid and undoing paid
+    #: on the refunds owed to customers (ADR 0079). Recording only: nothing
+    #: behind it moves money.
+    RETURNS_EDIT = "returns.edit"
 
     # ── Production (ADR 0069, ADR 0076 decision 5) ──
     #: Reading Production: every screen, read only.
@@ -126,7 +130,18 @@ ROLES: dict[str, frozenset[str]] = {
     # this role then, so nobody's access changed.
     #
     # Khazenly (ADR 0072) is his as well as customer service's.
-    "operations_manager": frozenset({Permission.ORDER_OPS_VIEW, Permission.KHAZENLY_USE}),
+    #
+    # Operations' levels (ADR 0079, the owner, 10 November 2026): viewers see
+    # every tab and change nothing; staff and the manager see every tab and
+    # change everything Operations can - Returns, and the Khazenly file. The
+    # keys stay the admin's (`settings.manage`).
+    "operations_viewer": frozenset({Permission.ORDER_OPS_VIEW}),
+    "operations_staff": frozenset(
+        {Permission.ORDER_OPS_VIEW, Permission.KHAZENLY_USE, Permission.RETURNS_EDIT}
+    ),
+    "operations_manager": frozenset(
+        {Permission.ORDER_OPS_VIEW, Permission.KHAZENLY_USE, Permission.RETURNS_EDIT}
+    ),
     # Customer service (ADR 0059): the inbox and nothing else - no model, code,
     # target, payroll, payment or Operations, and no invitations. Any number
     # of people may hold it; only an admin gives it. Of Operations, the
@@ -218,7 +233,11 @@ LEVELS: tuple[str, ...] = ("none", "viewer", "staff", "manager")
 #: and People are not yet (Batch 2.4, Choice 2). The owner (`admin`) is no department's level; it is its own line.
 DEPARTMENT_LEVELS: dict[str, dict[str, str | None]] = {
     "inbox": {"viewer": None, "staff": "customer_service", "manager": None},
-    "operations": {"viewer": None, "staff": None, "manager": "operations_manager"},
+    "operations": {
+        "viewer": "operations_viewer",
+        "staff": "operations_staff",
+        "manager": "operations_manager",
+    },
     "affiliates": {"viewer": None, "staff": "content_manager", "manager": "affiliate_manager"},
     "production": {
         "viewer": "production_viewer",
@@ -244,6 +263,8 @@ OWNER_ROLE = "admin"
 ROLE_WORDS: dict[str, str] = {
     "admin": "Owner",
     "operations_manager": "Operations manager",
+    "operations_staff": "Operations staff",
+    "operations_viewer": "Operations viewer",
     "customer_service": "Inbox staff",
     "affiliate_manager": "Affiliates manager",
     "content_manager": "Affiliates staff",

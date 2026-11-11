@@ -312,7 +312,8 @@ def test_none_on_the_only_access_is_refused_in_todays_words(client):
 def test_a_level_not_offered_is_refused(client):
     sara = _person("sara@example.com", "Sara", "content_manager")
 
-    for department, level in (("inbox", "manager"), ("inbox", "viewer"), ("operations", "staff")):
+    # Operations offers every level since ADR 0079; Affiliates still has no viewer.
+    for department, level in (("inbox", "manager"), ("inbox", "viewer"), ("affiliates", "viewer")):
         response = _set(client, sara, department, level)
         assert response.status_code == 422, (department, level)
         assert response.json()["detail"] == "Not offered yet"

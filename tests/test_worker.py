@@ -473,5 +473,7 @@ def test_between_them_the_lanes_take_every_kind_and_only_one_tops_up():
         JobKind.ORDER_OPS_SHOPIFY,
         JobKind.ORDER_OPS_BOSTA,
         JobKind.ORDER_OPS_ESTEBDAL,
+        # Returns' Khazenly read (ADR 0079): bounded to 3 minutes, inside the lease.
+        JobKind.ORDER_OPS_RETURNS,
     }
     assert LANES["operations"]["lease_seconds"] > LANES["main"]["lease_seconds"]

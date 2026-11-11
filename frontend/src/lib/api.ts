@@ -344,6 +344,8 @@ export function roleLabel(actor: Actor): string {
 export const ROLE_WORDS: Record<string, string> = {
   admin: "Owner",
   operations_manager: "Operations manager",
+  operations_staff: "Operations staff",
+  operations_viewer: "Operations viewer",
   customer_service: "Inbox staff",
   affiliate_manager: "Affiliates manager",
   content_manager: "Affiliates staff",

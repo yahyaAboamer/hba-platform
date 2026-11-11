@@ -19,7 +19,7 @@ afterEach(() => {
 });
 
 describe("the operations manager", () => {
-  it("starts on Operations, on Shopify, with its five sections", async () => {
+  it("starts on Operations, on Shopify, with its six sections", async () => {
     serve(sessionOf("operations_only"));
     render(<App />);
 
@@ -31,6 +31,7 @@ describe("the operations manager", () => {
       "E-stebdal",
       "WhatsApp",
       "Khazenly",
+      "Returns",
     ]);
   });
 
