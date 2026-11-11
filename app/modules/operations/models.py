@@ -253,9 +253,10 @@ class OpsRefund(Base):
     Khazenly number and amount alone.
 
     Khazenly's timeline is kept as read (``timeline``, newest first); the row
-    is received once it says *Return Completed*, and only then can it be
-    paid. Amount, method and refund ID may wait until then, but a paid row
-    has all three, and all three are locked with it.
+    is received once it says *Return Completed*. It is normally paid then;
+    paying earlier is allowed when confirmed (ADR 0080). Amount, method and
+    refund ID may wait, but a paid row has all three, locked with it, and
+    may carry one proof photo.
     """
 
     __tablename__ = "ops_refund"
@@ -268,15 +269,21 @@ class OpsRefund(Base):
         ),
         CheckConstraint("amount IS NULL OR amount > 0", name="ops_refund_amount_positive"),
         # Paid is the date and when it was recorded, both or neither; and a
-        # paid row was received and says what was sent, how and where.
+        # paid row says what was sent, how and where (received or not: ADR 0080).
         CheckConstraint(
             "(paid_on IS NULL) = (paid_recorded_at IS NULL)", name="ops_refund_paid_whole"
         ),
         CheckConstraint(
-            "paid_on IS NULL OR (received_at IS NOT NULL AND amount IS NOT NULL "
+            "paid_on IS NULL OR (amount IS NOT NULL "
             "AND method IS NOT NULL AND refund_to IS NOT NULL)",
             name="ops_refund_paid_complete",
         ),
+        # A proof photo is a key and its type, both or neither, on a paid row.
+        CheckConstraint(
+            "(proof_key IS NULL) = (proof_type IS NULL)", name="ops_refund_proof_whole"
+        ),
+        CheckConstraint("proof_key IS NULL OR paid_on IS NOT NULL", name="ops_refund_proof_paid"),
+        CheckConstraint("NOT paid_early OR paid_on IS NOT NULL", name="ops_refund_early_paid"),
         Index("ix_ops_refund_paid_on", "paid_on"),
         # The 30-minute read takes the rows not yet received.
         Index(
@@ -317,6 +324,11 @@ class OpsRefund(Base):
     paid_on: Mapped[date | None] = mapped_column(Date)
     paid_recorded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     paid_by: Mapped[int | None] = mapped_column(ForeignKey("user_account.id", ondelete="SET NULL"))
+    #: Paid before Khazenly said *Return Completed* (ADR 0080).
+    paid_early: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    #: The optional photo of the payment: its key in the file bucket, and type.
+    proof_key: Mapped[str | None] = mapped_column(String(200))
+    proof_type: Mapped[str | None] = mapped_column(String(20))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )

@@ -17,11 +17,13 @@ router and permission (ADR 0072), at the end of this file.
 """
 
 import base64
+import logging
 from datetime import date, datetime
 
 from typing import Literal
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -32,6 +34,8 @@ from app.shared.models.identity import UserAccount
 from app.shared.services.audit import record_audit
 from app.modules.operations.services import bosta, connections, estebdal, khazenly, returns, shopify
 from app.modules.operations.services.freshness import SOURCES, State, describe, has_numbers
+
+logger = logging.getLogger(__name__)
 
 #: The one guard, kept by name so a test can find it on every route.
 GUARD = require_permission(Permission.ORDER_OPS_VIEW)
@@ -233,6 +237,8 @@ class RefundPaid(BaseModel):
     amount: str | None = None
     method: str | None = None
     refund_to: str | None = None
+    #: Confirms a payment before Khazenly said *Return Completed* (ADR 0080).
+    early: bool = False
 
 
 class RefundUnpaid(BaseModel):
@@ -323,7 +329,71 @@ def undo_refund_paid(
         db.rollback()
         raise _refused(exc) from None
     db.commit()
+    returns.drop_files(db)
     return _row(db, refund_id)
+
+
+@router.post("/returns/{refund_id}/proof")
+def add_refund_proof(
+    refund_id: int,
+    file: UploadFile = File(...),
+    actor: UserAccount = Depends(RETURNS_GUARD),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Keep a photo of the payment on a paid refund (ADR 0080)."""
+    from app.modules.inbox.public import StorageError
+
+    content = file.file.read(returns.PROOF_MAX_BYTES + 1)
+    try:
+        returns.add_proof(db, refund_id, content, actor)
+    except LookupError as exc:
+        raise HTTPException(404, str(exc)) from None
+    except returns.Refused as exc:
+        db.rollback()
+        raise _refused(exc) from None
+    except StorageError:
+        db.rollback()
+        logger.exception("A refund's proof photo could not be stored")
+        raise HTTPException(503, "The photo couldn't be saved. Try again.") from None
+    db.commit()
+    returns.drop_files(db)
+    return _row(db, refund_id)
+
+
+@router.delete("/returns/{refund_id}/proof")
+def remove_refund_proof(
+    refund_id: int,
+    actor: UserAccount = Depends(RETURNS_GUARD),
+    db: Session = Depends(get_session),
+) -> dict:
+    try:
+        returns.remove_proof(db, refund_id, actor)
+    except LookupError as exc:
+        raise HTTPException(404, str(exc)) from None
+    except returns.Refused as exc:
+        db.rollback()
+        raise _refused(exc) from None
+    db.commit()
+    returns.drop_files(db)
+    return _row(db, refund_id)
+
+
+@router.get("/returns/{refund_id}/proof")
+def refund_proof(refund_id: int, db: Session = Depends(get_session)) -> Response:
+    """The photo, to anyone who sees Operations."""
+    found = returns.proof(db, refund_id)
+    if found is None:
+        raise HTTPException(404, "No photo.")
+    content, mime = found
+    return Response(
+        content,
+        media_type=mime,
+        headers={
+            "Content-Disposition": "inline",
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "private, max-age=300",
+        },
+    )
 
 
 @router.post("/returns/{refund_id}/check")

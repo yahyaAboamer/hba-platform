@@ -222,7 +222,10 @@ def sentence(event: AuditEvent, names: _Names) -> str:
         "order_ops.khazenly_file_built": f"Built the Khazenly confirmation file: {a.get('confirmed', '?')} of {a.get('rows_read', '?')} orders confirmed" if a.get("file") else f"Checked a Khazenly export: none of its {a.get('rows_read', '?')} orders confirmed",
         "order_ops.refund_added": f"Added a refund for {a.get('number') or '?'}",
         "order_ops.refund_edited": f"Changed the refund for {a.get('number') or '?'}",
-        "order_ops.refund_paid": f"Marked the refund for {a.get('number') or '?'} paid: EGP {a.get('amount') or '?'}",
+        "order_ops.refund_paid": f"Marked the refund for {a.get('number') or '?'} paid"
+        f"{' before the return was back' if a.get('early') else ''}: EGP {a.get('amount') or '?'}",
+        "order_ops.refund_proof_added": f"{'Replaced' if a.get('replaced') else 'Added'} the payment photo for {a.get('number') or '?'}",
+        "order_ops.refund_proof_removed": f"Removed the payment photo for {a.get('number') or '?'}",
         "order_ops.refund_unpaid": f"Undid the payment of the refund for {a.get('number') or '?'}",
         "order_ops.refund_deleted": f"Deleted the refund for {a.get('number') or '?'}",
         "inbox.whatsapp_saved": "Saved the WhatsApp connection",

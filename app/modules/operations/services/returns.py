@@ -6,8 +6,10 @@ or Khazenly, or is read by anything that decides pay.
 Each row is one customer owed a refund for a return or an exchange. It is
 added by its Khazenly number; Khazenly's public tracking
 (``khazenly_tracking``) is read at once and then every 30 minutes until it
-says *Return Completed*, and only then can the row be marked paid. A paid
-row is locked; undoing it needs a reason, kept in the activity log.
+says *Return Completed*. The row is normally marked paid then; paying
+earlier is allowed when the person confirms it, and the row keeps being
+read (ADR 0080). A paid row is locked except for its optional proof photo;
+undoing it needs a reason, kept in the activity log.
 
 The customer's name and phone are read from the Shopify order Khazenly
 names, best effort: when Shopify gives none, a person types them. They are
@@ -49,6 +51,16 @@ GIVE_UP_AFTER = 5
 MAX_PASTED = 20
 #: The paid rows the tab lists, newest first.
 PAID_SHOWN = 100
+#: How long a refund paid before its return was back is still read from
+#: Khazenly, from the day it was paid (ADR 0080, decision 2).
+PAID_EARLY_TRACKED_FOR = timedelta(days=60)
+
+#: The proof photo (ADR 0080, decision 3): its size, and where it is kept.
+PROOF_MAX_BYTES = 10 * 1024 * 1024
+PROOF_PREFIX = "operations/refunds"
+#: ``db.info`` key for photos to take out of the bucket once the change
+#: that dropped them is committed (``drop_files``).
+_DROP = "ops_refund_drop"
 
 #: Needs attention (ADR 0079, decision 6).
 STUCK_AFTER = timedelta(days=3)
@@ -294,7 +306,11 @@ def waiting(db: Session) -> list[OpsRefund]:
     return list(
         db.scalars(
             select(OpsRefund)
-            .where(OpsRefund.received_at.is_(None), OpsRefund.paid_on.is_(None))
+            .where(
+                OpsRefund.received_at.is_(None),
+                (OpsRefund.paid_on.is_(None))
+                | (OpsRefund.paid_on >= business_date(utcnow()) - PAID_EARLY_TRACKED_FOR),
+            )
             .order_by(OpsRefund.checked_at.asc().nulls_first(), OpsRefund.id)
             .limit(READ_BATCH)
         )
@@ -517,12 +533,16 @@ def edit(db: Session, refund_id: int, values: dict, actor: UserAccount) -> OpsRe
 
 def mark_paid(db: Session, refund_id: int, values: dict, actor: UserAccount, today: date | None = None) -> OpsRefund:
     """Record that the refund was sent: the day, and the amount, method and
-    refund ID as sent. Only once Khazenly said *Return Completed*."""
+    refund ID as sent. Normally once Khazenly said *Return Completed*; before
+    then only when ``values["early"]`` confirms it (ADR 0080)."""
     row = _get(db, refund_id)
     if row.paid_on is not None:
         raise Locked("This refund is already marked paid.")
-    if row.received_at is None:
-        raise Refused("Khazenly hasn't said this return is completed yet, so it can't be marked paid.")
+    early = row.received_at is None
+    if early and values.get("early") is not True:
+        raise Refused(
+            "Khazenly hasn't said this return is completed yet. Confirm you paid it before it was back."
+        )
     today = today or business_date(utcnow())
     try:
         paid_on = date.fromisoformat(str(values.get("paid_on") or today.isoformat()))
@@ -530,7 +550,7 @@ def mark_paid(db: Session, refund_id: int, values: dict, actor: UserAccount, tod
         raise Refused("Choose the day the refund was sent.") from None
     if paid_on > today:
         raise Refused("The day it was sent can't be in the future.")
-    if paid_on < business_date(row.received_at):
+    if not early and paid_on < business_date(row.received_at):
         raise Refused("The day it was sent can't be before Khazenly received the return.")
     edits = {key: values[key] for key in ("amount", "method", "refund_to") if key in values}
     if edits:
@@ -543,12 +563,13 @@ def mark_paid(db: Session, refund_id: int, values: dict, actor: UserAccount, tod
     if missing:
         raise Refused(f"Add {' and '.join(missing)} before marking it paid.")
     row.paid_on = paid_on
+    row.paid_early = early
     row.paid_recorded_at = utcnow()
     row.paid_by = actor.id
     row.updated_by = actor.id
     row.updated_at = row.paid_recorded_at
     db.flush()
-    _audit(db, "order_ops.refund_paid", row, actor, paid_on=paid_on.isoformat(), method=row.method)
+    _audit(db, "order_ops.refund_paid", row, actor, paid_on=paid_on.isoformat(), method=row.method, early=early)
     return row
 
 
@@ -562,7 +583,9 @@ def undo_paid(db: Session, refund_id: int, reason: str, actor: UserAccount) -> O
     if len(reason) > 300:
         raise Refused("Keep the reason to 300 characters.")
     was = row.paid_on.isoformat()
+    _drop_proof(db, row)
     row.paid_on = None
+    row.paid_early = False
     row.paid_recorded_at = None
     row.paid_by = None
     row.updated_by = actor.id
@@ -584,8 +607,8 @@ def delete(db: Session, refund_id: int, actor: UserAccount) -> None:
 def recheck(db: Session, refund_id: int, client: tracking.Client | None = None) -> OpsRefund:
     """Ask Khazenly again now, for a person waiting on one row."""
     row = _get(db, refund_id)
-    if row.paid_on is not None:
-        raise Locked("This refund is paid; Khazenly isn't checked for it any more.")
+    if row.received_at is not None:
+        raise Refused("Khazenly already said this return is completed.")
     owned = client is None
     client = client or tracking.Client()
     try:
@@ -595,6 +618,103 @@ def recheck(db: Session, refund_id: int, client: tracking.Client | None = None) 
             client.close()
     db.flush()
     return row
+
+
+# ── The proof photo (ADR 0080, decision 3) ────────────────────────────────────
+
+
+def image_type(head: bytes) -> str | None:
+    """The photo a file really is, from its first bytes."""
+    if head[:3] == b"\xff\xd8\xff":
+        return "image/jpeg"
+    if head[:8] == b"\x89PNG\r\n\x1a\n":
+        return "image/png"
+    if head[:4] == b"RIFF" and head[8:12] == b"WEBP":
+        return "image/webp"
+    return None
+
+
+def _bucket():
+    from app.modules.inbox.public import file_bucket
+
+    return file_bucket()
+
+
+def _drop_proof(db: Session, row: OpsRefund) -> str | None:
+    """Unlink the photo; the file goes once the change is committed."""
+    key = row.proof_key
+    if key:
+        db.info.setdefault(_DROP, []).append(key)
+        row.proof_key = None
+        row.proof_type = None
+    return key
+
+
+def drop_files(db: Session) -> None:
+    """Take out of the bucket the photos a committed change unlinked. Best
+    effort: a file left behind is linked from nothing."""
+    from app.modules.inbox.public import StorageError
+
+    keys = db.info.pop(_DROP, [])
+    if not keys:
+        return
+    try:
+        bucket = _bucket()
+        for key in keys:
+            bucket.delete(key)
+    except StorageError:
+        logger.warning("A refund's proof photo could not be removed from the bucket")
+
+
+def add_proof(db: Session, refund_id: int, content: bytes, actor: UserAccount) -> OpsRefund:
+    """Keep a photo of the payment on a paid row, replacing any before it."""
+    import uuid
+
+    row = _get(db, refund_id)
+    if row.paid_on is None:
+        raise Refused("Mark the refund paid first, then add the photo.")
+    if not content:
+        raise Refused("Choose a photo.")
+    if len(content) > PROOF_MAX_BYTES:
+        raise Refused("The photo must be 10 MB or smaller.")
+    mime = image_type(content[:16])
+    if mime is None:
+        raise Refused("Use a JPG, PNG or WebP photo.")
+    key = f"{PROOF_PREFIX}/{row.id}/{uuid.uuid4()}"
+    _bucket().put(key, content, mime)
+    replaced = _drop_proof(db, row) is not None
+    row.proof_key = key
+    row.proof_type = mime
+    row.updated_by = actor.id
+    row.updated_at = utcnow()
+    db.flush()
+    _audit(db, "order_ops.refund_proof_added", row, actor, replaced=replaced)
+    return row
+
+
+def remove_proof(db: Session, refund_id: int, actor: UserAccount) -> OpsRefund:
+    row = _get(db, refund_id)
+    if row.proof_key is None:
+        raise Refused("This refund has no photo.")
+    _drop_proof(db, row)
+    row.updated_by = actor.id
+    row.updated_at = utcnow()
+    db.flush()
+    _audit(db, "order_ops.refund_proof_removed", row, actor)
+    return row
+
+
+def proof(db: Session, refund_id: int) -> tuple[bytes, str] | None:
+    """The photo's bytes and type, or None when there is none."""
+    from app.modules.inbox.public import StorageError
+
+    row = db.get(OpsRefund, refund_id)
+    if row is None or row.proof_key is None:
+        return None
+    try:
+        return _bucket().get(row.proof_key), row.proof_type
+    except StorageError:
+        return None
 
 
 # ── The tab ───────────────────────────────────────────────────────────────────
@@ -655,6 +775,10 @@ def serialise(row: OpsRefund, now: datetime | None = None, names: dict[int, str]
         "check_error": row.check_error,
         "paid_on": row.paid_on.isoformat() if row.paid_on else None,
         "paid_by": (names or {}).get(row.paid_by) if row.paid_by else None,
+        "paid_early": bool(row.paid_early),
+        "proof_url": f"/api/order-ops/returns/{row.id}/proof?v={row.proof_key.rsplit('/', 1)[-1][:8]}"
+        if row.proof_key
+        else None,
         "created_at": _iso(row.created_at),
         "group": group_of(row, now),
         "attention": attention(row, now),

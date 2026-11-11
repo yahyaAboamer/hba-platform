@@ -179,6 +179,22 @@ One batch, one pull request. Merge and deploy only on the owner's word.
 - **Exchanges**: none was seen on Khazenly. Received is *Return Completed*
   for both; confirm with one real exchange number.
 
+## Added 11 November 2026 (ADR 0080, the owner)
+
+- **Paid before it is back.** Any refund not yet received can be recorded
+  as paid after ticking "I paid it before Khazenly said the return was
+  back" (*Paid it already? Record it* on the row). It moves to *Paid*,
+  tagged "Paid before it was back" with its Khazenly step, and is still read
+  every 30 minutes (and by *Check Khazenly now*) until *Return Completed*,
+  for up to 60 days after the day paid. Migration `b2d8f4a60029`.
+- **Payment photo, optional.** Chosen in the pay form, or added, replaced or
+  removed later on a paid row. JPG, PNG or WebP up to 10 MB, in the file
+  bucket under `operations/refunds/`, served only to Operations; undoing
+  paid removes it.
+- **The four groups fold.** *Ready to refund* and *Needs attention* start
+  open, *On the way back* and *Paid* folded; each person's choice is kept
+  in their browser. A search opens every group it found something in.
+
 ## Not in scope
 
 Paying anyone; writing to Shopify or Khazenly; fees or deductions; changing

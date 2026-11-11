@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { OperationsKhazenly } from "../OperationsKhazenly";
-import { OperationsReturns, matches, sortRefunds } from "../OperationsReturns";
+import { DEFAULT_FOLDS, OperationsReturns, matches, sortRefunds } from "../OperationsReturns";
 import type { Refund, ReturnsTab } from "../OperationsReturns";
 
 const reply = (status: number, body: unknown) =>
@@ -40,6 +40,8 @@ function refund(extra: Partial<Refund>): Refund {
     check_error: null,
     paid_on: null,
     paid_by: null,
+    paid_early: false,
+    proof_url: null,
     created_at: minutesAgo(3000),
     group: "ready",
     attention: [],
@@ -94,8 +96,14 @@ const STUCK = refund({
 });
 const PAID = refund({ id: 4, khazenly_number: "KH-HBA-09000213", group: "paid", paid_on: "2026-11-09", paid_by: "Mona" });
 
+/** Open a group that starts folded, by its header. */
+function openGroup(title: string) {
+  fireEvent.click(screen.getByRole("button", { name: new RegExp(`^${title} ·`) }));
+}
+
 let fetchMock: ReturnType<typeof vi.fn>;
 beforeEach(() => {
+  window.localStorage.clear();
   fetchMock = vi.fn();
   vi.stubGlobal("fetch", fetchMock);
   vi.stubGlobal(
@@ -130,6 +138,7 @@ describe("Operations → Returns (ADR 0079)", () => {
     expect(screen.getByRole("heading", { name: "Needs attention · 1" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Paid · 1" })).toBeTruthy();
     expect(screen.getByText("No movement for 3 days")).toBeTruthy();
+    openGroup("Paid");
     expect(screen.getByText("Paid 9 Nov")).toBeTruthy();
     expect(screen.getByText(/Khazenly checked 5 minutes ago · every 30 minutes/)).toBeTruthy();
   });
@@ -145,6 +154,7 @@ describe("Operations → Returns (ADR 0079)", () => {
     expect(await screen.findByText("Open on Khazenly")).toBeTruthy();
     expect(screen.queryByRole("button", { name: /as paid/ })).toBeNull();
     expect(screen.queryByRole("button", { name: "Save details" })).toBeNull();
+    openGroup("Paid");
     fireEvent.click(screen.getByText("KH-HBA-09000213"));
     expect(screen.queryByRole("button", { name: "Undo paid" })).toBeNull();
   });
@@ -206,7 +216,9 @@ describe("Operations → Returns (ADR 0079)", () => {
       return reply(200, { refund: READY, totals: tab([]).totals });
     });
     render(<OperationsReturns canEdit />);
-    fireEvent.click(await screen.findByText("KH-HBA-09000213"));
+    await screen.findByRole("heading", { name: "Paid · 1" });
+    openGroup("Paid");
+    fireEvent.click(screen.getByText("KH-HBA-09000213"));
     fireEvent.click(screen.getByRole("button", { name: "Undo paid" }));
 
     const confirm = screen.getAllByRole("button", { name: "Undo paid" }).at(-1) as HTMLButtonElement;
@@ -324,5 +336,101 @@ describe("Operations → Khazenly for a viewer (ADR 0079)", () => {
     render(<OperationsKhazenly canBuild={false} />);
     expect(await screen.findByRole("heading", { name: "History" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Build the file" })).toBeNull();
+  });
+});
+
+describe("Folding the groups", () => {
+  it("opens the groups that ask for something, folds the rest, and remembers", async () => {
+    respond(tab([READY, ON_THE_WAY, STUCK, PAID]));
+    render(<OperationsReturns canEdit={false} />);
+    await screen.findByText("KH-HBA-08997921");
+
+    expect(DEFAULT_FOLDS).toEqual({ ready: true, attention: true, on_the_way: false, paid: false });
+    expect(screen.getByText("KH-HBA-09000241")).toBeTruthy();
+    expect(screen.queryByText("KH-HBA-09000276")).toBeNull();
+    expect(screen.queryByText("KH-HBA-09000213")).toBeNull();
+
+    const onTheWay = screen.getByRole("button", { name: /^On the way back ·/ });
+    expect(onTheWay.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(onTheWay);
+    expect(onTheWay.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByText("KH-HBA-09000276")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /^Ready to refund ·/ }));
+    expect(screen.queryByText("KH-HBA-08997921")).toBeNull();
+
+    expect(JSON.parse(window.localStorage.getItem("hba.ops.returns.open")!)).toMatchObject({
+      ready: false,
+      on_the_way: true,
+    });
+  });
+
+  it("opens every group a search found something in", async () => {
+    respond(tab([READY, PAID]));
+    render(<OperationsReturns canEdit={false} />);
+    await screen.findByText("KH-HBA-08997921");
+    fireEvent.change(screen.getByLabelText("Search refunds"), { target: { value: "09000213" } });
+    expect(screen.getByText("KH-HBA-09000213")).toBeTruthy();
+  });
+});
+
+describe("Paying before the return is back (ADR 0080)", () => {
+  it("asks to confirm a payment made early, and says so to the server", async () => {
+    let sent: { path: string; body: Record<string, unknown> } | null = null;
+    respond(tab([STUCK]), (path, init) => {
+      sent = { path, body: JSON.parse(String(init.body)) };
+      return reply(200, { refund: { ...STUCK, group: "paid" } });
+    });
+    render(<OperationsReturns canEdit />);
+    fireEvent.click(await screen.findByText("KH-HBA-09000241"));
+    fireEvent.click(screen.getByRole("button", { name: "Paid it already? Record it" }));
+
+    expect(screen.getByRole("heading", { name: "Mark as paid early" })).toBeTruthy();
+    const record = screen.getByRole("button", { name: "Record EGP 395.00 as paid early" }) as HTMLButtonElement;
+    expect(record.disabled).toBe(true);
+    fireEvent.click(screen.getByLabelText(/I paid it before Khazenly said the return was back/));
+    expect(record.disabled).toBe(false);
+    fireEvent.click(record);
+
+    await waitFor(() => expect(sent).not.toBeNull());
+    expect(sent!.path).toBe("/api/order-ops/returns/3/paid");
+    expect(sent!.body).toMatchObject({ early: true, amount: "395.00" });
+  });
+
+  it("sends the optional photo after recording the payment", async () => {
+    const paths: string[] = [];
+    respond(tab([READY]), (path) => {
+      paths.push(path);
+      return reply(200, { refund: { ...READY, group: "paid" } });
+    });
+    render(<OperationsReturns canEdit />);
+    fireEvent.click(await screen.findByText("KH-HBA-08997921"));
+    const photo = new File([new Uint8Array([0x89, 0x50])], "proof.png", { type: "image/png" });
+    fireEvent.change(screen.getByLabelText(/Photo of the payment/), { target: { files: [photo] } });
+    fireEvent.click(screen.getByRole("button", { name: "Record EGP 395.00 as paid" }));
+
+    await waitFor(() => expect(paths).toEqual(["/api/order-ops/returns/1/paid", "/api/order-ops/returns/1/proof"]));
+  });
+
+  it("shows a refund paid early with its Khazenly step and its photo, to a viewer too", async () => {
+    const early = refund({
+      ...STUCK,
+      group: "paid",
+      attention: [],
+      paid_on: "2026-11-09",
+      paid_by: "Mona",
+      paid_early: true,
+      proof_url: "/api/order-ops/returns/3/proof?v=abc",
+    });
+    respond(tab([early]));
+    render(<OperationsReturns canEdit={false} />);
+    await screen.findByRole("heading", { name: "Paid · 1" });
+    openGroup("Paid");
+
+    expect(screen.getByText("Paid before it was back")).toBeTruthy();
+    expect(screen.getByText("Khazenly: Return Picked Up")).toBeTruthy();
+    fireEvent.click(screen.getByText("KH-HBA-09000241"));
+    const image = screen.getByRole("img", { name: "Payment photo for KH-HBA-09000241" }) as HTMLImageElement;
+    expect(image.getAttribute("src")).toBe("/api/order-ops/returns/3/proof?v=abc");
+    expect(screen.queryByRole("button", { name: "Remove photo" })).toBeNull();
   });
 });
