@@ -72,7 +72,8 @@ describe("linked account pages", () => {
   it("keeps the guarantee conditional and the guide in plain language", () => {
     const terms = renderToStaticMarkup(<MemoryRouter><YouTerms me={base} workingMonth="2026-09" /></MemoryRouter>);
     const guide = renderToStaticMarkup(<MemoryRouter><YouGuide /></MemoryRouter>);
-    expect(terms).toContain("met and HBA confirmed");
+    expect(terms).toContain("for the month were met.");
+    expect(terms).not.toContain("confirm");
     expect(terms).toContain('href="/targets"');
     expect(guide).toContain("Why can sales and pay differ?");
     expect(guide).toContain("What if a target has no result yet?");

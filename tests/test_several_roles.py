@@ -53,14 +53,14 @@ ROLES_BEFORE: dict[str, frozenset[str]] = {
     "affiliate_manager": frozenset(
         {
             P.AFFILIATES_VIEW, P.AFFILIATES_MANAGE, P.COMPENSATION_MANAGE,
-            P.TARGETS_MANAGE, P.TARGETS_VERIFY, P.TARGETS_RECORD,
+            P.TARGETS_MANAGE, P.TARGETS_RECORD,
             P.PAYROLL_APPROVE, P.INVITATIONS_SEND, P.AUDIT_VIEW,
         }
     ),
     "content_manager": frozenset(
         {
             P.AFFILIATES_VIEW, P.AFFILIATES_MANAGE, P.COMPENSATION_MANAGE,
-            P.TARGETS_RECORD, P.TARGETS_MANAGE, P.TARGETS_VERIFY, P.AUDIT_VIEW,
+            P.TARGETS_RECORD, P.TARGETS_MANAGE, P.AUDIT_VIEW,
         }
     ),
     "operations_manager": frozenset({P.ORDER_OPS_VIEW, P.INBOX_USE}),

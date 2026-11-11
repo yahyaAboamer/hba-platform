@@ -321,8 +321,13 @@ def source_version(
     orders: list[AttributedOrder],
     carried: list[AttributedOrder] | None = None,
     deductions: list[dict] | None = None,
+    *,
+    legacy_verified: bool | None = None,
 ) -> str:
     """A short fingerprint of everything this month's figure was computed from.
+
+    `legacy_verified` rebuilds the fingerprint as it was written before
+    ADR 0081 removed target confirmation - see `agreed_source_unchanged`.
 
     §11.3, 05B. Approving is the moment a working number becomes a debt, and
     the operator agrees to **the figure they were shown**. Between the preview
@@ -356,10 +361,9 @@ def source_version(
         "commission_rate_bp": calculation.commission_rate_bp,
         "fixed_piastres": calculation.fixed_piastres,
         "base_amount_piastres": calculation.base_amount_piastres,
-        # A target that is met but unconfirmed is a different month from one
-        # that is met and confirmed: only the second releases a guarantee.
+        # Met or missed decides whether a guarantee applies (ADR 0081: the
+        # recorded counts are the confirmed ones).
         "target_achieved": calculation.target_achieved,
-        "target_verified": calculation.target_verified,
         "orders": [_order_line(order) for order in orders],
         "carried": [
             {**_order_line(order), "business_month": order.business_month}
@@ -383,7 +387,31 @@ def source_version(
     # reason as the deductions above.
     if calculation.bonus_lines:
         facts["bonuses"] = calculation.bonus_lines
+    if legacy_verified is not None:
+        facts["target_verified"] = legacy_verified
     return content_hash(facts)[:16]
+
+
+def agreed_source_unchanged(
+    frozen: str,
+    calculation: MonthCalculation,
+    orders: list[AttributedOrder],
+    carried: list[AttributedOrder] | None = None,
+    deductions: list[dict] | None = None,
+) -> bool:
+    """Whether an agreed month's evidence is what it was agreed on.
+
+    **Snapshots agreed before ADR 0081 hashed a `target_verified` flag** that
+    no longer exists. Compared with today's fingerprint alone, every one of
+    them would read *changed since approval* although nothing behind it
+    moved. So the old forms are tried too, with the flag either way: the
+    confirmation it recorded no longer decides anything, and every other fact
+    must still match exactly.
+    """
+    return frozen in {
+        source_version(calculation, orders, carried, deductions, legacy_verified=flag)
+        for flag in (None, True, False)
+    }
 
 
 def policy_of(snapshot: PayrollSnapshot) -> str:

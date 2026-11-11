@@ -67,6 +67,22 @@ the formula that produces it (`app/modules/.../api/*.py`, `services/*.py`).
 Write the formula into the journal. Two endpoints that describe one fact
 (a row and a statement) must be traced to the same source.
 
+**Then question every feature, not only how it looks** (the owner, on
+Targets: *is confirming reasonable? are boxes anyone can press by mistake
+reasonable?*). For each action and each editable field, write in the
+journal:
+
+- **What it changes**: money, a record, what someone else sees. Trace it
+  to the formula, not the label (*Confirm* changed pay in one case only).
+- **Whether it checks anything**: who can do it, and can the same person
+  undo or satisfy it alone? A check one person passes by themselves is a
+  step, not a safeguard.
+- **What a slip does**: a stray tap, a wrong number, an old month edited,
+  leaving with unsaved work. Is there a way to see it before it is written,
+  and a way back after?
+- **Whether it should exist at all.** Removing or merging a step is a
+  finding like any other, and it goes to the owner (it changes a rule).
+
 ### 5. Build the state gallery (see `references/harness.md`)
 
 Make every state visible at **390 and 1440**, in both themes, with the same

@@ -31,7 +31,6 @@ class Permission:
     COMPENSATION_MANAGE = "compensation.manage"
     TARGETS_RECORD = "targets.record"
     TARGETS_MANAGE = "targets.manage"
-    TARGETS_VERIFY = "targets.verify"
     PAYROLL_APPROVE = "payroll.approve"
     PAYROLL_REOPEN = "payroll.reopen"
     PAYMENTS_RECORD = "payments.record"
@@ -83,7 +82,6 @@ ROLES: dict[str, frozenset[str]] = {
             Permission.AFFILIATES_MANAGE,
             Permission.COMPENSATION_MANAGE,
             Permission.TARGETS_MANAGE,
-            Permission.TARGETS_VERIFY,
             Permission.TARGETS_RECORD,
             Permission.PAYROLL_APPROVE,
             Permission.PAYROLL_BONUS,
@@ -92,15 +90,15 @@ ROLES: dict[str, frozenset[str]] = {
         }
     ),
     # Sara: owns content and the affiliate roster day to day. Their job combines
-    # setting monthly requirements, recording what was published, verifying it,
-    # maintaining affiliate records, and setting compensation terms.
+    # setting monthly requirements, recording what was published, maintaining
+    # affiliate records, and setting compensation terms.
     #
     # Note deliberately, so it is not mistaken for an oversight: this role both
-    # verifies targets and manages compensation. Verification is what releases a
-    # base guarantee, so there is no second pair of eyes between setting a
-    # target, judging it met, and the money that follows. The business accepted
-    # this knowingly. Approving payroll and recording payments remain elsewhere,
-    # so the obligation and its settlement are still separate acts.
+    # records targets and manages compensation, and a recorded met target
+    # releases a base guarantee (ADR 0081), so there is no second pair of eyes
+    # between setting a target, recording it met, and the money that follows.
+    # The owner chose this. Approving payroll and recording payments remain
+    # elsewhere, so the obligation and its settlement are still separate acts.
     "content_manager": frozenset(
         {
             Permission.AFFILIATES_VIEW,
@@ -108,7 +106,6 @@ ROLES: dict[str, frozenset[str]] = {
             Permission.COMPENSATION_MANAGE,
             Permission.TARGETS_RECORD,
             Permission.TARGETS_MANAGE,
-            Permission.TARGETS_VERIFY,
             # Models only (ADR 0073): staff invitations are `settings.manage`
             # since Batch 2.3, so this hands out no staff access.
             Permission.INVITATIONS_SEND,

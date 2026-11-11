@@ -97,7 +97,6 @@ def preview_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
             "base_amount_piastres": calculation.base_amount_piastres,
             "guarantee_applied": calculation.guarantee_applied,
             "target_achieved": calculation.target_achieved,
-            "target_verified": calculation.target_verified,
             "payout": {
                 "piastres": calculation.payout_piastres,
                 "exact_unrounded_piastres": str(calculation.exact_unrounded_piastres),

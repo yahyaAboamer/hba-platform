@@ -195,7 +195,6 @@ def home(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
                     "actual_videos",
                     "required_stories",
                     "actual_stories",
-                    "verified",
                 )
             }
             if target

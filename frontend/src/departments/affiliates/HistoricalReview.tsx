@@ -60,7 +60,7 @@ export type HistoricalReviewBody = {
 export const MISSING_TEXT: Record<string, string> = {
   no_terms: "no terms recorded",
   no_target_outcome: "guaranteed minimum with no met/missed recorded",
-  target_not_verified: "targets not confirmed",
+  target_not_recorded: "targets not recorded",
 };
 
 /**

@@ -25,7 +25,7 @@ from app.modules.affiliates.services.codes import register_code
 from app.modules.affiliates.services.compensation import set_terms
 from app.modules.affiliates.services.overview import month_summary
 from app.shared.services.shopify.fulfilment import DELIVERED
-from app.modules.affiliates.services.targets import record_actuals, set_requirements, verify
+from app.modules.affiliates.services.targets import record_actuals, set_requirements
 
 AUGUST = "2026-08"
 
@@ -104,7 +104,6 @@ def _order(db, affiliate, order_id, base, *, month=AUGUST):
 def _hit_target(db, affiliate, month=AUGUST):
     target = set_requirements(db, affiliate, month, videos=4, stories=4)
     record_actuals(db, target, videos=4, stories=4)
-    verify(db, target)
     db.flush()
 
 

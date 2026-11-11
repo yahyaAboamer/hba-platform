@@ -37,8 +37,8 @@ Two things, and the second only sometimes:
    For a month **settled outside the platform** (ADR 0036), the outcome is the
    recorded met/missed - the counts were never kept and inventing them would be
    fabricating evidence for a figure that decides money (H02). For a **live**
-   month, the existing verification is the gate, because that is what already
-   releases a guarantee.
+   month, the recorded counts are the gate: met or missed is what decides a
+   guarantee, and recording is the confirmation (ADR 0081).
 
 ## What "eligible" means
 
@@ -68,7 +68,7 @@ from app.modules.affiliates.services.compensation import all_terms
 #: wire, and each one is a sentence the interface turns into a reason.
 NO_TERMS = "no_terms"
 NO_TARGET_OUTCOME = "no_target_outcome"
-TARGET_NOT_VERIFIED = "target_not_verified"
+TARGET_NOT_RECORDED = "target_not_recorded"
 
 
 def collaboration_from(db: Session, affiliate: AffiliateProfile) -> str | None:
@@ -134,11 +134,11 @@ def month_gaps(terms, target, *, historical: bool) -> list[str]:
         if target is None or target.recorded_outcome is None:
             return [NO_TARGET_OUTCOME]
         return []
-    # Live months keep the existing gate. Verification is what releases a
-    # guarantee today, and adding a second approval would be a duplicate
-    # process for one fact.
-    if target is None or target.verified_at is None:
-        return [TARGET_NOT_VERIFIED]
+    # Live months need what she produced recorded: met or missed is what
+    # decides the guarantee, and the recorded counts are the confirmed ones
+    # (ADR 0081).
+    if target is None or target.is_achieved is None:
+        return [TARGET_NOT_RECORDED]
     return []
 
 

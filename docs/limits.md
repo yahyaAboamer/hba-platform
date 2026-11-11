@@ -797,30 +797,26 @@ E£34,444 of merchandise against **E£2,689 actually refunded** — a factor of 
 thirteen. Goods come back; money largely does not. That is the exchange pattern
 ADR 0011 identified, now measured across a real sample rather than one order.
 
-### 🟠 Recording a target and verifying it are the same person
+### 🟠 One person's recorded count releases a guaranteed minimum
 
-**The limit.** `targets.record` and `targets.verify` are separate permissions,
-because one person recording a number that unlocks a payment is one person
-deciding what somebody is owed. **HBA's `content_manager` role holds both**
-(ADR 0018), so today the separation is structural rather than organisational:
-the platform enforces a split the staffing does not.
+**The limit.** Recording a target's counts is its confirmation (ADR 0081, owner,
+11 November 2026). There used to be a separate `targets.verify` step, but the
+role that recorded the counts held it too (ADR 0018), so it was a step the same
+person passed alone, and the owner removed it. A recorded, met target now
+applies a base guarantee (§9.5) on its own.
 
-Phase 3 recorded this for compensation. Phase 5 is where it starts **deciding
-payments** — a verified, achieved target is what applies a base guarantee (§9.5),
-and Sara can record the actuals and confirm them themselves.
+**What failure looks like.** A miscount, in either direction: counted high, a
+guarantee is paid on a month that did not qualify; counted low, a model loses
+one she earned. Nothing errors, and the audit trail shows a correct process.
 
-**What failure looks like.** Not fraud, most likely. A miscount confirmed by the
-person who made it, and a guarantee paid on a month that did not qualify. Nothing
-errors, and the audit trail shows a correctly-followed process.
+**What exists instead.** The Targets save lists every change old → new before
+writing, with any month that turns from met to missed (or back) and what that
+does to a guaranteed minimum. The audit trail records who recorded what and
+when. Approving payroll is a separate permission, so the month's figure is
+still looked at before it becomes a debt.
 
-**What exists instead.** The full trail: who recorded, when, who verified, when,
-and a written reason required to take a verification back. Re-recording actuals
-**clears any verification**, so a correction cannot inherit somebody else's
-confirmation.
-
-*What to do:* when there are two people, give `targets.verify` to somebody who
-does not hold `targets.record`. The endpoint check is already there and will start
-meaning something the day the roles differ.
+*What to do:* if a second check is ever wanted again, it belongs on the payroll
+approval (where a different person already looks), not as a tick on this grid.
 
 ### 🟠 Nothing stops a target being changed after payroll
 
@@ -2663,7 +2659,7 @@ These are not bugs. They are accepted costs, recorded so nobody "fixes" them.
 |---|---|---|
 | Commission paid on an order returned after approval | Up to the 10-day window | 0012 |
 | Sub-pound rounding difference absorbed on every payout | ~E£90/year programme-wide | 0004 |
-| One role sets, records and verifies targets | Releases base guarantees unchecked | 0018 |
+| One person's recorded count releases a base guarantee | A miscount pays or withholds a minimum | 0018, 0081 |
 | Payment screenshots visible to affiliates | May expose HBA banking details | 0017 |
 | Manual out-of-window exchanges are invisible | Created in Bosta only, never reach Shopify | Spec §9.4 |
 | A late order is paid its commission even where its own month paid a guarantee | Small, in the model's favour; bought an explainable rule | 0029 |

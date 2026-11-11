@@ -20,18 +20,20 @@ exactly the case that blocks their month later (§11.3). Returning them with nul
 puts the gap where somebody will see it, rather than leaving their absent and
 therefore invisible.
 
-## Recording and verifying are different permissions
+## Recording is the confirmation
 
-`targets.record` writes actuals; `targets.verify` confirms them. Today one role
-holds both (ADR 0018), so the split is enforced against a distinction HBA's
-staffing does not yet make — which is the point: roles change, and the check is
-what will still be here.
+`targets.record` writes actuals, and the counts it writes are the confirmed
+ones (ADR 0081, owner, 11 November 2026). There was a separate *confirm* step
+and permission; it changed money only for a guarantee that was met, and the
+person who recorded the counts could confirm them a second later, so it checked
+nothing. The screen's guard is the list of changes it shows before it saves.
 """
 
 import hashlib
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.shared.api.deps import require_permission
@@ -53,8 +55,6 @@ from app.modules.affiliates.services.targets import (
     set_requirements,
     set_requirements_for_year,
     targets_for,
-    unverify,
-    verify,
 )
 
 router = APIRouter(prefix="/api/targets")
@@ -94,15 +94,6 @@ class GridBody(BaseModel):
     #: one is refused rather than allowed through, because the callers that
     #: send nothing are the ones that have not been taught to check.
     revision: str | None = None
-
-
-class VerifyBody(BaseModel):
-    affiliate_ids: list[int]
-
-
-class UnverifyBody(BaseModel):
-    affiliate_ids: list[int]
-    reason: str = Field(min_length=1, max_length=500)
 
 
 def _month_or_400(month: str) -> str:
@@ -146,10 +137,6 @@ def _render(
         # Three answers, not two. `null` means nobody has recorded what they
         # did - which blocks their month, where missing the target does not.
         "achieved": target.is_achieved if target else None,
-        "verified": bool(target and target.is_verified),
-        "verified_at": target.verified_at.isoformat()
-        if target and target.verified_at
-        else None,
         "recorded_at": target.recorded_at.isoformat()
         if target and target.recorded_at
         else None,
@@ -217,6 +204,7 @@ def target_grid(
     # reads too (`grid_roster`).
     affiliates = grid_roster(db, include_archived=include_archived)
     found = targets_for(db, month)
+    agreed = _agreed(db, month)
 
     return {
         "month": month,
@@ -238,6 +226,10 @@ def target_grid(
                 # and the screen draws it closed with the month she starts.
                 "start_month": affiliate.collaboration_start_month,
                 "before_start": before_her_start(affiliate, month),
+                # Her month is approved in payroll, so a save here is refused
+                # (`assert_recordable`). Said up front, so the screen can lock
+                # the row and say why instead of refusing the whole save.
+                "agreed": affiliate.id in agreed,
             }
             for affiliate, arrangement in (
                 (affiliate, _arrangement(db, affiliate, month))
@@ -245,6 +237,23 @@ def target_grid(
             )
         ],
     }
+
+
+def _agreed(db: Session, month: str) -> set[int]:
+    """Who has this month approved in payroll.
+
+    Read-only: the refusal itself stays in `assert_recordable`. This only lets
+    the grid say so before anybody types into a row that cannot be saved.
+    """
+    from app.modules.affiliates.models.payroll import CalculationState, PayrollMonth
+
+    return set(
+        db.scalars(
+            select(PayrollMonth.affiliate_id)
+            .where(PayrollMonth.month == month)
+            .where(PayrollMonth.calculation_state == CalculationState.APPROVED)
+        )
+    )
 
 
 def _arrangement(
@@ -384,80 +393,3 @@ def save_grid(
         "revision": _revision(targets_for(db, month)),
         "applied_to_year": year_report,
     }
-
-
-@router.post("/{month}/verify")
-def verify_targets(
-    month: str,
-    body: VerifyBody,
-    actor: UserAccount = Depends(require_permission(Permission.TARGETS_VERIFY)),
-    db: Session = Depends(get_session),
-) -> dict:
-    """Confirm the recorded numbers, one model or many.
-
-    This is what unlocks a base guarantee (§9.5). It confirms the **numbers**,
-    not the outcome - verifying a target they missed is a normal thing to do.
-    """
-    month = _month_or_400(month)
-    by_id = {a.id: a for a in list_affiliates(db, include_archived=True)}
-
-    for affiliate_id in body.affiliate_ids:
-        affiliate = by_id.get(affiliate_id)
-        if affiliate is None:
-            raise HTTPException(404, f"No affiliate {affiliate_id}. Nothing verified.")
-
-        target = get_target(db, affiliate, month)
-        if target is None:
-            raise HTTPException(
-                400,
-                f"{affiliate.name} has no target for {month}. Nothing verified.",
-            )
-        try:
-            verify(db, target, actor_id=actor.id, actor_email=actor.email)
-        except ValueError as exc:
-            db.rollback()
-            raise HTTPException(
-                400, f"{affiliate.name}: {exc} Nothing verified."
-            ) from exc
-
-    db.commit()
-    return {"month": month, "verified": len(body.affiliate_ids)}
-
-
-@router.post("/{month}/unverify")
-def unverify_targets(
-    month: str,
-    body: UnverifyBody,
-    actor: UserAccount = Depends(require_permission(Permission.TARGETS_VERIFY)),
-    db: Session = Depends(get_session),
-) -> dict:
-    """Take a confirmation back, with a written reason.
-
-    The only way back from a mistaken verification - and a mistaken
-    verification silently pays a guarantee, so the audit has to say why.
-    """
-    month = _month_or_400(month)
-    by_id = {a.id: a for a in list_affiliates(db, include_archived=True)}
-
-    for affiliate_id in body.affiliate_ids:
-        affiliate = by_id.get(affiliate_id)
-        if affiliate is None:
-            raise HTTPException(404, f"No affiliate {affiliate_id}. Nothing changed.")
-
-        target = get_target(db, affiliate, month)
-        if target is None or not target.is_verified:
-            raise HTTPException(
-                400,
-                f"{affiliate.name} has no verified target for {month}. "
-                "Nothing changed.",
-            )
-        unverify(
-            db,
-            target,
-            reason=body.reason,
-            actor_id=actor.id,
-            actor_email=actor.email,
-        )
-
-    db.commit()
-    return {"month": month, "unverified": len(body.affiliate_ids)}

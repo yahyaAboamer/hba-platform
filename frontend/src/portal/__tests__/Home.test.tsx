@@ -242,7 +242,6 @@ describe("Home", () => {
         commission_piastres: 0,
         commission,
         targets_achieved: applied ? true : null,
-        targets_verified: applied,
       },
     },
   });

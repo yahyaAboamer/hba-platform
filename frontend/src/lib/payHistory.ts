@@ -69,7 +69,7 @@ export type ReadinessMonth = {
   settled_outside: boolean;
   approved: boolean;
   /** Empty when the month is ready. Reasons, not sentences. */
-  missing: ("no_terms" | "no_target_outcome" | "target_not_verified")[];
+  missing: ("no_terms" | "no_target_outcome" | "target_not_recorded")[];
   ready: boolean;
 };
 
@@ -148,7 +148,7 @@ export function startLine(
 export const MISSING_REASON: Record<ReadinessMonth["missing"][number], string> = {
   no_terms: "no arrangement",
   no_target_outcome: "no target outcome recorded",
-  target_not_verified: "her targets are not confirmed",
+  target_not_recorded: "her targets are not recorded",
 };
 
 /** What is set for one month while the screen is being used. */

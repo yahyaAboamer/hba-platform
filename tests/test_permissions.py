@@ -46,7 +46,6 @@ def test_affiliate_manager_runs_the_affiliate_programme():
         Permission.AFFILIATES_MANAGE,
         Permission.COMPENSATION_MANAGE,
         Permission.TARGETS_MANAGE,
-        Permission.TARGETS_VERIFY,
         Permission.PAYROLL_APPROVE,
         Permission.INVITATIONS_SEND,
         Permission.AUDIT_VIEW,
@@ -79,7 +78,6 @@ def test_content_manager_owns_content_and_the_affiliate_roster():
         Permission.COMPENSATION_MANAGE,
         Permission.TARGETS_RECORD,
         Permission.TARGETS_MANAGE,
-        Permission.TARGETS_VERIFY,
         Permission.AUDIT_VIEW,
     ):
         assert has_permission("content_manager", granted) is True

@@ -15,7 +15,7 @@ export const HELD = {
     roles: ["admin"],
     permissions: [
       "affiliates.view", "affiliates.manage", "affiliates.erase", "compensation.manage",
-      "targets.record", "targets.manage", "targets.verify", "payroll.approve",
+      "targets.record", "targets.manage", "payroll.approve",
       "payroll.reopen", "payments.record", "invitations.send", "audit.view",
       "settings.manage", "order_ops.view", "inbox.use",
       "production.view", "production.edit", "production.qc", "production.suppliers", "production.payments",
@@ -25,14 +25,14 @@ export const HELD = {
     roles: ["affiliate_manager"],
     permissions: [
       "affiliates.view", "affiliates.manage", "compensation.manage", "targets.manage",
-      "targets.verify", "targets.record", "payroll.approve", "invitations.send", "audit.view",
+      "targets.record", "payroll.approve", "invitations.send", "audit.view",
     ],
   },
   content_manager: {
     roles: ["content_manager"],
     permissions: [
       "affiliates.view", "affiliates.manage", "compensation.manage", "targets.record",
-      "targets.manage", "targets.verify", "audit.view",
+      "targets.manage", "audit.view",
     ],
   },
   // A person holding two roles since ADR 0067.

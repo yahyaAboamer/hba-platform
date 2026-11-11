@@ -74,7 +74,7 @@ from app.modules.affiliates.services.setup import (
     collaboration_from,
     NO_TARGET_OUTCOME,
     NO_TERMS,
-    TARGET_NOT_VERIFIED,
+    TARGET_NOT_RECORDED,
     eligible_months,
     month_gaps,
 )
@@ -82,7 +82,7 @@ from app.modules.affiliates.services.setup import (
 __all__ = [
     "NO_TARGET_OUTCOME",
     "NO_TERMS",
-    "TARGET_NOT_VERIFIED",
+    "TARGET_NOT_RECORDED",
     "FinalisationLocked",
     "finalise_historical",
     "historical_review",

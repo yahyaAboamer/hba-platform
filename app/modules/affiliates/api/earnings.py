@@ -88,7 +88,6 @@ def _render(result: MonthCalculation, name: str | None = None) -> dict:
             # produced - which blocks their month, where missing the target does
             # not (§11.3).
             "achieved": result.target_achieved,
-            "verified": result.target_verified,
             "guarantee_applied": result.guarantee_applied,
         },
         "is_house": result.is_house,

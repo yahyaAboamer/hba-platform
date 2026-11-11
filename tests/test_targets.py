@@ -1,4 +1,4 @@
-"""What a model was asked to produce, what they produced, and who confirmed it.
+"""What a model was asked to produce, and what they produced.
 
 Phase 5 Tasks 1-3. §15, and for a `base_guarantee` model this is the input that
 decides their pay.
@@ -7,7 +7,8 @@ The distinction the whole design turns on (§11.3):
 
     no target recorded      blocks the month - nobody knows what they did
     recorded, missed        pays their commission, month approves
-    recorded, achieved      unlocks the guarantee - **once verified**
+    recorded, achieved      unlocks the guarantee (recording is the
+                            confirmation, ADR 0081)
 
 "Not achieved" and "not yet recorded" are different answers with different
 consequences, which is why `is_achieved` returns three things and not two.
@@ -29,8 +30,6 @@ from app.modules.affiliates.services.targets import (
     record_actuals,
     set_requirements,
     targets_for,
-    unverify,
-    verify,
 )
 
 MONTH = "2026-04"
@@ -219,38 +218,27 @@ def test_recording_says_who_and_when(db):
     assert target.recorded_at is not None
 
 
-# ── Verification ───────────────────────────────────────────────────────────────
+# ── Recording is the confirmation (ADR 0081) ───────────────────────────────────
 
 
-def test_verifying_records_who_and_when(db):
-    """"Verified, by whom, eight months ago" is a different answer from
-    "verified", and only one of them can be audited.
+def test_recording_is_the_confirmation(db):
+    """There is no second step: the owner removed confirming on 11 November
+    2026, so recorded counts decide a guarantee by themselves.
     """
+    from app.modules.affiliates.services import targets as service
+
     affiliate = _affiliate(db)
     target = _target(db, affiliate)
     record_actuals(db, target, videos=8, stories=5)
 
-    verify(db, target, actor_id=affiliate.user_account_id)
-
-    assert target.is_verified is True
-    assert target.verified_by == affiliate.user_account_id
-    assert target.verified_at is not None
-
-
-def test_verifying_nothing_is_refused(db):
-    """Confirming numbers nobody has entered would unlock a base guarantee on
-    an empty month.
-    """
-    target = _target(db, _affiliate(db))
-
-    with pytest.raises(ValueError, match="nothing to verify"):
-        verify(db, target)
+    assert target.is_achieved is True
+    assert target.verified_at is None
+    assert not hasattr(service, "verify")
+    assert not hasattr(service, "unverify")
 
 
-def test_the_database_refuses_it_too(db):
-    """The service message is for a person; the constraint is what makes it
-    true.
-    """
+def test_the_database_still_refuses_a_confirmation_of_nothing(db):
+    """The old columns stay for the record, and so does their constraint."""
     affiliate = _affiliate(db)
     _target(db, affiliate)
     db.commit()
@@ -264,52 +252,24 @@ def test_the_database_refuses_it_too(db):
     db.rollback()
 
 
-def test_a_missed_target_can_be_verified(db):
-    """Verification confirms the **numbers**, not the outcome. A verified miss
-    is a confirmed miss: they are paid their commission, the month approves, and
-    the guarantee simply does not apply. Conflating the two would block every
-    model who had a quiet month.
-    """
-    affiliate = _affiliate(db)
-    target = _target(db, affiliate, videos=8, stories=5)
-    record_actuals(db, target, videos=3, stories=1)
+def test_clearing_counts_clears_an_old_confirmation(db):
+    """A month confirmed before ADR 0081 can still have its counts cleared:
+    the confirmation goes with them, or the constraint would refuse."""
+    from app.modules.affiliates.services.targets import clear_actuals
 
-    verify(db, target)
-
-    assert target.is_verified is True
-    assert target.is_achieved is False
-
-
-def test_re_recording_clears_the_verification(db):
-    """The confirmation was of the old numbers. Leaving it would let a
-    correction inherit somebody else's approval and unlock a guarantee nobody
-    agreed to.
-    """
-    affiliate = _affiliate(db)
-    target = _target(db, affiliate)
-    record_actuals(db, target, videos=3, stories=1)
-    verify(db, target)
-
-    record_actuals(db, target, videos=8, stories=5)
-
-    assert target.is_verified is False
-    assert target.is_achieved is True, "achieved, but now nobody has confirmed it"
-
-
-def test_un_verifying_requires_a_written_reason(db):
-    """It is the only way back from a mistaken verification, and a mistaken
-    verification silently pays a guarantee.
-    """
     affiliate = _affiliate(db)
     target = _target(db, affiliate)
     record_actuals(db, target, videos=8, stories=5)
-    verify(db, target)
+    db.execute(
+        text("UPDATE monthly_target SET verified_at = now() WHERE id = :t"),
+        {"t": target.id},
+    )
+    db.refresh(target)
 
-    with pytest.raises(ValueError, match="written reason"):
-        unverify(db, target, reason="   ")
+    clear_actuals(db, target)
 
-    unverify(db, target, reason="Sara counted last month's posts by mistake")
-    assert target.is_verified is False
+    assert target.verified_at is None
+    assert target.is_achieved is None
 
 
 # ── The audit trail ────────────────────────────────────────────────────────────
@@ -320,23 +280,9 @@ def test_every_change_is_audited(db):
     affiliate = _affiliate(db)
     target = _target(db, affiliate)
     record_actuals(db, target, videos=8, stories=5)
-    verify(db, target)
-    unverify(db, target, reason="counted the wrong month")
 
     assert len(_audits(db, "target.requirements_set")) == 1
     assert len(_audits(db, "target.actuals_recorded")) == 1
-    assert len(_audits(db, "target.verified")) == 1
-    assert len(_audits(db, "target.unverified")) == 1
-
-
-def test_un_verifying_records_the_reason(db):
-    affiliate = _affiliate(db)
-    target = _target(db, affiliate)
-    record_actuals(db, target, videos=8, stories=5)
-    verify(db, target)
-    unverify(db, target, reason="Sara counted last month's posts")
-
-    assert "last month" in _audits(db, "target.unverified")[0].reason
 
 
 def test_a_correction_records_what_it_replaced(db):
@@ -349,17 +295,6 @@ def test_a_correction_records_what_it_replaced(db):
     latest = _audits(db, "target.actuals_recorded")[-1]
     assert latest.before_json["actual_videos"] == 3
     assert latest.after_json["actual_videos"] == 8
-
-
-def test_a_cleared_verification_is_visible_in_the_audit(db):
-    affiliate = _affiliate(db)
-    target = _target(db, affiliate)
-    record_actuals(db, target, videos=3, stories=1)
-    verify(db, target)
-    record_actuals(db, target, videos=8, stories=5)
-
-    latest = _audits(db, "target.actuals_recorded")[-1]
-    assert latest.after_json["verification_cleared"] is True
 
 
 # ── Reading a whole month ──────────────────────────────────────────────────────
@@ -508,22 +443,17 @@ def test_a_missed_outcome_is_achieved_false_not_unknown(db, _go_live):
     assert target.is_recorded is True
 
 
-def test_recording_an_outcome_verifies_it_in_the_same_act(db, _go_live):
-    """The one place in the platform where recording and confirming are one act.
-
-    Verification exists to stop one person inventing numbers that unlock a
-    payment. There are no numbers here, and the month can never be paid - its
-    balance is structurally zero. The split protects nothing, and requiring it
-    would mean a second pass through a screen built around counts for every
-    guarantee month of every model.
-    """
+def test_recording_an_outcome_settles_it(db, _go_live):
+    """Recorded is settled, as for counts (ADR 0081): nothing is confirmed
+    separately, and the audit says who recorded it."""
     from app.modules.affiliates.services.targets import record_outcome
 
     affiliate = _affiliate(db)
 
     target = record_outcome(db, affiliate, BEFORE, outcome="met")
 
-    assert target.is_verified is True
+    assert target.is_achieved is True
+    assert target.verified_at is None
     assert _audits(db, "target.outcome_recorded")
 
 

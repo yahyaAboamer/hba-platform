@@ -1,6 +1,6 @@
 # 0018. content_manager holds wide, overlapping authority
 
-**Status:** Accepted — risk knowingly accepted by the business
+**Status:** Accepted — risk knowingly accepted by the business; `targets.verify` removed by ADR 0081 (recording is the confirmation)
 **Date:** 2026-08-22
 
 ## Context
