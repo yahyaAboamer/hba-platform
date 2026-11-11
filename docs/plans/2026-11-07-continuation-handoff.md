@@ -1,4 +1,4 @@
-# Where the work is — 7 November 2026 (Batch 4.1 live on staging and production)
+# Where the work is — 11 November 2026 (Targets refined; confirming removed; live on staging and production)
 
 Supersedes `2026-11-06-continuation-handoff.md`, which superseded
 `2026-10-30-continuation-handoff.md` and `2026-10-28-continuation-handoff.md`.
@@ -14,13 +14,32 @@ Re-read the remote before describing it: `git ls-remote --heads origin main prod
 
 | | |
 |---|---|
-| **Code on both sites** | `origin/main` = `origin/production` = `32f6936` (PR #158), deployed 7 November on the owner's order ("merge after CI … deploy to staging and production"). This handoff's own docs-only PR follows it on both |
-| **Migration head** | `e3c5a9d20026` (ADR 0077: Production QC folded into Production staff; the role checks lose `production_qc`), on its pull request; before it `d1b4f0a10025` (Production's tables; the role checks gain Production's four levels), applied on staging and production 7 November. Both join the release gate's migration/rollback rehearsal list; each rehearsed up/down/up on a disposable database (`e3c5a9d20026` with QC holders and a QC invitation seeded) |
+| **Code on both sites** | `origin/main` = `origin/production` = `527a137` (PR #167), deployed 11 November on the owner's order ("commit, merge, and deploy to staging and production"). This handoff's own docs-only PR follows it on both |
+| **Migration head** (11 Nov) | `a1c7e3f50028` (Returns, PR #166). PR #167 adds none: `monthly_target.verified_by` / `verified_at` and their check constraint stay, unread (ADR 0081) |
+| **Migration head** (7 Nov) | `e3c5a9d20026` (ADR 0077: Production QC folded into Production staff; the role checks lose `production_qc`), on its pull request; before it `d1b4f0a10025` (Production's tables; the role checks gain Production's four levels), applied on staging and production 7 November. Both join the release gate's migration/rollback rehearsal list; each rehearsed up/down/up on a disposable database (`e3c5a9d20026` with QC holders and a QC invitation seeded) |
 | **Production's data** | Imported on staging and on production 7 November from the 2 November export plus the 4 task confirmations of 6 November read from the live site. Both reconciled count by count and field by field, and compared with the live site's own `/api/state`: every order, task, sample, supplier and product equal, in the same order |
 | **Railway settings** | As in the 6 November handoff: `.railway/railway.ts` is the source; run `railway config plan` and read every line before any `apply` |
 | **Branches** | none open |
 
-## What shipped since the last handoff
+## Since 7 November
+
+| PR | What |
+|---|---|
+| #159 | The 7 November handoff |
+| #160 | Production: the dashboard and Timeline fit a phone |
+| #161 | Production: staff also record quality checks; QC is no longer a level (ADR 0077) |
+| #162 | Production: row menus, delete orders/samples/phases, photo library |
+| #163 | Products: sort by most received, keep current with Shopify, rows-per-page pager; add products from a model's wardrobe (ADR 0078) |
+| #164 | Inbox: says what a message it cannot draw was |
+| #165 | The Payments method as a project skill, `.claude/skills/screen-refinement/` |
+| #166 | Operations: Returns, a record of refunds owed to customers (ADR 0079) |
+| #167 | **Targets refined** (ADR 0080) and **confirming removed** (ADR 0081, owner, 11 November): a recorded met target releases a guaranteed minimum; a guarantee month blocks payroll only where nothing is recorded; `/verify`, `/unverify` and `targets.verify` are gone; Save lists every change, old → new, before it writes. Agreed months still compare equal to their pre-0081 fingerprint. Also fixed two Returns tests that turned red on 11 November at 13:00 UTC (fixed date against the real clock). Record: `docs/design-refinement/targets/JOURNAL.md` |
+
+**After #167, on both sites:** open guarantee months that were met and waiting on a confirmation now pay their minimum (where it is above the commission) on their next calculation and stop blocking payroll. Agreed months are unchanged. Checked after the deploy without signing in: both sites serve the new build, its words are in it, the confirm endpoint is gone, the server started cleanly. A signed-in look waits for the owner's sign-in.
+
+**Open from #167:** leaving the Targets screen by an in-app link with unsaved figures still drops them (no router-level block); not tried on a real phone or with a screen reader.
+
+## What shipped 6 November
 
 All on 6 November, all on staging and production. The full record, with
 findings, screenshots and lessons, is
