@@ -194,6 +194,21 @@
 .ops-rt__work { display:grid; gap:18px; align-content:start; }
 .ops-rt__pay { padding:14px; border:1px solid var(--accent); border-radius:var(--radius); background:var(--surface); }
 .ops-rt__pay .ops-hint { margin-bottom:4px; }
+/* Paid early (ADR 0082): a confirmation, said in full beside its box. */
+.ops-rt__early { display:flex; gap:10px; align-items:flex-start; margin:8px 0 4px; padding:10px 12px; border:1px solid var(--owed); border-radius:var(--radius); font-size:13px; cursor:pointer; }
+.ops-rt__early input { width:18px; height:18px; margin:1px 0 0; flex:none; accent-color:var(--accent); }
+.ops-rt__early small { display:block; margin-top:2px; color:var(--quiet); font-size:12px; }
+.ops-rt__photo { grid-column:1 / -1; }
+.ops-rt__photo input[type="file"] { padding:6px; }
+/* The payment photo: a thumbnail that opens full size. */
+.ops-rt__proof .ops-kh__actions { margin-top:8px; }
+.ops-rt__proofimg { display:inline-flex; flex-direction:column; gap:4px; font-size:12px; color:var(--quiet); }
+.ops-rt__proofimg img { display:block; max-width:220px; max-height:220px; object-fit:contain; border:1px solid var(--rule); border-radius:var(--radius); background:var(--surface); }
+/* Each group folds; the header is the button. */
+.ops-rt__fold { display:flex; align-items:center; gap:8px; width:100%; min-height:32px; padding:0; border:0; background:none; color:inherit; font:inherit; text-align:left; cursor:pointer; }
+.ops-rt__fold > svg { width:14px; height:14px; color:var(--faint); flex:none; }
+.ops-rt__fold:disabled { cursor:default; }
+.ops-rt__fold:focus-visible { outline:2px solid var(--accent); outline-offset:2px; border-radius:4px; }
 .ops-rt__undo .field { max-width:420px; }
 .ops-rt__form legend, .ops-rt__edit legend { padding:0; }
 

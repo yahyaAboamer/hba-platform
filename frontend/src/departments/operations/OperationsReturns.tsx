@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { ApiError, api } from "../../lib/api";
 import { formatEgp } from "../../lib/money";
@@ -15,8 +15,10 @@ import "./OperationsDashboard.css";
  * elsewhere and marks it paid here.
  *
  * Grouped by the next act: ready to refund, on the way back, needs
- * attention, paid. Viewers see it all; staff, the manager and the admin
- * (`returns.edit`) add, change and mark paid.
+ * attention, paid; each group folds. Viewers see it all; staff, the
+ * manager and the admin (`returns.edit`) add, change and mark paid. A
+ * refund can be marked paid before it is back when the person confirms it,
+ * and carry an optional photo of the payment (ADR 0082).
  *
  * No approved frame exists for this tab; it is drawn from the Operations
  * dashboard's own pieces (heading, cards, panels, expanding rows).
@@ -51,6 +53,8 @@ export type Refund = {
   check_error: string | null;
   paid_on: string | null;
   paid_by: string | null;
+  paid_early: boolean;
+  proof_url: string | null;
   created_at: string | null;
   group: Group;
   attention: Reason[];
@@ -102,13 +106,13 @@ const GROUPS: { key: Group; title: string; empty: string; hint: string }[] = [
     key: "attention",
     title: "Needs attention",
     empty: "Nothing needs a look.",
-    hint: "Stuck, unknown to Khazenly, or flagged by them.",
+    hint: "Stuck, unknown to Khazenly, or flagged by them. One paid early can still be recorded.",
   },
   {
     key: "paid",
     title: "Paid",
     empty: "No refund has been marked paid yet.",
-    hint: "Locked once paid. Undo needs a reason.",
+    hint: "Locked once paid. Undo needs a reason. One paid early is still checked with Khazenly.",
   },
 ];
 
@@ -233,6 +237,15 @@ function AddRefund({ methods, onAdded }: { methods: Method[]; onAdded: () => voi
         ) : (
           <div className="ops-rt__grid ops-rt__wide">
             <label className="field">
+              <span className="field__label">Customer phone</span>
+              <input className="input" inputMode="tel" value={phone} disabled={busy} autoComplete="off" onChange={(event) => setPhone(event.target.value)} />
+            </label>
+            <label className="field">
+              <span className="field__label">Customer name</span>
+              <input className="input" value={name} disabled={busy} autoComplete="off" onChange={(event) => setName(event.target.value)} />
+              <span className="field__hint">Leave empty to take it from Shopify.</span>
+            </label>
+            <label className="field">
               <span className="field__label">Amount to refund (EGP)</span>
               <input className="input" inputMode="decimal" value={amount} disabled={busy} onChange={(event) => setAmount(event.target.value)} />
             </label>
@@ -250,15 +263,6 @@ function AddRefund({ methods, onAdded }: { methods: Method[]; onAdded: () => voi
               <span className="field__label">Refund ID</span>
               <input className="input" value={refundTo} disabled={busy} onChange={(event) => setRefundTo(event.target.value)} />
               <span className="field__hint">A mobile number, an …@instapay address or an ipn.eg link.</span>
-            </label>
-            <label className="field">
-              <span className="field__label">Customer name</span>
-              <input className="input" value={name} disabled={busy} autoComplete="off" onChange={(event) => setName(event.target.value)} />
-              <span className="field__hint">Leave empty to take it from Shopify.</span>
-            </label>
-            <label className="field">
-              <span className="field__label">Customer phone</span>
-              <input className="input" inputMode="tel" value={phone} disabled={busy} autoComplete="off" onChange={(event) => setPhone(event.target.value)} />
             </label>
           </div>
         )}
@@ -384,6 +388,14 @@ function EditForm({ refund, methods, onDone }: { refund: Refund; methods: Method
           </span>
         </fieldset>
         <label className="field">
+          <span className="field__label">Customer phone</span>
+          <input className="input" inputMode="tel" value={phone} autoComplete="off" onChange={(event) => setPhone(event.target.value)} />
+        </label>
+        <label className="field">
+          <span className="field__label">Customer name</span>
+          <input className="input" value={name} autoComplete="off" onChange={(event) => setName(event.target.value)} />
+        </label>
+        <label className="field">
           <span className="field__label">Amount to refund (EGP)</span>
           <input className="input" inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} />
         </label>
@@ -401,14 +413,6 @@ function EditForm({ refund, methods, onDone }: { refund: Refund; methods: Method
           <span className="field__label">Refund ID</span>
           <input className="input" value={refundTo} onChange={(event) => setRefundTo(event.target.value)} />
         </label>
-        <label className="field">
-          <span className="field__label">Customer name</span>
-          <input className="input" value={name} autoComplete="off" onChange={(event) => setName(event.target.value)} />
-        </label>
-        <label className="field">
-          <span className="field__label">Customer phone</span>
-          <input className="input" inputMode="tel" value={phone} autoComplete="off" onChange={(event) => setPhone(event.target.value)} />
-        </label>
       </div>
       <div className="ops-kh__actions">
         <button type="submit" className="button" disabled={busy}>
@@ -425,7 +429,23 @@ function EditForm({ refund, methods, onDone }: { refund: Refund; methods: Method
   );
 }
 
-function PayForm({ refund, methods, onDone }: { refund: Refund; methods: Method[]; onDone: () => void }) {
+const PHOTO_TYPES = "image/jpeg,image/png,image/webp";
+
+function PayForm({
+  refund,
+  methods,
+  onDone,
+  onNotice,
+}: {
+  refund: Refund;
+  methods: Method[];
+  onDone: () => void;
+  onNotice: (text: string) => void;
+}) {
+  // Not back at Khazenly yet: paying now is early, and must be confirmed.
+  const early = refund.received_at === null;
+  const [confirmed, setConfirmed] = useState(false);
+  const [photo, setPhoto] = useState<File | null>(null);
   const [paidOn, setPaidOn] = useState(cairoToday());
   const [amount, setAmount] = useState(refund.amount ?? "");
   const [method, setMethod] = useState(refund.method ?? "instapay");
@@ -443,8 +463,18 @@ function PayForm({ refund, methods, onDone }: { refund: Refund; methods: Method[
         amount: amount.trim() || null,
         method,
         refund_to: refundTo.trim() || null,
+        early,
       })
-      .then(onDone)
+      .then(async () => {
+        if (photo) {
+          try {
+            await api.upload(`/api/order-ops/returns/${refund.id}/proof`, photo);
+          } catch (caught: unknown) {
+            onNotice(`Recorded as paid, but the photo didn't save: ${failure(caught)} Add it again below.`);
+          }
+        }
+        onDone();
+      })
       .catch((caught: unknown) => {
         setError(failure(caught));
         setBusy(false);
@@ -455,9 +485,18 @@ function PayForm({ refund, methods, onDone }: { refund: Refund; methods: Method[
   return (
     <form className="ops-rt__pay" onSubmit={pay} aria-labelledby={id}>
       <h3 className="ops-rt__sub" id={id}>
-        Mark as paid
+        {early ? "Mark as paid early" : "Mark as paid"}
       </h3>
       <p className="ops-hint">This records the refund you sent. It sends nothing.</p>
+      {early && (
+        <label className="ops-rt__early">
+          <input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />
+          <span>
+            I paid it before Khazenly said the return was back.
+            <small>It moves to Paid and is still checked with Khazenly until the return is completed.</small>
+          </span>
+        </label>
+      )}
       <div className="ops-rt__grid">
         <label className="field">
           <span className="field__label">Sent on</span>
@@ -481,10 +520,24 @@ function PayForm({ refund, methods, onDone }: { refund: Refund; methods: Method[
           <span className="field__label">Refund ID</span>
           <input className="input" value={refundTo} onChange={(event) => setRefundTo(event.target.value)} required />
         </label>
+        <label className="field ops-rt__photo">
+          <span className="field__label">
+            Photo of the payment <span className="ops-muted">(optional)</span>
+          </span>
+          <input
+            className="input"
+            type="file"
+            accept={PHOTO_TYPES}
+            onChange={(event) => setPhoto(event.target.files?.[0] ?? null)}
+          />
+          <span className="field__hint">A screenshot of the transfer. JPG, PNG or WebP, up to 10 MB.</span>
+        </label>
       </div>
       <div className="ops-kh__actions">
-        <button type="submit" className="button button--primary" disabled={busy}>
-          {busy ? "Recording…" : `Record ${amount.trim() ? egp(amount.trim()) : "the refund"} as paid`}
+        <button type="submit" className="button button--primary" disabled={busy || (early && !confirmed)}>
+          {busy
+            ? "Recording…"
+            : `Record ${amount.trim() ? egp(amount.trim()) : "the refund"} as paid${early ? " early" : ""}`}
         </button>
       </div>
       {error && (
@@ -493,6 +546,77 @@ function PayForm({ refund, methods, onDone }: { refund: Refund; methods: Method[
         </p>
       )}
     </form>
+  );
+}
+
+function Proof({ refund, canEdit, onDone }: { refund: Refund; canEdit: boolean; onDone: () => void }) {
+  const picker = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function run(request: () => Promise<unknown>) {
+    setBusy(true);
+    setError(null);
+    request()
+      .then(onDone)
+      .catch((caught: unknown) => setError(failure(caught)))
+      .finally(() => setBusy(false));
+  }
+
+  // The server's address carries a version, so a replaced photo is never
+  // the old one from the browser's cache.
+  const version = refund.proof_url?.split("v=")[1] ?? "";
+  if (!refund.proof_url && !canEdit) return null;
+  return (
+    <div className="ops-rt__proof">
+      <h3 className="ops-rt__sub">Payment photo</h3>
+      {refund.proof_url ? (
+        <a
+          className="ops-rt__proofimg"
+          href={`/api/order-ops/returns/${refund.id}/proof?v=${version}`}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <img
+            src={`/api/order-ops/returns/${refund.id}/proof?v=${version}`}
+            alt={`Payment photo for ${refund.khazenly_number}`}
+            loading="lazy"
+          />
+          <span>Open full size</span>
+        </a>
+      ) : (
+        <p className="ops-hint">None yet. It's optional.</p>
+      )}
+      {canEdit && (
+        <div className="ops-kh__actions">
+          <input
+            ref={picker}
+            type="file"
+            accept={PHOTO_TYPES}
+            hidden
+            aria-label={refund.proof_url ? "Replace the payment photo" : "Add a payment photo"}
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = "";
+              if (file) run(() => api.upload(`/api/order-ops/returns/${refund.id}/proof`, file));
+            }}
+          />
+          <button type="button" className="button button--row" disabled={busy} onClick={() => picker.current?.click()}>
+            {busy ? "Saving…" : refund.proof_url ? "Replace photo" : "Add a photo"}
+          </button>
+          {refund.proof_url && (
+            <button type="button" className="button button--row" disabled={busy} onClick={() => run(() => api.del(`/api/order-ops/returns/${refund.id}/proof`))}>
+              Remove photo
+            </button>
+          )}
+        </div>
+      )}
+      {error && (
+        <p className="notice notice--refused" role="alert">
+          {error}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -515,13 +639,35 @@ function PaidActions({ refund, onDone }: { refund: Refund; onDone: () => void })
       });
   }
 
+  function check() {
+    setBusy(true);
+    setError(null);
+    api
+      .post(`/api/order-ops/returns/${refund.id}/check`)
+      .then(onDone)
+      .catch((caught: unknown) => setError(failure(caught)))
+      .finally(() => setBusy(false));
+  }
+
   if (!undoing) {
     return (
-      <div className="ops-kh__actions">
-        <button type="button" className="button button--row" onClick={() => setUndoing(true)}>
-          Undo paid
-        </button>
-      </div>
+      <>
+        <div className="ops-kh__actions">
+          {refund.received_at === null && (
+            <button type="button" className="button button--row" disabled={busy} onClick={check}>
+              {busy ? "Checking…" : "Check Khazenly now"}
+            </button>
+          )}
+          <button type="button" className="button button--row" onClick={() => setUndoing(true)}>
+            Undo paid
+          </button>
+        </div>
+        {error && (
+          <p className="notice notice--refused" role="alert">
+            {error}
+          </p>
+        )}
+      </>
     );
   }
   return (
@@ -618,9 +764,18 @@ function RefundRow({
   onChanged: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [payingEarly, setPayingEarly] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   const id = `ops-rt-row-${refund.id}`;
   const flags = refund.attention;
   const paid = refund.group === "paid";
+  // Paid early and not back yet: its Khazenly step still shows (ADR 0082).
+  const stillComing = paid && refund.received_at === null;
+  const tags = [
+    ...(refund.paid_early ? ["Paid before it was back"] : []),
+    ...(stillComing ? [`Khazenly: ${refund.step ?? "not read yet"}`] : []),
+    ...(refund.proof_url ? ["Photo"] : []),
+  ];
 
   return (
     <li className="ops-rt__row">
@@ -661,11 +816,16 @@ function RefundRow({
                 ? dayAndTime(refund.step_at)
                 : ""}
           </small>
-          {flags.length > 0 && (
+          {(flags.length > 0 || tags.length > 0) && (
             <span className="ops-rt__flags">
               {flags.map((flag) => (
                 <span key={flag} className={flag === "details_missing" ? "ops-tag" : "ops-tag ops-rt__flag"}>
                   {REASON_WORDS[flag]}
+                </span>
+              ))}
+              {tags.map((tag) => (
+                <span key={tag} className="ops-tag">
+                  {tag}
                 </span>
               ))}
             </span>
@@ -676,26 +836,44 @@ function RefundRow({
       {open && (
         <div className="ops-rt__open" id={id}>
           <Timeline refund={refund} now={now} />
-          {canEdit && (
+          {(canEdit || paid) && (
             <div className="ops-rt__work">
-              {refund.group === "ready" && (
+              {notice && (
+                <p className="notice notice--refused" role="alert">
+                  {notice}
+                </p>
+              )}
+              {paid && <Proof refund={refund} canEdit={canEdit} onDone={onChanged} />}
+              {canEdit && !paid && refund.received_at === null && !payingEarly && (
+                <div className="ops-kh__actions">
+                  <button type="button" className="button button--row" onClick={() => setPayingEarly(true)}>
+                    Paid it already? Record it
+                  </button>
+                </div>
+              )}
+              {canEdit && !paid && (refund.received_at !== null || payingEarly) && (
                 // Keyed on the saved details: saving new ones beside it
                 // refreshes what this form will send.
                 <PayForm
                   key={`${refund.amount}|${refund.method}|${refund.refund_to}`}
                   refund={refund}
                   methods={methods}
-                  onDone={onChanged}
+                  onDone={() => {
+                    setPayingEarly(false);
+                    onChanged();
+                  }}
+                  onNotice={setNotice}
                 />
               )}
-              {paid ? (
-                <PaidActions refund={refund} onDone={onChanged} />
-              ) : (
-                <>
-                  <EditForm refund={refund} methods={methods} onDone={onChanged} />
-                  <RowActions refund={refund} onDone={onChanged} />
-                </>
-              )}
+              {canEdit &&
+                (paid ? (
+                  <PaidActions refund={refund} onDone={onChanged} />
+                ) : (
+                  <>
+                    <EditForm refund={refund} methods={methods} onDone={onChanged} />
+                    <RowActions refund={refund} onDone={onChanged} />
+                  </>
+                ))}
             </div>
           )}
         </div>
@@ -907,12 +1085,47 @@ function SortHeader({ sort, onSort, paid }: { sort: Sort; onSort: (sort: Sort) =
 
 // ── The tab ─────────────────────────────────────────────────────────────────
 
+type Folds = Record<Group, boolean>;
+
+/** Which groups start open: the two that ask for something to be done. */
+export const DEFAULT_FOLDS: Folds = { ready: true, attention: true, on_the_way: false, paid: false };
+const FOLDS_KEY = "hba.ops.returns.open";
+
+function readFolds(): Folds {
+  try {
+    const kept = JSON.parse(window.localStorage.getItem(FOLDS_KEY) ?? "null");
+    if (kept && typeof kept === "object") {
+      return Object.fromEntries(
+        GROUPS.map(({ key }) => [key, typeof kept[key] === "boolean" ? kept[key] : DEFAULT_FOLDS[key]]),
+      ) as Folds;
+    }
+  } catch {
+    // A private window or blocked storage: the defaults serve.
+  }
+  return DEFAULT_FOLDS;
+}
+
+function keepFolds(folds: Folds): void {
+  try {
+    window.localStorage.setItem(FOLDS_KEY, JSON.stringify(folds));
+  } catch {
+    // Not kept; the page works the same.
+  }
+}
+
 export function OperationsReturns({ canEdit }: { canEdit: boolean }) {
   const now = useNow();
   const { tab, failed, reload } = useOpsTab(() => api.get<ReturnsTab>("/api/order-ops/returns"));
 
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<Sort>(DEFAULT_SORT);
+  const [folds, setFolds] = useState<Folds>(readFolds);
+
+  function toggle(key: Group) {
+    const next = { ...folds, [key]: !folds[key] };
+    setFolds(next);
+    keepFolds(next);
+  }
 
   const grouped = (key: Group) => tab?.refunds.filter((refund) => refund.group === key) ?? [];
   const searching = query.trim().length > 0;
@@ -1016,6 +1229,9 @@ export function OperationsReturns({ canEdit }: { canEdit: boolean }) {
             // While searching, a group with nothing found steps aside.
             if (searching && rows.length === 0) return null;
             const headingId = `ops-rt-${group.key}`;
+            const bodyId = `ops-rt-${group.key}-rows`;
+            // A search opens every group it found something in.
+            const expanded = searching || folds[group.key];
             const count = searching
               ? `${rows.length} of ${all.length}`
               : group.key === "paid" && rows.length >= tab.paid_shown
@@ -1025,26 +1241,42 @@ export function OperationsReturns({ canEdit }: { canEdit: boolean }) {
               <section key={group.key} className="panel ops-list" aria-labelledby={headingId}>
                 <div className="panel__head ops-kh__head">
                   <h2 className="panel__title" id={headingId}>
-                    {group.title} · {count}
+                    <button
+                      type="button"
+                      className="ops-rt__fold"
+                      aria-expanded={expanded}
+                      aria-controls={expanded ? bodyId : undefined}
+                      disabled={searching}
+                      onClick={() => toggle(group.key)}
+                    >
+                      <span>
+                        {group.title} · {count}
+                      </span>
+                      <OpsIcon name={expanded ? "up" : "down"} />
+                    </button>
                   </h2>
-                  <p className="ops-hint">{group.hint}</p>
+                  {expanded && <p className="ops-hint">{group.hint}</p>}
                 </div>
-                {rows.length > 1 && <SortHeader sort={sort} onSort={setSort} paid={group.key === "paid"} />}
-                {rows.length ? (
-                  <ul className="ops-rt__rows">
-                    {rows.map((refund) => (
-                      <RefundRow
-                        key={refund.id}
-                        refund={refund}
-                        methods={tab.methods}
-                        canEdit={canEdit}
-                        now={now}
-                        onChanged={reload}
-                      />
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="empty">{group.empty}</p>
+                {expanded && (
+                  <div id={bodyId}>
+                    {rows.length > 1 && <SortHeader sort={sort} onSort={setSort} paid={group.key === "paid"} />}
+                    {rows.length ? (
+                      <ul className="ops-rt__rows">
+                        {rows.map((refund) => (
+                          <RefundRow
+                            key={refund.id}
+                            refund={refund}
+                            methods={tab.methods}
+                            canEdit={canEdit}
+                            now={now}
+                            onChanged={reload}
+                          />
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="empty">{group.empty}</p>
+                    )}
+                  </div>
                 )}
               </section>
             );

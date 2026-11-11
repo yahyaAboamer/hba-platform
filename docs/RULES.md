@@ -77,8 +77,10 @@ payroll without touching a maintainer screen.
   history, so it is the same whenever the order was first seen.
 - **A refund in Operations → Returns is a record, never a payment**
   (ADR 0079). Nothing there moves money, writes to Shopify or Khazenly, or
-  changes model pay. A row can be marked paid only after Khazenly says
-  *Return Completed*; a paid row is locked, and undoing it needs a reason.
+  changes model pay. A row is normally paid after Khazenly says *Return
+  Completed*; paying earlier is allowed when the person confirms it is early
+  (ADR 0082), and the row keeps being tracked. A paid row is locked except
+  for its optional proof photo, and undoing it needs a reason.
 - **A code use is every order that used her code** (ADR 0049, superseding
   D03's definition): delivered, pending, failed delivery, cancelled or
   refunded alike. *Orders counted* is delivered and pending only (F02).

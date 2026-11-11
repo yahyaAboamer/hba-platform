@@ -36,9 +36,11 @@ RETURN_STEPS = [
 ]
 
 
-def _answer(number: str, steps: list[str], start: datetime = NOW - timedelta(days=2), po: str = "#31876-RE") -> dict:
+def _answer(number: str, steps: list[str], start: datetime | None = None, po: str = "#31876-RE") -> dict:
     """Khazenly's answer for ``steps`` in the order they happened, one hour
-    apart, returned newest first as Khazenly returns them."""
+    apart from ``start`` (two days ago by default, so a row is never stuck
+    by the calendar alone), returned newest first as Khazenly returns them."""
+    start = start or utcnow().replace(microsecond=0) - timedelta(days=2)
     timeline = []
     for index, step in enumerate(steps):
         at = start + timedelta(hours=index)
@@ -112,7 +114,7 @@ def test_an_answer_is_read_newest_first_with_its_shopify_number():
 def test_received_only_once_khazenly_says_return_completed():
     almost = tracking.parse(KH1, _answer(KH1, RETURN_STEPS[:-1]))
     assert not almost.received and almost.received_at is None
-    done = tracking.parse(KH1, _answer(KH1, RETURN_STEPS))
+    done = tracking.parse(KH1, _answer(KH1, RETURN_STEPS, start=NOW - timedelta(days=2)))
     assert done.received
     assert done.received_at == NOW - timedelta(days=2) + timedelta(hours=6)
     assert done.latest.note == "shipment Delivered"
@@ -295,10 +297,46 @@ def _row(db, steps, **details) -> tuple[OpsRefund, UserAccount]:
     return db.scalar(select(OpsRefund)), actor
 
 
-def test_a_row_cannot_be_paid_before_khazenly_says_completed(db):
+def test_paying_before_khazenly_says_completed_must_be_confirmed(db):
+    """ADR 0082, decision 1: early is allowed, never by accident."""
     row, actor = _row(db, RETURN_STEPS[:-1], amount="395", method="instapay", refund_to="01060910507")
-    with pytest.raises(returns.Refused, match="completed"):
+    with pytest.raises(returns.Refused, match="Confirm you paid it before it was back"):
         returns.mark_paid(db, row.id, {}, actor)
+    returns.mark_paid(db, row.id, {"early": True, "paid_on": "2026-11-01"}, actor, today=date(2026, 11, 10))
+    assert row.paid_on == date(2026, 11, 1) and row.received_at is None
+    shown = returns.serialise(row, utcnow())
+    assert shown["group"] == "paid" and shown["paid_early"] is True
+    assert shown["step"] == RETURN_STEPS[-2] and shown["attention"] == []
+    db.flush()
+    event = db.scalar(select(AuditEvent).where(AuditEvent.action == "order_ops.refund_paid"))
+    assert event.after_json["early"] is True
+
+
+def test_a_refund_paid_early_keeps_being_read_until_completed(db):
+    """ADR 0082, decision 2: it keeps its status in Paid."""
+    row, actor = _row(db, RETURN_STEPS[:3], amount="395", method="instapay", refund_to="01060910507")
+    returns.mark_paid(db, row.id, {"early": True}, actor)
+    assert row in returns.waiting(db)
+    returns.read_waiting(db, client=FakeClient({KH1: _answer(KH1, RETURN_STEPS)}), pause=0)
+    assert row.received_at is not None and row.step == "Return Completed"
+    assert row not in returns.waiting(db)
+    shown = returns.serialise(row, utcnow())
+    assert shown["group"] == "paid" and shown["paid_early"] is True
+
+
+def test_a_refund_paid_early_can_be_checked_by_hand(db):
+    row, actor = _row(db, RETURN_STEPS[:3], amount="395", method="instapay", refund_to="01060910507")
+    returns.mark_paid(db, row.id, {"early": True}, actor)
+    returns.recheck(db, row.id, client=FakeClient({KH1: _answer(KH1, RETURN_STEPS[:5])}))
+    assert row.step == RETURN_STEPS[4] and row.paid_on is not None
+
+
+def test_a_refund_paid_early_long_ago_is_no_longer_read(db):
+    row, actor = _row(db, RETURN_STEPS[:3], amount="395", method="instapay", refund_to="01060910507")
+    returns.mark_paid(db, row.id, {"early": True}, actor)
+    row.paid_on = date.today() - returns.PAID_EARLY_TRACKED_FOR - timedelta(days=2)
+    db.flush()
+    assert row not in returns.waiting(db)
 
 
 def test_a_row_needs_its_amount_method_and_id_to_be_paid(db):
@@ -344,11 +382,19 @@ def test_undoing_paid_needs_a_reason_and_logs_it(db):
     assert event.reason == "Transfer bounced"
 
 
-def test_the_database_refuses_a_paid_row_that_was_not_received(db):
-    row, _ = _row(db, RETURN_STEPS[:2], amount="395", method="instapay", refund_to="01060910507")
+def test_the_database_refuses_a_paid_row_without_what_was_sent(db):
+    row, _ = _row(db, RETURN_STEPS[:2], amount="395")
     row.paid_on = date(2026, 11, 10)
     row.paid_recorded_at = utcnow()
     with pytest.raises(Exception, match="ops_refund_paid_complete"):
+        db.flush()
+
+
+def test_the_database_refuses_a_photo_on_an_unpaid_row(db):
+    row, _ = _row(db, RETURN_STEPS[:2])
+    row.proof_key = "operations/refunds/1/x"
+    row.proof_type = "image/png"
+    with pytest.raises(Exception, match="ops_refund_proof_paid"):
         db.flush()
 
 
@@ -460,11 +506,104 @@ def test_received_is_never_taken_back(db):
     assert row.received_at == received
 
 
-def test_a_paid_row_is_not_checked_again(db):
+def test_a_received_row_is_not_checked_again(db):
     row, actor = _row(db, RETURN_STEPS, amount="395", method="instapay", refund_to="01060910507")
     returns.mark_paid(db, row.id, {}, actor)
-    with pytest.raises(returns.Locked):
+    assert row not in returns.waiting(db)
+    with pytest.raises(returns.Refused, match="already said"):
         returns.recheck(db, row.id, client=FakeClient({}))
+
+
+# ── The proof photo (ADR 0082, decision 3) ────────────────────────────────────
+
+PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 40
+JPEG = b"\xff\xd8\xff\xe0" + b"\x00" * 40
+
+
+class FakeBucket:
+    def __init__(self):
+        self.files: dict[str, bytes] = {}
+        self.deleted: list[str] = []
+
+    def put(self, key, content, content_type):
+        self.files[key] = content
+
+    def get(self, key):
+        return self.files[key]
+
+    def delete(self, key):
+        self.deleted.append(key)
+        self.files.pop(key, None)
+
+
+@pytest.fixture()
+def bucket(monkeypatch):
+    fake = FakeBucket()
+    monkeypatch.setattr(returns, "_bucket", lambda: fake)
+    return fake
+
+
+def _paid(db):
+    row, actor = _row(db, RETURN_STEPS, amount="395", method="instapay", refund_to="01060910507")
+    returns.mark_paid(db, row.id, {}, actor)
+    return row, actor
+
+
+def test_a_photo_is_added_only_to_a_paid_refund(db, bucket):
+    row, actor = _row(db, RETURN_STEPS, amount="395", method="instapay", refund_to="01060910507")
+    with pytest.raises(returns.Refused, match="paid first"):
+        returns.add_proof(db, row.id, PNG, actor)
+    assert bucket.files == {}
+
+
+@pytest.mark.parametrize(
+    "content, words",
+    [(b"", "Choose a photo"), (b"%PDF-1.7 not a photo", "JPG, PNG or WebP"), (PNG + b"\x00" * returns.PROOF_MAX_BYTES, "10 MB")],
+    ids=["empty", "not-a-photo", "too-large"],
+)
+def test_a_photo_that_is_not_one_is_refused(db, bucket, content, words):
+    row, actor = _paid(db)
+    with pytest.raises(returns.Refused, match=words):
+        returns.add_proof(db, row.id, content, actor)
+    assert bucket.files == {} and row.proof_key is None
+
+
+def test_a_photo_is_kept_replaced_and_the_old_one_removed_after_commit(db, bucket):
+    row, actor = _paid(db)
+    returns.add_proof(db, row.id, PNG, actor)
+    first = row.proof_key
+    assert first.startswith(f"operations/refunds/{row.id}/") and row.proof_type == "image/png"
+    assert returns.proof(db, row.id) == (PNG, "image/png")
+    assert returns.serialise(row, utcnow())["proof_url"].startswith(f"/api/order-ops/returns/{row.id}/proof")
+
+    returns.add_proof(db, row.id, JPEG, actor)
+    assert row.proof_key != first and row.proof_type == "image/jpeg"
+    assert bucket.deleted == []  # nothing leaves the bucket before the commit
+    returns.drop_files(db)
+    assert bucket.deleted == [first]
+    db.flush()
+    actions = db.scalars(select(AuditEvent.action).where(AuditEvent.action.like("order_ops.refund_proof%"))).all()
+    assert actions == ["order_ops.refund_proof_added", "order_ops.refund_proof_added"]
+
+
+def test_undoing_paid_removes_the_photo(db, bucket):
+    row, actor = _paid(db)
+    returns.add_proof(db, row.id, PNG, actor)
+    key = row.proof_key
+    returns.undo_paid(db, row.id, "Sent twice", actor)
+    assert row.proof_key is None and row.proof_type is None
+    db.flush()
+    returns.drop_files(db)
+    assert bucket.deleted == [key]
+
+
+def test_a_photo_can_be_removed(db, bucket):
+    row, actor = _paid(db)
+    with pytest.raises(returns.Refused, match="no photo"):
+        returns.remove_proof(db, row.id, actor)
+    returns.add_proof(db, row.id, PNG, actor)
+    returns.remove_proof(db, row.id, actor)
+    assert row.proof_key is None and returns.proof(db, row.id) is None
 
 
 def test_a_paid_day_before_khazenly_received_it_is_refused(db):
@@ -556,3 +695,34 @@ def test_an_amount_that_is_not_a_number_is_a_readable_422(client):
     response = client.post("/api/order-ops/returns", json={"numbers": [KH1], "kind": "return", "amount": "abc"})
     assert response.status_code == 422
     assert "number of pounds" in response.json()["detail"]
+
+
+def test_paying_early_and_a_photo_over_http(client, monkeypatch):
+    fake = FakeBucket()
+    monkeypatch.setattr(returns, "_bucket", lambda: fake)
+    _become("operations_staff")
+    added = client.post(
+        "/api/order-ops/returns",
+        json={"numbers": [KH2], "kind": "return", "amount": "200", "method": "instapay", "refund_to": "01060910507"},
+    )
+    assert added.status_code == 200, added.text
+    refund = added.json()["added"][0]
+    assert refund["group"] != "ready"
+    assert client.post(f"/api/order-ops/returns/{refund['id']}/paid", json={}).status_code == 422
+    paid = client.post(f"/api/order-ops/returns/{refund['id']}/paid", json={"early": True})
+    assert paid.status_code == 200, paid.text
+    assert paid.json()["refund"]["paid_early"] is True and paid.json()["refund"]["group"] == "paid"
+
+    shown = client.post(f"/api/order-ops/returns/{refund['id']}/proof", files={"file": ("proof.png", PNG, "image/png")})
+    assert shown.status_code == 200, shown.text
+    url = shown.json()["refund"]["proof_url"]
+    _become("operations_viewer")
+    photo = client.get(url)
+    assert photo.status_code == 200 and photo.content == PNG
+    assert photo.headers["content-type"] == "image/png"
+    assert client.delete(f"/api/order-ops/returns/{refund['id']}/proof").status_code == 403
+    assert client.post(
+        f"/api/order-ops/returns/{refund['id']}/proof", files={"file": ("p.png", PNG, "image/png")}
+    ).status_code == 403
+    _become("customer_service")
+    assert client.get(url).status_code == 403

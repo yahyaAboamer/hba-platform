@@ -117,9 +117,10 @@ what was chosen.
 | [0075](0075-payments-words-and-totals-go-past-the-export.md) | The payments desk's totals, labels and messages go past the approved export | Accepted; a divergence |
 | [0076](0076-how-production-moves-in.md) | How Production moves in: tables, its own screens in HBA's frame, HBA's sign-in, its levels | Accepted; amends 0069; decision 5 amended by 0077 |
 | [0077](0077-production-staff-also-records-quality-checks.md) | Production staff also record quality checks; QC is no longer a level of its own | Accepted; amends 0076 |
-| [0079](0079-operations-records-refunds-and-gets-its-levels.md) | Operations records refunds owed and never pays; Operations gets viewer and staff levels | Accepted; amends 0057, 0072 |
+| [0079](0079-operations-records-refunds-and-gets-its-levels.md) | Operations records refunds owed and never pays; Operations gets viewer and staff levels | Accepted; amends 0057, 0072; amended by 0082 |
 | [0080](0080-targets-offers-a-box-only-where-a-save-keeps-it.md) | Targets offers a box only where a save keeps it, and is a list of cards on a phone | Accepted |
 | [0081](0081-recording-a-target-is-its-confirmation.md) | Recording a target is its confirmation; no separate confirm step, and the save lists its changes first | Accepted; amends 0018 (targets) |
+| [0082](0082-a-refund-can-be-paid-before-the-return-is-back.md) | A refund can be paid before the return is back, and can carry a photo | Accepted; amends 0079 |
 
 **0014 is superseded by 0036** and **0038 by 0039**. **0027 keeps its
 principle and loses its mechanism to 0039**: an agreed figure is still set
