@@ -254,7 +254,7 @@ class OpsRefund(Base):
 
     Khazenly's timeline is kept as read (``timeline``, newest first); the row
     is received once it says *Return Completed*. It is normally paid then;
-    paying earlier is allowed when confirmed (ADR 0080). Amount, method and
+    paying earlier is allowed when confirmed (ADR 0082). Amount, method and
     refund ID may wait, but a paid row has all three, locked with it, and
     may carry one proof photo.
     """
@@ -269,7 +269,7 @@ class OpsRefund(Base):
         ),
         CheckConstraint("amount IS NULL OR amount > 0", name="ops_refund_amount_positive"),
         # Paid is the date and when it was recorded, both or neither; and a
-        # paid row says what was sent, how and where (received or not: ADR 0080).
+        # paid row says what was sent, how and where (received or not: ADR 0082).
         CheckConstraint(
             "(paid_on IS NULL) = (paid_recorded_at IS NULL)", name="ops_refund_paid_whole"
         ),
@@ -324,7 +324,7 @@ class OpsRefund(Base):
     paid_on: Mapped[date | None] = mapped_column(Date)
     paid_recorded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     paid_by: Mapped[int | None] = mapped_column(ForeignKey("user_account.id", ondelete="SET NULL"))
-    #: Paid before Khazenly said *Return Completed* (ADR 0080).
+    #: Paid before Khazenly said *Return Completed* (ADR 0082).
     paid_early: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
     #: The optional photo of the payment: its key in the file bucket, and type.
     proof_key: Mapped[str | None] = mapped_column(String(200))

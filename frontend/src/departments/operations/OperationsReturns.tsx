@@ -18,7 +18,7 @@ import "./OperationsDashboard.css";
  * attention, paid; each group folds. Viewers see it all; staff, the
  * manager and the admin (`returns.edit`) add, change and mark paid. A
  * refund can be marked paid before it is back when the person confirms it,
- * and carry an optional photo of the payment (ADR 0080).
+ * and carry an optional photo of the payment (ADR 0082).
  *
  * No approved frame exists for this tab; it is drawn from the Operations
  * dashboard's own pieces (heading, cards, panels, expanding rows).
@@ -769,7 +769,7 @@ function RefundRow({
   const id = `ops-rt-row-${refund.id}`;
   const flags = refund.attention;
   const paid = refund.group === "paid";
-  // Paid early and not back yet: its Khazenly step still shows (ADR 0080).
+  // Paid early and not back yet: its Khazenly step still shows (ADR 0082).
   const stillComing = paid && refund.received_at === null;
   const tags = [
     ...(refund.paid_early ? ["Paid before it was back"] : []),

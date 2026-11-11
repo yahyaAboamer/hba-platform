@@ -23,7 +23,7 @@ from app.modules.affiliates.services.commission.source import source_order
 from app.modules.affiliates.services.compensation import set_terms
 from app.modules.affiliates.services.payroll import approve_month, content_hash
 from app.modules.affiliates.services.payments import record_payment
-from app.modules.affiliates.services.targets import record_actuals, set_requirements, verify
+from app.modules.affiliates.services.targets import record_actuals, set_requirements
 from tests.support_policy import approved_before_the_switch
 
 MONTH = "2026-04"
@@ -298,21 +298,19 @@ def test_fractional_pending_and_delivered_commissions_are_aggregated_once(db, mo
     assert view["performance"]["counted_orders"] == 40
 
 
-@pytest.mark.parametrize("outcome,verified,expected,blocker", [
-    (None, False, 10_600, "no_target_recorded_for_this_month"),
-    (False, False, 10_600, None),
-    (True, False, 10_600, "targets_achieved_but_not_verified"),
-    (True, True, 200_000, None),
+@pytest.mark.parametrize("outcome,expected,blocker", [
+    (None, 10_600, "no_target_recorded_for_this_month"),
+    (False, 10_600, None),
+    # ADR 0081: met is enough, there is no confirming step.
+    (True, 200_000, None),
 ])
-def test_guarantee_reuses_three_valued_verified_evidence(db, model, outcome, verified, expected, blocker):
+def test_guarantee_reuses_three_valued_target_evidence(db, model, outcome, expected, blocker):
     set_terms(db, model, start_month=MONTH, compensation_type="base_guarantee",
               commission_rate_bp=1000, base_amount_piastres=200_000)
     pending(db)
     if outcome is not None:
         target = set_requirements(db, model, MONTH, videos=1, stories=1)
         record_actuals(db, target, videos=int(outcome), stories=int(outcome))
-        if verified:
-            verify(db, target)
     result = preview_month(db, model, MONTH)["current_entitlement"]
     assert result["payout"]["piastres"] == expected
     assert result["blockers"] == ([blocker] if blocker else [])

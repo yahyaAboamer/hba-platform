@@ -184,11 +184,6 @@
   color: var(--owed);
 }
 
-.targets__confirmed,
-.targets__unconfirmed {
-  color: var(--faint);
-}
-
 /* D08. Whether she is keeping up, week by week — on this screen only, because
    the owner chose to keep it internal. Second line and quieter: it is a
    prompt for a conversation rather than a verdict competing with the one
@@ -270,24 +265,93 @@
   white-space: nowrap;
 }
 
-/* Folded away on purpose. Undoing a confirmation stops a guaranteed minimum
-   applying, so it should not read as the sibling of the button beside it. */
-.targets__undo {
-  margin-top: var(--space-4);
-  padding: var(--space-4);
+/* A box the save would refuse, marked as the export marks it (`badKey`):
+   the border in the refusal colour, and the reason under it in words. */
+.targets__input--bad,
+.targets__input--bad:hover,
+.targets__input--bad:focus {
+  border-color: var(--refused);
 }
 
-.targets__undo-list {
-  margin: var(--space-3) 0;
+.targets__error {
+  display: block;
+  margin-top: 4px;
+  font-size: 11.5px;
+  color: var(--refused);
+}
+
+/* A figure that cannot be changed here: text, not a box that refuses. */
+.targets__value {
+  min-width: 56px;
+  text-align: center;
+  font-size: 13.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--quiet);
+}
+
+/* *Videos* / *Stories*, for the phone, where the column headings are gone. */
+.targets__cell-label {
+  display: none;
+}
+
+/* *Set requirements first*, where counts would have nothing to be measured
+   against - in place of two boxes whose figures a save used to drop. */
+.targets__first-act {
+  min-height: 36px;
+  font-size: 12.5px;
+}
+
+/*
+ * The change list a save shows before it writes (ADR 0081). The lifecycle
+ * dialog's frame; the list scrolls inside it when a month has many changes,
+ * so *Save* never falls below the screen.
+ */
+.targets__review {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
+}
+
+.targets__changes {
+  margin: 12px 0 0;
   padding: 0;
   list-style: none;
+  overflow-y: auto;
+  border-top: 1px solid var(--rule);
 }
 
-.targets__lead {
-  max-width: 72ch;
-  margin: 0 0 var(--space-4);
+.targets__changes li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--rule);
+  font-size: 13.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.targets__changes span {
+  color: var(--quiet);
+}
+
+/* The month's record turning, and what that does: the line to read. */
+.targets__changes .targets__turn {
+  color: var(--owed);
+}
+
+.targets__review-note {
+  margin: 12px 0 0;
   font-size: 12.5px;
   color: var(--quiet);
+}
+
+.targets__month-note {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
 }
 
 @media (max-width: 900px) {
@@ -297,5 +361,148 @@
 
   .surface:has(> .targets__grid) {
     overflow-x: auto;
+  }
+}
+
+/*
+ * ── The phone ─────────────────────────────────────────────────────────────
+ *
+ * ADR 0080. The export draws this screen for a desk only; at 390 the table
+ * kept its columns and the outcome sat off the right edge. Each model becomes
+ * a card instead: name, then the outcome (the answer first), then the two
+ * boxes side by side. The `<table>` stays underneath, so a screen reader
+ * still meets rows and cells.
+ */
+@media (max-width: 640px) {
+  .surface:has(> .targets__grid) {
+    overflow-x: visible;
+  }
+
+  .targets__grid,
+  .targets__grid tbody {
+    display: block;
+    width: 100%;
+  }
+
+  .targets__grid thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .targets__grid tr {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 12px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .targets__grid tr:last-child {
+    border-bottom: 0;
+  }
+
+  /* Every phone rule below is written at this weight (`.table.targets__grid
+     td.…`): the Payments pass lost a phone layout to an equal-weight rule,
+     and this one lost the date and the outcome line the same way. */
+  .table.targets__grid td,
+  .table.targets__grid td.targets__outcome,
+  .table.targets__grid td.targets__updated,
+  .targets__grid td.targets__number {
+    display: block;
+    width: auto;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .table.targets__grid td.targets__model {
+    grid-column: 1 / -1;
+    order: 0;
+  }
+
+  .table.targets__grid td.targets__outcome {
+    grid-column: 1 / -1;
+    order: 1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 10px;
+  }
+
+  .targets__outcome > * + * {
+    margin-top: 0;
+  }
+
+  .table.targets__grid td.targets__number {
+    order: 2;
+  }
+
+  .table.targets__grid td.targets__first {
+    grid-column: 1 / -1;
+  }
+
+  /* The date is in the record already; on a card it is one line too many. */
+  .table.targets__grid td.targets__updated {
+    display: none;
+  }
+
+  .targets__who {
+    flex-wrap: wrap;
+    gap: 2px 10px;
+    min-height: 44px;
+  }
+
+  .targets__arrangement {
+    white-space: normal;
+  }
+
+  .targets__name {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    font-size: 15px;
+  }
+
+  .targets__cell-label {
+    display: inline;
+    min-width: 46px;
+    font-size: 12.5px;
+    color: var(--quiet);
+  }
+
+  /* 16px or iOS zooms the page on focus; 44px to be tapped. */
+  .targets__input {
+    width: 64px;
+    min-height: 44px;
+    font-size: 16px;
+  }
+
+  .targets__first-act,
+  .targets__bar .button,
+  .targets__month-note .button,
+  .targets__review .button {
+    min-height: 44px;
+  }
+
+  .targets__bar .input--search {
+    width: 100%;
+    min-height: 44px;
+    font-size: 16px;
+  }
+
+  .targets__bar-left,
+  .targets__bar-right {
+    width: 100%;
+  }
+
+  .targets__bar .seg-opt {
+    min-height: 44px;
+  }
+
+  .targets__year {
+    min-height: 44px;
   }
 }

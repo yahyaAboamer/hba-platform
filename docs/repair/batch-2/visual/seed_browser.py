@@ -62,7 +62,6 @@ from app.modules.affiliates.services.targets import (  # noqa: E402
     record_actuals,
     record_outcome,
     set_requirements,
-    verify,
 )
 
 PASSWORD = "a-long-enough-password"
@@ -509,9 +508,6 @@ def main() -> None:
                         stories=stories,
                         recorded_at=now,
                     )
-                    if index % 3 != 2:
-                        verify(db, target, actor_id=owner.id,
-                               actor_email=OWNER_EMAIL, verified_at=now)
             month = month_add(month, 1)
 
     db.commit()

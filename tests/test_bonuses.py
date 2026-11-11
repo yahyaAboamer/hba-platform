@@ -68,7 +68,7 @@ def test_a_bonus_is_paid_on_top_of_a_guaranteed_minimum(db):
     who earned least."""
     affiliate = _affiliate(db)
     _guaranteed(db, affiliate, base=800_000)
-    _target(db, affiliate, actual=(8, 5), verified=True)
+    _target(db, affiliate, actual=(8, 5))
     _earned(db, affiliate, "1", 2_000_000)
 
     add_bonus(db, affiliate, month=MONTH, amount_piastres=100_000)

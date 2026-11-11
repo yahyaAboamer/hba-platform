@@ -40,7 +40,7 @@ export const GLOSSARY_TERMS: GlossaryTerm[] = [
     id: "guaranteed-minimum",
     term: "Guaranteed minimum",
     definition:
-      "A floor under a month's pay for models on that arrangement. It only applies in a month where targets were both met and confirmed, and it is never added on top of commission - whichever is larger is what is paid, not both.",
+      "A floor under a month's pay for models on that arrangement. It only applies in a month where targets were met, and it is never added on top of commission - whichever is larger is what is paid, not both.",
   },
   {
     id: "provisional",

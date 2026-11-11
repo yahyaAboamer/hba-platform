@@ -56,11 +56,23 @@ def _make_account(email: str) -> int:
         ).scalar_one()
 
 
-def _affiliate(client, name="Nour", email="nour@example.com", **extra) -> dict:
+def _affiliate(
+    client, name="Nour", email="nour@example.com", status="active", **extra
+) -> dict:
+    """A working model. Made active directly: a bare application (pending, no
+    terms) is left off the grid (owner, 10 November 2026), and these tests are
+    about models HBA works with."""
     body = {"user_account_id": _make_account(email), "name": name, **extra}
     response = client.post("/api/affiliates", json=body)
     assert response.status_code == 201, response.text
-    return response.json()
+    made = response.json()
+    if status != "pending":
+        with engine.begin() as connection:
+            connection.execute(
+                text("UPDATE affiliate_profile SET status = :s WHERE id = :i"),
+                {"s": status, "i": made["id"]},
+            )
+    return made
 
 
 def _row(affiliate_id, required=(8, 5), actual=None) -> dict:
@@ -111,6 +123,33 @@ def test_a_model_with_no_target_appears_anyway(client):
     assert rows[0]["affiliate_id"] == affiliate["id"]
     assert rows[0]["required_videos"] is None
     assert rows[0]["achieved"] is None
+
+
+def test_a_bare_application_is_not_on_the_grid(client):
+    """Pending with no terms is an application, not a model: nothing is owed,
+    so a row of empty boxes beside her warned about nothing (owner, 10 Nov)."""
+    _affiliate(client, "Applied", "applied@example.com", status="pending")
+    working = _affiliate(client, "Nour", "nour@example.com")
+
+    assert [row["affiliate_id"] for row in _grid(client)["rows"]] == [working["id"]]
+
+
+def test_the_grid_says_which_months_are_agreed(client):
+    """So the screen can lock the row and say why, rather than refusing the
+    whole save afterwards. Read-only: the refusal is still the server's."""
+    affiliate = _affiliate(client)
+    assert _grid(client)["rows"][0]["agreed"] is False
+
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO payroll_month (affiliate_id, month, calculation_state) "
+                "VALUES (:a, :m, 'approved')"
+            ),
+            {"a": affiliate["id"], "m": MONTH},
+        )
+
+    assert _grid(client)["rows"][0]["agreed"] is True
 
 
 def test_every_model_is_listed(client):
@@ -226,114 +265,30 @@ def test_a_negative_number_is_refused_before_it_reaches_the_database(client):
     assert response.status_code == 422
 
 
-# ── Verification ───────────────────────────────────────────────────────────────
+# ── Recording is the confirmation (ADR 0081) ───────────────────────────────────
 
 
-def test_verifying_unlocks_the_guarantee(client):
+def test_there_is_no_confirm_step(client):
+    """The owner removed confirming (11 November 2026): the grid says nothing
+    about it, and the old endpoints are gone."""
     affiliate = _affiliate(client)
     _save(client, [_row(affiliate["id"], (8, 5), (8, 5))], month=MONTH)
 
-    response = client.post(
-        f"/api/targets/{MONTH}/verify", json={"affiliate_ids": [affiliate["id"]]}
-    )
-
-    assert response.status_code == 200
     row = _grid(client)["rows"][0]
-    assert row["verified"] is True
-    assert row["verified_at"] is not None
-
-
-def test_verifying_several_at_once(client):
-    nour = _affiliate(client, "Nour", "nour@example.com")
-    sara = _affiliate(client, "Sara", "sara@example.com")
-    _save(client, [
-                _row(nour["id"], (8, 5), (8, 5)),
-                _row(sara["id"], (2, 1), (2, 1)),
-            ])
-
-    response = client.post(
-        f"/api/targets/{MONTH}/verify",
-        json={"affiliate_ids": [nour["id"], sara["id"]]},
-    )
-
-    assert response.json()["verified"] == 2
-    assert all(row["verified"] for row in _grid(client)["rows"])
-
-
-def test_verifying_an_unrecorded_month_verifies_nothing(client):
-    """Confirming numbers nobody entered would unlock a guarantee on an empty
-    month - and the rest of the batch must not slip through with it.
-    """
-    nour = _affiliate(client, "Nour", "nour@example.com")
-    sara = _affiliate(client, "Sara", "sara@example.com")
-    _save(client, [_row(nour["id"], (8, 5), (8, 5)), _row(sara["id"], (2, 1))], month=MONTH)
-
-    response = client.post(
-        f"/api/targets/{MONTH}/verify",
-        json={"affiliate_ids": [nour["id"], sara["id"]]},
-    )
-
-    assert response.status_code == 400
-    assert all(not row["verified"] for row in _grid(client)["rows"])
-
-
-def test_a_missed_target_can_be_verified(client):
-    """Verification confirms the numbers, not the outcome."""
-    affiliate = _affiliate(client)
-    _save(client, [_row(affiliate["id"], (8, 5), (1, 1))], month=MONTH)
-
-    response = client.post(
-        f"/api/targets/{MONTH}/verify", json={"affiliate_ids": [affiliate["id"]]}
-    )
-
-    assert response.status_code == 200
-    row = _grid(client)["rows"][0]
-    assert row["verified"] is True
-    assert row["achieved"] is False
-
-
-def test_un_verifying_needs_a_reason(client):
-    affiliate = _affiliate(client)
-    _save(client, [_row(affiliate["id"], (8, 5), (8, 5))], month=MONTH)
-    client.post(f"/api/targets/{MONTH}/verify", json={"affiliate_ids": [affiliate["id"]]})
-
-    assert (
-        client.post(
-            f"/api/targets/{MONTH}/unverify",
-            json={"affiliate_ids": [affiliate["id"]], "reason": ""},
-        ).status_code
-        == 422
-    )
-
-    response = client.post(
-        f"/api/targets/{MONTH}/unverify",
-        json={
-            "affiliate_ids": [affiliate["id"]],
-            "reason": "Sara counted last month's posts",
-        },
-    )
-    assert response.status_code == 200
-    assert _grid(client)["rows"][0]["verified"] is False
-
-
-def test_re_saving_actuals_clears_the_verification(client):
-    """The confirmation was of the old numbers. Letting a correction inherit it
-    would unlock a guarantee nobody agreed to.
-    """
-    affiliate = _affiliate(client)
-    _save(client, [_row(affiliate["id"], (8, 5), (8, 5))], month=MONTH)
-    client.post(f"/api/targets/{MONTH}/verify", json={"affiliate_ids": [affiliate["id"]]})
-
-    _save(client, [_row(affiliate["id"], (8, 5), (9, 6))], month=MONTH)
-
-    assert _grid(client)["rows"][0]["verified"] is False
+    assert row["achieved"] is True
+    assert "verified" not in row
+    for action in ("verify", "unverify"):
+        response = client.post(
+            f"/api/targets/{MONTH}/{action}",
+            json={"affiliate_ids": [affiliate["id"]], "reason": "x"},
+        )
+        assert response.status_code in (404, 405)
 
 
 def test_saving_the_grid_leaves_every_unchanged_row_as_it_was(client):
     """The grid sends every row it shows. Saving one model's count must not
-    clear another's confirmation (it releases her guarantee), move her *Last
-    updated*, or write audit rows for numbers nobody touched - which it did,
-    found in the batch J browser check.
+    move another's *Last updated*, or write audit rows for numbers nobody
+    touched - which it did, found in the batch J browser check.
     """
     from sqlalchemy import text
     from app.db import engine
@@ -341,7 +296,6 @@ def test_saving_the_grid_leaves_every_unchanged_row_as_it_was(client):
     nour = _affiliate(client, "Nour", "nour@example.com")
     sara = _affiliate(client, "Sara", "sara@example.com")
     _save(client, [_row(nour["id"], (8, 5), (8, 5)), _row(sara["id"], (2, 1), (2, 1))])
-    client.post(f"/api/targets/{MONTH}/verify", json={"affiliate_ids": [nour["id"], sara["id"]]})
     before = {row["affiliate_id"]: row for row in _grid(client)["rows"]}
     with engine.connect() as connection:
         audits = connection.execute(text("SELECT count(*) FROM audit_event")).scalar()
@@ -351,9 +305,8 @@ def test_saving_the_grid_leaves_every_unchanged_row_as_it_was(client):
     assert response.status_code == 200, response.text
 
     after = {row["affiliate_id"]: row for row in _grid(client)["rows"]}
-    assert after[nour["id"]]["verified"] is True
     assert after[nour["id"]]["recorded_at"] == before[nour["id"]]["recorded_at"]
-    assert after[sara["id"]]["verified"] is False
+    assert after[sara["id"]]["actual_stories"] == 2
     with engine.connect() as connection:
         written = connection.execute(text(
             "SELECT action, subject FROM audit_event ORDER BY id OFFSET :n"
@@ -375,12 +328,6 @@ def test_a_model_may_touch_none_of_it(client):
     # the wrong reason. The refusal being proven is the *save*.
     assert (
         _save(client, [], month=MONTH, revision="anything").status_code == 403
-    )
-    assert (
-        client.post(
-            f"/api/targets/{MONTH}/verify", json={"affiliate_ids": [affiliate["id"]]}
-        ).status_code
-        == 403
     )
 
 
@@ -452,21 +399,6 @@ def test_a_mistyped_count_can_be_taken_off_rather_than_zeroed(client):
     # Not `False`. Nobody has recorded what she did, which is a different
     # answer from "she missed".
     assert row["achieved"] is None
-
-
-def test_clearing_a_count_takes_its_confirmation_with_it(client):
-    """The verification was of numbers that are now gone. Leaving it would let
-    an empty month inherit somebody's approval."""
-    affiliate = _affiliate(client)
-    _save(client, [_row(affiliate["id"], (8, 5), (8, 5))])
-    client.post(
-        f"/api/targets/{MONTH}/verify", json={"affiliate_ids": [affiliate["id"]]}
-    )
-    assert _grid(client)["rows"][0]["verified"] is True
-
-    _save(client, [{**_row(affiliate["id"], (8, 5)), "clear_actuals": True}])
-
-    assert _grid(client)["rows"][0]["verified"] is False
 
 
 def test_clearing_and_recording_at_once_is_refused(client):

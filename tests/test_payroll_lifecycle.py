@@ -868,7 +868,7 @@ def test_carried_money_sits_on_top_of_a_guarantee_not_inside_it(db):
     """
     from app.modules.affiliates.services.commission.calculate import calculate_month
     from app.modules.affiliates.services.compensation import close_terms, terms_for
-    from app.modules.affiliates.services.targets import record_actuals, set_requirements, verify
+    from app.modules.affiliates.services.targets import record_actuals, set_requirements
 
     affiliate = _affiliate(db)
     close_terms(db, terms_for(db, affiliate, AUGUST), end_month="2026-07")
@@ -884,7 +884,6 @@ def test_carried_money_sits_on_top_of_a_guarantee_not_inside_it(db):
     for month in (AUGUST, SEPTEMBER):
         target = set_requirements(db, affiliate, month, videos=1, stories=1)
         record_actuals(db, target, videos=2, stories=2)
-        verify(db, target, actor_id=None)
 
     _order(db, affiliate, "paid", 200_000)
     late = _order(db, affiliate, "late", 100_000, state=CommissionState.PENDING)

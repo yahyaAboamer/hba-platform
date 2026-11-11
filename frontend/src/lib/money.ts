@@ -83,7 +83,6 @@ export function moneyClass(
 const BLOCKER_TEXT: Record<string, string> = {
   no_compensation_terms_for_this_month: "No pay terms for this month",
   no_target_recorded_for_this_month: "No target recorded",
-  targets_achieved_but_not_verified: "Targets met, not yet verified",
   orders_held_for_multi_code_review: "An order two models both claim",
   house_accounts_are_never_owed: "House account — never owed",
   month_is_already_approved: "Already approved",

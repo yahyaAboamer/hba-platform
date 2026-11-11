@@ -33,14 +33,14 @@ left out, which is a finite backlog that empties and is never added to.
 |---|---|
 | `commission` | base sum × rate |
 | `fixed_plus_commission` | commission **plus** the fixed salary |
-| `base_guarantee` | **max(commission, base amount)** — targets achieved *and* verified |
+| `base_guarantee` | **max(commission, base amount)** — targets achieved (ADR 0081: recording is the confirmation) |
 
 The base guarantee is never added on top of a higher commission, and never caps
 it. §9.5.
 
 ## Two things it refuses to decide
 
-**A base guarantee whose targets nobody recorded.** "Achieved and verified" has
+**A base guarantee whose targets nobody recorded.** "Achieved" has
 no answer, so the month blocks rather than guessing. It never assumes they missed,
 which underpays, and never assumes they hit them, which overpays.
 
@@ -85,10 +85,6 @@ NO_TERMS = "no_compensation_terms_for_this_month"
 #: guarantee applies. §11.3 blocks on **missing information**, never on poor
 #: performance.
 NO_TARGET = "no_target_recorded_for_this_month"
-
-#: They hit their targets and nobody has confirmed the numbers. Verification is
-#: what unlocks the guarantee (§11.3), so this is not a formality.
-TARGETS_UNVERIFIED = "targets_achieved_but_not_verified"
 
 #: F02. The live counting rule, written into every snapshot it agrees.
 PENDING_INCLUSIVE = "pending_inclusive"
@@ -237,10 +233,9 @@ class MonthCalculation:
     #: different answer from missing the target, and blocks where missing does
     #: not.
     target_achieved: bool | None = None
-    target_verified: bool = False
 
     #: Whether ``max(commission, base)`` actually took effect. False on a
-    #: `commission` model, on a missed target, and on an unverified one.
+    #: `commission` model and on a missed target.
     guarantee_applied: bool = False
 
     #: Real, and never owed. §8, §17.
@@ -490,7 +485,6 @@ def _calculate(
 
     target = get_target(db, affiliate, month)
     achieved = target.is_achieved if target else None
-    verified = bool(target and target.is_verified)
     guarantee_applied = False
 
     if is_preview:
@@ -529,7 +523,6 @@ def _calculate(
             pending_base_piastres=pending_base,
             void_orders=void_count,
             target_achieved=achieved,
-            target_verified=verified,
             is_house=is_house,
             carried_orders=carried["orders"],
             carried_base_piastres=carried["base_piastres"],
@@ -575,15 +568,14 @@ def _calculate(
             # missing information.
             blockers.append(NO_TARGET)
         elif not achieved:
-            # A confirmed miss. They are paid their commission, promptly, and the
-            # month approves - the block is never a punishment for a quiet
-            # month.
+            # A miss. They are paid their commission, promptly, and the month
+            # approves - the block is never a punishment for a quiet month.
             pass
-        elif not verified:
-            blockers.append(TARGETS_UNVERIFIED)
         else:
             # §9.5. The base is never added on top of a higher commission and
             # never caps it, which is the intuitive mistake the spec calls out.
+            # Met is enough: the recorded counts are the confirmed ones
+            # (ADR 0081, owner, 11 November 2026).
             if guarantee > commission:
                 exact = Decimal(guarantee)
                 guarantee_applied = True
@@ -617,7 +609,6 @@ def _calculate(
         exact_unrounded_piastres=exact,
         payout_piastres=payout,
         target_achieved=achieved,
-        target_verified=verified,
         guarantee_applied=guarantee_applied,
         is_house=is_house,
         carried_orders=carried["orders"],

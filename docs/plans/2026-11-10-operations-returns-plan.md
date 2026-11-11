@@ -179,7 +179,7 @@ One batch, one pull request. Merge and deploy only on the owner's word.
 - **Exchanges**: none was seen on Khazenly. Received is *Return Completed*
   for both; confirm with one real exchange number.
 
-## Added 11 November 2026 (ADR 0080, the owner)
+## Added 11 November 2026 (ADR 0082, the owner)
 
 - **Paid before it is back.** Any refund not yet received can be recorded
   as paid after ticking "I paid it before Khazenly said the return was

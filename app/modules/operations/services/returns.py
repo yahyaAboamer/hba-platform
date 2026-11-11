@@ -8,7 +8,7 @@ added by its Khazenly number; Khazenly's public tracking
 (``khazenly_tracking``) is read at once and then every 30 minutes until it
 says *Return Completed*. The row is normally marked paid then; paying
 earlier is allowed when the person confirms it, and the row keeps being
-read (ADR 0080). A paid row is locked except for its optional proof photo;
+read (ADR 0082). A paid row is locked except for its optional proof photo;
 undoing it needs a reason, kept in the activity log.
 
 The customer's name and phone are read from the Shopify order Khazenly
@@ -52,10 +52,10 @@ MAX_PASTED = 20
 #: The paid rows the tab lists, newest first.
 PAID_SHOWN = 100
 #: How long a refund paid before its return was back is still read from
-#: Khazenly, from the day it was paid (ADR 0080, decision 2).
+#: Khazenly, from the day it was paid (ADR 0082, decision 2).
 PAID_EARLY_TRACKED_FOR = timedelta(days=60)
 
-#: The proof photo (ADR 0080, decision 3): its size, and where it is kept.
+#: The proof photo (ADR 0082, decision 3): its size, and where it is kept.
 PROOF_MAX_BYTES = 10 * 1024 * 1024
 PROOF_PREFIX = "operations/refunds"
 #: ``db.info`` key for photos to take out of the bucket once the change
@@ -534,7 +534,7 @@ def edit(db: Session, refund_id: int, values: dict, actor: UserAccount) -> OpsRe
 def mark_paid(db: Session, refund_id: int, values: dict, actor: UserAccount, today: date | None = None) -> OpsRefund:
     """Record that the refund was sent: the day, and the amount, method and
     refund ID as sent. Normally once Khazenly said *Return Completed*; before
-    then only when ``values["early"]`` confirms it (ADR 0080)."""
+    then only when ``values["early"]`` confirms it (ADR 0082)."""
     row = _get(db, refund_id)
     if row.paid_on is not None:
         raise Locked("This refund is already marked paid.")
@@ -620,7 +620,7 @@ def recheck(db: Session, refund_id: int, client: tracking.Client | None = None) 
     return row
 
 
-# ── The proof photo (ADR 0080, decision 3) ────────────────────────────────────
+# ── The proof photo (ADR 0082, decision 3) ────────────────────────────────────
 
 
 def image_type(head: bytes) -> str | None:

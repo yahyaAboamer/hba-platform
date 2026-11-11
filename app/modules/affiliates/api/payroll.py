@@ -19,7 +19,7 @@ then are still read, by `/{month}/reopened` and the audit trail.
 ## Bulk approval is all-or-nothing per model, not per run
 
 One model failing does not stop the others — twenty months are twenty separate
-obligations, and refusing them all because Nour's target is unverified would
+obligations, and refusing them all because Nour's target is unrecorded would
 make month-end hostage to a single row. What each model got is reported
 individually.
 """
@@ -56,6 +56,7 @@ from app.modules.affiliates.services.payroll import (
     reconciliation_for,
     snapshots_for,
     source_version,
+    agreed_source_unchanged,
 )
 
 router = APIRouter(prefix="/api/payroll")
@@ -75,6 +76,26 @@ class ApproveBody(BaseModel):
     source_versions: dict[int, str] | None = None
 
 
+def _source_inputs(db: Session, affiliate: AffiliateProfile, month: str) -> tuple:
+    """The orders, carried orders and deductions a month is computed from."""
+    orders = list(
+        db.scalars(
+            select(AttributedOrder)
+            .where(AttributedOrder.affiliate_id == affiliate.id)
+            .where(AttributedOrder.business_month == month)
+            .order_by(AttributedOrder.shopify_order_id)
+        )
+    )
+    # R1. The same facts approval will check against, deductions included - a
+    # preview that omitted them would hand out a fingerprint the commit could
+    # never match.
+    return (
+        orders,
+        carried_into(db, affiliate, month),
+        deductions_landing_on(db, affiliate, month),
+    )
+
+
 def _source_version_for(
     db: Session, affiliate: AffiliateProfile, month: str, calculation
 ) -> str:
@@ -85,23 +106,7 @@ def _source_version_for(
     stand-in - a timestamp, a row count - would agree when the month had
     changed, which is the one case it exists for.
     """
-    orders = list(
-        db.scalars(
-            select(AttributedOrder)
-            .where(AttributedOrder.affiliate_id == affiliate.id)
-            .where(AttributedOrder.business_month == month)
-            .order_by(AttributedOrder.shopify_order_id)
-        )
-    )
-    return source_version(
-        calculation,
-        orders,
-        carried_into(db, affiliate, month),
-        # R1. The same facts approval will check against, deductions included -
-        # a preview that omitted them would hand out a fingerprint the commit
-        # could never match.
-        deductions_landing_on(db, affiliate, month),
-    )
+    return source_version(calculation, *_source_inputs(db, affiliate, month))
 
 
 def _month_or_400(month: str) -> str:
@@ -227,8 +232,11 @@ def _row(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
         "source_changed_since_approval": (
             bool(snapshot)
             and snapshot.payload_json.get("source_version") is not None
-            and snapshot.payload_json.get("source_version")
-            != _source_version_for(db, affiliate, month, calculation)
+            and not agreed_source_unchanged(
+                snapshot.payload_json.get("source_version"),
+                calculation,
+                *_source_inputs(db, affiliate, month),
+            )
         ),
         # ADR 0036. Approvable, and never payable. The screen needs both
         # facts: it offers approval, and it must not offer to send money.

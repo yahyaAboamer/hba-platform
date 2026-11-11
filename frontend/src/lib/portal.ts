@@ -37,7 +37,6 @@ export type MonthTargets = {
   numbers_kept: boolean | null;
   /** §15. `null` means nobody has recorded what they produced. */
   achieved: boolean | null;
-  verified: boolean;
   /**
    * §15, and the clause that matters: targets decide money only on a
    * guaranteed minimum. On commission they are informational, and a model
@@ -298,7 +297,6 @@ export type MyEarnings = {
     commission: string;
     /** §15. `null` means nobody has recorded what they produced. */
     targets_achieved: boolean | null;
-    targets_verified: boolean;
   } | null;
   commission_rate_bp: number | null;
   /**
@@ -506,7 +504,6 @@ export type MyHome = {
     actual_videos: number | null;
     required_stories: number | null;
     actual_stories: number | null;
-    verified: boolean;
   } | null;
   best_seller: {
     title: string;

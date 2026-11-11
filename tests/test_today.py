@@ -733,9 +733,10 @@ def test_today_and_each_screen_give_the_same_number(owner, monkeypatch):
         if row["account_kind"] != "house" and not row["before_start"] and row["required_videos"] is None
     )
     with SessionLocal() as db:
-        # Salma (an application) and Habiba; Nour has hers; the house code is off.
-        assert targets_not_set(db, next_month) == (empty, 3)
-    assert empty == 2
+        # Habiba; Nour has hers; the house code is off, and so is Salma - an
+        # application is nobody's model yet (owner, 10 November 2026).
+        assert targets_not_set(db, next_month) == (empty, 2)
+    assert empty == 1
 
 
 def test_a_model_may_not_read_today(owner):

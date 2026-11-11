@@ -35,10 +35,8 @@ agreement (05C), never by quietly restating what the agreement said.
 ## Blockers are translated, and none of them is their fault
 
 Every blocker the platform can raise is HBA's own work - nobody has set their
-rate, nobody has recorded their targets, nobody has confirmed them, an order
-needs a decision. Not one is something they did, and
-`targets_achieved_but_not_verified` in particular reads as an accusation when
-it means the opposite: they hit them, and somebody here is slow.
+rate, nobody has recorded their targets, an order needs a decision. Not one
+is something they did.
 
 So each one says whose move it is, and today every one of them says HBA. The
 field is not decoration - it is what lets the screen tell them there is nothing
@@ -124,13 +122,6 @@ WAITING_ON: dict[str, dict[str, str]] = {
         "who": "hba",
         # Owner, 1 October 2026: the sentence alone, behind the home card's ⓘ.
         "text": "Nobody has recorded what you posted this month yet.",
-    },
-    "targets_achieved_but_not_verified": {
-        "who": "hba",
-        "text": (
-            "You hit your targets. Someone at HBA still has to confirm the "
-            "numbers before your guaranteed minimum can apply."
-        ),
     },
     "no_compensation_terms_for_a_carried_month": {
         "who": "hba",
@@ -622,7 +613,6 @@ def _guarantee(figures: dict, total: int) -> dict | None:
         # they produced - a different thing from missing the target, and the
         # difference decides which sentence they should be reading.
         "targets_achieved": figures.get("target_achieved"),
-        "targets_verified": bool(figures.get("target_verified")),
     }
 
 
@@ -901,8 +891,8 @@ def my_month(db: Session, affiliate: AffiliateProfile, month: str) -> dict:
         "commission_rate_bp": figures.get("commission_rate_bp"),
         # Nothing blocks a month that is already agreed. The live blocker list
         # keeps answering "could this be approved *now*", and after approval
-        # that question has a stale answer: unverifying a target in October
-        # would otherwise put "someone still has to confirm your numbers" on
+        # that question has a stale answer: clearing a target's counts in
+        # October would otherwise put "nobody has recorded what you posted" on
         # top of a month they were paid for in September.
         #
         # A settled month waits on nobody either: HBA settled it directly, so
@@ -1466,7 +1456,6 @@ def _targets(
         # produced*, which is a different thing from missing the target and is
         # the only one of the three that stops a month closing (§11.3).
         "achieved": target.is_achieved,
-        "verified": bool(target.is_verified),
         "determines_pay": (
             figures.get("compensation_type") == CompensationType.BASE_GUARANTEE
         ),
@@ -1885,7 +1874,6 @@ def my_targets(db: Session, affiliate: AffiliateProfile) -> dict:
                 # asked of you* is not *the numbers were lost*.
                 "numbers_kept": None if target is None else not target.is_backfilled,
                 "achieved": target.is_achieved if target else None,
-                "verified": bool(target and target.is_verified),
                 "recorded_at": (
                     target.recorded_at.isoformat()
                     if target and target.recorded_at

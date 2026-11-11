@@ -373,7 +373,7 @@ describe("Folding the groups", () => {
   });
 });
 
-describe("Paying before the return is back (ADR 0080)", () => {
+describe("Paying before the return is back (ADR 0082)", () => {
   it("asks to confirm a payment made early, and says so to the server", async () => {
     let sent: { path: string; body: Record<string, unknown> } | null = null;
     respond(tab([STUCK]), (path, init) => {

@@ -298,7 +298,7 @@ def _row(db, steps, **details) -> tuple[OpsRefund, UserAccount]:
 
 
 def test_paying_before_khazenly_says_completed_must_be_confirmed(db):
-    """ADR 0080, decision 1: early is allowed, never by accident."""
+    """ADR 0082, decision 1: early is allowed, never by accident."""
     row, actor = _row(db, RETURN_STEPS[:-1], amount="395", method="instapay", refund_to="01060910507")
     with pytest.raises(returns.Refused, match="Confirm you paid it before it was back"):
         returns.mark_paid(db, row.id, {}, actor)
@@ -313,7 +313,7 @@ def test_paying_before_khazenly_says_completed_must_be_confirmed(db):
 
 
 def test_a_refund_paid_early_keeps_being_read_until_completed(db):
-    """ADR 0080, decision 2: it keeps its status in Paid."""
+    """ADR 0082, decision 2: it keeps its status in Paid."""
     row, actor = _row(db, RETURN_STEPS[:3], amount="395", method="instapay", refund_to="01060910507")
     returns.mark_paid(db, row.id, {"early": True}, actor)
     assert row in returns.waiting(db)
@@ -427,7 +427,12 @@ def test_received_and_unpaid_for_two_days_is_late_but_still_ready(db):
 
 
 def test_missing_details_alone_do_not_move_a_row_to_attention(db):
-    row, _ = _row(db, RETURN_STEPS[:2])
+    # Moved two days before the real clock, not before the fixed NOW: the
+    # check below reads `utcnow()`, and a row dated from NOW turned *stuck*
+    # (3 days) at 13:00 UTC on 11 November 2026 and failed CI.
+    actor = _actor(db)
+    _add(db, actor, [KH1], {KH1: _answer(KH1, RETURN_STEPS[:2], start=utcnow() - timedelta(days=2))})
+    row = db.scalar(select(OpsRefund))
     assert returns.attention(row, utcnow()) == ["details_missing"]
     assert returns.group_of(row, utcnow()) == "on_the_way"
 
@@ -437,7 +442,9 @@ def test_the_tab_totals_what_is_owed_and_what_was_refunded_this_month(db):
     third = "KH-HBA-09000213"
     _add(db, actor, [KH1], {KH1: _answer(KH1, RETURN_STEPS)}, details={"amount": "395", "method": "instapay", "refund_to": "01060910507"})
     _add(db, actor, [KH2], {KH2: _answer(KH2, RETURN_STEPS)}, details={"amount": "100.50", "method": "instapay", "refund_to": "01060910507"})
-    _add(db, actor, [third], {third: _answer(third, RETURN_STEPS[:2])}, details={"amount": "70"})
+    # Relative to the real clock, which `tab` reads: dated from the fixed NOW
+    # this row turned *stuck* on 11 November 2026.
+    _add(db, actor, [third], {third: _answer(third, RETURN_STEPS[:2], start=utcnow() - timedelta(days=2))}, details={"amount": "70"})
     paid = db.scalar(select(OpsRefund).where(OpsRefund.khazenly_number == KH2))
     returns.mark_paid(db, paid.id, {}, actor)
     found = returns.tab(db)
@@ -507,7 +514,7 @@ def test_a_received_row_is_not_checked_again(db):
         returns.recheck(db, row.id, client=FakeClient({}))
 
 
-# ── The proof photo (ADR 0080, decision 3) ────────────────────────────────────
+# ── The proof photo (ADR 0082, decision 3) ────────────────────────────────────
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 40
 JPEG = b"\xff\xd8\xff\xe0" + b"\x00" * 40

@@ -16,13 +16,13 @@ import "./MyYou.css";
 const ARRANGEMENT_NOTE: Record<string, string> = {
   commission: "You earn a share of eligible sales attributed to your code.",
   fixed_plus_commission: "You receive both your monthly fixed amount and a share of eligible code sales.",
-  base_guarantee: "You receive the larger of your commission or your guaranteed minimum when content targets are met and confirmed.",
+  base_guarantee: "You receive the larger of your commission or your guaranteed minimum when content targets are met.",
 };
 
 const ARRANGEMENT_DETAIL: Record<string, string> = {
   commission: "Your pay comes from eligible sales attributed to your code. Your exact rate and amount are shown in the month's calculation.",
   fixed_plus_commission: "Your fixed amount and your commission are added together. Neither replaces the other. The exact amounts are shown in the month's calculation.",
-  base_guarantee: "The guaranteed minimum is a floor, not an extra amount added to commission. It applies when your content targets for the month were met and HBA confirmed them. You receive whichever is larger: the minimum or your commission.",
+  base_guarantee: "The guaranteed minimum is a floor, not an extra amount added to commission. It applies when your content targets for the month were met. You receive whichever is larger: the minimum or your commission.",
 };
 
 type IconName = "payment" | "history" | "contact" | "sizes" | "notifications" | "help" | "appearance";
@@ -150,7 +150,7 @@ export function YouTerms({ me, workingMonth }: { me: Me; workingMonth: string | 
       <p className="you__detail-note">Terms can differ in another month. The figure for each month is on that month's calculation, not this account page.</p>
       {workingMonth && <Link className="you__text-link" to={`/earnings?month=${workingMonth}`}>See this month's calculation →</Link>}
     </section>
-    {me.arrangement === "base_guarantee" && <section className="you__detail-card"><h2>When does the minimum apply?</h2><p>HBA must record and confirm that your content targets were met. Until then, the guarantee is not an amount you have been promised for that month.</p><Link className="you__text-link" to="/targets">See your targets →</Link></section>}
+    {me.arrangement === "base_guarantee" && <section className="you__detail-card"><h2>When does the minimum apply?</h2><p>HBA must record that your content targets were met. Until then, the guarantee is not an amount you have been promised for that month.</p><Link className="you__text-link" to="/targets">See your targets →</Link></section>}
   </div>;
 }
 
@@ -215,7 +215,7 @@ export function YouGuide() {
     <section className="you__detail-card"><h1>Why can sales and pay differ?</h1><p>Sales describe orders attributed to your code. Your pay follows the terms HBA set for that month, which may include commission, a fixed amount, or a guaranteed minimum. An open month's figure can still change.</p><Link className="you__text-link" to="/">See your current month →</Link></section>
     <section className="you__detail-card"><h2>When is a month final?</h2><p>While a month is in progress, its amount is still adding up. HBA later approves the month and its agreed amount stays fixed. If something changes after approval, you will see a separate correction.</p><Link className="you__text-link" to="/payments">See payment history →</Link></section>
     <section className="you__detail-card"><h2>Where can I check a transfer?</h2><p>Payment history shows when HBA recorded it, where it was sent at the time, and a transfer screenshot when one is attached. An open month is separate from money already agreed and owed.</p><Link className="you__text-link" to="/payments">Open payment history →</Link></section>
-    <section className="you__detail-card"><h2>What if a target has no result yet?</h2><p>It means no result has been recorded. It does not mean you missed the target. The Targets tab shows what HBA has recorded and when it was confirmed.</p><Link className="you__text-link" to="/targets">Open Targets →</Link></section>
+    <section className="you__detail-card"><h2>What if a target has no result yet?</h2><p>It means no result has been recorded. It does not mean you missed the target. The Targets tab shows what HBA has recorded and when it was last updated.</p><Link className="you__text-link" to="/targets">Open Targets →</Link></section>
   </div>;
 }
 

@@ -1,4 +1,4 @@
-"""A refund can be paid before the return is back, and carry a photo (ADR 0080).
+"""A refund can be paid before the return is back, and carry a photo (ADR 0082).
 
 Revision ID: b2d8f4a60029
 Revises: a1c7e3f50028

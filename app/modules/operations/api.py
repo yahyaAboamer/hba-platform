@@ -237,7 +237,7 @@ class RefundPaid(BaseModel):
     amount: str | None = None
     method: str | None = None
     refund_to: str | None = None
-    #: Confirms a payment before Khazenly said *Return Completed* (ADR 0080).
+    #: Confirms a payment before Khazenly said *Return Completed* (ADR 0082).
     early: bool = False
 
 
@@ -340,7 +340,7 @@ def add_refund_proof(
     actor: UserAccount = Depends(RETURNS_GUARD),
     db: Session = Depends(get_session),
 ) -> dict:
-    """Keep a photo of the payment on a paid refund (ADR 0080)."""
+    """Keep a photo of the payment on a paid refund (ADR 0082)."""
     from app.modules.inbox.public import StorageError
 
     content = file.file.read(returns.PROOF_MAX_BYTES + 1)

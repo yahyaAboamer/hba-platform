@@ -51,7 +51,7 @@ from app.modules.affiliates.services.compensation import set_terms
 from app.modules.affiliates.services.corrections import correction_for, resolve
 from app.modules.affiliates.services.payments import balance_for, credited_into, record_payment
 from app.modules.affiliates.services.payroll import approve_month, get_month
-from app.modules.affiliates.services.targets import record_actuals, set_requirements, verify
+from app.modules.affiliates.services.targets import record_actuals, set_requirements
 
 JUNE = "2026-06"
 JULY = "2026-07"
@@ -579,7 +579,6 @@ def test_a_qualified_guarantee_month_still_owes_what_it_was_agreed_at(db):
     )
     target = set_requirements(db, affiliate, AUGUST, videos=4, stories=8)
     record_actuals(db, target, videos=4, stories=8)
-    verify(db, target)
 
     _order(db, affiliate, "aug-most", 1_800_000, month=AUGUST)
     _order(db, affiliate, "aug-lost", 200_000, month=AUGUST)

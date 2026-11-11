@@ -127,7 +127,7 @@ export function MyTargets() {
       </section>
 
       {current.determines_pay ? (
-        <aside className={current.achieved && current.verified ? "mytargets__pay-note mytargets__pay-note--met" : "mytargets__pay-note"}>
+        <aside className={current.achieved ? "mytargets__pay-note mytargets__pay-note--met" : "mytargets__pay-note"}>
           <h2>How this affects your pay</h2>
           <p>{describeCurrentTargetPay(current)}</p>
         </aside>

@@ -24,7 +24,6 @@ from app.modules.affiliates.services.affiliates import create_affiliate
 from app.modules.affiliates.services.commission.calculate import (
     NO_TARGET,
     NO_TERMS,
-    TARGETS_UNVERIFIED,
     calculate_month,
 )
 from app.modules.affiliates.services.compensation import set_terms
@@ -424,20 +423,18 @@ def test_a_house_account_has_real_sales_and_is_owed_nothing(db):
 # -- The base guarantee, resolved ---------------------------------------------
 #
 # Section 9.5 pays max(commission, base amount) - but only when targets were
-# achieved **and** verified. Section 11.3's rule underneath it: missing
+# achieved (recording is the confirmation, ADR 0081). Section 11.3's rule underneath it: missing
 # information blocks a month, poor performance does not.
 
 
-def _target(db, affiliate, *, required=(8, 5), actual=None, verified=False):
-    from app.modules.affiliates.services.targets import record_actuals, set_requirements, verify
+def _target(db, affiliate, *, required=(8, 5), actual=None):
+    from app.modules.affiliates.services.targets import record_actuals, set_requirements
 
     target = set_requirements(
         db, affiliate, MONTH, videos=required[0], stories=required[1]
     )
     if actual is not None:
         record_actuals(db, target, videos=actual[0], stories=actual[1])
-        if verified:
-            verify(db, target)
     return target
 
 
@@ -452,13 +449,13 @@ def _guaranteed(db, affiliate, *, base=800_000, rate_bp=1000):
     )
 
 
-def test_achieved_and_verified_applies_the_guarantee(db):
+def test_achieved_applies_the_guarantee(db):
     """Their commission is 200 pounds; the guarantee is 8,000. They are paid the
     guarantee.
     """
     affiliate = _affiliate(db)
     _guaranteed(db, affiliate, base=800_000)
-    _target(db, affiliate, actual=(8, 5), verified=True)
+    _target(db, affiliate, actual=(8, 5))
     _earned(db, affiliate, "1", 200_000)
 
     result = calculate_month(db, affiliate, MONTH)
@@ -474,7 +471,7 @@ def test_the_guarantee_never_caps_a_higher_commission(db):
     """
     affiliate = _affiliate(db)
     _guaranteed(db, affiliate, base=800_000)
-    _target(db, affiliate, actual=(8, 5), verified=True)
+    _target(db, affiliate, actual=(8, 5))
     _earned(db, affiliate, "1", 20_000_000)
 
     result = calculate_month(db, affiliate, MONTH)
@@ -487,7 +484,7 @@ def test_the_guarantee_is_never_added_on_top(db):
     """max(commission, base), not commission + base."""
     affiliate = _affiliate(db)
     _guaranteed(db, affiliate, base=800_000)
-    _target(db, affiliate, actual=(8, 5), verified=True)
+    _target(db, affiliate, actual=(8, 5))
     _earned(db, affiliate, "1", 200_000)
 
     result = calculate_month(db, affiliate, MONTH)
@@ -502,7 +499,7 @@ def test_a_missed_target_pays_commission_and_approves(db):
     """
     affiliate = _affiliate(db)
     _guaranteed(db, affiliate, base=800_000)
-    _target(db, affiliate, required=(8, 5), actual=(8, 4), verified=True)
+    _target(db, affiliate, required=(8, 5), actual=(8, 4))
     _earned(db, affiliate, "1", 200_000)
 
     result = calculate_month(db, affiliate, MONTH)
@@ -540,31 +537,31 @@ def test_requirements_set_but_nothing_recorded_also_blocks(db):
     assert NO_TARGET in result.blockers
 
 
-def test_achieved_but_unverified_blocks(db):
-    """Verification is what unlocks the guarantee, not a formality. One person
-    recording a number that pays a guarantee is one person deciding what
-    somebody is owed.
+def test_a_recorded_met_target_releases_the_guarantee(db):
+    """ADR 0081: recording is the confirmation. A met month pays the floor
+    and approves; nothing waits on a second step.
     """
     affiliate = _affiliate(db)
     _guaranteed(db, affiliate)
-    _target(db, affiliate, actual=(8, 5), verified=False)
+    _target(db, affiliate, actual=(8, 5))
     _earned(db, affiliate, "1", 200_000)
 
     result = calculate_month(db, affiliate, MONTH)
 
     assert result.target_achieved is True
-    assert result.target_verified is False
-    assert TARGETS_UNVERIFIED in result.blockers
-    assert result.is_payable is False
+    assert result.guarantee_applied is True
+    assert result.blockers == []
+    assert result.is_payable is True
+    assert result.payout_piastres == 800_000
 
 
-def test_a_missed_target_needs_no_verification_to_approve(db):
-    """Section 11.3: recorded and not achieved is allowed. Requiring
-    verification of a miss would block a model for having a quiet month.
+def test_a_missed_target_approves(db):
+    """Section 11.3: recorded and not achieved is allowed. Blocking a miss
+    would block a model for having a quiet month.
     """
     affiliate = _affiliate(db)
     _guaranteed(db, affiliate)
-    _target(db, affiliate, required=(8, 5), actual=(1, 1), verified=False)
+    _target(db, affiliate, required=(8, 5), actual=(1, 1))
 
     result = calculate_month(db, affiliate, MONTH)
 
@@ -611,27 +608,29 @@ def test_a_fixed_salary_model_is_unaffected_too(db):
     assert result.payout_piastres == 500_000
 
 
-def test_re_recording_actuals_re_blocks_the_month(db):
-    """A correction clears the verification, so the guarantee stops applying
-    until somebody confirms the new numbers. That is the point of clearing it.
+def test_a_corrected_count_decides_the_guarantee_at_once(db):
+    """The recorded counts decide it (ADR 0081): correcting a met month to a
+    miss takes the floor away on the next calculation, and the month still
+    approves.
     """
     from app.modules.affiliates.services.targets import record_actuals
 
     affiliate = _affiliate(db)
     _guaranteed(db, affiliate)
-    target = _target(db, affiliate, actual=(8, 5), verified=True)
-    assert calculate_month(db, affiliate, MONTH).is_payable is True
+    target = _target(db, affiliate, actual=(8, 5))
+    assert calculate_month(db, affiliate, MONTH).guarantee_applied is True
 
-    record_actuals(db, target, videos=9, stories=6)
+    record_actuals(db, target, videos=1, stories=1)
 
     result = calculate_month(db, affiliate, MONTH)
-    assert TARGETS_UNVERIFIED in result.blockers
+    assert result.guarantee_applied is False
+    assert result.is_payable is True
 
 
 def test_a_guaranteed_house_account_is_still_owed_nothing(db):
     affiliate = _affiliate(db, "House", kind=AccountKind.HOUSE)
     _guaranteed(db, affiliate, base=800_000)
-    _target(db, affiliate, actual=(8, 5), verified=True)
+    _target(db, affiliate, actual=(8, 5))
 
     result = calculate_month(db, affiliate, MONTH)
 
@@ -643,13 +642,12 @@ def test_another_months_target_does_not_decide_this_one(db):
     """Each month stands alone. April's guarantee must not turn on May's
     posting.
     """
-    from app.modules.affiliates.services.targets import record_actuals, set_requirements, verify
+    from app.modules.affiliates.services.targets import record_actuals, set_requirements
 
     affiliate = _affiliate(db)
     _guaranteed(db, affiliate)
     other = set_requirements(db, affiliate, "2026-05", videos=8, stories=5)
     record_actuals(db, other, videos=8, stories=5)
-    verify(db, other)
 
     result = calculate_month(db, affiliate, MONTH)
 

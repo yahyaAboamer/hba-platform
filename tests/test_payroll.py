@@ -37,7 +37,7 @@ from app.modules.affiliates.services.payroll import (
     open_month,
     snapshots_for,
 )
-from app.modules.affiliates.services.targets import record_actuals, set_requirements, verify
+from app.modules.affiliates.services.targets import record_actuals, set_requirements
 
 MONTH = "2026-04"
 
@@ -328,7 +328,6 @@ def test_a_verified_target_approves_at_the_guarantee(db):
     )
     target = set_requirements(db, affiliate, MONTH, videos=8, stories=5)
     record_actuals(db, target, videos=8, stories=5)
-    verify(db, target)
     _order(db, affiliate, "1", 200_000)
 
     snapshot = approve_month(db, affiliate, MONTH)
@@ -587,7 +586,6 @@ def test_a_target_cannot_be_changed_after_approval(db):
     )
     target = set_requirements(db, affiliate, MONTH, videos=8, stories=5)
     record_actuals(db, target, videos=8, stories=5)
-    verify(db, target)
     _order(db, affiliate, "1", 200_000)
     approve_month(db, affiliate, MONTH)
 
@@ -812,3 +810,44 @@ def test_a_concurrent_approval_is_answered_rather_than_crashing(db, monkeypatch)
     # **The transaction is still usable.** That is the whole point of the
     # savepoint: the other nineteen models in the run still go through.
     assert _seen(db, affiliate) is not None
+
+
+def test_a_month_agreed_before_adr_0081_still_reads_unchanged():
+    """Snapshots agreed before confirmation was removed hashed a
+    `target_verified` flag. Today's fingerprint has no such key, so compared
+    alone every one of them would read *changed since approval* with nothing
+    behind it moved (review, 11 November 2026).
+
+    The old fingerprint is rebuilt here by hand, exactly as the code before
+    ADR 0081 wrote it, so the test does not lean on the function under test.
+    """
+    from app.modules.affiliates.services.commission.calculate import MonthCalculation
+    from app.modules.affiliates.services.payroll import (
+        agreed_source_unchanged,
+        content_hash,
+        source_version,
+    )
+
+    calculation = MonthCalculation(
+        affiliate_id=7, month="2026-08", compensation_type="base_guarantee",
+        commission_rate_bp=1000, base_amount_piastres=800_000, target_achieved=True,
+    )
+    for flag in (True, False):
+        before_0081 = content_hash({
+            "affiliate_id": 7, "month": "2026-08",
+            "compensation_type": "base_guarantee", "commission_rate_bp": 1000,
+            "fixed_piastres": calculation.fixed_piastres,
+            "base_amount_piastres": 800_000,
+            "target_achieved": True, "target_verified": flag,
+            "orders": [], "carried": [],
+        })[:16]
+        assert before_0081 != source_version(calculation, [])
+        assert agreed_source_unchanged(before_0081, calculation, [])
+
+    assert agreed_source_unchanged(source_version(calculation, []), calculation, [])
+    # Anything else that moved still reads as moved.
+    missed = MonthCalculation(
+        affiliate_id=7, month="2026-08", compensation_type="base_guarantee",
+        commission_rate_bp=1000, base_amount_piastres=800_000, target_achieved=False,
+    )
+    assert not agreed_source_unchanged(source_version(calculation, []), missed, [])

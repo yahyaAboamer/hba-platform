@@ -51,7 +51,7 @@ from app.modules.affiliates.services.payroll import (
     deductions_landing_on,
     source_version,
 )
-from app.modules.affiliates.services.targets import record_actuals, set_requirements, verify
+from app.modules.affiliates.services.targets import record_actuals, set_requirements
 
 AUGUST = "2026-08"
 SEPTEMBER = "2026-09"
@@ -350,7 +350,6 @@ def test_a_failed_sale_above_a_guarantee_costs_nothing(db):
     _order(db, affiliate, "2", 2_000_000)
     target = set_requirements(db, affiliate, AUGUST, videos=4, stories=8)
     record_actuals(db, target, videos=4, stories=8)
-    verify(db, target)
     db.flush()
 
     snapshot = approve_month(db, affiliate, AUGUST)
@@ -497,10 +496,8 @@ def test_a_whole_month_can_be_consumed_including_below_a_guarantee(db):
     )
     missed = set_requirements(db, affiliate, AUGUST, videos=4, stories=8)
     record_actuals(db, missed, videos=0, stories=0)
-    verify(db, missed)
     met = set_requirements(db, affiliate, SEPTEMBER, videos=4, stories=8)
     record_actuals(db, met, videos=4, stories=8)
-    verify(db, met)
     db.flush()
 
     _order(db, affiliate, "1", 9_000_000)
@@ -1291,7 +1288,6 @@ def test_a_guarantee_month_recovers_exactly_what_the_acceptance_check_says(
     )
     target = set_requirements(db, affiliate, AUGUST, videos=4, stories=8)
     record_actuals(db, target, videos=4 if met else 0, stories=8 if met else 0)
-    verify(db, target)
     db.flush()
 
     # EGP 2,100 of commission at 10% is EGP 21,000 of sales: EGP 19,000 that stays

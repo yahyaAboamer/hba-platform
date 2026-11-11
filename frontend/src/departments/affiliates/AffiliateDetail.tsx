@@ -811,7 +811,7 @@ export function AffiliateDetail({ session }: { session: Session }) {
                       >
                         guaranteed minimum
                       </Link>{" "}
-                      applies only in a month where these are met and confirmed.
+                      applies only in a month where these are met.
                     </>
                   ) : (
                     <>
