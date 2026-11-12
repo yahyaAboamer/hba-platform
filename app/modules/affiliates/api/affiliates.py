@@ -1250,6 +1250,29 @@ def affiliate_wardrobe_route(
     return wardrobe_for(db, affiliate.id)
 
 
+@router.get("/{affiliate_id}/wardrobe/orders")
+def affiliate_wardrobe_orders_route(
+    affiliate_id: int,
+    _actor: UserAccount = Depends(require_permission(Permission.AFFILIATES_VIEW)),
+    db: Session = Depends(get_session),
+) -> dict:
+    """The gift orders placed for her, for staff to check one was placed.
+
+    Staff-only: the model's own portal does not read it. Each order links to
+    its page in the Shopify admin, where it was placed and where it is fixed.
+    """
+    from app.modules.affiliates.services.wardrobe import wardrobe_orders_for
+    from app.shared.services.shopify.connection import effective
+    from app.shared.services.stale import admin_url
+
+    affiliate = _get_affiliate_or_404(db, affiliate_id)
+    domain = effective(db).shop_domain
+    orders = wardrobe_orders_for(db, affiliate.id)
+    for order in orders:
+        order["admin_url"] = admin_url(domain, order["shopify_order_id"])
+    return {"orders": orders}
+
+
 @router.get("/{affiliate_id}/orders/{month}")
 def affiliate_orders_route(
     affiliate_id: int,

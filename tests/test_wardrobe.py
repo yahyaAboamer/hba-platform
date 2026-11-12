@@ -726,3 +726,114 @@ def test_a_product_nobody_has_is_absent_rather_than_zero(db):
 
     assert coverage_for(db, [PANTS]) == {}
     assert coverage_for(db, []) == {}
+
+
+# ── The orders placed for her ─────────────────────────────────────────────────
+
+
+def test_her_gift_orders_are_listed_one_per_order_newest_first(db):
+    """Staff check that an order was placed for her: one row per order,
+    with every piece it carried, the latest order on top."""
+    from app.modules.affiliates.services.wardrobe import wardrobe_orders_for
+
+    nour = _model(db)
+    _product(db, TSHIRT, "White tee")
+    _product(db, PANTS, "Wide-leg trousers")
+    _parcel(
+        db,
+        nour,
+        "6001",
+        [(TSHIRT, "White tee", "M"), (PANTS, "Wide-leg trousers", "L")],
+        delivery="delivered",
+        placed="2026-08-01",
+    )
+    _parcel(db, nour, "6002", [(PANTS, "Wide-leg trousers", "M")], delivery="in_transit", placed="2026-09-03")
+
+    orders = wardrobe_orders_for(db, nour.id)
+
+    assert [order["order_number"] for order in orders] == ["#6002", "#6001"]
+    assert orders[0]["state"] == PROCESSING
+    assert orders[1]["state"] == RECEIVED
+    assert orders[0]["placed_at"].startswith("2026-09-03")
+    assert sorted(item["title"] for item in orders[1]["items"]) == ["White tee", "Wide-leg trousers"]
+    assert {item["size"] for item in orders[1]["items"]} == {"M", "L"}
+
+
+def test_an_order_she_paid_for_is_not_in_her_gift_orders(db):
+    """D05: the list is the wardrobe's orders, so a purchase - including one
+    with her own discount code - is not one of them."""
+    from app.modules.affiliates.services.wardrobe import wardrobe_orders_for
+
+    nour = _model(db)
+    _parcel(db, nour, "6101", [(TSHIRT, "White tee", "M")], classification=Classification.PURCHASE, original=90000)
+    _parcel(db, nour, "6102", [(PANTS, "Wide-leg trousers", "M")], original=None, classification=Classification.UNKNOWN)
+
+    assert wardrobe_orders_for(db, nour.id) == []
+
+
+def test_another_models_orders_are_not_hers(db):
+    from app.modules.affiliates.services.wardrobe import wardrobe_orders_for
+
+    nour = _model(db)
+    salma = _model(db, name="Salma", email="salma@example.com")
+    _parcel(db, salma, "6201", [(TSHIRT, "White tee", "M")])
+
+    assert wardrobe_orders_for(db, nour.id) == []
+    assert [order["order_number"] for order in wardrobe_orders_for(db, salma.id)] == ["#6201"]
+
+
+def test_a_cancelled_order_says_cancelled_not_on_its_way(db):
+    from app.modules.affiliates.services.wardrobe import CANCELLED, wardrobe_orders_for
+
+    nour = _model(db)
+    _parcel(db, nour, "6301", [(TSHIRT, "White tee", "M")], delivery=None)
+    db.execute(text("UPDATE order_index SET cancelled_at = now() WHERE shopify_order_id = '6301'"))
+    db.flush()
+
+    [order] = wardrobe_orders_for(db, nour.id)
+    assert order["state"] == CANCELLED
+
+
+def test_a_failed_delivery_is_listed_as_failed(db):
+    from app.modules.affiliates.services.wardrobe import wardrobe_orders_for
+
+    nour = _model(db)
+    _parcel(db, nour, "6401", [(TSHIRT, "White tee", "M")], delivery="failed")
+
+    [order] = wardrobe_orders_for(db, nour.id)
+    assert order["state"] == FAILED
+
+
+def test_the_profile_route_lists_her_gift_orders_for_staff_only(fresh_database):
+    from fastapi.testclient import TestClient
+
+    from app.db import SessionLocal
+    from app.main import app
+
+    with TestClient(app) as client:
+        assert client.get("/api/affiliates/1/wardrobe/orders").status_code in (401, 403)
+
+        signed_in = client.post(
+            "/api/auth/bootstrap",
+            json={
+                "email": "owner@example.com",
+                "display_name": "Owner",
+                "password": "quiet-harbour-lantern",
+            },
+        )
+        client.headers["X-CSRF-Token"] = signed_in.json()["csrf"]
+
+        with SessionLocal() as db:
+            nour = _model(db)
+            _parcel(db, nour, "6501", [(TSHIRT, "White tee", "M")])
+            db.commit()
+            nour_id = nour.id
+
+        answer = client.get(f"/api/affiliates/{nour_id}/wardrobe/orders")
+        assert answer.status_code == 200, answer.text
+        [order] = answer.json()["orders"]
+        assert order["order_number"] == "#6501"
+        assert order["state"] == RECEIVED
+        assert "admin_url" in order
+
+        assert client.get("/api/affiliates/999999/wardrobe/orders").status_code == 404
