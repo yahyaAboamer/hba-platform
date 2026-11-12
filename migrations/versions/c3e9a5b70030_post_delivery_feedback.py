@@ -10,6 +10,8 @@ ADR 0083. Two new tables and nothing else; no existing table is touched.
   reads it.
 - `feedback_settings`: one row at most. `started_at` is when the feature
   first ran switched on, so nothing delivered earlier is ever asked.
+  `discount_gid` is Shopify's id for the one discount every reward code lives
+  in (batch B; made by the code the first time a code is needed).
 
 The settings row is made by the code on first use, not here.
 
@@ -44,6 +46,7 @@ def upgrade() -> None:
         sa.Column("started_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("review_url", sa.Text(), nullable=True),
         sa.Column("reply_hours", sa.Integer(), server_default="24", nullable=False),
+        sa.Column("discount_gid", sa.Text(), nullable=True),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.CheckConstraint("id = 1", name="feedback_settings_single_row"),
         sa.CheckConstraint("reply_hours > 0", name="feedback_settings_reply_hours_positive"),
@@ -81,10 +84,12 @@ def upgrade() -> None:
         sa.Column("solved_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("reopened_count", sa.Integer(), server_default="0", nullable=False),
         sa.Column("code", sa.String(length=40), nullable=True),
+        sa.Column("code_gid", sa.String(length=120), nullable=True),
         sa.Column("code_sent_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("code_expires_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("code_used_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("code_order_name", sa.String(length=40), nullable=True),
+        sa.Column("code_removed_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("step", sa.String(length=10), server_default="rating", nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
@@ -99,6 +104,7 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("shopify_order_id"),
         sa.UniqueConstraint("wa_message_id"),
+        sa.UniqueConstraint("code"),
     )
     op.create_index(
         "feedback_survey_due", "feedback_survey", ["next_attempt_at"],
@@ -118,9 +124,18 @@ def upgrade() -> None:
         [sa.literal_column("delivered_at DESC NULLS LAST"), sa.literal_column("id DESC")],
         unique=False,
     )
+    op.create_index(
+        "feedback_survey_code_open", "feedback_survey", ["code_expires_at"],
+        unique=False,
+        postgresql_where=sa.text("code IS NOT NULL AND code_used_at IS NULL AND code_removed_at IS NULL"),
+    )
 
 
 def downgrade() -> None:
+    op.drop_index(
+        "feedback_survey_code_open", table_name="feedback_survey",
+        postgresql_where=sa.text("code IS NOT NULL AND code_used_at IS NULL AND code_removed_at IS NULL"),
+    )
     op.drop_index("feedback_survey_delivered", table_name="feedback_survey")
     op.drop_index(
         "feedback_survey_follow_up", table_name="feedback_survey",

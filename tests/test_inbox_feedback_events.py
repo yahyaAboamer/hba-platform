@@ -608,13 +608,14 @@ def test_the_reply_handlers_do_nothing_with_the_flag_off(db, world, monkeypatch)
 
 
 def test_the_closing_words_are_built_in_one_place_with_a_seam_for_her_code(db, world, monkeypatch):
-    """Today no code is issued; the batch that issues them changes only
-    ``issue_code`` (and the words)."""
-    assert feedback_replies.issue_code(db, world.row) is None
+    """The code is issued by ``issue_code`` alone; the words by ``closing_text``.
+    (The codes themselves are tested in ``test_inbox_feedback_codes``.)"""
     cfg = feedback.get_settings(db)
-    assert feedback_replies.closing_text(world.row, cfg) == feedback.CLOSING
+    assert feedback_replies.closing_text(world.row, cfg) == (
+        feedback.THANKS + "\n\n" + feedback.INVITATION
+    )
 
-    monkeypatch.setattr(feedback_replies, "issue_code", lambda _db, _survey: "THANKS-7K2Q")
+    monkeypatch.setattr(feedback_replies, "issue_code", lambda _db, _survey, **_: "THANKS-7K2Q")
     _rated(world, db, "loved", "quality")
     closing = world.asked[1]["text"]["body"]
     assert "THANKS-7K2Q" in closing and "just reply here" in closing

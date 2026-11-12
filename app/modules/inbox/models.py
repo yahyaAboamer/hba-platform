@@ -446,6 +446,15 @@ class FeedbackSurvey(Base):
         ),
         # The Feedback sheet, newest delivery first.
         Index("feedback_survey_delivered", text("delivered_at DESC NULLS LAST"), text("id DESC")),
+        # Codes still out there: what the used-or-not pass and the 30-day
+        # clean-up read (a code on its way back to nothing is not in it).
+        Index(
+            "feedback_survey_code_open",
+            "code_expires_at",
+            postgresql_where=text(
+                "code IS NOT NULL AND code_used_at IS NULL AND code_removed_at IS NULL"
+            ),
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -495,12 +504,21 @@ class FeedbackSurvey(Base):
     solved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     reopened_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
 
-    # Her reward (filled in by the code batch).
-    code: Mapped[str | None] = mapped_column(String(40))
+    # Her reward: one code inside the platform's one Shopify discount.
+    #: Unique among surveys. Shopify treats codes without regard to case; ours
+    #: are issued in capitals.
+    code: Mapped[str | None] = mapped_column(String(40), unique=True)
+    #: Shopify's id for the code inside the discount (``DiscountRedeemCode``),
+    #: which removing it needs. Null until Shopify has finished adding it.
+    code_gid: Mapped[str | None] = mapped_column(String(120))
+    #: When the message carrying the code was sent. Not when it was issued.
     code_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     code_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    #: When the order that used it was placed, and that order's name.
     code_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     code_order_name: Mapped[str | None] = mapped_column(String(40))
+    #: When an unused code past its 30 days was taken out of Shopify.
+    code_removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     step: Mapped[str] = mapped_column(String(10), nullable=False, server_default="rating")
     created_at: Mapped[datetime] = mapped_column(
@@ -516,7 +534,8 @@ class FeedbackSettings(Base):
 
     ``started_at`` is when the feature first ran switched on: nothing
     delivered before it is ever asked. ``review_url`` and ``reply_hours`` are
-    what the closing messages say.
+    what the closing messages say. ``discount_gid`` is Shopify's id for the one
+    discount every reward code lives in (``feedback_codes.ensure_discount``).
     """
 
     __tablename__ = "feedback_settings"
@@ -529,6 +548,8 @@ class FeedbackSettings(Base):
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     review_url: Mapped[str | None] = mapped_column(Text)
     reply_hours: Mapped[int] = mapped_column(Integer, nullable=False, server_default="24")
+    #: Shopify's id for the one discount every reward code lives in.
+    discount_gid: Mapped[str | None] = mapped_column(Text)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )

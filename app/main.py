@@ -56,6 +56,7 @@ from app.modules.affiliates.services.commission import backfill as _backfill  # 
 from app.modules.inbox.services import confirmations as _inbox_confirmations  # noqa: F401  (registers handlers)
 from app.modules.inbox.services import events as _inbox_events  # noqa: F401  (registers handlers)
 from app.modules.inbox.services import feedback as _inbox_feedback  # noqa: F401  (registers handlers)
+from app.modules.inbox.services import feedback_codes as _inbox_feedback_codes  # noqa: F401  (registers handlers)
 from app.modules.inbox.services import feedback_replies as _inbox_feedback_replies  # noqa: F401  (registers handlers)
 from app.modules.inbox.services import media as _inbox_media  # noqa: F401  (registers handlers)
 from app.modules.inbox.services import outbound as _inbox_outbound  # noqa: F401  (registers handlers)

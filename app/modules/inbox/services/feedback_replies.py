@@ -44,12 +44,13 @@ from app.modules.inbox.models import (
     InboxConversation,
     InboxMessage,
 )
-from app.modules.inbox.services import feedback, outbound, sending
+from app.modules.inbox.services import feedback, feedback_codes, outbound, sending
 from app.modules.inbox.services.events import _conversation, _phone
 from app.modules.inbox.services.meta import MetaClient, MetaError
 from app.modules.inbox.services.outbound import NotSent, send_buttons, send_list, send_text
 from app.shared.services.audit import record_audit
-from app.shared.services.jobs import JobKind, PermanentFailure, enqueue
+from app.shared.models.integration import BackgroundJob
+from app.shared.services.jobs import JobKind, JobStatus, PermanentFailure, enqueue
 from app.worker import register_handler
 
 logger = logging.getLogger(__name__)
@@ -212,24 +213,34 @@ def get_settings(db: Session) -> FeedbackSettings:
     return feedback.get_settings(db)
 
 
-def issue_code(db: Session, survey: FeedbackSurvey) -> str | None:
-    """**The seam the codes batch fills in.** Her reward code, or None.
-
-    Called by the closing message (``send_closing``) just before it is built.
-    Today there are no codes, so it returns None. The batch that makes them
-    puts the Shopify call here, and must make it safe to call twice for one
-    survey (return the code already on the row).
-    """
-    return None
+def issue_code(
+    db: Session, survey: FeedbackSurvey, *, final_attempt: bool = False
+) -> str | None:
+    """Her reward code, or None (``feedback_codes.issue_code``, which says
+    how and why). Called by the closing message (``send_closing``) just before
+    it is built. Safe to call twice for one survey: it returns the code she
+    already has."""
+    return feedback_codes.issue_code(db, survey, final_attempt=final_attempt)
 
 
 def closing_text(survey: FeedbackSurvey, cfg: FeedbackSettings, code: str | None = None) -> str:
-    """The last message: thanks, her code if she has one, and the invitation to
-    say anything we could do better. One function, so the codes batch changes
-    the closing words in one place."""
-    lines = [feedback.CLOSING]
+    """The last message, in the wording of ``feedback``'s constants: thanks;
+    her code if she has one; the review link if she loved it and one is set;
+    the invitation to write - not for an unhappy customer, whose follow-up was
+    a person's. One function, so the closing words are changed in one place.
+    Without a code the code line is simply absent."""
+    lines = [feedback.THANKS]
     if code:
-        lines.insert(1, feedback.CODE_LINE.format(code=code))
+        lines.append(
+            feedback.CODE_LINE.format(
+                percent=feedback.DISCOUNT_PERCENT, code=code, days=feedback.CODE_DAYS
+            )
+        )
+    review_url = (cfg.review_url or "").strip()
+    if survey.rating == "loved" and review_url:
+        lines.append(feedback.REVIEW_LINE.format(url=review_url))
+    if survey.rating != "unhappy":
+        lines.append(feedback.INVITATION)
     return "\n\n".join(lines)
 
 
@@ -243,12 +254,21 @@ def send_closing(
     conversation: InboxConversation,
     reference: str,
     client: MetaClient | None,
+    *,
+    final_attempt: bool = False,
 ):
-    code = issue_code(db, survey)
+    """Thank her, with her code if one can be issued. **The thank-you does not
+    wait on Shopify**: a code that cannot be issued is left out and the survey
+    says why (``issue_code``). ``code_sent_at`` is set only if the message
+    carrying the code was really sent."""
+    code = issue_code(db, survey, final_attempt=final_attempt)
     words = closing_text(survey, get_settings(db), code)
-    return send_text(
+    message = send_text(
         db, conversation, words, origin="automatic", source_ref=reference, client=client
     )
+    if code and message.status != "failed":
+        feedback_codes.code_sent(survey)
+    return message
 
 
 def queue_reply(db: Session, message_id: int) -> None:
@@ -261,7 +281,11 @@ def queue_reply(db: Session, message_id: int) -> None:
 
 
 def reply(
-    db: Session, message_id: int, client: MetaClient | None = None
+    db: Session,
+    message_id: int,
+    client: MetaClient | None = None,
+    *,
+    final_attempt: bool = False,
 ) -> InboxMessage | None:
     """Answer one tap on a feedback question. At most one message per tap.
 
@@ -269,6 +293,10 @@ def reply(
     one already answered, nothing to send after it (*No, not solved*), her 24
     hours closed, or a customer this server may not message. The reply is
     stored under the tap's own id, so a job run twice cannot answer twice.
+
+    ``final_attempt`` is the job's last try at a reward code: until then a
+    Shopify error that may pass is raised, so the whole reply is tried again
+    (nothing has been sent yet); on the last try she is thanked without a code.
     """
     tap = db.get(InboxMessage, message_id)
     if tap is None or tap.direction != "in" or tap.kind != "button" or not tap.wa_message_id:
@@ -286,7 +314,9 @@ def reply(
     conversation = db.get(InboxConversation, tap.conversation_id)
 
     try:
-        message = _next_message(db, parsed, survey, conversation, reference, client)
+        message = _next_message(
+            db, parsed, survey, conversation, reference, client, final_attempt
+        )
     except NotSent:
         # Sending is off, this server may not message her, or her 24 hours
         # have closed. Say nothing.
@@ -307,6 +337,7 @@ def _next_message(
     conversation: InboxConversation,
     reference: str,
     client: MetaClient | None,
+    final_attempt: bool = False,
 ) -> InboxMessage | None:
     """Send what follows this tap, or return None if nothing does."""
     if parsed.step == "rating":
@@ -324,7 +355,9 @@ def _next_message(
                 db, conversation, support_text(get_settings(db)),
                 origin="automatic", source_ref=reference, client=client,
             )
-        return send_closing(db, survey, conversation, reference, client)
+        return send_closing(
+            db, survey, conversation, reference, client, final_attempt=final_attempt
+        )
     if parsed.step == "solved":
         if parsed.value != "yes":
             return None
@@ -334,7 +367,9 @@ def _next_message(
             origin="automatic", source_ref=reference, client=client,
         )
     # reorder
-    return send_closing(db, survey, conversation, reference, client)
+    return send_closing(
+        db, survey, conversation, reference, client, final_attempt=final_attempt
+    )
 
 
 # ── A person presses Resolved ─────────────────────────────────────────────────
@@ -624,7 +659,25 @@ def _handle_reply(db: Session, payload: dict) -> None:
         )
     if not feedback.enabled():
         return
-    reply(db, message_id)
+    reply(db, message_id, final_attempt=_final_code_attempt(db, message_id))
+
+
+def _final_code_attempt(db: Session, message_id: int) -> bool:
+    """Whether this is the reply job's last try at her reward code.
+
+    The job's own count of failed tries is the only thing that survives a
+    failed run (the run's own writes are rolled back), so it is read from the
+    job's row: its key is this tap's. Not found (run by hand, in a test) is
+    the last try - nobody is coming back to try again.
+    """
+    failed = db.scalar(
+        select(BackgroundJob.attempts).where(
+            BackgroundJob.kind == JobKind.INBOX_FEEDBACK_REPLY,
+            BackgroundJob.dedupe_key == f"{JobKind.INBOX_FEEDBACK_REPLY}:{message_id}",
+            BackgroundJob.status == JobStatus.RUNNING,
+        )
+    )
+    return failed is None or failed + 1 >= feedback_codes.CODE_ATTEMPTS
 
 
 @register_handler(JobKind.INBOX_FEEDBACK_ASK_SOLVED)

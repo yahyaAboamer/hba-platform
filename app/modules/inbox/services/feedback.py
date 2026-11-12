@@ -105,12 +105,22 @@ REASONS = {
     ),
 }
 
-#: After a happy or middling customer's reason (code and link: the codes batch).
-CLOSING = (
-    "Thank you for your feedback, it really helps us. "
-    "If there is anything we could do better, just reply here."
+#: The reward (ADR 0083, point 5): this much off the whole order, one code
+#: each, good for this many days. The discount's title and the code line both
+#: read these, so the words and what Shopify holds cannot drift apart.
+DISCOUNT_PERCENT = 20
+CODE_DAYS = 30
+
+#: The last message, in this order: thanks; her code if she has one; the
+#: review link if she loved it and one is set; the invitation to write (not
+#: for an unhappy customer, whose follow-up was done by a person).
+THANKS = "Thank you for your feedback, it really helps us."
+CODE_LINE = (
+    "Here is {percent}% off your next order: {code}. "
+    "It is yours alone and works once, for {days} days."
 )
-CODE_LINE = "Here is your code for 20% off your next order: {code}"
+REVIEW_LINE = "We'd love a review: {url}"
+INVITATION = "If there is anything we could do better, just reply here."
 #: After an unhappy customer's reason. ``{hours}`` is the promised time.
 SUPPORT = (
     "Thank you for telling us. A member of our team will message you here "
@@ -492,8 +502,12 @@ def sweep(
     if interrupted:
         logger.warning("%s feedback questions were interrupted while sending", interrupted)
     # Imported here: the replies build on this module.
-    from app.modules.inbox.services import feedback_replies
+    from app.modules.inbox.services import feedback_codes, feedback_replies
 
+    # Rewards that were spent since the last pass: one query, no Shopify.
+    spent = feedback_codes.mark_used(db)
+    if spent:
+        logger.info("%s feedback codes were used", spent)
     if feedback_replies.recover_interrupted_solved(db, now):
         logger.warning("solved questions were interrupted while sending")
     requeued = requeue_stale_pending(db, now)

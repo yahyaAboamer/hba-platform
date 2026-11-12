@@ -153,6 +153,9 @@ class JobKind:
     #: Ask an unhappy customer, a day after a person pressed Resolved,
     #: whether her issue was solved.
     INBOX_FEEDBACK_ASK_SOLVED = "inbox_feedback_ask_solved"
+    #: Take a reward code nobody used out of Shopify once its 30 days are up
+    #: (ADR 0083, point 5). Scheduled daily.
+    INBOX_FEEDBACK_EXPIRE_CODES = "inbox_feedback_expire_codes"
 
 
 #: The inbox's work (ADR 0059) runs in a lane of its own too: a WhatsApp outage
@@ -174,6 +177,7 @@ INBOX_WORK = frozenset(
         JobKind.INBOX_FEEDBACK_SEND,
         JobKind.INBOX_FEEDBACK_REPLY,
         JobKind.INBOX_FEEDBACK_ASK_SOLVED,
+        JobKind.INBOX_FEEDBACK_EXPIRE_CODES,
     }
 )
 
