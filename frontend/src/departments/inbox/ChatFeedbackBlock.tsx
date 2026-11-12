@@ -101,7 +101,9 @@ export function ChatFeedbackBlock({
         {feedback.comment && (
           <>
             <dt>She wrote</dt>
-            <dd className="inbox-fb-block__said">{feedback.comment}</dd>
+            <dd className="inbox-fb-block__said" dir="auto">
+              {feedback.comment}
+            </dd>
           </>
         )}
         {feedback.reorder && (
@@ -136,9 +138,8 @@ export function ChatFeedbackBlock({
         <p className="inbox-order__why">Solved: {feedback.solved ? "yes" : "no"}</p>
       )}
       {note && <p className="inbox-order__hint">{note}.</p>}
-      {feedback.last_error && (
-        <p className="inbox-order__hint">The last message to her could not be sent: {feedback.last_error}</p>
-      )}
+      {/* The platform's own sentence ("The question … could not be sent: …"), so nothing is put in front of it. */}
+      {feedback.last_error && <p className="inbox-order__hint">{feedback.last_error}</p>}
 
       {canResolve && (
         <>

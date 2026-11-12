@@ -902,7 +902,7 @@ describe("delivery feedback in the list of chats", () => {
     expect(await screen.findByText("Nobody needs a follow-up.")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Feedback: okay" }));
-    expect(await screen.findByText("Nobody has answered “It was okay”.")).toBeTruthy();
+    expect(await screen.findByText("Nobody has answered “It was okay” in the last 14 days.")).toBeTruthy();
   });
 
   it("opens on the view the address names, which is where Today sends people", async () => {
@@ -994,7 +994,8 @@ describe("delivery feedback beside the chat", () => {
     expect(fb.getByText("#7002")).toBeTruthy();
     expect(fb.getByText("Not happy")).toBeTruthy();
     expect(fb.getByText("Size / fit")).toBeTruthy();
-    expect(fb.getByText("Too small")).toBeTruthy();
+    // Her own words, in whatever script she wrote: read in their own direction.
+    expect(fb.getByText("Too small").getAttribute("dir")).toBe("auto");
     expect(fb.getByText("Needs follow-up")).toBeTruthy();
     expect(fb.getByText("She will be asked tomorrow whether her issue was solved.")).toBeTruthy();
     expect(fb.getByRole("button", { name: "Resolved" })).toBeTruthy();
@@ -1115,7 +1116,8 @@ describe("delivery feedback beside the chat", () => {
     const fb = await block();
     expect(fb.getByText("Reopened: she said her issue was not solved.")).toBeTruthy();
     expect(fb.getByText("Solved: no")).toBeTruthy();
-    expect(fb.getByText("The last message to her could not be sent: WhatsApp was not answering")).toBeTruthy();
+    // The platform's own sentence, with nothing put in front of it.
+    expect(fb.getByText("WhatsApp was not answering")).toBeTruthy();
     expect(fb.getByText("Could not be sent.")).toBeTruthy();
     // Waiting on a person again.
     expect(fb.getByRole("button", { name: "Resolved" })).toBeTruthy();

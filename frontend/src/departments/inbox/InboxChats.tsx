@@ -54,7 +54,7 @@ const EMPTY: Record<ViewKey, string> = {
   edit: "Nobody is waiting on a change.",
   cancelled: "Nobody has asked to cancel.",
   follow_up: "Nobody needs a follow-up.",
-  neutral: "Nobody has answered “It was okay”.",
+  neutral: "Nobody has answered “It was okay” in the last 14 days.",
 };
 
 /** The small word beside a name when her delivery feedback needs a look. */
@@ -86,7 +86,7 @@ function olderThan(page: Page, loaded: Conversation[]): Conversation[] {
 }
 
 function useChatList(view: ViewKey, q: string) {
-  const { setUnread } = useInbox();
+  const { setUnread, setFollowUp } = useInbox();
   const [chats, setChats] = useState<Conversation[] | null>(null);
   const [counts, setCounts] = useState<Counts | null>(null);
   const [failed, setFailed] = useState(false);
@@ -122,12 +122,13 @@ function useChatList(view: ViewKey, q: string) {
         if (older.length === 0) setMore(page.next);
         setCounts(page.counts);
         setUnread(page.counts.unread);
+        if (page.counts.follow_up !== undefined) setFollowUp(page.counts.follow_up);
         setFailed(false);
       })
       .catch(() => {
         if (question === asked.current) setFailed(true);
       });
-  }, [address, setUnread]);
+  }, [address, setUnread, setFollowUp]);
 
   useEffect(() => {
     asked.current += 1;

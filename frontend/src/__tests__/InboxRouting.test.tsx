@@ -90,6 +90,17 @@ describe("customer service", () => {
     expect(chats.textContent).not.toContain("follow-up");
   });
 
+  it("shows a newer follow-up number at once when the chat list reads one (Resolved was pressed)", async () => {
+    window.history.pushState({}, "", "/inbox/chats");
+    // The sidebar's own read is 30 seconds old and says 2; the list says 1.
+    serve(sessionOf("customer_service"), { followUp: 2, listFollowUp: 1 });
+    render(<App />);
+
+    const feedback = await screen.findByRole("link", { name: /^Feedback/ });
+    await waitFor(() => expect(feedback.textContent).toContain("1 customer needs a follow-up"));
+    expect(feedback.textContent).not.toContain("2 customers");
+  });
+
   it("says nothing beside Feedback when nobody needs a follow-up", async () => {
     serve(sessionOf("customer_service"), { followUp: 0 });
     render(<App />);

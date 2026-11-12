@@ -364,6 +364,8 @@ export type FeedbackPage = {
   next_offset: number | null;
   summary: FeedbackSummary;
   options: FeedbackOptions;
+  /** Whether the questions are being sent at all (the feature's switch on the server). */
+  enabled: boolean;
 };
 
 /** The feature's switch and settings (`GET /api/inbox/feedback/settings`). */

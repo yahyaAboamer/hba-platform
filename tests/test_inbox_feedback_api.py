@@ -161,7 +161,18 @@ def test_the_sheet_lists_asked_orders_newest_question_first(client, sheet):
         "#7006", "#7005", "#7002", "#7001", "#7003", "#7004",
     ]
     assert body["next_offset"] is None
-    assert set(body) == {"rows", "next_offset", "summary", "options"}
+    assert set(body) == {"rows", "next_offset", "summary", "options", "enabled"}
+
+
+def test_the_sheet_says_whether_the_questions_are_being_sent(client, sheet, monkeypatch):
+    """The screen reads the switch from the sheet itself, so it needs no second
+    read, and none that asks Shopify."""
+    monkeypatch.setattr("app.config.settings.inbox_feedback_enabled", True)
+    assert client.get("/api/inbox/feedback").json()["enabled"] is True
+    monkeypatch.setattr("app.config.settings.inbox_feedback_enabled", False)
+    assert client.get("/api/inbox/feedback").json()["enabled"] is False
+    # Every page carries it, and a narrowed one too.
+    assert client.get("/api/inbox/feedback", params={"offset": 4, "rating": "loved"}).json()["enabled"] is False
 
 
 def test_one_row_has_everything_the_screen_needs(client, sheet):

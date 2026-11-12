@@ -78,6 +78,8 @@ export type Answers = {
   unread?: number | null;
   /** Unhappy customers still waiting for a person to follow up, or null when the server could not read it. */
   followUp?: number | null;
+  /** What the chat list itself counts as needing a follow-up (it reads far more often than the sidebar). */
+  listFollowUp?: number;
   /** The two Affiliates numbers, or null when they could not be read. */
   counts?: Record<string, number> | null;
   /** Operations sources, by how their latest read went; null for none read. */
@@ -141,12 +143,20 @@ export function serve(me: unknown, answers: Answers = {}) {
         return answers.today === "failed" ? reply(500, { detail: "No" }) : reply(200, todayBody(me as Session, answers));
       }
       if (url.includes("/api/inbox/conversations")) {
-        return reply(200, { conversations: [], next: null, counts: { all: 0, unread: answers.unread ?? 4, edit: 0 } });
+        return reply(200, {
+          conversations: [],
+          next: null,
+          counts: {
+            all: 0,
+            unread: answers.unread ?? 4,
+            edit: 0,
+            ...(answers.listFollowUp === undefined ? {} : { follow_up: answers.listFollowUp }),
+          },
+        });
       }
       if (url.includes("/api/inbox/health")) {
         return reply(200, { connected: true, sending: true, last_heard_at: null, quiet_since: null });
       }
-      if (url.includes("/api/inbox/feedback/settings")) return reply(200, { enabled: true });
       if (url.includes("/api/inbox/feedback")) {
         return reply(200, {
           rows: [],
@@ -156,6 +166,7 @@ export function serve(me: unknown, answers: Answers = {}) {
             needs_follow_up: 0, solved: 0, codes_sent: 0, codes_used: 0,
           },
           options: { couriers: [], ratings: [], reasons: {}, states: [] },
+          enabled: true,
         });
       }
       if (url.includes("/api/inbox/confirmations")) {

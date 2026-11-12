@@ -9,7 +9,6 @@ import type {
   FeedbackPage,
   FeedbackRating,
   FeedbackRow,
-  FeedbackSettings,
   FeedbackSummary,
 } from "../../lib/inbox";
 import { OpsIcon, dayAndTime, dayMonth, useIsNarrow } from "../../components/OpsSource";
@@ -207,17 +206,33 @@ function Code({ row }: { row: FeedbackRow }) {
   );
 }
 
-/** What she wrote: two lines, the whole of it on a tap and as a tooltip. */
-function Comment({ text }: { text: string | null }) {
+/**
+ * What she wrote: two lines, the whole of it on a tap and as a tooltip. It is
+ * her own words, in any script, so each line reads in its own direction.
+ * `order` says whose comment the button opens, for a screen reader that hears
+ * every one of them in turn.
+ */
+function Comment({ text, order }: { text: string | null; order?: string | null }) {
   const [open, setOpen] = useState(false);
   if (!text) return <span className="ops-muted">—</span>;
+  const whose = order ? ` of the comment on ${order}` : " of the comment";
   return (
     <>
-      <span className={open ? "inbox-fb__comment inbox-fb__comment--open" : "inbox-fb__comment"} title={text}>
+      <span
+        className={open ? "inbox-fb__comment inbox-fb__comment--open" : "inbox-fb__comment"}
+        dir="auto"
+        title={text}
+      >
         {text}
       </span>
       {text.length > LONG_COMMENT && (
-        <button type="button" className="ops-linkbtn inbox-fb__more" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <button
+          type="button"
+          className="ops-linkbtn inbox-fb__more"
+          aria-expanded={open}
+          aria-label={`${open ? "Show less" : "Show all"}${whose}`}
+          onClick={() => setOpen(!open)}
+        >
           {open ? "Show less" : "Show all"}
         </button>
       )}
@@ -233,7 +248,9 @@ function Note({ row }: { row: FeedbackRow }) {
 function Customer({ row }: { row: FeedbackRow }) {
   return (
     <>
-      <span className="inbox-fb__name">{row.customer_name?.trim() || <span className="ops-muted">No name</span>}</span>
+      <span className="inbox-fb__name" dir="auto">
+        {row.customer_name?.trim() || <span className="ops-muted">No name</span>}
+      </span>
       <span className="inbox-fb__line ops-muted num">{formatPhone(row.phone) || "—"}</span>
     </>
   );
@@ -245,7 +262,7 @@ function Products({ row }: { row: FeedbackRow }) {
   const products = productsOf(row);
   if (!products) return <span className="ops-muted">—</span>;
   return (
-    <span className="inbox-fb__products" title={products}>
+    <span className="inbox-fb__products" dir="auto" title={products}>
       {products}
     </span>
   );
@@ -280,22 +297,22 @@ function SheetTable({ rows, options }: { rows: FeedbackRow[]; options: FeedbackO
               <td>
                 <Customer row={row} />
               </td>
-              <td className="num">{row.order_name ?? row.order_id}</td>
+              <td className="num inbox-fb__nowrap">{row.order_name ?? row.order_id}</td>
               <td>
                 <Products row={row} />
               </td>
-              <td>{row.courier ?? <span className="ops-muted">—</span>}</td>
-              <td>
+              <td className="inbox-fb__nowrap">{row.courier ?? <span className="ops-muted">—</span>}</td>
+              <td className="inbox-fb__nowrap">
                 <Answer row={row} />
               </td>
-              <td>{reasonTitle(row, options) ?? <span className="ops-muted">—</span>}</td>
+              <td className="inbox-fb__nowrap">{reasonTitle(row, options) ?? <span className="ops-muted">—</span>}</td>
               <td className="inbox-fb__commentcell">
-                <Comment text={row.comment} />
+                <Comment text={row.comment} order={row.order_name} />
               </td>
-              <td>
+              <td className="inbox-fb__followcell">
                 <Lines lines={followUpLines(row)} />
               </td>
-              <td>
+              <td className="inbox-fb__nowrap">
                 <Code row={row} />
               </td>
             </tr>
@@ -328,7 +345,7 @@ function SheetCards({ rows, options }: { rows: FeedbackRow[]; options: FeedbackO
             </div>
             {row.comment && (
               <div className="inbox-fb__block">
-                <Comment text={row.comment} />
+                <Comment text={row.comment} order={row.order_name} />
               </div>
             )}
             {(row.products.length > 0 || row.courier) && (
@@ -485,6 +502,7 @@ export function InboxFeedback() {
   // A refusal the server explained (dates out of range): its own words, not ours.
   const [refusal, setRefusal] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const [off, setOff] = useState(false);
   const [readingMore, setReadingMore] = useState(false);
   const [moreFailed, setMoreFailed] = useState(false);
   // Which question is current, so an answer to an older one is ignored.
@@ -506,6 +524,9 @@ export function InboxFeedback() {
         setNext(page.next_offset);
         setSummary(page.summary);
         setOptions(page.options);
+        // Whether the questions are being sent at all comes with the sheet
+        // (no second read, and none that asks Shopify).
+        setOff(page.enabled === false);
       })
       .catch((error: unknown) => {
         if (question !== asked.current) return;
@@ -539,22 +560,6 @@ export function InboxFeedback() {
         if (question === asked.current) setReadingMore(false);
       });
   }
-
-  // Whether the questions are being sent at all. Read apart from the sheet,
-  // and never waited for: the sheet is the same either way.
-  const [off, setOff] = useState(false);
-  useEffect(() => {
-    let current = true;
-    api
-      .get<FeedbackSettings>("/api/inbox/feedback/settings")
-      .then((settings) => {
-        if (current) setOff(settings.enabled === false);
-      })
-      .catch(() => undefined);
-    return () => {
-      current = false;
-    };
-  }, []);
 
   const [productTyped, setProductTyped] = useTyped(filters.product, (value) => change({ product: value }));
   const [searchTyped, setSearchTyped] = useTyped(filters.q, (value) => change({ q: value }));
@@ -598,7 +603,7 @@ export function InboxFeedback() {
         </div>
         <button
           type="button"
-          className="inbox-btn inbox-btn--quiet"
+          className="inbox-btn inbox-btn--quiet inbox-fb__download"
           disabled={downloading || rows === null || rows.length === 0}
           onClick={() => void download()}
         >
@@ -667,9 +672,10 @@ export function InboxFeedback() {
               className="input"
               value={filters.reason}
               disabled={!filters.rating}
+              title={filters.rating ? undefined : "Choose an answer first"}
               onChange={(event) => change({ reason: event.target.value })}
             >
-              <option value="">{filters.rating ? "Any reason" : "Choose an answer first"}</option>
+              <option value="">Any reason</option>
               {reasons.map((choice) => (
                 <option key={choice.id} value={choice.id}>
                   {choice.title}

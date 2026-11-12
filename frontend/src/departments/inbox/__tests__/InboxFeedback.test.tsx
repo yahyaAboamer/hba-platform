@@ -133,7 +133,8 @@ const ROWS = [
 
 type Served = {
   page?: (url: string) => [number, unknown];
-  settings?: object | [number, unknown];
+  /** The feature's switch, as the sheet itself reports it. On unless a test says otherwise. */
+  enabled?: boolean;
   download?: () => Promise<Response>;
 };
 
@@ -148,10 +149,6 @@ function serve(served: Served = {}) {
     "fetch",
     vi.fn((url: string) => {
       calls.push(url);
-      if (url.startsWith("/api/inbox/feedback/settings")) {
-        const settings = served.settings ?? { enabled: true };
-        return Array.isArray(settings) ? reply(settings[0], settings[1]) : reply(200, settings);
-      }
       if (url.startsWith("/api/inbox/feedback/download")) {
         return served.download?.() ?? reply(200, {});
       }
@@ -160,7 +157,8 @@ function serve(served: Served = {}) {
           200,
           { rows: ROWS, next_offset: null, summary: SUMMARY, options: OPTIONS },
         ];
-        return reply(status, body);
+        const found = body as object;
+        return reply(status, "rows" in found ? { enabled: served.enabled ?? true, ...found } : found);
       }
       return reply(404, { detail: "Not here" });
     }),
@@ -380,7 +378,9 @@ describe("the Feedback sheet", () => {
 
     const reason = screen.getByLabelText("Reason") as HTMLSelectElement;
     expect(reason.disabled).toBe(true);
-    expect(within(reason).getByText("Choose an answer first")).toBeTruthy();
+    // Short enough to be read whole in a narrow box; the reason it is shut is its tooltip.
+    expect(within(reason).getByText("Any reason")).toBeTruthy();
+    expect(reason.getAttribute("title")).toBe("Choose an answer first");
 
     fireEvent.change(screen.getByLabelText("Answer"), { target: { value: "okay" } });
     await waitFor(() => expect(reason.disabled).toBe(false));
@@ -481,7 +481,7 @@ describe("the Feedback sheet", () => {
     expect(comment.getAttribute("title")).toBe(full);
     expect(comment.className).not.toContain("--open");
     // Short enough to read whole: nothing to open.
-    expect(within(table).queryByRole("button", { name: "Show all" })).toBeNull();
+    expect(within(table).queryByRole("button", { name: /^Show all/ })).toBeNull();
 
     cleanup();
     serve({
@@ -496,10 +496,11 @@ describe("the Feedback sheet", () => {
       ],
     });
     show();
-    const open = await screen.findByRole("button", { name: "Show all" });
+    // Each button says whose comment it opens: a screen reader hears them one after another.
+    const open = await screen.findByRole("button", { name: "Show all of the comment on #7001" });
     expect(open.getAttribute("aria-expanded")).toBe("false");
     fireEvent.click(open);
-    expect(screen.getByRole("button", { name: "Show less" }).getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByRole("button", { name: "Show less of the comment on #7001" }).getAttribute("aria-expanded")).toBe("true");
     expect(screen.getByTitle("x".repeat(200)).className).toContain("--open");
   });
 
@@ -542,25 +543,45 @@ describe("the Feedback sheet", () => {
   });
 
   it("says when the questions are switched off, and nothing otherwise", async () => {
-    serve({ settings: { enabled: false } });
+    serve({ enabled: false });
     show();
     expect(await screen.findByText("Feedback questions are switched off. Nothing is being sent.")).toBeTruthy();
     // The sheet itself is read as usual.
     expect(await screen.findByRole("table")).toBeTruthy();
     cleanup();
 
-    serve({ settings: { enabled: true } });
+    serve({ enabled: true });
     show();
     await screen.findByRole("table");
-    await waitFor(() => expect(calls).toContain("/api/inbox/feedback/settings"));
     expect(screen.queryByText(/switched off/)).toBeNull();
+    // The switch comes with the sheet: no second read, and none that asks Shopify.
+    expect(calls.filter((url) => url.startsWith("/api/inbox/feedback/settings"))).toEqual([]);
   });
 
-  it("shows the sheet whatever the settings read does", async () => {
-    serve({ settings: [500, { detail: "No" }] });
+  it("reads everybody's words in their own direction", async () => {
+    serve({
+      page: () => [
+        200,
+        {
+          rows: [
+            row(1, {
+              customer_name: "نور الهدى",
+              comment: "القماش جميل جدا والتغليف كان ممتازا",
+              products: ["قميص كتان"],
+            }),
+          ],
+          next_offset: null,
+          summary: SUMMARY,
+          options: OPTIONS,
+        },
+      ],
+    });
     show();
-    expect(await screen.findByRole("table")).toBeTruthy();
-    expect(screen.queryByText(/switched off/)).toBeNull();
+    const table = await screen.findByRole("table");
+
+    expect(within(table).getByText("نور الهدى").getAttribute("dir")).toBe("auto");
+    expect(within(table).getByText("القماش جميل جدا والتغليف كان ممتازا").getAttribute("dir")).toBe("auto");
+    expect(within(table).getByText("قميص كتان").getAttribute("dir")).toBe("auto");
   });
 });
 

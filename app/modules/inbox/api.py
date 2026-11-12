@@ -540,7 +540,8 @@ def feedback_list(
     db: Session = Depends(get_session),
 ) -> dict:
     """The Feedback sheet: asked orders, newest question first, a page at a
-    time, with the numbers for the same filters and the filters' menus."""
+    time, with the numbers for the same filters, the filters' menus, and
+    whether the questions are being sent at all."""
     found = feedback.rows(db, **filters, by_asked=True, limit=limit + 1, offset=offset)
     page = found[:limit]
     return {
@@ -548,6 +549,9 @@ def feedback_list(
         "next_offset": offset + limit if len(found) > limit else None,
         "summary": feedback.summary(db, **filters),
         "options": feedback.options(db),
+        # The feature's switch, so the sheet can say "switched off" without a
+        # second read (the settings route also asks Shopify).
+        "enabled": feedback.enabled(),
     }
 
 
