@@ -831,3 +831,312 @@ describe("the order beside the chat", () => {
     expect(await screen.findByText("No order with a confirmation for this number.")).toBeTruthy();
   });
 });
+
+// ── Delivery feedback (ADR 0083) ────────────────────────────────────────────
+
+const feedback = (extra: object = {}) => ({
+  id: 2,
+  order_name: "#7002",
+  asked_at: minutesAgo(26 * 60),
+  state: "sent",
+  rating: "unhappy",
+  rated_at: minutesAgo(25 * 60),
+  reason: "size_fit",
+  reason_title: "Size / fit",
+  comment: "Too small",
+  reorder: null,
+  step: "support",
+  needs_follow_up: true,
+  resolved_at: null,
+  resolved_by_name: null,
+  solved: null,
+  reopened_count: 0,
+  last_error: null,
+  code: null,
+  code_used: false,
+  ...extra,
+});
+
+describe("delivery feedback in the list of chats", () => {
+  const FB_COUNTS = { all: 40, unread: 4, edit: 3, follow_up: 2 };
+
+  it("adds Needs follow-up, with its number, and Feedback: okay, after the others", async () => {
+    serve({ list: () => ({ conversations: [chat(12)], next: null, counts: FB_COUNTS }) });
+    show();
+
+    await screen.findByRole("link", { name: /Nour Adel/ });
+    const chips = within(screen.getByRole("group", { name: "Show" }))
+      .getAllByRole("button")
+      .map((chip) => chip.textContent);
+    expect(chips).toEqual([
+      "All", "Unread · 4", "Wants a change · 3", "Cancelled", "Needs follow-up · 2", "Feedback: okay",
+    ]);
+  });
+
+  it("shows no number on Needs follow-up when the server has not sent one", async () => {
+    serve();
+    show();
+
+    expect(await screen.findByRole("button", { name: "Needs follow-up" })).toBeTruthy();
+  });
+
+  it("narrows to the chats that need a follow-up, and to the okay answers", async () => {
+    serve({ list: () => ({ conversations: [chat(12)], next: null, counts: FB_COUNTS }) });
+    show();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Needs follow-up · 2" }));
+    await waitFor(() =>
+      expect(calls.some((call) => call.url === "/api/inbox/conversations?view=follow_up")).toBe(true),
+    );
+    expect(screen.getByRole("button", { name: "Needs follow-up · 2" }).getAttribute("aria-pressed")).toBe("true");
+
+    fireEvent.click(screen.getByRole("button", { name: "Feedback: okay" }));
+    await waitFor(() =>
+      expect(calls.some((call) => call.url === "/api/inbox/conversations?view=neutral")).toBe(true),
+    );
+  });
+
+  it("says why a view is empty, in its own words", async () => {
+    serve({ list: () => ({ conversations: [], next: null, counts: FB_COUNTS }) });
+    show("/inbox/chats?view=follow_up");
+    expect(await screen.findByText("Nobody needs a follow-up.")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Feedback: okay" }));
+    expect(await screen.findByText("Nobody has answered “It was okay”.")).toBeTruthy();
+  });
+
+  it("opens on the view the address names, which is where Today sends people", async () => {
+    serve({ list: () => ({ conversations: [chat(12)], next: null, counts: FB_COUNTS }) });
+    show("/inbox/chats?view=follow_up");
+
+    await screen.findByRole("link", { name: /Nour Adel/ });
+    expect(calls.find((call) => call.url.startsWith("/api/inbox/conversations"))?.url).toBe(
+      "/api/inbox/conversations?view=follow_up",
+    );
+    expect(screen.getByRole("button", { name: "Needs follow-up · 2" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("button", { name: "All" }).getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("reads a view it does not know as All", async () => {
+    serve();
+    show("/inbox/chats?view=nonsense");
+
+    await screen.findByRole("link", { name: /Nour Adel/ });
+    expect(calls.find((call) => call.url.startsWith("/api/inbox/conversations"))?.url).toBe(
+      "/api/inbox/conversations",
+    );
+    expect(screen.getByRole("button", { name: "All" }).getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("keeps the view when a chat is opened, so the list does not change under her", async () => {
+    serve({ list: () => ({ conversations: [chat(12)], next: null, counts: FB_COUNTS }) });
+    show("/inbox/chats?view=follow_up");
+
+    const link = await screen.findByRole("link", { name: /Nour Adel/ });
+    expect(link.getAttribute("href")).toBe("/inbox/chats/12?view=follow_up");
+    fireEvent.click(link);
+
+    await screen.findByRole("region", { name: "Chat with Nour Adel" });
+    expect(screen.getByRole("button", { name: "Needs follow-up · 2" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("link", { name: "Back to chats" }).getAttribute("href")).toBe(
+      "/inbox/chats?view=follow_up",
+    );
+  });
+
+  it("marks a chat whose feedback needs a person, or is only okay", async () => {
+    serve({
+      list: () => ({
+        conversations: [
+          chat(12, { feedback: "follow_up" }),
+          chat(13, { name: "Salma Hany", feedback: "reopened" }),
+          chat(14, { name: "Mai Ashraf", feedback: "neutral" }),
+          chat(15, { name: "Dina Fouad", feedback: null }),
+          chat(16, { name: "Laila Emad", unread_count: 3, feedback: "follow_up" }),
+        ],
+        next: null,
+        counts: FB_COUNTS,
+      }),
+    });
+    show();
+
+    const row = async (name: RegExp) => within(await screen.findByRole("link", { name }));
+    expect((await row(/Nour Adel/)).getByText("Needs follow-up")).toBeTruthy();
+    expect((await row(/Salma Hany/)).getByText("Reopened")).toBeTruthy();
+    expect((await row(/Mai Ashraf/)).getByText("Feedback: okay")).toBeTruthy();
+    const none = await row(/Dina Fouad/);
+    expect(none.queryByText("Needs follow-up")).toBeNull();
+    expect(none.queryByText("Reopened")).toBeNull();
+    expect(none.queryByText("Feedback: okay")).toBeNull();
+    // Her unread count is still there beside it.
+    const unread = await row(/Laila Emad/);
+    expect(unread.getByText("Needs follow-up")).toBeTruthy();
+    expect(unread.getByText("3")).toBeTruthy();
+  });
+});
+
+describe("delivery feedback beside the chat", () => {
+  const panel = () => screen.findByRole("complementary", { name: "Order" });
+  const block = async () => within(await within(await panel()).findByRole("region", { name: "Feedback" }));
+
+  it("shows nothing when she was never asked", async () => {
+    serve({ detail: { feedback: null } });
+    show("/inbox/chats/12");
+
+    await within(await panel()).findByText("Wants a change");
+    expect(within(await panel()).queryByRole("region", { name: "Feedback" })).toBeNull();
+  });
+
+  it("shows her answer, the reason, what she wrote and where it stands", async () => {
+    serve({ detail: { feedback: feedback() } });
+    show("/inbox/chats/12");
+
+    const fb = await block();
+    expect(fb.getByText("#7002")).toBeTruthy();
+    expect(fb.getByText("Not happy")).toBeTruthy();
+    expect(fb.getByText("Size / fit")).toBeTruthy();
+    expect(fb.getByText("Too small")).toBeTruthy();
+    expect(fb.getByText("Needs follow-up")).toBeTruthy();
+    expect(fb.getByText("She will be asked tomorrow whether her issue was solved.")).toBeTruthy();
+    expect(fb.getByRole("button", { name: "Resolved" })).toBeTruthy();
+    // A person needs to act on it: it comes before the order.
+    const headings = within(await panel())
+      .getAllByRole("heading", { level: 3 })
+      .map((heading) => heading.textContent);
+    expect(headings[0]).toBe("Feedback");
+    expect(headings[1]).toBe("Order");
+  });
+
+  it("is only read when nobody needs to act, and sits below the confirmation", async () => {
+    serve({
+      detail: {
+        feedback: feedback({
+          rating: "loved",
+          reason: "quality",
+          reason_title: "Quality",
+          comment: null,
+          step: "done",
+          needs_follow_up: false,
+          reorder: "maybe",
+          code: "THANKS-4F7K",
+          code_used: true,
+        }),
+      },
+    });
+    show("/inbox/chats/12");
+
+    const fb = await block();
+    expect(fb.getByText("Loved it")).toBeTruthy();
+    expect(fb.getByText("Maybe")).toBeTruthy();
+    expect(fb.getByText("THANKS-4F7K").parentElement?.textContent).toContain("used");
+    expect(fb.queryByRole("button", { name: "Resolved" })).toBeNull();
+    const headings = within(await panel())
+      .getAllByRole("heading", { level: 3 })
+      .map((heading) => heading.textContent);
+    expect(headings.indexOf("Order")).toBeLessThan(headings.indexOf("Feedback"));
+  });
+
+  it("offers Resolved only for an unhappy answer waiting on a person", async () => {
+    for (const extra of [
+      { step: "reorder", needs_follow_up: false, resolved_at: minutesAgo(60), resolved_by_name: "Mariam" },
+      { rating: "okay", step: "done", needs_follow_up: false },
+      { rating: null, step: "rating", needs_follow_up: false },
+    ]) {
+      serve({ detail: { feedback: feedback(extra) } });
+      show("/inbox/chats/12");
+      const fb = await block();
+      expect(fb.queryByRole("button", { name: "Resolved" })).toBeNull();
+      cleanup();
+    }
+  });
+
+  it("marks it resolved at once, then reads the chat and the list again", async () => {
+    const waiting = feedback();
+    serve({
+      detail: { feedback: waiting },
+      post: (url) => {
+        if (url !== "/api/inbox/feedback/2/resolve") return [404, { detail: "No" }];
+        Object.assign(waiting, {
+          needs_follow_up: false,
+          resolved_at: "2026-11-12T10:00:00+00:00",
+          resolved_by_name: "Owner",
+        });
+        return [200, { id: 2, resolved_at: "2026-11-12T10:00:00+00:00", resolved_by_name: "Owner" }];
+      },
+    });
+    show("/inbox/chats/12");
+    const fb = await block();
+    await screen.findByRole("link", { name: /Nour Adel/ });
+
+    fireEvent.click(fb.getByRole("button", { name: "Resolved" }));
+
+    // Once the chat is read again the block moves below the order, so look it up afresh.
+    const here = within(await panel());
+    expect(await here.findByText("Resolved by Owner on 12 Nov.")).toBeTruthy();
+    expect(posts()[0]).toMatchObject({ url: "/api/inbox/feedback/2/resolve" });
+    expect(here.queryByRole("button", { name: "Resolved" })).toBeNull();
+    expect(here.queryByText("She will be asked tomorrow whether her issue was solved.")).toBeNull();
+    expect(here.queryByText("Needs follow-up")).toBeNull();
+    const after = () => calls.slice(calls.findIndex((call) => call.method === "POST") + 1);
+    await waitFor(() => expect(after().some((call) => /\/conversations\/12$/.test(call.url))).toBe(true));
+    await waitFor(() => expect(after().some((call) => call.url === "/api/inbox/conversations")).toBe(true));
+  });
+
+  it("gives the server's reason, and offers the button again, when it refuses", async () => {
+    serve({
+      detail: { feedback: feedback() },
+      post: () => [422, { detail: "Only an unhappy answer that is waiting can be resolved." }],
+    });
+    show("/inbox/chats/12");
+    const fb = await block();
+
+    fireEvent.click(fb.getByRole("button", { name: "Resolved" }));
+
+    expect((await fb.findByRole("alert")).textContent).toBe(
+      "Only an unhappy answer that is waiting can be resolved.",
+    );
+    expect(fb.getByRole("button", { name: "Resolved" })).toBeTruthy();
+    expect(fb.getByText("Needs follow-up")).toBeTruthy();
+    expect(fb.queryByText(/^Resolved by|^Resolved on/)).toBeNull();
+  });
+
+  it("says she said it was not solved, and what happened to the last message", async () => {
+    serve({
+      detail: {
+        feedback: feedback({
+          reopened_count: 1,
+          solved: false,
+          last_error: "WhatsApp was not answering",
+          state: "failed",
+        }),
+      },
+    });
+    show("/inbox/chats/12");
+
+    const fb = await block();
+    expect(fb.getByText("Reopened: she said her issue was not solved.")).toBeTruthy();
+    expect(fb.getByText("Solved: no")).toBeTruthy();
+    expect(fb.getByText("The last message to her could not be sent: WhatsApp was not answering")).toBeTruthy();
+    expect(fb.getByText("Could not be sent.")).toBeTruthy();
+    // Waiting on a person again.
+    expect(fb.getByRole("button", { name: "Resolved" })).toBeTruthy();
+  });
+
+  it("says who resolved it, and whether it turned out solved", async () => {
+    serve({
+      detail: {
+        feedback: feedback({
+          step: "reorder",
+          needs_follow_up: false,
+          resolved_at: "2026-11-11T10:00:00+00:00",
+          resolved_by_name: "Mariam",
+          solved: true,
+        }),
+      },
+    });
+    show("/inbox/chats/12");
+
+    const fb = await block();
+    expect(fb.getByText("Resolved by Mariam on 11 Nov.")).toBeTruthy();
+    expect(fb.getByText("Solved: yes")).toBeTruthy();
+  });
+});

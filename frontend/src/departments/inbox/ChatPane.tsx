@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 
 import { ApiError, api } from "../../lib/api";
 import { chatName, formatPhone, orderStatus } from "../../lib/inbox";
@@ -88,6 +88,8 @@ export function ChatPane({
   const [searchProblem, setSearchProblem] = useState<string | null>(null);
   const now = useNow();
   const narrow = useIsNarrow();
+  // The way back keeps the list as it was (its view is in the address).
+  const { search } = useLocation();
 
   const held = useRef<ChatMessage[]>([]);
   const heardFromHer = useRef<number | null>(null);
@@ -410,7 +412,7 @@ export function ChatPane({
         <div className="inbox-empty">
           <InboxIcon name="search" />
           <span>
-            There is no chat at this address. <Link to="/inbox/chats">Back to chats</Link>
+            There is no chat at this address. <Link to={{ pathname: "/inbox/chats", search }}>Back to chats</Link>
           </span>
         </div>
       </section>
@@ -435,7 +437,7 @@ export function ChatPane({
       <section className="inbox-col inbox-col--chat" aria-label={name ? `Chat with ${name}` : "Chat"}>
         <div className="inbox-col__head">
           <div className="inbox-chathead">
-            <Link className="inbox-back" to="/inbox/chats" aria-label="Back to chats">
+            <Link className="inbox-back" to={{ pathname: "/inbox/chats", search }} aria-label="Back to chats">
               <InboxIcon name="left" />
             </Link>
             <div>
@@ -599,6 +601,7 @@ export function ChatPane({
         {detail && (
           <ChatOrderPanel
             orders={detail.orders}
+            feedback={detail.feedback ?? null}
             now={now}
             onAnswered={() => {
               void readDetail();

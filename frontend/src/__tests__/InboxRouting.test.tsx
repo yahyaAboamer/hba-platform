@@ -24,14 +24,18 @@ const names = () =>
     .map((row) => row.querySelector(".frame__dept-name")?.textContent);
 
 describe("customer service", () => {
-  it("starts on Chats, with the Inbox's two sections", async () => {
+  it("starts on Chats, with the Inbox's three sections", async () => {
     serve(sessionOf("customer_service"));
     render(<App />);
 
     expect(await screen.findByRole("heading", { name: "Chats" })).toBeTruthy();
     expect(window.location.pathname).toBe("/inbox/chats");
     const links = within(sidebar()).getAllByRole("link");
-    expect(links.map((link) => link.getAttribute("href"))).toEqual(["/inbox/chats", "/inbox/confirmations"]);
+    expect(links.map((link) => link.getAttribute("href"))).toEqual([
+      "/inbox/chats",
+      "/inbox/confirmations",
+      "/inbox/feedback",
+    ]);
     expect(links[0].getAttribute("aria-current")).toBe("page");
   });
 
@@ -71,6 +75,37 @@ describe("customer service", () => {
     const chats = await screen.findByRole("link", { name: /^Chats/ });
     await within(chats).findByText("4");
     expect(chats.textContent).toContain("4 chats waiting for a reply");
+  });
+
+  it("sees how many unhappy customers need a follow-up beside Feedback, not added to Chats", async () => {
+    serve(sessionOf("customer_service"), { followUp: 2 });
+    render(<App />);
+
+    const feedback = await screen.findByRole("link", { name: /^Feedback/ });
+    await within(feedback).findByText("2");
+    expect(feedback.textContent).toContain("2 customers need a follow-up");
+    // Chats still counts only what waits for a reply.
+    const chats = screen.getByRole("link", { name: /^Chats/ });
+    await within(chats).findByText("4");
+    expect(chats.textContent).not.toContain("follow-up");
+  });
+
+  it("says nothing beside Feedback when nobody needs a follow-up", async () => {
+    serve(sessionOf("customer_service"), { followUp: 0 });
+    render(<App />);
+
+    const chats = await screen.findByRole("link", { name: /^Chats/ });
+    await within(chats).findByText("4");
+    expect(screen.getByRole("link", { name: "Feedback" }).textContent).toBe("Feedback");
+  });
+
+  it("reaches Feedback", async () => {
+    window.history.pushState({}, "", "/inbox/feedback");
+    serve(sessionOf("customer_service"));
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "Feedback" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: /^Feedback/ }).getAttribute("aria-current")).toBe("page");
   });
 
   it("reaches Confirmations", async () => {

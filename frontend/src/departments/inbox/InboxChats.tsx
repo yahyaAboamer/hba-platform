@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams, useSearchParams } from "react-router-dom";
 
 import { ChatPane } from "./ChatPane";
 import { InboxIcon } from "./InboxIcon";
@@ -8,7 +8,7 @@ import { useInbox } from "./useInbox";
 import { OpsIcon, age, clockTime, useNow } from "../../components/OpsSource";
 import { api } from "../../lib/api";
 import { chatName, listTime } from "../../lib/inbox";
-import type { Conversation, InboxHealth } from "../../lib/inbox";
+import type { Conversation, FeedbackMarker, InboxHealth } from "../../lib/inbox";
 import "../operations/OperationsDashboard.css";
 import "./Inbox.css";
 
@@ -35,10 +35,17 @@ const VIEWS = [
   { key: "unread", label: "Unread", count: "unread" },
   { key: "edit", label: "Wants a change", count: "edit" },
   { key: "cancelled", label: "Cancelled", count: null },
+  // Delivery feedback (ADR 0083). Today's items link to `?view=follow_up`.
+  { key: "follow_up", label: "Needs follow-up", count: "follow_up" },
+  { key: "neutral", label: "Feedback: okay", count: null },
 ] as const;
 type ViewKey = (typeof VIEWS)[number]["key"];
 
-type Counts = { all: number; unread: number; edit: number };
+function isView(value: string | null): value is ViewKey {
+  return VIEWS.some((option) => option.key === value);
+}
+
+type Counts = { all: number; unread: number; edit: number; follow_up?: number };
 type Page = { conversations: Conversation[]; next: string | null; counts: Counts };
 
 const EMPTY: Record<ViewKey, string> = {
@@ -46,6 +53,15 @@ const EMPTY: Record<ViewKey, string> = {
   unread: "Nothing unread.",
   edit: "Nobody is waiting on a change.",
   cancelled: "Nobody has asked to cancel.",
+  follow_up: "Nobody needs a follow-up.",
+  neutral: "Nobody has answered “It was okay”.",
+};
+
+/** The small word beside a name when her delivery feedback needs a look. */
+const FEEDBACK_WORDS: Record<FeedbackMarker, string> = {
+  follow_up: "Needs follow-up",
+  reopened: "Reopened",
+  neutral: "Feedback: okay",
 };
 
 function movedAt(chat: Conversation): number {
@@ -212,21 +228,39 @@ function lastLine(chat: Conversation): { icon: InboxIconName | null; words: stri
   return { icon: null, words, ours: false };
 }
 
-function ChatRow({ chat, open, now }: { chat: Conversation; open: boolean; now: number }) {
+function ChatRow({
+  chat,
+  open,
+  now,
+  search,
+}: {
+  chat: Conversation;
+  open: boolean;
+  now: number;
+  /** The list's own address query (`?view=follow_up`), kept so opening a chat does not change the list. */
+  search: string;
+}) {
   const name = chatName(chat);
   const last = lastLine(chat);
   const unread = chat.unread_count > 0;
   return (
     <li>
       <Link
-        to={`/inbox/chats/${chat.id}`}
+        to={{ pathname: `/inbox/chats/${chat.id}`, search }}
         className={unread ? "inbox-chat inbox-chat--unread" : "inbox-chat"}
         aria-current={open ? "true" : undefined}
       >
         <span className="inbox-avatar" aria-hidden="true">
           {chat.name?.trim() ? name.charAt(0).toUpperCase() : "+"}
         </span>
-        <span className="inbox-chat__name">{name}</span>
+        <span className="inbox-chat__who">
+          <span className="inbox-chat__name">{name}</span>
+          {chat.feedback && FEEDBACK_WORDS[chat.feedback] && (
+            <span className={`inbox-chat__fb inbox-chat__fb--${chat.feedback}`}>
+              {FEEDBACK_WORDS[chat.feedback]}
+            </span>
+          )}
+        </span>
         <span className="inbox-chat__time">
           {chat.last_message_at ? listTime(chat.last_message_at, now) : ""}
         </span>
@@ -256,7 +290,18 @@ export function InboxChats() {
   const { conversationId } = useParams();
   const openId = conversationId && /^\d+$/.test(conversationId) ? Number(conversationId) : null;
 
-  const [view, setView] = useState<ViewKey>("all");
+  // The view is in the address (`?view=follow_up`), so Today can link to it
+  // and a reload keeps it. An unknown word is "All".
+  const [params, setParams] = useSearchParams();
+  const asked = params.get("view");
+  const view: ViewKey = isView(asked) ? asked : "all";
+  const { search } = useLocation();
+  const setView = (next: ViewKey) => {
+    const kept = new URLSearchParams(params);
+    if (next === "all") kept.delete("view");
+    else kept.set("view", next);
+    setParams(kept, { replace: true });
+  };
   const [typed, setTyped] = useState("");
   const [q, setQ] = useState("");
   const now = useNow();
@@ -313,7 +358,7 @@ export function InboxChats() {
 
         <div className="inbox-filters" role="group" aria-label="Show">
           {VIEWS.map((option) => {
-            const count = option.count && counts ? counts[option.count] : 0;
+            const count = option.count && counts ? (counts[option.count] ?? 0) : 0;
             return (
               <button
                 key={option.key}
@@ -358,7 +403,7 @@ export function InboxChats() {
         {chats !== null && chats.length > 0 && (
           <ul className="inbox-chats">
             {chats.map((chat) => (
-              <ChatRow key={chat.id} chat={chat} open={chat.id === openId} now={now} />
+              <ChatRow key={chat.id} chat={chat} open={chat.id === openId} now={now} search={search} />
             ))}
             {more && (
               <li className="inbox-chats__more" ref={end}>

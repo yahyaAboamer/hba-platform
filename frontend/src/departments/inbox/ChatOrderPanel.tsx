@@ -2,8 +2,9 @@ import { useState } from "react";
 
 import { ApiError, api } from "../../lib/api";
 import { ANSWER_WORDS, dayTimeLabel, orderStatus, totalLabel } from "../../lib/inbox";
-import type { ChatOrder } from "../../lib/inbox";
+import type { ChatFeedback, ChatOrder } from "../../lib/inbox";
 import { OpsIcon, dayMonth } from "../../components/OpsSource";
+import { ChatFeedbackBlock } from "./ChatFeedbackBlock";
 
 /**
  * The customer's order, beside her chat (ADR 0059; the approved mockup's
@@ -45,12 +46,16 @@ function OrderLink({ order }: { order: ChatOrder }) {
 
 export function ChatOrderPanel({
   orders,
+  feedback = null,
   now,
   onAnswered,
 }: {
   /** Newest first. */
   orders: ChatOrder[];
+  /** How her delivered order went, when she was asked (ADR 0083). */
+  feedback?: ChatFeedback | null;
   now: number;
+  /** Something here changed: the chat and the list are read again. */
   onAnswered: () => void;
 }) {
   const [busy, setBusy] = useState<string | null>(null);
@@ -71,11 +76,20 @@ export function ChatOrderPanel({
     }
   }
 
+  // An unhappy answer nobody has followed up comes first; any other sits
+  // below the order's own confirmation, where it is only read.
+  const waiting = feedback !== null && feedback.needs_follow_up;
+  const feedbackBlock = feedback && (
+    <ChatFeedbackBlock feedback={feedback} now={now} late={!waiting} onResolved={onAnswered} />
+  );
+
   if (!order) {
     return (
       <div className="inbox-order">
+        {waiting && feedbackBlock}
         <h3>Order</h3>
         <p className="inbox-order__none">No order with a confirmation for this number.</p>
+        {!waiting && feedbackBlock}
       </div>
     );
   }
@@ -83,6 +97,7 @@ export function ChatOrderPanel({
   const status = orderStatus(order);
   return (
     <div className="inbox-order">
+      {waiting && feedbackBlock}
       <h3>Order</h3>
       <dl>
         <dt>Number</dt>
@@ -152,6 +167,8 @@ export function ChatOrderPanel({
           )}
         </>
       )}
+
+      {!waiting && feedbackBlock}
 
       <h3>Tags in Shopify</h3>
       {/* What Shopify really has, once read - not what the platform last

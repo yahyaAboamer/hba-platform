@@ -76,6 +76,8 @@ export function reply(status: number, body: unknown): Response {
 export type Answers = {
   /** Unread chats, or null for a number the server could not read. */
   unread?: number | null;
+  /** Unhappy customers still waiting for a person to follow up, or null when the server could not read it. */
+  followUp?: number | null;
   /** The two Affiliates numbers, or null when they could not be read. */
   counts?: Record<string, number> | null;
   /** Operations sources, by how their latest read went; null for none read. */
@@ -97,7 +99,7 @@ export const asked = () => requested;
 
 /** `GET /api/today` for this person: the numbers and failures the sidebar reads, and whatever else the test gave. */
 function todayBody(me: Session, answers: Answers) {
-  const { unread = 4, counts = { models_awaiting_approval: 0, payments_awaiting_approval: 0 } } = answers;
+  const { unread = 4, followUp = 0, counts = { models_awaiting_approval: 0, payments_awaiting_approval: 0 } } = answers;
   const holds = (permission: string) => me.permissions.includes(permission);
   const departments: TodayDepartment[] = [
     ...(holds("inbox.use") ? (["inbox"] as const) : []),
@@ -106,6 +108,7 @@ function todayBody(me: Session, answers: Answers) {
   ];
   const read: Record<string, number> = {};
   if (holds("inbox.use") && unread !== null) read.chats_unread = unread;
+  if (holds("inbox.use") && followUp !== null) read.chats_follow_up = followUp;
   if (holds("affiliates.view") && counts !== null) Object.assign(read, counts);
   const failures = Object.fromEntries(
     Object.entries(answers.freshness ?? {})
@@ -142,6 +145,18 @@ export function serve(me: unknown, answers: Answers = {}) {
       }
       if (url.includes("/api/inbox/health")) {
         return reply(200, { connected: true, sending: true, last_heard_at: null, quiet_since: null });
+      }
+      if (url.includes("/api/inbox/feedback/settings")) return reply(200, { enabled: true });
+      if (url.includes("/api/inbox/feedback")) {
+        return reply(200, {
+          rows: [],
+          next_offset: null,
+          summary: {
+            asked: 0, not_reached: 0, answered: 0, loved: 0, okay: 0, unhappy: 0,
+            needs_follow_up: 0, solved: 0, codes_sent: 0, codes_used: 0,
+          },
+          options: { couriers: [], ratings: [], reasons: {}, states: [] },
+        });
       }
       if (url.includes("/api/inbox/confirmations")) {
         return reply(200, {

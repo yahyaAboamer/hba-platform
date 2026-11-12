@@ -90,7 +90,15 @@ export type Conversation = {
   window_closes_at: string | null;
   /** Her most recent order's answer. */
   answer: string | null;
+  /**
+   * Where her delivery feedback stands, as the list marks it (ADR 0083):
+   * `reopened` and `follow_up` need a person; `neutral` is an "It was okay".
+   * A marker only - the chat's own `feedback` is an object (`ChatFeedback`).
+   */
+  feedback?: FeedbackMarker | null;
 };
+
+export type FeedbackMarker = "reopened" | "follow_up" | "neutral";
 
 /** One order's confirmation, beside the chat. */
 export type ChatOrder = {
@@ -123,7 +131,38 @@ export type ChatOrder = {
   invoice_error?: string | null;
 };
 
-export type ConversationDetail = Conversation & { orders: ChatOrder[] };
+/**
+ * Her answer to "how did your order go?", beside her chat (ADR 0083). The
+ * newest one only; null when she was never asked.
+ */
+export type ChatFeedback = {
+  id: number;
+  order_name: string | null;
+  asked_at: string | null;
+  /** `sent`, or why it was not: `no_whatsapp`, `failed`, `would_send`, `pending`, `sending`. */
+  state: string;
+  rating: FeedbackRating | null;
+  rated_at: string | null;
+  reason: string | null;
+  reason_title: string | null;
+  comment: string | null;
+  reorder: FeedbackReorder | null;
+  step: FeedbackStep;
+  needs_follow_up: boolean;
+  resolved_at: string | null;
+  resolved_by_name: string | null;
+  /** Her answer to "was it solved?": null until she gives one. */
+  solved: boolean | null;
+  reopened_count: number;
+  last_error: string | null;
+  code: string | null;
+  code_used: boolean;
+};
+
+export type ConversationDetail = Conversation & {
+  orders: ChatOrder[];
+  feedback?: ChatFeedback | null;
+};
 
 export type ChatMedia = {
   id: number;
@@ -211,3 +250,128 @@ export function totalLabel(total: string | null): string {
   if (!Number.isFinite(amount) || !/\d/.test(total)) return total;
   return `EGP ${amount.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
 }
+
+
+// ── Feedback after delivery (ADR 0083; app/modules/inbox/services/feedback.py) ─
+
+export type FeedbackRating = "loved" | "okay" | "unhappy";
+export type FeedbackReorder = "very_likely" | "maybe" | "unlikely";
+export type FeedbackStep = "rating" | "reason" | "comment" | "support" | "solved" | "reorder" | "done";
+export type FeedbackFollowUp = "needs_follow_up" | "resolved" | "reopened";
+
+/** What her answer is called on screen. */
+export const RATING_WORDS: Record<FeedbackRating, string> = {
+  loved: "Loved it",
+  okay: "It was okay",
+  unhappy: "Not happy",
+};
+
+/** How likely she says she is to order again. */
+export const REORDER_WORDS: Record<FeedbackReorder, string> = {
+  very_likely: "Very likely",
+  maybe: "Maybe",
+  unlikely: "Unlikely",
+};
+
+/**
+ * Why a question did not reach her, in a few words; null when it did.
+ * A row whose question is still being sent says so rather than nothing.
+ */
+export function feedbackStateNote(state: string): string | null {
+  switch (state) {
+    case "sent":
+      return null;
+    case "no_whatsapp":
+      return "Not on WhatsApp";
+    case "failed":
+      return "Could not be sent";
+    case "would_send":
+      return "Would send: sending is off";
+    case "pending":
+      return "Waiting to be sent";
+    case "sending":
+      return "Being sent";
+    default:
+      return null;
+  }
+}
+
+/** One asked order, as a row of the Feedback sheet. */
+export type FeedbackRow = {
+  id: number;
+  order_id: string;
+  order_name: string | null;
+  delivered_at: string | null;
+  sent_at: string | null;
+  asked_at: string | null;
+  customer_name: string | null;
+  phone: string | null;
+  products: string[];
+  courier: string | null;
+  state: string;
+  state_label: string;
+  skip_reason: string | null;
+  last_error: string | null;
+  step: FeedbackStep;
+  rating: FeedbackRating | null;
+  rated_at: string | null;
+  reason: string | null;
+  comment: string | null;
+  comment_at: string | null;
+  reorder: FeedbackReorder | null;
+  needs_follow_up: boolean;
+  resolved_at: string | null;
+  resolved_by: number | null;
+  resolved_by_name: string | null;
+  solved: boolean | null;
+  solved_at: string | null;
+  reopened_count: number;
+  code: string | null;
+  code_sent_at: string | null;
+  code_expires_at: string | null;
+  code_used_at: string | null;
+  code_order_name: string | null;
+};
+
+/** The numbers for the sheet's current filters. */
+export type FeedbackSummary = {
+  /** Questions actually sent. */
+  asked: number;
+  /** Failed, sent to a number not on WhatsApp, or held because sending is off. */
+  not_reached: number;
+  answered: number;
+  loved: number;
+  okay: number;
+  unhappy: number;
+  needs_follow_up: number;
+  solved: number;
+  codes_sent: number;
+  codes_used: number;
+};
+
+type Choice = { id: string; title: string };
+
+/** The sheet's filter menus. `reasons` depends on the answer chosen. */
+export type FeedbackOptions = {
+  couriers: string[];
+  ratings: Choice[];
+  reasons: Partial<Record<FeedbackRating, Choice[]>>;
+  states: Choice[];
+};
+
+export type FeedbackPage = {
+  rows: FeedbackRow[];
+  next_offset: number | null;
+  summary: FeedbackSummary;
+  options: FeedbackOptions;
+};
+
+/** The feature's switch and settings (`GET /api/inbox/feedback/settings`). */
+export type FeedbackSettings = {
+  enabled: boolean;
+  started_at: string | null;
+  review_url: string | null;
+  reply_hours: number;
+  /** Only the read; a save does not answer it. */
+  codes_ready?: { ready: boolean; reason: string | null };
+};
