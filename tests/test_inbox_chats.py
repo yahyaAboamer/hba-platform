@@ -115,7 +115,7 @@ def test_the_list_is_newest_first_with_what_the_row_shows(db):
         "last_message_at": newest.last_message_at.isoformat(), "last_preview": "Voice note",
         "last_direction": "in", "unread_count": 2, "window_open": True,
         "window_closes_at": (newest.last_inbound_at + timedelta(hours=24)).isoformat(),
-        "answer": None,
+        "answer": None, "feedback": None,
     }
 
 
@@ -158,7 +158,7 @@ def test_the_views_narrow_the_list(db):
     assert names("unread") == ["Unread"]
     assert names("edit") == ["Edit"]
     assert names("cancelled") == ["Cancelled"]
-    assert chats.counts(db) == {"all": 4, "unread": 1, "edit": 1}
+    assert chats.counts(db) == {"all": 4, "unread": 1, "edit": 1, "follow_up": 0}
     with pytest.raises(chats.Refused):
         chats.list_conversations(db, view="everything")
 

@@ -57,6 +57,14 @@ node compare.mjs
 PLAYWRIGHT="$SCRATCH/pw/node_modules/playwright-core/index.js" node actions.mjs
 ```
 
+**Post-delivery feedback (ADR 0083).** `seed_feedback.py` adds about sixty
+surveys (every answer, reason, follow-up state, courier, code state and an
+Arabic and a long comment) and their chats on top of `seed_inbox.py`'s cast.
+Use a database named `hba_browser*`, run `seed_inbox.py` and then
+`seed_feedback.py`, and start the application with `INBOX_FEEDBACK_ENABLED=true`
+and no WhatsApp or Shopify keys, so nothing can be sent. Sign in as
+`owner@example.com` or `mariam@example.com` (customer service).
+
 `review.mjs` **resumes**: a step whose two screenshots already exist is skipped
 unless `FORCE=1`. Delete the pair for a screen you have changed and run again.
 This machine's memory watchdog killed the run twice; resuming is what made that

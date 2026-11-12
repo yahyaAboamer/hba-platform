@@ -75,7 +75,7 @@ def _demote_to(role: str) -> None:
 def test_the_list_the_chat_and_its_orders(client, chat):
     listed = client.get("/api/inbox/conversations").json()
     assert [row["name"] for row in listed["conversations"]] == ["Nour Adel"]
-    assert listed["counts"] == {"all": 1, "unread": 1, "edit": 0}
+    assert listed["counts"] == {"all": 1, "unread": 1, "edit": 0, "follow_up": 0}
     assert listed["next"] is None
 
     detail = client.get(f"/api/inbox/conversations/{chat}").json()

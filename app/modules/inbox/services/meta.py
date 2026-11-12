@@ -38,6 +38,33 @@ MEDIA_HOSTS = ("facebook.com", "fbsbx.com", "fbcdn.net", "whatsapp.net")
 
 MEDIA_KINDS = ("image", "audio", "video", "document", "sticker")
 
+#: WhatsApp's own limits on an interactive message. Checked before asking, so
+#: a wording that is too long fails here with a clear sentence and not as an
+#: error code from Meta.
+MAX_BUTTONS = 3
+MAX_BUTTON_TITLE = 20
+MAX_LIST_ROWS = 10
+MAX_ROW_TITLE = 24
+MAX_LIST_BUTTON = 20
+MAX_BODY = 1024
+MAX_CHOICE_ID = 256
+
+
+def _check_words(text: object, limit: int, what: str) -> None:
+    if not isinstance(text, str) or not text.strip() or len(text) > limit:
+        raise MetaError(f"{what} are one to {limit} characters", kind="invalid")
+
+
+def _check_choice(choice: object, limit: int, what: str) -> None:
+    """A button or a list row: an id, and a title that fits."""
+    if not isinstance(choice, dict):
+        raise MetaError(f"{what} is an id and a title", kind="invalid")
+    title, choice_id = choice.get("title"), choice.get("id")
+    if not isinstance(title, str) or not title.strip() or len(title) > limit:
+        raise MetaError(f"{what}'s title is one to {limit} characters", kind="invalid")
+    if not isinstance(choice_id, str) or not choice_id or len(choice_id) > MAX_CHOICE_ID:
+        raise MetaError(f"{what}'s id is one to {MAX_CHOICE_ID} characters", kind="invalid")
+
 
 class MetaError(RuntimeError):
     """WhatsApp refused, or did not answer. The text is safe to show.
@@ -275,6 +302,58 @@ class MetaClient:
     def send_text(self, to: str, body: str, *, reply_to: str | None = None) -> str:
         return self._send(
             to, {"type": "text", "text": {"body": body, "preview_url": False}}, reply_to
+        )
+
+    def send_buttons(self, to: str, body: str, buttons: list[dict[str, str]]) -> str:
+        """Send a message with up to three reply buttons (free, so only inside
+        the customer's 24 hours). Each button is ``{"id", "title"}``; her tap
+        comes back as ``interactive.button_reply`` carrying that id."""
+        if not 1 <= len(buttons) <= MAX_BUTTONS:
+            raise MetaError(f"A message has one to {MAX_BUTTONS} buttons", kind="invalid")
+        _check_words(body, MAX_BODY, "A message's words")
+        replies = []
+        for button in buttons:
+            _check_choice(button, MAX_BUTTON_TITLE, "A button")
+            replies.append({"type": "reply", "reply": {"id": button["id"], "title": button["title"]}})
+        return self._send(
+            to,
+            {
+                "type": "interactive",
+                "interactive": {
+                    "type": "button",
+                    "body": {"text": body},
+                    "action": {"buttons": replies},
+                },
+            },
+        )
+
+    def send_list(
+        self, to: str, body: str, button_label: str, rows: list[dict[str, str]]
+    ) -> str:
+        """Send a message with a list to choose from (free, so only inside
+        the customer's 24 hours): up to ten rows, each ``{"id", "title"}``.
+        Her choice comes back as ``interactive.list_reply`` carrying the id."""
+        if not 1 <= len(rows) <= MAX_LIST_ROWS:
+            raise MetaError(f"A list has one to {MAX_LIST_ROWS} rows", kind="invalid")
+        _check_words(body, MAX_BODY, "A message's words")
+        if not button_label or len(button_label) > MAX_LIST_BUTTON:
+            raise MetaError(
+                f"A list's button is one to {MAX_LIST_BUTTON} characters", kind="invalid"
+            )
+        chosen = []
+        for row in rows:
+            _check_choice(row, MAX_ROW_TITLE, "A list row")
+            chosen.append({"id": row["id"], "title": row["title"]})
+        return self._send(
+            to,
+            {
+                "type": "interactive",
+                "interactive": {
+                    "type": "list",
+                    "body": {"text": body},
+                    "action": {"button": button_label, "sections": [{"rows": chosen}]},
+                },
+            },
         )
 
     def send_template(

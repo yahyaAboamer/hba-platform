@@ -26,7 +26,7 @@ from app.shared.models.identity import UserAccount
 from app.modules.inbox.models import InboxConversation, InboxMedia, InboxMessage, OrderConfirmation
 from app.shared.models.orders import OrderIndex
 from app.shared.services.audit import record_audit
-from app.modules.inbox.services import outbound, payments, sending, tags
+from app.modules.inbox.services import feedback, outbound, payments, sending, tags
 from app.modules.inbox.services.events import ANSWERS, _TAP, held_back_words
 from app.modules.inbox.services.media import can_try_again
 from app.modules.inbox.services.meta import MetaClient
@@ -37,7 +37,7 @@ MESSAGE_PAGE = 50
 MAX_PAGE = 100
 
 #: The list's four views (the approved mockup's chips).
-FILTERS = ("all", "unread", "edit", "cancelled")
+FILTERS = ("all", "unread", "edit", "cancelled", "follow_up", "neutral")
 
 #: WhatsApp's own limit on a text message.
 MAX_TEXT = 4096
@@ -177,6 +177,10 @@ def list_conversations(
         query = query.where(InboxConversation.unread_count > 0)
     elif view in ("edit", "cancelled"):
         query = query.where(_latest_answer == view)
+    elif view == "follow_up":
+        query = query.where(feedback.follow_up_clause())
+    elif view == "neutral":
+        query = query.where(feedback.neutral_clause())
     if q and q.strip():
         query = query.where(_search(q.strip()[:120]))
     position = _read_cursor(before)
@@ -189,8 +193,12 @@ def list_conversations(
         query.order_by(_sorted_at.desc(), InboxConversation.id.desc()).limit(limit + 1)
     ).all()
     page = rows[:limit]
+    marked = feedback.markers(db, [row[0].id for row in page])
     return {
-        "conversations": [describe_conversation(row[0], row[1]) for row in page],
+        "conversations": [
+            {**describe_conversation(row[0], row[1]), "feedback": marked.get(row[0].id)}
+            for row in page
+        ],
         "next": _cursor(page[-1][0].last_message_at, page[-1][0].id) if len(rows) > limit else None,
     }
 
@@ -205,6 +213,8 @@ def counts(db: Session) -> dict:
         "edit": db.scalar(
             select(func.count()).select_from(InboxConversation).where(_latest_answer == "edit")
         ) or 0,
+        # Chats with an unhappy answer waiting for a person.
+        "follow_up": feedback.follow_up_chats(db),
     }
 
 
@@ -301,6 +311,9 @@ def conversation_detail(db: Session, conversation_id: int) -> dict:
     return {
         **describe_conversation(conversation, orders[0].answer if orders else None),
         "orders": [describe_order(order, domain) for order in orders],
+        # Her latest feedback survey, or null: what she answered and what is
+        # owed, so the chat can show it and offer Resolved.
+        "feedback": feedback.chat_block(db, conversation.id),
     }
 
 

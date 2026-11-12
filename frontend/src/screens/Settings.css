@@ -663,7 +663,7 @@
   line-height: normal;
 }
 
-.shop-conn__meta { margin: 4px 0 0; font-size: 12.5px; color: var(--faint); }
+.shop-conn__meta { margin: 4px 0 0; font-size: 12.5px; color: var(--faint); overflow-wrap: anywhere; }
 .sync__hint { margin: 10px 0 0; font-size: 12.5px; color: var(--faint); }
 .data__tool + .data__import { margin-top: var(--space-4); }
 

@@ -7,6 +7,7 @@ import type { Session } from "../lib/api";
 /** The numbers the sidebar can show beside a section, by where they come from. */
 export type CountKey =
   | "chats_unread"
+  | "chats_follow_up"
   | "models_awaiting_approval"
   | "payments_awaiting_approval";
 

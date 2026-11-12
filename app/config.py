@@ -152,6 +152,11 @@ class Settings(BaseSettings):
     #: only what follows is sent - so a change of store domain fails loudly
     #: here instead of sending a link that goes nowhere.
     inbox_payment_link_base: str = "https://hbawear.store/72695906535/order_payment/"
+    #: **Whether a delivered order is asked how it went on WhatsApp**
+    #: (ADR 0083). Off unless set. Switched on, the sweep decides and records
+    #: delivered orders from that moment on, and a server that may not
+    #: message customers records what it would have sent and sends nothing.
+    inbox_feedback_enabled: bool = False
 
     # Where links in emails point. Blank means the platform will not put a
     # link in an email at all rather than send one to localhost - a sign-in

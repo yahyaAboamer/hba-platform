@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.core.businesstime import at_words, clock_words
 from app.core.permissions import Permission
-from app.modules.inbox.services import chats, health
+from app.modules.inbox.services import chats, feedback, health
 from app.shared.services.today import ELAPSED, SINCE, Item, Look
 
 DEPARTMENT = "inbox"
@@ -73,6 +73,52 @@ def look(db: Session, permissions: frozenset[str], now: datetime) -> Look:
                 late=oldest is not None and now - oldest > CHANGE_LATE_AFTER,
                 since=oldest,
                 when=SINCE if oldest else None,
+            )
+        )
+
+    # Post-delivery feedback (ADR 0083). The same chats as Chats' *Needs
+    # follow-up* view; the second item is the stronger part of them, whose
+    # customer answered that their issue was not solved.
+    owed = counted["follow_up"]
+    found.counts["chats_follow_up"] = owed
+    promised = timedelta(hours=feedback.reply_hours(db))
+    if owed:
+        oldest = feedback.oldest_follow_up(db)
+        found.items.append(
+            Item(
+                key="inbox.feedback_follow_up",
+                department=DEPARTMENT,
+                what=(
+                    "1 unhappy customer needs a follow-up"
+                    if owed == 1
+                    else f"{owed} unhappy customers need a follow-up"
+                ),
+                detail="They said they were not happy with their order",
+                go_label="Open Chats",
+                go_to="/inbox/chats?view=follow_up",
+                late=oldest is not None and now - oldest > promised,
+                since=oldest,
+                when=ELAPSED if oldest else None,
+            )
+        )
+    reopened, since = feedback.reopened_chats(db)
+    if reopened:
+        found.items.append(
+            Item(
+                key="inbox.feedback_reopened",
+                department=DEPARTMENT,
+                what=(
+                    "1 customer says their issue was not solved"
+                    if reopened == 1
+                    else f"{reopened} customers say their issue was not solved"
+                ),
+                detail="They answered No to “Was your issue solved?”",
+                go_label="Open Chats",
+                go_to="/inbox/chats?view=follow_up",
+                # They have already waited once and been told it was dealt with.
+                late=True,
+                since=since,
+                when=ELAPSED if since else None,
             )
         )
 

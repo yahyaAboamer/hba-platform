@@ -228,9 +228,47 @@ async function upload<T>(
   return payload as T;
 }
 
+/**
+ * A file the server builds on request (the Feedback sheet's spreadsheet).
+ *
+ * A plain link would show the browser's own error page on a refusal and give
+ * no sign of progress, so the bytes are fetched here with the session and
+ * saved by the caller. Reading changes nothing, so no CSRF token is sent.
+ */
+async function download(path: string): Promise<{ blob: Blob; filename: string | null }> {
+  if (previewBase !== null) throw new ApiError(403, PREVIEW_READ_ONLY);
+
+  const response = await fetch(path, { credentials: "same-origin" });
+
+  if (!response.ok) {
+    let detail = `The platform returned ${response.status}.`;
+    try {
+      const payload = JSON.parse(await response.text());
+      if (payload && typeof payload.detail === "string") detail = payload.detail;
+    } catch {
+      /* not JSON: the generic sentence stands */
+    }
+    throw new ApiError(response.status, detail);
+  }
+
+  const named = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(
+    response.headers.get("content-disposition") ?? "",
+  );
+  let filename: string | null = null;
+  if (named) {
+    try {
+      filename = decodeURIComponent(named[1]);
+    } catch {
+      filename = named[1];
+    }
+  }
+  return { blob: await response.blob(), filename };
+}
+
 export const api = {
   get: <T>(path: string) => request<T>("GET", path),
   upload,
+  download,
   post: <T>(path: string, body?: unknown) => request<T>("POST", path, body),
   put: <T>(path: string, body?: unknown) => request<T>("PUT", path, body),
   patch: <T>(path: string, body?: unknown) => request<T>("PATCH", path, body),

@@ -73,6 +73,21 @@ CONFIRMATION_KINDS = ("confirmation", "payment")
 #: Where an answer was given (ADR 0063).
 ANSWERED_IN = ("whatsapp", "inbox", "shopify")
 
+#: Where a delivered order's feedback question stands (ADR 0083). Like a
+#: confirmation's, plus ``skipped``: decided, and not to be asked (the row
+#: says why, in ``skip_reason``); and ``waiting``: something that clears on
+#: its own stands in the way (``skip_reason`` says what), looked at again at
+#: ``next_attempt_at``.
+FEEDBACK_STATES = (
+    "pending", "waiting", "would_send", "sending", "sent", "no_whatsapp", "failed", "skipped",
+)
+FEEDBACK_RATINGS = ("loved", "okay", "unhappy")
+FEEDBACK_REORDERS = ("very_likely", "maybe", "unlikely")
+#: What the chat is waiting for next: her tap on the first question, her
+#: reason, her words, a person (an unhappy answer), her tap on *Was your issue
+#: solved?*, her tap on how likely she is to order again, or nothing.
+FEEDBACK_STEPS = ("rating", "reason", "comment", "support", "solved", "reorder", "done")
+
 
 def _in(column: str, values: tuple[str, ...]) -> str:
     return f"{column} IN ({', '.join(repr(value) for value in values)})"
@@ -377,6 +392,170 @@ class ShopifyTagsConnection(Base):
     client_secret_hint: Mapped[str] = mapped_column(String(8), nullable=False)
     verified_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     updated_by: Mapped[int | None] = mapped_column(Integer)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+
+
+class FeedbackSurvey(Base):
+    """One delivered order's feedback, asked or skipped (ADR 0083).
+
+    The row is the guard against a second question: ``shopify_order_id`` is
+    unique, so an order is looked at once however often the sweep runs, and a
+    skipped order is never looked at again. It also carries the customer's
+    answers, and the follow-up a person owes an unhappy one. ``step`` says
+    what the chat is waiting for; a tap counts only for the step it is on.
+
+    **This table holds customer details** (phone, first name, the products)
+    and, like the rest of the inbox, is read only by the inbox.
+    """
+
+    __tablename__ = "feedback_survey"
+    __table_args__ = (
+        CheckConstraint(_in("state", FEEDBACK_STATES), name="feedback_survey_state_valid"),
+        CheckConstraint(
+            f"rating IS NULL OR {_in('rating', FEEDBACK_RATINGS)}",
+            name="feedback_survey_rating_valid",
+        ),
+        CheckConstraint(
+            f"reorder IS NULL OR {_in('reorder', FEEDBACK_REORDERS)}",
+            name="feedback_survey_reorder_valid",
+        ),
+        CheckConstraint(_in("step", FEEDBACK_STEPS), name="feedback_survey_step_valid"),
+        CheckConstraint("attempts >= 0", name="feedback_survey_attempts_not_negative"),
+        CheckConstraint("reopened_count >= 0", name="feedback_survey_reopened_not_negative"),
+        # What the sender picks up next.
+        Index(
+            "feedback_survey_due",
+            "next_attempt_at",
+            postgresql_where=text("state = 'pending'"),
+        ),
+        # What the sweep looks at again.
+        Index(
+            "feedback_survey_waiting",
+            "next_attempt_at",
+            postgresql_where=text("state = 'waiting'"),
+        ),
+        # "Was she asked in the last 60 days?" and "what is waiting for her?".
+        Index("feedback_survey_phone", "phone", "created_at"),
+        # Needs follow-up: an unhappy answer waiting for a person.
+        Index(
+            "feedback_survey_follow_up",
+            "rated_at",
+            postgresql_where=text("rating = 'unhappy' AND step = 'support'"),
+        ),
+        # The Feedback sheet, newest delivery first.
+        Index("feedback_survey_delivered", text("delivered_at DESC NULLS LAST"), text("id DESC")),
+        # The survey beside a chat, and a chat's latest answer.
+        Index("feedback_survey_conversation", "conversation_id", "rated_at"),
+        # Codes still out there: what the used-or-not pass and the 30-day
+        # clean-up read (a code on its way back to nothing is not in it).
+        Index(
+            "feedback_survey_code_open",
+            "code_expires_at",
+            postgresql_where=text(
+                "code IS NOT NULL AND code_used_at IS NULL AND code_removed_at IS NULL"
+            ),
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    shopify_order_id: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    #: "#31044" - what staff and the customer call it.
+    order_name: Mapped[str | None] = mapped_column(String(40))
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    courier: Mapped[str | None] = mapped_column(String(80))
+    #: The titles of what was ordered, as Shopify gave them.
+    products: Mapped[list[str]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'::jsonb")
+    )
+    conversation_id: Mapped[int | None] = mapped_column(
+        ForeignKey("inbox_conversation.id", ondelete="SET NULL")
+    )
+    phone: Mapped[str | None] = mapped_column(String(20))
+    customer_name: Mapped[str | None] = mapped_column(String(120))
+
+    # Sending.
+    state: Mapped[str] = mapped_column(String(12), nullable=False, server_default="pending")
+    #: A short code saying why a skipped order was skipped.
+    skip_reason: Mapped[str | None] = mapped_column(String(40))
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_error: Mapped[str | None] = mapped_column(String(300))
+    #: WhatsApp's id for the first question, which a delivery failure names.
+    wa_message_id: Mapped[str | None] = mapped_column(String(200), unique=True)
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    # Her answers.
+    rating: Mapped[str | None] = mapped_column(String(10))
+    rated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reason: Mapped[str | None] = mapped_column(String(20))
+    reason_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    comment: Mapped[str | None] = mapped_column(Text)
+    comment_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reorder: Mapped[str | None] = mapped_column(String(12))
+
+    # The follow-up an unhappy answer is owed.
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    resolved_by: Mapped[int | None] = mapped_column(
+        ForeignKey("user_account.id", ondelete="SET NULL")
+    )
+    solved_asked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    #: Her answer to *Was your issue solved?*; null until she answers.
+    solved: Mapped[bool | None] = mapped_column(Boolean)
+    solved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reopened_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+
+    # Her reward: one code inside the platform's one Shopify discount.
+    #: Unique among surveys. Shopify treats codes without regard to case; ours
+    #: are issued in capitals.
+    code: Mapped[str | None] = mapped_column(String(40), unique=True)
+    #: Shopify's id for the code inside the discount (``DiscountRedeemCode``),
+    #: which removing it needs. Null until Shopify has finished adding it.
+    code_gid: Mapped[str | None] = mapped_column(String(120))
+    #: The code text drawn for this survey before Shopify was asked to add it,
+    #: written down first so a retry after a timeout reuses it (and finds it
+    #: in the discount) instead of leaving the first one there, unknown to us.
+    code_drawn: Mapped[str | None] = mapped_column(String(40))
+    #: When the message carrying the code was sent. Not when it was issued.
+    code_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    code_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    #: When the order that used it was placed, and that order's name.
+    code_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    code_order_name: Mapped[str | None] = mapped_column(String(40))
+    #: When an unused code past its 30 days was taken out of Shopify.
+    code_removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    step: Mapped[str] = mapped_column(String(10), nullable=False, server_default="rating")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+
+
+class FeedbackSettings(Base):
+    """What the feedback feature keeps about itself. One row at most (ADR 0083).
+
+    ``started_at`` is when the feature first ran switched on: nothing
+    delivered before it is ever asked. ``review_url`` and ``reply_hours`` are
+    what the closing messages say. ``discount_gid`` is Shopify's id for the one
+    discount every reward code lives in (``feedback_codes.ensure_discount``).
+    """
+
+    __tablename__ = "feedback_settings"
+    __table_args__ = (
+        CheckConstraint("id = 1", name="feedback_settings_single_row"),
+        CheckConstraint("reply_hours > 0", name="feedback_settings_reply_hours_positive"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    review_url: Mapped[str | None] = mapped_column(Text)
+    reply_hours: Mapped[int] = mapped_column(Integer, nullable=False, server_default="24")
+    #: Shopify's id for the one discount every reward code lives in.
+    discount_gid: Mapped[str | None] = mapped_column(Text)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )

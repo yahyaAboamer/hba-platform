@@ -57,13 +57,19 @@
 .inbox-chat:focus-visible { outline-offset:-2px; }
 .inbox-chat[aria-current="true"] { background:var(--accent-soft); }
 .inbox-avatar { display:grid; place-items:center; grid-row:span 2; width:38px; height:38px; border:1px solid var(--rule); border-radius:50%; background:var(--accent-soft); color:var(--accent-text); font-size:13px; }
-.inbox-chat__name { font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.inbox-chat__who { display:flex; align-items:center; gap:6px; min-width:0; }
+.inbox-chat__name { min-width:0; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+/* Where her delivery feedback stands (ADR 0083): a word beside the name. */
+.inbox-chat__fb { flex:none; padding:1px 7px; border-radius:999px; background:var(--hover); color:var(--quiet); font-size:11px; line-height:1.4; white-space:nowrap; }
+.inbox-chat__fb--follow_up { background:var(--owed-quiet); color:var(--owed); }
+.inbox-chat__fb--reopened { background:var(--refused-quiet); color:var(--refused); }
 .inbox-chat__time { font-size:11.5px; color:var(--faint); font-variant-numeric:tabular-nums; }
 .inbox-chat__last { display:flex; align-items:center; gap:5px; min-width:0; font-size:12.5px; color:var(--quiet); }
 .inbox-chat__last svg { width:13px; height:13px; flex:none; }
 .inbox-chat__words { min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .inbox-chat__badge { justify-self:end; min-width:20px; padding:1px 6px; border-radius:999px; background:var(--accent-fill); color:var(--accent-on); font-size:11.5px; text-align:center; }
 .inbox-chat--unread .inbox-chat__name, .inbox-chat--unread .inbox-chat__last { color:var(--ink); font-weight:500; }
+.inbox-chat--unread .inbox-chat__fb { font-weight:400; }
 .inbox-chat--unread .inbox-chat__time { color:var(--accent-text); }
 .inbox-chat__flag { justify-self:end; font-size:11px; color:var(--owed); }
 .inbox-chats__more { padding:12px; text-align:center; font-size:12.5px; color:var(--faint); }
@@ -198,6 +204,75 @@
 .inbox-other { margin:0; padding:0; list-style:none; font-size:13px; }
 .inbox-other li { display:flex; justify-content:space-between; gap:8px; padding:6px 0; border-bottom:1px solid var(--rule); }
 .inbox-other li:last-child { border-bottom:0; }
+
+
+/* ── The order panel's Feedback block (ADR 0083) ───────────────────────── */
+.inbox-fb-block { margin:0 0 16px; padding:0 0 16px; border-bottom:1px solid var(--rule); }
+.inbox-fb-block--late { margin:16px 0 0; padding:0; border-bottom:0; }
+.inbox-fb-block .inbox-order__hint { margin-top:6px; }
+.inbox-fb-block + h3 { margin-top:0; }
+.inbox-fb-block dd { overflow-wrap:anywhere; }
+.inbox-fb-block__said { white-space:pre-wrap; }
+.inbox-fb-block .inbox-setstatus { margin-top:10px; }
+
+/* ── Feedback: the sheet of every answer (ADR 0083) ────────────────────── */
+/* A compact version of Confirmations' cards: nine numbers, not nine panels. */
+.inbox-fb__tiles { grid-template-columns:repeat(5,minmax(0,1fr)); gap:14px; }
+.inbox-fb__tile { min-height:0; padding:12px 14px 10px; }
+.inbox-fb__tile .ops-tile__value { margin:4px 0 0; font-size:26px; }
+.inbox-fb__tile[aria-pressed="true"] { border-color:var(--accent); box-shadow:inset 0 0 0 1px var(--accent); }
+.inbox-fb__tile--static, .inbox-fb__tile--static:hover { border-color:transparent; cursor:default; }
+.inbox-fb__filters { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:4px 14px; align-items:end; padding:14px 18px 6px; border-bottom:1px solid var(--rule); }
+.inbox-fb__filters .field { min-width:0; margin-bottom:8px; }
+.inbox-fb__filters .field__label { font-size:12px; color:var(--quiet); font-weight:400; }
+.inbox-fb__filters select.input:disabled { color:var(--faint); }
+.inbox-fb__clear { justify-self:start; align-self:center; min-height:32px; margin-bottom:8px; }
+.inbox-fb .inbox-notice { margin:14px 18px; }
+.inbox-fb .empty { margin:0; }
+.inbox-fb .loading { margin:0; }
+.inbox-fb__scroll { overflow-x:auto; }
+.inbox-fb__table { font-size:13px; }
+.inbox-fb__table td { vertical-align:top; }
+.inbox-fb__table th, .inbox-fb__table td { padding-left:8px; padding-right:8px; }
+.inbox-fb__table th:first-child, .inbox-fb__table td:first-child { padding-left:18px; }
+.inbox-fb__table th:last-child, .inbox-fb__table td:last-child { padding-right:18px; }
+.inbox-fb__nowrap { white-space:nowrap; }
+/* An answer, a code and a courier are one word to the eye: they stay on a line and the long cells give way. */
+.inbox-fb__table .inbox-status { white-space:nowrap; }
+.inbox-fb__line { display:block; margin-top:2px; font-size:12.5px; line-height:1.4; }
+.inbox-fb__line:first-child { margin-top:0; }
+.inbox-fb__line--owed { color:var(--owed); white-space:nowrap; }
+.inbox-fb__note { color:var(--faint); font-size:12px; white-space:normal; }
+.inbox-fb__name { display:block; min-width:110px; overflow-wrap:anywhere; }
+.inbox-fb__products, .inbox-fb__comment { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; overflow-wrap:anywhere; }
+.inbox-fb__products { min-width:110px; }
+.inbox-fb__commentcell { min-width:150px; max-width:280px; }
+.inbox-fb__followcell { min-width:105px; }
+.inbox-fb__comment--open { display:block; white-space:pre-wrap; }
+.inbox-fb__more { display:block; margin-top:3px; font-size:12px; }
+.inbox-fb__code { display:block; font-size:12.5px; letter-spacing:.02em; white-space:nowrap; }
+.inbox-fb__foot { display:flex; flex-wrap:wrap; align-items:center; gap:6px 14px; }
+.inbox-fb__problem { color:var(--refused); font-size:12.5px; }
+.inbox-fb__card { display:block; }
+.inbox-fb__who { margin-top:6px; }
+.inbox-fb__who .inbox-fb__name { min-width:0; }
+.inbox-fb__said { display:flex; flex-wrap:wrap; align-items:center; gap:4px 10px; margin-top:8px; font-size:13.5px; }
+.inbox-fb__block { margin-top:8px; font-size:13px; overflow-wrap:anywhere; }
+.inbox-fb__card .inbox-fb__note { margin-top:8px; }
+
+@media (max-width:800px) {
+  .inbox-fb__tiles { grid-template-columns:1fr 1fr; }
+  .inbox-fb__tiles > :last-child:nth-child(odd) { grid-column:1 / -1; }
+  .inbox-fb__filters { grid-template-columns:1fr 1fr; padding:12px 14px 4px; }
+  /* Two to a row until the words need the line; a finger needs 44px, and 16px stops the phone zooming in. */
+  .inbox-fb__filters .input { min-height:44px; font-size:16px; }
+  .inbox-fb__filters .field:nth-last-of-type(-n+2) { grid-column:1 / -1; }
+  .inbox-fb__clear, .inbox-fb__download { min-height:44px; }
+  .inbox-fb-block .inbox-btn { min-height:44px; }
+  .inbox-fb .ops-foot { padding:6px 14px; }
+  .inbox-fb__foot .ops-linkbtn, .inbox-fb__more { min-height:44px; padding:0 4px; }
+  .inbox-fb .inbox-notice { margin:12px 14px; }
+}
 
 /* ── On a phone: one column at a time ──────────────────────────────────── */
 @media (max-width:800px) {
