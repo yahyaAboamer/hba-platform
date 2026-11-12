@@ -10,7 +10,7 @@ separate go-ahead.
 |---|---|---|
 | A | Engine: table, trigger, first question, taps, follow-up questions, resolve, solved question. Silent unless switched on. | Built on this branch; tests pass; not merged |
 | B | Codes: the one Shopify discount, a code per customer, 30-day clean-up, used-or-not, and the closing words that carry them. (Review link and promised hours are columns already; their settings card is batch C.) | Built on this branch; tests pass; not merged |
-| C | Screens: Inbox → Feedback sheet with filters and download; *Needs follow-up* and *Feedback: neutral* chips; *Resolved* button; Today counts; settings card. | Not started |
+| C | Screens: Inbox → Feedback sheet with filters and download; *Needs follow-up* and *Feedback: neutral* chips; *Resolved* button; Today counts; settings card. | C1 (the API and read side) built on this branch; tests pass. C2 (the screens) not started |
 | D | Switch-on: templates approved, discount permission added, test on the owner's phone, then on. | Waiting on the owner |
 
 ## Batch A: design
@@ -117,6 +117,39 @@ sent; if it cannot be sent (or may not have been) the survey returns to step
   from the token exchange (one call to Shopify; nothing is stored) and
   needs `write_discounts`. Saving the second app is unchanged: it still needs
   only `write_orders`.
+
+**As built (batch C1).** The HTTP side, all behind `inbox.use` in
+`app/modules/inbox/api.py`; the reads are in `feedback.py`, the file in
+`feedback_sheet.py` (openpyxl, one row per asked order, dates as dates in Cairo
+time, customers' words stored as text so a leading `=` is never a formula).
+
+- `GET /api/inbox/feedback`: a page of asked orders, newest question first
+  (`limit` 1-200, `offset`), filters `since`/`until` (the Cairo day she was
+  asked, `until` included), `rating`, `reason`, `product`, `courier`, `state`
+  (`needs_follow_up`, `resolved`, `reopened`), `q` (order, customer, phone).
+  Returns `rows`, `next_offset`, a `summary` for the same filters and the
+  `options` for the filter menus. Skipped and waiting rows are never listed.
+  A question never sent is placed by when it was recorded.
+- `GET /api/inbox/feedback/download`: the same filters, every row, as an
+  `.xlsx` named `feedback-<Cairo date>.xlsx`; audited as
+  `inbox.feedback_downloaded` (row count and filters, never the search text).
+- `POST /api/inbox/feedback/{id}/resolve`: `feedback_replies.resolve`; 404 no
+  such feedback, 422 not an unhappy answer waiting for follow-up (which covers
+  already resolved).
+- `GET /api/inbox/feedback/settings` (`enabled`, `started_at`, `review_url`,
+  `reply_hours`, `codes_ready: {ready, reason}`; the only read that asks
+  Shopify) and `PUT` (admin only, `settings.manage`): `review_url` empty or
+  `https://`, at most 500 characters; `reply_hours` 1-72; audited as
+  `inbox.feedback_settings_saved`.
+- A chat's detail carries `feedback` (her latest asked survey, or null). The
+  conversation list gains two views, `follow_up` and `neutral` (her latest
+  answered survey is *okay* and was given in the last 14 days), a `feedback`
+  marker on each row (`reopened`, `follow_up`, `neutral` or null) and
+  `counts.follow_up`.
+- Today: `inbox.feedback_follow_up` (chats with an unhappy answer waiting for a
+  person; late once the oldest has waited longer than the promised hours) and
+  the stronger `inbox.feedback_reopened` (always late). The sidebar count key
+  is `chats_follow_up`, the same number as the list's chip.
 
 ## Owner's steps (batch D)
 

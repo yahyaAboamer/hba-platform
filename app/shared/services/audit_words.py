@@ -234,6 +234,9 @@ def sentence(event: AuditEvent, names: _Names) -> str:
         "inbox.confirmation_resent": f"Sent the WhatsApp confirmation for order {a.get('order') or '?'} again",
         "inbox.answer_set": f"Marked order {a.get('order') or '?'} as {_ANSWER.get(a.get('answer'), 'answered')}",
         "inbox.feedback_resolved": f"Marked the unhappy feedback on order {a.get('order') or '?'} as resolved",
+        "inbox.feedback_downloaded": f"Downloaded the feedback sheet ({a.get('rows', '?')} rows)",
+        "inbox.feedback_settings_saved": "Changed the feedback settings"
+        + (f" ({', '.join(a['changed'])})" if a.get('changed') else ""),
         "staff.preference_changed": f"Turned {'on' if a.get('on') else 'off'} “{a.get('switch')}” for themselves",
         "staff.role_changed": f"Changed {who}'s access to {_ROLE.get(a.get('role'), a.get('role'))}",
         "staff.role_given": f"Gave {who} {_ROLE.get(a.get('role'), a.get('role'))} access",

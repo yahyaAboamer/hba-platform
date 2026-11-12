@@ -52,6 +52,7 @@ from app.modules.inbox.services.meta import MetaClient, MetaError
 from app.modules.inbox.services.sending import egyptian_mobile
 from app.shared.models.identity import UserAccount
 from app.shared.models.orders import OrderIndex
+from app.shared.services.audit import record_audit
 from app.shared.services.jobs import JobKind, PermanentFailure, enqueue
 from app.shared.services.shopify.client import ShopifyClient, ShopifyError
 from app.shared.services.shopify.sync import PERMANENT, build_client, order_gid
@@ -781,6 +782,9 @@ def describe(row: FeedbackSurvey, resolved_by: str | None = None) -> dict:
         "code_expires_at": _iso(row.code_expires_at),
         "code_used_at": _iso(row.code_used_at),
         "code_order_name": row.code_order_name,
+        "asked_at": _iso(row.sent_at or row.created_at),
+        "state_label": STATE_LABELS.get(row.state, row.state),
+        "last_error": row.last_error,
     }
 
 
@@ -816,32 +820,61 @@ def needs_follow_up(db: Session) -> list[dict]:
     return [describe(row) for row in rows]
 
 
-def rows(
-    db: Session,
+SHEET_STATES = ("needs_follow_up", "resolved", "reopened")
+
+#: What the sheet and its download call each way a question can stand.
+STATE_LABELS = {
+    "pending": "Queued",
+    "sending": "Sending",
+    "sent": "Sent",
+    "no_whatsapp": "Not on WhatsApp",
+    "failed": "Failed",
+    "would_send": "Would send (sending is off)",
+}
+REORDER_TITLES = dict(REORDERS)
+
+
+def reason_title(rating: str | None, reason: str | None) -> str | None:
+    """The words a customer tapped for her reason, e.g. ``Size / fit``."""
+    if not reason:
+        return None
+    for key, title in REASONS.get(rating or "", ()):
+        if key == reason:
+            return title
+    return reason
+
+
+def asked_at():
+    """When she was asked: the moment it was sent, else when it was recorded
+    (a question that was never sent still has a row)."""
+    return func.coalesce(FeedbackSurvey.sent_at, FeedbackSurvey.created_at)
+
+
+def _filtered(
+    query,
     *,
     since: datetime | None = None,
     until: datetime | None = None,
+    asked_from: datetime | None = None,
+    asked_before: datetime | None = None,
     rating: str | None = None,
     reason: str | None = None,
     product: str | None = None,
     courier: str | None = None,
+    state: str | None = None,
+    q: str | None = None,
     include_skipped: bool = False,
-    limit: int = 200,
-    offset: int = 0,
-) -> list[dict]:
-    """The Feedback sheet: one dict per asked order, newest delivery first.
-
-    ``since`` and ``until`` bound the delivered date. Skipped orders are not
-    asked, and waiting ones not yet, so both are left out unless
-    ``include_skipped``.
-    """
-    query = select(FeedbackSurvey)
+):
     if not include_skipped:
         query = query.where(FeedbackSurvey.state.not_in(("skipped", "waiting")))
     if since is not None:
         query = query.where(FeedbackSurvey.delivered_at >= since)
     if until is not None:
         query = query.where(FeedbackSurvey.delivered_at < until)
+    if asked_from is not None:
+        query = query.where(asked_at() >= asked_from)
+    if asked_before is not None:
+        query = query.where(asked_at() < asked_before)
     if rating:
         query = query.where(FeedbackSurvey.rating == rating)
     if reason:
@@ -850,14 +883,340 @@ def rows(
         query = query.where(FeedbackSurvey.courier == courier)
     if product:
         query = query.where(FeedbackSurvey.products.cast(Text).ilike(_like(product), escape="\\"))
-    found = list(
-        db.scalars(
-            query.order_by(
-                FeedbackSurvey.delivered_at.desc().nulls_last(), FeedbackSurvey.id.desc()
-            )
-            .limit(max(1, min(limit, 1000)))
-            .offset(max(0, offset))
-        )
+    if state == "needs_follow_up":
+        query = query.where(FeedbackSurvey.rating == "unhappy", FeedbackSurvey.step == "support")
+    elif state == "resolved":
+        query = query.where(FeedbackSurvey.resolved_at.is_not(None))
+    elif state == "reopened":
+        query = query.where(FeedbackSurvey.reopened_count > 0)
+    if q and q.strip():
+        words = q.strip()[:120]
+        digits = "".join(ch for ch in words if ch.isdigit())
+        clauses = [
+            FeedbackSurvey.order_name.ilike(_like(words.lstrip("#")), escape="\\"),
+            FeedbackSurvey.customer_name.ilike(_like(words), escape="\\"),
+        ]
+        if len(digits) >= 3:
+            clauses.append(FeedbackSurvey.phone.like(_like(digits), escape="\\"))
+            if digits.startswith("0"):
+                # 010... is how it is said; 2010... is how it is kept.
+                clauses.append(FeedbackSurvey.phone.like(_like("20" + digits[1:]), escape="\\"))
+        query = query.where(or_(*clauses))
+    return query
+
+
+def rows(
+    db: Session,
+    *,
+    since: datetime | None = None,
+    until: datetime | None = None,
+    asked_from: datetime | None = None,
+    asked_before: datetime | None = None,
+    rating: str | None = None,
+    reason: str | None = None,
+    product: str | None = None,
+    courier: str | None = None,
+    state: str | None = None,
+    q: str | None = None,
+    include_skipped: bool = False,
+    by_asked: bool = False,
+    limit: int | None = 200,
+    offset: int = 0,
+) -> list[dict]:
+    """The Feedback sheet: one dict per asked order, newest first.
+
+    ``since`` and ``until`` bound the delivered date; ``asked_from`` and
+    ``asked_before`` the moment she was asked. Newest delivery first, or newest
+    question first with ``by_asked``. Skipped orders are not asked, and waiting
+    ones not yet, so both are left out unless ``include_skipped``. ``limit``
+    None reads them all (the download).
+    """
+    query = _filtered(
+        select(FeedbackSurvey),
+        since=since, until=until, asked_from=asked_from, asked_before=asked_before,
+        rating=rating, reason=reason, product=product, courier=courier, state=state, q=q,
+        include_skipped=include_skipped,
     )
+    if by_asked:
+        query = query.order_by(asked_at().desc(), FeedbackSurvey.id.desc())
+    else:
+        query = query.order_by(
+            FeedbackSurvey.delivered_at.desc().nulls_last(), FeedbackSurvey.id.desc()
+        )
+    if limit is not None:
+        query = query.limit(max(1, min(limit, 1000)))
+    found = list(db.scalars(query.offset(max(0, offset))))
     names = _names(db, found)
     return [describe(row, names.get(row.resolved_by)) for row in found]
+
+
+def summary(db: Session, **filters) -> dict:
+    """The sheet's numbers for the same filters as ``rows``."""
+    S = FeedbackSurvey
+    found = db.execute(
+        _filtered(
+            select(
+                func.count(),
+                func.count().filter(S.rating.is_not(None)),
+                func.count().filter(S.rating == "loved"),
+                func.count().filter(S.rating == "okay"),
+                func.count().filter(S.rating == "unhappy"),
+                func.count().filter(S.rating == "unhappy", S.step == "support"),
+                func.count().filter(S.solved.is_(True)),
+                func.count().filter(S.code_sent_at.is_not(None)),
+                func.count().filter(S.code_used_at.is_not(None)),
+            ),
+            **filters,
+        )
+    ).one()
+    keys = (
+        "asked", "answered", "loved", "okay", "unhappy",
+        "needs_follow_up", "solved", "codes_sent", "codes_used",
+    )
+    return dict(zip(keys, (int(n) for n in found)))
+
+
+def couriers(db: Session) -> list[str]:
+    """Every courier a question was asked about, for the filter's menu."""
+    return list(
+        db.scalars(
+            select(FeedbackSurvey.courier)
+            .where(
+                FeedbackSurvey.courier.is_not(None),
+                FeedbackSurvey.state.not_in(("skipped", "waiting")),
+            )
+            .distinct()
+            .order_by(FeedbackSurvey.courier)
+        )
+    )
+
+
+def options(db: Session) -> dict:
+    """What the sheet's filter menus offer."""
+    return {
+        "couriers": couriers(db),
+        "ratings": [{"id": key, "title": RATING_TITLES[key]} for key in RATINGS],
+        "reasons": {
+            rating: [{"id": key, "title": title} for key, title in REASONS[rating]]
+            for rating in RATINGS
+        },
+        "states": [
+            {"id": "needs_follow_up", "title": "Needs follow-up"},
+            {"id": "resolved", "title": "Resolved"},
+            {"id": "reopened", "title": "Reopened"},
+        ],
+    }
+
+
+def reply_hours(db: Session) -> int:
+    """The promised hours, read without writing (Today reads this)."""
+    return db.scalar(select(FeedbackSettings.reply_hours).where(FeedbackSettings.id == 1)) or 24
+
+
+# ── Beside a chat: its list's views and markers, and the survey in it ────────
+
+#: A neutral answer stays a chip's worth of interest for this long.
+NEUTRAL_FOR = timedelta(days=14)
+
+
+def follow_up_clause():
+    """For a query over ``InboxConversation``: the customer has an unhappy
+    answer waiting for a person."""
+    S = FeedbackSurvey
+    return exists().where(
+        S.conversation_id == InboxConversation.id, S.rating == "unhappy", S.step == "support"
+    )
+
+
+def _latest_answered(column):
+    S = FeedbackSurvey
+    return (
+        select(column)
+        .where(S.conversation_id == InboxConversation.id, S.rating.is_not(None))
+        .order_by(S.rated_at.desc().nulls_last(), S.id.desc())
+        .limit(1)
+        .correlate(InboxConversation)
+        .scalar_subquery()
+    )
+
+
+def neutral_clause(now: datetime | None = None):
+    """For a query over ``InboxConversation``: her latest answered survey is
+    *It was okay*, given in the last 14 days."""
+    since = (now or utcnow()) - NEUTRAL_FOR
+    return and_(
+        _latest_answered(FeedbackSurvey.rating) == "okay",
+        _latest_answered(FeedbackSurvey.rated_at) >= since,
+    )
+
+
+def follow_up_chats(db: Session) -> int:
+    """Chats with an unhappy answer waiting for a person."""
+    return db.scalar(select(func.count()).select_from(InboxConversation).where(follow_up_clause())) or 0
+
+
+def reopened_chats(db: Session) -> tuple[int, datetime | None]:
+    """Chats whose customer said her issue was *not* solved, and since when
+    the longest-waiting has been waiting."""
+    S = FeedbackSurvey
+    count, since = db.execute(
+        select(func.count(func.distinct(S.conversation_id)), func.min(func.coalesce(S.solved_at, S.rated_at)))
+        .where(S.rating == "unhappy", S.step == "support", S.reopened_count > 0)
+        .where(S.conversation_id.is_not(None))
+    ).one()
+    return int(count or 0), since
+
+
+def oldest_follow_up(db: Session) -> datetime | None:
+    S = FeedbackSurvey
+    return db.scalar(
+        select(func.min(S.rated_at)).where(
+            S.rating == "unhappy", S.step == "support", S.conversation_id.is_not(None)
+        )
+    )
+
+
+def markers(db: Session, conversation_ids: list[int], now: datetime | None = None) -> dict[int, str]:
+    """The small badge a list row wears: ``reopened`` (she said her issue was
+    not solved), ``follow_up`` (unhappy, waiting for a person) or ``neutral``
+    (her latest answer was *okay*, in the last 14 days). Absent for none."""
+    if not conversation_ids:
+        return {}
+    S = FeedbackSurvey
+    now = now or utcnow()
+    found: dict[int, str] = {}
+    latest: dict[int, FeedbackSurvey] = {}
+    surveys = db.scalars(
+        select(S)
+        .where(S.conversation_id.in_(conversation_ids), S.rating.is_not(None))
+        .order_by(S.rated_at.nulls_first(), S.id)
+    )
+    for row in surveys:
+        latest[row.conversation_id] = row  # the last one wins: the latest answered
+        if row.rating == "unhappy" and row.step == "support":
+            if row.reopened_count > 0:
+                found[row.conversation_id] = "reopened"
+            elif found.get(row.conversation_id) != "reopened":
+                found[row.conversation_id] = "follow_up"
+    for conversation_id, row in latest.items():
+        if (
+            conversation_id not in found
+            and row.rating == "okay"
+            and row.rated_at is not None
+            and row.rated_at >= now - NEUTRAL_FOR
+        ):
+            found[conversation_id] = "neutral"
+    return found
+
+
+def chat_block(db: Session, conversation_id: int) -> dict | None:
+    """The customer's latest asked survey, for her chat: what she answered and
+    what is owed, so the chat can show it and offer *Resolved*."""
+    S = FeedbackSurvey
+    row = db.scalar(
+        select(S)
+        .where(S.conversation_id == conversation_id, S.state.not_in(("skipped", "waiting")))
+        .order_by(asked_at().desc(), S.id.desc())
+        .limit(1)
+    )
+    if row is None:
+        return None
+    names = _names(db, [row])
+    return {
+        "id": row.id,
+        "order_name": row.order_name,
+        "asked_at": _iso(row.sent_at or row.created_at),
+        "state": row.state,
+        "rating": row.rating,
+        "rated_at": _iso(row.rated_at),
+        "reason": row.reason,
+        "reason_title": reason_title(row.rating, row.reason),
+        "comment": row.comment,
+        "reorder": row.reorder,
+        "step": row.step,
+        "needs_follow_up": row.rating == "unhappy" and row.step == "support",
+        "resolved_at": _iso(row.resolved_at),
+        "resolved_by_name": names.get(row.resolved_by),
+        "solved": row.solved,
+        "reopened_count": row.reopened_count,
+        "last_error": row.last_error,
+        "code": row.code,
+        "code_used": row.code_used_at is not None,
+    }
+
+
+# ── Settings ──────────────────────────────────────────────────────────────────
+
+REVIEW_URL_MAX = 500
+REPLY_HOURS = (1, 72)
+
+
+class SettingsRefused(ValueError):
+    """A setting that cannot be saved, in words safe to show."""
+
+
+def describe_settings(db: Session) -> dict:
+    """What Settings shows, read without writing. ``codes_ready`` is not here:
+    it asks Shopify, so only the Settings read adds it."""
+    row = db.get(FeedbackSettings, 1)
+    return {
+        "enabled": enabled(),
+        "started_at": _iso(row.started_at) if row else None,
+        "review_url": row.review_url if row else None,
+        "reply_hours": row.reply_hours if row else 24,
+    }
+
+
+def _checked_url(value: str) -> str | None:
+    value = value.strip()
+    if not value:
+        return None
+    if len(value) > REVIEW_URL_MAX:
+        raise SettingsRefused(f"The review link can be at most {REVIEW_URL_MAX} characters.")
+    host = value[len("https://"):].split("/", 1)[0] if value.lower().startswith("https://") else ""
+    if not host or any(ch.isspace() or ord(ch) < 32 for ch in value):
+        raise SettingsRefused("The review link must start with https:// and be a single link.")
+    return value
+
+
+def save_settings(
+    db: Session,
+    *,
+    review_url: str | None = None,
+    reply_hours: int | None = None,
+    set_review_url: bool = False,
+    set_reply_hours: bool = False,
+    actor_id: int | None,
+    actor_email: str | None,
+) -> dict:
+    """Change the review link and the promised hours; audited."""
+    url = _checked_url(review_url or "") if set_review_url else None
+    if set_reply_hours and (
+        reply_hours is None or not REPLY_HOURS[0] <= reply_hours <= REPLY_HOURS[1]
+    ):
+        raise SettingsRefused(
+            f"The promised reply time must be between {REPLY_HOURS[0]} and {REPLY_HOURS[1]} hours."
+        )
+    row = get_settings(db)
+    before, after, changed = {}, {}, []
+    if set_review_url and url != row.review_url:
+        before["review_url"], after["review_url"] = row.review_url, url
+        row.review_url = url
+        changed.append("review link")
+    if set_reply_hours and reply_hours != row.reply_hours:
+        before["reply_hours"], after["reply_hours"] = row.reply_hours, reply_hours
+        row.reply_hours = reply_hours
+        changed.append("promised hours")
+    if changed:
+        row.updated_at = utcnow()
+        record_audit(
+            db,
+            action="inbox.feedback_settings_saved",
+            subject="feedback_settings",
+            actor_id=actor_id,
+            actor_email=actor_email,
+            before=before,
+            after={**after, "changed": changed},
+        )
+    db.flush()
+    return describe_settings(db)

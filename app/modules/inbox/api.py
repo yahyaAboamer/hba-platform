@@ -15,6 +15,7 @@ that customer, or her 24 hours have passed.
 """
 
 import logging
+from datetime import date, timedelta
 from typing import Literal
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile
@@ -23,10 +24,15 @@ from sqlalchemy.orm import Session
 
 from app.shared.api.deps import require_permission
 from app.core.permissions import Permission
+from app.core.businesstime import business_midnight, utcnow
 from app.db import get_session
 from app.shared.models.identity import UserAccount
+from app.shared.services.audit import record_audit
 from app.modules.inbox.models import InboxMessage
-from app.modules.inbox.services import chats, connection, health, media, outbound, sending
+from app.modules.inbox.services import (
+    chats, connection, feedback, feedback_codes, feedback_replies, feedback_sheet, health, media,
+    outbound, sending,
+)
 from app.modules.inbox.services.meta import MetaClient, MetaError
 
 logger = logging.getLogger(__name__)
@@ -69,7 +75,7 @@ class AnswerBody(BaseModel):
 
 @router.get("/conversations")
 def conversations(
-    view: Literal["all", "unread", "edit", "cancelled"] = "all",
+    view: Literal["all", "unread", "edit", "cancelled", "follow_up", "neutral"] = "all",
     q: str | None = Query(None, max_length=120),
     before: str | None = Query(None, max_length=80),
     limit: int | None = Query(None, ge=1, le=100),
@@ -485,3 +491,141 @@ def set_sending(
         raise HTTPException(422, str(exc)) from None
     db.commit()
     return _described(db)
+
+
+# ── Feedback after delivery (ADR 0083) ────────────────────────────────────────
+
+SHEET_PAGE = 50
+SHEET_MAX_PAGE = 200
+
+
+def _sheet_filters(
+    since: date | None = Query(None, description="First day she was asked (Cairo)"),
+    until: date | None = Query(None, description="Last day she was asked (Cairo), included"),
+    rating: Literal["loved", "okay", "unhappy"] | None = None,
+    reason: str | None = Query(None, max_length=30),
+    product: str | None = Query(None, max_length=120),
+    courier: str | None = Query(None, max_length=80),
+    state: Literal["needs_follow_up", "resolved", "reopened"] | None = None,
+    q: str | None = Query(None, max_length=120),
+) -> dict:
+    """The sheet's filters, shared by the list and the download."""
+    return {
+        "asked_from": business_midnight(since) if since else None,
+        "asked_before": business_midnight(until + timedelta(days=1)) if until else None,
+        "rating": rating,
+        "reason": reason,
+        "product": product,
+        "courier": courier,
+        "state": state,
+        "q": q,
+    }
+
+
+@router.get("/feedback")
+def feedback_list(
+    filters: dict = Depends(_sheet_filters),
+    limit: int = Query(SHEET_PAGE, ge=1, le=SHEET_MAX_PAGE),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_session),
+) -> dict:
+    """The Feedback sheet: asked orders, newest question first, a page at a
+    time, with the numbers for the same filters and the filters' menus."""
+    found = feedback.rows(db, **filters, by_asked=True, limit=limit + 1, offset=offset)
+    page = found[:limit]
+    return {
+        "rows": page,
+        "next_offset": offset + limit if len(found) > limit else None,
+        "summary": feedback.summary(db, **filters),
+        "options": feedback.options(db),
+    }
+
+
+@router.get("/feedback/download")
+def feedback_download(
+    filters: dict = Depends(_sheet_filters),
+    actor: UserAccount = Depends(GUARD),
+    db: Session = Depends(get_session),
+) -> Response:
+    """Every row the same filters match, as an ``.xlsx``.
+
+    It carries customers' names and phones, so it is audited: who, when, how
+    many rows and which filters (never what was typed in the search box).
+    """
+    found = feedback.rows(db, **filters, by_asked=True, limit=None)
+    now = utcnow()
+    record_audit(
+        db,
+        action="inbox.feedback_downloaded",
+        subject="feedback",
+        actor_id=actor.id,
+        actor_email=actor.email,
+        after={
+            "rows": len(found),
+            "filters": {
+                key: ("given" if key == "q" else value.isoformat() if hasattr(value, "isoformat") else value)
+                for key, value in filters.items()
+                if value
+            },
+        },
+    )
+    content = feedback_sheet.build(found)
+    db.commit()
+    return Response(
+        content=content,
+        media_type=feedback_sheet.CONTENT_TYPE,
+        headers={"Content-Disposition": f'attachment; filename="{feedback_sheet.file_name(now)}"'},
+    )
+
+
+@router.post("/feedback/{survey_id}/resolve")
+def feedback_resolve(
+    survey_id: int,
+    actor: UserAccount = Depends(GUARD),
+    db: Session = Depends(get_session),
+) -> dict:
+    """A person has followed up an unhappy answer. A day later she is asked
+    whether it was solved. Returns the survey as the sheet lists it."""
+    done = _answering(lambda: feedback_replies.resolve(db, survey_id, actor))
+    db.commit()
+    return done
+
+
+class FeedbackSettingsBody(BaseModel):
+    #: Empty clears it. Left out keeps it. Checked in ``feedback.save_settings``.
+    review_url: str | None = None
+    reply_hours: int | None = None
+
+
+@router.get("/feedback/settings")
+def feedback_settings(db: Session = Depends(get_session)) -> dict:
+    """The feature's switch, since when it has run, the review link, the
+    promised hours, and whether reward codes can be made right now (which asks
+    Shopify, so it is read here and nowhere else)."""
+    body = feedback.describe_settings(db)
+    ready, why = feedback_codes.codes_ready(db)
+    return {**body, "codes_ready": {"ready": ready, "reason": why}}
+
+
+@router.put("/feedback/settings")
+def save_feedback_settings(
+    body: FeedbackSettingsBody,
+    actor: UserAccount = Depends(SETTINGS_GUARD),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Change the review link and the promised hours. An admin's."""
+    try:
+        saved = feedback.save_settings(
+            db,
+            review_url=body.review_url,
+            reply_hours=body.reply_hours,
+            set_review_url="review_url" in body.model_fields_set,
+            set_reply_hours="reply_hours" in body.model_fields_set,
+            actor_id=actor.id,
+            actor_email=actor.email,
+        )
+    except feedback.SettingsRefused as exc:
+        db.rollback()
+        raise HTTPException(422, str(exc)) from None
+    db.commit()
+    return saved
