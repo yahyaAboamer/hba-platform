@@ -20,8 +20,8 @@ separate go-ahead.
 
 - order: `order_name`, `delivered_at`, `courier`, `products` (JSONB list of
   titles), `conversation_id`, `phone`, `customer_name`
-- sending: `state` (`pending`, `would_send`, `sending`, `sent`, `no_whatsapp`,
-  `failed`, `skipped`), `skip_reason`, `attempts`, `next_attempt_at`,
+- sending: `state` (`pending`, `waiting`, `would_send`, `sending`, `sent`,
+  `no_whatsapp`, `failed`, `skipped`), `skip_reason`, `attempts`, `next_attempt_at`,
   `last_error`, `wa_message_id` (unique), `sent_at`
 - answers: `rating` (`loved`, `okay`, `unhappy`), `rated_at`, `reason`,
   `reason_at`, `comment`, `comment_at`, `reorder` (`very_likely`, `maybe`,
@@ -67,6 +67,18 @@ seam `issue_code` (returns nothing until batch B). "Returns awaiting review or
 a refund owed" is read through `operations.public`. A skipped row keeps no
 phone, name or products. "An unhappy answer not yet resolved" means an unhappy
 survey on step `support`.
+
+An order whose customer has written something nobody on the team has answered
+(in the last 72 hours, ignoring button taps and reactions; "answered" means
+the latest message a member of staff sent her is newer), or who has an unhappy
+answer not yet resolved, is recorded `waiting` with no customer detail and
+looked at again every 6 hours by the sweep. Past 7 days from delivery it
+becomes `skipped` (`waited_too_long`). A `pending` question whose send job
+ended without sending is queued again by the sweep after 30 minutes. "Asked in
+the last 60 days" counts questions sent or on their way, not ones only
+recorded or never delivered. The solved question is claimed before it is
+sent; if it cannot be sent (or may not have been) the survey returns to step
+`support` with the reason in `last_error`, so a person sees her.
 
 ## Owner's steps (batch D)
 

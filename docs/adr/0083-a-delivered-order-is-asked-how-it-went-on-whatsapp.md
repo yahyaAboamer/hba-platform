@@ -32,10 +32,17 @@ Facts this is built on, checked on the day:
    - it was delivered before the feature was switched on, or more than seven
      days ago;
    - its phone is not an Egyptian mobile;
-   - the same phone was asked in the last 60 days;
-   - the customer's chat has an unanswered message from her, or an unhappy
-     answer not yet resolved.
-   A skipped order is recorded with its reason and never retried.
+   - the same phone was asked in the last 60 days.
+   An order not asked for one of these reasons is recorded with the reason
+   and never looked at again.
+
+   An order **waits**, instead of being dropped, when the customer has
+   written something in the last three days that nobody on the team has
+   answered, or when she has an unhappy answer not yet resolved: both clear
+   on their own. A tap on a button does not count as writing, and a message
+   older than three days no longer blocks. A waiting order is looked at again
+   every six hours and is asked as soon as it is clear. If seven days pass
+   after delivery and it is still waiting, it is dropped.
 2. **The first question** is an approved template naming the order, with
    three buttons: *Loved it*, *It was okay*, *Not happy*. It never mentions a
    reward.

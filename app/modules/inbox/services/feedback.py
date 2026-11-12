@@ -11,9 +11,14 @@ The flow, in the inbox lane:
    are due - two days after Shopify's delivered date, no later than seven,
    and not before the feature was first switched on - reads each one's phone,
    first name and products from Shopify with a query of its own, applies the
-   skips (``decide``) and records a row for it: ``pending`` to be asked, or
-   ``skipped`` with the reason. **Every decided order has a row, so it is
-   never looked at twice.** A skipped row keeps no customer details.
+   skips (``decide``) and records a row for it: ``pending`` to be asked,
+   ``skipped`` with the reason, or ``waiting``. **Every decided order has a
+   row, so it is never looked at twice** - except a waiting one: a customer
+   who has written something nobody has answered, or who has an unhappy
+   answer not yet resolved, is a reason to *wait*, not to give up, because it
+   clears on its own. A waiting order is looked at again every six hours and
+   is dropped (``skipped``) once seven days have passed since delivery. A
+   skipped or waiting row keeps no customer details.
 2. ``INBOX_FEEDBACK_SEND`` sends the first question, an approved template
    with three buttons. It is claimed in a transaction of its own before
    WhatsApp is asked, so it is sent at most once; on a server that may not
@@ -28,7 +33,7 @@ from collections.abc import Callable
 from datetime import datetime, timedelta
 from typing import Any
 
-from sqlalchemy import Text, exists, func, select, update
+from sqlalchemy import Text, and_, exists, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import set_committed_value
@@ -39,6 +44,7 @@ from app.modules.inbox.models import (
     FeedbackSettings,
     FeedbackSurvey,
     InboxConversation,
+    InboxMessage,
 )
 from app.modules.inbox.services import outbound, sending
 from app.modules.inbox.services.events import _conversation
@@ -123,6 +129,14 @@ ASK_AFTER = timedelta(days=2)
 ASK_BEFORE = timedelta(days=7)
 #: The same customer is not asked again within this long.
 SAME_PHONE_FOR = timedelta(days=60)
+#: A waiting order is looked at again this long after it was last looked at.
+WAIT_FOR = timedelta(hours=6)
+#: A written message from her that nobody on the team has answered blocks the
+#: question for this long after she wrote it. Older, it no longer blocks.
+UNANSWERED_FOR = timedelta(hours=72)
+#: A ``pending`` question whose send job ended without sending (the feature
+#: was off when it ran, say) is queued again after this long.
+PENDING_STALE_AFTER = timedelta(minutes=30)
 #: Orders decided per sweep. A day's deliveries are a fraction of this.
 SWEEP_BATCH = 50
 
@@ -132,11 +146,16 @@ SKIP_NOT_FOUND = "order_not_found"
 SKIP_CANCELLED = "cancelled"
 SKIP_TEST = "test_order"
 SKIP_RETURN = "return_or_refund"
+SKIP_REFUNDED = "refunded"
 SKIP_NO_PHONE = "no_phone"
 SKIP_BAD_PHONE = "bad_phone"
 SKIP_ASKED_RECENTLY = "asked_recently"
-SKIP_UNREAD = "unread_chat"
-SKIP_UNHAPPY_OPEN = "unhappy_open"
+SKIP_WAITED_TOO_LONG = "waited_too_long"
+
+# Why an order is waiting (``skip_reason`` on a ``waiting`` row).
+WAIT_UNANSWERED = "unanswered_message"
+WAIT_UNHAPPY_OPEN = "unhappy_open"
+WAITING_REASONS = (WAIT_UNANSWERED, WAIT_UNHAPPY_OPEN)
 
 #: What the feedback question needs from the order, and nothing else. Its own
 #: query, like the confirmation's: a customer field Shopify refused here fails
@@ -227,31 +246,83 @@ def _titles(node: dict) -> list[str]:
 
 
 def _asked_recently(db: Session, phone: str, now: datetime) -> bool:
-    asked_at = func.coalesce(FeedbackSurvey.sent_at, FeedbackSurvey.created_at)
+    """Whether this phone was asked in the last 60 days.
+
+    Counts a question that went out (``sent``, by when it was sent) and one
+    on its way (``pending`` or ``sending``, by when it was decided): without
+    the second, two orders for one customer decided in the same sweep would
+    both ask her. A question that was only recorded (``would_send``) or that
+    never reached her (``failed``, ``no_whatsapp``) is not asking her, so it
+    does not count. ``requeue_stale_pending`` keeps a ``pending`` one from
+    staying that way.
+    """
+    sent = and_(
+        FeedbackSurvey.state == "sent", FeedbackSurvey.sent_at >= now - SAME_PHONE_FOR
+    )
+    on_its_way = and_(
+        FeedbackSurvey.state.in_(("pending", "sending")),
+        FeedbackSurvey.created_at >= now - SAME_PHONE_FOR,
+    )
     return bool(
         db.scalar(
             select(FeedbackSurvey.id)
-            .where(
-                FeedbackSurvey.phone == phone,
-                FeedbackSurvey.state.in_(("pending", "sending", "would_send", "sent")),
-                asked_at >= now - SAME_PHONE_FOR,
-            )
+            .where(FeedbackSurvey.phone == phone, or_(sent, on_its_way))
             .limit(1)
         )
     )
 
 
+def _unanswered(db: Session, phone: str, now: datetime) -> bool:
+    """Whether she wrote something in the last 72 hours that nobody on the
+    team has answered.
+
+    Her latest message that is not a tap on a button (and not a reaction) is
+    newer than the latest message a member of staff sent her, and is under
+    72 hours old. A tap is not something to answer - every customer who
+    tapped Confirm has one - and an old message nobody answered no longer
+    blocks. An automatic message is not an answer.
+    """
+    conversation_id = db.scalar(
+        select(InboxConversation.id).where(InboxConversation.phone == phone)
+    )
+    if conversation_id is None:
+        return False
+    wrote_at = db.scalar(
+        select(func.max(InboxMessage.occurred_at)).where(
+            InboxMessage.conversation_id == conversation_id,
+            InboxMessage.direction == "in",
+            InboxMessage.kind.not_in(("button", "reaction")),
+        )
+    )
+    if wrote_at is None or now - wrote_at >= UNANSWERED_FOR:
+        return False
+    answered_at = db.scalar(
+        select(func.max(InboxMessage.occurred_at)).where(
+            InboxMessage.conversation_id == conversation_id,
+            InboxMessage.direction == "out",
+            InboxMessage.origin == "staff",
+        )
+    )
+    return answered_at is None or wrote_at > answered_at
+
+
 def _why_not(
     db: Session, order: OrderIndex, node: dict | None, now: datetime
 ) -> tuple[str | None, str | None]:
-    """``(skip reason, phone)``: the first reason this order is not asked, or
-    None and her number if it is."""
+    """``(reason, phone)``: why this order is not asked right now, or None and
+    her number if it is. A reason in ``WAITING_REASONS`` is one that clears on
+    its own, so the order waits; any other is final."""
     if not node:
         return SKIP_NOT_FOUND, None
     if node.get("test"):
         return SKIP_TEST, None
-    if node.get("cancelledAt"):
+    if node.get("cancelledAt") or order.cancelled_at is not None:
         return SKIP_CANCELLED, None
+    # What made an order undue is checked again for one that waited.
+    if order.return_open or order.return_activity:
+        return SKIP_RETURN, None
+    if str(order.financial_status or "").lower() in ("refunded", "voided"):
+        return SKIP_REFUNDED, None
 
     # Operations' side of "a return" (ADR 0083, point 1): a return waiting for
     # review on E-stebdal, or a refund still owed. Through its public surface.
@@ -274,10 +345,9 @@ def _why_not(
 
     if _asked_recently(db, phone, now):
         return SKIP_ASKED_RECENTLY, None
-    conversation = db.scalar(select(InboxConversation).where(InboxConversation.phone == phone))
-    if conversation is not None and conversation.unread_count > 0:
+    if _unanswered(db, phone, now):
         # She has written and nobody has answered: not the time to ask.
-        return SKIP_UNREAD, None
+        return WAIT_UNANSWERED, None
     if db.scalar(
         select(FeedbackSurvey.id)
         .where(
@@ -288,8 +358,14 @@ def _why_not(
         .limit(1)
     ):
         # An unhappy answer still waiting for a person.
-        return SKIP_UNHAPPY_OPEN, None
+        return WAIT_UNHAPPY_OPEN, None
     return None, phone
+
+
+def _drop_waited_too_long(row: FeedbackSurvey, now: datetime) -> None:
+    row.state, row.skip_reason, row.step = "skipped", SKIP_WAITED_TOO_LONG, "done"
+    row.next_attempt_at = None
+    row.updated_at = now
 
 
 def decide(
@@ -297,45 +373,112 @@ def decide(
 ) -> FeedbackSurvey:
     """Decide one due order and record it. Returns the row.
 
-    ``pending`` if she is to be asked, otherwise ``skipped`` with a short
-    ``skip_reason``. A skipped row keeps no customer detail: no phone, no
-    name, no products. An order already decided is returned as it stands.
+    ``pending`` if she is to be asked; ``waiting`` (looked at again in six
+    hours) if something that clears on its own stands in the way; otherwise
+    ``skipped`` with a short ``skip_reason``. A skipped or waiting row keeps
+    no customer detail: no phone, no name, no products. An order already
+    decided is returned as it stands - except a waiting one, which is decided
+    again, in place, and dropped if it is more than seven days past delivery.
     """
     now = now or utcnow()
     existing = db.scalar(
         select(FeedbackSurvey).where(FeedbackSurvey.shopify_order_id == order.shopify_order_id)
     )
-    if existing is not None:
+    if existing is not None and existing.state != "waiting":
+        return existing
+    if existing is not None and order.delivered_at and now - order.delivered_at > ASK_BEFORE:
+        _drop_waited_too_long(existing, now)
+        db.flush()
         return existing
 
     reason, phone = _why_not(db, order, shopify_order, now)
     node = shopify_order or {}
     values: dict[str, Any] = {
-        "shopify_order_id": order.shopify_order_id,
         "order_name": (str(node.get("name") or "").strip() or order.order_number)[:40] or None,
         "delivered_at": order.delivered_at,
         "courier": _courier(order.fulfilments),
+        "phone": None,
+        "customer_name": None,
+        "products": [],
+        "next_attempt_at": None,
     }
-    if reason is not None:
+    if reason in WAITING_REASONS:
+        values.update(
+            state="waiting", skip_reason=reason, step="rating", next_attempt_at=now + WAIT_FOR
+        )
+    elif reason is not None:
         values.update(state="skipped", skip_reason=reason, step="done")
     else:
         first_name = str((node.get("customer") or {}).get("firstName") or "").strip()
         values.update(
             state="pending",
+            skip_reason=None,
             step="rating",
             phone=phone,
             # The confirmation's own fallback, for an order with no first name.
             customer_name=(first_name or "there")[:120],
             products=_titles(node),
         )
+    if existing is not None:
+        for column, value in values.items():
+            setattr(existing, column, value)
+        existing.updated_at = now
+        db.flush()
+        return existing
     db.execute(
         insert(FeedbackSurvey)
-        .values(**values)
+        .values(shopify_order_id=order.shopify_order_id, **values)
         .on_conflict_do_nothing(index_elements=["shopify_order_id"])
     )
     db.flush()
     return db.scalar(
         select(FeedbackSurvey).where(FeedbackSurvey.shopify_order_id == order.shopify_order_id)
+    )
+
+
+def requeue_stale_pending(
+    db: Session, now: datetime | None = None, *, limit: int = SWEEP_BATCH
+) -> int:
+    """Queue the send again for a question still ``pending`` and never sent.
+
+    A send job can end without sending - the feature off when it ran, the
+    WhatsApp keys unreadable - and nothing else would ever look at the row
+    again. Only a question still inside its seven days is queued; one a retry
+    is already scheduled for (``next_attempt_at`` in the future) is left to
+    that retry. ``queue_send`` dedupes against a job still waiting.
+    """
+    now = now or utcnow()
+    stale = list(
+        db.scalars(
+            select(FeedbackSurvey)
+            .where(
+                FeedbackSurvey.state == "pending",
+                FeedbackSurvey.sent_at.is_(None),
+                FeedbackSurvey.updated_at < now - PENDING_STALE_AFTER,
+                or_(FeedbackSurvey.next_attempt_at.is_(None), FeedbackSurvey.next_attempt_at <= now),
+                FeedbackSurvey.delivered_at >= now - ASK_BEFORE,
+            )
+            .order_by(FeedbackSurvey.updated_at)
+            .limit(limit)
+        )
+    )
+    for row in stale:
+        queue_send(db, row.id, attempt=row.attempts)
+    return len(stale)
+
+
+def waiting_to_look_at(
+    db: Session, now: datetime | None = None, *, limit: int = SWEEP_BATCH
+) -> list[FeedbackSurvey]:
+    """Waiting orders whose six hours are up, longest waiting first."""
+    now = now or utcnow()
+    return list(
+        db.scalars(
+            select(FeedbackSurvey)
+            .where(FeedbackSurvey.state == "waiting", FeedbackSurvey.next_attempt_at <= now)
+            .order_by(FeedbackSurvey.next_attempt_at, FeedbackSurvey.id)
+            .limit(limit)
+        )
     )
 
 
@@ -348,6 +491,14 @@ def sweep(
     interrupted = recover_interrupted(db)
     if interrupted:
         logger.warning("%s feedback questions were interrupted while sending", interrupted)
+    # Imported here: the replies build on this module.
+    from app.modules.inbox.services import feedback_replies
+
+    if feedback_replies.recover_interrupted_solved(db, now):
+        logger.warning("solved questions were interrupted while sending")
+    requeued = requeue_stale_pending(db, now)
+    if requeued:
+        logger.warning("%s feedback questions were never sent; queued again", requeued)
 
     cfg = get_settings(db)
     if cfg.started_at is None:
@@ -356,8 +507,22 @@ def sweep(
         cfg.updated_at = now
         db.flush()
 
-    due = due_orders(db, now)
-    if not due:
+    # A waiting order more than seven days past delivery is dropped, without
+    # asking Shopify anything; the rest are decided again with the due ones.
+    to_read: list[OrderIndex] = []
+    for row in waiting_to_look_at(db, now):
+        indexed = db.get(OrderIndex, row.shopify_order_id)
+        if row.delivered_at is None or now - row.delivered_at > ASK_BEFORE:
+            _drop_waited_too_long(row, now)
+        elif indexed is None:
+            row.state, row.skip_reason, row.step = "skipped", SKIP_NOT_FOUND, "done"
+            row.next_attempt_at = None
+        else:
+            to_read.append(indexed)
+    db.flush()
+
+    to_read.extend(due_orders(db, now))
+    if not to_read:
         return 0
     try:
         client = client or build_client()
@@ -365,7 +530,7 @@ def sweep(
         raise PermanentFailure(f"Cannot read orders for their feedback question: {exc}") from exc
 
     decided = 0
-    for order in due:
+    for order in to_read:
         try:
             data = client.execute(FEEDBACK_ORDER, {"id": order_gid(order.shopify_order_id)})
         except PERMANENT as exc:
@@ -653,11 +818,12 @@ def rows(
     """The Feedback sheet: one dict per asked order, newest delivery first.
 
     ``since`` and ``until`` bound the delivered date. Skipped orders are not
-    asked and are left out unless ``include_skipped``.
+    asked, and waiting ones not yet, so both are left out unless
+    ``include_skipped``.
     """
     query = select(FeedbackSurvey)
     if not include_skipped:
-        query = query.where(FeedbackSurvey.state != "skipped")
+        query = query.where(FeedbackSurvey.state.not_in(("skipped", "waiting")))
     if since is not None:
         query = query.where(FeedbackSurvey.delivered_at >= since)
     if until is not None:

@@ -18,7 +18,8 @@ from app.modules.inbox.models import (
     InboxMessage,
     OrderConfirmation,
 )
-from app.modules.inbox.services import chats, feedback, feedback_replies
+from app.modules.inbox.services import chats, feedback, feedback_replies, outbound
+from app.modules.inbox.services.meta import MetaError
 from app.modules.inbox.services.events import _read_message, apply_event
 from app.shared.models.audit import AuditEvent
 from app.shared.models.identity import UserAccount
@@ -375,6 +376,15 @@ def test_only_an_unhappy_answer_waiting_for_a_person_can_be_resolved(db, world):
     assert len(jobs(db, JobKind.INBOX_FEEDBACK_ASK_SOLVED)) == 1
 
 
+def _ask(db, row, world, **kw):
+    """``ask_solved`` with its claim stood in for: the real one commits in a
+    session of its own, which a test's rolled-back transaction cannot see."""
+    kw.setdefault("client", world.client)
+    kw.setdefault("claim", lambda _id: True)
+    kw.setdefault("release", lambda _id: None)
+    return feedback_replies.ask_solved(db, row.id, **kw)
+
+
 def _resolved(world, db):
     row = _unhappy_waiting_for_a_person(world, db)
     feedback_replies.resolve(db, row.id, world.staff)
@@ -385,7 +395,7 @@ def test_the_solved_question_is_asked_with_buttons_while_her_24_hours_are_open(d
     row = _resolved(world, db)
     sent = len(world.asked)
 
-    feedback_replies.ask_solved(db, row.id, client=world.client)
+    _ask(db, row, world)
 
     assert row.solved_asked_at is not None
     message = world.asked[sent]
@@ -395,7 +405,7 @@ def test_the_solved_question_is_asked_with_buttons_while_her_24_hours_are_open(d
         {"id": f"fbs_yes_{row.id}", "title": "Yes"}, {"id": f"fbs_no_{row.id}", "title": "No"},
     ]
     # Once per Resolved, however often the job runs.
-    feedback_replies.ask_solved(db, row.id, client=world.client)
+    _ask(db, row, world)
     assert len(world.asked) == sent + 1
 
 
@@ -405,7 +415,7 @@ def test_the_solved_question_is_the_approved_message_once_her_24_hours_have_clos
     db.flush()
     sent = len(world.asked)
 
-    feedback_replies.ask_solved(db, row.id, client=world.client)
+    _ask(db, row, world)
 
     assert row.solved_asked_at is not None
     template = world.asked[sent]["template"]
@@ -425,11 +435,11 @@ def test_the_solved_question_is_not_asked_unless_it_is_due_and_allowed(db, world
     sent = len(world.asked)
     row.step = "support"
     db.flush()
-    feedback_replies.ask_solved(db, row.id, client=world.client)  # not on that step
+    _ask(db, row, world)  # not on that step
     row.step = "solved"
     row.solved_asked_at = utcnow()
     db.flush()
-    feedback_replies.ask_solved(db, row.id, client=world.client)  # already asked
+    _ask(db, row, world)  # already asked
     assert len(world.asked) == sent
 
 
@@ -437,13 +447,18 @@ def test_the_solved_question_is_not_sent_where_this_server_may_not_message_her(d
     row = _resolved(world, db)
     monkeypatch.setattr("app.config.settings.inbox_send_to_customers", False)
     sent = len(world.asked)
-    feedback_replies.ask_solved(db, row.id, client=world.client)
-    assert len(world.asked) == sent and row.solved_asked_at is None
+    _ask(db, row, world)
+    assert len(world.asked) == sent
+    # Nothing went out, and she is not left where nobody can see her.
+    assert (row.step, row.solved_asked_at, row.resolved_at, row.reopened_count) == ("support", None, None, 0)
+    assert "could not be sent" in row.last_error
+    db.flush()
+    assert [r["id"] for r in feedback.needs_follow_up(db)] == [row.id]
 
 
 def test_yes_leads_to_how_likely_she_is_to_order_again_and_then_the_closing_words(db, world):
     row = _resolved(world, db)
-    feedback_replies.ask_solved(db, row.id, client=world.client)
+    _ask(db, row, world)
     sent = len(world.asked)
 
     apply(db, interactive_tap("button_reply", f"fbs_yes_{row.id}", "Yes", "wamid.S1", ago=timedelta(seconds=20)))
@@ -469,7 +484,7 @@ def test_yes_to_the_approved_message_is_a_template_tap_and_works_the_same(db, wo
     row = _resolved(world, db)
     world.chat.last_inbound_at = utcnow() - timedelta(hours=30)
     db.flush()
-    feedback_replies.ask_solved(db, row.id, client=world.client)
+    _ask(db, row, world)
 
     apply(db, template_tap(f"fbs_yes_{row.id}", "Yes", "wamid.S1", ago=timedelta(seconds=20)))
     assert (row.solved, row.step) == (True, "reorder")
@@ -479,7 +494,7 @@ def test_yes_to_the_approved_message_is_a_template_tap_and_works_the_same(db, wo
 
 def test_no_sends_her_back_to_a_person_marked_as_reopened(db, world):
     row = _resolved(world, db)
-    feedback_replies.ask_solved(db, row.id, client=world.client)
+    _ask(db, row, world)
     sent = len(world.asked)
 
     apply(db, interactive_tap("button_reply", f"fbs_no_{row.id}", "No", "wamid.S1", ago=timedelta(seconds=20)))
@@ -496,12 +511,13 @@ def test_no_sends_her_back_to_a_person_marked_as_reopened(db, world):
 def test_after_the_second_resolve_she_is_asked_once_more_and_after_the_third_not_again(db, world):
     row = _resolved(world, db)
     mariam = world.staff
-    feedback_replies.ask_solved(db, row.id, client=world.client)
+    _ask(db, row, world)
     apply(db, interactive_tap("button_reply", f"fbs_no_{row.id}", "No", "wamid.S1", ago=timedelta(seconds=30)))
 
-    feedback_replies.resolve(db, row.id, mariam)
+    later = utcnow() + timedelta(hours=1)
+    feedback_replies.resolve(db, row.id, mariam, later)
     assert row.step == "solved"
-    feedback_replies.ask_solved(db, row.id, client=world.client)
+    _ask(db, row, world)
     assert row.solved_asked_at is not None
     asked_twice = [m for m in world.asked if m["type"] == "interactive" and m["interactive"]["type"] == "button"]
     assert len(asked_twice) == 2
@@ -510,10 +526,10 @@ def test_after_the_second_resolve_she_is_asked_once_more_and_after_the_third_not
     assert (row.step, row.reopened_count) == ("support", 2)
 
     sent = len(world.asked)
-    feedback_replies.resolve(db, row.id, mariam)
+    feedback_replies.resolve(db, row.id, mariam, later + timedelta(hours=1))
     assert row.step == "done" and row.resolved_at is not None
     assert len(jobs(db, JobKind.INBOX_FEEDBACK_ASK_SOLVED)) == 2
-    feedback_replies.ask_solved(db, row.id, client=world.client)
+    _ask(db, row, world)
     assert len(world.asked) == sent
     assert [r["id"] for r in feedback.needs_follow_up(db)] == []
     keys = [key for _, key, _ in jobs(db, JobKind.INBOX_FEEDBACK_ASK_SOLVED)]
@@ -615,3 +631,145 @@ def test_a_tap_job_for_something_that_is_not_a_tap_does_nothing(db, world):
     assert feedback_replies.reply(db, plain.id, world.client) is None
     assert world.asked == []
     assert db.query(InboxConversation).count() == 1 and db.query(FeedbackSurvey).count() == 1
+
+
+# ── The solved question: claimed before it is sent, and never strands her ─────
+
+
+def test_the_question_is_claimed_before_whatsapp_is_asked(db, world):
+    row = _resolved(world, db)
+    sent = len(world.asked)
+    seen = []
+    _ask(db, row, world, claim=lambda _id: seen.append(len(world.asked)) or True)
+    assert seen == [sent] and len(world.asked) == sent + 1
+
+
+def test_a_question_another_worker_claimed_is_not_sent(db, world):
+    row = _resolved(world, db)
+    sent = len(world.asked)
+    _ask(db, row, world, claim=lambda _id: False)
+    assert len(world.asked) == sent and row.step == "solved"
+
+
+def test_a_crash_after_whatsapp_took_the_question_never_sends_it_twice(db, world):
+    """The first run claimed it (committed) and WhatsApp took the message; the
+    job then died before its own commit, so no message is in the chat. The
+    retry finds the claim and sends nothing."""
+    row = _resolved(world, db)
+    row.solved_asked_at = utcnow()
+    db.flush()
+    sent = len(world.asked)
+
+    _ask(db, row, world)
+    _ask(db, row, world)
+
+    assert len(world.asked) == sent
+    assert db.query(InboxMessage).filter(InboxMessage.source_ref.like("fbq:%")).count() == 0
+
+
+def test_a_claimed_question_with_nothing_to_show_for_it_goes_back_to_a_person(db, world):
+    row = _resolved(world, db)
+    row.solved_asked_at = utcnow() - timedelta(minutes=11)
+    db.flush()
+
+    assert feedback_replies.recover_interrupted_solved(db) == 1
+
+    assert (row.step, row.solved_asked_at, row.resolved_at, row.resolved_by) == ("support", None, None, None)
+    assert (row.last_error, row.reopened_count) == (feedback_replies.INTERRUPTED_ASKING, 0)
+    db.flush()
+    assert [r["id"] for r in feedback.needs_follow_up(db)] == [row.id]
+
+
+def test_a_claim_that_is_recent_or_has_its_message_is_not_called_interrupted(db, world):
+    recent = _resolved(world, db)
+    recent.solved_asked_at = utcnow() - timedelta(minutes=2)
+    db.flush()
+    assert feedback_replies.recover_interrupted_solved(db) == 0
+    assert recent.step == "solved"
+
+    recent.solved_asked_at = None
+    _ask(db, recent, world)  # asked for real: its message is in the chat
+    assert recent.solved_asked_at is not None
+    recent.solved_asked_at = utcnow() - timedelta(minutes=30)
+    db.flush()
+    assert feedback_replies.recover_interrupted_solved(db) == 0
+    assert recent.step == "solved"
+
+
+@pytest.mark.parametrize("window_open", [True, False])
+def test_a_retryable_error_gives_the_claim_back_and_is_raised_for_a_retry(db, world, window_open):
+    row = _resolved(world, db)
+    if not window_open:
+        world.chat.last_inbound_at = utcnow() - timedelta(hours=30)
+        db.flush()
+    released: list = []
+
+    with pytest.raises(MetaError):
+        _ask(db, row, world, client=meta([], refuse=(400, 131000)), release=released.append)
+
+    assert released == [row.id]
+    assert (row.step, row.solved_asked_at, row.reopened_count) == ("solved", None, 0)
+    assert db.query(InboxMessage).filter(InboxMessage.source_ref.like("fbq:%")).count() == 0
+
+
+@pytest.mark.parametrize("window_open", [True, False])
+def test_a_refusal_that_will_not_change_sends_her_back_to_a_person_and_can_be_asked_again(db, world, window_open):
+    row = _resolved(world, db)
+    if not window_open:
+        world.chat.last_inbound_at = utcnow() - timedelta(hours=30)
+        db.flush()
+
+    _ask(db, row, world, client=meta([], refuse=(400, 132001)))
+
+    assert (row.step, row.solved_asked_at, row.resolved_at, row.resolved_by) == ("support", None, None, None)
+    assert row.reopened_count == 0
+    assert row.last_error.startswith('The question "Was your issue solved?" could not be sent: ')
+    failed = db.scalar(select(InboxMessage).where(InboxMessage.source_ref.like("fbq:%")))
+    assert failed.status == "failed"
+    db.flush()
+    assert [r["id"] for r in feedback.needs_follow_up(db)] == [row.id]
+
+    # A person follows up and presses Resolved again; this time it goes.
+    feedback_replies.resolve(db, row.id, world.staff, utcnow() + timedelta(hours=1))
+    sent = len(world.asked)
+    _ask(db, row, world, client=world.client, now=utcnow() + timedelta(hours=25))
+    assert len(world.asked) == sent + 1 and row.solved_asked_at is not None and row.step == "solved"
+
+
+def test_keys_that_cannot_be_read_send_her_back_to_a_person(db, world, monkeypatch):
+    def unreadable(_db):
+        raise outbound.NotSent("WhatsApp is not connected.")
+
+    row = _resolved(world, db)
+    monkeypatch.setattr(outbound, "_client", unreadable)
+    _ask(db, row, world, client=None)
+    assert (row.step, row.solved_asked_at, row.reopened_count) == ("support", None, 0)
+    assert "could not be sent" in row.last_error
+
+
+def test_with_the_feature_off_the_solved_job_hands_her_back_to_a_person(db, world, monkeypatch):
+    row = _resolved(world, db)
+    monkeypatch.setattr("app.config.settings.inbox_feedback_enabled", False)
+    feedback_replies._handle_ask_solved(db, {"survey_id": row.id})
+    assert (row.step, row.solved_asked_at, row.reopened_count) == ("support", None, 0)
+    assert "switched off" in row.last_error
+    assert len(world.asked) == 2  # her first two follow-ups; nothing since
+
+
+# ── A follow-up WhatsApp refuses leaves its reason on the survey ──────────────
+
+
+def test_a_follow_up_whatsapp_refuses_for_good_is_recorded_on_the_survey(db, world):
+    apply(db, template_tap("fb_loved_7001", "Loved it", "wamid.T1"))
+    asked: list = []
+
+    drain(db, meta(asked, refuse=(400, 132001)))
+
+    row = world.row
+    assert (row.rating, row.step) == ("loved", "reason")
+    assert row.last_error.startswith("A follow-up could not be sent: ")
+    failed = db.scalar(select(InboxMessage).where(InboxMessage.source_ref == "fb:wamid.T1"))
+    assert failed.status == "failed"
+    # Run again: still one attempt.
+    drain(db, meta(asked))
+    assert len(asked) == 1

@@ -14,7 +14,7 @@ from cryptography.fernet import Fernet
 from sqlalchemy import text
 
 from app.core.businesstime import utcnow
-from app.modules.inbox.models import FeedbackSurvey, InboxConversation
+from app.modules.inbox.models import FeedbackSurvey, InboxConversation, InboxMessage
 from app.modules.inbox.services import connection
 from app.modules.inbox.services.meta import MetaClient, NumberInfo
 from app.shared.models.orders import OrderIndex
@@ -174,3 +174,22 @@ def jobs(db, kind: str | None = None) -> list[tuple]:
     if kind:
         return db.execute(text(query + " WHERE kind = :k ORDER BY id"), {"k": kind}).all()
     return db.execute(text(query + " ORDER BY id")).all()
+
+
+def message(
+    db, chat, *, direction="in", kind="text", origin=None, ago=timedelta(hours=1), body="hello"
+) -> InboxMessage:
+    """A message in her chat, ``ago`` ago. Her own by default; ``direction="out"``
+    is a member of staff's unless ``origin`` says otherwise."""
+    row = InboxMessage(
+        conversation_id=chat.id,
+        direction=direction,
+        kind=kind,
+        body=body,
+        status="received" if direction == "in" else "sent",
+        origin=origin or ("customer" if direction == "in" else "staff"),
+        occurred_at=utcnow() - ago,
+    )
+    db.add(row)
+    db.flush()
+    return row

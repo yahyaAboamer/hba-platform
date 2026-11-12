@@ -30,10 +30,12 @@ import logging
 import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from collections.abc import Callable
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import BigInteger, cast, exists, func, select, update
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import set_committed_value
 
 from app.core.businesstime import utcnow
 from app.modules.inbox.models import (
@@ -284,36 +286,55 @@ def reply(
     conversation = db.get(InboxConversation, tap.conversation_id)
 
     try:
-        if parsed.step == "rating":
-            return send_list(
-                db, conversation, feedback.REASON_QUESTIONS[parsed.value], feedback.LIST_LABEL,
-                [
-                    {"id": f"fbr_{key}_{survey.id}", "title": title}
-                    for key, title in feedback.REASONS[parsed.value]
-                ],
-                origin="automatic", source_ref=reference, client=client,
-            )
-        if parsed.step == "reason":
-            if survey.rating == "unhappy":
-                return send_text(
-                    db, conversation, support_text(get_settings(db)),
-                    origin="automatic", source_ref=reference, client=client,
-                )
-            return send_closing(db, survey, conversation, reference, client)
-        if parsed.step == "solved":
-            if parsed.value != "yes":
-                return None
-            return send_buttons(
-                db, conversation, feedback.REORDER_QUESTION,
-                [{"id": f"fbo_{key}_{survey.id}", "title": title} for key, title in feedback.REORDERS],
-                origin="automatic", source_ref=reference, client=client,
-            )
-        # reorder
-        return send_closing(db, survey, conversation, reference, client)
+        message = _next_message(db, parsed, survey, conversation, reference, client)
     except NotSent:
         # Sending is off, this server may not message her, or her 24 hours
         # have closed. Say nothing.
         return None
+    if message is not None and message.status == "failed":
+        # WhatsApp refused it for good (the job is not retried). The survey
+        # stays on its step; the reason is kept where the Feedback sheet can
+        # show it.
+        survey.last_error = f"A follow-up could not be sent: {message.error or 'WhatsApp refused it'}"[:300]
+        survey.updated_at = utcnow()
+    return message
+
+
+def _next_message(
+    db: Session,
+    parsed: Tap,
+    survey: FeedbackSurvey,
+    conversation: InboxConversation,
+    reference: str,
+    client: MetaClient | None,
+) -> InboxMessage | None:
+    """Send what follows this tap, or return None if nothing does."""
+    if parsed.step == "rating":
+        return send_list(
+            db, conversation, feedback.REASON_QUESTIONS[parsed.value], feedback.LIST_LABEL,
+            [
+                {"id": f"fbr_{key}_{survey.id}", "title": title}
+                for key, title in feedback.REASONS[parsed.value]
+            ],
+            origin="automatic", source_ref=reference, client=client,
+        )
+    if parsed.step == "reason":
+        if survey.rating == "unhappy":
+            return send_text(
+                db, conversation, support_text(get_settings(db)),
+                origin="automatic", source_ref=reference, client=client,
+            )
+        return send_closing(db, survey, conversation, reference, client)
+    if parsed.step == "solved":
+        if parsed.value != "yes":
+            return None
+        return send_buttons(
+            db, conversation, feedback.REORDER_QUESTION,
+            [{"id": f"fbo_{key}_{survey.id}", "title": title} for key, title in feedback.REORDERS],
+            origin="automatic", source_ref=reference, client=client,
+        )
+    # reorder
+    return send_closing(db, survey, conversation, reference, client)
 
 
 # ── A person presses Resolved ─────────────────────────────────────────────────
@@ -369,50 +390,175 @@ def resolve(db: Session, survey_id: int, user: Any, now: datetime | None = None)
     return feedback.describe(survey, names.get(survey.resolved_by))
 
 
+#: What a survey says when the solved question may or may not have gone out.
+INTERRUPTED_ASKING = (
+    "Interrupted while asking whether the issue was solved. Check the chat in "
+    "WhatsApp before asking again: the question may have gone out."
+)
+COULD_NOT_ASK = "The question \"Was your issue solved?\" could not be sent: {why}"
+
+
+def _asked_reference(survey: FeedbackSurvey) -> str:
+    """One per press of *Resolved*: the survey and the second it was pressed."""
+    return f"fbq:{survey.id}:{int(survey.resolved_at.timestamp())}"
+
+
+def _claim_asked(survey_id: int) -> bool:
+    """Take the solved question for sending, in a transaction of its own.
+
+    Committed before WhatsApp is asked: whatever happens next - a crash after
+    WhatsApp accepted it, a lost lease, a second worker - the question counts
+    as asked and nobody sends it a second time. A template is billed.
+    """
+    from app.db import SessionLocal
+
+    with SessionLocal() as own:
+        claimed = own.execute(
+            update(FeedbackSurvey)
+            .where(
+                FeedbackSurvey.id == survey_id,
+                FeedbackSurvey.step == "solved",
+                FeedbackSurvey.solved_asked_at.is_(None),
+            )
+            .values(solved_asked_at=utcnow(), updated_at=utcnow())
+        ).rowcount
+        own.commit()
+    return claimed == 1
+
+
+def _release_asked(survey_id: int) -> None:
+    """Give the claim back, in a transaction of its own, because nothing went
+    out and the job is to be tried again."""
+    from app.db import SessionLocal
+
+    with SessionLocal() as own:
+        own.execute(
+            update(FeedbackSurvey)
+            .where(FeedbackSurvey.id == survey_id, FeedbackSurvey.step == "solved")
+            .values(solved_asked_at=None, updated_at=utcnow())
+        )
+        own.commit()
+
+
+def back_to_support(survey: FeedbackSurvey, why: str, now: datetime | None = None) -> None:
+    """The solved question cannot be (or may not have been) sent, so a person
+    has it again: the survey returns to step ``support`` - listed under needs
+    follow-up - with the reason in ``last_error``. Nothing is counted as a
+    reopening: she has not said *No*."""
+    now = now or utcnow()
+    survey.step = "support"
+    survey.resolved_at = None
+    survey.resolved_by = None
+    survey.solved_asked_at = None
+    survey.last_error = why[:300]
+    survey.updated_at = now
+
+
 def ask_solved(
     db: Session,
     survey_id: int,
     *,
     client: MetaClient | None = None,
     now: datetime | None = None,
+    claim: Callable[[int], bool] = _claim_asked,
+    release: Callable[[int], None] = _release_asked,
 ) -> FeedbackSurvey | None:
     """Ask *Was your issue solved?* once per *Resolved*: as buttons in the
-    chat if her 24 hours are open, otherwise as the approved message."""
+    chat if her 24 hours are open, otherwise as the approved message.
+
+    **Claimed before WhatsApp is asked** (``solved_asked_at``, committed in a
+    session of its own), so a crash after WhatsApp took the message can never
+    send it twice. **``solved_asked_at`` stays set only if the message really
+    went out.** Whenever it did not, a person must be able to see her, so:
+
+    - a *retryable* Meta error (WhatsApp did not answer): the claim is given
+      back and the error raised, so the job is tried again;
+    - a refusal (sending off, this server may not message her, keys
+      unreadable) or a refusal from WhatsApp that will not change (no
+      WhatsApp on that number, template paused): the survey returns to step
+      ``support`` with the reason in ``last_error`` (``back_to_support``);
+    - a crash: the claim stands and no message is in the chat; the sweep
+      returns the survey to ``support`` marked interrupted
+      (``recover_interrupted_solved``), and it is not asked again on its own.
+    """
     survey = db.get(FeedbackSurvey, survey_id)
     if (
         survey is None
         or survey.step != "solved"
         or survey.solved_asked_at is not None
         or not survey.phone
+        or survey.resolved_at is None
     ):
         return survey
-    if sending.refusal(db, survey.phone):
+    now = now or utcnow()
+    if (why := sending.refusal(db, survey.phone)) is not None:
+        back_to_support(survey, COULD_NOT_ASK.format(why=why), now)
         return survey
 
-    now = now or utcnow()
     conversation = (
         db.get(InboxConversation, survey.conversation_id) if survey.conversation_id else None
     ) or _conversation(db, survey.phone, None)
-    reference = f"fbq:{survey.id}:{survey.reopened_count}"
-    if db.scalar(select(InboxMessage.id).where(InboxMessage.source_ref == reference)):
+    reference = _asked_reference(survey)
+    already = db.scalar(
+        select(InboxMessage.status).where(InboxMessage.source_ref == reference)
+    )
+    if already is not None:
         # Asked already; only the survey's note of it was lost.
-        survey.solved_asked_at = now
+        if already != "failed":
+            survey.solved_asked_at = now
         return survey
 
     choices = [{"id": f"fbs_{key}_{survey.id}", "title": title} for key, title in feedback.SOLVED_BUTTONS]
+    if not claim(survey.id):
+        return survey
+    # What the claim committed, as this session sees it.
+    set_committed_value(survey, "solved_asked_at", now)
     try:
         if outbound.window_open(conversation, now):
-            send_buttons(
+            message = send_buttons(
                 db, conversation, feedback.SOLVED_QUESTION, choices,
                 origin="automatic", source_ref=reference, client=client,
             )
         else:
-            _send_solved_template(db, survey, conversation, choices, reference, client)
-    except NotSent:
+            message = _send_solved_template(db, survey, conversation, choices, reference, client)
+    except MetaError:
+        release(survey.id)
+        set_committed_value(survey, "solved_asked_at", None)
+        raise
+    except NotSent as exc:
+        back_to_support(survey, COULD_NOT_ASK.format(why=exc), now)
         return survey
-    survey.solved_asked_at = now
-    survey.updated_at = now
+    if message.status == "failed":
+        back_to_support(
+            survey, COULD_NOT_ASK.format(why=message.error or "WhatsApp refused it"), now
+        )
+    else:
+        survey.updated_at = now
     return survey
+
+
+def recover_interrupted_solved(db: Session, now: datetime | None = None) -> int:
+    """Surveys whose solved question was claimed, with no message to show for
+    it ten minutes later, go back to a person marked interrupted - never asked
+    again on their own, because the platform cannot know whether it went out."""
+    now = now or utcnow()
+    reference = func.concat(
+        "fbq:", FeedbackSurvey.id, ":",
+        cast(func.floor(func.extract("epoch", FeedbackSurvey.resolved_at)), BigInteger),
+    )
+    stuck = list(
+        db.scalars(
+            select(FeedbackSurvey).where(
+                FeedbackSurvey.step == "solved",
+                FeedbackSurvey.solved_asked_at.is_not(None),
+                FeedbackSurvey.solved_asked_at < now - outbound.INTERRUPTED_AFTER,
+                ~exists().where(InboxMessage.source_ref == reference),
+            )
+        )
+    )
+    for survey in stuck:
+        back_to_support(survey, INTERRUPTED_ASKING, now)
+    return len(stuck)
 
 
 def _send_solved_template(
@@ -422,8 +568,10 @@ def _send_solved_template(
     choices: list[dict[str, str]],
     reference: str,
     client: MetaClient | None,
-) -> None:
-    """The second approved message, for a customer whose 24 hours have closed."""
+) -> InboxMessage:
+    """The second approved message, for a customer whose 24 hours have closed.
+    Returns the message as recorded in the chat (``failed`` if WhatsApp refused
+    it for good); a refusal worth retrying is raised."""
     components: list[dict[str, Any]] = [
         {"type": "body", "parameters": [{"type": "text", "text": survey.order_name or ""}]}
     ]
@@ -450,7 +598,7 @@ def _send_solved_template(
     finally:
         if owned:
             client.close()
-    outbound.record_outbound(
+    return outbound.record_outbound(
         db,
         conversation,
         kind="template",
@@ -488,5 +636,10 @@ def _handle_ask_solved(db: Session, payload: dict) -> None:
             f"{sorted(payload)!r}"
         )
     if not feedback.enabled():
+        # Nothing is sent with the feature off, and she must not be left where
+        # nobody can see her: a person has her again.
+        survey = db.get(FeedbackSurvey, survey_id)
+        if survey is not None and survey.step == "solved" and survey.solved_asked_at is None:
+            back_to_support(survey, COULD_NOT_ASK.format(why="feedback is switched off."))
         return
     ask_solved(db, survey_id)

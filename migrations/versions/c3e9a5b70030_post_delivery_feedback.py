@@ -31,7 +31,7 @@ down_revision: Union[str, Sequence[str], None] = "b2d8f4a60029"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
-STATES = "('pending', 'would_send', 'sending', 'sent', 'no_whatsapp', 'failed', 'skipped')"
+STATES = "('pending', 'waiting', 'would_send', 'sending', 'sent', 'no_whatsapp', 'failed', 'skipped')"
 RATINGS = "('loved', 'okay', 'unhappy')"
 REORDERS = "('very_likely', 'maybe', 'unlikely')"
 STEPS = "('rating', 'reason', 'comment', 'support', 'solved', 'reorder', 'done')"
@@ -104,6 +104,10 @@ def upgrade() -> None:
         "feedback_survey_due", "feedback_survey", ["next_attempt_at"],
         unique=False, postgresql_where=sa.text("state = 'pending'"),
     )
+    op.create_index(
+        "feedback_survey_waiting", "feedback_survey", ["next_attempt_at"],
+        unique=False, postgresql_where=sa.text("state = 'waiting'"),
+    )
     op.create_index("feedback_survey_phone", "feedback_survey", ["phone", "created_at"], unique=False)
     op.create_index(
         "feedback_survey_follow_up", "feedback_survey", ["rated_at"],
@@ -123,6 +127,10 @@ def downgrade() -> None:
         postgresql_where=sa.text("rating = 'unhappy' AND step = 'support'"),
     )
     op.drop_index("feedback_survey_phone", table_name="feedback_survey")
+    op.drop_index(
+        "feedback_survey_waiting", table_name="feedback_survey",
+        postgresql_where=sa.text("state = 'waiting'"),
+    )
     op.drop_index(
         "feedback_survey_due", table_name="feedback_survey",
         postgresql_where=sa.text("state = 'pending'"),

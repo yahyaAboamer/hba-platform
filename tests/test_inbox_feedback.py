@@ -18,7 +18,13 @@ from app.modules.inbox.models import (
     InboxMessage,
 )
 from app.modules.inbox.services import events, feedback, feedback_replies, outbound
-from app.modules.inbox.services.feedback import decide, due_orders, send_first_question, sweep
+from app.modules.inbox.services.feedback import (
+    decide,
+    due_orders,
+    requeue_stale_pending,
+    send_first_question,
+    sweep,
+)
 from app.modules.inbox.services.meta import MAX_BODY, MetaClient, MetaError
 from app.modules.operations.models import OpsEstebdalReturn, OpsRefund
 from app.shared.services.jobs import INBOX_WORK, JobKind, PermanentFailure
@@ -32,6 +38,7 @@ from tests.feedback_support import (  # noqa: F401  (fixtures)
     feature_on,
     jobs,
     may_send,
+    message,
     meta,
     node,
     order,
@@ -306,23 +313,150 @@ def test_an_order_skipped_earlier_does_not_count_as_asking_her(db):
     assert _decided(db).state == "pending"
 
 
-def test_a_customer_with_an_unanswered_message_is_not_asked(db):
-    conversation(db, unread=2)
-    assert _decided(db).skip_reason == feedback.SKIP_UNREAD
-
-
-def test_a_customer_whose_chat_is_read_is_asked(db):
-    conversation(db, unread=0)
+def test_button_taps_leave_unread_messages_that_do_not_block(db):
+    """Every customer who tapped Confirm has one, and nobody has opened her chat."""
+    chat = conversation(db, unread=3)
+    message(db, chat, kind="button", ago=timedelta(hours=1))
+    message(db, chat, kind="reaction", ago=timedelta(minutes=30))
     assert _decided(db).state == "pending"
 
 
-def test_a_customer_with_an_unhappy_answer_not_yet_resolved_is_not_asked(db):
+def test_an_unanswered_text_within_72_hours_makes_it_wait_and_stores_nothing_of_hers(db):
+    chat = conversation(db)
+    message(db, chat, ago=timedelta(hours=5))
+    started(db)
+    when = utcnow()
+    row = decide(db, order(db), node(), when)
+    assert (row.state, row.skip_reason, row.step) == ("waiting", feedback.WAIT_UNANSWERED, "rating")
+    assert row.next_attempt_at == when + timedelta(hours=6)
+    assert (row.phone, row.customer_name, row.products) == (None, None, [])
+    assert row.order_name == "#7001" and row.courier == "Bosta"
+
+
+def test_an_old_unanswered_text_does_not_block(db):
+    chat = conversation(db)
+    message(db, chat, ago=timedelta(hours=73))
+    assert _decided(db).state == "pending"
+
+
+@pytest.mark.parametrize(
+    "setup",
+    [
+        "automatic reply",       # not an answer from a person
+        "staff reply before",    # an answer to something she wrote earlier
+    ],
+)
+def test_only_a_later_staff_message_answers_her(db, setup):
+    chat = conversation(db)
+    if setup == "automatic reply":
+        message(db, chat, ago=timedelta(hours=5))
+        message(db, chat, direction="out", origin="automatic", ago=timedelta(hours=1))
+    else:
+        message(db, chat, direction="out", ago=timedelta(hours=9))
+        message(db, chat, ago=timedelta(hours=5))
+    assert _decided(db).state == "waiting"
+
+
+def test_a_staff_reply_after_her_text_clears_it(db):
+    chat = conversation(db)
+    message(db, chat, ago=timedelta(hours=5))
+    message(db, chat, direction="out", ago=timedelta(hours=1))
+    assert _decided(db).state == "pending"
+
+
+def test_after_staff_reply_the_waiting_order_is_asked_on_the_next_sweep(db, feature_on):
+    started(db)
+    order(db)
+    chat = conversation(db)
+    message(db, chat, ago=timedelta(hours=5))
+    client = shopify({"7001": node()})
+
+    assert sweep(db, client=client) == 1
+    row = db.query(FeedbackSurvey).one()
+    assert row.state == "waiting" and jobs(db, JobKind.INBOX_FEEDBACK_SEND) == []
+
+    # Not looked at again before its six hours are up.
+    asked: list = []
+    assert sweep(db, now=utcnow() + timedelta(hours=1), client=shopify({"7001": node()}, asked)) == 0
+    assert asked == [] and row.state == "waiting"
+
+    message(db, chat, direction="out", ago=timedelta(minutes=30))  # staff answered
+    assert sweep(db, now=utcnow() + timedelta(hours=7), client=client) == 1
+
+    assert (row.state, row.skip_reason, row.step, row.next_attempt_at) == ("pending", None, "rating", None)
+    assert (row.phone, row.customer_name, row.products) == (HER, "Nour", ["Linen Shirt", "Wide Trousers"])
+    assert [key for _, key, _ in jobs(db, JobKind.INBOX_FEEDBACK_SEND)] == [
+        f"{JobKind.INBOX_FEEDBACK_SEND}:{row.id}:0"
+    ]
+    assert db.query(FeedbackSurvey).count() == 1
+
+
+def test_a_waiting_order_still_blocked_waits_another_six_hours(db, feature_on):
+    started(db)
+    order(db)
+    chat = conversation(db)
+    message(db, chat, ago=timedelta(hours=5))
+    sweep(db, client=shopify({"7001": node()}))
+    later = utcnow() + timedelta(hours=7)
+
+    assert sweep(db, now=later, client=shopify({"7001": node()})) == 1
+    row = db.query(FeedbackSurvey).one()
+    assert (row.state, row.next_attempt_at) == ("waiting", later + timedelta(hours=6))
+
+
+def test_a_waiting_order_past_seven_days_is_dropped_without_asking_shopify(db, feature_on):
+    started(db)
+    order(db, delivered_ago=timedelta(days=6, hours=23))
+    chat = conversation(db)
+    message(db, chat, ago=timedelta(hours=5))
+    sweep(db, client=shopify({"7001": node()}))
+    row = db.query(FeedbackSurvey).one()
+    assert row.state == "waiting"
+
+    asked: list = []
+    assert sweep(db, now=utcnow() + timedelta(hours=7), client=shopify({"7001": node()}, asked)) == 0
+    assert asked == []
+    assert (row.state, row.skip_reason, row.step, row.next_attempt_at) == (
+        "skipped", "waited_too_long", "done", None,
+    )
+    assert jobs(db, JobKind.INBOX_FEEDBACK_SEND) == []
+
+
+def test_deciding_a_waiting_order_after_seven_days_drops_it(db):
+    started(db)
+    chat = conversation(db)
+    message(db, chat, ago=timedelta(hours=5))
+    indexed = order(db, delivered_ago=timedelta(days=6, hours=23))
+    assert decide(db, indexed, node(), utcnow()).state == "waiting"
+    assert decide(db, indexed, node(), utcnow() + timedelta(hours=7)).skip_reason == "waited_too_long"
+
+
+def test_a_waiting_order_that_has_since_had_a_return_is_skipped_for_good(db):
+    started(db)
+    chat = conversation(db)
+    message(db, chat, ago=timedelta(hours=5))
+    indexed = order(db)
+    assert decide(db, indexed, node(), utcnow()).state == "waiting"
+    indexed.return_activity = True
+    row = decide(db, indexed, node(), utcnow() + timedelta(hours=7))
+    assert (row.state, row.skip_reason) == ("skipped", feedback.SKIP_RETURN)
+
+
+def test_waiting_orders_are_not_on_the_sheet_unless_asked_for(db):
+    survey(db, "1", state="waiting", step="rating", phone=None, wa_message_id=None, sent_at=None, skip_reason="unanswered_message")
+    survey(db, "2")
+    assert [row["order_id"] for row in feedback.rows(db)] == ["2"]
+    assert sorted(row["order_id"] for row in feedback.rows(db, include_skipped=True)) == ["1", "2"]
+
+
+def test_a_customer_with_an_unhappy_answer_not_yet_resolved_waits(db):
     """Past the 60 days, which would cover it, she is still waiting for a person."""
     survey(
         db, "6001", rating="unhappy", step="support", rated_at=utcnow() - timedelta(days=80),
         sent_at=utcnow() - timedelta(days=90), created_at=utcnow() - timedelta(days=90),
     )
-    assert _decided(db).skip_reason == feedback.SKIP_UNHAPPY_OPEN
+    row = _decided(db)
+    assert (row.state, row.skip_reason) == ("waiting", feedback.WAIT_UNHAPPY_OPEN)
 
 
 def test_once_resolved_an_unhappy_customer_is_not_a_reason_to_skip(db):
@@ -649,3 +783,66 @@ def test_an_interactive_message_outside_the_24_hours_is_refused(db, may_send):
             origin="automatic", client=meta(asked),
         )
     assert refused.value.kind == "window_closed" and asked == []
+
+
+# ── Who counts as asked, and a question that never went out ───────────────────
+
+
+@pytest.mark.parametrize(
+    ("state", "blocks"),
+    [
+        ("sent", True),
+        ("pending", True),     # on its way: stops a second order's question in the same sweep
+        ("sending", True),
+        ("would_send", False),  # only recorded: nobody was asked
+        ("failed", False),
+        ("no_whatsapp", False),
+    ],
+)
+def test_only_a_question_that_went_out_or_is_on_its_way_counts_as_asking_her(db, state, blocks):
+    started(db)
+    survey(
+        db, "6001", state=state, wa_message_id=None,
+        sent_at=utcnow() - timedelta(days=10) if state == "sent" else None,
+    )
+    assert (_decided(db).skip_reason == feedback.SKIP_ASKED_RECENTLY) is blocks
+
+
+def test_a_question_never_sent_is_queued_again_once_it_is_stale(db):
+    stale = _pending(db, shopify_order_id="1")
+    stale.updated_at = utcnow() - timedelta(minutes=31)
+    fresh = _pending(db, shopify_order_id="2")
+    fresh.updated_at = utcnow() - timedelta(minutes=10)
+    retrying = _pending(db, shopify_order_id="3", next_attempt_at=utcnow() + timedelta(hours=1))
+    retrying.updated_at = utcnow() - timedelta(minutes=40)
+    too_old = _pending(db, shopify_order_id="4", delivered_at=utcnow() - timedelta(days=8))
+    too_old.updated_at = utcnow() - timedelta(minutes=40)
+    db.flush()
+
+    assert requeue_stale_pending(db) == 1
+    assert [key for _, key, _ in jobs(db, JobKind.INBOX_FEEDBACK_SEND)] == [
+        f"{JobKind.INBOX_FEEDBACK_SEND}:{stale.id}:0"
+    ]
+    # Queued again while that job still waits: absorbed, not doubled.
+    requeue_stale_pending(db)
+    assert len(jobs(db, JobKind.INBOX_FEEDBACK_SEND)) == 1
+
+
+def test_the_sweep_queues_a_stale_pending_question_again(db, feature_on):
+    started(db)
+    stale = _pending(db)
+    stale.updated_at = utcnow() - timedelta(hours=2)
+    db.flush()
+    sweep(db, client=shopify({}))
+    assert [key for _, key, _ in jobs(db, JobKind.INBOX_FEEDBACK_SEND)] == [
+        f"{JobKind.INBOX_FEEDBACK_SEND}:{stale.id}:0"
+    ]
+
+
+def test_a_question_whose_send_ended_without_sending_is_sent_by_the_requeued_job(db, may_send):
+    """The whole mend: the flag was off when the first job ran, the row stayed
+    pending, the sweep queued it again, and now it goes."""
+    row = _pending(db)
+    asked: list = []
+    send_first_question(db, row.id, client=meta(asked), claim=_yes)
+    assert row.state == "sent" and len(asked) == 1

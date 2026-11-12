@@ -75,9 +75,11 @@ ANSWERED_IN = ("whatsapp", "inbox", "shopify")
 
 #: Where a delivered order's feedback question stands (ADR 0083). Like a
 #: confirmation's, plus ``skipped``: decided, and not to be asked (the row
-#: says why, in ``skip_reason``).
+#: says why, in ``skip_reason``); and ``waiting``: something that clears on
+#: its own stands in the way (``skip_reason`` says what), looked at again at
+#: ``next_attempt_at``.
 FEEDBACK_STATES = (
-    "pending", "would_send", "sending", "sent", "no_whatsapp", "failed", "skipped",
+    "pending", "waiting", "would_send", "sending", "sent", "no_whatsapp", "failed", "skipped",
 )
 FEEDBACK_RATINGS = ("loved", "okay", "unhappy")
 FEEDBACK_REORDERS = ("very_likely", "maybe", "unlikely")
@@ -427,6 +429,12 @@ class FeedbackSurvey(Base):
             "feedback_survey_due",
             "next_attempt_at",
             postgresql_where=text("state = 'pending'"),
+        ),
+        # What the sweep looks at again.
+        Index(
+            "feedback_survey_waiting",
+            "next_attempt_at",
+            postgresql_where=text("state = 'waiting'"),
         ),
         # "Was she asked in the last 60 days?" and "what is waiting for her?".
         Index("feedback_survey_phone", "phone", "created_at"),
