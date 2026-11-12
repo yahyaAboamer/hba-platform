@@ -8,7 +8,7 @@ separate go-ahead.
 
 | # | Batch | Status |
 |---|---|---|
-| A | Engine: table, trigger, first question, taps, follow-up questions, resolve, solved question. Silent unless switched on. | Not started |
+| A | Engine: table, trigger, first question, taps, follow-up questions, resolve, solved question. Silent unless switched on. | Built on this branch; tests pass; not merged |
 | B | Codes: the one Shopify discount, a code per customer, 30-day clean-up, used-or-not. Settings (review link, promised hours). | Not started |
 | C | Screens: Inbox → Feedback sheet with filters and download; *Needs follow-up* and *Feedback: neutral* chips; *Resolved* button; Today counts; settings card. | Not started |
 | D | Switch-on: templates approved, discount permission added, test on the owner's phone, then on. | Waiting on the owner |
@@ -56,6 +56,17 @@ wrong_item, delivery, other.
 **Flag.** `INBOX_FEEDBACK_ENABLED` (off by default). `feedback_started_at` is
 kept in a one-row `feedback_settings` table so nothing delivered before
 switch-on is asked.
+
+**As built (batch A).** The sweep and first question are
+`app/modules/inbox/services/feedback.py`; taps, follow-ups, comment, resolve
+and the solved question are `feedback_replies.py`. A fourth job,
+`INBOX_FEEDBACK_REPLY` (one per tap, under the tap's own id), carries the
+follow-up messages; `INBOX_FEEDBACK_SWEEP`, `_SEND` and `_ASK_SOLVED` are as
+above. The closing words are built by `closing_text`, and her code by the one
+seam `issue_code` (returns nothing until batch B). "Returns awaiting review or
+a refund owed" is read through `operations.public`. A skipped row keeps no
+phone, name or products. "An unhappy answer not yet resolved" means an unhappy
+survey on step `support`.
 
 ## Owner's steps (batch D)
 

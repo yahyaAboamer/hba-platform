@@ -204,7 +204,7 @@ KINDS: dict[str, tuple[str, ...]] = {
         "staff.preference_changed",
     ),
     # What staff did to an order's confirmation from the Inbox (ADR 0059).
-    "inbox": ("inbox.confirmation_resent", "inbox.answer_set"),
+    "inbox": ("inbox.confirmation_resent", "inbox.answer_set", "inbox.feedback_resolved"),
     # A Khazenly bulk-confirm file built from Operations (ADR 0071).
     # And every change on Operations → Returns (ADR 0079).
     "operations": ("order_ops.khazenly_file_built", "order_ops.refund_"),

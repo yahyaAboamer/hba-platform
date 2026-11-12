@@ -281,6 +281,89 @@ def send_text(
     )
 
 
+def _send_interactive(
+    db: Session,
+    conversation: InboxConversation,
+    body: str,
+    *,
+    kind: str,
+    choices: list[dict[str, str]],
+    send: Callable[[MetaClient], str],
+    origin: str,
+    source_ref: str | None,
+    client: MetaClient | None,
+) -> InboxMessage:
+    """Send a message with buttons or a list and put it in the chat.
+
+    The same two rules as a text, and the same handling of a refusal. It is
+    stored as an ordinary text message that carries its choices' titles in
+    ``extra`` (``buttons``, which the chat already draws under a message), so
+    it needs no kind of its own.
+    """
+    reason = sending.refusal(db, conversation.phone)
+    if reason:
+        raise NotSent(reason)
+    if not window_open(conversation):
+        raise NotSent(WINDOW_CLOSED, kind="window_closed")
+
+    extra = {"buttons": [choice["title"] for choice in choices], "interactive": kind}
+    owned = client is None
+    client = client or _client(db)
+    try:
+        wa_message_id = send(client)
+    except MetaError as exc:
+        if origin == "automatic" and exc.retryable:
+            raise
+        return record_outbound(
+            db, conversation, kind="text", body=body, origin=origin, status="failed",
+            error=str(exc), source_ref=source_ref, extra=extra,
+        )
+    finally:
+        if owned:
+            client.close()
+    return record_outbound(
+        db, conversation, kind="text", body=body, origin=origin, status="sent",
+        wa_message_id=wa_message_id, source_ref=source_ref, extra=extra,
+    )
+
+
+def send_buttons(
+    db: Session,
+    conversation: InboxConversation,
+    body: str,
+    buttons: list[dict[str, str]],
+    *,
+    origin: str,
+    source_ref: str | None = None,
+    client: MetaClient | None = None,
+) -> InboxMessage:
+    """Send a message with up to three reply buttons (``{"id", "title"}``)."""
+    return _send_interactive(
+        db, conversation, body, kind="buttons", choices=buttons, origin=origin,
+        source_ref=source_ref, client=client,
+        send=lambda meta: meta.send_buttons(conversation.phone, body, buttons),
+    )
+
+
+def send_list(
+    db: Session,
+    conversation: InboxConversation,
+    body: str,
+    button_label: str,
+    rows: list[dict[str, str]],
+    *,
+    origin: str,
+    source_ref: str | None = None,
+    client: MetaClient | None = None,
+) -> InboxMessage:
+    """Send a message with a list to choose from (``{"id", "title"}`` rows)."""
+    return _send_interactive(
+        db, conversation, body, kind="list", choices=rows, origin=origin,
+        source_ref=source_ref, client=client,
+        send=lambda meta: meta.send_list(conversation.phone, body, button_label, rows),
+    )
+
+
 def send_template(
     db: Session,
     conversation: InboxConversation,

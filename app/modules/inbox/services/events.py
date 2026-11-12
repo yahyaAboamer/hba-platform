@@ -37,6 +37,7 @@ from app.modules.inbox.models import (
     InboxMedia,
     InboxMessage,
     MetaWebhookEvent,
+    FeedbackSurvey,
     OrderConfirmation,
 )
 from app.modules.inbox.services.meta import MEDIA_KINDS, failure_words
@@ -155,7 +156,10 @@ def _read_message(message: dict) -> dict:
             extra={"payload": _text(button.get("payload"), 200)},
         )
     elif kind == "interactive":
-        reply = (message.get("interactive") or {}).get("button_reply") or {}
+        # A tap on a reply button, or a choice from a list: both arrive as a
+        # reply with an id (what we put on it) and the title she saw.
+        interactive = message.get("interactive") or {}
+        reply = interactive.get("button_reply") or interactive.get("list_reply") or {}
         fields.update(
             kind="button",
             body=_text(reply.get("title"), 200),
@@ -265,6 +269,18 @@ def apply_message(db: Session, message: dict, names: dict[str, str]) -> bool:
         fields["extra"] = {**(fields["extra"] or {}), "unmatched": True}
         answer = None
 
+    # A tap on a feedback question (ADR 0083) counts only from the survey's
+    # own phone and only for the step the survey is on; otherwise it is kept
+    # in the chat like any other unmatched tap, and changes nothing.
+    from app.modules.inbox.services import feedback_replies
+
+    feedback_tap = feedback_replies.read_tap(fields)
+    survey = feedback_replies.accepted(db, feedback_tap, phone) if feedback_tap else None
+    if feedback_tap and survey is None:
+        logger.warning("a feedback tap was not the sender's or not for this step; ignored")
+        fields["extra"] = {**(fields["extra"] or {}), "unmatched": True}
+        feedback_tap = None
+
     message_id = db.execute(
         insert(InboxMessage)
         .values(
@@ -277,7 +293,7 @@ def apply_message(db: Session, message: dict, names: dict[str, str]) -> bool:
             or _text((message.get("context") or {}).get("id"), 200),
             status="received",
             origin="customer",
-            shopify_order_id=answer[1] if answer else None,
+            shopify_order_id=answer[1] if answer else (survey.shopify_order_id if survey else None),
             extra=fields["extra"],
             occurred_at=occurred_at,
         )
@@ -309,6 +325,11 @@ def apply_message(db: Session, message: dict, names: dict[str, str]) -> bool:
 
     if answer:
         _record_answer(db, order, answer[0], occurred_at, conversation, message_id)
+    if survey is not None and feedback_tap is not None:
+        feedback_replies.record_tap(db, survey, feedback_tap, occurred_at, conversation, message_id)
+    elif fields["kind"] == "text":
+        # Her first words after a feedback answer are her comment.
+        feedback_replies.capture_comment(db, phone, fields["body"], occurred_at)
 
     # She wrote: free replies are allowed for 24 hours from now.
     if conversation.last_inbound_at is None or occurred_at > conversation.last_inbound_at:
@@ -357,6 +378,16 @@ def apply_status(db: Session, status: dict) -> bool:
         db.execute(
             update(OrderConfirmation)
             .where(OrderConfirmation.wa_message_id == wa_message_id)
+            .values(
+                state="no_whatsapp" if kind == UNDELIVERABLE else "failed",
+                last_error=words[:300],
+                updated_at=utcnow(),
+            )
+        )
+        # Or a feedback question's: the survey says so too (ADR 0083).
+        db.execute(
+            update(FeedbackSurvey)
+            .where(FeedbackSurvey.wa_message_id == wa_message_id)
             .values(
                 state="no_whatsapp" if kind == UNDELIVERABLE else "failed",
                 last_error=words[:300],
