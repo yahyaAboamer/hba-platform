@@ -550,6 +550,11 @@
   font-size: 12.5px;
 }
 
+.profile__gift-order-date {
+  color: var(--quiet);
+  font-size: 12.5px;
+}
+
 .profile__catalogue {
   display: flex;
   align-items: center;

@@ -353,6 +353,51 @@ def wardrobe_for(db: Session, affiliate_id: int) -> dict:
     }
 
 
+#: An order Shopify says was cancelled. Only the order list says so; the
+#: wardrobe itself keeps reading delivery state, as it always has.
+CANCELLED = "cancelled"
+
+
+def wardrobe_orders_for(db: Session, affiliate_id: int) -> list[dict]:
+    """The gift orders placed for her, one entry per order, newest first.
+
+    The wardrobe answers *what does she have*; this answers *was an order
+    placed for her at all, and when* - the question staff ask when checking
+    that the person who places gift orders did place hers. **The same rows the
+    wardrobe is built from** (`_gift_lines`): only matched, zero-priced orders
+    (D05), never a purchase and never an order that used her discount code.
+
+    A cancelled order is shown as cancelled rather than as on its way, because
+    "an order exists" and "an order was cancelled" are different answers to
+    the question this list is for.
+
+    One query, whatever the size of her history.
+    """
+    orders: dict[str, dict] = {}
+    for shipment, order, line in _gift_lines(db, affiliate_id):
+        entry = orders.get(shipment.shopify_order_id)
+        if entry is None:
+            entry = orders[shipment.shopify_order_id] = {
+                "shopify_order_id": shipment.shopify_order_id,
+                "order_number": order.order_number,
+                "placed_at": order.placed_at.isoformat() if order.placed_at else None,
+                "state": CANCELLED if order.cancelled_at else _state_for(order),
+                "delivered_at": order.delivered_at.isoformat()
+                if order.delivered_at
+                else None,
+                "items": [],
+            }
+        entry["items"].append(
+            {
+                "title": line.title,
+                "size": line.variant_title,
+                "quantity": line.quantity,
+            }
+        )
+    # `_gift_lines` is newest order first, and dicts keep insertion order.
+    return list(orders.values())
+
+
 def roster_for(db: Session, shopify_product_id: str) -> dict:
     """Which models have this product, grouped as W02 asks.
 

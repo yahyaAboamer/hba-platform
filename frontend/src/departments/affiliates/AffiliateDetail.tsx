@@ -18,6 +18,7 @@ import { ROSTER_STATUS } from "./Affiliates";
 import type { Affiliate } from "./Affiliates";
 import { ApproveDialog, ModelLifecycle } from "./ModelLifecycle";
 import { WardrobeAdd } from "./WardrobeAdd";
+import { GiftOrders } from "./GiftOrders";
 import "./PaymentDetail.css";
 import "./AffiliateDetail.css";
 
@@ -1264,6 +1265,7 @@ export function AffiliateDetail({ session }: { session: Session }) {
                 </ul>
               </div>
             </>}
+            <GiftOrders affiliateId={detail.id} name={detail.name} reload={wardrobeReload} />
             <div className="profile__catalogue">
               <span>What HBA has not sent {detail.name} yet is in the catalogue.</span>
               <Link className="pay-detail__link" to="/affiliates/products">Open the catalogue →</Link>

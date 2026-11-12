@@ -347,6 +347,10 @@ def test_a_row_needs_its_amount_method_and_id_to_be_paid(db):
 
 def test_marking_paid_records_the_day_and_locks_the_row(db):
     row, actor = _row(db, RETURN_STEPS)
+    # Received on a fixed day, not "now": the paid day below is fixed, and a
+    # return received after it is refused, so a real clock past 9 November
+    # failed this test on every run.
+    row.received_at = datetime(2026, 11, 8, 12, tzinfo=timezone.utc)
     returns.mark_paid(
         db,
         row.id,
