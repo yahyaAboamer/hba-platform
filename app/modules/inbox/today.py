@@ -79,7 +79,7 @@ def look(db: Session, permissions: frozenset[str], now: datetime) -> Look:
     # Post-delivery feedback (ADR 0083). The same chats as Chats' *Needs
     # follow-up* view; the second item is the stronger part of them, whose
     # customer answered that their issue was not solved.
-    owed = chats.counts(db)["follow_up"]
+    owed = counted["follow_up"]
     found.counts["chats_follow_up"] = owed
     promised = timedelta(hours=feedback.reply_hours(db))
     if owed:

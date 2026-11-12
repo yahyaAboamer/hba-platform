@@ -446,6 +446,8 @@ class FeedbackSurvey(Base):
         ),
         # The Feedback sheet, newest delivery first.
         Index("feedback_survey_delivered", text("delivered_at DESC NULLS LAST"), text("id DESC")),
+        # The survey beside a chat, and a chat's latest answer.
+        Index("feedback_survey_conversation", "conversation_id", "rated_at"),
         # Codes still out there: what the used-or-not pass and the 30-day
         # clean-up read (a code on its way back to nothing is not in it).
         Index(
@@ -511,6 +513,10 @@ class FeedbackSurvey(Base):
     #: Shopify's id for the code inside the discount (``DiscountRedeemCode``),
     #: which removing it needs. Null until Shopify has finished adding it.
     code_gid: Mapped[str | None] = mapped_column(String(120))
+    #: The code text drawn for this survey before Shopify was asked to add it,
+    #: written down first so a retry after a timeout reuses it (and finds it
+    #: in the discount) instead of leaving the first one there, unknown to us.
+    code_drawn: Mapped[str | None] = mapped_column(String(40))
     #: When the message carrying the code was sent. Not when it was issued.
     code_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     code_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

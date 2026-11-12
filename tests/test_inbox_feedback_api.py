@@ -11,7 +11,7 @@ from datetime import timedelta
 import pytest
 from fastapi.testclient import TestClient
 from openpyxl import load_workbook
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 
 from app.core.businesstime import BUSINESS_TIMEZONE, business_date, business_midnight, utcnow
 from app.db import SessionLocal, engine
@@ -249,15 +249,27 @@ def test_the_dates_are_the_day_she_was_asked(client, sheet):
 def test_the_summary_follows_the_filters(client, sheet):
     summary = client.get("/api/inbox/feedback").json()["summary"]
     assert summary == {
-        "asked": 6, "answered": 5, "loved": 1, "okay": 1, "unhappy": 3,
+        "asked": 5, "answered": 5, "loved": 1, "okay": 1, "unhappy": 3,
         "needs_follow_up": 2, "solved": 1, "codes_sent": 1, "codes_used": 1,
+        "not_reached": 1,
     }
     print("SUMMARY", json.dumps(summary))
     narrowed = client.get("/api/inbox/feedback", params={"courier": "Aramex"}).json()["summary"]
     assert narrowed == {
         "asked": 2, "answered": 2, "loved": 0, "okay": 0, "unhappy": 2,
         "needs_follow_up": 2, "solved": 0, "codes_sent": 0, "codes_used": 0,
+        "not_reached": 0,
     }
+
+
+def test_asked_counts_only_questions_that_reached_the_customer(client, sheet):
+    with SessionLocal() as db:
+        survey(db, "7020", state="no_whatsapp", sent_at=None, delivered_at=at(2))
+        survey(db, "7021", state="would_send", sent_at=None, delivered_at=at(2))
+        survey(db, "7022", state="pending", sent_at=None, delivered_at=at(2))
+        db.commit()
+    summary = client.get("/api/inbox/feedback").json()["summary"]
+    assert summary["asked"] == 5 and summary["not_reached"] == 3
 
 
 def test_the_filters_menus(client, sheet):
@@ -286,7 +298,7 @@ def test_paging(client, sheet):
     names = [r["order_name"] for r in first["rows"] + second["rows"]]
     assert len(set(names)) == 6
     # The summary counts the whole filter, not the page.
-    assert first["summary"]["asked"] == 6
+    assert first["summary"]["asked"] == 5
     assert client.get("/api/inbox/feedback", params={"limit": 0}).status_code == 422
     assert client.get("/api/inbox/feedback", params={"limit": 500}).status_code == 422
     assert client.get("/api/inbox/feedback", params={"rating": "great"}).status_code == 422
@@ -340,6 +352,43 @@ def test_a_download_is_audited_and_carries_no_search_words(client, sheet):
         assert event.after_json["rows"] == 1
         assert event.after_json["filters"] == {"rating": "unhappy", "q": "given"}
         assert "habiba" not in json.dumps(event.after_json)
+
+
+def test_a_control_character_in_a_comment_does_not_break_the_download(client, sheet):
+    with SessionLocal() as db:
+        survey(
+            db, "7011", phone="201005550178", customer_name="Sara\x01",
+            courier="Bosta", products=["Silk\x0bscarf"], delivered_at=at(2), sent_at=at(1),
+            rating="okay", rated_at=at(1), reason="other", comment="fine\x07 =1+1\x1f",
+        )
+        db.commit()
+    response = client.get("/api/inbox/feedback/download", params={"q": "7011"})
+    assert response.status_code == 200, response.text
+    [row] = list(load_workbook(io.BytesIO(response.content)).active.iter_rows(min_row=2, values_only=True))
+    assert row[1] == "Sara" and row[4] == "Silkscarf" and row[9] == "fine =1+1"
+
+
+def test_dates_out_of_range_or_the_wrong_way_round_are_a_422_in_words(client, sheet):
+    for path in ("/api/inbox/feedback", "/api/inbox/feedback/download"):
+        far = client.get(path, params={"until": "9999-12-31"})
+        assert far.status_code == 422 and "out of range" in far.json()["detail"]
+        backwards = client.get(path, params={"since": day(1), "until": day(3)})
+        assert backwards.status_code == 422 and "after" in backwards.json()["detail"]
+        assert client.get(path, params={"since": day(3), "until": day(3)}).status_code == 200
+
+
+def test_a_download_of_too_many_rows_asks_for_a_narrower_range(client, sheet, monkeypatch):
+    from app.modules.inbox import api
+
+    monkeypatch.setattr(api, "DOWNLOAD_MAX_ROWS", 5)
+    ok = client.get("/api/inbox/feedback/download", params={"courier": "Aramex"})
+    assert ok.status_code == 200  # 2 rows
+    five = client.get("/api/inbox/feedback/download")  # 6 rows
+    assert five.status_code == 422 and "narrower date range" in five.json()["detail"]
+    monkeypatch.setattr(api, "DOWNLOAD_MAX_ROWS", 6)
+    assert client.get("/api/inbox/feedback/download").status_code == 200
+    with SessionLocal() as db:  # a refused download is not audited as a download
+        assert db.scalar(select(func.count()).select_from(AuditEvent).where(AuditEvent.action == "inbox.feedback_downloaded")) == 2
 
 
 def test_an_empty_download_is_still_a_sheet(client, sheet):

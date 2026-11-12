@@ -951,12 +951,17 @@ def rows(
 
 
 def summary(db: Session, **filters) -> dict:
-    """The sheet's numbers for the same filters as ``rows``."""
+    """The sheet's numbers for the same filters as ``rows``.
+
+    ``asked`` counts only questions that reached the customer (``sent_at``
+    set), so answered / asked is a true response rate; ``not_reached`` is the
+    rest the sheet lists: failed, no WhatsApp, or only logged (would_send).
+    """
     S = FeedbackSurvey
     found = db.execute(
         _filtered(
             select(
-                func.count(),
+                func.count().filter(S.sent_at.is_not(None)),
                 func.count().filter(S.rating.is_not(None)),
                 func.count().filter(S.rating == "loved"),
                 func.count().filter(S.rating == "okay"),
@@ -965,13 +970,14 @@ def summary(db: Session, **filters) -> dict:
                 func.count().filter(S.solved.is_(True)),
                 func.count().filter(S.code_sent_at.is_not(None)),
                 func.count().filter(S.code_used_at.is_not(None)),
+                func.count().filter(S.state.in_(("failed", "no_whatsapp", "would_send"))),
             ),
             **filters,
         )
     ).one()
     keys = (
         "asked", "answered", "loved", "okay", "unhappy",
-        "needs_follow_up", "solved", "codes_sent", "codes_used",
+        "needs_follow_up", "solved", "codes_sent", "codes_used", "not_reached",
     )
     return dict(zip(keys, (int(n) for n in found)))
 

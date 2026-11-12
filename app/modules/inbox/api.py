@@ -497,6 +497,9 @@ def set_sending(
 
 SHEET_PAGE = 50
 SHEET_MAX_PAGE = 200
+#: The download is one workbook built in memory: more rows than this is a
+#: request for a narrower date range, never a silent cut-off.
+DOWNLOAD_MAX_ROWS = 50_000
 
 
 def _sheet_filters(
@@ -510,9 +513,16 @@ def _sheet_filters(
     q: str | None = Query(None, max_length=120),
 ) -> dict:
     """The sheet's filters, shared by the list and the download."""
+    if since and until and since > until:
+        raise HTTPException(422, "The first day is after the last day.")
+    try:
+        asked_from = business_midnight(since) if since else None
+        asked_before = business_midnight(until + timedelta(days=1)) if until else None
+    except (OverflowError, ValueError):
+        raise HTTPException(422, "That date is out of range. Choose real dates for the first and last day.") from None
     return {
-        "asked_from": business_midnight(since) if since else None,
-        "asked_before": business_midnight(until + timedelta(days=1)) if until else None,
+        "asked_from": asked_from,
+        "asked_before": asked_before,
         "rating": rating,
         "reason": reason,
         "product": product,
@@ -552,7 +562,13 @@ def feedback_download(
     It carries customers' names and phones, so it is audited: who, when, how
     many rows and which filters (never what was typed in the search box).
     """
-    found = feedback.rows(db, **filters, by_asked=True, limit=None)
+    found = feedback.rows(db, **filters, by_asked=True, limit=DOWNLOAD_MAX_ROWS + 1)
+    if len(found) > DOWNLOAD_MAX_ROWS:
+        raise HTTPException(
+            422,
+            f"More than {DOWNLOAD_MAX_ROWS:,} rows match. Choose a narrower date range "
+            "and download again.",
+        )
     now = utcnow()
     record_audit(
         db,

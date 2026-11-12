@@ -38,7 +38,9 @@ from datetime import datetime, timedelta
 from typing import Any, Callable
 
 from sqlalchemy import func, select, text, update
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import set_committed_value
 
 from app.core.businesstime import utcnow
 from app.modules.inbox.models import FeedbackSettings, FeedbackSurvey
@@ -204,11 +206,17 @@ def generate_code() -> str:
 
 
 def _fresh_code(db: Session) -> str:
-    """A code no survey has. (Shopify has the last word: see ``_add_code``.)"""
+    """A code no survey has or has drawn. (Shopify has the last word: see
+    ``_add_code``.)"""
     for _ in range(DRAW_TRIES):
         code = generate_code()
         if not db.scalar(
-            select(FeedbackSurvey.id).where(func.upper(FeedbackSurvey.code) == code).limit(1)
+            select(FeedbackSurvey.id)
+            .where(
+                (func.upper(FeedbackSurvey.code) == code)
+                | (func.upper(FeedbackSurvey.code_drawn) == code)
+            )
+            .limit(1)
         ):
             return code
     raise ShopifyError("Could not draw a reward code nobody has.")  # 31^6 makes this a sign of something wrong
@@ -249,10 +257,15 @@ def _remember_discount(gid: str) -> None:
     from app.db import SessionLocal
 
     with SessionLocal() as own:
+        # An upsert: the settings row may exist only uncommitted, in the
+        # caller's transaction (``get_settings`` makes it the first time), and
+        # a plain UPDATE would then find nothing and silently lose the id.
         own.execute(
-            update(FeedbackSettings)
-            .where(FeedbackSettings.id == 1)
-            .values(discount_gid=gid, updated_at=utcnow())
+            insert(FeedbackSettings)
+            .values(id=1, discount_gid=gid, updated_at=utcnow())
+            .on_conflict_do_update(
+                index_elements=["id"], set_={"discount_gid": gid, "updated_at": utcnow()}
+            )
         )
         own.commit()
 
@@ -345,6 +358,22 @@ def _remember_code(
         own.commit()
 
 
+def _remember_drawn(survey_id: int, code: str) -> None:
+    """Write the code drawn for a survey down, in a transaction of its own and
+    committed now, *before* Shopify is asked to add it: if the call times out
+    after Shopify took it, the retry reuses this text instead of drawing (and
+    leaving behind) another."""
+    from app.db import SessionLocal
+
+    with SessionLocal() as own:
+        own.execute(
+            update(FeedbackSurvey)
+            .where(FeedbackSurvey.id == survey_id, FeedbackSurvey.code.is_(None))
+            .values(code_drawn=code, updated_at=utcnow())
+        )
+        own.commit()
+
+
 def _read_creation(node: dict | None, code: str) -> tuple[str, str | None]:
     """``(what, redeem code id)``: ``what`` is ``added``, ``pending`` (Shopify
     has not finished adding it) or ``taken`` (it is already in the discount)."""
@@ -367,9 +396,10 @@ def _add_code(client: ShopifyClient, discount_gid: str, code: str) -> tuple[str,
     """Add one code to the discount. Returns what ``_read_creation`` does.
 
     Shopify adds codes in the background, so this asks once more how it went
-    if the answer to the mutation says it is not done; a code still not added
-    after that is taken as on its way (the customer will not use it within
-    seconds, and the 30-day clean-up finds it by its text).
+    if the answer to the mutation says it is not done. A code still not
+    confirmed after that **raises** (a retryable error): a code Shopify has
+    not confirmed is never stored as hers or sent. The retry finds the code
+    by its text (``_issue``), so nothing is added twice.
     """
     data = client.execute(CODE_ADD, {"discountId": discount_gid, "codes": [{"code": code}]})
     payload = (data or {}).get("discountRedeemCodeBulkAdd") or {}
@@ -383,7 +413,21 @@ def _add_code(client: ShopifyClient, discount_gid: str, code: str) -> tuple[str,
     if state == "pending" and creation.get("id"):
         status = client.execute(CODE_ADD_STATUS, {"id": creation["id"]})
         state, gid = _read_creation((status or {}).get("discountRedeemCodeBulkCreation"), code)
+    if state == "pending":
+        raise ShopifyError(f"Shopify has not finished adding code {code} yet.")
     return state, gid
+
+
+def _find_code(client: ShopifyClient, discount_gid: str, code: str) -> dict | None:
+    """The code as the discount has it now (``id``, use count), by its text,
+    or None."""
+    data = client.execute(CODE_BY_CODE, {"id": discount_gid, "code": code})
+    nodes = (
+        (((data or {}).get("discountNode") or {}).get("discount") or {}).get("codes") or {}
+    ).get("nodes") or []
+    return next(
+        (n for n in nodes if str(n.get("code") or "").upper() == str(code).upper()), None
+    )
 
 
 def _issue(
@@ -392,12 +436,39 @@ def _issue(
     client: ShopifyClient,
     remember: Callable[..., None],
     now: datetime,
+    remember_drawn: Callable[[int, str], None] | None = None,
 ) -> str:
+    """Draw (or, on a retry, reuse) the survey's code, make sure Shopify has
+    it, and only then store it as hers.
+
+    The drawn text is written down first, so a retry after a timeout asks the
+    discount for that very text and adopts it if Shopify did take it. A code
+    Shopify has not confirmed raises (the job retries) and is never stored.
+    """
     discount_gid = ensure_discount(db, client, now=now)
+    note = remember_drawn or _remember_drawn
     for _ in range(DRAW_TRIES):
-        code = _fresh_code(db)
-        state, gid = _add_code(client, discount_gid, code)
+        code = survey.code_drawn
+        retry = bool(code)
+        if not code:
+            code = _fresh_code(db)
+            note(survey.id, code)
+            # Not marked as changed: the row is already written, and a dirty
+            # row would hold a lock the own-session writes then wait on.
+            set_committed_value(survey, "code_drawn", code)
+        gid: str | None = None
+        found = _find_code(client, discount_gid, code) if retry else None
+        if found:
+            state, gid = "added", str(found["id"])
+        else:
+            state, gid = _add_code(client, discount_gid, code)
+            if state == "taken" and retry:
+                found = _find_code(client, discount_gid, code)
+                if found:
+                    state, gid = "added", str(found["id"])
         if state == "taken":
+            # Someone else's: draw another.
+            set_committed_value(survey, "code_drawn", None)
             continue
         expires_at = now + CODE_VALID_FOR
         remember(survey.id, code, gid, expires_at)
@@ -467,24 +538,33 @@ def code_sent(survey: FeedbackSurvey, at: datetime | None = None) -> None:
 #: order is the one that used it.
 _MARK_USED = text(
     """
+    WITH open_codes AS (
+        SELECT id, upper(code) AS ucode, code_sent_at
+        FROM feedback_survey
+        WHERE code IS NOT NULL
+          AND code_sent_at IS NOT NULL
+          AND code_used_at IS NULL
+    ),
+    -- Orders placed since the earliest open code was sent, their codes
+    -- unnested and uppercased once each, not once per pair.
+    order_codes AS (
+        SELECT o.shopify_order_id, o.placed_at, o.order_number, upper(c.code) AS ucode
+        FROM order_index AS o
+        CROSS JOIN LATERAL unnest(o.discount_codes) AS c(code)
+        WHERE o.placed_at >= (SELECT min(code_sent_at) FROM open_codes)
+    ),
+    first_use AS (
+        SELECT DISTINCT ON (f.id) f.id AS survey_id, oc.placed_at, oc.order_number
+        FROM open_codes AS f
+        JOIN order_codes AS oc
+          ON oc.ucode = f.ucode AND oc.placed_at >= f.code_sent_at
+        ORDER BY f.id, oc.placed_at, oc.shopify_order_id
+    )
     UPDATE feedback_survey AS s
     SET code_used_at = u.placed_at,
         code_order_name = left(u.order_number, 40),
         updated_at = now()
-    FROM (
-        SELECT DISTINCT ON (f.id) f.id AS survey_id, o.placed_at, o.order_number
-        FROM feedback_survey AS f
-        JOIN order_index AS o
-          ON o.placed_at >= f.code_sent_at
-         AND EXISTS (
-               SELECT 1 FROM unnest(o.discount_codes) AS c(code)
-               WHERE upper(c.code) = upper(f.code)
-             )
-        WHERE f.code IS NOT NULL
-          AND f.code_sent_at IS NOT NULL
-          AND f.code_used_at IS NULL
-        ORDER BY f.id, o.placed_at, o.shopify_order_id
-    ) AS u
+    FROM first_use AS u
     WHERE s.id = u.survey_id
     """
 )
@@ -538,14 +618,7 @@ def _redeem_codes(
         if row.id in found:
             continue
         # Its id was not known when it was issued: find it by its text.
-        data = client.execute(CODE_BY_CODE, {"id": discount_gid, "code": row.code})
-        nodes = (
-            (((data or {}).get("discountNode") or {}).get("discount") or {}).get("codes") or {}
-        ).get("nodes") or []
-        match = next(
-            (n for n in nodes if str(n.get("code") or "").upper() == str(row.code).upper()), None
-        )
-        found[row.id] = match
+        found[row.id] = _find_code(client, discount_gid, row.code)
     return found
 
 
@@ -558,7 +631,12 @@ def expire(
     max_batches: int = REMOVE_BATCHES,
 ) -> int:
     """Take codes nobody used out of Shopify once their 30 days are up.
-    Returns how many were removed (or found already gone).
+    Returns how many are now **confirmed gone** (a lookup no longer finds them).
+
+    Shopify deletes in the background, so asking for a code's removal does not
+    mark it removed: the next daily run looks it up, finds it gone, and only
+    then records ``code_removed_at``. Asking again for a code already being
+    deleted is harmless.
 
     **A used code is never removed**: the used-or-not pass runs first, and a
     code Shopify says has been used (its own count, which can be ahead of our
@@ -596,11 +674,13 @@ def expire(
             errors = _errors((data or {}).get("discountCodeRedeemCodeBulkDelete"))
             if errors:
                 raise _refuse_or_retry("removing expired codes", errors)
-        for row in [*gone, *(row for row, _ in to_delete)]:
+            # Asked for, not yet confirmed: tomorrow's lookup settles it.
+            skipped.update(row.id for row, _ in to_delete)
+        for row in gone:
             row.code_removed_at = now
             row.updated_at = now
         db.flush()
-        removed += len(gone) + len(to_delete)
+        removed += len(gone)
     return removed
 
 

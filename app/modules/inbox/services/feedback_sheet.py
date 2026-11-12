@@ -10,6 +10,7 @@ import io
 from datetime import datetime
 
 from openpyxl import Workbook
+from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
 from openpyxl.styles import Alignment, Font
 
 from app.core.businesstime import BUSINESS_TIMEZONE
@@ -60,7 +61,17 @@ def _yes_no(value: bool | None) -> str | None:
     return None if value is None else ("Yes" if value else "No")
 
 
+def _clean(value):
+    """A cell's value without control characters, which openpyxl refuses (one
+    stray character in one comment must not break the whole download)."""
+    return ILLEGAL_CHARACTERS_RE.sub("", value) if isinstance(value, str) else value
+
+
 def _line(row: dict) -> list:
+    return [_clean(value) for value in _values(row)]
+
+
+def _values(row: dict) -> list:
     return [
         _when(row["asked_at"]),
         row["customer_name"],

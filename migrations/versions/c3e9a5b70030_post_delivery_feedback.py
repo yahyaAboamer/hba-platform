@@ -85,6 +85,7 @@ def upgrade() -> None:
         sa.Column("reopened_count", sa.Integer(), server_default="0", nullable=False),
         sa.Column("code", sa.String(length=40), nullable=True),
         sa.Column("code_gid", sa.String(length=120), nullable=True),
+        sa.Column("code_drawn", sa.String(length=40), nullable=True),
         sa.Column("code_sent_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("code_expires_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("code_used_at", sa.DateTime(timezone=True), nullable=True),
@@ -125,6 +126,10 @@ def upgrade() -> None:
         unique=False,
     )
     op.create_index(
+        "feedback_survey_conversation", "feedback_survey", ["conversation_id", "rated_at"],
+        unique=False,
+    )
+    op.create_index(
         "feedback_survey_code_open", "feedback_survey", ["code_expires_at"],
         unique=False,
         postgresql_where=sa.text("code IS NOT NULL AND code_used_at IS NULL AND code_removed_at IS NULL"),
@@ -136,6 +141,7 @@ def downgrade() -> None:
         "feedback_survey_code_open", table_name="feedback_survey",
         postgresql_where=sa.text("code IS NOT NULL AND code_used_at IS NULL AND code_removed_at IS NULL"),
     )
+    op.drop_index("feedback_survey_conversation", table_name="feedback_survey")
     op.drop_index("feedback_survey_delivered", table_name="feedback_survey")
     op.drop_index(
         "feedback_survey_follow_up", table_name="feedback_survey",

@@ -200,6 +200,10 @@ def shop(monkeypatch):
         feedback_codes, "_remember_code",
         lambda *args: store.remembered.append(("code", *args)),
     )
+    monkeypatch.setattr(
+        feedback_codes, "_remember_drawn",
+        lambda *args: store.remembered.append(("drawn", *args)),
+    )
     return store
 
 
@@ -378,13 +382,100 @@ def test_a_code_shopify_says_is_taken_is_drawn_again(db, shop, monkeypatch):
     assert [entry["code"] for entry in shop.codes.values()] == ["FB-BBBBBB"]
 
 
-def test_a_code_shopify_has_not_finished_adding_is_still_issued(db, shop):
+def test_a_code_shopify_has_not_confirmed_is_not_stored_or_sent_and_is_retried(db, shop):
     shop.adds_done = False
     shop.finishes = False
     row = survey(db)
-    code = _issue(db, row)
-    assert code and row.code_gid is None  # its id is found later, by its text
+    with pytest.raises(ShopifyError):
+        _issue(db, row)
+    assert row.code is None and row.code_gid is None
+    assert not [entry for entry in shop.remembered if entry[0] == "code"]
     assert len(shop.names("FeedbackCodeAddStatus")) == 1
+    # Given up on at the last try: thanked without a code, nothing stored.
+    assert _issue(db, row, final_attempt=True) is None
+    assert row.code is None and "not finished" in row.last_error
+
+
+def test_a_pending_code_is_adopted_on_the_retry_once_shopify_has_it(db, shop, monkeypatch):
+    draws = iter(["FB-AAAAAA", "FB-BBBBBB"])
+    monkeypatch.setattr(feedback_codes, "generate_code", lambda: next(draws))
+    shop.adds_done = False
+    shop.finishes = False
+    row = survey(db)
+    with pytest.raises(ShopifyError):
+        _issue(db, row)
+    # Shopify gets there in the end.
+    shop.codes["gid://shopify/DiscountRedeemCode/900"] = {"code": "FB-AAAAAA", "uses": 0}
+    adds = len(shop.names("FeedbackCodeAdd"))
+    assert _issue(db, row) == "FB-AAAAAA"
+    assert row.code_gid == "gid://shopify/DiscountRedeemCode/900"
+    assert len(shop.names("FeedbackCodeAdd")) == adds  # not added a second time
+
+
+def test_a_code_shopify_reports_failed_is_not_issued(db, shop, monkeypatch):
+    shop.adds_done = False
+    monkeypatch.setattr(
+        shop, "_FeedbackCodeAddStatus",
+        lambda v: {
+            "discountRedeemCodeBulkCreation": {
+                "id": v["id"], "done": True, "codesCount": 1, "importedCount": 0, "failedCount": 1,
+                "codes": {"nodes": [{"code": "x", "errors": [refused("INVALID", "Bad code")], "discountRedeemCode": None}]},
+            }
+        },
+    )
+    row = survey(db)
+    assert _issue(db, row) is None
+    assert row.code is None and row.last_error.startswith("The reward code could not be issued")
+
+
+def test_a_retry_after_a_timeout_reuses_the_same_code_and_adds_nothing(db, shop, monkeypatch):
+    draws = iter(["FB-AAAAAA", "FB-BBBBBB"])
+    monkeypatch.setattr(feedback_codes, "generate_code", lambda: next(draws))
+    row = survey(db)
+    shop.fail["FeedbackCodeAdd"] = [server_error()] * 10
+    with pytest.raises(ShopifyError):
+        _issue(db, row)
+    assert ("drawn", row.id, "FB-AAAAAA") in shop.remembered and row.code is None
+    # Shopify had in fact taken it before the call went wrong.
+    shop.codes["gid://shopify/DiscountRedeemCode/901"] = {"code": "FB-AAAAAA", "uses": 0}
+    shop.fail.clear()
+    assert _issue(db, row) == "FB-AAAAAA"
+    assert row.code_gid == "gid://shopify/DiscountRedeemCode/901"
+    assert len(shop.codes) == 1  # no second code left in the discount
+
+
+def test_a_retry_adds_the_remembered_code_when_shopify_never_took_it(db, shop, monkeypatch):
+    monkeypatch.setattr(feedback_codes, "generate_code", lambda: "FB-AAAAAA")
+    row = survey(db, code_drawn="FB-CCCCCC")
+    assert _issue(db, row) == "FB-CCCCCC"
+    assert [c["code"] for c in shop.codes.values()] == ["FB-CCCCCC"]
+
+
+def test_the_drawn_code_is_really_written_down_before_shopify_is_asked(fresh_database):
+    from app.db import SessionLocal
+    from app.modules.inbox.models import FeedbackSurvey
+
+    with SessionLocal() as own:
+        row = survey(own)
+        own.commit()
+        survey_id = row.id
+    feedback_codes._remember_drawn(survey_id, "FB-ZZZZZZ")
+    with SessionLocal() as own:
+        assert own.get(FeedbackSurvey, survey_id).code_drawn == "FB-ZZZZZZ"
+
+
+def test_the_first_ever_discount_id_is_not_lost_when_the_settings_row_is_new(fresh_database):
+    from app.db import SessionLocal
+    from app.modules.inbox.models import FeedbackSettings
+
+    with SessionLocal() as own:
+        assert own.get(FeedbackSettings, 1) is None
+    feedback_codes._remember_discount("gid://shopify/DiscountCodeNode/55")
+    with SessionLocal() as own:
+        assert own.get(FeedbackSettings, 1).discount_gid == "gid://shopify/DiscountCodeNode/55"
+    feedback_codes._remember_discount("gid://shopify/DiscountCodeNode/56")
+    with SessionLocal() as own:
+        assert own.get(FeedbackSettings, 1).discount_gid == "gid://shopify/DiscountCodeNode/56"
 
 
 def test_a_code_shopify_finishes_a_moment_later_gets_its_id(db, shop):
@@ -696,7 +787,7 @@ def test_every_code_is_marked_in_one_query(db):
         assert feedback_codes.mark_used(db) == 3
     finally:
         event.remove(db.get_bind(), "before_cursor_execute", listener)
-    assert len(statements) == 1 and statements[0].lstrip().startswith("UPDATE feedback_survey")
+    assert len(statements) == 1 and "UPDATE feedback_survey" in statements[0]
     for row in rows:
         db.refresh(row)
         assert row.code_used_at is not None
@@ -740,10 +831,26 @@ def _expire_on(row, *, expired):
 def test_an_unused_code_past_its_thirty_days_is_removed_from_shopify(db, shop, feature_on):
     row, redeem_id = _out_there(db, shop, "7001", "FB-ABC234")
     _expire_on(row, expired=True)
-    assert expire(db) == 1
-    assert redeem_id not in shop.codes and row.code_removed_at is not None
+    # Shopify deletes in the background: asked for, not yet marked.
+    assert expire(db) == 0
+    assert redeem_id not in shop.codes and row.code_removed_at is None
     [removal] = shop.names("FeedbackCodesRemove")
     assert removal == {"discountId": shop.discount, "ids": [redeem_id]}
+    # The next run finds it gone and only then records it.
+    assert expire(db) == 1 and row.code_removed_at is not None
+    assert len(shop.names("FeedbackCodesRemove")) == 1
+
+
+def test_a_code_whose_delete_is_still_running_is_asked_again_harmlessly(db, shop, monkeypatch):
+    row, redeem_id = _out_there(db, shop, "7001", "FB-ABC234")
+    _expire_on(row, expired=True)
+    monkeypatch.setattr(
+        shop, "_FeedbackCodesRemove",
+        lambda v: {"discountCodeRedeemCodeBulkDelete": {"job": {"id": "j"}, "userErrors": []}},
+    )
+    assert expire(db) == 0 and expire(db) == 0
+    assert row.code_removed_at is None and redeem_id in shop.codes
+    assert len(shop.names("FeedbackCodesRemove")) == 2
 
 
 def test_a_code_still_inside_its_thirty_days_is_left_alone(db, shop):
@@ -798,8 +905,8 @@ def test_a_code_shopify_no_longer_has_counts_as_removed(db, shop):
 def test_a_code_whose_id_was_never_learned_is_found_by_its_text(db, shop):
     row, redeem_id = _out_there(db, shop, "7001", "FB-ABC234", gid=False)
     _expire_on(row, expired=True)
-    assert expire(db) == 1
-    assert redeem_id not in shop.codes and row.code_removed_at is not None
+    assert expire(db) == 0 and redeem_id not in shop.codes
+    assert expire(db) == 1 and row.code_removed_at is not None
 
 
 def test_codes_are_removed_in_batches(db, shop):
@@ -808,9 +915,10 @@ def test_codes_are_removed_in_batches(db, shop):
         row, _ = _out_there(db, shop, str(7001 + number), f"FB-BBBB{number}2")
         _expire_on(row, expired=True)
         rows.append(row)
-    assert expire(db, batch_size=2) == 5
+    assert expire(db, batch_size=2) == 0
     sizes = [len(call["ids"]) for call in shop.names("FeedbackCodesRemove")]
     assert sizes == [2, 2, 1] and shop.codes == {}
+    assert expire(db, batch_size=2) == 5
     assert all(row.code_removed_at is not None for row in rows)
 
 
@@ -822,8 +930,9 @@ def test_only_the_expired_unused_ones_among_many_are_removed(db, shop):
     _expire_on(fresh, expired=False)
     _expire_on(used, expired=True)
     used.code_used_at = utcnow() - timedelta(days=9)
-    assert expire(db) == 1
+    assert expire(db) == 0
     assert set(shop.codes) == {fresh_id, used_id}
+    assert expire(db) == 1 and old.code_removed_at is not None
 
 
 def test_a_shopify_refusal_removes_nothing_and_marks_nothing(db, shop, monkeypatch):
@@ -852,7 +961,9 @@ def test_the_expiry_job_removes_expired_codes_with_the_flag_on(db, shop, feature
     _expire_on(row, expired=True)
     db.flush()
     feedback_codes._handle_expire(db, {})
-    assert redeem_id not in shop.codes and row.code_removed_at is not None
+    assert redeem_id not in shop.codes and row.code_removed_at is None
+    feedback_codes._handle_expire(db, {})
+    assert row.code_removed_at is not None
 
 
 def test_the_expiry_job_needs_the_permission_and_says_so(db, shop, feature_on):
