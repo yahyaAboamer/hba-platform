@@ -31,6 +31,10 @@ VERBS = {
     "put": "PUT",
     "patch": "PATCH",
     "upload": "POST",
+    # A file fetched with the session and saved: Inbox → Feedback's sheet
+    # (ADR 0083). A GET like any other; the screen's Download button is its
+    # way in.
+    "download": "GET",
     # `del`, because `delete` is a reserved word in JavaScript. Added in 03C
     # with the platform's first DELETE - withdrawing a feature request. It is
     # deliberately not used for anything financial: money records are
@@ -174,7 +178,7 @@ def _called() -> set[tuple[str, str]]:
     # allowed around the dot. An earlier version required them contiguous
     # and reported a dozen screens as having no way in.
     call = re.compile(
-        r"""api\s*\.\s*(get|post|put|patch|upload|del)\s*(?:<[^>]*>)?\s*\(\s*[`"']([^`"']*)[`"']"""
+        r"""api\s*\.\s*(get|post|put|patch|upload|download|del)\s*(?:<[^>]*>)?\s*\(\s*[`"']([^`"']*)[`"']"""
     )
     image = re.compile(r"""src=\{(?:portalPath\()?`(/api/[^`]*)`\)?\}""")
 
