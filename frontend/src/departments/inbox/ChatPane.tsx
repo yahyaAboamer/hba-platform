@@ -464,7 +464,7 @@ export function ChatPane({
               aria-controls="inbox-order-panel"
               onClick={() => setOrderOpen(!orderOpen)}
             >
-              Order
+              {detail?.feedback ? "Order and feedback" : "Order"}
             </button>
           </div>
         </div>
@@ -587,7 +587,7 @@ export function ChatPane({
       >
         {narrow && (
           <div className="inbox-col__head">
-            <h2>Order</h2>
+            <h2>{detail?.feedback ? "Order and feedback" : "Order"}</h2>
             <button
               type="button"
               className="inbox-iconbtn"

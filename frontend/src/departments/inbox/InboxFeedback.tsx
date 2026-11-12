@@ -166,7 +166,9 @@ function followUpLines(row: FeedbackRow): Line[] {
 
 /** A quiet note on a question that did not go as it should have. */
 function problemNote(row: FeedbackRow): string | null {
-  const words = [feedbackStateNote(row.state), row.last_error].filter(Boolean);
+  // "Not on WhatsApp" already says it; the stored reason only repeats it.
+  const why = row.state === "no_whatsapp" ? null : row.last_error;
+  const words = [feedbackStateNote(row.state), why].filter(Boolean);
   return words.length ? words.join(": ") : null;
 }
 

@@ -88,7 +88,7 @@ REMOVE_BATCHES = 10
 # Why a code was not issued (``last_error``; Settings and the sheet show it).
 NOT_ISSUED = "The reward code could not be issued: {why}"
 NOT_CONNECTED = (
-    "The second Shopify app is not connected (Settings → Shopify), so no reward "
+    "The second Shopify app is not connected (Settings → Integrations), so no reward "
     "codes can be made."
 )
 NO_PERMISSION = (

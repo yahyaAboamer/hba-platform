@@ -164,6 +164,15 @@ time, customers' words stored as text so a leading `=` is never a formula).
 3. Give the review link.
 4. Test on his own phone, then say go.
 
+**Where these stand (told by the owner while the screens were being checked).** Both templates are approved
+by Meta as *Utility*, under exactly these names. `write_discounts` is added to
+the second app; whether the platform's token now holds it shows on the
+Settings card (*Reward codes*) once this is deployed, and the use-one-code-
+twice check is still to do. The review link is Judge.me's
+(`https://judge.me/product_reviews/a34be3ff-0a3d-4e51-8343-16f813bcac58/new?source=shareable-link`):
+it asks for a product review and offers a store review too. It is entered in
+Settings → Integrations → Feedback questions after deploy, not in code.
+
 ## Decisions made, not to reopen
 
 - In WhatsApp, not Google Forms. Two days after delivery. 24-hour promise.
