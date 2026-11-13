@@ -55,9 +55,10 @@ export function useWaiting(session: Session): Waiting {
         .then((body) => {
           if (!current) return;
           setToday({ body, readAt: Date.now(), failed: false });
-          // An answer to a question asked before Chats' number is older than it.
-          if (asked >= pushedAt.current) setPushed(null);
-          if (asked >= followUpAt.current) setPushedFollowUp(null);
+          // An answer to a question asked before Chats' number is older than it;
+          // asked in the same millisecond counts as before (it cannot know).
+          if (asked > pushedAt.current) setPushed(null);
+          if (asked > followUpAt.current) setPushedFollowUp(null);
         })
         .catch(() => {
           if (!current) return;
