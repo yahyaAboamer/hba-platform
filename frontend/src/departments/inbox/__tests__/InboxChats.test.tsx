@@ -1007,6 +1007,26 @@ describe("delivery feedback beside the chat", () => {
     expect(headings[1]).toBe("Order");
   });
 
+  it("tags a test, which is a real survey in every other way: Resolved works", async () => {
+    serve({ detail: { feedback: feedback({ order_name: "TEST", is_test: true }) } });
+    show("/inbox/chats/12");
+
+    const fb = await block();
+    expect(fb.getByText("Test")).toBeTruthy();
+    expect(fb.getByText("TEST")).toBeTruthy();
+    expect(fb.getByText(/Not counted/)).toBeTruthy();
+    expect(fb.getByRole("button", { name: "Resolved" })).toBeTruthy();
+  });
+
+  it("does not tag a customer's own answer as a test", async () => {
+    serve({ detail: { feedback: feedback({ is_test: false }) } });
+    show("/inbox/chats/12");
+
+    const fb = await block();
+    expect(fb.getByText("#7002")).toBeTruthy();
+    expect(fb.queryByText("Test")).toBeNull();
+  });
+
   it("is only read when nobody needs to act, and sits below the confirmation", async () => {
     serve({
       detail: {

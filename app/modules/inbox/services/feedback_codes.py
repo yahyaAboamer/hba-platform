@@ -583,7 +583,7 @@ def mark_used(db: Session) -> int:
 
 
 def _due_for_removal(
-    db: Session, now: datetime, skip: set[int], limit: int
+    db: Session, now: datetime, skip: set[int], limit: int, tests_only: bool = False
 ) -> list[FeedbackSurvey]:
     query = select(FeedbackSurvey).where(
         FeedbackSurvey.code.is_not(None),
@@ -591,6 +591,8 @@ def _due_for_removal(
         FeedbackSurvey.code_used_at.is_(None),
         FeedbackSurvey.code_removed_at.is_(None),
     )
+    if tests_only:
+        query = query.where(FeedbackSurvey.is_test.is_(True))
     if skip:
         query = query.where(FeedbackSurvey.id.not_in(skip))
     return list(
@@ -629,6 +631,7 @@ def expire(
     client: ShopifyClient | None = None,
     batch_size: int = REMOVE_BATCH,
     max_batches: int = REMOVE_BATCHES,
+    tests_only: bool = False,
 ) -> int:
     """Take codes nobody used out of Shopify once their 30 days are up.
     Returns how many are now **confirmed gone** (a lookup no longer finds them).
@@ -649,7 +652,7 @@ def expire(
     removed = 0
     skipped: set[int] = set()
     for _ in range(max_batches):
-        batch = _due_for_removal(db, now, skipped, batch_size)
+        batch = _due_for_removal(db, now, skipped, batch_size, tests_only)
         if not batch:
             break
         if not cfg.discount_gid:
@@ -698,8 +701,20 @@ def _client(db: Session) -> ShopifyClient:
 
 @register_handler(JobKind.INBOX_FEEDBACK_EXPIRE_CODES)
 def _handle_expire(db: Session, payload: dict[str, Any]) -> None:
-    if not feedback.enabled():
+    tests_only = not feedback.enabled()
+    if tests_only and not db.scalar(
+        select(FeedbackSurvey.id)
+        .where(
+            FeedbackSurvey.is_test.is_(True),
+            FeedbackSurvey.code.is_not(None),
+            FeedbackSurvey.code_removed_at.is_(None),
+        )
+        .limit(1)
+    ):
+        # Switched off, and no test has left a code behind: nothing to do.
         return
-    removed = expire(db)
+    # Switched off, only the codes an administrator's tests made are cleared
+    # away: nothing else is touched until the feature is on.
+    removed = expire(db, tests_only=tests_only)
     if removed:
         logger.info("%s feedback codes expired and were removed from Shopify", removed)

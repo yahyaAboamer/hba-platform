@@ -19,7 +19,7 @@ from datetime import date, timedelta
 from typing import Literal
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.shared.api.deps import require_permission
@@ -649,3 +649,24 @@ def save_feedback_settings(
         raise HTTPException(422, str(exc)) from None
     db.commit()
     return saved
+
+
+class FeedbackTestBody(BaseModel):
+    phone: str = Field("", max_length=40)
+
+
+@router.post("/feedback/test")
+def feedback_test(
+    body: FeedbackTestBody,
+    actor: UserAccount = Depends(SETTINGS_GUARD),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Send the real first question to one number now, as a test. An admin's.
+
+    Works with the questions switched off for customers. The test is never
+    counted. 422 for a number that is not an Egyptian mobile; 409 if this
+    server may not message that number, or WhatsApp does not take it.
+    """
+    sent = _answering(lambda: feedback.send_test(db, body.phone, actor))
+    db.commit()
+    return sent

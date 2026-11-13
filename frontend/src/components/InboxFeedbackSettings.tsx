@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 
 import { ApiError, api } from "../lib/api";
 import type { Session } from "../lib/api";
 import { isOwner } from "../frame/where";
-import type { FeedbackSettings } from "../lib/inbox";
+import { formatPhone } from "../lib/inbox";
+import type { FeedbackSettings, FeedbackTestSent } from "../lib/inbox";
 import { dayMonth } from "./OpsSource";
 
 /** The API's own limits (`feedback.save_settings`), checked here first so a slip is caught before it is sent. */
@@ -32,11 +34,32 @@ export function replyHoursProblem(value: string): string | null {
 }
 
 /**
+ * Why a number would be refused as a test's, or null when it is fine. The same
+ * reading as the server's (`sending.egyptian_mobile`: any usual way of writing
+ * an Egyptian mobile), checked here first; the server decides.
+ */
+export function testPhoneProblem(value: string): string | null {
+  let digits = value.replace(/\D/g, "");
+  if (digits.startsWith("0020")) digits = digits.slice(2);
+  else if (digits.startsWith("0")) digits = `20${digits.slice(1)}`;
+  else if (digits.length === 10 && digits.startsWith("1")) digits = `20${digits}`;
+  // The 0 of 010... kept after the country code (+20 0100...).
+  if (digits.startsWith("200") && /^20(10|11|12|15)\d{8}$/.test(`20${digits.slice(3)}`)) {
+    digits = `20${digits.slice(3)}`;
+  }
+  return /^20(10|11|12|15)\d{8}$/.test(digits)
+    ? null
+    : "That is not an Egyptian mobile number. Write it like 01xxxxxxxxx.";
+}
+
+/**
  * Inbox → Feedback's settings, in Settings → Integrations beside the
  * WhatsApp connection (ADR 0083). Read-only: whether the questions are on
  * (a switch on the server, not here), since when, and whether reward codes
  * can be made. Editable: the review link and the reply time promised to an
- * unhappy customer.
+ * unhappy customer. And a test: the real first question sent to one number
+ * now, even while the questions are off, so the owner can answer it on his own
+ * phone and try each path.
  */
 function Card() {
   const [settings, setSettings] = useState<FeedbackSettings | null>(null);
@@ -47,6 +70,10 @@ function Card() {
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
+  const [testPhone, setTestPhone] = useState("");
+  const [testing, setTesting] = useState(false);
+  const [testError, setTestError] = useState<string | null>(null);
+  const [testSent, setTestSent] = useState<FeedbackTestSent | null>(null);
 
   useEffect(() => {
     let current = true;
@@ -90,6 +117,30 @@ function Card() {
     setError(null);
     setSaved(null);
     setOpen(true);
+  }
+
+  const testProblem = testPhone.trim() === "" ? null : testPhoneProblem(testPhone);
+
+  async function sendTest(event: React.FormEvent) {
+    event.preventDefault();
+    if (testing) return;
+    const problem = testPhoneProblem(testPhone);
+    if (problem) {
+      setTestSent(null);
+      setTestError(problem);
+      return;
+    }
+    setTesting(true);
+    setTestError(null);
+    setTestSent(null);
+    try {
+      setTestSent(await api.post<FeedbackTestSent>("/api/inbox/feedback/test", { phone: testPhone.trim() }));
+    } catch (caught) {
+      // The server's own words: it knows why (not connected, sending off, not a number it may message).
+      setTestError(caught instanceof ApiError ? caught.message : "The test could not be sent.");
+    } finally {
+      setTesting(false);
+    }
   }
 
   async function save(event: React.FormEvent) {
@@ -216,6 +267,55 @@ function Card() {
           Change
         </button>
       )}
+      <form className="shop-conn" onSubmit={sendTest} noValidate>
+        <label className="shop-conn__field" htmlFor="inbox-feedback-test-phone">
+          <span className="shop-conn__label">Send a test</span>
+          <input
+            id="inbox-feedback-test-phone"
+            className="shop-conn__input"
+            type="tel"
+            inputMode="tel"
+            autoComplete="off"
+            maxLength={40}
+            value={testPhone}
+            placeholder="01xxxxxxxxx"
+            aria-invalid={testProblem !== null}
+            aria-describedby={testProblem ? "inbox-feedback-test-problem" : "inbox-feedback-test-hint"}
+            onChange={(event) => {
+              setTestPhone(event.target.value);
+              setTestError(null);
+            }}
+          />
+        </label>
+        {testProblem ? (
+          <p className="sync__error" id="inbox-feedback-test-problem">
+            {testProblem}
+          </p>
+        ) : (
+          <p className="sync__hint" id="inbox-feedback-test-hint">
+            Sends the real first question to this number now, even while questions are switched off. Answer it on
+            that phone to try each path. Tests are not counted in the sheet.
+          </p>
+        )}
+        {testError && !testProblem && (
+          <p className="sync__error" role="alert">
+            {testError}
+          </p>
+        )}
+        {testSent && (
+          <p className="sync__notice" role="status">
+            Sent to {formatPhone(testSent.phone)}.{" "}
+            <Link to={`/inbox/chats/${testSent.conversation_id}`}>Open the chat</Link>
+          </p>
+        )}
+        <button
+          type="submit"
+          className="button button--quiet shop-conn__submit"
+          disabled={testing || testPhone.trim() === "" || testProblem !== null}
+        >
+          {testing ? "Sending…" : "Send a test to this number"}
+        </button>
+      </form>
     </section>
   );
 }

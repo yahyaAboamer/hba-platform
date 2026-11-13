@@ -151,6 +151,41 @@ time, customers' words stored as text so a leading `=` is never a formula).
   the stronger `inbox.feedback_reopened` (always late). The sidebar count key
   is `chats_follow_up`, the same number as the list's chip.
 
+## Test send
+
+An admin can try the whole flow on his own phone before the questions are
+switched on for customers: Settings → Integrations → Feedback questions →
+*Send a test to this number* (`POST /api/inbox/feedback/test`, `settings.manage`;
+audited as `inbox.feedback_test_sent`, which keeps only the last four digits).
+
+- It sends the real first question (`order_feedback`) at once, for one
+  Egyptian mobile, to a survey row marked `is_test`. Its order id is a 20-digit
+  number, which no Shopify order id can be, so it cannot collide with a real
+  order and the buttons read it like any other.
+- **It works with `INBOX_FEEDBACK_ENABLED` off.** The sweep stays off, and so
+  does everything else for a customer. The jobs that carry on the flow (the
+  send, the reply to each tap, the solved question and the 30-day clean-up)
+  let a test survey through the switch and nothing else. WhatsApp must be
+  connected and sending allowed for that number, as for any message.
+- The flow is the real one, with real WhatsApp and real Shopify. A test that
+  reaches the closing message gets a real code in the real discount, to try at
+  checkout; the clean-up removes it after 30 days. After *Resolved* on a test
+  the solved question comes after one minute instead of a day. A test is not
+  tried again in the background if WhatsApp does not take it: the caller is
+  told why. Sending another test closes the earlier unfinished one.
+- **Tests are kept out of the numbers.** Never in the sheet, its summary, its
+  filter menus or the download; never in Today, the sidebar or the
+  *Needs follow-up* chip. They are in the chats: the chat's Feedback block
+  carries a *Test* tag and *Resolved* works, and the *Needs follow-up* view
+  and badge list them, so the owner can practise finding and resolving one.
+  They are never in the *okay* view or badge and never stand in for her real
+  latest answer; a real unhappy survey that needs a person keeps the chat's
+  card over a newer test, and her typed words go to a real survey before a
+  test. A test that fails to send is closed, never sent later.
+  A test never counts as "asked in the last 60 days", never holds back a real
+  question for the same phone (an unresolved unhappy answer), and is never held
+  back by one.
+
 ## Owner's steps (batch D)
 
 1. Meta: submit two templates (wording supplied): `order_feedback` and
@@ -162,7 +197,7 @@ time, customers' words stored as text so a leading `=` is never a formula).
    limit must count per code (Shopify's REST docs say so; the GraphQL docs
    only say "times the discount can be redeemed").
 3. Give the review link.
-4. Test on his own phone, then say go.
+4. Test on his own phone with *Send a test* (see above), then say go.
 
 **Where these stand (told by the owner while the screens were being checked).** Both templates are approved
 by Meta as *Utility*, under exactly these names. `write_discounts` is added to

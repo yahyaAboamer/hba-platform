@@ -59,6 +59,9 @@ logger = logging.getLogger(__name__)
 COMMENT_WINDOW = timedelta(hours=24)
 #: A person presses *Resolved*; she is asked whether it was this long after.
 ASK_SOLVED_AFTER = timedelta(hours=24)
+#: ...or this long after, on an administrator's test, which would otherwise
+#: take a day to try.
+ASK_SOLVED_AFTER_TEST = timedelta(minutes=1)
 #: She may say "no" this many times; after the second *No*, the next
 #: *Resolved* closes it without asking again.
 MAX_REOPENS = 2
@@ -192,7 +195,9 @@ def capture_comment(db: Session, phone: str, body: str | None, at: datetime) -> 
             FeedbackSurvey.reason_at <= at,
             FeedbackSurvey.reason_at >= at - COMMENT_WINDOW,
         )
-        .order_by(FeedbackSurvey.reason_at.desc())
+        # A real survey awaiting her words comes before a test: a test only
+        # receives them when nothing real is waiting.
+        .order_by(FeedbackSurvey.is_test, FeedbackSurvey.reason_at.desc())
         .limit(1)
     )
     if survey is None:
@@ -406,7 +411,7 @@ def resolve(db: Session, survey_id: int, user: Any, now: datetime | None = None)
             db,
             JobKind.INBOX_FEEDBACK_ASK_SOLVED,
             {"survey_id": survey.id},
-            run_after=now + ASK_SOLVED_AFTER,
+            run_after=now + (ASK_SOLVED_AFTER_TEST if survey.is_test else ASK_SOLVED_AFTER),
             # The reopen count is in the key: the second round is its own job.
             dedupe_key=f"{JobKind.INBOX_FEEDBACK_ASK_SOLVED}:{survey.id}:{survey.reopened_count}",
         )
@@ -584,6 +589,7 @@ def recover_interrupted_solved(db: Session, now: datetime | None = None) -> int:
     stuck = list(
         db.scalars(
             select(FeedbackSurvey).where(
+                FeedbackSurvey.is_test.is_(False),
                 FeedbackSurvey.step == "solved",
                 FeedbackSurvey.solved_asked_at.is_not(None),
                 FeedbackSurvey.solved_asked_at < now - outbound.INTERRUPTED_AFTER,
@@ -657,9 +663,22 @@ def _handle_reply(db: Session, payload: dict) -> None:
             f"{JobKind.INBOX_FEEDBACK_REPLY} requires a message_id; got payload keys "
             f"{sorted(payload)!r}"
         )
-    if not feedback.enabled():
+    # Off, only an administrator's test is answered (``feedback.send_test``).
+    if not feedback.enabled() and not _is_test_tap(db, message_id):
         return
     reply(db, message_id, final_attempt=_final_code_attempt(db, message_id))
+
+
+def _is_test_tap(db: Session, message_id: int) -> bool:
+    """Whether this tap answers an administrator's test survey."""
+    order_id = db.scalar(select(InboxMessage.shopify_order_id).where(InboxMessage.id == message_id))
+    if not order_id:
+        return False
+    return bool(
+        db.scalar(
+            select(FeedbackSurvey.is_test).where(FeedbackSurvey.shopify_order_id == order_id)
+        )
+    )
 
 
 def _final_code_attempt(db: Session, message_id: int) -> bool:
@@ -688,9 +707,9 @@ def _handle_ask_solved(db: Session, payload: dict) -> None:
             f"{JobKind.INBOX_FEEDBACK_ASK_SOLVED} requires a survey_id; got payload keys "
             f"{sorted(payload)!r}"
         )
-    if not feedback.enabled():
-        # Nothing is sent with the feature off, and she must not be left where
-        # nobody can see her: a person has her again.
+    if not feedback.enabled() and not feedback.is_test_survey(db, survey_id):
+        # Nothing is sent with the feature off (a test aside), and she must
+        # not be left where nobody can see her: a person has her again.
         survey = db.get(FeedbackSurvey, survey_id)
         if survey is not None and survey.step == "solved" and survey.solved_asked_at is None:
             back_to_support(survey, COULD_NOT_ASK.format(why="feedback is switched off."))

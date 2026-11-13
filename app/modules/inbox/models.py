@@ -527,6 +527,12 @@ class FeedbackSurvey(Base):
     code_removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     step: Mapped[str] = mapped_column(String(10), nullable=False, server_default="rating")
+    #: A question an administrator sent to a number of his choosing to try the
+    #: flow (``feedback.send_test``). Never counted, never in the sheet, and
+    #: never in the way of a real question for the same phone.
+    is_test: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )

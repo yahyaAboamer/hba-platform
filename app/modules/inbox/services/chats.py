@@ -178,7 +178,9 @@ def list_conversations(
     elif view in ("edit", "cancelled"):
         query = query.where(_latest_answer == view)
     elif view == "follow_up":
-        query = query.where(feedback.follow_up_clause())
+        # Tests are in the view, so one can be found and resolved; they are not
+        # in ``counts`` below.
+        query = query.where(feedback.follow_up_clause(include_tests=True))
     elif view == "neutral":
         query = query.where(feedback.neutral_clause())
     if q and q.strip():

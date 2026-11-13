@@ -79,7 +79,11 @@ Facts this is built on, checked on the day:
 7. **Nobody is asked by accident.** Everything in ADR 0059's sending rules
    applies. In addition the feature is off unless `INBOX_FEEDBACK_ENABLED` is
    set; until sending is allowed it records what it would have sent and sends
-   nothing.
+   nothing. An admin can send the first question to a number of his choosing as
+   a test, at once and with the feature still off for everyone else; the
+   test runs the real flow (and issues a real code) but is never counted in
+   the sheet, Today or the sidebar, and never stands in the way of a real
+   question for that phone.
 
 This amends ADR 0059 (what the platform sends, and what it writes to Shopify)
 and narrows ADR 0015 a second time.

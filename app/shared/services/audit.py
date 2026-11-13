@@ -201,6 +201,7 @@ KINDS: dict[str, tuple[str, ...]] = {
         "inbox.sending_changed",
         "inbox.tags_connection_saved",
         "inbox.feedback_settings_saved",
+        "inbox.feedback_test_sent",
         "policy_version.",
         "staff.preference_changed",
     ),
