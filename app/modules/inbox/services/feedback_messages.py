@@ -165,7 +165,7 @@ def _build() -> tuple[Item, ...]:
     )
     text_item(
         "review_line", "loved", "Review request",
-        "Added to the closing message only when a review link is set in Settings.",
+        "Added to the closing message only when a review link is set, at the top of this page.",
         "Would you share it in a short review? It takes a minute and helps other customers choose:\n{url}",
         uses=("name", "url"), required=("url",),
     )
@@ -188,7 +188,7 @@ def _build() -> tuple[Item, ...]:
     text_item(
         "solved_question", "unhappy", "Was it solved? (in the chat)",
         "Asked a day after your team marks her as resolved, while her 24 hours are open. When "
-        "they have closed, the approved message \"feedback_resolved\" goes instead, and its "
+        "they have closed, the message Meta approved goes instead (shown below), and its "
         "words cannot be changed here.",
         "Was your issue solved?", why=_WHY_BODY, limit=MAX_BODY,
     )

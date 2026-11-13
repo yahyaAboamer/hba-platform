@@ -54,3 +54,12 @@
   .conns .act { grid-column:2; grid-row:3 / span 2; align-self:center; }
   .conns__btn { min-height:44px; padding:8px 14px; }
 }
+
+/* The Feedback card in WhatsApp's details: short, with one way on. */
+.integrations__problem { color:var(--owed); }
+.integrations__open { margin-top:12px; align-self:flex-start; }
+
+@media (max-width:800px) {
+  /* A finger, not a pointer: the buttons inside a connection's details. */
+  .integrations__detail-body .shop-conn__submit { min-height:44px; }
+}

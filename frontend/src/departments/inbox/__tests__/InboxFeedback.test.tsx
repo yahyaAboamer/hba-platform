@@ -246,6 +246,15 @@ describe("the Feedback sheet", () => {
     expect(within(rows[5]).getByText("Would send: sending is off")).toBeTruthy();
   });
 
+  it("has a link to the feedback setup in its head, beside Download", async () => {
+    serve();
+    show();
+
+    await screen.findByRole("table");
+    const link = screen.getByRole("link", { name: "Feedback setup" });
+    expect(link.getAttribute("href")).toBe("/inbox/feedback/setup");
+  });
+
   it("puts the numbers for these filters above the sheet", async () => {
     serve();
     show();

@@ -608,7 +608,7 @@ def test_reading_gives_the_editor_everything_and_writes_nothing(client):
     assert (by_key["reason_option.loved.fit"]["kind"], by_key["reason_option.loved.fit"]["max"]) == ("label", 24)
     assert (by_key["thanks.loved"]["kind"], by_key["thanks.loved"]["max"]) == ("text", 1000)
     assert by_key["reason_question.loved"]["max"] == 1024
-    assert by_key["solved_question"]["help"].count("feedback_resolved") == 1
+    assert "message Meta approved goes instead" in by_key["solved_question"]["help"]
     assert body["sample"] == {
         "name": "Sara", "order": "#1234", "code": "FB-7K2M9Q", "percent": 20, "days": 30,
         "hours": 24, "url": None,

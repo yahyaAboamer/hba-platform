@@ -92,9 +92,9 @@ export function KeyCard({ provider }: { provider: "bosta" | "estebdal" }) {
 
   return (
     <section className="pay-detail__card sync__card" aria-labelledby={`${fieldId}-title`}>
-      <h2 className="pay-detail__card-title" id={`${fieldId}-title`}>
+      <h3 className="pay-detail__card-title" id={`${fieldId}-title`}>
         {label}
-      </h2>
+      </h3>
       {state && (
         <p className="shop-conn__meta">
           {STATE_WORDS[source]}
