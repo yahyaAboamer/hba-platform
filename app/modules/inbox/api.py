@@ -22,16 +22,16 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Respon
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.shared.api.deps import require_permission
+from app.shared.api.deps import holds, require_permission
 from app.core.permissions import Permission
 from app.core.businesstime import business_midnight, utcnow
 from app.db import get_session
 from app.shared.models.identity import UserAccount
 from app.shared.services.audit import record_audit
-from app.modules.inbox.models import InboxMessage
+from app.modules.inbox.models import FeedbackSettings, InboxMessage
 from app.modules.inbox.services import (
-    chats, connection, feedback, feedback_codes, feedback_replies, feedback_sheet, health, media,
-    outbound, sending,
+    chats, connection, feedback, feedback_codes, feedback_messages, feedback_replies,
+    feedback_sheet, health, media, outbound, sending,
 )
 from app.modules.inbox.services.meta import MetaClient, MetaError
 
@@ -649,6 +649,51 @@ def save_feedback_settings(
         raise HTTPException(422, str(exc)) from None
     db.commit()
     return saved
+
+
+class FeedbackMessagesBody(BaseModel):
+    #: ``{message key: words}``. Blank or null puts the built-in words back; a
+    #: message left out stays as it is. Checked in ``feedback_messages``.
+    values: dict[str, str | None] = Field(default_factory=dict, max_length=200)
+
+
+def _messages_body(db: Session, actor: UserAccount) -> dict:
+    """Every message's wording, read without writing."""
+    return feedback_messages.describe(
+        db.get(FeedbackSettings, 1), can_edit=holds(db, actor, Permission.SETTINGS_MANAGE)
+    )
+
+
+@router.get("/feedback/messages")
+def feedback_messages_read(
+    actor: UserAccount = Depends(GUARD), db: Session = Depends(get_session)
+) -> dict:
+    """The wording of every message the feedback feature sends: built-in and
+    saved, with each one's limits and placeholders, the two approved messages
+    (shown, not editable) and each path as the customer meets it."""
+    return _messages_body(db, actor)
+
+
+@router.put("/feedback/messages")
+def save_feedback_messages(
+    body: FeedbackMessagesBody,
+    actor: UserAccount = Depends(SETTINGS_GUARD),
+    db: Session = Depends(get_session),
+) -> dict:
+    """Change the wording of the messages. An admin's.
+
+    All or nothing: if any of it cannot be used, 422 with
+    ``{"detail": {"errors": {key: why}}}`` and nothing is saved.
+    """
+    try:
+        feedback_messages.save(
+            db, body.values, actor_id=actor.id, actor_email=actor.email
+        )
+    except feedback_messages.MessagesRefused as exc:
+        db.rollback()
+        raise HTTPException(422, {"errors": exc.errors}) from None
+    db.commit()
+    return _messages_body(db, actor)
 
 
 class FeedbackTestBody(BaseModel):

@@ -22,6 +22,7 @@ from app.modules.inbox.services import (
     connection,
     feedback,
     feedback_codes,
+    feedback_messages,
     feedback_replies,
     tags,
 )
@@ -560,43 +561,62 @@ def _closing(db, rating, code=None, review_url=None):
     return feedback_replies.closing_text(SimpleNamespace(rating=rating), cfg, code)
 
 
-CODE_LINE = "Here is 20% off your next order: FB-ABC234. It is yours alone and works once, for 30 days."
-THANKS = "Thank you for your feedback, it really helps us."
+CODE_LINE = (
+    "As a thank you, here is 20% off your next order:\nFB-ABC234\n"
+    "It is yours only, works once, and is valid for 30 days."
+)
+THANKS = {
+    "loved": "Thank you! We're so glad you loved it.",
+    "okay": "Thank you. Your honest answer helps us get better.",
+    "unhappy": "Thank you. We're glad we could put it right.",
+}
 INVITATION = "If there is anything we could do better, just reply here."
-REVIEW = "We'd love a review: https://reviews.example/hba"
+REVIEW = (
+    "Would you share it in a short review? It takes a minute and helps other customers "
+    "choose:\nhttps://reviews.example/hba"
+)
 
 
-def test_a_loved_customer_is_thanked_given_her_code_and_the_review_link_then_invited_to_write(db):
+def test_a_loved_customer_is_thanked_given_her_code_and_the_review_link_and_not_also_invited_to_write(db):
     assert _closing(db, "loved", "FB-ABC234", "https://reviews.example/hba") == "\n\n".join(
-        [THANKS, CODE_LINE, REVIEW, INVITATION]
+        [THANKS["loved"], CODE_LINE, REVIEW]
     )
 
 
-def test_a_loved_customer_without_a_review_link_is_not_sent_an_empty_one(db):
-    assert _closing(db, "loved", "FB-ABC234") == "\n\n".join([THANKS, CODE_LINE, INVITATION])
-    assert _closing(db, "loved", "FB-ABC234", "   ") == "\n\n".join([THANKS, CODE_LINE, INVITATION])
+def test_a_loved_customer_without_a_review_link_is_not_sent_an_empty_one_and_is_invited_to_write(db):
+    assert _closing(db, "loved", "FB-ABC234") == "\n\n".join([THANKS["loved"], CODE_LINE, INVITATION])
+    assert _closing(db, "loved", "FB-ABC234", "   ") == "\n\n".join(
+        [THANKS["loved"], CODE_LINE, INVITATION]
+    )
 
 
 def test_a_loved_customer_without_a_code_loses_only_the_code_line(db):
     assert _closing(db, "loved", None, "https://reviews.example/hba") == "\n\n".join(
-        [THANKS, REVIEW, INVITATION]
+        [THANKS["loved"], REVIEW]
     )
+    assert _closing(db, "loved") == "\n\n".join([THANKS["loved"], INVITATION])
 
 
 def test_an_okay_customer_gets_her_code_and_the_invitation_but_never_the_review_link(db):
     assert _closing(db, "okay", "FB-ABC234", "https://reviews.example/hba") == "\n\n".join(
-        [THANKS, CODE_LINE, INVITATION]
+        [THANKS["okay"], CODE_LINE, INVITATION]
     )
-    assert _closing(db, "okay") == "\n\n".join([THANKS, INVITATION])
+    assert _closing(db, "okay") == "\n\n".join([THANKS["okay"], INVITATION])
 
 
 def test_an_unhappy_customer_whose_issue_was_solved_gets_thanks_and_her_code_only(db):
-    assert _closing(db, "unhappy", "FB-ABC234", "https://reviews.example/hba") == f"{THANKS}\n\n{CODE_LINE}"
-    assert _closing(db, "unhappy") == THANKS
+    assert _closing(db, "unhappy", "FB-ABC234", "https://reviews.example/hba") == (
+        f"{THANKS['unhappy']}\n\n{CODE_LINE}"
+    )
+    assert _closing(db, "unhappy") == THANKS["unhappy"]
 
 
-def test_the_words_come_from_the_modules_constants(db):
-    assert feedback.CODE_LINE.format(percent=feedback.DISCOUNT_PERCENT, code="X", days=feedback.CODE_DAYS)
+def test_the_reward_the_words_promise_is_the_one_shopify_holds(db):
+    cfg = feedback.get_settings(db)
+    said = feedback_messages.text(
+        cfg, "code_line", code="X", percent=feedback.DISCOUNT_PERCENT, days=feedback.CODE_DAYS
+    )
+    assert f"{feedback.DISCOUNT_PERCENT}%" in said and f"{feedback.CODE_DAYS} days" in said
     assert feedback_codes.DISCOUNT_TITLE == f"Feedback {feedback.DISCOUNT_PERCENT}%"
     assert feedback_codes.CODE_VALID_FOR == timedelta(days=feedback.CODE_DAYS)
 
@@ -634,7 +654,7 @@ def test_the_closing_message_carries_her_code_and_stamps_when_it_was_sent(db, wo
     [closing] = world.asked[before:]
     row = world.row
     assert CODE_SHAPE.search(closing["text"]["body"]) and row.code in closing["text"]["body"]
-    assert "We'd love a review: https://reviews.example/hba" in closing["text"]["body"]
+    assert "helps other customers choose:\nhttps://reviews.example/hba" in closing["text"]["body"]
     assert closing["text"]["body"] == feedback_replies.closing_text(row, feedback.get_settings(db), row.code)
     assert row.code_sent_at is not None and row.last_error is None
 
@@ -652,7 +672,7 @@ def test_without_the_app_connected_she_is_thanked_all_the_same_exactly_once(db, 
     message_id, before = _reason_job(db, world)
     feedback_replies.reply(db, message_id, world.client)
     [closing] = world.asked[before:]
-    assert closing["text"]["body"] == f"{feedback.THANKS}\n\n{feedback.INVITATION}"
+    assert closing["text"]["body"] == f"Thank you, Nour! We're so glad you loved it.\n\n{INVITATION}"
     row = world.row
     assert row.code is None and row.code_sent_at is None
     assert row.last_error.startswith("The reward code could not be issued")
@@ -679,7 +699,7 @@ def test_a_shopify_error_is_tried_again_before_she_is_thanked_without_a_code(db,
     # The last try: she is thanked, without a code, once.
     feedback_replies.reply(db, message_id, world.client, final_attempt=True)
     [closing] = world.asked[before:]
-    assert closing["text"]["body"] == f"{feedback.THANKS}\n\n{feedback.INVITATION}"
+    assert closing["text"]["body"] == f"Thank you, Nour! We're so glad you loved it.\n\n{INVITATION}"
     assert "Shopify did not answer" in world.row.last_error
     assert feedback_replies.reply(db, message_id, world.client, final_attempt=True) is None
     assert len(world.asked) == before + 1
@@ -712,7 +732,11 @@ def test_the_unhappy_customers_code_comes_after_her_answer_to_would_you_order_ag
     message_id = jobs(db, JobKind.INBOX_FEEDBACK_REPLY)[-1][2]["message_id"]
     feedback_replies.reply(db, message_id, world.client)
     body = world.asked[-1]["text"]["body"]
-    assert body == f"{feedback.THANKS}\n\n" + feedback.CODE_LINE.format(percent=20, code=row.code, days=30)
+    assert body == (
+        "Thank you, Nour. We're glad we could put it right.\n\n"
+        f"As a thank you, here is 20% off your next order:\n{row.code}\n"
+        "It is yours only, works once, and is valid for 30 days."
+    )
     assert row.code_sent_at is not None
 
 

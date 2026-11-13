@@ -17,7 +17,7 @@ from app.modules.inbox.models import (
     InboxConversation,
     InboxMessage,
 )
-from app.modules.inbox.services import events, feedback, feedback_replies, outbound
+from app.modules.inbox.services import events, feedback, feedback_messages, feedback_replies, outbound
 from app.modules.inbox.services.feedback import (
     decide,
     due_orders,
@@ -744,15 +744,21 @@ def test_ten_rows_and_three_buttons_at_the_limit_are_sent():
 
 def test_every_word_the_customer_is_sent_fits_whatsapps_limits():
     """The wording is ours to edit; this is what stops an edit that Meta would refuse."""
-    assert len(feedback.LIST_LABEL) <= 20
+    assert len(feedback_messages.text(None, "list_label")) <= 20
     for rating, rows in feedback.REASONS.items():
         assert len(rows) <= 10
-        assert len(feedback.REASON_QUESTIONS[rating]) <= MAX_BODY
+        assert len(feedback_messages.text(None, f"reason_question.{rating}", name="x" * 40)) <= MAX_BODY
         for key, title in rows:
             assert len(title) <= 24 and len(f"fbr_{key}_999999999999") <= 256
-    for key, title in (*feedback.SOLVED_BUTTONS, *feedback.REORDERS):
-        assert len(title) <= 20
-    assert len(feedback.REORDERS) <= 3 and len(feedback.SOLVED_BUTTONS) <= 3
+            assert len(feedback_messages.text(None, f"reason_option.{rating}.{key}")) <= 24
+    for key, title in feedback.REORDERS:
+        assert len(title) <= 20 and len(feedback_messages.text(None, f"reorder_option.{key}")) <= 20
+    for key in feedback.SOLVED_ANSWERS:
+        assert len(feedback_messages.text(None, f"solved_option.{key}")) <= 20
+    assert len(feedback.REORDERS) <= 3 and len(feedback.SOLVED_ANSWERS) <= 3
+    # Every built-in message is within its own limit, which is WhatsApp's.
+    for item in feedback_messages.ITEMS:
+        assert feedback_messages.validate({item.key: item.default}) == {}, item.key
     for title in feedback.RATING_TITLES.values():
         assert len(title) <= 20
     # Reasons the customer can name are the grammar's: nothing the template or a
