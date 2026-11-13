@@ -41,7 +41,7 @@ from collections.abc import Callable
 from datetime import datetime, timedelta
 from typing import Any
 
-from sqlalchemy import Text, and_, exists, func, or_, select, update
+from sqlalchemy import Text, and_, case, exists, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import set_committed_value
@@ -477,10 +477,29 @@ def requeue_stale_pending(
     that retry. ``queue_send`` dedupes against a job still waiting.
     """
     now = now or utcnow()
+    # A test that never went out is closed, never sent later: whoever sent it
+    # was told it failed, and the number may by now be a customer's.
+    db.execute(
+        update(FeedbackSurvey)
+        .where(
+            FeedbackSurvey.is_test.is_(True),
+            FeedbackSurvey.state == "pending",
+            FeedbackSurvey.sent_at.is_(None),
+            FeedbackSurvey.updated_at < now - PENDING_STALE_AFTER,
+        )
+        .values(
+            state="failed",
+            step="done",
+            last_error=func.coalesce(FeedbackSurvey.last_error, TEST_NOT_SENT),
+            next_attempt_at=None,
+            updated_at=now,
+        )
+    )
     stale = list(
         db.scalars(
             select(FeedbackSurvey)
             .where(
+                FeedbackSurvey.is_test.is_(False),
                 FeedbackSurvey.state == "pending",
                 FeedbackSurvey.sent_at.is_(None),
                 FeedbackSurvey.updated_at < now - PENDING_STALE_AFTER,
@@ -504,7 +523,11 @@ def waiting_to_look_at(
     return list(
         db.scalars(
             select(FeedbackSurvey)
-            .where(FeedbackSurvey.state == "waiting", FeedbackSurvey.next_attempt_at <= now)
+            .where(
+                FeedbackSurvey.is_test.is_(False),
+                FeedbackSurvey.state == "waiting",
+                FeedbackSurvey.next_attempt_at <= now,
+            )
             .order_by(FeedbackSurvey.next_attempt_at, FeedbackSurvey.id)
             .limit(limit)
         )
@@ -732,7 +755,13 @@ def recover_interrupted(db: Session) -> int:
             FeedbackSurvey.state == "sending",
             FeedbackSurvey.updated_at < utcnow() - outbound.INTERRUPTED_AFTER,
         )
-        .values(state="failed", last_error=outbound.INTERRUPTED, updated_at=utcnow())
+        .values(
+            state="failed",
+            # A test that was interrupted is closed outright.
+            step=case((FeedbackSurvey.is_test.is_(True), "done"), else_=FeedbackSurvey.step),
+            last_error=outbound.INTERRUPTED,
+            updated_at=utcnow(),
+        )
     ).rowcount
     return recovered or 0
 
@@ -786,6 +815,21 @@ def _test_order_id() -> str:
     the buttons' ``fb_<answer>_<order id>`` payloads read it like any other.
     """
     return f"9{secrets.randbelow(10**19):019d}"
+
+
+def _close_test(db: Session, survey_id: int, why: str) -> None:
+    """A test that did not go out is over: ``failed``, step ``done``, the
+    reason kept, and committed, because the caller is about to be told it
+    failed and nothing may send it afterwards."""
+    row = db.get(FeedbackSurvey, survey_id)
+    if row is not None:
+        row.step = "done"
+        if row.state in ("pending", "sending"):
+            row.state = "failed"  # no_whatsapp and failed already say it
+        row.last_error = (row.last_error or why)[:300]
+        row.next_attempt_at = None
+        row.updated_at = utcnow()
+    db.commit()
 
 
 def send_test(
@@ -850,16 +894,24 @@ def send_test(
     survey_id = row.id
     db.commit()
 
-    sent = send_first_question(db, survey_id, client=client, claim=claim)
+    try:
+        sent = send_first_question(db, survey_id, client=client, claim=claim)
+    except outbound.NotSent as exc:
+        # Raised outside the returned row (WhatsApp not connected, say): the
+        # row is committed and still ``pending``, so close it or it would be
+        # sent later, perhaps to someone else.
+        _close_test(db, survey_id, str(exc))
+        raise
+    except Exception as exc:
+        db.rollback()
+        _close_test(db, survey_id, TEST_NOT_SENT)
+        logger.warning("feedback test %s was not sent: %s", survey_id, exc)
+        raise
     if sent is None or sent.state != "sent":
-        reason = (sent.last_error if sent is not None else None) or TEST_NOT_SENT
-        if sent is not None:
-            # Nothing is waiting on a question that never went out.
-            sent.step, sent.updated_at = "done", utcnow()
-            if sent.state in ("pending", "sending"):
-                sent.state = "failed"
-        db.commit()
-        raise outbound.NotSent(reason, kind="failed")
+        _close_test(db, survey_id, (sent.last_error if sent is not None else None) or TEST_NOT_SENT)
+        raise outbound.NotSent(
+            (sent.last_error if sent is not None else None) or TEST_NOT_SENT, kind="failed"
+        )
 
     actor_id = getattr(user, "id", None)
     record_audit(
@@ -1185,7 +1237,11 @@ def _latest_answered(column):
     S = FeedbackSurvey
     return (
         select(column)
-        .where(S.conversation_id == InboxConversation.id, S.rating.is_not(None))
+        .where(
+            S.conversation_id == InboxConversation.id,
+            S.rating.is_not(None),
+            S.is_test.is_(False),
+        )
         .order_by(S.rated_at.desc().nulls_last(), S.id.desc())
         .limit(1)
         .correlate(InboxConversation)
@@ -1248,7 +1304,9 @@ def markers(db: Session, conversation_ids: list[int], now: datetime | None = Non
         .order_by(S.rated_at.nulls_first(), S.id)
     )
     for row in surveys:
-        latest[row.conversation_id] = row  # the last one wins: the latest answered
+        if not row.is_test:
+            # The last one wins: the latest answered. A test never is.
+            latest[row.conversation_id] = row
         if row.rating == "unhappy" and row.step == "support":
             if row.reopened_count > 0:
                 found[row.conversation_id] = "reopened"
@@ -1277,6 +1335,22 @@ def chat_block(db: Session, conversation_id: int) -> dict | None:
     )
     if row is None:
         return None
+    if row.is_test:
+        # A test never takes a real customer's card from her: if she has an
+        # unhappy answer that needs a person, that is what the chat shows.
+        owed = db.scalar(
+            select(S)
+            .where(
+                S.conversation_id == conversation_id,
+                S.is_test.is_(False),
+                S.rating == "unhappy",
+                S.step.in_(("support", "solved")),
+                S.state.not_in(("skipped", "waiting")),
+            )
+            .order_by(asked_at().desc(), S.id.desc())
+            .limit(1)
+        )
+        row = owed or row
     names = _names(db, [row])
     return {
         "id": row.id,

@@ -178,6 +178,10 @@ audited as `inbox.feedback_test_sent`, which keeps only the last four digits).
   *Needs follow-up* chip. They are in the chats: the chat's Feedback block
   carries a *Test* tag and *Resolved* works, and the *Needs follow-up* view
   and badge list them, so the owner can practise finding and resolving one.
+  They are never in the *okay* view or badge and never stand in for her real
+  latest answer; a real unhappy survey that needs a person keeps the chat's
+  card over a newer test, and her typed words go to a real survey before a
+  test. A test that fails to send is closed, never sent later.
   A test never counts as "asked in the last 60 days", never holds back a real
   question for the same phone (an unresolved unhappy answer), and is never held
   back by one.

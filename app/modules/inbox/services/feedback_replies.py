@@ -195,7 +195,9 @@ def capture_comment(db: Session, phone: str, body: str | None, at: datetime) -> 
             FeedbackSurvey.reason_at <= at,
             FeedbackSurvey.reason_at >= at - COMMENT_WINDOW,
         )
-        .order_by(FeedbackSurvey.reason_at.desc())
+        # A real survey awaiting her words comes before a test: a test only
+        # receives them when nothing real is waiting.
+        .order_by(FeedbackSurvey.is_test, FeedbackSurvey.reason_at.desc())
         .limit(1)
     )
     if survey is None:
@@ -587,6 +589,7 @@ def recover_interrupted_solved(db: Session, now: datetime | None = None) -> int:
     stuck = list(
         db.scalars(
             select(FeedbackSurvey).where(
+                FeedbackSurvey.is_test.is_(False),
                 FeedbackSurvey.step == "solved",
                 FeedbackSurvey.solved_asked_at.is_not(None),
                 FeedbackSurvey.solved_asked_at < now - outbound.INTERRUPTED_AFTER,

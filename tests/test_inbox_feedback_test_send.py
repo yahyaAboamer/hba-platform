@@ -46,6 +46,7 @@ from tests.feedback_support import (  # noqa: F401  (fixtures)
     TOKEN,
     connected,
     conversation,
+    feature_on,
     jobs,
     may_send,
     meta,
@@ -61,6 +62,7 @@ from tests.test_inbox_feedback_events import (
     interactive_tap,
     template_tap,
 )
+from tests.test_inbox_feedback_events import text as typed
 
 HER_WRITTEN = "010 0555 0188"
 
@@ -508,6 +510,189 @@ def test_a_refused_test_is_not_audited(db, world):
     with pytest.raises(Exception):
         send(db, world, "12345")
     assert db.scalars(select(AuditEvent).where(AuditEvent.action == "inbox.feedback_test_sent")).all() == []
+
+
+# ── A test that failed is never sent later ────────────────────────────────────
+
+
+def _unconnected(db, world, monkeypatch):
+    """WhatsApp's keys cannot be read when the send goes to build its client."""
+
+    def refuse(_db):
+        raise outbound.NotSent("WhatsApp is not connected.", kind="not_connected")
+
+    monkeypatch.setattr(outbound, "_client", refuse)
+    with pytest.raises(outbound.NotSent) as refused:
+        feedback.send_test(db, HER, world.owner, claim=_yes)
+    return refused
+
+
+def test_a_test_that_fails_outside_the_returned_row_is_closed_not_left_pending(db, world, monkeypatch):
+    refused = _unconnected(db, world, monkeypatch)
+    row = the_test(db)
+    assert str(refused.value) == "WhatsApp is not connected."
+    assert (row.state, row.step) == ("failed", "done")
+    assert row.last_error == "WhatsApp is not connected."
+    assert world.asked == []
+
+
+def test_a_failed_test_is_never_sent_later_once_the_feature_is_on(db, world, monkeypatch, feature_on):
+    _unconnected(db, world, monkeypatch)
+    row = the_test(db)
+    later = utcnow() + timedelta(hours=2)
+    assert feedback.requeue_stale_pending(db, later) == 0
+    assert jobs(db, JobKind.INBOX_FEEDBACK_SEND) == []
+    assert (row.state, row.step) == ("failed", "done")
+
+
+def test_the_sweep_closes_an_orphaned_test_instead_of_queuing_it(db, world, feature_on):
+    """A test left pending by a crash between its saving and its sending."""
+    orphan = survey(
+        db, "9" * 20, state="pending", sent_at=None, wa_message_id=None, is_test=True
+    )
+    real = survey(db, "7002", state="pending", sent_at=None, wa_message_id=None)
+    old = utcnow() - timedelta(hours=1)
+    for row in (orphan, real):
+        row.updated_at = old
+    db.flush()
+    assert feedback.requeue_stale_pending(db) == 1  # the real one only
+    assert [p["survey_id"] for _, _, p in jobs(db, JobKind.INBOX_FEEDBACK_SEND)] == [real.id]
+    db.refresh(orphan)
+    assert (orphan.state, orphan.step) == ("failed", "done")
+    assert orphan.last_error
+
+
+def test_no_other_sweep_pass_picks_a_test_up_again(db, world):
+    waiting = survey(
+        db, "9" * 20, state="waiting", sent_at=None, is_test=True,
+        next_attempt_at=utcnow() - timedelta(hours=1),
+    )
+    assert feedback.waiting_to_look_at(db) == []
+    assert waiting.state == "waiting"
+
+    stuck = survey(db, "9" * 19 + "1", state="sending", is_test=True, step="rating")
+    stuck_real = survey(db, "7002", state="sending")
+    old = utcnow() - timedelta(hours=1)
+    stuck.updated_at = stuck_real.updated_at = old
+    db.flush()
+    assert feedback.recover_interrupted(db) == 2
+    db.refresh(stuck)
+    db.refresh(stuck_real)
+    assert (stuck.state, stuck.step) == ("failed", "done")  # closed outright
+    assert (stuck_real.state, stuck_real.step) == ("failed", "rating")
+
+    solved_test = survey(
+        db, "9" * 19 + "2", is_test=True, rating="unhappy", step="solved",
+        resolved_at=old, solved_asked_at=old,
+    )
+    solved_real = survey(
+        db, "7003", rating="unhappy", step="solved", resolved_at=old, solved_asked_at=old
+    )
+    assert feedback_replies.recover_interrupted_solved(db) == 1
+    assert solved_test.step == "solved" and solved_real.step == "support"
+
+
+# ── The okay view and badge are the customers' ────────────────────────────────
+
+
+def _okay_test(db, world):
+    send(db, world)
+    row = the_test(db)
+    tap_rating(db, row, "okay", "wamid.K1")
+    tap_list(db, row, "price", "wamid.K2")
+    db.refresh(row)
+    assert row.rating == "okay"
+    return row
+
+
+def test_a_test_answered_okay_does_not_make_the_chat_neutral(db, world):
+    row = _okay_test(db, world)
+    assert chats.list_conversations(db, view="neutral")["conversations"] == []
+    assert feedback.markers(db, [row.conversation_id]) == {}
+    assert chats.list_conversations(db, view="all")["conversations"][0]["feedback"] is None
+
+
+def test_a_test_does_not_replace_her_real_latest_answer(db, world):
+    chat = conversation(db)
+    survey(
+        db, "7002", conversation_id=chat.id, rating="okay", step="done",
+        rated_at=utcnow() - timedelta(days=1),
+    )
+    send(db, world)
+    row = the_test(db)
+    tap_rating(db, row, "loved", "wamid.L1")
+    tap_list(db, row, "quality", "wamid.L2")
+    # Her real answer is still the latest: the chat stays in the okay view.
+    assert [c["id"] for c in chats.list_conversations(db, view="neutral")["conversations"]] == [chat.id]
+    assert feedback.markers(db, [chat.id]) == {chat.id: "neutral"}
+
+
+def test_a_test_that_is_unhappy_still_badges_the_follow_up_view(db, world):
+    row = _unhappy_test(db, world)
+    assert feedback.markers(db, [row.conversation_id]) == {row.conversation_id: "follow_up"}
+
+
+# ── A test does not take over a real customer's chat ──────────────────────────
+
+
+def test_her_next_words_go_to_her_real_survey_not_a_newer_test(db, world):
+    chat = conversation(db)
+    real = survey(
+        db, "7002", conversation_id=chat.id, rating="loved", step="comment",
+        reason="quality", reason_at=utcnow() - timedelta(minutes=30),
+    )
+    send(db, world)
+    test_row = the_test(db)
+    test_row.rating, test_row.step = "loved", "comment"
+    test_row.reason, test_row.reason_at = "quality", utcnow() - timedelta(minutes=5)
+    db.flush()
+    apply(db, typed("Lovely, thank you", "wamid.W1"))
+    assert real.comment == "Lovely, thank you" and real.step == "done"
+    assert test_row.comment is None and test_row.step == "comment"
+
+
+def test_a_test_receives_her_words_when_nothing_real_is_waiting(db, world):
+    send(db, world)
+    test_row = the_test(db)
+    test_row.rating, test_row.step = "loved", "comment"
+    test_row.reason, test_row.reason_at = "quality", utcnow() - timedelta(minutes=5)
+    db.flush()
+    apply(db, typed("Nice", "wamid.W2"))
+    assert test_row.comment == "Nice"
+
+
+def test_the_chat_shows_her_real_unhappy_survey_over_a_newer_test(db, world):
+    chat = conversation(db)
+    real = survey(
+        db, "7002", conversation_id=chat.id, rating="unhappy", step="support",
+        rated_at=utcnow() - timedelta(days=2), sent_at=utcnow() - timedelta(days=2),
+    )
+    send(db, world)
+    assert the_test(db).conversation_id == chat.id
+    block = chats.conversation_detail(db, chat.id)["feedback"]
+    assert block["id"] == real.id and block["is_test"] is False
+    assert block["needs_follow_up"] is True
+    # Also while it waits for her answer to "was it solved?".
+    real.step = "solved"
+    db.flush()
+    assert chats.conversation_detail(db, chat.id)["feedback"]["id"] == real.id
+
+
+def test_the_chat_shows_the_newest_survey_otherwise(db, world):
+    chat = conversation(db)
+    survey(
+        db, "7002", conversation_id=chat.id, rating="loved", step="done",
+        sent_at=utcnow() - timedelta(days=2),
+    )
+    send(db, world)
+    block = chats.conversation_detail(db, chat.id)["feedback"]
+    assert block["is_test"] is True
+    # And a real survey that needs nothing does not hide a newer real one.
+    newer = survey(
+        db, "7003", conversation_id=chat.id, rating="okay", step="done",
+        sent_at=utcnow() + timedelta(minutes=1),
+    )
+    assert chats.conversation_detail(db, chat.id)["feedback"]["id"] == newer.id
 
 
 # ── The route ─────────────────────────────────────────────────────────────────
