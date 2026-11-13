@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 import { ApiError, api } from "../../lib/api";
 import { RATING_WORDS, REORDER_WORDS, feedbackStateNote, formatPhone } from "../../lib/inbox";
@@ -12,6 +12,7 @@ import type {
   FeedbackSummary,
 } from "../../lib/inbox";
 import { OpsIcon, dayAndTime, dayMonth, useIsNarrow } from "../../components/OpsSource";
+import { InboxIcon } from "./InboxIcon";
 import "../operations/OperationsDashboard.css";
 import "./Inbox.css";
 
@@ -603,15 +604,21 @@ export function InboxFeedback() {
             What customers said about their delivered orders, and where each follow-up stands
           </span>
         </div>
-        <button
-          type="button"
-          className="inbox-btn inbox-btn--quiet inbox-fb__download"
-          disabled={downloading || rows === null || rows.length === 0}
-          onClick={() => void download()}
-        >
-          {downloading ? "Preparing the file…" : "Download"}
-          <span className="visually-hidden"> these answers as a spreadsheet</span>
-        </button>
+        <div className="inbox-fb__headacts">
+          <Link className="inbox-btn inbox-btn--quiet" to="/inbox/feedback/setup">
+            <InboxIcon name="settings" />
+            Feedback setup
+          </Link>
+          <button
+            type="button"
+            className="inbox-btn inbox-btn--quiet inbox-fb__download"
+            disabled={downloading || rows === null || rows.length === 0}
+            onClick={() => void download()}
+          >
+            {downloading ? "Preparing the file…" : "Download"}
+            <span className="visually-hidden"> these answers as a spreadsheet</span>
+          </button>
+        </div>
       </header>
 
       {off && (

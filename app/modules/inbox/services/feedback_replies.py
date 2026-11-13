@@ -15,6 +15,9 @@ that kind of tap: a no-op, and no second message.
     rating -> reason -> support -> solved -> reorder -> done   (unhappy)
                           ^________ (She says no: back to support) ___|
 
+She is told when she says no (``not_solved``): a person will write to her
+again.
+
 What a tap *changes* is done when it is applied (``record_tap``); what is
 *sent* because of it is queued as a job of its own (``reply``), once per tap,
 under that tap's own id - so WhatsApp being down never loses her answer and a
@@ -23,7 +26,7 @@ need her 24 hours open; unlike the automatic reply to a confirmation's tap
 they are **not** dropped for being late: she answered, and the next question
 is still the right one.
 
-Wording lives in ``feedback``.
+Wording lives in ``feedback_messages``, where an admin can change it.
 """
 
 import logging
@@ -44,7 +47,13 @@ from app.modules.inbox.models import (
     InboxConversation,
     InboxMessage,
 )
-from app.modules.inbox.services import feedback, feedback_codes, outbound, sending
+from app.modules.inbox.services import (
+    feedback,
+    feedback_codes,
+    feedback_messages,
+    outbound,
+    sending,
+)
 from app.modules.inbox.services.events import _conversation, _phone
 from app.modules.inbox.services.meta import MetaClient, MetaError
 from app.modules.inbox.services.outbound import NotSent, send_buttons, send_list, send_text
@@ -173,8 +182,7 @@ def record_tap(
     elif tap.step == "reorder":
         survey.reorder, survey.step = tap.value, "done"
     db.flush()
-    if not (tap.step == "solved" and not survey.solved):
-        queue_reply(db, message_id)
+    queue_reply(db, message_id)
 
 
 def capture_comment(db: Session, phone: str, body: str | None, at: datetime) -> bool:
@@ -229,24 +237,36 @@ def issue_code(
 
 
 def closing_text(survey: FeedbackSurvey, cfg: FeedbackSettings, code: str | None = None) -> str:
-    """The last message, in the wording of ``feedback``'s constants: thanks;
-    her code if she has one; the review link if she loved it and one is set;
-    the invitation to write - not for an unhappy customer, whose follow-up was
-    a person's. After *Something else* the invitation asks what it was
-    instead. One function, so the closing words are changed in one place.
-    Without a code the code line is simply absent."""
-    lines = [feedback.THANKS]
+    """The last message, in the wording of ``feedback_messages``: thanks for
+    her answer; her code if she has one; the review link if she loved it and
+    one is set; then one last line.
+
+    That last line asks what *Something else* was, or else invites her to
+    write - except that a customer who loved it and was shown the review link
+    gets no invitation (one ask per message), and an unhappy customer gets
+    neither: a person has already followed her up. One function, so the
+    closing words are put together in one place. Without a code the code line
+    is simply absent.
+    """
+    name = feedback_messages.first_name(survey)
+    rating = survey.rating if survey.rating in feedback.RATINGS else "okay"
+    lines = [feedback_messages.text(cfg, f"thanks.{rating}", name=name)]
     if code:
         lines.append(
-            feedback.CODE_LINE.format(
-                percent=feedback.DISCOUNT_PERCENT, code=code, days=feedback.CODE_DAYS
+            feedback_messages.text(
+                cfg, "code_line", name=name, code=code,
+                percent=feedback.DISCOUNT_PERCENT, days=feedback.CODE_DAYS,
             )
         )
     review_url = (cfg.review_url or "").strip()
-    if survey.rating == "loved" and review_url:
-        lines.append(feedback.REVIEW_LINE.format(url=review_url))
+    review_shown = survey.rating == "loved" and bool(review_url)
+    if review_shown:
+        lines.append(feedback_messages.text(cfg, "review_line", name=name, url=review_url))
     if survey.rating != "unhappy":
-        lines.append(feedback.TELL_US if _something_else(survey) else feedback.INVITATION)
+        if _something_else(survey):
+            lines.append(feedback_messages.text(cfg, "tell_us", name=name))
+        elif not review_shown:
+            lines.append(feedback_messages.text(cfg, "invitation", name=name))
     return "\n\n".join(lines)
 
 
@@ -257,9 +277,10 @@ def _something_else(survey: FeedbackSurvey | None) -> bool:
 def support_text(cfg: FeedbackSettings, survey: FeedbackSurvey | None = None) -> str:
     """The promise of a person. After *Something else* it also asks what went
     wrong, so whoever writes to her already knows."""
-    words = feedback.SUPPORT.format(hours=cfg.reply_hours)
+    name = feedback_messages.first_name(survey)
+    words = feedback_messages.text(cfg, "support", name=name, hours=cfg.reply_hours)
     if _something_else(survey):
-        words += "\n\n" + feedback.TELL_US
+        words += "\n\n" + feedback_messages.text(cfg, "tell_us", name=name)
     return words
 
 
@@ -305,8 +326,8 @@ def reply(
     """Answer one tap on a feedback question. At most one message per tap.
 
     ``None`` when there is nothing to say: not a tap we took as an answer,
-    one already answered, nothing to send after it (*No, not solved*), her 24
-    hours closed, or a customer this server may not message. The reply is
+    one already answered, her 24 hours closed, or a customer this server may
+    not message. The reply is
     stored under the tap's own id, so a job run twice cannot answer twice.
 
     ``final_attempt`` is the job's last try at a reward code: until then a
@@ -355,19 +376,26 @@ def _next_message(
     final_attempt: bool = False,
 ) -> InboxMessage | None:
     """Send what follows this tap, or return None if nothing does."""
+    cfg = get_settings(db)
+    name = feedback_messages.first_name(survey)
     if parsed.step == "rating":
         return send_list(
-            db, conversation, feedback.REASON_QUESTIONS[parsed.value], feedback.LIST_LABEL,
+            db, conversation,
+            feedback_messages.text(cfg, f"reason_question.{parsed.value}", name=name),
+            feedback_messages.text(cfg, "list_label"),
             [
-                {"id": f"fbr_{key}_{survey.id}", "title": title}
-                for key, title in feedback.REASONS[parsed.value]
+                {
+                    "id": f"fbr_{key}_{survey.id}",
+                    "title": feedback_messages.text(cfg, f"reason_option.{parsed.value}.{key}"),
+                }
+                for key, _ in feedback.REASONS[parsed.value]
             ],
             origin="automatic", source_ref=reference, client=client,
         )
     if parsed.step == "reason":
         if survey.rating == "unhappy":
             return send_text(
-                db, conversation, support_text(get_settings(db), survey),
+                db, conversation, support_text(cfg, survey),
                 origin="automatic", source_ref=reference, client=client,
             )
         return send_closing(
@@ -375,10 +403,22 @@ def _next_message(
         )
     if parsed.step == "solved":
         if parsed.value != "yes":
-            return None
+            # She says it is not solved: she is told a person will write
+            # again. (Reopening it for them was done when her tap was applied.)
+            return send_text(
+                db, conversation,
+                feedback_messages.text(cfg, "not_solved", name=name, hours=cfg.reply_hours),
+                origin="automatic", source_ref=reference, client=client,
+            )
         return send_buttons(
-            db, conversation, feedback.REORDER_QUESTION,
-            [{"id": f"fbo_{key}_{survey.id}", "title": title} for key, title in feedback.REORDERS],
+            db, conversation, feedback_messages.text(cfg, "reorder_question", name=name),
+            [
+                {
+                    "id": f"fbo_{key}_{survey.id}",
+                    "title": feedback_messages.text(cfg, f"reorder_option.{key}"),
+                }
+                for key, _ in feedback.REORDERS
+            ],
             origin="automatic", source_ref=reference, client=client,
         )
     # reorder
@@ -558,7 +598,14 @@ def ask_solved(
             survey.solved_asked_at = now
         return survey
 
-    choices = [{"id": f"fbs_{key}_{survey.id}", "title": title} for key, title in feedback.SOLVED_BUTTONS]
+    cfg = get_settings(db)
+    choices = [
+        {
+            "id": f"fbs_{key}_{survey.id}",
+            "title": feedback_messages.text(cfg, f"solved_option.{key}"),
+        }
+        for key in feedback.SOLVED_ANSWERS
+    ]
     if not claim(survey.id):
         return survey
     # What the claim committed, as this session sees it.
@@ -566,7 +613,11 @@ def ask_solved(
     try:
         if outbound.window_open(conversation, now):
             message = send_buttons(
-                db, conversation, feedback.SOLVED_QUESTION, choices,
+                db, conversation,
+                feedback_messages.text(
+                    cfg, "solved_question", name=feedback_messages.first_name(survey)
+                ),
+                choices,
                 origin="automatic", source_ref=reference, client=client,
             )
         else:
@@ -659,7 +710,8 @@ def _send_solved_template(
         wa_message_id=wa_message_id,
         error=error,
         template_name=feedback.SOLVED_TEMPLATE,
-        extra={"buttons": [choice["title"] for choice in choices]},
+        # The approved message's own buttons, whatever the chat's say.
+        extra={"buttons": list(feedback_messages.SOLVED_TEMPLATE_BUTTONS)},
         order_id=survey.shopify_order_id,
         source_ref=reference,
     )

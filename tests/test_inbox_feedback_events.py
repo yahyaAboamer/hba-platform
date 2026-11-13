@@ -305,7 +305,7 @@ def test_the_unhappy_path_until_a_person_has_to_act(db, world):
     apply(db, template_tap("fb_unhappy_7001", "Not happy", "wamid.T1", ago=timedelta(seconds=50)))
     drain(db, world.client)
     question = world.asked[0]["interactive"]
-    assert question["body"]["text"] == "We're sorry. What went wrong?"
+    assert question["body"]["text"] == "We're sorry about that. What went wrong?"
     assert [r["id"] for r in question["action"]["sections"][0]["rows"]] == [
         f"fbr_{key}_{row.id}" for key in ("size_fit", "quality", "wrong_item", "delivery", "other")
     ]
@@ -314,7 +314,8 @@ def test_the_unhappy_path_until_a_person_has_to_act(db, world):
     assert (row.reason, row.step) == ("wrong_item", "support")
     drain(db, world.client)
     assert world.asked[1]["text"]["body"] == (
-        "Thank you for telling us. A member of our team will message you here within 24 hours."
+        "We're sorry, Nour, and thank you for telling us. A member of our team will message "
+        "you here within 24 hours to make it right."
     )
 
     apply(db, text("I got the black one, not the beige", "wamid.T3"))
@@ -503,7 +504,14 @@ def test_no_sends_her_back_to_a_person_marked_as_reopened(db, world):
     assert (row.resolved_at, row.resolved_by, row.solved_asked_at) == (None, None, None)
     assert row.solved_at is not None
     drain(db, world.client)
-    assert len(world.asked) == sent
+    # She is told a person will write to her again, once, and nothing else.
+    assert len(world.asked) == sent + 1
+    assert _bodies(world.asked)[-1] == (
+        "We're sorry it isn't solved yet. We've passed it back to our team, and someone "
+        "will message you here within 24 hours."
+    )
+    drain(db, world.client)
+    assert len(world.asked) == sent + 1
     assert [r["id"] for r in feedback.needs_follow_up(db)] == [row.id]
     assert feedback.needs_follow_up(db)[0]["reopened_count"] == 1
 
@@ -611,8 +619,10 @@ def test_the_closing_words_are_built_in_one_place_with_a_seam_for_her_code(db, w
     """The code is issued by ``issue_code`` alone; the words by ``closing_text``.
     (The codes themselves are tested in ``test_inbox_feedback_codes``.)"""
     cfg = feedback.get_settings(db)
+    # No answer yet: the neutral thanks.
     assert feedback_replies.closing_text(world.row, cfg) == (
-        feedback.THANKS + "\n\n" + feedback.INVITATION
+        "Thank you, Nour. Your honest answer helps us get better.\n\n"
+        "If there is anything we could do better, just reply here."
     )
 
     monkeypatch.setattr(feedback_replies, "issue_code", lambda _db, _survey, **_: "THANKS-7K2Q")

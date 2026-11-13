@@ -546,7 +546,8 @@ class FeedbackSettings(Base):
 
     ``started_at`` is when the feature first ran switched on: nothing
     delivered before it is ever asked. ``review_url`` and ``reply_hours`` are
-    what the closing messages say. ``discount_gid`` is Shopify's id for the one
+    what the closing messages say. ``messages`` holds the wording an admin has
+    changed. ``discount_gid`` is Shopify's id for the one
     discount every reward code lives in (``feedback_codes.ensure_discount``).
     """
 
@@ -562,6 +563,12 @@ class FeedbackSettings(Base):
     reply_hours: Mapped[int] = mapped_column(Integer, nullable=False, server_default="24")
     #: Shopify's id for the one discount every reward code lives in.
     discount_gid: Mapped[str | None] = mapped_column(Text)
+    #: The owner's own wording, as ``{message key: text}``: only what was
+    #: changed. A key that is absent says its built-in words
+    #: (``feedback_messages``).
+    messages: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )

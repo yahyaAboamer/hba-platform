@@ -2,8 +2,10 @@
 asked, the first question, and the sheet's reads.
 
 **This decides and sends the first question; the rest of the conversation is
-``feedback_replies``.** Everything a customer is sent in this feature is
-worded in the constants below, so it is edited in one place.
+``feedback_replies``.** The words of every other message a customer is sent are
+in ``feedback_messages``, where an admin can change them; what is here is what
+does not change: the ids, the built-in option titles (the Feedback sheet and
+its filters always show those) and the two approved messages.
 
 The flow, in the inbox lane:
 
@@ -68,9 +70,10 @@ from app.worker import register_handler
 
 logger = logging.getLogger(__name__)
 
-# ── What customers are sent ───────────────────────────────────────────────────
-# Button titles are at most 20 characters, list rows 24, a list's own button
-# 20 (WhatsApp's limits; ``MetaClient`` refuses anything longer).
+# ── What is fixed about what customers are sent ───────────────────────────────
+# The words are in ``feedback_messages``. Button titles are at most 20
+# characters, list rows 24, a list's own button 20 (WhatsApp's limits;
+# ``MetaClient`` refuses anything longer).
 
 #: The first question: an approved message, by the name and language Meta
 #: holds it under. Its two details are her first name and the order's name;
@@ -88,17 +91,13 @@ FIRST_QUESTION_CHAT = "Order feedback · {order}"
 #: 24 hours have closed. One detail (the order's name), two buttons.
 SOLVED_TEMPLATE = "feedback_resolved"
 SOLVED_LANGUAGE = "en"
-SOLVED_QUESTION = "Was your issue solved?"
 SOLVED_CHAT = "Was your issue solved? · {order}"
-SOLVED_BUTTONS = (("yes", "Yes"), ("no", "No"))
+#: The answers to it, in the order of its two buttons.
+SOLVED_ANSWERS = ("yes", "no")
 
-#: The one question after a rating, as a list: ``(id, title)`` rows.
-LIST_LABEL = "Choose one"
-REASON_QUESTIONS = {
-    "loved": "What did you like most?",
-    "okay": "What would have made it better?",
-    "unhappy": "We're sorry. What went wrong?",
-}
+#: The one question after a rating is a list of ``(id, built-in title)`` rows.
+#: The ids are what is stored; the titles are what the sheet shows. What she
+#: is *sent* may be an admin's own title (``feedback_messages``).
 REASONS = {
     "loved": (
         ("quality", "Quality"), ("fit", "Fit"), ("design", "Design"),
@@ -120,29 +119,13 @@ REASONS = {
 DISCOUNT_PERCENT = 20
 CODE_DAYS = 30
 
-#: The last message, in this order: thanks; her code if she has one; the
-#: review link if she loved it and one is set; the invitation to write (not
-#: for an unhappy customer, whose follow-up was done by a person).
-THANKS = "Thank you for your feedback, it really helps us."
-CODE_LINE = (
-    "Here is {percent}% off your next order: {code}. "
-    "It is yours alone and works once, for {days} days."
-)
-REVIEW_LINE = "We'd love a review: {url}"
-INVITATION = "If there is anything we could do better, just reply here."
-#: In place of the invitation when her reason was *Something else*: the list
-#: could not say what it was, so she is asked to. What she writes is kept as
-#: her comment, as any first reply is.
+#: When her reason was *Something else*, the list could not say what it was,
+#: so the last message asks her to. What she writes is kept as her comment, as
+#: any first reply is.
 OTHER_REASON = "other"
-TELL_US = "Please tell us what it was in a few words. Just reply here."
-#: After an unhappy customer's reason. ``{hours}`` is the promised time.
-SUPPORT = (
-    "Thank you for telling us. A member of our team will message you here "
-    "within {hours} hours."
-)
 
-#: After she says her issue was solved.
-REORDER_QUESTION = "How likely are you to order from us again?"
+#: After she says her issue was solved: how likely she is to order again.
+#: ``(id, built-in title)`` rows, as above.
 REORDERS = (("very_likely", "Very likely"), ("maybe", "Maybe"), ("unlikely", "Unlikely"))
 
 # ── When ──────────────────────────────────────────────────────────────────────

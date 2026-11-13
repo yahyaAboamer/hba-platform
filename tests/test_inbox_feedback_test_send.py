@@ -32,6 +32,7 @@ from app.modules.inbox.services import (
     connection,
     feedback,
     feedback_codes,
+    feedback_messages,
     feedback_replies,
     feedback_sheet,
     outbound,
@@ -270,8 +271,8 @@ def test_the_loved_path_ends_with_a_real_code_and_the_closing_message_with_the_f
     assert [c["code"] for c in world.shop.codes.values()] == [row.code]
     assert row.code_sent_at is not None and row.code_expires_at is not None
     closing = _bodies(world.asked)[-1]
-    assert feedback.THANKS in closing and row.code in closing
-    assert feedback.INVITATION in closing
+    assert "We're so glad you loved it" in closing and row.code in closing
+    assert feedback_messages.text(None, "invitation") in closing
     assert feedback.enabled() is False
 
 
@@ -282,7 +283,7 @@ def test_the_unhappy_path_asks_was_it_solved_after_a_minute_then_reorder_then_a_
     tap_list(db, row, "size_fit", "wamid.U2")
     db.refresh(row)
     assert row.step == "support" and _bodies(world.asked)[-1] == feedback_replies.support_text(
-        feedback.get_settings(db)
+        feedback.get_settings(db), row
     )
 
     before = utcnow()
@@ -300,12 +301,12 @@ def test_the_unhappy_path_asks_was_it_solved_after_a_minute_then_reorder_then_a_
     # The job runs (through its handler, with the switch off) and asks.
     feedback_replies._handle_ask_solved(db, {"survey_id": row.id})
     assert row.solved_asked_at is not None
-    assert _bodies(world.asked)[-1] == feedback.SOLVED_QUESTION
+    assert _bodies(world.asked)[-1] == feedback_messages.text(None, "solved_question")
 
     apply(db, interactive_tap("button_reply", f"fbs_yes_{row.id}", "Yes", "wamid.U3"))
     run_replies(db)
     assert row.solved is True and row.step == "reorder"
-    assert _bodies(world.asked)[-1] == feedback.REORDER_QUESTION
+    assert _bodies(world.asked)[-1] == feedback_messages.text(None, "reorder_question")
 
     apply(db, interactive_tap("button_reply", f"fbo_very_likely_{row.id}", "x", "wamid.U4"))
     run_replies(db)
@@ -813,8 +814,9 @@ def test_something_else_is_asked_what_it_was_in_place_of_the_invitation(db, worl
 
     closing = _bodies(world.asked)[-1]
     assert row.reason == "other" and row.step == "comment"
-    assert feedback.THANKS in closing and closing.endswith(feedback.TELL_US)
-    assert feedback.INVITATION not in closing
+    assert "Your honest answer helps us get better" in closing
+    assert closing.endswith(feedback_messages.text(None, "tell_us"))
+    assert feedback_messages.text(None, "invitation") not in closing
 
 
 def test_an_unhappy_something_else_is_promised_a_person_and_asked_what_went_wrong(db, world):
@@ -827,6 +829,8 @@ def test_an_unhappy_something_else_is_promised_a_person_and_asked_what_went_wron
     cfg = feedback.get_settings(db)
     said = _bodies(world.asked)[-1]
     assert row.step == "support"
-    assert said == feedback.SUPPORT.format(hours=cfg.reply_hours) + "\n\n" + feedback.TELL_US
+    promise = feedback_messages.text(None, "support", name="Yahya", hours=cfg.reply_hours)
+    assert said == promise + "\n\n" + feedback_messages.text(None, "tell_us")
     # Any other reason is promised a person and asked nothing more.
-    assert feedback_replies.support_text(cfg) == feedback.SUPPORT.format(hours=cfg.reply_hours)
+    price = SimpleNamespace(customer_name="Yahya", reason="price")
+    assert feedback_replies.support_text(cfg, price) == promise

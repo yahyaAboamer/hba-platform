@@ -48,8 +48,10 @@ Facts this is built on, checked on the day:
    reward.
 3. **What follows a tap**, sent as ordinary chat messages while her 24 hours
    are open:
-   - *Loved it*: one question, what she liked most. Then her code, the review
-     link, and an invitation to write anything we could do better.
+   - *Loved it*: one question, what she liked most. Then her code and the
+     review link. A customer who is shown the review link is not also invited
+     to write: one ask per message. Without a review link she gets the
+     invitation instead.
    - *It was okay*: one question, what would have made it better. Then her
      code and the same invitation.
    - *Not happy*: one question, what went wrong. Then a promise that a person
@@ -59,11 +61,20 @@ Facts this is built on, checked on the day:
    the promise, for *Not happy*).
    The first thing she writes after that, within 24 hours, is kept as her
    comment. Nobody is asked more than three questions.
+
+   **The wording of all of these is the owner's to edit** (Settings, an
+   admin's), within WhatsApp's limits: 24 characters on a list option, 20 on a
+   button, 1,024 in a question with options. What each option records does not
+   change, and the Feedback sheet and its filters keep showing the built-in
+   names. Only the two approved messages (decisions 2 and 4) are excepted:
+   their words change in Meta's WhatsApp Manager and need Meta's approval
+   again.
 4. **Unhappy chats are followed up by a person.** The chat is listed under
    *Needs follow-up* with the reason and the order until someone presses
    *Resolved*. A day later she is asked *Was your issue solved?*:
    - *Yes*: she is asked how likely she is to order again, then sent her code.
-   - *No*: the chat returns to *Needs follow-up*, marked as reopened, and is
+   - *No*: she is told a person will write to her again, within the promised
+     time. The chat returns to *Needs follow-up*, marked as reopened, and is
      raised to the manager on Today. It is asked only once more after the
      second *Resolved*.
    This question goes as a chat message if her 24 hours are open and as a

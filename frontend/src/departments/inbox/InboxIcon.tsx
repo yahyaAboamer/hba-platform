@@ -21,7 +21,10 @@ export type InboxIconName =
   | "close"
   | "stop"
   | "up"
-  | "down";
+  | "down"
+  | "lock"
+  | "list"
+  | "settings";
 
 export function InboxIcon({ name }: { name: InboxIconName }) {
   const line = {
@@ -71,6 +74,19 @@ export function InboxIcon({ name }: { name: InboxIconName }) {
         <>
           <rect x="4" y="4" width="16" height="16" rx="2" {...line} />
           <path d="M8 9h8M8 13h8M8 17h4" {...line} />
+        </>
+      )}
+      {name === "lock" && (
+        <>
+          <rect x="5" y="11" width="14" height="9" rx="2" {...line} />
+          <path d="M8 11V8a4 4 0 0 1 8 0v3" {...line} />
+        </>
+      )}
+      {name === "list" && <path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01" {...line} />}
+      {name === "settings" && (
+        <>
+          <circle cx="12" cy="12" r="3" {...line} />
+          <path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1" {...line} />
         </>
       )}
       {name === "left" && <path d="M15 6l-6 6 6 6" {...line} />}

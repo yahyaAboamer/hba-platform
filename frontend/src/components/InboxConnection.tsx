@@ -193,9 +193,9 @@ function WhatsAppCard({ state, onChanged }: { state: WhatsAppState; onChanged: (
 
   return (
     <section className="pay-detail__card sync__card" aria-labelledby="inbox-whatsapp-title">
-      <h2 className="pay-detail__card-title" id="inbox-whatsapp-title">
+      <h3 className="pay-detail__card-title" id="inbox-whatsapp-title">
         WhatsApp
-      </h2>
+      </h3>
       <p className="shop-conn__meta">
         {state.connected ? "Connected" : "Not connected"}
         {state.connected && title && ` · ${title}`}
@@ -333,9 +333,9 @@ function TagsCard({ state, onChanged }: { state: TagsState; onChanged: (both: Bo
 
   return (
     <section className="pay-detail__card sync__card" aria-labelledby="inbox-tags-title">
-      <h2 className="pay-detail__card-title" id="inbox-tags-title">
+      <h3 className="pay-detail__card-title" id="inbox-tags-title">
         Shopify, for order tags
-      </h2>
+      </h3>
       <p className="shop-conn__meta">
         {state.connected ? "Connected" : "Not connected"}
         {state.shop_domain && ` · ${state.shop_domain}`}
@@ -416,9 +416,9 @@ export function InboxConnections() {
   if (error) {
     return (
       <section className="pay-detail__card sync__card" aria-labelledby="inbox-whatsapp-title">
-        <h2 className="pay-detail__card-title" id="inbox-whatsapp-title">
+        <h3 className="pay-detail__card-title" id="inbox-whatsapp-title">
           WhatsApp
-        </h2>
+        </h3>
         {/* Loading failed: a note, not an alert - nothing was asked. */}
         <p className="sync__error">{error}</p>
       </section>

@@ -116,7 +116,7 @@ describe("customer service", () => {
     render(<App />);
 
     expect(await screen.findByRole("heading", { name: "Feedback" })).toBeTruthy();
-    expect(screen.getByRole("link", { name: /^Feedback/ }).getAttribute("aria-current")).toBe("page");
+    expect(screen.getByRole("link", { name: /^Feedback(?! setup)/ }).getAttribute("aria-current")).toBe("page");
   });
 
   it("reaches Confirmations", async () => {
