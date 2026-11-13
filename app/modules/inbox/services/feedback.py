@@ -130,6 +130,11 @@ CODE_LINE = (
 )
 REVIEW_LINE = "We'd love a review: {url}"
 INVITATION = "If there is anything we could do better, just reply here."
+#: In place of the invitation when her reason was *Something else*: the list
+#: could not say what it was, so she is asked to. What she writes is kept as
+#: her comment, as any first reply is.
+OTHER_REASON = "other"
+TELL_US = "Please tell us what it was in a few words. Just reply here."
 #: After an unhappy customer's reason. ``{hours}`` is the promised time.
 SUPPORT = (
     "Thank you for telling us. A member of our team will message you here "

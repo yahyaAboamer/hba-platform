@@ -54,6 +54,9 @@ Facts this is built on, checked on the day:
      code and the same invitation.
    - *Not happy*: one question, what went wrong. Then a promise that a person
      will write to her within the promised time (24 hours). No code yet.
+   When her answer to that one question is *Something else*, the last
+   message asks her to say what it was, in place of the invitation (and after
+   the promise, for *Not happy*).
    The first thing she writes after that, within 24 hours, is kept as her
    comment. Nobody is asked more than three questions.
 4. **Unhappy chats are followed up by a person.** The chat is listed under

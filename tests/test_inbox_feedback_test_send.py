@@ -798,3 +798,35 @@ def test_a_role_without_the_inbox_cannot_send_a_test(wired, role):
 def test_nobody_signed_out_can_send_a_test(fresh_database):
     with TestClient(app) as anonymous:
         assert anonymous.post("/api/inbox/feedback/test", json={"phone": "01005550188"}).status_code == 401
+
+
+# ── Something else ────────────────────────────────────────────────────────────
+
+
+def test_something_else_is_asked_what_it_was_in_place_of_the_invitation(db, world):
+    """The list could not say what it was, so the last message asks her."""
+    send(db, world)
+    row = the_test(db)
+    tap_rating(db, row, "okay", "wamid.S1")
+    tap_list(db, row, "other", "wamid.S2")
+    db.refresh(row)
+
+    closing = _bodies(world.asked)[-1]
+    assert row.reason == "other" and row.step == "comment"
+    assert feedback.THANKS in closing and closing.endswith(feedback.TELL_US)
+    assert feedback.INVITATION not in closing
+
+
+def test_an_unhappy_something_else_is_promised_a_person_and_asked_what_went_wrong(db, world):
+    send(db, world)
+    row = the_test(db)
+    tap_rating(db, row, "unhappy", "wamid.S3")
+    tap_list(db, row, "other", "wamid.S4")
+    db.refresh(row)
+
+    cfg = feedback.get_settings(db)
+    said = _bodies(world.asked)[-1]
+    assert row.step == "support"
+    assert said == feedback.SUPPORT.format(hours=cfg.reply_hours) + "\n\n" + feedback.TELL_US
+    # Any other reason is promised a person and asked nothing more.
+    assert feedback_replies.support_text(cfg) == feedback.SUPPORT.format(hours=cfg.reply_hours)
