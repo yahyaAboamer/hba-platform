@@ -157,6 +157,8 @@ export type ChatFeedback = {
   last_error: string | null;
   code: string | null;
   code_used: boolean;
+  /** An administrator's test (`POST /api/inbox/feedback/test`), not a customer's answer. */
+  is_test?: boolean;
 };
 
 export type ConversationDetail = Conversation & {
@@ -366,6 +368,14 @@ export type FeedbackPage = {
   options: FeedbackOptions;
   /** Whether the questions are being sent at all (the feature's switch on the server). */
   enabled: boolean;
+};
+
+/** What a test send answers (`POST /api/inbox/feedback/test`). */
+export type FeedbackTestSent = {
+  sent: true;
+  /** As the server keeps it: `201005550188`. */
+  phone: string;
+  conversation_id: number;
 };
 
 /** The feature's switch and settings (`GET /api/inbox/feedback/settings`). */

@@ -73,6 +73,12 @@ export function ChatFeedbackBlock({
       aria-labelledby="inbox-feedback-title"
     >
       <h3 id="inbox-feedback-title">Feedback</h3>
+      {feedback.is_test && (
+        <p className="inbox-order__hint">
+          <span className="inbox-status inbox-status--plain">Test</span> Sent from Settings to try the
+          questions. Not counted.
+        </p>
+      )}
       <dl>
         <dt>Order</dt>
         <dd className="num">{feedback.order_name ?? "—"}</dd>

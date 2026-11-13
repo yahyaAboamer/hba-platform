@@ -459,6 +459,7 @@ def test_the_chat_carries_the_latest_survey(client, sheet):
         "last_error": None,
         "code": None,
         "code_used": False,
+        "is_test": False,
     }
     print("CHAT", json.dumps(detail["feedback"]))
     used = client.get(f"/api/inbox/conversations/{sheet['nour']}").json()["feedback"]

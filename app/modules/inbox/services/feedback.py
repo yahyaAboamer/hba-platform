@@ -26,9 +26,17 @@ The flow, in the inbox lane:
 
 **Off unless the server is told to** (``INBOX_FEEDBACK_ENABLED``): switched
 off, the sweep returns at once and nothing is read or kept.
+
+**A test is the one exception** (``send_test``): an administrator can send the
+first question to a number of his choosing, at once, with the feature still
+off for everyone else. Its survey row has ``is_test`` set; every job in the
+flow lets a test through the switch and nothing else, and a test is kept out
+of every number (the sheet, Today, the sidebar) and out of every rule that
+decides whether a real customer is asked.
 """
 
 import logging
+import secrets
 from collections.abc import Callable
 from datetime import datetime, timedelta
 from typing import Any
@@ -192,6 +200,11 @@ def enabled() -> bool:
     return bool(settings.inbox_feedback_enabled)
 
 
+def is_test_survey(db: Session, survey_id: int) -> bool:
+    """Whether this survey is an administrator's test (``send_test``)."""
+    return bool(db.scalar(select(FeedbackSurvey.is_test).where(FeedbackSurvey.id == survey_id)))
+
+
 def get_settings(db: Session) -> FeedbackSettings:
     """The feature's one settings row, made the first time it is asked for."""
     db.execute(
@@ -277,7 +290,11 @@ def _asked_recently(db: Session, phone: str, now: datetime) -> bool:
     return bool(
         db.scalar(
             select(FeedbackSurvey.id)
-            .where(FeedbackSurvey.phone == phone, or_(sent, on_its_way))
+            .where(
+                FeedbackSurvey.phone == phone,
+                FeedbackSurvey.is_test.is_(False),
+                or_(sent, on_its_way),
+            )
             .limit(1)
         )
     )
@@ -363,6 +380,7 @@ def _why_not(
         select(FeedbackSurvey.id)
         .where(
             FeedbackSurvey.phone == phone,
+            FeedbackSurvey.is_test.is_(False),
             FeedbackSurvey.rating == "unhappy",
             FeedbackSurvey.step == "support",
         )
@@ -630,12 +648,14 @@ def _not_taken(db: Session, row: FeedbackSurvey, exc: MetaError) -> None:
     if exc.kind == "undeliverable":
         # The number has no WhatsApp. Trying again will not give it one.
         row.state = "no_whatsapp"
-    elif exc.retryable and row.attempts < outbound.MAX_ATTEMPTS:
+    elif exc.retryable and row.attempts < outbound.MAX_ATTEMPTS and not row.is_test:
         row.state = "pending"
         wait = outbound.RETRY_AFTER[min(row.attempts, len(outbound.RETRY_AFTER)) - 1]
         row.next_attempt_at = utcnow() + wait
         queue_send(db, row.id, attempt=row.attempts, run_after=row.next_attempt_at)
     else:
+        # A test is never tried again in the background: whoever sent it is
+        # waiting to be told, and sends another.
         row.state = "failed"
 
 
@@ -732,14 +752,127 @@ def _handle_send(db: Session, payload: dict) -> None:
             f"{JobKind.INBOX_FEEDBACK_SEND} requires a survey_id; got payload keys "
             f"{sorted(payload)!r}"
         )
-    # Queued while it was on, run after it was turned off: send nothing.
-    if not enabled():
+    # Queued while it was on, run after it was turned off: send nothing. A
+    # test goes out whatever the switch says.
+    if not enabled() and not is_test_survey(db, survey_id):
         return
     try:
         send_first_question(db, survey_id)
     except outbound.NotSent as exc:
         # The keys cannot be read. Retrying will not read them.
         raise PermanentFailure(f"Cannot send feedback question {survey_id}: {exc}") from exc
+
+
+# ── A test, sent by an administrator ──────────────────────────────────────────
+
+TEST_BAD_PHONE = (
+    "That is not an Egyptian mobile number. Write it like 01xxxxxxxxx."
+)
+TEST_NOT_SENT = "The test question could not be sent."
+#: What a test survey says about its "order", so a person reading the chat
+#: cannot take it for a delivery.
+TEST_ORDER_NAME = "TEST"
+TEST_COURIER = "Test"
+TEST_PRODUCTS = ["Test order"]
+
+
+def _test_order_id() -> str:
+    """An order id that no real order can have.
+
+    Shopify's order ids are 64-bit numbers, so at most 19 digits and never
+    above 9223372036854775807. This is 20 digits, always: it can never equal
+    a Shopify id, and so never collides with a real survey's unique
+    ``shopify_order_id``, and it is all digits (at most 32 are allowed), so
+    the buttons' ``fb_<answer>_<order id>`` payloads read it like any other.
+    """
+    return f"9{secrets.randbelow(10**19):019d}"
+
+
+def send_test(
+    db: Session,
+    phone: str,
+    user: Any,
+    *,
+    client: MetaClient | None = None,
+    claim: Callable[[int], bool] = _claim,
+) -> dict:
+    """Send the real first question to one phone now, as a test.
+
+    For an administrator trying the flow on his own phone before the
+    questions are switched on for customers. It works whether or not
+    ``INBOX_FEEDBACK_ENABLED`` is set: the survey it makes is a test
+    (``is_test``), which every job in the flow lets through the switch. It is
+    never counted and never in the way of a real question for that phone.
+
+    Refused with a ``Refused`` (422) for a number that is not an Egyptian
+    mobile; with ``NotSent`` (409) if this server may not message that phone,
+    or if WhatsApp does not take the message. An earlier unfinished test for
+    the same phone is closed, so a test can be repeated.
+
+    **The survey is committed before WhatsApp is asked**: the claim that makes
+    a send happen at most once is made in a session of its own and can only
+    see a row that is saved.
+    """
+    # Imported here: chats builds on this module.
+    from app.modules.inbox.services.chats import Refused
+
+    read = egyptian_mobile(phone)
+    if read is None:
+        raise Refused(TEST_BAD_PHONE)
+    if (why := sending.refusal(db, read)) is not None:
+        raise outbound.NotSent(why)
+
+    now = utcnow()
+    db.execute(
+        update(FeedbackSurvey)
+        .where(
+            FeedbackSurvey.is_test.is_(True),
+            FeedbackSurvey.phone == read,
+            FeedbackSurvey.step != "done",
+        )
+        .values(step="done", updated_at=now)
+    )
+    first_name = str(getattr(user, "display_name", None) or "").strip().split(" ")[0]
+    row = FeedbackSurvey(
+        shopify_order_id=_test_order_id(),
+        order_name=TEST_ORDER_NAME,
+        delivered_at=now,
+        courier=TEST_COURIER,
+        products=list(TEST_PRODUCTS),
+        phone=read,
+        customer_name=(first_name or "there")[:120],
+        state="pending",
+        step="rating",
+        is_test=True,
+    )
+    db.add(row)
+    db.flush()
+    survey_id = row.id
+    db.commit()
+
+    sent = send_first_question(db, survey_id, client=client, claim=claim)
+    if sent is None or sent.state != "sent":
+        reason = (sent.last_error if sent is not None else None) or TEST_NOT_SENT
+        if sent is not None:
+            # Nothing is waiting on a question that never went out.
+            sent.step, sent.updated_at = "done", utcnow()
+            if sent.state in ("pending", "sending"):
+                sent.state = "failed"
+        db.commit()
+        raise outbound.NotSent(reason, kind="failed")
+
+    actor_id = getattr(user, "id", None)
+    record_audit(
+        db,
+        action="inbox.feedback_test_sent",
+        subject=f"feedback:{survey_id}",
+        actor_id=actor_id,
+        actor_email=getattr(user, "email", None),
+        # Only the end of the number, like a card: who it was is not needed.
+        after={"phone_ending": read[-4:]},
+    )
+    db.flush()
+    return {"sent": True, "phone": read, "conversation_id": sent.conversation_id}
 
 
 # ── What the Feedback sheet and Needs follow-up read ──────────────────────────
@@ -813,7 +946,11 @@ def needs_follow_up(db: Session) -> list[dict]:
     rows = list(
         db.scalars(
             select(FeedbackSurvey)
-            .where(FeedbackSurvey.rating == "unhappy", FeedbackSurvey.step == "support")
+            .where(
+                FeedbackSurvey.rating == "unhappy",
+                FeedbackSurvey.step == "support",
+                FeedbackSurvey.is_test.is_(False),
+            )
             .order_by(FeedbackSurvey.rated_at, FeedbackSurvey.id)
         )
     )
@@ -865,6 +1002,8 @@ def _filtered(
     q: str | None = None,
     include_skipped: bool = False,
 ):
+    # A test is never in the sheet, its numbers, its menus or its download.
+    query = query.where(FeedbackSurvey.is_test.is_(False))
     if not include_skipped:
         query = query.where(FeedbackSurvey.state.not_in(("skipped", "waiting")))
     if since is not None:
@@ -989,6 +1128,7 @@ def couriers(db: Session) -> list[str]:
             select(FeedbackSurvey.courier)
             .where(
                 FeedbackSurvey.courier.is_not(None),
+                FeedbackSurvey.is_test.is_(False),
                 FeedbackSurvey.state.not_in(("skipped", "waiting")),
             )
             .distinct()
@@ -1025,13 +1165,20 @@ def reply_hours(db: Session) -> int:
 NEUTRAL_FOR = timedelta(days=14)
 
 
-def follow_up_clause():
+def follow_up_clause(*, include_tests: bool = False):
     """For a query over ``InboxConversation``: the customer has an unhappy
-    answer waiting for a person."""
+    answer waiting for a person.
+
+    A test's answer is left out unless ``include_tests``: the chat list's
+    *Needs follow-up* view asks for them, so an administrator can practise
+    finding and resolving one; every number (the chip, Today, the sidebar)
+    does not.
+    """
     S = FeedbackSurvey
-    return exists().where(
+    found = exists().where(
         S.conversation_id == InboxConversation.id, S.rating == "unhappy", S.step == "support"
     )
+    return found if include_tests else found.where(S.is_test.is_(False))
 
 
 def _latest_answered(column):
@@ -1068,7 +1215,7 @@ def reopened_chats(db: Session) -> tuple[int, datetime | None]:
     count, since = db.execute(
         select(func.count(func.distinct(S.conversation_id)), func.min(func.coalesce(S.solved_at, S.rated_at)))
         .where(S.rating == "unhappy", S.step == "support", S.reopened_count > 0)
-        .where(S.conversation_id.is_not(None))
+        .where(S.conversation_id.is_not(None), S.is_test.is_(False))
     ).one()
     return int(count or 0), since
 
@@ -1077,7 +1224,10 @@ def oldest_follow_up(db: Session) -> datetime | None:
     S = FeedbackSurvey
     return db.scalar(
         select(func.min(S.rated_at)).where(
-            S.rating == "unhappy", S.step == "support", S.conversation_id.is_not(None)
+            S.rating == "unhappy",
+            S.step == "support",
+            S.conversation_id.is_not(None),
+            S.is_test.is_(False),
         )
     )
 
@@ -1148,6 +1298,7 @@ def chat_block(db: Session, conversation_id: int) -> dict | None:
         "last_error": row.last_error,
         "code": row.code,
         "code_used": row.code_used_at is not None,
+        "is_test": row.is_test,
     }
 
 
