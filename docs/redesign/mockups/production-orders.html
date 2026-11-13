@@ -1,0 +1,554 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Production Orders mockup</title>
+<style>
+/* Mockup only. Tokens copied from frontend/src/styles/tokens.css and accent.css. Sample data throughout. */
+:root{
+  --paper:#eff1ee;--surface:#fff;--ink:#101214;--quiet:#4e534e;--faint:#5e645e;--rule:#dde1dc;--rule-strong:#c9cec8;--hover:#eff1ee;
+  --owed:#8a5a16;--refused:#9a2f22;--owed-quiet:rgba(138,90,22,.1);--refused-quiet:rgba(154,47,34,.1);
+  --accent:#14653a;--accent-soft:rgba(20,101,58,.09);
+  --radius:8px;--sans:Inter,ui-sans-serif,system-ui,-apple-system,sans-serif;
+  color-scheme:light;
+}
+[data-theme="dark"]{
+  --paper:#08090a;--surface:#15171a;--ink:#ecefea;--quiet:#a7ada6;--faint:#8a918a;--rule:#23272b;--rule-strong:#2d3237;--hover:#1d2126;
+  --owed:#e0a458;--refused:#e2705f;--owed-quiet:rgba(224,164,88,.12);--refused-quiet:rgba(226,112,95,.12);
+  --accent:#23a95c;--accent-soft:rgba(35,169,92,.14);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.45}
+button{font:inherit;color:inherit}
+.shell{display:grid;grid-template-columns:216px minmax(0,1fr);min-height:100vh}
+.side{padding:20px 12px;border-right:1px solid var(--rule)}
+.side__brand{padding:0 10px 18px;font-weight:600}
+.side a{display:block;padding:8px 10px;border-radius:var(--radius);color:var(--quiet);text-decoration:none;font-size:13.5px}
+.side a.on{color:var(--accent);background:var(--accent-soft)}
+.main{padding:24px 28px 64px;max-width:1240px;width:100%}
+.note{margin:0 0 18px;padding:9px 13px;border-radius:var(--radius);background:var(--owed-quiet);color:var(--owed);font-size:12.5px}
+.tabs{display:flex;gap:4px;margin:0 0 22px;border-bottom:1px solid var(--rule);overflow-x:auto}
+.tabs span,.tabs button{padding:9px 13px;font-size:13.5px;color:var(--quiet);white-space:nowrap;border:0;border-bottom:2px solid transparent;margin-bottom:-1px;background:none;cursor:pointer}
+.group{margin:20px 0 8px;font-size:12.5px;color:var(--faint)}
+.group.late{color:var(--refused)}
+.task{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--rule)}
+.task:last-child{border-bottom:0}
+.task__what{flex:1 1 260px;min-width:0}
+.task__what b{font-weight:600;font-size:13.5px}
+.task__side{display:flex;gap:12px;align-items:center;font-size:12.5px;color:var(--quiet)}
+.button--row{min-height:34px;padding:7px 11px;font-size:12.5px}
+.halves{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start;margin-bottom:16px}
+.halves h2{margin:0 0 8px}
+.plain{padding-left:0;padding-right:0}
+@media (max-width:860px){.halves{grid-template-columns:minmax(0,1fr)}}
+.dates{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+@media (max-width:860px){.dates{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.tabs .on{color:var(--accent);border-color:var(--accent)}
+.head{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:16px}
+h1{margin:0;font-size:20px;font-weight:600;letter-spacing:-.01em}
+h2{margin:0 0 12px;font-size:15px;font-weight:600}
+.sub{color:var(--quiet);font-size:13.5px}
+.button{display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:9px 13px;border:1px solid var(--rule);border-radius:var(--radius);background:transparent;font-size:13.5px;cursor:pointer}
+.button:hover{background:var(--hover)}
+.button--primary,.button--primary:hover{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+.button:focus-visible,.chip:focus-visible,.row-link:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.chip{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:8px 13px;border:1px solid var(--rule);border-radius:var(--radius);background:transparent;color:var(--quiet);font-size:13px;cursor:pointer}
+.chip--on{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+.surface{border-radius:var(--radius);background:var(--surface);overflow:hidden}
+.card{border-radius:var(--radius);background:var(--surface);padding:18px}
+.table{width:100%;border-collapse:collapse;font-size:13.5px}
+.table th,.table td{padding:10px 8px;border-bottom:1px solid var(--rule);text-align:left;vertical-align:top}
+.table th:first-child,.table td:first-child{padding-left:18px}
+.table th:last-child,.table td:last-child{padding-right:18px}
+.table th{font-size:11px;font-weight:400;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);white-space:nowrap}
+.table .numeric{text-align:right;font-variant-numeric:tabular-nums}
+.table tfoot td{font-weight:600;border-bottom:0}
+.row-link{background:none;border:0;padding:0;font-weight:600;color:var(--ink);cursor:pointer;text-align:left}
+.row-link:hover{color:var(--accent)}
+.small{font-size:12.5px;color:var(--quiet)}
+.pill{display:inline-block;padding:2px 9px;border:1px solid currentColor;border-radius:999px;font-size:11.5px;white-space:nowrap;color:var(--quiet)}
+.pill--late{color:var(--refused)}.pill--wait{color:var(--owed)}.pill--ok{color:var(--accent)}
+.late{color:var(--refused)}.warn{color:var(--owed)}.ok{color:var(--accent)}
+.steps{display:flex;gap:3px;margin-top:6px;width:120px}
+.steps i{flex:1;height:4px;border-radius:2px;background:var(--rule-strong)}
+.steps i.d{background:var(--accent)}.steps i.s{background:transparent;border:1px solid var(--rule-strong)}
+.view{display:none}.view.on{display:block}
+.back{background:none;border:0;padding:0;margin-bottom:12px;color:var(--quiet);font-size:13px;cursor:pointer}
+.next{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:16px;padding:14px 18px;border-radius:var(--radius);background:var(--accent-soft)}
+.next b{font-weight:600}
+.facts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;margin-bottom:16px;border-radius:var(--radius);overflow:hidden;background:var(--rule)}
+.facts div{background:var(--surface);padding:14px 18px}
+.facts dt{font-size:12px;color:var(--faint)}
+.facts dd{margin:2px 0 0;font-size:17px;font-weight:600;font-variant-numeric:tabular-nums}
+.cols{display:grid;grid-template-columns:340px minmax(0,1fr);gap:16px;align-items:start}
+.stack{display:grid;grid-template-columns:minmax(0,1fr);gap:16px}
+.stage{display:grid;grid-template-columns:22px minmax(0,1fr);gap:10px;padding:10px 0;border-bottom:1px solid var(--rule)}
+.stage:last-child{border-bottom:0;padding-bottom:0}
+.dot{width:18px;height:18px;margin-top:2px;border-radius:50%;border:1.5px solid var(--rule-strong);font-size:11px;line-height:15px;text-align:center;color:var(--accent)}
+.stage.done .dot{border-color:var(--accent);background:var(--accent-soft)}
+.stage.now .dot{border-color:var(--accent);background:var(--accent)}
+.stage.skip .name,.stage.todo .name{color:var(--faint)}
+.stage .name{font-size:13.5px;font-weight:600}
+.stage.todo .name,.stage.skip .name{font-weight:400}
+.flag{margin-top:12px;padding:10px 13px;border-radius:var(--radius);font-size:13px}
+.flag--owed{background:var(--owed-quiet);color:var(--owed)}
+.flag--refused{background:var(--refused-quiet);color:var(--refused)}
+.reasons{margin:12px 0 0;padding:0;list-style:none;font-size:13px;color:var(--quiet)}
+.reasons li{padding:3px 0}
+.scroll{overflow-x:auto}
+.form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 16px;max-width:760px}
+.field{display:grid;gap:5px;font-size:12.5px;color:var(--quiet)}
+.field.wide{grid-column:1/-1}
+.input{min-height:38px;padding:8px 11px;border:1px solid var(--rule-strong);border-radius:var(--radius);background:var(--surface);color:var(--ink);font:inherit;font-size:13.5px;width:100%}
+.sizes{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+.sizes label{display:grid;gap:4px;font-size:12px;color:var(--faint);text-align:center}
+.cards{display:none}
+@media (max-width:860px){
+  .shell{grid-template-columns:1fr}.side{display:none}
+  .main{padding:16px 16px 56px}
+  .cols{grid-template-columns:minmax(0,1fr)}
+  .facts{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .list-table{display:none}.cards{display:grid;gap:10px}
+  .form{grid-template-columns:minmax(0,1fr)}.form>*{min-width:0}.tabs{scrollbar-width:none}.sizes{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+</style>
+</head>
+<body>
+<div class="shell">
+  <nav class="side" aria-label="Departments">
+    <div class="side__brand">HBA</div>
+    <a href="#">Home</a><a href="#">Affiliates</a><a href="#">Operations</a><a href="#" class="on">Production</a><a href="#">Payments</a><a href="#">Settings</a>
+  </nav>
+  <main class="main">
+    <p class="note">Mockup for review. Every name, date and number is sample data.</p>
+    <div class="tabs" aria-label="Production sections"><button data-go="v-overview" data-tab>Overview</button><button class="on" data-go="v-list" data-tab>Orders</button><button data-go="v-tasks" data-tab>Tasks</button><button data-go="v-incoming" data-tab>Incoming</button><button data-go="v-suppliers" data-tab>Suppliers</button></div>
+
+    <!-- ── Overview ── -->
+    <section class="view" id="v-overview">
+      <div class="head"><div><h1>Production</h1><div class="sub">Friday 13 Nov · 5 orders in production, 3,900 pieces planned</div></div><button class="button button--primary" data-go="v-new">New order</button></div>
+      <dl class="facts">
+        <div><dt>Waiting for your decision</dt><dd class="warn">2</dd></div>
+        <div><dt>Orders running late</dt><dd class="late">2 of 5</dd></div>
+        <div><dt>Arriving in November</dt><dd>715 pieces</dd></div>
+        <div><dt>You owe suppliers</dt><dd>EGP 143,150</dd></div>
+      </dl>
+      <div class="halves">
+        <div class="card">
+          <h2>Waiting for your decision</h2>
+          <div class="task plain"><div class="task__what"><b>Approve the sample</b><div class="small">Zip hoodie · Olive · waiting 3 days, the order cannot move</div></div><div class="task__side"><button class="button button--row">Review sample</button></div></div>
+          <div class="task plain"><div class="task__what"><b>Settle with the factory</b><div class="small">Oversized hoodie · Black · after the fix pieces arrive on 17 Nov</div></div><div class="task__side"><span>after 17 Nov</span></div></div>
+        </div>
+        <div class="card">
+          <h2>Problems right now</h2>
+          <div class="task plain"><div class="task__what"><b>Oversized hoodie · Off-white is 6 days late</b><div class="small">Factory moved 20 Nov to 26 Nov · waiting in the print queue</div></div><div class="task__side"><button class="row-link" data-go="v-order">Open</button></div></div>
+          <div class="task plain"><div class="task__what"><b>Zips for the sweatpants are 2 days late</b><div class="small">Trims supplier · cutting can finish, sewing cannot start without them</div></div><div class="task__side"><button class="row-link" data-go="v-tasks">Open</button></div></div>
+          <div class="task plain"><div class="task__what"><b>1 piece missing between factory and Khazenly</b><div class="small">Oversized hoodie · Black · size M · no reason given yet</div></div><div class="task__side"><button class="row-link" data-go="v-incoming">Open</button></div></div>
+          <div class="task plain"><div class="task__what"><b>Oversized hoodie · Black costs EGP 9 more per piece than planned</b><div class="small">EGP 309 against EGP 300 · fabric and accessories</div></div><div class="task__side"><button class="row-link" data-go="v-order">Open</button></div></div>
+        </div>
+      </div>
+      <div class="group">Every order, and what happens next</div>
+      <div class="surface">
+        <div class="task"><div class="task__what"><button class="row-link" data-go="v-order">Oversized hoodie · Black</button><div class="small">9 of 10 · Warehouse receipt · 925 of 1,000 counted</div><div class="steps"><i class="d"></i><i class="s"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i></i></div></div><div class="task__side"><span>Next: 30 fix pieces · Factory</span><span class="late">17 Nov · finished 6 days late</span></div></div>
+        <div class="task"><div class="task__what"><button class="row-link" data-go="v-order">Oversized hoodie · Off-white</button><div class="small">7 of 10 · Making · 300 of 985 shipped</div><div class="steps"><i class="d"></i><i class="s"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i></i><i></i><i></i></div></div><div class="task__side"><span>Next: final inspection · QC manager</span><span class="late">26 Nov · 6 days late</span></div></div>
+        <div class="task"><div class="task__what"><button class="row-link" data-go="v-order">Wide-leg sweatpants · Grey</button><div class="small">6 of 10 · Cutting · 800 planned</div><div class="steps"><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i></i><i></i><i></i><i></i></div></div><div class="task__side"><span>Next: record cut quantities · QC manager</span><span>15 Nov · on time</span></div></div>
+        <div class="task"><div class="task__what"><button class="row-link" data-go="v-order">Boxy tee · Black</button><div class="small">3 of 10 · Materials · 600 planned</div><div class="steps"><i class="d"></i><i class="s"></i><i class="d"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div><div class="task__side"><span>Next: check fabric · QC manager</span><span>16 Nov · on time</span></div></div>
+        <div class="task"><div class="task__what"><button class="row-link" data-go="v-order">Zip hoodie · Olive</button><div class="small">2 of 10 · Sample · 500 planned</div><div class="steps"><i class="d"></i><i class="d"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div><div class="task__side"><span class="warn">Next: approve the sample · Owner</span><span class="late">3 days overdue</span></div></div>
+      </div>
+      <div class="halves" style="margin-top:16px">
+        <div class="card">
+          <h2>Arriving next</h2>
+          <div class="task plain"><div class="task__what"><b>30 fix pieces · Oversized hoodie · Black</b></div><div class="task__side"><span>17 Nov</span></div></div>
+          <div class="task plain"><div class="task__what"><b>685 pieces · Oversized hoodie · Off-white</b></div><div class="task__side"><span class="late">by 26 Nov</span></div></div>
+          <div class="task plain"><div class="task__what"><b>800 pieces · Wide-leg sweatpants · Grey</b></div><div class="task__side"><span>5 Dec</span></div></div>
+        </div>
+        <div class="card">
+          <h2>What you owe</h2>
+          <div class="task plain"><div class="task__what"><b>Fabric supplier A</b><div class="small">Rest of the fleece purchase</div></div><div class="task__side"><span>EGP 132,000</span></div></div>
+          <div class="task plain"><div class="task__what"><b>Trims supplier</b></div><div class="task__side"><span>EGP 8,400</span></div></div>
+          <div class="task plain"><div class="task__what"><b>Main factory</b><div class="small">Next weekly payment 19 Nov</div></div><div class="task__side"><span>EGP 2,750</span></div></div>
+        </div>
+      </div>
+      <p class="small">The QC manager sees this page without the money card and the cost line.</p>
+    </section>
+
+    <!-- ── Suppliers ── -->
+    <section class="view" id="v-suppliers">
+      <div class="head">
+        <div><h1>Suppliers</h1><div class="sub">14 suppliers · you owe EGP 143,150 in total</div></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="button" data-go="v-purchase">Record a purchase</button><button class="button button--primary">Add supplier</button></div>
+      </div>
+      <div class="chips">
+        <button class="chip chip--on">All · 14</button><button class="chip">Manufacturers · 2</button><button class="chip">Fabric · 4</button><button class="chip">Printing houses · 3</button><button class="chip">Accessories · 4</button><button class="chip">Packaging · 2</button><button class="chip">+ Add section</button>
+      </div>
+      <div class="surface">
+        <div class="task"><div class="task__what"><button class="row-link" data-go="v-supplier">Main factory</button><div class="small">Manufacturers, Printing houses · 5 orders open</div><div class="small">Quality 4.0 ★ · Timing 2.5 ★ · Dealing 4.5 ★ · usually 5 days late</div></div><div class="task__side"><span class="warn">You owe EGP 2,750</span></div></div>
+        <div class="task"><div class="task__what"><button class="row-link" data-go="v-supplier">Fabric supplier A</button><div class="small">Fabric · 1 purchase not fully paid</div><div class="small">Quality 4.5 ★ · Timing 4.0 ★ · Dealing 4.0 ★ · usually on time</div></div><div class="task__side"><span class="warn">You owe EGP 132,000</span></div></div>
+        <div class="task"><div class="task__what"><button class="row-link" data-go="v-supplier">Trims supplier</button><div class="small">Accessories · 1 delivery late</div><div class="small">Quality 4.0 ★ · Timing 3.0 ★ · Dealing 3.5 ★ · usually 2 days late</div></div><div class="task__side"><span class="warn">You owe EGP 8,400</span></div></div>
+        <div class="task"><div class="task__what"><button class="row-link" data-go="v-supplier">Fabric supplier B</button><div class="small">Fabric · nothing open</div><div class="small">Quality 3.5 ★ · Timing 4.5 ★ · Dealing 4.0 ★ · usually on time</div></div><div class="task__side"><span>Nothing owed</span></div></div>
+        <div class="task"><div class="task__what"><button class="row-link" data-go="v-supplier">Print house A</button><div class="small">Printing houses · nothing open</div><div class="small">Quality 4.5 ★ · Timing 3.5 ★ · Dealing 4.0 ★ · usually 1 day late</div></div><div class="task__side"><span>Nothing owed</span></div></div>
+        <div class="task"><div class="task__what"><button class="row-link" data-go="v-supplier">Packaging supplier</button><div class="small">Packaging · nothing open</div><div class="small">Not rated yet</div></div><div class="task__side"><span>Nothing owed</span></div></div>
+      </div>
+      <p class="small" style="margin-top:12px">The QC manager sees this list without amounts: names, sections, ratings and dates only.</p>
+    </section>
+
+    <!-- ── One supplier ── -->
+    <section class="view" id="v-supplier">
+      <button class="back" data-go="v-suppliers">← All suppliers</button>
+      <div class="head">
+        <div><h1>Main factory</h1><div class="sub">Manufacturers, Printing houses · paid a lump sum every week</div></div>
+        <button class="button button--primary" data-go="v-pay">Record a payment</button>
+      </div>
+      <dl class="facts">
+        <div><dt>You owe now</dt><dd class="warn">EGP 2,750</dd></div>
+        <div><dt>Held until pieces are fixed</dt><dd>EGP 3,450</dd></div>
+        <div><dt>Paid since 1 Oct</dt><dd>EGP 180,000</dd></div>
+        <div><dt>Usual lateness</dt><dd class="late">5 days</dd></div>
+      </dl>
+      <div class="stack">
+        <div class="card">
+          <h2>Account</h2>
+          <div class="scroll">
+          <table class="table">
+            <thead><tr><th>Date</th><th>What</th><th class="numeric">Amount</th><th class="numeric">You owe</th></tr></thead>
+            <tbody>
+              <tr><td>12 Nov</td><td>Weekly payment · bank transfer</td><td class="numeric">− EGP 30,000</td><td class="numeric">EGP 2,750</td></tr>
+              <tr><td>11 Nov</td><td>Oversized hoodie · Black, work done<div class="small">PO-2610-01 · after rejects and held pieces</div></td><td class="numeric">+ EGP 106,490</td><td class="numeric">EGP 32,750</td></tr>
+              <tr><td>5 Nov</td><td>Weekly payment · InstaPay</td><td class="numeric">− EGP 30,000</td><td class="numeric ok">Overpaid 73,740</td></tr>
+              <tr><td>30 Oct</td><td>Boxy tee · White, work done<div class="small">PO-2609-04 · 571 pieces</div></td><td class="numeric">+ EGP 34,260</td><td class="numeric ok">Overpaid 43,740</td></tr>
+              <tr><td>29 Oct</td><td>Weekly payment · cash</td><td class="numeric">− EGP 30,000</td><td class="numeric ok">Overpaid 78,000</td></tr>
+              <tr><td>22 Oct</td><td>Weekly payment · InstaPay</td><td class="numeric">− EGP 30,000</td><td class="numeric ok">Overpaid 48,000</td></tr>
+              <tr><td>15 Oct</td><td>Weekly payment · cash</td><td class="numeric">− EGP 30,000</td><td class="numeric ok">Overpaid 18,000</td></tr>
+              <tr><td>8 Oct</td><td>Weekly payment · bank transfer</td><td class="numeric">− EGP 30,000</td><td class="numeric">EGP 12,000</td></tr>
+              <tr><td>1 Oct</td><td>Balance brought forward</td><td class="numeric"></td><td class="numeric">EGP 42,000</td></tr>
+            </tbody>
+          </table>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Orders and ratings</h2>
+          <div class="task" style="padding-left:0;padding-right:0"><div class="task__what"><b>Oversized hoodie · Black</b><div class="small">PO-2610-01 · 6 days late · 1.6% rejected</div></div><div class="task__side"><span>Rate it when the order is settled</span></div></div>
+          <div class="task" style="padding-left:0;padding-right:0"><div class="task__what"><b>Boxy tee · White</b><div class="small">PO-2609-04 · closed 30 Oct · 2 days late · 1.2% rejected</div><div class="small">"Fixed the stitching problem quickly."</div></div><div class="task__side"><span>Quality 4 ★ · Timing 3 ★ · Dealing 5 ★</span></div></div>
+          <div class="task" style="padding-left:0;padding-right:0"><div class="task__what"><b>Oversized hoodie · Grey</b><div class="small">PO-2608-03 · closed 2 Oct · 8 days late · 2.1% rejected</div><div class="small">"Good work, but the date moved three times."</div></div><div class="task__side"><span>Quality 4 ★ · Timing 2 ★ · Dealing 4 ★</span></div></div>
+        </div>
+        <div class="card">
+          <h2>Details</h2>
+          <p class="small" style="margin:0">Contact name and phone · Cairo · sections: Manufacturers, Printing houses · notes</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Record a payment ── -->
+    <section class="view" id="v-pay">
+      <button class="back" data-go="v-supplier">← Main factory</button>
+      <div class="head"><div><h1>Record a payment to Main factory</h1><div class="sub">You owe EGP 2,750 now · owner only</div></div></div>
+      <div class="card">
+        <div class="form">
+          <label class="field">Amount, EGP<input class="input" value="30,000"></label>
+          <label class="field">Date<input class="input" value="19 Nov 2026"></label>
+          <label class="field">Paid by<select class="input"><option>Bank transfer</option><option>Cash</option><option>InstaPay</option><option>Mobile wallet</option><option>Cheque</option></select></label>
+          <label class="field">What it is<select class="input"><option>Weekly payment</option><option>Deposit</option><option>Final payment</option></select></label>
+          <label class="field wide">Note, optional<input class="input" value=""></label>
+          <label class="field wide">Receipt photo, optional<input class="input" type="file"></label>
+          <div class="wide small">After this payment the factory will be overpaid by EGP 27,250, which comes off the next finished order.</div>
+          <div class="wide"><button class="button button--primary" data-go="v-supplier">Save payment</button></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Record a purchase ── -->
+    <section class="view" id="v-purchase">
+      <button class="back" data-go="v-suppliers">← All suppliers</button>
+      <div class="head"><div><h1>Record a purchase</h1><div class="sub">Fabric, printing, accessories or packaging bought by HBA</div></div></div>
+      <div class="card">
+        <div class="form">
+          <label class="field">Supplier<select class="input"><option>Fabric supplier A</option></select></label>
+          <label class="field">For which order, optional<select class="input"><option>Oversized hoodie · Black · PO-2610-01</option></select></label>
+          <label class="field wide">What was bought<input class="input" value="Heavy fleece, black"></label>
+          <label class="field">Quantity<input class="input" value="1,075"></label>
+          <label class="field">Measured in<select class="input"><option>Kilograms</option><option>Metres</option><option>Pieces</option></select></label>
+          <label class="field">Price per kilogram, EGP<input class="input" value="160"></label>
+          <label class="field">Expected to arrive<input class="input" value="6 Oct 2026"></label>
+          <label class="field">Deposit paid now, optional<input class="input" value="40,000"></label>
+          <label class="field">Deposit paid by<select class="input"><option>Bank transfer</option><option>Cash</option><option>InstaPay</option><option>Mobile wallet</option><option>Cheque</option></select></label>
+          <div class="wide small">Total EGP 172,000. After the deposit you owe EGP 132,000, which stays on this supplier's balance until you pay it. Fabric cost for the order: EGP 172 per planned piece.</div>
+          <div class="wide"><button class="button button--primary" data-go="v-suppliers">Save purchase</button></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Incoming ── -->
+    <section class="view" id="v-incoming">
+      <div class="head">
+        <div><h1>Incoming</h1><div class="sub">2,615 pieces still to leave the factory · 300 shipped and waiting for Khazenly's count</div></div>
+        <button class="button button--primary" data-go="v-deliver">Record a delivery</button>
+      </div>
+      <dl class="facts">
+        <div><dt>Arriving in November</dt><dd>715</dd></div>
+        <div><dt>Arriving in December</dt><dd>1,900</dd></div>
+        <div><dt>Waiting for Khazenly's count</dt><dd class="warn">300</dd></div>
+        <div><dt>Counts that do not match</dt><dd class="late">1 piece</dd></div>
+      </dl>
+
+      <div class="group">Arriving next</div>
+      <div class="surface">
+        <div class="task"><div class="task__what"><b>Oversized hoodie · Black · 30 fix pieces</b><div class="small">S 5 · M 8 · L 9 · XL 5 · XXL 3</div><div class="small">PO-2610-01 · Main factory · repaired pieces</div></div><div class="task__side"><span>17 Nov</span><button class="button button--row" data-go="v-deliver">Record delivery</button></div></div>
+        <div class="task"><div class="task__what"><b>Oversized hoodie · Off-white · 685 of 985 still to come</b><div class="small">S 148 · M 296 · L 295 · XL 177 · XXL 69 cut · 300 already shipped</div><div class="small">PO-2610-02 · Main factory · arriving as pieces finish</div></div><div class="task__side"><span class="late">26 Nov · 6 days late</span><button class="button button--row" data-go="v-deliver">Record delivery</button></div></div>
+        <div class="task"><div class="task__what"><b>Wide-leg sweatpants · Grey · 800 planned</b><div class="small">S 120 · M 240 · L 240 · XL 140 · XXL 60</div><div class="small">PO-2611-01 · Main factory · being cut, final numbers after cutting</div></div><div class="task__side"><span>5 Dec</span></div></div>
+        <div class="task"><div class="task__what"><b>Boxy tee · Black · 600 planned</b><div class="small">XS 40 · S 100 · M 180 · L 160 · XL 90 · XXL 30</div><div class="small">PO-2611-02 · Main factory · waiting for fabric</div></div><div class="task__side"><span>15 Dec</span></div></div>
+        <div class="task"><div class="task__what"><b>Zip hoodie · Olive · 500 planned</b><div class="small">S 75 · M 150 · L 150 · XL 90 · XXL 35</div><div class="small">PO-2611-03 · Main factory · sample not approved yet</div></div><div class="task__side"><span>22 Dec</span></div></div>
+      </div>
+
+      <div class="group">Deliveries</div>
+      <div class="surface">
+        <div class="task"><div class="task__what"><b>Oversized hoodie · Off-white · delivery 1</b><div class="small">12 Nov · factory shipped 300 · Khazenly's count not entered yet</div></div><div class="task__side"><span class="pill pill--wait">Waiting for count</span><button class="button button--row" data-go="v-deliver">Enter Khazenly's count</button></div></div>
+        <div class="task"><div class="task__what"><b>Oversized hoodie · Black · delivery 2</b><div class="small">11 Nov · factory shipped 446 · Khazenly counted 445 · size M is 1 short</div></div><div class="task__side"><span class="pill pill--late">1 piece missing</span><button class="button button--row">Add reason</button></div></div>
+        <div class="task"><div class="task__what"><b>Oversized hoodie · Black · delivery 1</b><div class="small">9 Nov · factory shipped 480 · Khazenly counted 480</div></div><div class="task__side"><span class="pill pill--ok">Counts match</span></div></div>
+      </div>
+    </section>
+
+    <!-- ── Record a delivery ── -->
+    <section class="view" id="v-deliver">
+      <button class="back" data-go="v-incoming">← Incoming</button>
+      <div class="head"><div><h1>Delivery 2 · Oversized hoodie · Black</h1><div class="sub">PO-2610-01 · Main factory · the two counts can be entered on different days</div></div></div>
+      <div class="card">
+        <div class="form">
+          <label class="field">Date it left the factory<input class="input" value="11 Nov 2026"></label>
+          <label class="field">Date Khazenly counted it<input class="input" value="12 Nov 2026"></label>
+          <div class="field wide">Shipped from the factory, counted by the QC manager
+            <div class="sizes"><label>XS<input class="input" value="0"></label><label>S<input class="input" value="60"></label><label>M<input class="input" value="140"></label><label>L<input class="input" value="136"></label><label>XL<input class="input" value="80"></label><label>XXL<input class="input" value="30"></label></div>
+            <span>Total 446</span>
+          </div>
+          <div class="field wide">Counted by Khazenly, copied from their dashboard
+            <div class="sizes"><label>XS<input class="input" value="0"></label><label>S<input class="input" value="60"></label><label>M<input class="input" value="139" style="border-color:var(--refused)"></label><label>L<input class="input" value="136"></label><label>XL<input class="input" value="80"></label><label>XXL<input class="input" value="30"></label></div>
+            <span>Total 445</span>
+          </div>
+          <div class="wide flag flag--refused" style="margin-top:0">Size M: shipped 140, Khazenly counted 139. One piece is missing. Saving this delivery opens a task to find out why.</div>
+          <div class="wide"><button class="button button--primary" data-go="v-incoming">Save delivery</button></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Tasks ── -->
+    <section class="view" id="v-tasks">
+      <div class="head">
+        <div><h1>Tasks</h1><div class="sub">10 open · 3 overdue · 2 for today, Friday 13 Nov</div></div>
+        <button class="button button--primary">Add task</button>
+      </div>
+      <div class="chips">
+        <button class="chip chip--on">Everything · 10</button><button class="chip">Overdue · 3</button><button class="chip">QC manager · 6</button><button class="chip">Owner · 2</button><button class="chip">Waiting on suppliers · 2</button>
+      </div>
+
+      <div class="group late">Overdue</div>
+      <div class="surface">
+        <div class="task"><div class="task__what"><b>Approve the sample</b><div class="small">Zip hoodie · Olive · PO-2611-03</div></div><div class="task__side"><span>Owner</span><span class="late">10 Nov · 3 days</span><button class="button button--row">Review sample</button></div></div>
+        <div class="task"><div class="task__what"><b>Give a reason for 1 missing piece, size M</b><div class="small">Oversized hoodie · Black · PO-2610-01</div></div><div class="task__side"><span>QC manager</span><span class="late">12 Nov · 1 day</span><button class="button button--row">Add reason</button></div></div>
+        <div class="task"><div class="task__what"><b>Chase the zips delivery</b><div class="small">Wide-leg sweatpants · Grey · PO-2611-01 · waiting on Trims supplier</div></div><div class="task__side"><span>QC manager</span><span class="late">11 Nov · 2 days</span><button class="button button--row">Set new date</button></div></div>
+      </div>
+
+      <div class="group">Today</div>
+      <div class="surface">
+        <div class="task"><div class="task__what"><b>Check progress at the factory</b><div class="small">Oversized hoodie · Off-white · PO-2610-02 · stage 7, Making</div></div><div class="task__side"><span>QC manager</span><span>13 Nov</span><button class="button button--row">Report progress</button></div></div>
+        <div class="task"><div class="task__what"><b>Visit the new print house</b><div class="small">Added by hand · no order</div></div><div class="task__side"><span>QC manager</span><span>13 Nov</span><button class="button button--row">Mark done</button></div></div>
+      </div>
+
+      <div class="group">This week</div>
+      <div class="surface">
+        <div class="task"><div class="task__what"><b>Record cut quantities</b><div class="small">Wide-leg sweatpants · Grey · PO-2611-01</div></div><div class="task__side"><span>QC manager</span><span>15 Nov</span><button class="button button--row">Enter counts</button></div></div>
+        <div class="task"><div class="task__what"><b>Check fabric on arrival</b><div class="small">Boxy tee · Black · PO-2611-02</div></div><div class="task__side"><span>QC manager</span><span>16 Nov</span><button class="button button--row">Record check</button></div></div>
+        <div class="task"><div class="task__what"><b>Receive 30 fix pieces</b><div class="small">Oversized hoodie · Black · PO-2610-01 · waiting on Main factory</div></div><div class="task__side"><span>Warehouse</span><span>17 Nov</span><button class="button button--row">Record delivery</button></div></div>
+      </div>
+
+      <div class="group">Later</div>
+      <div class="surface">
+        <div class="task"><div class="task__what"><b>Final inspection</b><div class="small">Oversized hoodie · Off-white · PO-2610-02</div></div><div class="task__side"><span>QC manager</span><span>around 26 Nov</span></div></div>
+        <div class="task"><div class="task__what"><b>Settle with the factory</b><div class="small">Oversized hoodie · Black · PO-2610-01 · after the last delivery</div></div><div class="task__side"><span>Owner</span><span>after 17 Nov</span></div></div>
+      </div>
+    </section>
+
+    <!-- ── Orders list ── -->
+    <section class="view on" id="v-list">
+      <div class="head">
+        <div><h1>Production orders</h1><div class="sub">5 in production, 2 need attention</div></div>
+        <div style="display:flex;gap:8px"><button class="button" id="theme">Dark</button><button class="button button--primary" data-go="v-new">New order</button></div>
+      </div>
+      <div class="chips">
+        <button class="chip chip--on">In production · 5</button><button class="chip">Late · 2</button><button class="chip">Waiting for owner · 1</button><button class="chip">Closed · 1</button>
+      </div>
+      <div class="surface list-table">
+        <table class="table">
+          <thead><tr><th>Order</th><th>Factory</th><th>Stage</th><th class="numeric">Planned</th><th class="numeric">Received</th><th>Target date</th><th>Next action</th></tr></thead>
+          <tbody>
+            <tr><td><button class="row-link" data-go="v-order">Oversized hoodie · Black</button><div class="small">PO-2610-01</div></td><td>Main factory</td><td>9 of 10 · Warehouse receipt<div class="steps"><i class="d"></i><i class="s"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i></i></div></td><td class="numeric">1,000</td><td class="numeric">925</td><td>3 Nov<div class="small late">Finished 6 days late</div></td><td><span class="warn">30 fix pieces due 17 Nov</span><div class="small">1 piece missing a reason</div></td></tr>
+            <tr><td><button class="row-link" data-go="v-order">Oversized hoodie · Off-white</button><div class="small">PO-2610-02</div></td><td>Main factory</td><td>7 of 10 · Making<div class="steps"><i class="d"></i><i class="s"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i></i><i></i><i></i></div></td><td class="numeric">1,000</td><td class="numeric">—</td><td>20 Nov<div class="small late">Factory now says 26 Nov</div></td><td>Final inspection<div class="small">QC manager · around 26 Nov</div></td></tr>
+            <tr><td><button class="row-link" data-go="v-order">Wide-leg sweatpants · Grey</button><div class="small">PO-2611-01</div></td><td>Main factory</td><td>6 of 10 · Cutting<div class="steps"><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i></i><i></i><i></i><i></i></div></td><td class="numeric">800</td><td class="numeric">—</td><td>5 Dec<div class="small ok">On time</div></td><td>Record cut quantities<div class="small">QC manager · 15 Nov</div></td></tr>
+            <tr><td><button class="row-link" data-go="v-order">Boxy tee · Black</button><div class="small">PO-2611-02</div></td><td>Main factory</td><td>3 of 10 · Materials<div class="steps"><i class="d"></i><i class="s"></i><i class="d"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></td><td class="numeric">600</td><td class="numeric">—</td><td>15 Dec<div class="small ok">On time</div></td><td>Check fabric on arrival<div class="small">QC manager · 16 Nov</div></td></tr>
+            <tr><td><button class="row-link" data-go="v-order">Zip hoodie · Olive</button><div class="small">PO-2611-03</div></td><td>Main factory</td><td>2 of 10 · Sample<div class="steps"><i class="d"></i><i class="d"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></td><td class="numeric">500</td><td class="numeric">—</td><td>22 Dec<div class="small ok">On time</div></td><td><span class="warn">Approve the sample</span><div class="small">Owner · waiting 3 days</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="cards">
+        <div class="card"><button class="row-link" data-go="v-order">Oversized hoodie · Black</button><div class="small">PO-2610-01 · Main factory</div><div style="margin:8px 0;font-size:13.5px">9 of 10 · Warehouse receipt</div><div class="small">925 of 1,000 received · <span class="late">finished 6 days late</span></div><div class="flag flag--owed">30 fix pieces due 17 Nov</div></div>
+        <div class="card"><button class="row-link" data-go="v-order">Oversized hoodie · Off-white</button><div class="small">PO-2610-02 · Main factory</div><div style="margin:8px 0;font-size:13.5px">7 of 10 · Making</div><div class="small">1,000 planned · target 20 Nov · <span class="late">factory now says 26 Nov</span></div></div>
+        <div class="card"><button class="row-link" data-go="v-order">Zip hoodie · Olive</button><div class="small">PO-2611-03 · Main factory</div><div style="margin:8px 0;font-size:13.5px">2 of 10 · Sample</div><div class="flag flag--owed">Owner: approve the sample · waiting 3 days</div></div>
+      </div>
+    </section>
+
+    <!-- ── One order ── -->
+    <section class="view" id="v-order">
+      <button class="back" data-go="v-list">← All orders</button>
+      <div class="head">
+        <div><h1>Oversized hoodie · Black</h1><div class="sub">PO-2610-01 · Main factory · fabric bought by HBA · repeat run</div></div>
+        <span class="pill pill--wait">9 of 10 · Warehouse receipt</span>
+      </div>
+      <div class="next">
+        <div><b>Next: receive 30 fix pieces</b><div class="small">Warehouse · factory promised 17 Nov</div></div>
+        <button class="button button--primary">Record second delivery</button>
+      </div>
+      <dl class="facts">
+        <div><dt>Planned</dt><dd>1,000</dd></div>
+        <div><dt>Received so far</dt><dd>925</dd></div>
+        <div><dt>Target date</dt><dd>3 Nov</dd></div>
+        <div><dt>Finished</dt><dd class="late">9 Nov · 6 days late</dd></div>
+      </dl>
+      <div class="cols">
+        <div class="card">
+          <h2>Stages</h2>
+          <div class="stage done"><div class="dot">✓</div><div><div class="name">1 · Plan</div><div class="small">Owner · 28 Sep</div></div></div>
+          <div class="stage skip"><div class="dot"></div><div><div class="name">2 · Sample</div><div class="small">Skipped: repeat run, nothing changed</div></div></div>
+          <div class="stage done"><div class="dot">✓</div><div><div class="name">3 · Materials</div><div class="small">QC manager · ordered 30 Sep, arrived 6 Oct</div></div></div>
+          <div class="stage done"><div class="dot">✓</div><div><div class="name">4 · Fabric check</div><div class="small">Passed 9 Oct · 2 rolls returned for shade</div></div></div>
+          <div class="stage done"><div class="dot">✓</div><div><div class="name">5 · Pattern check</div><div class="small">Sizes confirmed 12 Oct</div></div></div>
+          <div class="stage done"><div class="dot">✓</div><div><div class="name">6 · Cutting</div><div class="small">972 cut on 14 Oct · factory promised 1 Nov</div></div></div>
+          <div class="stage done"><div class="dot">✓</div><div><div class="name">7 · Making</div><div class="small">Printed at the factory · finished 9 Nov</div></div></div>
+          <div class="stage done"><div class="dot">✓</div><div><div class="name">8 · Final inspection</div><div class="small">QC manager · 9 Nov · 926 passed</div></div></div>
+          <div class="stage now"><div class="dot"></div><div><div class="name">9 · Warehouse receipt</div><div class="small">925 counted 11 Nov · 30 fix pieces still at the factory</div></div></div>
+          <div class="stage todo"><div class="dot"></div><div><div class="name">10 · Settle</div><div class="small">Owner · after the last delivery</div></div></div>
+        </div>
+        <div class="stack">
+          <div class="card">
+            <h2>Pieces by size</h2>
+            <div class="scroll">
+            <table class="table">
+              <thead><tr><th>Size</th><th class="numeric">Planned</th><th class="numeric">Cut</th><th class="numeric">Passed</th><th class="numeric">To fix</th><th class="numeric">Rejected</th><th class="numeric">Khazenly counted</th></tr></thead>
+              <tbody>
+                <tr><td>S</td><td class="numeric">150</td><td class="numeric">148</td><td class="numeric">140</td><td class="numeric">5</td><td class="numeric">3</td><td class="numeric">140</td></tr>
+                <tr><td>M</td><td class="numeric">300</td><td class="numeric">292</td><td class="numeric">280</td><td class="numeric">8</td><td class="numeric">4</td><td class="numeric late">279</td></tr>
+                <tr><td>L</td><td class="numeric">300</td><td class="numeric">290</td><td class="numeric">276</td><td class="numeric">9</td><td class="numeric">5</td><td class="numeric">276</td></tr>
+                <tr><td>XL</td><td class="numeric">180</td><td class="numeric">176</td><td class="numeric">168</td><td class="numeric">5</td><td class="numeric">3</td><td class="numeric">168</td></tr>
+                <tr><td>XXL</td><td class="numeric">70</td><td class="numeric">66</td><td class="numeric">62</td><td class="numeric">3</td><td class="numeric">1</td><td class="numeric">62</td></tr>
+              </tbody>
+              <tfoot><tr><td>Total</td><td class="numeric">1,000</td><td class="numeric">972</td><td class="numeric">926</td><td class="numeric">30</td><td class="numeric">16</td><td class="numeric">925</td></tr></tfoot>
+            </table>
+            </div>
+            <ul class="reasons">
+              <li>Planned to cut, 28 fewer: fabric defects 18, not enough fabric 10</li>
+              <li>Rejected 16: stitching 9, print misplaced 5, stain 2</li>
+              <li>To fix 30: loose stitching 21, label 9. Due back 17 Nov</li>
+            </ul>
+            <div class="flag flag--refused">Size M: the factory count was 280, the warehouse counted 279. One piece needs a reason before this order can close.</div>
+          </div>
+          <div class="card">
+            <h2>Delivery date</h2>
+            <table class="table">
+              <thead><tr><th>Set on</th><th>Date</th><th>By</th><th>Reason</th></tr></thead>
+              <tbody>
+                <tr><td>28 Sep</td><td>3 Nov</td><td>Owner</td><td>Target when planned</td></tr>
+                <tr><td>14 Oct</td><td>1 Nov</td><td>Factory</td><td>Promised at cutting</td></tr>
+                <tr><td>27 Oct</td><td class="late">6 Nov</td><td>Factory</td><td>Waiting in the print queue</td></tr>
+                <tr><td>4 Nov</td><td class="late">9 Nov</td><td>Factory</td><td>Zips arrived late</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="card">
+            <h2>Cost per piece</h2>
+            <table class="table">
+              <thead><tr><th>Part</th><th class="numeric">Target</th><th class="numeric">Actual</th></tr></thead>
+              <tbody>
+                <tr><td>Fabric</td><td class="numeric">EGP 165</td><td class="numeric late">EGP 172</td></tr>
+                <tr><td>Manufacturing</td><td class="numeric">EGP 85</td><td class="numeric">EGP 85</td></tr>
+                <tr><td>Printing</td><td class="numeric">EGP 30</td><td class="numeric">EGP 30</td></tr>
+                <tr><td>Accessories</td><td class="numeric">EGP 12</td><td class="numeric late">EGP 14</td></tr>
+                <tr><td>Special packaging</td><td class="numeric">EGP 8</td><td class="numeric">EGP 8</td></tr>
+              </tbody>
+              <tfoot><tr><td>Total</td><td class="numeric">EGP 300</td><td class="numeric late">EGP 309</td></tr></tfoot>
+            </table>
+          </div>
+          <div class="card">
+            <h2>Owed to the factory for this order</h2>
+            <table class="table">
+              <tbody>
+                <tr><td>Pieces cut, 972 × EGP 115 (manufacturing and printing)</td><td class="numeric">EGP 111,780</td></tr>
+                <tr><td>Rejected, 16 × EGP 115<div class="small">HBA bought the fabric, so only the making cost comes off</div></td><td class="numeric">− EGP 1,840</td></tr>
+                <tr><td>Held until fixed, 30 × EGP 115</td><td class="numeric">− EGP 3,450</td></tr>
+              </tbody>
+              <tfoot><tr><td>Payable now</td><td class="numeric">EGP 106,490</td></tr></tfoot>
+            </table>
+            <p class="small" style="margin:12px 0 0">Added to the factory's account. Weekly payments are recorded under Suppliers.</p>
+          </div>
+          <div class="card">
+            <h2>Sample, photos and history</h2>
+            <p class="small" style="margin:0">Sample: skipped on this run; approved sample from PO-2608-03 applies. · 14 photos · 37 changes recorded.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── New order ── -->
+    <section class="view" id="v-new">
+      <button class="back" data-go="v-list">← All orders</button>
+      <div class="head"><div><h1>New production order</h1><div class="sub">One style in one colour</div></div></div>
+      <div class="card">
+        <div class="form">
+          <label class="field">Style, from the product list<select class="input"><option>Oversized hoodie</option></select></label>
+          <label class="field">Colour<select class="input"><option>Black</option></select></label>
+          <label class="field">Factory<select class="input"><option>Main factory</option></select></label>
+          <label class="field">Who buys the fabric<select class="input"><option>HBA</option><option>The factory</option></select></label>
+          <div class="field wide">Pieces per size
+            <div class="sizes">
+              <label>XS<input class="input" value="0"></label><label>S<input class="input" value="150"></label><label>M<input class="input" value="300"></label><label>L<input class="input" value="300"></label><label>XL<input class="input" value="180"></label><label>XXL<input class="input" value="70"></label>
+            </div>
+            <span>Total 1,000 pieces</span>
+          </div>
+          <label class="field">Target date<input class="input" value="3 Nov 2026"></label>
+          <label class="field">Printing<select class="input"><option>At the factory</option><option>Outside print house</option><option>No printing</option></select></label>
+          <div class="field wide">Target cost per piece, EGP
+            <div class="sizes" style="grid-template-columns:repeat(5,minmax(0,1fr))">
+              <label>Fabric<input class="input" value="165"></label><label>Manufacturing<input class="input" value="85"></label><label>Printing<input class="input" value="30"></label><label>Accessories<input class="input" value="12"></label><label>Packaging<input class="input" value="8"></label>
+            </div>
+            <span>Total EGP 300 per piece · EGP 300,000 for the order</span>
+          </div>
+          <div class="field wide">Expected date for each stage, filled in from the target date. Change any of them.
+            <div class="dates">
+              <label>Sample approved<input class="input" value="Skipped"></label><label>Materials arrive<input class="input" value="6 Oct"></label><label>Fabric check<input class="input" value="8 Oct"></label><label>Pattern check<input class="input" value="11 Oct"></label><label>Cutting<input class="input" value="13 Oct"></label><label>Making finished<input class="input" value="30 Oct"></label><label>Final inspection<input class="input" value="31 Oct"></label><label>At the warehouse<input class="input" value="3 Nov"></label>
+            </div>
+          </div>
+          <label class="field wide"><span><input type="checkbox" checked> Repeat run with nothing changed: skip the sample</span></label>
+          <div class="wide"><button class="button button--primary" data-go="v-list">Create order</button></div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+<script>
+document.addEventListener("click", function (e) {
+  var go = e.target.closest("[data-go]");
+  if (go) {
+    document.querySelectorAll(".view").forEach(function (v) { v.classList.toggle("on", v.id === go.dataset.go); });
+    document.querySelectorAll("[data-tab]").forEach(function (t) {
+      var area = { "v-tasks": "v-tasks", "v-incoming": "v-incoming", "v-deliver": "v-incoming", "v-suppliers": "v-suppliers", "v-supplier": "v-suppliers", "v-pay": "v-suppliers", "v-purchase": "v-suppliers", "v-overview": "v-overview" }[go.dataset.go] || "v-list";
+      t.classList.toggle("on", t.dataset.go === area);
+    });
+    window.scrollTo(0, 0);
+  }
+  if (e.target.id === "theme") {
+    var dark = document.documentElement.dataset.theme === "dark";
+    document.documentElement.dataset.theme = dark ? "light" : "dark";
+    e.target.textContent = dark ? "Dark" : "Light";
+  }
+});
+</script>
+</body>
+</html>
