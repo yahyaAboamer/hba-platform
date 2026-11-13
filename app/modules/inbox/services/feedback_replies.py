@@ -232,7 +232,8 @@ def closing_text(survey: FeedbackSurvey, cfg: FeedbackSettings, code: str | None
     """The last message, in the wording of ``feedback``'s constants: thanks;
     her code if she has one; the review link if she loved it and one is set;
     the invitation to write - not for an unhappy customer, whose follow-up was
-    a person's. One function, so the closing words are changed in one place.
+    a person's. After *Something else* the invitation asks what it was
+    instead. One function, so the closing words are changed in one place.
     Without a code the code line is simply absent."""
     lines = [feedback.THANKS]
     if code:
@@ -245,12 +246,21 @@ def closing_text(survey: FeedbackSurvey, cfg: FeedbackSettings, code: str | None
     if survey.rating == "loved" and review_url:
         lines.append(feedback.REVIEW_LINE.format(url=review_url))
     if survey.rating != "unhappy":
-        lines.append(feedback.INVITATION)
+        lines.append(feedback.TELL_US if _something_else(survey) else feedback.INVITATION)
     return "\n\n".join(lines)
 
 
-def support_text(cfg: FeedbackSettings) -> str:
-    return feedback.SUPPORT.format(hours=cfg.reply_hours)
+def _something_else(survey: FeedbackSurvey | None) -> bool:
+    return getattr(survey, "reason", None) == feedback.OTHER_REASON
+
+
+def support_text(cfg: FeedbackSettings, survey: FeedbackSurvey | None = None) -> str:
+    """The promise of a person. After *Something else* it also asks what went
+    wrong, so whoever writes to her already knows."""
+    words = feedback.SUPPORT.format(hours=cfg.reply_hours)
+    if _something_else(survey):
+        words += "\n\n" + feedback.TELL_US
+    return words
 
 
 def send_closing(
@@ -357,7 +367,7 @@ def _next_message(
     if parsed.step == "reason":
         if survey.rating == "unhappy":
             return send_text(
-                db, conversation, support_text(get_settings(db)),
+                db, conversation, support_text(get_settings(db), survey),
                 origin="automatic", source_ref=reference, client=client,
             )
         return send_closing(
