@@ -274,3 +274,70 @@ export type TaskList = { today: string; counts: TaskCounts; tasks: Task[] };
 
 /** What a write to a hand-added task answers with. */
 export type TaskAnswer = { task: ManualTask };
+
+// ── Incoming (`app/modules/production/orders/services/incoming.py`) ──────────
+// No money in any of it, for anybody.
+
+/** Pieces per size (every size, zero where there are none) and in total. */
+export type IncomingCounts = { sizes: Record<Size, number>; total: number };
+
+export type IncomingArrival = {
+  key: string;
+  /** Finished pieces still to leave the factory, or pieces sent back for fixing. */
+  kind: "finished" | "fix";
+  order: TaskOrder;
+  factory: string | null;
+  /** Which count `expected` comes from; `null` for fix pieces. */
+  basis: "planned" | "cut" | "passed" | null;
+  expected: IncomingCounts;
+  shipped: IncomingCounts;
+  to_come: IncomingCounts;
+  due: string;
+  late_days: number;
+  stage: { key: StageKey; label: string; position: number } | null;
+  status_words: string;
+  /** The order's own delivery form would accept a delivery now. */
+  can_record: boolean;
+};
+
+export type DeliveryState = "waiting_for_count" | "mismatch" | "explained" | "match";
+
+export type IncomingDelivery = {
+  id: number;
+  order: TaskOrder;
+  number: number;
+  kind: DeliveryKind;
+  shipped_on: string;
+  counted_on: string | null;
+  /** Only the sizes the delivery holds. */
+  shipped: Partial<Record<Size, number>>;
+  shipped_total: number;
+  /** Only the sizes Khazenly has counted; empty until the count date is entered. */
+  counted: Partial<Record<Size, number>>;
+  counted_total: number | null;
+  state: DeliveryState;
+  /** Counted minus shipped, signed; `null` unless the counts differ. */
+  difference: number | null;
+  missing: number;
+  extra: number;
+  sizes_differ: { size: Size; shipped: number; counted: number; difference: number }[];
+  /** The reason somebody gave, when the counts differ and one was given. */
+  reason: string | null;
+};
+
+export type IncomingMonth = { month: string; label: string; pieces: number };
+
+export type IncomingTotals = {
+  to_come_total: number;
+  this_month: IncomingMonth;
+  next_month: IncomingMonth;
+  waiting_for_count: number;
+  mismatch_pieces: number;
+};
+
+export type Incoming = {
+  today: string;
+  totals: IncomingTotals;
+  arrivals: IncomingArrival[];
+  deliveries: IncomingDelivery[];
+};

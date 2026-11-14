@@ -422,7 +422,7 @@ describe("The Tasks tab", () => {
     const link = await within(tabs).findByRole("link", { name: "Tasks 2 overdue" });
     expect(link.getAttribute("href")).toBe("/production/next/tasks");
     // Between Orders and Stage days.
-    expect(within(tabs).getAllByRole("link").map((item) => item.textContent)).toEqual(["Orders", "Tasks 2 overdue", "Stage days"]);
+    expect(within(tabs).getAllByRole("link").map((item) => item.textContent)).toEqual(["Orders", "Tasks 2 overdue", "Incoming", "Stage days"]);
   });
 
   it("shows no count when nothing is overdue, and survives the count not loading", async () => {

@@ -184,7 +184,7 @@ def test_after_inspection_pieces_to_come_and_fix_pieces_are_two_tasks(owner):
     pieces = next(task for task in tasks if task["key"].endswith(":stage:warehouse"))
     fix = next(task for task in tasks if task["key"].endswith(":fix"))
     assert (pieces["title"], pieces["who"], pieces["open"]) == ("Receive 926 pieces", "factory", "delivery")
-    assert (fix["title"], fix["who"], fix["open"], fix["stage"]) == ("Receive 30 fix pieces", "factory", "delivery", "warehouse")
+    assert (fix["title"], fix["who"], fix["open"], fix["stage"]) == ("Receive 30 fix pieces", "factory", "delivery:fix", "warehouse")
     for task in tasks:
         assert task["waiting_on"] == "Main factory"
         assert task["due"] == TARGET.isoformat()

@@ -127,6 +127,8 @@ const OWNER_FORMS = new Set(["sample", "settle"]);
 const formKind = (open: string): string => open.split(":")[0];
 
 function formWords(open: string): string | null {
+  // A new delivery of one kind (fix pieces coming back, or finished pieces), not a count on an existing one.
+  if (open === "delivery:fix" || open === "delivery:finished") return FORM_WORDS.delivery;
   if (open.startsWith("delivery:")) return FORM_WORDS["delivery:count"];
   if (open.startsWith("delivery-reason:")) return FORM_WORDS["delivery-reason"];
   return FORM_WORDS[open] ?? null;

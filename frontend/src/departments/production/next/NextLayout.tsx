@@ -8,12 +8,14 @@ import type { ProdTab } from "./ProdTabs";
 import type { TaskList } from "./types";
 
 const TASKS = "/production/next/tasks";
+const INCOMING = "/production/next/incoming";
 
-/** The tabs that exist so far. Later batches (Incoming, Suppliers, Overview) add theirs here. */
+/** The tabs that exist so far. Later batches (Suppliers, Overview) add theirs here. */
 export function prodTabs(overdue: number): readonly ProdTab[] {
   return [
     { to: "/production/next/orders", label: "Orders" },
     { to: TASKS, label: "Tasks", count: overdue, countLabel: `${overdue} overdue` },
+    { to: INCOMING, label: "Incoming" },
     { to: "/production/next/settings", label: "Stage days" },
   ];
 }

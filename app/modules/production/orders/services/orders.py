@@ -1509,7 +1509,7 @@ def _order_tasks(facts: Facts, factory: str | None, on: date) -> list[dict]:
         found.append(
             task(
                 f"order:{order.id}:fix", f"Receive {_plural(facts.fix_not_returned, 'fix piece')}", "factory",
-                _day(order.delivery_date), "warehouse", _day(facts.stages["final_inspection"].done_on), "delivery",
+                _day(order.delivery_date), "warehouse", _day(facts.stages["final_inspection"].done_on), "delivery:fix",
             )
         )
     return found

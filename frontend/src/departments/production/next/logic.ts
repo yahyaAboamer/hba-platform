@@ -459,6 +459,10 @@ export function panelFromOpen(open: string | null, order: OrderView, powers: Pow
     }
     case "delivery": {
       if (!canEdit) return null;
+      // `delivery:fix` and `delivery:finished` open a new delivery of that kind (Incoming's rows name
+      // theirs, so fix pieces are not mistaken for finished ones); a number is an existing delivery.
+      if (argument === "fix") return (order.fix_not_returned ?? 0) > 0 ? { kind: "delivery", id: null, deliveryKind: "fix" } : null;
+      if (argument === "finished") return finishedToCome(order) > 0 ? { kind: "delivery", id: null, deliveryKind: "finished" } : null;
       if (argument === undefined) {
         // A new delivery: of finished pieces while any are still to come, else of fix pieces.
         if (finishedToCome(order) > 0) return { kind: "delivery", id: null, deliveryKind: "finished" };
