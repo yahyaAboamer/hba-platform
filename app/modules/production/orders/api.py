@@ -420,6 +420,9 @@ def remove_file(file_id: int, actor: UserAccount = Depends(EDIT), db: Session = 
         files.remove(db, file_id, actor)
     except LookupError as exc:
         raise HTTPException(404, str(exc)) from None
+    except orders.Refused as exc:
+        db.rollback()
+        raise _refused(exc) from None
     db.commit()
     return {"deleted": file_id}
 

@@ -14,13 +14,19 @@ from sqlalchemy.orm import Session
 from app.core.businesstime import utcnow
 from app.modules.inbox.public import file_bucket
 from app.modules.production.orders.models import STAGE_LABELS, STAGES, ProdOrder, ProdOrderFile
-from app.modules.production.orders.services.orders import Refused, _audit, _iso, _people
+from app.modules.production.orders.services.orders import Locked, Refused, _audit, _iso, _people
 from app.modules.production.services.files import MAX_BYTES, image_type
 from app.shared.models.identity import UserAccount
 
 __all__ = ["MAX_BYTES", "add", "for_download", "listing", "remove"]
 
 PDF = "application/pdf"
+
+
+def _must_be_open(order: ProdOrder) -> None:
+    """A closed or cancelled order keeps the files it closed with."""
+    if order.status != "open":
+        raise Locked(f"{order.code} is {order.status}: its files can no longer be changed.")
 
 
 def file_type(content: bytes) -> str | None:
@@ -67,6 +73,7 @@ def add(
     order = db.get(ProdOrder, order_id)
     if order is None:
         raise LookupError("There is no such production order.")
+    _must_be_open(order)
     stage = (stage or "").strip() or None
     if stage is not None and stage not in STAGES:
         raise Refused(f"{stage} is not a stage.")
@@ -101,6 +108,7 @@ def remove(db: Session, file_id: int, actor: UserAccount) -> None:
     row = for_download(db, file_id)
     if row is None:
         raise LookupError("There is no such file.")
-    row.deleted_at = utcnow()
     order = db.get(ProdOrder, row.order_id)
+    _must_be_open(order)
+    row.deleted_at = utcnow()
     _audit(db, order, actor, "file_removed", f"Removed {row.name} from {order.code}", file=row.id)
