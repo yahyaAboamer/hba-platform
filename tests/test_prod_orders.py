@@ -797,6 +797,22 @@ def bucket(monkeypatch):
     return store
 
 
+def test_an_order_that_is_not_open_keeps_its_files(owner, staff, viewer, bucket):
+    oid = _new(owner)["id"]
+    url = f"/api/prod/orders/{oid}/files"
+    photo = staff.post(url, files={"file": ("front.png", PNG, "image/png")}).json()["file"]
+    _ok(owner.post(f"/api/prod/orders/{oid}/cancel", json={"reason": "Style dropped"}))
+
+    assert staff.post(url, files={"file": ("late.png", PNG, "image/png")}).status_code == 409
+    assert owner.post(url, files={"file": ("late.png", PNG, "image/png")}).status_code == 409
+    assert staff.delete(photo["url"]).status_code == 409
+    assert owner.delete(photo["url"]).status_code == 409
+    # Still there, and still readable.
+    assert [f["name"] for f in viewer.get(url).json()["files"]] == ["front.png"]
+    assert viewer.get(photo["url"]).status_code == 200
+    assert len(bucket.files) == 1
+
+
 def test_files_are_kept_served_to_production_and_removed(owner, staff, viewer, bucket):
     oid = _new(owner)["id"]
     url = f"/api/prod/orders/{oid}/files"
@@ -817,7 +833,8 @@ def test_files_are_kept_served_to_production_and_removed(owner, staff, viewer, b
     served = viewer.get(photo["url"])
     assert served.status_code == 200 and served.content == PNG
     assert served.headers["x-content-type-options"] == "nosniff"
-    assert served.headers["cache-control"] == "private, max-age=300"
+    # The app marks every /api response no-store (app/main.py), a file included.
+    assert served.headers["cache-control"] == "no-store"
     assert _person("cs@example.com", "customer_service").get(photo["url"]).status_code == 403
     assert owner.get(f"/api/prod/orders/{oid}").json()["order"]["files_count"] == 2
 
