@@ -87,7 +87,11 @@ five sub-tabs; sample data). The owner approved each sub-tab in turn.
    order it is for and an optional deposit; the rest stays on the balance
    with no due date. A payment records amount, date, method (bank transfer,
    cash, InstaPay, mobile wallet, cheque), kind, and an optional note and
-   receipt photo. Only owners record payments. **The QC manager never sees
+   receipt photo. Only owners record payments. The account is append-only:
+   a wrong line is reversed, never edited. Until an order is settled, what
+   it has earned so far counts in what is owed but is not yet a line;
+   settling writes the line. A purchase suggests the order's actual cost
+   per piece and never sets it by itself. **The QC manager never sees
    money**: no prices, costs, balances or payments, on any screen.
 
 10. **Ratings.** When an order is settled the owner rates each supplier on

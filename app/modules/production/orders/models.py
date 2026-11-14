@@ -14,6 +14,7 @@ with ``deleted_at``, an order is cancelled rather than removed.
 """
 
 from datetime import date, datetime
+from decimal import Decimal
 
 from sqlalchemy import (
     BigInteger,
@@ -24,10 +25,12 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    Numeric,
     String,
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -361,5 +364,152 @@ class ProdTask(Base):
     done_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     done_by: Mapped[int | None] = _user()
     created_by: Mapped[int | None] = _user()
+    created_at: Mapped[datetime] = _created()
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+# ── Suppliers (batch 4; build plan 2026-11-14-production-suppliers-build.md) ──
+
+PURCHASE_UNITS = ("kg", "m", "piece")
+#: What a purchase is part of. ``other`` belongs to none of an order's cost parts.
+PURCHASE_PARTS = ("fabric", "printing", "accessories", "packaging", "other")
+ENTRY_KINDS = ("opening", "purchase", "work", "payment", "adjustment")
+PAY_METHODS = ("bank_transfer", "cash", "instapay", "wallet", "cheque")
+PAY_KINDS = ("weekly", "deposit", "final")
+
+
+class ProdSection(Base):
+    """One of the owner's supplier sections. Removed with ``deleted_at``."""
+
+    __tablename__ = "prod_section"
+    __table_args__ = (
+        UniqueConstraint("name", name="prod_section_name_unique"),
+        CheckConstraint("char_length(name) BETWEEN 1 AND 60", name="prod_section_name_length"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(60), nullable=False)
+    position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_by: Mapped[int | None] = _user()
+    created_at: Mapped[datetime] = _created()
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ProdSupplierSection(Base):
+    """A supplier may be in several sections, or none."""
+
+    __tablename__ = "prod_supplier_section"
+    __table_args__ = (UniqueConstraint("supplier_id", "section_id", name="prod_supplier_section_once"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    supplier_id: Mapped[str] = mapped_column(String(80), ForeignKey("production_supplier.id"), nullable=False)
+    section_id: Mapped[int] = mapped_column(Integer, ForeignKey("prod_section.id"), nullable=False)
+
+
+class ProdPurchase(Base):
+    """Something HBA bought from a supplier. Its price, quantity, unit,
+    supplier and order are never edited: a mistake is voided (``voided_at``)
+    and the account reversed. **Money, the owner's alone.**"""
+
+    __tablename__ = "prod_purchase"
+    __table_args__ = (
+        CheckConstraint("char_length(item) BETWEEN 1 AND 200", name="prod_purchase_item_length"),
+        CheckConstraint("quantity > 0", name="prod_purchase_quantity_positive"),
+        CheckConstraint(f"unit IN ({_in(PURCHASE_UNITS)})", name="prod_purchase_unit_valid"),
+        CheckConstraint("unit_price_piastres > 0", name="prod_purchase_unit_price_positive"),
+        CheckConstraint("total_piastres > 0", name="prod_purchase_total_positive"),
+        CheckConstraint(f"cost_part IN ({_in(PURCHASE_PARTS)})", name="prod_purchase_part_valid"),
+        CheckConstraint("(voided_at IS NULL) = (void_reason IS NULL)", name="prod_purchase_void_whole"),
+        Index("ix_prod_purchase_supplier", "supplier_id"),
+        Index("ix_prod_purchase_order", "order_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    supplier_id: Mapped[str] = mapped_column(String(80), ForeignKey("production_supplier.id"), nullable=False)
+    order_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("prod_order.id"))
+    item: Mapped[str] = mapped_column(String(200), nullable=False)
+    quantity: Mapped[Decimal] = mapped_column(Numeric(12, 3), nullable=False)
+    unit: Mapped[str] = mapped_column(String(5), nullable=False)
+    unit_price_piastres: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    #: quantity x unit price, rounded half up to a whole piastre, by the server.
+    total_piastres: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    cost_part: Mapped[str] = mapped_column(String(12), nullable=False)
+    expected_on: Mapped[date | None] = mapped_column(Date)
+    received_on: Mapped[date | None] = mapped_column(Date)
+    note: Mapped[str | None] = mapped_column(Text)
+    voided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    voided_by: Mapped[int | None] = _user()
+    void_reason: Mapped[str | None] = mapped_column(Text)
+    created_by: Mapped[int | None] = _user()
+    created_at: Mapped[datetime] = _created()
+
+
+class ProdSupplierEntry(Base):
+    """One line of a supplier's account. **Append-only**: a database trigger
+    refuses UPDATE and DELETE; a mistake is undone by a reversing line
+    (``reverses_id``). ``amount_piastres`` is signed: positive means HBA owes
+    more, negative means HBA owes less. **Money, the owner's alone.**"""
+
+    __tablename__ = "prod_supplier_entry"
+    __table_args__ = (
+        CheckConstraint(f"kind IN ({_in(ENTRY_KINDS)})", name="prod_supplier_entry_kind_valid"),
+        CheckConstraint("amount_piastres <> 0", name="prod_supplier_entry_amount_not_zero"),
+        CheckConstraint(
+            f"method IS NULL OR method IN ({_in(PAY_METHODS)})", name="prod_supplier_entry_method_valid"
+        ),
+        CheckConstraint(
+            f"payment_kind IS NULL OR payment_kind IN ({_in(PAY_KINDS)})",
+            name="prod_supplier_entry_payment_kind_valid",
+        ),
+        CheckConstraint(
+            "(kind = 'payment') = (method IS NOT NULL AND payment_kind IS NOT NULL)",
+            name="prod_supplier_entry_payment_shape",
+        ),
+        CheckConstraint("kind <> 'work' OR order_id IS NOT NULL", name="prod_supplier_entry_work_has_order"),
+        CheckConstraint(
+            "kind <> 'purchase' OR purchase_id IS NOT NULL", name="prod_supplier_entry_purchase_has_purchase"
+        ),
+        CheckConstraint(
+            "kind <> 'adjustment' OR note IS NOT NULL", name="prod_supplier_entry_adjustment_has_note"
+        ),
+        UniqueConstraint("reverses_id", name="prod_supplier_entry_reversed_once"),
+        Index("ix_prod_supplier_entry_supplier", "supplier_id", "happened_on", "id"),
+        Index("ix_prod_supplier_entry_purchase", "purchase_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    supplier_id: Mapped[str] = mapped_column(String(80), ForeignKey("production_supplier.id"), nullable=False)
+    kind: Mapped[str] = mapped_column(String(10), nullable=False)
+    amount_piastres: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    happened_on: Mapped[date] = mapped_column(Date, nullable=False)
+    order_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("prod_order.id"))
+    purchase_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("prod_purchase.id"))
+    method: Mapped[str | None] = mapped_column(String(14))
+    payment_kind: Mapped[str | None] = mapped_column(String(10))
+    note: Mapped[str | None] = mapped_column(Text)
+    reverses_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("prod_supplier_entry.id"))
+    created_by: Mapped[int | None] = _user()
+    created_at: Mapped[datetime] = _created()
+
+
+class ProdSupplierReceipt(Base):
+    """An optional photo of a payment, in the file bucket under
+    ``production/suppliers/{supplier_id}/``. Replaced or removed with
+    ``deleted_at``; at most one is live per payment."""
+
+    __tablename__ = "prod_supplier_receipt"
+    __table_args__ = (
+        CheckConstraint("size_bytes >= 0", name="prod_supplier_receipt_size_not_negative"),
+        Index(
+            "uq_prod_supplier_receipt_live", "entry_id", unique=True, postgresql_where=text("deleted_at IS NULL")
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    entry_id: Mapped[int] = mapped_column(Integer, ForeignKey("prod_supplier_entry.id"), nullable=False)
+    storage_key: Mapped[str] = mapped_column(String(300), nullable=False)
+    mime_type: Mapped[str] = mapped_column(String(120), nullable=False)
+    size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
+    uploaded_by: Mapped[int | None] = _user()
     created_at: Mapped[datetime] = _created()
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

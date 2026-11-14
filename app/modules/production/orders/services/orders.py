@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session
 
 from app.core.businesstime import business_date, utcnow
 from app.modules.production.models import ProductionSupplier, ProductionSupplierCategory
+from app.modules.production.orders.services import account
 from app.modules.production.orders.models import (
     COST_PARTS,
     DEFAULT_STAGE_DAYS,
@@ -1237,12 +1238,22 @@ def settle(db: Session, order_id: int, actor: UserAccount) -> ProdOrder:
     _earlier_done(facts, "settle")
     if any(d.needs_reason for d in facts.deliveries):
         raise Refused("A delivery's counts do not match and have no reason yet.")
+    # The order is locked (by ``_open``); now the factory, always in that order.
+    account.lock_supplier(db, order.factory_id)
     figures = settlement(facts)
     order.settled_payable_piastres = figures["payable_piastres"]
     order.settled_at = utcnow()
     order.settled_by = actor.id
     order.status = "closed"
     _mark_done(stage, actor, today())
+    # What the factory is owed becomes a line of its account, in this same
+    # transaction: dated today, tied to the order, and negative when the
+    # rejects came to more than the work. A payable of nothing writes none.
+    if figures["payable_piastres"] != 0:
+        account.append(
+            db, supplier_id=order.factory_id, kind="work", amount=figures["payable_piastres"],
+            happened_on=today(), order_id=order.id, actor_id=actor.id,
+        )
     _touch(order)
     _audit(db, order, actor, "settled", f"Settled {order.code} with the factory and closed it")
     return order
@@ -1526,6 +1537,8 @@ def generated_tasks(db: Session, on: date | None = None) -> list[dict]:
     found: list[dict] = []
     for order in open_orders:
         found.extend(_order_tasks(facts[order.id], factories.get(order.factory_id), on))
+    # Purchases still to arrive (batch 4): chased when late, checked on arrival.
+    found.extend(account.purchase_tasks(db, on))
     return found
 
 
@@ -1719,6 +1732,13 @@ def view(db: Session, order_id: int, *, with_money: bool) -> dict:
     }
     if with_money:
         body["cost"] = cost(order)
+        # What the purchases tied to this order say each part costs per piece:
+        # over the pieces cut once cutting is done, else over those planned.
+        cut_done = facts.done("cutting")
+        body["cost"]["from_purchases"] = account.from_purchases(
+            db, order.id, facts.total("cut") if cut_done else facts.total("planned"),
+            "cut" if cut_done else "planned",
+        )
         body["settlement"] = settlement(facts) if facts.done("cutting") else None
     return body
 
