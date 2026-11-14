@@ -36,6 +36,11 @@
 .prod-tabs a:hover { color: var(--ink); }
 .prod-tabs a[aria-current="page"] { color: var(--accent); border-bottom-color: var(--accent); }
 .prod-tabs a:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+/* The Tasks tab's overdue count, in words so it is never colour alone. */
+.prod-tabs__count {
+  margin-left: 8px; padding: 1px 8px; border-radius: 999px; background: var(--refused-quiet); color: var(--refused);
+  font-size: 11.5px; line-height: 1.5; font-variant-numeric: tabular-nums;
+}
 
 .prod-screen .page__title h1 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
 .prod-screen h2 { margin: 0 0 12px; font-size: 15px; font-weight: 600; }
@@ -189,6 +194,23 @@
 .prod-owner__row { display: flex; flex-wrap: wrap; gap: 8px; }
 .prod-decision { padding: 0; margin: 0; border: 0; display: flex; flex-wrap: wrap; gap: 8px; }
 
+/* ── Tasks ── */
+.prod-screen .prod-group { margin: 22px 0 8px; font-size: 12.5px; font-weight: 400; color: var(--faint); }
+.prod-screen .prod-group--late { color: var(--refused); }
+.prod-tasks { margin: 0; padding: 0; list-style: none; }
+.prod-task {
+  display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between;
+  padding: 12px 18px; border-bottom: 1px solid var(--rule);
+}
+.prod-task:last-child { border-bottom: 0; }
+.prod-task__what { flex: 1 1 260px; min-width: 0; }
+.prod-task b { font-weight: 600; font-size: 13.5px; overflow-wrap: anywhere; }
+.prod-task__note { margin-top: 2px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.prod-task__side { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; font-size: 12.5px; color: var(--quiet); }
+.prod-task--done b { font-weight: 400; color: var(--quiet); text-decoration: line-through; }
+.prod-task--narrow { display: grid; gap: 6px; justify-content: stretch; }
+.prod-task__actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 12.5px; color: var(--quiet); }
+
 /* ── Phone: one column; touch targets of 44px. ── */
 @media (max-width: 860px) {
   .prod-screen { padding: 16px 16px 56px; }
@@ -205,5 +227,6 @@
   .prod-screen .button, .prod-screen .button--row, .prod-screen .button--quiet, .prod-screen .chip { min-height: 44px; }
   .prod-screen .input { min-height: 44px; font-size: 16px; }
   .prod-tabs a { min-height: 44px; }
+  .prod-task { padding: 14px 16px; }
   .prod-nextbar .button { width: 100%; }
 }

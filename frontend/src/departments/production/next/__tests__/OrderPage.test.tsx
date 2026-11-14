@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { productionNextRoutes } from "../routes";
@@ -595,5 +595,111 @@ describe("Slow and out-of-order answers", () => {
     });
     expect(screen.queryByRole("heading", { level: 1, name: "Late hoodie · Black" })).toBeNull();
     expect(screen.getByRole("heading", { level: 1, name: "Boxy tee · Black" })).toBeTruthy();
+  });
+});
+
+describe("A form opened from a task (`?open=`)", () => {
+  /** The order page at an address, with the address on show so a test can see it cleared. */
+  function renderWith(address: string, session = qc()) {
+    function Where() {
+      const location = useLocation();
+      return <output data-testid="where">{location.pathname + location.search}</output>;
+    }
+    render(
+      <MemoryRouter initialEntries={[address]}>
+        <Routes>
+          <Route path="/production">{productionNextRoutes(session)}</Route>
+        </Routes>
+        <Where />
+      </MemoryRouter>,
+    );
+  }
+  const where = () => screen.getByTestId("where").textContent;
+  const panel = () => document.querySelector(".prod-panel");
+
+  it("opens that form once the order has loaded, and clears the address", async () => {
+    serve(makeOrder("cutting"));
+    renderWith(`${ADDRESS}?open=cut`);
+    expect(await screen.findByRole("heading", { level: 2, name: "Record cut quantities" })).toBeTruthy();
+    expect(where()).toBe(ADDRESS);
+    // The panel has focus, as when a button opened it.
+    await waitFor(() => expect(document.activeElement?.textContent).toBe("Record cut quantities"));
+  });
+
+  it("opens a stage's own form, the fabric check's and a delivery's", async () => {
+    serve(makeOrder("making"));
+    renderWith(`${ADDRESS}?open=stage:making`);
+    expect(await screen.findByRole("heading", { level: 2, name: /Mark making finished|Making/ })).toBeTruthy();
+    expect(where()).toBe(ADDRESS);
+    cleanup();
+
+    serve(makeOrder("fabric_check"));
+    renderWith(`${ADDRESS}?open=stage:fabric_check`);
+    expect(await screen.findByRole("group", { name: "Result" })).toBeTruthy();
+    cleanup();
+
+    const delivery: Delivery = {
+      id: 11, number: 2, kind: "finished", shipped_on: "2030-10-01", counted_on: "2030-10-01", mismatch_reason: null,
+      sizes: [{ size: "S", shipped: 10, counted: 10 }, { size: "M", shipped: 20, counted: 19 }],
+      shipped_total: 30, counted_total: 29, waiting_for_count: false, mismatch: true, needs_reason: true,
+    };
+    serve(makeOrder("warehouse", { sizes: [{ cut: 10, passed: 10 }, { cut: 20, passed: 20 }], deliveries: [delivery] }));
+    renderWith(`${ADDRESS}?open=delivery-reason:11`);
+    expect(await screen.findByRole("heading", { level: 2, name: "Delivery 2" })).toBeTruthy();
+    expect(screen.getByLabelText("Why the counts differ")).toBeTruthy();
+    expect(where()).toBe(ADDRESS);
+  });
+
+  it("opens the owner's forms for the owner", async () => {
+    serve(makeOrder("settle", { money: true }));
+    renderWith(`${ADDRESS}?open=settle`, owner());
+    expect(await screen.findByRole("heading", { level: 2, name: /Settle/ })).toBeTruthy();
+  });
+
+  it("opens nothing for a form this person may not use, but still clears the address", async () => {
+    serve(makeOrder("settle"));
+    renderWith(`${ADDRESS}?open=settle`);
+    await screen.findByRole("heading", { level: 1, name: "Oversized hoodie · Black" });
+    expect(panel()).toBeNull();
+    expect(where()).toBe(ADDRESS);
+    cleanup();
+
+    serve(makeOrder("cutting"));
+    const reader = qc();
+    reader.permissions = ["production.view"];
+    renderWith(`${ADDRESS}?open=cut`, reader);
+    await screen.findByRole("heading", { level: 1, name: "Oversized hoodie · Black" });
+    expect(panel()).toBeNull();
+    expect(where()).toBe(ADDRESS);
+  });
+
+  it("opens nothing for work the order has moved past, or a value it does not know", async () => {
+    serve(makeOrder("final_inspection"));
+    renderWith(`${ADDRESS}?open=cut`);
+    await screen.findByRole("heading", { level: 1, name: "Oversized hoodie · Black" });
+    expect(panel()).toBeNull();
+    cleanup();
+
+    serve(makeOrder("cutting"));
+    renderWith(`${ADDRESS}?open=nonsense`);
+    await screen.findByRole("heading", { level: 1, name: "Oversized hoodie · Black" });
+    expect(panel()).toBeNull();
+    expect(where()).toBe(ADDRESS);
+  });
+
+  it("opens it once: closing it does not bring it back, and an ordinary visit opens nothing", async () => {
+    serve(makeOrder("cutting"));
+    renderWith(`${ADDRESS}?open=cut`);
+    await screen.findByRole("heading", { level: 2, name: "Record cut quantities" });
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(panel()).toBeNull();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(panel()).toBeNull();
+    cleanup();
+
+    serve(makeOrder("cutting"));
+    renderWith(ADDRESS);
+    await screen.findByRole("heading", { level: 1, name: "Oversized hoodie · Black" });
+    expect(panel()).toBeNull();
   });
 });

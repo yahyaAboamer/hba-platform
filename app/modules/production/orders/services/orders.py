@@ -395,12 +395,18 @@ def save_stage_days(db: Session, changes: dict[str, int], actor: UserAccount) ->
         )
 
 
-def fill_dates(target: date, days: dict[str, int], skipped: frozenset[str] = frozenset()) -> dict[str, date | None]:
+def fill_dates(
+    target: date, days: dict[str, int], skipped: frozenset[str] = frozenset(), not_before: date | None = None
+) -> dict[str, date | None]:
     """Each stage's expected date, backwards from the target date.
 
     ``warehouse`` is the target date; each earlier stage is the next stage's
     expected date minus the next stage's days; ``settle`` is the target date
     plus its days. A skipped stage has no date and takes no days.
+
+    With ``not_before`` (the day the order is made) no stage is expected
+    before that day: a target date too near for the usual days would
+    otherwise make an order that is weeks overdue the moment it is saved.
     """
     dates: dict[str, date | None] = {
         "warehouse": target,
@@ -413,6 +419,10 @@ def fill_dates(target: date, days: dict[str, int], skipped: frozenset[str] = fro
             continue
         dates[key] = dates[following] - timedelta(days=days[following])
         following = key
+    if not_before is not None:
+        for key, day in dates.items():
+            if day is not None and day < not_before:
+                dates[key] = not_before
     return dates
 
 
@@ -524,7 +534,7 @@ def create(db: Session, data: dict, actor: UserAccount) -> ProdOrder:
             db.add(ProdOrderSize(order_id=order.id, size=size, planned=planned[size]))
 
     skipped = frozenset({"sample"}) if repeat else frozenset()
-    dates = fill_dates(target, stage_days(db), skipped)
+    dates = fill_dates(target, stage_days(db), skipped, not_before=today())
     overrides = data.get("expected_dates") or {}
     for key, day in overrides.items():
         if key not in STAGES:
@@ -1398,6 +1408,125 @@ def flags(facts: Facts, on: date) -> dict:
         "count_mismatch": any(d.needs_reason for d in facts.deliveries),
         "fix_pieces_due": open_ and facts.done("final_inspection") and facts.fix_not_returned > 0,
     }
+
+
+# ── Tasks, generated and never stored (batch 2) ──────────────────────────────
+
+#: Which form of the order page each stage's work is done in (``open``, below).
+_STAGE_FORM = {
+    "materials": "stage:materials",
+    "fabric_check": "stage:fabric_check",
+    "pattern_check": "stage:pattern_check",
+    "making": "stage:making",
+    "cutting": "cut",
+    "final_inspection": "inspection",
+    "settle": "settle",
+}
+
+
+def _said_by_a_delivery_task(facts: Facts) -> bool:
+    """Whether the warehouse stage's next action is work that one of the
+    delivery tasks below already says, per delivery: a reason to give, a
+    count to enter, or fix pieces to receive. Mirrors the branch order of
+    ``next_action`` so each piece of work is one task, never two."""
+    if any(d.needs_reason or d.waiting_for_count for d in facts.deliveries):
+        return True
+    to_come = max(0, facts.total("passed") - facts.shipped("finished"))
+    return not to_come and facts.fix_not_returned > 0
+
+
+def _difference_words(delivery: Delivery) -> str:
+    short = sum(max(0, r.shipped - r.counted) for r in delivery.sizes.values() if r.counted is not None)
+    over = sum(max(0, r.counted - r.shipped) for r in delivery.sizes.values() if r.counted is not None)
+    parts = []
+    if short:
+        parts.append(_plural(short, "missing piece"))
+    if over:
+        parts.append(f"{_plural(over, 'piece')} more than shipped")
+    return " and ".join(parts)
+
+
+def _order_tasks(facts: Facts, factory: str | None, on: date) -> list[dict]:
+    """One open order's tasks, in the order the build plan gives them: its
+    next action; each delivery's missing reason; each delivery not yet
+    counted; fix pieces not yet back. The same work is never listed twice."""
+    order = facts.order
+    ref = {"id": order.id, "code": order.code, "style_name": order.style_name, "colour": order.colour}
+
+    def task(key: str, title: str, who: str, due: str | None, stage: str | None, since: str | None, form: str | None):
+        return {
+            "key": key,
+            "title": title,
+            "who": who,
+            "due": due,
+            "order": ref,
+            "stage": stage,
+            "waiting_on": factory if who == "factory" else None,
+            "since": since,
+            "open": form,
+        }
+
+    found: list[dict] = []
+
+    action = next_action(facts, on)
+    if action is not None and not (action["stage"] == "warehouse" and _said_by_a_delivery_task(facts)):
+        stage, who = action["stage"], action["who"]
+        if stage == "sample":
+            form = "sample" if who == "owner" else None  # the factory is sending the changed sample
+        elif stage == "warehouse":
+            # Pieces still to come are recorded as a new delivery. With everything shipped and counted
+            # (a receipt the owner reopened) the last delivery is checked again.
+            to_come = max(0, facts.total("passed") - facts.shipped("finished"))
+            form = "delivery" if to_come or not facts.deliveries else f"delivery:{facts.deliveries[-1].row.id}"
+        else:
+            form = _STAGE_FORM[stage]
+        found.append(task(f"order:{order.id}:stage:{stage}", action["what"], who, action["by"], stage, action["since"], form))
+
+    several = len(facts.deliveries) > 1
+    for delivery in facts.deliveries:
+        row = delivery.row
+        if delivery.needs_reason:
+            title = f"Give a reason for {_difference_words(delivery)}"
+            if several:
+                title += f", delivery {row.number}"
+            found.append(
+                task(
+                    f"delivery:{row.id}:reason", title, "qc", _day(row.counted_on), "warehouse", _day(row.counted_on),
+                    f"delivery-reason:{row.id}",
+                )
+            )
+    for delivery in facts.deliveries:
+        row = delivery.row
+        if delivery.waiting_for_count:
+            found.append(
+                task(
+                    f"delivery:{row.id}:count", f"Enter Khazenly's count for delivery {row.number}", "qc",
+                    _day(row.shipped_on + timedelta(days=1)), "warehouse", _day(row.shipped_on), f"delivery:{row.id}",
+                )
+            )
+
+    if flags(facts, on)["fix_pieces_due"]:
+        found.append(
+            task(
+                f"order:{order.id}:fix", f"Receive {_plural(facts.fix_not_returned, 'fix piece')}", "factory",
+                _day(order.delivery_date), "warehouse", _day(facts.stages["final_inspection"].done_on), "delivery",
+            )
+        )
+    return found
+
+
+def generated_tasks(db: Session, on: date | None = None) -> list[dict]:
+    """The work every open order is waiting on, worked out now from the
+    orders (never stored). Unsorted and ungrouped: the Tasks module does
+    that, and adds the tasks people typed in by hand."""
+    on = on or today()
+    open_orders = list(db.scalars(select(ProdOrder).where(ProdOrder.status == "open").order_by(ProdOrder.id)))
+    facts = _facts_for(db, open_orders)
+    factories = _suppliers(db, [o.factory_id for o in open_orders])
+    found: list[dict] = []
+    for order in open_orders:
+        found.extend(_order_tasks(facts[order.id], factories.get(order.factory_id), on))
+    return found
 
 
 # ── Views ─────────────────────────────────────────────────────────────────────

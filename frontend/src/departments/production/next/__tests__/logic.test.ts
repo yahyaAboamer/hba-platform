@@ -63,6 +63,13 @@ describe("the dates filled backwards (the server's fill_dates)", () => {
   it("gives the sample its days when it is not skipped", () => {
     expect(fillDates("2030-11-03", DAYS).sample).toBe("2030-09-29");
   });
+
+  it("never expects a stage before the day the order is made", () => {
+    const dates = fillDates("2030-11-03", DAYS, new Set(), "2030-10-20");
+    expect(dates.warehouse).toBe("2030-11-03");
+    for (const day of Object.values(dates)) if (day) expect(day >= "2030-10-20").toBe(true);
+    expect(dates.sample).toBe("2030-10-20");
+  });
 });
 
 describe("cutting", () => {

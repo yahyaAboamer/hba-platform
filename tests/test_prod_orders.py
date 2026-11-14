@@ -1318,5 +1318,16 @@ def test_the_downgrade_refuses_while_an_order_exists(owner):
     with pytest.raises(RuntimeError, match="production order"):
         command.downgrade(Config("alembic.ini"), "e5a2c7d90032")
     with engine.connect() as connection:
-        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "f6b3d8e10033"
+        # The whole downgrade is one transaction, so a refusal leaves the database at the head
+        # (batch 2's `a7c4e9f20034`, whose own downgrade ran first and was rolled back with it).
+        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "a7c4e9f20034"
         assert connection.execute(text("SELECT count(*) FROM prod_order")).scalar_one() == 1
+
+
+def test_a_near_target_date_never_makes_stages_expected_before_today(owner):
+    """The usual days do not fit before a target five days away; nothing is
+    expected before the day the order is made, so it is not born overdue."""
+    order = _new(owner, target_date=_day(5))
+    expected = [stage["expected_date"] for stage in order["stages"] if stage["expected_date"]]
+    assert expected and min(expected) >= TODAY.isoformat()
+    assert _stage(order, "warehouse")["expected_date"] == _day(5)
