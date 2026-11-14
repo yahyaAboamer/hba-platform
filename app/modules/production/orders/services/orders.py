@@ -101,6 +101,11 @@ def _iso(moment: datetime | None) -> str | None:
     return moment.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
+def _said(value: date) -> str:
+    """A day as a person reads it in a sentence: 20 Dec 2026."""
+    return f"{value.day} {value.strftime('%b %Y')}"
+
+
 def _day(value: date | None) -> str | None:
     return value.isoformat() if value is not None else None
 
@@ -546,7 +551,7 @@ def create(db: Session, data: dict, actor: UserAccount) -> ProdOrder:
     )
     _audit(
         db, order, actor, "created",
-        f"Created {order.code}: {style} · {colour}, {_plural(total, 'piece')}, target {target.isoformat()}",
+        f"Created {order.code}: {style} · {colour}, {_plural(total, 'piece')}, target {_said(target)}",
     )
     return order
 
@@ -874,7 +879,7 @@ def record_cut(db: Session, order_id: int, data: dict, actor: UserAccount) -> Pr
     moved = ""
     if promised != order.delivery_date:
         _move_delivery_date(db, order, promised, "factory", "Promised at cutting", actor)
-        moved = f"; the factory promised {promised.isoformat()}"
+        moved = f"; the factory promised {_said(promised)}"
     _touch(order)
     _audit(
         db, order, actor, "cut_recorded",
@@ -1029,14 +1034,14 @@ def change_delivery_date(
     order = _open(db, order_id)
     reason = _text(reason, limit=200, what="the reason", required=True)
     if new == order.delivery_date:
-        raise Refused(f"The delivery date is already {new.isoformat()}.")
+        raise Refused(f"The delivery date is already {_said(new)}.")
     old = order.delivery_date
     _move_delivery_date(db, order, new, set_by, reason, actor)
     _touch(order)
     who = "the factory" if set_by == "factory" else "the owner"
     _audit(
         db, order, actor, "delivery_date_changed",
-        f"Delivery date of {order.code} moved from {old.isoformat()} to {new.isoformat()} by {who}: {reason}",
+        f"Delivery date of {order.code} moved from {_said(old)} to {_said(new)} by {who}: {reason}",
     )
     return order
 
@@ -1108,7 +1113,7 @@ def add_delivery(db: Session, order_id: int, data: dict, actor: UserAccount) -> 
     delivery.mismatch_reason = _text(data.get("mismatch_reason"), limit=1000, what="the reason")
     total = sum(shipped.values())
     words = "fixed pieces" if kind == "fix" else "pieces"
-    summary = f"Delivery {number} of {order.code}: {total:,} {words} left the factory on {shipped_on.isoformat()}"
+    summary = f"Delivery {number} of {order.code}: {total:,} {words} left the factory on {_said(shipped_on)}"
     if delivery.counted_on is not None:
         summary += f"; Khazenly counted {sum(counted.values()):,}"
     _touch(order)

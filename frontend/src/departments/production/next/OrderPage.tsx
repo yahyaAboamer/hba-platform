@@ -230,7 +230,7 @@ export function OrderPage({ session }: { session: Session }) {
               <b>Next: {action.what.charAt(0).toLowerCase() + action.what.slice(1)}</b>
               <div className="prod-small">
                 {whoWhen(action, today, order.flags.waiting_for_owner)}
-                {action.stage === "making" && " · mark making finished first"}
+                {action.stage === "making" && " · once the factory finishes making"}
                 {waitingFor && ` · waiting for ${waitingFor}`}
               </div>
             </div>
