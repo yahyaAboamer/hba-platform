@@ -244,6 +244,18 @@ payroll without touching a maintainer screen.
     hours it is shown as needing a person. Nothing is cancelled
     automatically.
   - Off unless `INBOX_PAYMENT_REQUESTS_ENABLED` is set.
+- **A delivered order is asked how it went, once** (ADR 0083).
+  - Two days after Shopify's delivered date, never for an order with a
+    return, a refund or no delivered date, and never the same phone twice in
+    60 days.
+  - The first question never mentions a reward. Only a tap is an answer; what
+    she types is kept as a message.
+  - An unhappy answer stays under *Needs follow-up* until a person resolves
+    it; she is then asked whether it was solved, and *No* reopens it.
+  - Everyone who finishes gets her own 20% code, once, inside the one
+    *Feedback 20%* discount. The platform also writes to Shopify for this,
+    through the second app. An unused code is deleted after 30 days.
+  - Off unless `INBOX_FEEDBACK_ENABLED` is set.
 - **Operations' numbers are at most 10 minutes old** (ADR 0057).
   - The platform reads each source every 5 minutes.
   - A source that can't be read shows as a failure, never as 0.

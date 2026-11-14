@@ -186,7 +186,7 @@ def test_the_owner_sees_every_department(everything):
     assert body["departments"] == ["inbox", "operations", "affiliates"]
     assert _departments(body) == {"inbox", "operations", "affiliates"}
     assert set(body["counts"]) == {
-        "chats_unread", "models_awaiting_approval", "payments_awaiting_approval"
+        "chats_unread", "chats_follow_up", "models_awaiting_approval", "payments_awaiting_approval"
     }
     assert {k: _at(v) for k, v in body["failures"].items()} == {"bosta": NOW - timedelta(hours=3)}
     assert body["orders"] is not None
@@ -199,7 +199,7 @@ def test_customer_service_sees_only_the_inbox(everything):
 
     assert body["departments"] == ["inbox"]
     assert _departments(body) == {"inbox"}
-    assert set(body["counts"]) == {"chats_unread"}
+    assert set(body["counts"]) == {"chats_unread", "chats_follow_up"}
     assert body["failures"] == {}
     assert body["orders"] is None
 
@@ -210,7 +210,7 @@ def test_the_operations_manager_sees_inbox_operations_and_the_week(everything):
 
     assert body["departments"] == ["inbox", "operations"]
     assert _departments(body) == {"inbox", "operations"}
-    assert set(body["counts"]) == {"chats_unread"}
+    assert set(body["counts"]) == {"chats_unread", "chats_follow_up"}
     assert body["orders"] is not None
     # WhatsApp is not connected here: he holds Operations, so it opens there.
     whatsapp = next(i for i in body["items"] if i["key"] == "inbox.whatsapp_not_connected")
@@ -335,7 +335,7 @@ def test_customers_waiting_are_counted_from_their_unread_messages(db):
     assert _at(item["since"]) == _cairo(2026, 10, 25, 9, 40)
     assert item["when"] == "elapsed" and item["late"] is True
     assert item["go"] == {"label": "Open Chats", "to": "/inbox/chats"}
-    assert body["counts"] == {"chats_unread": 2}
+    assert body["counts"] == {"chats_unread": 2, "chats_follow_up": 0}
 
 
 def test_one_customer_waiting_and_not_yet_late(db):

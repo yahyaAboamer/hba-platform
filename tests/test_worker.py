@@ -465,6 +465,11 @@ def test_between_them_the_lanes_take_every_kind_and_only_one_tops_up():
         JobKind.INBOX_PAYMENT_REMINDER,
         JobKind.INBOX_SEND_INVOICE,
         JobKind.INBOX_READ_TAGS,
+        JobKind.INBOX_FEEDBACK_SWEEP,
+        JobKind.INBOX_FEEDBACK_SEND,
+        JobKind.INBOX_FEEDBACK_REPLY,
+        JobKind.INBOX_FEEDBACK_ASK_SOLVED,
+        JobKind.INBOX_FEEDBACK_EXPIRE_CODES,
     }
     # Every kind named for the inbox runs in the inbox lane.
     named = {value for name, value in vars(JobKind).items() if name.startswith("INBOX_")}

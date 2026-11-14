@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { InboxConnections } from "../../components/InboxConnection";
+import { InboxFeedbackSettings } from "../../components/InboxFeedbackSettings";
 import { KeyCard } from "../../components/IntegrationKey";
 import { OpsIcon, age, clockTime, dayAndTime, dayMonth, useNow } from "../../components/OpsSource";
 import { api } from "../../lib/api";
@@ -75,7 +76,13 @@ function KeyForm({ form, session }: { form: KeyFormName; session: Session }) {
     case "estebdal":
       return <KeyCard provider={form} />;
     case "whatsapp":
-      return <InboxConnections />;
+      return (
+        <>
+          <InboxConnections />
+          {/* The owner's, and about what the Inbox sends over this connection (ADR 0083). */}
+          <InboxFeedbackSettings session={session} />
+        </>
+      );
   }
 }
 

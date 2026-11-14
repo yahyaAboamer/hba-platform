@@ -141,6 +141,21 @@ class JobKind:
     #: Read a recent order's confirmation tags back from Shopify, and take an
     #: answer the team tagged there (ADR 0063). Reads only.
     INBOX_READ_TAGS = "inbox_read_tags"
+    #: Decide which delivered orders are due their feedback question and
+    #: record each, asked or skipped (ADR 0083). Scheduled every 30 minutes.
+    INBOX_FEEDBACK_SWEEP = "inbox_feedback_sweep"
+    #: Send one order's first feedback question, if it is still waiting.
+    #: Claimed before WhatsApp is asked, so sent at most once.
+    INBOX_FEEDBACK_SEND = "inbox_feedback_send"
+    #: The next question or the closing words after a tap on a feedback
+    #: question. One per tap.
+    INBOX_FEEDBACK_REPLY = "inbox_feedback_reply"
+    #: Ask an unhappy customer, a day after a person pressed Resolved,
+    #: whether her issue was solved.
+    INBOX_FEEDBACK_ASK_SOLVED = "inbox_feedback_ask_solved"
+    #: Take a reward code nobody used out of Shopify once its 30 days are up
+    #: (ADR 0083, point 5). Scheduled daily.
+    INBOX_FEEDBACK_EXPIRE_CODES = "inbox_feedback_expire_codes"
 
 
 #: The inbox's work (ADR 0059) runs in a lane of its own too: a WhatsApp outage
@@ -158,6 +173,11 @@ INBOX_WORK = frozenset(
         JobKind.INBOX_PAYMENT_REMINDER,
         JobKind.INBOX_SEND_INVOICE,
         JobKind.INBOX_READ_TAGS,
+        JobKind.INBOX_FEEDBACK_SWEEP,
+        JobKind.INBOX_FEEDBACK_SEND,
+        JobKind.INBOX_FEEDBACK_REPLY,
+        JobKind.INBOX_FEEDBACK_ASK_SOLVED,
+        JobKind.INBOX_FEEDBACK_EXPIRE_CODES,
     }
 )
 

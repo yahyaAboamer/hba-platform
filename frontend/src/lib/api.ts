@@ -13,11 +13,17 @@ const CSRF_STORAGE_KEY = "hba.csrf";
 /** A refusal from the platform, carrying what it said and what to do. */
 export class ApiError extends Error {
   readonly status: number;
+  /**
+   * Per-field refusals, when the server answers `{"detail": {"errors": {field: why}}}`
+   * (the feedback wording, 422). Absent for every other refusal.
+   */
+  readonly fieldErrors?: Record<string, string>;
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, fieldErrors?: Record<string, string>) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    if (fieldErrors) this.fieldErrors = fieldErrors;
   }
 
   /** Signed out, or the session expired while the tab sat open. */
@@ -134,6 +140,21 @@ export function portalPath(path: string): string {
   return path;
 }
 
+/**
+ * `{"detail": {"errors": {key: "why"}}}` as a plain map, or undefined. Only
+ * strings are kept, so an unexpected shape never reaches a screen.
+ */
+function readFieldErrors(payload: unknown): Record<string, string> | undefined {
+  const detail = (payload as { detail?: unknown } | null)?.detail;
+  const errors = (detail as { errors?: unknown } | null | undefined)?.errors;
+  if (!errors || typeof errors !== "object" || Array.isArray(errors)) return undefined;
+  const found: Record<string, string> = {};
+  for (const [key, why] of Object.entries(errors)) {
+    if (typeof why === "string") found[key] = why;
+  }
+  return Object.keys(found).length > 0 ? found : undefined;
+}
+
 async function request<T>(
   method: string,
   path: string,
@@ -171,11 +192,14 @@ async function request<T>(
     // FastAPI puts the readable message in `detail`. Those messages are
     // written for a person — "Nour's 2026-08 cannot be approved: …" — so they
     // are shown as they are rather than replaced with something generic.
+    const fieldErrors = readFieldErrors(payload);
     const detail =
       payload && typeof payload.detail === "string"
         ? payload.detail
-        : `The platform returned ${response.status}.`;
-    throw new ApiError(response.status, detail);
+        : fieldErrors
+          ? "Some of it could not be saved."
+          : `The platform returned ${response.status}.`;
+    throw new ApiError(response.status, detail, fieldErrors);
   }
 
   return payload as T;
@@ -228,9 +252,47 @@ async function upload<T>(
   return payload as T;
 }
 
+/**
+ * A file the server builds on request (the Feedback sheet's spreadsheet).
+ *
+ * A plain link would show the browser's own error page on a refusal and give
+ * no sign of progress, so the bytes are fetched here with the session and
+ * saved by the caller. Reading changes nothing, so no CSRF token is sent.
+ */
+async function download(path: string): Promise<{ blob: Blob; filename: string | null }> {
+  if (previewBase !== null) throw new ApiError(403, PREVIEW_READ_ONLY);
+
+  const response = await fetch(path, { credentials: "same-origin" });
+
+  if (!response.ok) {
+    let detail = `The platform returned ${response.status}.`;
+    try {
+      const payload = JSON.parse(await response.text());
+      if (payload && typeof payload.detail === "string") detail = payload.detail;
+    } catch {
+      /* not JSON: the generic sentence stands */
+    }
+    throw new ApiError(response.status, detail);
+  }
+
+  const named = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(
+    response.headers.get("content-disposition") ?? "",
+  );
+  let filename: string | null = null;
+  if (named) {
+    try {
+      filename = decodeURIComponent(named[1]);
+    } catch {
+      filename = named[1];
+    }
+  }
+  return { blob: await response.blob(), filename };
+}
+
 export const api = {
   get: <T>(path: string) => request<T>("GET", path),
   upload,
+  download,
   post: <T>(path: string, body?: unknown) => request<T>("POST", path, body),
   put: <T>(path: string, body?: unknown) => request<T>("PUT", path, body),
   patch: <T>(path: string, body?: unknown) => request<T>("PATCH", path, body),

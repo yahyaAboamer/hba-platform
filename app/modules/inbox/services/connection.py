@@ -42,6 +42,10 @@ MAX_SECRET_LENGTH = 1024
 
 #: What the tags connection must be allowed to do, and all it is used for.
 TAGS_SCOPE = "write_orders"
+#: What the same app must also be allowed to do for the post-delivery reward
+#: codes (ADR 0083). Not required to save the connection: order tags work
+#: without it. ``feedback_codes.codes_ready`` is where it is checked.
+DISCOUNTS_SCOPE = "write_discounts"
 
 
 class NotSaved(ValueError):

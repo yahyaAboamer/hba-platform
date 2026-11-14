@@ -1315,7 +1315,7 @@ def test_the_downgrade_refuses_while_an_order_exists(owner):
 
     _new(owner)
     with pytest.raises(RuntimeError, match="production order"):
-        command.downgrade(Config("alembic.ini"), "b2d8f4a60029")
+        command.downgrade(Config("alembic.ini"), "e5a2c7d90032")
     with engine.connect() as connection:
-        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "c3e9a5b70030"
+        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "f6b3d8e10033"
         assert connection.execute(text("SELECT count(*) FROM prod_order")).scalar_one() == 1

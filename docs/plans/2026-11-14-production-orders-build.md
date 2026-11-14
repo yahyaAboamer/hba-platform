@@ -234,5 +234,5 @@ Dates travel as `YYYY-MM-DD`; money as integer piastres in keys ending
   frontend does not call yet go in `NOT_BUILT_YET`, and come out as the
   frontend wires them.
 - Frontend: `cd frontend && npm test` and `npm run build`.
-- The migration id continues the sequence after `b2d8f4a60029` and has a
+- The migration id continues the sequence after `e5a2c7d90032 (renumbered to f6b3d8e10033 after main gained three)` and has a
   working `downgrade()` that refuses rather than lose rows.

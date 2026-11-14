@@ -4,10 +4,12 @@ import { useOutletContext } from "react-router-dom";
 export type InboxOutlet = {
   /** Chats reads the list far more often than the frame does, and tells it. */
   setUnread: (unread: number) => void;
+  /** Likewise for the unhappy customers still waiting for a person. */
+  setFollowUp: (waiting: number) => void;
 };
 
 /** Outside the frame - a screen drawn on its own - there is nobody to tell. */
-const ALONE: InboxOutlet = { setUnread: () => undefined };
+const ALONE: InboxOutlet = { setUnread: () => undefined, setFollowUp: () => undefined };
 
 export function useInbox(): InboxOutlet {
   return useOutletContext<InboxOutlet | undefined>() ?? ALONE;

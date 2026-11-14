@@ -29,6 +29,8 @@ export type Waiting = {
   today: TodayRead;
   /** Chats reads the list far more often than the frame does, and tells it. */
   setUnread: (unread: number) => void;
+  /** Likewise for the unhappy customers still waiting for a person (Resolved changes it at once). */
+  setFollowUp: (waiting: number) => void;
 };
 
 const NO_COUNTS: Counts = {};
@@ -39,6 +41,8 @@ export function useWaiting(session: Session): Waiting {
   // Chats' own, newer number; a read asked for after it replaces it.
   const [pushed, setPushed] = useState<number | null>(null);
   const pushedAt = useRef(0);
+  const [pushedFollowUp, setPushedFollowUp] = useState<number | null>(null);
+  const followUpAt = useRef(0);
   const holdsAny = departmentsFor(session).length > 0;
 
   useEffect(() => {
@@ -51,8 +55,10 @@ export function useWaiting(session: Session): Waiting {
         .then((body) => {
           if (!current) return;
           setToday({ body, readAt: Date.now(), failed: false });
-          // An answer to a question asked before Chats' number is older than it.
-          if (asked >= pushedAt.current) setPushed(null);
+          // An answer to a question asked before Chats' number is older than it;
+          // asked in the same millisecond counts as before (it cannot know).
+          if (asked > pushedAt.current) setPushed(null);
+          if (asked > followUpAt.current) setPushedFollowUp(null);
         })
         .catch(() => {
           if (!current) return;
@@ -88,15 +94,29 @@ export function useWaiting(session: Session): Waiting {
     [],
   );
 
+  const setFollowUp = useMemo(
+    () => (waiting: number) => {
+      followUpAt.current = Date.now();
+      setPushedFollowUp(waiting);
+    },
+    [],
+  );
+
   const counts = useMemo<Counts>(() => {
     const read = today.body?.counts ?? NO_COUNTS;
-    return pushed === null ? read : { ...read, chats_unread: pushed };
-  }, [today.body, pushed]);
+    if (pushed === null && pushedFollowUp === null) return read;
+    return {
+      ...read,
+      ...(pushed === null ? {} : { chats_unread: pushed }),
+      ...(pushedFollowUp === null ? {} : { chats_follow_up: pushedFollowUp }),
+    };
+  }, [today.body, pushed, pushedFollowUp]);
 
   return {
     counts,
     failures: today.body?.failures ?? NO_FAILURES,
     today,
     setUnread,
+    setFollowUp,
   };
 }

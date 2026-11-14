@@ -37,8 +37,8 @@ export function Frame({ session, departments }: { session: Session; departments:
   useMaintainerTheme();
 
   const outlet = useMemo<InboxOutlet & TodayOutlet>(
-    () => ({ setUnread: waiting.setUnread, today: waiting.today }),
-    [waiting.setUnread, waiting.today],
+    () => ({ setUnread: waiting.setUnread, setFollowUp: waiting.setFollowUp, today: waiting.today }),
+    [waiting.setUnread, waiting.setFollowUp, waiting.today],
   );
 
   const role = where.settings

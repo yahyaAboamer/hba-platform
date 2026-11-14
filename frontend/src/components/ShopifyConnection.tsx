@@ -83,7 +83,7 @@ export function ShopifyConnection({ onChanged }: { onChanged?: (state: ShopifyCo
   const saving = state?.source === "saved";
   return (
     <section className="pay-detail__card sync__card">
-      <h2 className="pay-detail__card-title">Connection</h2>
+      <h3 className="pay-detail__card-title">Connection</h3>
       {/* S1: when it was last proven to work, and where the credentials in
           use come from - the server sent both and the card showed neither. */}
       {state && state.source && (

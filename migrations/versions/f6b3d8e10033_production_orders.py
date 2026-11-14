@@ -1,7 +1,7 @@
 """Production orders, as platform screens (ADR 0084, batch 1).
 
-Revision ID: c3e9a5b70030
-Revises: b2d8f4a60029
+Revision ID: f6b3d8e10033
+Revises: e5a2c7d90032
 Create Date: 2026-11-14
 
 Creates the ``prod_`` tables: the production order, its sizes, its ten
@@ -18,8 +18,8 @@ from typing import Sequence, Union
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "c3e9a5b70030"
-down_revision: Union[str, Sequence[str], None] = "b2d8f4a60029"
+revision: str = "f6b3d8e10033"
+down_revision: Union[str, Sequence[str], None] = "e5a2c7d90032"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
