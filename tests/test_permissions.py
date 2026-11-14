@@ -37,6 +37,23 @@ def test_admin_grants_stay_in_sync_with_the_permission_list():
     assert ROLES["admin"] == ALL_PERMISSIONS
 
 
+def test_production_owner_is_the_admins_alone():
+    """ADR 0084 (14 November 2026): creating and settling a production order,
+    approving a sample, writing off, changing the typical days - and seeing
+    its money - are the owner's. No Production level holds it, not even the
+    manager's; every other role's set stays as it was."""
+    holders = {role for role, granted in ROLES.items() if Permission.PRODUCTION_OWNER in granted}
+    assert holders == {"admin"}
+    assert Permission.PRODUCTION_OWNER == "production.owner"
+    for role in ("production_viewer", "production_staff", "production_manager"):
+        assert has_permission(role, Permission.PRODUCTION_OWNER) is False
+        assert has_permission(role, Permission.PRODUCTION_VIEW) is True
+    # The QC manager's writes are `production.edit`, which staff and the manager hold.
+    assert has_permission("production_viewer", Permission.PRODUCTION_EDIT) is False
+    assert has_permission("production_staff", Permission.PRODUCTION_EDIT) is True
+    assert has_permission("production_manager", Permission.PRODUCTION_EDIT) is True
+
+
 # ── affiliate_manager (Boda) ───────────────────────────────────────────────────
 
 

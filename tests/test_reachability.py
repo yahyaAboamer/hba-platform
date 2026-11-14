@@ -135,6 +135,7 @@ def _served() -> set[tuple[str, str]]:
     )
     from app.modules.inbox import api as inbox
     from app.modules.operations import api as order_ops
+    from app.modules.production.orders import api as production_orders
     from app.shared.api import audit, auth, health, integrations, staff, today, webhooks
 
     # **Named one by one, not discovered.** A router that is served and not
@@ -154,6 +155,8 @@ def _served() -> set[tuple[str, str]]:
     routers.append(order_ops.frame_router)
     # And its third: Khazenly, behind its own permission (ADR 0072).
     routers.append(order_ops.khazenly_router)
+    # Production orders (ADR 0084), beside the old framed Production's own.
+    routers.append(production_orders.router)
     for router in routers:
         for route in router.routes:
             for method in getattr(route, "methods", set()):

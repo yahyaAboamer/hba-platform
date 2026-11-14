@@ -44,6 +44,7 @@ export const PERMISSION_PHRASE: Record<string, string> = {
   "production.qc": "recording quality checks",
   "production.suppliers": "adding suppliers",
   "production.payments": "approving supplier payments",
+  "production.owner": "creating and settling production orders, and seeing their costs",
 };
 
 /** What a person is told they do *not* get; each is said only when none of its permissions is held. */
@@ -103,6 +104,7 @@ export const ACCESS_LINES: [string, string[]][] = [
   ["Change production orders, tasks and samples", ["production.edit"]],
   ["Record quality checks in Production", ["production.qc"]],
   ["Add suppliers in Production", ["production.suppliers"]],
+  ["Create and settle production orders, and see costs", ["production.owner"]],
   ["Invite models", ["invitations.send"]],
   ["Record payments and reopen approved months", ["payments.record", "payroll.reopen"]],
   ["Invite staff and change anyone's access, Shopify and the pay policy; erase a model", ["settings.manage", "affiliates.erase"]],

@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import App from "../App";
 import { appSource } from "../departments/production/ProductionScreens";
-import { serve, sessionOf } from "./frameHarness";
+import { reply, serve, sessionOf } from "./frameHarness";
 import type { Kind } from "./frameHarness";
 
 beforeEach(() => window.history.pushState({}, "", "/"));
@@ -84,6 +84,35 @@ describe("Production's frame", () => {
     render(<App />);
     await screen.findByRole("navigation", { name: "HBA departments" });
     expect(window.location.pathname).toBe("/production");
+  });
+
+  it("shows the native screens at /production/next, and keeps the frame for everything else", async () => {
+    window.history.pushState({}, "", "/production/next");
+    serve(sessionOf("owner"), {});
+    const platform = fetch;
+    // The platform's own reads as the harness answers them; Production's orders as the server would.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+        return url.includes("/api/prod/") ? reply(200, { orders: [] }) : platform(input, init);
+      }),
+    );
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn(() => ({ matches: false, addEventListener: () => undefined, removeEventListener: () => undefined })),
+    );
+    render(<App />);
+
+    // Redirected to the orders, in the platform's own screens: no frame.
+    expect(await screen.findByRole("heading", { name: "Production orders" })).toBeTruthy();
+    expect(window.location.pathname).toBe("/production/next/orders");
+    expect(document.querySelector("iframe")).toBeNull();
+    const tabs = screen.getByRole("navigation", { name: "Production sections" });
+    expect(within(tabs).getByRole("link", { name: "Orders" }).getAttribute("aria-current")).toBe("page");
+    expect(within(tabs).getByRole("link", { name: "Stage days" })).toBeTruthy();
+    // The strip around Production stays.
+    expect(screen.getByRole("navigation", { name: "HBA departments" })).toBeTruthy();
   });
 
   it("is a link in the full sidebar elsewhere", async () => {

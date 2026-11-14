@@ -33,6 +33,7 @@ from app.modules.affiliates.api import (
 from app.modules.inbox import api as inbox
 from app.modules.operations import api as order_ops
 from app.modules.production import api as production
+from app.modules.production.orders import api as production_orders
 from app.shared.api import (
     audit,
     auth,
@@ -185,6 +186,7 @@ app.include_router(policy.router)
 app.include_router(today.router)
 app.include_router(integrations.router)
 app.include_router(production.router)
+app.include_router(production_orders.router)
 app.add_exception_handler(production.ProductionRefused, production.refused_handler)
 
 

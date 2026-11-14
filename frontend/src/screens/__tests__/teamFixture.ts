@@ -9,6 +9,7 @@ export const ALL = [
   "payments.record", "payroll.bonus", "invitations.send", "audit.view", "settings.manage",
   "order_ops.view", "inbox.use", "khazenly.use", "returns.edit",
   "production.view", "production.edit", "production.qc", "production.suppliers", "production.payments",
+  "production.owner",
 ];
 
 export const ROLE_PERMISSIONS: Record<string, string[]> = {
