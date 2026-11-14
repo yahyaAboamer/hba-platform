@@ -7,6 +7,8 @@ import { NextLayout } from "./NextLayout";
 import { OrderList } from "./OrderList";
 import { OrderPage } from "./OrderPage";
 import { StageDays } from "./StageDays";
+import { SupplierPage } from "./SupplierPage";
+import { SupplierScreen } from "./SupplierScreen";
 import { TaskScreen } from "./TaskScreen";
 
 /**
@@ -23,6 +25,8 @@ export function productionNextRoutes(session: Session) {
       <Route path="orders/:id" element={<OrderPage session={session} />} />
       <Route path="tasks" element={<TaskScreen session={session} />} />
       <Route path="incoming" element={<IncomingScreen session={session} />} />
+      <Route path="suppliers" element={<SupplierScreen session={session} />} />
+      <Route path="suppliers/:id" element={<SupplierPage session={session} />} />
       <Route path="settings" element={<StageDays session={session} />} />
     </Route>
   );

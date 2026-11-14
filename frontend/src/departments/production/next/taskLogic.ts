@@ -137,11 +137,19 @@ function formWords(open: string): string | null {
 export type TaskLink = { label: string; to: string; opens: boolean };
 
 /**
- * Where a generated task's button goes. With a form this person may use, the order page with that form
+ * Where a generated task's button goes. A purchase's task goes to its supplier's page (see below). With a form this person may use, the order page with that form
  * already open ("Review sample"); with none (waiting on the factory, an owner-only form for the QC
  * manager, or somebody who can only read), the order itself ("Open order"), never a button that writes.
  */
 export function taskLink(task: GeneratedTask, powers: Powers): TaskLink | null {
+  // A purchase's task (`purchase:<id>`, either "chase" or "check on arrival") goes to its supplier's page, with
+  // the purchase's "Mark received" open for somebody who may mark it; anybody else is given the supplier.
+  if (task.open?.startsWith("purchase:") && task.supplier) {
+    const page = `/production/next/suppliers/${task.supplier.id}`;
+    return powers.canEdit
+      ? { label: "Mark received", to: `${page}?open=${task.open}`, opens: true }
+      : { label: "Open supplier", to: page, opens: false };
+  }
   if (!task.order) return null;
   const page = `/production/next/orders/${task.order.id}`;
   const open = task.open;

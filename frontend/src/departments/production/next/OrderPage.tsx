@@ -16,6 +16,11 @@ import type { Run } from "./ui";
 
 const PRINTING_WORDS = { factory: "printed at the factory", outside: "printed outside", none: "no printing" } as const;
 
+/** A supplier's name, linking to its page (batch 4); a name that is not known is a dash. */
+function SupplierLink({ supplier }: { supplier: { id: string; name: string | null } }) {
+  return supplier.name ? <Link to={`/production/next/suppliers/${supplier.id}`}>{supplier.name}</Link> : <>—</>;
+}
+
 function Facts({ order }: { order: OrderView }) {
   const late = order.lateness_days > 0 && order.status !== "cancelled";
   return (
@@ -239,8 +244,14 @@ export function OrderPage({ session }: { session: Session }) {
         <div className="page__title">
           <h1 ref={heading} tabIndex={-1}>{order.style_name} · {order.colour}</h1>
           <span className="page__subtitle">
-            {order.code} · {order.factory.name ?? "—"} · fabric bought by {BUYER_WORDS[order.fabric_bought_by]} ·{" "}
-            {order.printing === "outside" && order.print_supplier?.name ? `printed by ${order.print_supplier.name}` : PRINTING_WORDS[order.printing]}
+            {order.code} · <SupplierLink supplier={order.factory} /> · fabric bought by {BUYER_WORDS[order.fabric_bought_by]} ·{" "}
+            {order.printing === "outside" && order.print_supplier?.name ? (
+              <>
+                printed by <SupplierLink supplier={order.print_supplier} />
+              </>
+            ) : (
+              PRINTING_WORDS[order.printing]
+            )}
             {order.repeat_run ? " · repeat run" : ""}
           </span>
         </div>
@@ -284,7 +295,7 @@ export function OrderPage({ session }: { session: Session }) {
           <SizesCard order={order} powers={powers} open={open} />
           <DatesCard order={order} powers={powers} open={open} />
           <DeliveriesCard order={order} powers={powers} open={open} />
-          <CostCard order={order} powers={powers} open={open} />
+          <CostCard order={order} powers={powers} open={open} run={run} />
           <OwedCard order={order} />
           <OwnerCard order={order} powers={powers} open={open} />
           <FilesCard order={order} powers={powers} version={version} />

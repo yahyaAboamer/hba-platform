@@ -264,6 +264,7 @@ export function TextBox({
   hint,
   max,
   wide,
+  inputMode,
 }: {
   label: string;
   value: string;
@@ -272,6 +273,8 @@ export function TextBox({
   hint?: string;
   max?: number;
   wide?: boolean;
+  /** `decimal` for an amount in pounds, so a phone offers the number pad. */
+  inputMode?: "decimal" | "numeric" | "tel";
 }) {
   const id = useId();
   const common = {
@@ -279,6 +282,8 @@ export function TextBox({
     className: "input",
     value,
     maxLength: max,
+    inputMode,
+    autoComplete: inputMode ? "off" : undefined,
     "aria-describedby": hint ? `${id}-hint` : undefined,
   };
   return (
@@ -291,6 +296,44 @@ export function TextBox({
       ) : (
         <input {...common} onChange={(event) => onChange(event.target.value)} />
       )}
+      {hint && (
+        <span id={`${id}-hint`} className="field__hint">
+          {hint}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** A labelled choice from a short list. */
+export function SelectBox({
+  label,
+  value,
+  onChange,
+  options,
+  wide,
+  hint,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: readonly { value: string; label: string }[];
+  wide?: boolean;
+  hint?: string;
+}) {
+  const id = useId();
+  return (
+    <div className={`prod-field${wide ? " prod-wide" : ""}`}>
+      <label className="field__label" htmlFor={id}>
+        {label}
+      </label>
+      <select id={id} className="input" value={value} aria-describedby={hint ? `${id}-hint` : undefined} onChange={(event) => onChange(event.target.value)}>
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
       {hint && (
         <span id={`${id}-hint`} className="field__hint">
           {hint}
@@ -332,14 +375,14 @@ export function Actions({
  * on the page is replaced with the answer and the panel closes. A refusal
  * comes back as the server's own words, for the panel to show.
  */
-export type Run = (request: () => Promise<OrderAnswer>, done: string) => Promise<string | null>;
+export type Run<A = OrderAnswer> = (request: () => Promise<A>, done: string) => Promise<string | null>;
 
 /** A panel's one submission: a check made before sending, then the request, then the refusal if there is one. */
-export function useSubmit(run: Run) {
+export function useSubmit<A = OrderAnswer>(run: Run<A>) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   /** Resolves `true` when the order was saved, `false` when a check or the server refused. */
-  async function submit(problem: string | null, request: () => Promise<OrderAnswer>, done: string): Promise<boolean> {
+  async function submit(problem: string | null, request: () => Promise<A>, done: string): Promise<boolean> {
     if (problem) {
       setError(problem);
       return false;

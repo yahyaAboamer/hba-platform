@@ -101,26 +101,6 @@ NOT_BUILT_YET = {
     # not "affiliates without invitations" in general, just a model who
     # genuinely cannot receive one.
     ("POST", "/api/affiliates"),
-    # Production's Suppliers (ADR 0084, batch 4): the backend is built, the
-    # screens at /production/next/suppliers follow. The frontend engineer
-    # strikes each one off as it is wired.
-    ("GET", "/api/prod/suppliers"),
-    ("POST", "/api/prod/suppliers"),
-    ("GET", "/api/prod/suppliers/{supplier_id}"),
-    ("PATCH", "/api/prod/suppliers/{supplier_id}"),
-    ("POST", "/api/prod/sections"),
-    ("PATCH", "/api/prod/sections/{section_id}"),
-    ("DELETE", "/api/prod/sections/{section_id}"),
-    ("POST", "/api/prod/suppliers/{supplier_id}/purchases"),
-    ("PATCH", "/api/prod/purchases/{purchase_id}"),
-    ("POST", "/api/prod/purchases/{purchase_id}/void"),
-    ("POST", "/api/prod/suppliers/{supplier_id}/payments"),
-    ("POST", "/api/prod/suppliers/{supplier_id}/opening"),
-    ("POST", "/api/prod/suppliers/{supplier_id}/adjustments"),
-    ("POST", "/api/prod/entries/{entry_id}/reverse"),
-    ("POST", "/api/prod/entries/{entry_id}/receipt"),
-    ("GET", "/api/prod/entries/{entry_id}/receipt"),
-    ("DELETE", "/api/prod/entries/{entry_id}/receipt"),
 }
 
 

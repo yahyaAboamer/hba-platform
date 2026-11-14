@@ -143,6 +143,31 @@ export type Cost = {
   target_total_piastres: number;
   actual_total_piastres: number | null;
   piece_cost_piastres: number;
+  /** Owner only: what the purchases for this order say each part costs per piece (batch 4). */
+  from_purchases?: FromPurchases;
+};
+
+/** The four parts a purchase can be of that an order's cost also has. Manufacturing is never bought. */
+export type BoughtPart = "fabric" | "printing" | "accessories" | "packaging";
+
+export type PurchaseBehind = { id: number; item: string; supplier: { id: string; name: string }; total_piastres: number };
+
+export type FromPurchasesPart = {
+  part: BoughtPart;
+  label: string;
+  purchases: PurchaseBehind[];
+  total_piastres: number;
+  /** `null` when there are no purchases for the part. */
+  per_piece_piastres: number | null;
+};
+
+export type FromPurchases = {
+  /** The pieces cut once cutting is done, else the pieces planned. */
+  pieces: number;
+  basis: "cut" | "planned";
+  parts: FromPurchasesPart[];
+  /** Purchases for the order that belong to no part. */
+  other: { purchases: PurchaseBehind[]; total_piastres: number };
 };
 
 export type Settlement = {
@@ -241,6 +266,8 @@ type TaskCommon = {
   waiting_on: string | null;
   /** The day it started waiting. */
   since: string | null;
+  /** Only on the two purchase tasks (`open` is `purchase:<id>`): the supplier the goods are from. */
+  supplier?: { id: string; name: string };
   group: TaskGroup;
   overdue_days: number;
 };
@@ -341,3 +368,127 @@ export type Incoming = {
   arrivals: IncomingArrival[];
   deliveries: IncomingDelivery[];
 };
+
+// ── Suppliers (`app/modules/production/orders/services/suppliers.py`, `account.py`) ──
+// Money keys are absent, not null, for anybody without `production.owner`: every one is optional here,
+// and a screen draws a figure only when its key is there.
+
+export type SectionRef = { id: number; name: string };
+export type Section = SectionRef & { position: number; supplier_count: number };
+
+export type PayMethod = "bank_transfer" | "cash" | "instapay" | "wallet" | "cheque";
+export type PayKind = "weekly" | "deposit" | "final";
+export type PurchaseUnit = "kg" | "m" | "piece";
+export type PurchasePart = "fabric" | "printing" | "accessories" | "packaging" | "other";
+
+type SupplierBasics = {
+  /** `fac`, or a UUID: whatever the old table holds. */
+  id: string;
+  code: string;
+  name: string;
+  contact_person: string | null;
+  phone: string | null;
+  whatsapp: string | null;
+  city: string | null;
+  notes: string | null;
+  active: boolean;
+  sections: SectionRef[];
+  open_orders: number;
+  /** Purchases not yet received. */
+  open_purchases: number;
+};
+
+/** One line of the supplier list. */
+export type SupplierRow = SupplierBasics & {
+  /** Positive: HBA owes. Negative: overpaid. Owner only. */
+  owed_piastres?: number;
+  held_piastres?: number;
+};
+
+export type SupplierList = {
+  sections: Section[];
+  suppliers: SupplierRow[];
+  unsectioned: number;
+  /** What is owed in total, leaving out suppliers that are overpaid. Owner only. */
+  owed_total_piastres?: number;
+};
+
+export type PurchaseView = {
+  id: number;
+  supplier_id: string;
+  item: string;
+  /** A decimal string (`"1075"`, `"12.5"`), never a float. */
+  quantity: string;
+  unit: PurchaseUnit;
+  part: PurchasePart;
+  order: { id: number; code: string; style_name: string; colour: string; status: OrderStatus } | null;
+  bought_on: string;
+  expected_on: string | null;
+  received_on: string | null;
+  note: string | null;
+  voided: boolean;
+  voided_at: string | null;
+  // Owner only.
+  unit_price_piastres?: number;
+  total_piastres?: number;
+  deposit_piastres?: number;
+  void_reason?: string | null;
+};
+
+export type AccountLine = {
+  /** `null` for the line "so far, not settled", which is worked out on each read and is not a ledger line. */
+  id: number | null;
+  kind: "opening" | "purchase" | "work" | "payment" | "adjustment";
+  what: string;
+  /** Positive: HBA owes more. Negative: HBA owes less. */
+  amount_piastres: number;
+  /** What HBA owes after this line. */
+  balance_after_piastres: number;
+  happened_on: string | null;
+  order: { id: number; code: string } | null;
+  purchase: { id: number; item: string } | null;
+  method: PayMethod | null;
+  payment_kind: PayKind | null;
+  note: string | null;
+  /** This line undoes `reverses_id`, and `note` is the reason. */
+  reversal: boolean;
+  reverses_id: number | null;
+  reversed: boolean;
+  reversed_by_id: number | null;
+  not_settled: boolean;
+  receipt: { url: string; mime_type: string; size_bytes: number } | null;
+  created_by: string | null;
+  created_at: string | null;
+};
+
+export type SupplierOrder = {
+  id: number;
+  code: string;
+  style_name: string;
+  colour: string;
+  status: OrderStatus;
+  role: "factory" | "print";
+  /** `null` unless the order is open. */
+  stage: { key: StageKey; label: string; position: number } | null;
+};
+
+/** `GET /suppliers/{id}`, and what every write on a supplier answers with. */
+export type SupplierView = SupplierBasics & {
+  purchases: PurchaseView[];
+  orders: SupplierOrder[];
+  // Owner only.
+  owed_piastres?: number;
+  held_piastres?: number;
+  /** This calendar year's payments that still stand. */
+  paid_piastres?: number;
+  paid_year?: number;
+  /** A balance brought forward still stands. */
+  has_opening?: boolean;
+  /** Newest first. */
+  account?: AccountLine[];
+};
+
+/** Every write on a supplier answers with its page. `notice` is added by the screen, never sent. */
+export type SupplierAnswer = { supplier: SupplierView; purchase_id?: number; entry_id?: number; notice?: string };
+
+export type SectionsAnswer = { sections: Section[]; section_id?: number; deleted?: number };

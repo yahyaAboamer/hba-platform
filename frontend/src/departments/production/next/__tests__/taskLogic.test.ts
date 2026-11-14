@@ -107,6 +107,26 @@ describe("Which button a generated task gets", () => {
   });
 });
 
+describe("A purchase's task (batch 4)", () => {
+  const purchase = (key: string, title: string, who: "qc" | "factory", order: boolean = true) =>
+    makeTask({ key, title, who, open: "purchase:1", ...(order ? {} : { order: null }), supplier: { id: "fac", name: "Main factory" } });
+
+  it("is Mark received, on the supplier's page with that purchase open, for both of its tasks", () => {
+    const to = "/production/next/suppliers/fac?open=purchase:1";
+    expect(taskLink(purchase("purchase:1:arrival", "Check Heavy fleece, black on arrival", "qc"), QC)).toEqual({ label: "Mark received", to, opens: true });
+    expect(taskLink(purchase("purchase:1:chase", "Chase the Heavy fleece, black delivery", "factory"), QC)).toEqual({ label: "Mark received", to, opens: true });
+    expect(taskLink(purchase("purchase:1:chase", "x", "factory"), OWNER)?.label).toBe("Mark received");
+  });
+
+  it("goes to the supplier even when the purchase is for no order", () => {
+    expect(taskLink(purchase("purchase:1:arrival", "x", "qc", false), QC)?.to).toBe("/production/next/suppliers/fac?open=purchase:1");
+  });
+
+  it("gives somebody who can only read the supplier's page, not a button that writes", () => {
+    expect(taskLink(purchase("purchase:1:arrival", "x", "qc"), VIEWER)).toEqual({ label: "Open supplier", to: "/production/next/suppliers/fac", opens: false });
+  });
+});
+
 /** The fixture skips the sample (a repeat run); this order is waiting for it. */
 function waitingForSample() {
   const order = makeOrder("sample");
