@@ -151,7 +151,7 @@ export type Settlement = {
   pieces_cut: number;
   work_value_piastres: number;
   rejected_pieces: number;
-  rejected_basis: "making" | "piece";
+  rejected_basis: "making" | "fabric_and_making";
   rejected_rate_piastres: number;
   rejected_deduction_piastres: number;
   held_pieces: number;

@@ -414,7 +414,7 @@ export function OwedCard({ order }: { order: OrderView }) {
                   <div className="prod-small">
                     {owed.rejected_basis === "making"
                       ? "HBA bought the fabric, so only the making cost comes off"
-                      : "The factory bought the fabric, so the whole piece cost comes off"}
+                      : "The factory bought the fabric, so the fabric and the making cost come off"}
                   </div>
                 </td>
                 <td className="numeric">− <Money piastres={owed.rejected_deduction_piastres} /></td>

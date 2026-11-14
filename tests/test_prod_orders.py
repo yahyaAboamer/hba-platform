@@ -666,13 +666,13 @@ def _money_facts(printing: str, buyer: str, **actual) -> service.Facts:
     ("printing", "buyer", "rate", "rejected_rate", "payable"),
     [
         # Rate = manufacturing (+ printing when the factory prints).
-        # 100 cut x rate - 4 rejected x (rate | whole piece 17,800) - 4 still to fix x rate.
+        # 100 cut x rate - 4 rejected x (rate | fabric 10,000 + rate) - 4 still to fix x rate.
         ("factory", "hba", 7000, 7000, 700000 - 28000 - 28000),
         ("outside", "hba", 5000, 5000, 500000 - 20000 - 20000),
         ("none", "hba", 5000, 5000, 500000 - 20000 - 20000),
-        ("factory", "factory", 7000, 17800, 700000 - 71200 - 28000),
-        ("outside", "factory", 5000, 17800, 500000 - 71200 - 20000),
-        ("none", "factory", 5000, 17800, 500000 - 71200 - 20000),
+        ("factory", "factory", 7000, 17000, 700000 - 68000 - 28000),
+        ("outside", "factory", 5000, 15000, 500000 - 60000 - 20000),
+        ("none", "factory", 5000, 15000, 500000 - 60000 - 20000),
     ],
 )
 def test_every_money_formula(printing, buyer, rate, rejected_rate, payable):
@@ -681,7 +681,7 @@ def test_every_money_formula(printing, buyer, rate, rejected_rate, payable):
     assert figures["rate_includes_printing"] is (printing == "factory")
     assert figures["work_value_piastres"] == 100 * rate
     assert figures["rejected_rate_piastres"] == rejected_rate
-    assert figures["rejected_basis"] == ("making" if buyer == "hba" else "piece")
+    assert figures["rejected_basis"] == ("making" if buyer == "hba" else "fabric_and_making")
     assert figures["rejected_deduction_piastres"] == 4 * rejected_rate
     assert figures["held_pieces"] == 4
     assert figures["held_piastres"] == 4 * rate
@@ -693,7 +693,8 @@ def test_an_actual_cost_replaces_its_target_part_by_part():
     facts = _money_facts("factory", "factory", manufacturing=5500, fabric=11000)
     figures = service.settlement(facts)
     assert figures["making_rate_piastres"] == 5500 + 2000
-    assert figures["rejected_rate_piastres"] == 11000 + 5500 + 2000 + 500 + 300
+    # Fabric plus making: accessories and packaging never come off the factory.
+    assert figures["rejected_rate_piastres"] == 11000 + 5500 + 2000
     cost = service.cost(facts.order)
     assert cost["target_total_piastres"] == 17800
     assert cost["actual_total_piastres"] == 19300

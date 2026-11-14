@@ -1295,7 +1295,10 @@ def settlement(facts: Facts) -> dict:
     rate = making_rate(order)
     cut = facts.total("cut")
     rejected = facts.total("rejected")
-    rejected_rate = rate if order.fabric_bought_by == "hba" else piece_cost(order)
+    # A rejected piece is not paid for: the making, and the fabric too when
+    # the factory bought it (the owner, 14 November 2026). Accessories and
+    # packaging are HBA's own and never come off the factory.
+    rejected_rate = rate if order.fabric_bought_by == "hba" else rate + _part(order, "fabric")
     held_pieces = facts.fix_not_returned
     work = cut * rate
     deduction = rejected * rejected_rate
@@ -1308,7 +1311,7 @@ def settlement(facts: Facts) -> dict:
         "pieces_cut": cut,
         "work_value_piastres": work,
         "rejected_pieces": rejected,
-        "rejected_basis": "making" if order.fabric_bought_by == "hba" else "piece",
+        "rejected_basis": "making" if order.fabric_bought_by == "hba" else "fabric_and_making",
         "rejected_rate_piastres": rejected_rate,
         "rejected_deduction_piastres": deduction,
         "held_pieces": held_pieces,

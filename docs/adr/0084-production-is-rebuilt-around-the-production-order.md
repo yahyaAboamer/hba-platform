@@ -73,8 +73,9 @@ five sub-tabs; sample data). The owner approved each sub-tab in turn.
 
 8. **Settlement.** The factory is owed the making rate (manufacturing, plus
    printing when it prints) for each piece cut. A rejected piece takes off
-   the making rate when HBA bought the fabric, and the full piece cost when
-   the factory bought it. Pieces sent back for fixing are held until they
+   the making rate when HBA bought the fabric, and the fabric cost plus the
+   making rate when the factory bought it (the owner, 14 November 2026:
+   accessories and packaging never come off the factory). Pieces sent back for fixing are held until they
    return.
 
 9. **Suppliers** belong to one or more sections (manufacturers, fabric,

@@ -327,7 +327,8 @@ payroll without touching a maintainer screen.
   reason. Only the owner (`production.owner`) creates orders, approves
   samples, settles and sees money; **the QC manager never receives a cost,
   rate or balance**. The factory is owed the making rate per piece cut, less
-  rejected pieces and less pieces held until fixed.
+  rejected pieces (the making, and the fabric too when the factory bought
+  it) and less pieces held until fixed.
 - **Three compensation types, not one.** `commission`,
   `fixed_plus_commission` (**both** are paid — the one most often got wrong),
   `base_guarantee` (`max(commission, base)`, only where targets were met). No

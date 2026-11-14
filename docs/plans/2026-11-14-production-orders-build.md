@@ -178,8 +178,8 @@ History is the platform's `audit_event` (`record_audit`, actions named
      manufacturing; actual if typed, else target.
    - Work value = total cut x making rate.
    - Rejected deduction = total rejected x making rate when
-     `fabric_bought_by = hba`; x the whole actual-or-target cost per piece
-     when `factory`.
+     `fabric_bought_by = hba`; x (the fabric part + the making rate) when `factory`
+     (the owner, 14 November 2026).
    - Held until fixed = (to fix not yet returned) x making rate.
    - Payable now = work value - rejected deduction - held.
    Shown from the moment cutting is done; frozen at settle.
