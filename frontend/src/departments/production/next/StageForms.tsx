@@ -245,8 +245,10 @@ export function InspectionForm({ order, run, onClose }: FormProps) {
       <form
         className="prod-form prod-form--wide"
         onSubmit={(event) => {
+          // Enter in a count box submits the form: that only saves. Completing the inspection is
+          // its own button, so a keystroke cannot finish a stage whose numbers happen to add up.
           event.preventDefault();
-          send(true);
+          send(false);
         }}
       >
         <div className="prod-inspect prod-wide" role="group" aria-label="Counts by size">
@@ -302,11 +304,11 @@ export function InspectionForm({ order, run, onClose }: FormProps) {
         <Actions
           error={error}
           busy={busy}
-          label="Complete the inspection"
+          label="Save counts for now"
           working="Saving…"
           extra={
-            <button type="button" className="button" disabled={busy} onClick={() => send(false)}>
-              Save counts for now
+            <button type="button" className="button" disabled={busy} onClick={() => send(true)}>
+              Complete the inspection
             </button>
           }
         />

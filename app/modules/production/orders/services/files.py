@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from app.core.businesstime import utcnow
 from app.modules.inbox.public import file_bucket
 from app.modules.production.orders.models import STAGE_LABELS, STAGES, ProdOrder, ProdOrderFile
-from app.modules.production.orders.services.orders import Locked, Refused, _audit, _iso, _people
+from app.modules.production.orders.services.orders import Locked, NotFound, Refused, _audit, _iso, _order, _people
 from app.modules.production.services.files import MAX_BYTES, image_type
 from app.shared.models.identity import UserAccount
 
@@ -54,7 +54,7 @@ def view(row: ProdOrderFile, people: dict[int, str]) -> dict:
 
 def listing(db: Session, order_id: int) -> list[dict]:
     if db.get(ProdOrder, order_id) is None:
-        raise LookupError("There is no such production order.")
+        raise NotFound("There is no such production order.")
     rows = list(
         db.scalars(
             select(ProdOrderFile)
@@ -69,10 +69,14 @@ def listing(db: Session, order_id: int) -> list[dict]:
 def add(
     db: Session, order_id: int, *, filename: str, content: bytes, stage: str | None, actor: UserAccount
 ) -> dict:
-    """Store a checked file and record it. Staged; the route commits."""
-    order = db.get(ProdOrder, order_id)
-    if order is None:
-        raise LookupError("There is no such production order.")
+    """Check a file, record it and store it. Staged; the route commits.
+
+    The order is read ``FOR UPDATE``, as every other write does, so an upload
+    cannot slip past a settle or a cancel that is committing at the same
+    time. The bucket is written last, once every check has passed and the row
+    is staged, so a refusal never leaves a stored file behind.
+    """
+    order = _order(db, order_id, for_update=True)
     _must_be_open(order)
     stage = (stage or "").strip() or None
     if stage is not None and stage not in STAGES:
@@ -86,7 +90,6 @@ def add(
         raise Refused("Use a JPG, PNG, WebP or GIF photo, or a PDF.")
     name = " ".join((filename or "").split())[:255] or ("Document" if mime == PDF else "Photo")
     key = f"production/orders/{order.id}/{uuid.uuid4()}"
-    file_bucket().put(key, content, mime)
     row = ProdOrderFile(
         order_id=order.id, stage=stage, name=name, storage_key=key, mime_type=mime,
         size_bytes=len(content), uploaded_by=actor.id,
@@ -95,6 +98,7 @@ def add(
     db.flush()
     where = f" to {STAGE_LABELS[stage]}" if stage else ""
     _audit(db, order, actor, "file_added", f"Added {name}{where} on {order.code}", file=row.id)
+    file_bucket().put(key, content, mime)
     return view(row, _people(db, [actor.id]))
 
 
@@ -107,8 +111,13 @@ def for_download(db: Session, file_id: int) -> ProdOrderFile | None:
 def remove(db: Session, file_id: int, actor: UserAccount) -> None:
     row = for_download(db, file_id)
     if row is None:
-        raise LookupError("There is no such file.")
-    order = db.get(ProdOrder, row.order_id)
+        raise NotFound("There is no such file.")
+    # Lock the order first, then look at the file again: a settle, a cancel or
+    # another removal may have committed while this one waited.
+    order = _order(db, row.order_id, for_update=True)
+    db.refresh(row)
+    if row.deleted_at is not None:
+        raise NotFound("There is no such file.")
     _must_be_open(order)
     row.deleted_at = utcnow()
     _audit(db, order, actor, "file_removed", f"Removed {row.name} from {order.code}", file=row.id)

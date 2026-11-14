@@ -364,7 +364,11 @@ export const stageStatus = (order: OrderView, key: StageKey): StageStatus =>
 export const finishedToCome = (order: OrderView): number =>
   Math.max(0, (order.totals.passed ?? 0) - (order.totals.shipped ?? 0));
 
-/** What the next-action bar's button does, for this person; `null` when there is nothing for them to press. */
+/**
+ * What the next-action bar's button does, for this person; `null` when there is nothing for them to
+ * press. Somebody who may record has a button for every action on an open order: the warehouse stage
+ * in particular is "Add the reason", "Enter Khazenly's count" or "Record a delivery", never nothing.
+ */
 export function nextButton(order: OrderView, powers: Powers): { label: string; panel: Panel } | null {
   const action = order.next_action;
   if (order.status !== "open" || !action) return null;
@@ -400,7 +404,11 @@ export function nextButton(order: OrderView, powers: Powers): { label: string; p
       if ((order.fix_not_returned ?? 0) > 0) {
         return { label: "Record the fix pieces", panel: { kind: "delivery", id: null, deliveryKind: "fix" } };
       }
-      return null;
+      // Everything is shipped and counted: a receipt the owner reopened. Saving a delivery
+      // completes it again, so the bar still has a button rather than an action nobody can take.
+      const last = order.deliveries.at(-1);
+      if (last) return { label: "Check the counts", panel: { kind: "delivery", id: last.id, deliveryKind: last.kind } };
+      return { label: "Record a delivery", panel: { kind: "delivery", id: null, deliveryKind: "finished" } };
     }
     case "settle":
       return isOwner ? { label: "Settle with the factory", panel: { kind: "settle" } } : null;

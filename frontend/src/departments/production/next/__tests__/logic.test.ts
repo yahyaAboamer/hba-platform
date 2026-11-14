@@ -13,6 +13,7 @@ import {
   nextButton,
 } from "../logic";
 import type { InspectionLine } from "../logic";
+import type { Delivery } from "../types";
 import { makeOrder } from "./fixtures";
 
 const DAYS = { sample: 7, materials: 7, fabric_check: 2, pattern_check: 3, cutting: 2, making: 17, final_inspection: 1, warehouse: 3, settle: 7 };
@@ -151,5 +152,50 @@ describe("what the next-action button opens", () => {
     expect(nextButton(makeOrder("settle"), qc)).toBeNull();
     expect(nextButton(makeOrder("settle"), { canEdit: true, isOwner: true })?.panel).toEqual({ kind: "settle" });
     expect(nextButton(makeOrder("cutting"), { canEdit: false, isOwner: false })).toBeNull();
+  });
+
+  describe("at the warehouse, somebody who may record always has a button", () => {
+    const qc = { canEdit: true, isOwner: false };
+    const passed = [{ cut: 10, passed: 10 }, { cut: 20, passed: 20 }];
+    const delivery = (over: Partial<Delivery>): Delivery => ({
+      id: 11, number: 1, kind: "finished", shipped_on: "2030-10-01", counted_on: "2030-10-02", mismatch_reason: null,
+      sizes: [{ size: "S", shipped: 10, counted: 10 }, { size: "M", shipped: 20, counted: 20 }],
+      shipped_total: 30, counted_total: 30, waiting_for_count: false, mismatch: false, needs_reason: false, ...over,
+    });
+
+    it("records a delivery while finished pieces are still to come", () => {
+      expect(nextButton(makeOrder("warehouse", { sizes: passed }), qc)).toEqual({
+        label: "Record a delivery", panel: { kind: "delivery", id: null, deliveryKind: "finished" },
+      });
+    });
+
+    it("enters Khazenly's count on the delivery that has none, and adds a missing reason first", () => {
+      const waiting = delivery({ id: 12, counted_on: null, waiting_for_count: true, counted_total: null });
+      expect(nextButton(makeOrder("warehouse", { sizes: passed, deliveries: [waiting] }), qc)).toEqual({
+        label: "Enter Khazenly's count", panel: { kind: "delivery", id: 12, deliveryKind: "finished" },
+      });
+      const unexplained = delivery({ id: 13, mismatch: true, needs_reason: true });
+      expect(nextButton(makeOrder("warehouse", { sizes: passed, deliveries: [waiting, unexplained] }), qc)).toEqual({
+        label: "Add the reason", panel: { kind: "delivery", id: 13, deliveryKind: "finished" },
+      });
+    });
+
+    it("records the fix pieces still at the factory", () => {
+      const done = delivery({});
+      const order = makeOrder("warehouse", { sizes: [{ cut: 10, passed: 10 }, { cut: 20, passed: 20, shipped: 0 }], deliveries: [done] });
+      order.totals.shipped = 30;
+      order.fix_not_returned = 3;
+      expect(nextButton(order, qc)?.label).toBe("Record the fix pieces");
+    });
+
+    it("still has a button once everything is shipped and counted (a receipt that was reopened)", () => {
+      const order = makeOrder("warehouse", { sizes: [{ cut: 10, passed: 10, shipped: 10 }, { cut: 20, passed: 20, shipped: 20 }], deliveries: [delivery({})] });
+      expect(order.next_action?.stage).toBe("warehouse");
+      expect(nextButton(order, qc)).toEqual({
+        label: "Check the counts", panel: { kind: "delivery", id: 11, deliveryKind: "finished" },
+      });
+      const none = makeOrder("warehouse", { sizes: [{ cut: 10, passed: 0, shipped: 0 }, { cut: 20, passed: 0, shipped: 0 }] });
+      expect(nextButton(none, qc)?.panel).toEqual({ kind: "delivery", id: null, deliveryKind: "finished" });
+    });
   });
 });

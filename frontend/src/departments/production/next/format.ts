@@ -118,7 +118,7 @@ export function whoWhen(action: NextAction, today: string, flagged: boolean): st
 
 /** The stage, as the list and the order's pill say it: `7 of 10 · Making`. */
 export function stagePhrase(row: Pick<OrderRow, "stage" | "status">): string {
-  // A cancelled order still has a stage it never got past (`_row.stage`), so the status is asked first.
+  // A cancelled or closed order is at no stage (`_row.stage` is null), but the status is asked first anyway.
   if (row.status === "cancelled") return "Cancelled";
   if (row.status === "closed" || !row.stage) return "Settled and closed";
   return `${row.stage.position} of 10 · ${row.stage.label}`;

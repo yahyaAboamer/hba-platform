@@ -148,11 +148,14 @@ History is the platform's `audit_event` (`record_audit`, actions named
      total to fix. Counts may be saved (not completed) at any time after
      cutting is done, because pieces finish in batches.
    - `warehouse`: completes by itself when every delivery has a Khazenly
-     count, no mismatch is without a reason, total counted on `finished`
-     deliveries + mismatch-explained pieces covers `passed`, and total fix
-     pieces returned covers `to_fix`. The owner can **write off** fix pieces
-     that will not return (they move from `to_fix` to `rejected`, reason
-     required).
+     count (every size), no mismatch is without a reason, finished pieces
+     **shipped** cover `passed` and fix pieces **shipped** cover `to_fix`
+     (pieces still at the factory hold it open, whatever was counted), and
+     total counted + mismatch-explained pieces cover them. It is checked after
+     every delivery, write-off and inspection save. The owner can **write
+     off** fix pieces that will not return (they move from `to_fix` to
+     `rejected`, reason required; the `to_fix` reasons shrink with them,
+     largest first).
    - `settle`: the owner settles; the snapshot is stored and the order
      closes.
    The owner can reopen the latest done stage (reason required) while the
@@ -195,7 +198,10 @@ Refusals follow the Operations pattern (`Refused` -> 422, locked -> 409).
 - `GET  /orders?status=open|closed` — list rows for the order list.
 - `POST /orders` — create (owner).
 - `GET  /orders/{id}` — the whole order.
-- `PATCH /orders/{id}` — basics, target and actual cost (owner).
+- `PATCH /orders/{id}` — basics, target and actual cost (owner). Who buys
+  the fabric, printing and the print house are locked once cutting is done
+  (409; the same value sent again is no change); the order's own factory or
+  print house may stay even if deactivated, only a changed one must be active.
 - `PATCH /orders/{id}/stages/{stage}` — expected date, note.
 - `POST /orders/{id}/stages/{stage}/complete` — body depends on the stage.
 - `POST /orders/{id}/stages/{stage}/reopen` — owner, reason.

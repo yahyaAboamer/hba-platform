@@ -108,19 +108,41 @@ export function OrderPage({ session }: { session: Session }) {
   // Bumped after every write, so the history and the photos read again.
   const [version, setVersion] = useState(0);
   const trigger = useRef<Element | null>(null);
+  const nextBar = useRef<HTMLDivElement>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
+  // Set after a panel saved, so focus goes somewhere sensible once the page has redrawn. Only a
+  // panel's save does it: an inline save (a stage's date) leaves focus where it was.
+  const refocus = useRef(false);
+  const panelOpen = useRef(false);
+  // Which order is on the page (changes with the id and on leaving), and which answer is the newest.
+  // An answer for an order the person has left, or one that an earlier request delivers late, is dropped.
+  const page = useRef(0);
+  const latest = useRef(0);
   const today = useMemo(cairoToday, []);
+  useEffect(() => {
+    panelOpen.current = panel !== null;
+  }, [panel]);
 
   const load = useCallback(() => {
+    const mine = ++latest.current;
     setError(null);
     api.get<{ order: OrderView }>(`/api/prod/orders/${id}`)
-      .then((answer) => setOrder(answer.order))
-      .catch((caught) => setError(caught instanceof Error ? caught.message : "The order could not be loaded."));
+      .then((answer) => {
+        if (latest.current === mine) setOrder(answer.order);
+      })
+      .catch((caught) => {
+        if (latest.current === mine) setError(caught instanceof Error ? caught.message : "The order could not be loaded.");
+      });
   }, [id]);
   useEffect(() => {
     setOrder(null);
     setPanel(null);
     setNotice(null);
     load();
+    return () => {
+      page.current += 1;
+      latest.current += 1;
+    };
   }, [load]);
 
   const open = useCallback((next: Panel) => {
@@ -138,9 +160,14 @@ export function OrderPage({ session }: { session: Session }) {
   }, []);
 
   const run = useCallback<Run>(async (request, done) => {
+    const here = page.current;
     try {
       const answer: OrderAnswer = await request();
+      // The write is done either way; it is only drawn if this order is still the one on the page.
+      if (page.current !== here) return null;
+      latest.current += 1;
       setOrder(answer.order);
+      refocus.current = panelOpen.current;
       setPanel(null);
       setNotice(done);
       setVersion((before) => before + 1);
@@ -149,6 +176,19 @@ export function OrderPage({ session }: { session: Session }) {
       return caught instanceof Error ? caught.message : "It could not be saved.";
     }
   }, []);
+
+  // After a panel saved and closed: the control that opened it if it is still on the page (the
+  // stage moved on, so it may be gone), else the next-action bar's button, else the page heading.
+  useEffect(() => {
+    if (panel !== null || !refocus.current) return;
+    refocus.current = false;
+    const back = trigger.current;
+    const target =
+      back instanceof HTMLElement && back !== document.body && back.isConnected
+        ? back
+        : (nextBar.current?.querySelector<HTMLElement>("button") ?? heading.current);
+    target?.focus();
+  }, [panel, order]);
 
   if (error) {
     return (
@@ -171,7 +211,7 @@ export function OrderPage({ session }: { session: Session }) {
       <Link className="prod-back" to="/production/next/orders">← All orders</Link>
       <div className="page__head">
         <div className="page__title">
-          <h1>{order.style_name} · {order.colour}</h1>
+          <h1 ref={heading} tabIndex={-1}>{order.style_name} · {order.colour}</h1>
           <span className="page__subtitle">
             {order.code} · {order.factory.name ?? "—"} · fabric bought by {BUYER_WORDS[order.fabric_bought_by]} ·{" "}
             {order.printing === "outside" && order.print_supplier?.name ? `printed by ${order.print_supplier.name}` : PRINTING_WORDS[order.printing]}
@@ -183,7 +223,7 @@ export function OrderPage({ session }: { session: Session }) {
 
       {notice && <p className="notice notice--settled" role="status">{notice}</p>}
 
-      <div className="prod-nextbar" role="region" aria-label="Next action">
+      <div ref={nextBar} className="prod-nextbar" role="region" aria-label="Next action">
         {action ? (
           <>
             <div>

@@ -9,8 +9,8 @@ added later cannot be added without it. The QC manager's writes add
 are absent, not null. The history carries no money for anybody.
 
 Refusals follow Operations: ``Refused`` -> 422, ``Locked`` -> 409, an
-unknown order, stage, delivery or file -> 404. A refusal rolls back
-whatever was staged; success commits.
+unknown order, stage, delivery or file (``NotFound``, and only that) -> 404.
+A refusal rolls back whatever was staged; success commits.
 """
 
 import logging
@@ -61,7 +61,7 @@ def _write(db: Session, actor: UserAccount, act) -> dict:
     may see it, or roll back and refuse."""
     try:
         order = act()
-    except LookupError as exc:
+    except orders.NotFound as exc:
         db.rollback()
         raise HTTPException(404, str(exc)) from None
     except orders.Refused as exc:
@@ -148,9 +148,12 @@ class Cut(BaseModel):
 
 
 class Inspected(BaseModel):
-    passed: int = Field(default=0, ge=0, le=orders.MAX_PIECES)
-    to_fix: int = Field(default=0, ge=0, le=orders.MAX_PIECES)
-    rejected: int = Field(default=0, ge=0, le=orders.MAX_PIECES)
+    """One size's counts. All three are required: a size sent in part would
+    silently zero the others."""
+
+    passed: int = Field(ge=0, le=orders.MAX_PIECES)
+    to_fix: int = Field(ge=0, le=orders.MAX_PIECES)
+    rejected: int = Field(ge=0, le=orders.MAX_PIECES)
 
 
 class InspectionReason(Reason):
@@ -225,7 +228,7 @@ def create_order(body: NewOrder, actor: UserAccount = Depends(OWNER), db: Sessio
 def one_order(order_id: int, actor: UserAccount = Depends(GUARD), db: Session = Depends(get_session)) -> dict:
     try:
         return {"order": orders.view(db, order_id, with_money=_money(db, actor))}
-    except LookupError as exc:
+    except orders.NotFound as exc:
         raise HTTPException(404, str(exc)) from None
 
 
@@ -345,7 +348,7 @@ def order_history(order_id: int, db: Session = Depends(get_session)) -> dict:
     """The order's history, newest first. No entry carries money."""
     try:
         return orders.history(db, order_id)
-    except LookupError as exc:
+    except orders.NotFound as exc:
         raise HTTPException(404, str(exc)) from None
 
 
@@ -356,7 +359,7 @@ def order_history(order_id: int, db: Session = Depends(get_session)) -> dict:
 def order_files(order_id: int, db: Session = Depends(get_session)) -> dict:
     try:
         return {"files": files.listing(db, order_id)}
-    except LookupError as exc:
+    except orders.NotFound as exc:
         raise HTTPException(404, str(exc)) from None
 
 
@@ -378,7 +381,7 @@ async def add_file(
     def store() -> dict:
         try:
             saved = files.add(db, order_id, filename=filename, content=content, stage=stage, actor=actor)
-        except LookupError as exc:
+        except orders.NotFound as exc:
             db.rollback()
             raise HTTPException(404, str(exc)) from None
         except orders.Refused as exc:
@@ -409,7 +412,8 @@ def one_file(file_id: int, db: Session = Depends(get_session)) -> Response:
         headers={
             "Content-Disposition": "inline",
             "X-Content-Type-Options": "nosniff",
-            "Cache-Control": "private, max-age=300",
+            # No Cache-Control here: the app marks every API response
+            # no-store (app/main.py), which is right for a production file too.
         },
     )
 
@@ -418,7 +422,7 @@ def one_file(file_id: int, db: Session = Depends(get_session)) -> Response:
 def remove_file(file_id: int, actor: UserAccount = Depends(EDIT), db: Session = Depends(get_session)) -> dict:
     try:
         files.remove(db, file_id, actor)
-    except LookupError as exc:
+    except orders.NotFound as exc:
         raise HTTPException(404, str(exc)) from None
     except orders.Refused as exc:
         db.rollback()

@@ -6,7 +6,7 @@
  * `order.settlement` are absent for anybody without `production.owner`, and a
  * card that needs them is not drawn at all (the server decides, this follows).
  */
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { api } from "../../../lib/api";
 import { formatEgp } from "../../../lib/money";
@@ -473,21 +473,35 @@ export function FilesCard({ order, powers, version }: { order: OrderView; powers
   const [files, setFiles] = useState<ProdFile[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Bumped to read the list again after an upload or a removal.
+  const [reads, setReads] = useState(0);
   const picker = useRef<HTMLInputElement>(null);
+  // The server refuses a file added to or taken off an order that is not open (409), so none is offered.
+  const editable = powers.canEdit && isOpen(order);
 
-  const load = useCallback(() => {
+  useEffect(() => {
+    // An earlier read that answers late must not replace a later one, nor a different order's.
+    let current = true;
     api.get<FilesAnswer>(`/api/prod/orders/${order.id}/files`)
-      .then((answer) => setFiles(answer.files))
-      .catch((caught) => setError(caught instanceof Error ? caught.message : "The photos could not be loaded."));
-  }, [order.id]);
-  useEffect(load, [load, version]);
+      .then((answer) => {
+        if (!current) return;
+        setFiles(answer.files);
+        setError(null);
+      })
+      .catch((caught) => {
+        if (current) setError(caught instanceof Error ? caught.message : "The photos could not be loaded.");
+      });
+    return () => {
+      current = false;
+    };
+  }, [order.id, version, reads]);
 
   async function add(file: File) {
     setBusy(true);
     setError(null);
     try {
       await api.upload(`/api/prod/orders/${order.id}/files`, file);
-      load();
+      setReads((before) => before + 1);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The file could not be added.");
     } finally {
@@ -501,7 +515,7 @@ export function FilesCard({ order, powers, version }: { order: OrderView; powers
     setError(null);
     try {
       await api.del(`/api/prod/files/${file.id}`);
-      load();
+      setReads((before) => before + 1);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The file could not be removed.");
     } finally {
@@ -513,7 +527,7 @@ export function FilesCard({ order, powers, version }: { order: OrderView; powers
     <section className="prod-block" aria-labelledby="prod-photos">
       <div className="prod-block__head">
         <h2 id="prod-photos">Photos and files</h2>
-        {powers.canEdit && (
+        {editable && (
           <>
             <input
               ref={picker}
@@ -553,7 +567,7 @@ export function FilesCard({ order, powers, version }: { order: OrderView; powers
                 {file.name}
                 {file.stage && ` · ${file.stage.replace(/_/g, " ")}`}
               </span>
-              {powers.canEdit && (
+              {editable && (
                 <button type="button" className="button button--row" disabled={busy} onClick={() => remove(file)}>
                   Remove<span className="prod-sr"> {file.name}</span>
                 </button>
@@ -577,9 +591,21 @@ export function HistoryCard({ order, version }: { order: OrderView; version: num
   const [all, setAll] = useState(false);
 
   useEffect(() => {
+    // An earlier read that answers late must not replace a later one, nor a different order's;
+    // a later read that works clears an earlier read's error.
+    let current = true;
     api.get<HistoryAnswer>(`/api/prod/orders/${order.id}/history`)
-      .then((answer) => setEvents(answer.events))
-      .catch((caught) => setError(caught instanceof Error ? caught.message : "The history could not be loaded."));
+      .then((answer) => {
+        if (!current) return;
+        setEvents(answer.events);
+        setError(null);
+      })
+      .catch((caught) => {
+        if (current) setError(caught instanceof Error ? caught.message : "The history could not be loaded.");
+      });
+    return () => {
+      current = false;
+    };
   }, [order.id, version]);
 
   const shown = events ? (all ? events : events.slice(0, HISTORY_SHOWN)) : [];

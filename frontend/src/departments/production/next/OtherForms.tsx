@@ -339,7 +339,14 @@ export function EditForm({ order, run, onClose }: FormProps) {
             );
           }}
         >
-          <OrderFields draft={draft} onChange={setDraft} choices={choices} lockPlanned={locked} />
+          <OrderFields
+            draft={draft}
+            onChange={setDraft}
+            choices={choices}
+            lockPlanned={locked}
+            lockBuyerAndPrinting={locked}
+            held={{ factory: order.factory, printSupplier: order.print_supplier }}
+          />
           <Actions error={error} busy={busy} label="Save changes" working="Saving…" />
         </form>
       )}

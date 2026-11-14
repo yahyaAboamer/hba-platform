@@ -48,7 +48,8 @@ export function mockApi(table: Record<string, Handler | unknown>) {
       calls.push(call);
       const entry = table[`${method} ${path}`];
       if (entry === undefined) return reply(404, { detail: `Not served: ${method} ${path}` });
-      const answer = typeof entry === "function" ? (entry as Handler)(call.body, call) : entry;
+      // A handler may answer later (a promise), to play a slow response.
+      const answer = await (typeof entry === "function" ? (entry as Handler)(call.body, call) : entry);
       return answer instanceof Response ? answer : reply(200, answer);
     }),
   );

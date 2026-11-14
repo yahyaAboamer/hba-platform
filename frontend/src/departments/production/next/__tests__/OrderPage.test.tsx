@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { productionNextRoutes } from "../routes";
 import type { Delivery, OrderView } from "../types";
 import { makeOrder, mockApi, narrowScreen, owner, qc, renderAt, reply } from "./fixtures";
 import type { Call } from "./fixtures";
@@ -342,5 +344,256 @@ describe("The owner's decisions", () => {
       actual_accessories_piastres: 1450,
       actual_packaging_piastres: null,
     });
+  });
+});
+
+const PHOTO = { id: 5, name: "front.png", stage: null, mime_type: "image/png", size_bytes: 10, created_at: null, uploaded_by: "Nour", url: "/api/prod/files/5" };
+
+describe("Files follow the order's status", () => {
+  it("offers adding and removing a photo while the order is open", async () => {
+    serve(makeOrder("cutting"), { "GET /api/prod/orders/3/files": { files: [PHOTO] } });
+    renderAt(ADDRESS, qc());
+    await screen.findByRole("heading", { level: 1, name: "Oversized hoodie · Black" });
+    expect(screen.getByRole("button", { name: "Add a photo" })).toBeTruthy();
+    expect(await screen.findByRole("button", { name: /^Remove\s*front\.png$/ })).toBeTruthy();
+  });
+
+  it.each(["cancelled", "closed"] as const)("offers neither on a %s order, which keeps its files as they are", async (status) => {
+    serve(makeOrder("settle", { extra: { status, stage: null, next_action: null } }), { "GET /api/prod/orders/3/files": { files: [PHOTO] } });
+    renderAt(ADDRESS, owner());
+    await screen.findByRole("heading", { level: 1, name: "Oversized hoodie · Black" });
+    expect(await screen.findByAltText("front.png")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Add a photo" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Remove/ })).toBeNull();
+  });
+});
+
+describe("Where focus goes after a panel saves", () => {
+  const cutOrder = () => serve(makeOrder("cutting"), { "PUT /api/prod/orders/3/cut": () => ({ order: makeOrder("final_inspection") }) });
+
+  it("returns to the control that opened it, when that is still there", async () => {
+    cutOrder();
+    renderAt(ADDRESS, qc());
+    await screen.findByRole("heading", { level: 1, name: "Oversized hoodie · Black" });
+    const opener = screen.getAllByRole("button", { name: "Record cut quantities" })[0];
+    opener.focus();
+    fireEvent.click(opener);
+    fireEvent.click(screen.getByRole("button", { name: "Save cut quantities" }));
+    expect(await screen.findByText("Cut quantities recorded.")).toBeTruthy();
+    await waitFor(() => expect(document.activeElement).toBe(opener));
+    expect(opener.isConnected).toBe(true);
+  });
+
+  it("goes to the next-action button when the control that opened it has gone", async () => {
+    cutOrder();
+    renderAt(ADDRESS, qc());
+    await screen.findByRole("heading", { level: 1, name: "Oversized hoodie · Black" });
+    const sizesButton = screen.getAllByRole("button", { name: "Record cut quantities" })[1];
+    sizesButton.focus();
+    fireEvent.click(sizesButton);
+    fireEvent.click(screen.getByRole("button", { name: "Save cut quantities" }));
+    expect(await screen.findByText("Cut quantities recorded.")).toBeTruthy();
+    // Cutting is done, so the pieces card no longer offers that button; the bar offers the next step.
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "Record the inspection" })));
+    expect(sizesButton.isConnected).toBe(false);
+  });
+
+  it("goes to the page heading when there is no button left, such as after cancelling", async () => {
+    serve(makeOrder("final_inspection", { money: true }), {
+      "POST /api/prod/orders/3/cancel": () => ({ order: makeOrder("final_inspection", { money: true, extra: { status: "cancelled", next_action: null, stage: null } }) }),
+    });
+    renderAt(ADDRESS, owner());
+    await screen.findByRole("heading", { level: 1, name: "Oversized hoodie · Black" });
+    const opener = screen.getByRole("button", { name: "Cancel this order" });
+    opener.focus();
+    fireEvent.click(opener);
+    type("Why", "Fabric never came");
+    fireEvent.click(screen.getByRole("button", { name: "Cancel the order" }));
+    expect(await screen.findByText("This order was cancelled.")).toBeTruthy();
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("heading", { level: 1, name: "Oversized hoodie · Black" })));
+  });
+});
+
+describe("The inspection form", () => {
+  const sizes = [{ cut: 10 }, { cut: 20 }];
+
+  it("only saves when Enter is pressed in a count box, even when the numbers add up", async () => {
+    const calls = serve(makeOrder("final_inspection", { sizes }), {
+      "PUT /api/prod/orders/3/inspection": () => ({ order: makeOrder("final_inspection", { sizes }) }),
+    });
+    renderAt(ADDRESS, qc());
+    await screen.findByRole("heading", { level: 1, name: "Oversized hoodie · Black" });
+    fireEvent.click(screen.getByRole("button", { name: "Record the inspection" }));
+
+    type("S passed", "8");
+    type("S to fix", "1");
+    type("S rejected", "1");
+    type("M passed", "20");
+    type("Rejected reason 1", "Stain");
+    type("Pieces for rejected reason 1", "1");
+    type("Fix reason 1", "Loose stitching");
+    type("Pieces for fix reason 1", "1");
+
+    // Enter in a box submits the form. Everything adds up, and still it must not complete.
+    fireEvent.submit(screen.getByLabelText("S passed").closest("form")!);
+    await waitFor(() => expect(writes(calls)).toHaveLength(1));
+    expect(writes(calls)[0].body).toMatchObject({ complete: false });
+    expect(writes(calls)[0].body).not.toHaveProperty("done_on");
+    expect(await screen.findByText("Inspection counts saved.")).toBeTruthy();
+  });
+
+  it("makes the form's own submit the save, and completing a separate button", async () => {
+    serve(makeOrder("final_inspection", { sizes }));
+    renderAt(ADDRESS, qc());
+    await screen.findByRole("heading", { level: 1, name: "Oversized hoodie · Black" });
+    fireEvent.click(screen.getByRole("button", { name: "Record the inspection" }));
+    expect((screen.getByRole("button", { name: "Save counts for now" }) as HTMLButtonElement).type).toBe("submit");
+    expect((screen.getByRole("button", { name: "Complete the inspection" }) as HTMLButtonElement).type).toBe("button");
+  });
+});
+
+describe("Editing the order", () => {
+  const choices = {
+    suppliers: [{ id: "SUP-2", name: "Print house A", category: "Printing houses" }],
+    products: [{ id: "P1", title: "Oversized hoodie" }],
+    sizes: ["XS", "S", "M", "L", "XL", "XXL"],
+    stage_days: {},
+  };
+
+  it("keeps a factory that is no longer active in the list, and says so", async () => {
+    serve(makeOrder("cutting", { money: true }), { "GET /api/prod/choices": choices });
+    renderAt(ADDRESS, owner());
+    await screen.findByRole("heading", { level: 1, name: "Oversized hoodie · Black" });
+    fireEvent.click(screen.getByRole("button", { name: "Edit the order" }));
+    const factory = (await screen.findByRole("combobox", { name: "Factory" })) as HTMLSelectElement;
+    expect(factory.value).toBe("SUP-1");
+    expect(within(factory).getByRole("option", { name: "Main factory (no longer active)" })).toBeTruthy();
+    expect(within(factory).getByRole("option", { name: /Print house A/ })).toBeTruthy();
+  });
+
+  it("keeps an inactive print house in its list too, and sends it back unchanged", async () => {
+    const calls = serve(
+      makeOrder("cutting", { money: true, extra: { printing: "outside", print_supplier: { id: "SUP-9", name: "Old print house" } } }),
+      { "GET /api/prod/choices": choices, "PATCH /api/prod/orders/3": () => ({ order: makeOrder("cutting", { money: true }) }) },
+    );
+    renderAt(ADDRESS, owner());
+    await screen.findByRole("heading", { level: 1, name: "Oversized hoodie · Black" });
+    fireEvent.click(screen.getByRole("button", { name: "Edit the order" }));
+    const printer = (await screen.findByRole("combobox", { name: "Print house" })) as HTMLSelectElement;
+    expect(printer.value).toBe("SUP-9");
+    expect(within(printer).getByRole("option", { name: "Old print house (no longer active)" })).toBeTruthy();
+    type("Colour", "Red");
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(writes(calls)).toHaveLength(1));
+    expect(writes(calls)[0].body).toMatchObject({ factory_id: "SUP-1", printing: "outside", print_supplier_id: "SUP-9", colour: "Red" });
+  });
+
+  it("lets who buys the fabric and printing change before cutting", async () => {
+    serve(makeOrder("cutting", { money: true }), { "GET /api/prod/choices": choices });
+    renderAt(ADDRESS, owner());
+    await screen.findByRole("heading", { level: 1, name: "Oversized hoodie · Black" });
+    fireEvent.click(screen.getByRole("button", { name: "Edit the order" }));
+    expect(((await screen.findByRole("combobox", { name: "Who buys the fabric" })) as HTMLSelectElement).disabled).toBe(false);
+    expect((screen.getByRole("combobox", { name: "Printing" }) as HTMLSelectElement).disabled).toBe(false);
+    expect(screen.queryByText(/cannot change after cutting/)).toBeNull();
+  });
+
+  it("shows who buys the fabric and printing read-only, with the reason, once cutting is done", async () => {
+    const calls = serve(makeOrder("final_inspection", { money: true }), {
+      "GET /api/prod/choices": choices,
+      "PATCH /api/prod/orders/3": () => ({ order: makeOrder("final_inspection", { money: true }) }),
+    });
+    renderAt(ADDRESS, owner());
+    await screen.findByRole("heading", { level: 1, name: "Oversized hoodie · Black" });
+    fireEvent.click(screen.getByRole("button", { name: "Edit the order" }));
+    const buyer = (await screen.findByRole("combobox", { name: "Who buys the fabric" })) as HTMLSelectElement;
+    const printing = screen.getByRole("combobox", { name: "Printing" }) as HTMLSelectElement;
+    expect(buyer.disabled).toBe(true);
+    expect(printing.disabled).toBe(true);
+    expect(buyer.value).toBe("hba");
+    expect(printing.value).toBe("factory");
+    expect(screen.getByText("Who buys the fabric cannot change after cutting. Reopen cutting first.")).toBeTruthy();
+    expect(screen.getByText("Printing cannot change after cutting. Reopen cutting first.")).toBeTruthy();
+    expect(buyer.getAttribute("aria-describedby")).toBeTruthy();
+
+    // Saving still sends the unchanged values, which the server accepts.
+    type("Colour", "Red");
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(writes(calls)).toHaveLength(1));
+    expect(writes(calls)[0].body).toMatchObject({ fabric_bought_by: "hba", printing: "factory", print_supplier_id: null });
+  });
+});
+
+describe("Slow and out-of-order answers", () => {
+  const event = (id: number, summary: string) => ({ id, at: "2030-09-28T08:00:00Z", who: "Nour", action: "production.order_x", summary });
+
+  it("keeps the newer history when an earlier read answers late", async () => {
+    let release: (answer: unknown) => void = () => undefined;
+    let reads = 0;
+    serve(makeOrder("cutting"), {
+      "GET /api/prod/orders/3/history": () => {
+        reads += 1;
+        if (reads === 1) return new Promise((resolve) => (release = resolve));
+        return { events: [event(2, "Newer entry")] };
+      },
+      "PUT /api/prod/orders/3/cut": () => ({ order: makeOrder("final_inspection") }),
+    });
+    renderAt(ADDRESS, qc());
+    await screen.findByRole("heading", { level: 1, name: "Oversized hoodie · Black" });
+    fireEvent.click(screen.getAllByRole("button", { name: "Record cut quantities" })[0]);
+    fireEvent.click(screen.getByRole("button", { name: "Save cut quantities" }));
+    expect(await screen.findByText("Newer entry")).toBeTruthy();
+
+    await act(async () => {
+      release({ events: [event(1, "Older entry")] });
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    expect(screen.queryByText("Older entry")).toBeNull();
+    expect(screen.getByText("Newer entry")).toBeTruthy();
+  });
+
+  it("clears the history's error once a later read works", async () => {
+    let reads = 0;
+    serve(makeOrder("cutting"), {
+      "GET /api/prod/orders/3/history": () => (++reads === 1 ? reply(500, { detail: "The history is not available just now." }) : { events: [event(3, "Back again")] }),
+      "PUT /api/prod/orders/3/cut": () => ({ order: makeOrder("final_inspection") }),
+    });
+    renderAt(ADDRESS, qc());
+    expect(await screen.findByText("The history is not available just now.")).toBeTruthy();
+    fireEvent.click(screen.getAllByRole("button", { name: "Record cut quantities" })[0]);
+    fireEvent.click(screen.getByRole("button", { name: "Save cut quantities" }));
+    expect(await screen.findByText("Back again")).toBeTruthy();
+    expect(screen.queryByText("The history is not available just now.")).toBeNull();
+  });
+
+  it("does not let a slow answer for the order left behind replace the one on the page", async () => {
+    let release: (answer: unknown) => void = () => undefined;
+    mockApi({
+      "GET /api/prod/orders/3": () => new Promise((resolve) => (release = resolve)),
+      "GET /api/prod/orders/4": { order: makeOrder("cutting", { extra: { id: 4, style_name: "Boxy tee" } }) },
+      "GET /api/prod/orders/4/history": { events: [] },
+      "GET /api/prod/orders/4/files": { files: [] },
+    });
+    function Jump() {
+      const navigate = useNavigate();
+      return <button type="button" onClick={() => navigate("/production/next/orders/4")}>Go to the other order</button>;
+    }
+    render(
+      <MemoryRouter initialEntries={[ADDRESS]}>
+        <Jump />
+        <Routes>
+          <Route path="/production">{productionNextRoutes(qc())}</Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Go to the other order" }));
+    expect(await screen.findByRole("heading", { level: 1, name: "Boxy tee · Black" })).toBeTruthy();
+
+    await act(async () => {
+      release({ order: makeOrder("cutting", { extra: { id: 3, style_name: "Late hoodie" } }) });
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    expect(screen.queryByRole("heading", { level: 1, name: "Late hoodie · Black" })).toBeNull();
+    expect(screen.getByRole("heading", { level: 1, name: "Boxy tee · Black" })).toBeTruthy();
   });
 });

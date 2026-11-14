@@ -104,17 +104,50 @@ export function draftBody(draft: OrderDraft, lockPlanned = false) {
   };
 }
 
+/** What the server says when who buys the fabric, or printing, is changed after cutting. */
+export const FABRIC_LOCKED = "Who buys the fabric cannot change after cutting. Reopen cutting first.";
+export const PRINTING_LOCKED = "Printing cannot change after cutting. Reopen cutting first.";
+
+/** The supplier an order already has, which may since have been deactivated. */
+type HeldSupplier = { id: string; name: string | null } | null | undefined;
+
+/**
+ * The supplier options: the active ones, plus the one the order already has even when it is no
+ * longer active (the server lets it stay), so a stale supplier does not hide the select's value.
+ */
+function SupplierOptions({ suppliers, held }: { suppliers: Choices["suppliers"]; held: HeldSupplier }) {
+  return (
+    <>
+      {suppliers.map((supplier) => (
+        <option key={supplier.id} value={supplier.id}>
+          {supplier.name}
+          {supplier.category ? ` · ${supplier.category}` : ""}
+        </option>
+      ))}
+      {held && !suppliers.some((supplier) => supplier.id === held.id) && (
+        <option value={held.id}>{held.name ?? held.id} (no longer active)</option>
+      )}
+    </>
+  );
+}
+
 export function OrderFields({
   draft,
   onChange,
   choices,
   lockPlanned,
+  lockBuyerAndPrinting,
+  held,
 }: {
   draft: OrderDraft;
   onChange: (draft: OrderDraft) => void;
   choices: Choices;
   /** Cutting is done: the plan stays as it was. */
   lockPlanned?: boolean;
+  /** Cutting is done: who buys the fabric and how it is printed stay as they were (shown, not editable). */
+  lockBuyerAndPrinting?: boolean;
+  /** The factory and print house the order has now, kept in the lists even if no longer active. */
+  held?: { factory: HeldSupplier; printSupplier: HeldSupplier };
 }) {
   const id = useId();
   const set = <K extends keyof OrderDraft>(key: K, value: OrderDraft[K]) => onChange({ ...draft, [key]: value });
@@ -163,22 +196,29 @@ export function OrderFields({
         </label>
         <select id={`${id}-factory`} className="input" value={draft.factoryId} onChange={(event) => set("factoryId", event.target.value)}>
           <option value="">Choose the factory…</option>
-          {choices.suppliers.map((supplier) => (
-            <option key={supplier.id} value={supplier.id}>
-              {supplier.name}
-              {supplier.category ? ` · ${supplier.category}` : ""}
-            </option>
-          ))}
+          <SupplierOptions suppliers={choices.suppliers} held={held?.factory} />
         </select>
       </div>
       <div className="prod-field">
         <label className="field__label" htmlFor={`${id}-buyer`}>
           Who buys the fabric
         </label>
-        <select id={`${id}-buyer`} className="input" value={draft.fabricBy} onChange={(event) => set("fabricBy", event.target.value as FabricBuyer)}>
+        <select
+          id={`${id}-buyer`}
+          className="input"
+          value={draft.fabricBy}
+          disabled={lockBuyerAndPrinting}
+          aria-describedby={lockBuyerAndPrinting ? `${id}-buyer-locked` : undefined}
+          onChange={(event) => set("fabricBy", event.target.value as FabricBuyer)}
+        >
           <option value="hba">HBA</option>
           <option value="factory">The factory</option>
         </select>
+        {lockBuyerAndPrinting && (
+          <span id={`${id}-buyer-locked`} className="field__hint">
+            {FABRIC_LOCKED}
+          </span>
+        )}
       </div>
 
       <SizeInputs
@@ -194,25 +234,39 @@ export function OrderFields({
         <label className="field__label" htmlFor={`${id}-printing`}>
           Printing
         </label>
-        <select id={`${id}-printing`} className="input" value={draft.printing} onChange={(event) => set("printing", event.target.value as Printing)}>
+        <select
+          id={`${id}-printing`}
+          className="input"
+          value={draft.printing}
+          disabled={lockBuyerAndPrinting}
+          aria-describedby={lockBuyerAndPrinting ? `${id}-printing-locked` : undefined}
+          onChange={(event) => set("printing", event.target.value as Printing)}
+        >
           <option value="factory">At the factory</option>
           <option value="outside">Outside print house</option>
           <option value="none">No printing</option>
         </select>
+        {lockBuyerAndPrinting && (
+          <span id={`${id}-printing-locked`} className="field__hint">
+            {PRINTING_LOCKED}
+          </span>
+        )}
       </div>
       {draft.printing === "outside" && (
         <div className="prod-field">
           <label className="field__label" htmlFor={`${id}-printer`}>
             Print house
           </label>
-          <select id={`${id}-printer`} className="input" value={draft.printSupplierId} onChange={(event) => set("printSupplierId", event.target.value)}>
+          <select
+            id={`${id}-printer`}
+            className="input"
+            value={draft.printSupplierId}
+            disabled={lockBuyerAndPrinting}
+            aria-describedby={lockBuyerAndPrinting ? `${id}-printing-locked` : undefined}
+            onChange={(event) => set("printSupplierId", event.target.value)}
+          >
             <option value="">Choose the print house…</option>
-            {choices.suppliers.map((supplier) => (
-              <option key={supplier.id} value={supplier.id}>
-                {supplier.name}
-                {supplier.category ? ` · ${supplier.category}` : ""}
-              </option>
-            ))}
+            <SupplierOptions suppliers={choices.suppliers} held={held?.printSupplier} />
           </select>
         </div>
       )}

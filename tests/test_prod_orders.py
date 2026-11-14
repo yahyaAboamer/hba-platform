@@ -8,13 +8,14 @@ from datetime import timedelta
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import select, text
+from sqlalchemy import event, select, text
 
 from app.core.businesstime import business_date, utcnow
 from app.core.passwords import hash_password
 from app.db import SessionLocal, engine
 from app.main import app
 from app.modules.production.models import ProductionSupplier, ProductionSupplierCategory
+from app.modules.production.orders import api as orders_api
 from app.modules.production.orders.models import (
     ProdDelivery,
     ProdDeliverySize,
@@ -25,6 +26,7 @@ from app.modules.production.orders.services import files as order_files
 from app.modules.production.orders.services import orders as service
 from app.shared.models.audit import AuditEvent
 from app.shared.models.catalogue import Product
+from app.shared.models.identity import UserAccount
 
 PASSWORD = "quiet-harbour-lantern"
 BOOTSTRAP = {"email": "owner@example.com", "display_name": "Owner", "password": PASSWORD}
@@ -468,16 +470,16 @@ def test_the_plan_can_change_until_cutting_only(owner):
 def test_inspection_counts_are_saved_in_batches_and_must_add_up_to_complete(owner, staff):
     oid = _new(owner)["id"]
     url = f"/api/prod/orders/{oid}/inspection"
-    assert staff.put(url, json={"sizes": {"M": {"passed": 1}}}).status_code == 422  # before cutting
+    assert staff.put(url, json={"sizes": {"M": {"passed": 1, "to_fix": 0, "rejected": 0}}}).status_code == 422  # before cutting
     _to_cutting(owner, oid)
     _cut(owner, oid)
 
-    partial = _ok(staff.put(url, json={"sizes": {"M": {"passed": 200, "to_fix": 2}}}))
+    partial = _ok(staff.put(url, json={"sizes": {"M": {"passed": 200, "to_fix": 2, "rejected": 0}}}))
     m = next(s for s in partial["sizes"] if s["size"] == "M")
     assert (m["passed"], m["to_fix"], m["rejected"]) == (200, 2, 0)
     assert _stage(partial, "final_inspection")["status"] == "todo"
 
-    over = staff.put(url, json={"sizes": {"S": {"passed": 149}}})
+    over = staff.put(url, json={"sizes": {"S": {"passed": 149, "to_fix": 0, "rejected": 0}}})
     assert over.status_code == 422 and "148" in over.json()["detail"]
 
     # Making is not done yet, so the inspection cannot be completed.
@@ -598,6 +600,10 @@ def test_writing_off_fix_pieces_moves_them_to_rejected(owner, staff):
     assert (xl["to_fix"], xl["rejected"]) == (0, 8)
     assert done["totals"]["rejected"] == 24 and done["totals"]["to_fix"] == 22
     assert ("Written off: Factory lost them", 8) in [(r["reason"], r["quantity"]) for r in done["reasons"]["rejected"]]
+    # The reasons for fixing shrink with the pieces (largest first), so they
+    # still add up to what is left to fix.
+    assert [(r["reason"], r["quantity"]) for r in done["reasons"]["to_fix"]] == [("Loose stitching", 13), ("Label", 9)]
+    assert sum(r["quantity"] for r in done["reasons"]["to_fix"]) == done["totals"]["to_fix"] == 22
     # That was all that was missing: the warehouse receipt completed by itself.
     assert _stage(done, "warehouse")["status"] == "done"
     assert owner.post(url, json={"sizes": {"S": 1}, "reason": "x"}).status_code == 409
@@ -744,11 +750,13 @@ def test_cancel_needs_a_reason_and_locks_the_order(owner, staff):
     assert owner.post(url, json={}).status_code == 422
     cancelled = _ok(owner.post(url, json={"reason": "Style dropped"}))
     assert cancelled["status"] == "cancelled" and cancelled["next_action"] is None
+    # A cancelled order is at no stage, in the order and in the list.
+    assert cancelled["stage"] is None and cancelled["current_stage"] is None
     assert cancelled["lateness_days"] == 0
     assert staff.post(f"/api/prod/orders/{oid}/delivery-date", json={"new_date": _day(9), "set_by": "owner", "reason": "x"}).status_code == 409
     assert owner.post(url, json={"reason": "Again"}).status_code == 409
     closed = owner.get("/api/prod/orders", params={"status": "closed"}).json()["orders"]
-    assert closed[0]["status"] == "cancelled"
+    assert closed[0]["status"] == "cancelled" and closed[0]["stage"] is None
 
 
 def test_the_owner_reopens_only_the_latest_done_stage(owner, staff):
@@ -1026,9 +1034,9 @@ def test_the_inspection_cannot_fall_below_what_has_already_shipped(owner, staff)
     _to_cutting(owner, oid)
     _cut(owner, oid)
     url = f"/api/prod/orders/{oid}/inspection"
-    _ok(staff.put(url, json={"sizes": {"M": {"passed": 200}}}))
+    _ok(staff.put(url, json={"sizes": {"M": {"passed": 200, "to_fix": 0, "rejected": 0}}}))
     _ok(_deliver(staff, oid, "finished", {"M": 150}))
-    refused = staff.put(url, json={"sizes": {"M": {"passed": 100}}})
+    refused = staff.put(url, json={"sizes": {"M": {"passed": 100, "to_fix": 0, "rejected": 0}}})
     assert refused.status_code == 422 and "already left the factory" in refused.json()["detail"]
     kept = owner.get(f"/api/prod/orders/{oid}").json()["order"]
     assert next(s for s in kept["sizes"] if s["size"] == "M")["passed"] == 200  # the refusal rolled back
@@ -1049,6 +1057,253 @@ def test_the_to_fix_reasons_must_add_up_to_complete_the_inspection(owner, staff)
 def test_a_size_with_nothing_planned_gets_no_row(owner):
     order = _new(owner, planned={"S": 0, "M": 10})
     assert [s["size"] for s in order["sizes"]] == ["M"]
+
+
+# ── Review fixes: write-off reasons, locks, suppliers, warehouse, files ──────
+
+
+def _summaries(client: TestClient, oid: int) -> list[str]:
+    return [e["summary"] for e in client.get(f"/api/prod/orders/{oid}/history").json()["events"]]
+
+
+def _record_sql():
+    """Every statement the engine runs from now on, until the returned stop()."""
+    seen: list[str] = []
+
+    def listen(connection, cursor, statement, parameters, context, executemany):
+        seen.append(" ".join(statement.split()))
+
+    event.listen(engine, "before_cursor_execute", listen)
+    return seen, lambda: event.remove(engine, "before_cursor_execute", listen)
+
+
+def test_writing_off_everything_left_removes_the_fix_reasons_that_reach_zero(owner):
+    order = _all_the_way(owner)
+    oid = order["id"]
+    assert [r["quantity"] for r in order["reasons"]["to_fix"]] == [21, 9]
+    done = _ok(owner.post(f"/api/prod/orders/{oid}/write-off", json={"sizes": FIX, "reason": "Never came back"}))
+    assert done["reasons"]["to_fix"] == []
+    assert done["totals"]["to_fix"] == 0 and done["totals"]["rejected"] == 46
+    assert sum(r["quantity"] for r in done["reasons"]["rejected"]) == 46
+    assert _stage(done, "warehouse")["status"] == "done"
+
+
+def test_an_inspection_reopened_after_a_write_off_completes_again_without_retyping(owner):
+    order = _all_the_way(owner)
+    oid = order["id"]
+    _ok(_deliver(owner, oid, "fix", {"S": 5, "M": 8, "L": 9}, counted_on=_day(0), counted={"S": 5, "M": 8, "L": 9}))
+    done = _ok(owner.post(f"/api/prod/orders/{oid}/write-off", json={"sizes": {"XL": 5, "XXL": 3}, "reason": "Lost"}))
+    assert _stage(done, "warehouse")["status"] == "done"
+    _ok(owner.post(f"/api/prod/orders/{oid}/stages/warehouse/reopen", json={"reason": "Recheck"}))
+    reopened = _ok(owner.post(f"/api/prod/orders/{oid}/stages/final_inspection/reopen", json={"reason": "Recount"}))
+    assert _stage(reopened, "final_inspection")["status"] == "todo"
+    # No sizes and no reasons sent: what is stored already adds up.
+    again = _ok(owner.put(f"/api/prod/orders/{oid}/inspection", json={"complete": True}))
+    assert _stage(again, "final_inspection")["status"] == "done"
+    assert (again["totals"]["to_fix"], again["totals"]["rejected"]) == (22, 24)
+
+
+def test_a_fix_delivery_counted_over_what_it_shipped_does_not_complete_the_warehouse(owner, staff):
+    order = _all_the_way(owner)
+    oid = order["id"]
+    # 28 of the 30 fix pieces shipped, and Khazenly's count typed as 30 with a reason.
+    shipped = {**FIX, "XL": 3}
+    held = _ok(
+        _deliver(staff, oid, "fix", shipped, counted_on=_day(-1), counted=FIX, mismatch_reason="Counted at the dock")
+    )
+    assert _stage(held, "warehouse")["status"] == "todo"
+    assert held["next_action"]["what"] == "Receive 2 fix pieces" and held["next_action"]["who"] == "factory"
+    assert held["flags"]["fix_pieces_due"] is True
+    # The last two ship and are counted: now it completes.
+    last = _ok(_deliver(staff, oid, "fix", {"XL": 2}, counted_on=_day(-1), counted={"XL": 2}))
+    assert _stage(last, "warehouse")["status"] == "done"
+
+
+def test_a_size_added_to_a_counted_delivery_waits_for_its_count(owner, staff):
+    order = _all_the_way(owner)
+    oid = order["id"]
+    fix = _ok(_deliver(staff, oid, "fix", {"S": 5}, counted_on=_day(-1), counted={"S": 5}))
+    fix_id = fix["deliveries"][2]["id"]
+    assert fix["deliveries"][2]["waiting_for_count"] is False
+    edited = _ok(staff.patch(f"/api/prod/deliveries/{fix_id}", json={"shipped": {"S": 5, "M": 8}}))
+    assert edited["deliveries"][2]["waiting_for_count"] is True
+    assert edited["next_action"]["what"] == "Enter Khazenly's count" and edited["next_action"]["who"] == "qc"
+
+
+def test_a_reopened_warehouse_stays_open_until_a_delivery_is_saved(owner, staff):
+    order = _all_the_way(owner)
+    oid = order["id"]
+    done = _ok(_deliver(owner, oid, "fix", FIX, counted_on=_day(-1), counted=FIX))
+    assert _stage(done, "warehouse")["status"] == "done"
+    reopened = _ok(owner.post(f"/api/prod/orders/{oid}/stages/warehouse/reopen", json={"reason": "Recheck a count"}))
+    # Reopening does not complete it again on the spot: that would undo the reopen.
+    assert _stage(reopened, "warehouse")["status"] == "todo"
+    assert reopened["stage"]["key"] == "warehouse"
+    assert reopened["next_action"]["what"] == "Check the delivery counts"
+    # Saving a delivery, even unchanged, completes it once everything is counted.
+    saved = _ok(staff.patch(f"/api/prod/deliveries/{reopened['deliveries'][0]['id']}", json={}))
+    assert _stage(saved, "warehouse")["status"] == "done"
+
+
+def test_an_inspection_size_must_be_sent_whole(owner, staff):
+    oid = _new(owner)["id"]
+    _to_cutting(owner, oid)
+    _cut(owner, oid)
+    url = f"/api/prod/orders/{oid}/inspection"
+    _ok(staff.put(url, json={"sizes": {"M": {"passed": 200, "to_fix": 2, "rejected": 1}}}))
+    for partial in ({"passed": 5}, {"passed": 5, "to_fix": 1}, {"to_fix": 1, "rejected": 0}, {}):
+        assert staff.put(url, json={"sizes": {"M": partial}}).status_code == 422, partial
+    kept = owner.get(f"/api/prod/orders/{oid}").json()["order"]
+    m = next(s for s in kept["sizes"] if s["size"] == "M")
+    assert (m["passed"], m["to_fix"], m["rejected"]) == (200, 2, 1)  # nothing was zeroed
+    # The service refuses it too, whoever calls it.
+    with SessionLocal() as db:
+        actor = db.scalar(select(UserAccount).limit(1))
+        with pytest.raises(service.Refused, match="together"):
+            service.save_inspection(db, oid, {"sizes": {"M": {"passed": 5}}}, actor)
+        db.rollback()
+
+
+def test_who_buys_the_fabric_and_printing_are_locked_once_cutting_is_done(owner):
+    oid = _new(owner)["id"]
+    code = owner.get(f"/api/prod/orders/{oid}").json()["order"]["code"]
+    url = f"/api/prod/orders/{oid}"
+    # Before cutting they can change, and the history says old and new in words.
+    _ok(owner.patch(url, json={"fabric_bought_by": "factory", "printing": "none"}))
+    assert _summaries(owner, oid)[0] == (
+        f"Changed {code}'s who buys the fabric (from HBA to the factory) "
+        "and printing (from at the factory to no printing)"
+    )
+    _ok(owner.patch(url, json={"printing": "factory"}))
+    _to_cutting(owner, oid)
+    _cut(owner, oid)
+
+    fabric = owner.patch(url, json={"fabric_bought_by": "hba"})
+    assert fabric.status_code == 409
+    assert fabric.json()["detail"] == "Who buys the fabric cannot change after cutting. Reopen cutting first."
+    printing = owner.patch(url, json={"printing": "none"})
+    assert printing.status_code == 409
+    assert printing.json()["detail"] == "Printing cannot change after cutting. Reopen cutting first."
+    assert owner.patch(url, json={"printing": "outside", "print_supplier_id": "prt"}).status_code == 409
+    # The same value sent again is no change, so the form can send everything.
+    kept = _ok(
+        owner.patch(
+            url, json={"fabric_bought_by": "factory", "printing": "factory", "print_supplier_id": None, "colour": "Red"}
+        )
+    )
+    assert kept["colour"] == "Red" and kept["fabric_bought_by"] == "factory" and kept["printing"] == "factory"
+    # Reopen cutting and they can change again.
+    _ok(owner.post(f"/api/prod/orders/{oid}/stages/cutting/reopen", json={"reason": "Wrong fabric buyer"}))
+    assert _ok(owner.patch(url, json={"fabric_bought_by": "hba"}))["fabric_bought_by"] == "hba"
+
+
+def test_a_change_of_print_house_is_told_with_both_names(owner):
+    order = _new(owner, printing="outside", print_supplier_id="prt")
+    oid = order["id"]
+    _ok(owner.patch(f"/api/prod/orders/{oid}", json={"print_supplier_id": "fac"}))
+    assert _summaries(owner, oid)[0] == (
+        f"Changed {order['code']}'s print house (from Print house A to Main factory)"
+    )
+    locked = _new(owner, printing="outside", print_supplier_id="prt")["id"]
+    _to_cutting(owner, locked)
+    _cut(owner, locked)
+    refused = owner.patch(f"/api/prod/orders/{locked}", json={"print_supplier_id": "fac"})
+    assert refused.status_code == 409 and "Printing cannot change" in refused.json()["detail"]
+
+
+def test_an_inactive_factory_or_print_house_already_on_the_order_may_stay(owner):
+    with SessionLocal() as db:
+        db.add(ProductionSupplier(id="alt", code="ALT", name="Second factory", category_id="cat-make", active=True))
+        db.commit()
+    oid = _new(owner, printing="outside", print_supplier_id="prt")["id"]
+    with SessionLocal() as db:
+        for supplier in ("fac", "prt"):
+            db.get(ProductionSupplier, supplier).active = False
+        db.commit()
+    url = f"/api/prod/orders/{oid}"
+
+    # What the form sends on every save: the factory and print house it has.
+    kept = {"factory_id": "fac", "printing": "outside", "print_supplier_id": "prt"}
+    order = _ok(owner.patch(url, json={**kept, "colour": "Red"}))
+    assert order["colour"] == "Red"
+    assert order["factory"]["id"] == "fac" and order["print_supplier"]["id"] == "prt"
+
+    # A *changed* supplier must be active.
+    for body in ({"factory_id": "old"}, {"print_supplier_id": "old"}):
+        refused = owner.patch(url, json=body)
+        assert refused.status_code == 422 and "not an active supplier" in refused.json()["detail"], body
+    assert _ok(owner.patch(url, json={"factory_id": "alt"}))["factory"]["id"] == "alt"
+    # Once moved off the inactive factory, it cannot come back.
+    assert owner.patch(url, json={"factory_id": "fac"}).status_code == 422
+
+
+def test_a_stray_key_error_is_a_bug_not_a_404(owner, monkeypatch):
+    oid = _new(owner)["id"]
+    assert issubclass(service.NotFound, LookupError)
+
+    def boom(*args, **kwargs):
+        raise KeyError("size")
+
+    monkeypatch.setattr(service, "complete_stage", boom)
+    with pytest.raises(KeyError):
+        owner.post(f"/api/prod/orders/{oid}/stages/materials/complete", json={})
+    # The real not-founds still answer 404, everywhere they can occur.
+    assert owner.get("/api/prod/orders/9999").status_code == 404
+    assert owner.get("/api/prod/orders/9999/history").status_code == 404
+    assert owner.get("/api/prod/orders/9999/files").status_code == 404
+    assert owner.patch("/api/prod/deliveries/99999", json={}).status_code == 404
+    assert owner.delete("/api/prod/files/99999").status_code == 404
+    with SessionLocal() as db:
+        with pytest.raises(service.NotFound):
+            service.edit_delivery(db, 99999, {}, None)
+
+
+def test_editing_a_delivery_locks_the_order_before_reading_the_delivery(owner, staff):
+    order = _all_the_way(owner)
+    delivery = order["deliveries"][0]["id"]
+    seen, stop = _record_sql()
+    try:
+        _ok(staff.patch(f"/api/prod/deliveries/{delivery}", json={"mismatch_reason": "Checked again"}))
+    finally:
+        stop()
+    lock = next(i for i, sql in enumerate(seen) if "FROM prod_order" in sql and "FOR UPDATE" in sql)
+    row = next(i for i, sql in enumerate(seen) if "FROM prod_delivery" in sql and "prod_delivery.number" in sql)
+    assert lock < row
+
+
+def test_files_lock_the_order_and_store_only_after_the_checks(owner, staff, bucket):
+    oid = _new(owner)["id"]
+    url = f"/api/prod/orders/{oid}/files"
+    assert staff.post(url, files={"file": ("x.txt", b"hello", "text/plain")}).status_code == 422
+    assert bucket.files == {}  # a refused file is never stored
+
+    seen, stop = _record_sql()
+    real_put = bucket.put
+
+    def put(key, content, content_type):
+        seen.append("BUCKET PUT")
+        real_put(key, content, content_type)
+
+    bucket.put = put
+    try:
+        photo = staff.post(url, files={"file": ("front.png", PNG, "image/png")}).json()["file"]
+        stored = seen.index("BUCKET PUT")
+        assert staff.delete(photo["url"]).status_code == 200
+    finally:
+        stop()
+    locks = [i for i, sql in enumerate(seen) if "FROM prod_order" in sql and "FOR UPDATE" in sql]
+    assert locks and locks[0] < stored  # the upload locked the order first
+    assert any(i > stored for i in locks)  # and so did the removal
+
+
+def test_a_file_is_served_without_a_cache_header_of_its_own(owner, staff, bucket):
+    oid = _new(owner)["id"]
+    photo = staff.post(f"/api/prod/orders/{oid}/files", files={"file": ("front.png", PNG, "image/png")}).json()["file"]
+    with SessionLocal() as db:
+        response = orders_api.one_file(photo["id"], db)
+    assert "cache-control" not in response.headers  # the app adds no-store to every /api response
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert staff.get(photo["url"]).headers["cache-control"] == "no-store"
 
 
 # ── The migration ─────────────────────────────────────────────────────────────

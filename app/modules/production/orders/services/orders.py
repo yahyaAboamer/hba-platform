@@ -79,6 +79,14 @@ class Locked(Refused):
     """The order, or this part of it, has moved past changing."""
 
 
+class NotFound(LookupError):
+    """There is no such order, stage, delivery or file (404).
+
+    A class of its own, so the API turns exactly this into a 404 and a stray
+    ``KeyError`` (also a ``LookupError``) inside a service stays the bug it is.
+    """
+
+
 # ── Small helpers ─────────────────────────────────────────────────────────────
 
 
@@ -180,6 +188,12 @@ class Delivery:
         return sum(r.counted or 0 for r in self.sizes.values())
 
     @property
+    def waiting_for_count(self) -> bool:
+        """No count date yet, or a size (added to the shipped numbers after
+        the count was typed) that Khazenly has not counted."""
+        return self.row.counted_on is None or any(r.counted is None for r in self.sizes.values())
+
+    @property
     def mismatch(self) -> bool:
         return self.row.counted_on is not None and any(
             r.counted is not None and r.counted != r.shipped for r in self.sizes.values()
@@ -279,7 +293,7 @@ def _facts(db: Session, order: ProdOrder) -> Facts:
 def _order(db: Session, order_id: int, *, for_update: bool = False) -> ProdOrder:
     order = db.get(ProdOrder, order_id, with_for_update=for_update or None)
     if order is None:
-        raise LookupError("There is no such production order.")
+        raise NotFound("There is no such production order.")
     return order
 
 
@@ -420,11 +434,16 @@ def choices(db: Session) -> dict:
     }
 
 
-def _supplier(db: Session, supplier_id: str | None, what: str) -> ProductionSupplier:
+def _supplier(db: Session, supplier_id: str | None, what: str, keep: str | None = None) -> ProductionSupplier:
+    """A supplier to put on an order. ``keep`` is the supplier the order
+    already has: it may stay even after it was deactivated, so one stale
+    supplier does not make every other edit fail. Only a *changed* supplier
+    must be active."""
     supplier = db.get(ProductionSupplier, supplier_id) if supplier_id else None
-    if supplier is None or supplier.deleted_at is not None:
+    staying = supplier is not None and supplier.id == keep
+    if supplier is None or (supplier.deleted_at is not None and not staying):
         raise Refused(f"Choose {what} from the list.")
-    if not supplier.active:
+    if not supplier.active and not staying:
         raise Refused(f"{supplier.name} is not an active supplier.")
     return supplier
 
@@ -453,9 +472,9 @@ def _next_code(db: Session) -> str:
     return f"{prefix}{max(numbers, default=0) + 1:02d}"
 
 
-def _printing(db: Session, printing: str, print_supplier_id: str | None) -> str | None:
+def _printing(db: Session, printing: str, print_supplier_id: str | None, keep: str | None = None) -> str | None:
     if printing == "outside":
-        return _supplier(db, print_supplier_id, "the print house").id
+        return _supplier(db, print_supplier_id, "the print house", keep).id
     return None
 
 
@@ -546,15 +565,25 @@ _BASICS = {
 }
 
 
+#: The words a change of who buys the fabric, or of printing, is told in.
+_FABRIC_WORDS = {"hba": "HBA", "factory": "the factory"}
+_PRINTING_WORDS = {"factory": "at the factory", "outside": "at an outside print house", "none": "no printing"}
+
+
 def edit(db: Session, order_id: int, data: dict, actor: UserAccount) -> ProdOrder:
     order = _open(db, order_id)
     facts = _facts(db, order)
     changed: list[str] = []
+    #: After cutting, the factory's deduction rests on who bought the fabric
+    #: and on who prints, so those two stay as they were (the same value sent
+    #: again is no change).
+    cut = facts.done("cutting")
 
-    def put(column: str, value) -> None:
-        if getattr(order, column) != value:
+    def put(column: str, value, told=None) -> None:
+        before = getattr(order, column)
+        if before != value:
             setattr(order, column, value)
-            changed.append(_BASICS[column])
+            changed.append(f"{_BASICS[column]} ({told(before, value)})" if told else _BASICS[column])
 
     if "style_name" in data:
         put("style_name", _text(data["style_name"], limit=180, what="the style", required=True))
@@ -563,14 +592,26 @@ def edit(db: Session, order_id: int, data: dict, actor: UserAccount) -> ProdOrde
     if "shopify_product_id" in data:
         put("shopify_product_id", _product(db, data["shopify_product_id"]))
     if "factory_id" in data:
-        put("factory_id", _supplier(db, data["factory_id"], "the factory").id)
+        put("factory_id", _supplier(db, data["factory_id"], "the factory", keep=order.factory_id).id)
     if "fabric_bought_by" in data and data["fabric_bought_by"] is not None:
-        put("fabric_bought_by", data["fabric_bought_by"])
+        if cut and data["fabric_bought_by"] != order.fabric_bought_by:
+            raise Locked("Who buys the fabric cannot change after cutting. Reopen cutting first.")
+        put(
+            "fabric_bought_by", data["fabric_bought_by"],
+            lambda old, new: f"from {_FABRIC_WORDS[old]} to {_FABRIC_WORDS[new]}",
+        )
     if "printing" in data or "print_supplier_id" in data:
         printing = data.get("printing") or order.printing
-        supplier = data.get("print_supplier_id", order.print_supplier_id)
-        put("printing", printing)
-        put("print_supplier_id", _printing(db, printing, supplier))
+        wanted = data.get("print_supplier_id", order.print_supplier_id) if printing == "outside" else None
+        if cut and (printing != order.printing or wanted != order.print_supplier_id):
+            raise Locked("Printing cannot change after cutting. Reopen cutting first.")
+        supplier = _printing(db, printing, wanted, keep=order.print_supplier_id)
+        names = _suppliers(db, [order.print_supplier_id, supplier])
+        put("printing", printing, lambda old, new: f"from {_PRINTING_WORDS[old]} to {_PRINTING_WORDS[new]}")
+        put(
+            "print_supplier_id", supplier,
+            lambda old, new: f"from {names.get(old, 'none') if old else 'none'} to {names.get(new, 'none') if new else 'none'}",
+        )
     if "target_date" in data and data["target_date"] is not None:
         put("target_date", data["target_date"])
     if "notes" in data:
@@ -631,7 +672,7 @@ def _words(parts: list[str]) -> str:
 
 def _stage_key(key: str) -> str:
     if key not in STAGES:
-        raise LookupError("There is no such stage.")
+        raise NotFound("There is no such stage.")
     return key
 
 
@@ -857,7 +898,11 @@ def save_inspection(db: Session, order_id: int, data: dict, actor: UserAccount) 
             raise Refused(f"{size} is not a size. Use XS, S, M, L, XL or XXL.")
         row = facts.sizes.get(size)
         cut = (row.cut or 0) if row is not None else 0
-        values = {column: _pieces(counts.get(column, 0)) for column in ("passed", "to_fix", "rejected")}
+        absent = [column for column in ("passed", "to_fix", "rejected") if column not in counts]
+        if absent:
+            # A size sent in part would silently zero the rest.
+            raise Refused(f"Size {size}: give passed, to fix and rejected together, 0 where there are none.")
+        values = {column: _pieces(counts[column]) for column in ("passed", "to_fix", "rejected")}
         if sum(values.values()) > cut:
             raise Refused(f"Size {size}: {sum(values.values()):,} inspected, more than the {cut:,} cut.")
         if row is None:
@@ -900,6 +945,7 @@ def save_inspection(db: Session, order_id: int, data: dict, actor: UserAccount) 
             f"Saved inspection counts on {order.code}: {facts.total('passed'):,} passed, "
             f"{facts.total('to_fix'):,} to fix, {facts.total('rejected'):,} rejected",
         )
+        _warehouse_check(db, order, actor)
         return order
 
     _earlier_done(facts, "final_inspection")
@@ -957,6 +1003,20 @@ def write_off(db: Session, order_id: int, sizes: dict, reason: str, actor: UserA
             created_by=actor.id,
         )
     )
+    # The pieces left "to fix", so the reasons for fixing must shrink with
+    # them: the order page then adds up, and a reopened inspection can be
+    # completed again without retyping. Largest reason first; a reason that
+    # reaches zero goes.
+    left = total
+    for old in sorted((r for r in facts.reasons if r.kind == "to_fix"), key=lambda r: (-r.quantity, r.id)):
+        if left <= 0:
+            break
+        taken = min(old.quantity, left)
+        left -= taken
+        if taken == old.quantity:
+            db.delete(old)
+        else:
+            old.quantity -= taken
     _touch(order)
     _audit(db, order, actor, "written_off", f"Wrote off {_plural(total, 'fix piece')} on {order.code}: {reason}")
     _warehouse_check(db, order, actor)
@@ -1058,10 +1118,15 @@ def add_delivery(db: Session, order_id: int, data: dict, actor: UserAccount) -> 
 
 
 def edit_delivery(db: Session, delivery_id: int, data: dict, actor: UserAccount) -> ProdOrder:
-    delivery = db.get(ProdDelivery, delivery_id)
+    # Lock the order before reading the delivery, as every other write does,
+    # so two edits (or an edit and a settle) cannot both act on stale rows.
+    order_id = db.scalar(select(ProdDelivery.order_id).where(ProdDelivery.id == delivery_id))
+    if order_id is None:
+        raise NotFound("There is no such delivery.")
+    order = _open(db, order_id)
+    delivery = db.get(ProdDelivery, delivery_id, populate_existing=True)
     if delivery is None:
-        raise LookupError("There is no such delivery.")
-    order = _open(db, delivery.order_id)
+        raise NotFound("There is no such delivery.")
     facts = _facts(db, order)
     if facts.done("warehouse"):
         raise Locked("The warehouse receipt is done. Reopen it to change a delivery.")
@@ -1099,6 +1164,9 @@ def edit_delivery(db: Session, delivery_id: int, data: dict, actor: UserAccount)
         delivery.mismatch_reason = _text(data["mismatch_reason"], limit=1000, what="the reason")
         changed.append("the reason the counts differ")
     if not changed:
+        # Nothing to save, but a warehouse receipt the owner reopened has no
+        # other way to be completed again than a save from here.
+        _warehouse_check(db, order, actor)
         return order
     delivery.updated_at = utcnow()
     _touch(order)
@@ -1117,10 +1185,13 @@ def _warehouse_ready(facts: Facts) -> bool:
     if any(facts.stages[k].status == "todo" for k in STAGES[: STAGES.index("warehouse")]):
         return False
     for delivery in facts.deliveries:
-        if delivery.row.counted_on is None or any(r.counted is None for r in delivery.sizes.values()):
+        if delivery.waiting_for_count or delivery.needs_reason:
             return False
-        if delivery.needs_reason:
-            return False
+    # Everything has to have *left the factory* as well as been counted: a fix
+    # delivery that shipped 8 of 10 and was counted as 10 leaves 2 pieces at
+    # the factory that no count can account for.
+    if facts.shipped("finished") < facts.total("passed") or facts.fix_not_returned > 0:
+        return False
     if facts.counted("finished") + facts.explained("finished") < facts.total("passed"):
         return False
     if facts.counted("fix") + facts.explained("fix") < facts.total("to_fix"):
@@ -1292,14 +1363,16 @@ def next_action(facts: Facts, on: date | None = None) -> dict | None:
         to_come = max(0, facts.total("passed") - facts.shipped("finished"))
         if any(d.needs_reason for d in facts.deliveries):
             what, who = "Give a reason for the count that does not match", "qc"
-        elif any(d.row.counted_on is None for d in facts.deliveries):
+        elif any(d.waiting_for_count for d in facts.deliveries):
             what, who = "Enter Khazenly's count", "qc"
         elif to_come:
             what, who, by = f"Receive {_plural(to_come, 'piece')}", "factory", order.delivery_date
         elif facts.fix_not_returned:
             what, who, by = f"Receive {_plural(facts.fix_not_returned, 'fix piece')}", "factory", order.delivery_date
         else:
-            what, who = "Check the warehouse receipt", "qc"
+            # Everything is shipped and counted, so this is a receipt the
+            # owner reopened: saving a delivery completes it again.
+            what, who = "Check the delivery counts", "qc"
     else:  # settle
         what, who = "Settle with the factory", "owner"
     return {"stage": key, "what": what, "who": who, "by": _day(by), "since": _day(since)}
@@ -1343,7 +1416,8 @@ def _suppliers(db: Session, ids) -> dict[str, str]:
 
 def _row(facts: Facts, suppliers: dict[str, str], on: date) -> dict:
     order = facts.order
-    current = facts.current
+    # A cancelled or closed order is at no stage: it is not going anywhere.
+    current = facts.current if order.status == "open" else None
     finished_counted = [d for d in facts.of_kind("finished") if d.row.counted_on is not None]
     warehouse = facts.stages["warehouse"]
     return {
@@ -1430,7 +1504,7 @@ def view(db: Session, order_id: int, *, with_money: bool) -> dict:
         for key in ("planned", "cut", "passed", "to_fix", "rejected", "shipped", "counted", "fix_shipped", "fix_counted")
     }
     warehouse = facts.stages["warehouse"]
-    current = facts.current
+    current = facts.current if order.status == "open" else None
     body = {
         **_row(facts, suppliers, on),
         "shopify_product_id": order.shopify_product_id,
@@ -1496,7 +1570,7 @@ def view(db: Session, order_id: int, *, with_money: bool) -> dict:
                 ],
                 "shipped_total": d.shipped,
                 "counted_total": d.counted,
-                "waiting_for_count": d.row.counted_on is None,
+                "waiting_for_count": d.waiting_for_count,
                 "mismatch": d.mismatch,
                 "needs_reason": d.needs_reason,
             }
