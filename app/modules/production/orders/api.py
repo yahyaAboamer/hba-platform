@@ -8,6 +8,10 @@ added later cannot be added without it. The QC manager's writes add
 ``settlement`` only to somebody holding ``production.owner``. Without it they
 are absent, not null. The history carries no money for anybody.
 
+Tasks (``/tasks``): the list is every open order's generated tasks plus the
+ones typed in by hand, for anybody who reads Production; the hand-added ones
+are written with ``production.edit``. No task carries money.
+
 Refusals follow Operations: ``Refused`` -> 422, ``Locked`` -> 409, an
 unknown order, stage, delivery or file (``NotFound``, and only that) -> 404.
 A refusal rolls back whatever was staged; success commits.
@@ -27,7 +31,7 @@ from app.core.permissions import Permission
 from app.db import get_session
 from app.modules.inbox.public import StorageError, file_bucket
 from app.modules.production.api import _too_large
-from app.modules.production.orders.services import files, orders
+from app.modules.production.orders.services import files, orders, tasks
 from app.shared.api.deps import holds, require_permission
 from app.shared.models.identity import UserAccount
 
@@ -205,6 +209,26 @@ class StageDays(BaseModel):
     days: dict[str, int]
 
 
+class NewTask(BaseModel):
+    title: str = Field(max_length=400)
+    due_on: date | None = None
+    order_id: int | None = Field(default=None, ge=1, le=2_147_483_647)
+    note: str | None = Field(default=None, max_length=4000)
+    for_owner: bool = False
+
+
+class TaskEdit(BaseModel):
+    """Any of these; what is left out stays as it was. ``null`` clears the
+    date, the order or the note."""
+
+    title: str | None = Field(default=None, max_length=400)
+    due_on: date | None = None
+    order_id: int | None = Field(default=None, ge=1, le=2_147_483_647)
+    note: str | None = Field(default=None, max_length=4000)
+    for_owner: bool | None = None
+    done: bool | None = None
+
+
 # ── Orders ────────────────────────────────────────────────────────────────────
 
 
@@ -350,6 +374,57 @@ def order_history(order_id: int, db: Session = Depends(get_session)) -> dict:
         return orders.history(db, order_id)
     except orders.NotFound as exc:
         raise HTTPException(404, str(exc)) from None
+
+
+# ── Tasks ─────────────────────────────────────────────────────────────────────
+
+
+def _task_write(db: Session, act) -> dict:
+    """Run one staged change to a hand-added task; commit and answer with it
+    as the list shows it, or roll back and refuse."""
+    try:
+        task = act()
+    except orders.NotFound as exc:
+        db.rollback()
+        raise HTTPException(404, str(exc)) from None
+    except orders.Refused as exc:
+        db.rollback()
+        raise _refused(exc) from None
+    db.commit()
+    return {"task": tasks.view(db, task)}
+
+
+@router.get("/tasks")
+def task_list(done: bool = Query(False), db: Session = Depends(get_session)) -> dict:
+    """Every open task, grouped by when it is due, and the counts the filters
+    show. ``done=1`` adds the hand-added tasks done in the last 14 days. No
+    money, for anybody."""
+    return tasks.listing(db, show_done=done)
+
+
+@router.post("/tasks", status_code=201)
+def add_task(body: NewTask, actor: UserAccount = Depends(EDIT), db: Session = Depends(get_session)) -> dict:
+    data = body.model_dump()
+    return _task_write(db, lambda: tasks.create(db, data, actor))
+
+
+@router.patch("/tasks/{task_id}")
+def edit_task(
+    task_id: int, body: TaskEdit, actor: UserAccount = Depends(EDIT), db: Session = Depends(get_session)
+) -> dict:
+    data = body.model_dump(exclude_unset=True)
+    return _task_write(db, lambda: tasks.edit(db, task_id, data, actor))
+
+
+@router.delete("/tasks/{task_id}")
+def delete_task(task_id: int, actor: UserAccount = Depends(EDIT), db: Session = Depends(get_session)) -> dict:
+    try:
+        tasks.delete(db, task_id, actor)
+    except orders.NotFound as exc:
+        db.rollback()
+        raise HTTPException(404, str(exc)) from None
+    db.commit()
+    return {"deleted": task_id}
 
 
 # ── Files ─────────────────────────────────────────────────────────────────────

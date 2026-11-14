@@ -221,3 +221,56 @@ export type Choices = {
   sizes: Size[];
   stage_days: Record<string, number>;
 };
+
+// ── Tasks (`app/modules/production/orders/services/tasks.py`) ────────────────
+
+/** `done` is only there when the list was asked for recently done tasks. */
+export type TaskGroup = "overdue" | "today" | "week" | "later" | "done";
+
+export type TaskOrder = { id: number; code: string; style_name: string; colour: string };
+
+type TaskCommon = {
+  /** Stable for the same work. */
+  key: string;
+  title: string;
+  who: Who;
+  due: string | null;
+  order: TaskOrder | null;
+  stage: StageKey | null;
+  /** The supplier's name when `who` is the factory. */
+  waiting_on: string | null;
+  /** The day it started waiting. */
+  since: string | null;
+  group: TaskGroup;
+  overdue_days: number;
+};
+
+/** Worked out from an open order on each read; never stored. */
+export type GeneratedTask = TaskCommon & {
+  kind: "generated";
+  /**
+   * Which form of the order page does the work: `sample`, `stage:<key>`, `cut`, `inspection`,
+   * `delivery`, `delivery:<id>`, `delivery-reason:<id>`, `settle`; `null` when there is nothing to fill in.
+   */
+  open: string | null;
+};
+
+/** Typed in by somebody. */
+export type ManualTask = TaskCommon & {
+  kind: "manual";
+  id: number;
+  open: null;
+  note: string | null;
+  done: boolean;
+  done_at: string | null;
+  for_owner: boolean;
+};
+
+export type Task = GeneratedTask | ManualTask;
+
+export type TaskCounts = { all: number; overdue: number; qc: number; owner: number; factory: number };
+
+export type TaskList = { today: string; counts: TaskCounts; tasks: Task[] };
+
+/** What a write to a hand-added task answers with. */
+export type TaskAnswer = { task: ManualTask };

@@ -332,3 +332,34 @@ class ProdOrderFile(Base):
     uploaded_by: Mapped[int | None] = _user()
     created_at: Mapped[datetime] = _created()
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ProdTask(Base):
+    """A task somebody added by hand (ADR 0084, decision 7; build plan
+    2026-11-14 batch 2).
+
+    The tasks the orders generate are **never stored**: they are worked out on
+    each read from the open orders. This table holds only what a person typed.
+    It is done when somebody marks it done and can be reopened; deleting one
+    hides it with ``deleted_at``. It carries no money.
+    """
+
+    __tablename__ = "prod_task"
+    __table_args__ = (
+        CheckConstraint("char_length(title) BETWEEN 1 AND 200", name="prod_task_title_length"),
+        Index("ix_prod_task_order", "order_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    due_on: Mapped[date | None] = mapped_column(Date)
+    #: The order it hangs on, if any.
+    order_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("prod_order.id"))
+    note: Mapped[str | None] = mapped_column(Text)
+    #: Whose list it is on: the owner's when true, else the QC manager's.
+    for_owner: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    done_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    done_by: Mapped[int | None] = _user()
+    created_by: Mapped[int | None] = _user()
+    created_at: Mapped[datetime] = _created()
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

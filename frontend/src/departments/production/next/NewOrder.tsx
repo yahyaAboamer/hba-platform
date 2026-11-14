@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { api, can } from "../../../lib/api";
 import type { Session } from "../../../lib/api";
 import { DATED_STAGES, DATE_LABELS, fillDates } from "./logic";
+import { cairoToday } from "./format";
 import type { DatedStage } from "./logic";
 import { OrderFields, draftBody, draftProblem, emptyDraft } from "./OrderFields";
 import type { Choices, OrderAnswer, StageKey } from "./types";
@@ -36,7 +37,7 @@ export function NewOrder({ session }: { session: Session }) {
   // The expected date of each stage, backwards from the target date: again when the date or the tick changes.
   useEffect(() => {
     if (!choices || !draft.targetDate) return;
-    const filled = fillDates(draft.targetDate, choices.stage_days, repeat ? new Set<StageKey>(["sample"]) : new Set<StageKey>());
+    const filled = fillDates(draft.targetDate, choices.stage_days, repeat ? new Set<StageKey>(["sample"]) : new Set<StageKey>(), cairoToday());
     setDates((before) => {
       const next = { ...before };
       for (const stage of DATED_STAGES) if (!touched.has(stage)) next[stage] = filled[stage] ?? "";

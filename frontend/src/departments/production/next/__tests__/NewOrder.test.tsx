@@ -138,6 +138,7 @@ describe("New production order", () => {
     renderAt("/production/next/orders/new", qc());
     expect(await screen.findByText("Only owners make production orders.")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Create order" })).toBeNull();
-    expect(calls).toHaveLength(0);
+    // The screen reads nothing of its own; the layout's tab row reads only the overdue task count.
+    expect(calls.filter((call) => call.path !== "/api/prod/tasks")).toHaveLength(0);
   });
 });

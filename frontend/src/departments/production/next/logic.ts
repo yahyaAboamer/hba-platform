@@ -300,6 +300,7 @@ export function fillDates(
   target: string,
   days: Record<string, number>,
   skipped: ReadonlySet<StageKey> = new Set(),
+  notBefore?: string,
 ): Partial<Record<StageKey, string | null>> {
   const dates: Partial<Record<StageKey, string | null>> = {
     warehouse: target,
@@ -314,6 +315,13 @@ export function fillDates(
     }
     dates[key] = addDays(dates[following] as string, -(days[following] ?? 0));
     following = key;
+  }
+  // No stage is expected before the day the order is made (as the server does).
+  if (notBefore) {
+    for (const key of Object.keys(dates) as StageKey[]) {
+      const day = dates[key];
+      if (day && day < notBefore) dates[key] = notBefore;
+    }
   }
   return dates;
 }
@@ -419,3 +427,55 @@ export function nextButton(order: OrderView, powers: Powers): { label: string; p
 
 /** Who buys the fabric, in words. */
 export const BUYER_WORDS: Record<FabricBuyer, string> = { hba: "HBA", factory: "the factory" };
+
+// ── Opening a form from a task (`?open=` on the order page) ──────────────────
+
+/**
+ * The panel a Tasks button asked the order page to open (`open` on a task, `?open=<value>` in the
+ * address), or `null` when nothing should open: a value this page does not know, a form this person
+ * may not use, or work the order has already moved past. The server decides again on save; this only
+ * keeps the page from opening a form that would be refused.
+ */
+export function panelFromOpen(open: string | null, order: OrderView, powers: Powers): Panel | null {
+  if (!open || order.status !== "open") return null;
+  const { canEdit, isOwner } = powers;
+  const todo = (key: StageKey) => stageStatus(order, key) === "todo";
+  const [kind, argument] = open.split(":") as [string, string | undefined];
+  switch (kind) {
+    case "sample":
+      return isOwner && todo("sample") ? { kind: "sample" } : null;
+    case "settle":
+      return isOwner && todo("settle") ? { kind: "settle" } : null;
+    case "cut":
+      return canEdit && todo("cutting") ? { kind: "cut" } : null;
+    case "inspection":
+      return canEdit && todo("final_inspection") ? { kind: "inspection" } : null;
+    case "stage": {
+      if (!canEdit || !argument || !STAGE_KEYS.includes(argument as StageKey) || !todo(argument as StageKey)) return null;
+      if (argument === "fabric_check") return { kind: "fabric" };
+      return argument === "materials" || argument === "pattern_check" || argument === "making"
+        ? { kind: "complete", stage: argument }
+        : null;
+    }
+    case "delivery": {
+      if (!canEdit) return null;
+      if (argument === undefined) {
+        // A new delivery: of finished pieces while any are still to come, else of fix pieces.
+        if (finishedToCome(order) > 0) return { kind: "delivery", id: null, deliveryKind: "finished" };
+        if ((order.fix_not_returned ?? 0) > 0) return { kind: "delivery", id: null, deliveryKind: "fix" };
+        return null;
+      }
+      return deliveryPanel(order, argument);
+    }
+    case "delivery-reason":
+      // The reason is typed in the delivery's own form, beside the counts it explains.
+      return canEdit ? deliveryPanel(order, argument) : null;
+    default:
+      return null;
+  }
+}
+
+function deliveryPanel(order: OrderView, id: string | undefined): Panel | null {
+  const found = order.deliveries.find((delivery) => String(delivery.id) === id);
+  return found ? { kind: "delivery", id: found.id, deliveryKind: found.kind } : null;
+}

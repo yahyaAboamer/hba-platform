@@ -1,6 +1,7 @@
 import { NavLink } from "react-router-dom";
 
-export type ProdTab = { to: string; label: string; end?: boolean };
+/** `count` is drawn beside the name in words, as `countLabel` ("3 overdue"), never as a bare number or a colour. */
+export type ProdTab = { to: string; label: string; end?: boolean; count?: number; countLabel?: string };
 
 /**
  * The row of tabs at the top of Production's native screens (the mockup's
@@ -14,6 +15,12 @@ export function ProdTabs({ tabs, label = "Production sections" }: { tabs: readon
       {tabs.map((tab) => (
         <NavLink key={tab.to} to={tab.to} end={tab.end}>
           {tab.label}
+          {tab.count ? (
+            <>
+              {" "}
+              <span className="prod-tabs__count">{tab.countLabel ?? tab.count}</span>
+            </>
+          ) : null}
         </NavLink>
       ))}
     </nav>

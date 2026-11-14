@@ -10,7 +10,21 @@ import { vi } from "vitest";
 import type { Session } from "../../../../lib/api";
 import { sessionOf } from "../../../../__tests__/frameHarness";
 import { productionNextRoutes } from "../routes";
-import type { Cost, Delivery, OrderRow, OrderStage, OrderView, Settlement, SizeLine, StageKey, StageStatus } from "../types";
+import type {
+  Cost,
+  Delivery,
+  GeneratedTask,
+  ManualTask,
+  OrderRow,
+  OrderStage,
+  OrderView,
+  Settlement,
+  SizeLine,
+  StageKey,
+  StageStatus,
+  Task,
+  TaskList,
+} from "../types";
 import { STAGE_KEYS } from "../types";
 
 export const owner = (): Session => sessionOf("owner");
@@ -27,7 +41,7 @@ export function narrowScreen(narrow: boolean) {
   );
 }
 
-export type Call = { method: string; path: string; body: unknown };
+export type Call = { method: string; path: string; /** With its query string. */ url: string; body: unknown };
 type Handler = (body: unknown, call: Call) => unknown;
 
 /**
@@ -44,7 +58,7 @@ export function mockApi(table: Record<string, Handler | unknown>) {
       const path = url.split("?")[0];
       const method = (init?.method ?? "GET").toUpperCase();
       const raw = typeof init?.body === "string" ? init.body : undefined;
-      const call: Call = { method, path, body: raw ? JSON.parse(raw) : undefined };
+      const call: Call = { method, path, url, body: raw ? JSON.parse(raw) : undefined };
       calls.push(call);
       const entry = table[`${method} ${path}`];
       if (entry === undefined) return reply(404, { detail: `Not served: ${method} ${path}` });
@@ -249,5 +263,67 @@ export function makeRow(over: Partial<OrderRow> & { id: number; style_name: stri
     next_action: { stage: "making", what: "Final inspection", who: "qc", by: "2030-11-26", since: "2030-11-01" },
     flags: { late: false, waiting_for_owner: false, count_mismatch: false, fix_pieces_due: false },
     ...over,
+  };
+}
+
+// ── Tasks ────────────────────────────────────────────────────────────────────
+
+/** Cairo's "today" in the task tests: a Wednesday. */
+export const TODAY = "2030-11-13";
+
+const HOODIE = { id: 1, code: "PO-2610-01", style_name: "Oversized hoodie", colour: "Black" };
+
+/** A task worked out from an order (`GET /api/prod/tasks`). */
+export function makeTask(over: Partial<GeneratedTask> & { key: string; title: string }): GeneratedTask {
+  return {
+    kind: "generated",
+    who: "qc",
+    due: "2030-11-15",
+    order: HOODIE,
+    stage: null,
+    waiting_on: null,
+    since: null,
+    open: null,
+    group: "week",
+    overdue_days: 0,
+    ...over,
+  };
+}
+
+/** A task somebody typed in. */
+export function makeManual(over: Partial<ManualTask> & { id: number; title: string }): ManualTask {
+  return {
+    kind: "manual",
+    key: `task:${over.id}`,
+    who: "qc",
+    due: null,
+    order: null,
+    stage: null,
+    waiting_on: null,
+    since: null,
+    open: null,
+    note: null,
+    done: false,
+    done_at: null,
+    for_owner: false,
+    group: "later",
+    overdue_days: 0,
+    ...over,
+  };
+}
+
+/** The list as the server answers it: counts worked out from the open tasks. */
+export function makeTaskList(tasks: Task[]): TaskList {
+  const open = tasks.filter((task) => !(task.kind === "manual" && task.done));
+  return {
+    today: TODAY,
+    counts: {
+      all: open.length,
+      overdue: open.filter((task) => task.group === "overdue").length,
+      qc: open.filter((task) => task.who === "qc").length,
+      owner: open.filter((task) => task.who === "owner").length,
+      factory: open.filter((task) => task.who === "factory").length,
+    },
+    tasks,
   };
 }

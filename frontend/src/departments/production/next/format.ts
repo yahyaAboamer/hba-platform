@@ -80,6 +80,13 @@ export function addDays(day: string, count: number): string {
   return new Date(midnight(day) + count * DAY_MS).toISOString().slice(0, 10);
 }
 
+const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+/** `Friday` for a calendar day (a UTC midnight, so the browser's timezone cannot move it). */
+export function weekdayOf(day: string): string {
+  return WEEKDAYS[new Date(midnight(day)).getUTCDay()];
+}
+
 export const WHO: Record<Who, string> = { owner: "Owner", qc: "QC manager", factory: "Factory" };
 
 export type Tone = "late" | "warn" | "ok" | "";

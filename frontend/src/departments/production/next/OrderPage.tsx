@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import { api, can } from "../../../lib/api";
 import type { Session } from "../../../lib/api";
 import { DeliveryForm } from "./DeliveryForm";
 import { cairoToday, pieces, plural, shortDay, stagePhrase, whoWhen } from "./format";
-import { BUYER_WORDS, nextButton, panelKey } from "./logic";
+import { BUYER_WORDS, nextButton, panelFromOpen, panelKey } from "./logic";
 import type { Panel, Powers } from "./logic";
 import { CostCard, DatesCard, DeliveriesCard, FilesCard, HistoryCard, OwedCard, OwnerCard, SizesCard, StagesCard } from "./OrderCards";
 import { ActualCostForm, CancelForm, DateChangeForm, EditForm, ReopenForm, SampleForm, SettleForm, WriteOffForm } from "./OtherForms";
@@ -123,6 +123,24 @@ export function OrderPage({ session }: { session: Session }) {
     panelOpen.current = panel !== null;
   }, [panel]);
 
+  // `?open=<form>` (from a task on the Tasks screen) is read once: kept here, cleared from the address
+  // at once so a reload or a shared link does not open it again, and used when the order has loaded.
+  const [params, setParams] = useSearchParams();
+  const asked = params.get("open");
+  const wanted = useRef<string | null>(null);
+  useEffect(() => {
+    if (asked === null) return;
+    wanted.current = asked;
+    setParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        next.delete("open");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [asked, setParams]);
+
   const load = useCallback(() => {
     const mine = ++latest.current;
     setError(null);
@@ -150,6 +168,14 @@ export function OrderPage({ session }: { session: Session }) {
     setNotice(null);
     setPanel(next);
   }, []);
+
+  // The order for this address has loaded: open the form the address asked for, if this person may use it.
+  useEffect(() => {
+    if (wanted.current === null || !order || String(order.id) !== id) return;
+    const next = panelFromOpen(wanted.current, order, powers);
+    wanted.current = null;
+    if (next) open(next);
+  }, [order, id, powers, open]);
 
   const close = useCallback(() => {
     setPanel(null);
