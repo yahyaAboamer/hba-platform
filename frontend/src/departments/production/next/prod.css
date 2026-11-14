@@ -211,6 +211,10 @@
 .prod-task--narrow { display: grid; gap: 6px; justify-content: stretch; }
 .prod-task__actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 12.5px; color: var(--quiet); }
 
+/* ── Incoming ── */
+.prod-task .prod-small { overflow-wrap: anywhere; }
+.prod-task__actions .prod-pill, .prod-task__side .prod-pill { white-space: normal; }
+
 /* ── Phone: one column; touch targets of 44px. ── */
 @media (max-width: 860px) {
   .prod-screen { padding: 16px 16px 56px; }
@@ -228,5 +232,6 @@
   .prod-screen .input { min-height: 44px; font-size: 16px; }
   .prod-tabs a { min-height: 44px; }
   .prod-task { padding: 14px 16px; }
+  .prod-task--narrow .prod-rowlink { display: inline-flex; align-items: center; min-height: 44px; }
   .prod-nextbar .button { width: 100%; }
 }

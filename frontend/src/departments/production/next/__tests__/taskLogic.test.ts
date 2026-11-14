@@ -83,6 +83,7 @@ describe("Which button a generated task gets", () => {
     expect(link("stage:making")?.label).toBe("Mark finished");
     expect(link("inspection")?.label).toBe("Record inspection");
     expect(link("delivery")?.label).toBe("Record delivery");
+    expect(link("delivery:fix")?.label).toBe("Record delivery");
     expect(link("delivery:7")).toEqual({ label: "Enter counts", to: "/production/next/orders/1?open=delivery:7", opens: true });
     expect(link("delivery-reason:7")?.label).toBe("Add reason");
     expect(link("sample", OWNER)?.label).toBe("Review sample");

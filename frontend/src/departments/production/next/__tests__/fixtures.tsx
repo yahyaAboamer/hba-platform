@@ -14,6 +14,10 @@ import type {
   Cost,
   Delivery,
   GeneratedTask,
+  Incoming,
+  IncomingArrival,
+  IncomingCounts,
+  IncomingDelivery,
   ManualTask,
   OrderRow,
   OrderStage,
@@ -325,5 +329,80 @@ export function makeTaskList(tasks: Task[]): TaskList {
       factory: open.filter((task) => task.who === "factory").length,
     },
     tasks,
+  };
+}
+
+// ── Incoming ─────────────────────────────────────────────────────────────────
+
+const NO_SIZES = { XS: 0, S: 0, M: 0, L: 0, XL: 0, XXL: 0 };
+
+/** Pieces per size (every size, as the server sends them) and the total. */
+export function counts(sizes: Partial<IncomingCounts["sizes"]> = {}): IncomingCounts {
+  const all = { ...NO_SIZES, ...sizes };
+  return { sizes: all, total: Object.values(all).reduce((sum, n) => sum + n, 0) };
+}
+
+/** Finished pieces still to come: 20 planned for the hoodie, none shipped. */
+export function makeArrival(over: Partial<IncomingArrival> = {}): IncomingArrival {
+  const planned = counts({ S: 8, M: 12 });
+  return {
+    key: "order:1:finished",
+    kind: "finished",
+    order: HOODIE,
+    factory: "Main factory",
+    basis: "planned",
+    expected: planned,
+    shipped: counts(),
+    to_come: planned,
+    due: "2030-11-26",
+    late_days: 0,
+    stage: { key: "cutting", label: "Cutting", position: 6 },
+    status_words: "being cut, final numbers after cutting",
+    can_record: false,
+    ...over,
+  };
+}
+
+/** A delivery of finished pieces, counted by Khazenly, every size matching. */
+export function makeIncomingDelivery(over: Partial<IncomingDelivery> = {}): IncomingDelivery {
+  return {
+    id: 1,
+    order: HOODIE,
+    number: 1,
+    kind: "finished",
+    shipped_on: "2030-11-09",
+    counted_on: "2030-11-10",
+    shipped: { S: 200, M: 280 },
+    shipped_total: 480,
+    counted: { S: 200, M: 280 },
+    counted_total: 480,
+    state: "match",
+    difference: null,
+    missing: 0,
+    extra: 0,
+    sizes_differ: [],
+    reason: null,
+    ...over,
+  };
+}
+
+/** The screen's answer, with the four figures worked out from the rows as the server does. */
+export function makeIncoming(arrivals: IncomingArrival[], deliveries: IncomingDelivery[]): Incoming {
+  const toCome = arrivals.reduce((sum, row) => sum + row.to_come.total, 0);
+  const waiting = deliveries.filter((d) => d.state === "waiting_for_count").reduce((sum, d) => sum + d.shipped_total, 0);
+  const off = deliveries.filter((d) => d.state === "mismatch").reduce((sum, d) => sum + d.missing + d.extra, 0);
+  const inMonth = (month: string) =>
+    arrivals.filter((row) => row.due.startsWith(month)).reduce((sum, row) => sum + row.to_come.total, 0);
+  return {
+    today: TODAY,
+    totals: {
+      to_come_total: toCome,
+      this_month: { month: "2030-11", label: "November", pieces: inMonth("2030-11") },
+      next_month: { month: "2030-12", label: "December", pieces: inMonth("2030-12") },
+      waiting_for_count: waiting,
+      mismatch_pieces: off,
+    },
+    arrivals,
+    deliveries,
   };
 }

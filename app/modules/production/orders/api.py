@@ -12,6 +12,10 @@ Tasks (``/tasks``): the list is every open order's generated tasks plus the
 ones typed in by hand, for anybody who reads Production; the hand-added ones
 are written with ``production.edit``. No task carries money.
 
+Incoming (``/incoming``): what is still to arrive at Khazenly and every delivery
+with its two counts, read from the orders for anybody who reads Production.
+No money, for anybody.
+
 Refusals follow Operations: ``Refused`` -> 422, ``Locked`` -> 409, an
 unknown order, stage, delivery or file (``NotFound``, and only that) -> 404.
 A refusal rolls back whatever was staged; success commits.
@@ -31,7 +35,7 @@ from app.core.permissions import Permission
 from app.db import get_session
 from app.modules.inbox.public import StorageError, file_bucket
 from app.modules.production.api import _too_large
-from app.modules.production.orders.services import files, orders, tasks
+from app.modules.production.orders.services import files, incoming, orders, tasks
 from app.shared.api.deps import holds, require_permission
 from app.shared.models.identity import UserAccount
 
@@ -400,6 +404,14 @@ def task_list(done: bool = Query(False), db: Session = Depends(get_session)) -> 
     show. ``done=1`` adds the hand-added tasks done in the last 14 days. No
     money, for anybody."""
     return tasks.listing(db, show_done=done)
+
+
+@router.get("/incoming")
+def incoming_list(db: Session = Depends(get_session)) -> dict:
+    """The arrivals (finished and fix pieces still to leave the factory, nearest
+    first), the deliveries with their counts and state, and the four figures at
+    the top. Read only; no money, for anybody."""
+    return incoming.listing(db)
 
 
 @router.post("/tasks", status_code=201)
