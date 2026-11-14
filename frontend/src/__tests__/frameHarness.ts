@@ -19,6 +19,7 @@ export const HELD = {
       "payroll.reopen", "payments.record", "invitations.send", "audit.view",
       "settings.manage", "order_ops.view", "inbox.use",
       "production.view", "production.edit", "production.qc", "production.suppliers", "production.payments",
+      "production.owner",
     ],
   },
   affiliate_manager: {

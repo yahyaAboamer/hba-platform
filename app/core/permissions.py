@@ -68,6 +68,12 @@ class Permission:
     #: Approving a supplier invoice for payment. The owner's alone (ADR 0067,
     #: decision 4; ADR 0076 decision 7).
     PRODUCTION_PAYMENTS = "production.payments"
+    #: The production order's owner acts (ADR 0084): creating and editing an
+    #: order, approving a sample, settling, writing off fix pieces, reopening
+    #: a stage, the typical days per stage - **and seeing money**. Without
+    #: it a production order carries no cost, rate or settlement at all.
+    #: Held by no role but admin.
+    PRODUCTION_OWNER = "production.owner"
 
 
 ALL_PERMISSIONS = frozenset(

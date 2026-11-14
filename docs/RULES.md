@@ -35,7 +35,7 @@ in place, and so is the sentence here that it replaced.
 | **Affiliate portal** (`.affiliate`) | Models on phones | Dark by default, denser, phone-shaped |
 | **Operations** (ADR 0057, levels ADR 0079) | Its viewers, staff and one manager, and the admin | Laptop-first, usable on a phone. Its own shell, built from the owner-approved mockup (`docs/design/operations-dashboard-2026-10-03.html`), because no approved export draws it. Same tokens and palette as the maintainer's tool. |
 | **Inbox** (ADR 0059, being built) | Customer service, the operations manager, and the admin | Laptop-first, usable on a phone. Its own shell, built from the owner-approved mockup (`docs/design/whatsapp-inbox-2026-10-11.html`). Same tokens and palette. |
-| **Production** (ADR 0069, decided, not built yet) | The production team, its suppliers through the supplier portal, and the owner | **Its own look, exactly as the app the owner approved**: dark, its own green, its own typeface and sidebar. The one department that does not use HBA's tokens, by the owner's decision. Not restyled either way without a new ADR. |
+| **Production** (ADR 0069, decided, not built yet) | The production team, its suppliers through the supplier portal, and the owner | **Its own look, exactly as the app the owner approved**: dark, its own green, its own typeface and sidebar. The one department that does not use HBA's tokens, by the owner's decision. **Being replaced (ADR 0084):** Production is rebuilt as platform screens with HBA's tokens, around the production order; the new screens are at `/production/next` and the framed app stays until they cover it. |
 
 **Decided, not built yet: one frame for every department (ADR 0068)**, from
 the owner-approved mockup `docs/design/hba-os-shell-2026-10-25.html`. One
@@ -320,6 +320,15 @@ payroll without touching a maintainer screen.
   Production department in HBA's database; its sign-in is HBA's; suppliers
   reach only the work assigned to them. Its costing and payments record no
   money until a separate decision brings them under the money rules.
+- **Production is being rebuilt around the production order** (ADR 0084,
+  superseding 0069's own look once the new screens cover the old). One order
+  is one style in one colour at one factory, through ten stages. Pieces are
+  counted per size from planned to Khazenly's count, and every drop carries a
+  reason. Only the owner (`production.owner`) creates orders, approves
+  samples, settles and sees money; **the QC manager never receives a cost,
+  rate or balance**. The factory is owed the making rate per piece cut, less
+  rejected pieces (the making, and the fabric too when the factory bought
+  it) and less pieces held until fixed.
 - **Three compensation types, not one.** `commission`,
   `fixed_plus_commission` (**both** are paid — the one most often got wrong),
   `base_guarantee` (`max(commission, base)`, only where targets were met). No
