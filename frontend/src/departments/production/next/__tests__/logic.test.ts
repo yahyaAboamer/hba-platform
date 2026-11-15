@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { addDays, daysBetween, lateWords, shortDay, stagePhrase } from "../format";
 import {
+  affectsFactoryPay,
   blankCounts,
   costTotal,
   countDifferences,
@@ -204,5 +205,15 @@ describe("what the next-action button opens", () => {
       const none = makeOrder("warehouse", { sizes: [{ cut: 10, passed: 0, shipped: 0 }, { cut: 20, passed: 0, shipped: 0 }] });
       expect(nextButton(none, qc)?.panel).toEqual({ kind: "delivery", id: null, deliveryKind: "finished" });
     });
+  });
+});
+
+describe("affectsFactoryPay", () => {
+  it("counts manufacturing always, printing when the factory prints, and fabric when the factory bought it", () => {
+    const hba = { printing: "outside", fabric_bought_by: "hba" } as const;
+    const factory = { printing: "factory", fabric_bought_by: "factory" } as const;
+    expect(["manufacturing", "printing", "fabric", "accessories", "packaging"].map((part) => affectsFactoryPay(hba, part))).toEqual([true, false, false, false, false]);
+    expect(["manufacturing", "printing", "fabric", "accessories", "packaging"].map((part) => affectsFactoryPay(factory, part))).toEqual([true, true, true, false, false]);
+    expect(affectsFactoryPay({ printing: "none", fabric_bought_by: "hba" }, "printing")).toBe(false);
   });
 });

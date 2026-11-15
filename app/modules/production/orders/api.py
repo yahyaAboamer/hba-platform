@@ -35,19 +35,15 @@ from app.core.permissions import Permission
 from app.db import get_session
 from app.modules.inbox.public import StorageError, file_bucket
 from app.modules.production.api import _too_large
+from app.modules.production.orders.guards import EDIT, GUARD, OWNER, SUPPLIERS  # noqa: F401
 from app.modules.production.orders.services import files, incoming, orders, tasks
-from app.shared.api.deps import holds, require_permission
+from app.shared.api.deps import holds
 from app.shared.models.identity import UserAccount
 
 logger = logging.getLogger(__name__)
 
-#: The router's guard, kept by name so a test can find it.
-GUARD = require_permission(Permission.PRODUCTION_VIEW)
-#: The QC manager's writes: stages, counts, deliveries, dates, files.
-EDIT = require_permission(Permission.PRODUCTION_EDIT)
-#: The owner's: create, edit, sample, write-off, settle, cancel, reopen, settings.
-OWNER = require_permission(Permission.PRODUCTION_OWNER)
-
+# The guards (kept by name so a test can find them) live in ``guards``, which
+# the suppliers' routes share.
 router = APIRouter(prefix="/api/prod", tags=["production-orders"], dependencies=[Depends(GUARD)])
 
 Size = Literal["XS", "S", "M", "L", "XL", "XXL"]
@@ -544,3 +540,12 @@ def choices(db: Session = Depends(get_session)) -> dict:
     """What the New order form needs: active suppliers, active Shopify
     products, the sizes and the typical days per stage."""
     return orders.choices(db)
+
+
+# ── Suppliers (batch 4) ───────────────────────────────────────────────────────
+# Their routes are in ``suppliers_api`` (built with this router's prefix and
+# guard) and are appended to this router's own routes.
+
+from app.modules.production.orders import suppliers_api  # noqa: E402
+
+router.routes.extend(suppliers_api.router.routes)

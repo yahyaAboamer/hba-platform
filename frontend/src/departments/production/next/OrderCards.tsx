@@ -12,9 +12,9 @@ import { api } from "../../../lib/api";
 import { formatEgp } from "../../../lib/money";
 import { Money } from "../../../components/Money";
 import { cairoDay, pieces, plural, shortDay, stamp } from "./format";
-import { reopenable, stageStatus } from "./logic";
+import { affectsFactoryPay, reopenable, stageStatus } from "./logic";
 import type { Panel, Powers } from "./logic";
-import type { Delivery, DeliveryKind, HistoryEvent, OrderAnswer, OrderStage, OrderView, ProdFile, ReasonLine, Size } from "./types";
+import type { CostPart, Delivery, DeliveryKind, HistoryEvent, OrderAnswer, OrderStage, OrderView, ProdFile, ReasonLine, Size } from "./types";
 import { DateBox, Problem, useSubmit } from "./ui";
 import type { Run } from "./ui";
 
@@ -340,17 +340,38 @@ export function DeliveriesCard({ order, powers, open }: CardProps) {
 
 // ── Money (the owner's) ──────────────────────────────────────────────────────
 
-export function CostCard({ order, powers, open }: CardProps) {
+export function CostCard({ order, powers, open, run }: CardProps & { run: Run }) {
   const cost = order.cost;
+  const heading = useRef<HTMLHeadingElement>(null);
+  const { error, busy, submit } = useSubmit(run);
+  // The part whose "Use this" is waiting for a yes: it changes what the factory is owed.
+  const [confirming, setConfirming] = useState<string | null>(null);
   if (!cost) return null;
+  const bought = cost.from_purchases;
+  const canUse = powers.isOwner && isOpen(order);
+
+  /** Set one part's actual cost to what the purchases say, through the order's own edit. */
+  function use(part: CostPart, each: number) {
+    submit(
+      null,
+      () => api.patch<OrderAnswer>(`/api/prod/orders/${order.id}`, { [`actual_${part.part}_piastres`]: each }),
+      `${part.label} actual cost set to ${formatEgp(each)} per piece.`,
+    ).then((saved) => {
+      // The button that was pressed is gone once the figure is in: focus goes to the card, and the notice is read.
+      setConfirming(null);
+      if (saved) heading.current?.focus();
+    });
+  }
+
   return (
     <section className="prod-block" aria-labelledby="prod-cost">
       <div className="prod-block__head">
-        <h2 id="prod-cost">Cost per piece</h2>
+        <h2 id="prod-cost" ref={heading} tabIndex={-1}>Cost per piece</h2>
         {powers.isOwner && isOpen(order) && (
           <button type="button" className="button button--row" onClick={() => open({ kind: "actual" })}>Edit actual cost</button>
         )}
       </div>
+      {error && <Problem>{error}</Problem>}
       <div className="prod-scroll">
         <table className="table">
           <thead>
@@ -363,9 +384,48 @@ export function CostCard({ order, powers, open }: CardProps) {
           <tbody>
             {cost.parts.map((part) => {
               const over = part.actual_piastres !== null && part.actual_piastres > part.target_piastres;
+              const from = bought?.parts.find((candidate) => candidate.part === part.part);
+              const each = from?.per_piece_piastres ?? null;
               return (
                 <tr key={part.part}>
-                  <td>{part.label}</td>
+                  <td>
+                    {part.label}
+                    {bought && from && each !== null && (
+                      <div className="prod-from">
+                        <span className="prod-small">From purchases: {formatEgp(each)} per piece</span>
+                        <div className="prod-small">
+                          {from.purchases.map((item) => `${item.item} (${item.supplier.name})`).join(", ")} · {formatEgp(from.total_piastres)} over{" "}
+                          {pieces(bought.pieces)} {bought.basis} pieces
+                        </div>
+                        {canUse && part.actual_piastres !== each && !affectsFactoryPay(order, part.part) && (
+                          <button type="button" className="button button--row" disabled={busy} onClick={() => use(part, each)}>
+                            Use this<span className="prod-sr"> for {part.label}: {formatEgp(each)} per piece</span>
+                          </button>
+                        )}
+                        {canUse && part.actual_piastres !== each && affectsFactoryPay(order, part.part) && confirming !== part.part && (
+                          <button type="button" className="button button--row" disabled={busy} onClick={() => setConfirming(part.part)}>
+                            Use this<span className="prod-sr"> for {part.label}: {formatEgp(each)} per piece. This changes what the factory is owed for this order</span>
+                          </button>
+                        )}
+                        {canUse && part.actual_piastres !== each && affectsFactoryPay(order, part.part) && confirming === part.part && (
+                          <div role="group" aria-label={`Use the purchases' figure for ${part.label}`} className="prod-confirm">
+                            <p className="prod-small" role="alert">
+                              This changes what the factory is owed for this order. Use {formatEgp(each)} per piece as the actual {part.label.toLowerCase()} cost?
+                            </p>
+                            <div className="prod-actions">
+                              <button type="button" className="button button--row button--primary" disabled={busy} onClick={() => use(part, each)}>
+                                {busy ? "Saving…" : "Yes, use it"}
+                              </button>
+                              <button type="button" className="button button--row" disabled={busy} onClick={() => setConfirming(null)}>
+                                Keep it as it is
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                        {part.actual_piastres === each && <div className="prod-small">This is already the actual cost.</div>}
+                      </div>
+                    )}
+                  </td>
                   <td className="numeric"><Money piastres={part.target_piastres} /></td>
                   <td className={`numeric${over ? " prod-late" : ""}`}>
                     {part.actual_piastres === null ? "—" : <Money piastres={part.actual_piastres} />}
@@ -386,6 +446,11 @@ export function CostCard({ order, powers, open }: CardProps) {
           </tfoot>
         </table>
       </div>
+      {bought && bought.other.purchases.length > 0 && (
+        <p className="prod-small">
+          Other purchases for this order, not counted in a part: {formatEgp(bought.other.total_piastres)} ({bought.other.purchases.map((item) => item.item).join(", ")}).
+        </p>
+      )}
     </section>
   );
 }
@@ -426,7 +491,13 @@ export function OwedCard({ order }: { order: OrderView }) {
             </tbody>
             <tfoot>
               <tr>
-                <td>{owed.settled ? "Settled with the factory" : "Payable now"}</td>
+                <td>
+                  {owed.settled
+                    ? order.status === "cancelled"
+                      ? "Owed to the factory when the order was cancelled, on their account"
+                      : "Settled with the factory"
+                    : "Payable now"}
+                </td>
                 <td className="numeric"><Money piastres={owed.payable_piastres} kind={owed.settled ? "agreed" : "provisional"} /></td>
               </tr>
             </tfoot>

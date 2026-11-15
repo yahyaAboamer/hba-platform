@@ -87,7 +87,18 @@ five sub-tabs; sample data). The owner approved each sub-tab in turn.
    order it is for and an optional deposit; the rest stays on the balance
    with no due date. A payment records amount, date, method (bank transfer,
    cash, InstaPay, mobile wallet, cheque), kind, and an optional note and
-   receipt photo. Only owners record payments. **The QC manager never sees
+   receipt photo. Only owners record payments. The account is append-only:
+   a wrong line is reversed, never edited. Until an order is settled, what
+   it has earned so far counts in what is owed but is not yet a line;
+   settling writes the line. An order cancelled after cutting keeps what
+   the factory has earned: cancelling writes the work done so far onto its
+   account, and the figure is frozen on the order. Voiding a purchase that
+   has a deposit asks whether the supplier returned the deposit: if it did,
+   the deposit is reversed too; if not, it stays on the account as credit
+   with the supplier. *Both of these are built as recommended on 15 November
+   2026 and await the owner's confirmation; change them here first.* A
+   purchase suggests the order's actual cost
+   per piece and never sets it by itself. **The QC manager never sees
    money**: no prices, costs, balances or payments, on any screen.
 
 10. **Ratings.** When an order is settled the owner rates each supplier on

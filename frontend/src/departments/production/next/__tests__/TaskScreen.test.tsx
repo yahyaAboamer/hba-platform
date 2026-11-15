@@ -6,6 +6,7 @@ import type { Session } from "../../../../lib/api";
 import type { ManualTask, Task } from "../types";
 import { makeManual, makeRow, makeTask, makeTaskList, mockApi, narrowScreen, owner, qc, renderAt, reply } from "./fixtures";
 import type { Call } from "./fixtures";
+import { makeSupplierPage } from "./supplierFixtures";
 
 const ADDRESS = "/production/next/tasks";
 
@@ -138,6 +139,50 @@ describe("The Tasks screen", () => {
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(await screen.findByText("Nothing to do right now.")).toBeTruthy();
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+});
+
+describe("The two purchase tasks", () => {
+  const purchaseTasks = (): Task[] => [
+    makeTask({
+      key: "purchase:1:chase", title: "Chase the Heavy fleece, black delivery", who: "factory", waiting_on: "Main factory", since: "2030-11-09",
+      due: "2030-11-12", group: "overdue", overdue_days: 1, open: "purchase:1", supplier: { id: "fac", name: "Main factory" },
+    }),
+    makeTask({
+      key: "purchase:2:arrival", title: "Check Zips on arrival", who: "qc", due: "2030-11-19", group: "week", since: "2030-11-13",
+      open: "purchase:2", supplier: { id: "fac", name: "Main factory" },
+    }),
+  ];
+
+  it("reads Mark received and opens that purchase on its supplier's page", async () => {
+    serve(purchaseTasks());
+    renderAt(ADDRESS, qc());
+    await screen.findByRole("heading", { level: 1, name: "Tasks" });
+    const chase = within(rowOf("Chase the Heavy fleece, black delivery")).getByRole("link", { name: /^Mark received/ });
+    expect(chase.getAttribute("href")).toBe("/production/next/suppliers/fac?open=purchase:1");
+    const arrival = within(rowOf("Check Zips on arrival")).getByRole("link", { name: /^Mark received/ });
+    expect(arrival.getAttribute("href")).toBe("/production/next/suppliers/fac?open=purchase:2");
+    // The title carries no money, and neither does the row.
+    expect(document.body.textContent).not.toMatch(/EGP/);
+  });
+
+  it("gives somebody who can only read the supplier, never a button that writes", async () => {
+    serve(purchaseTasks());
+    renderAt(ADDRESS, readOnly());
+    await screen.findByRole("heading", { level: 1, name: "Tasks" });
+    expect(screen.queryByRole("link", { name: /^Mark received/ })).toBeNull();
+    expect(within(rowOf("Check Zips on arrival")).getByRole("link", { name: /^Open supplier/ }).getAttribute("href")).toBe("/production/next/suppliers/fac");
+  });
+
+  it("goes to the supplier's page, and the page opens the form", async () => {
+    mockApi({
+      "GET /api/prod/tasks": () => makeTaskList(purchaseTasks()),
+      "GET /api/prod/suppliers/fac": { supplier: makeSupplierPage({}, false) },
+    });
+    renderAt(ADDRESS, qc());
+    await screen.findByRole("heading", { level: 1, name: "Tasks" });
+    fireEvent.click(within(rowOf("Chase the Heavy fleece, black delivery")).getByRole("link", { name: /^Mark received/ }));
+    expect(await screen.findByRole("heading", { level: 2, name: "Mark Heavy fleece, black received" })).toBeTruthy();
   });
 });
 
@@ -421,8 +466,8 @@ describe("The Tasks tab", () => {
     const tabs = await screen.findByRole("navigation", { name: "Production sections" });
     const link = await within(tabs).findByRole("link", { name: "Tasks 2 overdue" });
     expect(link.getAttribute("href")).toBe("/production/next/tasks");
-    // Between Orders and Stage days.
-    expect(within(tabs).getAllByRole("link").map((item) => item.textContent)).toEqual(["Orders", "Tasks 2 overdue", "Incoming", "Stage days"]);
+    // Suppliers follows Incoming, before Stage days.
+    expect(within(tabs).getAllByRole("link").map((item) => item.textContent)).toEqual(["Orders", "Tasks 2 overdue", "Incoming", "Suppliers", "Stage days"]);
   });
 
   it("shows no count when nothing is overdue, and survives the count not loading", async () => {

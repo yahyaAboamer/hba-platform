@@ -483,3 +483,31 @@ function deliveryPanel(order: OrderView, id: string | undefined): Panel | null {
   const found = order.deliveries.find((delivery) => String(delivery.id) === id);
   return found ? { kind: "delivery", id: found.id, deliveryKind: found.kind } : null;
 }
+
+// ── What a change does to the factory's pay ──────────────────────────────────
+
+/**
+ * Whether a cost part counts in what the factory is owed for this order: manufacturing always, printing
+ * when the factory prints, and fabric when the factory bought it (it comes off a rejected piece). The
+ * accessories and the special packaging are HBA's own and never touch it. Mirrors batch 1's `settlement`.
+ */
+export function affectsFactoryPay(order: Pick<OrderView, "printing" | "fabric_bought_by">, part: string): boolean {
+  if (part === "manufacturing") return true;
+  if (part === "printing") return order.printing === "factory";
+  if (part === "fabric") return order.fabric_bought_by === "factory";
+  return false;
+}
+
+/**
+ * What cancelling will write on the factory's account, in words, or `null` when nothing is to be said:
+ * only the owner has a settlement, and only once cutting is done. (Built as recommended on 15 November
+ * 2026, awaiting the owner's confirmation.)
+ */
+export function cancelSentence(order: Pick<OrderView, "settlement" | "stages">, money: (piastres: number) => string): string | null {
+  const cutDone = order.stages.some((stage) => stage.key === "cutting" && stage.status === "done");
+  if (!cutDone || !order.settlement) return null;
+  const payable = order.settlement.payable_piastres;
+  if (payable > 0) return `The factory keeps ${money(payable)} for the work already done; it goes on their account.`;
+  if (payable < 0) return `The rejected pieces came to more than the work done, so the factory owes HBA ${money(-payable)}; it goes on their account.`;
+  return "Nothing is owed to the factory for the work already done, so nothing goes on their account.";
+}

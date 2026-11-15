@@ -3,6 +3,8 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import { MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { formatEgp } from "../../../../lib/money";
+import { cancelSentence } from "../logic";
 import { productionNextRoutes } from "../routes";
 import type { Delivery, OrderView } from "../types";
 import { makeOrder, mockApi, narrowScreen, owner, qc, renderAt, reply } from "./fixtures";
@@ -701,5 +703,89 @@ describe("A form opened from a task (`?open=`)", () => {
     renderWith(ADDRESS);
     await screen.findByRole("heading", { level: 1, name: "Oversized hoodie · Black" });
     expect(panel()).toBeNull();
+  });
+});
+
+describe("Cancelling after cutting says what goes on the factory's account", () => {
+  // Built as recommended on 15 November 2026, awaiting the owner's confirmation.
+  it("tells the owner the factory keeps what it earned, once cutting is done", async () => {
+    serve(makeOrder("final_inspection", { money: true }));
+    renderAt(ADDRESS, owner());
+    await screen.findByRole("heading", { level: 1, name: "Oversized hoodie · Black" });
+    fireEvent.click(screen.getByRole("button", { name: "Cancel this order" }));
+    expect(screen.getByText("The factory keeps EGP 3,450.00 for the work already done; it goes on their account.")).toBeTruthy();
+  });
+
+  it("says the other two cases in words too", async () => {
+    const owed = makeOrder("final_inspection", { money: true });
+    expect(cancelSentence(owed, formatEgp)).toBe("The factory keeps EGP 3,450.00 for the work already done; it goes on their account.");
+    expect(cancelSentence({ ...owed, settlement: { ...owed.settlement!, payable_piastres: 0 } }, formatEgp)).toBe(
+      "Nothing is owed to the factory for the work already done, so nothing goes on their account.",
+    );
+    expect(cancelSentence({ ...owed, settlement: { ...owed.settlement!, payable_piastres: -17140000 } }, formatEgp)).toBe(
+      "The rejected pieces came to more than the work done, so the factory owes HBA EGP 171,400.00; it goes on their account.",
+    );
+  });
+
+  it("says nothing before cutting is done", async () => {
+    serve(makeOrder("cutting", { money: true }));
+    renderAt(ADDRESS, owner());
+    await screen.findByRole("heading", { level: 1, name: "Oversized hoodie · Black" });
+    fireEvent.click(screen.getByRole("button", { name: "Cancel this order" }));
+    expect(screen.getByRole("heading", { name: "Cancel this order", level: 2 })).toBeTruthy();
+    expect(document.body.textContent).not.toMatch(/goes on their account|nothing goes on their account/);
+  });
+
+  it("never says it to somebody who has no settlement to read", () => {
+    const seen = makeOrder("final_inspection");
+    expect(seen.settlement).toBeUndefined();
+    expect(cancelSentence(seen, formatEgp)).toBeNull();
+  });
+
+  it("calls the frozen figure of a cancelled order what it is, not a settlement", async () => {
+    const frozen = makeOrder("final_inspection", { money: true, extra: { status: "cancelled", next_action: null, stage: null } });
+    frozen.settlement = { ...frozen.settlement!, settled: true, settled_at: "2030-11-13T10:00:00Z" };
+    serve(frozen);
+    renderAt(ADDRESS, owner());
+    await screen.findByRole("heading", { level: 1, name: "Oversized hoodie · Black" });
+    expect(screen.getByText("Owed to the factory when the order was cancelled, on their account")).toBeTruthy();
+    expect(screen.queryByText("Settled with the factory")).toBeNull();
+  });
+});
+
+describe("The factory is read-only once cutting is done", () => {
+  const choices = {
+    suppliers: [{ id: "SUP-2", name: "Print house A", category: "Printing houses" }],
+    products: [{ id: "P1", title: "Oversized hoodie" }],
+    sizes: ["XS", "S", "M", "L", "XL", "XXL"],
+    stage_days: {},
+  };
+
+  it("lets the factory change before cutting", async () => {
+    serve(makeOrder("cutting", { money: true }), { "GET /api/prod/choices": choices });
+    renderAt(ADDRESS, owner());
+    await screen.findByRole("heading", { level: 1, name: "Oversized hoodie · Black" });
+    fireEvent.click(screen.getByRole("button", { name: "Edit the order" }));
+    expect(((await screen.findByRole("combobox", { name: "Factory" })) as HTMLSelectElement).disabled).toBe(false);
+    expect(screen.queryByText("The factory cannot change after cutting. Reopen cutting first.")).toBeNull();
+  });
+
+  it("shows it with the reason once cutting is done, and still sends it back unchanged", async () => {
+    const calls = serve(makeOrder("final_inspection", { money: true }), {
+      "GET /api/prod/choices": choices,
+      "PATCH /api/prod/orders/3": () => ({ order: makeOrder("final_inspection", { money: true }) }),
+    });
+    renderAt(ADDRESS, owner());
+    await screen.findByRole("heading", { level: 1, name: "Oversized hoodie · Black" });
+    fireEvent.click(screen.getByRole("button", { name: "Edit the order" }));
+    const factory = (await screen.findByRole("combobox", { name: "Factory" })) as HTMLSelectElement;
+    expect(factory.disabled).toBe(true);
+    expect(factory.value).toBe("SUP-1");
+    expect(factory.getAttribute("aria-describedby")).toBeTruthy();
+    expect(screen.getByText("The factory cannot change after cutting. Reopen cutting first.")).toBeTruthy();
+    type("Colour", "Red");
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(writes(calls)).toHaveLength(1));
+    expect(writes(calls)[0].body).toMatchObject({ factory_id: "SUP-1", colour: "Red" });
   });
 });
