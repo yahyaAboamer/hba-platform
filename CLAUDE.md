@@ -8,6 +8,7 @@ Stack: FastAPI + SQLAlchemy + Postgres, React + Vite, Railway.
 
 - **Rules:** `docs/RULES.md`. Read before changing anything involving money. Do not restate rules here.
 - **Current work / branch / next steps:** `docs/plans/2026-11-07-continuation-handoff.md`. It supersedes older handoffs.
+- **The Production rebuild (ADR 0084):** `docs/plans/2026-11-15-production-rebuild-handoff.md`. Where it stands, how each batch is run, what is next.
 - **The whole plan (Phase → Batch → Task → Status):** `docs/plans/hba-os-roadmap.md`.
 - **Screen parity state:** `docs/redesign/parity/SCREEN_MATRIX.md`.
 - **Current visual repair evidence / decisions:** `docs/repair/batch-2/visual/CHECKLIST.md`.
