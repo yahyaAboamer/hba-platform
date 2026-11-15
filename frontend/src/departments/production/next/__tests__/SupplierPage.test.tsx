@@ -735,3 +735,141 @@ describe("Record a purchase, from a supplier's page", () => {
     expect(screen.getByText("Manufacturers · 1 order open · 3 purchases not received")).toBeTruthy();
   });
 });
+
+describe("Voiding a purchase that has a deposit asks what became of the deposit", () => {
+  // Built as recommended on 15 November 2026, awaiting the owner's confirmation.
+  const fleece = (): HTMLElement => {
+    fireEvent.click(screen.getByRole("button", { name: "Void: Heavy fleece, black" }));
+    return panelOf("Void the Heavy fleece, black purchase");
+  };
+
+  it("shows the question with neither answer chosen, and will not send until one is", async () => {
+    const { calls } = serve(makeSupplierPage(), true);
+    renderAt(ADDRESS, owner());
+    await screen.findByRole("heading", { level: 1, name: "Main factory" });
+    const panel = fleece();
+    expect(within(panel).getByText("What became of the EGP 40,000.00 deposit?")).toBeTruthy();
+    const returned = within(panel).getByRole("radio", { name: "The supplier returned the deposit" }) as HTMLInputElement;
+    const kept = within(panel).getByRole("radio", { name: "The supplier keeps the deposit as credit" }) as HTMLInputElement;
+    expect(returned.checked).toBe(false);
+    expect(kept.checked).toBe(false);
+    expect(within(panel).getByText("Choose one to see what the account will show.")).toBeTruthy();
+
+    type("Why, required", "Wrong supplier");
+    fireEvent.click(within(panel).getByRole("button", { name: "Void this purchase" }));
+    expect((await within(panel).findByRole("alert")).textContent).toBe("Say whether the supplier returned the deposit.");
+    expect(writes(calls)).toEqual([]);
+  });
+
+  it("says what the account will show after each answer, and sends the answer", async () => {
+    const { calls } = serve(makeSupplierPage(), true, { "POST /api/prod/purchases/1/void": () => reply(200, { supplier: makeSupplierPage() }) });
+    renderAt(ADDRESS, owner());
+    await screen.findByRole("heading", { level: 1, name: "Main factory" });
+    const panel = fleece();
+    fireEvent.click(within(panel).getByRole("radio", { name: "The supplier returned the deposit" }));
+    expect(within(panel).getByText("The purchase and the deposit are both reversed, so the account shows neither of them any more.")).toBeTruthy();
+    fireEvent.click(within(panel).getByRole("radio", { name: "The supplier keeps the deposit as credit" }));
+    expect(panel.textContent).toContain("Only the purchase is reversed. The EGP 40,000.00 deposit stays on the account as credit with Main factory");
+    expect(panel.textContent).toContain("Overpaid");
+
+    type("Why, required", " Wrong supplier ");
+    fireEvent.click(within(panel).getByRole("button", { name: "Void this purchase" }));
+    await waitFor(() => expect(screen.getByRole("status").textContent).toBe("Purchase voided: Heavy fleece, black."));
+    expect(writes(calls).map((call) => [call.method, call.path, call.body])).toEqual([
+      ["POST", "/api/prod/purchases/1/void", { reason: "Wrong supplier", deposit_returned: false }],
+    ]);
+  });
+
+  it("sends true when the supplier returned it", async () => {
+    const { calls } = serve(makeSupplierPage(), true, { "POST /api/prod/purchases/1/void": () => reply(200, { supplier: makeSupplierPage() }) });
+    renderAt(ADDRESS, owner());
+    await screen.findByRole("heading", { level: 1, name: "Main factory" });
+    const panel = fleece();
+    fireEvent.click(within(panel).getByRole("radio", { name: "The supplier returned the deposit" }));
+    type("Why, required", "Typo");
+    fireEvent.click(within(panel).getByRole("button", { name: "Void this purchase" }));
+    await waitFor(() => expect(writes(calls)).toHaveLength(1));
+    expect(writes(calls)[0].body).toEqual({ reason: "Typo", deposit_returned: true });
+  });
+
+  it("asks nothing when there is no deposit, and sends no answer", async () => {
+    const { calls } = serve(makeSupplierPage(), true, { "POST /api/prod/purchases/2/void": () => reply(200, { supplier: makeSupplierPage() }) });
+    renderAt(ADDRESS, owner());
+    await screen.findByRole("heading", { level: 1, name: "Main factory" });
+    fireEvent.click(screen.getByRole("button", { name: "Void: Zips" }));
+    const panel = panelOf("Void the Zips purchase");
+    expect(within(panel).queryByRole("radio")).toBeNull();
+    expect(panel.textContent).not.toContain("deposit");
+    type("Why, required", "Ordered twice");
+    fireEvent.click(within(panel).getByRole("button", { name: "Void this purchase" }));
+    await waitFor(() => expect(writes(calls)).toHaveLength(1));
+    expect(writes(calls)[0].body).toEqual({ reason: "Ordered twice" });
+  });
+
+  it("shows a voided purchase whose deposit was kept as credit", async () => {
+    const page = makeSupplierPage({
+      purchases: [makePurchase({ id: 1, voided: true, voided_at: "2030-11-12T09:00:00Z", void_reason: "Wrong supplier", deposit_piastres: 4000000, deposit_kept: true })],
+    });
+    serve(page, true);
+    renderAt(ADDRESS, owner());
+    await screen.findByRole("heading", { level: 1, name: "Main factory" });
+    const row = within(cardOf("Purchases")).getByText("Heavy fleece, black").closest("tr")!;
+    expect(row.textContent).toContain("Deposit kept as credit EGP 40,000.00");
+    expect(row.textContent).not.toContain("Deposit paid");
+  });
+});
+
+describe("Saving twice by accident", () => {
+  it("sends one payment however many times Save is pressed while it is in flight, and shows the server's refusal as it comes", async () => {
+    let answer: (value: Response) => void = () => {};
+    const slow = new Promise<Response>((resolve) => (answer = resolve));
+    const { calls } = serve(makeSupplierPage(), true, { "POST /api/prod/suppliers/fac/payments": () => slow });
+    renderAt(ADDRESS, owner());
+    await screen.findByRole("heading", { level: 1, name: "Main factory" });
+    click("Record a payment");
+    const panel = panelOf("Record a payment to Main factory");
+    type("Amount, EGP", "1,000");
+    const save = within(panel).getByRole("button", { name: "Save payment" }) as HTMLButtonElement;
+    fireEvent.click(save);
+    fireEvent.click(save);
+    fireEvent.submit(save.closest("form")!);
+    await waitFor(() => expect((within(panel).getByRole("button", { name: "Saving…" }) as HTMLButtonElement).disabled).toBe(true));
+    expect(writes(calls)).toHaveLength(1);
+
+    const twice = "This looks like the same payment recorded twice. Wait a minute if it really is a second one.";
+    answer(reply(409, { detail: twice }));
+    expect((await within(panel).findByRole("alert")).textContent).toBe(twice);
+    // Refused: the form is back, and nothing more was sent.
+    expect((within(panel).getByRole("button", { name: "Save payment" }) as HTMLButtonElement).disabled).toBe(false);
+    expect(writes(calls)).toHaveLength(1);
+  });
+});
+
+describe("Dates a money entry cannot have", () => {
+  it("stops a payment dated more than a year back before sending it", async () => {
+    const { calls } = serve(makeSupplierPage(), true);
+    renderAt(ADDRESS, owner());
+    await screen.findByRole("heading", { level: 1, name: "Main factory" });
+    click("Record a payment");
+    const panel = panelOf("Record a payment to Main factory");
+    type("Amount, EGP", "100");
+    expect((screen.getByLabelText("Date") as HTMLInputElement).min).toBe("2029-11-12");
+    type("Date", "2029-11-11");
+    fireEvent.click(within(panel).getByRole("button", { name: "Save payment" }));
+    expect((await within(panel).findByRole("alert")).textContent).toBe("The payment date can't be more than a year ago. Check the date.");
+    expect(writes(calls)).toEqual([]);
+  });
+
+  it("will not mark a purchase received before the day it was bought", async () => {
+    const { calls } = serve(makeSupplierPage(), true);
+    renderAt(ADDRESS, owner());
+    await screen.findByRole("heading", { level: 1, name: "Main factory" });
+    fireEvent.click(screen.getByRole("button", { name: "Mark received: Zips" }));
+    const panel = panelOf("Mark Zips received");
+    expect((screen.getByLabelText("Arrived on") as HTMLInputElement).min).toBe("2030-11-09");
+    type("Arrived on", "2030-11-08");
+    fireEvent.click(within(panel).getByRole("button", { name: "Mark received" }));
+    expect((await within(panel).findByRole("alert")).textContent).toMatch(/^The date it arrived can't be before the day it was bought, /);
+    expect(writes(calls)).toEqual([]);
+  });
+});

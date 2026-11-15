@@ -13,8 +13,16 @@ history (``audit_event``) never carries an amount: its sentences are words.
 
 **The account is append-only.** A line is never edited or deleted (the
 database refuses it); a mistake is undone by a reversing line, once. Whoever
-changes an account takes the supplier's row lock first (``account.lock_supplier``)
-and only then reads a balance.
+changes an account takes the supplier's row lock (``account.lock_supplier``)
+before reading a balance.
+
+**Lock order, for the whole module: whenever a write involves a known order,
+lock the order's row ``FOR UPDATE`` first, then the supplier's.** A line that
+carries an ``order_id`` takes a key-share lock on the order through the foreign
+key, and ``orders.settle`` and ``orders.cancel`` lock the order and then the
+factory; a writer that took the supplier first and the order second could wait
+on one of them while it waits on this one. ``_lock`` does it for every writer
+that may carry an order (adding a purchase, voiding one, reversing a line).
 
 What HBA owes a supplier now is the sum of its lines plus what its open orders
 (cutting done, not yet settled) would pay it so far, which is worked out on
@@ -24,7 +32,7 @@ it with the real line, so nothing is counted twice.
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, timedelta
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 from sqlalchemy import func, or_, select, text
@@ -58,6 +66,7 @@ from app.modules.production.orders.services.orders import (
     _iso,
     _not_future,
     _people,
+    _said,
     _text,
     _words,
     settlement,
@@ -72,6 +81,11 @@ MAX_LINE_PIASTRES = 10_000_000_000
 MAX_UNIT_PIASTRES = 100_000_000
 #: The most one purchase may be of: a million units.
 MAX_QUANTITY = Decimal("1000000")
+#: Two identical money entries by the same person this close together are taken
+#: for one saved twice by accident (a double click, a retry).
+DUPLICATE_WINDOW_SECONDS = 60
+#: The oldest day a money entry may be dated: a guard against a typo in the year.
+MAX_DAYS_BACK = 366
 
 METHOD_LABELS = {
     "bank_transfer": "Bank transfer",
@@ -118,6 +132,51 @@ def _supplier(db: Session, supplier_id: str | None, *, for_update: bool = False)
     if supplier is None or supplier.deleted_at is not None:
         raise NotFound("There is no such supplier.")
     return supplier
+
+
+def _lock(db: Session, supplier_id: str, order_id: int | None = None) -> tuple[ProductionSupplier, ProdOrder | None]:
+    """Lock what a write is about, **the order first (when there is one), then
+    the supplier**: the module's lock order (see the docstring). The order is
+    read afresh under its lock; an unknown ``order_id`` gives ``None``."""
+    order = None
+    if order_id:
+        order = db.get(ProdOrder, order_id, with_for_update=True, populate_existing=True)
+    return _supplier(db, supplier_id, for_update=True), order
+
+
+def _dated(day: date | None, what: str) -> date:
+    """A day for a money entry: today when left out, not in the future and not
+    more than a year ago (a typo guard)."""
+    day = _not_future(day, what)
+    if (today() - day).days > MAX_DAYS_BACK:
+        raise Refused(f"{what} can't be more than a year ago. Check the date.")
+    return day
+
+
+def _twice(what: str) -> Locked:
+    return Locked(f"This looks like the same {what} recorded twice. Wait a minute if it really is a second one.")
+
+
+def _is(column, value):
+    return column.is_(None) if value is None else column == value
+
+
+def _recent_entry(db: Session, supplier_id: str, actor: UserAccount, **same) -> bool:
+    """Whether this person recorded, for this supplier, a line like this within
+    the last minute and it still stands (a reversed line, or a reversal, does
+    not count: correcting a slip and entering it again is not a double). Call
+    under the supplier's lock."""
+    reversed_ids = select(ProdSupplierEntry.reverses_id).where(ProdSupplierEntry.reverses_id.is_not(None))
+    query = select(ProdSupplierEntry.id).where(
+        ProdSupplierEntry.supplier_id == supplier_id,
+        ProdSupplierEntry.created_by == actor.id,
+        ProdSupplierEntry.created_at >= func.now() - timedelta(seconds=DUPLICATE_WINDOW_SECONDS),
+        ProdSupplierEntry.reverses_id.is_(None),
+        ProdSupplierEntry.id.not_in(reversed_ids),
+    )
+    for column, value in same.items():
+        query = query.where(_is(getattr(ProdSupplierEntry, column), value))
+    return db.scalar(query.limit(1)) is not None
 
 
 def _amount(value, what: str, *, signed: bool = False) -> int:
@@ -302,6 +361,26 @@ def edit_supplier(db: Session, supplier_id: str, data: dict, actor: UserAccount)
     """Change what was sent; what is left out stays as it was. A supplier is
     never deleted, only made inactive."""
     supplier = _supplier(db, supplier_id, for_update=True)
+    if supplier.active and data.get("active") is False:
+        # Not its balance: the person who changes a supplier may not be allowed to know it.
+        codes = list(
+            db.scalars(
+                select(ProdOrder.code)
+                .where(
+                    ProdOrder.status == "open",
+                    or_(ProdOrder.factory_id == supplier.id, ProdOrder.print_supplier_id == supplier.id),
+                )
+                .order_by(ProdOrder.id)
+            )
+        )
+        if codes:
+            shown = _words(codes[:3]) + (f" and {len(codes) - 3} more" if len(codes) > 3 else "")
+            them = "it" if len(codes) == 1 else "them"
+            raise Refused(
+                f"{supplier.name} is the factory or print house of {shown}, still in production. "
+                f"Finish or cancel {them}, or give {them} another factory or print house, "
+                f"before making {supplier.name} inactive."
+            )
     changed: list[str] = []
     for key, (what, limit) in _FIELDS.items():
         if key not in data:
@@ -358,8 +437,10 @@ def _quantity(value) -> Decimal:
 def add_purchase(db: Session, supplier_id: str, data: dict, actor: UserAccount) -> tuple[ProductionSupplier, ProdPurchase]:
     """Record a purchase: one purchase line on the account, and, when a
     deposit is paid now, a second line for it. The total is worked out here,
-    never typed."""
-    supplier = _supplier(db, supplier_id, for_update=True)
+    never typed. When it is for an order, the order is locked first and checked
+    open under that lock, then the supplier."""
+    _supplier(db, supplier_id)  # a supplier that is not there is a 404, whatever the order says
+    supplier, order = _lock(db, supplier_id, data.get("order_id"))
     if not supplier.active:
         raise Refused(f"{supplier.name} is not an active supplier.")
     item = _text(data.get("item"), limit=200, what="what was bought", required=True)
@@ -374,12 +455,11 @@ def add_purchase(db: Session, supplier_id: str, data: dict, actor: UserAccount) 
         raise Refused("That comes to less than a piastre. Check the quantity and the price.")
     if total > MAX_LINE_PIASTRES:
         raise Refused("That total is too large. Check the quantity and the price.")
-    order = None
-    if data.get("order_id"):
-        order = db.get(ProdOrder, data["order_id"])
-        if order is None or order.status != "open":
-            raise Refused("Pick an order that is still in production.")
-    bought_on = _not_future(data.get("bought_on"), "The purchase date")
+    if data.get("order_id") and (order is None or order.status != "open"):
+        raise Refused("Pick an order that is still in production.")
+    bought_on = _dated(data.get("bought_on"), "The purchase date")
+    if data.get("expected_on") and data["expected_on"] < bought_on:
+        raise Refused("The expected date can't be before the day it was bought.")
     deposit = data.get("deposit_piastres") or 0
     method = data.get("deposit_method")
     if deposit:
@@ -387,6 +467,23 @@ def add_purchase(db: Session, supplier_id: str, data: dict, actor: UserAccount) 
         if deposit > total:
             raise Refused("The deposit can't be more than the total.")
         _choice(method, PAY_METHODS, "how the deposit was paid")
+    twin = db.scalar(
+        select(ProdPurchase.id)
+        .where(
+            ProdPurchase.supplier_id == supplier.id,
+            ProdPurchase.created_by == actor.id,
+            ProdPurchase.created_at >= func.now() - timedelta(seconds=DUPLICATE_WINDOW_SECONDS),
+            ProdPurchase.voided_at.is_(None),
+            ProdPurchase.item == item,
+            ProdPurchase.quantity == quantity,
+            ProdPurchase.unit == unit,
+            ProdPurchase.unit_price_piastres == price,
+            _is(ProdPurchase.order_id, order.id if order else None),
+        )
+        .limit(1)
+    )
+    if twin is not None:
+        raise _twice("purchase")
     purchase = ProdPurchase(
         supplier_id=supplier.id, order_id=order.id if order else None, item=item, quantity=quantity, unit=unit,
         unit_price_piastres=price, total_piastres=total, cost_part=part, expected_on=data.get("expected_on"),
@@ -412,6 +509,17 @@ def add_purchase(db: Session, supplier_id: str, data: dict, actor: UserAccount) 
     return supplier, purchase
 
 
+def _bought_on(db: Session, purchase_id: int) -> date | None:
+    """The day a purchase was bought: the date of its own line on the account."""
+    return db.scalar(
+        select(func.min(ProdSupplierEntry.happened_on)).where(
+            ProdSupplierEntry.purchase_id == purchase_id,
+            ProdSupplierEntry.kind == "purchase",
+            ProdSupplierEntry.reverses_id.is_(None),
+        )
+    )
+
+
 def edit_purchase(
     db: Session, purchase_id: int, data: dict, actor: UserAccount
 ) -> tuple[ProductionSupplier, ProdPurchase]:
@@ -425,6 +533,9 @@ def edit_purchase(
     if purchase.voided_at is not None:
         raise Locked("This purchase was voided. Nothing on it can change now.")
     subject = _subject(supplier)
+    bought = _bought_on(db, purchase.id)
+    if bought is not None and data.get("expected_on") is not None and data["expected_on"] < bought:
+        raise Refused(f"The expected date can't be before the day it was bought, {_said(bought)}.")
     changed: list[str] = []
     if "expected_on" in data and data["expected_on"] != purchase.expected_on:
         purchase.expected_on = data["expected_on"]
@@ -440,6 +551,8 @@ def edit_purchase(
         received = data["received_on"]
         if received is not None:
             received = _not_future(received, "The date it arrived")
+            if bought is not None and received < bought:
+                raise Refused(f"The date it arrived can't be before the day it was bought, {_said(bought)}.")
         purchase.received_on = received
         _audit(
             db, subject, actor, "purchase_received" if received else "purchase_unreceived",
@@ -471,27 +584,46 @@ def _reverse_line(db: Session, entry: ProdSupplierEntry, reason: str, actor: Use
 
 
 def void_purchase(
-    db: Session, purchase_id: int, reason: str, actor: UserAccount
+    db: Session, purchase_id: int, reason: str, actor: UserAccount, deposit_returned: bool | None = None
 ) -> tuple[ProductionSupplier, ProdPurchase]:
-    """Void a purchase: it stays, struck through, and its line and its
-    deposit's line are each reversed by a line of their own."""
+    """Void a purchase: it stays, struck through, and its line is reversed by
+    a line of its own.
+
+    What happens to a deposit still standing on it is asked, not assumed
+    (built as recommended on 15 November 2026, awaiting the owner's
+    confirmation): ``deposit_returned`` is then required. ``True``: the supplier
+    gave the money back, so the deposit's line is reversed too. ``False``: the
+    supplier keeps it, so the deposit payment stays on the account and, with
+    the purchase gone, the supplier holds that much of HBA's money as credit
+    (the account reads "Overpaid"). With no deposit standing, it is ignored.
+
+    The purchase's order, when it has one, is locked first, then the supplier."""
     reason = _text(reason, limit=400, what="the reason", required=True)
     purchase = db.get(ProdPurchase, purchase_id)
     if purchase is None:
         raise NotFound("There is no such purchase.")
-    supplier = _supplier(db, purchase.supplier_id, for_update=True)
+    supplier, _ = _lock(db, purchase.supplier_id, purchase.order_id)
     db.refresh(purchase)
     if purchase.voided_at is not None:
         raise Locked("This purchase was already voided.")
+    lines = _live_lines(db, purchase_id=purchase.id)
+    has_deposit = any(line.kind == "payment" for line in lines)
+    if has_deposit and deposit_returned is None:
+        raise Refused("This purchase has a deposit. Say whether the supplier returned it.")
     purchase.voided_at = utcnow()
     purchase.voided_by = actor.id
     purchase.void_reason = reason
-    for line in _live_lines(db, purchase_id=purchase.id):
+    for line in lines:
+        if line.kind == "payment" and not deposit_returned:
+            continue
         _reverse_line(db, line, reason, actor)
     db.flush()
+    about = ""
+    if has_deposit:
+        about = ", the deposit was returned" if deposit_returned else ", the supplier keeps the deposit as credit"
     _audit(
         db, _subject(supplier), actor, "purchase_voided",
-        f"Voided the purchase of {purchase.item} from {supplier.name}", purchase=purchase.id,
+        f"Voided the purchase of {purchase.item} from {supplier.name}{about}", purchase=purchase.id,
     )
     return supplier, purchase
 
@@ -505,7 +637,12 @@ def record_payment(db: Session, supplier_id: str, data: dict, actor: UserAccount
     amount = _amount(data.get("amount_piastres"), "The amount")
     method = _choice(data.get("method"), PAY_METHODS, "how it was paid")
     kind = _choice(data.get("kind"), PAY_KINDS, "what the payment is")
-    paid_on = _not_future(data.get("paid_on"), "The payment date")
+    paid_on = _dated(data.get("paid_on"), "The payment date")
+    if _recent_entry(
+        db, supplier.id, actor, kind="payment", amount_piastres=-amount, happened_on=paid_on, method=method,
+        payment_kind=kind, purchase_id=None,
+    ):
+        raise _twice("payment")
     entry = account.append(
         db, supplier_id=supplier.id, kind="payment", amount=-amount, happened_on=paid_on, method=method,
         payment_kind=kind, note=_text(data.get("note"), limit=500, what="the note"), actor_id=actor.id,
@@ -523,7 +660,9 @@ def record_opening(db: Session, supplier_id: str, data: dict, actor: UserAccount
     owes, negative when HBA has overpaid. Corrected later by an adjustment."""
     supplier = _supplier(db, supplier_id, for_update=True)
     amount = _amount(data.get("amount_piastres"), "The balance", signed=True)
-    on = _not_future(data.get("happened_on"), "The date")
+    on = _dated(data.get("happened_on"), "The date")
+    if _recent_entry(db, supplier.id, actor, kind="opening", amount_piastres=amount, happened_on=on):
+        raise _twice("balance brought forward")
     if _live_opening(db, supplier.id):
         raise Refused(
             f"{supplier.name} already has a balance brought forward. Correct it with an adjustment, "
@@ -544,7 +683,11 @@ def record_adjustment(db: Session, supplier_id: str, data: dict, actor: UserAcco
     supplier = _supplier(db, supplier_id, for_update=True)
     amount = _amount(data.get("amount_piastres"), "The adjustment", signed=True)
     note = _text(data.get("note"), limit=500, what="the note that says why", required=True)
-    on = _not_future(data.get("happened_on"), "The date")
+    on = _dated(data.get("happened_on"), "The date")
+    if _recent_entry(
+        db, supplier.id, actor, kind="adjustment", amount_piastres=amount, happened_on=on, note=note
+    ):
+        raise _twice("correction")
     entry = account.append(
         db, supplier_id=supplier.id, kind="adjustment", amount=amount, happened_on=on, note=note, actor_id=actor.id
     )
@@ -563,7 +706,11 @@ def reverse_entry(db: Session, entry_id: int, reason: str, actor: UserAccount) -
     entry = db.get(ProdSupplierEntry, entry_id)
     if entry is None:
         raise NotFound("There is no such line on the account.")
-    supplier = _supplier(db, entry.supplier_id, for_update=True)
+    # A line of an order, or of a purchase that is for one, locks that order first.
+    order_id = entry.order_id
+    if order_id is None and entry.purchase_id is not None:
+        order_id = db.scalar(select(ProdPurchase.order_id).where(ProdPurchase.id == entry.purchase_id))
+    supplier, _ = _lock(db, entry.supplier_id, order_id)
     if entry.kind == "work":
         raise Refused("A work line comes from settling the order and can't be reversed.")
     if entry.kind == "purchase":
@@ -609,6 +756,8 @@ def add_receipt(
     never leaves a stored file behind. The replaced copy stays in the bucket."""
     entry = _payment_entry(db, entry_id)
     supplier = _supplier(db, entry.supplier_id, for_update=True)
+    if db.scalar(select(ProdSupplierEntry.id).where(ProdSupplierEntry.reverses_id == entry.id)) is not None:
+        raise Refused("That payment was reversed. A receipt can't be added to it.")
     if not content:
         raise Refused("Choose a photo to upload.")
     if len(content) > MAX_BYTES:
@@ -867,6 +1016,8 @@ def _purchase_views(db: Session, purchases: list[ProdPurchase], *, with_money: b
             view["unit_price_piastres"] = p.unit_price_piastres
             view["total_piastres"] = p.total_piastres
             view["deposit_piastres"] = deposits.get(p.id, 0)
+            # Voided, and the supplier kept the deposit: it stands on the account as credit.
+            view["deposit_kept"] = p.voided_at is not None and deposits.get(p.id, 0) > 0
             view["void_reason"] = p.void_reason
         views.append(view)
     return views

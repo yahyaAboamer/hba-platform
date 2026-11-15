@@ -12,14 +12,14 @@ purchases, without a circle. The rules (what may be bought, paid, reversed)
 are in ``suppliers``.
 
 **Locking.** Anything that changes a supplier's account takes the supplier's
-row ``FOR UPDATE`` first (``lock_supplier``), before it reads a balance. Where
-an order is locked too, the order is locked first and the supplier second,
-always, so two writers cannot wait on each other.
+row ``FOR UPDATE`` (``lock_supplier``) before it reads a balance. Whenever a
+write involves a known order, **the order is locked first and the supplier
+second**, always, so two writers cannot wait on each other.
 """
 
 from datetime import date
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.modules.production.models import ProductionSupplier
@@ -33,7 +33,7 @@ from app.modules.production.orders.models import (
 def lock_supplier(db: Session, supplier_id: str) -> ProductionSupplier | None:
     """The supplier's row, locked ``FOR UPDATE`` until the transaction ends
     (and read afresh, whatever the session had cached)."""
-    return db.get(ProductionSupplier, supplier_id, with_for_update=True)
+    return db.get(ProductionSupplier, supplier_id, with_for_update=True, populate_existing=True)
 
 
 def append(
@@ -106,6 +106,8 @@ def purchase_tasks(db: Session, on: date) -> list[dict]:
             ProdPurchase.voided_at.is_(None),
             ProdPurchase.received_on.is_(None),
             ProdPurchase.expected_on.is_not(None),
+            # A purchase for an order that was cancelled is nothing to chase or check.
+            or_(ProdOrder.id.is_(None), ProdOrder.status != "cancelled"),
         )
         .order_by(ProdPurchase.expected_on, ProdPurchase.id)
     ).all()

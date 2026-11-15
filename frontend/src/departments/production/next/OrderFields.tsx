@@ -107,6 +107,8 @@ export function draftBody(draft: OrderDraft, lockPlanned = false) {
 /** What the server says when who buys the fabric, or printing, is changed after cutting. */
 export const FABRIC_LOCKED = "Who buys the fabric cannot change after cutting. Reopen cutting first.";
 export const PRINTING_LOCKED = "Printing cannot change after cutting. Reopen cutting first.";
+/** The same for the factory: what is owed is for one factory, so it stays after cutting. */
+export const FACTORY_LOCKED = "The factory cannot change after cutting. Reopen cutting first.";
 
 /** The supplier an order already has, which may since have been deactivated. */
 type HeldSupplier = { id: string; name: string | null } | null | undefined;
@@ -137,6 +139,7 @@ export function OrderFields({
   choices,
   lockPlanned,
   lockBuyerAndPrinting,
+  lockFactory,
   held,
 }: {
   draft: OrderDraft;
@@ -146,6 +149,8 @@ export function OrderFields({
   lockPlanned?: boolean;
   /** Cutting is done: who buys the fabric and how it is printed stay as they were (shown, not editable). */
   lockBuyerAndPrinting?: boolean;
+  /** Cutting is done: the factory stays as it was (shown, not editable). */
+  lockFactory?: boolean;
   /** The factory and print house the order has now, kept in the lists even if no longer active. */
   held?: { factory: HeldSupplier; printSupplier: HeldSupplier };
 }) {
@@ -194,10 +199,22 @@ export function OrderFields({
         <label className="field__label" htmlFor={`${id}-factory`}>
           Factory
         </label>
-        <select id={`${id}-factory`} className="input" value={draft.factoryId} onChange={(event) => set("factoryId", event.target.value)}>
+        <select
+          id={`${id}-factory`}
+          className="input"
+          value={draft.factoryId}
+          disabled={lockFactory}
+          aria-describedby={lockFactory ? `${id}-factory-locked` : undefined}
+          onChange={(event) => set("factoryId", event.target.value)}
+        >
           <option value="">Choose the factory…</option>
           <SupplierOptions suppliers={choices.suppliers} held={held?.factory} />
         </select>
+        {lockFactory && (
+          <span id={`${id}-factory-locked`} className="field__hint">
+            {FACTORY_LOCKED}
+          </span>
+        )}
       </div>
       <div className="prod-field">
         <label className="field__label" htmlFor={`${id}-buyer`}>

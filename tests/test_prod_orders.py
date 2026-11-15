@@ -1198,6 +1198,70 @@ def test_who_buys_the_fabric_and_printing_are_locked_once_cutting_is_done(owner)
     assert _ok(owner.patch(url, json={"fabric_bought_by": "hba"}))["fabric_bought_by"] == "hba"
 
 
+def test_the_factory_is_locked_once_cutting_is_done(owner):
+    """Moving the order to another factory after cutting would move what is
+    owed from one supplier to another with no line to show it."""
+    with SessionLocal() as db:
+        db.add(ProductionSupplier(id="alt", code="ALT", name="Second factory", category_id="cat-make", active=True))
+        db.commit()
+    oid = _new(owner)["id"]
+    url = f"/api/prod/orders/{oid}"
+    # Before cutting it can change.
+    assert _ok(owner.patch(url, json={"factory_id": "alt"}))["factory"]["id"] == "alt"
+    assert _ok(owner.patch(url, json={"factory_id": "fac"}))["factory"]["id"] == "fac"
+    _to_cutting(owner, oid)
+    _cut(owner, oid)
+
+    refused = owner.patch(url, json={"factory_id": "alt"})
+    assert refused.status_code == 409
+    assert refused.json()["detail"] == "The factory cannot change after cutting. Reopen cutting first."
+    assert owner.get(url).json()["order"]["factory"]["id"] == "fac"
+    # The same value sent again is no change, so the form can send everything.
+    kept = _ok(owner.patch(url, json={"factory_id": "fac", "colour": "Red"}))
+    assert kept["colour"] == "Red" and kept["factory"]["id"] == "fac"
+    # Reopen cutting and it can change again.
+    _ok(owner.post(f"/api/prod/orders/{oid}/stages/cutting/reopen", json={"reason": "Wrong factory"}))
+    assert _ok(owner.patch(url, json={"factory_id": "alt"}))["factory"]["id"] == "alt"
+
+
+def test_an_order_cancelled_after_cutting_still_says_what_the_factory_earned(owner, staff, viewer):
+    """Cancelling after cutting freezes the payable so far (as settling does)
+    while the status stays cancelled; only the owner sees the figures.
+    Built as recommended on 15 November 2026, awaiting the owner's confirmation."""
+    order = _all_the_way(owner)
+    oid = order["id"]
+    open_figures = owner.get(f"/api/prod/orders/{oid}").json()["order"]["settlement"]
+    assert open_figures["settled"] is False and open_figures["payable_piastres"] == 10_649_000
+
+    cancelled = _ok(owner.post(f"/api/prod/orders/{oid}/cancel", json={"reason": "Style dropped"}))
+    assert cancelled["status"] == "cancelled" and cancelled["stage"] is None
+    seen = owner.get(f"/api/prod/orders/{oid}").json()["order"]
+    assert seen["status"] == "cancelled"  # never "closed"
+    frozen = seen["settlement"]
+    assert frozen["payable_piastres"] == 10_649_000 and frozen["held_piastres"] == 345_000
+    assert frozen["settled"] is True and frozen["settled_at"] is not None  # the figure is frozen
+    assert seen["cost"]["piece_cost_piastres"] == 30000
+    # The frozen figure does not move with later edits of cost (cancelled orders cannot be edited).
+    assert owner.patch(f"/api/prod/orders/{oid}", json={"target_manufacturing_piastres": 1}).status_code == 409
+    assert owner.get(f"/api/prod/orders/{oid}").json()["order"]["settlement"] == frozen
+
+    # Everybody else: no cost, no settlement, no money word at any depth.
+    for person in (staff, viewer):
+        body = person.get(f"/api/prod/orders/{oid}")
+        assert body.status_code == 200 and body.json()["order"]["status"] == "cancelled"
+        assert "cost" not in body.json()["order"] and "settlement" not in body.json()["order"]
+        _no_money(body.json(), "cancelled after cutting")
+        assert "piastres" not in body.text
+        listed = person.get("/api/prod/orders", params={"status": "closed"})
+        _no_money(listed.json(), "list")
+        assert "piastres" not in listed.text and listed.json()["orders"][0]["status"] == "cancelled"
+        history = person.get(f"/api/prod/orders/{oid}/history")
+        assert "piastres" not in history.text and not any(
+            char.isdigit() and "EGP" in event["summary"] for event in history.json()["events"] for char in event["summary"]
+        )
+        assert all("EGP" not in event["summary"] for event in history.json()["events"])
+
+
 def test_a_change_of_print_house_is_told_with_both_names(owner):
     order = _new(owner, printing="outside", print_supplier_id="prt")
     oid = order["id"]

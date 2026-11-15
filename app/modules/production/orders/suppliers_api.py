@@ -29,7 +29,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
 from app.core.permissions import Permission
@@ -143,7 +143,11 @@ class NewPurchase(BaseModel):
 
 
 class PurchaseEdit(BaseModel):
-    """Any of these; what is left out stays as it was. ``null`` clears one."""
+    """Any of these; what is left out stays as it was. ``null`` clears one.
+    Any other field is refused (422), not ignored: money on a purchase never
+    changes (void it instead)."""
+
+    model_config = ConfigDict(extra="forbid")
 
     expected_on: date | None = None
     received_on: date | None = None
@@ -152,6 +156,14 @@ class PurchaseEdit(BaseModel):
 
 class Reason(BaseModel):
     reason: str = Field(max_length=1000)
+
+
+class Void(BaseModel):
+    reason: str = Field(max_length=1000)
+    #: Required when the purchase has a deposit standing (else ignored): did the
+    #: supplier give it back? ``true`` reverses it too; ``false`` leaves it on the
+    #: account as credit with the supplier.
+    deposit_returned: bool | None = None
 
 
 class NewPayment(BaseModel):
@@ -264,9 +276,11 @@ def edit_purchase(
 
 @router.post("/purchases/{purchase_id}/void")
 def void_purchase(
-    purchase_id: int, body: Reason, actor: UserAccount = Depends(OWNER), db: Session = Depends(get_session)
+    purchase_id: int, body: Void, actor: UserAccount = Depends(OWNER), db: Session = Depends(get_session)
 ) -> dict:
-    return _write(db, actor, lambda: suppliers.void_purchase(db, purchase_id, body.reason, actor))
+    return _write(
+        db, actor, lambda: suppliers.void_purchase(db, purchase_id, body.reason, actor, body.deposit_returned)
+    )
 
 
 # ── The account ───────────────────────────────────────────────────────────────

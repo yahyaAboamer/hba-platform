@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  oldestDay,
+  voidSentence,
   afterLineSentence,
   afterPaymentSentence,
   canHaveReceipt,
@@ -304,5 +306,28 @@ describe("What a page carries, and `?open=`", () => {
     expect(panelFromSupplierOpen(null, page, owner)).toBeNull();
     const received = makeSupplierPage({ purchases: [makePurchase({ id: 1, received_on: "2030-11-12" })] });
     expect(panelFromSupplierOpen("purchase:1", received, owner)).toBeNull();
+  });
+});
+
+describe("A money entry a year or more back, and the void question", () => {
+  it("refuses a day more than 366 days back, for a payment, a line and a purchase, and accepts the edge", () => {
+    const today = "2030-11-13";
+    expect(oldestDay(today)).toBe("2029-11-12");
+    expect(paymentProblem({ amount: "100", date: "2029-11-12", method: "cash", kind: "final", note: "" }, today)).toBeNull();
+    expect(paymentProblem({ amount: "100", date: "2029-11-11", method: "cash", kind: "final", note: "" }, today)).toBe(
+      "The payment date can't be more than a year ago. Check the date.",
+    );
+    expect(lineProblem({ amount: "100", direction: "more", date: "2029-11-11", note: "x" }, today, true)).toBe(
+      "The date can't be more than a year ago. Check the date.",
+    );
+    expect(lineProblem({ amount: "100", direction: "more", date: "2029-11-12", note: "x" }, today, true)).toBeNull();
+  });
+
+  it("says in words what the account shows after each answer", () => {
+    expect(voidSentence(null, 4_000_000, "Main factory")).toBeNull();
+    expect(voidSentence(true, 4_000_000, "Main factory")).toContain("both reversed");
+    const kept = voidSentence(false, 4_000_000, "Main factory")!;
+    expect(kept).toContain("EGP 40,000.00");
+    expect(kept).toContain("credit with Main factory");
   });
 });

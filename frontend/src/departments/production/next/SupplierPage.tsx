@@ -66,7 +66,7 @@ function PanelView({
     }
     case "void": {
       const purchase = supplier.purchases.find((candidate) => candidate.id === panel.id);
-      return purchase ? <VoidForm purchase={purchase} run={run} onClose={onClose} /> : null;
+      return purchase ? <VoidForm purchase={purchase} supplier={supplier} run={run} onClose={onClose} /> : null;
     }
     case "reverse": {
       const line = supplier.account?.find((candidate) => candidate.id === panel.entry);

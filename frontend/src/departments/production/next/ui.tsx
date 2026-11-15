@@ -381,15 +381,24 @@ export type Run<A = OrderAnswer> = (request: () => Promise<A>, done: string) => 
 export function useSubmit<A = OrderAnswer>(run: Run<A>) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // A second press while a save is still going is ignored, before the button has had time to redraw as disabled.
+  const flying = useRef(false);
   /** Resolves `true` when the order was saved, `false` when a check or the server refused. */
   async function submit(problem: string | null, request: () => Promise<A>, done: string): Promise<boolean> {
+    if (flying.current) return false;
     if (problem) {
       setError(problem);
       return false;
     }
     setError(null);
+    flying.current = true;
     setBusy(true);
-    const refused = await run(request, done);
+    let refused: string | null;
+    try {
+      refused = await run(request, done);
+    } finally {
+      flying.current = false;
+    }
     setBusy(false);
     if (refused) setError(refused);
     return refused === null;

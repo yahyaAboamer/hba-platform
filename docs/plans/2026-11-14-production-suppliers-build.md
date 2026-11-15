@@ -92,10 +92,28 @@ files; keys under `production/suppliers/{supplier_id}/`.
    the purchase. The rest stays on the balance with no due date.
    A purchase's price, quantity, unit, supplier and order are never edited:
    it is **voided** with a reason (owner), which writes a reversing line for
-   the purchase and for its deposit, and a voided purchase is shown struck
-   through. Its `expected_on`, `received_on` and `note` can be changed; the
-   QC manager can set `expected_on` and mark it received (`received_on`, not
-   in the future), since materials arriving is his work.
+   the purchase, and a voided purchase is shown struck through. **When a
+   deposit stands on it, the void must say what became of the deposit**
+   (`deposit_returned`, required then; ignored when no deposit stands).
+   `true`: the supplier gave it back, so the deposit's line is reversed too.
+   `false`: the supplier keeps it, so the deposit payment stays on the
+   account and, with the purchase gone, the supplier holds that much of
+   HBA's money as credit (the account reads "Overpaid"); the purchase then
+   shows `deposit_kept`. *Built as recommended on 15 November 2026, awaiting
+   the owner's confirmation.* Its `expected_on`, `received_on` and `note` can
+   be changed; the QC manager can set `expected_on` and mark it received
+   (`received_on`, not in the future), since materials arriving is his work.
+   Neither date may be before the day the purchase was bought, and
+   `PATCH /purchases/{id}` refuses any other field (422) instead of
+   ignoring it.
+   **Lines and dates.** A purchase date, a payment's date, an opening's
+   date and an adjustment's date are not in the future and not more than 366
+   days in the past (a typo guard). A receipt cannot be attached to a
+   payment that has been reversed. Reversing a deposit payment that is tied
+   to a live purchase stays allowed: the purchase then shows no deposit and
+   the account's reversing line says it was the deposit of that purchase.
+   A purchase task (rule 8) is not made for a purchase tied to a cancelled
+   order.
 3. **Payments** (owner). Amount > 0, date not in the future, a method, a kind
    (`weekly` | `deposit` | `final`), optional note, optional receipt photo
    (added with the payment or afterwards; replaceable; removable). A payment
@@ -111,6 +129,20 @@ files; keys under `production/suppliers/{supplier_id}/`.
    account: `+settled_payable_piastres`, dated the day it is settled, tied
    to the order. A settled payable of zero writes no line; a negative one
    writes a negative line.
+   **Cancelling an order after cutting is done keeps what the factory has
+   earned.** In the same transaction `cancel` writes one `work` line on the
+   factory's account for the payable so far (batch 1's
+   `settlement(...)["payable_piastres"]`; none at zero, a negative line when
+   negative), dated the day of the cancel, tied to the order, noted
+   "Cancelled after cutting", and freezes the figure on the order the way
+   `settle` does (`settled_payable_piastres`, `settled_at`, `settled_by`)
+   while `status` stays `cancelled`; the order page then shows the frozen
+   figure to the owner, as "owed to the factory when the order was
+   cancelled". Cancelling **before** cutting is done writes nothing. *Built
+   as recommended on 15 November 2026, awaiting the owner's confirmation.*
+   Once cutting is done the order's factory cannot change (`Locked`, 409:
+   "The factory cannot change after cutting. Reopen cutting first."; the
+   unchanged value is accepted), like who buys the fabric and printing.
    **Until an order is settled, its payable so far is not a ledger line.**
    It is worked out on each read from batch 1's `settlement` and shown on
    the factory's page as a line "so far, not settled", and it counts in what
@@ -135,6 +167,26 @@ files; keys under `production/suppliers/{supplier_id}/`.
    `/production/next/suppliers/{supplier_id}?open=purchase:<id>`. A purchase
    expected today or later and not received is a task "Check <item> on
    arrival", who `qc`, due `expected_on`. Titles carry no money.
+**Lock order.** Whenever a write involves a known order, the order's row
+is locked `FOR UPDATE` first and the supplier's second: `settle` and
+`cancel` (order, then factory) and, in the supplier module, adding a
+purchase (which also re-checks the order is still open under that lock),
+voiding one and reversing a line that has an order or a purchase with
+one. A line with an `order_id` takes a key-share lock on the order
+through its foreign key, so locking the supplier first could deadlock
+with a `settle` or `cancel`. The rule is stated in the docstrings of
+`services/suppliers.py` and `services/account.py`.
+**No double entry by accident.** A payment, a purchase, an opening
+balance or an adjustment identical to one the same person recorded for
+the same supplier within the last 60 seconds is refused (`Locked`, 409:
+"This looks like the same payment / purchase / correction recorded twice.
+Wait a minute if it really is a second one."; for an opening, "balance
+brought forward"). Payment: amount, date, method, kind. Purchase: item,
+quantity, unit, unit price, order. Adjustment: amount, date, note.
+Opening: amount, date. A line that was reversed, and a purchase that was
+voided, no longer count. The check is made under the supplier's lock.
+**A supplier cannot be made inactive** while it is the factory or print
+house of an open order (422, in plain words, with no balance in it).
 9. **Permissions.**
    - `production.view`: the supplier list and page **without money**: names,
      sections, contact, purchases as item / quantity / unit / dates only, no
@@ -168,7 +220,8 @@ files; keys under `production/suppliers/{supplier_id}/`.
   (`production.suppliers`).
 - `POST /suppliers/{id}/purchases` (owner); `PATCH /purchases/{id}`
   (expected_on, received_on, note: `production.edit`);
-  `POST /purchases/{id}/void` (owner, reason).
+  `POST /purchases/{id}/void` (owner, reason, and `deposit_returned` when a
+  deposit stands on the purchase).
 - `POST /suppliers/{id}/payments` (owner);
   `POST /suppliers/{id}/opening` (owner);
   `POST /suppliers/{id}/adjustments` (owner);
@@ -201,7 +254,16 @@ files; keys under `production/suppliers/{supplier_id}/`.
 - `?open=purchase:<id>` on the supplier page opens that purchase's "Mark
   received" panel (from Tasks).
 - The order page's **Cost per piece** card shows "From purchases" per part
-  with "Use this" (owner).
+  with "Use this" (owner). When the part is in what the factory is owed
+  (manufacturing; printing when the factory prints; fabric when the factory
+  bought it) "Use this" first says "This changes what the factory is owed
+  for this order" and asks to confirm inline; other parts act at once.
+- **Void** asks what became of a standing deposit (two plain answers, neither
+  chosen for the owner, each with what the account will show). **Cancel
+  order**, once cutting is done and for the owner, says what will go on the
+  factory's account ("The factory keeps EGP X for the work already done; it
+  goes on their account."). The edit form shows the factory read-only after
+  cutting. A save button is disabled while a save is in flight.
 - A person without `production.owner` sees no money and no money controls
   anywhere. Phone first where the QC manager works (purchases: mark
   received); 44px targets; no horizontal scroll at 390px; both themes.
@@ -225,7 +287,7 @@ files; keys under `production/suppliers/{supplier_id}/`.
 ## Response shapes (as built)
 Generated from real responses of the built backend (one scenario on the main factory `fac`: a balance brought forward, a settled order, a purchase with a deposit, a payment with a receipt, a reversed adjustment, a voided purchase and an order not yet settled). Ids, dates and names are the scenario's; the shapes are exact. Everything is under `/api/prod`.
 ### Rules that hold for every response
-- **Money is integer piastres**, in keys ending `_piastres`, and appears only for somebody holding `production.owner`. For anybody else the keys are **absent, not null**, on every route, a write's answer included. The money keys are: `owed_piastres`, `held_piastres`, `paid_piastres`, `paid_year`, `owed_total_piastres`, `has_opening`, `account` (the whole list), and on a purchase `unit_price_piastres`, `total_piastres`, `deposit_piastres`, `void_reason`.
+- **Money is integer piastres**, in keys ending `_piastres`, and appears only for somebody holding `production.owner`. For anybody else the keys are **absent, not null**, on every route, a write's answer included. The money keys are: `owed_piastres`, `held_piastres`, `paid_piastres`, `paid_year`, `owed_total_piastres`, `has_opening`, `account` (the whole list), and on a purchase `unit_price_piastres`, `total_piastres`, `deposit_piastres`, `deposit_kept`, `void_reason`.
 - A purchase's part is called **`part`** in the JSON (`fabric` | `printing` | `accessories` | `packaging` | `other`), not `cost_part`.
 - A purchase's **`quantity` is a decimal string** (`"1075"`, `"12.5"`), never a float, so it survives exactly; send it as a number or a string.
 - Dates are `YYYY-MM-DD`; moments are UTC ISO with `Z`.
@@ -457,6 +519,7 @@ Generated from real responses of the built backend (one scenario on the main fac
         "unit_price_piastres": 4000,
         "total_piastres": 50000,
         "deposit_piastres": 0,
+        "deposit_kept": false,
         "void_reason": "Wrong supplier"
       },
       {
@@ -482,6 +545,7 @@ Generated from real responses of the built backend (one scenario on the main fac
         "unit_price_piastres": 300,
         "total_piastres": 300000,
         "deposit_piastres": 0,
+        "deposit_kept": false,
         "void_reason": null
       },
       {
@@ -507,6 +571,7 @@ Generated from real responses of the built backend (one scenario on the main fac
         "unit_price_piastres": 16000,
         "total_piastres": 17200000,
         "deposit_piastres": 4000000,
+        "deposit_kept": false,
         "void_reason": null
       }
     ],
@@ -1036,6 +1101,34 @@ Account notes: lines are **newest first**, by date then id; `balance_after_piast
 ]
 ```
 Keys are `purchase:{id}:chase` (late: expected before today, not received; `who: "factory"`, `waiting_on` the supplier's name) and `purchase:{id}:arrival` (expected today or later; `who: "qc"`). `open` is `purchase:{id}`; the link is `/production/next/suppliers/{supplier.id}?open=purchase:{id}`. `supplier` is an extra key on these two tasks only. No title carries money. A purchase with no expected date makes no task.
+### A cancelled order, after cutting (the factory's page and the order's)
+
+Cancelling an order whose cutting is done (not before) writes one `work` line on the factory's account, in the same transaction, and freezes the payable so far on the order. Built as recommended on 15 November 2026, awaiting the owner's confirmation. For a payable so far of EGP 106,490.00 the owner reads, on `GET /suppliers/{factory}`, a line like this (newest first; there is no `not_settled` line for the order any more, and it counts once in `owed_piastres`):
+```json
+{
+  "id": 14,
+  "kind": "work",
+  "what": "Work on PO-2611-02",
+  "amount_piastres": 10649000,
+  "balance_after_piastres": 7649000,
+  "happened_on": "2026-11-15",
+  "order": { "id": 2, "code": "PO-2611-02" },
+  "purchase": null,
+  "method": null,
+  "payment_kind": null,
+  "note": "Cancelled after cutting",
+  "reversal": false,
+  "reverses_id": null,
+  "reversed": false,
+  "reversed_by_id": null,
+  "not_settled": false,
+  "receipt": null
+}
+```
+On `GET /orders/{id}` the `status` is `"cancelled"` and the owner's `settlement` block is the frozen one (`payable_piastres` as it was at the cancel, `settled: true`, `settled_at` set). Anybody else gets the order with no `cost` and no `settlement`, as for every order. At a payable of zero no line is written (the block is still frozen); a negative payable writes a negative line. A cancel before cutting is done writes nothing, and the order has `settlement: null`.
+
+A voided purchase whose deposit the supplier kept (`deposit_returned: false`) keeps its `deposit_piastres`, has `deposit_kept: true`, and its deposit line stays on the account, not reversed.
+
 ### Request bodies and what each route answers
 #### `POST /api/prod/sections` -> 201
 Who and rules: `production.suppliers`. Answers `{sections, section_id}`.
@@ -1081,7 +1174,7 @@ Who and rules: `production.suppliers`; any of these, what is left out stays; `se
 }
 ```
 #### `POST /api/prod/suppliers/{supplier_id}/purchases` -> 201
-Who and rules: `production.owner`; `quantity` > 0, three decimals at most; `unit` `kg`|`m`|`piece`; `part` as above; `order_id` and `expected_on` optional; `bought_on` not in the future (default today); a deposit is `deposit_piastres` (0 < deposit <= the server's total) with `deposit_method` (`bank_transfer`|`cash`|`instapay`|`wallet`|`cheque`); the total is never sent. Answers `{supplier, purchase_id}`.
+Who and rules: `production.owner`; `quantity` > 0, three decimals at most; `unit` `kg`|`m`|`piece`; `part` as above; `order_id` and `expected_on` optional; `bought_on` not in the future and not more than 366 days back (default today); `expected_on` not before `bought_on`; the same purchase by the same person within 60 seconds answers 409; a deposit is `deposit_piastres` (0 < deposit <= the server's total) with `deposit_method` (`bank_transfer`|`cash`|`instapay`|`wallet`|`cheque`); the total is never sent. Answers `{supplier, purchase_id}`.
 ```json
 {
   "item": "Heavy fleece, black",
@@ -1098,7 +1191,7 @@ Who and rules: `production.owner`; `quantity` > 0, three decimals at most; `unit
 }
 ```
 #### `PATCH /api/prod/purchases/{purchase_id}` -> 200
-Who and rules: `production.edit`; only these three; `null` clears; `received_on` not in the future; a voided purchase answers 409. Answers `{supplier}` (no money for a non-owner).
+Who and rules: `production.edit`; only these three, any other field answers 422; `null` clears; `received_on` not in the future; neither `expected_on` nor `received_on` before the purchase's `bought_on` (422); a voided purchase answers 409. Answers `{supplier}` (no money for a non-owner).
 ```json
 {
   "expected_on": "2026-11-12",
@@ -1107,14 +1200,15 @@ Who and rules: `production.edit`; only these three; `null` clears; `received_on`
 }
 ```
 #### `POST /api/prod/purchases/{purchase_id}/void` -> 200
-Who and rules: `production.owner`; `reason` required. Answers `{supplier}`.
+Who and rules: `production.owner`; `reason` required; `deposit_returned` (boolean) is **required (422) when a deposit stands on the purchase** and ignored otherwise: `true` reverses the purchase and the deposit, `false` reverses the purchase only and leaves the deposit on the account as credit with the supplier. Built as recommended on 15 November 2026, awaiting the owner's confirmation. Answers `{supplier}`; the voided purchase then has `deposit_kept: true` (owner only) when its deposit was kept.
 ```json
 {
-  "reason": "Wrong supplier"
+  "reason": "Wrong supplier",
+  "deposit_returned": true
 }
 ```
 #### `POST /api/prod/suppliers/{supplier_id}/payments` -> 201
-Who and rules: `production.owner`; `amount_piastres` > 0; `paid_on` not in the future (default today); `method` as above; `kind` `weekly`|`deposit`|`final`. Answers `{supplier, entry_id}`.
+Who and rules: `production.owner`; `amount_piastres` > 0; `paid_on` not in the future and not more than 366 days back (default today); `method` as above; `kind` `weekly`|`deposit`|`final`; the same payment by the same person within 60 seconds answers 409. Answers `{supplier, entry_id}`.
 ```json
 {
   "amount_piastres": 3000000,
@@ -1125,7 +1219,7 @@ Who and rules: `production.owner`; `amount_piastres` > 0; `paid_on` not in the f
 }
 ```
 #### `POST /api/prod/suppliers/{supplier_id}/opening` -> 201
-Who and rules: `production.owner`; `amount_piastres` signed and not 0 (positive: HBA owes; negative: overpaid); refused (422) while one still stands. Answers `{supplier, entry_id}`.
+Who and rules: `production.owner`; `amount_piastres` signed and not 0 (positive: HBA owes; negative: overpaid); refused (422) while one still stands; `happened_on` not in the future and not more than 366 days back; an identical one within 60 seconds answers 409. Answers `{supplier, entry_id}`.
 ```json
 {
   "amount_piastres": 4200000,
@@ -1134,7 +1228,7 @@ Who and rules: `production.owner`; `amount_piastres` signed and not 0 (positive:
 }
 ```
 #### `POST /api/prod/suppliers/{supplier_id}/adjustments` -> 201
-Who and rules: `production.owner`; signed, not 0; `note` required. Answers `{supplier, entry_id}`.
+Who and rules: `production.owner`; signed, not 0; `note` required; `happened_on` not in the future and not more than 366 days back; an identical one within 60 seconds answers 409. Answers `{supplier, entry_id}`.
 ```json
 {
   "amount_piastres": 250000,
@@ -1150,7 +1244,7 @@ Who and rules: `production.owner`; `reason` required; not for `work`, `purchase`
 }
 ```
 #### `POST /api/prod/entries/{entry_id}/receipt` -> 201
-Who and rules: `production.owner`; multipart with `file` (JPG/PNG/WebP/GIF or PDF, 20 MB); on a payment only; replaces the one there is. Answers `{supplier}`.
+Who and rules: `production.owner`; multipart with `file` (JPG/PNG/WebP/GIF or PDF, 20 MB); on a payment only (422 for one that has been reversed); replaces the one there is. Answers `{supplier}`.
 Body: multipart: file
 #### `GET /api/prod/entries/{entry_id}/receipt` and `DELETE /api/prod/entries/{entry_id}/receipt`
 `production.owner` only (403 for everybody else, the viewer, the QC manager and the manager included). `GET` returns the photo or PDF itself (`Content-Disposition: inline`, `nosniff`, no-store); 404 when there is none. `DELETE` has no body and answers `{supplier}`.

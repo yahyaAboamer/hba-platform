@@ -9,6 +9,8 @@ Every name and figure here is invented. The order helpers are batch 1's.
 """
 
 import importlib.util
+import threading
+import time
 from datetime import timedelta
 from pathlib import Path
 
@@ -595,10 +597,16 @@ def test_voiding_a_purchase_reverses_both_lines_and_strikes_it_through(owner, st
     assert owner.post(url, json={}).status_code == 422
     assert owner.post("/api/prod/purchases/9999/void", json={"reason": "x"}).status_code == 404
 
-    voided = owner.post(url, json={"reason": "Wrong supplier"})
+    # A deposit stands on it, so the owner must say what became of it.
+    asked = owner.post(url, json={"reason": "Wrong supplier"})
+    assert asked.status_code == 422 and "deposit" in asked.json()["detail"], asked.text
+    assert owner.post(url, json={"reason": "Wrong supplier", "deposit_returned": "maybe"}).status_code == 422
+    assert len(_entries(sid)) == 2  # the refusals wrote nothing
+
+    voided = owner.post(url, json={"reason": "Wrong supplier", "deposit_returned": True})
     assert voided.status_code == 200, voided.text
     page = voided.json()["supplier"]
-    assert page["purchases"][0]["voided"] is True and page["purchases"][0]["void_reason"] == "Wrong supplier"
+    assert page["purchases"][0]["voided"] is True and page["purchases"][0]["deposit_kept"] is False and page["purchases"][0]["void_reason"] == "Wrong supplier"
     assert page["purchases"][0]["voided_at"]
     assert page["owed_piastres"] == 0 and page["paid_piastres"] == 0 and len(page["account"]) == 4
     reversals = _lines(page, reversal=True)
@@ -610,7 +618,7 @@ def test_voiding_a_purchase_reverses_both_lines_and_strikes_it_through(owner, st
     original = _line(page, kind="purchase", reversal=False)
     assert original["reversed"] is True and original["reversed_by_id"] in {l["id"] for l in reversals}
 
-    assert owner.post(url, json={"reason": "Again"}).status_code == 409
+    assert owner.post(url, json={"reason": "Again", "deposit_returned": True}).status_code == 409
     assert owner.patch(f"/api/prod/purchases/{purchase}", json={"note": "x"}).status_code == 409
     # Not even the lines can be reversed twice.
     for line in reversals + [original]:
@@ -630,7 +638,7 @@ def test_voiding_after_the_deposit_was_reversed_reverses_only_what_still_stands(
 def test_a_voided_purchase_is_not_in_what_a_cost_card_learns_nor_in_the_tasks(owner):
     sid = _make(owner)["id"]
     order = _new(owner)["id"]
-    purchase = _buy(owner, sid, order_id=order, expected_on=_day(-2))["purchase_id"]
+    purchase = _buy(owner, sid, order_id=order, expected_on=_day(-2), bought_on=_day(-10))["purchase_id"]
     assert owner.get("/api/prod/tasks").json()["counts"]["factory"] == 1
     owner.post(f"/api/prod/purchases/{purchase}/void", json={"reason": "Wrong"})
     card = owner.get(f"/api/prod/orders/{order}").json()["order"]["cost"]["from_purchases"]
@@ -661,8 +669,11 @@ def test_the_qc_manager_sets_the_expected_date_and_marks_it_received_without_mon
     assert manager.patch(url, json={"note": None}).json()["supplier"]["purchases"][0]["received_on"] == TODAY.isoformat()
     cleared = owner.patch(url, json={"received_on": None, "expected_on": None}).json()["supplier"]["purchases"][0]
     assert cleared["received_on"] is None and cleared["expected_on"] is None and cleared["note"] is None
-    assert owner.patch(url, json={"unit_price_piastres": 1, "total_piastres": 1}).status_code == 200
-    assert _page(owner, sid)["purchases"][0]["total_piastres"] == 17_200_000
+    # Money is not something this route knows: a field it does not have is refused, not ignored.
+    refused = owner.patch(url, json={"unit_price_piastres": 1, "total_piastres": 1})
+    assert refused.status_code == 422
+    assert owner.patch(url, json={"note": "x", "surprise": 1}).status_code == 422
+    assert _page(owner, sid)["purchases"][0]["total_piastres"] == 17_200_000 and _page(owner, sid)["purchases"][0]["note"] is None
     assert staff.patch("/api/prod/purchases/9999", json={"note": "x"}).status_code == 404
     assert owner.patch(url, json={"received_on": "2999-01-01"}).status_code == 422
 
@@ -844,13 +855,112 @@ def test_owed_and_held_before_and_after_settling_with_no_double_count(owner):
     assert len([e for e in _entries("fac") if e.kind == "work"]) == 1
 
 
-def test_an_order_not_yet_cut_and_a_cancelled_one_count_for_nothing(owner):
+def _cancel(client: TestClient, oid: int, reason: str = "Dropped"):
+    return client.post(f"/api/prod/orders/{oid}/cancel", json={"reason": reason})
+
+
+def test_an_order_not_yet_cut_counts_for_nothing_and_cancelling_it_writes_no_line(owner):
     fresh = _new(owner)["id"]
     assert _page(owner, "fac")["owed_piastres"] == 0 and _page(owner, "fac")["account"] == []
-    gone = _all_the_way(owner)["id"]
-    assert _page(owner, "fac")["owed_piastres"] == 10_649_000
-    assert owner.post(f"/api/prod/orders/{gone}/cancel", json={"reason": "Dropped"}).status_code == 200
-    assert _page(owner, "fac")["owed_piastres"] == 0 and fresh
+    early = _new(owner)["id"]
+    _to_cutting(owner, early)  # everything but cutting is done: still nothing is earned
+    assert _page(owner, "fac")["owed_piastres"] == 0
+    for oid in (fresh, early):
+        assert _cancel(owner, oid).status_code == 200
+    page = _page(owner, "fac")
+    assert page["owed_piastres"] == 0 and page["account"] == [] and _entries("fac") == []
+    assert owner.get(f"/api/prod/orders/{early}").json()["order"]["settlement"] is None
+
+
+# ── Cancelling after cutting keeps what the factory earned ────────────────────
+# Built as recommended on 15 November 2026, awaiting the owner's confirmation.
+
+
+def test_cancelling_after_cutting_writes_the_payable_so_far_on_the_factorys_account(owner, staff):
+    order = _all_the_way(owner)
+    oid = order["id"]
+    _pay(owner, "fac", 3_000_000)
+    before = _page(owner, "fac")
+    assert before["owed_piastres"] == 7_649_000 and before["held_piastres"] == 345_000
+    assert _lines(before, not_settled=True) and [e.kind for e in _entries("fac")] == ["payment"]
+
+    assert staff.post(f"/api/prod/orders/{oid}/cancel", json={"reason": "No"}).status_code == 403
+    assert _cancel(owner, oid, "Style dropped").status_code == 200
+    page = _page(owner, "fac")
+    work = _line(page, kind="work")
+    assert (work["amount_piastres"], work["happened_on"], work["note"], work["order"]["id"]) == (
+        10_649_000, TODAY.isoformat(), "Cancelled after cutting", oid
+    )
+    assert work["what"] == f"Work on {order['code']}" and work["reversal"] is False and work["not_settled"] is False
+    # No double count: what was owed so far is now the line, once.
+    assert not _lines(page, not_settled=True)
+    assert page["owed_piastres"] == 7_649_000 == -3_000_000 + 10_649_000
+    assert page["held_piastres"] == 0 and page["orders"][0]["status"] == "cancelled"
+    assert [l["balance_after_piastres"] for l in page["account"]] == [7_649_000, -3_000_000]
+    row = next(s for s in owner.get("/api/prod/suppliers").json()["suppliers"] if s["id"] == "fac")
+    assert (row["owed_piastres"], row["held_piastres"], row["open_orders"]) == (7_649_000, 0, 0)
+    # Once: a second cancel is refused and writes nothing more.
+    assert _cancel(owner, oid).status_code == 409
+    assert len([e for e in _entries("fac") if e.kind == "work"]) == 1
+    # And a work line is not reversed by hand.
+    refused = _reverse(owner, work["id"])
+    assert refused.status_code == 422 and "can't be reversed" in refused.json()["detail"]
+    with SessionLocal() as db:
+        entry = db.scalars(select(ProdSupplierEntry).where(ProdSupplierEntry.kind == "work")).one()
+        assert entry.created_by is not None and entry.order_id == oid
+
+
+def test_cancelling_after_cutting_with_nothing_earned_writes_no_line_but_freezes_the_figure(owner):
+    oid = _new(owner, target_manufacturing_piastres=0, target_printing_piastres=0, printing="none")["id"]
+    _to_cutting(owner, oid)
+    _cut(owner, oid)
+    assert owner.get(f"/api/prod/orders/{oid}").json()["order"]["settlement"]["payable_piastres"] == 0
+    assert _cancel(owner, oid).status_code == 200
+    assert _entries("fac") == [] and _page(owner, "fac")["owed_piastres"] == 0
+    figures = owner.get(f"/api/prod/orders/{oid}").json()["order"]["settlement"]
+    assert figures["payable_piastres"] == 0 and figures["settled"] is True
+
+
+def test_cancelling_after_cutting_with_more_rejected_than_work_writes_a_negative_line(owner):
+    """The factory bought the fabric and the rejects came to more than the work."""
+    oid = _new(owner, fabric_bought_by="factory", printing="none", target_manufacturing_piastres=100)["id"]
+    _to_cutting(owner, oid)
+    _cut(owner, oid)
+    _inspected(owner, oid)  # 16 rejected, 30 to fix and not back yet
+    expected = 972 * 100 - 16 * 16600 - 30 * 100
+    assert expected < 0
+    assert owner.get(f"/api/prod/orders/{oid}").json()["order"]["settlement"]["payable_piastres"] == expected
+    assert _page(owner, "fac")["owed_piastres"] == expected
+    assert _cancel(owner, oid).status_code == 200
+    page = _page(owner, "fac")
+    assert _line(page, kind="work")["amount_piastres"] == expected and page["owed_piastres"] == expected
+    assert owner.get(f"/api/prod/orders/{oid}").json()["order"]["settlement"]["payable_piastres"] == expected
+
+
+def test_cancelling_locks_the_order_then_the_factory_then_writes(owner):
+    oid = _all_the_way(owner)["id"]
+    seen, stop = _record_sql()
+    try:
+        assert _cancel(owner, oid).status_code == 200
+    finally:
+        stop()
+    order_lock = next(i for i, s in enumerate(seen) if "FROM prod_order " in s and "FOR UPDATE" in s)
+    supplier_lock = next(i for i, s in enumerate(seen) if "FROM production_supplier" in s and "FOR UPDATE" in s)
+    insert = next(i for i, s in enumerate(seen) if s.startswith("INSERT INTO prod_supplier_entry"))
+    assert order_lock < supplier_lock < insert
+
+
+def test_a_purchase_for_a_cancelled_order_makes_no_task(owner):
+    sid = _make(owner)["id"]
+    oid = _new(owner)["id"]
+    purchase = _buy(owner, sid, order_id=oid, expected_on=_day(-2), bought_on=_day(-10))["purchase_id"]
+    other = _buy(owner, sid, item="Thread", expected_on=_day(3))["purchase_id"]  # tied to no order
+    keys = lambda: {t["key"] for t in owner.get("/api/prod/tasks").json()["tasks"] if t["key"].startswith("purchase:")}  # noqa: E731
+    assert keys() == {f"purchase:{purchase}:chase", f"purchase:{other}:arrival"}
+    assert _cancel(owner, oid).status_code == 200
+    assert keys() == {f"purchase:{other}:arrival"}
+    # The purchase itself is untouched: still on the supplier's page, not voided.
+    assert _page(owner, sid)["purchases"][1]["voided"] is False
 
 
 def test_a_settled_payable_of_zero_writes_no_line(owner):
@@ -959,11 +1069,13 @@ def test_the_cost_card_for_anybody_but_the_owner_has_no_cost_at_all(owner, staff
 def test_a_late_purchase_is_chased_and_a_coming_one_is_checked_on_arrival(owner, staff, viewer):
     fabric = _make(owner, "Fabric supplier A")
     oid = _new(owner)
-    late = _buy(owner, fabric["id"], expected_on=_day(-3), order_id=oid["id"])["purchase_id"]
+    late = _buy(owner, fabric["id"], expected_on=_day(-3), order_id=oid["id"], bought_on=_day(-10))["purchase_id"]
     today_ = _buy(owner, fabric["id"], item="Thread", expected_on=TODAY.isoformat())["purchase_id"]
-    soon = _buy(owner, fabric["id"], item="Labels", expected_on=_day(4), part="accessories")["purchase_id"]
+    soon = _buy(owner, fabric["id"], item="Labels", expected_on=_day(4), part="accessories", bought_on=_day(-10))["purchase_id"]
     _buy(owner, fabric["id"], item="Boxes", part="packaging")  # no date: no task
-    received = _buy(owner, fabric["id"], item="Buttons", expected_on=_day(-5), part="accessories")["purchase_id"]
+    received = _buy(
+        owner, fabric["id"], item="Buttons", expected_on=_day(-5), part="accessories", bought_on=_day(-10)
+    )["purchase_id"]
     owner.patch(f"/api/prod/purchases/{received}", json={"received_on": TODAY.isoformat()})
 
     for person in (owner, staff, viewer):
@@ -977,7 +1089,7 @@ def test_a_late_purchase_is_chased_and_a_coming_one_is_checked_on_arrival(owner,
         )
         assert chase["supplier"] == {"id": fabric["id"], "name": "Fabric supplier A"}
         assert chase["order"]["id"] == oid["id"] and chase["group"] == "overdue" and chase["overdue_days"] == 3
-        assert chase["since"] == TODAY.isoformat() and chase["kind"] == "generated"
+        assert chase["since"] == _day(-10) and chase["kind"] == "generated"
         arrival = mine[f"purchase:{today_}:arrival"]
         assert arrival["title"] == "Check Thread on arrival" and arrival["who"] == "qc" and arrival["due"] == TODAY.isoformat()
         assert arrival["waiting_on"] is None and arrival["order"] is None and arrival["group"] == "today"
@@ -1069,7 +1181,7 @@ def test_every_route_asks_its_permission_and_answers_nobody_else_money(owner, ro
     sid = supplier["id"]
     order = _all_the_way(owner)
     other_order = _new(owner, colour="Off-white")
-    purchase = _buy(owner, sid, order_id=other_order["id"], deposit_piastres=100_000, deposit_method="cash", expected_on=_day(-1))
+    purchase = _buy(owner, sid, order_id=other_order["id"], deposit_piastres=100_000, deposit_method="cash", expected_on=_day(-1), bought_on=_day(-5))
     entry = _pay(owner, sid, 200_000)["entry_id"]
     owner.post(f"/api/prod/entries/{entry}/receipt", files={"file": ("a.png", PNG, "image/png")})
     section = owner.post("/api/prod/sections", json={"name": "Spare"}).json()["section_id"]
@@ -1149,7 +1261,7 @@ def test_every_write_is_in_the_history_without_an_amount(owner, bucket):
     owner.post(f"/api/prod/suppliers/{sid}/adjustments", json={"amount_piastres": 250_000, "note": "Missed invoice 5555"})
     _reverse(owner, opening, "Typed 4,200 by mistake 7777")
     _reverse(owner, entry, "Wrong 8888")
-    owner.post(f"/api/prod/purchases/{p}/void", json={"reason": "Wrong 9999"})
+    owner.post(f"/api/prod/purchases/{p}/void", json={"reason": "Wrong 9999", "deposit_returned": True})
     owner.delete(f"/api/prod/sections/{section}")  # refused: still in use, writes nothing
     owner.patch(f"/api/prod/suppliers/{sid}", json={"section_ids": []})
     owner.delete(f"/api/prod/sections/{section}")
@@ -1181,3 +1293,326 @@ def test_every_write_is_in_the_history_without_an_amount(owner, bucket):
         assert figure not in everything, figure
     for event in events:
         assert event.after_json["summary"]
+
+
+# ── Lock order: the order first, then the supplier ────────────────────────────
+
+
+def _lock_order(seen: list[str], insert: str) -> None:
+    """The order's row is locked, then the supplier's, then the first row is written."""
+    order_lock = next(i for i, s in enumerate(seen) if "FROM prod_order " in s and "FOR UPDATE" in s)
+    supplier_lock = next(i for i, s in enumerate(seen) if "FROM production_supplier" in s and "FOR UPDATE" in s)
+    written = next(i for i, s in enumerate(seen) if s.startswith(insert))
+    assert order_lock < supplier_lock < written, (order_lock, supplier_lock, written)
+
+
+def test_adding_a_purchase_for_an_order_locks_the_order_then_the_supplier(owner):
+    sid = _make(owner)["id"]
+    oid = _new(owner)["id"]
+    seen, stop = _record_sql()
+    try:
+        _buy(owner, sid, order_id=oid, deposit_piastres=100, deposit_method="cash")
+    finally:
+        stop()
+    _lock_order(seen, "INSERT INTO prod_purchase")
+
+
+def test_voiding_a_purchase_for_an_order_locks_the_order_then_the_supplier(owner):
+    sid = _make(owner)["id"]
+    oid = _new(owner)["id"]
+    purchase = _buy(owner, sid, order_id=oid, deposit_piastres=100, deposit_method="cash")["purchase_id"]
+    seen, stop = _record_sql()
+    try:
+        done = owner.post(f"/api/prod/purchases/{purchase}/void", json={"reason": "Wrong", "deposit_returned": True})
+        assert done.status_code == 200, done.text
+    finally:
+        stop()
+    _lock_order(seen, "INSERT INTO prod_supplier_entry")
+
+
+def test_reversing_a_line_of_a_purchase_for_an_order_locks_the_order_then_the_supplier(owner):
+    sid = _make(owner)["id"]
+    oid = _new(owner)["id"]
+    _buy(owner, sid, order_id=oid, deposit_piastres=100, deposit_method="cash")
+    deposit = _line(_page(owner, sid), kind="payment", reversal=False)
+    seen, stop = _record_sql()
+    try:
+        assert _reverse(owner, deposit["id"]).status_code == 200
+    finally:
+        stop()
+    _lock_order(seen, "INSERT INTO prod_supplier_entry")
+
+
+def test_an_order_cancelled_while_a_purchase_waits_for_its_lock_refuses_the_purchase(owner):
+    """The open check is made under the order's lock: a purchase that queued
+    behind a cancel sees the order cancelled, whatever it saw before."""
+    sid = _make(owner)["id"]
+    oid = _new(owner)["id"]
+    answer: dict = {}
+    with engine.connect() as holder:
+        holder.execute(text("SELECT id FROM prod_order WHERE id = :i FOR UPDATE"), {"i": oid})
+        thread = threading.Thread(
+            target=lambda: answer.update(
+                response=owner.post(f"/api/prod/suppliers/{sid}/purchases", json=_purchase_body(order_id=oid))
+            )
+        )
+        thread.start()
+        time.sleep(1.0)
+        assert thread.is_alive(), "the purchase should be waiting for the order's lock"
+        holder.execute(text("UPDATE prod_order SET status = 'cancelled' WHERE id = :i"), {"i": oid})
+        holder.commit()
+    thread.join(20)
+    response = answer["response"]
+    assert response.status_code == 422 and "still in production" in response.json()["detail"]
+    assert _entries(sid) == [] and _page(owner, sid)["purchases"] == []
+
+
+# ── Voiding a purchase that has a deposit asks about the deposit ──────────────
+# Built as recommended on 15 November 2026, awaiting the owner's confirmation.
+
+
+def test_voiding_when_the_supplier_keeps_the_deposit_leaves_it_on_the_account_as_credit(owner):
+    sid = _make(owner)["id"]
+    purchase = _buy(owner, sid, deposit_piastres=4_000_000, deposit_method="cash")["purchase_id"]
+    url = f"/api/prod/purchases/{purchase}/void"
+    kept = owner.post(url, json={"reason": "Wrong supplier", "deposit_returned": False})
+    assert kept.status_code == 200, kept.text
+    page = kept.json()["supplier"]
+    shown = page["purchases"][0]
+    assert shown["voided"] is True and shown["deposit_piastres"] == 4_000_000 and shown["deposit_kept"] is True
+    # The purchase is reversed, the deposit stays: the supplier holds HBA's money.
+    reversals = _lines(page, reversal=True)
+    assert [l["amount_piastres"] for l in reversals] == [-17_200_000] and reversals[0]["kind"] == "purchase"
+    deposit = _line(page, kind="payment", reversal=False)
+    assert deposit["amount_piastres"] == -4_000_000 and deposit["reversed"] is False
+    assert page["owed_piastres"] == -4_000_000 and page["paid_piastres"] == 4_000_000 and len(_entries(sid)) == 3
+    assert [l["balance_after_piastres"] for l in page["account"]] == [-4_000_000, 13_200_000, 17_200_000]
+    listed = next(r for r in owner.get("/api/prod/suppliers").json()["suppliers"] if r["id"] == sid)
+    assert listed["owed_piastres"] == -4_000_000
+    assert owner.get("/api/prod/suppliers").json()["owed_total_piastres"] == 0  # overpaid is not owed
+    # The deposit can still be reversed later, by hand, once the supplier gives the money back.
+    assert _reverse(owner, deposit["id"], "Supplier returned it").status_code == 200
+    after = _page(owner, sid)
+    assert after["owed_piastres"] == 0 and after["purchases"][0]["deposit_piastres"] == 0
+    assert after["purchases"][0]["deposit_kept"] is False
+    # The history says it in words, with no figure.
+    with SessionLocal() as db:
+        voids = [
+            e.after_json["summary"]
+            for e in db.scalars(select(AuditEvent).where(AuditEvent.action == "production.purchase_voided"))
+        ]
+    assert voids == ["Voided the purchase of Heavy fleece, black from Fabric supplier A, the supplier keeps the deposit as credit"]
+
+
+def test_the_deposit_question_is_asked_only_when_a_deposit_stands(owner):
+    sid = _make(owner)["id"]
+    plain = _buy(owner, sid, item="Plain")["purchase_id"]
+    for answer in (None, True, False):
+        body = {"reason": "Wrong"} if answer is None else {"reason": "Wrong", "deposit_returned": answer}
+        bought = _buy(owner, sid, item=f"Plain {answer}")["purchase_id"]
+        done = owner.post(f"/api/prod/purchases/{bought}/void", json=body)
+        assert done.status_code == 200, (answer, done.text)
+        assert done.json()["supplier"]["purchases"][0]["deposit_kept"] is False
+    # A deposit that was reversed already no longer stands: nothing to ask.
+    deposited = _buy(owner, sid, item="Deposited", deposit_piastres=1_000, deposit_method="cash")["purchase_id"]
+    deposit = _line(_page(owner, sid), kind="payment", reversal=False)
+    assert _reverse(owner, deposit["id"]).status_code == 200
+    assert owner.post(f"/api/prod/purchases/{deposited}/void", json={"reason": "Wrong"}).status_code == 200
+    assert owner.post(f"/api/prod/purchases/{plain}/void", json={"reason": "Wrong"}).status_code == 200
+    assert _page(owner, sid)["owed_piastres"] == 0
+
+
+def test_reversing_the_deposit_of_a_live_purchase_leaves_it_with_no_deposit_and_says_which_line_it_was(owner):
+    sid = _make(owner)["id"]
+    oid = _new(owner)["id"]
+    purchase = _buy(owner, sid, order_id=oid, deposit_piastres=4_000_000, deposit_method="cash")["purchase_id"]
+    deposit = _line(_page(owner, sid), kind="payment", reversal=False)
+    done = _reverse(owner, deposit["id"], "Never paid")
+    assert done.status_code == 200, done.text
+    page = done.json()["supplier"]
+    shown = page["purchases"][0]
+    assert shown["deposit_piastres"] == 0 and shown["voided"] is False and shown["deposit_kept"] is False
+    back = page["account"][0]
+    assert back["reversal"] is True and back["reverses_id"] == deposit["id"]
+    assert (back["kind"], back["payment_kind"], back["purchase"]["id"]) == ("payment", "deposit", purchase)
+    assert back["what"] == "Reversal · Deposit · Cash · Heavy fleece, black"
+    assert page["owed_piastres"] == 17_200_000 and page["paid_piastres"] == 0
+
+
+# ── The same money entry is not recorded twice by accident ────────────────────
+
+TWICE = "This looks like the same {} recorded twice. Wait a minute if it really is a second one."
+
+
+def test_the_same_payment_twice_in_a_minute_is_refused_and_a_different_one_is_not(owner):
+    sid = _make(owner)["id"]
+    url = f"/api/prod/suppliers/{sid}/payments"
+    body = {"amount_piastres": 500_000, "method": "cash", "kind": "weekly", "paid_on": _day(-1)}
+    assert owner.post(url, json=body).status_code == 201
+    twice = owner.post(url, json=body)
+    assert twice.status_code == 409 and twice.json()["detail"] == TWICE.format("payment")
+    assert len(_entries(sid)) == 1  # the refusal wrote nothing
+    # Anything that differs makes it another payment.
+    for change in ({"amount_piastres": 500_001}, {"method": "instapay"}, {"kind": "final"}, {"paid_on": _day(-2)}):
+        assert owner.post(url, json={**body, **change}).status_code == 201, change
+    assert len(_entries(sid)) == 5
+    # Another supplier is another matter.
+    other = _make(owner, "Other supplier")["id"]
+    assert owner.post(f"/api/prod/suppliers/{other}/payments", json=body).status_code == 201
+
+
+def test_a_payment_that_was_reversed_may_be_entered_again_at_once(owner):
+    sid = _make(owner)["id"]
+    url = f"/api/prod/suppliers/{sid}/payments"
+    body = {"amount_piastres": 700_000, "method": "cash", "kind": "weekly"}
+    first = owner.post(url, json=body).json()["entry_id"]
+    assert owner.post(url, json=body).status_code == 409
+    assert _reverse(owner, first, "Wrong day").status_code == 200
+    assert owner.post(url, json=body).status_code == 201
+    assert owner.post(url, json=body).status_code == 409
+
+
+def test_somebody_elses_identical_payment_does_not_count_as_the_same_person_twice(owner):
+    sid = _make(owner)["id"]
+    other = _person("second@example.com", "production_viewer", name="Second")
+    with engine.begin() as connection:
+        other_id = connection.execute(text("SELECT id FROM user_account WHERE email = 'second@example.com'")).scalar_one()
+        connection.execute(
+            text(
+                "INSERT INTO prod_supplier_entry (supplier_id, kind, amount_piastres, happened_on, method, payment_kind, created_by) "
+                "VALUES (:s, 'payment', -500000, :d, 'cash', 'weekly', :u)"
+            ),
+            {"s": sid, "d": TODAY, "u": other_id},
+        )
+    body = {"amount_piastres": 500_000, "method": "cash", "kind": "weekly"}
+    assert owner.post(f"/api/prod/suppliers/{sid}/payments", json=body).status_code == 201
+    assert other and owner.post(f"/api/prod/suppliers/{sid}/payments", json=body).status_code == 409
+
+
+def test_after_the_window_the_same_payment_is_accepted_again(owner, monkeypatch):
+    monkeypatch.setattr(service, "DUPLICATE_WINDOW_SECONDS", 1)
+    sid = _make(owner)["id"]
+    url = f"/api/prod/suppliers/{sid}/payments"
+    body = {"amount_piastres": 123_000, "method": "cash", "kind": "weekly"}
+    assert owner.post(url, json=body).status_code == 201
+    assert owner.post(url, json=body).status_code == 409
+    time.sleep(1.5)
+    assert owner.post(url, json=body).status_code == 201
+
+
+def test_the_window_is_a_minute():
+    assert service.DUPLICATE_WINDOW_SECONDS == 60
+
+
+def test_the_same_purchase_twice_in_a_minute_is_refused_and_a_different_one_is_not(owner):
+    sid = _make(owner)["id"]
+    oid = _new(owner)["id"]
+    url = f"/api/prod/suppliers/{sid}/purchases"
+    first = owner.post(url, json=_purchase_body(order_id=oid))
+    assert first.status_code == 201
+    twice = owner.post(url, json=_purchase_body(order_id=oid, expected_on=_day(5), note="Again", deposit_piastres=0))
+    assert twice.status_code == 409 and twice.json()["detail"] == TWICE.format("purchase")
+    assert len(_entries(sid)) == 1 and len(_page(owner, sid)["purchases"]) == 1
+    for change in (
+        {"item": "Light fleece"}, {"quantity": 1076}, {"unit": "m"}, {"unit_price_piastres": 16001}, {"order_id": None},
+    ):
+        assert owner.post(url, json=_purchase_body(**{"order_id": oid, **change})).status_code == 201, change
+    # One that was voided no longer stands, so the same may be bought again.
+    voided = _buy(owner, sid, item="Slip")["purchase_id"]
+    assert owner.post(url, json=_purchase_body(item="Slip")).status_code == 409
+    assert owner.post(f"/api/prod/purchases/{voided}/void", json={"reason": "Typo"}).status_code == 200
+    assert owner.post(url, json=_purchase_body(item="Slip")).status_code == 201
+
+
+def test_the_same_adjustment_and_the_same_opening_twice_in_a_minute_are_refused(owner):
+    sid = _make(owner)["id"]
+    adjust = f"/api/prod/suppliers/{sid}/adjustments"
+    body = {"amount_piastres": 250_000, "note": "Missed invoice", "happened_on": _day(-3)}
+    assert owner.post(adjust, json=body).status_code == 201
+    twice = owner.post(adjust, json=body)
+    assert twice.status_code == 409 and twice.json()["detail"] == TWICE.format("correction")
+    for change in ({"amount_piastres": 250_001}, {"note": "Another invoice"}, {"happened_on": _day(-4)}):
+        assert owner.post(adjust, json={**body, **change}).status_code == 201, change
+
+    opening = f"/api/prod/suppliers/{sid}/opening"
+    one = {"amount_piastres": 4_200_000, "happened_on": _day(-40)}
+    assert owner.post(opening, json=one).status_code == 201
+    again = owner.post(opening, json=one)
+    assert again.status_code == 409 and again.json()["detail"] == TWICE.format("balance brought forward")
+    # A different one is still refused, for the old reason: there is a balance already.
+    assert owner.post(opening, json={"amount_piastres": 5}).status_code == 422
+    assert len([e for e in _entries(sid) if e.kind == "opening"]) == 1
+
+
+# ── Smaller rules ─────────────────────────────────────────────────────────────
+
+
+def test_a_receipt_cannot_be_attached_to_a_payment_that_was_reversed(owner, bucket):
+    sid = _make(owner)["id"]
+    entry = _pay(owner, sid)["entry_id"]
+    assert _reverse(owner, entry).status_code == 200
+    refused = owner.post(f"/api/prod/entries/{entry}/receipt", files={"file": ("a.png", PNG, "image/png")})
+    assert refused.status_code == 422 and "reversed" in refused.json()["detail"]
+    assert bucket.files == {}
+    with engine.connect() as connection:
+        assert connection.execute(text("SELECT count(*) FROM prod_supplier_receipt")).scalar_one() == 0
+
+
+def test_the_dates_of_a_purchase_cannot_come_before_the_day_it_was_bought(owner, staff):
+    sid = _make(owner)["id"]
+    url = f"/api/prod/suppliers/{sid}/purchases"
+    early = owner.post(url, json=_purchase_body(bought_on=_day(-5), expected_on=_day(-6)))
+    assert early.status_code == 422 and "before the day it was bought" in early.json()["detail"]
+    assert _entries(sid) == []
+    bought = _buy(owner, sid, bought_on=_day(-5), expected_on=_day(-5))["purchase_id"]  # the same day is fine
+    patch = f"/api/prod/purchases/{bought}"
+    for field in ("expected_on", "received_on"):
+        refused = staff.patch(patch, json={field: _day(-6)})
+        assert refused.status_code == 422 and "before the day it was bought" in refused.json()["detail"], field
+    assert _page(owner, sid)["purchases"][0]["received_on"] is None
+    assert staff.patch(patch, json={"received_on": _day(-5), "expected_on": _day(-4)}).status_code == 200
+    # null clears and is never "before".
+    assert staff.patch(patch, json={"received_on": None, "expected_on": None}).status_code == 200
+
+
+def test_a_money_entry_cannot_be_dated_more_than_a_year_back_nor_in_the_future(owner):
+    sid = _make(owner)["id"]
+    far, edge, tomorrow = _day(-367), _day(-366), _day(1)
+    for path, body, field in (
+        (f"/api/prod/suppliers/{sid}/purchases", _purchase_body(), "bought_on"),
+        (f"/api/prod/suppliers/{sid}/payments", {"amount_piastres": 100, "method": "cash", "kind": "final"}, "paid_on"),
+        (f"/api/prod/suppliers/{sid}/opening", {"amount_piastres": 100}, "happened_on"),
+        (f"/api/prod/suppliers/{sid}/adjustments", {"amount_piastres": 100, "note": "x"}, "happened_on"),
+    ):
+        refused = owner.post(path, json={**body, field: far})
+        assert refused.status_code == 422 and "more than a year ago" in refused.json()["detail"], path
+        assert owner.post(path, json={**body, field: tomorrow}).status_code == 422, path
+        assert owner.post(path, json={**body, field: edge}).status_code == 201, path
+    assert len(_entries(sid)) == 4
+
+
+def test_a_supplier_cannot_be_made_inactive_while_it_is_the_factory_or_print_house_of_an_open_order(owner, manager):
+    factory = _make(owner, "Second factory")["id"]
+    printer = _make(owner, "Second print house")["id"]
+    made = _new(owner, factory_id=factory, printing="outside", print_supplier_id=printer)
+    url = lambda sid: f"/api/prod/suppliers/{sid}"  # noqa: E731
+    for sid, name in ((factory, "Second factory"), (printer, "Second print house")):
+        refused = manager.patch(url(sid), json={"active": False})
+        assert refused.status_code == 422, refused.text
+        detail = refused.json()["detail"]
+        assert name in detail and made["code"] in detail and "inactive" in detail
+        # It says nothing of money: the person asking may not be allowed to know it.
+        assert "EGP" not in detail and "piastre" not in detail and "owe" not in detail
+        assert _page(owner, sid)["active"] is True
+    # Other changes still go through, and sending active=true is no change.
+    assert manager.patch(url(factory), json={"city": "Giza", "active": True}).status_code == 200
+    # Once the order is cancelled (or settled) they can go inactive.
+    assert owner.post(f"/api/prod/orders/{made['id']}/cancel", json={"reason": "Dropped"}).status_code == 200
+    for sid in (factory, printer):
+        assert manager.patch(url(sid), json={"active": False}).json()["supplier"]["active"] is False
+
+
+def test_a_supplier_with_a_balance_but_no_open_order_can_still_be_made_inactive(owner, manager):
+    sid = _make(owner)["id"]
+    _pay(owner, sid)
+    assert manager.patch(f"/api/prod/suppliers/{sid}", json={"active": False}).status_code == 200

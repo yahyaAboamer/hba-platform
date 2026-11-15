@@ -58,6 +58,9 @@ PART_LABELS = {
     "packaging": "Special packaging",
 }
 
+#: The note on the work line an order cancelled after cutting writes on its factory's account.
+CANCELLED_AFTER_CUTTING = "Cancelled after cutting"
+
 #: Stages the QC manager marks done from ``complete``: a date and a note.
 SIMPLE_STAGES = ("materials", "pattern_check", "making")
 
@@ -591,8 +594,8 @@ def edit(db: Session, order_id: int, data: dict, actor: UserAccount) -> ProdOrde
     facts = _facts(db, order)
     changed: list[str] = []
     #: After cutting, the factory's deduction rests on who bought the fabric
-    #: and on who prints, so those two stay as they were (the same value sent
-    #: again is no change).
+    #: and on who prints, and what it is owed is for one factory, so those
+    #: three stay as they were (the same value sent again is no change).
     cut = facts.done("cutting")
 
     def put(column: str, value, told=None) -> None:
@@ -608,6 +611,8 @@ def edit(db: Session, order_id: int, data: dict, actor: UserAccount) -> ProdOrde
     if "shopify_product_id" in data:
         put("shopify_product_id", _product(db, data["shopify_product_id"]))
     if "factory_id" in data:
+        if cut and data["factory_id"] != order.factory_id:
+            raise Locked("The factory cannot change after cutting. Reopen cutting first.")
         put("factory_id", _supplier(db, data["factory_id"], "the factory", keep=order.factory_id).id)
     if "fabric_bought_by" in data and data["fabric_bought_by"] is not None:
         if cut and data["fabric_bought_by"] != order.fabric_bought_by:
@@ -1260,8 +1265,30 @@ def settle(db: Session, order_id: int, actor: UserAccount) -> ProdOrder:
 
 
 def cancel(db: Session, order_id: int, reason: str, actor: UserAccount) -> ProdOrder:
+    """Cancel an open order. One cancelled **before cutting is done** writes
+    nothing to any account. One cancelled **after cutting** keeps what the
+    factory has earned (built as recommended on 15 November 2026, awaiting the
+    owner's confirmation): in this same transaction, one ``work`` line on the
+    factory's account for the payable so far (batch 1's ``settlement``), dated
+    today, tied to the order, noted "Cancelled after cutting"; none at zero, a
+    negative line when the rejects came to more than the work. The figure is
+    frozen on the order as ``settle`` freezes it, so the order page still says
+    what was owed, while the status stays ``cancelled`` (never ``closed``).
+    The order is locked by ``_open``; the factory after it, always in that order."""
     reason = _text(reason, limit=500, what="the reason", required=True)
     order = _open(db, order_id)
+    facts = _facts(db, order)
+    if facts.done("cutting"):
+        account.lock_supplier(db, order.factory_id)
+        payable = settlement(facts)["payable_piastres"]
+        order.settled_payable_piastres = payable
+        order.settled_at = utcnow()
+        order.settled_by = actor.id
+        if payable != 0:
+            account.append(
+                db, supplier_id=order.factory_id, kind="work", amount=payable, happened_on=today(),
+                order_id=order.id, note=CANCELLED_AFTER_CUTTING, actor_id=actor.id,
+            )
     order.status = "cancelled"
     order.notes = (f"{order.notes}\n" if order.notes else "") + f"Cancelled: {reason}"
     _touch(order)

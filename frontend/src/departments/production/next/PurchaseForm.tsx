@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { api } from "../../../lib/api";
 import { cairoToday } from "./format";
-import { METHODS, PARTS, UNITS, UNIT_PER, perPieceSentence, purchaseBody, purchaseProblem, purchaseSentence, purchaseSums } from "./supplierLogic";
+import { METHODS, PARTS, UNITS, UNIT_PER, oldestDay, perPieceSentence, purchaseBody, purchaseProblem, purchaseSentence, purchaseSums } from "./supplierLogic";
 import type { PurchaseDraft } from "./supplierLogic";
 import type { OrderRow, PayMethod, PurchasePart, PurchaseUnit, SupplierAnswer } from "./types";
 import { Actions, DateBox, PanelShell, Problem, SelectBox, TextBox, useSubmit } from "./ui";
@@ -120,8 +120,8 @@ export function PurchaseForm({
         <TextBox label="Quantity" value={draft.quantity} onChange={(value) => set({ quantity: value })} inputMode="decimal" />
         <SelectBox label="Measured in" value={draft.unit} onChange={(value) => set({ unit: value as PurchaseUnit })} options={UNITS} />
         <TextBox label={`Price per ${UNIT_PER[draft.unit]}, EGP`} value={draft.price} onChange={(value) => set({ price: value })} inputMode="decimal" />
-        <DateBox label="Bought on" value={draft.boughtOn} onChange={(value) => set({ boughtOn: value })} max={today} />
-        <DateBox label="Expected to arrive, optional" value={draft.expectedOn} onChange={(value) => set({ expectedOn: value })} />
+        <DateBox label="Bought on" value={draft.boughtOn} onChange={(value) => set({ boughtOn: value })} min={oldestDay(today)} max={today} />
+        <DateBox label="Expected to arrive, optional" value={draft.expectedOn} onChange={(value) => set({ expectedOn: value })} min={draft.boughtOn || undefined} />
         <TextBox label="Deposit paid now, EGP, optional" value={draft.deposit} onChange={(value) => set({ deposit: value })} inputMode="decimal" />
         <SelectBox
           label="Deposit paid by"

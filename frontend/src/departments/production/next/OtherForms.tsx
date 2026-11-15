@@ -8,7 +8,7 @@ import { useEffect, useState } from "react";
 import { api } from "../../../lib/api";
 import { egpPlain, formatEgp, parseEgp } from "../../../lib/money";
 import { shortDay } from "./format";
-import { COST_LABELS, COST_PARTS, blankCounts, blankCost, isBlank, totalOf, unreadable, whole, NOT_WHOLE } from "./logic";
+import { COST_LABELS, COST_PARTS, blankCounts, blankCost, cancelSentence, isBlank, totalOf, unreadable, whole, NOT_WHOLE } from "./logic";
 import type { Counts, CostText } from "./logic";
 import { OrderFields, draftBody, draftFromOrder, draftProblem } from "./OrderFields";
 import type { Choices, OrderAnswer, OrderView, Size, StageKey } from "./types";
@@ -208,6 +208,8 @@ export function ReopenForm({ order, run, onClose, stage }: FormProps & { stage: 
 export function CancelForm({ order, run, onClose }: FormProps) {
   const [reason, setReason] = useState("");
   const { error, busy, submit } = useSubmit(run);
+  // Only the owner has a settlement, and only once cutting is done: so only then is it said.
+  const earned = cancelSentence(order, formatEgp);
   return (
     <PanelShell title="Cancel this order" intro="A cancelled order cannot be changed afterwards. The reason is kept." onClose={onClose}>
       <form
@@ -222,6 +224,11 @@ export function CancelForm({ order, run, onClose }: FormProps) {
         }}
       >
         <TextBox label="Why" value={reason} onChange={setReason} wide max={500} />
+        {earned && (
+          <p className="prod-wide prod-small prod-sentence" role="note">
+            {earned}
+          </p>
+        )}
         <Actions
           error={error}
           busy={busy}
@@ -345,6 +352,7 @@ export function EditForm({ order, run, onClose }: FormProps) {
             choices={choices}
             lockPlanned={locked}
             lockBuyerAndPrinting={locked}
+            lockFactory={locked}
             held={{ factory: order.factory, printSupplier: order.print_supplier }}
           />
           <Actions error={error} busy={busy} label="Save changes" working="Saving…" />

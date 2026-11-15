@@ -15,9 +15,11 @@ import {
   afterLineSentence,
   afterPaymentSentence,
   lineProblem,
+  oldestDay,
   paymentProblem,
   poundsToPiastres,
   signedPiastres,
+  voidSentence,
 } from "./supplierLogic";
 import type { Direction, LineDraft, PaymentDraft } from "./supplierLogic";
 import type { AccountLine, PayKind, PayMethod, PurchaseView, Section, SupplierList, SupplierView, SupplierAnswer } from "./types";
@@ -85,7 +87,7 @@ export function PaymentForm({ supplier, run, onClose }: FormProps) {
         }}
       >
         <TextBox label="Amount, EGP" value={draft.amount} onChange={(value) => set({ amount: value })} inputMode="decimal" />
-        <DateBox label="Date" value={draft.date} onChange={(value) => set({ date: value })} max={today} />
+        <DateBox label="Date" value={draft.date} onChange={(value) => set({ date: value })} min={oldestDay(today)} max={today} />
         <SelectBox label="Paid by" value={draft.method} onChange={(value) => set({ method: value as PayMethod })} options={METHODS} />
         <SelectBox label="What it is" value={draft.kind} onChange={(value) => set({ kind: value as PayKind })} options={PAY_KINDS} />
         <TextBox label="Note, optional" value={draft.note} onChange={(value) => set({ note: value })} wide max={500} />
@@ -183,7 +185,7 @@ export function LineForm({ supplier, run, onClose, mode }: FormProps & { mode: "
                 ]
           }
         />
-        <DateBox label="Date" value={draft.date} onChange={(value) => set({ date: value })} max={today} />
+        <DateBox label="Date" value={draft.date} onChange={(value) => set({ date: value })} min={oldestDay(today)} max={today} />
         <TextBox label={opening ? "Note, optional" : "Why, required"} value={draft.note} onChange={(value) => set({ note: value })} wide max={500} />
         <div className="prod-wide prod-small prod-sentence" aria-live="polite">
           {sentence ?? "Give the amount to see what you will owe after it."}
@@ -235,14 +237,26 @@ export function ReverseForm({ line, run, onClose }: { line: AccountLine; run: Ru
   );
 }
 
-/** Void a purchase: it and its deposit are reversed on the account, and it is shown struck through. */
-export function VoidForm({ purchase, run, onClose }: { purchase: PurchaseView; run: Run<SupplierAnswer>; onClose: () => void }) {
+/**
+ * Void a purchase: it is reversed on the account and shown struck through. When a deposit stands on it the
+ * owner says what became of the deposit, neither answer chosen for them (built as recommended on 15 November
+ * 2026, awaiting the owner's confirmation): returned, so it is reversed too; or kept by the supplier, so it
+ * stays on the account as credit with them.
+ */
+export function VoidForm({ purchase, supplier, run, onClose }: { purchase: PurchaseView; supplier: SupplierView; run: Run<SupplierAnswer>; onClose: () => void }) {
   const [reason, setReason] = useState("");
+  const [returned, setReturned] = useState<boolean | null>(null);
   const { error, busy, submit } = useSubmit(run);
+  const deposit = purchase.deposit_piastres ?? 0;
+  const asked = deposit > 0 && !purchase.voided;
   return (
     <PanelShell
       title={`Void the ${purchase.item} purchase`}
-      intro="Its price and quantity can't be edited, so a wrong purchase is voided. The purchase and any deposit are reversed on the account, and the reason is kept."
+      intro={
+        asked
+          ? "Its price and quantity can't be edited, so a wrong purchase is voided. The purchase is reversed on the account and the reason is kept. A deposit was paid on it, so say what became of the deposit."
+          : "Its price and quantity can't be edited, so a wrong purchase is voided. The purchase is reversed on the account, and the reason is kept."
+      }
       onClose={onClose}
     >
       <form
@@ -251,13 +265,33 @@ export function VoidForm({ purchase, run, onClose }: { purchase: PurchaseView; r
         onSubmit={(event) => {
           event.preventDefault();
           submit(
-            isBlank(reason) ? "Say why you are voiding it." : null,
-            () => api.post<SupplierAnswer>(`/api/prod/purchases/${purchase.id}/void`, { reason: reason.trim() }),
+            isBlank(reason) ? "Say why you are voiding it." : asked && returned === null ? "Say whether the supplier returned the deposit." : null,
+            () =>
+              api.post<SupplierAnswer>(
+                `/api/prod/purchases/${purchase.id}/void`,
+                asked ? { reason: reason.trim(), deposit_returned: returned } : { reason: reason.trim() },
+              ),
             `Purchase voided: ${purchase.item}.`,
           );
         }}
       >
         <TextBox label="Why, required" value={reason} onChange={setReason} wide max={400} />
+        {asked && (
+          <fieldset className="prod-fieldset prod-wide">
+            <legend className="field__label">What became of the {formatEgp(deposit)} deposit?</legend>
+            <label className="prod-check">
+              <input type="radio" name="deposit-returned" checked={returned === true} onChange={() => setReturned(true)} />
+              The supplier returned the deposit
+            </label>
+            <label className="prod-check">
+              <input type="radio" name="deposit-returned" checked={returned === false} onChange={() => setReturned(false)} />
+              The supplier keeps the deposit as credit
+            </label>
+            <p className="prod-small prod-sentence" aria-live="polite">
+              {voidSentence(returned, deposit, supplier.name) ?? "Choose one to see what the account will show."}
+            </p>
+          </fieldset>
+        )}
         <Actions
           error={error}
           busy={busy}
@@ -314,10 +348,20 @@ export function DatesForm({
             send(
               { received_on: date },
               `${purchase.item} marked as received.`,
-              !date ? "Give the day it arrived." : date > today ? "The date it arrived can't be in the future." : null,
+              !date
+                ? "Give the day it arrived."
+                : date > today
+                  ? "The date it arrived can't be in the future."
+                  : date < purchase.bought_on
+                    ? `The date it arrived can't be before the day it was bought, ${shortDay(purchase.bought_on)}.`
+                    : null,
             );
           } else {
-            send({ expected_on: date || null }, date ? `${purchase.item} is now expected ${shortDay(date)}.` : `${purchase.item} no longer has an expected date.`);
+            send(
+              { expected_on: date || null },
+              date ? `${purchase.item} is now expected ${shortDay(date)}.` : `${purchase.item} no longer has an expected date.`,
+              date && date < purchase.bought_on ? `The expected date can't be before the day it was bought, ${shortDay(purchase.bought_on)}.` : null,
+            );
           }
         }}
       >
@@ -325,6 +369,7 @@ export function DatesForm({
           label={receive ? "Arrived on" : "Expected on"}
           value={date}
           onChange={setDate}
+          min={purchase.bought_on}
           max={receive ? today : undefined}
         />
         <Actions

@@ -9,7 +9,7 @@
  * words where it has them; the server still decides, and its `detail` is shown as it is.
  */
 import { formatEgp, parseEgp } from "../../../lib/money";
-import { daysBetween, plural, shortDay } from "./format";
+import { addDays, daysBetween, plural, shortDay } from "./format";
 import { isBlank } from "./logic";
 import type { Powers } from "./logic";
 import type {
@@ -26,6 +26,16 @@ import type {
 } from "./types";
 
 export type SupplierPowers = Powers & { canManage: boolean };
+
+/** The server refuses a money entry dated further back than this (a typo guard in the year). */
+export const MAX_DAYS_BACK = 366;
+
+/** The oldest day a money entry may be dated, for the date box's `min`. */
+export const oldestDay = (today: string): string => addDays(today, -MAX_DAYS_BACK);
+
+/** The refusal for a day that is too far back, in the server's words, or `null`. */
+const tooOld = (day: string, today: string, what: string): string | null =>
+  day < oldestDay(today) ? `${what} can't be more than a year ago. Check the date.` : null;
 
 // ── Words ────────────────────────────────────────────────────────────────────
 
@@ -219,6 +229,9 @@ export function purchaseProblem(draft: PurchaseDraft, today: string): string | n
   if (sums.total > MAX_LINE_PIASTRES) return "That total is too large. Check the quantity and the price.";
   if (isBlank(draft.boughtOn)) return "Give the date it was bought.";
   if (draft.boughtOn > today) return "The purchase date can't be in the future.";
+  const old = tooOld(draft.boughtOn, today, "The purchase date");
+  if (old) return old;
+  if (draft.expectedOn && draft.expectedOn < draft.boughtOn) return "The expected date can't be before the day it was bought.";
   if (sums.deposit !== null) {
     if (sums.deposit < 0) return "The deposit must be more than 0, or left empty.";
     if (sums.deposit > sums.total) return "The deposit can't be more than the total.";
@@ -308,7 +321,7 @@ export function paymentProblem(draft: PaymentDraft, today: string): string | nul
   if (typed > MAX_LINE_PIASTRES) return "The amount is too large. Check the number.";
   if (isBlank(draft.date)) return "Give the date it was paid.";
   if (draft.date > today) return "The payment date can't be in the future.";
-  return null;
+  return tooOld(draft.date, today, "The payment date");
 }
 
 /** Who owes whom on a balance brought forward or a correction. */
@@ -331,6 +344,8 @@ export function lineProblem(draft: LineDraft, today: string, noteRequired: boole
   if (typed > MAX_LINE_PIASTRES) return "The amount is too large. Check the number.";
   if (isBlank(draft.date)) return "Give the date.";
   if (draft.date > today) return "The date can't be in the future.";
+  const old = tooOld(draft.date, today, "The date");
+  if (old) return old;
   if (noteRequired && isBlank(draft.note)) return "Say why: the note is kept with the line.";
   return null;
 }
@@ -430,4 +445,16 @@ export function panelFromSupplierOpen(open: string | null, supplier: SupplierVie
   const purchase = supplier.purchases.find((candidate) => String(candidate.id) === argument);
   if (!purchase || purchase.voided || purchase.received_on) return null;
   return { kind: "receive", id: purchase.id };
+}
+
+// ── Voiding a purchase that has a deposit ────────────────────────────────────
+
+/**
+ * What the account will show after voiding a purchase with a deposit, for each answer; `null` until one is
+ * chosen. (Built as recommended on 15 November 2026, awaiting the owner's confirmation.)
+ */
+export function voidSentence(returned: boolean | null, deposit: number, name: string): string | null {
+  if (returned === null) return null;
+  if (returned) return "The purchase and the deposit are both reversed, so the account shows neither of them any more.";
+  return `Only the purchase is reversed. The ${formatEgp(deposit)} deposit stays on the account as credit with ${name}: it comes off what you owe them next, and the account reads Overpaid if nothing else is owed.`;
 }

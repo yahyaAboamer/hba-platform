@@ -432,6 +432,8 @@ export type PurchaseView = {
   unit_price_piastres?: number;
   total_piastres?: number;
   deposit_piastres?: number;
+  /** Voided, and the supplier kept the deposit: it stands on the account as credit. */
+  deposit_kept?: boolean;
   void_reason?: string | null;
 };
 

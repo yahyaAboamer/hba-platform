@@ -94,7 +94,7 @@ function PurchaseMoney({ purchase }: { purchase: PurchaseView }) {
       {priceWords(purchase) && <div className="prod-small">{priceWords(purchase)}</div>}
       {(purchase.deposit_piastres ?? 0) > 0 && (
         <div className="prod-small">
-          Deposit paid <Money piastres={purchase.deposit_piastres as number} />
+          {purchase.deposit_kept ? "Deposit kept as credit" : "Deposit paid"} <Money piastres={purchase.deposit_piastres as number} />
         </div>
       )}
     </>

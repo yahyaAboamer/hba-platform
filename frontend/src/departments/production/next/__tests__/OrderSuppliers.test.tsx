@@ -157,3 +157,64 @@ describe("The factory's name on the order page", () => {
     expect(screen.getByRole("link", { name: "Print house A" }).getAttribute("href")).toBe("/production/next/suppliers/prt");
   });
 });
+
+describe("Use this, when the part is in what the factory is owed", () => {
+  const stay = () => within(costCard()).getByRole("button", { name: "Keep it as it is" });
+
+  it("asks first, inline, for fabric the factory bought, and sends nothing until the owner agrees", async () => {
+    const after = ownersOrder({ fabric_bought_by: "factory" });
+    const calls = serve(ownersOrder({ fabric_bought_by: "factory" }), { "PATCH /api/prod/orders/3": () => ({ order: after }) });
+    const confirm = vi.spyOn(window, "confirm");
+    renderAt(ADDRESS, owner());
+    await screen.findByRole("heading", { level: 1, name: "Oversized hoodie · Black" });
+
+    fireEvent.click(within(rowOf("Fabric")).getByRole("button", { name: /^Use this/ }));
+    expect(writes(calls)).toEqual([]);
+    expect(confirm).not.toHaveBeenCalled(); // inline, not window.confirm
+    const group = within(costCard()).getByRole("group", { name: "Use the purchases' figure for Fabric" });
+    expect(group.textContent).toContain("This changes what the factory is owed for this order.");
+    expect(group.textContent).toContain("EGP 176.95 per piece");
+
+    // Keeping it as it is writes nothing and brings the button back.
+    fireEvent.click(stay());
+    expect(writes(calls)).toEqual([]);
+    expect(within(rowOf("Fabric")).getByRole("button", { name: /^Use this/ })).toBeTruthy();
+
+    fireEvent.click(within(rowOf("Fabric")).getByRole("button", { name: /^Use this/ }));
+    fireEvent.click(within(costCard()).getByRole("button", { name: "Yes, use it" }));
+    await waitFor(() => expect(writes(calls)).toHaveLength(1));
+    expect(writes(calls)[0].body).toEqual({ actual_fabric_piastres: 17_695 });
+  });
+
+  it("says so for printing when the factory prints, and acts at once when an outside house prints", async () => {
+    const printed = fromPurchases({
+      parts: fromPurchases().parts.map((part) =>
+        part.part === "printing" ? { ...part, purchases: [{ ...ZIPS, id: 5, item: "Screens" }], total_piastres: 97_200, per_piece_piastres: 100 } : part,
+      ),
+    });
+    const calls = serve(ownersOrder({ printing: "factory" }, printed), { "PATCH /api/prod/orders/3": () => ({ order: ownersOrder({}, printed) }) });
+    renderAt(ADDRESS, owner());
+    await screen.findByRole("heading", { level: 1, name: "Oversized hoodie · Black" });
+    fireEvent.click(within(rowOf("Printing")).getByRole("button", { name: /^Use this/ }));
+    expect(within(costCard()).getByRole("group").textContent).toContain("This changes what the factory is owed for this order.");
+    expect(writes(calls)).toEqual([]);
+    cleanup();
+
+    serve(ownersOrder({ printing: "outside" }, printed), { "PATCH /api/prod/orders/3": () => ({ order: ownersOrder({}, printed) }) });
+    renderAt(ADDRESS, owner());
+    await screen.findByRole("heading", { level: 1, name: "Oversized hoodie · Black" });
+    fireEvent.click(within(rowOf("Printing")).getByRole("button", { name: /^Use this/ }));
+    await waitFor(() => expect(screen.getByRole("status").textContent).toContain("Printing actual cost set to EGP 1.00 per piece."));
+    expect(within(costCard()).queryByRole("group")).toBeNull();
+  });
+
+  it("acts at once for fabric HBA bought and for accessories, which never touch the factory's pay", async () => {
+    const calls = serve(ownersOrder({ fabric_bought_by: "hba" }), { "PATCH /api/prod/orders/3": () => ({ order: ownersOrder() }) });
+    renderAt(ADDRESS, owner());
+    await screen.findByRole("heading", { level: 1, name: "Oversized hoodie · Black" });
+    expect(within(costCard()).queryByRole("group")).toBeNull();
+    fireEvent.click(within(rowOf("Accessories")).getByRole("button", { name: /^Use this/ }));
+    await waitFor(() => expect(writes(calls)).toHaveLength(1));
+    expect(writes(calls)[0].body).toEqual({ actual_accessories_piastres: 309 });
+  });
+});
