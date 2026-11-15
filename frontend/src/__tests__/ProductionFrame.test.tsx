@@ -95,6 +95,18 @@ describe("Production's frame", () => {
       "fetch",
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+        if (url.includes("/api/prod/overview")) {
+          return reply(200, {
+            today: "2030-11-13",
+            summary: { open_orders: 0, planned_pieces: 0 },
+            figures: { decisions: 0, late_orders: 0, open_orders: 0, arriving_this_month: { month: "2030-11", pieces: 0 }, owed_piastres: 0 },
+            decisions: [],
+            problems: [],
+            orders: [],
+            arriving: [],
+            owed: [],
+          });
+        }
         return url.includes("/api/prod/") ? reply(200, { orders: [] }) : platform(input, init);
       }),
     );
@@ -104,12 +116,12 @@ describe("Production's frame", () => {
     );
     render(<App />);
 
-    // Redirected to the orders, in the platform's own screens: no frame.
-    expect(await screen.findByRole("heading", { name: "Production orders" })).toBeTruthy();
-    expect(window.location.pathname).toBe("/production/next/orders");
+    // Redirected to the Overview, in the platform's own screens: no frame.
+    expect(await screen.findByRole("heading", { level: 1, name: "Production" })).toBeTruthy();
+    expect(window.location.pathname).toBe("/production/next/overview");
     expect(document.querySelector("iframe")).toBeNull();
     const tabs = screen.getByRole("navigation", { name: "Production sections" });
-    expect(within(tabs).getByRole("link", { name: "Orders" }).getAttribute("aria-current")).toBe("page");
+    expect(within(tabs).getByRole("link", { name: "Overview" }).getAttribute("aria-current")).toBe("page");
     expect(within(tabs).getByRole("link", { name: "Stage days" })).toBeTruthy();
     // The strip around Production stays.
     expect(screen.getByRole("navigation", { name: "HBA departments" })).toBeTruthy();

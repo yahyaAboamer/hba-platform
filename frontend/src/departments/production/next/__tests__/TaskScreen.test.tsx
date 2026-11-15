@@ -466,8 +466,8 @@ describe("The Tasks tab", () => {
     const tabs = await screen.findByRole("navigation", { name: "Production sections" });
     const link = await within(tabs).findByRole("link", { name: "Tasks 2 overdue" });
     expect(link.getAttribute("href")).toBe("/production/next/tasks");
-    // Suppliers follows Incoming, before Stage days.
-    expect(within(tabs).getAllByRole("link").map((item) => item.textContent)).toEqual(["Orders", "Tasks 2 overdue", "Incoming", "Suppliers", "Stage days"]);
+    // Overview leads; Suppliers follows Incoming, before Stage days.
+    expect(within(tabs).getAllByRole("link").map((item) => item.textContent)).toEqual(["Overview", "Orders", "Tasks 2 overdue", "Incoming", "Suppliers", "Stage days"]);
   });
 
   it("shows no count when nothing is overdue, and survives the count not loading", async () => {
