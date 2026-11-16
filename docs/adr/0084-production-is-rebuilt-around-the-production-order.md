@@ -1,6 +1,6 @@
 # 0084. Production is rebuilt around the production order, as platform screens
 
-**Status:** Accepted (design approved; nothing built yet)
+**Status:** Accepted; decision 1's carry-over of old records is superseded by ADR 0085 (Production starts from zero)
 **Date:** 2026-11-14
 
 ## Context
