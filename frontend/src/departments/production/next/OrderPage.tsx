@@ -9,8 +9,9 @@ import { BUYER_WORDS, nextButton, panelFromOpen, panelKey } from "./logic";
 import type { Panel, Powers } from "./logic";
 import { CostCard, DatesCard, DeliveriesCard, FilesCard, HistoryCard, OwedCard, OwnerCard, SizesCard, StagesCard } from "./OrderCards";
 import { ActualCostForm, CancelForm, DateChangeForm, EditForm, ReopenForm, SampleForm, SettleForm, WriteOffForm } from "./OtherForms";
+import { RatePanel, RatingsCard } from "./RatingForms";
 import { CompleteForm, CutForm, FabricForm, InspectionForm } from "./StageForms";
-import type { OrderAnswer, OrderView } from "./types";
+import type { OrderAnswer, OrderRatings, OrderView } from "./types";
 import { Problem } from "./ui";
 import type { Run } from "./ui";
 
@@ -53,12 +54,16 @@ function PanelView({
   order,
   run,
   powers,
+  ratings,
+  onSaved,
   onClose,
 }: {
   panel: Panel;
   order: OrderView;
   run: Run;
   powers: Powers;
+  ratings: { data: OrderRatings | null; error: string | null };
+  onSaved: (name: string) => void;
   onClose: () => void;
 }) {
   const common = { order, run, onClose };
@@ -96,6 +101,8 @@ function PanelView({
       return <EditForm {...common} />;
     case "actual":
       return <ActualCostForm {...common} />;
+    case "rate":
+      return <RatePanel order={order} ratings={ratings.data} error={ratings.error} fresh={panel.fresh} onSaved={onSaved} onClose={onClose} />;
   }
 }
 
@@ -112,6 +119,12 @@ export function OrderPage({ session }: { session: Session }) {
   const [notice, setNotice] = useState<string | null>(null);
   // Bumped after every write, so the history and the photos read again.
   const [version, setVersion] = useState(0);
+  // The ratings of a closed order: read when the order is closed, and again after each rating is saved.
+  const [ratings, setRatings] = useState<OrderRatings | null>(null);
+  const [ratingsError, setRatingsError] = useState<string | null>(null);
+  const ratingsLatest = useRef(0);
+  // The status the page last showed, so a settle that has just closed the order can be told from a reload.
+  const shownStatus = useRef<string | null>(null);
   const trigger = useRef<Element | null>(null);
   const nextBar = useRef<HTMLDivElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
@@ -124,6 +137,10 @@ export function OrderPage({ session }: { session: Session }) {
   const page = useRef(0);
   const latest = useRef(0);
   const today = useMemo(cairoToday, []);
+  const powersRef = useRef(powers);
+  useEffect(() => {
+    powersRef.current = powers;
+  }, [powers]);
   useEffect(() => {
     panelOpen.current = panel !== null;
   }, [panel]);
@@ -151,7 +168,9 @@ export function OrderPage({ session }: { session: Session }) {
     setError(null);
     api.get<{ order: OrderView }>(`/api/prod/orders/${id}`)
       .then((answer) => {
-        if (latest.current === mine) setOrder(answer.order);
+        if (latest.current !== mine) return;
+        shownStatus.current = answer.order.status;
+        setOrder(answer.order);
       })
       .catch((caught) => {
         if (latest.current === mine) setError(caught instanceof Error ? caught.message : "The order could not be loaded.");
@@ -159,6 +178,7 @@ export function OrderPage({ session }: { session: Session }) {
   }, [id]);
   useEffect(() => {
     setOrder(null);
+    shownStatus.current = null;
     setPanel(null);
     setNotice(null);
     load();
@@ -167,6 +187,28 @@ export function OrderPage({ session }: { session: Session }) {
       latest.current += 1;
     };
   }, [load]);
+
+  const loadRatings = useCallback(() => {
+    const mine = ++ratingsLatest.current;
+    api.get<OrderRatings>(`/api/prod/orders/${id}/ratings`)
+      .then((answer) => {
+        if (ratingsLatest.current !== mine) return;
+        setRatings(answer);
+        setRatingsError(null);
+      })
+      .catch((caught) => {
+        if (ratingsLatest.current === mine) setRatingsError(caught instanceof Error ? caught.message : "The ratings could not be loaded.");
+      });
+  }, [id]);
+  const closed = order?.status === "closed";
+  useEffect(() => {
+    setRatings(null);
+    setRatingsError(null);
+    if (closed) loadRatings();
+    return () => {
+      ratingsLatest.current += 1;
+    };
+  }, [closed, loadRatings]);
 
   const open = useCallback((next: Panel) => {
     trigger.current = document.activeElement;
@@ -197,9 +239,12 @@ export function OrderPage({ session }: { session: Session }) {
       // The write is done either way; it is only drawn if this order is still the one on the page.
       if (page.current !== here) return null;
       latest.current += 1;
+      // Settling closes the order, and the owner is offered the ratings there and then (they can be skipped).
+      const justSettled = answer.order.status === "closed" && shownStatus.current === "open" && powersRef.current.isOwner;
+      shownStatus.current = answer.order.status;
       setOrder(answer.order);
-      refocus.current = panelOpen.current;
-      setPanel(null);
+      refocus.current = panelOpen.current && !justSettled;
+      setPanel(justSettled ? { kind: "rate", fresh: true } : null);
       setNotice(done);
       setVersion((before) => before + 1);
       return null;
@@ -220,6 +265,13 @@ export function OrderPage({ session }: { session: Session }) {
         : (nextBar.current?.querySelector<HTMLElement>("button") ?? heading.current);
     target?.focus();
   }, [panel, order]);
+
+  // A rating was saved: read the ratings again (the card behind the panel follows) and say which one.
+  function ratingSaved(name: string) {
+    loadRatings();
+    setNotice(`${name} rated.`);
+    setVersion((before) => before + 1);
+  }
 
   if (error) {
     return (
@@ -285,7 +337,18 @@ export function OrderPage({ session }: { session: Session }) {
         )}
       </div>
 
-      {panel && <PanelView key={panelKey(panel)} panel={panel} order={order} run={run} powers={powers} onClose={close} />}
+      {panel && (
+        <PanelView
+          key={panelKey(panel)}
+          panel={panel}
+          order={order}
+          run={run}
+          powers={powers}
+          ratings={{ data: ratings, error: ratingsError }}
+          onSaved={ratingSaved}
+          onClose={close}
+        />
+      )}
 
       <Facts order={order} />
 
@@ -296,6 +359,7 @@ export function OrderPage({ session }: { session: Session }) {
           <DatesCard order={order} powers={powers} open={open} />
           <DeliveriesCard order={order} powers={powers} open={open} />
           <CostCard order={order} powers={powers} open={open} run={run} />
+          <RatingsCard order={order} ratings={ratings} error={ratingsError} isOwner={powers.isOwner} onRate={() => open({ kind: "rate", fresh: false })} />
           <OwedCard order={order} />
           <OwnerCard order={order} powers={powers} open={open} />
           <FilesCard order={order} powers={powers} version={version} />

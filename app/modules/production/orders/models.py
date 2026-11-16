@@ -26,6 +26,7 @@ from sqlalchemy import (
     Index,
     Integer,
     Numeric,
+    SmallInteger,
     String,
     Text,
     UniqueConstraint,
@@ -513,3 +514,36 @@ class ProdSupplierReceipt(Base):
     uploaded_by: Mapped[int | None] = _user()
     created_at: Mapped[datetime] = _created()
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+# ── Ratings (batch 6a; build plan 2026-11-15-production-ratings-build.md) ──
+
+
+class ProdRating(Base):
+    """The owner's stars for one supplier on one settled order: quality,
+    timing and dealing, 1 to 5, and an optional note. One row per order and
+    supplier, edited in place; never deleted. **No money.** The record a
+    supplier shows (usual lateness, averages) is calculated from these and
+    the orders and purchases, never typed."""
+
+    __tablename__ = "prod_rating"
+    __table_args__ = (
+        UniqueConstraint("order_id", "supplier_id", name="prod_rating_once"),
+        CheckConstraint("quality BETWEEN 1 AND 5", name="prod_rating_quality_range"),
+        CheckConstraint("timing BETWEEN 1 AND 5", name="prod_rating_timing_range"),
+        CheckConstraint("dealing BETWEEN 1 AND 5", name="prod_rating_dealing_range"),
+        CheckConstraint("note IS NULL OR char_length(note) <= 1000", name="prod_rating_note_length"),
+        Index("ix_prod_rating_supplier", "supplier_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    order_id: Mapped[int] = mapped_column(Integer, ForeignKey("prod_order.id"), nullable=False)
+    supplier_id: Mapped[str] = mapped_column(String(80), ForeignKey("production_supplier.id"), nullable=False)
+    quality: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    timing: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    dealing: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    note: Mapped[str | None] = mapped_column(Text)
+    created_by: Mapped[int | None] = _user()
+    created_at: Mapped[datetime] = _created()
+    updated_by: Mapped[int | None] = _user()
+    updated_at: Mapped[datetime] = _created()

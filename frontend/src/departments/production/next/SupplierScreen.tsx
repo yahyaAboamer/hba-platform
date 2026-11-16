@@ -6,7 +6,7 @@ import type { Session } from "../../../lib/api";
 import { PurchaseForm } from "./PurchaseForm";
 import { SectionBar } from "./SectionBar";
 import { SupplierForm } from "./SupplierForms";
-import { listSentence, openWords, owedWords, sectionNames, visibleSuppliers } from "./supplierLogic";
+import { listSentence, openWords, owedWords, ratingLine, sectionNames, visibleSuppliers } from "./supplierLogic";
 import type { SectionFilter, SupplierPowers } from "./supplierLogic";
 import type { Section, SupplierAnswer, SupplierList, SupplierRow } from "./types";
 import { Problem, useIsNarrow } from "./ui";
@@ -31,6 +31,7 @@ function Row({ row, narrow }: { row: SupplierRow; narrow: boolean }) {
         <div className="prod-small">
           {sectionNames(row.sections)} · {openWords(row)}
         </div>
+        <div className="prod-small">{ratingLine(row)}</div>
       </div>
       <div className="prod-task__side">
         {!row.active && <span className="prod-pill">Inactive</span>}

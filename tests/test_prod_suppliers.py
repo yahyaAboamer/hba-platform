@@ -61,7 +61,8 @@ def _no_money(payload, where: str = "") -> None:
     """Recursively: no key that names money, at any depth."""
     if isinstance(payload, dict):
         for key, value in payload.items():
-            lowered = key.lower()
+            # `reject_rate` is a share of pieces rejected (batch 6a), not a rate of pay.
+            lowered = key.lower().replace("reject_rate", "")
             assert not any(word in lowered for word in MONEY_WORDS), f"money key {where}.{key}"
             _no_money(value, f"{where}.{key}")
     elif isinstance(payload, list):
@@ -275,7 +276,7 @@ def test_the_downgrade_refuses_while_a_purchase_or_a_line_exists(owner):
     with pytest.raises(RuntimeError, match="purchase"):
         command.downgrade(Config("alembic.ini"), "a7c4e9f20034")
     with engine.connect() as connection:
-        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "b8d5f1a30035"
+        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "c9e6a2b40036"
         assert connection.execute(text("SELECT count(*) FROM prod_supplier_entry")).scalar_one() == 1
 
 

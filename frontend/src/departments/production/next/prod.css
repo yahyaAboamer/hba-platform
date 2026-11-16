@@ -216,7 +216,7 @@
 .prod-task__actions .prod-pill, .prod-task__side .prod-pill { white-space: normal; }
 
 /* ── Suppliers (batch 4) ── */
-.prod-facts--three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.prod-facts--one { grid-template-columns: minmax(0, 1fr); }
 .prod-struck { text-decoration: line-through; color: var(--quiet); }
 .prod-sentence { min-height: 1.45em; }
 .prod-sectionbar { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin: 0 0 14px; }
@@ -241,6 +241,29 @@
 .prod-details dt { font-size: 12.5px; color: var(--faint); }
 .prod-details dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
 
+/* ── Ratings (batch 6a) ── */
+.prod-orderrow { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: center; justify-content: space-between; }
+.prod-orderrow__what { flex: 1 1 260px; min-width: 0; overflow-wrap: anywhere; }
+.prod-orderrow__side { font-size: 12.5px; color: var(--quiet); }
+.prod-rates { display: grid; gap: 14px; }
+.prod-rate { display: grid; gap: 12px; padding: 14px 0; border-top: 1px solid var(--rule); min-width: 0; }
+.prod-rate__who { display: flex; flex-wrap: wrap; gap: 2px 12px; align-items: baseline; }
+.prod-rate__stars { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 16px; }
+.prod-rate .prod-field { min-width: 0; }
+.prod-stars { display: flex; flex-wrap: wrap; gap: 4px; }
+.prod-star {
+  position: relative; display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
+  min-width: 44px; min-height: 44px; border: 1px solid var(--rule-strong); border-radius: var(--radius);
+  cursor: pointer; line-height: 1.1; color: var(--quiet); background: var(--surface);
+}
+.prod-star input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.prod-star__glyph { font-size: 17px; }
+.prod-star__n { font-size: 11px; font-variant-numeric: tabular-nums; }
+.prod-star.is-on { color: var(--owed); }
+.prod-star.is-picked { border-color: var(--ink); border-width: 2px; color: var(--ink); font-weight: 600; }
+.prod-star:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.prod-rates__end { margin-top: 4px; }
+
 /* ── Overview (batch 5) ── */
 .prod-halves { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; margin-bottom: 16px; }
 .prod-halves--after { margin: 16px 0 0; }
@@ -254,11 +277,14 @@
   .prod-screen { padding: 16px 16px 56px; }
   .prod-cols { grid-template-columns: minmax(0, 1fr); }
   .prod-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .prod-facts--one { grid-template-columns: minmax(0, 1fr); }
+
   .prod-facts--three { grid-template-columns: minmax(0, 1fr); }
   .prod-halves { grid-template-columns: minmax(0, 1fr); }
   .prod-details div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
   .prod-sectionbar--form .input { width: 100%; }
   .prod-form { grid-template-columns: minmax(0, 1fr); max-width: none; }
+  .prod-rate__stars { grid-template-columns: minmax(0, 1fr); }
   .prod-sizes { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .prod-sizes--five { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .prod-sizes--dates { grid-template-columns: repeat(2, minmax(0, 1fr)); }

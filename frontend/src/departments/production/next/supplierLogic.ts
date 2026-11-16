@@ -21,6 +21,7 @@ import type {
   PurchaseUnit,
   PurchaseView,
   Section,
+  SupplierRatings,
   SupplierRow,
   SupplierView,
 } from "./types";
@@ -458,3 +459,44 @@ export function voidSentence(returned: boolean | null, deposit: number, name: st
   if (returned) return "The purchase and the deposit are both reversed, so the account shows neither of them any more.";
   return `Only the purchase is reversed. The ${formatEgp(deposit)} deposit stays on the account as credit with ${name}: it comes off what you owe them next, and the account reads Overpaid if nothing else is owed.`;
 }
+
+// ── Ratings and the record (batch 6a) ────────────────────────────────────────
+
+/** One average or one star count with its decimal: `4.0 ★`. */
+const starWords = (value: number, decimals: number): string => `${value.toFixed(decimals)} ★`;
+
+/** `Quality 4.0 ★ · Timing 2.5 ★ · Dealing 4.5 ★`, averages to one decimal. */
+export const averageWords = (ratings: Pick<SupplierRatings, "quality" | "timing" | "dealing">): string =>
+  `Quality ${starWords(ratings.quality, 1)} · Timing ${starWords(ratings.timing, 1)} · Dealing ${starWords(ratings.dealing, 1)}`;
+
+/** One order's own stars: `Quality 4 ★ · Timing 3 ★ · Dealing 5 ★`. */
+export const starsWords = (rating: Pick<SupplierRatings, "quality" | "timing" | "dealing">): string =>
+  `Quality ${starWords(rating.quality, 0)} · Timing ${starWords(rating.timing, 0)} · Dealing ${starWords(rating.dealing, 0)}`;
+
+/** "usually on time", "usually 5 days late"; `null` while it is not known. */
+export function usualWords(days: number | null | undefined): string | null {
+  if (days === null || days === undefined) return null;
+  return days > 0 ? `usually ${plural(days, "day")} late` : "usually on time";
+}
+
+/** The list's line under a supplier: the averages and the usual lateness, or "Not rated yet". */
+export function ratingLine(row: Pick<SupplierRow, "ratings" | "usual_lateness_days">): string {
+  const usual = usualWords(row.usual_lateness_days);
+  const parts = [row.ratings ? averageWords(row.ratings) : "Not rated yet"];
+  if (usual) parts.push(usual);
+  return parts.join(" · ");
+}
+
+/** The supplier page's fourth figure: "5 days", "On time", or "Not known yet", and whether it is a bad one. */
+export function usualFigure(days: number | null | undefined): { text: string; late: boolean } {
+  if (days === null || days === undefined) return { text: "Not known yet", late: false };
+  return days > 0 ? { text: plural(days, "day"), late: true } : { text: "On time", late: false };
+}
+
+/** An order's own lateness for a supplier: "6 days late", "on time", or nothing while it is not known. */
+export function latenessWords(days: number | null | undefined): { text: string; late: boolean } | null {
+  if (days === null || days === undefined) return null;
+  return days > 0 ? { text: `${plural(days, "day")} late`, late: true } : { text: "on time", late: false };
+}
+
+export const RATING_ROLE_WORDS = { factory: "Factory", print: "Printing", materials: "Materials" } as const;

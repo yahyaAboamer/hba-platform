@@ -38,7 +38,7 @@ from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from sqlalchemy import func, or_, select, text
 from sqlalchemy.orm import Session
 
-from app.core.businesstime import utcnow
+from app.core.businesstime import business_date, utcnow
 from app.modules.inbox.public import file_bucket
 from app.modules.production.models import ProductionSupplier
 from app.modules.production.orders.models import (
@@ -54,7 +54,7 @@ from app.modules.production.orders.models import (
     ProdSupplierReceipt,
     ProdSupplierSection,
 )
-from app.modules.production.orders.services import account
+from app.modules.production.orders.services import account, ratings
 from app.modules.production.orders.services.files import MAX_BYTES, file_type
 from app.modules.production.orders.services.orders import (
     Facts,
@@ -942,9 +942,12 @@ def listing(db: Session, *, with_money: bool) -> dict:
     orders = _open_order_counts(db, ids)
     purchases = _open_purchase_counts(db, ids)
     money = standings(db, ids) if with_money else {}
+    record = ratings.records(db, ids)
     rows = []
     for supplier in suppliers:
         row = _row(supplier, sections[supplier.id], orders[supplier.id], purchases[supplier.id])
+        row["ratings"] = record[supplier.id].ratings
+        row["usual_lateness_days"] = record[supplier.id].usual_lateness_days
         if with_money:
             row["owed_piastres"] = money[supplier.id].owed
             row["held_piastres"] = money[supplier.id].held
@@ -1024,18 +1027,36 @@ def _purchase_views(db: Session, purchases: list[ProdPurchase], *, with_money: b
 
 
 def _order_views(db: Session, supplier_id: str) -> list[dict]:
+    """The orders this supplier worked on: as the factory, the outside print
+    house, or the seller of anything bought for the order (``materials``), each
+    with how late it was, the factory's reject rate and its rating. No money."""
+    bought_for = select(ProdPurchase.order_id).where(
+        ProdPurchase.supplier_id == supplier_id,
+        ProdPurchase.voided_at.is_(None),
+        ProdPurchase.order_id.is_not(None),
+    )
     orders = list(
         db.scalars(
             select(ProdOrder)
-            .where(or_(ProdOrder.factory_id == supplier_id, ProdOrder.print_supplier_id == supplier_id))
+            .where(
+                or_(
+                    ProdOrder.factory_id == supplier_id,
+                    ProdOrder.print_supplier_id == supplier_id,
+                    ProdOrder.id.in_(bought_for),
+                )
+            )
             .order_by((ProdOrder.status == "open").desc(), ProdOrder.id.desc())
             .limit(200)
         )
     )
     facts = _facts_for(db, orders)
+    lateness = ratings.lateness_map(db, orders, supplier_id)
+    rated = ratings.rating_map(db, supplier_id)
     views = []
     for order in orders:
         current = facts[order.id].current if order.status == "open" else None
+        role = "factory" if order.factory_id == supplier_id else "print" if order.print_supplier_id == supplier_id else "materials"
+        closed = order.status == "closed"
         views.append(
             {
                 "id": order.id,
@@ -1043,10 +1064,14 @@ def _order_views(db: Session, supplier_id: str) -> list[dict]:
                 "style_name": order.style_name,
                 "colour": order.colour,
                 "status": order.status,
-                "role": "factory" if order.factory_id == supplier_id else "print",
+                "role": role,
                 "stage": None
                 if current is None
                 else {"key": current.stage, "label": STAGE_LABELS[current.stage], "position": current.position},
+                "lateness_days": lateness.get((order.id, supplier_id)),
+                "reject_rate": ratings.reject_rate(facts[order.id]) if closed and role == "factory" else None,
+                "closed_on": _day(business_date(order.settled_at)) if closed and order.settled_at else None,
+                "rating": ratings.rating_view(rated.get(order.id)) if closed else None,
             }
         )
     return views
@@ -1172,6 +1197,9 @@ def page(db: Session, supplier_id: str, *, with_money: bool) -> dict:
         supplier, sections, _open_order_counts(db, [supplier.id])[supplier.id],
         _open_purchase_counts(db, [supplier.id])[supplier.id],
     )
+    record = ratings.records(db, [supplier.id])[supplier.id]
+    body["ratings"] = record.ratings
+    body["usual_lateness_days"] = record.usual_lateness_days
     body["purchases"] = _purchase_views(db, purchases, with_money=with_money)
     body["orders"] = _order_views(db, supplier.id)
     if with_money:

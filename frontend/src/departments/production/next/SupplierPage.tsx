@@ -9,28 +9,41 @@ import { cairoToday } from "./format";
 import { PurchaseForm } from "./PurchaseForm";
 import { DatesForm, LineForm, PaymentForm, ReverseForm, SupplierForm, VoidForm } from "./SupplierForms";
 import { DetailsCard, OrdersCard, PurchasesCard } from "./SupplierCards";
-import { hasMoney, openWords, owedFigure, panelFromSupplierOpen, sectionNames, supplierPanelKey } from "./supplierLogic";
+import { hasMoney, openWords, owedFigure, panelFromSupplierOpen, sectionNames, supplierPanelKey, usualFigure } from "./supplierLogic";
 import type { SupplierPanel, SupplierPowers } from "./supplierLogic";
 import type { SupplierAnswer, SupplierView } from "./types";
 import { Problem, useIsNarrow } from "./ui";
 import type { Run } from "./ui";
 
+/**
+ * The figures under the heading. The three money figures are the owner's alone; the fourth, how late the
+ * supplier usually is, is not money and is every viewer's.
+ */
 function Figures({ supplier }: { supplier: SupplierView }) {
-  if (!hasMoney(supplier)) return null;
-  const owed = supplier.owed_piastres as number;
+  const money = hasMoney(supplier);
+  const owed = supplier.owed_piastres ?? 0;
+  const usual = usualFigure(supplier.usual_lateness_days);
   return (
-    <dl className="prod-facts prod-facts--three">
+    <dl className={`prod-facts${money ? "" : " prod-facts--one"}`}>
+      {money && (
+        <>
+          <div>
+            <dt>You owe now</dt>
+            <dd className={owed > 0 ? "prod-warn" : owed < 0 ? "prod-ok" : undefined}>{owedFigure(owed)}</dd>
+          </div>
+          <div>
+            <dt>Held until pieces are fixed</dt>
+            <dd>{formatEgp(supplier.held_piastres ?? 0)}</dd>
+          </div>
+          <div>
+            <dt>Paid in {supplier.paid_year}</dt>
+            <dd>{formatEgp(supplier.paid_piastres ?? 0)}</dd>
+          </div>
+        </>
+      )}
       <div>
-        <dt>You owe now</dt>
-        <dd className={owed > 0 ? "prod-warn" : owed < 0 ? "prod-ok" : undefined}>{owedFigure(owed)}</dd>
-      </div>
-      <div>
-        <dt>Held until pieces are fixed</dt>
-        <dd>{formatEgp(supplier.held_piastres ?? 0)}</dd>
-      </div>
-      <div>
-        <dt>Paid in {supplier.paid_year}</dt>
-        <dd>{formatEgp(supplier.paid_piastres ?? 0)}</dd>
+        <dt>Usual lateness</dt>
+        <dd className={usual.late ? "prod-late" : undefined}>{usual.text}</dd>
       </div>
     </dl>
   );
@@ -246,7 +259,7 @@ export function SupplierPage({ session }: { session: Session }) {
       <div className="prod-stack">
         <AccountCard supplier={supplier} today={today} narrow={narrow} open={open} onChange={apply} heading={heading} />
         <PurchasesCard supplier={supplier} powers={powers} today={today} narrow={narrow} open={open} />
-        <OrdersCard supplier={supplier} />
+        <OrdersCard supplier={supplier} powers={powers} />
         <DetailsCard supplier={supplier} powers={powers} open={open} />
       </div>
     </>
