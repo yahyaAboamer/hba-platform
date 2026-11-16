@@ -1,8 +1,7 @@
 """Photos and PDFs on a production order, in the platform's file bucket.
 
-The same bucket, the same first-bytes check and the same size limit as the
-old Production (``app.modules.production.services.files``); keys are built
-here, never from what a browser sent, under ``production/orders/{order_id}/``.
+The platform's file bucket, a first-bytes check and a size limit; keys are
+built here, never from what a browser sent, under ``production/orders/{order_id}/``.
 A file is taken off an order by ``deleted_at``; the stored copy stays.
 """
 
@@ -15,12 +14,25 @@ from app.core.businesstime import utcnow
 from app.modules.inbox.public import file_bucket
 from app.modules.production.orders.models import STAGE_LABELS, STAGES, ProdOrder, ProdOrderFile
 from app.modules.production.orders.services.orders import Locked, NotFound, Refused, _audit, _iso, _order, _people
-from app.modules.production.services.files import MAX_BYTES, image_type
 from app.shared.models.identity import UserAccount
 
 __all__ = ["MAX_BYTES", "add", "for_download", "listing", "remove"]
 
 PDF = "application/pdf"
+MAX_BYTES = 20 * 1024 * 1024
+
+
+def image_type(head: bytes) -> str | None:
+    """The image a file really is, from its first bytes."""
+    if head[:3] == b"\xff\xd8\xff":
+        return "image/jpeg"
+    if head[:8] == b"\x89PNG\r\n\x1a\n":
+        return "image/png"
+    if head[:6] in (b"GIF87a", b"GIF89a"):
+        return "image/gif"
+    if head[:4] == b"RIFF" and head[8:12] == b"WEBP":
+        return "image/webp"
+    return None
 
 
 def _must_be_open(order: ProdOrder) -> None:

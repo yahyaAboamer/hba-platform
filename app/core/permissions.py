@@ -59,15 +59,10 @@ class Permission:
     # ── Production (ADR 0069, ADR 0076 decision 5) ──
     #: Reading Production: every screen, read only.
     PRODUCTION_VIEW = "production.view"
-    #: Orders, drop phases, tasks, samples, their photos and documents.
+    #: The QC manager's writes: production orders, tasks and their files.
     PRODUCTION_EDIT = "production.edit"
-    #: Recording an order's QC checklist, and uploading documents.
-    PRODUCTION_QC = "production.qc"
     #: Adding suppliers and sending the supplier portal's update.
     PRODUCTION_SUPPLIERS = "production.suppliers"
-    #: Approving a supplier invoice for payment. The owner's alone (ADR 0067,
-    #: decision 4; ADR 0076 decision 7).
-    PRODUCTION_PAYMENTS = "production.payments"
     #: The production order's owner acts (ADR 0084): creating and editing an
     #: order, approving a sample, settling, writing off fix pieces, reopening
     #: a stage, the typical days per stage - **and seeing money**. Without
@@ -151,19 +146,16 @@ ROLES: dict[str, frozenset[str]] = {
     # Khazenly section alone (ADR 0072): confirming orders is their job.
     "customer_service": frozenset({Permission.INBOX_USE, Permission.KHAZENLY_USE}),
     # Production's levels (ADR 0076, decision 5, as amended by ADR 0077).
-    # Staff run the work and record its quality checks (the owner, 7 November
-    # 2026: the people who check are the people who produce); QC is no longer
-    # a level of its own. The manager adds suppliers. Approving a payment is
-    # no level's: the owner's alone.
+    # Staff run the work; QC is not a level of its own. The manager adds
+    # suppliers. Money is the owner's alone (`production.owner`). The old
+    # framed app's `production.qc` and `production.payments` went with it
+    # (ADR 0085).
     "production_viewer": frozenset({Permission.PRODUCTION_VIEW}),
-    "production_staff": frozenset(
-        {Permission.PRODUCTION_VIEW, Permission.PRODUCTION_EDIT, Permission.PRODUCTION_QC}
-    ),
+    "production_staff": frozenset({Permission.PRODUCTION_VIEW, Permission.PRODUCTION_EDIT}),
     "production_manager": frozenset(
         {
             Permission.PRODUCTION_VIEW,
             Permission.PRODUCTION_EDIT,
-            Permission.PRODUCTION_QC,
             Permission.PRODUCTION_SUPPLIERS,
         }
     ),

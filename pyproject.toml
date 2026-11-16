@@ -74,8 +74,10 @@ testpaths = ["tests"]
 # with the reason. The list only shrinks: an entry that no longer matches an
 # import is an error, so a crossing that is fixed must be deleted here too.
 #
-# Production (ADR 0069) is empty. When it gains api, models or services, add
-# them to the other three contracts' forbidden_modules.
+# Production's own code (the old framed app's api, services and tables went with
+# ADR 0085) is under app.modules.production.orders (ADR 0084). Nothing here
+# names it yet: when another department must be kept from importing it, add its
+# api, models and services to the other contracts' forbidden_modules.
 [tool.importlinter]
 root_packages = ["app"]
 

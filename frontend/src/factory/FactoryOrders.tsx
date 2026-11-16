@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { api } from "../lib/api";
-import { pieces, plural, shortDay } from "../departments/production/next/format";
+import { pieces, plural, shortDay } from "../departments/production/screens/format";
 import { cutWords, unwrap } from "./logic";
 import type { FactoryOrderRow } from "./types";
 

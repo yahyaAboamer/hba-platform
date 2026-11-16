@@ -30,7 +30,8 @@ piece of work.
 | 4 | Suppliers | Merged (PR #178), on staging |
 | 5 | Overview | Merged (PR #179), on staging |
 | 6a | Ratings and the performance record | Merged (PR #180), on staging |
-| 6b | The factory's own login | Pull request open from `claude/production-factory-login`; **not merged** |
+| 6b | The factory's own login | Merged (PR #181), on staging |
+| Final | Start from zero (ADR 0085): the old app and records removed, the department native | Pull request open from `claude/production-switch-over`; **not merged** |
 | Final | Carry the old orders over, retire the framed tab | Not started |
 
 Production (the `production` branch) has none of this. Nothing is merged or
@@ -42,17 +43,18 @@ deployed without the owner saying so, each time.
   `suppliers_api.py`, `guards.py`, `services/`). API under `/api/prod`.
   Tables are prefixed `prod_`; suppliers stay in the old
   `production_supplier` table, which is read and written but never altered.
-- Frontend: `frontend/src/departments/production/next/`, reached at
-  `/production/next/*` (tabs: Overview, Orders, Tasks, Incoming, Suppliers,
-  Stage days). The factory's own desk is `frontend/src/factory/` at
-  `/factory`, API `/api/factory` (`factory_api.py`, `services/factory.py`). The Production department is still `own: true`: the old framed app
-  (`production-ui/`, `/api/production/*`, the `production_*` tables,
-  `tests/test_production_api.py`) is untouched and keeps working until the
-  final batch.
+- Frontend: `frontend/src/departments/production/screens/`, reached at
+  `/production/*` (sidebar sections: Overview, Orders, Tasks, Incoming,
+  Suppliers, Stage days). The factory's own desk is `frontend/src/factory/`
+  at `/factory`, API `/api/factory` (`factory_api.py`,
+  `services/factory.py`). The old framed app (`production-ui/`,
+  `/production-app`, `/api/production/*`) and its tables are removed (ADR
+  0085); `production_supplier` and `production_supplier_category` stay.
+  `/production/next/*` and the old app's page addresses redirect.
 - Migrations so far: `f6b3d8e10033` (orders), `a7c4e9f20034` (tasks),
   `b8d5f1a30035` (suppliers), `c9e6a2b40036` (ratings), `d4a8f2c60037`
-  (the factory's login; in the open pull request). The Overview adds none.
-  The next id ends `0038`. Each joins the list for the migration and rollback rehearsal.
+  (the factory's login), `e5b9a3d70038` (start from zero: drops the old
+  tables). The Overview adds none. The next id ends `0039`. Each joins the list for the migration and rollback rehearsal.
 - Permissions: `production.view` reads without money; `production.edit` is
   the QC manager's writes; `production.suppliers` manages suppliers and
   sections; `production.owner` (admin only) creates, approves, settles and
@@ -109,7 +111,8 @@ deployed without the owner saying so, each time.
   italic sentence): cancelling an order after cutting writes what the factory
   has earned onto its account; voiding a purchase asks whether its deposit
   was returned.
-- **Merge the factory login pull request** to staging.
+- **Merge the final batch** to staging (the staging backup is taken right before).
+- **Production**: none of the rebuild is there. A production deploy needs the owner's separate go-ahead, and production's old records are backed up immediately before it.
 - The typical days per stage are still the starting values; the owner edits
   them on the Stage days screen.
 
@@ -124,16 +127,21 @@ deployed without the owner saying so, each time.
 
 ## What is next
 
-Batches 1 to 6 are built (6b in its pull request). Ratings, the record and
-the factory's login are described in their contracts.
+Every batch is built. What remains:
 
-**Final batch** (ask the owner first; it removes things): carry the old
-orders, samples and uploads over from the `production_*` tables, make the
-department native (sidebar sections, drop `own: true` and the iframe), and
-retire `production-ui/`. It needs the owner's explicit go-ahead and an ADR
-for what is kept.
-
-**Known, small, not done:** the order page's "Next:" line says "Record cut
-quantities" while a factory's report waits, where the Tasks list says
-"Confirm the factory's cut". A switched-off factory address cannot be
-invited again (invite another address).
+- **Production deploy**, on the owner's separate go-ahead: export
+  production's old records first (the same script as staging's backup,
+  read only, to `D:\Desktop\HBA\Backups\production-old\`, outside the
+  repository), check the counts, then deploy. Migrations `f6b3d8e10033` to
+  `e5b9a3d70038` join the migration and rollback rehearsal list.
+- **Small, not done:** the sidebar has no overdue-tasks badge for Production
+  (badges come from the Today feed, which does not read Production yet; the
+  count shows on the Tasks screen). The order page's "Next:" line says
+  "Record cut quantities" while a factory's report waits, where Tasks says
+  "Confirm the factory's cut". A switched-off factory address cannot be
+  invited again.
+- **The old tables' backup**: staging's is
+  `D:\Desktop\HBA\Backups\production-old\staging-2026-11-16.json`
+  (53 orders, 31 samples, 32 tasks, 40 styles, 2 phases, 165 activity lines,
+  the 17 suppliers and 7 categories). It is the only copy once the
+  migration runs.

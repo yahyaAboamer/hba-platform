@@ -1,17 +1,14 @@
-import { Route } from "react-router-dom";
-
 import type { Department } from "../types";
-import { productionNextRoutes } from "./next/routes";
-import { ProductionScreens } from "./ProductionScreens";
+import { productionRoutes } from "./screens/routes";
 
 /**
- * Production (ADR 0069, ADR 0076): its own screens, in its own look, inside
- * HBA's frame. It has its own sidebar, so HBA's row for it is a link and has
- * no sections; while it is open HBA's sidebar is the narrow strip.
+ * Production (ADR 0069, 0084, 0085): a department like the others, in the
+ * platform's own frame, look and sidebar. Its sections are Overview, Orders,
+ * Tasks, Incoming, Suppliers and Stage days; an order and a supplier's page
+ * show their parent as the current section.
  *
- * `/production/next/*` is the rebuilt Production (ADR 0084), native screens in
- * the platform's own look; everything else is still the frame until the
- * switch-over batch.
+ * `/production/next/*` and the old framed app's pages redirect (see
+ * `screens/routes.tsx`), so no address that was shared stops working.
  */
 export const production: Department = {
   key: "production",
@@ -19,15 +16,14 @@ export const production: Department = {
   icon: "scissors",
   holds: "production.view",
   base: "/production",
-  sections: [],
-  own: true,
-  routes: (session) => (
-    <>
-      {/* Native screens (ADR 0084) ahead of the frame's catch-all. */}
-      {productionNextRoutes(session)}
-      <Route index element={<ProductionScreens />} />
-      <Route path="*" element={<ProductionScreens />} />
-    </>
-  ),
+  sections: [
+    { slug: "overview", label: "Overview", to: "/production/overview" },
+    { slug: "orders", label: "Orders", to: "/production/orders" },
+    { slug: "tasks", label: "Tasks", to: "/production/tasks" },
+    { slug: "incoming", label: "Incoming", to: "/production/incoming" },
+    { slug: "suppliers", label: "Suppliers", to: "/production/suppliers" },
+    { slug: "stage-days", label: "Stage days", to: "/production/settings" },
+  ],
+  routes: productionRoutes,
   moved: [],
 };

@@ -41,9 +41,7 @@ export const PERMISSION_PHRASE: Record<string, string> = {
   "returns.edit": "recording refunds owed to customers",
   "production.view": "reading Production",
   "production.edit": "changing production orders, tasks and samples",
-  "production.qc": "recording quality checks",
   "production.suppliers": "adding suppliers",
-  "production.payments": "approving supplier payments",
   "production.owner": "creating and settling production orders, and seeing their costs",
 };
 
@@ -102,7 +100,6 @@ export const ACCESS_LINES: [string, string[]][] = [
   ["Add refunds and mark them paid on Returns", ["returns.edit"]],
   ["Read Production", ["production.view"]],
   ["Change production orders, tasks and samples", ["production.edit"]],
-  ["Record quality checks in Production", ["production.qc"]],
   ["Add suppliers in Production", ["production.suppliers"]],
   ["Create and settle production orders, and see costs", ["production.owner"]],
   ["Invite models", ["invitations.send"]],

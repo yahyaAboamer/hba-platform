@@ -89,10 +89,9 @@ ADDED_SINCE: dict[str, frozenset[str]] = {
     # ADR 0076: Production's levels (owner, 7 November 2026).
     "production_viewer": frozenset({P.PRODUCTION_VIEW}),
     # ADR 0077 (owner, 7 November 2026): staff also record QC; QC is no role.
-    "production_staff": frozenset({P.PRODUCTION_VIEW, P.PRODUCTION_EDIT, P.PRODUCTION_QC}),
-    "production_manager": frozenset(
-        {P.PRODUCTION_VIEW, P.PRODUCTION_EDIT, P.PRODUCTION_QC, P.PRODUCTION_SUPPLIERS}
-    ),
+    # ADR 0085: the old app's `production.qc` is gone, so it is not listed.
+    "production_staff": frozenset({P.PRODUCTION_VIEW, P.PRODUCTION_EDIT}),
+    "production_manager": frozenset({P.PRODUCTION_VIEW, P.PRODUCTION_EDIT, P.PRODUCTION_SUPPLIERS}),
     # ADR 0079: Operations' levels (owner, 10 November 2026).
     "operations_viewer": frozenset({P.ORDER_OPS_VIEW}),
     "operations_staff": frozenset({P.ORDER_OPS_VIEW, P.KHAZENLY_USE, P.RETURNS_EDIT}),

@@ -3,7 +3,7 @@ import type { FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { api } from "../lib/api";
-import { cairoToday, pieces, plural, shortDay } from "../departments/production/next/format";
+import { cairoToday, pieces, plural, shortDay } from "../departments/production/screens/format";
 import { dayWords, reportBody, reportProblem, reportedTotal, totalTyped, typedFrom, unwrap } from "./logic";
 import type { Typed } from "./logic";
 import type { FactoryOrder } from "./types";

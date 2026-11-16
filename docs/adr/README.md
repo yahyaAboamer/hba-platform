@@ -122,7 +122,8 @@ what was chosen.
 | [0081](0081-recording-a-target-is-its-confirmation.md) | Recording a target is its confirmation; no separate confirm step, and the save lists its changes first | Accepted; amends 0018 (targets) |
 | [0082](0082-a-refund-can-be-paid-before-the-return-is-back.md) | A refund can be paid before the return is back, and can carry a photo | Accepted; amends 0079 |
 | [0083](0083-a-delivered-order-is-asked-how-it-went-on-whatsapp.md) | A delivered order is asked how it went on WhatsApp; answers are kept as a sheet and rewarded with one code each | Accepted, being built; amends 0059, narrows 0015 |
-| [0084](0084-production-is-rebuilt-around-the-production-order.md) | Production is rebuilt around the production order, as platform screens with five sub-tabs | Accepted, Orders built; supersedes 0069's own look and 0076 decision 6. |
+| [0084](0084-production-is-rebuilt-around-the-production-order.md) | Production is rebuilt around the production order, as platform screens with five sub-tabs | Accepted, built (batches 1 to 6); supersedes 0069's own look and 0076 decision 6; its carry-over of old records is superseded by 0085. |
+| [0085](0085-production-starts-from-zero.md) | Production starts from zero; the old tab and its records are removed (suppliers kept, backup file first) | Accepted, not built yet. |
 
 **0014 is superseded by 0036** and **0038 by 0039**. **0027 keeps its
 principle and loses its mechanism to 0039**: an agreed figure is still set

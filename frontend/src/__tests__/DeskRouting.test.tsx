@@ -66,7 +66,7 @@ describe("deskFor", () => {
 describe("each kind of person: the departments they hold, and where they start", () => {
   const cases: [Kind, [string, boolean][], string][] = [
     // Two or more departments start on Today, with every department folded.
-    ["owner", [["Inbox", false], ["Operations", false], ["Affiliates", false]], "/today"],
+    ["owner", [["Inbox", false], ["Operations", false], ["Affiliates", false], ["Production", false]], "/today"],
     ["affiliate_manager", [["Affiliates", true]], "/affiliates/overview"],
     ["content_manager", [["Affiliates", true]], "/affiliates/overview"],
     ["operations_manager", [["Inbox", false], ["Operations", false]], "/today"],

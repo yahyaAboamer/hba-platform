@@ -150,13 +150,13 @@ describe("the operations manager", () => {
 });
 
 describe("the admin", () => {
-  it("holds all three departments, the Inbox first", async () => {
+  it("holds all four departments, the Inbox first", async () => {
     window.history.pushState({}, "", "/inbox/confirmations");
     serve(sessionOf("owner"));
     render(<App />);
 
     await screen.findByRole("heading", { name: "Confirmations" });
-    expect(names()).toEqual(["Inbox", "Operations", "Affiliates"]);
+    expect(names()).toEqual(["Inbox", "Operations", "Affiliates", "Production"]);
     expect(within(sidebar()).getAllByRole("button")[0].getAttribute("aria-expanded")).toBe("true");
     expect(screen.getByRole("link", { name: "Confirmations" }).getAttribute("aria-current")).toBe("page");
   });
