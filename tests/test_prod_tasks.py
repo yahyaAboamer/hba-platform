@@ -579,5 +579,5 @@ def test_the_downgrade_refuses_while_a_task_exists(owner):
     with pytest.raises(RuntimeError, match="production task"):
         command.downgrade(Config("alembic.ini"), "f6b3d8e10033")
     with engine.connect() as connection:
-        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "d4a8f2c60037"
+        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "e5b9a3d70038"
         assert connection.execute(text("SELECT count(*) FROM prod_task WHERE id = :id"), {"id": task["id"]}).scalar_one() == 1

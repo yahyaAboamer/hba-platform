@@ -3,7 +3,7 @@
  * tested without drawing anything. What the server checks again is checked
  * here first, so a mistake is told next to the box that caused it.
  */
-import { cairoDay, shortDay } from "../departments/production/next/format";
+import { cairoDay, shortDay } from "../departments/production/screens/format";
 import type { FactoryOrder, FactoryOrderRow, FactorySizeLine } from "./types";
 
 /** The most pieces one size may be reported at (the server's own limit). */

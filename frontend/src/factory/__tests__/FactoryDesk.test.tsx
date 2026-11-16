@@ -2,8 +2,8 @@
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { mockApi, reply } from "../../departments/production/next/__tests__/fixtures";
-import type { Call } from "../../departments/production/next/__tests__/fixtures";
+import { mockApi, reply } from "../../departments/production/screens/__tests__/fixtures";
+import type { Call } from "../../departments/production/screens/__tests__/fixtures";
 import type { FactoryOrder } from "../types";
 import { makeOrder, makeRow, renderDesk, reportedOrder } from "./fixtures";
 
@@ -313,7 +313,7 @@ describe("One order", () => {
 
   it("sends an address that is not a factory screen to the list", async () => {
     mockApi({ "GET /api/factory/orders": { orders: [] } });
-    renderDesk("/production/next/orders");
+    renderDesk("/production/orders");
     expect(await screen.findByRole("heading", { level: 1, name: "Your orders" })).toBeTruthy();
   });
 });

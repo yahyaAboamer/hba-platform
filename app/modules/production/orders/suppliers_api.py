@@ -35,8 +35,7 @@ from sqlalchemy.orm import Session
 from app.core.permissions import Permission
 from app.db import get_session
 from app.modules.inbox.public import StorageError, file_bucket
-from app.modules.production.api import _too_large
-from app.modules.production.orders.guards import EDIT, GUARD, OWNER, SUPPLIERS
+from app.modules.production.orders.guards import EDIT, GUARD, OWNER, SUPPLIERS, too_large
 from app.modules.production.orders.services import factory
 from app.modules.production.orders.services import orders as order_service
 from app.modules.production.orders.services import suppliers
@@ -408,7 +407,7 @@ async def add_receipt(
 ) -> dict:
     """A photo or PDF of a payment, multipart: ``file``. Replaces the one there
     is. Refused before reading when too large or of no stated size."""
-    if _too_large(request):
+    if too_large(request):
         raise HTTPException(413, "Files must be 20 MB or smaller.")
     form = await request.form()
     upload = form.get("file")

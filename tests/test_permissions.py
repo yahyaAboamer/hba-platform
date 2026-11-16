@@ -14,11 +14,14 @@ import pytest
 
 from app.core.permissions import (
     ALL_PERMISSIONS,
+    DEPARTMENT_LEVELS,
     ROLES,
     VALID_ROLES,
     Permission,
+    access_words,
     has_permission,
     invitation_permission,
+    level_in,
     permissions_for,
     permissions_of_roles,
 )
@@ -52,6 +55,24 @@ def test_production_owner_is_the_admins_alone():
     assert has_permission("production_viewer", Permission.PRODUCTION_EDIT) is False
     assert has_permission("production_staff", Permission.PRODUCTION_EDIT) is True
     assert has_permission("production_manager", Permission.PRODUCTION_EDIT) is True
+
+
+def test_production_offers_viewer_staff_and_manager_and_no_qc_level():
+    """ADR 0077: QC is part of staff, not a level of its own."""
+    assert set(DEPARTMENT_LEVELS["production"]) == {"viewer", "staff", "manager"}
+    assert all("qc" not in levels for levels in DEPARTMENT_LEVELS.values())
+    assert level_in("production", {"production_staff"}) == "staff"
+    assert access_words({"production_manager", "customer_service"}) == "Production manager · Inbox staff"
+
+
+def test_the_old_framed_apps_two_permissions_are_gone():
+    """ADR 0085: `production.qc` and `production.payments` served only the
+    retired framed app; no role and no list names them any more."""
+    values = {permission.value if hasattr(permission, "value") else permission for permission in ALL_PERMISSIONS}
+    assert not {"production.qc", "production.payments"} & values
+    assert not hasattr(Permission, "PRODUCTION_QC") and not hasattr(Permission, "PRODUCTION_PAYMENTS")
+    for role, granted in ROLES.items():
+        assert not {"production.qc", "production.payments"} & set(granted), role
 
 
 # ── affiliate_manager (Boda) ───────────────────────────────────────────────────

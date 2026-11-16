@@ -56,10 +56,4 @@ export type Department = {
   immersive?: (pathname: string) => boolean;
   /** Seen only in part: some sections, by their own `holds` (ADR 0072). */
   partial?: boolean;
-  /**
-   * Has its own navigation (Production, ADR 0069): the sidebar's row is a
-   * link with no sections, and while it is open HBA's sidebar folds to the
-   * strip of the approved Production frame (ADR 0076, decision 6).
-   */
-  own?: boolean;
 };

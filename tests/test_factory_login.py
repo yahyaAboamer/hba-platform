@@ -45,7 +45,7 @@ from tests.test_prod_orders import (  # noqa: F401  (fixtures)
 )
 
 FACTORY_EMAIL = "cutting.room@example.com"
-HEAD = "d4a8f2c60037"
+HEAD = "e5b9a3d70038"
 OWNER_NOTE = "Owner-only remark about margins"
 SAMPLE_NOTE = "Owner sample remark"
 

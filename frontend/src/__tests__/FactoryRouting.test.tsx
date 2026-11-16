@@ -64,7 +64,7 @@ describe("a factory account", () => {
     expect(requested.some((url) => url.includes("/api/today") || url.includes("/api/staff") || url.includes("/api/me/"))).toBe(false);
   });
 
-  it.each(["/production/next/orders", "/settings", "/affiliates/overview", "/orders", "/you", "/sign-in", "/factory/nonsense"])(
+  it.each(["/production/orders", "/settings", "/affiliates/overview", "/orders", "/you", "/sign-in", "/factory/nonsense"])(
     "is sent from %s to /factory",
     async (address) => {
       serveFactory(address);

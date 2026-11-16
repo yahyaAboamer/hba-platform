@@ -6,10 +6,8 @@ import type { InboxOutlet } from "../departments/inbox/useInbox";
 import type { TodayOutlet } from "../departments/today/useToday";
 import type { Department } from "../departments/types";
 import type { Session } from "../lib/api";
-import { startFor } from "../departments";
 import { Shell } from "./Shell";
 import { SideBody } from "./Sidebar";
-import { Strip, StripPhoneBar } from "./Strip";
 import { useWaiting } from "./useWaiting";
 import { whereAmI } from "./where";
 
@@ -64,25 +62,6 @@ export function Frame({ session, departments }: { session: Session; departments:
       />
     </Shell.PhoneMenu>
   );
-
-  // A department with its own navigation (Production): HBA's sidebar folds
-  // to the strip, and on a phone a thin bar sits above it (ADR 0076).
-  if (where.department?.own) {
-    return (
-      <div className="frame frame--strip">
-        <Strip
-          session={session}
-          departments={departments}
-          where={where}
-          waiting={waiting}
-          start={startFor(session)}
-        />
-        <StripPhoneBar name={where.department.name} onOpen={() => setOpenedAt(pathname)} menuButton={menuButton} />
-        <main className="frame__own">{page}</main>
-        {menu}
-      </div>
-    );
-  }
 
   return (
     <Shell immersive={where.department?.immersive?.(pathname) === true}>

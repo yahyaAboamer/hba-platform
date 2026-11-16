@@ -249,22 +249,6 @@ export function SideBody({
             </li>
           )}
           {departments.map((department) => {
-            if (department.own) {
-              // Its own navigation (Production): a link, no sections.
-              return (
-                <li key={department.key}>
-                  <Link
-                    to={department.base}
-                    className="frame__dept"
-                    aria-current={where.department === department ? "page" : undefined}
-                    onClick={onNavigate}
-                  >
-                    <Icon name={department.icon} />
-                    <span className="frame__dept-name">{department.name}</span>
-                  </Link>
-                </li>
-              );
-            }
             const isOpen = open === department.key;
             const mark = isOpen ? null : departmentMark(department, waiting);
             return (

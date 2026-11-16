@@ -213,7 +213,15 @@ def test_no_migration_destroys_a_column_or_table_on_the_way_up():
     #: nothing was held any more - the column had stopped describing anything,
     #: and keeping it would have been keeping a lie. It ran on production long
     #: ago.
-    allowed = {"ea6565864418_delivery_is_final_so_nothing_is_held"}
+    #:
+    #: The second is ADR 0085 (the owner, 16 November 2026: "remove all the data
+    #: from the previous production tab, we will start from zero"): the old framed
+    #: Production app's eleven tables. Its records are exported to a backup file
+    #: first, in each environment; the supplier tables stay.
+    allowed = {
+        "ea6565864418_delivery_is_final_so_nothing_is_held",
+        "e5b9a3d70038_production_starts_from_zero",
+    }
     offenders = []
 
     for path in sorted(Path("migrations/versions").glob("*.py")):

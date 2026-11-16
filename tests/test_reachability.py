@@ -159,7 +159,7 @@ def _served() -> set[tuple[str, str]]:
     routers.append(order_ops.frame_router)
     # And its third: Khazenly, behind its own permission (ADR 0072).
     routers.append(order_ops.khazenly_router)
-    # Production orders (ADR 0084), beside the old framed Production's own.
+    # Production orders (ADR 0084). The old framed Production's API is gone (ADR 0085).
     routers.append(production_orders.router)
     # The factory's own desk (ADR 0084, batch 6b), behind `current_factory`.
     from app.modules.production.orders import factory_api as production_factory

@@ -32,7 +32,6 @@ from app.modules.affiliates.api import (
 )
 from app.modules.inbox import api as inbox
 from app.modules.operations import api as order_ops
-from app.modules.production import api as production
 from app.modules.production.orders import api as production_orders
 from app.modules.production.orders import factory_api as production_factory
 from app.shared.api import (
@@ -72,8 +71,6 @@ from app.shared.services.shopify import bulk as _shopify_bulk  # noqa: F401  (re
 from app.shared.services.shopify import sync as _shopify_sync  # noqa: F401  (registers handlers)
 
 WEB_DIR = Path(__file__).resolve().parent / "web"
-#: Production's own build (ADR 0076), apart from HBA's so neither styles the other.
-PRODUCTION_WEB_DIR = Path(__file__).resolve().parent / "web_production"
 
 logger = logging.getLogger(__name__)
 
@@ -127,11 +124,10 @@ _PREVIEW_FRAME = re.compile(r"^/affiliates/(?:models/)?[0-9]+/portal/frame/?$")
 async def security_headers(request: Request, call_next):
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
-    if _PREVIEW_FRAME.match(request.url.path) or request.url.path.startswith("/production-app"):
+    if _PREVIEW_FRAME.match(request.url.path):
         # ADR 0064: the one page the platform frames itself - a model's portal
         # inside *View her portal*. Our own pages may frame it; no other site
-        # may, so the reason for DENY (clickjacking) still holds. Production's
-        # screens are framed the same way, inside HBA's frame (ADR 0076).
+        # may, so the reason for DENY (clickjacking) still holds.
         response.headers["X-Frame-Options"] = "SAMEORIGIN"
         response.headers["Content-Security-Policy"] = "frame-ancestors 'self'"
     else:
@@ -145,7 +141,7 @@ async def security_headers(request: Request, call_next):
     # Authenticated responses must never sit in a shared or browser cache.
     if request.url.path.startswith("/api/"):
         response.headers["Cache-Control"] = "no-store"
-    elif request.url.path.startswith(("/assets/", "/production-app/assets/")):
+    elif request.url.path.startswith("/assets/"):
         # **Content-hashed, so immutable.** Vite puts a hash of the contents in
         # every asset filename, which means a given URL can never mean
         # something different - a change produces a new name.
@@ -189,33 +185,9 @@ app.include_router(products.router)
 app.include_router(policy.router)
 app.include_router(today.router)
 app.include_router(integrations.router)
-app.include_router(production.router)
 app.include_router(production_orders.router)
 # The factory's own desk (ADR 0084, batch 6b): `current_factory` on the router.
 app.include_router(production_factory.router)
-app.add_exception_handler(production.ProductionRefused, production.refused_handler)
-
-
-if (PRODUCTION_WEB_DIR / "index.html").exists():
-    app.mount(
-        "/production-app/assets",
-        StaticFiles(directory=PRODUCTION_WEB_DIR / "assets"),
-        name="production-assets",
-    )
-    app.mount(
-        "/production-app/fonts",
-        StaticFiles(directory=PRODUCTION_WEB_DIR / "fonts"),
-        name="production-fonts",
-    )
-
-    @app.get("/production-app", include_in_schema=False)
-    @app.get("/production-app/{full_path:path}", include_in_schema=False)
-    def serve_production(full_path: str = "") -> FileResponse:
-        """Production's screens (ADR 0076): its two public files by name,
-        every other address its own page, which reads the address itself."""
-        if full_path in ("favicon.svg", "hba-logo.jpg"):
-            return FileResponse(PRODUCTION_WEB_DIR / full_path)
-        return FileResponse(PRODUCTION_WEB_DIR / "index.html")
 
 
 if (WEB_DIR / "index.html").exists():
@@ -248,5 +220,9 @@ if (WEB_DIR / "index.html").exists():
         confusing parse error instead of an obvious missing endpoint.
         """
         if full_path.startswith("api/"):
+            raise HTTPException(404, "Not found")
+        # The framed Production app is retired (ADR 0085): its old address is
+        # not answered with the shell, which would look like it still lived here.
+        if full_path == "production-app" or full_path.startswith("production-app/"):
             raise HTTPException(404, "Not found")
         return FileResponse(WEB_DIR / "index.html")

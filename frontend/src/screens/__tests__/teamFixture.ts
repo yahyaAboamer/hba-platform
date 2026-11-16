@@ -8,7 +8,7 @@ export const ALL = [
   "targets.record", "targets.manage", "payroll.approve", "payroll.reopen",
   "payments.record", "payroll.bonus", "invitations.send", "audit.view", "settings.manage",
   "order_ops.view", "inbox.use", "khazenly.use", "returns.edit",
-  "production.view", "production.edit", "production.qc", "production.suppliers", "production.payments",
+  "production.view", "production.edit", "production.suppliers",
   "production.owner",
 ];
 
@@ -27,8 +27,8 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
   operations_manager: ["order_ops.view", "khazenly.use", "returns.edit"],
   customer_service: ["inbox.use", "khazenly.use"],
   production_viewer: ["production.view"],
-  production_staff: ["production.view", "production.edit", "production.qc"],
-  production_manager: ["production.view", "production.edit", "production.qc", "production.suppliers"],
+  production_staff: ["production.view", "production.edit"],
+  production_manager: ["production.view", "production.edit", "production.suppliers"],
 };
 
 export const ROLE_WORDS: Record<string, string> = {

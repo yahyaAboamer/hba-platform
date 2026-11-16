@@ -38,8 +38,7 @@ from sqlalchemy.orm import Session
 from app.core.permissions import Permission
 from app.db import get_session
 from app.modules.inbox.public import StorageError, file_bucket
-from app.modules.production.api import _too_large
-from app.modules.production.orders.guards import EDIT, GUARD, OWNER, SUPPLIERS  # noqa: F401
+from app.modules.production.orders.guards import EDIT, GUARD, OWNER, SUPPLIERS, too_large  # noqa: F401
 from app.modules.production.orders.services import files, incoming, orders, overview, ratings, tasks
 from app.shared.api.deps import holds
 from app.shared.models.identity import UserAccount
@@ -503,7 +502,7 @@ async def add_file(
 ) -> dict:
     """A photo or PDF, multipart: ``file`` and an optional ``stage``. Refused
     before reading when too large or of no stated size."""
-    if _too_large(request):
+    if too_large(request):
         raise HTTPException(413, "Files must be 20 MB or smaller.")
     form = await request.form()
     upload = form.get("file")
