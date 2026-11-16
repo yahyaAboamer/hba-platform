@@ -369,6 +369,56 @@ export type Incoming = {
   deliveries: IncomingDelivery[];
 };
 
+// ── Overview (`app/modules/production/orders/services/overview.py`) ─────────
+// Money keys (`owed_piastres`, `owed`, the `cost_over` problems) are absent, not null, for anybody without
+// `production.owner`: a screen draws money only when its key is there.
+
+/** One thing waiting for the owner: an open task of his (`tasks.listing`), with the fields the screen needs. */
+export type OverviewDecision = {
+  key: string;
+  title: string;
+  kind: "generated" | "manual";
+  /** The hand-added task's id; `null` for a generated one. */
+  id?: number | null;
+  order: TaskOrder | null;
+  due: string | null;
+  since: string | null;
+  open: string | null;
+  overdue_days: number;
+};
+
+export type OverviewProblemKind = "late_order" | "late_material" | "count_mismatch" | "cost_over";
+
+/** Where a problem's "Open" goes: an order (perhaps with a form open), Incoming, or Tasks. */
+export type OverviewLink = { to: "order"; id: number; open?: string | null } | { to: "incoming" } | { to: "tasks" };
+
+export type OverviewProblem = { kind: OverviewProblemKind; title: string; detail: string; link: OverviewLink };
+
+export type OverviewOwed = {
+  supplier: { id: string; name: string };
+  owed_piastres: number;
+  /** One short line ("Rest of the fleece purchase"), or nothing. */
+  detail?: string | null;
+};
+
+export type Overview = {
+  today: string;
+  summary: { open_orders: number; planned_pieces: number };
+  figures: {
+    decisions: number;
+    late_orders: number;
+    open_orders: number;
+    /** `month` is the month's name ("November") or `YYYY-MM`; `label` is the name when the server sends both. */
+    arriving_this_month: { month: string; label?: string; pieces: number };
+    owed_piastres?: number;
+  };
+  decisions: OverviewDecision[];
+  problems: OverviewProblem[];
+  orders: OrderRow[];
+  arriving: IncomingArrival[];
+  owed?: OverviewOwed[];
+};
+
 // ── Suppliers (`app/modules/production/orders/services/suppliers.py`, `account.py`) ──
 // Money keys are absent, not null, for anybody without `production.owner`: every one is optional here,
 // and a screen draws a figure only when its key is there.

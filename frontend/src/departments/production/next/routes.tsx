@@ -6,6 +6,7 @@ import { NewOrder } from "./NewOrder";
 import { NextLayout } from "./NextLayout";
 import { OrderList } from "./OrderList";
 import { OrderPage } from "./OrderPage";
+import { OverviewScreen } from "./OverviewScreen";
 import { StageDays } from "./StageDays";
 import { SupplierPage } from "./SupplierPage";
 import { SupplierScreen } from "./SupplierScreen";
@@ -19,7 +20,8 @@ import { TaskScreen } from "./TaskScreen";
 export function productionNextRoutes(session: Session) {
   return (
     <Route path="next" element={<NextLayout />}>
-      <Route index element={<Navigate to="orders" replace />} />
+      <Route index element={<Navigate to="overview" replace />} />
+      <Route path="overview" element={<OverviewScreen session={session} />} />
       <Route path="orders" element={<OrderList session={session} />} />
       <Route path="orders/new" element={<NewOrder session={session} />} />
       <Route path="orders/:id" element={<OrderPage session={session} />} />
