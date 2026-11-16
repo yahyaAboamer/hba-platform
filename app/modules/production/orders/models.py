@@ -33,6 +33,7 @@ from sqlalchemy import (
     func,
     text,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -547,3 +548,80 @@ class ProdRating(Base):
     created_at: Mapped[datetime] = _created()
     updated_by: Mapped[int | None] = _user()
     updated_at: Mapped[datetime] = _created()
+
+
+# ── The factory's own login (batch 6b; build plan 2026-11-16-production-factory-login-build.md) ──
+
+
+class ProdFactoryAccess(Base):
+    """A supplier's login: the email it was invited at, the invitation, and
+    the account once accepted. **At most one live row per supplier** and one
+    per account; switching the login off keeps the row (``switched_off_at``)
+    so the trail survives. ``current_factory`` reads this: an account reaches
+    ``/api/factory`` only while its row is live."""
+
+    __tablename__ = "prod_factory_access"
+    __table_args__ = (
+        CheckConstraint("email = lower(email) AND char_length(email) BETWEEN 3 AND 320", name="prod_factory_access_email_valid"),
+        CheckConstraint(
+            "switched_off_at IS NOT NULL OR switched_off_by IS NULL", name="prod_factory_access_off_by_only_when_off"
+        ),
+        Index(
+            "uq_prod_factory_access_live_supplier",
+            "supplier_id",
+            unique=True,
+            postgresql_where=text("switched_off_at IS NULL"),
+        ),
+        Index(
+            "uq_prod_factory_access_live_account",
+            "user_account_id",
+            unique=True,
+            postgresql_where=text("switched_off_at IS NULL AND user_account_id IS NOT NULL"),
+        ),
+        Index("ix_prod_factory_access_invitation", "invitation_id"),
+        Index("ix_prod_factory_access_account", "user_account_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    supplier_id: Mapped[str] = mapped_column(String(80), ForeignKey("production_supplier.id"), nullable=False)
+    email: Mapped[str] = mapped_column(String(320), nullable=False)
+    invitation_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("invitation.id", ondelete="SET NULL"))
+    user_account_id: Mapped[int | None] = _user()
+    created_by: Mapped[int | None] = _user()
+    created_at: Mapped[datetime] = _created()
+    switched_off_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    switched_off_by: Mapped[int | None] = _user()
+
+
+class ProdCutReport(Base):
+    """What the factory says it cut, per size, waiting for the QC manager.
+    **It counts for nothing until confirmed**: recording the cut (``record_cut``)
+    sets ``confirmed_at`` on the waiting report, and the confirmed figures are
+    whatever the QC manager saved. A new report before then replaces the
+    waiting one (``replaced_at``); nothing is deleted. No money."""
+
+    __tablename__ = "prod_cut_report"
+    __table_args__ = (
+        CheckConstraint("note IS NULL OR char_length(note) <= 500", name="prod_cut_report_note_length"),
+        CheckConstraint(
+            "confirmed_at IS NULL OR replaced_at IS NULL", name="prod_cut_report_confirmed_or_replaced"
+        ),
+        Index("ix_prod_cut_report_order", "order_id"),
+        # One report waits per order at a time.
+        Index(
+            "uq_prod_cut_report_waiting",
+            "order_id",
+            unique=True,
+            postgresql_where=text("confirmed_at IS NULL AND replaced_at IS NULL"),
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    order_id: Mapped[int] = mapped_column(Integer, ForeignKey("prod_order.id"), nullable=False)
+    #: ``{"S": 118, "M": 240, ...}``: the order's sizes, whole pieces.
+    sizes: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    note: Mapped[str | None] = mapped_column(Text)
+    reported_by: Mapped[int | None] = _user()
+    reported_at: Mapped[datetime] = _created()
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    replaced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

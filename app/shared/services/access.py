@@ -45,3 +45,27 @@ def live_roles_by_account(db: Session, account_ids: list[int]) -> dict[int, froz
     for account_id, role in rows:
         found[account_id].add(role)
     return {account_id: frozenset(roles) for account_id, roles in found.items()}
+
+
+def is_factory_account(db: Session, user_account_id: int) -> bool:
+    """Whether this account is - or ever was - a factory's login (ADR 0084,
+    batch 6b): it holds, or once held, the `factory` role.
+
+    **Ever, not now**, on purpose. Switching a login off revokes the role and
+    suspends the account; were it ever reactivated it would hold nothing, and
+    it must still reach nothing but the factory's own few addresses
+    (`app.shared.api.deps.signed_in`). Fails closed.
+    """
+    from app.core.permissions import FACTORY_ROLE
+
+    return (
+        db.scalar(
+            select(RoleAssignment.id)
+            .where(
+                RoleAssignment.user_account_id == user_account_id,
+                RoleAssignment.role == FACTORY_ROLE,
+            )
+            .limit(1)
+        )
+        is not None
+    )

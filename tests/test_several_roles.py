@@ -96,6 +96,9 @@ ADDED_SINCE: dict[str, frozenset[str]] = {
     # ADR 0079: Operations' levels (owner, 10 November 2026).
     "operations_viewer": frozenset({P.ORDER_OPS_VIEW}),
     "operations_staff": frozenset({P.ORDER_OPS_VIEW, P.KHAZENLY_USE, P.RETURNS_EDIT}),
+    # ADR 0084, batch 6b: a factory's own login (owner, 16 November 2026).
+    # Grants nothing; reaches its orders through `current_factory`.
+    "factory": frozenset(),
 }
 
 
@@ -160,6 +163,9 @@ def test_an_account_with_no_live_role_holds_nothing_and_is_not_staff(db):
 def test_a_model_role_never_makes_somebody_staff():
     assert not is_staff({"affiliate"})
     assert is_staff({"affiliate", "customer_service"})
+    # Nor a factory's (batch 6b).
+    assert not is_staff({"factory"})
+    assert not is_staff({"factory", "affiliate"})
     assert is_staff({"customer_service"})
 
 
@@ -397,7 +403,7 @@ def _gates(dependant, found: set[str]) -> set[str]:
         if any_of:
             found.add("any:" + "|".join(sorted(any_of)))
         name = getattr(call, "__name__", "")
-        if name in ("require_staff", "current_affiliate", "_applicant"):
+        if name in ("require_staff", "current_affiliate", "_applicant", "current_factory"):
             found.add(f"<{name}>")
     for child in dependant.dependencies:
         _gates(child, found)
@@ -411,6 +417,9 @@ def _allowed(gates: set[str], permissions: frozenset[str], staff: bool, model: b
         if gate == "<_applicant>" and staff:
             return False
         if gate == "<current_affiliate>" and not model:
+            return False
+        # Nobody in `PEOPLE` is a factory's login (batch 6b).
+        if gate == "<current_factory>":
             return False
         if gate.startswith("any:"):
             if not set(gate[4:].split("|")) & permissions:
@@ -468,7 +477,9 @@ def test_the_migration_moves_the_inbox_and_changes_nobodys_access(old_schema):
     # Every route the platform serves gives each of them the same answer.
     routes = [(route, _gates(route.dependant, set())) for route in _walk(app.routes)]
     assert len(routes) > 100, "the walk missed the routers"
-    assert any(gates - {"<require_staff>", "<current_affiliate>", "<_applicant>"} for _, gates in routes)
+    assert any(
+        gates - {"<require_staff>", "<current_affiliate>", "<_applicant>", "<current_factory>"} for _, gates in routes
+    )
     for email, role in PEOPLE.items():
         for model in (False, True):
             for route, gates in routes:

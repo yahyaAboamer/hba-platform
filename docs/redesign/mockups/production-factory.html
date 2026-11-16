@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Factory login mockup</title>
+<style>
+/* Mockup only. Tokens copied from production-orders.html. Sample data throughout. */
+:root{
+  --paper:#eff1ee;--surface:#fff;--ink:#101214;--quiet:#4e534e;--faint:#5e645e;--rule:#dde1dc;--rule-strong:#c9cec8;--hover:#eff1ee;
+  --owed:#8a5a16;--refused:#9a2f22;--owed-quiet:rgba(138,90,22,.1);--refused-quiet:rgba(154,47,34,.1);
+  --accent:#14653a;--accent-soft:rgba(20,101,58,.09);
+  --radius:8px;--sans:Inter,ui-sans-serif,system-ui,-apple-system,sans-serif;color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--paper:#08090a;--surface:#15171a;--ink:#ecefea;--quiet:#a7ada6;--faint:#8a918a;--rule:#23272b;--rule-strong:#2d3237;--hover:#1d2126;--owed:#e0a458;--refused:#e2705f;--owed-quiet:rgba(224,164,88,.12);--refused-quiet:rgba(226,112,95,.12);--accent:#23a95c;--accent-soft:rgba(35,169,92,.14);color-scheme:dark}}
+[data-theme="dark"]{--paper:#08090a;--surface:#15171a;--ink:#ecefea;--quiet:#a7ada6;--faint:#8a918a;--rule:#23272b;--rule-strong:#2d3237;--hover:#1d2126;--owed:#e0a458;--refused:#e2705f;--owed-quiet:rgba(224,164,88,.12);--refused-quiet:rgba(226,112,95,.12);--accent:#23a95c;--accent-soft:rgba(35,169,92,.14);color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.45}
+button{font:inherit;color:inherit}
+.top{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--rule);background:var(--surface)}
+.top b{font-weight:600}.top span{color:var(--quiet);font-size:13px}
+.main{max-width:720px;margin:0 auto;padding:20px 16px 64px}
+.note{margin:0 0 18px;padding:9px 13px;border-radius:var(--radius);background:var(--owed-quiet);color:var(--owed);font-size:12.5px}
+h1{margin:0;font-size:20px;font-weight:600}
+h2{margin:0 0 10px;font-size:15px;font-weight:600}
+.sub{color:var(--quiet);font-size:13.5px;margin:2px 0 16px}
+.surface{border-radius:var(--radius);background:var(--surface);overflow:hidden}
+.card{border-radius:var(--radius);background:var(--surface);padding:16px;margin-bottom:14px}
+.row{display:block;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--rule);padding:14px 16px;cursor:pointer;min-height:44px}
+.row:last-child{border-bottom:0}.row:hover{background:var(--hover)}
+.row b{font-weight:600}.small{font-size:12.5px;color:var(--quiet)}
+.late{color:var(--refused)}.warn{color:var(--owed)}.ok{color:var(--accent)}
+.back{background:none;border:0;padding:0;margin-bottom:12px;color:var(--quiet);font-size:13px;cursor:pointer;min-height:44px}
+.button{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:9px 14px;border:1px solid var(--rule);border-radius:var(--radius);background:transparent;font-size:14px;cursor:pointer}
+.button--primary{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+.table{width:100%;border-collapse:collapse;font-size:14px}
+.table th,.table td{padding:9px 6px;border-bottom:1px solid var(--rule);text-align:left}
+.table th{font-size:11px;font-weight:400;letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
+.table .n{text-align:right;font-variant-numeric:tabular-nums}
+.sizes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:10px 0}
+.sizes label,.field{display:grid;gap:4px;font-size:12.5px;color:var(--quiet)}
+.input{min-height:44px;padding:8px 11px;border:1px solid var(--rule-strong);border-radius:var(--radius);background:var(--surface);color:var(--ink);font:inherit;font-size:15px;width:100%}
+.flag{padding:10px 13px;border-radius:var(--radius);font-size:13px;background:var(--owed-quiet);color:var(--owed);margin-bottom:12px}
+.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.view{display:none}.view.on{display:block}
+</style>
+</head>
+<body>
+<div class="top"><b>HBA · Production</b><span>Main factory</span></div>
+<main class="main">
+  <p class="note">Mockup for review. Every name, date and number is sample data. The factory signs in on the platform's own sign-in page.</p>
+
+  <!-- Your orders -->
+  <section class="view on" id="v-list">
+    <h1>Your orders</h1>
+    <div class="sub">3 orders with HBA</div>
+    <div class="surface">
+      <button class="row" data-go="v-order"><b>Wide-leg sweatpants · Grey</b><div class="small">PO-2611-02 · 800 planned · <span class="warn">tell us how many you cut</span></div><div class="small">Deliver by 5 Dec</div></button>
+      <button class="row" data-go="v-order"><b>Oversized hoodie · Off-white</b><div class="small">PO-2610-03 · 985 cut · being made</div><div class="small late">Deliver by 26 Nov · moved from 20 Nov</div></button>
+      <button class="row" data-go="v-order"><b>Boxy tee · Black</b><div class="small">PO-2611-04 · 600 planned · fabric not yet with you</div><div class="small">Deliver by 16 Dec</div></button>
+    </div>
+    <p class="small" style="margin-top:12px">Only your own orders appear here. No prices, costs or payments are shown.</p>
+  </section>
+
+  <!-- One order -->
+  <section class="view" id="v-order">
+    <button class="back" data-go="v-list">← Your orders</button>
+    <h1>Wide-leg sweatpants · Grey</h1>
+    <div class="sub">PO-2611-02 · printing: none · deliver by 5 Dec</div>
+
+    <div class="card">
+      <h2>Sizes</h2>
+      <table class="table">
+        <thead><tr><th>Size</th><th class="n">Planned</th><th class="n">You reported cut</th><th class="n">Confirmed cut</th></tr></thead>
+        <tbody>
+          <tr><td>S</td><td class="n">120</td><td class="n">—</td><td class="n">—</td></tr>
+          <tr><td>M</td><td class="n">240</td><td class="n">—</td><td class="n">—</td></tr>
+          <tr><td>L</td><td class="n">240</td><td class="n">—</td><td class="n">—</td></tr>
+          <tr><td>XL</td><td class="n">140</td><td class="n">—</td><td class="n">—</td></tr>
+          <tr><td>XXL</td><td class="n">60</td><td class="n">—</td><td class="n">—</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>Report how many you cut</h2>
+      <div class="small">HBA's QC manager checks and confirms these before they count.</div>
+      <div class="sizes">
+        <label>S<input class="input" inputmode="numeric" value="118"></label>
+        <label>M<input class="input" inputmode="numeric" value="240"></label>
+        <label>L<input class="input" inputmode="numeric" value="236"></label>
+        <label>XL<input class="input" inputmode="numeric" value="140"></label>
+        <label>XXL<input class="input" inputmode="numeric" value="58"></label>
+      </div>
+      <label class="field">Note (optional)<input class="input" value="Short on fabric for S and L"></label>
+      <div class="actions"><button class="button button--primary" data-go="v-sent">Send 792 pieces cut</button></div>
+    </div>
+
+    <div class="card">
+      <h2>Delivery date</h2>
+      <div class="small" style="margin-bottom:10px">Now 5 Dec. If it will change, tell us the new date and why.</div>
+      <label class="field">New date<input class="input" type="date"></label>
+      <label class="field" style="margin-top:10px">Why<input class="input" placeholder="For example: waiting in the print queue"></label>
+      <div class="actions"><button class="button">Move the date</button></div>
+      <table class="table" style="margin-top:14px">
+        <thead><tr><th>When</th><th>Date</th><th>Moved by</th><th>Why</th></tr></thead>
+        <tbody><tr><td>2 Nov</td><td>5 Dec</td><td>HBA</td><td>Planned</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- After sending the cut -->
+  <section class="view" id="v-sent">
+    <button class="back" data-go="v-list">← Your orders</button>
+    <h1>Wide-leg sweatpants · Grey</h1>
+    <div class="sub">PO-2611-02 · deliver by 5 Dec</div>
+    <div class="flag">You reported 792 pieces cut on 16 Nov. Waiting for HBA's QC manager to confirm.</div>
+    <div class="card">
+      <h2>Sizes</h2>
+      <table class="table">
+        <thead><tr><th>Size</th><th class="n">Planned</th><th class="n">You reported cut</th><th class="n">Confirmed cut</th></tr></thead>
+        <tbody>
+          <tr><td>S</td><td class="n">120</td><td class="n">118</td><td class="n">—</td></tr>
+          <tr><td>M</td><td class="n">240</td><td class="n">240</td><td class="n">—</td></tr>
+          <tr><td>L</td><td class="n">240</td><td class="n">236</td><td class="n">—</td></tr>
+          <tr><td>XL</td><td class="n">140</td><td class="n">140</td><td class="n">—</td></tr>
+          <tr><td>XXL</td><td class="n">60</td><td class="n">58</td><td class="n">—</td></tr>
+        </tbody>
+      </table>
+      <div class="actions"><button class="button" data-go="v-order">Correct what I sent</button></div>
+    </div>
+    <p class="small">On HBA's side, the QC manager gets a task "Confirm the factory's cut", opens the order's cut form already filled with these numbers, and saves or corrects them.</p>
+  </section>
+</main>
+<script>
+document.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('.view').forEach(v=>v.classList.remove('on'));document.getElementById(b.dataset.go).classList.add('on');scrollTo(0,0)}));
+</script>
+</body>
+</html>

@@ -142,3 +142,19 @@ The old framed tab stays in place until the new one covers it.
 - Later, not decided: reminders for overdue tasks, comparing suppliers within
   a section, reports, logins for suppliers other than the main factory,
   restock planning inside the platform.
+
+## Amendment, 15 and 16 November 2026 (the second build)
+
+The owner's answers for batch 6:
+
+- **Ratings** are offered when an order is settled and can be skipped; timing
+  stars are filled in from the lateness (on time 5, 1-2 days 4, 3-5 days 3,
+  6-9 days 2, 10 or more 1) and can be changed.
+- **The factory's login**: the factory enters cut counts and moves its
+  delivery date with a reason, nothing else. Its cut counts wait for the QC
+  manager to confirm them before they count. It never sees ratings, its
+  record, costs, balances, payments or other suppliers. English. Whoever
+  manages suppliers (the owner and the production manager) invites it by
+  email from the supplier's page and can switch it off, which signs it out at
+  once. Approved screens: `docs/redesign/mockups/production-factory.html`.
+

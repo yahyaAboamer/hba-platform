@@ -161,6 +161,10 @@ def _served() -> set[tuple[str, str]]:
     routers.append(order_ops.khazenly_router)
     # Production orders (ADR 0084), beside the old framed Production's own.
     routers.append(production_orders.router)
+    # The factory's own desk (ADR 0084, batch 6b), behind `current_factory`.
+    from app.modules.production.orders import factory_api as production_factory
+
+    routers.append(production_factory.router)
     for router in routers:
         for route in router.routes:
             for method in getattr(route, "methods", set()):

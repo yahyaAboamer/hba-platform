@@ -189,8 +189,18 @@ export type Settlement = {
 export type Printing = "factory" | "outside" | "none";
 export type FabricBuyer = "hba" | "factory";
 
+/** What the factory told HBA it cut, still waiting for the QC manager (batch 6b). `null` once none waits. */
+export type CutReport = {
+  sizes: Partial<Record<Size, number>>;
+  note: string | null;
+  /** A day (`YYYY-MM-DD`) or the instant the server stamped. */
+  reported_on: string;
+};
+
 /** `view`: the row, and everything on the order. */
 export type OrderView = OrderRow & {
+  /** The factory's cut figures waiting to be confirmed on the Cutting stage; absent or `null` when none wait. */
+  cut_report?: CutReport | null;
   shopify_product_id: string | null;
   fabric_bought_by: FabricBuyer;
   printing: Printing;
@@ -543,8 +553,25 @@ export type SupplierOrder = {
   rating: OrderRating | null;
 };
 
+/** Where a supplier's own login stands (batch 6b). `off` is a login that was switched off. */
+export type FactoryLoginState = "invited" | "active" | "off";
+
+export type FactoryLogin = {
+  state: FactoryLoginState;
+  email: string;
+  /** The instant the invitation was sent. */
+  invited_at: string | null;
+  /** The instant the factory last used its login; `null` until it first does. */
+  last_seen_at: string | null;
+};
+
 /** `GET /suppliers/{id}`, and what every write on a supplier answers with. */
 export type SupplierView = SupplierBasics & SupplierRecord & {
+  /**
+   * Only for people with `production.suppliers`: the key is **absent** for everybody else, and `null` when the
+   * supplier has no login yet. A screen draws the card only when the key is there.
+   */
+  factory_login?: FactoryLogin | null;
   purchases: PurchaseView[];
   orders: SupplierOrder[];
   // Owner only.

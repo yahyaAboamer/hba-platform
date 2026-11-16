@@ -38,7 +38,7 @@ from app.core.permissions import (
     GRANT_REFUSED,
     INVITATION_BRINGS,
     LEVELS,
-    MODEL_ROLE,
+    NON_STAFF_ROLES,
     NOT_OFFERED,
     ROLE_WORDS,
     Permission,
@@ -189,7 +189,7 @@ def roster(
         "invitations": [
             _invitation_row(invitation, now)
             for invitation in list_pending_invitations(
-                db, exclude_roles=("affiliate",), current_only=True
+                db, exclude_roles=tuple(sorted(NON_STAFF_ROLES)), current_only=True
             )
         ],
         "assignable_roles": sorted(ASSIGNABLE_ROLES),
@@ -268,7 +268,7 @@ def remove_access(
 
 
 def _roles_now(db: Session, user: UserAccount) -> list[str]:
-    return sorted_roles(roles_of(db, user) - {MODEL_ROLE})
+    return sorted_roles(roles_of(db, user) - NON_STAFF_ROLES)
 
 
 def _staff_or_404(db: Session, user_id: int) -> tuple[UserAccount, dict]:

@@ -25,6 +25,7 @@ from app.core.password_quality import password_problem, password_strength
 from app.core.passwords import MINIMUM_PASSWORD_LENGTH, hash_password
 from app.core.periods import PLATFORM_START_MONTH
 from app.core.permissions import (
+    FACTORY_ROLE,
     GRANT_REFUSED,
     VALID_ROLES,
     Permission,
@@ -697,6 +698,12 @@ def me(
     }
 
 
+#: Refused by the general invitation: a factory is invited from its supplier.
+FACTORY_INVITED_ELSEWHERE = (
+    "A factory's login is sent from its supplier's page in Production, not from here."
+)
+
+
 @router.post("/invitations", status_code=201)
 def invite(
     body: InviteBody,
@@ -718,6 +725,10 @@ def invite(
     """
     if body.role not in VALID_ROLES:
         raise HTTPException(422, f"Unknown role: {body.role}")
+    # A factory's login is sent from its supplier's page and nowhere else
+    # (ADR 0084, batch 6b), so it always has a supplier to belong to.
+    if body.role == FACTORY_ROLE:
+        raise HTTPException(422, FACTORY_INVITED_ELSEWHERE)
     # A staff invitation is the owner's (Batch 2.3); a model's needs only
     # `invitations.send`, which every caller here already holds.
     needed = invitation_permission(body.role)

@@ -628,6 +628,16 @@ def render(event: str, payload: dict) -> Message | None:
                 "You've been given access to HBA's operations dashboard. Choose "
                 "a password to get in."
             )
+        elif payload.get("role") == "factory":
+            # ADR 0084, batch 6b: a factory's own login - its orders with
+            # HBA, the cut it reports and its delivery dates. Nothing else.
+            subject = "Your access to your orders with HBA"
+            body = (
+                f"{greeting}\n\n"
+                "HBA has given you a login to see your production orders with "
+                "us, tell us how many pieces you cut, and let us know if a "
+                "delivery date will change. Choose a password to get in."
+            )
         elif payload.get("role") == "customer_service":
             # ADR 0059: the inbox is all this person sees.
             subject = "Your access to HBA's customer inbox"

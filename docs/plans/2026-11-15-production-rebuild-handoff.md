@@ -13,7 +13,11 @@ piece of work.
    all five sub-tabs (sample data). The owner approved each sub-tab.
 4. The four build contracts, each ending with what was built:
    `docs/plans/2026-11-14-production-orders-build.md`,
-   `…-tasks-build.md`, `…-incoming-build.md`, `…-suppliers-build.md`.
+   `…-tasks-build.md`, `…-incoming-build.md`, `…-suppliers-build.md`, and
+   `2026-11-15-production-overview-build.md`,
+   `2026-11-15-production-ratings-build.md`,
+   `2026-11-16-production-factory-login-build.md` (approved screens:
+   `docs/redesign/mockups/production-factory.html`).
 5. `docs/RULES.md`, the Production paragraph.
 
 ## Where it stands
@@ -24,8 +28,9 @@ piece of work.
 | 2 | Tasks | Merged (PR #176), live on staging |
 | 3 | Incoming | Merged (PR #177), live on staging |
 | 4 | Suppliers | Merged (PR #178), on staging |
-| 5 | Overview | Pull request open from `claude/production-overview`; **not merged** |
-| 6 | Ratings and the performance record, then the factory's own login | Not started |
+| 5 | Overview | Merged (PR #179), on staging |
+| 6a | Ratings and the performance record | Merged (PR #180), on staging |
+| 6b | The factory's own login | Pull request open from `claude/production-factory-login`; **not merged** |
 | Final | Carry the old orders over, retire the framed tab | Not started |
 
 Production (the `production` branch) has none of this. Nothing is merged or
@@ -38,20 +43,27 @@ deployed without the owner saying so, each time.
   Tables are prefixed `prod_`; suppliers stay in the old
   `production_supplier` table, which is read and written but never altered.
 - Frontend: `frontend/src/departments/production/next/`, reached at
-  `/production/next/*` (tabs: Orders, Tasks, Incoming, Suppliers, Stage
-  days). The Production department is still `own: true`: the old framed app
+  `/production/next/*` (tabs: Overview, Orders, Tasks, Incoming, Suppliers,
+  Stage days). The factory's own desk is `frontend/src/factory/` at
+  `/factory`, API `/api/factory` (`factory_api.py`, `services/factory.py`). The Production department is still `own: true`: the old framed app
   (`production-ui/`, `/api/production/*`, the `production_*` tables,
   `tests/test_production_api.py`) is untouched and keeps working until the
   final batch.
 - Migrations so far: `f6b3d8e10033` (orders), `a7c4e9f20034` (tasks),
-  `b8d5f1a30035` (suppliers). The Overview adds none. The next id ends
-  `0036`. Each joins the list for the migration and rollback rehearsal.
+  `b8d5f1a30035` (suppliers), `c9e6a2b40036` (ratings), `d4a8f2c60037`
+  (the factory's login; in the open pull request). The Overview adds none.
+  The next id ends `0038`. Each joins the list for the migration and rollback rehearsal.
 - Permissions: `production.view` reads without money; `production.edit` is
   the QC manager's writes; `production.suppliers` manages suppliers and
   sections; `production.owner` (admin only) creates, approves, settles and
   **is the only one who receives money**. Money keys are omitted, not null,
   for everybody else, on every endpoint, and every batch has a recursive
   test proving it. Keep that test in every new batch.
+- The factory's login is role `factory`: not staff, no permissions, never
+  granted from Settings. `current_factory` guards its desk, and `signed_in`
+  refuses a factory account everywhere else by route pattern.
+  `tests/test_factory_login.py` calls every route as a factory: a new route
+  must be refused to it or be added to that test's allow-list with a reason.
 - Money is integer piastres. The supplier account is append-only (database
   trigger); a wrong line is reversed, never edited. A write that knows an
   order locks the order first, then the supplier.
@@ -97,7 +109,7 @@ deployed without the owner saying so, each time.
   italic sentence): cancelling an order after cutting writes what the factory
   has earned onto its account; voiding a purchase asks whether its deposit
   was returned.
-- **Merge the Overview pull request** to staging.
+- **Merge the factory login pull request** to staging.
 - The typical days per stage are still the starting values; the owner edits
   them on the Stage days screen.
 
@@ -112,27 +124,16 @@ deployed without the owner saying so, each time.
 
 ## What is next
 
-**Batch 5, Overview** (`#v-overview` in the mockup): nothing to type; it
-reads the other four. Decisions waiting for the owner, problems (late
-orders, late materials, count mismatches, cost over target), every order
-with its next action, the nearest deliveries, what is owed. The QC manager
-sees it without the money card and the cost line. No migration.
+Batches 1 to 6 are built (6b in its pull request). Ratings, the record and
+the factory's login are described in their contracts.
 
-**Owner's answers for batch 6 (15 November 2026):** the factory's own cut
-counts wait for the QC manager to confirm them before they count; the factory
-enters cut counts and dates only (moving its delivery date with a reason),
-nothing else; the rating form is offered when an order is settled and can be
-skipped and done later; the factory never sees ratings or its record.
+**Final batch** (ask the owner first; it removes things): carry the old
+orders, samples and uploads over from the `production_*` tables, make the
+department native (sidebar sections, drop `own: true` and the iframe), and
+retire `production-ui/`. It needs the owner's explicit go-ahead and an ADR
+for what is kept.
 
-**Batch 6**: a rating per supplier per order when it is settled (quality,
-timing, dealing with them, 1 to 5 stars, a note; timing offered from the real
-lateness), the lateness and reject record per supplier, and the supplier
-list's ratings line and "Usual lateness" figure that batch 4 left out. Then
-the factory's own login: its own orders only; it enters cut quantities,
-dates and progress; it sees no costs, balances or other suppliers. The login
-is a new kind of user: plan its security review before building.
-
-**Final batch**: carry the old orders, samples and uploads over from the
-`production_*` tables, make the department native (sidebar sections, drop
-`own: true` and the iframe), and retire `production-ui/`. This one removes
-things: it needs the owner's explicit go-ahead and an ADR for what is kept.
+**Known, small, not done:** the order page's "Next:" line says "Record cut
+quantities" while a factory's report waits, where the Tasks list says
+"Confirm the factory's cut". A switched-off factory address cannot be
+invited again (invite another address).

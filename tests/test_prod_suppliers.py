@@ -276,7 +276,7 @@ def test_the_downgrade_refuses_while_a_purchase_or_a_line_exists(owner):
     with pytest.raises(RuntimeError, match="purchase"):
         command.downgrade(Config("alembic.ini"), "a7c4e9f20034")
     with engine.connect() as connection:
-        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "c9e6a2b40036"
+        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "d4a8f2c60037"
         assert connection.execute(text("SELECT count(*) FROM prod_supplier_entry")).scalar_one() == 1
 
 

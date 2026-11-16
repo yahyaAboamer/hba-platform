@@ -28,6 +28,7 @@ from app.core.permissions import (
     DEPARTMENT_LEVELS,
     GRANT_REFUSED,
     MODEL_ROLE,
+    NON_STAFF_ROLES,
     OWNER_ROLE,
     VALID_ROLES,
     access_of,
@@ -39,7 +40,7 @@ from app.core.permissions import (
 )
 from app.shared.models.audit import AuditEvent
 from app.shared.models.identity import Invitation, RoleAssignment, UserAccount
-from app.shared.services.access import live_roles, live_roles_by_account
+from app.shared.services.access import is_factory_account, live_roles, live_roles_by_account
 from app.shared.services.audit import record_audit
 from app.shared.services.auth import revoke_all_sessions
 from app.shared.services.trusted_browsers import forget_all as forget_trusted_browsers
@@ -52,8 +53,12 @@ from app.shared.services.two_step import (
 
 #: A model's role grants nothing and makes nobody staff; a model holds it by
 #: accepting her invitation, and reaches her portal by owning her record. It
-#: is never given or taken here.
-ASSIGNABLE_ROLES = frozenset(VALID_ROLES - {MODEL_ROLE})
+#: is never given or taken here. Nor is a factory's (ADR 0084, batch 6b): it
+#: comes only with the login its supplier's page sends.
+ASSIGNABLE_ROLES = frozenset(VALID_ROLES - NON_STAFF_ROLES)
+
+#: Refused when somebody tries to give a factory's login staff access.
+FACTORY_ACCOUNT = "This is a factory's login. It cannot be given staff access."
 
 #: Refused when somebody acts on their own row. Another admin does it.
 OWN_ACCOUNT = "You cannot change your own access. Another admin can."
@@ -137,7 +142,8 @@ def list_staff(db: Session, *, only: int | None = None) -> list[dict]:
     `only` narrows it to one account - the row Team and access shows again
     after changing somebody's level - built by exactly the same code.
     """
-    query = select(RoleAssignment.user_account_id).where(RoleAssignment.role != MODEL_ROLE)
+    # A factory's login is not staff either (ADR 0084, batch 6b).
+    query = select(RoleAssignment.user_account_id).where(RoleAssignment.role.not_in(NON_STAFF_ROLES))
     if only is not None:
         query = query.where(RoleAssignment.user_account_id == only)
     account_ids = list(db.scalars(query.distinct()))
@@ -170,7 +176,7 @@ def list_staff(db: Session, *, only: int | None = None) -> list[dict]:
             "display_name": account.display_name,
             # Every staff role held now, widest first (ADR 0067). A model's
             # role grants nothing and is not staff access, so it is left out.
-            "roles": sorted_roles(held[account.id] - {MODEL_ROLE}),
+            "roles": sorted_roles(held[account.id] - NON_STAFF_ROLES),
             "status": account.status,
             #: The lock beside a name on Team and access (ADR 0067): on when a
             #: new browser asks them for a code of either kind, and which.
@@ -366,6 +372,10 @@ def give_role(
     _lock_account(db, user)
     if user.status == "suspended":
         raise ValueError(suspended_refusal(user))
+    # A factory's login stays a factory's: never staff as well (ADR 0084,
+    # batch 6b). Ever, so a switched-off one is refused too.
+    if is_factory_account(db, user.id):
+        raise ValueError(FACTORY_ACCOUNT)
     before = live_roles(db, user.id)
     if role in before:
         raise ValueError(f"{_name(user)} already holds this access")
@@ -435,7 +445,7 @@ def remove_role(
         raise ValueError(f"{_name(user)} does not hold this access")
 
     before = live_roles(db, user.id)
-    if not (before - {role, MODEL_ROLE}):
+    if not (before - {role} - NON_STAFF_ROLES):
         raise ValueError(
             f"This is the only access {_name(user)} has. Give them other access "
             "first, or suspend the account."

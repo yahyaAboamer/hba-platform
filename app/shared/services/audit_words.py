@@ -14,7 +14,7 @@ by the name on record, and a destination only by its method.
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.permissions import MODEL_ROLE, ROLE_WORDS
+from app.core.permissions import FACTORY_ROLE, MODEL_ROLE, ROLE_WORDS
 from app.modules.affiliates.models.affiliates import AffiliateProfile
 from app.shared.models.audit import AuditEvent
 from app.shared.models.identity import UserAccount
@@ -32,7 +32,7 @@ _PROVIDER = {"bosta": "Bosta", "estebdal": "E-stebdal"}
 #: Inbox staff access". One table, `ROLE_WORDS`, so the log and Team and access
 #: never name a role two ways. A model's role is no staff access and keeps its
 #: own word.
-_ROLE = {**ROLE_WORDS, MODEL_ROLE: "model"}
+_ROLE = {**ROLE_WORDS, MODEL_ROLE: "model", FACTORY_ROLE: "factory login"}
 
 _METHOD = {"instapay": "InstaPay", "wallet": "a wallet", "bank": "a bank account"}
 

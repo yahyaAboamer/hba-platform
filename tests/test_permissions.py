@@ -219,6 +219,8 @@ def test_the_expected_roles_exist_and_no_others():
         # Operations' levels (ADR 0079).
         "operations_viewer",
         "operations_staff",
+        # A factory's own login (ADR 0084, batch 6b): grants nothing, not staff.
+        "factory",
     }
 
 

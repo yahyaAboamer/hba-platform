@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.permissions import (
+    FACTORY_ROLE,
     has_permission,
     is_staff,
     permissions_of_roles,
@@ -18,8 +19,10 @@ from app.core.permissions import (
 )
 from app.db import get_session
 from app.modules.affiliates.models.affiliates import AffiliateProfile, AffiliateStatus
+from app.modules.production.models import ProductionSupplier
+from app.modules.production.orders.models import ProdFactoryAccess
 from app.shared.models.identity import UserAccount
-from app.shared.services.access import live_roles
+from app.shared.services.access import is_factory_account, live_roles
 from app.shared.services.auth import resolve_session
 from app.shared.services.two_step import must_set_up
 from app.shared.services.two_step import status as two_step_status
@@ -86,8 +89,52 @@ def signed_in(request: Request, db: Session = Depends(get_session)) -> UserAccou
     user = resolve_session(db, token, csrf)
     if user is None:
         raise HTTPException(401, "Authentication required")
+    _factory_stays_in_its_lane(request, db, user)
     request.state.user = user
     return user
+
+
+#: Everything a factory's login may reach besides ``/api/factory/...``
+#: (ADR 0084, batch 6b): who it is, and its own sessions. Signing out does not
+#: resolve a person here at all, and the public routes resolve nobody.
+FACTORY_REACHES = frozenset(
+    {
+        ("GET", "/api/auth/me"),
+        ("GET", "/api/auth/sessions"),
+        ("POST", "/api/auth/sessions/end-others"),
+        ("POST", "/api/auth/sessions/{session_id}/end"),
+    }
+)
+FACTORY_PREFIX = "/api/factory/"
+
+#: What any other address answers a factory's login.
+FACTORY_ONLY = "This sign-in reaches its own production orders only."
+
+
+def factory_may_reach(method: str, path: str | None) -> bool:
+    """Whether a factory's login may call this route, by its **template**
+    (``/api/auth/sessions/{session_id}/end``), never the address typed."""
+    if not path:
+        return False
+    return path.startswith(FACTORY_PREFIX) or (method, path) in FACTORY_REACHES
+
+
+def _factory_stays_in_its_lane(request: Request, db: Session, user: UserAccount) -> None:
+    """**A factory's login reaches an allow-list and nothing else**, checked
+    here, where every signed-in call already passes.
+
+    Its role grants no permission and it is not staff, so every staff and
+    model route refuses it already. This is the second wall, and the one
+    that holds for a route added later that asks only who is signed in:
+    it is refused to a factory without anybody remembering to say so. Keyed
+    on having **ever** held the role (`is_factory_account`), so an account
+    switched off and later reactivated still reaches nothing else.
+    """
+    if not is_factory_account(db, user.id):
+        return
+    route = request.scope.get("route")
+    if not factory_may_reach(request.method, getattr(route, "path", None)):
+        raise HTTPException(403, FACTORY_ONLY)
 
 
 def current_user(
@@ -234,6 +281,10 @@ def actor_payload(db: Session, user: UserAccount) -> dict:
         "roles": sorted_roles(roles),
         "is_staff": is_staff(roles),
         "is_model": owns_a_profile(db, user),
+        #: A factory's login (ADR 0084, batch 6b): the screens send it to
+        #: `/factory`, the only desk it has. Whether it is still switched on
+        #: is `/api/factory`'s to answer (`current_factory`).
+        "is_factory": is_factory_account(db, user.id),
         #: On, required for this person's access, and - while the owner's
         #: switch is on - whether setting it up is all they may do.
         "two_step": two_step_status(db, user),
@@ -286,3 +337,53 @@ def current_affiliate(
     # locking them out would make "paused" and "archived" the same thing to the
     # only person they affect.
     return profile
+
+
+#: Every refusal `current_factory` gives. One sentence for all of them, so a
+#: status code or a message never tells a caller which check failed.
+NOT_A_FACTORY = "This account is not a factory's login"
+
+
+def current_factory(
+    user: UserAccount = Depends(current_user), db: Session = Depends(get_session)
+) -> ProductionSupplier:
+    """The supplier whose login this account **is**, or refuse the request
+    (ADR 0084, batch 6b). The factory's routes (`/api/factory`) use it on the
+    router itself.
+
+    The same shape as `current_affiliate`, and never mixed with
+    `require_permission`: a factory reaches its orders by owning a live
+    `prod_factory_access` row, never by a permission (its role grants none).
+
+    Every condition must hold, or it is refused:
+
+    - the account is active (`resolve_session` already refuses any other);
+    - it holds a live `factory` role **and no other role** - a factory's
+      login is never also staff or a model;
+    - it owns no model's record;
+    - it owns a live (not switched off) `prod_factory_access` row;
+    - that row's supplier exists and is not deleted.
+
+    Switching the login off (`DELETE /api/prod/suppliers/{id}/factory-login`)
+    fails this on the very next request. **Every refusal is 403, never 404**,
+    with one sentence.
+    """
+    refused = HTTPException(403, NOT_A_FACTORY)
+    if user.status != "active":
+        raise refused
+    if roles_of(db, user) != frozenset({FACTORY_ROLE}):
+        raise refused
+    if owns_a_profile(db, user):
+        raise refused
+    access = db.scalar(
+        select(ProdFactoryAccess).where(
+            ProdFactoryAccess.user_account_id == user.id,
+            ProdFactoryAccess.switched_off_at.is_(None),
+        )
+    )
+    if access is None:
+        raise refused
+    supplier = db.get(ProductionSupplier, access.supplier_id)
+    if supplier is None or supplier.deleted_at is not None:
+        raise refused
+    return supplier
