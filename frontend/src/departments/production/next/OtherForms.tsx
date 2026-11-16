@@ -54,7 +54,7 @@ export function DateChangeForm({ order, run, onClose, isOwner }: FormProps & { i
             <option value="owner">The owner</option>
           </select>
         </div>
-        <TextBox label="Why" value={reason} onChange={setReason} wide max={200} hint="For example: waiting in the print queue." />
+        <TextBox label="Why" value={reason} onChange={setReason} wide max={200} hint="For example: waiting in the print queue. The factory can read this." />
         <Actions error={error} busy={busy} label="Save the new date" working="Saving…" />
       </form>
     </PanelShell>

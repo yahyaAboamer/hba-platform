@@ -5,6 +5,8 @@ import { api, can } from "../../../lib/api";
 import type { Session } from "../../../lib/api";
 import { formatEgp } from "../../../lib/money";
 import { AccountCard } from "./AccountCard";
+import { FactoryLoginCard } from "./FactoryLoginCard";
+import type { LoginChanged } from "./FactoryLoginCard";
 import { cairoToday } from "./format";
 import { PurchaseForm } from "./PurchaseForm";
 import { DatesForm, LineForm, PaymentForm, ReverseForm, SupplierForm, VoidForm } from "./SupplierForms";
@@ -210,6 +212,19 @@ export function SupplierPage({ session }: { session: Session }) {
     setNotice(said);
   }, []);
 
+  // The factory login changed (invited, resent, switched off): the page it answered with, or else read it again.
+  const loginChanged = useCallback<LoginChanged>(
+    (answer, said) => {
+      const next = (answer as { supplier?: SupplierView } | null)?.supplier;
+      if (next && next.factory_login !== undefined) apply(next, said);
+      else {
+        setNotice(said);
+        load();
+      }
+    },
+    [apply, load],
+  );
+
   // After a panel saved and closed: the control that opened it if it is still on the page, else the heading.
   useEffect(() => {
     if (panel !== null || !refocus.current) return;
@@ -261,6 +276,9 @@ export function SupplierPage({ session }: { session: Session }) {
         <PurchasesCard supplier={supplier} powers={powers} today={today} narrow={narrow} open={open} />
         <OrdersCard supplier={supplier} powers={powers} />
         <DetailsCard supplier={supplier} powers={powers} open={open} />
+        {powers.canManage && supplier.factory_login !== undefined && (
+          <FactoryLoginCard key={supplier.id} supplierId={supplier.id} login={supplier.factory_login} onChanged={loginChanged} />
+        )}
       </div>
     </>
   );

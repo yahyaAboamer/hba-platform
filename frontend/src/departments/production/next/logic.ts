@@ -373,6 +373,10 @@ export const stageStatus = (order: OrderView, key: StageKey): StageStatus =>
 export const finishedToCome = (order: OrderView): number =>
   Math.max(0, (order.totals.passed ?? 0) - (order.totals.shipped ?? 0));
 
+/** The cut form's button: confirming what the factory reported (batch 6b), or recording the figures from scratch. */
+export const cutLabel = (order: Pick<OrderView, "cut_report">): string =>
+  order.cut_report ? "Confirm the factory's cut" : "Record cut quantities";
+
 /**
  * What the next-action bar's button does, for this person; `null` when there is nothing for them to
  * press. Somebody who may record has a button for every action on an open order: the warehouse stage
@@ -392,7 +396,7 @@ export function nextButton(order: OrderView, powers: Powers): { label: string; p
     case "pattern_check":
       return canEdit ? { label: "Confirm the pattern check", panel: { kind: "complete", stage: "pattern_check" } } : null;
     case "cutting":
-      return canEdit ? { label: "Record cut quantities", panel: { kind: "cut" } } : null;
+      return canEdit ? { label: cutLabel(order), panel: { kind: "cut" } } : null;
     case "making":
       return canEdit ? { label: "Mark making finished", panel: { kind: "complete", stage: "making" } } : null;
     case "final_inspection":

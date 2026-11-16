@@ -24,8 +24,9 @@ piece of work.
 | 2 | Tasks | Merged (PR #176), live on staging |
 | 3 | Incoming | Merged (PR #177), live on staging |
 | 4 | Suppliers | Merged (PR #178), on staging |
-| 5 | Overview | Pull request open from `claude/production-overview`; **not merged** |
-| 6 | Ratings and the performance record, then the factory's own login | Not started |
+| 5 | Overview | Merged (PR #179), on staging |
+| 6a | Ratings and the performance record | Merged (PR #180), on staging |
+| 6b | The factory's own login | Pull request open from `claude/production-factory-login`; **not merged** |
 | Final | Carry the old orders over, retire the framed tab | Not started |
 
 Production (the `production` branch) has none of this. Nothing is merged or

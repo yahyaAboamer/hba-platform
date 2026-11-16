@@ -29,7 +29,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import Response
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from sqlalchemy.orm import Session
 
 from app.core.permissions import Permission
@@ -37,6 +37,7 @@ from app.db import get_session
 from app.modules.inbox.public import StorageError, file_bucket
 from app.modules.production.api import _too_large
 from app.modules.production.orders.guards import EDIT, GUARD, OWNER, SUPPLIERS
+from app.modules.production.orders.services import factory
 from app.modules.production.orders.services import orders as order_service
 from app.modules.production.orders.services import suppliers
 from app.modules.production.orders.services.orders import NotFound, Refused
@@ -63,6 +64,16 @@ def _money(db: Session, actor: UserAccount) -> bool:
     return holds(db, actor, Permission.PRODUCTION_OWNER)
 
 
+def _page(db: Session, supplier_id: str, actor: UserAccount) -> dict:
+    """The supplier's page as this person may see it: its money for the
+    owner, and its factory login (batch 6b) for whoever manages suppliers -
+    absent, not null, for everybody else."""
+    body = suppliers.page(db, supplier_id, with_money=_money(db, actor))
+    if holds(db, actor, Permission.PRODUCTION_SUPPLIERS):
+        body["factory_login"] = factory.login_view(db, supplier_id)
+    return body
+
+
 def _write(db: Session, actor: UserAccount, act, extra=lambda result: {}) -> dict:
     """Run one staged change; commit and answer with the supplier's page as
     this person may see it, or roll back and refuse."""
@@ -75,7 +86,7 @@ def _write(db: Session, actor: UserAccount, act, extra=lambda result: {}) -> dic
         db.rollback()
         raise _refused(exc) from None
     db.commit()
-    return {"supplier": suppliers.page(db, supplier.id, with_money=_money(db, actor)), **extra(result)}
+    return {"supplier": _page(db, supplier.id, actor), **extra(result)}
 
 
 def _same(supplier) -> tuple:
@@ -239,7 +250,7 @@ def add_supplier(body: NewSupplier, actor: UserAccount = Depends(SUPPLIERS), db:
 @router.get("/suppliers/{supplier_id}")
 def one_supplier(supplier_id: str, actor: UserAccount = Depends(GUARD), db: Session = Depends(get_session)) -> dict:
     try:
-        return {"supplier": suppliers.page(db, supplier_id, with_money=_money(db, actor))}
+        return {"supplier": _page(db, supplier_id, actor)}
     except NotFound as exc:
         raise HTTPException(404, str(exc)) from None
 
@@ -250,6 +261,67 @@ def edit_supplier(
 ) -> dict:
     data = body.model_dump(exclude_unset=True)
     return _write(db, actor, lambda: _same(suppliers.edit_supplier(db, supplier_id, data, actor)))
+
+
+# ── The factory's own login (batch 6b) ────────────────────────────────────────
+
+
+class FactoryInvite(BaseModel):
+    email: EmailStr
+    name: str = Field(default="", max_length=120)
+
+
+def _invitation_write(db: Session, actor: UserAccount, act) -> dict:
+    from app.config import settings
+    from app.shared.services.notifications import invitation_link, invitation_sent
+
+    try:
+        supplier, token, invitation = act()
+        queued = invitation_sent(db, invitation.email, token, invitation.role, invitation.name)
+    except NotFound as exc:
+        db.rollback()
+        raise HTTPException(404, str(exc)) from None
+    except Refused as exc:
+        db.rollback()
+        raise _refused(exc) from None
+    db.commit()
+    emailed = queued is not None and settings.mail_configured
+    answer: dict = {"supplier": _page(db, supplier.id, actor), "invitation": {"expires_at": invitation.expires_at.isoformat(), "emailed": emailed}}
+    if not emailed:
+        # Only when no email goes out is the link handed to the inviter, to
+        # pass on by hand. Otherwise only the factory's mailbox holds it, so
+        # nobody but the factory can accept it.
+        answer["token"] = token
+        answer["invitation"]["link"] = invitation_link(token)
+    return answer
+
+
+@router.post("/suppliers/{supplier_id}/factory-login", status_code=201)
+def invite_factory(
+    supplier_id: str, body: FactoryInvite, actor: UserAccount = Depends(SUPPLIERS), db: Session = Depends(get_session)
+) -> dict:
+    """Invite the supplier's own login by email (the platform's ordinary
+    invitation, role ``factory``). Refuses a supplier that already has a live
+    login and an address that is already somebody's."""
+    data = body.model_dump()
+    return _invitation_write(db, actor, lambda: factory.invite(db, supplier_id, data, actor))
+
+
+@router.post("/suppliers/{supplier_id}/factory-login/resend", status_code=201)
+def resend_factory_login(
+    supplier_id: str, actor: UserAccount = Depends(SUPPLIERS), db: Session = Depends(get_session)
+) -> dict:
+    """A fresh link for a login not yet accepted; the old one stops working."""
+    return _invitation_write(db, actor, lambda: factory.resend(db, supplier_id, actor))
+
+
+@router.delete("/suppliers/{supplier_id}/factory-login")
+def switch_off_factory_login(
+    supplier_id: str, actor: UserAccount = Depends(SUPPLIERS), db: Session = Depends(get_session)
+) -> dict:
+    """Switch the login off: a waiting link is withdrawn, an account is
+    suspended and every session of it ends now."""
+    return _write(db, actor, lambda: _same(factory.switch_off(db, supplier_id, actor)))
 
 
 # ── Purchases ─────────────────────────────────────────────────────────────────

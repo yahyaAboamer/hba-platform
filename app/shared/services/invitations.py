@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from app.core.businesstime import utcnow
 from app.core.password_quality import password_problem
 from app.core.passwords import hash_password
-from app.core.permissions import INVITATION_BRINGS, VALID_ROLES
+from app.core.permissions import FACTORY_ROLE, INVITATION_BRINGS, VALID_ROLES
 from app.modules.affiliates.models.affiliates import AffiliateProfile
 from app.shared.models.identity import Invitation, RoleAssignment, UserAccount
 from app.shared.services.staff import assert_role_free
@@ -128,7 +128,27 @@ def preview_invitation(db: Session, token: str) -> Invitation:
         raise ValueError("This invitation has already been used")
     if invitation.expires_at <= utcnow():
         raise ValueError("This invitation has expired")
+    if invitation.role == FACTORY_ROLE:
+        _factory_access_for(db, invitation, lock=False)
     return invitation
+
+
+def _factory_access_for(db: Session, invitation: Invitation, *, lock: bool = True):
+    """The live supplier login this factory invitation was sent for, locked;
+    or refuse the link. **Fails closed**: an invitation with no live login
+    behind it (switched off, already taken, or made some other way) gives no
+    account at all, in the same words as any other dead link."""
+    from app.modules.production.orders.models import ProdFactoryAccess
+
+    query = select(ProdFactoryAccess).where(ProdFactoryAccess.invitation_id == invitation.id)
+    if lock:
+        query = query.with_for_update().execution_options(populate_existing=True)
+    access = db.scalar(query)
+    if access is None or access.switched_off_at is not None or access.user_account_id is not None:
+        raise ValueError("This invitation link is not valid")
+    if access.email != invitation.email.lower():
+        raise ValueError("This invitation link is not valid")
+    return access
 
 
 def accept_invitation(
@@ -162,6 +182,10 @@ def accept_invitation(
         raise ValueError("An account already exists for this email address")
     # Taken meanwhile - two requests racing past the check at invitation time.
     assert_role_free(db, invitation.role, accepting_invitation_id=invitation.id)
+    # A factory's invitation belongs to one supplier's login (ADR 0084, batch
+    # 6b). Locked, so switching the login off at the same moment either comes
+    # first (and this refuses) or sees the account and suspends it.
+    factory_access = _factory_access_for(db, invitation) if invitation.role == FACTORY_ROLE else None
 
     # Refused before the invitation is consumed, so a rejected password does
     # not burn the link - the same reasoning as hashing first, extended to the
@@ -199,6 +223,8 @@ def accept_invitation(
             )
         )
     db.flush()
+    if factory_access is not None:
+        factory_access.user_account_id = user.id
     accepted_at = utcnow()
     invitation.accepted_at = accepted_at
 

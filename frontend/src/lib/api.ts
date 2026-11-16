@@ -333,6 +333,12 @@ export type Actor = {
   /** Owns a model's record: what makes somebody a model (ADR 0006). */
   is_model: boolean;
   /**
+   * The account is a factory's own login (batch 6b): it holds the `factory`
+   * role and nothing else, and its one desk is `/factory`. Optional so an
+   * older answer still reads.
+   */
+  is_factory?: boolean;
+  /**
    * Two-step sign-in for this account (Batch 1.3), sent inside `actor` by
    * the server. Optional only so an older answer still reads.
    */
@@ -429,11 +435,16 @@ export function roleWords(role: string): string {
  *   by owning her record (`is_model`), or somebody invited to become one who
  *   has not applied yet;
  * - **staff**: everyone else - the one frame, with the departments they hold
- *   in its sidebar.
+ *   in its sidebar;
+ * - **factory** (batch 6b): a factory's own login. It holds no permission at
+ *   all, like a model, so it is told apart by what the server says the account
+ *   is (`is_factory`) and asked first - otherwise it would land in a model's
+ *   portal, which would refuse every call it made.
  */
-export type Desk = "portal" | "staff";
+export type Desk = "portal" | "staff" | "factory";
 
 export function deskFor(session: Session): Desk {
+  if (session.actor.is_factory === true) return "factory";
   return session.permissions.length === 0 ? "portal" : "staff";
 }
 

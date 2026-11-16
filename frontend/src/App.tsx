@@ -7,6 +7,7 @@ import type { Session } from "./lib/api";
 import { AcceptInvitation } from "./screens/AcceptInvitation";
 import { ResetPassword } from "./screens/ResetPassword";
 import { AffiliatePortal } from "./portal/AffiliatePortal";
+import { factoryRoutes } from "./factory/routes";
 import { Elsewhere, Start } from "./frame/Elsewhere";
 import { Onward } from "./frame/Onward";
 import { Frame } from "./frame/Frame";
@@ -196,7 +197,15 @@ export default function App() {
          * sidebar that teaches you the tool is broken. Before this, a model
          * signing in landed on the maintainer's Overview and a 403.
          */}
-        {session && desk === "portal" ? (
+        {/*
+         * Batch 6b: a factory's own login gets its own desk and nothing else -
+         * not the staff frame and not a model's portal. Any other address
+         * goes to `/factory`; staff and models never reach it (their routes
+         * below have no such path).
+         */}
+        {session && desk === "factory" ? (
+          factoryRoutes(session)
+        ) : session && desk === "portal" ? (
           <Route path="*" element={<AffiliatePortal session={session} />} />
         ) : session ? (
           staffRoutes(session)

@@ -7,6 +7,7 @@
 import { useMemo, useState } from "react";
 
 import { api } from "../../../lib/api";
+import { dayWords } from "../../../factory/logic";
 import { cairoToday, plural } from "./format";
 import {
   blankReason,
@@ -126,7 +127,11 @@ export function FabricForm({ order, run, onClose }: FormProps) {
 export function CutForm({ order, run, onClose }: FormProps) {
   const today = useMemo(cairoToday, []);
   const planned = order.totals.planned ?? 0;
-  const [cut, setCut] = useState<Counts>(() => countsFrom(Object.fromEntries(order.sizes.map((line) => [line.size, line.planned]))));
+  // A cut the factory has reported (batch 6b) opens already filled in; otherwise it starts from the plan.
+  const report = order.cut_report ?? null;
+  const [cut, setCut] = useState<Counts>(() =>
+    countsFrom(Object.fromEntries(order.sizes.map((line) => [line.size, report ? (report.sizes[line.size] ?? 0) : line.planned]))),
+  );
   const [reasons, setReasons] = useState<ReasonRow[]>([blankReason()]);
   const [promised, setPromised] = useState(order.delivery_date);
   const [day, setDay] = useState(today);
@@ -140,7 +145,7 @@ export function CutForm({ order, run, onClose }: FormProps) {
 
   return (
     <PanelShell
-      title="Record cut quantities"
+      title={report ? "Confirm the factory's cut" : "Record cut quantities"}
       intro="How many pieces were cut in each size, and the date the factory now promises to finish. Recording this completes cutting."
       onClose={onClose}
     >
@@ -161,6 +166,12 @@ export function CutForm({ order, run, onClose }: FormProps) {
           );
         }}
       >
+        {report && (
+          <p className="prod-flag prod-flag--owed prod-wide" role="status">
+            Reported by the factory on {dayWords(report.reported_on)}. Check the numbers, correct any that are wrong, and save.
+            {report.note && <span className="prod-small"> The factory's note: {report.note}</span>}
+          </p>
+        )}
         <SizeInputs
           legend="Pieces cut"
           counts={cut}

@@ -26,6 +26,7 @@ from app.modules.production.models import ProductionSupplier, ProductionSupplier
 from app.modules.production.orders.services import account
 from app.modules.production.orders.models import (
     COST_PARTS,
+    ProdCutReport,
     DEFAULT_STAGE_DAYS,
     SIZES,
     STAGE_LABELS,
@@ -896,6 +897,12 @@ def record_cut(db: Session, order_id: int, data: dict, actor: UserAccount) -> Pr
     if promised != order.delivery_date:
         _move_delivery_date(db, order, promised, "factory", "Promised at cutting", actor)
         moved = f"; the factory promised {_said(promised)}"
+    # The factory's own report, if one waits, is confirmed by this: the
+    # confirmed figures are what was saved here, whatever it said (batch 6b).
+    waiting = waiting_cut_reports(db, [order.id], lock=True).get(order.id)
+    if waiting is not None:
+        waiting.confirmed_at = utcnow()
+        moved += "; confirmed the factory's report"
     _touch(order)
     _audit(
         db, order, actor, "cut_recorded",
@@ -903,6 +910,39 @@ def record_cut(db: Session, order_id: int, data: dict, actor: UserAccount) -> Pr
         + (f", {shortfall:,} fewer than planned" if shortfall > 0 else "") + moved,
     )
     return order
+
+
+# ── The factory's cut report (batch 6b) ──────────────────────────────────────
+
+
+def waiting_cut_reports(db: Session, order_ids: list[int], *, lock: bool = False) -> dict[int, ProdCutReport]:
+    """The report each order's factory sent that the QC manager has not yet
+    confirmed (at most one per order), by order."""
+    if not order_ids:
+        return {}
+    query = select(ProdCutReport).where(
+        ProdCutReport.order_id.in_(order_ids),
+        ProdCutReport.confirmed_at.is_(None),
+        ProdCutReport.replaced_at.is_(None),
+    )
+    if lock:
+        query = query.with_for_update()
+    return {row.order_id: row for row in db.scalars(query)}
+
+
+def cut_report_view(report: ProdCutReport | None) -> dict | None:
+    """A waiting report as the order page and the cut form read it: the cut
+    form opens filled with these sizes and says when it was reported."""
+    if report is None:
+        return None
+    sizes = {size: int(report.sizes[size]) for size in SIZES if size in (report.sizes or {})}
+    return {
+        "sizes": sizes,
+        "total": sum(sizes.values()),
+        "note": report.note,
+        "reported_on": _day(business_date(report.reported_at)),
+        "reported_at": _iso(report.reported_at),
+    }
 
 
 def save_inspection(db: Session, order_id: int, data: dict, actor: UserAccount) -> ProdOrder:
@@ -1484,10 +1524,15 @@ def _difference_words(delivery: Delivery) -> str:
     return " and ".join(parts)
 
 
-def _order_tasks(facts: Facts, factory: str | None, on: date) -> list[dict]:
+def _order_tasks(facts: Facts, factory: str | None, on: date, report: ProdCutReport | None = None) -> list[dict]:
     """One open order's tasks, in the order the build plan gives them: its
     next action; each delivery's missing reason; each delivery not yet
-    counted; fix pieces not yet back. The same work is never listed twice."""
+    counted; fix pieces not yet back. The same work is never listed twice.
+
+    A cut the factory reported and the QC manager has not confirmed (batch
+    6b) is "Confirm the factory's cut", due the day it was reported. At the
+    cutting stage it **is** the stage's work, so it takes that task's place
+    rather than sitting beside "Record cut quantities"."""
     order = facts.order
     ref = {"id": order.id, "code": order.code, "style_name": order.style_name, "colour": order.colour}
 
@@ -1506,7 +1551,15 @@ def _order_tasks(facts: Facts, factory: str | None, on: date) -> list[dict]:
 
     found: list[dict] = []
 
+    if report is not None and facts.stages["cutting"].status == "todo":
+        reported = _day(business_date(report.reported_at))
+        found.append(task(f"order:{order.id}:cut-report", "Confirm the factory's cut", "qc", reported, "cutting", reported, "cut"))
+    else:
+        report = None
+
     action = next_action(facts, on)
+    if action is not None and report is not None and action["stage"] == "cutting":
+        action = None
     if action is not None and not (action["stage"] == "warehouse" and _said_by_a_delivery_task(facts)):
         stage, who = action["stage"], action["who"]
         if stage == "sample":
@@ -1561,9 +1614,10 @@ def generated_tasks(db: Session, on: date | None = None) -> list[dict]:
     open_orders = list(db.scalars(select(ProdOrder).where(ProdOrder.status == "open").order_by(ProdOrder.id)))
     facts = _facts_for(db, open_orders)
     factories = _suppliers(db, [o.factory_id for o in open_orders])
+    reports = waiting_cut_reports(db, [o.id for o in open_orders])
     found: list[dict] = []
     for order in open_orders:
-        found.extend(_order_tasks(facts[order.id], factories.get(order.factory_id), on))
+        found.extend(_order_tasks(facts[order.id], factories.get(order.factory_id), on, reports.get(order.id)))
     # Purchases still to arrive (batch 4): chased when late, checked on arrival.
     found.extend(account.purchase_tasks(db, on))
     return found
@@ -1756,6 +1810,12 @@ def view(db: Session, order_id: int, *, with_money: bool) -> dict:
         "fix_not_returned": facts.fix_not_returned if facts.done("final_inspection") else None,
         "files_count": files_count,
         "warehouse_done_on": _day(warehouse.done_on),
+        #: What the factory reported cutting, waiting for the QC manager
+        #: (batch 6b): the Cutting stage shows it and the cut form opens with
+        #: it. Only while cutting is still to record.
+        "cut_report": cut_report_view(waiting_cut_reports(db, [order.id]).get(order.id))
+        if facts.stages["cutting"].status == "todo"
+        else None,
     }
     if with_money:
         body["cost"] = cost(order)

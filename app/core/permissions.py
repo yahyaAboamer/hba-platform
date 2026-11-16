@@ -170,6 +170,13 @@ ROLES: dict[str, frozenset[str]] = {
     # Affiliates reach their own portal by owning the record, not by holding a
     # staff permission, so this set is intentionally empty.
     "affiliate": frozenset(),
+    # A factory's own login (ADR 0084, batch 6b): its own production orders
+    # only, reached through `current_factory` by owning a live
+    # `prod_factory_access` row, never by a permission - so this set is
+    # empty, like a model's. It is **not staff** (`NON_STAFF_ROLES`), it is
+    # given only by `POST /api/prod/suppliers/{id}/factory-login`, and never
+    # through Settings or the general invitation (`can_grant` refuses it).
+    "factory": frozenset(),
 }
 
 VALID_ROLES = frozenset(ROLES)
@@ -348,6 +355,21 @@ def access_words(roles: Iterable[str]) -> str:
 #: *staff* by holding it (ADR 0067, decision 2).
 MODEL_ROLE = "affiliate"
 
+#: A factory's login (ADR 0084, batch 6b). Grants nothing; makes nobody staff.
+#: **Two-step sign-in is not asked of it, by decision, not oversight** (build
+#: plan 2026-11-16): the owner's switch applies to staff only, and a factory
+#: reaches no money - its cut counts wait for the QC manager before they count.
+FACTORY_ROLE = "factory"
+
+#: Roles that make nobody staff. **The one list** `is_staff` and the staff
+#: roster read: holding any other role is being staff.
+NON_STAFF_ROLES = frozenset({MODEL_ROLE, FACTORY_ROLE})
+
+#: Roles nobody hands out through Settings, an invitation or managing a
+#: model: a factory's login comes only from its supplier's page, so it always
+#: has a supplier (`app.modules.production.orders.services.factory`).
+NEVER_GRANTED = frozenset({FACTORY_ROLE})
+
 
 def invitation_permission(role: str) -> str:
     """The permission an invitation to `role` needs, beside `can_invite`.
@@ -397,8 +419,9 @@ def sorted_roles(roles: Iterable[str]) -> list[str]:
 
 
 def is_staff(roles: Iterable[str]) -> bool:
-    """Whether these roles make somebody staff: any role but a model's."""
-    return any(role != MODEL_ROLE for role in roles)
+    """Whether these roles make somebody staff: any role but a model's or a
+    factory's (`NON_STAFF_ROLES`)."""
+    return any(role not in NON_STAFF_ROLES for role in roles)
 
 
 #: What a refused grant says. The same words wherever it is refused.
@@ -422,6 +445,10 @@ def can_grant(actor_roles: str | Iterable[str], target_role: str) -> bool:
     actor's live roles. One role or several may be passed.
     """
     if target_role not in VALID_ROLES:
+        return False
+    # A factory's role grants nothing, so the rule above would let anybody
+    # give it. It is never given this way (`NEVER_GRANTED`).
+    if target_role in NEVER_GRANTED:
         return False
     return permissions_for(target_role) <= permissions_of_roles(actor_roles)
 

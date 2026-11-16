@@ -12,7 +12,8 @@ import { api } from "../../../lib/api";
 import { formatEgp } from "../../../lib/money";
 import { Money } from "../../../components/Money";
 import { cairoDay, pieces, plural, shortDay, stamp } from "./format";
-import { affectsFactoryPay, reopenable, stageStatus } from "./logic";
+import { dayWords } from "../../../factory/logic";
+import { affectsFactoryPay, cutLabel, reopenable, stageStatus } from "./logic";
 import type { Panel, Powers } from "./logic";
 import type { CostPart, Delivery, DeliveryKind, HistoryEvent, OrderAnswer, OrderStage, OrderView, ProdFile, ReasonLine, Size } from "./types";
 import { DateBox, Problem, useSubmit } from "./ui";
@@ -42,6 +43,11 @@ function detail(order: OrderView, stage: OrderStage): string {
   const parts: string[] = [];
   if (stage.expected_date) parts.push(`Expected ${shortDay(stage.expected_date)}`);
   if (note) parts.push(stage.key === "fabric_check" ? `Last check failed: ${note}` : stage.key === "sample" ? `Changes asked for: ${note}` : note);
+  // The factory has told HBA what it cut; it does not count until the QC manager confirms it (batch 6b).
+  if (stage.key === "cutting" && order.cut_report) {
+    const reported = Object.values(order.cut_report.sizes).reduce((sum: number, count) => sum + (count ?? 0), 0);
+    parts.push(`Factory reported ${pieces(reported)} cut on ${dayWords(order.cut_report.reported_on)}, waiting to be confirmed`);
+  }
   return parts.join(" · ") || "Not started";
 }
 
@@ -140,7 +146,7 @@ export function SizesCard({ order, powers, open }: CardProps) {
       <div className="prod-block__head">
         <h2 id="prod-sizes">Pieces by size</h2>
         {edit && order.current_stage === "cutting" && (
-          <button type="button" className="button button--row" onClick={() => open({ kind: "cut" })}>Record cut quantities</button>
+          <button type="button" className="button button--row" onClick={() => open({ kind: "cut" })}>{cutLabel(order)}</button>
         )}
         {edit && cutDone && stageStatus(order, "final_inspection") === "todo" && (
           <button type="button" className="button button--row" onClick={() => open({ kind: "inspection" })}>Enter inspection counts</button>

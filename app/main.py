@@ -34,6 +34,7 @@ from app.modules.inbox import api as inbox
 from app.modules.operations import api as order_ops
 from app.modules.production import api as production
 from app.modules.production.orders import api as production_orders
+from app.modules.production.orders import factory_api as production_factory
 from app.shared.api import (
     audit,
     auth,
@@ -190,6 +191,8 @@ app.include_router(today.router)
 app.include_router(integrations.router)
 app.include_router(production.router)
 app.include_router(production_orders.router)
+# The factory's own desk (ADR 0084, batch 6b): `current_factory` on the router.
+app.include_router(production_factory.router)
 app.add_exception_handler(production.ProductionRefused, production.refused_handler)
 
 
