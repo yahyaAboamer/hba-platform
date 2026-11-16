@@ -341,7 +341,8 @@ export type Panel =
   | { kind: "reopen"; stage: StageKey }
   | { kind: "cancel" }
   | { kind: "edit" }
-  | { kind: "actual" };
+  | { kind: "actual" }
+  | { kind: "rate"; fresh: boolean };
 
 export function panelKey(panel: Panel): string {
   switch (panel.kind) {
@@ -437,6 +438,8 @@ export const BUYER_WORDS: Record<FabricBuyer, string> = { hba: "HBA", factory: "
  * keeps the page from opening a form that would be refused.
  */
 export function panelFromOpen(open: string | null, order: OrderView, powers: Powers): Panel | null {
+  // `?open=rate` (from "Rate it" on a supplier's page) is the owner's, and only on a settled order.
+  if (open === "rate") return powers.isOwner && order.status === "closed" ? { kind: "rate", fresh: false } : null;
   if (!open || order.status !== "open") return null;
   const { canEdit, isOwner } = powers;
   const todo = (key: StageKey) => stageStatus(order, key) === "todo";

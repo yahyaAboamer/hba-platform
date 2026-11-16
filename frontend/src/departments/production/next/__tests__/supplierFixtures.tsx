@@ -38,6 +38,8 @@ export function makeSupplierRow(over: Partial<SupplierRow> & { id: string; name:
     open_purchases: 0,
     owed_piastres: 0,
     held_piastres: 0,
+    ratings: null,
+    usual_lateness_days: null,
     ...over,
   };
   return money ? row : withoutKeys(row, MONEY_ROW);
@@ -57,7 +59,7 @@ export function makeSupplierList(rows: SupplierRow[], money = true, sections: Se
 /** Main factory: Manufacturers, one open order, two purchases not in, owing EGP 2,750.00. */
 export const factoryRow = (money = true): SupplierRow =>
   makeSupplierRow(
-    { id: "fac", name: "Main factory", sections: [{ id: 6, name: "Manufacturers" }], open_orders: 1, open_purchases: 2, owed_piastres: 275000, held_piastres: 345000, city: "Cairo" },
+    { id: "fac", name: "Main factory", sections: [{ id: 6, name: "Manufacturers" }], open_orders: 1, open_purchases: 2, owed_piastres: 275000, held_piastres: 345000, city: "Cairo", ratings: { quality: 4, timing: 2.5, dealing: 4.5, count: 2 }, usual_lateness_days: 5 },
     money,
   );
 
@@ -135,14 +137,17 @@ export function makeSupplierPage(over: Partial<SupplierView> = {}, money = true)
     sections: [{ id: 6, name: "Manufacturers" }],
     open_orders: 1,
     open_purchases: 2,
+    ratings: { quality: 4, timing: 2.5, dealing: 4.5, count: 2 },
+    usual_lateness_days: 5,
     purchases: [
       makePurchase({ id: 3, item: "Wrong thread", quantity: "12.5", unit: "kg", part: "accessories", order: null, expected_on: null, note: null, voided: true, voided_at: "2030-11-12T09:00:00Z", unit_price_piastres: 4000, total_piastres: 50000, deposit_piastres: 0, void_reason: "Wrong supplier" }),
       makePurchase({ id: 2, item: "Zips", quantity: "1000", unit: "piece", part: "accessories", expected_on: "2030-11-19", note: null, unit_price_piastres: 300, total_piastres: 300000, deposit_piastres: 0 }),
       makePurchase({ id: 1 }),
     ],
     orders: [
-      { id: 2, code: "PO-2611-02", style_name: "Oversized hoodie", colour: "Black", status: "open", role: "factory", stage: { key: "warehouse", label: "Warehouse receipt", position: 9 } },
-      { id: 1, code: "PO-2611-01", style_name: "Oversized hoodie", colour: "Black", status: "closed", role: "factory", stage: null },
+      { id: 2, code: "PO-2611-02", style_name: "Oversized hoodie", colour: "Black", status: "open", role: "factory", stage: { key: "warehouse", label: "Warehouse receipt", position: 9 }, lateness_days: 6, closed_on: null, rating: null },
+      { id: 1, code: "PO-2611-01", style_name: "Oversized hoodie", colour: "Black", status: "closed", role: "factory", stage: null, lateness_days: 2, reject_rate: 1.2, closed_on: "2030-11-11", rating: null },
+      { id: 4, code: "PO-2610-04", style_name: "Boxy tee", colour: "White", status: "closed", role: "factory", stage: null, lateness_days: 0, reject_rate: 2.1, closed_on: "2030-10-30", rating: { quality: 4, timing: 5, dealing: 3, note: "Fixed the stitching problem quickly.", updated_at: "2030-10-31T09:00:00Z" } },
     ],
     owed_piastres: 1339900,
     held_piastres: 345000,

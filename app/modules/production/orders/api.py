@@ -36,7 +36,7 @@ from app.db import get_session
 from app.modules.inbox.public import StorageError, file_bucket
 from app.modules.production.api import _too_large
 from app.modules.production.orders.guards import EDIT, GUARD, OWNER, SUPPLIERS  # noqa: F401
-from app.modules.production.orders.services import files, incoming, orders, tasks
+from app.modules.production.orders.services import files, incoming, orders, ratings, tasks
 from app.shared.api.deps import holds
 from app.shared.models.identity import UserAccount
 
@@ -365,6 +365,46 @@ def cancel(
     order_id: int, body: WithReason, actor: UserAccount = Depends(OWNER), db: Session = Depends(get_session)
 ) -> dict:
     return _write(db, actor, lambda: orders.cancel(db, order_id, body.reason, actor))
+
+
+class RatingBody(BaseModel):
+    quality: int = Field(strict=True, ge=1, le=5)
+    timing: int = Field(strict=True, ge=1, le=5)
+    dealing: int = Field(strict=True, ge=1, le=5)
+    note: str | None = Field(default=None, max_length=1000)
+
+
+@router.get("/orders/{order_id}/ratings")
+def order_ratings(order_id: int, db: Session = Depends(get_session)) -> dict:
+    """Who is rated on a settled order, the suggested timing stars and what
+    was saved. For anybody who reads Production; no money."""
+    try:
+        return ratings.sheet(db, order_id)
+    except orders.NotFound as exc:
+        raise HTTPException(404, str(exc)) from None
+
+
+@router.put("/orders/{order_id}/ratings/{supplier_id}")
+def rate_supplier(
+    order_id: int,
+    supplier_id: str,
+    body: RatingBody,
+    actor: UserAccount = Depends(OWNER),
+    db: Session = Depends(get_session),
+) -> dict:
+    """The owner's rating of one supplier on a settled order, saved or changed
+    in place. Answers with the order's ratings as ``GET`` gives them."""
+    data = body.model_dump()
+    try:
+        ratings.save(db, order_id, supplier_id, data, actor)
+    except orders.NotFound as exc:
+        db.rollback()
+        raise HTTPException(404, str(exc)) from None
+    except orders.Refused as exc:
+        db.rollback()
+        raise _refused(exc) from None
+    db.commit()
+    return ratings.sheet(db, order_id)
 
 
 @router.get("/orders/{order_id}/history")

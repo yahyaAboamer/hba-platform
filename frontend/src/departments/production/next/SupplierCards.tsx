@@ -9,8 +9,8 @@ import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import { Money } from "../../../components/Money";
-import { stagePhrase } from "./format";
-import { PART_WORDS, hasMoney, priceWords, purchaseDates, quantityWords, sectionNames } from "./supplierLogic";
+import { shortDay, stagePhrase } from "./format";
+import { PART_WORDS, RATING_ROLE_WORDS, hasMoney, latenessWords, priceWords, purchaseDates, quantityWords, sectionNames, starsWords } from "./supplierLogic";
 import type { SupplierPanel, SupplierPowers } from "./supplierLogic";
 import type { PurchaseView, SupplierOrder, SupplierView } from "./types";
 
@@ -182,23 +182,60 @@ export function PurchasesCard({ supplier, powers, today, narrow, open }: Purchas
 
 // ── Orders ───────────────────────────────────────────────────────────────────
 
-const ROLE_WORDS: Record<SupplierOrder["role"], string> = { factory: "Factory", print: "Printing" };
+/** "PO-2609-04 · Factory · closed 30 Oct · 2 days late · 1.2% rejected": what is known of the order, only. */
+function OrderFacts({ order }: { order: SupplierOrder }) {
+  const late = latenessWords(order.lateness_days);
+  const rejected = order.reject_rate === null || order.reject_rate === undefined ? null : `${order.reject_rate.toFixed(1)}% rejected`;
+  return (
+    <div className="prod-small">
+      {order.code} · {RATING_ROLE_WORDS[order.role]} ·{" "}
+      {order.status === "closed" && order.closed_on ? `closed ${shortDay(order.closed_on)}` : order.status === "cancelled" ? "cancelled" : stagePhrase(order)}
+      {late && (
+        <>
+          {" · "}
+          <span className={late.late ? "prod-late" : undefined}>{late.text}</span>
+        </>
+      )}
+      {rejected && ` · ${rejected}`}
+    </div>
+  );
+}
 
-export function OrdersCard({ supplier }: { supplier: SupplierView }) {
+/** The right-hand side of an order: its stars, or what can be done about having none. */
+function OrderRating({ order, isOwner }: { order: SupplierOrder; isOwner: boolean }) {
+  if (order.rating) return <span>{starsWords(order.rating)}</span>;
+  if (order.status === "open") return <span className="prod-small">Rate it when the order is settled</span>;
+  if (order.status !== "closed") return null;
+  // Rating is the owner's, and happens on the order's page, which opens the panel.
+  if (isOwner) {
+    return (
+      <Link className="button button--row" to={`/production/next/orders/${order.id}?open=rate`}>
+        Rate it<span className="prod-sr">: {order.style_name} · {order.colour}</span>
+      </Link>
+    );
+  }
+  return <span className="prod-small">Not rated yet</span>;
+}
+
+export function OrdersCard({ supplier, powers }: { supplier: SupplierView; powers: SupplierPowers }) {
   return (
     <section className="prod-block" aria-labelledby="prod-supplier-orders">
-      <h2 id="prod-supplier-orders">Orders</h2>
+      <h2 id="prod-supplier-orders">Orders and ratings</h2>
       {supplier.orders.length === 0 ? (
-        <p className="prod-small">{supplier.name} is not the factory or the print house of any order yet.</p>
+        <p className="prod-small">{supplier.name} has not worked on any order yet.</p>
       ) : (
         <ul className="prod-plain">
           {supplier.orders.map((order) => (
-            <li key={order.id} className="prod-plain__row">
-              <Link className="prod-rowlink" to={`/production/next/orders/${order.id}`}>
-                {order.style_name} · {order.colour}
-              </Link>
-              <div className="prod-small">
-                {order.code} · {ROLE_WORDS[order.role]} · {stagePhrase(order)}
+            <li key={`${order.id}-${order.role}`} className="prod-plain__row prod-orderrow">
+              <div className="prod-orderrow__what">
+                <Link className="prod-rowlink" to={`/production/next/orders/${order.id}`}>
+                  {order.style_name} · {order.colour}
+                </Link>
+                <OrderFacts order={order} />
+                {order.rating?.note && <div className="prod-small">“{order.rating.note}”</div>}
+              </div>
+              <div className="prod-orderrow__side">
+                <OrderRating order={order} isOwner={powers.isOwner} />
               </div>
             </li>
           ))}

@@ -1383,8 +1383,8 @@ def test_the_downgrade_refuses_while_an_order_exists(owner):
         command.downgrade(Config("alembic.ini"), "e5a2c7d90032")
     with engine.connect() as connection:
         # The whole downgrade is one transaction, so a refusal leaves the database at the head
-        # (batch 4's `b8d5f1a30035`, whose own downgrade ran first and was rolled back with it).
-        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "b8d5f1a30035"
+        # (batch 6a's `c9e6a2b40036`, whose own downgrade ran first and was rolled back with it).
+        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "c9e6a2b40036"
         assert connection.execute(text("SELECT count(*) FROM prod_order")).scalar_one() == 1
 
 

@@ -398,8 +398,21 @@ type SupplierBasics = {
   open_purchases: number;
 };
 
+/** What a supplier has been rated, as averages of 1 to 5 over `count` rated orders. */
+export type SupplierRatings = { quality: number; timing: number; dealing: number; count: number };
+
+/** One order's rating of one supplier. */
+export type OrderRating = { quality: number; timing: number; dealing: number; note: string | null; updated_at: string | null };
+
+/** Not money: anybody with `production.view` is sent these two. */
+export type SupplierRecord = {
+  ratings: SupplierRatings | null;
+  /** Whole days; the median of the last ten known figures. `null` until one is known. */
+  usual_lateness_days: number | null;
+};
+
 /** One line of the supplier list. */
-export type SupplierRow = SupplierBasics & {
+export type SupplierRow = SupplierBasics & SupplierRecord & {
   /** Positive: HBA owes. Negative: overpaid. Owner only. */
   owed_piastres?: number;
   held_piastres?: number;
@@ -469,13 +482,19 @@ export type SupplierOrder = {
   style_name: string;
   colour: string;
   status: OrderStatus;
-  role: "factory" | "print";
+  role: "factory" | "print" | "materials";
   /** `null` unless the order is open. */
   stage: { key: StageKey; label: string; position: number } | null;
+  /** This supplier's own lateness on the order, in days; `null` when it is not known. */
+  lateness_days: number | null;
+  /** Per cent, one decimal. Only for the factory of a closed order. */
+  reject_rate?: number | null;
+  closed_on: string | null;
+  rating: OrderRating | null;
 };
 
 /** `GET /suppliers/{id}`, and what every write on a supplier answers with. */
-export type SupplierView = SupplierBasics & {
+export type SupplierView = SupplierBasics & SupplierRecord & {
   purchases: PurchaseView[];
   orders: SupplierOrder[];
   // Owner only.
@@ -494,3 +513,20 @@ export type SupplierView = SupplierBasics & {
 export type SupplierAnswer = { supplier: SupplierView; purchase_id?: number; entry_id?: number; notice?: string };
 
 export type SectionsAnswer = { sections: Section[]; section_id?: number; deleted?: number };
+
+// ── Ratings (batch 6a) ───────────────────────────────────────────────────────
+
+export type RatingRole = "factory" | "print" | "materials";
+
+/** One supplier who worked on a closed order, with what is known of its lateness and its rating. */
+export type RatingTarget = {
+  supplier: { id: string; name: string | null };
+  role: RatingRole;
+  lateness_days: number | null;
+  /** 1 to 5, from the lateness; `null` when there is none to go by. */
+  suggested_timing: number | null;
+  rating: OrderRating | null;
+};
+
+/** `GET /api/prod/orders/{id}/ratings`: `ratable` is true only for a closed order. */
+export type OrderRatings = { ratable: boolean; suppliers: RatingTarget[] };

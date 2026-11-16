@@ -57,34 +57,35 @@ afterEach(() => {
 });
 
 describe("A supplier's page, for the owner", () => {
-  it("shows the three figures, the account, the purchases, the orders and the details", async () => {
+  it("shows the four figures, the account, the purchases, the orders and the details", async () => {
     serve(makeSupplierPage(), true);
     renderAt(ADDRESS, owner());
     expect(await screen.findByRole("heading", { level: 1, name: "Main factory" })).toBeTruthy();
     expect(screen.getByText("Manufacturers · 1 order open · 2 purchases not received")).toBeTruthy();
     expect(screen.getByRole("link", { name: "← All suppliers" }).getAttribute("href")).toBe("/production/next/suppliers");
 
-    // Three figures: what is owed, what is held, what was paid this year. Not the batch-6 lateness.
+    // Four figures: what is owed, what is held, what was paid this year, and how late the supplier usually is.
     const facts = document.querySelector(".prod-facts")!;
     expect(within(facts as HTMLElement).getAllByRole("term").map((term) => term.textContent)).toEqual([
       "You owe now",
       "Held until pieces are fixed",
       "Paid in 2030",
+      "Usual lateness",
     ]);
     expect(facts.textContent).toContain("EGP 13,399.00");
     expect(facts.textContent).toContain("EGP 3,450.00");
     expect(facts.textContent).toContain("EGP 30,000.00");
-    expect(screen.queryByText(/Usual lateness/)).toBeNull();
+    expect(facts.textContent).toContain("5 days");
     expect(screen.getByRole("button", { name: "Record a payment" })).toBeTruthy();
 
     // Orders and details.
-    const orders = cardOf("Orders");
+    const orders = cardOf("Orders and ratings");
     expect(within(orders).getAllByRole("link", { name: "Oversized hoodie · Black" }).map((link) => link.getAttribute("href"))).toEqual([
       "/production/next/orders/2",
       "/production/next/orders/1",
     ]);
     expect(orders.textContent).toContain("PO-2611-02 · Factory · 9 of 10 · Warehouse receipt");
-    expect(orders.textContent).toContain("PO-2611-01 · Factory · Settled and closed");
+    expect(orders.textContent).toContain("PO-2611-01 · Factory · closed 11 Nov");
     const details = cardOf("Details");
     expect(details.textContent).toContain("Karim");
     expect(within(details).getByRole("link", { name: "0100 111 2222" }).getAttribute("href")).toBe("tel:01001112222");
@@ -207,7 +208,9 @@ describe("A supplier's page, for somebody without the owner permission", () => {
     await screen.findByRole("heading", { level: 1, name: "Main factory" });
 
     expect(document.body.textContent).not.toMatch(/EGP|You owe|Overpaid|Nothing owed|Held until|Paid in|owe/);
-    expect(document.querySelector(".prod-facts")).toBeNull();
+    // The one figure that is not money: how late the supplier usually is.
+    const facts = document.querySelector(".prod-facts")!;
+    expect(within(facts as HTMLElement).getAllByRole("term").map((term) => term.textContent)).toEqual(["Usual lateness"]);
     expect(screen.queryByRole("heading", { name: "Account" })).toBeNull();
     for (const name of [/^Record a payment/, /^Record a purchase/, /^Void/, /^Reverse/, /Balance brought forward/, /Add a correction/, /receipt/i]) {
       expect(screen.queryByRole("button", { name })).toBeNull();
