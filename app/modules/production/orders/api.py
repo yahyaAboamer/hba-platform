@@ -16,6 +16,10 @@ Incoming (``/incoming``): what is still to arrive at Khazenly and every delivery
 with its two counts, read from the orders for anybody who reads Production.
 No money, for anybody.
 
+Overview (``/overview``): the first tab, read from what the other four screens
+already work out. Read only. Without ``production.owner`` it has no ``owed``,
+no cost problem and no key ending ``_piastres``.
+
 Refusals follow Operations: ``Refused`` -> 422, ``Locked`` -> 409, an
 unknown order, stage, delivery or file (``NotFound``, and only that) -> 404.
 A refusal rolls back whatever was staged; success commits.
@@ -36,7 +40,7 @@ from app.db import get_session
 from app.modules.inbox.public import StorageError, file_bucket
 from app.modules.production.api import _too_large
 from app.modules.production.orders.guards import EDIT, GUARD, OWNER, SUPPLIERS  # noqa: F401
-from app.modules.production.orders.services import files, incoming, orders, ratings, tasks
+from app.modules.production.orders.services import files, incoming, orders, overview, ratings, tasks
 from app.shared.api.deps import holds
 from app.shared.models.identity import UserAccount
 
@@ -448,6 +452,13 @@ def incoming_list(db: Session = Depends(get_session)) -> dict:
     first), the deliveries with their counts and state, and the four figures at
     the top. Read only; no money, for anybody."""
     return incoming.listing(db)
+
+
+@router.get("/overview")
+def overview_page(actor: UserAccount = Depends(GUARD), db: Session = Depends(get_session)) -> dict:
+    """What waits for the owner, what is wrong now, every open order and its next
+    action, the nearest arrivals and (owner only) what is owed. Read only."""
+    return overview.overview(db, with_money=_money(db, actor))
 
 
 @router.post("/tasks", status_code=201)

@@ -313,7 +313,7 @@ describe("Record a payment", () => {
     expect(document.querySelector(".prod-facts")!.textContent).toContain("EGP 12,399.00");
     expect(screen.queryByRole("heading", { name: "Record a payment to Main factory" })).toBeNull();
     // Focus is back on the button that opened the panel.
-    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Record a payment" }));
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "Record a payment" })));
   });
 
   it("does not call a saved payment failed when only its receipt could not be added", async () => {

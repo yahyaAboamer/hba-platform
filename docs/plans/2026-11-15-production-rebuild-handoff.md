@@ -23,8 +23,8 @@ piece of work.
 | 1 | Orders | Merged (PR #175), live on staging |
 | 2 | Tasks | Merged (PR #176), live on staging |
 | 3 | Incoming | Merged (PR #177), live on staging |
-| 4 | Suppliers | Pull request open from `claude/production-suppliers`; **not merged** |
-| 5 | Overview | Not started |
+| 4 | Suppliers | Merged (PR #178), on staging |
+| 5 | Overview | Pull request open from `claude/production-overview`; **not merged** |
 | 6 | Ratings and the performance record, then the factory's own login | Not started |
 | Final | Carry the old orders over, retire the framed tab | Not started |
 
@@ -44,7 +44,7 @@ deployed without the owner saying so, each time.
   `tests/test_production_api.py`) is untouched and keeps working until the
   final batch.
 - Migrations so far: `f6b3d8e10033` (orders), `a7c4e9f20034` (tasks),
-  `b8d5f1a30035` (suppliers; in the open pull request). The next id ends
+  `b8d5f1a30035` (suppliers). The Overview adds none. The next id ends
   `0036`. Each joins the list for the migration and rollback rehearsal.
 - Permissions: `production.view` reads without money; `production.edit` is
   the QC manager's writes; `production.suppliers` manages suppliers and
@@ -97,7 +97,7 @@ deployed without the owner saying so, each time.
   italic sentence): cancelling an order after cutting writes what the factory
   has earned onto its account; voiding a purchase asks whether its deposit
   was returned.
-- **Merge the Suppliers pull request** to staging.
+- **Merge the Overview pull request** to staging.
 - The typical days per stage are still the starting values; the owner edits
   them on the Stage days screen.
 
@@ -117,6 +117,12 @@ reads the other four. Decisions waiting for the owner, problems (late
 orders, late materials, count mismatches, cost over target), every order
 with its next action, the nearest deliveries, what is owed. The QC manager
 sees it without the money card and the cost line. No migration.
+
+**Owner's answers for batch 6 (15 November 2026):** the factory's own cut
+counts wait for the QC manager to confirm them before they count; the factory
+enters cut counts and dates only (moving its delivery date with a reason),
+nothing else; the rating form is offered when an order is settled and can be
+skipped and done later; the factory never sees ratings or its record.
 
 **Batch 6**: a rating per supplier per order when it is settled (quality,
 timing, dealing with them, 1 to 5 stars, a note; timing offered from the real

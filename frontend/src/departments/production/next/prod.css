@@ -264,12 +264,23 @@
 .prod-star:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
 .prod-rates__end { margin-top: 4px; }
 
+/* ── Overview (batch 5) ── */
+.prod-halves { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; margin-bottom: 16px; }
+.prod-halves--after { margin: 16px 0 0; }
+.prod-halves--one { grid-template-columns: minmax(0, 1fr); }
+.prod-halves .prod-block h2 { margin: 0 0 8px; }
+.prod-halves .empty { margin: 0; }
+.prod-task.prod-task--plain { padding-left: 0; padding-right: 0; }
+
 /* ── Phone: one column; touch targets of 44px. ── */
 @media (max-width: 860px) {
   .prod-screen { padding: 16px 16px 56px; }
   .prod-cols { grid-template-columns: minmax(0, 1fr); }
   .prod-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .prod-facts--one { grid-template-columns: minmax(0, 1fr); }
+
+  .prod-facts--three { grid-template-columns: minmax(0, 1fr); }
+  .prod-halves { grid-template-columns: minmax(0, 1fr); }
   .prod-details div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
   .prod-sectionbar--form .input { width: 100%; }
   .prod-form { grid-template-columns: minmax(0, 1fr); max-width: none; }
