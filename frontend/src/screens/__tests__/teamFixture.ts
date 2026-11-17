@@ -28,7 +28,7 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
   customer_service: ["inbox.use", "khazenly.use"],
   production_viewer: ["production.view"],
   production_staff: ["production.view", "production.edit"],
-  production_manager: ["production.view", "production.edit", "production.suppliers"],
+  production_manager: ["production.view", "production.edit", "production.suppliers", "production.owner"],
 };
 
 export const ROLE_WORDS: Record<string, string> = {

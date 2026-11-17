@@ -998,7 +998,7 @@ def test_the_list_rows_carry_what_the_list_shows(owner):
     assert rows[1]["steps"][1] == "skipped" and rows[1]["received_total"] is None
 
 
-@pytest.mark.parametrize("role", ["production_viewer", "production_staff", "production_manager"])
+@pytest.mark.parametrize("role", ["production_viewer", "production_staff"])
 def test_nobody_without_the_owner_permission_gets_a_money_key_anywhere(owner, role, bucket):
     """Every read, for every Production role short of the owner's, with money
     on the orders: an open one, a settled one and a cancelled one. Not a key
@@ -1395,3 +1395,15 @@ def test_a_near_target_date_never_makes_stages_expected_before_today(owner):
     expected = [stage["expected_date"] for stage in order["stages"] if stage["expected_date"]]
     assert expected and min(expected) >= TODAY.isoformat()
     assert _stage(order, "warehouse")["expected_date"] == _day(5)
+
+
+def test_the_production_manager_creates_settles_and_sees_the_money(owner):
+    """ADR 0086: everything in Production is the production manager's too."""
+    manager = _person("pm@example.com", "production_manager", name="Production Manager")
+    created = manager.post("/api/prod/orders", json=_body())
+    assert created.status_code == 201, created.text
+    order = created.json()["order"]
+    assert "cost" in order
+    _to_cutting(manager, order["id"])
+    seen = manager.get(f"/api/prod/orders/{order['id']}").json()["order"]
+    assert "settlement" in seen

@@ -475,12 +475,12 @@ def test_the_owner_gets_the_money(owner, staff):
     assert _money_keys(payload)  # and the owner's money does show
 
 
-@pytest.mark.parametrize("role", ["production_viewer", "production_staff", "production_manager"])
+@pytest.mark.parametrize("role", ["production_viewer", "production_staff"])
 def test_nobody_short_of_the_owner_gets_money_anywhere(owner, staff, role):
     """Walk the whole response, at any depth: no key ending `_piastres`, no string
     that says EGP, no `owed`, no cost problem. Absent, not null."""
     _everything_wrong(owner, staff)
-    person = _person(f"{role}@example.com", role)  # the manager adds suppliers but holds no money either
+    person = _person(f"{role}@example.com", role)
     payload = _overview(person)
     assert _money_keys(payload) == []
     assert "owed" not in payload and "owed_piastres" not in payload["figures"]
@@ -493,3 +493,11 @@ def test_the_qc_manager_sees_three_figures(owner, staff):
     figures = _overview(staff)["figures"]
     assert set(figures) == {"decisions", "late_orders", "open_orders", "arriving_this_month"}
     assert set(_overview(owner)["figures"]) == set(figures) | {"owed_piastres"}
+
+
+def test_the_production_manager_gets_the_money(owner, staff):
+    """ADR 0086: the production manager sees what the owner sees."""
+    _everything_wrong(owner, staff)
+    payload = _overview(_person("pm@example.com", "production_manager"))
+    assert "owed" in payload and "owed_piastres" in payload["figures"]
+    assert any(problem["kind"] == "cost_over" for problem in payload["problems"])

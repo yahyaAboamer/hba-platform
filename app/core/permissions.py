@@ -67,7 +67,8 @@ class Permission:
     #: order, approving a sample, settling, writing off fix pieces, reopening
     #: a stage, the typical days per stage - **and seeing money**. Without
     #: it a production order carries no cost, rate or settlement at all.
-    #: Held by no role but admin.
+    #: Held by admin and the production manager (ADR 0086); never by
+    #: production staff, the QC manager's level.
     PRODUCTION_OWNER = "production.owner"
 
 
@@ -146,8 +147,9 @@ ROLES: dict[str, frozenset[str]] = {
     # Khazenly section alone (ADR 0072): confirming orders is their job.
     "customer_service": frozenset({Permission.INBOX_USE, Permission.KHAZENLY_USE}),
     # Production's levels (ADR 0076, decision 5, as amended by ADR 0077).
-    # Staff run the work; QC is not a level of its own. The manager adds
-    # suppliers. Money is the owner's alone (`production.owner`). The old
+    # Staff run the work (the QC manager); QC is not a level of its own. The
+    # manager holds everything in Production, money included (ADR 0086):
+    # creating orders, samples, settling, purchases, payments, ratings. The old
     # framed app's `production.qc` and `production.payments` went with it
     # (ADR 0085).
     "production_viewer": frozenset({Permission.PRODUCTION_VIEW}),
@@ -157,6 +159,7 @@ ROLES: dict[str, frozenset[str]] = {
             Permission.PRODUCTION_VIEW,
             Permission.PRODUCTION_EDIT,
             Permission.PRODUCTION_SUPPLIERS,
+            Permission.PRODUCTION_OWNER,
         }
     ),
     # Affiliates reach their own portal by owning the record, not by holding a
